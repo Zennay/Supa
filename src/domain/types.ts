@@ -3,6 +3,25 @@ export type Store = {
   name: string
 }
 
+export type PriceSource =
+  | 'mock'
+  | 'supermarket-api'
+  | 'scraper'
+  | 'manual'
+
+export type Product = {
+  id: string
+  name: string
+}
+
+export type PriceObservation = {
+  productId: string
+  storeId: string
+  price: number
+  source: PriceSource
+  observedAt: string
+}
+
 export type Recipe = {
   id: string
   title: string
@@ -22,7 +41,7 @@ export type BasketLine = {
   label: string
   quantity: string
   price: number
-  source: string
+  source: PriceSource
   observedAt: string
 }
 
