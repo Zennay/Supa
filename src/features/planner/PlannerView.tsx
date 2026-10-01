@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { plan, recipes } from '../../data/mock'
 import { getBudgetState, getPlannedCost } from '../../domain/planner'
 import { euro } from '../../lib/money'
+import './planner.css'
 
 const budgetOptions = [30, 35, 40]
 
