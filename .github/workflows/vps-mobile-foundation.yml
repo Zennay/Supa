@@ -10,10 +10,14 @@ on:
 
 jobs:
   test-build:
-    runs-on: [self-hosted, zcloud, vps]
+    runs-on: self-hosted
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Verify permanent VPS runner
+        run: |
+          test "$(hostname -s)" = "vps-bb300bba"
+          echo "runner=$(hostname -s)"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
