@@ -35,6 +35,18 @@ test('planner preferences keep valid persisted choices and discard unknown days'
   })
 })
 
+test('planner preferences recover when every persisted day is stale', () => {
+  const state = parsePlannerPreferences(
+    JSON.stringify({ budget: 40, activeDays: ['Vr', 'Za'] }),
+    days,
+  )
+
+  assert.deepEqual(state, {
+    budget: 40,
+    activeDays: days,
+  })
+})
+
 test('planner preferences preserve an intentionally empty plan', () => {
   const state = parsePlannerPreferences(
     JSON.stringify({ budget: 30, activeDays: [] }),
