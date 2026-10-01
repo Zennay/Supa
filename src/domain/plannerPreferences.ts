@@ -38,7 +38,7 @@ export function parsePlannerPreferences(
         ? candidate.budget
         : fallbackBudget
 
-    const activeDays = Array.isArray(candidate.activeDays)
+    const persistedActiveDays = Array.isArray(candidate.activeDays)
       ? Array.from(
           new Set(
             candidate.activeDays.filter(
@@ -47,7 +47,14 @@ export function parsePlannerPreferences(
             ),
           ),
         )
-      : [...fallbackActiveDays]
+      : null
+
+    const activeDays =
+      persistedActiveDays === null
+        ? [...fallbackActiveDays]
+        : candidate.activeDays.length > 0 && persistedActiveDays.length === 0
+          ? [...fallbackActiveDays]
+          : persistedActiveDays
 
     return { budget, activeDays }
   } catch {
