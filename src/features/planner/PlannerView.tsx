@@ -1,31 +1,65 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { plan, recipes } from '../../data/mock'
 import { getBudgetState, getPlannedCost } from '../../domain/planner'
+import {
+  parsePlannerPreferences,
+  serializePlannerPreferences,
+} from '../../domain/plannerPreferences'
 import { euro } from '../../lib/money'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
+const plannerStorageKey = 'supa:planner-preferences:v1'
+const defaultActiveDays = plan.map((item) => item.day)
 
 export function PlannerView() {
-  const [budget, setBudget] = useState(35)
-  const [activeDays, setActiveDays] = useState(() => plan.map((item) => item.day))
+  const [preferences, setPreferences] = useState(() => {
+    if (typeof window === 'undefined') {
+      return parsePlannerPreferences(null, defaultActiveDays)
+    }
+
+    try {
+      return parsePlannerPreferences(
+        window.localStorage.getItem(plannerStorageKey),
+        defaultActiveDays,
+      )
+    } catch {
+      return parsePlannerPreferences(null, defaultActiveDays)
+    }
+  })
+
+  const { budget, activeDays } = preferences
   const plannedCost = useMemo(
     () => getPlannedCost(plan, recipes, activeDays),
     [activeDays],
   )
   const budgetState = getBudgetState(plannedCost, budget)
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        plannerStorageKey,
+        serializePlannerPreferences(preferences),
+      )
+    } catch {
+      // Storage can be unavailable in strict privacy modes; planner remains usable.
+    }
+  }, [preferences])
+
   const toggleDay = (day: string) => {
-    setActiveDays((current) =>
-      current.includes(day)
-        ? current.filter((candidate) => candidate !== day)
-        : [...current, day],
-    )
+    setPreferences((current) => ({
+      ...current,
+      activeDays: current.activeDays.includes(day)
+        ? current.activeDays.filter((candidate) => candidate !== day)
+        : [...current.activeDays, day],
+    }))
   }
 
   const resetWeek = () => {
-    setActiveDays(plan.map((item) => item.day))
-    setBudget(35)
+    setPreferences({
+      budget: 35,
+      activeDays: [...defaultActiveDays],
+    })
   }
 
   return (
@@ -57,7 +91,9 @@ export function PlannerView() {
               key={option}
               className={budget === option ? 'budget-chip active' : 'budget-chip'}
               aria-pressed={budget === option}
-              onClick={() => setBudget(option)}
+              onClick={() =>
+                setPreferences((current) => ({ ...current, budget: option }))
+              }
             >
               {euro.format(option)}
             </button>
