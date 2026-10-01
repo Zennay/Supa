@@ -1,0 +1,27 @@
+name: VPS mobile foundation
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "package.json"
+      - ".github/workflows/vps-mobile-foundation.yml"
+
+jobs:
+  test-build:
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify permanent VPS runner
+        run: |
+          test "$(hostname -s)" = "vps-bb300bba"
+          echo "runner=$(hostname -s)"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
