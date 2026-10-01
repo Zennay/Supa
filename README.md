@@ -18,6 +18,7 @@ The UI in this repository is a **foundation/prototype shell**, not proof that li
 - CSS design tokens, no heavy UI framework
 - Feature-first frontend structure
 - Mock repository boundary ready to be replaced by API/data adapters
+- Local planner preference persistence with defensive fallback when browser storage is unavailable or invalid
 
 ## Run locally
 
@@ -26,9 +27,10 @@ npm install
 npm run dev
 ```
 
-Build:
+Automated checks:
 
 ```bash
+npm test
 npm run build
 ```
 
