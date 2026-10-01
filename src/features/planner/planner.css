@@ -1,0 +1,139 @@
+.budget-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.budget-heading,
+.budget-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.budget-heading strong {
+  display: block;
+  font-size: 36px;
+  line-height: 1;
+  letter-spacing: -.05em;
+}
+
+.budget-status {
+  border-radius: 999px;
+  background: #eef8dd;
+  color: var(--accent-ink);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.budget-status.warning {
+  background: #fff0e5;
+  color: #8b4b22;
+}
+
+.budget-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.budget-chip {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 10px 8px;
+  font-weight: 800;
+}
+
+.budget-chip.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: white;
+}
+
+.budget-progress {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ecebe6;
+}
+
+.budget-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 180ms ease;
+}
+
+.budget-summary {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.budget-summary strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.meal-toggle {
+  width: 100%;
+  grid-template-columns: 42px 1fr 32px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.meal-toggle.active {
+  border-color: #c8dca7;
+  box-shadow: inset 0 0 0 1px #dbe8c6;
+}
+
+.meal-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.meal-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+
+.meal-copy small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.plan-check {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-weight: 900;
+}
+
+.meal-toggle.active .plan-check {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+@media (max-width: 360px) {
+  .budget-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
