@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
 
 const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
+const ALLOWED_PRICE_CONTEXTS = new Set(['in-store', 'online-order'])
 const ALLOWED_SOURCES = new Set(['manual-cart', 'receipt', 'consented-export'])
 
 function assert(condition, message) {
@@ -122,6 +123,10 @@ export function validateObservedWeekInput(study) {
   requireString(study.population, 'population')
   requireString(study.region, 'region')
   requireString(study.weekStart, 'weekStart')
+  assert(
+    ALLOWED_PRICE_CONTEXTS.has(study.priceContext),
+    'priceContext must be in-store or online-order',
+  )
   validateEvidence(study.baseline, 'baseline')
   validateEvidence(study.candidate, 'candidate')
   if (study.attributionEvidence !== undefined) {
@@ -157,6 +162,7 @@ export function buildObservedWeekReport(study) {
     population: study.population,
     region: study.region,
     weekStart: study.weekStart,
+    priceContext: study.priceContext,
     baseline: storeSummary(study.baseline),
     candidate: storeSummary(study.candidate),
     claimable: assessment.claimable,
