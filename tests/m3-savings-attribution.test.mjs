@@ -89,7 +89,7 @@ test('M3 attribution preserves an explicit unknown remainder instead of inventin
   assert.match(result.reasons.join(' '), /remain unattributed/)
 })
 
-test('M3 attribution can represent a planning effect only when explicit evidence is supplied', () => {
+test('M3 attribution rejects a non-zero planning effect inside a same-demand store comparison', () => {
   const result = attributeSavingsEffects({
     comparison: comparison({
       baselineTotalCents: 1000,
@@ -116,9 +116,14 @@ test('M3 attribution can represent a planning effect only when explicit evidence
     ],
   })
 
-  assert.equal(result.status, 'complete')
-  assert.equal(result.effectTotals.planningCents, -50)
-  assert.equal(result.effectTotals.unknownCents, 0)
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.planningCents, 0)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(
+    result.reasons.join(' '),
+    /planning attribution must be zero for same-demand basket comparisons/,
+  )
 })
 
 test('M3 attribution fails closed when evidence over-attributes a line', () => {
