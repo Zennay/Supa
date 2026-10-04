@@ -113,3 +113,145 @@ test('offer original price stays integer cents', () => {
     /Original price/,
   )
 })
+
+test('runtime gate rejects unsupported supermarket and source kind values', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        supermarket: 'jumbo',
+      }),
+    /unknown supermarket/,
+  )
+
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        provenance: {
+          ...baseObservation.provenance,
+          kind: 'search',
+        },
+      }),
+    /unknown source kind/,
+  )
+})
+
+test('runtime gate rejects non-EUR currency and unknown availability', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        currency: 'USD',
+      }),
+    /currency must be EUR/,
+  )
+
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        availability: 'in-stock',
+      }),
+    /unknown availability state/,
+  )
+})
+
+test('pack contract rejects malformed amount, unit and raw text', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        pack: {
+          ...baseObservation.pack,
+          amount: 0,
+        },
+      }),
+    /positive finite number/,
+  )
+
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        pack: {
+          ...baseObservation.pack,
+          unit: 'oz',
+        },
+      }),
+    /supported unit/,
+  )
+
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        pack: {
+          ...baseObservation.pack,
+          rawText: '   ',
+        },
+      }),
+    /non-empty string/,
+  )
+})
+
+test('offer contract validates identity, mechanics and validity window', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        offer: {
+          label: '',
+          mechanics: null,
+          offerPriceCents: 99,
+          originalPriceCents: 129,
+          validFrom: null,
+          validTo: null,
+        },
+      }),
+    /Offer label/,
+  )
+
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        offer: {
+          label: 'Bonus',
+          mechanics: '   ',
+          offerPriceCents: 99,
+          originalPriceCents: 129,
+          validFrom: null,
+          validTo: null,
+        },
+      }),
+    /Offer mechanics/,
+  )
+
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        offer: {
+          label: 'Bonus',
+          mechanics: '25% korting',
+          offerPriceCents: 99,
+          originalPriceCents: 129,
+          validFrom: '2026-10-10',
+          validTo: '2026-10-04',
+        },
+      }),
+    /cannot end before it starts/,
+  )
+})
+
+test('source product id must be null or a non-empty string', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        sourceProductId: '',
+      }),
+    /sourceProductId/,
+  )
+})
