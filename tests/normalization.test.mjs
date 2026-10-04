@@ -78,3 +78,20 @@ test('normalizes common supermarket offer mechanics without guessing unknown lab
     rawLabel: 'ACTIE',
   })
 })
+
+test('invalid offer mechanics fail closed instead of entering savings math', () => {
+  for (const label of [
+    '0+1 gratis',
+    '1+0 gratis',
+    '0 voor 5.00',
+    '2 voor 0.00',
+    '0% korting',
+    '150% korting',
+    'voor 0.00',
+  ]) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'unknown',
+      rawLabel: label,
+    })
+  }
+})
