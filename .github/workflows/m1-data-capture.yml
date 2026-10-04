@@ -1,0 +1,56 @@
+name: M1 supermarket source capture
+
+on:
+  pull_request:
+    paths:
+      - "scripts/m1-capture-sources.mjs"
+      - "tests/m1-capture-sources.test.mjs"
+      - ".github/workflows/m1-data-capture.yml"
+      - "docs/M1_DATA_FEASIBILITY.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: [self-hosted, zcloud, vps]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify permanent VPS runner
+        run: |
+          test "$(hostname -s)" = "vps-bb300bba"
+          echo "runner=$(hostname -s)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify bounded source contract
+        run: npm test
+
+      - name: Capture representative public pages
+        id: capture
+        continue-on-error: true
+        run: node scripts/m1-capture-sources.mjs
+
+      - name: Upload capture evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supa-m1-source-captures
+          path: artifacts/m1-captures/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail visibly when any source is unavailable
+        if: steps.capture.outcome != 'success'
+        run: |
+          echo "One or more bounded source captures failed. Inspect the uploaded manifest/artifact."
+          exit 1
