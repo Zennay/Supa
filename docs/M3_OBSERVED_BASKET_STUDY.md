@@ -62,3 +62,12 @@ This preflight is intentionally not a substitute for provenance review: it prove
 The report intentionally omits the pseudonymous participant key and includes only study/store provenance, totals, outcome, uncertainty and the evidence boundary. A `worse` or `unknown` study still produces a valid report; only malformed input is an execution error.
 
 Do not commit receipt images, names, emails, account IDs or other direct identifiers. The CLI does not turn a single observed week into a public savings claim: every generated report keeps `publicSavingsClaimEligible: false`.
+
+
+## Savings-effect attribution in the report
+
+Observed study JSON may include an optional `attributionEvidence` array. Each item must reference a comparison line, use one of `pack-size`, `offer` or `planning`, provide an integer-cent delta and retain a non-empty evidence reference.
+
+The assessment never infers a cause from price movement alone. Missing attribution evidence stays in `unknownCents`; malformed attribution items make attribution status `unknown` without fabricating a causal explanation. Planning attribution remains zero inside a same-demand store comparison.
+
+The privacy-safe report emits only aggregate effect totals plus attribution status/reasons. Evidence references are validation inputs and are deliberately not copied into the report.
