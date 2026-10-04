@@ -23,7 +23,7 @@ test('M1 capture source set is bounded to two supermarkets and three page kinds'
   assert.equal(validateSources(), true)
 })
 
-test('M1 capture rejects URLs outside the explicit allowlist', () => {
+test('M1 capture rejects unknown supermarkets', () => {
   assert.throws(
     () =>
       validateSources([
@@ -34,6 +34,51 @@ test('M1 capture rejects URLs outside the explicit allowlist', () => {
           url: 'https://example.com/product',
         },
       ]),
-    /outside allowlist/,
+    /Unsupported supermarket/,
+  )
+})
+
+test('M1 capture rejects a URL whose host does not match its supermarket', () => {
+  assert.throws(
+    () =>
+      validateSources([
+        {
+          id: 'mislabeled-source',
+          supermarket: 'ah',
+          kind: 'product',
+          url: 'https://www.plus.nl/producten',
+        },
+      ]),
+    /does not match supermarket allowlist/,
+  )
+})
+
+test('M1 capture rejects non-HTTPS supermarket URLs', () => {
+  assert.throws(
+    () =>
+      validateSources([
+        {
+          id: 'insecure-source',
+          supermarket: 'plus',
+          kind: 'offers',
+          url: 'http://www.plus.nl/aanbiedingen',
+        },
+      ]),
+    /does not match supermarket allowlist/,
+  )
+})
+
+test('M1 capture rejects unsupported source kinds', () => {
+  assert.throws(
+    () =>
+      validateSources([
+        {
+          id: 'wrong-kind',
+          supermarket: 'ah',
+          kind: 'search',
+          url: 'https://www.ah.nl/producten',
+        },
+      ]),
+    /Unsupported source kind/,
   )
 })
