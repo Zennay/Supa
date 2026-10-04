@@ -142,6 +142,32 @@ test('requires explicit reviewer identity and review timestamp', async () => {
   )
 })
 
+test('rejects promotion when review predates the captured candidate', async () => {
+  const { root, source } = await setupCandidate()
+  const review = await writeReview(
+    root,
+    approvalFor(source, { reviewedAt: '2026-10-04T01:59:59.999Z' }),
+  )
+
+  await assert.rejects(
+    () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
+    /review cannot predate its capture/,
+  )
+})
+
+test('rejects promotion with an implausibly future-dated review', async () => {
+  const { root, source } = await setupCandidate()
+  const review = await writeReview(
+    root,
+    approvalFor(source, { reviewedAt: '2999-01-01T00:00:00.000Z' }),
+  )
+
+  await assert.rejects(
+    () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
+    /implausibly in the future/,
+  )
+})
+
 test('refuses to overwrite a reviewed fixture with different provenance', async () => {
   const { root, source } = await setupCandidate()
   const review = await writeReview(root, approvalFor(source))
