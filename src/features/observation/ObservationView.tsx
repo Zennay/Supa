@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   buildObservationSheet,
   OBSERVATION_DRAFT_STORAGE_KEY,
+  observationLineCollectionComplete,
   observationSheetProgress,
   observationSheetReadiness,
   observationStoreProgress,
@@ -503,7 +504,9 @@ export function ObservationView() {
                       </div>
                       <span className="line-state">
                         {product.available === true
-                          ? 'gevonden'
+                          ? observationLineCollectionComplete(line)
+                            ? 'compleet'
+                            : 'details aanvullen'
                           : product.available === false
                             ? 'niet beschikbaar'
                             : 'nog meten'}
