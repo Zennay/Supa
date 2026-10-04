@@ -4,7 +4,7 @@
 
 Produce reproducible evidence from real public supermarket pages before any source-specific parser selectors are trusted.
 
-This is a feasibility spike, not a production crawler. It intentionally captures a tiny fixed source set for the two M1 supermarkets selected in the project handoff: Albert Heijn and PLUS.
+This is a feasibility spike, not a production crawler. The original M1 pair was Albert Heijn + PLUS. Exact live evidence on 2026-10-04 proved Albert Heijn inaccessible from the permitted VPS route (3/3 HTTP 403), so M1 now uses PLUS + DekaMarkt as the technical feasibility pair. This substitution is **not** production/legal reuse approval.
 
 ## Fixed source set
 
@@ -270,3 +270,25 @@ A second bounded browser-rendered run targeted only the already-accessible publi
 The rendered DOM exposes one standard Schema.org Product node with observed SKU `579010`, name `Zuivelmeester Halfvolle melk`, weight `1000 ml`, `InStock` availability and a `UnitPriceSpecification` of EUR 0.85. This is the first real-source PLUS regression evidence. The parser now supports exactly the observed nested `priceSpecification` price/currency shape and the observed `weight.value` pack shape; it does not introduce guessed CSS selectors.
 
 The sanitized fixture `fixtures/m1/plus-rendered-product-halfvolle-melk.v1.json` stores only the observed structured Product JSON-LD plus exact browser evidence identity. Raw rendered HTML and screenshots remain in the short-retention workflow artifact.
+
+## 2026-10-04 second-source substitution: DekaMarkt
+
+Albert Heijn is no longer the technical second source for M1 because exact bounded VPS evidence returned HTTP 403 `Access Denied` for product, catalog and offers. SUPA does not bypass that restriction.
+
+A bounded DekaMarkt fallback probe was run on `vps-bb300bba` against exactly three public pages:
+- zCloud run `37223714917`;
+- artifact `11310519403`;
+- artifact digest `sha256:4e49756d10bc5bfd27c64fb1653601a11f3793b6e71980cdb9dede866fe415b3`;
+- pinned Supa head `5120038fa121e35fd13e30284800b87d007a3a45`;
+- no login, credentials, private API calls, anti-bot bypass or recursive crawling.
+
+All three DekaMarkt pages returned HTTP 200:
+- product SHA-256 `33af1a3f0117c22401309507627d04fc8e8b1044a88180c6230c7cdee8e8c670`;
+- milk category SHA-256 `6666d3ed68bee4306bae95be7a7acf3e5867649cc79a5e6e2c80e7eb08c60a1d`;
+- offers SHA-256 `0240e5ba658748bcc553d3cee1728c140b68473fc3f72dade699783d73c9f2a0`.
+
+The product response is server-rendered and contains both structured Nuxt SSR state and Product JSON-LD. The observed Nuxt state provides product ID `115873`, name `Zuivelmeester Halfvolle melk`, packaging `1 liter` and normal price `0.85`; the Product JSON-LD independently corroborates the same ID/name/price and `InStock` availability.
+
+`dekaMarktSsrProduct.ts` deliberately cross-checks both observed structures instead of introducing guessed selectors. The committed fixture stores only a minimal sanitized representation of those structured fields plus exact artifact identity; raw HTML remains in the short-retention artifact.
+
+DekaMarkt is therefore the **technical M1 fallback source** alongside PLUS. Production ingestion/reuse still requires a separate explicit terms/permission review before dependency lock-in.
