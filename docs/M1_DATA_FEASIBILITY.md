@@ -128,7 +128,9 @@ and separately verifies `hostname -s == vps-bb300bba` before doing capture work.
 
 After integrity inspection, the capture workflow now runs `npm run m1:export-candidates -- <capture-directory>`.
 
-This produces a `sanitized-candidates/` bundle inside the short-retention workflow artifact. A candidate is emitted only when:
+This produces a `sanitized-candidates/` bundle inside the short-retention workflow artifact. Before any candidate file is written, product source IDs must be path-safe and unique so inspection metadata cannot escape the candidate directory or silently overwrite another candidate.
+
+A candidate is emitted only when:
 
 - the source is a successful product capture;
 - the raw HTML hash was integrity-verified against `manifest.json`;
