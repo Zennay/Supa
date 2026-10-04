@@ -53,3 +53,63 @@ test('provenance requires exact snapshot hash', () => {
     /SHA-256/,
   )
 })
+
+test('observation supermarket must match provenance supermarket', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        provenance: {
+          ...baseObservation.provenance,
+          supermarket: 'plus',
+        },
+      }),
+    /match provenance supermarket/,
+  )
+})
+
+test('provenance host must match the observation supermarket', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        provenance: {
+          ...baseObservation.provenance,
+          url: 'https://www.plus.nl/producten',
+        },
+      }),
+    /www\.ah\.nl/,
+  )
+})
+
+test('provenance requires a valid capture timestamp', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        provenance: {
+          ...baseObservation.provenance,
+          capturedAt: 'not-a-timestamp',
+        },
+      }),
+    /valid capturedAt/,
+  )
+})
+
+test('offer original price stays integer cents', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        offer: {
+          label: 'Bonus',
+          mechanics: null,
+          offerPriceCents: 99,
+          originalPriceCents: 1.29,
+          validFrom: null,
+          validTo: null,
+        },
+      }),
+    /Original price/,
+  )
+})
