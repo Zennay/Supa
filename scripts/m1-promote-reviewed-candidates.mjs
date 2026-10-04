@@ -13,6 +13,13 @@ function validIso(value) {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
 }
 
+function isSafeSourceId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  )
+}
+
 function requireReviewChronology(candidate, approval, now = Date.now()) {
   const capturedAt = Date.parse(candidate.source.capturedAt)
   const reviewedAt = Date.parse(approval.reviewedAt)
@@ -98,8 +105,8 @@ function validatedCandidateIndex(index) {
   const candidateIds = index.candidates.map((entry) => entry?.id)
   const abstentionIds = index.abstentions.map((entry) => entry?.id)
   for (const id of [...candidateIds, ...abstentionIds]) {
-    if (typeof id !== 'string' || !id.trim()) {
-      throw new Error('Sanitized candidate index contains an invalid source id')
+    if (!isSafeSourceId(id)) {
+      throw new Error('Sanitized candidate index contains an unsafe source id')
     }
   }
 
@@ -162,7 +169,19 @@ async function readCandidateWithIntegrity(captureDir, entry) {
     )
   }
 
-  return JSON.parse(serialized)
+  const candidate = JSON.parse(serialized)
+  if (!isSafeSourceId(candidate?.source?.id)) {
+    throw new Error(
+      `Sanitized candidate contains an unsafe source id: ${candidate?.source?.id ?? 'unknown'}`,
+    )
+  }
+  if (candidate.source.id !== entry.id) {
+    throw new Error(
+      `Sanitized candidate source id mismatch: expected=${entry.id} actual=${candidate.source.id}`,
+    )
+  }
+
+  return candidate
 }
 
 async function writeFixtureSafely(filePath, fixture) {

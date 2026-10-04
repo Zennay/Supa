@@ -204,3 +204,16 @@ test('candidate-index metadata and duplicate decisions are part of consistency',
   assert.equal(report.documentConsistency.consistent, false)
   assert.equal(report.adapterEvidenceReady, false)
 })
+
+test('unsafe candidate-index source ids cannot become adapter-ready', () => {
+  const data = bundle()
+  data.candidateIndex.candidates = [{ id: '../ah-product' }]
+  data.candidateIndex.candidateCount = 1
+
+  const report = buildEvidenceSummary(data)
+
+  assert.equal(report.documentConsistency.candidateIndexStructureValid, false)
+  assert.equal(report.documentConsistency.consistent, false)
+  assert.equal(report.adapterEvidenceReady, false)
+  assert.equal(report.nextAction, 'repair-evidence-bundle')
+})
