@@ -115,3 +115,23 @@ test('reviewed fixtures require explicit review identity and timestamp', () => {
     /valid reviewedAt/,
   )
 })
+
+test('reviewed fixtures reject reviews that predate the captured evidence', () => {
+  const reviewed = fixture('ah')
+  reviewed.review.reviewedAt = '2026-10-04T01:59:59.999Z'
+
+  assert.throws(
+    () => validateReviewedLiveProductFixture(reviewed, 'ah'),
+    /cannot predate its capture/,
+  )
+})
+
+test('reviewed fixtures reject implausibly future-dated review evidence', () => {
+  const reviewed = fixture('ah')
+  reviewed.review.reviewedAt = '2999-01-01T00:00:00.000Z'
+
+  assert.throws(
+    () => validateReviewedLiveProductFixture(reviewed, 'ah'),
+    /implausibly in the future/,
+  )
+})
