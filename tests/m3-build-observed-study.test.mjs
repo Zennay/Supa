@@ -42,6 +42,7 @@ function completedSheet() {
   sheet.study.population = 'independently living students'
   sheet.study.region = 'test-region'
   sheet.study.weekStart = '2026-09-28'
+  sheet.study.priceContext = 'in-store'
   fillSide(sheet, 'baseline', {
     storeId: 'store-a',
     storeName: 'Store A',
@@ -59,6 +60,7 @@ test('M3 observation sheet converts into a structurally valid claimable weekly s
   const study = buildWeeklyBasketStudyFromObservationSheet(completedSheet())
   const assessment = assessWeeklyBasketStudy(study)
 
+  assert.equal(study.priceContext, 'in-store')
   assert.equal(study.baseline.basket.matchedLineCount, 11)
   assert.equal(study.baseline.basket.unresolvedLineCount, 0)
   assert.equal(study.candidate.basket.matchedLineCount, 11)
@@ -91,6 +93,16 @@ test('M3 converter preserves a missing observed price as unresolved instead of i
 
   assert.equal(line.status, 'unresolved')
   assert.match(line.reasons.join(' '), /price is unknown/i)
+})
+
+test('M3 converter refuses a missing price context', () => {
+  const sheet = completedSheet()
+  sheet.study.priceContext = ''
+
+  assert.throws(
+    () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+    /priceContext must be in-store or online-order/,
+  )
 })
 
 test('M3 converter refuses planner-demand drift', () => {
