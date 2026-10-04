@@ -3,6 +3,8 @@ import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { parseSchemaOrgProduct } from '../src/data/schemaOrgProduct.ts'
+
 function sha256(text) {
   return createHash('sha256').update(text).digest('hex')
 }
@@ -16,35 +18,46 @@ function decodeHtmlEntities(value) {
     .replace(/&gt;/g, '>')
 }
 
+export function extractJsonLdValues(html) {
+  const values = []
+  const pattern =
+    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+
+  for (const match of html.matchAll(pattern)) {
+    const raw = match[1].trim()
+    if (!raw) continue
+    try {
+      values.push(JSON.parse(raw))
+    } catch {
+      values.push({ __supaParseError: true })
+    }
+  }
+  return values
+}
+
 export function inspectHtml(html) {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
   const title = titleMatch ? decodeHtmlEntities(titleMatch[1].trim()) : null
 
   const jsonLd = []
-  const jsonLdPattern =
-    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
-
-  for (const match of html.matchAll(jsonLdPattern)) {
-    const raw = match[1].trim()
-    if (!raw) continue
-
-    try {
-      const parsed = JSON.parse(raw)
-      const values = Array.isArray(parsed) ? parsed : [parsed]
-      for (const value of values) {
-        if (!value || typeof value !== 'object') continue
-        const type = value['@type']
-        jsonLd.push({
-          type: Array.isArray(type)
-            ? type.map(String)
-            : type == null
-              ? []
-              : [String(type)],
-          keys: Object.keys(value).sort(),
-        })
-      }
-    } catch {
+  for (const parsed of extractJsonLdValues(html)) {
+    if (parsed?.__supaParseError) {
       jsonLd.push({ type: [], keys: [], parseError: true })
+      continue
+    }
+
+    const values = Array.isArray(parsed) ? parsed : [parsed]
+    for (const value of values) {
+      if (!value || typeof value !== 'object') continue
+      const type = value['@type']
+      jsonLd.push({
+        type: Array.isArray(type)
+          ? type.map(String)
+          : type == null
+            ? []
+            : [String(type)],
+        keys: Object.keys(value).sort(),
+      })
     }
   }
 
@@ -120,6 +133,34 @@ export async function inspectCaptureDirectory(rootDir) {
 
       record.integrity = 'verified'
       record.html = inspectHtml(html)
+
+      const provenance = {
+        supermarket: result.supermarket,
+        kind: result.kind,
+        url: result.finalUrl ?? result.requestedUrl,
+        capturedAt: result.capturedAt,
+        sha256: result.sha256,
+      }
+      const schemaResults = extractJsonLdValues(html)
+        .filter((value) => !value?.__supaParseError)
+        .map((value) => parseSchemaOrgProduct(value, provenance))
+
+      const observations = schemaResults.filter(
+        (value) => value.type === 'observation',
+      )
+      record.schemaOrgProduct =
+        observations.length === 1
+          ? {
+              type: 'observation',
+              observation: observations[0].observation,
+            }
+          : {
+              type: 'abstain',
+              reasons:
+                observations.length > 1
+                  ? ['multiple independently parseable Product JSON-LD blocks']
+                  : schemaResults.map((value) => value.reason).filter(Boolean),
+            }
     }
 
     sources.push(record)
