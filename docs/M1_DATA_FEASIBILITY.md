@@ -65,7 +65,7 @@ The first benchmark is deliberately a **controlled baseline**, not evidence abou
 
 - exact/generic product naming;
 - pack-size fit and oversupply;
-- mass/volume/piece unit-family mismatches;
+- mass/volume/piece unit-family mismatches, including when the amount is unknown but the unit is known;
 - confusing near-neighbours;
 - unavailable best candidates;
 - ambiguous equal candidates;
