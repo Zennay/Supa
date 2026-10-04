@@ -3,6 +3,11 @@ import {
   compareFullBaskets,
   type BasketComparison,
 } from './basketComparison.ts'
+import {
+  attributeSavingsEffects,
+  type SavingsAttribution,
+  type SavingsAttributionEvidence,
+} from './savingsAttribution.ts'
 
 export type ObservedBasketSource =
   | 'manual-cart'
@@ -26,12 +31,14 @@ export type WeeklyBasketStudy = {
   weekStart: string
   baseline: ObservedBasketEvidence
   candidate: ObservedBasketEvidence
+  attributionEvidence?: SavingsAttributionEvidence[]
 }
 
 export type WeeklyBasketStudyAssessment = {
   claimable: boolean
   reasons: string[]
   comparison: BasketComparison
+  attribution: SavingsAttribution
   observationWindowHours: number | null
 }
 
@@ -114,6 +121,13 @@ export function assessWeeklyBasketStudy(
   reasons.push(...validateEvidence('baseline', study.baseline))
   reasons.push(...validateEvidence('candidate', study.candidate))
 
+  if (
+    study.attributionEvidence !== undefined &&
+    !Array.isArray(study.attributionEvidence)
+  ) {
+    reasons.push('attributionEvidence must be an array when provided')
+  }
+
   if (study.baseline.evidenceId === study.candidate.evidenceId) {
     reasons.push('baseline and candidate evidence IDs must differ')
   }
@@ -146,14 +160,21 @@ export function assessWeeklyBasketStudy(
 
   const uniqueReasons = [...new Set(reasons)]
   if (uniqueReasons.length > 0) {
+    const invalidComparison = unknownComparison(
+      study.baseline.basket,
+      study.candidate.basket,
+      uniqueReasons,
+    )
     return {
       claimable: false,
       reasons: uniqueReasons,
-      comparison: unknownComparison(
-        study.baseline.basket,
-        study.candidate.basket,
-        uniqueReasons,
-      ),
+      comparison: invalidComparison,
+      attribution: attributeSavingsEffects({
+        comparison: invalidComparison,
+        evidence: Array.isArray(study.attributionEvidence)
+          ? study.attributionEvidence
+          : [],
+      }),
       observationWindowHours,
     }
   }
@@ -162,6 +183,10 @@ export function assessWeeklyBasketStudy(
     claimable: true,
     reasons: [],
     comparison,
+    attribution: attributeSavingsEffects({
+      comparison,
+      evidence: study.attributionEvidence ?? [],
+    }),
     observationWindowHours,
   }
 }

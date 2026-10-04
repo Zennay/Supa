@@ -2,6 +2,8 @@ import type { BasketComparison } from './basketComparison.ts'
 
 export type SavingsEffect = 'pack-size' | 'offer' | 'planning'
 
+const SAVINGS_EFFECTS = new Set<SavingsEffect>(['pack-size', 'offer', 'planning'])
+
 export type SavingsAttributionEvidence = {
   lineId: string
   effect: SavingsEffect
@@ -44,7 +46,7 @@ export function attributeSavingsEffects({
   evidence,
 }: {
   comparison: BasketComparison
-  evidence: SavingsAttributionEvidence[]
+  evidence: unknown[]
 }): SavingsAttribution {
   if (!comparison.claimable || comparison.deltaCents === null) {
     return {
@@ -63,9 +65,26 @@ export function attributeSavingsEffects({
   const reasons: string[] = []
   const evidenceByLine = new Map<string, SavingsAttributionEvidence[]>()
 
-  for (const item of evidence) {
+  for (const rawItem of evidence) {
+    if (!rawItem || typeof rawItem !== 'object') {
+      reasons.push('attribution evidence item must be an object')
+      continue
+    }
+
+    const item = rawItem as Partial<SavingsAttributionEvidence>
+
+    if (typeof item.lineId !== 'string' || item.lineId.trim().length === 0) {
+      reasons.push('attribution evidence lineId must be a non-empty string')
+      continue
+    }
+
     if (!lineById.has(item.lineId)) {
       reasons.push(`attribution references unknown comparison line ${item.lineId}`)
+      continue
+    }
+
+    if (!SAVINGS_EFFECTS.has(item.effect as SavingsEffect)) {
+      reasons.push(`attribution for ${item.lineId} has an unsupported effect`)
       continue
     }
 
@@ -74,31 +93,38 @@ export function attributeSavingsEffects({
       continue
     }
 
-    if (item.evidenceRef.trim().length === 0) {
+    if (
+      typeof item.evidenceRef !== 'string' ||
+      item.evidenceRef.trim().length === 0
+    ) {
       reasons.push(`attribution for ${item.lineId} is missing an evidence reference`)
       continue
     }
 
-    if (item.effect === 'planning' && item.deltaCents !== 0) {
+    const validatedItem = item as SavingsAttributionEvidence
+
+    if (validatedItem.effect === 'planning' && validatedItem.deltaCents !== 0) {
       reasons.push(
-        `planning attribution must be zero for same-demand basket comparisons: ${item.lineId}`,
+        `planning attribution must be zero for same-demand basket comparisons: ${validatedItem.lineId}`,
       )
       continue
     }
 
-    const lineDelta = lineById.get(item.lineId)!.deltaCents
+    const lineDelta = lineById.get(validatedItem.lineId)!.deltaCents
     if (
-      (lineDelta > 0 && item.deltaCents < 0) ||
-      (lineDelta < 0 && item.deltaCents > 0) ||
-      (lineDelta === 0 && item.deltaCents !== 0)
+      (lineDelta > 0 && validatedItem.deltaCents < 0) ||
+      (lineDelta < 0 && validatedItem.deltaCents > 0) ||
+      (lineDelta === 0 && validatedItem.deltaCents !== 0)
     ) {
-      reasons.push(`attribution direction conflicts with line delta for ${item.lineId}`)
+      reasons.push(
+        `attribution direction conflicts with line delta for ${validatedItem.lineId}`,
+      )
       continue
     }
 
-    const current = evidenceByLine.get(item.lineId) ?? []
-    current.push(item)
-    evidenceByLine.set(item.lineId, current)
+    const current = evidenceByLine.get(validatedItem.lineId) ?? []
+    current.push(validatedItem)
+    evidenceByLine.set(validatedItem.lineId, current)
   }
 
   if (reasons.length > 0) {

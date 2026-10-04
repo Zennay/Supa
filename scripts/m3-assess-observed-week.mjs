@@ -124,6 +124,12 @@ export function validateObservedWeekInput(study) {
   requireString(study.weekStart, 'weekStart')
   validateEvidence(study.baseline, 'baseline')
   validateEvidence(study.candidate, 'candidate')
+  if (study.attributionEvidence !== undefined) {
+    assert(
+      Array.isArray(study.attributionEvidence),
+      'attributionEvidence must be an array when provided',
+    )
+  }
   return study
 }
 
@@ -160,6 +166,13 @@ export function buildObservedWeekReport(study) {
     deltaCents: assessment.comparison.deltaCents,
     savingsCents: assessment.comparison.savingsCents,
     observationWindowHours: assessment.observationWindowHours,
+    attribution: {
+      status: assessment.attribution.status,
+      fullyAttributed: assessment.attribution.fullyAttributed,
+      comparisonDeltaCents: assessment.attribution.comparisonDeltaCents,
+      effectTotals: assessment.attribution.effectTotals,
+      reasons: assessment.attribution.reasons,
+    },
     reasons: assessment.reasons,
     publicSavingsClaimEligible: false,
     evidenceBoundary:
