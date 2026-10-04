@@ -7,10 +7,10 @@ test('M1 capture source set is bounded to two supermarkets and three page kinds'
   assert.equal(SOURCES.length, 6)
   assert.deepEqual(
     [...new Set(SOURCES.map((source) => source.supermarket))].sort(),
-    ['ah', 'plus'],
+    ['dekamarkt', 'plus'],
   )
 
-  for (const supermarket of ['ah', 'plus']) {
+  for (const supermarket of ['dekamarkt', 'plus']) {
     assert.deepEqual(
       SOURCES
         .filter((source) => source.supermarket === supermarket)
@@ -23,15 +23,15 @@ test('M1 capture source set is bounded to two supermarkets and three page kinds'
   assert.equal(validateSources(), true)
 })
 
-test('M1 capture rejects unknown supermarkets', () => {
+test('M1 capture rejects supermarkets outside the current technical pair', () => {
   assert.throws(
     () =>
       validateSources([
         {
-          id: 'bad-source',
-          supermarket: 'other',
+          id: 'historical-ah-source',
+          supermarket: 'ah',
           kind: 'product',
-          url: 'https://example.com/product',
+          url: 'https://www.ah.nl/producten',
         },
       ]),
     /Unsupported supermarket/,
@@ -44,7 +44,7 @@ test('M1 capture rejects a URL whose host does not match its supermarket', () =>
       validateSources([
         {
           id: 'mislabeled-source',
-          supermarket: 'ah',
+          supermarket: 'dekamarkt',
           kind: 'product',
           url: 'https://www.plus.nl/producten',
         },
@@ -74,9 +74,9 @@ test('M1 capture rejects unsupported source kinds', () => {
       validateSources([
         {
           id: 'wrong-kind',
-          supermarket: 'ah',
+          supermarket: 'dekamarkt',
           kind: 'search',
-          url: 'https://www.ah.nl/producten',
+          url: 'https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk',
         },
       ]),
     /Unsupported source kind/,

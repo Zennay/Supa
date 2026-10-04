@@ -10,9 +10,9 @@ import {
 } from '../scripts/m1-build-evidence-summary.mjs'
 
 const ids = [
-  ['ah-product', 'ah', 'product'],
-  ['ah-catalog', 'ah', 'catalog'],
-  ['ah-offers', 'ah', 'offers'],
+  ['dekamarkt-product', 'dekamarkt', 'product'],
+  ['dekamarkt-catalog', 'dekamarkt', 'catalog'],
+  ['dekamarkt-offers', 'dekamarkt', 'offers'],
   ['plus-product', 'plus', 'product'],
   ['plus-catalog', 'plus', 'catalog'],
   ['plus-offers', 'plus', 'offers'],
@@ -57,7 +57,7 @@ function bundle({
     milestone: 'M1 Data Feasibility',
     candidateCount: 1,
     abstentionCount: 1,
-    candidates: [{ id: 'ah-product' }],
+    candidates: [{ id: 'dekamarkt-product' }],
     abstentions: [{ id: 'plus-product' }],
   }
   return { manifest, inspection, freshness, candidateIndex }
@@ -91,23 +91,23 @@ test('fails readiness when one capture failed', () => {
 })
 
 test('fails readiness when one source is stale', () => {
-  const report = buildEvidenceSummary(bundle({ staleId: 'ah-catalog' }))
+  const report = buildEvidenceSummary(bundle({ staleId: 'dekamarkt-catalog' }))
 
   assert.equal(report.adapterEvidenceReady, false)
   assert.ok(
     report.sources
-      .find((source) => source.id === 'ah-catalog')
+      .find((source) => source.id === 'dekamarkt-catalog')
       .reasons.includes('freshness-stale'),
   )
 })
 
 test('detects inconsistent evidence documents', () => {
   const report = buildEvidenceSummary(
-    bundle({ missingInspectionId: 'ah-offers' }),
+    bundle({ missingInspectionId: 'dekamarkt-offers' }),
   )
 
   assert.equal(report.documentConsistency.consistent, false)
-  assert.deepEqual(report.documentConsistency.missingInspection, ['ah-offers'])
+  assert.deepEqual(report.documentConsistency.missingInspection, ['dekamarkt-offers'])
   assert.equal(report.nextAction, 'repair-evidence-bundle')
 })
 
@@ -154,7 +154,7 @@ test('inconsistent evidence documents can never be adapter-ready', () => {
   const data = bundle()
   data.inspection.sources.push({
     id: 'unexpected-extra-source',
-    supermarket: 'ah',
+    supermarket: 'dekamarkt',
     kind: 'catalog',
     integrity: 'verified',
   })
@@ -191,7 +191,7 @@ test('unexpected candidate-index decisions make the bundle inconsistent', () => 
 test('candidate-index metadata and duplicate decisions are part of consistency', () => {
   const data = bundle()
   data.candidateIndex.milestone = 'M2 Planner Slice'
-  data.candidateIndex.candidates.push({ id: 'ah-product' })
+  data.candidateIndex.candidates.push({ id: 'dekamarkt-product' })
   data.candidateIndex.candidateCount = 1
 
   const report = buildEvidenceSummary(data)
@@ -199,7 +199,7 @@ test('candidate-index metadata and duplicate decisions are part of consistency',
   assert.equal(report.documentConsistency.candidateIndexMilestoneMatches, false)
   assert.equal(report.documentConsistency.candidateIndexCountsMatch, false)
   assert.deepEqual(report.documentConsistency.duplicateCandidateIds, [
-    'ah-product',
+    'dekamarkt-product',
   ])
   assert.equal(report.documentConsistency.consistent, false)
   assert.equal(report.adapterEvidenceReady, false)
@@ -207,7 +207,7 @@ test('candidate-index metadata and duplicate decisions are part of consistency',
 
 test('unsafe candidate-index source ids cannot become adapter-ready', () => {
   const data = bundle()
-  data.candidateIndex.candidates = [{ id: '../ah-product' }]
+  data.candidateIndex.candidates = [{ id: '../dekamarkt-product' }]
   data.candidateIndex.candidateCount = 1
 
   const report = buildEvidenceSummary(data)
