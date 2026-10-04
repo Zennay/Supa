@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "milestone": "M1 Data Feasibility",
+  "evidenceType": "bounded-rendered-listings-repeatability",
+  "supermarket": "plus",
+  "capturedOn": "2026-10-04",
+  "workflow": {
+    "repository": "Zennay/zCloud",
+    "runId": 37226107225,
+    "pinnedSupaSha": "2378d34e36ed199505bd3a535458d7869a3a5b4e",
+    "browser": "Firefox 157.0",
+    "driver": "geckodriver 0.37.1",
+    "safety": {
+      "login": false,
+      "credentials": false,
+      "privateApiCalls": false,
+      "networkInterception": false,
+      "antiBotBypass": false,
+      "recursiveCrawl": false,
+      "targetCount": 2
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "artifactId": 11312390194,
+      "artifactDigest": "sha256:90ea9ef3dabdb97f067a9f8a37f3113db1bc50b2b045bc503a9ae08b9eec8985",
+      "pages": {
+        "catalog": {
+          "renderedHtmlSha256": "96c4426306753c4f1c9fd337c9bbc49e959e3c47662c9ca9f501d3f56faf3c72",
+          "renderedHtmlBytes": 1558525,
+          "visibleTextLength": 30068,
+          "normalizedVisibleTextSha256": "c415392579dfbe1f584b87b7dbdcefb9f7de73ce983373a2501d5a50e2e88b7b",
+          "jsonLdCount": 0,
+          "applicationJsonCount": 0,
+          "productLinkCount": 12,
+          "uniqueProductLinkCount": 12,
+          "firstProductLinksSha256": "a57ae2f0070ad867045febd83440cadac90faa7697a9b2f6b5d8e5cec854a780"
+        },
+        "offers": {
+          "renderedHtmlSha256": "d348ca126007bf186c4941002305a22bd48bd9c6dca71cf5872fdc76e0c968b7",
+          "renderedHtmlBytes": 474005,
+          "visibleTextLength": 8090,
+          "normalizedVisibleTextSha256": "ff70532fa386d6191e074e01f3e627e7a63541ed129a463dffb911a928caf04e",
+          "jsonLdCount": 0,
+          "applicationJsonCount": 0,
+          "productLinkCount": 16,
+          "uniqueProductLinkCount": 16,
+          "firstProductLinksSha256": "400e1cd5c075f53f6a833416ab3c54789b1948d1bfafe6caf6b636d1fffe33d9"
+        }
+      }
+    },
+    {
+      "attempt": 2,
+      "artifactId": 11313000803,
+      "artifactDigest": "sha256:45a18f3d0813b01139f2e8322a6214b4816b81d17f1052d5a7b29a87968d969e",
+      "pages": {
+        "catalog": {
+          "renderedHtmlSha256": "e8070a75fbea75cd9ac4d78d2478b6d7bc8d92b123f29cfa86e232e2a1544f72",
+          "renderedHtmlBytes": 1558506,
+          "visibleTextLength": 30037,
+          "normalizedVisibleTextSha256": "c660dba36f7a0ba2bdd38b428bc057466903632a6cda9552149fd1e0333f95a9",
+          "jsonLdCount": 0,
+          "applicationJsonCount": 0,
+          "productLinkCount": 12,
+          "uniqueProductLinkCount": 12,
+          "firstProductLinksSha256": "a57ae2f0070ad867045febd83440cadac90faa7697a9b2f6b5d8e5cec854a780"
+        },
+        "offers": {
+          "renderedHtmlSha256": "e62847a4dc0b7865e38e4521f409be03bd47441516d6beb0890e7ffa84fa52e0",
+          "renderedHtmlBytes": 474609,
+          "visibleTextLength": 8090,
+          "normalizedVisibleTextSha256": "ff70532fa386d6191e074e01f3e627e7a63541ed129a463dffb911a928caf04e",
+          "jsonLdCount": 0,
+          "applicationJsonCount": 0,
+          "productLinkCount": 16,
+          "uniqueProductLinkCount": 16,
+          "firstProductLinksSha256": "400e1cd5c075f53f6a833416ab3c54789b1948d1bfafe6caf6b636d1fffe33d9"
+        }
+      }
+    }
+  ],
+  "comparison": {
+    "catalog": {
+      "rawHtmlExact": false,
+      "structuredDataCountsStable": true,
+      "productLinkCountStable": true,
+      "uniqueProductLinkCountStable": true,
+      "firstProductLinksExact": true,
+      "normalizedVisibleTextExact": false,
+      "normalizedVisibleTextSimilarity": 0.999484236,
+      "visibleTextLengthDelta": -31
+    },
+    "offers": {
+      "rawHtmlExact": false,
+      "structuredDataCountsStable": true,
+      "productLinkCountStable": true,
+      "uniqueProductLinkCountStable": true,
+      "firstProductLinksExact": true,
+      "normalizedVisibleTextExact": true,
+      "normalizedVisibleTextSimilarity": 1,
+      "visibleTextLengthDelta": 0
+    }
+  },
+  "conclusion": "bounded-repeatability-supported",
+  "scopeNote": "Two bounded captures support stability of the observed PLUS catalog/offers listing contract. This is not a claim of indefinite source stability or production reuse permission."
+}
