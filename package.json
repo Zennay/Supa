@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "m1:matching-benchmark": "node --experimental-strip-types scripts/m1-run-matching-benchmark.mjs",
-    "m1:inspect-captures": "node scripts/m1-inspect-captures.mjs"
+    "m1:inspect-captures": "node --experimental-strip-types scripts/m1-inspect-captures.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
