@@ -16,6 +16,25 @@ export type BasketLineDelta = {
   deltaCents: number
 }
 
+export type BasketEffectAttribution =
+  | {
+      status: 'known'
+      deltaCents: number
+      reasons: string[]
+    }
+  | {
+      status: 'unknown'
+      deltaCents: null
+      reasons: string[]
+    }
+
+export type BasketComparisonAttribution = {
+  planning: BasketEffectAttribution
+  packSize: BasketEffectAttribution
+  offer: BasketEffectAttribution
+  unattributedCents: number | null
+}
+
 export type BasketComparison = {
   outcome: BasketComparisonOutcome
   claimable: boolean
@@ -24,6 +43,7 @@ export type BasketComparison = {
   deltaCents: number | null
   savingsCents: number | null
   lineDeltas: BasketLineDelta[]
+  attribution: BasketComparisonAttribution
   reasons: string[]
 }
 
@@ -77,11 +97,80 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   return reasons
 }
 
+function unknownEffect(reason: string): BasketEffectAttribution {
+  return {
+    status: 'unknown',
+    deltaCents: null,
+    reasons: [reason],
+  }
+}
+
+function unknownAttribution(reason: string): BasketComparisonAttribution {
+  return {
+    planning: unknownEffect(reason),
+    packSize: unknownEffect(reason),
+    offer: unknownEffect(reason),
+    unattributedCents: null,
+  }
+}
+
+function samePackGeometry(
+  baselineLine: MatchedBasketLine,
+  candidateLine: MatchedBasketLine,
+) {
+  return (
+    baselineLine.pack.amount === candidateLine.pack.amount &&
+    baselineLine.pack.unit === candidateLine.pack.unit &&
+    baselineLine.pack.count === candidateLine.pack.count &&
+    baselineLine.packs === candidateLine.packs
+  )
+}
+
+function buildClaimableAttribution(
+  baselineById: Map<string, MatchedBasketLine>,
+  candidateById: Map<string, MatchedBasketLine>,
+  deltaCents: number,
+): BasketComparisonAttribution {
+  const differingPackIds: string[] = []
+
+  for (const [id, baselineLine] of baselineById) {
+    const candidateLine = candidateById.get(id)
+    if (!candidateLine || !samePackGeometry(baselineLine, candidateLine)) {
+      differingPackIds.push(id)
+    }
+  }
+
+  return {
+    planning: {
+      status: 'known',
+      deltaCents: 0,
+      reasons: ['comparison contract requires identical ingredient demand'],
+    },
+    packSize:
+      differingPackIds.length === 0
+        ? {
+            status: 'known',
+            deltaCents: 0,
+            reasons: ['all compared lines use identical pack geometry and pack counts'],
+          }
+        : unknownEffect(
+            `pack-size effect cannot be isolated from price for: ${differingPackIds
+              .sort()
+              .join(', ')}`,
+          ),
+    offer: unknownEffect(
+      'basket trace does not distinguish promotional price from regular price',
+    ),
+    unattributedCents: deltaCents,
+  }
+}
+
 function unknownComparison(
   baseline: OneStoreBasket,
   candidate: OneStoreBasket,
   reasons: string[],
 ): BasketComparison {
+  const uniqueReasons = [...new Set(reasons)]
   return {
     outcome: 'unknown',
     claimable: false,
@@ -90,7 +179,10 @@ function unknownComparison(
     deltaCents: null,
     savingsCents: null,
     lineDeltas: [],
-    reasons: [...new Set(reasons)],
+    attribution: unknownAttribution(
+      'effect attribution is unavailable because the basket comparison is not claimable',
+    ),
+    reasons: uniqueReasons,
   }
 }
 
@@ -176,6 +268,11 @@ export function compareFullBaskets({
     deltaCents,
     savingsCents: deltaCents === 0 ? 0 : -deltaCents,
     lineDeltas,
+    attribution: buildClaimableAttribution(
+      baselineById,
+      candidateById,
+      deltaCents,
+    ),
     reasons: [],
   }
 }
