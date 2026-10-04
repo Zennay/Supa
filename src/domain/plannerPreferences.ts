@@ -47,23 +47,22 @@ export function parsePlannerPreferences(
         ? candidate.budget
         : fallbackBudget
 
-    const filteredDays = Array.isArray(candidate.activeDays)
-      ? Array.from(
-          new Set(
-            candidate.activeDays.filter(
-              (day): day is string =>
-                typeof day === 'string' && validDays.has(day),
-            ),
+    let activeDays = fallback.activeDays
+    if (Array.isArray(candidate.activeDays)) {
+      const filteredDays = Array.from(
+        new Set(
+          candidate.activeDays.filter(
+            (day): day is string =>
+              typeof day === 'string' && validDays.has(day),
           ),
-        )
-      : null
+        ),
+      )
 
-    const activeDays =
-      filteredDays === null
-        ? fallback.activeDays
-        : candidate.activeDays.length > 0 && filteredDays.length === 0
+      activeDays =
+        candidate.activeDays.length > 0 && filteredDays.length === 0
           ? fallback.activeDays
           : filteredDays
+    }
 
     const persistedRecipes =
       candidate.recipeByDay &&
