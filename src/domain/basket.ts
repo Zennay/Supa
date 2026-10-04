@@ -14,9 +14,13 @@ export type RecipeWithIngredients = Recipe & {
   ingredients: RecipeIngredient[]
 }
 
+export type StoreProductPriceKind = 'regular' | 'offer' | 'unknown'
+
 export type StoreProduct = ProductCandidate & {
   storeId: string
   priceCents: number
+  priceKind?: StoreProductPriceKind
+  regularPriceCents?: number | null
 }
 
 export type BasketTraceLine =
@@ -31,6 +35,10 @@ export type BasketTraceLine =
       pack: { amount: number; unit: MatchUnit; count: number }
       pricePerPackCents: number
       lineTotalCents: number
+      pricing: {
+        kind: StoreProductPriceKind
+        regularPriceCents: number | null
+      }
       matchScore: number
       reasons: string[]
     }
@@ -54,6 +62,31 @@ export type OneStoreBasket = {
 
 type AggregatedIngredient = RecipeIngredient & {
   amount: number | null
+}
+
+function trustedPricing(product: StoreProduct): {
+  kind: StoreProductPriceKind
+  regularPriceCents: number | null
+} | null {
+  const kind = product.priceKind ?? 'unknown'
+
+  if (kind === 'unknown') {
+    return { kind, regularPriceCents: null }
+  }
+
+  if (kind === 'regular') {
+    return { kind, regularPriceCents: product.priceCents }
+  }
+
+  const regularPriceCents = product.regularPriceCents
+  if (
+    !Number.isInteger(regularPriceCents) ||
+    (regularPriceCents as number) < product.priceCents
+  ) {
+    return null
+  }
+
+  return { kind, regularPriceCents: regularPriceCents as number }
 }
 
 function baseAmount(
@@ -192,6 +225,18 @@ export function buildOneStoreBasket({
       }
     }
 
+    const pricing = trustedPricing(product)
+    if (!pricing) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: [...decision.reasons, 'basket pricing context is not trusted'],
+        matchScore: decision.score,
+      }
+    }
+
     const packs = Math.ceil(required.amount / pack.amount)
     return {
       id: ingredient.id,
@@ -208,6 +253,7 @@ export function buildOneStoreBasket({
       },
       pricePerPackCents: product.priceCents,
       lineTotalCents: packs * product.priceCents,
+      pricing,
       matchScore: decision.score,
       reasons: decision.reasons,
     }
