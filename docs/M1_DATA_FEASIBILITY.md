@@ -369,7 +369,5 @@ The adapter deliberately fails closed:
   validator
 
 Sanitized regression fixtures cover three observed milk-category products and
-three observed offers (Croma, Del Monte bananas and Nutella). The matching
-benchmark also adds one real-source candidate set from the observed DekaMarkt
-milk category; it remains a regression case, not a broad live-accuracy claim.
+three observed offers (Croma, Del Monte bananas and Nutella). The matching benchmark now includes two cases from the same observed DekaMarkt milk candidate set: a generic `halfvolle melk` requirement that correctly abstains because a lactose-free 1 L variant ties the normal 1 L product, and a more specific `zuivelmeester halfvolle melk` requirement that resolves to product `115873`. These remain regression cases, not a broad live-accuracy claim.
 
