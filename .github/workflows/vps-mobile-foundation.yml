@@ -13,12 +13,15 @@ on:
       - "src/domain/plannerPreferences.ts"
       - "src/domain/basket.ts"
       - "src/domain/matching.ts"
+      - "src/domain/comparison.ts"
       - "src/domain/types.ts"
       - "src/data/mock.ts"
       - "src/data/m2Fixture.ts"
+      - "src/data/m3Fixture.ts"
       - "src/lib/**"
       - "tests/planner*.test.*"
       - "tests/m2-core-slice.test.mjs"
+      - "tests/m3-comparison.test.mjs"
 
 concurrency:
   group: supa-vps-mobile-${{ github.event.pull_request.number || github.ref }}
