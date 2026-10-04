@@ -1,0 +1,276 @@
+export type MatchUnit = 'g' | 'kg' | 'ml' | 'l' | 'piece' | 'unknown'
+
+export type IngredientRequirement = {
+  id: string
+  query: string
+  amount: number | null
+  unit: MatchUnit
+}
+
+export type ProductCandidate = {
+  id: string
+  name: string
+  packAmount: number | null
+  packUnit: MatchUnit
+  available: boolean
+}
+
+export type MatchDecision =
+  | {
+      type: 'match'
+      productId: string
+      score: number
+      runnerUpScore: number | null
+      reasons: string[]
+    }
+  | {
+      type: 'abstain'
+      score: number | null
+      runnerUpScore: number | null
+      reasons: string[]
+    }
+
+const STOP_TOKENS = new Set([
+  'ah',
+  'plus',
+  'de',
+  'het',
+  'een',
+  'pak',
+  'fles',
+  'zak',
+  'doos',
+])
+
+function textTokens(value: string): string[] {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token && !STOP_TOKENS.has(token))
+}
+
+function normalizedPhrase(value: string): string {
+  return textTokens(value).join(' ')
+}
+
+function baseUnitAmount(
+  amount: number | null,
+  unit: MatchUnit,
+): { amount: number | null; family: 'mass' | 'volume' | 'piece' | 'unknown' } {
+  if (amount === null) {
+    return { amount: null, family: unit === 'piece' ? 'piece' : 'unknown' }
+  }
+
+  if (unit === 'kg') return { amount: amount * 1000, family: 'mass' }
+  if (unit === 'g') return { amount, family: 'mass' }
+  if (unit === 'l') return { amount: amount * 1000, family: 'volume' }
+  if (unit === 'ml') return { amount, family: 'volume' }
+  if (unit === 'piece') return { amount, family: 'piece' }
+  return { amount, family: 'unknown' }
+}
+
+function scoreCandidate(
+  requirement: IngredientRequirement,
+  candidate: ProductCandidate,
+): { score: number; reasons: string[] } {
+  if (!candidate.available) {
+    return { score: -100, reasons: ['candidate unavailable'] }
+  }
+
+  const queryPhrase = normalizedPhrase(requirement.query)
+  const productPhrase = normalizedPhrase(candidate.name)
+  const queryTokens = new Set(textTokens(requirement.query))
+  const productTokens = new Set(textTokens(candidate.name))
+  const reasons: string[] = []
+
+  let overlap = 0
+  for (const token of queryTokens) {
+    if (productTokens.has(token)) overlap += 1
+  }
+
+  const overlapRatio = queryTokens.size === 0 ? 0 : overlap / queryTokens.size
+  let score = Math.round(overlapRatio * 55)
+
+  if (queryPhrase && productPhrase.includes(queryPhrase)) {
+    score += 35
+    reasons.push('query phrase present')
+  } else if (overlap > 0) {
+    reasons.push(`${overlap}/${queryTokens.size} query tokens present`)
+  }
+
+  const required = baseUnitAmount(requirement.amount, requirement.unit)
+  const pack = baseUnitAmount(candidate.packAmount, candidate.packUnit)
+
+  if (
+    required.family !== 'unknown' &&
+    pack.family !== 'unknown' &&
+    required.family !== pack.family
+  ) {
+    score -= 35
+    reasons.push('unit family mismatch')
+  } else if (
+    required.amount !== null &&
+    pack.amount !== null &&
+    required.family === pack.family
+  ) {
+    if (pack.amount >= required.amount) {
+      const oversupplyRatio = pack.amount / Math.max(required.amount, 1)
+      if (oversupplyRatio <= 1.5) {
+        score += 15
+        reasons.push('pack closely covers requirement')
+      } else if (oversupplyRatio <= 4) {
+        score += 8
+        reasons.push('pack covers requirement')
+      } else {
+        score += 2
+        reasons.push('pack covers requirement with high oversupply')
+      }
+    } else {
+      score -= 10
+      reasons.push('single pack underfills requirement')
+    }
+  }
+
+  return { score, reasons }
+}
+
+export function matchIngredient(
+  requirement: IngredientRequirement,
+  candidates: ProductCandidate[],
+  options: { minimumScore?: number; minimumMargin?: number } = {},
+): MatchDecision {
+  const minimumScore = options.minimumScore ?? 65
+  const minimumMargin = options.minimumMargin ?? 12
+
+  const scored = candidates
+    .map((candidate) => ({
+      candidate,
+      ...scoreCandidate(requirement, candidate),
+    }))
+    .sort((a, b) => b.score - a.score || a.candidate.id.localeCompare(b.candidate.id))
+
+  const best = scored[0]
+  const runnerUp = scored[1]
+
+  if (!best) {
+    return {
+      type: 'abstain',
+      score: null,
+      runnerUpScore: null,
+      reasons: ['no candidates'],
+    }
+  }
+
+  const margin = runnerUp ? best.score - runnerUp.score : Number.POSITIVE_INFINITY
+
+  if (best.score < minimumScore) {
+    return {
+      type: 'abstain',
+      score: best.score,
+      runnerUpScore: runnerUp?.score ?? null,
+      reasons: [...best.reasons, 'score below trust threshold'],
+    }
+  }
+
+  if (margin < minimumMargin) {
+    return {
+      type: 'abstain',
+      score: best.score,
+      runnerUpScore: runnerUp?.score ?? null,
+      reasons: [...best.reasons, 'top candidates too close'],
+    }
+  }
+
+  return {
+    type: 'match',
+    productId: best.candidate.id,
+    score: best.score,
+    runnerUpScore: runnerUp?.score ?? null,
+    reasons: best.reasons,
+  }
+}
+
+export type BenchmarkCase = {
+  id: string
+  requirement: IngredientRequirement
+  candidates: ProductCandidate[]
+  expected:
+    | { type: 'match'; acceptedProductIds: string[] }
+    | { type: 'abstain' }
+}
+
+export type BenchmarkMetrics = {
+  total: number
+  correct: number
+  accuracy: number
+  expectedMatches: number
+  acceptedMatches: number
+  matchAccuracy: number
+  expectedAbstentions: number
+  correctAbstentions: number
+  abstentionAccuracy: number
+  falsePositiveMatches: number
+}
+
+export function evaluateMatchingBenchmark(
+  cases: BenchmarkCase[],
+): { metrics: BenchmarkMetrics; decisions: Array<{ id: string; decision: MatchDecision; correct: boolean }> } {
+  let correct = 0
+  let expectedMatches = 0
+  let acceptedMatches = 0
+  let expectedAbstentions = 0
+  let correctAbstentions = 0
+  let falsePositiveMatches = 0
+
+  const decisions = cases.map((benchmarkCase) => {
+    const decision = matchIngredient(
+      benchmarkCase.requirement,
+      benchmarkCase.candidates,
+    )
+
+    let isCorrect = false
+    if (benchmarkCase.expected.type === 'match') {
+      expectedMatches += 1
+      if (
+        decision.type === 'match' &&
+        benchmarkCase.expected.acceptedProductIds.includes(decision.productId)
+      ) {
+        acceptedMatches += 1
+        isCorrect = true
+      }
+    } else {
+      expectedAbstentions += 1
+      if (decision.type === 'abstain') {
+        correctAbstentions += 1
+        isCorrect = true
+      } else {
+        falsePositiveMatches += 1
+      }
+    }
+
+    if (isCorrect) correct += 1
+    return { id: benchmarkCase.id, decision, correct: isCorrect }
+  })
+
+  const total = cases.length
+  return {
+    metrics: {
+      total,
+      correct,
+      accuracy: total === 0 ? 0 : correct / total,
+      expectedMatches,
+      acceptedMatches,
+      matchAccuracy: expectedMatches === 0 ? 0 : acceptedMatches / expectedMatches,
+      expectedAbstentions,
+      correctAbstentions,
+      abstentionAccuracy:
+        expectedAbstentions === 0 ? 0 : correctAbstentions / expectedAbstentions,
+      falsePositiveMatches,
+    },
+    decisions,
+  }
+}
