@@ -39,6 +39,13 @@ export function buildObservedWeekReport(study) {
     deltaCents: assessment.comparison.deltaCents,
     savingsCents: assessment.comparison.savingsCents,
     observationWindowHours: assessment.observationWindowHours,
+    attribution: {
+      status: assessment.attribution.status,
+      fullyAttributed: assessment.attribution.fullyAttributed,
+      comparisonDeltaCents: assessment.attribution.comparisonDeltaCents,
+      effectTotals: assessment.attribution.effectTotals,
+      reasons: assessment.attribution.reasons,
+    },
     reasons: assessment.reasons,
     publicSavingsClaimEligible: false,
     evidenceBoundary:
