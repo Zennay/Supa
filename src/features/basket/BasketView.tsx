@@ -1,4 +1,5 @@
 import type { OneStoreBasket } from '../../domain/basket'
+import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { StatPill } from '../../components/StatPill'
 
@@ -6,7 +7,37 @@ function quantity(amount: number | null, unit: string) {
   return amount === null ? `? ${unit}` : `${amount} ${unit}`
 }
 
-export function BasketView({ basket }: { basket: OneStoreBasket }) {
+function comparisonTitle(
+  comparison: BasketComparison,
+  candidate: OneStoreBasket,
+) {
+  if (!comparison.claimable || comparison.outcome === 'unknown') {
+    return 'Nog geen betrouwbare vergelijking'
+  }
+
+  if (comparison.outcome === 'same') {
+    return 'Beide testmanden zijn even duur'
+  }
+
+  const difference = euro.format(
+    Math.abs(comparison.savingsCents ?? 0) / 100,
+  )
+  return comparison.outcome === 'better'
+    ? `${candidate.store.name} ligt ${difference} lager`
+    : `${candidate.store.name} ligt ${difference} hoger`
+}
+
+export function BasketView({
+  basket,
+  comparison,
+  comparisonBaseline,
+  comparisonCandidate,
+}: {
+  basket: OneStoreBasket
+  comparison: BasketComparison
+  comparisonBaseline: OneStoreBasket
+  comparisonCandidate: OneStoreBasket
+}) {
   return (
     <section className="screen">
       <div className="section-heading">
@@ -26,6 +57,32 @@ export function BasketView({ basket }: { basket: OneStoreBasket }) {
         <p className="disclaimer">
           M2 testfixture — geen besparingsclaim en geen productie-liveprijs.
         </p>
+      </div>
+
+      <div className="comparison-card" data-comparison-outcome={comparison.outcome}>
+        <span className="eyebrow">Gecontroleerde winkelvergelijking</span>
+        <strong>{comparisonTitle(comparison, comparisonCandidate)}</strong>
+        <div className="comparison-totals">
+          <div>
+            <span>Baseline · {comparisonBaseline.store.name}</span>
+            <strong>{euro.format(comparisonBaseline.totalCents / 100)}</strong>
+          </div>
+          <div>
+            <span>Kandidaat · {comparisonCandidate.store.name}</span>
+            <strong>{euro.format(comparisonCandidate.totalCents / 100)}</strong>
+          </div>
+        </div>
+        {comparison.claimable ? (
+          <p className="disclaimer">
+            M3 controlled testdata · zelfde week en volledige mand · geen
+            live-besparingsclaim.
+          </p>
+        ) : (
+          <div className="comparison-warning">
+            <strong>Geen financieel verschil tonen</strong>
+            <span>{comparison.reasons.join(' · ')}</span>
+          </div>
+        )}
       </div>
 
       <div className="list-card">
