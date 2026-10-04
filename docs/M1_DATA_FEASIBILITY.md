@@ -111,7 +111,7 @@ When exactly one usable Product node exists, it may produce a raw product observ
 - explicit availability;
 - source snapshot provenance.
 
-It deliberately keeps pack size unknown unless a later source-specific/structured-data path proves it. Multiple Product nodes, non-EUR pricing or otherwise ambiguous data cause abstention rather than guessing. The capture inspector summarizes this parser result automatically when Product JSON-LD is present.
+It deliberately keeps pack size unknown unless a later source-specific/structured-data path proves it. Multiple Product nodes, non-EUR pricing, priced offers without an explicit currency, malformed validity metadata or otherwise ambiguous data cause abstention rather than guessing. External JSON-LD validation failures stay inside the parser's explicit abstention contract instead of throwing trusted observations downstream. The capture inspector summarizes this parser result automatically when Product JSON-LD is present.
 
 ## VPS runner contract
 
