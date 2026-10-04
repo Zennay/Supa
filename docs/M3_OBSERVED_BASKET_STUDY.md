@@ -59,3 +59,12 @@ npm run m3:assess-observed-week -- evidence/m3/<study>.json --output artifacts/m
 The report intentionally omits the pseudonymous participant key and includes only study/store provenance, totals, outcome, uncertainty and the evidence boundary. A `worse` or `unknown` study still produces a valid report; only malformed input is an execution error.
 
 Do not commit receipt images, names, emails, account IDs or other direct identifiers. The CLI does not turn a single observed week into a public savings claim: every generated report keeps `publicSavingsClaimEligible: false`.
+
+
+## Savings-effect attribution in the report
+
+Observed study JSON may include an optional `attributionEvidence` array. Each item must reference a comparison line, use one of `pack-size`, `offer` or `planning`, provide an integer-cent delta and retain a non-empty evidence reference.
+
+The assessment report never infers a cause from price movement alone. Missing evidence remains in `unknownCents`; invalid attribution evidence makes attribution status `unknown` without turning an otherwise valid same-demand basket comparison into a fabricated causal claim. Planning attribution remains zero inside a same-demand store comparison.
+
+The privacy-safe report includes only aggregate effect totals and attribution status/reasons. Evidence references are used for validation but are not copied into the emitted report.
