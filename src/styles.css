@@ -242,7 +242,7 @@ h3, p { margin: 0; }
   transform: translateX(-50%);
   width: min(calc(100% - 28px), 532px);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   padding: 6px;
   gap: 4px;
   border: 1px solid var(--line);
