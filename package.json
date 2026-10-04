@@ -7,7 +7,8 @@
     "dev": "vite",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "m1:matching-benchmark": "node --experimental-strip-types scripts/m1-run-matching-benchmark.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
