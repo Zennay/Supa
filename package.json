@@ -12,7 +12,8 @@
     "m1:inspect-captures": "node --experimental-strip-types scripts/m1-inspect-captures.mjs",
     "m1:export-candidates": "node scripts/m1-export-sanitized-candidates.mjs",
     "m1:compare-captures": "node scripts/m1-compare-captures.mjs",
-    "m1:evaluate-freshness": "node scripts/m1-evaluate-freshness.mjs"
+    "m1:evaluate-freshness": "node scripts/m1-evaluate-freshness.mjs",
+    "m1:evidence-summary": "node scripts/m1-build-evidence-summary.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
