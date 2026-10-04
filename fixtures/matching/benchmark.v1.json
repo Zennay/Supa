@@ -506,5 +506,95 @@
         "deka-115873"
       ]
     }
+  },
+  {
+    "id": "real-plus-halfvolle-melk-pack-fit",
+    "requirement": {
+      "id": "real-plus-milk",
+      "query": "zuivelmeester halfvolle melk",
+      "amount": 1000,
+      "unit": "ml"
+    },
+    "candidates": [
+      {
+        "id": "plus-579010",
+        "name": "Zuivelmeester Halfvolle melk",
+        "packAmount": 1000,
+        "packUnit": "ml",
+        "available": true
+      },
+      {
+        "id": "plus-145701",
+        "name": "Zuivelmeester Halfvolle melk",
+        "packAmount": 2000,
+        "packUnit": "ml",
+        "available": true
+      },
+      {
+        "id": "plus-579021",
+        "name": "Zuivelmeester Karnemelk",
+        "packAmount": 1000,
+        "packUnit": "ml",
+        "available": true
+      },
+      {
+        "id": "plus-113651",
+        "name": "PLUS Bananen Fairtrade",
+        "packAmount": 1000,
+        "packUnit": "g",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "plus-579010"
+      ]
+    }
+  },
+  {
+    "id": "real-plus-offer-banana-pack-fit",
+    "requirement": {
+      "id": "real-plus-bananas",
+      "query": "bananen",
+      "amount": 1000,
+      "unit": "g"
+    },
+    "candidates": [
+      {
+        "id": "plus-113651",
+        "name": "PLUS Bananen Fairtrade",
+        "packAmount": 1000,
+        "packUnit": "g",
+        "available": true
+      },
+      {
+        "id": "plus-113840",
+        "name": "PLUS Handappels Jonagold",
+        "packAmount": 1000,
+        "packUnit": "g",
+        "available": true
+      },
+      {
+        "id": "plus-211887",
+        "name": "PLUS Limoenen",
+        "packAmount": 3,
+        "packUnit": "piece",
+        "available": true
+      },
+      {
+        "id": "plus-114209",
+        "name": "PLUS Bloemkool",
+        "packAmount": 1,
+        "packUnit": "piece",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "plus-113651"
+      ]
+    }
   }
 ]
