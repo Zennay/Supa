@@ -20,6 +20,13 @@ function byId(items, label) {
   return map
 }
 
+function isSafeSourceId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  )
+}
+
 function duplicateIds(ids) {
   const seen = new Set()
   const duplicates = new Set()
@@ -35,7 +42,7 @@ function candidateIndex(index) {
   const abstentionItems = Array.isArray(index?.abstentions) ? index.abstentions : []
   const candidateIds = candidateItems
     .map((item) => item?.id)
-    .filter((id) => typeof id === 'string' && id.length > 0)
+    .filter((id) => isSafeSourceId(id))
   const abstentionIds = abstentionItems
     .map((item) => item?.id)
     .filter((id) => typeof id === 'string' && id.length > 0)
