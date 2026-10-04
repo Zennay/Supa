@@ -92,10 +92,20 @@ jobs:
           targets = call("GET", "/api/runner-targets")
           allocation = (targets.get("global_allocation") or {}).get("workers") or []
           print("DYNAMIC_WORKERS=" + json.dumps(settings, sort_keys=True))
-          print("ALLOCATION_BEFORE=" + json.dumps(allocation, sort_keys=True))
+          print("ALLOCATION_INITIAL=" + json.dumps(allocation, sort_keys=True))
 
           if not allocation:
-              raise SystemExit("no allocated workers to start")
+              for _ in range(12):
+                  time.sleep(5)
+                  targets = call("GET", "/api/runner-targets")
+                  allocation = (targets.get("global_allocation") or {}).get("workers") or []
+                  if allocation:
+                      break
+
+          print("ALLOCATION_BEFORE=" + json.dumps(allocation, sort_keys=True))
+          if not allocation:
+              print("RUNNER_TARGETS_EMPTY=" + json.dumps(targets, sort_keys=True))
+              raise SystemExit("no allocated workers after scheduler warm-up")
 
           started = []
           keys = []
