@@ -146,3 +146,24 @@ test('writes evidence-summary.json from an artifact directory', async () => {
   assert.equal(written.sourceCount, 6)
   assert.equal(written.supermarketCount, 2)
 })
+
+test('inconsistent evidence documents can never be adapter-ready', () => {
+  const data = bundle()
+  data.inspection.sources.push({
+    id: 'unexpected-extra-source',
+    supermarket: 'ah',
+    kind: 'catalog',
+    integrity: 'verified',
+  })
+
+  const report = buildEvidenceSummary(data)
+
+  assert.equal(report.captureReady, true)
+  assert.equal(report.coverageReady, true)
+  assert.equal(report.documentConsistency.consistent, false)
+  assert.deepEqual(report.documentConsistency.unexpectedInspection, [
+    'unexpected-extra-source',
+  ])
+  assert.equal(report.adapterEvidenceReady, false)
+  assert.equal(report.nextAction, 'repair-evidence-bundle')
+})
