@@ -193,3 +193,38 @@ This writes `evidence-summary.json` and cross-checks the evidence bundle by sour
 A Product abstention is valid evidence: it means the generic parser did not guess. It does **not** prove a source-specific adapter can already extract the product. When the evidence bundle is structurally complete, the next action becomes review of the exact live product candidates/raw captures followed by AH/PLUS-specific adapter implementation.
 
 The command exits non-zero when the evidence bundle is not adapter-ready, making an incomplete live artifact a visible M1 failure rather than a manual interpretation problem.
+
+## Reviewed live-fixture promotion
+
+Live product candidates are **not** committed as fixtures automatically. After a capture artifact is inspected, promotion requires an explicit review file whose provenance matches the sanitized candidate exactly.
+
+Run:
+
+```bash
+npm run m1:promote-reviewed -- <capture-dir> <review.json> [output-dir]
+```
+
+A version-1 review file contains an `approvals` array. Every promoted approval must match the candidate's source ID, supermarket, final URL, captured-at timestamp and SHA-256 exactly, and must include `decision: "promote"`, a non-empty reviewer identifier and a valid review timestamp. The tool rejects abstentions, stale review files whose provenance no longer matches the candidate, and overwriting an existing reviewed fixture with different provenance.
+
+Promoted fixtures contain only the structured candidate observation, exact source provenance and review metadata; raw HTML is never copied into the fixture. This creates a deliberate trust boundary between short-retention capture evidence and versioned regression evidence.
+
+Example review shape (values must come from the inspected live artifact, never from this documentation):
+
+```json
+{
+  "version": 1,
+  "approvals": [
+    {
+      "id": "<source-id>",
+      "supermarket": "<ah-or-plus>",
+      "url": "<exact-final-url>",
+      "capturedAt": "<exact-capture-timestamp>",
+      "sha256": "<exact-capture-sha256>",
+      "decision": "promote",
+      "reviewer": "<reviewer-id>",
+      "reviewedAt": "<review-timestamp>",
+      "notes": "<why this candidate is acceptable regression evidence>"
+    }
+  ]
+}
+```
