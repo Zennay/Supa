@@ -12,6 +12,7 @@ export type ProductCandidate = {
   name: string
   packAmount: number | null
   packUnit: MatchUnit
+  packCount?: number | null
   available: boolean
 }
 
@@ -81,6 +82,11 @@ function scoreCandidate(
     return { score: -100, reasons: ['candidate unavailable'] }
   }
 
+  const packCount = candidate.packCount ?? 1
+  if (!Number.isInteger(packCount) || packCount <= 0) {
+    return { score: -100, reasons: ['invalid pack count'] }
+  }
+
   const queryPhrase = normalizedPhrase(requirement.query)
   const productPhrase = normalizedPhrase(candidate.name)
   const queryTokens = new Set(textTokens(requirement.query))
@@ -103,7 +109,13 @@ function scoreCandidate(
   }
 
   const required = baseUnitAmount(requirement.amount, requirement.unit)
-  const pack = baseUnitAmount(candidate.packAmount, candidate.packUnit)
+  const effectivePackAmount =
+    candidate.packAmount === null ? null : candidate.packAmount * packCount
+  const pack = baseUnitAmount(effectivePackAmount, candidate.packUnit)
+
+  if (packCount > 1 && candidate.packAmount !== null) {
+    reasons.push(`multipack count ${packCount} applied`)
+  }
 
   if (
     required.family !== 'unknown' &&
