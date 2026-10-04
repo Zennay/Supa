@@ -193,6 +193,7 @@ try {
   let observationText = await waitForText(sessionId, 'Meten zonder gokken.')
   assert.match(observationText, /0\/22 regels geobserveerd/)
   assert.match(observationText, /collection-template-not-evidence/)
+  assert.match(observationText, /JSON-concept openen/)
 
   const observationChanged = await execute(
     sessionId,

@@ -84,6 +84,10 @@ export function ObservationView() {
       return fresh
     }
   })
+  const [importStatus, setImportStatus] = useState<{
+    kind: 'success' | 'error'
+    message: string
+  } | null>(null)
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
   const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
   const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
@@ -106,6 +110,7 @@ export function ObservationView() {
       // Keep reset usable even when storage is unavailable.
     }
     setSheet(buildObservationSheet())
+    setImportStatus(null)
   }
 
   const updateStudy = (
@@ -187,6 +192,34 @@ export function ObservationView() {
     anchor.click()
     anchor.remove()
     URL.revokeObjectURL(href)
+  }
+
+  const importDraft = async (file: File | undefined) => {
+    if (!file) return
+
+    try {
+      const restored = restoreObservationSheetDraft(await file.text())
+      if (!restored) {
+        setImportStatus({
+          kind: 'error',
+          message:
+            'Import geweigerd: het bestand past niet bij de huidige M3-vraagset of evidence-grenzen.',
+        })
+        return
+      }
+
+      setSheet(restored)
+      setImportStatus({
+        kind: 'success',
+        message:
+          'Concept veilig geïmporteerd. De inhoud blijft collection-template-not-evidence tot converter en assessment slagen.',
+      })
+    } catch {
+      setImportStatus({
+        kind: 'error',
+        message: 'Import mislukt: het JSON-bestand kon niet worden gelezen.',
+      })
+    }
   }
 
   return (
@@ -604,6 +637,18 @@ export function ObservationView() {
         <button className="primary-button" type="button" onClick={downloadDraft}>
           JSON-concept bewaren
         </button>
+        <label className="ghost-button observation-import-button">
+          JSON-concept openen
+          <input
+            aria-label="JSON-concept openen"
+            type="file"
+            accept=".json,application/json"
+            onChange={async (event) => {
+              await importDraft(event.target.files?.[0])
+              event.target.value = ''
+            }}
+          />
+        </label>
         <button
           className="ghost-button"
           type="button"
@@ -612,6 +657,15 @@ export function ObservationView() {
           Alles wissen
         </button>
       </div>
+
+      {importStatus && (
+        <p
+          className={`observation-import-status is-${importStatus.kind}`}
+          role="status"
+        >
+          {importStatus.message}
+        </p>
+      )}
 
       <p className="disclaimer">
         Vul alleen waarden in die je echt hebt waargenomen. Een gedownload
