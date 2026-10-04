@@ -83,3 +83,62 @@ export function normalizePackText(input: string | null): NormalizedPack {
 
   return { rawText, count: 1, amount: null, unit: 'unknown' }
 }
+
+export type NormalizedOfferMechanic =
+  | { type: 'buy_x_get_y_free'; buy: number; free: number }
+  | { type: 'quantity_for_price'; quantity: number; totalPriceCents: number }
+  | { type: 'percent_discount'; percent: number }
+  | { type: 'fixed_price'; priceCents: number }
+  | { type: 'second_half_price' }
+  | { type: 'unknown'; rawLabel: string }
+
+export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
+  const rawLabel = label.trim()
+  const cleaned = rawLabel.toLowerCase().replace(/\s+/g, ' ')
+
+  const buyFree = cleaned.match(/^(\d+)\s*\+\s*(\d+)\s+gratis$/)
+  if (buyFree) {
+    return {
+      type: 'buy_x_get_y_free',
+      buy: Number(buyFree[1]),
+      free: Number(buyFree[2]),
+    }
+  }
+
+  const quantityForPrice = cleaned.match(
+    /^(\d+)\s+voor\s+€?\s*(\d+(?:[.,]\d{1,2})?)$/,
+  )
+  if (quantityForPrice) {
+    const totalPriceCents = normalizeMoneyToCents(quantityForPrice[2])
+    if (totalPriceCents !== null) {
+      return {
+        type: 'quantity_for_price',
+        quantity: Number(quantityForPrice[1]),
+        totalPriceCents,
+      }
+    }
+  }
+
+  const percent = cleaned.match(/^(\d+(?:[.,]\d+)?)%\s+korting$/)
+  if (percent) {
+    return {
+      type: 'percent_discount',
+      percent: decimal(percent[1]),
+    }
+  }
+
+  const fixed = cleaned.match(/^voor\s+€?\s*(\d+(?:[.,]\d{1,2})?)$/)
+  if (fixed) {
+    const priceCents = normalizeMoneyToCents(fixed[1])
+    if (priceCents !== null) {
+      return { type: 'fixed_price', priceCents }
+    }
+  }
+
+  if (/^2e\s+halve\s+prijs$/.test(cleaned)) {
+    return { type: 'second_half_price' }
+  }
+
+  return { type: 'unknown', rawLabel }
+}
+
