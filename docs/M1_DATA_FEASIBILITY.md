@@ -71,7 +71,8 @@ The first benchmark is deliberately a **controlled baseline**, not evidence abou
 - unavailable best candidates;
 - ambiguous equal candidates;
 - safe abstention when confidence is insufficient;
-- fail-closed offer normalization for impossible quantities, zero-price mechanics and percentages outside 1–100%.
+- fail-closed offer normalization for impossible quantities, zero-price mechanics and percentages outside 1–100%;
+- fail-closed pack normalization for zero/invalid parsed sizes or multipack counts, preserving raw text while returning an explicit unknown quantity.
 
 Run it with:
 
