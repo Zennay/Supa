@@ -490,3 +490,55 @@ export function observationSheetReadiness(
     issues,
   }
 }
+
+export type ObservationWindowSummary =
+  | { state: 'not-started' }
+  | {
+      state: 'single-observation'
+      firstSide: 'baseline' | 'candidate'
+      firstObservedAt: string
+      deadlineAt: string
+    }
+  | { state: 'within-window'; deltaHours: number }
+  | { state: 'outside-window'; deltaHours: number }
+
+export function observationWindowSummary(
+  sheet: ObservationSheet,
+): ObservationWindowSummary {
+  const baselineAt = validObservedAt(sheet.baseline.observedAt)
+  const candidateAt = validObservedAt(sheet.candidate.observedAt)
+
+  if (baselineAt === null && candidateAt === null) {
+    return { state: 'not-started' }
+  }
+
+  if (baselineAt === null || candidateAt === null) {
+    const firstSide = baselineAt !== null ? 'baseline' : 'candidate'
+    const firstObservedAt = baselineAt ?? candidateAt
+
+    if (firstObservedAt === null) {
+      return { state: 'not-started' }
+    }
+
+    return {
+      state: 'single-observation',
+      firstSide,
+      firstObservedAt: new Date(firstObservedAt).toISOString(),
+      deadlineAt: new Date(
+        firstObservedAt + sheet.study.maxObservationWindowHours * 60 * 60 * 1000,
+      ).toISOString(),
+    }
+  }
+
+  const deltaHours =
+    Math.abs(baselineAt - candidateAt) / (60 * 60 * 1000)
+
+  return {
+    state:
+      deltaHours <= sheet.study.maxObservationWindowHours
+        ? 'within-window'
+        : 'outside-window',
+    deltaHours,
+  }
+}
+
