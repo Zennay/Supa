@@ -17,4 +17,5 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run m1:matching-benchmark
+      - run: npm run m1:source-permission-gate
       - run: npm run build
