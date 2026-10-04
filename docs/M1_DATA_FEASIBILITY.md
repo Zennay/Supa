@@ -135,3 +135,21 @@ This produces a `sanitized-candidates/` bundle inside the short-retention workfl
 The exported candidate contains structured observation data plus provenance only; raw HTML is not copied into the candidate file. Product pages that cannot be interpreted safely are recorded as abstentions in `sanitized-candidates/index.json` rather than guessed into fixtures.
 
 These files are **review candidates**, not automatically committed fixtures. Source-specific AH/PLUS adapters still require inspection of the live artifact and explicit promotion of minimal representative evidence.
+
+## Repeated capture drift detection
+
+M1 requires repeated acquisition to fail visibly when a source changes. After two inspected capture artifacts are available, compare them with:
+
+```bash
+npm run m1:compare-captures -- <baseline-capture-dir> <current-capture-dir>
+```
+
+The command writes `drift.json` into the current capture directory. It separates ordinary content churn (for example a different HTML hash caused by changed prices/offers) from changes that require review:
+
+- a source being added or removed;
+- capture success changing;
+- redirect/final URL changing;
+- JSON-LD / application-json / framework structure changing;
+- the conservative Schema.org Product extraction contract changing.
+
+Volatile HTML hashes and application-json byte counts alone do **not** count as structural breakage. Structural/source-contract changes set `reviewRequired: true` and the CLI exits non-zero so a future repeated-ingestion job can fail visibly instead of silently trusting stale extraction assumptions.
