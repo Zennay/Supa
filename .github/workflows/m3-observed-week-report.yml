@@ -4,11 +4,9 @@ on:
   pull_request:
     paths:
       - ".github/workflows/m3-observed-week-report.yml"
-      - "scripts/m3-create-observation-sheet.mjs"
       - "scripts/m3-assess-observed-week.mjs"
       - "src/domain/observedBasketStudy.ts"
       - "src/domain/basketComparison.ts"
-      - "tests/m3-observation-sheet.test.mjs"
       - "tests/m3-observed-study-report.test.mjs"
       - "package.json"
   workflow_dispatch:
@@ -29,8 +27,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node --experimental-strip-types --test tests/m3-observation-sheet.test.mjs tests/m3-observed-study-report.test.mjs
-      - run: npm run m3:create-observation-sheet -- --output /tmp/supa-m3-observation-sheet.json
-      - run: test -s /tmp/supa-m3-observation-sheet.json
+      - run: node --experimental-strip-types --test tests/m3-observed-study-report.test.mjs
       - run: npm test
       - run: npm run build
