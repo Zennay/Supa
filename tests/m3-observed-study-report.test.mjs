@@ -59,6 +59,7 @@ function observedStudy(overrides = {}) {
     population: 'independently living students',
     region: 'Leiden',
     weekStart: '2026-09-28',
+    priceContext: 'in-store',
     baseline: {
       evidenceId: 'runner-baseline-001',
       observedAt: '2026-10-02T17:00:00Z',
@@ -83,6 +84,7 @@ test('M3 report runner keeps participant key out of the emitted assessment', () 
   assert.equal(report.claimable, true)
   assert.equal(report.outcome, 'better')
   assert.equal(report.publicSavingsClaimEligible, false)
+  assert.equal(report.priceContext, 'in-store')
   assert.ok(report.savingsCents > 0)
   assert.equal(report.attribution.status, 'partial')
   assert.equal(report.attribution.effectTotals.unknownCents, report.deltaCents)
