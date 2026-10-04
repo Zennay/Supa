@@ -10,6 +10,7 @@ import {
 } from '../../domain/m3ObservationSheet.ts'
 
 type Side = 'baseline' | 'candidate'
+type StudyTextField = Exclude<keyof ObservationSheet['study'], 'maxObservationWindowHours'>
 
 const sideLabels: Record<Side, string> = {
   baseline: 'Winkel A · baseline',
@@ -62,7 +63,7 @@ export function ObservationView() {
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
 
   const updateStudy = (
-    field: keyof ObservationSheet['study'],
+    field: StudyTextField,
     value: string,
   ) => {
     setSheet((current) => ({
