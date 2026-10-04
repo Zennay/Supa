@@ -10,12 +10,12 @@ This is a feasibility spike, not a production crawler. The original M1 pair was 
 
 | Supermarket | Kind | URL |
 | --- | --- | --- |
-| Albert Heijn | product | https://www.ah.nl/producten/product/wi1525/halfvolle-melk |
-| Albert Heijn | catalog | https://www.ah.nl/producten |
-| Albert Heijn | offers | https://www.ah.nl/bonus |
 | PLUS | product | https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010 |
 | PLUS | catalog | https://www.plus.nl/producten |
 | PLUS | offers | https://www.plus.nl/aanbiedingen |
+| DekaMarkt | product | https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk/zuivelmeester-halfvolle-melk-1-liter/115873 |
+| DekaMarkt | catalog | https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk |
+| DekaMarkt | offers | https://www.dekamarkt.nl/aanbiedingen |
 
 ## Safety and scope contract
 
@@ -23,7 +23,7 @@ This is a feasibility spike, not a production crawler. The original M1 pair was 
 - No login, cookies, credentials, private APIs or authenticated endpoints.
 - No CAPTCHA or anti-bot bypass.
 - No link discovery or recursive crawling.
-- Only `www.ah.nl` and `www.plus.nl` are accepted, including after redirects.
+- Only `www.plus.nl` and `www.dekamarkt.nl` are accepted by the canonical M1 capture, including after redirects. Albert Heijn remains historical blocked-route evidence only.
 - Maximum response size is 5 MiB per page.
 - One request per fixed source per run.
 - Failed/changed sources fail visibly instead of silently substituting guessed data.
@@ -49,11 +49,11 @@ The GitHub Actions workflow uploads the evidence as a short-retention artifact. 
 After a successful VPS capture:
 
 1. download/inspect the exact artifact;
-2. identify stable structured data or selectors separately for AH and PLUS;
-3. sanitize and commit minimal representative fixtures with the capture metadata/hash;
-4. implement source-specific adapters against those fixtures;
-5. add regression tests for product name, current price, pack/unit, offer mechanics and availability;
-6. re-run the live bounded capture to prove at least one end-to-end extraction per source.
+2. verify the observed source-specific PLUS and DekaMarkt extraction contracts against the new capture;
+3. compare the new capture with the versioned PLUS/DekaMarkt evidence and classify drift;
+4. keep source-specific adapters fail-closed when the observed contract changes;
+5. run the real-source matching regression suite;
+6. treat production permission/terms as a separate pre-lock-in decision rather than weakening the technical proof.
 
 A source that blocks or changes materially is evidence for M1; do not work around restrictions by escalating scraping techniques.
 
@@ -189,7 +189,7 @@ npm run m1:evidence-summary -- <capture-directory>
 
 This writes `evidence-summary.json` and cross-checks the evidence bundle by source ID. It only reports `adapterEvidenceReady: true` when:
 
-- all six bounded AH/PLUS sources are represented consistently across manifest, inspection and freshness reports;
+- all six bounded PLUS/DekaMarkt sources are represented consistently across manifest, inspection and freshness reports;
 - each successful source has verified integrity and a fresh snapshot;
 - both supermarkets retain product + catalog + offers coverage;
 - each product page has an explicit sanitized decision: candidate or abstention;
