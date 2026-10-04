@@ -419,5 +419,50 @@
     "expected": {
       "type": "abstain"
     }
+  },
+  {
+    "id": "real-dekamarkt-halfvolle-melk-pack-fit",
+    "requirement": {
+      "id": "real-deka-milk",
+      "query": "halfvolle melk",
+      "amount": 1000,
+      "unit": "ml"
+    },
+    "candidates": [
+      {
+        "id": "deka-115873",
+        "name": "Zuivelmeester Halfvolle melk",
+        "packAmount": 1,
+        "packUnit": "l",
+        "available": true
+      },
+      {
+        "id": "deka-101229",
+        "name": "Zuivelmeester Halfvolle melk",
+        "packAmount": 2,
+        "packUnit": "l",
+        "available": true
+      },
+      {
+        "id": "deka-103408",
+        "name": "Melkan Halfvolle melk lactosevrij",
+        "packAmount": 1,
+        "packUnit": "l",
+        "available": true
+      },
+      {
+        "id": "deka-6279",
+        "name": "Melkunie Karnemelk",
+        "packAmount": 1,
+        "packUnit": "l",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "deka-115873"
+      ]
+    }
   }
 ]
