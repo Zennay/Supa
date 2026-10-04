@@ -193,7 +193,7 @@ This writes `evidence-summary.json` and cross-checks the evidence bundle by sour
 - each product page has an explicit sanitized decision: candidate or abstention;
 - no evidence document silently adds, removes or loses a source.
 
-A Product abstention is valid evidence: it means the generic parser did not guess. It does **not** prove a source-specific adapter can already extract the product. When the evidence bundle is structurally complete, the next action becomes review of the exact live product candidates/raw captures followed by AH/PLUS-specific adapter implementation.
+A Product abstention is valid evidence: it means the generic parser did not guess. It does **not** prove a source-specific adapter can already extract the product. Adapter readiness also requires the manifest, inspection and freshness documents to be mutually consistent: unexpected extra source IDs or count mismatches cannot be adapter-ready even when every manifest source individually looks complete. When the evidence bundle is structurally complete, the next action becomes review of the exact live product candidates/raw captures followed by AH/PLUS-specific adapter implementation.
 
 The command exits non-zero when the evidence bundle is not adapter-ready, making an incomplete live artifact a visible M1 failure rather than a manual interpretation problem.
 

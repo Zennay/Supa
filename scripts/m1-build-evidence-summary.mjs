@@ -145,6 +145,7 @@ export function buildEvidenceSummary({
 
   const productSources = sources.filter((source) => source.kind === 'product')
   const adapterEvidenceReady =
+    documentConsistency.consistent &&
     captureReady &&
     coverageReady &&
     productSources.length === supermarkets.length &&
