@@ -10,6 +10,7 @@ test('M3 local draft recovery restores genuine editable collection fields', () =
   const sheet = buildObservationSheet()
   sheet.study.studyId = 'm3-week-001'
   sheet.study.participantKey = 'student-001'
+  sheet.study.priceContext = 'online-order'
   sheet.baseline.store.name = 'Observed store A'
   sheet.baseline.lines[0].observedProduct.available = true
   sheet.baseline.lines[0].observedProduct.productName = 'Observed chicken'
@@ -21,6 +22,7 @@ test('M3 local draft recovery restores genuine editable collection fields', () =
 
   assert.ok(restored)
   assert.equal(restored.study.studyId, 'm3-week-001')
+  assert.equal(restored.study.priceContext, 'online-order')
   assert.equal(restored.baseline.store.name, 'Observed store A')
   assert.equal(restored.baseline.lines[0].observedProduct.productName, 'Observed chicken')
   assert.equal(restored.baseline.lines[0].observedProduct.priceCents, 499)
