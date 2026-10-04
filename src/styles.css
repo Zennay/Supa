@@ -275,3 +275,44 @@ h3, p { margin: 0; }
     box-shadow: 0 30px 90px rgba(34, 39, 33, .12);
   }
 }
+
+
+.trace-row > div {
+  min-width: 0;
+}
+
+.trace-row .trace-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.unresolved-row {
+  background: #fff9ef;
+}
+
+.unresolved-row > strong {
+  color: #8b4b22;
+}
+
+.attention-card {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #efd9bf;
+  border-radius: 18px;
+  background: #fff9ef;
+  color: #6d4426;
+}
+
+.attention-card span {
+  font-size: 13px;
+}
+
+.unresolved-shopping {
+  background: #fff9ef;
+}
+
+.unresolved-shopping .check {
+  border-color: #d9b88f;
+}
