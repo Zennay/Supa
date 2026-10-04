@@ -70,7 +70,8 @@ The first benchmark is deliberately a **controlled baseline**, not evidence abou
 - confusing near-neighbours;
 - unavailable best candidates;
 - ambiguous equal candidates;
-- safe abstention when confidence is insufficient.
+- safe abstention when confidence is insufficient;
+- fail-closed offer normalization for impossible quantities, zero-price mechanics and percentages outside 1–100%.
 
 Run it with:
 
