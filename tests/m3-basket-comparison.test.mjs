@@ -69,6 +69,13 @@ test('M3 compares the same complete basket against an explicit baseline', () => 
     baseline.totalCents - candidate.totalCents,
   )
   assert.equal(comparison.lineDeltas.length, baseline.matchedLineCount)
+  assert.equal(comparison.attribution.planning.status, 'known')
+  assert.equal(comparison.attribution.planning.deltaCents, 0)
+  assert.equal(comparison.attribution.packSize.status, 'known')
+  assert.equal(comparison.attribution.packSize.deltaCents, 0)
+  assert.equal(comparison.attribution.offer.status, 'unknown')
+  assert.equal(comparison.attribution.offer.deltaCents, null)
+  assert.equal(comparison.attribution.unattributedCents, comparison.deltaCents)
   assert.deepEqual(comparison.reasons, [])
 })
 
@@ -106,6 +113,10 @@ test('M3 returns unknown when a superficially cheaper basket is incomplete', () 
   assert.equal(comparison.outcome, 'unknown')
   assert.equal(comparison.savingsCents, null)
   assert.equal(comparison.deltaCents, null)
+  assert.equal(comparison.attribution.planning.status, 'unknown')
+  assert.equal(comparison.attribution.packSize.status, 'unknown')
+  assert.equal(comparison.attribution.offer.status, 'unknown')
+  assert.equal(comparison.attribution.unattributedCents, null)
   assert.match(comparison.reasons.join(' '), /unresolved ingredients/)
 })
 
@@ -138,4 +149,31 @@ test('M3 records a neutral result when comparable baskets cost the same', () => 
   assert.equal(comparison.outcome, 'same')
   assert.equal(comparison.deltaCents, 0)
   assert.equal(comparison.savingsCents, 0)
+})
+
+test('M3 marks pack-size attribution unknown when pack geometry differs', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidateProducts = productsForStore(candidateStore.id, 0).map((product) =>
+    product.id.endsWith('chicken-400')
+      ? { ...product, packAmount: 300, name: 'Kippendij 300 g' }
+      : product,
+  )
+  const candidate = buildOneStoreBasket({
+    store: candidateStore,
+    plan: m2InitialPlan,
+    recipes: m2Recipes,
+    activeDays: m2DefaultActiveDays,
+    products: candidateProducts,
+  })
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, true)
+  assert.equal(comparison.attribution.planning.status, 'known')
+  assert.equal(comparison.attribution.packSize.status, 'unknown')
+  assert.match(
+    comparison.attribution.packSize.reasons.join(' '),
+    /pack-size effect cannot be isolated/,
+  )
+  assert.equal(comparison.attribution.offer.status, 'unknown')
 })
