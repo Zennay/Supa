@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 
 import { buildObservationSheet } from '../scripts/m3-create-observation-sheet.mjs'
+import { observationSheetProgress } from '../src/domain/m3ObservationSheet.ts'
 
 function requirement(sheet, id) {
   return sheet.requirements.find((item) => item.id === id)
@@ -56,6 +57,23 @@ test('M3 observation sheet gives both stores the same demand and blank evidence 
       ),
     )
   }
+})
+
+test('M3 observation progress counts explicit availability without inventing evidence', () => {
+  const sheet = buildObservationSheet()
+  let progress = observationSheetProgress(sheet)
+
+  assert.equal(progress.totalLines, 22)
+  assert.equal(progress.availabilityRecorded, 0)
+  assert.equal(progress.metadataCompleted, 0)
+  assert.equal(progress.metadataTotal, 15)
+
+  sheet.baseline.lines[0].observedProduct.available = false
+  sheet.baseline.store.name = 'Observed store'
+  progress = observationSheetProgress(sheet)
+
+  assert.equal(progress.availabilityRecorded, 1)
+  assert.equal(progress.metadataCompleted, 1)
 })
 
 test('M3 observation sheet does not prefill participant identity or savings evidence', () => {
