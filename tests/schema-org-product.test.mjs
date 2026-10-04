@@ -118,3 +118,42 @@ test('abstains on explicit non-EUR product pricing', () => {
     reason: 'Product JSON-LD currency is not EUR: GBP',
   })
 })
+
+test('abstains when a priced offer has no explicit currency', () => {
+  const result = parseSchemaOrgProduct(
+    {
+      '@type': 'Product',
+      name: 'Milk',
+      offers: {
+        '@type': 'Offer',
+        price: '1.29',
+      },
+    },
+    provenance,
+  )
+
+  assert.deepEqual(result, {
+    type: 'abstain',
+    reason: 'Product JSON-LD priced offer has no explicit currency',
+  })
+})
+
+test('malformed external JSON-LD abstains instead of throwing through the parser contract', () => {
+  const result = parseSchemaOrgProduct(
+    {
+      '@type': 'Product',
+      name: 'Milk',
+      offers: {
+        '@type': 'Offer',
+        price: '1.29',
+        priceCurrency: 'EUR',
+        validFrom: 'not-a-date',
+      },
+    },
+    provenance,
+  )
+
+  assert.equal(result.type, 'abstain')
+  assert.match(result.reason, /failed trust validation/)
+  assert.match(result.reason, /validFrom/)
+})
