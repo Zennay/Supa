@@ -324,5 +324,26 @@
     "expected": {
       "type": "abstain"
     }
+  },
+  {
+    "id": "known-unit-null-amount-mismatch",
+    "requirement": {
+      "id": "coconut-milk",
+      "query": "kokosmelk",
+      "amount": null,
+      "unit": "g"
+    },
+    "candidates": [
+      {
+        "id": "coconut-milk-can",
+        "name": "Kokosmelk",
+        "packAmount": 400,
+        "packUnit": "ml",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "abstain"
+    }
   }
 ]
