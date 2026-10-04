@@ -56,3 +56,28 @@ After a successful VPS capture:
 6. re-run the live bounded capture to prove at least one end-to-end extraction per source.
 
 A source that blocks or changes materially is evidence for M1; do not work around restrictions by escalating scraping techniques.
+
+## Matching benchmark contract
+
+M1 also requires a reproducible ingredient-to-product matching benchmark before basket calculations can be trusted.
+
+The first benchmark is deliberately a **controlled baseline**, not evidence about live AH/PLUS accuracy yet. It lives in `fixtures/matching/benchmark.v1.json` and covers:
+
+- exact/generic product naming;
+- pack-size fit and oversupply;
+- mass/volume/piece unit-family mismatches;
+- confusing near-neighbours;
+- unavailable best candidates;
+- ambiguous equal candidates;
+- safe abstention when confidence is insufficient.
+
+Run it with:
+
+```bash
+npm run m1:matching-benchmark
+```
+
+Current safety thresholds are explicit and versioned: at least 90% overall accuracy, at least 85% accepted-match accuracy, 100% correct abstention on gold abstention cases and zero false-positive matches on those cases.
+
+These numbers are only a regression gate for the controlled fixture. They must not be reported as real supermarket matching accuracy. After the VPS source capture is inspected, sanitized AH/PLUS-derived candidates should be added as a new benchmark version and the thresholds re-evaluated against real observed edge cases.
+
