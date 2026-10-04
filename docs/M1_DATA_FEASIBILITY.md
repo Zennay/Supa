@@ -242,7 +242,7 @@ The boundary deliberately does **not** contain selectors or extraction guesses. 
 - fixture version/type is the reviewed-live product format;
 - the source is a product page for the expected supermarket;
 - the observation passes the raw ingestion trust contract;
-- source ID/provenance and observation provenance match exactly for supermarket, kind, URL, captured-at and SHA-256;
+- the fixture source ID is path-safe and provenance matches the observation exactly for supermarket, kind, URL, captured-at and SHA-256;
 - reviewer identity and review timestamp are present and valid;
 - review chronology is sane: review occurs at/after capture and is not implausibly future-dated;
 - cross-supermarket fixture reuse is rejected.

@@ -135,3 +135,13 @@ test('reviewed fixtures reject implausibly future-dated review evidence', () => 
     /implausibly in the future/,
   )
 })
+
+test('reviewed fixtures reject unsafe or path-like source ids', () => {
+  const reviewed = fixture('ah')
+  reviewed.source.id = '../ah-product'
+
+  assert.throws(
+    () => validateReviewedLiveProductFixture(reviewed, 'ah'),
+    /path-safe source id/,
+  )
+})
