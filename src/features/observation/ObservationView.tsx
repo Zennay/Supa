@@ -4,6 +4,7 @@ import {
   buildObservationSheet,
   OBSERVATION_DRAFT_STORAGE_KEY,
   observationSheetProgress,
+  observationSheetReadiness,
   restoreObservationSheetDraft,
   type ObservationSheet,
   type ObservationSource,
@@ -74,6 +75,7 @@ export function ObservationView() {
     }
   })
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
+  const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
 
   useEffect(() => {
     try {
@@ -201,6 +203,42 @@ export function ObservationView() {
           Je concept wordt automatisch lokaal op dit apparaat bewaard, zodat een
           refresh of gesloten tab je winkelmeting niet wist.
         </p>
+      </div>
+
+      <div
+        className={`observation-readiness ${readiness.ready ? 'is-ready' : ''}`}
+        aria-live="polite"
+      >
+        <div>
+          <span className="eyebrow">Preflight</span>
+          <strong>
+            {readiness.ready
+              ? 'Klaar voor de M3-converter'
+              : `Nog ${readiness.issues.length} controle${readiness.issues.length === 1 ? '' : 's'} open`}
+          </strong>
+        </div>
+        {readiness.ready ? (
+          <p>
+            De verzameling is lokaal compleet genoeg om door de bestaande
+            fail-closed converter te laten beoordelen. Dit maakt het nog geen
+            evidence.
+          </p>
+        ) : (
+          <>
+            <p>
+              Los deze punten op vóór je de observatie als kandidaat voor de
+              converter gebruikt:
+            </p>
+            <ul>
+              {readiness.issues.slice(0, 6).map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+            {readiness.issues.length > 6 && (
+              <p>+ {readiness.issues.length - 6} extra controles.</p>
+            )}
+          </>
+        )}
       </div>
 
       <div className="observation-card">
