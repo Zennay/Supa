@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   normalizeMoneyToCents,
+  normalizeOfferLabel,
   normalizePackText,
 } from '../src/data/normalize.ts'
 
@@ -47,5 +48,33 @@ test('unknown pack text remains explicit instead of guessed', () => {
     count: 1,
     amount: null,
     unit: 'unknown',
+  })
+})
+
+test('normalizes common supermarket offer mechanics without guessing unknown labels', () => {
+  assert.deepEqual(normalizeOfferLabel('1+1 gratis'), {
+    type: 'buy_x_get_y_free',
+    buy: 1,
+    free: 1,
+  })
+  assert.deepEqual(normalizeOfferLabel('2 voor 5.00'), {
+    type: 'quantity_for_price',
+    quantity: 2,
+    totalPriceCents: 500,
+  })
+  assert.deepEqual(normalizeOfferLabel('30% korting'), {
+    type: 'percent_discount',
+    percent: 30,
+  })
+  assert.deepEqual(normalizeOfferLabel('voor 1.19'), {
+    type: 'fixed_price',
+    priceCents: 119,
+  })
+  assert.deepEqual(normalizeOfferLabel('2e halve prijs'), {
+    type: 'second_half_price',
+  })
+  assert.deepEqual(normalizeOfferLabel('ACTIE'), {
+    type: 'unknown',
+    rawLabel: 'ACTIE',
   })
 })
