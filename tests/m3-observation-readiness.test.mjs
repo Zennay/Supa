@@ -13,6 +13,7 @@ function completeSheet() {
   sheet.study.population = 'uitwonende student'
   sheet.study.region = 'Leiden'
   sheet.study.weekStart = '2026-10-05'
+  sheet.study.priceContext = 'in-store'
 
   const observations = [
     ['baseline', 'store-a', 'Store A', 'obs-a', '2026-10-05T10:00:00.000Z'],
@@ -55,6 +56,16 @@ test('M3 readiness accepts a structurally complete two-store observation', () =>
     ready: true,
     issues: [],
   })
+})
+
+test('M3 readiness rejects a missing shared price context', () => {
+  const sheet = completeSheet()
+  sheet.study.priceContext = ''
+
+  const readiness = observationSheetReadiness(sheet)
+
+  assert.equal(readiness.ready, false)
+  assert.ok(readiness.issues.some((issue) => issue.includes('Prijscontext ontbreekt')))
 })
 
 test('M3 readiness rejects the same store on both sides', () => {
