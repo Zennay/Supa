@@ -17,6 +17,8 @@ export type ReviewedLiveProductFixture = {
   }
 }
 
+const MAX_REVIEW_CLOCK_SKEW_MS = 5 * 60 * 1000
+
 function validIso(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
 }
@@ -33,6 +35,24 @@ function sourceExactlyMatchesObservation(
     provenance.capturedAt === source.capturedAt &&
     provenance.sha256 === source.sha256
   )
+}
+
+function validateReviewChronology(
+  fixture: ReviewedLiveProductFixture,
+  now = Date.now(),
+) {
+  const capturedAt = Date.parse(fixture.source.capturedAt)
+  const reviewedAt = Date.parse(fixture.review.reviewedAt)
+
+  if (reviewedAt < capturedAt) {
+    throw new Error('Reviewed live fixture review cannot predate its capture')
+  }
+
+  if (reviewedAt > now + MAX_REVIEW_CLOCK_SKEW_MS) {
+    throw new Error(
+      'Reviewed live fixture review timestamp is implausibly in the future',
+    )
+  }
 }
 
 export function validateReviewedLiveProductFixture(
@@ -76,6 +96,7 @@ export function validateReviewedLiveProductFixture(
     throw new Error('Reviewed live fixture must include a valid reviewedAt')
   }
 
+  validateReviewChronology(fixture)
   return observation
 }
 
