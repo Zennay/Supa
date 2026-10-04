@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 
 import { promoteReviewedCandidates } from '../scripts/m1-promote-reviewed-candidates.mjs'
+
+function sha256Text(value) {
+  return createHash('sha256').update(value, 'utf8').digest('hex')
+}
 
 async function setupCandidate({ abstain = false } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-promote-'))
@@ -42,10 +47,13 @@ async function setupCandidate({ abstain = false } = {}) {
     },
   }
 
+  let candidateSha256 = null
   if (!abstain) {
+    const serialized = JSON.stringify(candidate, null, 2) + '\n'
+    candidateSha256 = sha256Text(serialized)
     await writeFile(
       path.join(sanitizedDir, 'ah-product.json'),
-      JSON.stringify(candidate),
+      serialized,
       'utf8',
     )
   }
@@ -55,13 +63,15 @@ async function setupCandidate({ abstain = false } = {}) {
     JSON.stringify({
       milestone: 'M1 Data Feasibility',
       captureStartedAt: '2026-10-04T01:59:00.000Z',
-      candidates: abstain ? [] : [{ id: source.id, file: 'ah-product.json' }],
+      candidates: abstain
+        ? []
+        : [{ id: source.id, file: 'ah-product.json', candidateSha256 }],
       abstentions: abstain ? [{ id: source.id }] : [],
     }),
     'utf8',
   )
 
-  return { root, source, candidate }
+  return { root, source, candidate, candidateSha256 }
 }
 
 async function writeReview(root, approval) {
@@ -90,13 +100,14 @@ function approvalFor(source, overrides = {}) {
 }
 
 test('promotes an exactly reviewed sanitized candidate without raw html', async () => {
-  const { root, source } = await setupCandidate()
+  const { root, source, candidateSha256 } = await setupCandidate()
   const review = await writeReview(root, approvalFor(source))
   const output = path.join(root, 'fixtures')
 
   const manifest = await promoteReviewedCandidates(root, review, output)
 
   assert.equal(manifest.promotedCount, 1)
+  assert.equal(manifest.promoted[0].candidateSha256, candidateSha256)
   const fixture = JSON.parse(
     await readFile(path.join(output, 'ah-product.json'), 'utf8'),
   )
@@ -165,6 +176,42 @@ test('rejects promotion with an implausibly future-dated review', async () => {
   await assert.rejects(
     () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
     /implausibly in the future/,
+  )
+})
+
+test('rejects tampering with a sanitized candidate after export', async () => {
+  const { root, source } = await setupCandidate()
+  const review = await writeReview(root, approvalFor(source))
+  const candidatePath = path.join(
+    root,
+    'sanitized-candidates',
+    'ah-product.json',
+  )
+  const candidate = JSON.parse(await readFile(candidatePath, 'utf8'))
+  candidate.observation.name = 'Tampered product'
+  await writeFile(
+    candidatePath,
+    JSON.stringify(candidate, null, 2) + '\n',
+    'utf8',
+  )
+
+  await assert.rejects(
+    () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
+    /candidate integrity mismatch/i,
+  )
+})
+
+test('rejects an index entry without a candidate integrity hash', async () => {
+  const { root, source } = await setupCandidate()
+  const review = await writeReview(root, approvalFor(source))
+  const indexPath = path.join(root, 'sanitized-candidates', 'index.json')
+  const index = JSON.parse(await readFile(indexPath, 'utf8'))
+  delete index.candidates[0].candidateSha256
+  await writeFile(indexPath, JSON.stringify(index), 'utf8')
+
+  await assert.rejects(
+    () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
+    /missing a valid candidate SHA-256/,
   )
 })
 
