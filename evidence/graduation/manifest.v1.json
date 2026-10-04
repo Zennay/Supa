@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "project": "SUPA",
+  "artifactSet": "graduation-2026",
+  "generatedAt": "2026-10-04T02:53:00Z",
+  "storage": {
+    "provider": "ChatGPT Library",
+    "canonicalFolder": "/Supa/Evidence/Graduation-2026"
+  },
+  "artifacts": [
+    {
+      "role": "design-rationale",
+      "canonicalFilename": "Design_Rationale_Supa_Zennay.pdf",
+      "sourceFilename": "Design_Rationale_Supa_Zennay(10).pdf",
+      "sizeBytes": 26462749,
+      "sha256": "65722ca0711d55f03ac91439a024aba07f4a9f3c6230c9df2d1fa9ca1d65772b",
+      "sourceCreatedAt": "2026-06-17T22:07:23Z",
+      "archiveState": "copied-to-canonical-folder"
+    },
+    {
+      "role": "product-biography",
+      "canonicalFilename": "Productbiografie_Supa_Zennay.pdf",
+      "sourceFilename": "Productbiografie_Supa_Zennay(7).pdf",
+      "sizeBytes": 47623784,
+      "sha256": "d1bb6fb792458ddf2a9788c845487ff659f7d2b334ca4b4fa7dd9ea580e7afc7",
+      "sourceCreatedAt": "2026-06-17T22:07:29Z",
+      "archiveState": "copied-to-canonical-folder"
+    },
+    {
+      "role": "reflection",
+      "canonicalFilename": "Reflectie_Supa_Zennay.pdf",
+      "sourceFilename": "Reflectie_Supa_Zennay_500858050.pdf",
+      "sizeBytes": 36056,
+      "sha256": null,
+      "sourceCreatedAt": "2026-08-28T11:25:13Z",
+      "archiveState": "library-reference-only",
+      "retrievalKey": "Reflectie_Supa_Zennay_500858050.pdf",
+      "verificationNote": "The current Library backend exposes parsed content and stable metadata but does not authorize raw-byte materialization or server-side cloning for this Project file. Do not invent a byte hash; retrieve by exact filename and size until a byte-preserving copy route is available."
+    }
+  ]
+}
