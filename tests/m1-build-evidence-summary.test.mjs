@@ -199,7 +199,7 @@ test('candidate-index metadata and duplicate decisions are part of consistency',
   assert.equal(report.documentConsistency.candidateIndexMilestoneMatches, false)
   assert.equal(report.documentConsistency.candidateIndexCountsMatch, false)
   assert.deepEqual(report.documentConsistency.duplicateCandidateIds, [
-    'ah-product',
+    'dekamarkt-product',
   ])
   assert.equal(report.documentConsistency.consistent, false)
   assert.equal(report.adapterEvidenceReady, false)
