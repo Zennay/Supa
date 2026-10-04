@@ -345,5 +345,37 @@
     "expected": {
       "type": "abstain"
     }
+  },
+  {
+    "id": "multipack-effective-quantity",
+    "requirement": {
+      "id": "sparkling-water",
+      "query": "bruiswater",
+      "amount": 4,
+      "unit": "l"
+    },
+    "candidates": [
+      {
+        "id": "water-6x1l",
+        "name": "Bruiswater",
+        "packAmount": 1,
+        "packUnit": "l",
+        "packCount": 6,
+        "available": true
+      },
+      {
+        "id": "water-1l",
+        "name": "Bruiswater",
+        "packAmount": 1,
+        "packUnit": "l",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "water-6x1l"
+      ]
+    }
   }
 ]

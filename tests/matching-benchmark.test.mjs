@@ -13,7 +13,7 @@ const cases = JSON.parse(await readFile(fixtureUrl, 'utf8'))
 test('matching benchmark meets M1 safety baseline', () => {
   const { metrics } = evaluateMatchingBenchmark(cases)
 
-  assert.equal(metrics.total, 11)
+  assert.equal(metrics.total, 12)
   assert.ok(metrics.accuracy >= 0.9)
   assert.ok(metrics.matchAccuracy >= 0.85)
   assert.equal(metrics.abstentionAccuracy, 1)
@@ -47,4 +47,38 @@ test('known unit family is enforced even when amount is unknown', () => {
   )
   assert.equal(decision.type, 'abstain')
   assert.match(decision.reasons.join(' '), /unit family mismatch/)
+})
+
+test('multipack count contributes to effective pack quantity', () => {
+  const benchmarkCase = cases.find(
+    (candidate) => candidate.id === 'multipack-effective-quantity',
+  )
+  assert.ok(benchmarkCase)
+
+  const decision = matchIngredient(
+    benchmarkCase.requirement,
+    benchmarkCase.candidates,
+  )
+  assert.equal(decision.type, 'match')
+  assert.equal(decision.productId, 'water-6x1l')
+  assert.match(decision.reasons.join(' '), /multipack count 6 applied/)
+})
+
+test('invalid multipack counts fail closed', () => {
+  const decision = matchIngredient(
+    { id: 'milk', query: 'halfvolle melk', amount: 1, unit: 'l' },
+    [
+      {
+        id: 'invalid-pack',
+        name: 'Halfvolle melk',
+        packAmount: 1,
+        packUnit: 'l',
+        packCount: 0,
+        available: true,
+      },
+    ],
+  )
+
+  assert.equal(decision.type, 'abstain')
+  assert.match(decision.reasons.join(' '), /invalid pack count/)
 })
