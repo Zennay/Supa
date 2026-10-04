@@ -120,3 +120,18 @@ runs-on: self-hosted
 
 and separately verifies `hostname -s == vps-bb300bba` before doing capture work. Requiring extra undeclared labels would leave valid permanent-runner work queued indefinitely.
 
+
+## Sanitized candidate export
+
+After integrity inspection, the capture workflow now runs `npm run m1:export-candidates -- <capture-directory>`.
+
+This produces a `sanitized-candidates/` bundle inside the short-retention workflow artifact. A candidate is emitted only when:
+
+- the source is a successful product capture;
+- the raw HTML hash was integrity-verified against `manifest.json`;
+- the generic Schema.org parser produced one trustworthy observation;
+- the observation provenance exactly matches supermarket, source kind, final URL, capture timestamp and SHA-256 from the inspected capture.
+
+The exported candidate contains structured observation data plus provenance only; raw HTML is not copied into the candidate file. Product pages that cannot be interpreted safely are recorded as abstentions in `sanitized-candidates/index.json` rather than guessed into fixtures.
+
+These files are **review candidates**, not automatically committed fixtures. Source-specific AH/PLUS adapters still require inspection of the live artifact and explicit promotion of minimal representative evidence.
