@@ -366,3 +366,127 @@ export function observationSheetProgress(sheet: ObservationSheet) {
     metadataTotal: metadataValues.length,
   }
 }
+
+
+export type ObservationSheetReadiness = {
+  ready: boolean
+  issues: string[]
+}
+
+function nonBlank(value: string) {
+  return value.trim().length > 0
+}
+
+function validObservedAt(value: string) {
+  if (!nonBlank(value)) return null
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
+export function observationSheetReadiness(
+  sheet: ObservationSheet,
+): ObservationSheetReadiness {
+  const issues: string[] = []
+
+  const studyFields: Array<[string, string]> = [
+    ['Study ID', sheet.study.studyId],
+    ['Participant key', sheet.study.participantKey],
+    ['Populatie', sheet.study.population],
+    ['Regio', sheet.study.region],
+    ['Week start', sheet.study.weekStart],
+  ]
+
+  for (const [label, value] of studyFields) {
+    if (!nonBlank(value)) issues.push(`${label} ontbreekt.`)
+  }
+
+  const observations: Array<[string, StoreObservation]> = [
+    ['Winkel A', sheet.baseline],
+    ['Winkel B', sheet.candidate],
+  ]
+  const observedTimes: number[] = []
+
+  for (const [label, observation] of observations) {
+    if (!nonBlank(observation.store.name)) {
+      issues.push(`${label}: winkelnaam ontbreekt.`)
+    }
+    if (!nonBlank(observation.store.id)) {
+      issues.push(`${label}: winkel-ID ontbreekt.`)
+    }
+    if (!nonBlank(observation.evidenceId)) {
+      issues.push(`${label}: evidence ID ontbreekt.`)
+    }
+    if (!nonBlank(observation.provenanceNote)) {
+      issues.push(`${label}: provenance-notitie ontbreekt.`)
+    }
+
+    const observedAt = validObservedAt(observation.observedAt)
+    if (observedAt === null) {
+      issues.push(`${label}: geldige observatietijd ontbreekt.`)
+    } else {
+      observedTimes.push(observedAt)
+    }
+
+    observation.lines.forEach((line) => {
+      const product = line.observedProduct
+      const lineLabel = `${label} · ${line.ingredientLabel}`
+
+      if (typeof product.available !== 'boolean') {
+        issues.push(`${lineLabel}: beschikbaarheid is nog niet gemeten.`)
+        return
+      }
+
+      if (!product.available) return
+
+      if (!nonBlank(product.productName)) {
+        issues.push(`${lineLabel}: productnaam ontbreekt.`)
+      }
+      if (
+        product.packAmount === null ||
+        !Number.isFinite(product.packAmount) ||
+        product.packAmount <= 0
+      ) {
+        issues.push(`${lineLabel}: verpakkingshoeveelheid moet groter dan 0 zijn.`)
+      }
+      if (product.packUnit === null || product.packUnit === 'unknown') {
+        issues.push(`${lineLabel}: geldige verpakkingseenheid ontbreekt.`)
+      }
+      if (
+        !Number.isInteger(product.packCount) ||
+        product.packCount <= 0
+      ) {
+        issues.push(`${lineLabel}: aantal per verpakking moet minimaal 1 zijn.`)
+      }
+      if (
+        product.priceCents === null ||
+        !Number.isInteger(product.priceCents) ||
+        product.priceCents < 0
+      ) {
+        issues.push(`${lineLabel}: prijs per verpakking ontbreekt of is ongeldig.`)
+      }
+    })
+  }
+
+  if (
+    nonBlank(sheet.baseline.store.id) &&
+    nonBlank(sheet.candidate.store.id) &&
+    sheet.baseline.store.id.trim() === sheet.candidate.store.id.trim()
+  ) {
+    issues.push('Winkel A en Winkel B moeten verschillende winkel-ID\'s hebben.')
+  }
+
+  if (observedTimes.length === 2) {
+    const deltaHours =
+      Math.abs(observedTimes[0] - observedTimes[1]) / (60 * 60 * 1000)
+    if (deltaHours > sheet.study.maxObservationWindowHours) {
+      issues.push(
+        `De twee observaties liggen ${deltaHours.toFixed(1)} uur uit elkaar; maximaal ${sheet.study.maxObservationWindowHours} uur is toegestaan.`,
+      )
+    }
+  }
+
+  return {
+    ready: issues.length === 0,
+    issues,
+  }
+}

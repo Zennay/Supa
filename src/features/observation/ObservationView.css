@@ -184,3 +184,40 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.observation-readiness {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfaf6;
+}
+
+.observation-readiness.is-ready {
+  border-color: var(--accent);
+}
+
+.observation-readiness > div {
+  display: grid;
+  gap: 4px;
+}
+
+.observation-readiness strong {
+  font-size: 17px;
+}
+
+.observation-readiness p,
+.observation-readiness li {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.observation-readiness ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
