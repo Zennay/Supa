@@ -192,7 +192,7 @@ This writes `evidence-summary.json` and cross-checks the evidence bundle by sour
 - both supermarkets retain product + catalog + offers coverage;
 - each product page has an explicit sanitized decision: candidate or abstention;
 - no evidence document silently adds, removes or loses a source;
-- the sanitized candidate index has the expected M1 milestone/count metadata, unique decisions, no candidate/abstention conflicts, and no decision IDs outside the manifest's product sources.
+- the sanitized candidate index has the expected M1 milestone/count metadata, path-safe source IDs, unique decisions, no candidate/abstention conflicts, and no decision IDs outside the manifest's product sources.
 
 A Product abstention is valid evidence: it means the generic parser did not guess. It does **not** prove a source-specific adapter can already extract the product. Adapter readiness also requires the manifest, inspection, freshness and sanitized-candidate index to be mutually consistent: unexpected extra source IDs, unexpected candidate decisions, duplicate/conflicting product decisions, candidate-index milestone/count drift, or source-count mismatches cannot be adapter-ready even when every manifest source individually looks complete. When the evidence bundle is structurally complete, the next action becomes review of the exact live product candidates/raw captures followed by AH/PLUS-specific adapter implementation.
 
@@ -208,7 +208,7 @@ Run:
 npm run m1:promote-reviewed -- <capture-dir> <review.json> [output-dir]
 ```
 
-A version-1 review file contains an `approvals` array. Every promoted approval must match the candidate's source ID, supermarket, final URL, captured-at timestamp and SHA-256 exactly, and must include `decision: "promote"`, a non-empty reviewer identifier and a valid review timestamp. Review chronology is part of the trust contract: `reviewedAt` may not predate the captured source evidence, and implausibly future-dated reviews are rejected (with only a small clock-skew tolerance). The tool also rejects abstentions, stale review files whose provenance no longer matches the candidate, duplicate promotion approvals, inconsistent candidate-index counts/IDs, candidate-vs-abstention conflicts, unexpected candidate file paths, and overwriting an existing reviewed fixture with different provenance.
+A version-1 review file contains an `approvals` array. Every promoted approval must match the candidate's source ID, supermarket, final URL, captured-at timestamp and SHA-256 exactly, and must include `decision: "promote"`, a non-empty reviewer identifier and a valid review timestamp. Review chronology is part of the trust contract: `reviewedAt` may not predate the captured source evidence, and implausibly future-dated reviews are rejected (with only a small clock-skew tolerance). The tool also rejects abstentions, stale review files whose provenance no longer matches the candidate, duplicate promotion approvals, inconsistent candidate-index counts/IDs, unsafe/path-like source IDs, candidate-vs-abstention conflicts, unexpected candidate file paths, candidate payload source IDs that do not exactly match their index entry, and overwriting an existing reviewed fixture with different provenance.
 
 Promoted fixtures contain only the structured candidate observation, exact source provenance and review metadata; raw HTML is never copied into the fixture. This creates a deliberate trust boundary between short-retention capture evidence and versioned regression evidence.
 
