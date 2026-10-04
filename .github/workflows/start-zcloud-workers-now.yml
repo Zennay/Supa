@@ -13,6 +13,14 @@ jobs:
     runs-on: [self-hosted, supa, vps]
     timeout-minutes: 5
     steps:
+      - name: Check out exact zCloud main for deploy repair
+        uses: actions/checkout@v4
+        with:
+          repository: Zennay/zCloud
+          ref: e4d1b34339d9aa5403b6852f557dd91decc4a87b
+          path: zcloud-src
+          persist-credentials: false
+
       - name: Recover zCloud control plane and start allocated workers
         shell: bash
         run: |
@@ -29,10 +37,22 @@ jobs:
           systemctl --user reset-failed chatgpt-firefox.service || true
           systemctl --user restart chatgpt-firefox.service || systemctl --user start chatgpt-firefox.service || true
 
-          if ! curl -fsS --max-time 3 http://127.0.0.1:8765/api/runner-targets >/dev/null 2>&1; then
-            sudo -n systemctl reset-failed zennay-cloud.service || true
-            sudo -n systemctl restart zennay-cloud.service
-          fi
+          target=/home/ubuntu/zennay-cloud
+          source="$GITHUB_WORKSPACE/zcloud-src"
+          for file in project_runtime.py lane_generator.py; do
+            test -f "$source/$file"
+            if [[ ! -f "$target/$file" ]] || ! cmp -s "$source/$file" "$target/$file"; then
+              sudo -n install -o ubuntu -g ubuntu -m 0644 "$source/$file" "$target/$file"
+              echo "DEPLOY_REPAIRED=$file"
+            else
+              echo "DEPLOY_ALREADY_CURRENT=$file"
+            fi
+          done
+
+          python3 -m py_compile             "$target/server.py"             "$target/enhancements.py"             "$target/project_runtime.py"             "$target/lane_generator.py"
+
+          sudo -n systemctl reset-failed zennay-cloud.service || true
+          sudo -n systemctl restart zennay-cloud.service
 
           ready=0
           for _ in $(seq 1 30); do
