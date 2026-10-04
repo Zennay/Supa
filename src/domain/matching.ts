@@ -61,13 +61,13 @@ function baseUnitAmount(
   amount: number | null,
   unit: MatchUnit,
 ): { amount: number | null; family: 'mass' | 'volume' | 'piece' | 'unknown' } {
-  if (amount === null) {
-    return { amount: null, family: unit === 'piece' ? 'piece' : 'unknown' }
+  if (unit === 'kg') {
+    return { amount: amount === null ? null : amount * 1000, family: 'mass' }
   }
-
-  if (unit === 'kg') return { amount: amount * 1000, family: 'mass' }
   if (unit === 'g') return { amount, family: 'mass' }
-  if (unit === 'l') return { amount: amount * 1000, family: 'volume' }
+  if (unit === 'l') {
+    return { amount: amount === null ? null : amount * 1000, family: 'volume' }
+  }
   if (unit === 'ml') return { amount, family: 'volume' }
   if (unit === 'piece') return { amount, family: 'piece' }
   return { amount, family: 'unknown' }
