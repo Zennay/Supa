@@ -20,14 +20,43 @@ function byId(items, label) {
   return map
 }
 
+function duplicateIds(ids) {
+  const seen = new Set()
+  const duplicates = new Set()
+  for (const id of ids) {
+    if (seen.has(id)) duplicates.add(id)
+    else seen.add(id)
+  }
+  return [...duplicates].sort()
+}
+
 function candidateIndex(index) {
-  const candidates = new Set(
-    Array.isArray(index.candidates) ? index.candidates.map((item) => item.id) : [],
-  )
-  const abstentions = new Set(
-    Array.isArray(index.abstentions) ? index.abstentions.map((item) => item.id) : [],
-  )
-  return { candidates, abstentions }
+  const candidateItems = Array.isArray(index?.candidates) ? index.candidates : []
+  const abstentionItems = Array.isArray(index?.abstentions) ? index.abstentions : []
+  const candidateIds = candidateItems
+    .map((item) => item?.id)
+    .filter((id) => typeof id === 'string' && id.length > 0)
+  const abstentionIds = abstentionItems
+    .map((item) => item?.id)
+    .filter((id) => typeof id === 'string' && id.length > 0)
+
+  return {
+    candidates: new Set(candidateIds),
+    abstentions: new Set(abstentionIds),
+    candidateIds,
+    abstentionIds,
+    structureValid:
+      Array.isArray(index?.candidates) &&
+      Array.isArray(index?.abstentions) &&
+      candidateIds.length === candidateItems.length &&
+      abstentionIds.length === abstentionItems.length,
+    milestoneMatches: index?.milestone === 'M1 Data Feasibility',
+    countsMatch:
+      index?.candidateCount === candidateItems.length &&
+      index?.abstentionCount === abstentionItems.length,
+    duplicateCandidateIds: duplicateIds(candidateIds),
+    duplicateAbstentionIds: duplicateIds(abstentionIds),
+  }
 }
 
 export function buildEvidenceSummary({
@@ -122,18 +151,43 @@ export function buildEvidenceSummary({
   const unexpectedFreshness = [...freshnessById.keys()].filter(
     (id) => !manifestById.has(id),
   )
+  const productManifestIds = new Set(
+    ids.filter((id) => manifestById.get(id)?.kind === 'product'),
+  )
+  const candidateDecisionIds = [
+    ...new Set([
+      ...candidateSets.candidateIds,
+      ...candidateSets.abstentionIds,
+    ]),
+  ].sort()
+  const unexpectedCandidateDecisions = candidateDecisionIds.filter(
+    (id) => !productManifestIds.has(id),
+  )
+  const candidateDecisionConflicts = [...candidateSets.candidates]
+    .filter((id) => candidateSets.abstentions.has(id))
+    .sort()
 
   const documentConsistency = {
     missingInspection,
     missingFreshness,
     unexpectedInspection,
     unexpectedFreshness,
+    unexpectedCandidateDecisions,
+    candidateDecisionConflicts,
+    duplicateCandidateIds: candidateSets.duplicateCandidateIds,
+    duplicateAbstentionIds: candidateSets.duplicateAbstentionIds,
+    candidateIndexStructureValid: candidateSets.structureValid,
+    candidateIndexMilestoneMatches: candidateSets.milestoneMatches,
+    candidateIndexCountsMatch: candidateSets.countsMatch,
     sourceCountsMatch:
       manifest.results.length === inspection.sources.length &&
       manifest.results.length === freshness.sources.length,
   }
   documentConsistency.consistent =
     documentConsistency.sourceCountsMatch &&
+    documentConsistency.candidateIndexStructureValid &&
+    documentConsistency.candidateIndexMilestoneMatches &&
+    documentConsistency.candidateIndexCountsMatch &&
     Object.values(documentConsistency)
       .filter(Array.isArray)
       .every((values) => values.length === 0)
