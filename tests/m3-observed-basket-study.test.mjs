@@ -51,6 +51,7 @@ function study(overrides = {}) {
     population: 'independently living students',
     region: 'Leiden',
     weekStart: '2026-09-28',
+    priceContext: 'in-store',
     baseline: {
       evidenceId: 'basket-a-001',
       observedAt: '2026-10-02T17:00:00Z',
@@ -106,6 +107,17 @@ test('M3 observed-basket study fails closed when observations are too far apart'
   assert.equal(result.comparison.outcome, 'unknown')
   assert.equal(result.comparison.savingsCents, null)
   assert.match(result.reasons.join(' '), /max is 24h/)
+})
+
+test('M3 observed-basket study fails closed without an explicit price context', () => {
+  const value = study()
+  value.priceContext = 'mixed-channel'
+
+  const result = assessWeeklyBasketStudy(value)
+
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.match(result.reasons.join(' '), /priceContext/)
 })
 
 test('M3 observed-basket study rejects non-observed fixture-style source labels', () => {
