@@ -11,7 +11,8 @@
     "m1:matching-benchmark": "node --experimental-strip-types scripts/m1-run-matching-benchmark.mjs",
     "m1:inspect-captures": "node --experimental-strip-types scripts/m1-inspect-captures.mjs",
     "m1:export-candidates": "node scripts/m1-export-sanitized-candidates.mjs",
-    "m1:compare-captures": "node scripts/m1-compare-captures.mjs"
+    "m1:compare-captures": "node scripts/m1-compare-captures.mjs",
+    "m1:evaluate-freshness": "node scripts/m1-evaluate-freshness.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
