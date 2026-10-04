@@ -1,8 +1,13 @@
+import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const MAX_REVIEW_CLOCK_SKEW_MS = 5 * 60 * 1000
+
+function sha256Text(value) {
+  return createHash('sha256').update(value, 'utf8').digest('hex')
+}
 
 function validIso(value) {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
@@ -79,6 +84,29 @@ async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, 'utf8'))
 }
 
+async function readCandidateWithIntegrity(captureDir, entry) {
+  if (!/^[a-f0-9]{64}$/.test(entry?.candidateSha256 ?? '')) {
+    throw new Error(
+      `Sanitized candidate index is missing a valid candidate SHA-256 for ${entry?.id ?? 'unknown'}`,
+    )
+  }
+
+  const filePath = path.join(
+    captureDir,
+    'sanitized-candidates',
+    entry.file,
+  )
+  const serialized = await readFile(filePath, 'utf8')
+  const actualSha256 = sha256Text(serialized)
+  if (actualSha256 !== entry.candidateSha256) {
+    throw new Error(
+      `Sanitized candidate integrity mismatch for ${entry.id}: expected=${entry.candidateSha256} actual=${actualSha256}`,
+    )
+  }
+
+  return JSON.parse(serialized)
+}
+
 async function writeFixtureSafely(filePath, fixture) {
   let existing = null
   try {
@@ -146,9 +174,7 @@ export async function promoteReviewedCandidates(
       )
     }
 
-    const candidate = await readJson(
-      path.join(captureDir, 'sanitized-candidates', entry.file),
-    )
+    const candidate = await readCandidateWithIntegrity(captureDir, entry)
     requireExactApproval(candidate, approval)
 
     const fixture = fixtureFromCandidate(candidate, approval)
@@ -161,6 +187,7 @@ export async function promoteReviewedCandidates(
       file,
       sha256: candidate.source.sha256,
       capturedAt: candidate.source.capturedAt,
+      candidateSha256: entry.candidateSha256,
     })
   }
 
