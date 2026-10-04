@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
+import { compareFullBaskets } from '../src/domain/basketComparison.ts'
 import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
 import {
   m2DefaultActiveDays,
@@ -80,6 +81,11 @@ test('M3 report runner keeps participant key out of the emitted assessment', () 
   assert.equal(report.outcome, 'better')
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.ok(report.savingsCents > 0)
+  assert.equal(report.attribution.status, 'partial')
+  assert.equal(
+    report.attribution.effectTotals.unknownCents,
+    report.deltaCents,
+  )
   assert.equal('participantKey' in report, false)
   assert.match(report.evidenceBoundary, /never sufficient/)
 })
@@ -105,7 +111,59 @@ test('M3 report runner preserves unknown evidence without inventing a money delt
   assert.equal(report.outcome, 'unknown')
   assert.equal(report.deltaCents, null)
   assert.equal(report.savingsCents, null)
+  assert.equal(report.attribution.status, 'unknown')
+  assert.equal(report.attribution.effectTotals.unknownCents, null)
   assert.match(report.reasons.join(' '), /unresolved ingredients/)
+})
+
+test('M3 observed report emits complete evidence-backed effect attribution', () => {
+  const study = observedStudy()
+  const comparison = compareFullBaskets({
+    baseline: study.baseline.basket,
+    candidate: study.candidate.basket,
+  })
+  study.attributionEvidence = comparison.lineDeltas
+    .filter((line) => line.deltaCents !== 0)
+    .map((line) => ({
+      lineId: line.id,
+      effect: 'offer',
+      deltaCents: line.deltaCents,
+      evidenceRef: `synthetic-regression:${line.id}`,
+    }))
+
+  const report = buildObservedWeekReport(study)
+
+  assert.equal(report.claimable, true)
+  assert.equal(report.attribution.status, 'complete')
+  assert.equal(report.attribution.fullyAttributed, true)
+  assert.equal(report.attribution.effectTotals.offerCents, report.deltaCents)
+  assert.equal(report.attribution.effectTotals.packSizeCents, 0)
+  assert.equal(report.attribution.effectTotals.planningCents, 0)
+  assert.equal(report.attribution.effectTotals.unknownCents, 0)
+})
+
+test('M3 observed report fails malformed attribution evidence closed without crashing', () => {
+  const study = observedStudy()
+  const comparison = compareFullBaskets({
+    baseline: study.baseline.basket,
+    candidate: study.candidate.basket,
+  })
+  study.attributionEvidence = [
+    {
+      lineId: comparison.lineDeltas[0].id,
+      effect: 'mystery-effect',
+      deltaCents: comparison.lineDeltas[0].deltaCents,
+      evidenceRef: 'synthetic-regression:bad-effect',
+    },
+  ]
+
+  const report = buildObservedWeekReport(study)
+
+  assert.equal(report.claimable, true)
+  assert.equal(report.attribution.status, 'unknown')
+  assert.equal(report.attribution.fullyAttributed, false)
+  assert.equal(report.attribution.effectTotals.unknownCents, null)
+  assert.match(report.attribution.reasons.join(' '), /unsupported effect/)
 })
 
 test('M3 CLI writes a reproducible assessment report file', async () => {
@@ -138,6 +196,7 @@ test('M3 CLI writes a reproducible assessment report file', async () => {
     assert.equal(report.studyId, 'week-2026-40-runner')
     assert.equal(report.claimable, true)
     assert.equal(report.publicSavingsClaimEligible, false)
+    assert.equal(report.attribution.status, 'partial')
     assert.equal('participantKey' in report, false)
   } finally {
     await rm(directory, { recursive: true, force: true })
