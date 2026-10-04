@@ -93,3 +93,20 @@ Observed study JSON may include an optional `attributionEvidence` array. Each it
 The assessment never infers a cause from price movement alone. Missing attribution evidence stays in `unknownCents`; malformed attribution items make attribution status `unknown` without fabricating a causal explanation. Planning attribution remains zero inside a same-demand store comparison.
 
 The privacy-safe report emits only aggregate effect totals plus attribution status/reasons. Evidence references are validation inputs and are deliberately not copied into the report.
+
+## Price-context provenance rule — 2026-10-04
+
+A two-store basket is comparable only when both sides use one explicitly recorded price context:
+
+- `in-store` — prices observed in physical stores / on the receipt;
+- `online-order` — prices observed for an online order flow.
+
+Do not mix these contexts inside one study. The observation sheet requires a shared `priceContext`, the converter refuses a missing or unsupported value, and the assessment report preserves it.
+
+This is evidence-integrity policy, not a supermarket-data permission grant. It follows official operating constraints observed in the current source review:
+
+- PLUS states that assortment may change with the selected entrepreneur/store and that website/app prices can differ from in-store prices: https://taarten.plus.nl/alv/
+- DekaMarkt states that self-scan product characteristics such as price and weight can be wrong and that packaging/store information takes precedence: https://www.dekamarkt.nl/algemene-voorwaarden
+
+Operational consequence: M3 collectors choose the context before collecting, keep it identical across both stores, and describe the exact store/order provenance in the existing provenance note. Cached/search-index prices remain insufficient as fresh M3 observations.
+
