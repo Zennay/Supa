@@ -16,7 +16,8 @@
     "m1:evidence-summary": "node scripts/m1-build-evidence-summary.mjs",
     "m1:promote-reviewed": "node --experimental-strip-types scripts/m1-promote-reviewed-candidates.mjs",
     "m1:source-permission-gate": "node scripts/m1-check-source-permission-gate.mjs",
-    "m1:source-production-ready": "node scripts/m1-check-source-permission-gate.mjs --require-production-ready"
+    "m1:source-production-ready": "node scripts/m1-check-source-permission-gate.mjs --require-production-ready",
+    "m2:ui-smoke": "node scripts/m2-ui-smoke.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
@@ -29,4 +30,4 @@
     "typescript": "^5.9.2",
     "vite": "^7.1.7"
   }
-}
+}\n
