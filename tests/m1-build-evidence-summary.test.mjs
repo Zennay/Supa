@@ -54,6 +54,9 @@ function bundle({
     })),
   }
   const candidateIndex = {
+    milestone: 'M1 Data Feasibility',
+    candidateCount: 1,
+    abstentionCount: 1,
     candidates: [{ id: 'ah-product' }],
     abstentions: [{ id: 'plus-product' }],
   }
@@ -166,4 +169,38 @@ test('inconsistent evidence documents can never be adapter-ready', () => {
   ])
   assert.equal(report.adapterEvidenceReady, false)
   assert.equal(report.nextAction, 'repair-evidence-bundle')
+})
+
+test('unexpected candidate-index decisions make the bundle inconsistent', () => {
+  const data = bundle()
+  data.candidateIndex.candidates.push({ id: 'ghost-product' })
+  data.candidateIndex.candidateCount = 2
+
+  const report = buildEvidenceSummary(data)
+
+  assert.equal(report.captureReady, true)
+  assert.equal(report.coverageReady, true)
+  assert.equal(report.documentConsistency.consistent, false)
+  assert.deepEqual(report.documentConsistency.unexpectedCandidateDecisions, [
+    'ghost-product',
+  ])
+  assert.equal(report.adapterEvidenceReady, false)
+  assert.equal(report.nextAction, 'repair-evidence-bundle')
+})
+
+test('candidate-index metadata and duplicate decisions are part of consistency', () => {
+  const data = bundle()
+  data.candidateIndex.milestone = 'M2 Planner Slice'
+  data.candidateIndex.candidates.push({ id: 'ah-product' })
+  data.candidateIndex.candidateCount = 1
+
+  const report = buildEvidenceSummary(data)
+
+  assert.equal(report.documentConsistency.candidateIndexMilestoneMatches, false)
+  assert.equal(report.documentConsistency.candidateIndexCountsMatch, false)
+  assert.deepEqual(report.documentConsistency.duplicateCandidateIds, [
+    'ah-product',
+  ])
+  assert.equal(report.documentConsistency.consistent, false)
+  assert.equal(report.adapterEvidenceReady, false)
 })
