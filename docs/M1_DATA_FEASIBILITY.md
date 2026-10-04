@@ -173,3 +173,23 @@ npm run m1:evaluate-freshness -- <capture-directory> [--max-age-hours 24]
 ```
 
 The freshness gate is deliberately conservative about what HTTP metadata proves. A recent capture can pass without ETag or Last-Modified, but missing upstream validators are recorded explicitly. Conversely, a recent Last-Modified header does not rescue an old local capture. The current M1 policy treats capture age as the operational freshness gate; source headers are supporting evidence only.
+
+## Machine-readable M1 evidence gate
+
+After capture, inspection, freshness evaluation and candidate export, the workflow now runs:
+
+```bash
+npm run m1:evidence-summary -- <capture-directory>
+```
+
+This writes `evidence-summary.json` and cross-checks the evidence bundle by source ID. It only reports `adapterEvidenceReady: true` when:
+
+- all six bounded AH/PLUS sources are represented consistently across manifest, inspection and freshness reports;
+- each successful source has verified integrity and a fresh snapshot;
+- both supermarkets retain product + catalog + offers coverage;
+- each product page has an explicit sanitized decision: candidate or abstention;
+- no evidence document silently adds, removes or loses a source.
+
+A Product abstention is valid evidence: it means the generic parser did not guess. It does **not** prove a source-specific adapter can already extract the product. When the evidence bundle is structurally complete, the next action becomes review of the exact live product candidates/raw captures followed by AH/PLUS-specific adapter implementation.
+
+The command exits non-zero when the evidence bundle is not adapter-ready, making an incomplete live artifact a visible M1 failure rather than a manual interpretation problem.
