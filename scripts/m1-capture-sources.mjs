@@ -42,9 +42,21 @@ export const SOURCES = [
   },
 ]
 
-const ALLOWED_HOSTS = new Set(['www.ah.nl', 'www.plus.nl'])
+const HOST_BY_SUPERMARKET = new Map([
+  ['ah', 'www.ah.nl'],
+  ['plus', 'www.plus.nl'],
+])
+const SUPPORTED_KINDS = new Set(['product', 'catalog', 'offers'])
 const MAX_BYTES = 5 * 1024 * 1024
 const TIMEOUT_MS = 20_000
+
+function expectedHost(supermarket) {
+  const host = HOST_BY_SUPERMARKET.get(supermarket)
+  if (!host) {
+    throw new Error(`Unsupported supermarket: ${supermarket}`)
+  }
+  return host
+}
 
 export function validateSources(sources = SOURCES) {
   const ids = new Set()
@@ -54,11 +66,14 @@ export function validateSources(sources = SOURCES) {
     }
     ids.add(source.id)
 
+    const host = expectedHost(source.supermarket)
     const url = new URL(source.url)
-    if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname)) {
-      throw new Error(`Source outside allowlist: ${source.url}`)
+    if (url.protocol !== 'https:' || url.hostname !== host) {
+      throw new Error(
+        `Source does not match supermarket allowlist (${source.supermarket} -> ${host}): ${source.url}`,
+      )
     }
-    if (!['product', 'catalog', 'offers'].includes(source.kind)) {
+    if (!SUPPORTED_KINDS.has(source.kind)) {
       throw new Error(`Unsupported source kind: ${source.kind}`)
     }
   }
@@ -73,10 +88,17 @@ function safeTimestamp(iso) {
   return iso.replace(/[:.]/g, '-')
 }
 
+function isHtmlContentType(value) {
+  if (!value) return false
+  const mediaType = value.split(';', 1)[0].trim().toLowerCase()
+  return mediaType === 'text/html' || mediaType === 'application/xhtml+xml'
+}
+
 async function captureSource(source, rootDir) {
   const capturedAt = new Date().toISOString()
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const host = expectedHost(source.supermarket)
 
   const metadata = {
     id: source.id,
@@ -99,8 +121,25 @@ async function captureSource(source, rootDir) {
     })
 
     const finalUrl = new URL(response.url)
-    if (finalUrl.protocol !== 'https:' || !ALLOWED_HOSTS.has(finalUrl.hostname)) {
-      throw new Error(`Redirected outside allowlist: ${response.url}`)
+    if (finalUrl.protocol !== 'https:' || finalUrl.hostname !== host) {
+      throw new Error(
+        `Redirected outside supermarket allowlist (${source.supermarket} -> ${host}): ${response.url}`,
+      )
+    }
+
+    const contentType = response.headers.get('content-type')
+    const contentLength = Number(response.headers.get('content-length'))
+    if (Number.isFinite(contentLength) && contentLength > MAX_BYTES) {
+      Object.assign(metadata, {
+        finalUrl: response.url,
+        status: response.status,
+        ok: response.ok,
+        contentType,
+        etag: response.headers.get('etag'),
+        lastModified: response.headers.get('last-modified'),
+        contentLength,
+      })
+      throw new Error(`Declared response size exceeded ${MAX_BYTES} bytes: ${contentLength}`)
     }
 
     const body = await response.text()
@@ -109,7 +148,7 @@ async function captureSource(source, rootDir) {
       finalUrl: response.url,
       status: response.status,
       ok: response.ok,
-      contentType: response.headers.get('content-type'),
+      contentType,
       etag: response.headers.get('etag'),
       lastModified: response.headers.get('last-modified'),
       bytes,
@@ -126,6 +165,9 @@ async function captureSource(source, rootDir) {
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
+    }
+    if (!isHtmlContentType(contentType)) {
+      throw new Error(`Unexpected content type: ${contentType || 'missing'}`)
     }
 
     return { ...metadata, success: true }
