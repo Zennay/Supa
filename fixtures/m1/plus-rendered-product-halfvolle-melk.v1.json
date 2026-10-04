@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "evidenceType": "plus-browser-rendered-schema-org-product",
+  "source": {
+    "id": "plus-product-halfvolle-melk-rendered",
+    "supermarket": "plus",
+    "kind": "product",
+    "url": "https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010",
+    "capturedAt": "2026-10-04T18:08:57.837Z",
+    "sha256": "bce1d766ddd5044284104bf9d3247d3302393183ff2ef554fc6d7e5e3e016f5e"
+  },
+  "browserEvidence": {
+    "runId": 37223249250,
+    "artifactId": 11310897789,
+    "artifactDigest": "sha256:1dee165a5901082498acc423a614f2aef69e870effba009c07dc3b4244192a01",
+    "renderedHtmlSha256": "bce1d766ddd5044284104bf9d3247d3302393183ff2ef554fc6d7e5e3e016f5e",
+    "finalUrl": "https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010",
+    "supaSha": "b4554a0adb16d89b559b0754a47bbeeef36e3816",
+    "safety": {
+      "login": false,
+      "privateApiCalls": false,
+      "networkInterception": false,
+      "antiBotBypass": false,
+      "targetCount": 1
+    }
+  },
+  "jsonLd": {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "sku": "579010",
+    "name": "Zuivelmeester Halfvolle melk",
+    "category": "Melk, karnemelk",
+    "image": "https://images.ctfassets.net/s0lodsnpsezb/579010_M/fe91d95d8d17af3e21b5e7c5b32bd399/579010.png",
+    "description": "Bestel Zuivelmeester Halfvolle melk 1000 Milliliter online op plus.nl. Laat je boodschappen makkelijk en snel thuis bezorgen of haal het op bij jouw PLUS.",
+    "weight": {
+      "@type": "QuantitativeValue",
+      "value": "1000 ml"
+    },
+    "url": "https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010",
+    "Gtin13": "8710624323684",
+    "brand": {
+      "@type": "Brand",
+      "name": "Zuivelmeester"
+    },
+    "offers": {
+      "@type": "Offer",
+      "availability": "https://schema.org/InStock",
+      "priceSpecification": [
+        {
+          "@type": "UnitPriceSpecification",
+          "price": 0.85,
+          "priceCurrency": "EUR",
+          "referenceQuantity": {
+            "@type": "QuantitativeValue",
+            "value": "1000",
+            "unitCode": "MLT"
+          }
+        }
+      ]
+    }
+  }
+}

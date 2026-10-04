@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "evidenceType": "dekamarkt-public-ssr-nuxt-offers",
+  "source": {
+    "id": "dekamarkt-offers",
+    "supermarket": "dekamarkt",
+    "kind": "offers",
+    "url": "https://www.dekamarkt.nl/aanbiedingen",
+    "capturedAt": "2026-10-04T18:15:30.693Z",
+    "sha256": "0240e5ba658748bcc553d3cee1728c140b68473fc3f72dade699783d73c9f2a0"
+  },
+  "captureEvidence": {
+    "runId": 37223714917,
+    "artifactId": 11310519403,
+    "artifactDigest": "sha256:4e49756d10bc5bfd27c64fb1653601a11f3793b6e71980cdb9dede866fe415b3",
+    "supaSha": "5120038fa121e35fd13e30284800b87d007a3a45",
+    "status": 200,
+    "contentType": "text/html;charset=utf-8",
+    "bytes": 1106454,
+    "safety": {
+      "login": false,
+      "credentials": false,
+      "privateApiCalls": false,
+      "antiBotBypass": false,
+      "recursiveCrawl": false,
+      "targetCount": 3
+    }
+  },
+  "nuxtPayload": [
+    null,
+    false,
+    "",
+    137489,
+    "Croma Bakken En Braden",
+    1.99,
+    4.49,
+    "per stuk 1,99",
+    "Fles 750 ml.",
+    "2026-09-29T00:00:00.000Z",
+    "2026-10-05T00:00:00.000Z",
+    47936,
+    "Croma Vloeibaar",
+    "750 ml",
+    {
+      "productId": 11,
+      "headerText": 12,
+      "packaging": 13
+    },
+    {
+      "productId": 11,
+      "normalPrice": 6,
+      "offerPrice": 5,
+      "startDate": 9,
+      "endDate": 10,
+      "productInformation": 14
+    },
+    [
+      15
+    ],
+    {
+      "offerId": 3,
+      "headerText": 4,
+      "packaging": 2,
+      "offerPrice": 5,
+      "normalPrice": 6,
+      "textPriceSign": 7,
+      "subText": 8,
+      "startDate": 9,
+      "endDate": 10,
+      "products": 16
+    },
+    137490,
+    "Del Monte Bananen",
+    0.89,
+    1.99,
+    "per kilo 0,89",
+    "Los.",
+    "2026-09-29T00:00:00.000Z",
+    "2026-10-05T00:00:00.000Z",
+    4579,
+    "Del Monte Bananen",
+    "1 kg (ca. 5 stuks)",
+    {
+      "productId": 26,
+      "headerText": 27,
+      "packaging": 28
+    },
+    {
+      "productId": 26,
+      "normalPrice": 21,
+      "offerPrice": 20,
+      "startDate": 24,
+      "endDate": 25,
+      "productInformation": 29
+    },
+    [
+      30
+    ],
+    {
+      "offerId": 18,
+      "headerText": 19,
+      "packaging": 2,
+      "offerPrice": 20,
+      "normalPrice": 21,
+      "textPriceSign": 22,
+      "subText": 23,
+      "startDate": 24,
+      "endDate": 25,
+      "products": 31
+    },
+    137491,
+    "Nutella Hazelnootpasta",
+    2.99,
+    4.59,
+    "per stuk 2,99",
+    "Pot 450 gram.",
+    "2026-09-29T00:00:00.000Z",
+    "2026-10-05T00:00:00.000Z",
+    57593,
+    "Nutella Hazelnootpasta",
+    "450 g",
+    {
+      "productId": 41,
+      "headerText": 42,
+      "packaging": 43
+    },
+    {
+      "productId": 41,
+      "normalPrice": 36,
+      "offerPrice": 35,
+      "startDate": 39,
+      "endDate": 40,
+      "productInformation": 44
+    },
+    [
+      45
+    ],
+    {
+      "offerId": 33,
+      "headerText": 34,
+      "packaging": 2,
+      "offerPrice": 35,
+      "normalPrice": 36,
+      "textPriceSign": 37,
+      "subText": 38,
+      "startDate": 39,
+      "endDate": 40,
+      "products": 46
+    },
+    [
+      17,
+      32,
+      47
+    ],
+    [
+      48
+    ],
+    {
+      "offers-overview-/aanbiedingen": 49
+    }
+  ]
+}

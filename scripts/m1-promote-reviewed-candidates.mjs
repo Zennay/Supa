@@ -3,6 +3,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { validateRawProductObservation } from '../src/data/ingestion.ts'
+
 const MAX_REVIEW_CLOCK_SKEW_MS = 5 * 60 * 1000
 
 function sha256Text(value) {
@@ -11,6 +13,13 @@ function sha256Text(value) {
 
 function validIso(value) {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
+}
+
+function isSafeSourceId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  )
 }
 
 function requireReviewChronology(candidate, approval, now = Date.now()) {
@@ -84,6 +93,112 @@ async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, 'utf8'))
 }
 
+function validatedCandidateIndex(index) {
+  if (!Array.isArray(index.candidates) || !Array.isArray(index.abstentions)) {
+    throw new Error('Sanitized candidate index must contain candidates and abstentions arrays')
+  }
+  if (
+    index.candidateCount !== index.candidates.length ||
+    index.abstentionCount !== index.abstentions.length
+  ) {
+    throw new Error('Sanitized candidate index declared counts do not match its arrays')
+  }
+
+  const candidateIds = index.candidates.map((entry) => entry?.id)
+  const abstentionIds = index.abstentions.map((entry) => entry?.id)
+  for (const id of [...candidateIds, ...abstentionIds]) {
+    if (!isSafeSourceId(id)) {
+      throw new Error('Sanitized candidate index contains an unsafe source id')
+    }
+  }
+
+  const duplicateIds = (ids) => {
+    const seen = new Set()
+    return ids.filter((id) => {
+      if (seen.has(id)) return true
+      seen.add(id)
+      return false
+    })
+  }
+
+  if (duplicateIds(candidateIds).length > 0) {
+    throw new Error('Sanitized candidate index contains duplicate candidate ids')
+  }
+  if (duplicateIds(abstentionIds).length > 0) {
+    throw new Error('Sanitized candidate index contains duplicate abstention ids')
+  }
+
+  const abstentionSet = new Set(abstentionIds)
+  const conflicts = candidateIds.filter((id) => abstentionSet.has(id))
+  if (conflicts.length > 0) {
+    throw new Error(
+      `Sanitized candidate index contains candidate/abstention conflicts: ${conflicts.join(', ')}`,
+    )
+  }
+
+  for (const entry of index.candidates) {
+    const expectedFile = `${entry.id}.json`
+    if (entry.file !== expectedFile) {
+      throw new Error(
+        `Sanitized candidate index has unexpected candidate file for ${entry.id}: ${entry.file}`,
+      )
+    }
+  }
+
+  return {
+    candidateEntries: new Map(index.candidates.map((entry) => [entry.id, entry])),
+    abstentionIds: new Set(abstentionIds),
+  }
+}
+
+function requireTrustedCandidate(candidate, entry) {
+  if (candidate?.version !== 1) {
+    throw new Error(
+      `Sanitized candidate must use version 1: ${entry.id}`,
+    )
+  }
+  if (!candidate?.source || typeof candidate.source !== 'object') {
+    throw new Error(
+      `Sanitized candidate is missing source metadata: ${entry.id}`,
+    )
+  }
+  if (!isSafeSourceId(candidate.source.id)) {
+    throw new Error(
+      `Sanitized candidate contains an unsafe source id: ${candidate?.source?.id ?? 'unknown'}`,
+    )
+  }
+  if (candidate.source.id !== entry.id) {
+    throw new Error(
+      `Sanitized candidate source id mismatch: expected=${entry.id} actual=${candidate.source.id}`,
+    )
+  }
+  if (candidate.source.kind !== 'product') {
+    throw new Error(
+      `Sanitized candidate must come from a product source: ${entry.id}`,
+    )
+  }
+
+  const observation = validateRawProductObservation(candidate.observation)
+  const provenance = observation.provenance
+  const checks = [
+    ['supermarket', candidate.source.supermarket, provenance.supermarket],
+    ['kind', candidate.source.kind, provenance.kind],
+    ['url', candidate.source.url, provenance.url],
+    ['capturedAt', candidate.source.capturedAt, provenance.capturedAt],
+    ['sha256', candidate.source.sha256, provenance.sha256],
+  ]
+
+  for (const [key, expected, actual] of checks) {
+    if (expected !== actual) {
+      throw new Error(
+        `Sanitized candidate provenance mismatch for ${entry.id} field ${key}: expected=${expected} actual=${actual}`,
+      )
+    }
+  }
+
+  return candidate
+}
+
 async function readCandidateWithIntegrity(captureDir, entry) {
   if (!/^[a-f0-9]{64}$/.test(entry?.candidateSha256 ?? '')) {
     throw new Error(
@@ -104,7 +219,8 @@ async function readCandidateWithIntegrity(captureDir, entry) {
     )
   }
 
-  return JSON.parse(serialized)
+  const candidate = JSON.parse(serialized)
+  return requireTrustedCandidate(candidate, entry)
 }
 
 async function writeFixtureSafely(filePath, fixture) {
@@ -148,19 +264,25 @@ export async function promoteReviewedCandidates(
     throw new Error('Review file must be version 1 with an approvals array')
   }
 
-  const candidateEntries = new Map(
-    (index.candidates ?? []).map((entry) => [entry.id, entry]),
+  const { candidateEntries, abstentionIds } = validatedCandidateIndex(index)
+
+  const promoteApprovals = review.approvals.filter(
+    (approval) => approval?.decision === 'promote',
   )
-  const abstentionIds = new Set(
-    (index.abstentions ?? []).map((entry) => entry.id),
-  )
+  const seenApprovalIds = new Set()
+  for (const approval of promoteApprovals) {
+    if (seenApprovalIds.has(approval.id)) {
+      throw new Error(
+        `Review file contains duplicate promotion approval for: ${approval.id}`,
+      )
+    }
+    seenApprovalIds.add(approval.id)
+  }
 
   await mkdir(outputDir, { recursive: true })
 
   const promoted = []
-  for (const approval of review.approvals) {
-    if (approval.decision !== 'promote') continue
-
+  for (const approval of promoteApprovals) {
     if (abstentionIds.has(approval.id)) {
       throw new Error(
         `Cannot promote abstained product source: ${approval.id}`,

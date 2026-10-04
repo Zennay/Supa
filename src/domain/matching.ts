@@ -12,6 +12,7 @@ export type ProductCandidate = {
   name: string
   packAmount: number | null
   packUnit: MatchUnit
+  packCount?: number | null
   available: boolean
 }
 
@@ -61,16 +62,20 @@ function baseUnitAmount(
   amount: number | null,
   unit: MatchUnit,
 ): { amount: number | null; family: 'mass' | 'volume' | 'piece' | 'unknown' } {
-  if (amount === null) {
-    return { amount: null, family: unit === 'piece' ? 'piece' : 'unknown' }
+  if (unit === 'kg') {
+    return { amount: amount === null ? null : amount * 1000, family: 'mass' }
   }
-
-  if (unit === 'kg') return { amount: amount * 1000, family: 'mass' }
   if (unit === 'g') return { amount, family: 'mass' }
-  if (unit === 'l') return { amount: amount * 1000, family: 'volume' }
+  if (unit === 'l') {
+    return { amount: amount === null ? null : amount * 1000, family: 'volume' }
+  }
   if (unit === 'ml') return { amount, family: 'volume' }
   if (unit === 'piece') return { amount, family: 'piece' }
   return { amount, family: 'unknown' }
+}
+
+function hasInvalidKnownAmount(amount: number | null): boolean {
+  return amount !== null && (!Number.isFinite(amount) || amount <= 0)
 }
 
 function scoreCandidate(
@@ -79,6 +84,15 @@ function scoreCandidate(
 ): { score: number; reasons: string[] } {
   if (!candidate.available) {
     return { score: -100, reasons: ['candidate unavailable'] }
+  }
+
+  if (hasInvalidKnownAmount(candidate.packAmount)) {
+    return { score: -100, reasons: ['candidate pack amount invalid'] }
+  }
+
+  const packCount = candidate.packCount ?? 1
+  if (!Number.isInteger(packCount) || packCount <= 0) {
+    return { score: -100, reasons: ['invalid pack count'] }
   }
 
   const queryPhrase = normalizedPhrase(requirement.query)
@@ -103,7 +117,13 @@ function scoreCandidate(
   }
 
   const required = baseUnitAmount(requirement.amount, requirement.unit)
-  const pack = baseUnitAmount(candidate.packAmount, candidate.packUnit)
+  const effectivePackAmount =
+    candidate.packAmount === null ? null : candidate.packAmount * packCount
+  const pack = baseUnitAmount(effectivePackAmount, candidate.packUnit)
+
+  if (packCount > 1 && candidate.packAmount !== null) {
+    reasons.push(`multipack count ${packCount} applied`)
+  }
 
   if (
     required.family !== 'unknown' &&
@@ -145,6 +165,15 @@ export function matchIngredient(
 ): MatchDecision {
   const minimumScore = options.minimumScore ?? 65
   const minimumMargin = options.minimumMargin ?? 12
+
+  if (hasInvalidKnownAmount(requirement.amount)) {
+    return {
+      type: 'abstain',
+      score: null,
+      runnerUpScore: null,
+      reasons: ['requirement amount invalid'],
+    }
+  }
 
   const scored = candidates
     .map((candidate) => ({

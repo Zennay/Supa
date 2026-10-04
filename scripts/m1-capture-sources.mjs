@@ -5,24 +5,6 @@ import path from 'node:path'
 
 export const SOURCES = [
   {
-    id: 'ah-product-halfvolle-melk',
-    supermarket: 'ah',
-    kind: 'product',
-    url: 'https://www.ah.nl/producten/product/wi1525/halfvolle-melk',
-  },
-  {
-    id: 'ah-catalog',
-    supermarket: 'ah',
-    kind: 'catalog',
-    url: 'https://www.ah.nl/producten',
-  },
-  {
-    id: 'ah-offers',
-    supermarket: 'ah',
-    kind: 'offers',
-    url: 'https://www.ah.nl/bonus',
-  },
-  {
     id: 'plus-product-halfvolle-melk',
     supermarket: 'plus',
     kind: 'product',
@@ -40,11 +22,29 @@ export const SOURCES = [
     kind: 'offers',
     url: 'https://www.plus.nl/aanbiedingen',
   },
+  {
+    id: 'dekamarkt-product-halfvolle-melk',
+    supermarket: 'dekamarkt',
+    kind: 'product',
+    url: 'https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk/zuivelmeester-halfvolle-melk-1-liter/115873',
+  },
+  {
+    id: 'dekamarkt-category-melk',
+    supermarket: 'dekamarkt',
+    kind: 'catalog',
+    url: 'https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk',
+  },
+  {
+    id: 'dekamarkt-offers',
+    supermarket: 'dekamarkt',
+    kind: 'offers',
+    url: 'https://www.dekamarkt.nl/aanbiedingen',
+  },
 ]
 
 const HOST_BY_SUPERMARKET = new Map([
-  ['ah', 'www.ah.nl'],
   ['plus', 'www.plus.nl'],
+  ['dekamarkt', 'www.dekamarkt.nl'],
 ])
 const SUPPORTED_KINDS = new Set(['product', 'catalog', 'offers'])
 const MAX_BYTES = 5 * 1024 * 1024

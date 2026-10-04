@@ -3,6 +3,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const DEFAULT_MAX_CAPTURE_AGE_HOURS = 24
+const MAX_FUTURE_CLOCK_SKEW_MS = 5 * 60 * 1000
 
 function parseDate(value) {
   if (typeof value !== 'string' || !value.trim()) return null
@@ -40,6 +41,9 @@ export function evaluateManifestFreshness(
     const capturedAtMs = parseDate(result.capturedAt)
     const captureAgeHours =
       capturedAtMs === null ? null : hoursBetween(capturedAtMs, nowMs)
+    const captureIsFuture =
+      capturedAtMs !== null &&
+      capturedAtMs - nowMs > MAX_FUTURE_CLOCK_SKEW_MS
     const stale =
       captureAgeHours === null || captureAgeHours > maxCaptureAgeHours
 
@@ -55,6 +59,7 @@ export function evaluateManifestFreshness(
     const reasons = []
     if (!result.success) reasons.push('capture-failed')
     if (capturedAtMs === null) reasons.push('invalid-captured-at')
+    else if (captureIsFuture) reasons.push('capture-in-future')
     else if (captureAgeHours > maxCaptureAgeHours) reasons.push('capture-stale')
     if (!validators.etagPresent && !validators.lastModifiedPresent) {
       reasons.push('no-upstream-cache-validator')
@@ -73,9 +78,11 @@ export function evaluateManifestFreshness(
       freshness:
         !result.success
           ? 'failed'
-          : stale
-            ? 'stale'
-            : 'fresh',
+          : captureIsFuture
+            ? 'future'
+            : stale
+              ? 'stale'
+              : 'fresh',
       etag: result.etag ?? null,
       lastModified: result.lastModified ?? null,
       upstreamLastModifiedAgeHours:
@@ -99,6 +106,7 @@ export function evaluateManifestFreshness(
     sourceCount: sources.length,
     freshCount: sources.filter((source) => source.freshness === 'fresh').length,
     staleCount: sources.filter((source) => source.freshness === 'stale').length,
+    futureCount: sources.filter((source) => source.freshness === 'future').length,
     failedCount: sources.filter((source) => source.freshness === 'failed').length,
     unknownValidatorCount: sources.filter(
       (source) =>

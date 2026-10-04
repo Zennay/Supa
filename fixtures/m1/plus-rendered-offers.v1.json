@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "evidenceType": "plus-browser-rendered-offers",
+  "source": {
+    "id": "plus-rendered-offers",
+    "supermarket": "plus",
+    "kind": "offers",
+    "url": "https://www.plus.nl/aanbiedingen",
+    "capturedAt": "2026-10-04T18:53:10.645Z",
+    "sha256": "d348ca126007bf186c4941002305a22bd48bd9c6dca71cf5872fdc76e0c968b7"
+  },
+  "browserEvidence": {
+    "runId": 37226107225,
+    "artifactId": 11312390194,
+    "artifactDigest": "sha256:90ea9ef3dabdb97f067a9f8a37f3113db1bc50b2b045bc503a9ae08b9eec8985",
+    "supaSha": "2378d34e36ed199505bd3a535458d7869a3a5b4e",
+    "browser": "Firefox 157.0",
+    "driver": "geckodriver 0.37.1",
+    "selectorContract": {
+      "cardAnchor": "a[href^=\"/product/\"]",
+      "catalogBlock": "ProductList.ProductItem",
+      "offersBlock": "PromotionListFlow.OfferItem",
+      "name": ".plp-item-name h3 span[data-expression]",
+      "pack": ".plp-item-complementary span[data-expression]",
+      "priceInteger": ".product-header-price-integer",
+      "priceDecimals": ".product-header-price-decimals",
+      "previousPrice": ".product-header-price-previous"
+    },
+    "safety": {
+      "login": false,
+      "credentials": false,
+      "privateApiCalls": false,
+      "networkInterception": false,
+      "antiBotBypass": false,
+      "recursiveCrawl": false,
+      "targetCount": 2
+    },
+    "renderedHtmlSha256": "d348ca126007bf186c4941002305a22bd48bd9c6dca71cf5872fdc76e0c968b7",
+    "renderedHtmlBytes": 474005,
+    "screenshotBytes": 203800,
+    "observedProductLinkCount": 16
+  },
+  "cards": [
+    {
+      "block": "PromotionListFlow.OfferItem",
+      "href": "/product/plus-bananen-fairtrade-kg-1000-g-113651",
+      "name": "PLUS Bananen Fairtrade",
+      "packText": "Per 1000 gram",
+      "priceInteger": "0.",
+      "priceDecimals": "99",
+      "previousPriceText": "2.29"
+    },
+    {
+      "block": "PromotionListFlow.OfferItem",
+      "href": "/product/plus-handappels-jonagold-zak-1000-g-113840",
+      "name": "PLUS Handappels Jonagold",
+      "packText": "Per 1000 gram",
+      "priceInteger": "1.",
+      "priceDecimals": "29",
+      "previousPriceText": "1.39"
+    },
+    {
+      "block": "PromotionListFlow.OfferItem",
+      "href": "/product/plus-limoenen-net-3-st-211887",
+      "name": "PLUS Limoenen",
+      "packText": "Per 3 st",
+      "priceInteger": "0.",
+      "priceDecimals": "99",
+      "previousPriceText": "1.09"
+    },
+    {
+      "block": "PromotionListFlow.OfferItem",
+      "href": "/product/plus-bloemkool-stuk-1-st-114209",
+      "name": "PLUS Bloemkool",
+      "packText": "Per 1 st",
+      "priceInteger": "0.",
+      "priceDecimals": "99",
+      "previousPriceText": "1.69"
+    }
+  ]
+}

@@ -7,6 +7,33 @@ function sha256Text(value) {
   return createHash('sha256').update(value, 'utf8').digest('hex')
 }
 
+function isSafeSourceId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  )
+}
+
+function requireSafeUniqueProductSourceIds(sources) {
+  const seen = new Set()
+
+  for (const source of sources) {
+    if (source?.kind !== 'product') continue
+
+    if (!isSafeSourceId(source.id)) {
+      throw new Error(
+        `Inspection contains an unsafe product source id: ${source?.id ?? 'unknown'}`,
+      )
+    }
+    if (seen.has(source.id)) {
+      throw new Error(
+        `Inspection contains a duplicate product source id: ${source.id}`,
+      )
+    }
+    seen.add(source.id)
+  }
+}
+
 function requireMatchingProvenance(source, observation) {
   const provenance = observation?.provenance
   if (!provenance || typeof provenance !== 'object') {
@@ -41,6 +68,8 @@ export async function exportSanitizedCandidates(rootDir) {
   if (!Array.isArray(report.sources)) {
     throw new Error('Inspection sources must be an array')
   }
+
+  requireSafeUniqueProductSourceIds(report.sources)
 
   const outputDir = path.join(rootDir, 'sanitized-candidates')
   await mkdir(outputDir, { recursive: true })

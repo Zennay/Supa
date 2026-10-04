@@ -60,12 +60,23 @@ export function normalizePackText(input: string | null): NormalizedPack {
   )
 
   if (multipack) {
-    return {
-      rawText,
-      count: Number(multipack[1]),
-      amount: decimal(multipack[2]),
-      unit: UNIT_ALIASES[multipack[3]],
+    const count = Number(multipack[1])
+    const amount = decimal(multipack[2])
+    if (
+      Number.isInteger(count) &&
+      count > 0 &&
+      Number.isFinite(amount) &&
+      amount > 0
+    ) {
+      return {
+        rawText,
+        count,
+        amount,
+        unit: UNIT_ALIASES[multipack[3]],
+      }
     }
+
+    return { rawText, count: 1, amount: null, unit: 'unknown' }
   }
 
   const single = cleaned.match(
@@ -73,12 +84,17 @@ export function normalizePackText(input: string | null): NormalizedPack {
   )
 
   if (single) {
-    return {
-      rawText,
-      count: 1,
-      amount: decimal(single[1]),
-      unit: UNIT_ALIASES[single[2]],
+    const amount = decimal(single[1])
+    if (Number.isFinite(amount) && amount > 0) {
+      return {
+        rawText,
+        count: 1,
+        amount,
+        unit: UNIT_ALIASES[single[2]],
+      }
     }
+
+    return { rawText, count: 1, amount: null, unit: 'unknown' }
   }
 
   return { rawText, count: 1, amount: null, unit: 'unknown' }
@@ -98,10 +114,14 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
 
   const buyFree = cleaned.match(/^(\d+)\s*\+\s*(\d+)\s+gratis$/)
   if (buyFree) {
-    return {
-      type: 'buy_x_get_y_free',
-      buy: Number(buyFree[1]),
-      free: Number(buyFree[2]),
+    const buy = Number(buyFree[1])
+    const free = Number(buyFree[2])
+    if (buy > 0 && free > 0) {
+      return {
+        type: 'buy_x_get_y_free',
+        buy,
+        free,
+      }
     }
   }
 
@@ -109,11 +129,12 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
     /^(\d+)\s+voor\s+€?\s*(\d+(?:[.,]\d{1,2})?)$/,
   )
   if (quantityForPrice) {
+    const quantity = Number(quantityForPrice[1])
     const totalPriceCents = normalizeMoneyToCents(quantityForPrice[2])
-    if (totalPriceCents !== null) {
+    if (quantity > 0 && totalPriceCents !== null && totalPriceCents > 0) {
       return {
         type: 'quantity_for_price',
-        quantity: Number(quantityForPrice[1]),
+        quantity,
         totalPriceCents,
       }
     }
@@ -121,16 +142,19 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
 
   const percent = cleaned.match(/^(\d+(?:[.,]\d+)?)%\s+korting$/)
   if (percent) {
-    return {
-      type: 'percent_discount',
-      percent: decimal(percent[1]),
+    const percentValue = decimal(percent[1])
+    if (percentValue > 0 && percentValue <= 100) {
+      return {
+        type: 'percent_discount',
+        percent: percentValue,
+      }
     }
   }
 
   const fixed = cleaned.match(/^voor\s+€?\s*(\d+(?:[.,]\d{1,2})?)$/)
   if (fixed) {
     const priceCents = normalizeMoneyToCents(fixed[1])
-    if (priceCents !== null) {
+    if (priceCents !== null && priceCents > 0) {
       return { type: 'fixed_price', priceCents }
     }
   }
