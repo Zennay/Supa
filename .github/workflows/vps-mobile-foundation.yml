@@ -19,6 +19,8 @@ on:
       - "src/lib/**"
       - "tests/planner*.test.*"
       - "tests/m2-core-slice.test.mjs"
+      - "scripts/m2-ui-smoke.mjs"
+      - "package.json"
 
 concurrency:
   group: supa-vps-mobile-${{ github.event.pull_request.number || github.ref }}
@@ -41,3 +43,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Verify Firefox smoke prerequisites
+        run: |
+          command -v firefox
+          command -v geckodriver
+          firefox --version
+          geckodriver --version
+      - name: Run M2 browser interaction smoke
+        run: npm run m2:ui-smoke
