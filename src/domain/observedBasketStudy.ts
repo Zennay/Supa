@@ -81,6 +81,7 @@ function unknownComparison(
     deltaCents: null,
     savingsCents: null,
     lineDeltas: [],
+    attribution: null,
     reasons,
   }
 }
