@@ -165,3 +165,31 @@ test('M3 attribution refuses to decompose an unclaimable basket comparison', () 
   assert.match(result.reasons.join(' '), /not claimable/)
   assert.match(result.reasons.join(' '), /unresolved ingredients/)
 })
+
+
+test('M3 attribution rejects malformed JSON evidence without throwing', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison(),
+    evidence: [
+      null,
+      {
+        lineId: 'tomato',
+        effect: 'mystery-effect',
+        deltaCents: -120,
+        evidenceRef: 'synthetic:bad-effect',
+      },
+      {
+        lineId: 'rice',
+        effect: 'offer',
+        deltaCents: 30,
+      },
+    ],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /must be an object/)
+  assert.match(result.reasons.join(' '), /unsupported effect/)
+  assert.match(result.reasons.join(' '), /missing an evidence reference/)
+})
