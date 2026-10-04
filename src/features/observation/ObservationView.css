@@ -157,8 +157,40 @@
 
 .observation-actions {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
   gap: 10px;
+}
+
+.observation-import-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-align: center;
+}
+
+.observation-import-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.observation-import-status {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fbfaf6;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.observation-import-status.is-success {
+  border-color: var(--accent);
 }
 
 .primary-button {
