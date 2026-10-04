@@ -377,5 +377,47 @@
         "water-6x1l"
       ]
     }
+  },
+  {
+    "id": "invalid-requirement-zero-amount",
+    "requirement": {
+      "id": "milk-zero",
+      "query": "halfvolle melk",
+      "amount": 0,
+      "unit": "ml"
+    },
+    "candidates": [
+      {
+        "id": "milk-1l-zero-req",
+        "name": "Halfvolle melk",
+        "packAmount": 1,
+        "packUnit": "l",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "abstain"
+    }
+  },
+  {
+    "id": "invalid-candidate-negative-pack",
+    "requirement": {
+      "id": "milk-negative-pack",
+      "query": "halfvolle melk",
+      "amount": 500,
+      "unit": "ml"
+    },
+    "candidates": [
+      {
+        "id": "milk-negative",
+        "name": "Halfvolle melk",
+        "packAmount": -1,
+        "packUnit": "l",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "abstain"
+    }
   }
 ]
