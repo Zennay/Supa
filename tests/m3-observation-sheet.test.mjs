@@ -69,7 +69,7 @@ test('M3 observation progress counts explicit availability without inventing evi
   assert.equal(progress.totalLines, 22)
   assert.equal(progress.availabilityRecorded, 0)
   assert.equal(progress.metadataCompleted, 0)
-  assert.equal(progress.metadataTotal, 15)
+  assert.equal(progress.metadataTotal, 16)
 
   sheet.baseline.lines[0].observedProduct.available = false
   sheet.baseline.store.name = 'Observed store'
@@ -86,6 +86,7 @@ test('M3 observation sheet does not prefill participant identity or savings evid
   assert.equal(sheet.study.population, '')
   assert.equal(sheet.study.region, '')
   assert.equal(sheet.study.weekStart, '')
+  assert.equal(sheet.study.priceContext, '')
   assert.equal(sheet.study.maxObservationWindowHours, 24)
   assert.match(sheet.instructions.join(' '), /do not guess/i)
   assert.match(sheet.instructions.join(' '), /pseudonymous/i)
