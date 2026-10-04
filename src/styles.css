@@ -316,3 +316,60 @@ h3, p { margin: 0; }
 .unresolved-shopping .check {
   border-color: #d9b88f;
 }
+
+
+.comparison-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.comparison-card > strong {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.comparison-card .eyebrow {
+  margin-bottom: 0;
+}
+
+.comparison-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.comparison-totals > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #f0efe9;
+}
+
+.comparison-totals span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.comparison-totals strong {
+  font-size: 18px;
+}
+
+.comparison-warning {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff9ef;
+  color: #6d4426;
+}
+
+.comparison-warning span {
+  font-size: 12px;
+  line-height: 1.4;
+}
