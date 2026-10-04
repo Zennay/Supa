@@ -76,6 +76,7 @@ export function App() {
             activeDays={activeDays}
             plannedMeals={plannedMeals}
             recipes={m2Recipes}
+            basketTotalCents={basket.totalCents}
             onBudgetChange={setBudget}
             onToggleDay={toggleDay}
             onRecipeChange={changeRecipe}
