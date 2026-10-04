@@ -1,0 +1,328 @@
+[
+  {
+    "id": "halfvolle-melk-pack-fit",
+    "requirement": {
+      "id": "milk",
+      "query": "halfvolle melk",
+      "amount": 1000,
+      "unit": "ml"
+    },
+    "candidates": [
+      {
+        "id": "milk-1l",
+        "name": "AH Halfvolle melk",
+        "packAmount": 1,
+        "packUnit": "l",
+        "available": true
+      },
+      {
+        "id": "milk-500",
+        "name": "Halfvolle melk",
+        "packAmount": 500,
+        "packUnit": "ml",
+        "available": true
+      },
+      {
+        "id": "skim-1l",
+        "name": "Magere melk",
+        "packAmount": 1,
+        "packUnit": "l",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "milk-1l"
+      ]
+    }
+  },
+  {
+    "id": "basmati-vs-other-rice",
+    "requirement": {
+      "id": "rice",
+      "query": "basmati rijst",
+      "amount": 300,
+      "unit": "g"
+    },
+    "candidates": [
+      {
+        "id": "basmati",
+        "name": "Basmati rijst",
+        "packAmount": 1,
+        "packUnit": "kg",
+        "available": true
+      },
+      {
+        "id": "brown",
+        "name": "Zilvervlies rijst",
+        "packAmount": 1,
+        "packUnit": "kg",
+        "available": true
+      },
+      {
+        "id": "risotto",
+        "name": "Risotto rijst",
+        "packAmount": 500,
+        "packUnit": "g",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "basmati"
+      ]
+    }
+  },
+  {
+    "id": "tomato-cubes-vs-passata",
+    "requirement": {
+      "id": "tomato",
+      "query": "tomatenblokjes",
+      "amount": 400,
+      "unit": "g"
+    },
+    "candidates": [
+      {
+        "id": "cubes",
+        "name": "Tomatenblokjes",
+        "packAmount": 400,
+        "packUnit": "g",
+        "available": true
+      },
+      {
+        "id": "passata",
+        "name": "Tomaten passata",
+        "packAmount": 500,
+        "packUnit": "g",
+        "available": true
+      },
+      {
+        "id": "paste",
+        "name": "Tomatenpuree",
+        "packAmount": 140,
+        "packUnit": "g",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "cubes"
+      ]
+    }
+  },
+  {
+    "id": "egg-count-pack",
+    "requirement": {
+      "id": "eggs",
+      "query": "vrije uitloop eieren",
+      "amount": 6,
+      "unit": "piece"
+    },
+    "candidates": [
+      {
+        "id": "eggs-6",
+        "name": "Vrije uitloop eieren 6 stuks",
+        "packAmount": 6,
+        "packUnit": "piece",
+        "available": true
+      },
+      {
+        "id": "eggs-10",
+        "name": "Vrije uitloop eieren 10 stuks",
+        "packAmount": 10,
+        "packUnit": "piece",
+        "available": true
+      },
+      {
+        "id": "barn-6",
+        "name": "Scharreleieren 6 stuks",
+        "packAmount": 6,
+        "packUnit": "piece",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "eggs-6"
+      ]
+    }
+  },
+  {
+    "id": "olive-oil",
+    "requirement": {
+      "id": "oil",
+      "query": "olijfolie",
+      "amount": 100,
+      "unit": "ml"
+    },
+    "candidates": [
+      {
+        "id": "olive",
+        "name": "Extra vierge olijfolie",
+        "packAmount": 500,
+        "packUnit": "ml",
+        "available": true
+      },
+      {
+        "id": "sunflower",
+        "name": "Zonnebloemolie",
+        "packAmount": 1,
+        "packUnit": "l",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "olive"
+      ]
+    }
+  },
+  {
+    "id": "chicken-fillet-vs-thigh",
+    "requirement": {
+      "id": "chicken",
+      "query": "kipfilet",
+      "amount": 300,
+      "unit": "g"
+    },
+    "candidates": [
+      {
+        "id": "breast",
+        "name": "Kipfilet naturel",
+        "packAmount": 400,
+        "packUnit": "g",
+        "available": true
+      },
+      {
+        "id": "thigh",
+        "name": "Kipdijfilet",
+        "packAmount": 400,
+        "packUnit": "g",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "match",
+      "acceptedProductIds": [
+        "breast"
+      ]
+    }
+  },
+  {
+    "id": "unit-family-mismatch",
+    "requirement": {
+      "id": "onion",
+      "query": "gele ui",
+      "amount": 2,
+      "unit": "piece"
+    },
+    "candidates": [
+      {
+        "id": "onion-kg",
+        "name": "Gele uien",
+        "packAmount": 1,
+        "packUnit": "kg",
+        "available": true
+      },
+      {
+        "id": "red-onion",
+        "name": "Rode ui",
+        "packAmount": 2,
+        "packUnit": "piece",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "abstain"
+    }
+  },
+  {
+    "id": "unrelated-herb-safe-abstention",
+    "requirement": {
+      "id": "coriander",
+      "query": "verse koriander",
+      "amount": 15,
+      "unit": "g"
+    },
+    "candidates": [
+      {
+        "id": "parsley",
+        "name": "Verse peterselie",
+        "packAmount": 15,
+        "packUnit": "g",
+        "available": true
+      },
+      {
+        "id": "basil",
+        "name": "Verse basilicum",
+        "packAmount": 15,
+        "packUnit": "g",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "abstain"
+    }
+  },
+  {
+    "id": "ambiguous-identical-candidates",
+    "requirement": {
+      "id": "pasta",
+      "query": "spaghetti",
+      "amount": 500,
+      "unit": "g"
+    },
+    "candidates": [
+      {
+        "id": "spag-a",
+        "name": "Spaghetti",
+        "packAmount": 500,
+        "packUnit": "g",
+        "available": true
+      },
+      {
+        "id": "spag-b",
+        "name": "Spaghetti",
+        "packAmount": 500,
+        "packUnit": "g",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "abstain"
+    }
+  },
+  {
+    "id": "unavailable-best-candidate",
+    "requirement": {
+      "id": "yogurt",
+      "query": "griekse yoghurt",
+      "amount": 500,
+      "unit": "g"
+    },
+    "candidates": [
+      {
+        "id": "greek-unavailable",
+        "name": "Griekse yoghurt",
+        "packAmount": 500,
+        "packUnit": "g",
+        "available": false
+      },
+      {
+        "id": "plain",
+        "name": "Volle yoghurt",
+        "packAmount": 500,
+        "packUnit": "g",
+        "available": true
+      }
+    ],
+    "expected": {
+      "type": "abstain"
+    }
+  }
+]
