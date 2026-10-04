@@ -4,7 +4,7 @@ import type {
   RawProductObservation,
   SourceSnapshotRef,
 } from './ingestion.ts'
-import { validateRawProductObservation } from './ingestion'
+import { validateRawProductObservation } from './ingestion.ts'
 import { normalizeMoneyToCents } from './normalize.ts'
 
 type JsonObject = Record<string, unknown>
