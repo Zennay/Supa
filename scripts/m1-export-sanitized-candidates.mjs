@@ -1,6 +1,11 @@
+import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+
+function sha256Text(value) {
+  return createHash('sha256').update(value, 'utf8').digest('hex')
+}
 
 function requireMatchingProvenance(source, observation) {
   const provenance = observation?.provenance
@@ -68,12 +73,10 @@ export async function exportSanitizedCandidates(rootDir) {
       }
 
       const file = `${source.id}.json`
-      await writeFile(
-        path.join(outputDir, file),
-        JSON.stringify(candidate, null, 2) + '\n',
-        'utf8',
-      )
-      candidates.push({ id: source.id, file })
+      const serialized = JSON.stringify(candidate, null, 2) + '\n'
+      const candidateSha256 = sha256Text(serialized)
+      await writeFile(path.join(outputDir, file), serialized, 'utf8')
+      candidates.push({ id: source.id, file, candidateSha256 })
       continue
     }
 
