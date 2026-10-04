@@ -5,6 +5,7 @@ import {
   OBSERVATION_DRAFT_STORAGE_KEY,
   observationSheetProgress,
   observationSheetReadiness,
+  observationWindowSummary,
   restoreObservationSheetDraft,
   type ObservationSheet,
   type ObservationSource,
@@ -59,6 +60,15 @@ function safeFilePart(value: string) {
   return cleaned || 'draft'
 }
 
+function formatLocalDateTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('nl-NL', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  })
+}
+
 export function ObservationView() {
   const [sheet, setSheet] = useState<ObservationSheet>(() => {
     const fresh = buildObservationSheet()
@@ -76,6 +86,7 @@ export function ObservationView() {
   })
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
   const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
+  const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
 
   useEffect(() => {
     try {
@@ -203,6 +214,26 @@ export function ObservationView() {
           Je concept wordt automatisch lokaal op dit apparaat bewaard, zodat een
           refresh of gesloten tab je winkelmeting niet wist.
         </p>
+        {windowSummary.state === 'single-observation' && (
+          <p>
+            <strong>24u-venster:</strong> meet de andere winkel uiterlijk{' '}
+            {formatLocalDateTime(windowSummary.deadlineAt)}. De deadline wordt
+            berekend vanaf de eerste geldige observatietijd.
+          </p>
+        )}
+        {windowSummary.state === 'within-window' && (
+          <p>
+            <strong>24u-venster geldig:</strong> de twee observaties liggen{' '}
+            {windowSummary.deltaHours.toFixed(1)} uur uit elkaar.
+          </p>
+        )}
+        {windowSummary.state === 'outside-window' && (
+          <p>
+            <strong>24u-venster overschreden:</strong> de twee observaties liggen{' '}
+            {windowSummary.deltaHours.toFixed(1)} uur uit elkaar. Deze combinatie
+            is niet geschikt voor M3-evidence.
+          </p>
+        )}
       </div>
 
       <div
