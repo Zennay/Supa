@@ -479,3 +479,61 @@ For offer cards:
 The listing fixtures therefore prove bounded catalog and discount-price
 extraction without overstating promotion semantics.
 
+
+## PLUS rendered catalog + offers repeatability — 2026-10-04
+
+The exact bounded browser workflow above was re-run unchanged as **attempt 2**
+on the same permanent VPS route to test whether the observed listing contract
+survives normal client-rendered drift.
+
+- zCloud run: `37226107225`, attempt 2
+- repeat job: `111510554019` — success
+- repeat artifact: `11313000803`
+- repeat artifact digest:
+  `sha256:45a18f3d0813b01139f2e8322a6214b4816b81d17f1052d5a7b29a87968d969e`
+- original artifact: `11312390194`
+- original digest:
+  `sha256:90ea9ef3dabdb97f067a9f8a37f3113db1bc50b2b045bc503a9ae08b9eec8985`
+- same pinned Supa SHA, Firefox 157.0, geckodriver 0.37.1, two fixed public
+  targets and the same no-login/no-private-API/no-interception/no-bypass safety
+  contract
+
+### Repeat comparison
+
+Catalog raw rendered HTML changed slightly, as expected for a dynamic client
+application:
+
+- original SHA:
+  `96c4426306753c4f1c9fd337c9bbc49e959e3c47662c9ca9f501d3f56faf3c72`
+- repeat SHA:
+  `e8070a75fbea75cd9ac4d78d2478b6d7bc8d92b123f29cfa86e232e2a1544f72`
+- rendered bytes: 1,558,525 → 1,558,506
+- unique product links: 12 → 12
+- the ordered first-product-link set is exact across attempts
+- Product JSON-LD: 0 → 0
+- application/json blocks: 0 → 0
+- normalized visible-text length: 30,068 → 30,037
+- normalized visible-text similarity: 0.999484236
+
+Offers also changed at raw HTML level but preserved the observed listing
+content exactly after visible-text normalization:
+
+- original SHA:
+  `d348ca126007bf186c4941002305a22bd48bd9c6dca71cf5872fdc76e0c968b7`
+- repeat SHA:
+  `e62847a4dc0b7865e38e4521f409be03bd47441516d6beb0890e7ffa84fa52e0`
+- rendered bytes: 474,005 → 474,609
+- unique product links: 16 → 16
+- the ordered first-product-link set is exact across attempts
+- Product JSON-LD: 0 → 0
+- application/json blocks: 0 → 0
+- normalized visible text is byte-identical across attempts:
+  `sha256:ff70532fa386d6191e074e01f3e627e7a63541ed129a463dffb911a928caf04e`
+
+The machine-readable comparison is versioned at
+`evidence/m1/plus-listings-repeatability.v1.json` and CI validates its
+artifact identity, safety boundary and structural invariants.
+
+This closes the **bounded technical repeatability** gap for the observed PLUS
+catalog/offers contract. It does not claim indefinite source stability and it
+does not grant production ingestion/reuse permission.
