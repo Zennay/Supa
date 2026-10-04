@@ -3,6 +3,7 @@ import { PlannerView } from './features/planner/PlannerView'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { buildOneStoreBasket } from './domain/basket'
+import { compareStoreBaskets } from './domain/comparison'
 import {
   m2DefaultActiveDays,
   m2InitialPlan,
@@ -10,6 +11,13 @@ import {
   m2Recipes,
   m2Store,
 } from './data/m2Fixture'
+import {
+  m3BaselineProducts,
+  m3BaselineStore,
+  m3CandidateProducts,
+  m3CandidateStore,
+  m3Recipes,
+} from './data/m3Fixture'
 
 type Tab = 'planner' | 'basket' | 'list'
 
@@ -37,6 +45,39 @@ export function App() {
         products: m2Products,
       }),
     [activeDays, plannedMeals],
+  )
+
+  const comparisonBaseline = useMemo(
+    () =>
+      buildOneStoreBasket({
+        store: m3BaselineStore,
+        plan: plannedMeals,
+        recipes: m3Recipes,
+        activeDays,
+        products: m3BaselineProducts,
+      }),
+    [activeDays, plannedMeals],
+  )
+
+  const comparisonCandidate = useMemo(
+    () =>
+      buildOneStoreBasket({
+        store: m3CandidateStore,
+        plan: plannedMeals,
+        recipes: m3Recipes,
+        activeDays,
+        products: m3CandidateProducts,
+      }),
+    [activeDays, plannedMeals],
+  )
+
+  const storeComparison = useMemo(
+    () =>
+      compareStoreBaskets({
+        baseline: comparisonBaseline,
+        candidate: comparisonCandidate,
+      }),
+    [comparisonBaseline, comparisonCandidate],
   )
 
   const toggleDay = (day: string) => {
@@ -83,7 +124,14 @@ export function App() {
             onReset={resetPlan}
           />
         )}
-        {tab === 'basket' && <BasketView basket={basket} />}
+        {tab === 'basket' && (
+          <BasketView
+            basket={basket}
+            comparison={storeComparison}
+            baselineStoreName={m3BaselineStore.name}
+            candidateStoreName={m3CandidateStore.name}
+          />
+        )}
         {tab === 'list' && <ShoppingListView basket={basket} />}
       </div>
 
