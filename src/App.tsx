@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
+import { ObservationView } from './features/observation/ObservationView'
 import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
@@ -22,12 +23,13 @@ import {
   m3CandidateStore,
 } from './data/m3ComparisonFixture'
 
-type Tab = 'planner' | 'basket' | 'list'
+type Tab = 'planner' | 'basket' | 'list' | 'observe'
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'planner', label: 'Planner' },
   { id: 'basket', label: 'Mand' },
   { id: 'list', label: 'Lijst' },
+  { id: 'observe', label: 'Meten' },
 ]
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
@@ -182,6 +184,7 @@ export function App() {
           />
         )}
         {tab === 'list' && <ShoppingListView basket={basket} />}
+        {tab === 'observe' && <ObservationView />}
       </div>
 
       <nav className="bottom-nav" aria-label="Hoofdnavigatie">
