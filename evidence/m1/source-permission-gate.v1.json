@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "milestone": "M1 Data Feasibility",
+  "reviewedAt": "2026-10-04",
+  "policy": "production ingestion requires an explicit permission or licensing basis per source; technical feasibility alone never enables production reuse",
+  "sources": [
+    {
+      "supermarket": "plus",
+      "technicalStatus": "proven",
+      "permissionStatus": "permission_required",
+      "productionEnabled": false,
+      "evidence": [
+        {
+          "kind": "official_terms",
+          "url": "https://taarten.plus.nl/alv/",
+          "section": "19.1",
+          "finding": "Published PLUS terms reserve website/app intellectual-property rights and state that reproducing, publishing or editing website/app information requires permission outside personal household use."
+        }
+      ],
+      "nextAction": "Obtain written permission or another explicit licensing basis before enabling scheduled production ingestion or redistribution."
+    },
+    {
+      "supermarket": "dekamarkt",
+      "technicalStatus": "proven",
+      "permissionStatus": "unresolved",
+      "productionEnabled": false,
+      "evidence": [
+        {
+          "kind": "official_terms",
+          "url": "https://www.dekamarkt.nl/algemene-voorwaarden",
+          "section": "current general conditions",
+          "finding": "The reviewed public general-conditions page does not provide a clear grant for systematic reuse of catalog or offer data; absence of a prohibition is not treated as permission."
+        }
+      ],
+      "nextAction": "Obtain written confirmation or a published licensing basis before enabling scheduled production ingestion or redistribution."
+    }
+  ]
+}
