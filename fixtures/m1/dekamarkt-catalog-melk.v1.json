@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "evidenceType": "dekamarkt-public-ssr-nuxt-catalog",
+  "source": {
+    "id": "dekamarkt-category-melk",
+    "supermarket": "dekamarkt",
+    "kind": "catalog",
+    "url": "https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk",
+    "capturedAt": "2026-10-04T18:15:30.306Z",
+    "sha256": "6666d3ed68bee4306bae95be7a7acf3e5867649cc79a5e6e2c80e7eb08c60a1d"
+  },
+  "captureEvidence": {
+    "runId": 37223714917,
+    "artifactId": 11310519403,
+    "artifactDigest": "sha256:4e49756d10bc5bfd27c64fb1653601a11f3793b6e71980cdb9dede866fe415b3",
+    "supaSha": "5120038fa121e35fd13e30284800b87d007a3a45",
+    "status": 200,
+    "contentType": "text/html;charset=utf-8",
+    "bytes": 532429,
+    "safety": {
+      "login": false,
+      "credentials": false,
+      "privateApiCalls": false,
+      "antiBotBypass": false,
+      "recursiveCrawl": false,
+      "targetCount": 3
+    }
+  },
+  "nuxtPayload": [
+    null,
+    false,
+    0,
+    "",
+    "Zuivelmeester Halfvolle melk",
+    "1 liter",
+    115873,
+    "/producten/zuivel-kaas/melk-karnemelk/zuivelmeester%20halfvolle%20melk/115873",
+    "Zuivelmeester",
+    0.85,
+    {
+      "offerPrice": 2,
+      "normalPrice": 9,
+      "priceToShow": 2,
+      "textPriceSign": 3,
+      "isOffer": 1
+    },
+    {
+      "headerText": 4,
+      "packaging": 5,
+      "productId": 6,
+      "url": 7,
+      "brand": 8,
+      "price": 10
+    },
+    "Zuivelmeester Halfvolle melk",
+    "2 liter",
+    101229,
+    "/producten/zuivel-kaas/melk-karnemelk/zuivelmeester%20halfvolle%20melk/101229",
+    "Zuivelmeester",
+    1.69,
+    {
+      "offerPrice": 2,
+      "normalPrice": 17,
+      "priceToShow": 2,
+      "textPriceSign": 3,
+      "isOffer": 1
+    },
+    {
+      "headerText": 12,
+      "packaging": 13,
+      "productId": 14,
+      "url": 15,
+      "brand": 16,
+      "price": 18
+    },
+    "Melkunie Karnemelk",
+    "1 liter",
+    6279,
+    "/producten/zuivel-kaas/melk-karnemelk/melkunie%20karnemelk/6279",
+    "Melkunie",
+    1.45,
+    {
+      "offerPrice": 2,
+      "normalPrice": 25,
+      "priceToShow": 2,
+      "textPriceSign": 3,
+      "isOffer": 1
+    },
+    {
+      "headerText": 20,
+      "packaging": 21,
+      "productId": 22,
+      "url": 23,
+      "brand": 24,
+      "price": 26
+    },
+    [
+      11,
+      19,
+      27
+    ],
+    "Melk & karnemelk",
+    {
+      "products": 28,
+      "category": 29
+    },
+    {
+      "webgroup-zuivel-kaas-melk-karnemelk": 30
+    }
+  ]
+}

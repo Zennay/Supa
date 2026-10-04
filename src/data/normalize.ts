@@ -1,0 +1,168 @@
+import type { PackUnit, RawPack } from './ingestion'
+
+const UNIT_ALIASES: Record<string, PackUnit> = {
+  g: 'g',
+  gram: 'g',
+  kg: 'kg',
+  ml: 'ml',
+  l: 'l',
+  liter: 'l',
+  st: 'piece',
+  stuk: 'piece',
+  stuks: 'piece',
+}
+
+function decimal(value: string): number {
+  return Number(value.replace(',', '.'))
+}
+
+export function normalizeMoneyToCents(input: string): number | null {
+  const cleaned = input
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/^€/, '')
+
+  if (!cleaned) {
+    return null
+  }
+
+  const normalized = cleaned.includes(',')
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : cleaned
+
+  const value = Number(normalized)
+  if (!Number.isFinite(value) || value < 0) {
+    return null
+  }
+
+  const cents = Math.round(value * 100)
+  return Math.abs(value * 100 - cents) < 1e-6 ? cents : null
+}
+
+export type NormalizedPack = RawPack & {
+  count: number
+}
+
+export function normalizePackText(input: string | null): NormalizedPack {
+  const rawText = input?.trim() || null
+
+  if (!rawText) {
+    return { rawText, count: 1, amount: null, unit: 'unknown' }
+  }
+
+  const cleaned = rawText
+    .toLowerCase()
+    .replace(/^per\s+(pak|fles|doos|zak)\s+/i, '')
+    .trim()
+
+  const multipack = cleaned.match(
+    /^(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)\b/,
+  )
+
+  if (multipack) {
+    const count = Number(multipack[1])
+    const amount = decimal(multipack[2])
+    if (
+      Number.isInteger(count) &&
+      count > 0 &&
+      Number.isFinite(amount) &&
+      amount > 0
+    ) {
+      return {
+        rawText,
+        count,
+        amount,
+        unit: UNIT_ALIASES[multipack[3]],
+      }
+    }
+
+    return { rawText, count: 1, amount: null, unit: 'unknown' }
+  }
+
+  const single = cleaned.match(
+    /^(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)\b/,
+  )
+
+  if (single) {
+    const amount = decimal(single[1])
+    if (Number.isFinite(amount) && amount > 0) {
+      return {
+        rawText,
+        count: 1,
+        amount,
+        unit: UNIT_ALIASES[single[2]],
+      }
+    }
+
+    return { rawText, count: 1, amount: null, unit: 'unknown' }
+  }
+
+  return { rawText, count: 1, amount: null, unit: 'unknown' }
+}
+
+export type NormalizedOfferMechanic =
+  | { type: 'buy_x_get_y_free'; buy: number; free: number }
+  | { type: 'quantity_for_price'; quantity: number; totalPriceCents: number }
+  | { type: 'percent_discount'; percent: number }
+  | { type: 'fixed_price'; priceCents: number }
+  | { type: 'second_half_price' }
+  | { type: 'unknown'; rawLabel: string }
+
+export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
+  const rawLabel = label.trim()
+  const cleaned = rawLabel.toLowerCase().replace(/\s+/g, ' ')
+
+  const buyFree = cleaned.match(/^(\d+)\s*\+\s*(\d+)\s+gratis$/)
+  if (buyFree) {
+    const buy = Number(buyFree[1])
+    const free = Number(buyFree[2])
+    if (buy > 0 && free > 0) {
+      return {
+        type: 'buy_x_get_y_free',
+        buy,
+        free,
+      }
+    }
+  }
+
+  const quantityForPrice = cleaned.match(
+    /^(\d+)\s+voor\s+€?\s*(\d+(?:[.,]\d{1,2})?)$/,
+  )
+  if (quantityForPrice) {
+    const quantity = Number(quantityForPrice[1])
+    const totalPriceCents = normalizeMoneyToCents(quantityForPrice[2])
+    if (quantity > 0 && totalPriceCents !== null && totalPriceCents > 0) {
+      return {
+        type: 'quantity_for_price',
+        quantity,
+        totalPriceCents,
+      }
+    }
+  }
+
+  const percent = cleaned.match(/^(\d+(?:[.,]\d+)?)%\s+korting$/)
+  if (percent) {
+    const percentValue = decimal(percent[1])
+    if (percentValue > 0 && percentValue <= 100) {
+      return {
+        type: 'percent_discount',
+        percent: percentValue,
+      }
+    }
+  }
+
+  const fixed = cleaned.match(/^voor\s+€?\s*(\d+(?:[.,]\d{1,2})?)$/)
+  if (fixed) {
+    const priceCents = normalizeMoneyToCents(fixed[1])
+    if (priceCents !== null && priceCents > 0) {
+      return { type: 'fixed_price', priceCents }
+    }
+  }
+
+  if (/^2e\s+halve\s+prijs$/.test(cleaned)) {
+    return { type: 'second_half_price' }
+  }
+
+  return { type: 'unknown', rawLabel }
+}
+

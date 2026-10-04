@@ -1,0 +1,121 @@
+name: M1 supermarket source capture
+
+on:
+  pull_request:
+    paths:
+      - "scripts/m1-capture-sources.mjs"
+      - "tests/m1-capture-sources.test.mjs"
+      - "tests/ingestion-contract.test.mjs"
+      - "tests/normalization.test.mjs"
+      - "tests/matching-benchmark.test.mjs"
+      - "fixtures/matching/**"
+      - "scripts/m1-run-matching-benchmark.mjs"
+      - "scripts/m1-inspect-captures.mjs"
+      - "tests/m1-inspect-captures.test.mjs"
+      - "scripts/m1-export-sanitized-candidates.mjs"
+      - "tests/m1-export-sanitized-candidates.test.mjs"
+      - "scripts/m1-compare-captures.mjs"
+      - "tests/m1-compare-captures.test.mjs"
+      - "scripts/m1-evaluate-freshness.mjs"
+      - "tests/m1-evaluate-freshness.test.mjs"
+      - "scripts/m1-build-evidence-summary.mjs"
+      - "tests/m1-build-evidence-summary.test.mjs"
+      - "scripts/m1-promote-reviewed-candidates.mjs"
+      - "tests/m1-promote-reviewed-candidates.test.mjs"
+      - "src/data/reviewedLiveFixtures.ts"
+      - "tests/reviewed-live-fixtures.test.mjs"
+      - "src/domain/matching.ts"
+      - "package.json"
+      - "src/data/ingestion.ts"
+      - "src/data/normalize.ts"
+      - "src/data/schemaOrgProduct.ts"
+      - "tests/schema-org-product.test.mjs"
+      - ".github/workflows/m1-data-capture.yml"
+      - "docs/M1_DATA_FEASIBILITY.md"
+  workflow_dispatch:
+
+concurrency:
+  group: supa-m1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    if: github.event_name == 'workflow_dispatch' || github.base_ref == 'main'
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify permanent VPS runner
+        run: |
+          test "$(hostname -s)" = "vps-bb300bba"
+          echo "runner=$(hostname -s)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify bounded source contract
+        run: npm test
+
+      - name: Run matching benchmark
+        run: npm run m1:matching-benchmark
+
+      - name: Capture representative public pages
+        id: capture
+        continue-on-error: true
+        run: node scripts/m1-capture-sources.mjs
+
+      - name: Inspect capture integrity and structured data
+        id: inspect
+        if: always()
+        run: |
+          capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          test -n "$capture_dir"
+          npm run m1:inspect-captures -- "$capture_dir"
+
+      - name: Evaluate capture freshness evidence
+        id: freshness
+        if: always()
+        run: |
+          capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          test -n "$capture_dir"
+          npm run m1:evaluate-freshness -- "$capture_dir"
+
+      - name: Export sanitized product candidates
+        id: export
+        if: steps.inspect.outcome == 'success'
+        run: |
+          capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          test -n "$capture_dir"
+          npm run m1:export-candidates -- "$capture_dir"
+
+      - name: Build M1 evidence summary
+        id: evidence
+        if: steps.inspect.outcome == 'success' && steps.freshness.outcome == 'success' && steps.export.outcome == 'success'
+        run: |
+          capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          test -n "$capture_dir"
+          npm run m1:evidence-summary -- "$capture_dir"
+
+      - name: Upload capture evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supa-m1-source-captures
+          path: artifacts/m1-captures/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail visibly when capture evidence fails
+        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.freshness.outcome != 'success' || steps.export.outcome == 'failure' || steps.evidence.outcome == 'failure'
+        run: |
+          echo "M1 capture evidence failed. Inspect manifest.json, inspection.json, freshness.json, sanitized-candidates/index.json and evidence-summary.json in the uploaded artifact."
+          exit 1
