@@ -22,6 +22,8 @@ on:
       - "tests/m1-build-evidence-summary.test.mjs"
       - "scripts/m1-promote-reviewed-candidates.mjs"
       - "tests/m1-promote-reviewed-candidates.test.mjs"
+      - "src/data/reviewedLiveFixtures.ts"
+      - "tests/reviewed-live-fixtures.test.mjs"
       - "src/domain/matching.ts"
       - "package.json"
       - "src/data/ingestion.ts"
