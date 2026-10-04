@@ -189,6 +189,38 @@ try {
     observed: 'manual-choice shopping-list row remains usable as a checklist item',
   })
 
+  await clickNav(sessionId, 'Meten')
+  let observationText = await waitForText(sessionId, 'Meten zonder gokken.')
+  assert.match(observationText, /0\/22 regels geobserveerd/)
+  assert.match(observationText, /collection-template-not-evidence/)
+
+  const observationChanged = await execute(
+    sessionId,
+    `
+      const select = document.querySelector(
+        'select[aria-label="baseline Basmati rijst beschikbaar"]',
+      )
+      if (!select) return false
+      select.value = 'false'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+      return select.value === 'false'
+    `,
+  )
+  assert.equal(
+    observationChanged,
+    true,
+    'M3 observation availability could not be recorded',
+  )
+  observationText = await waitForText(sessionId, '1/22 regels geobserveerd')
+  assert.match(observationText, /Basmati rijst/)
+  await screenshot(sessionId, 'm3-observation-entry.png')
+  evidence.checks.push({
+    step: 'm3-observation-entry',
+    passed: true,
+    observed:
+      'rendered M3 collector exposes the canonical 22 store/ingredient observations and records explicit unavailable state without inventing product data',
+  })
+
   await clickNav(sessionId, 'Planner')
   await waitForText(sessionId, 'Plan eerst. Bespaar daarna.')
 
