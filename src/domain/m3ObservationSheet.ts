@@ -6,6 +6,8 @@ import {
   m2Recipes,
 } from '../data/m2Fixture.ts'
 
+export type PriceContext = 'in-store' | 'online-order'
+
 export type ObservationSource =
   | 'manual-cart'
   | 'receipt'
@@ -63,6 +65,7 @@ export type ObservationSheet = {
     population: string
     region: string
     weekStart: string
+    priceContext: PriceContext | ''
     maxObservationWindowHours: 24
   }
   requirements: ObservationRequirement[]
@@ -138,6 +141,7 @@ export function buildObservationSheet(): ObservationSheet {
       population: '',
       region: '',
       weekStart: '',
+      priceContext: '',
       maxObservationWindowHours: 24,
     },
     requirements,
@@ -145,6 +149,7 @@ export function buildObservationSheet(): ObservationSheet {
     candidate: blankStoreObservation(requirements),
     instructions: [
       'Observe both stores for the exact same requirement list.',
+      'Use one shared price context for both stores: in-store or online order.',
       'Record actual pack, price and availability; do not guess missing values.',
       'Keep baseline and candidate observations within 24 hours.',
       'Use a pseudonymous participant key and never store names, email addresses or account IDs.',
@@ -313,6 +318,11 @@ export function restoreObservationSheetDraft(
         population: stringOrBlank(value.study.population),
         region: stringOrBlank(value.study.region),
         weekStart: stringOrBlank(value.study.weekStart),
+        priceContext:
+          value.study.priceContext === 'in-store' ||
+          value.study.priceContext === 'online-order'
+            ? value.study.priceContext
+            : '',
         maxObservationWindowHours: 24,
       },
       baseline,
@@ -344,6 +354,7 @@ export function observationSheetProgress(sheet: ObservationSheet) {
     sheet.study.population,
     sheet.study.region,
     sheet.study.weekStart,
+    sheet.study.priceContext,
     sheet.baseline.evidenceId,
     sheet.baseline.observedAt,
     sheet.baseline.provenanceNote,
@@ -394,6 +405,7 @@ export function observationSheetReadiness(
     ['Populatie', sheet.study.population],
     ['Regio', sheet.study.region],
     ['Week start', sheet.study.weekStart],
+    ['Prijscontext', sheet.study.priceContext],
   ]
 
   for (const [label, value] of studyFields) {
