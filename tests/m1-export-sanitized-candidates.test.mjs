@@ -129,3 +129,64 @@ test('records product abstentions without exporting guessed fixtures', async () 
     'no Product JSON-LD node',
   ])
 })
+
+test('rejects unsafe product source ids before writing sanitized candidate paths', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-unsafe-'))
+  const source = {
+    id: '../ah-product',
+    supermarket: 'ah',
+    kind: 'product',
+    success: true,
+    integrity: 'verified',
+    requestedUrl: 'https://www.ah.nl/producten/product/example',
+    finalUrl: 'https://www.ah.nl/producten/product/example',
+    capturedAt: '2026-10-04T00:00:30.000Z',
+    manifestSha256: 'a'.repeat(64),
+  }
+  source.schemaOrgProduct = {
+    type: 'observation',
+    observation: observationFor(source),
+  }
+
+  await writeInspection(root, [source])
+
+  await assert.rejects(
+    () => exportSanitizedCandidates(root),
+    /unsafe product source id/,
+  )
+})
+
+test('rejects duplicate product source ids before candidate files can overwrite each other', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-duplicate-'))
+  const first = {
+    id: 'ah-product',
+    supermarket: 'ah',
+    kind: 'product',
+    success: true,
+    integrity: 'verified',
+    requestedUrl: 'https://www.ah.nl/producten/product/example',
+    finalUrl: 'https://www.ah.nl/producten/product/example',
+    capturedAt: '2026-10-04T00:00:30.000Z',
+    manifestSha256: 'a'.repeat(64),
+  }
+  first.schemaOrgProduct = {
+    type: 'observation',
+    observation: observationFor(first),
+  }
+  const second = {
+    ...first,
+    finalUrl: 'https://www.ah.nl/producten/product/other',
+    manifestSha256: 'b'.repeat(64),
+  }
+  second.schemaOrgProduct = {
+    type: 'observation',
+    observation: observationFor(second),
+  }
+
+  await writeInspection(root, [first, second])
+
+  await assert.rejects(
+    () => exportSanitizedCandidates(root),
+    /duplicate product source id/,
+  )
+})
