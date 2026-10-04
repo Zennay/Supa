@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   buildObservationSheet,
   restoreObservationSheetDraft,
+  withObservedProductAvailability,
 } from '../src/domain/m3ObservationSheet.ts'
 
 test('M3 local draft recovery restores genuine editable collection fields', () => {
@@ -63,4 +64,62 @@ test('M3 local draft recovery sanitizes malformed editable product values', () =
   assert.equal(restored.baseline.lines[0].observedProduct.available, null)
   assert.equal(restored.baseline.lines[0].observedProduct.packCount, 1)
   assert.equal(restored.baseline.lines[0].observedProduct.priceCents, null)
+})
+
+
+test('M3 availability reset clears stale observed product details', () => {
+  const sheet = buildObservationSheet()
+  const product = sheet.baseline.lines[0].observedProduct
+  product.available = true
+  product.productId = 'stale-id'
+  product.productName = 'Stale product'
+  product.packAmount = 500
+  product.packUnit = 'g'
+  product.packCount = 2
+  product.priceCents = 399
+  product.sourceUrl = 'https://example.invalid/product'
+  product.note = 'stale note'
+
+  const unavailable = withObservedProductAvailability(product, false)
+
+  assert.deepEqual(unavailable, {
+    productId: '',
+    productName: '',
+    packAmount: null,
+    packUnit: null,
+    packCount: 1,
+    priceCents: null,
+    available: false,
+    sourceUrl: '',
+    note: '',
+  })
+})
+
+test('M3 draft recovery removes contradictory stale details from unavailable lines', () => {
+  const sheet = buildObservationSheet()
+  const product = sheet.baseline.lines[0].observedProduct
+  product.available = false
+  product.productId = 'stale-id'
+  product.productName = 'Should not survive'
+  product.packAmount = 500
+  product.packUnit = 'g'
+  product.packCount = 2
+  product.priceCents = 399
+  product.sourceUrl = 'https://example.invalid/product'
+  product.note = 'stale note'
+
+  const restored = restoreObservationSheetDraft(JSON.stringify(sheet))
+
+  assert.ok(restored)
+  assert.deepEqual(restored.baseline.lines[0].observedProduct, {
+    productId: '',
+    productName: '',
+    packAmount: null,
+    packUnit: null,
+    packCount: 1,
+    priceCents: null,
+    available: false,
+    sourceUrl: '',
+    note: '',
+  })
 })
