@@ -292,3 +292,82 @@ The product response is server-rendered and contains both structured Nuxt SSR st
 `dekaMarktSsrProduct.ts` deliberately cross-checks both observed structures instead of introducing guessed selectors. The committed fixture stores only a minimal sanitized representation of those structured fields plus exact artifact identity; raw HTML remains in the short-retention artifact.
 
 DekaMarkt is therefore the **technical M1 fallback source** alongside PLUS. Production ingestion/reuse still requires a separate explicit terms/permission review before dependency lock-in.
+
+## Repeatability + representative listing evidence — 2026-10-04
+
+The technical M1 pair is now **PLUS + DekaMarkt**. Albert Heijn remains a
+failed technical source for the permitted direct route (HTTP 403 on the
+bounded product/catalog/offers sample); no bypass is attempted.
+
+### DekaMarkt repeat capture
+
+The exact bounded DekaMarkt workflow run `37223714917` was repeated without
+changing its capture code or targets.
+
+- first artifact: `11310519403`
+  (`sha256:4e49756d10bc5bfd27c64fb1653601a11f3793b6e71980cdb9dede866fe415b3`)
+- second artifact: `11311089806`
+  (`sha256:4902f0cc093f05920d956fcb744593456ac520e6936f6cae6529c3ea35630c4d`)
+- product, milk-category and offers pages all returned HTTP 200 again
+- byte lengths, titles, JSON-LD counts and visible-text lengths were identical
+  between captures
+- the raw HTML hashes changed, but after normalizing the single observed Nuxt
+  `Date` value, each second-capture document is byte-for-byte identical to
+  its first-capture counterpart
+
+This is treated as **timestamp/content-only drift**, not structural drift.
+
+### PLUS rendered repeat capture
+
+The original bounded browser evidence is zCloud run `37223249250`, artifact
+`11310897789`. A direct job re-run exposed an execution-only regression in
+the old guard (`geckodriver --version | head -n 1` can make current
+geckodriver panic on a broken stdout pipe). The page itself was not reached by
+that failed attempt.
+
+A temporary isolated repeat workflow changed only that version-print guard and
+preserved the same public product URL, browser/driver path, Supa evidence SHA
+and safety contract.
+
+- repeat run: `37224912417`
+- repeat artifact: `11311163214`
+- artifact digest:
+  `sha256:e052d86ff0bc9a027ce5b16201893359f3d15b7a1ccc479bff27224cb8701ee1`
+- rendered outer HTML changed from 265,213 to 265,794 bytes
+- visible text length remained exactly 7,111 characters
+- product probes remained identical
+- both captures contain exactly one Schema.org Product node
+- canonical Product JSON-LD is byte-identical across the two captures:
+  `sha256:d42011c57bd4ae5c77b3dfb41f0a46d5245e25f7d08b6af1e517fccf0baf7234`
+- the stable extraction contract still yields SKU `579010`,
+  `Zuivelmeester Halfvolle melk`, `1000 ml`, EUR `0.85`, InStock
+
+The relevant PLUS product extraction contract is therefore stable across this
+repeat even though surrounding client-rendered HTML contains dynamic drift.
+
+### DekaMarkt catalog + offers extraction
+
+The first DekaMarkt artifact also contains server-rendered Nuxt state for the
+bounded milk category and offers page. The new listing adapter is derived only
+from those observed structures:
+
+- catalog: the observed `webgroup-...` record references a `products` list;
+  product records expose source product ID, name, packaging and a price record
+- offers: the observed `offers-overview-/aanbiedingen` record references
+  section lists; offer records expose offer price, normal price, validity and
+  linked product records
+
+The adapter deliberately fails closed:
+
+- catalog records marked as offers are not reinterpreted in the catalog lane
+- offers are accepted only when linked product identity is internally
+  consistent and product-level offer/normal prices exactly corroborate the
+  outer offer record
+- weight-price or otherwise transformed records that disagree are skipped
+  rather than converted by guessed semantics
+- all emitted observations still pass the canonical ingestion/provenance
+  validator
+
+Sanitized regression fixtures cover three observed milk-category products and
+three observed offers (Croma, Del Monte bananas and Nutella). The matching benchmark now includes two cases from the same observed DekaMarkt milk candidate set: a generic `halfvolle melk` requirement that correctly abstains because a lactose-free 1 L variant ties the normal 1 L product, and a more specific `zuivelmeester halfvolle melk` requirement that resolves to product `115873`. These remain regression cases, not a broad live-accuracy claim.
+

@@ -13,7 +13,7 @@ const cases = JSON.parse(await readFile(fixtureUrl, 'utf8'))
 test('matching benchmark meets M1 safety baseline', () => {
   const { metrics } = evaluateMatchingBenchmark(cases)
 
-  assert.equal(metrics.total, 14)
+  assert.equal(metrics.total, 16)
   assert.ok(metrics.accuracy >= 0.9)
   assert.ok(metrics.matchAccuracy >= 0.85)
   assert.equal(metrics.abstentionAccuracy, 1)
