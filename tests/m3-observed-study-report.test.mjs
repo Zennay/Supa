@@ -1,0 +1,145 @@
+import assert from 'node:assert/strict'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import test from 'node:test'
+
+import { buildOneStoreBasket } from '../src/domain/basket.ts'
+import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
+import {
+  m2DefaultActiveDays,
+  m2InitialPlan,
+  m2Products,
+  m2Recipes,
+} from '../src/data/m2Fixture.ts'
+
+const baselineStore = { id: 'study-a', name: 'Study store A' }
+const candidateStore = { id: 'study-b', name: 'Study store B' }
+
+function completeProducts(storeId, delta = 0) {
+  return [
+    ...m2Products.map((product) => ({
+      ...product,
+      id: `${storeId}-${product.id}`,
+      storeId,
+      priceCents: product.priceCents + delta,
+    })),
+    {
+      id: `${storeId}-garam-50`,
+      storeId,
+      name: 'Garam masala 50 g',
+      packAmount: 50,
+      packUnit: 'g',
+      available: true,
+      priceCents: 139 + delta,
+    },
+  ]
+}
+
+function basket(store, delta = 0) {
+  return buildOneStoreBasket({
+    store,
+    plan: m2InitialPlan,
+    recipes: m2Recipes,
+    activeDays: m2DefaultActiveDays,
+    products: completeProducts(store.id, delta),
+  })
+}
+
+function observedStudy(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    studyId: 'week-2026-40-runner',
+    participantKey: 'student-002',
+    population: 'independently living students',
+    region: 'Leiden',
+    weekStart: '2026-09-28',
+    baseline: {
+      evidenceId: 'runner-baseline-001',
+      observedAt: '2026-10-02T17:00:00Z',
+      source: 'manual-cart',
+      provenanceNote: 'Synthetic regression observation for CLI protocol testing.',
+      basket: basket(baselineStore, 0),
+    },
+    candidate: {
+      evidenceId: 'runner-candidate-001',
+      observedAt: '2026-10-02T18:00:00Z',
+      source: 'manual-cart',
+      provenanceNote: 'Synthetic regression observation for CLI protocol testing.',
+      basket: basket(candidateStore, -10),
+    },
+    ...overrides,
+  }
+}
+
+test('M3 report runner keeps participant key out of the emitted assessment', () => {
+  const report = buildObservedWeekReport(observedStudy())
+
+  assert.equal(report.claimable, true)
+  assert.equal(report.outcome, 'better')
+  assert.equal(report.publicSavingsClaimEligible, false)
+  assert.ok(report.savingsCents > 0)
+  assert.equal('participantKey' in report, false)
+  assert.match(report.evidenceBoundary, /never sufficient/)
+})
+
+test('M3 report runner preserves unknown evidence without inventing a money delta', () => {
+  const study = observedStudy()
+  study.candidate = {
+    ...study.candidate,
+    basket: buildOneStoreBasket({
+      store: candidateStore,
+      plan: m2InitialPlan,
+      recipes: m2Recipes,
+      activeDays: m2DefaultActiveDays,
+      products: completeProducts(candidateStore.id, -10).filter(
+        (product) => !product.id.endsWith('garam-50'),
+      ),
+    }),
+  }
+
+  const report = buildObservedWeekReport(study)
+
+  assert.equal(report.claimable, false)
+  assert.equal(report.outcome, 'unknown')
+  assert.equal(report.deltaCents, null)
+  assert.equal(report.savingsCents, null)
+  assert.match(report.reasons.join(' '), /unresolved ingredients/)
+})
+
+test('M3 CLI writes a reproducible assessment report file', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-report-'))
+  const input = join(directory, 'study.json')
+  const output = join(directory, 'report.json')
+
+  try {
+    await writeFile(input, JSON.stringify(observedStudy(), null, 2), 'utf8')
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        'scripts/m3-assess-observed-week.mjs',
+        input,
+        '--output',
+        output,
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      },
+    )
+
+    assert.equal(result.status, 0, result.stderr)
+
+    const report = JSON.parse(await readFile(output, 'utf8'))
+    assert.equal(report.reportType, 'm3-observed-week-assessment')
+    assert.equal(report.studyId, 'week-2026-40-runner')
+    assert.equal(report.claimable, true)
+    assert.equal(report.publicSavingsClaimEligible, false)
+    assert.equal('participantKey' in report, false)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
