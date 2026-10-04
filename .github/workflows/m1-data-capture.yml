@@ -16,6 +16,8 @@ on:
       - "tests/m1-export-sanitized-candidates.test.mjs"
       - "scripts/m1-compare-captures.mjs"
       - "tests/m1-compare-captures.test.mjs"
+      - "scripts/m1-evaluate-freshness.mjs"
+      - "tests/m1-evaluate-freshness.test.mjs"
       - "src/domain/matching.ts"
       - "package.json"
       - "src/data/ingestion.ts"
@@ -72,6 +74,14 @@ jobs:
           test -n "$capture_dir"
           npm run m1:inspect-captures -- "$capture_dir"
 
+      - name: Evaluate capture freshness evidence
+        id: freshness
+        if: always()
+        run: |
+          capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          test -n "$capture_dir"
+          npm run m1:evaluate-freshness -- "$capture_dir"
+
       - name: Export sanitized product candidates
         id: export
         if: steps.inspect.outcome == 'success'
@@ -89,8 +99,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Fail visibly when capture, inspection or candidate export fails
-        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.export.outcome == 'failure'
+      - name: Fail visibly when capture evidence fails
+        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.freshness.outcome != 'success' || steps.export.outcome == 'failure'
         run: |
-          echo "M1 capture, integrity inspection and/or sanitized candidate export failed. Inspect the uploaded manifest, inspection report and artifact."
+          echo "M1 capture, integrity, freshness and/or sanitized candidate evidence failed. Inspect manifest.json, inspection.json, freshness.json and the uploaded artifact."
           exit 1
