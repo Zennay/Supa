@@ -18,6 +18,8 @@ on:
       - "tests/m1-compare-captures.test.mjs"
       - "scripts/m1-evaluate-freshness.mjs"
       - "tests/m1-evaluate-freshness.test.mjs"
+      - "scripts/m1-build-evidence-summary.mjs"
+      - "tests/m1-build-evidence-summary.test.mjs"
       - "src/domain/matching.ts"
       - "package.json"
       - "src/data/ingestion.ts"
@@ -90,6 +92,14 @@ jobs:
           test -n "$capture_dir"
           npm run m1:export-candidates -- "$capture_dir"
 
+      - name: Build M1 evidence summary
+        id: evidence
+        if: steps.inspect.outcome == 'success' && steps.freshness.outcome == 'success' && steps.export.outcome == 'success'
+        run: |
+          capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          test -n "$capture_dir"
+          npm run m1:evidence-summary -- "$capture_dir"
+
       - name: Upload capture evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -100,7 +110,7 @@ jobs:
           retention-days: 14
 
       - name: Fail visibly when capture evidence fails
-        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.freshness.outcome != 'success' || steps.export.outcome == 'failure'
+        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.freshness.outcome != 'success' || steps.export.outcome == 'failure' || steps.evidence.outcome == 'failure'
         run: |
-          echo "M1 capture, integrity, freshness and/or sanitized candidate evidence failed. Inspect manifest.json, inspection.json, freshness.json and the uploaded artifact."
+          echo "M1 capture evidence failed. Inspect manifest.json, inspection.json, freshness.json, sanitized-candidates/index.json and evidence-summary.json in the uploaded artifact."
           exit 1
