@@ -57,7 +57,17 @@ npm run m3:create-observation-sheet -- --output artifacts/m3/observation-sheet.j
 
 The command creates missing output directories automatically. The generated sheet contains the same 11 ingredient requirements for baseline and candidate, plus blank fields for store, timestamp, product, pack, price, availability and provenance. It is deliberately marked `collection-template-not-evidence`: do not prefill or infer supermarket values, and do not treat the generated sheet as savings evidence.
 
-Use the sheet to record one genuine `manual-cart`, `receipt` or `consented-export` observation per store within the 24-hour study window. After the observations have been verified and converted into the `WeeklyBasketStudy` contract, run the operational assessment command below.
+Use the sheet to record one genuine `manual-cart`, `receipt` or `consented-export` observation per store within the 24-hour study window. Missing/unavailable products or prices must stay explicit; do not invent replacements.
+
+Convert the verified filled sheet into the canonical `WeeklyBasketStudy` contract with:
+
+```bash
+npm run m3:build-observed-study -- artifacts/m3/observation-sheet.json --output evidence/m3/<study>.json
+```
+
+The converter re-checks that the planner demand was not changed, recalculates packs and totals from the observed pack/price fields, reuses the existing conservative ingredient matcher for each explicitly observed product, and turns unavailable/incomplete/untrusted lines into `unresolved` evidence instead of fabricating a comparison. A missing source product ID gets only an observation-local key; it is not presented as a supermarket product identifier.
+
+After conversion, run the operational assessment command below.
 
 ## Operational assessment command
 
