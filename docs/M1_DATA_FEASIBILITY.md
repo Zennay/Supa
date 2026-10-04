@@ -250,3 +250,23 @@ The boundary deliberately does **not** contain selectors or extraction guesses. 
 - cross-supermarket fixture reuse is rejected.
 
 This separates two concerns: live HTML extraction remains source-specific work derived only from observed AH/PLUS captures, while downstream normalization/matching can already rely on a strict reviewed-fixture trust boundary. Once the live capture lands, promoted fixtures can therefore plug into the source-specific adapter regression lane without weakening provenance guarantees.
+
+## 2026-10-04 live source feasibility result
+
+Exact PR #3 SHA `b4554a0adb16d89b559b0754a47bbeeef36e3816` was executed on `vps-bb300bba` through the existing zCloud control runner because no Supa-specific Actions runner service exists.
+
+Direct bounded capture evidence:
+- zCloud bridge run `37222788389`, artifact `11310941899`;
+- Albert Heijn product/catalog/offers: all HTTP 403 `Access Denied`; this route is treated as infeasible and is not bypassed;
+- PLUS product/catalog/offers: all HTTP 200 and fresh/integrity-verified, but the static HTML is an OutSystems application shell.
+
+A second bounded browser-rendered run targeted only the already-accessible public PLUS product page:
+- run `37223249250`;
+- artifact `11310897789`, digest `sha256:1dee165a5901082498acc423a614f2aef69e870effba009c07dc3b4244192a01`;
+- Firefox 157.0 + geckodriver 0.37.1;
+- no login, private API calls, network interception or anti-bot bypass;
+- final rendered HTML SHA-256 `bce1d766ddd5044284104bf9d3247d3302393183ff2ef554fc6d7e5e3e016f5e`.
+
+The rendered DOM exposes one standard Schema.org Product node with observed SKU `579010`, name `Zuivelmeester Halfvolle melk`, weight `1000 ml`, `InStock` availability and a `UnitPriceSpecification` of EUR 0.85. This is the first real-source PLUS regression evidence. The parser now supports exactly the observed nested `priceSpecification` price/currency shape and the observed `weight.value` pack shape; it does not introduce guessed CSS selectors.
+
+The sanitized fixture `fixtures/m1/plus-rendered-product-halfvolle-melk.v1.json` stores only the observed structured Product JSON-LD plus exact browser evidence identity. Raw rendered HTML and screenshots remain in the short-retention workflow artifact.
