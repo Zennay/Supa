@@ -74,12 +74,20 @@ function baseUnitAmount(
   return { amount, family: 'unknown' }
 }
 
+function hasInvalidKnownAmount(amount: number | null): boolean {
+  return amount !== null && (!Number.isFinite(amount) || amount <= 0)
+}
+
 function scoreCandidate(
   requirement: IngredientRequirement,
   candidate: ProductCandidate,
 ): { score: number; reasons: string[] } {
   if (!candidate.available) {
     return { score: -100, reasons: ['candidate unavailable'] }
+  }
+
+  if (hasInvalidKnownAmount(candidate.packAmount)) {
+    return { score: -100, reasons: ['candidate pack amount invalid'] }
   }
 
   const packCount = candidate.packCount ?? 1
@@ -157,6 +165,15 @@ export function matchIngredient(
 ): MatchDecision {
   const minimumScore = options.minimumScore ?? 65
   const minimumMargin = options.minimumMargin ?? 12
+
+  if (hasInvalidKnownAmount(requirement.amount)) {
+    return {
+      type: 'abstain',
+      score: null,
+      runnerUpScore: null,
+      reasons: ['requirement amount invalid'],
+    }
+  }
 
   const scored = candidates
     .map((candidate) => ({
