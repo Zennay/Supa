@@ -47,6 +47,18 @@ The contract does not authorize automated supermarket collection. Production PLU
 
 The validator and its tests are infrastructure for the M3 study. Synthetic regression fixtures are **not** themselves observed savings evidence. AUD-003 stays open until reproducible real-basket records exist with population, time window, positive/negative/unknown outcomes and uncertainty preserved.
 
+## Manual observation sheet
+
+Generate the exact aggregated demand for the current proven four-meal planner fixture before visiting or manually checking two stores:
+
+```bash
+npm run m3:create-observation-sheet -- --output artifacts/m3/observation-sheet.json
+```
+
+The command creates missing output directories automatically. The generated sheet contains the same 11 ingredient requirements for baseline and candidate, plus blank fields for store, timestamp, product, pack, price, availability and provenance. It is deliberately marked `collection-template-not-evidence`: do not prefill or infer supermarket values, and do not treat the generated sheet as savings evidence.
+
+Use the sheet to record one genuine `manual-cart`, `receipt` or `consented-export` observation per store within the 24-hour study window. After the observations have been verified and converted into the `WeeklyBasketStudy` contract, run the operational assessment command below.
+
 ## Operational assessment command
 
 Once a real observed study JSON has been collected under this contract, assess it reproducibly with:
