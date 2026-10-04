@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "evidenceType": "dekamarkt-public-ssr-nuxt-product",
+  "source": {
+    "id": "dekamarkt-product-halfvolle-melk",
+    "supermarket": "dekamarkt",
+    "kind": "product",
+    "url": "https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk/zuivelmeester-halfvolle-melk-1-liter/115873",
+    "capturedAt": "2026-10-04T18:15:29.695Z",
+    "sha256": "33af1a3f0117c22401309507627d04fc8e8b1044a88180c6230c7cdee8e8c670"
+  },
+  "captureEvidence": {
+    "runId": 37223714917,
+    "artifactId": 11310519403,
+    "artifactDigest": "sha256:4e49756d10bc5bfd27c64fb1653601a11f3793b6e71980cdb9dede866fe415b3",
+    "supaSha": "5120038fa121e35fd13e30284800b87d007a3a45",
+    "status": 200,
+    "contentType": "text/html;charset=utf-8",
+    "bytes": 380939,
+    "safety": {
+      "login": false,
+      "credentials": false,
+      "privateApiCalls": false,
+      "antiBotBypass": false,
+      "recursiveCrawl": false,
+      "targetCount": 3
+    }
+  },
+  "nuxtPayload": [
+    null,
+    null,
+    null,
+    {
+      "product-information-115873": 4
+    },
+    {
+      "productId": 5,
+      "headerText": 6,
+      "packaging": 8,
+      "productAssortment": 10
+    },
+    115873,
+    "Zuivelmeester Halfvolle melk",
+    null,
+    "1 liter",
+    null,
+    {
+      "productId": 5,
+      "normalPrice": 11,
+      "offerPrice": 12
+    },
+    0.85,
+    0
+  ],
+  "jsonLdProduct": {
+    "@type": "Product",
+    "@id": "https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk/zuivelmeester-halfvolle-melk-1-liter/115873#product",
+    "name": "Zuivelmeester Halfvolle melk",
+    "mpn": 115873,
+    "offers": {
+      "@type": "Offer",
+      "priceCurrency": "EUR",
+      "Price": 0.85,
+      "url": "https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk/zuivelmeester-halfvolle-melk-1-liter/115873",
+      "availability": "http://schema.org/InStock"
+    }
+  }
+}
