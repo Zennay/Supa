@@ -10,6 +10,8 @@ on:
       - "tests/matching-benchmark.test.mjs"
       - "fixtures/matching/**"
       - "scripts/m1-run-matching-benchmark.mjs"
+      - "scripts/m1-inspect-captures.mjs"
+      - "tests/m1-inspect-captures.test.mjs"
       - "src/domain/matching.ts"
       - "package.json"
       - "src/data/ingestion.ts"
@@ -56,6 +58,14 @@ jobs:
         continue-on-error: true
         run: node scripts/m1-capture-sources.mjs
 
+      - name: Inspect capture integrity and structured data
+        id: inspect
+        if: always()
+        run: |
+          capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          test -n "$capture_dir"
+          npm run m1:inspect-captures -- "$capture_dir"
+
       - name: Upload capture evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -65,8 +75,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Fail visibly when any source is unavailable
-        if: steps.capture.outcome != 'success'
+      - name: Fail visibly when capture or inspection fails
+        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success'
         run: |
-          echo "One or more bounded source captures failed. Inspect the uploaded manifest/artifact."
+          echo "M1 capture and/or integrity inspection failed. Inspect the uploaded manifest, inspection report and raw artifact."
           exit 1
