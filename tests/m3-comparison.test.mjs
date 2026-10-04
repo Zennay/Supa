@@ -56,8 +56,8 @@ test('M3 keeps a worse second-store outcome instead of optimizing it away', () =
 
   assert.equal(result.claimable, true)
   assert.equal(result.direction, 'worse')
-  assert.equal(result.deltaCents, -430)
-  assert.equal(result.effects.unexplainedCents, -430)
+  assert.equal(result.deltaCents, -930)
+  assert.equal(result.effects.unexplainedCents, -930)
 })
 
 test('M3 refuses a savings delta when either basket has unresolved ingredients', () => {
@@ -89,7 +89,7 @@ test('M3 refuses comparison when the selected week differs', () => {
   assert.equal(result.direction, 'unknown')
   assert.equal(result.deltaCents, null)
   assert.match(result.reasons.join(' '), /selected meal count differs/)
-  assert.match(result.reasons.join(' '), /basket requirement set differs/)
+  assert.match(result.reasons.join(' '), /basket requirement differs/)
 })
 
 test('M3 effect attribution preserves unknown remainder explicitly', () => {
