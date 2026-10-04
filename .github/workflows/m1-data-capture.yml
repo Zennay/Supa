@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   capture:
-    runs-on: [self-hosted, zcloud, vps]
+    runs-on: self-hosted
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
