@@ -77,6 +77,7 @@ test('verifies captured HTML against manifest SHA-256', async () => {
   assert.equal(report.integrityVerifiedCount, 1)
   assert.equal(report.sources[0].integrity, 'verified')
   assert.equal(report.sources[0].html.title, 'Milk')
+  assert.equal(report.sources[0].schemaOrgProduct.type, 'abstain')
 })
 
 test('fails loudly on capture hash mismatch', async () => {
