@@ -46,6 +46,44 @@ export type RawProductObservation = {
   provenance: SourceSnapshotRef
 }
 
+const HOST_BY_SUPERMARKET: Record<SupermarketId, string> = {
+  ah: 'www.ah.nl',
+  plus: 'www.plus.nl',
+}
+
+function validateSnapshotRef(
+  observationSupermarket: SupermarketId,
+  provenance: SourceSnapshotRef,
+) {
+  if (provenance.supermarket !== observationSupermarket) {
+    throw new Error(
+      'Product observation supermarket must match provenance supermarket',
+    )
+  }
+
+  let url: URL
+  try {
+    url = new URL(provenance.url)
+  } catch {
+    throw new Error('Product observation provenance must contain a valid URL')
+  }
+
+  const expectedHost = HOST_BY_SUPERMARKET[observationSupermarket]
+  if (url.protocol !== 'https:' || url.hostname !== expectedHost) {
+    throw new Error(
+      `Product observation provenance must use HTTPS on ${expectedHost}`,
+    )
+  }
+
+  if (!Number.isFinite(Date.parse(provenance.capturedAt))) {
+    throw new Error('Product observation provenance must include a valid capturedAt')
+  }
+
+  if (!/^[a-f0-9]{64}$/.test(provenance.sha256)) {
+    throw new Error('Product observation provenance must include a SHA-256')
+  }
+}
+
 /**
  * Minimal M1 trust gate for source adapters.
  *
@@ -61,13 +99,7 @@ export function validateRawProductObservation(
     throw new Error('Product observation must have a non-empty name')
   }
 
-  if (!/^https:\/\//.test(observation.provenance.url)) {
-    throw new Error('Product observation provenance must use HTTPS')
-  }
-
-  if (!/^[a-f0-9]{64}$/.test(observation.provenance.sha256)) {
-    throw new Error('Product observation provenance must include a SHA-256')
-  }
+  validateSnapshotRef(observation.supermarket, observation.provenance)
 
   if (
     observation.currentPriceCents !== null &&
@@ -84,6 +116,17 @@ export function validateRawProductObservation(
       observation.offer.offerPriceCents < 0)
   ) {
     throw new Error('Offer price must be null or a non-negative integer cent value')
+  }
+
+  if (
+    observation.offer?.originalPriceCents !== null &&
+    observation.offer?.originalPriceCents !== undefined &&
+    (!Number.isInteger(observation.offer.originalPriceCents) ||
+      observation.offer.originalPriceCents < 0)
+  ) {
+    throw new Error(
+      'Original price must be null or a non-negative integer cent value',
+    )
   }
 
   return observation
