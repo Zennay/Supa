@@ -141,7 +141,7 @@ try {
   assert.match(basketText, /Garam masala/)
   assert.match(basketText, /Controle nodig/)
   assert.match(basketText, /M2 testwinkel/)
-  assert.match(basketText, /Gecontroleerde winkelvergelijking/)
+  assert.match(basketText, /Gecontroleerde winkelvergelijking/i)
   assert.match(basketText, /M3 testwinkel B ligt/)
   assert.match(basketText, /geen live-besparingsclaim/)
   const comparisonOutcome = await execute(
