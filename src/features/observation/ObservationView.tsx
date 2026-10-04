@@ -9,6 +9,7 @@ import {
   observationStoreProgress,
   observationWindowSummary,
   restoreObservationSheetDraft,
+  withObservedProductAvailability,
   type ObservationSheet,
   type ObservationSource,
   type ObservedProduct,
@@ -519,14 +520,30 @@ export function ObservationView() {
                         <select
                           aria-label={`${side} ${line.ingredientLabel} beschikbaar`}
                           value={availability}
-                          onChange={(event) =>
-                            updateProduct(side, lineIndex, {
-                              available:
-                                event.target.value === ''
-                                  ? null
-                                  : event.target.value === 'true',
-                            })
-                          }
+                          onChange={(event) => {
+                            const available =
+                              event.target.value === ''
+                                ? null
+                                : event.target.value === 'true'
+
+                            setSheet((current) => ({
+                              ...current,
+                              [side]: {
+                                ...current[side],
+                                lines: current[side].lines.map((currentLine, index) =>
+                                  index === lineIndex
+                                    ? {
+                                        ...currentLine,
+                                        observedProduct: withObservedProductAvailability(
+                                          currentLine.observedProduct,
+                                          available,
+                                        ),
+                                      }
+                                    : currentLine,
+                                ),
+                              },
+                            }))
+                          }}
                         >
                           <option value="">Nog niet gemeten</option>
                           <option value="true">Ja</option>
