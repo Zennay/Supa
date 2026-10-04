@@ -174,7 +174,7 @@ export function compareFullBaskets({
     baselineTotalCents: baseline.totalCents,
     candidateTotalCents: candidate.totalCents,
     deltaCents,
-    savingsCents: -deltaCents,
+    savingsCents: deltaCents === 0 ? 0 : -deltaCents,
     lineDeltas,
     reasons: [],
   }
