@@ -348,3 +348,63 @@ test('rejects candidate payload whose source id differs from its index entry', a
     /source id mismatch/,
   )
 })
+
+test('rejects a rehashed candidate with an unsupported candidate version', async () => {
+  const { root, source } = await setupCandidate()
+  const review = await writeReview(root, approvalFor(source))
+  const candidatePath = path.join(root, 'sanitized-candidates', 'ah-product.json')
+  const indexPath = path.join(root, 'sanitized-candidates', 'index.json')
+  const candidate = JSON.parse(await readFile(candidatePath, 'utf8'))
+  candidate.version = 2
+  const serialized = JSON.stringify(candidate, null, 2) + '\n'
+  await writeFile(candidatePath, serialized, 'utf8')
+
+  const index = JSON.parse(await readFile(indexPath, 'utf8'))
+  index.candidates[0].candidateSha256 = sha256Text(serialized)
+  await writeFile(indexPath, JSON.stringify(index), 'utf8')
+
+  await assert.rejects(
+    () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
+    /must use version 1/,
+  )
+})
+
+test('rejects a rehashed candidate whose observation fails the ingestion trust gate', async () => {
+  const { root, source } = await setupCandidate()
+  const review = await writeReview(root, approvalFor(source))
+  const candidatePath = path.join(root, 'sanitized-candidates', 'ah-product.json')
+  const indexPath = path.join(root, 'sanitized-candidates', 'index.json')
+  const candidate = JSON.parse(await readFile(candidatePath, 'utf8'))
+  candidate.observation.currentPriceCents = -1
+  const serialized = JSON.stringify(candidate, null, 2) + '\n'
+  await writeFile(candidatePath, serialized, 'utf8')
+
+  const index = JSON.parse(await readFile(indexPath, 'utf8'))
+  index.candidates[0].candidateSha256 = sha256Text(serialized)
+  await writeFile(indexPath, JSON.stringify(index), 'utf8')
+
+  await assert.rejects(
+    () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
+    /Current price must be null or a non-negative integer cent value/,
+  )
+})
+
+test('rejects a rehashed candidate whose source provenance differs from its observation', async () => {
+  const { root, source } = await setupCandidate()
+  const review = await writeReview(root, approvalFor(source))
+  const candidatePath = path.join(root, 'sanitized-candidates', 'ah-product.json')
+  const indexPath = path.join(root, 'sanitized-candidates', 'index.json')
+  const candidate = JSON.parse(await readFile(candidatePath, 'utf8'))
+  candidate.source.url = 'https://www.ah.nl/product/other'
+  const serialized = JSON.stringify(candidate, null, 2) + '\n'
+  await writeFile(candidatePath, serialized, 'utf8')
+
+  const index = JSON.parse(await readFile(indexPath, 'utf8'))
+  index.candidates[0].candidateSha256 = sha256Text(serialized)
+  await writeFile(indexPath, JSON.stringify(index), 'utf8')
+
+  await assert.rejects(
+    () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
+    /provenance mismatch/,
+  )
+})
