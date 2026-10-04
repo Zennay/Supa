@@ -204,7 +204,7 @@ Run:
 npm run m1:promote-reviewed -- <capture-dir> <review.json> [output-dir]
 ```
 
-A version-1 review file contains an `approvals` array. Every promoted approval must match the candidate's source ID, supermarket, final URL, captured-at timestamp and SHA-256 exactly, and must include `decision: "promote"`, a non-empty reviewer identifier and a valid review timestamp. The tool rejects abstentions, stale review files whose provenance no longer matches the candidate, and overwriting an existing reviewed fixture with different provenance.
+A version-1 review file contains an `approvals` array. Every promoted approval must match the candidate's source ID, supermarket, final URL, captured-at timestamp and SHA-256 exactly, and must include `decision: "promote"`, a non-empty reviewer identifier and a valid review timestamp. Review chronology is part of the trust contract: `reviewedAt` may not predate the captured source evidence, and implausibly future-dated reviews are rejected (with only a small clock-skew tolerance). The tool also rejects abstentions, stale review files whose provenance no longer matches the candidate, and overwriting an existing reviewed fixture with different provenance.
 
 Promoted fixtures contain only the structured candidate observation, exact source provenance and review metadata; raw HTML is never copied into the fixture. This creates a deliberate trust boundary between short-retention capture evidence and versioned regression evidence.
 
@@ -240,6 +240,7 @@ The boundary deliberately does **not** contain selectors or extraction guesses. 
 - the observation passes the raw ingestion trust contract;
 - source ID/provenance and observation provenance match exactly for supermarket, kind, URL, captured-at and SHA-256;
 - reviewer identity and review timestamp are present and valid;
+- review chronology is sane: review occurs at/after capture and is not implausibly future-dated;
 - cross-supermarket fixture reuse is rejected.
 
 This separates two concerns: live HTML extraction remains source-specific work derived only from observed AH/PLUS captures, while downstream normalization/matching can already rely on a strict reviewed-fixture trust boundary. Once the live capture lands, promoted fixtures can therefore plug into the source-specific adapter regression lane without weakening provenance guarantees.
