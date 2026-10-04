@@ -371,3 +371,111 @@ The adapter deliberately fails closed:
 Sanitized regression fixtures cover three observed milk-category products and
 three observed offers (Croma, Del Monte bananas and Nutella). The matching benchmark now includes two cases from the same observed DekaMarkt milk candidate set: a generic `halfvolle melk` requirement that correctly abstains because a lactose-free 1 L variant ties the normal 1 L product, and a more specific `zuivelmeester halfvolle melk` requirement that resolves to product `115873`. These remain regression cases, not a broad live-accuracy claim.
 
+## PLUS rendered catalog + offers evidence — 2026-10-04
+
+The remaining technical M1 listing gap was captured through a bounded browser run
+on the existing permanent VPS.
+
+- zCloud run: `37226107225`
+- artifact: `11312390194` (`supa-plus-listings-rendered-evidence`)
+- artifact digest:
+  `sha256:90ea9ef3dabdb97f067a9f8a37f3113db1bc50b2b045bc503a9ae08b9eec8985`
+- pinned Supa evidence SHA:
+  `2378d34e36ed199505bd3a535458d7869a3a5b4e`
+- browser: Firefox 157.0
+- driver: geckodriver 0.37.1
+- no login, credentials, private API calls, network interception, anti-bot
+  bypass or recursive crawl
+- exactly two fixed public targets:
+  `https://www.plus.nl/producten` and
+  `https://www.plus.nl/aanbiedingen`
+
+### Catalog evidence
+
+Rendered catalog snapshot:
+
+- SHA-256:
+  `96c4426306753c4f1c9fd337c9bbc49e959e3c47662c9ca9f501d3f56faf3c72`
+- 1,558,525 rendered HTML bytes
+- title: `Producten | PLUS`
+- visible text reports `17291 producten`
+- 12 unique rendered product links in the bounded initial view
+- no Product JSON-LD and no `application/json` blocks
+
+Representative exact rendered values include:
+
+- product `113651` — PLUS Bananen Fairtrade — `Per 1000 gram` — EUR 2.29
+- product `579010` — Zuivelmeester Halfvolle melk — `Per 1000 ml` — EUR 0.85
+- product `145701` — Zuivelmeester Halfvolle melk — `Per 2000 ml` — EUR 1.69
+- product `579021` — Zuivelmeester Karnemelk — `Per 1000 ml` — EUR 0.92
+
+### Offers evidence
+
+Rendered offers snapshot:
+
+- SHA-256:
+  `d348ca126007bf186c4941002305a22bd48bd9c6dca71cf5872fdc76e0c968b7`
+- 474,005 rendered HTML bytes
+- title:
+  `Aanbiedingen | Bestel je aanbiedingen makkelijk op plus.nl | PLUS`
+- 16 unique rendered product links
+- no Product JSON-LD and no `application/json` blocks
+- rendered campaign text visibly includes mechanics such as `1+1 gratis`,
+  but the product-card adapter does **not** bind surrounding campaign text to a
+  product unless that relationship is explicit on the card
+
+Representative exact product-card values include:
+
+- product `113651` — PLUS Bananen Fairtrade — `Per 1000 gram` —
+  EUR 0.99, previous EUR 2.29
+- product `113840` — PLUS Handappels Jonagold — `Per 1000 gram` —
+  EUR 1.29, previous EUR 1.39
+- product `211887` — PLUS Limoenen — `Per 3 st` —
+  EUR 0.99, previous EUR 1.09
+- product `114209` — PLUS Bloemkool — `Per 1 st` —
+  EUR 0.99, previous EUR 1.69
+
+Product `113651` provides direct cross-page corroboration: its catalog current
+price is EUR 2.29 and the offer card's previous price is also EUR 2.29, while
+the offer current price is EUR 0.99.
+
+### Evidence-derived DOM contract
+
+The source-specific adapter is bound to exact structures observed in the
+rendered artifact:
+
+- product link: `a[href^="/product/"]`
+- catalog card block marker: `ProductList.ProductItem`
+- offer card block marker: `PromotionListFlow.OfferItem`
+- name: `.plp-item-name h3 span[data-expression]`
+- pack text: `.plp-item-complementary span[data-expression]`
+- current-price integer:
+  `.product-header-price-integer`
+- current-price decimals:
+  `.product-header-price-decimals`
+- previous price:
+  `.product-header-price-previous`
+
+These are versioned as part of the evidence contract. Selector drift causes
+abstention rather than fallback to guessed selectors.
+
+### Trust boundary
+
+The adapter extracts the source product ID from the numeric suffix of the
+observed `/product/...-<id>` link and requires canonical money/pack
+normalization plus the shared raw-observation validator.
+
+For offer cards:
+
+- current price is accepted only from the exact integer + decimals fields;
+- previous price must be present and strictly greater than current price;
+- promotion mechanics remain `null` because the product card itself does not
+  safely bind the surrounding campaign mechanic;
+- `validFrom` and `validTo` remain `null` because the observed card/date
+  relationship is not uniform enough to assign a date window without
+  inference;
+- availability remains `unknown` on listing cards.
+
+The listing fixtures therefore prove bounded catalog and discount-price
+extraction without overstating promotion semantics.
+
