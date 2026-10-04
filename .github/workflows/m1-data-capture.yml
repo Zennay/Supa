@@ -7,6 +7,11 @@ on:
       - "tests/m1-capture-sources.test.mjs"
       - "tests/ingestion-contract.test.mjs"
       - "tests/normalization.test.mjs"
+      - "tests/matching-benchmark.test.mjs"
+      - "fixtures/matching/**"
+      - "scripts/m1-run-matching-benchmark.mjs"
+      - "src/domain/matching.ts"
+      - "package.json"
       - "src/data/ingestion.ts"
       - "src/data/normalize.ts"
       - ".github/workflows/m1-data-capture.yml"
@@ -42,6 +47,9 @@ jobs:
 
       - name: Verify bounded source contract
         run: npm test
+
+      - name: Run matching benchmark
+        run: npm run m1:matching-benchmark
 
       - name: Capture representative public pages
         id: capture
