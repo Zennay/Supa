@@ -43,6 +43,7 @@ permissions:
 
 jobs:
   capture:
+    if: github.event_name == 'workflow_dispatch' || github.base_ref == 'main'
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
