@@ -3,6 +3,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { validateRawProductObservation } from '../src/data/ingestion.ts'
+
 const MAX_REVIEW_CLOCK_SKEW_MS = 5 * 60 * 1000
 
 function sha256Text(value) {
@@ -149,6 +151,54 @@ function validatedCandidateIndex(index) {
   }
 }
 
+function requireTrustedCandidate(candidate, entry) {
+  if (candidate?.version !== 1) {
+    throw new Error(
+      `Sanitized candidate must use version 1: ${entry.id}`,
+    )
+  }
+  if (!candidate?.source || typeof candidate.source !== 'object') {
+    throw new Error(
+      `Sanitized candidate is missing source metadata: ${entry.id}`,
+    )
+  }
+  if (!isSafeSourceId(candidate.source.id)) {
+    throw new Error(
+      `Sanitized candidate contains an unsafe source id: ${candidate?.source?.id ?? 'unknown'}`,
+    )
+  }
+  if (candidate.source.id !== entry.id) {
+    throw new Error(
+      `Sanitized candidate source id mismatch: expected=${entry.id} actual=${candidate.source.id}`,
+    )
+  }
+  if (candidate.source.kind !== 'product') {
+    throw new Error(
+      `Sanitized candidate must come from a product source: ${entry.id}`,
+    )
+  }
+
+  const observation = validateRawProductObservation(candidate.observation)
+  const provenance = observation.provenance
+  const checks = [
+    ['supermarket', candidate.source.supermarket, provenance.supermarket],
+    ['kind', candidate.source.kind, provenance.kind],
+    ['url', candidate.source.url, provenance.url],
+    ['capturedAt', candidate.source.capturedAt, provenance.capturedAt],
+    ['sha256', candidate.source.sha256, provenance.sha256],
+  ]
+
+  for (const [key, expected, actual] of checks) {
+    if (expected !== actual) {
+      throw new Error(
+        `Sanitized candidate provenance mismatch for ${entry.id} field ${key}: expected=${expected} actual=${actual}`,
+      )
+    }
+  }
+
+  return candidate
+}
+
 async function readCandidateWithIntegrity(captureDir, entry) {
   if (!/^[a-f0-9]{64}$/.test(entry?.candidateSha256 ?? '')) {
     throw new Error(
@@ -170,18 +220,7 @@ async function readCandidateWithIntegrity(captureDir, entry) {
   }
 
   const candidate = JSON.parse(serialized)
-  if (!isSafeSourceId(candidate?.source?.id)) {
-    throw new Error(
-      `Sanitized candidate contains an unsafe source id: ${candidate?.source?.id ?? 'unknown'}`,
-    )
-  }
-  if (candidate.source.id !== entry.id) {
-    throw new Error(
-      `Sanitized candidate source id mismatch: expected=${entry.id} actual=${candidate.source.id}`,
-    )
-  }
-
-  return candidate
+  return requireTrustedCandidate(candidate, entry)
 }
 
 async function writeFixtureSafely(filePath, fixture) {
