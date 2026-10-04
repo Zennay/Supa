@@ -228,3 +228,18 @@ Example review shape (values must come from the inspected live artifact, never f
   ]
 }
 ```
+
+## Reviewed-fixture adapter boundary
+
+Promoted live fixtures now pass through a supermarket-specific adapter boundary before they can be consumed as trusted observations. `ahReviewedFixtureAdapter` only accepts reviewed AH product fixtures; `plusReviewedFixtureAdapter` only accepts reviewed PLUS product fixtures.
+
+The boundary deliberately does **not** contain selectors or extraction guesses. It verifies that:
+
+- fixture version/type is the reviewed-live product format;
+- the source is a product page for the expected supermarket;
+- the observation passes the raw ingestion trust contract;
+- source ID/provenance and observation provenance match exactly for supermarket, kind, URL, captured-at and SHA-256;
+- reviewer identity and review timestamp are present and valid;
+- cross-supermarket fixture reuse is rejected.
+
+This separates two concerns: live HTML extraction remains source-specific work derived only from observed AH/PLUS captures, while downstream normalization/matching can already rely on a strict reviewed-fixture trust boundary. Once the live capture lands, promoted fixtures can therefore plug into the source-specific adapter regression lane without weakening provenance guarantees.
