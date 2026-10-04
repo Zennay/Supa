@@ -12,6 +12,8 @@ on:
       - "scripts/m1-run-matching-benchmark.mjs"
       - "scripts/m1-inspect-captures.mjs"
       - "tests/m1-inspect-captures.test.mjs"
+      - "scripts/m1-export-sanitized-candidates.mjs"
+      - "tests/m1-export-sanitized-candidates.test.mjs"
       - "src/domain/matching.ts"
       - "package.json"
       - "src/data/ingestion.ts"
@@ -68,6 +70,14 @@ jobs:
           test -n "$capture_dir"
           npm run m1:inspect-captures -- "$capture_dir"
 
+      - name: Export sanitized product candidates
+        id: export
+        if: steps.inspect.outcome == 'success'
+        run: |
+          capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+          test -n "$capture_dir"
+          npm run m1:export-candidates -- "$capture_dir"
+
       - name: Upload capture evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -77,8 +87,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Fail visibly when capture or inspection fails
-        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success'
+      - name: Fail visibly when capture, inspection or candidate export fails
+        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.export.outcome == 'failure'
         run: |
-          echo "M1 capture and/or integrity inspection failed. Inspect the uploaded manifest, inspection report and raw artifact."
+          echo "M1 capture, integrity inspection and/or sanitized candidate export failed. Inspect the uploaded manifest, inspection report and artifact."
           exit 1
