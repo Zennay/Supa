@@ -122,3 +122,42 @@ test('writes freshness.json into the capture artifact', async () => {
   assert.equal(written.freshCount, 1)
   assert.equal(written.policy.maxCaptureAgeHours, 24)
 })
+
+test('future-dated captures fail freshness instead of being clamped to age zero', () => {
+  const report = evaluateManifestFreshness(
+    manifest([
+      result({
+        capturedAt: '2026-10-04T02:00:00.000Z',
+      }),
+    ]),
+    {
+      now: new Date('2026-10-04T01:00:00.000Z'),
+      maxCaptureAgeHours: 24,
+    },
+  )
+
+  assert.equal(report.acceptable, false)
+  assert.equal(report.futureCount, 1)
+  assert.equal(report.sources[0].freshness, 'future')
+  assert.equal(report.sources[0].captureAgeHours, 0)
+  assert.ok(report.sources[0].reasons.includes('capture-in-future'))
+})
+
+test('small capture clock skew remains acceptable within the five-minute tolerance', () => {
+  const report = evaluateManifestFreshness(
+    manifest([
+      result({
+        capturedAt: '2026-10-04T01:04:00.000Z',
+      }),
+    ]),
+    {
+      now: new Date('2026-10-04T01:00:00.000Z'),
+      maxCaptureAgeHours: 24,
+    },
+  )
+
+  assert.equal(report.acceptable, true)
+  assert.equal(report.futureCount, 0)
+  assert.equal(report.sources[0].freshness, 'fresh')
+  assert.ok(!report.sources[0].reasons.includes('capture-in-future'))
+})

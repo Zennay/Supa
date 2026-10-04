@@ -166,7 +166,7 @@ Every capture now emits `freshness.json` with:
 - HTTP status and capture success;
 - ETag / Last-Modified presence where the source supplies them;
 - informational age of Last-Modified when parseable;
-- explicit fresh / stale / failed state;
+- explicit fresh / stale / future / failed state;
 - SHA-256 linkage back to the captured snapshot.
 
 Run manually with:
@@ -175,7 +175,7 @@ Run manually with:
 npm run m1:evaluate-freshness -- <capture-directory> [--max-age-hours 24]
 ```
 
-The freshness gate is deliberately conservative about what HTTP metadata proves. A recent capture can pass without ETag or Last-Modified, but missing upstream validators are recorded explicitly. Conversely, a recent Last-Modified header does not rescue an old local capture. The current M1 policy treats capture age as the operational freshness gate; source headers are supporting evidence only.
+The freshness gate is deliberately conservative about what HTTP metadata proves. A recent capture can pass without ETag or Last-Modified, but missing upstream validators are recorded explicitly. Conversely, a recent Last-Modified header does not rescue an old local capture. Future-dated capture timestamps beyond a five-minute clock-skew tolerance are rejected explicitly instead of being clamped to age zero and treated as fresh. The current M1 policy treats capture age as the operational freshness gate; source headers are supporting evidence only.
 
 ## Machine-readable M1 evidence gate
 
