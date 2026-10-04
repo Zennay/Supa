@@ -25,7 +25,7 @@ on:
       - "src/data/reviewedLiveFixtures.ts"
       - "tests/reviewed-live-fixtures.test.mjs"
       - "src/domain/matching.ts"
-      - "package.json"
+      - "package-lock.json"
       - "src/data/ingestion.ts"
       - "src/data/normalize.ts"
       - "src/data/schemaOrgProduct.ts"
