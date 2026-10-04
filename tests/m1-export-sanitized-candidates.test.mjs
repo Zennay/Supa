@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 
 import { exportSanitizedCandidates } from '../scripts/m1-export-sanitized-candidates.mjs'
+
+function sha256Text(value) {
+  return createHash('sha256').update(value, 'utf8').digest('hex')
+}
 
 function observationFor(source) {
   return {
@@ -63,15 +68,17 @@ test('exports only sanitized trusted product observations with capture provenanc
   assert.equal(index.candidateCount, 1)
   assert.equal(index.abstentionCount, 0)
 
-  const candidate = JSON.parse(
-    await readFile(
-      path.join(root, 'sanitized-candidates', 'ah-product.json'),
-      'utf8',
-    ),
+  const candidatePath = path.join(
+    root,
+    'sanitized-candidates',
+    'ah-product.json',
   )
+  const serialized = await readFile(candidatePath, 'utf8')
+  const candidate = JSON.parse(serialized)
   assert.equal(candidate.source.sha256, source.manifestSha256)
   assert.equal(candidate.observation.name, 'Halfvolle melk')
   assert.equal('html' in candidate, false)
+  assert.equal(index.candidates[0].candidateSha256, sha256Text(serialized))
 })
 
 test('fails instead of exporting an observation whose provenance drifted', async () => {
