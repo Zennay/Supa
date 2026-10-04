@@ -1,0 +1,32 @@
+name: M3 observed-week report
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m3-observed-week-report.yml"
+      - "scripts/m3-assess-observed-week.mjs"
+      - "src/domain/observedBasketStudy.ts"
+      - "src/domain/basketComparison.ts"
+      - "tests/m3-observed-study-report.test.mjs"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report-gate:
+    runs-on: self-hosted
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify permanent VPS runner
+        run: test "$(hostname -s)" = "vps-bb300bba"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --experimental-strip-types --test tests/m3-observed-study-report.test.mjs
+      - run: npm test
+      - run: npm run build
