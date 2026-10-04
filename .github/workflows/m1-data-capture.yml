@@ -14,6 +14,8 @@ on:
       - "tests/m1-inspect-captures.test.mjs"
       - "scripts/m1-export-sanitized-candidates.mjs"
       - "tests/m1-export-sanitized-candidates.test.mjs"
+      - "scripts/m1-compare-captures.mjs"
+      - "tests/m1-compare-captures.test.mjs"
       - "src/domain/matching.ts"
       - "package.json"
       - "src/data/ingestion.ts"
