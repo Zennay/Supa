@@ -1,8 +1,10 @@
 import './ObservationView.css'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   buildObservationSheet,
+  OBSERVATION_DRAFT_STORAGE_KEY,
   observationSheetProgress,
+  restoreObservationSheetDraft,
   type ObservationSheet,
   type ObservationSource,
   type ObservedProduct,
@@ -57,10 +59,41 @@ function safeFilePart(value: string) {
 }
 
 export function ObservationView() {
-  const [sheet, setSheet] = useState<ObservationSheet>(() =>
-    buildObservationSheet(),
-  )
+  const [sheet, setSheet] = useState<ObservationSheet>(() => {
+    const fresh = buildObservationSheet()
+    if (typeof window === 'undefined') return fresh
+
+    try {
+      return (
+        restoreObservationSheetDraft(
+          window.localStorage.getItem(OBSERVATION_DRAFT_STORAGE_KEY),
+        ) ?? fresh
+      )
+    } catch {
+      return fresh
+    }
+  })
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        OBSERVATION_DRAFT_STORAGE_KEY,
+        JSON.stringify(sheet),
+      )
+    } catch {
+      // Local draft persistence is best-effort; manual JSON export stays available.
+    }
+  }, [sheet])
+
+  const clearDraft = () => {
+    try {
+      window.localStorage.removeItem(OBSERVATION_DRAFT_STORAGE_KEY)
+    } catch {
+      // Keep reset usable even when storage is unavailable.
+    }
+    setSheet(buildObservationSheet())
+  }
 
   const updateStudy = (
     field: StudyTextField,
@@ -163,6 +196,10 @@ export function ObservationView() {
         <p>
           Dit scherm verzamelt invoer. Pas de bestaande converter en assessment
           bepalen of de observatie geldig en vergelijkbaar is.
+        </p>
+        <p>
+          Je concept wordt automatisch lokaal op dit apparaat bewaard, zodat een
+          refresh of gesloten tab je winkelmeting niet wist.
         </p>
       </div>
 
@@ -501,7 +538,7 @@ export function ObservationView() {
         <button
           className="ghost-button"
           type="button"
-          onClick={() => setSheet(buildObservationSheet())}
+          onClick={clearDraft}
         >
           Alles wissen
         </button>
