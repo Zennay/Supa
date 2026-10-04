@@ -84,6 +84,64 @@ async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, 'utf8'))
 }
 
+function validatedCandidateIndex(index) {
+  if (!Array.isArray(index.candidates) || !Array.isArray(index.abstentions)) {
+    throw new Error('Sanitized candidate index must contain candidates and abstentions arrays')
+  }
+  if (
+    index.candidateCount !== index.candidates.length ||
+    index.abstentionCount !== index.abstentions.length
+  ) {
+    throw new Error('Sanitized candidate index declared counts do not match its arrays')
+  }
+
+  const candidateIds = index.candidates.map((entry) => entry?.id)
+  const abstentionIds = index.abstentions.map((entry) => entry?.id)
+  for (const id of [...candidateIds, ...abstentionIds]) {
+    if (typeof id !== 'string' || !id.trim()) {
+      throw new Error('Sanitized candidate index contains an invalid source id')
+    }
+  }
+
+  const duplicateIds = (ids) => {
+    const seen = new Set()
+    return ids.filter((id) => {
+      if (seen.has(id)) return true
+      seen.add(id)
+      return false
+    })
+  }
+
+  if (duplicateIds(candidateIds).length > 0) {
+    throw new Error('Sanitized candidate index contains duplicate candidate ids')
+  }
+  if (duplicateIds(abstentionIds).length > 0) {
+    throw new Error('Sanitized candidate index contains duplicate abstention ids')
+  }
+
+  const abstentionSet = new Set(abstentionIds)
+  const conflicts = candidateIds.filter((id) => abstentionSet.has(id))
+  if (conflicts.length > 0) {
+    throw new Error(
+      `Sanitized candidate index contains candidate/abstention conflicts: ${conflicts.join(', ')}`,
+    )
+  }
+
+  for (const entry of index.candidates) {
+    const expectedFile = `${entry.id}.json`
+    if (entry.file !== expectedFile) {
+      throw new Error(
+        `Sanitized candidate index has unexpected candidate file for ${entry.id}: ${entry.file}`,
+      )
+    }
+  }
+
+  return {
+    candidateEntries: new Map(index.candidates.map((entry) => [entry.id, entry])),
+    abstentionIds: new Set(abstentionIds),
+  }
+}
+
 async function readCandidateWithIntegrity(captureDir, entry) {
   if (!/^[a-f0-9]{64}$/.test(entry?.candidateSha256 ?? '')) {
     throw new Error(
@@ -148,19 +206,25 @@ export async function promoteReviewedCandidates(
     throw new Error('Review file must be version 1 with an approvals array')
   }
 
-  const candidateEntries = new Map(
-    (index.candidates ?? []).map((entry) => [entry.id, entry]),
+  const { candidateEntries, abstentionIds } = validatedCandidateIndex(index)
+
+  const promoteApprovals = review.approvals.filter(
+    (approval) => approval?.decision === 'promote',
   )
-  const abstentionIds = new Set(
-    (index.abstentions ?? []).map((entry) => entry.id),
-  )
+  const seenApprovalIds = new Set()
+  for (const approval of promoteApprovals) {
+    if (seenApprovalIds.has(approval.id)) {
+      throw new Error(
+        `Review file contains duplicate promotion approval for: ${approval.id}`,
+      )
+    }
+    seenApprovalIds.add(approval.id)
+  }
 
   await mkdir(outputDir, { recursive: true })
 
   const promoted = []
-  for (const approval of review.approvals) {
-    if (approval.decision !== 'promote') continue
-
+  for (const approval of promoteApprovals) {
     if (abstentionIds.has(approval.id)) {
       throw new Error(
         `Cannot promote abstained product source: ${approval.id}`,
