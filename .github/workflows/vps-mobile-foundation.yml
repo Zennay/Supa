@@ -17,6 +17,7 @@ on:
       - "src/domain/types.ts"
       - "src/data/mock.ts"
       - "src/data/m2Fixture.ts"
+      - "src/data/m3ComparisonFixture.ts"
       - "src/lib/**"
       - "tests/planner*.test.*"
       - "tests/m2-core-slice.test.mjs"
