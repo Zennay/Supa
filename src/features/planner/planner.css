@@ -83,7 +83,7 @@
   font-size: 16px;
 }
 
-.meal-toggle {
+.meal-config {
   width: 100%;
   grid-template-columns: 42px 1fr 32px;
   color: var(--ink);
@@ -91,7 +91,7 @@
   cursor: pointer;
 }
 
-.meal-toggle.active {
+.meal-config.active {
   border-color: #c8dca7;
   box-shadow: inset 0 0 0 1px #dbe8c6;
 }
@@ -102,11 +102,24 @@
   gap: 4px;
 }
 
-.meal-copy strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.meal-copy label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.meal-copy select {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  font: inherit;
   font-size: 15px;
+  font-weight: 800;
 }
 
 .meal-copy small {
@@ -125,7 +138,7 @@
   font-weight: 900;
 }
 
-.meal-toggle.active .plan-check {
+.meal-config.active .plan-check {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-ink);
