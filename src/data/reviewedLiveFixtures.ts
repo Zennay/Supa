@@ -23,6 +23,13 @@ function validIso(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
 }
 
+function isSafeSourceId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  )
+}
+
 function sourceExactlyMatchesObservation(
   source: ReviewedLiveProductFixture['source'],
   observation: RawProductObservation,
@@ -65,8 +72,8 @@ export function validateReviewedLiveProductFixture(
   if (fixture.fixtureType !== 'reviewed-live-product-observation') {
     throw new Error('Unexpected reviewed live fixture type')
   }
-  if (!fixture.source?.id?.trim()) {
-    throw new Error('Reviewed live fixture must identify its source')
+  if (!isSafeSourceId(fixture.source?.id)) {
+    throw new Error('Reviewed live fixture must use a path-safe source id')
   }
   if (fixture.source.kind !== 'product') {
     throw new Error('Reviewed live product fixture must come from a product source')
