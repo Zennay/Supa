@@ -5,6 +5,8 @@ on:
     paths:
       - "scripts/m1-capture-sources.mjs"
       - "tests/m1-capture-sources.test.mjs"
+      - "tests/ingestion-contract.test.mjs"
+      - "src/data/ingestion.ts"
       - ".github/workflows/m1-data-capture.yml"
       - "docs/M1_DATA_FEASIBILITY.md"
   workflow_dispatch:
