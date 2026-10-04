@@ -1,0 +1,229 @@
+import {
+  matchIngredient,
+  type IngredientRequirement,
+  type MatchUnit,
+  type ProductCandidate,
+} from './matching.ts'
+import type { PlannedMeal, Recipe, Store } from './types.ts'
+
+export type RecipeIngredient = IngredientRequirement & {
+  label: string
+}
+
+export type RecipeWithIngredients = Recipe & {
+  ingredients: RecipeIngredient[]
+}
+
+export type StoreProduct = ProductCandidate & {
+  storeId: string
+  priceCents: number
+}
+
+export type BasketTraceLine =
+  | {
+      id: string
+      ingredientLabel: string
+      requirement: { amount: number; unit: MatchUnit }
+      status: 'matched'
+      productId: string
+      productName: string
+      packs: number
+      pack: { amount: number; unit: MatchUnit; count: number }
+      pricePerPackCents: number
+      lineTotalCents: number
+      matchScore: number
+      reasons: string[]
+    }
+  | {
+      id: string
+      ingredientLabel: string
+      requirement: { amount: number | null; unit: MatchUnit }
+      status: 'unresolved'
+      reasons: string[]
+      matchScore: number | null
+    }
+
+export type OneStoreBasket = {
+  store: Store
+  selectedMealCount: number
+  lines: BasketTraceLine[]
+  totalCents: number
+  matchedLineCount: number
+  unresolvedLineCount: number
+}
+
+type AggregatedIngredient = RecipeIngredient & {
+  amount: number | null
+}
+
+function baseAmount(
+  amount: number,
+  unit: MatchUnit,
+): { amount: number; family: 'mass' | 'volume' | 'piece' } | null {
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  if (unit === 'kg') return { amount: amount * 1000, family: 'mass' }
+  if (unit === 'g') return { amount, family: 'mass' }
+  if (unit === 'l') return { amount: amount * 1000, family: 'volume' }
+  if (unit === 'ml') return { amount, family: 'volume' }
+  if (unit === 'piece') return { amount, family: 'piece' }
+  return null
+}
+
+export function aggregatePlanIngredients(
+  plan: PlannedMeal[],
+  recipes: RecipeWithIngredients[],
+  activeDays: string[],
+): AggregatedIngredient[] {
+  const active = new Set(activeDays)
+  const aggregated = new Map<string, AggregatedIngredient>()
+
+  for (const meal of plan) {
+    if (!active.has(meal.day)) continue
+
+    const recipe = recipes.find((candidate) => candidate.id === meal.recipeId)
+    if (!recipe) {
+      throw new Error(`Missing recipe for planned meal: ${meal.recipeId}`)
+    }
+
+    for (const ingredient of recipe.ingredients) {
+      const current = aggregated.get(ingredient.id)
+      if (!current) {
+        aggregated.set(ingredient.id, { ...ingredient })
+        continue
+      }
+
+      if (
+        current.query !== ingredient.query ||
+        current.unit !== ingredient.unit ||
+        current.label !== ingredient.label
+      ) {
+        throw new Error(`Ingredient definition drift: ${ingredient.id}`)
+      }
+
+      current.amount =
+        current.amount === null || ingredient.amount === null
+          ? null
+          : current.amount + ingredient.amount
+    }
+  }
+
+  return [...aggregated.values()].sort((a, b) => a.id.localeCompare(b.id))
+}
+
+export function buildOneStoreBasket({
+  store,
+  plan,
+  recipes,
+  activeDays,
+  products,
+}: {
+  store: Store
+  plan: PlannedMeal[]
+  recipes: RecipeWithIngredients[]
+  activeDays: string[]
+  products: StoreProduct[]
+}): OneStoreBasket {
+  const ingredients = aggregatePlanIngredients(plan, recipes, activeDays)
+  const storeProducts = products.filter((product) => product.storeId === store.id)
+
+  const lines: BasketTraceLine[] = ingredients.map((ingredient) => {
+    if (
+      ingredient.amount === null ||
+      !Number.isFinite(ingredient.amount) ||
+      ingredient.amount <= 0
+    ) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: ['ingredient amount unknown or invalid'],
+        matchScore: null,
+      }
+    }
+
+    const decision = matchIngredient(ingredient, storeProducts)
+    if (decision.type === 'abstain') {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: decision.reasons,
+        matchScore: decision.score,
+      }
+    }
+
+    const product = storeProducts.find(
+      (candidate) => candidate.id === decision.productId,
+    )
+    if (!product) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: ['matched product missing from store catalog'],
+        matchScore: decision.score,
+      }
+    }
+
+    const packCount = product.packCount ?? 1
+    const required = baseAmount(ingredient.amount, ingredient.unit)
+    const pack =
+      product.packAmount === null
+        ? null
+        : baseAmount(product.packAmount * packCount, product.packUnit)
+
+    if (
+      !required ||
+      !pack ||
+      required.family !== pack.family ||
+      !Number.isInteger(product.priceCents) ||
+      product.priceCents < 0
+    ) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: [...decision.reasons, 'basket quantity or price is not trusted'],
+        matchScore: decision.score,
+      }
+    }
+
+    const packs = Math.ceil(required.amount / pack.amount)
+    return {
+      id: ingredient.id,
+      ingredientLabel: ingredient.label,
+      requirement: { amount: ingredient.amount, unit: ingredient.unit },
+      status: 'matched',
+      productId: product.id,
+      productName: product.name,
+      packs,
+      pack: {
+        amount: product.packAmount!,
+        unit: product.packUnit,
+        count: packCount,
+      },
+      pricePerPackCents: product.priceCents,
+      lineTotalCents: packs * product.priceCents,
+      matchScore: decision.score,
+      reasons: decision.reasons,
+    }
+  })
+
+  const matched = lines.filter(
+    (line): line is Extract<BasketTraceLine, { status: 'matched' }> =>
+      line.status === 'matched',
+  )
+
+  return {
+    store,
+    selectedMealCount: plan.filter((meal) => activeDays.includes(meal.day)).length,
+    lines,
+    totalCents: matched.reduce((total, line) => total + line.lineTotalCents, 0),
+    matchedLineCount: matched.length,
+    unresolvedLineCount: lines.length - matched.length,
+  }
+}

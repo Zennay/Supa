@@ -1,32 +1,37 @@
-import { useMemo, useState } from 'react'
-import { plan, recipes } from '../../data/mock'
+import { useMemo } from 'react'
+import type { PlannedMeal, Recipe } from '../../domain/types'
 import { getBudgetState, getPlannedCost } from '../../domain/planner'
 import { euro } from '../../lib/money'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
 
-export function PlannerView() {
-  const [budget, setBudget] = useState(35)
-  const [activeDays, setActiveDays] = useState(() => plan.map((item) => item.day))
+type PlannerViewProps = {
+  budget: number
+  activeDays: string[]
+  plannedMeals: PlannedMeal[]
+  recipes: Recipe[]
+  onBudgetChange: (budget: number) => void
+  onToggleDay: (day: string) => void
+  onRecipeChange: (day: string, recipeId: string) => void
+  onReset: () => void
+}
+
+export function PlannerView({
+  budget,
+  activeDays,
+  plannedMeals,
+  recipes,
+  onBudgetChange,
+  onToggleDay,
+  onRecipeChange,
+  onReset,
+}: PlannerViewProps) {
   const plannedCost = useMemo(
-    () => getPlannedCost(plan, recipes, activeDays),
-    [activeDays],
+    () => getPlannedCost(plannedMeals, recipes, activeDays),
+    [activeDays, plannedMeals, recipes],
   )
   const budgetState = getBudgetState(plannedCost, budget)
-
-  const toggleDay = (day: string) => {
-    setActiveDays((current) =>
-      current.includes(day)
-        ? current.filter((candidate) => candidate !== day)
-        : [...current, day],
-    )
-  }
-
-  const resetWeek = () => {
-    setActiveDays(plan.map((item) => item.day))
-    setBudget(35)
-  }
 
   return (
     <section className="screen">
@@ -35,13 +40,13 @@ export function PlannerView() {
           <span className="eyebrow">Deze week</span>
           <h2>Plan eerst. Bespaar daarna.</h2>
         </div>
-        <button className="ghost-button" onClick={resetWeek}>Reset</button>
+        <button className="ghost-button" onClick={onReset}>Reset</button>
       </div>
 
       <section className="budget-card" aria-labelledby="weekbudget-title">
         <div className="budget-heading">
           <div>
-            <span className="eyebrow">Weekbudget</span>
+            <span className="eyebrow">Voorkeur · weekbudget</span>
             <strong id="weekbudget-title">{euro.format(budget)}</strong>
           </div>
           <span className={budgetState.overBudget ? 'budget-status warning' : 'budget-status'}>
@@ -57,7 +62,7 @@ export function PlannerView() {
               key={option}
               className={budget === option ? 'budget-chip active' : 'budget-chip'}
               aria-pressed={budget === option}
-              onClick={() => setBudget(option)}
+              onClick={() => onBudgetChange(option)}
             >
               {euro.format(option)}
             </button>
@@ -76,40 +81,63 @@ export function PlannerView() {
         </div>
 
         <div className="budget-summary">
-          <span>{activeDays.length} maaltijden gepland</span>
+          <span>{activeDays.length} maaltijden actief</span>
           <strong>{euro.format(plannedCost)}</strong>
         </div>
-        <p className="disclaimer">Gebaseerd op mock-receptkosten; nog geen echte besparingsclaim.</p>
+        <p className="disclaimer">
+          Receptkosten zijn planningsfixtures. De Mand-tab rekent de gekozen
+          week apart uit via productmatching en verpakkingen.
+        </p>
       </section>
 
       <div className="day-grid" aria-label="Geplande maaltijden">
-        {plan.map((item) => {
-          const recipe = recipes.find((candidate) => candidate.id === item.recipeId)!
+        {plannedMeals.map((item) => {
+          const recipe = recipes.find((candidate) => candidate.id === item.recipeId)
+          if (!recipe) return null
           const active = activeDays.includes(item.day)
 
           return (
-            <button
-              type="button"
-              className={active ? 'meal-card meal-toggle active' : 'meal-card meal-toggle'}
+            <article
+              className={active ? 'meal-card meal-config active' : 'meal-card meal-config'}
               key={item.day}
-              aria-pressed={active}
-              onClick={() => toggleDay(item.day)}
             >
               <span className="day">{item.day}</span>
               <span className="meal-copy">
-                <strong>{recipe.title}</strong>
+                <label htmlFor={`recipe-${item.day}`}>Recept</label>
+                <select
+                  id={`recipe-${item.day}`}
+                  value={item.recipeId}
+                  onChange={(event) => onRecipeChange(item.day, event.target.value)}
+                >
+                  {recipes.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.title}
+                    </option>
+                  ))}
+                </select>
                 <small>{recipe.minutes} min · {euro.format(recipe.estimatedCost)} / recept</small>
               </span>
-              <span className="plan-check" aria-hidden="true">{active ? '✓' : '+'}</span>
-            </button>
+              <button
+                type="button"
+                className="plan-check"
+                aria-label={active ? `${item.day} uit planning halen` : `${item.day} aan planning toevoegen`}
+                aria-pressed={active}
+                onClick={() => onToggleDay(item.day)}
+              >
+                {active ? '✓' : '+'}
+              </button>
+            </article>
           )
         })}
       </div>
 
       <div className="insight-card">
-        <span className="eyebrow">Slim gecombineerd</span>
-        <strong>2 ingrediënten worden deze week opnieuw gebruikt.</strong>
-        <p>De planner houdt budget en maaltijden nu samen bij; hergebruik blijft voorlopig expliciete mockdata.</p>
+        <span className="eyebrow">M2 verticale slice</span>
+        <strong>Je receptkeuzes sturen nu dezelfde mand en boodschappenlijst aan.</strong>
+        <p>
+          Onzekere productmatches worden niet ingevuld: ze blijven zichtbaar
+          als controlepunt in Mand en Lijst.
+        </p>
       </div>
     </section>
   )
