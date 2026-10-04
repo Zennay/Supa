@@ -60,12 +60,23 @@ export function normalizePackText(input: string | null): NormalizedPack {
   )
 
   if (multipack) {
-    return {
-      rawText,
-      count: Number(multipack[1]),
-      amount: decimal(multipack[2]),
-      unit: UNIT_ALIASES[multipack[3]],
+    const count = Number(multipack[1])
+    const amount = decimal(multipack[2])
+    if (
+      Number.isInteger(count) &&
+      count > 0 &&
+      Number.isFinite(amount) &&
+      amount > 0
+    ) {
+      return {
+        rawText,
+        count,
+        amount,
+        unit: UNIT_ALIASES[multipack[3]],
+      }
     }
+
+    return { rawText, count: 1, amount: null, unit: 'unknown' }
   }
 
   const single = cleaned.match(
@@ -73,12 +84,17 @@ export function normalizePackText(input: string | null): NormalizedPack {
   )
 
   if (single) {
-    return {
-      rawText,
-      count: 1,
-      amount: decimal(single[1]),
-      unit: UNIT_ALIASES[single[2]],
+    const amount = decimal(single[1])
+    if (Number.isFinite(amount) && amount > 0) {
+      return {
+        rawText,
+        count: 1,
+        amount,
+        unit: UNIT_ALIASES[single[2]],
+      }
     }
+
+    return { rawText, count: 1, amount: null, unit: 'unknown' }
   }
 
   return { rawText, count: 1, amount: null, unit: 'unknown' }
