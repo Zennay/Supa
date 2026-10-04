@@ -79,6 +79,13 @@ export function attributeSavingsEffects({
       continue
     }
 
+    if (item.effect === 'planning' && item.deltaCents !== 0) {
+      reasons.push(
+        `planning attribution must be zero for same-demand basket comparisons: ${item.lineId}`,
+      )
+      continue
+    }
+
     const lineDelta = lineById.get(item.lineId)!.deltaCents
     if (
       (lineDelta > 0 && item.deltaCents < 0) ||
