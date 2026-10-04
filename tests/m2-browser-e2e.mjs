@@ -191,9 +191,29 @@ try {
 
   await clickNav(sessionId, 'Meten')
   let observationText = await waitForText(sessionId, 'Meten zonder gokken.')
-  assert.match(observationText, /0\/22 regels geobserveerd/)
+  assert.match(observationText, /0\/22 regels compleet/)
   assert.match(observationText, /collection-template-not-evidence/)
   assert.match(observationText, /JSON-concept openen/)
+
+  const incompleteObservationChanged = await execute(
+    sessionId,
+    `
+      const select = document.querySelector(
+        'select[aria-label="baseline Basmati rijst beschikbaar"]',
+      )
+      if (!select) return false
+      select.value = 'true'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+      return select.value === 'true'
+    `,
+  )
+  assert.equal(
+    incompleteObservationChanged,
+    true,
+    'M3 available observation could not be recorded',
+  )
+  observationText = await waitForText(sessionId, 'details aanvullen')
+  assert.match(observationText, /0\/22 regels compleet/)
 
   const observationChanged = await execute(
     sessionId,
@@ -212,7 +232,7 @@ try {
     true,
     'M3 observation availability could not be recorded',
   )
-  observationText = await waitForText(sessionId, '1/22 regels geobserveerd')
+  observationText = await waitForText(sessionId, '1/22 regels compleet')
   assert.match(observationText, /Basmati rijst/)
   await screenshot(sessionId, 'm3-observation-entry.png')
   evidence.checks.push({
