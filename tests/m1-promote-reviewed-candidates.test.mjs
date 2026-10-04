@@ -313,3 +313,38 @@ test('rejects duplicate promotion approvals for the same source', async () => {
     /duplicate promotion approval/,
   )
 })
+
+test('rejects unsafe candidate source ids before resolving candidate paths', async () => {
+  const { root, source } = await setupCandidate()
+  const review = await writeReview(root, approvalFor(source))
+  const indexPath = path.join(root, 'sanitized-candidates', 'index.json')
+  const index = JSON.parse(await readFile(indexPath, 'utf8'))
+  index.candidates[0].id = '../ah-product'
+  index.candidates[0].file = '../ah-product.json'
+  await writeFile(indexPath, JSON.stringify(index), 'utf8')
+
+  await assert.rejects(
+    () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
+    /unsafe source id/,
+  )
+})
+
+test('rejects candidate payload whose source id differs from its index entry', async () => {
+  const { root, source } = await setupCandidate()
+  const review = await writeReview(root, approvalFor(source))
+  const candidatePath = path.join(root, 'sanitized-candidates', 'ah-product.json')
+  const indexPath = path.join(root, 'sanitized-candidates', 'index.json')
+  const candidate = JSON.parse(await readFile(candidatePath, 'utf8'))
+  candidate.source.id = 'other-product'
+  const serialized = JSON.stringify(candidate, null, 2) + '\n'
+  await writeFile(candidatePath, serialized, 'utf8')
+
+  const index = JSON.parse(await readFile(indexPath, 'utf8'))
+  index.candidates[0].candidateSha256 = sha256Text(serialized)
+  await writeFile(indexPath, JSON.stringify(index), 'utf8')
+
+  await assert.rejects(
+    () => promoteReviewedCandidates(root, review, path.join(root, 'fixtures')),
+    /source id mismatch/,
+  )
+})
