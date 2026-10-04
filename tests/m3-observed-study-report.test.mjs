@@ -6,7 +6,10 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
-import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
+import {
+  buildObservedWeekReport,
+  validateObservedWeekInput,
+} from '../scripts/m3-assess-observed-week.mjs'
 import {
   m2DefaultActiveDays,
   m2InitialPlan,
@@ -108,6 +111,38 @@ test('M3 report runner preserves unknown evidence without inventing a money delt
   assert.match(report.reasons.join(' '), /unresolved ingredients/)
 })
 
+test('M3 observed input preflight rejects missing nested basket evidence with a path-specific error', () => {
+  const study = observedStudy()
+  study.candidate = {
+    ...study.candidate,
+    basket: null,
+  }
+
+  assert.throws(
+    () => validateObservedWeekInput(study),
+    /candidate\.basket must be an object/,
+  )
+})
+
+test('M3 observed input preflight rejects inconsistent observed line money', () => {
+  const study = observedStudy()
+  const matchedIndex = study.baseline.basket.lines.findIndex(
+    (line) => line.status === 'matched',
+  )
+  assert.ok(matchedIndex >= 0)
+
+  study.baseline.basket.lines[matchedIndex] = {
+    ...study.baseline.basket.lines[matchedIndex],
+    lineTotalCents:
+      study.baseline.basket.lines[matchedIndex].lineTotalCents + 1,
+  }
+
+  assert.throws(
+    () => buildObservedWeekReport(study),
+    /lineTotalCents must equal packs × pricePerPackCents/,
+  )
+})
+
 test('M3 CLI writes a reproducible assessment report file', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'supa-m3-report-'))
   const input = join(directory, 'study.json')
@@ -139,6 +174,44 @@ test('M3 CLI writes a reproducible assessment report file', async () => {
     assert.equal(report.claimable, true)
     assert.equal(report.publicSavingsClaimEligible, false)
     assert.equal('participantKey' in report, false)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('M3 CLI fails before report generation when collected JSON is structurally incomplete', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-malformed-'))
+  const input = join(directory, 'study.json')
+  const output = join(directory, 'report.json')
+
+  try {
+    await writeFile(
+      input,
+      JSON.stringify({
+        schemaVersion: 1,
+        studyId: 'week-2026-40-malformed',
+      }),
+      'utf8',
+    )
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        'scripts/m3-assess-observed-week.mjs',
+        input,
+        '--output',
+        output,
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      },
+    )
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /participantKey must be a non-empty string/)
+    await assert.rejects(readFile(output, 'utf8'), /ENOENT/)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

@@ -47,7 +47,6 @@ The contract does not authorize automated supermarket collection. Production PLU
 
 The validator and its tests are infrastructure for the M3 study. Synthetic regression fixtures are **not** themselves observed savings evidence. AUD-003 stays open until reproducible real-basket records exist with population, time window, positive/negative/unknown outcomes and uncertainty preserved.
 
-
 ## Operational assessment command
 
 Once a real observed study JSON has been collected under this contract, assess it reproducibly with:
@@ -55,6 +54,10 @@ Once a real observed study JSON has been collected under this contract, assess i
 ```bash
 npm run m3:assess-observed-week -- evidence/m3/<study>.json --output artifacts/m3/<study>-assessment.json
 ```
+
+Before comparison/report generation, the CLI now performs a structural evidence preflight. It fails closed with a path-specific error when required study/evidence/basket fields are missing, observed-source values are invalid, money/counters are malformed, or a matched line's total does not reconcile to `packs × pricePerPackCents`. An invalid input does not emit an assessment file.
+
+This preflight is intentionally not a substitute for provenance review: it proves the collected JSON is structurally trustworthy enough to enter the existing M3 evidence gate, not that a receipt/cart observation is genuine.
 
 The report intentionally omits the pseudonymous participant key and includes only study/store provenance, totals, outcome, uncertainty and the evidence boundary. A `worse` or `unknown` study still produces a valid report; only malformed input is an execution error.
 
