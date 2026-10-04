@@ -1,0 +1,110 @@
+name: Start zCloud workers now from Supa runner
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/start-zcloud-workers-now.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  start-workers:
+    runs-on: [self-hosted, supa, vps]
+    timeout-minutes: 5
+    steps:
+      - name: Recover zCloud control plane and start allocated workers
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "vps-bb300bba"
+
+          export XDG_RUNTIME_DIR=/run/user/1000
+          export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+
+          for dependency in chatgpt-display.service chatgpt-openbox.service; do
+            systemctl --user reset-failed "$dependency" || true
+            systemctl --user start "$dependency" || true
+          done
+          systemctl --user reset-failed chatgpt-firefox.service || true
+          systemctl --user restart chatgpt-firefox.service || systemctl --user start chatgpt-firefox.service || true
+
+          if ! curl -fsS --max-time 3 http://127.0.0.1:8765/api/runner-targets >/dev/null 2>&1; then
+            sudo -n systemctl reset-failed zennay-cloud.service || true
+            sudo -n systemctl restart zennay-cloud.service
+          fi
+
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl -fsS --max-time 3 http://127.0.0.1:8765/api/runner-targets >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+
+          if [[ "$ready" != "1" ]]; then
+            echo "ZCLOUD_API=unavailable"
+            sudo -n systemctl --no-pager --full status zennay-cloud.service || true
+            sudo -n journalctl -u zennay-cloud.service -n 160 --no-pager || true
+            ss -ltnp | grep ':8765' || true
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import json
+          import time
+          import urllib.request
+
+          BASE = "http://127.0.0.1:8765"
+
+          def call(method, path, payload=None):
+              data = None
+              headers = {"User-Agent": "supa-start-zcloud-workers-now/1"}
+              if payload is not None:
+                  data = json.dumps(payload).encode("utf-8")
+                  headers["Content-Type"] = "application/json"
+              req = urllib.request.Request(BASE + path, data=data, headers=headers, method=method)
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  return json.load(response)
+
+          settings = call("GET", "/api/dynamic-workers")
+          targets = call("GET", "/api/runner-targets")
+          allocation = (targets.get("global_allocation") or {}).get("workers") or []
+          print("DYNAMIC_WORKERS=" + json.dumps(settings, sort_keys=True))
+          print("ALLOCATION_BEFORE=" + json.dumps(allocation, sort_keys=True))
+
+          if not allocation:
+              raise SystemExit("no allocated workers to start")
+
+          started = []
+          keys = []
+          for item in allocation:
+              key = str(item.get("worker_key") or "").strip()
+              if not key:
+                  project = str(item.get("project_id") or "").strip()
+                  slot = int(item.get("worker_slot") or 1)
+                  key = f"{project}::w{slot}"
+              keys.append(key)
+              result = call("POST", "/api/runner-control", {"project_id": key, "action": "start"})
+              started.append({"worker": key, "result": result})
+              if not result.get("ok"):
+                  raise SystemExit(f"start rejected for {key}: {result}")
+          print("WORKER_STARTS=" + json.dumps(started, sort_keys=True))
+
+          time.sleep(4)
+          pushed = call("POST", "/api/dynamic-workers/force-push", {})
+          print("FORCE_PUSH=" + json.dumps(pushed, sort_keys=True))
+          if not pushed.get("ok"):
+              raise SystemExit("force-push returned ok=false")
+
+          by_worker = {str(item.get("worker")): item for item in (pushed.get("results") or [])}
+          missing = [key for key in keys if key not in by_worker]
+          refused = [key for key in keys if not bool((by_worker.get(key) or {}).get("queued"))]
+          if missing or refused:
+              raise SystemExit("not all workers queued: " + json.dumps({"missing": missing, "refused": refused}, sort_keys=True))
+
+          final = call("GET", "/api/runner-targets")
+          print("RUNNER_TARGETS_AFTER=" + json.dumps(final, sort_keys=True))
+          print("ALL_ALLOCATED_WORKERS_STARTED_AND_PUSHED=1")
+          PY
