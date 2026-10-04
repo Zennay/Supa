@@ -37,6 +37,24 @@ The study must retain:
 
 A negative or unknown result is evidence, not a record to discard.
 
+## Intake validator
+
+Save one observed study as JSON using the `WeeklyBasketStudy` contract, then run:
+
+```bash
+npm run m3:validate-observed-study -- path/to/study.json
+```
+
+The command emits a compact JSON assessment with the study ID, claimability, outcome, totals, delta/savings, observation window and reasons.
+
+Exit codes are deliberate:
+
+- `0`: the observed study passes all evidence and basket gates;
+- `2`: the document is readable but the study is not claimable; savings/delta stay suppressed where required;
+- `1`: the input cannot be parsed or evaluated as a study document.
+
+The CLI does not fetch supermarket data and does not turn regression fixtures into evidence. Its job is to make a manually observed, receipt-derived or consented study reproducible through the same fail-closed contract used in tests.
+
 ## Privacy and source boundary
 
 Use pseudonymous participant keys and do not put names, email addresses or account IDs in versioned study fixtures.
