@@ -6,7 +6,10 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 
 import { buildObservationSheet } from '../scripts/m3-create-observation-sheet.mjs'
-import { observationSheetProgress } from '../src/domain/m3ObservationSheet.ts'
+import {
+  observationSheetProgress,
+  observationWindowSummary,
+} from '../src/domain/m3ObservationSheet.ts'
 
 function requirement(sheet, id) {
   return sheet.requirements.find((item) => item.id === id)
@@ -115,3 +118,26 @@ test('M3 observation sheet CLI creates nested output directories', async () => {
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test('M3 observation window exposes the second-store deadline after the first measurement', () => {
+  const sheet = buildObservationSheet()
+  sheet.baseline.observedAt = '2026-10-04T10:00:00.000Z'
+
+  const single = observationWindowSummary(sheet)
+
+  assert.equal(single.state, 'single-observation')
+  assert.equal(single.firstSide, 'baseline')
+  assert.equal(single.firstObservedAt, '2026-10-04T10:00:00.000Z')
+  assert.equal(single.deadlineAt, '2026-10-05T10:00:00.000Z')
+
+  sheet.candidate.observedAt = '2026-10-05T09:30:00.000Z'
+  const validPair = observationWindowSummary(sheet)
+  assert.equal(validPair.state, 'within-window')
+  assert.equal(validPair.deltaHours, 23.5)
+
+  sheet.candidate.observedAt = '2026-10-05T10:30:00.000Z'
+  const expiredPair = observationWindowSummary(sheet)
+  assert.equal(expiredPair.state, 'outside-window')
+  assert.equal(expiredPair.deltaHours, 24.5)
+})
+
