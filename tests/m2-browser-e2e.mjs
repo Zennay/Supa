@@ -215,27 +215,59 @@ try {
   observationText = await waitForText(sessionId, 'details aanvullen')
   assert.match(observationText, /0\/22 regels compleet/)
 
-  const staleDetailsCleared = await execute(
+  const temporaryProductEntered = await execute(
     sessionId,
     `
-      const line = document.querySelector('[data-observation-line="rice"]')
-      const select = document.querySelector(
-        'select[aria-label="baseline Basmati rijst beschikbaar"]',
-      )
+      const line = document.querySelector('[data-observation-line="basmati-rice"]')
       const productName = line?.querySelector('input[placeholder="Exacte productnaam"]')
-      if (!select || !productName) return false
+      if (!productName) return false
 
       productName.value = 'Temporary observed product'
       productName.dispatchEvent(new Event('input', { bubbles: true }))
       productName.dispatchEvent(new Event('change', { bubbles: true }))
+      return productName.value === 'Temporary observed product'
+    `,
+  )
+  assert.equal(
+    temporaryProductEntered,
+    true,
+    'M3 temporary observed product detail could not be entered',
+  )
 
+  await execute(
+    sessionId,
+    `
+      const select = document.querySelector(
+        'select[aria-label="baseline Basmati rijst beschikbaar"]',
+      )
+      if (!select) return false
       select.value = 'false'
       select.dispatchEvent(new Event('change', { bubbles: true }))
+      return true
+    `,
+  )
+  await waitForText(sessionId, 'niet beschikbaar')
+
+  await execute(
+    sessionId,
+    `
+      const select = document.querySelector(
+        'select[aria-label="baseline Basmati rijst beschikbaar"]',
+      )
+      if (!select) return false
       select.value = 'true'
       select.dispatchEvent(new Event('change', { bubbles: true }))
+      return true
+    `,
+  )
+  await waitForText(sessionId, 'details aanvullen')
 
-      const restoredName = line.querySelector('input[placeholder="Exacte productnaam"]')
-      return restoredName?.value === ''
+  const staleDetailsCleared = await execute(
+    sessionId,
+    `
+      const line = document.querySelector('[data-observation-line="basmati-rice"]')
+      const productName = line?.querySelector('input[placeholder="Exacte productnaam"]')
+      return productName?.value === ''
     `,
   )
   assert.equal(
