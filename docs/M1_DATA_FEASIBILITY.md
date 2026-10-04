@@ -537,3 +537,60 @@ artifact identity, safety boundary and structural invariants.
 This closes the **bounded technical repeatability** gap for the observed PLUS
 catalog/offers contract. It does not claim indefinite source stability and it
 does not grant production ingestion/reuse permission.
+
+
+## Production source-permission gate — 2026-10-04
+
+The technical M1 source pair is **PLUS + DekaMarkt**, but technical access is
+not treated as permission to run a production ingestion dependency.
+
+The canonical machine-readable policy is
+`evidence/m1/source-permission-gate.v1.json` and is validated in CI with
+`npm run m1:source-permission-gate`.
+
+### PLUS
+
+The reviewed published PLUS ordering terms, section 19.1, reserve intellectual
+property rights in the Website/App and state that reproducing, publishing or
+editing the information requires permission outside personal household use.
+
+M1 therefore records PLUS as:
+
+- technical status: **proven**;
+- production permission: **permission required**;
+- scheduled production ingestion: **disabled**.
+
+Official source reviewed:
+`https://taarten.plus.nl/alv/`.
+
+### DekaMarkt
+
+The reviewed DekaMarkt general-conditions page does not provide a clear grant
+for systematic reuse of catalog/offer data. Lack of an explicit prohibition in
+that page is deliberately **not** interpreted as permission.
+
+M1 therefore records DekaMarkt as:
+
+- technical status: **proven**;
+- production permission: **unresolved**;
+- scheduled production ingestion: **disabled**.
+
+Official source reviewed:
+`https://www.dekamarkt.nl/algemene-voorwaarden`.
+
+### Fail-closed rule
+
+A source can become production-enabled only when its permission status is
+`permitted` **and** the versioned evidence includes explicit authorization
+(`written_permission` or an `official_license`). The checker rejects an
+attempt to enable a source while its status is unresolved, permission-required
+or prohibited.
+
+`npm run m1:source-production-ready` is intentionally red with the current
+evidence. That command is the future dependency-lock-in gate; ordinary CI only
+validates that the restrictive policy is internally consistent.
+
+This permission gate does not invalidate the bounded M1 feasibility artifacts
+or their regression fixtures. Those remain technical proof. It prevents those
+artifacts from being silently promoted into an autonomous production data
+dependency before permission/licensing is established.
