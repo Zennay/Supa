@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   buildObservationSheet,
+  observationSheetProgress,
   observationSheetReadiness,
 } from '../src/domain/m3ObservationSheet.ts'
 
@@ -118,4 +119,27 @@ test('M3 readiness rejects incomplete product details for an available line', ()
       issue.includes('prijs per verpakking'),
     ),
   )
+})
+
+
+test('M3 progress only counts lines complete when required observed product details exist', () => {
+  const sheet = buildObservationSheet()
+  const unavailable = sheet.baseline.lines[0]
+  const incompleteAvailable = sheet.baseline.lines[1]
+
+  unavailable.observedProduct.available = false
+  incompleteAvailable.observedProduct.available = true
+
+  let progress = observationSheetProgress(sheet)
+  assert.equal(progress.availabilityRecorded, 2)
+  assert.equal(progress.completeLines, 1)
+
+  incompleteAvailable.observedProduct.productName = 'Observed product'
+  incompleteAvailable.observedProduct.packAmount = 500
+  incompleteAvailable.observedProduct.packUnit = 'g'
+  incompleteAvailable.observedProduct.packCount = 1
+  incompleteAvailable.observedProduct.priceCents = 249
+
+  progress = observationSheetProgress(sheet)
+  assert.equal(progress.completeLines, 2)
 })

@@ -5,6 +5,7 @@ import {
   OBSERVATION_DRAFT_STORAGE_KEY,
   observationSheetProgress,
   observationSheetReadiness,
+  observationStoreProgress,
   observationWindowSummary,
   restoreObservationSheetDraft,
   type ObservationSheet,
@@ -248,11 +249,11 @@ export function ObservationView() {
 
       <div className="observation-status">
         <strong>
-          {progress.availabilityRecorded}/{progress.totalLines} regels geobserveerd
+          {progress.completeLines}/{progress.totalLines} regels compleet
         </strong>
         <span>
-          {progress.metadataCompleted}/{progress.metadataTotal} verplichte metadata
-          ingevuld
+          {progress.availabilityRecorded}/{progress.totalLines} beschikbaarheid gemeten ·{' '}
+          {progress.metadataCompleted}/{progress.metadataTotal} verplichte metadata ingevuld
         </span>
         <p>
           Dit scherm verzamelt invoer. Pas de bestaande converter en assessment
@@ -393,6 +394,7 @@ export function ObservationView() {
 
       {(['baseline', 'candidate'] as Side[]).map((side) => {
         const observation = sheet[side]
+        const storeProgress = observationStoreProgress(observation)
 
         return (
           <div className="observation-card" key={side} data-observation-side={side}>
@@ -402,13 +404,7 @@ export function ObservationView() {
                 <h3>{observation.store.name || 'Nog geen winkel ingevuld'}</h3>
               </div>
               <span className="observation-count">
-                {
-                  observation.lines.filter(
-                    (line) =>
-                      typeof line.observedProduct.available === 'boolean',
-                  ).length
-                }
-                /{observation.lines.length}
+                {storeProgress.completeLines}/{storeProgress.totalLines} compleet
               </span>
             </div>
 

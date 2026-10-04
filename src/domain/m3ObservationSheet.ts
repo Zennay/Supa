@@ -333,6 +333,39 @@ export function restoreObservationSheetDraft(
   }
 }
 
+export function observationLineCollectionComplete(
+  line: StoreObservation['lines'][number],
+) {
+  const product = line.observedProduct
+  if (typeof product.available !== 'boolean') return false
+  if (!product.available) return true
+
+  return (
+    nonBlank(product.productName) &&
+    product.packAmount !== null &&
+    Number.isFinite(product.packAmount) &&
+    product.packAmount > 0 &&
+    product.packUnit !== null &&
+    product.packUnit !== 'unknown' &&
+    Number.isInteger(product.packCount) &&
+    product.packCount > 0 &&
+    product.priceCents !== null &&
+    Number.isInteger(product.priceCents) &&
+    product.priceCents >= 0
+  )
+}
+
+export function observationStoreProgress(observation: StoreObservation) {
+  return {
+    totalLines: observation.lines.length,
+    availabilityRecorded: observation.lines.filter(
+      (line) => typeof line.observedProduct.available === 'boolean',
+    ).length,
+    completeLines: observation.lines.filter(observationLineCollectionComplete)
+      .length,
+  }
+}
+
 export function observationSheetProgress(sheet: ObservationSheet) {
   const observations = [sheet.baseline, sheet.candidate]
   const totalLines = observations.reduce(
@@ -341,10 +374,12 @@ export function observationSheetProgress(sheet: ObservationSheet) {
   )
   const availabilityRecorded = observations.reduce(
     (total, observation) =>
-      total +
-      observation.lines.filter(
-        (line) => typeof line.observedProduct.available === 'boolean',
-      ).length,
+      total + observationStoreProgress(observation).availabilityRecorded,
+    0,
+  )
+  const completeLines = observations.reduce(
+    (total, observation) =>
+      total + observationStoreProgress(observation).completeLines,
     0,
   )
 
@@ -373,6 +408,7 @@ export function observationSheetProgress(sheet: ObservationSheet) {
   return {
     totalLines,
     availabilityRecorded,
+    completeLines,
     metadataCompleted,
     metadataTotal: metadataValues.length,
   }
