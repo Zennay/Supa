@@ -8,6 +8,10 @@ on:
       - "package.json"
       - ".github/workflows/vps-mobile-foundation.yml"
 
+concurrency:
+  group: supa-vps-mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-build:
     runs-on: self-hosted
