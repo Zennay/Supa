@@ -81,3 +81,42 @@ Current safety thresholds are explicit and versioned: at least 90% overall accur
 
 These numbers are only a regression gate for the controlled fixture. They must not be reported as real supermarket matching accuracy. After the VPS source capture is inspected, sanitized AH/PLUS-derived candidates should be added as a new benchmark version and the thresholds re-evaluated against real observed edge cases.
 
+## Automated capture inspection
+
+Every bounded VPS capture is now followed by an integrity/structure inspection before the artifact is accepted.
+
+`npm run m1:inspect-captures -- <capture-directory>`:
+
+- verifies each successful HTML file against the SHA-256 stored in `manifest.json`;
+- fails loudly when a captured file is missing or its hash changed;
+- records the page title and generic JSON-LD metadata;
+- detects generic `application/json` script blocks and framework-level `__NEXT_DATA__` presence without assuming supermarket selectors;
+- writes `inspection.json` into the same capture artifact;
+- runs even after a partial capture failure so diagnostic evidence remains available.
+
+The inspector does not turn arbitrary markup into product truth. It only reports verifiable structure that can guide the next source-specific adapter decision.
+
+## Schema.org Product fallback
+
+SUPA now has a conservative source-independent parser for standard Schema.org `Product` JSON-LD.
+
+When exactly one usable Product node exists, it may produce a raw product observation for:
+
+- product name;
+- stable source identifier from SKU/GTIN when present;
+- one unambiguous EUR price;
+- explicit availability;
+- source snapshot provenance.
+
+It deliberately keeps pack size unknown unless a later source-specific/structured-data path proves it. Multiple Product nodes, non-EUR pricing or otherwise ambiguous data cause abstention rather than guessing. The capture inspector summarizes this parser result automatically when Product JSON-LD is present.
+
+## VPS runner contract
+
+The portfolio execution policy currently advertises the permanent lane with the `self-hosted` label and host `vps-bb300bba`. The M1 workflow therefore uses:
+
+```yaml
+runs-on: self-hosted
+```
+
+and separately verifies `hostname -s == vps-bb300bba` before doing capture work. Requiring extra undeclared labels would leave valid permanent-runner work queued indefinitely.
+
