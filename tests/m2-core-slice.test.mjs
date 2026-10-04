@@ -5,6 +5,7 @@ import {
   aggregatePlanIngredients,
   buildOneStoreBasket,
 } from '../src/domain/basket.ts'
+import { getBudgetState } from '../src/domain/planner.ts'
 import {
   m2DefaultActiveDays,
   m2InitialPlan,
@@ -26,6 +27,11 @@ test('M2 default plan produces a reproducible one-store basket with visible unce
   assert.equal(basket.totalCents, 3008)
   assert.equal(basket.matchedLineCount, 10)
   assert.equal(basket.unresolvedLineCount, 1)
+
+  const budgetState = getBudgetState(basket.totalCents / 100, 35)
+  assert.equal(budgetState.plannedCost, 30.08)
+  assert.ok(Math.abs(budgetState.remaining - 4.92) < 1e-9)
+  assert.equal(budgetState.overBudget, false)
 
   const unresolved = basket.lines.find((line) => line.id === 'garam-masala')
   assert.ok(unresolved)
