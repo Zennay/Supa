@@ -1,6 +1,5 @@
-import { useMemo } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
-import { getBudgetState, getPlannedCost } from '../../domain/planner'
+import { getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
 import './planner.css'
 
@@ -11,6 +10,7 @@ type PlannerViewProps = {
   activeDays: string[]
   plannedMeals: PlannedMeal[]
   recipes: Recipe[]
+  basketTotalCents: number
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
@@ -22,15 +22,13 @@ export function PlannerView({
   activeDays,
   plannedMeals,
   recipes,
+  basketTotalCents,
   onBudgetChange,
   onToggleDay,
   onRecipeChange,
   onReset,
 }: PlannerViewProps) {
-  const plannedCost = useMemo(
-    () => getPlannedCost(plannedMeals, recipes, activeDays),
-    [activeDays, plannedMeals, recipes],
-  )
+  const plannedCost = basketTotalCents / 100
   const budgetState = getBudgetState(plannedCost, budget)
 
   return (
@@ -85,8 +83,8 @@ export function PlannerView({
           <strong>{euro.format(plannedCost)}</strong>
         </div>
         <p className="disclaimer">
-          Receptkosten zijn planningsfixtures. De Mand-tab rekent de gekozen
-          week apart uit via productmatching en verpakkingen.
+          Dit bedrag komt uit exact dezelfde productmatching en
+          verpakkingsberekening als de Mand-tab.
         </p>
       </section>
 
