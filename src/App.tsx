@@ -1,10 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { buildOneStoreBasket } from './domain/basket'
 import {
-  m2DefaultActiveDays,
+  defaultPlannerPreferences,
+  parsePlannerPreferences,
+  serializePlannerPreferences,
+} from './domain/plannerPreferences'
+import {
   m2InitialPlan,
   m2Products,
   m2Recipes,
@@ -19,12 +23,37 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'list', label: 'Lijst' },
 ]
 
+const plannerStorageKey = 'supa:planner-preferences:v2'
+const validRecipeIds = m2Recipes.map((recipe) => recipe.id)
+
+function readPlannerPreferences() {
+  if (typeof window === 'undefined') {
+    return defaultPlannerPreferences(m2InitialPlan)
+  }
+
+  try {
+    return parsePlannerPreferences(
+      window.localStorage.getItem(plannerStorageKey),
+      m2InitialPlan,
+      validRecipeIds,
+    )
+  } catch {
+    return defaultPlannerPreferences(m2InitialPlan)
+  }
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>('planner')
-  const [budget, setBudget] = useState(35)
-  const [activeDays, setActiveDays] = useState<string[]>(m2DefaultActiveDays)
-  const [plannedMeals, setPlannedMeals] = useState(() =>
-    m2InitialPlan.map((meal) => ({ ...meal })),
+  const [preferences, setPreferences] = useState(readPlannerPreferences)
+  const { budget, activeDays, recipeByDay } = preferences
+
+  const plannedMeals = useMemo(
+    () =>
+      m2InitialPlan.map((meal) => ({
+        ...meal,
+        recipeId: recipeByDay[meal.day] ?? meal.recipeId,
+      })),
+    [recipeByDay],
   )
 
   const basket = useMemo(
@@ -39,24 +68,40 @@ export function App() {
     [activeDays, plannedMeals],
   )
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      window.localStorage.setItem(
+        plannerStorageKey,
+        serializePlannerPreferences(preferences),
+      )
+    } catch {
+      // Strict privacy modes can deny storage; the active session remains usable.
+    }
+  }, [preferences])
+
   const toggleDay = (day: string) => {
-    setActiveDays((current) =>
-      current.includes(day)
-        ? current.filter((candidate) => candidate !== day)
-        : [...current, day],
-    )
+    setPreferences((current) => ({
+      ...current,
+      activeDays: current.activeDays.includes(day)
+        ? current.activeDays.filter((candidate) => candidate !== day)
+        : [...current.activeDays, day],
+    }))
   }
 
   const changeRecipe = (day: string, recipeId: string) => {
-    setPlannedMeals((current) =>
-      current.map((meal) => (meal.day === day ? { ...meal, recipeId } : meal)),
-    )
+    setPreferences((current) => ({
+      ...current,
+      recipeByDay: {
+        ...current.recipeByDay,
+        [day]: recipeId,
+      },
+    }))
   }
 
   const resetPlan = () => {
-    setBudget(35)
-    setActiveDays(m2DefaultActiveDays)
-    setPlannedMeals(m2InitialPlan.map((meal) => ({ ...meal })))
+    setPreferences(defaultPlannerPreferences(m2InitialPlan))
   }
 
   return (
@@ -77,7 +122,12 @@ export function App() {
             plannedMeals={plannedMeals}
             recipes={m2Recipes}
             basketTotalCents={basket.totalCents}
-            onBudgetChange={setBudget}
+            onBudgetChange={(nextBudget) =>
+              setPreferences((current) => ({
+                ...current,
+                budget: nextBudget,
+              }))
+            }
             onToggleDay={toggleDay}
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
