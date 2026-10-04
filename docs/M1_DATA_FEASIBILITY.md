@@ -191,9 +191,10 @@ This writes `evidence-summary.json` and cross-checks the evidence bundle by sour
 - each successful source has verified integrity and a fresh snapshot;
 - both supermarkets retain product + catalog + offers coverage;
 - each product page has an explicit sanitized decision: candidate or abstention;
-- no evidence document silently adds, removes or loses a source.
+- no evidence document silently adds, removes or loses a source;
+- the sanitized candidate index has the expected M1 milestone/count metadata, unique decisions, no candidate/abstention conflicts, and no decision IDs outside the manifest's product sources.
 
-A Product abstention is valid evidence: it means the generic parser did not guess. It does **not** prove a source-specific adapter can already extract the product. Adapter readiness also requires the manifest, inspection and freshness documents to be mutually consistent: unexpected extra source IDs or count mismatches cannot be adapter-ready even when every manifest source individually looks complete. When the evidence bundle is structurally complete, the next action becomes review of the exact live product candidates/raw captures followed by AH/PLUS-specific adapter implementation.
+A Product abstention is valid evidence: it means the generic parser did not guess. It does **not** prove a source-specific adapter can already extract the product. Adapter readiness also requires the manifest, inspection, freshness and sanitized-candidate index to be mutually consistent: unexpected extra source IDs, unexpected candidate decisions, duplicate/conflicting product decisions, candidate-index milestone/count drift, or source-count mismatches cannot be adapter-ready even when every manifest source individually looks complete. When the evidence bundle is structurally complete, the next action becomes review of the exact live product candidates/raw captures followed by AH/PLUS-specific adapter implementation.
 
 The command exits non-zero when the evidence bundle is not adapter-ready, making an incomplete live artifact a visible M1 failure rather than a manual interpretation problem.
 
