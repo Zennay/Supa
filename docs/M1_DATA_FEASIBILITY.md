@@ -153,3 +153,23 @@ The command writes `drift.json` into the current capture directory. It separates
 - the conservative Schema.org Product extraction contract changing.
 
 Volatile HTML hashes and application-json byte counts alone do **not** count as structural breakage. Structural/source-contract changes set `reviewRequired: true` and the CLI exits non-zero so a future repeated-ingestion job can fail visibly instead of silently trusting stale extraction assumptions.
+
+## Capture freshness evidence
+
+Every capture now emits `freshness.json` with:
+
+- capture age per source;
+- configured maximum snapshot age (24 hours for the current M1 evidence policy);
+- HTTP status and capture success;
+- ETag / Last-Modified presence where the source supplies them;
+- informational age of Last-Modified when parseable;
+- explicit fresh / stale / failed state;
+- SHA-256 linkage back to the captured snapshot.
+
+Run manually with:
+
+```bash
+npm run m1:evaluate-freshness -- <capture-directory> [--max-age-hours 24]
+```
+
+The freshness gate is deliberately conservative about what HTTP metadata proves. A recent capture can pass without ETag or Last-Modified, but missing upstream validators are recorded explicitly. Conversely, a recent Last-Modified header does not rescue an old local capture. The current M1 policy treats capture age as the operational freshness gate; source headers are supporting evidence only.
