@@ -5,7 +5,9 @@ on:
     paths:
       - "src/App.tsx"
       - "src/domain/basket.ts"
+      - "src/domain/basketComparison.ts"
       - "src/data/m2Fixture.ts"
+      - "src/data/m3ComparisonFixture.ts"
       - "src/features/planner/**"
       - "src/features/basket/**"
       - "src/features/shopping-list/**"
