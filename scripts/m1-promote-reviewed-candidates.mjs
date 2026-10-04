@@ -2,8 +2,27 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+const MAX_REVIEW_CLOCK_SKEW_MS = 5 * 60 * 1000
+
 function validIso(value) {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
+}
+
+function requireReviewChronology(candidate, approval, now = Date.now()) {
+  const capturedAt = Date.parse(candidate.source.capturedAt)
+  const reviewedAt = Date.parse(approval.reviewedAt)
+
+  if (reviewedAt < capturedAt) {
+    throw new Error(
+      `Candidate ${candidate.source.id} review cannot predate its capture`,
+    )
+  }
+
+  if (reviewedAt > now + MAX_REVIEW_CLOCK_SKEW_MS) {
+    throw new Error(
+      `Candidate ${candidate.source.id} review timestamp is implausibly in the future`,
+    )
+  }
 }
 
 function requireExactApproval(candidate, approval) {
@@ -38,6 +57,8 @@ function requireExactApproval(candidate, approval) {
       `Candidate ${candidate.source.id} approval must include valid reviewedAt`,
     )
   }
+
+  requireReviewChronology(candidate, approval)
 }
 
 function fixtureFromCandidate(candidate, approval) {
