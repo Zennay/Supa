@@ -7,7 +7,9 @@ on:
       - "scripts/m3-assess-observed-week.mjs"
       - "src/domain/observedBasketStudy.ts"
       - "src/domain/basketComparison.ts"
+      - "src/domain/savingsAttribution.ts"
       - "tests/m3-observed-study-report.test.mjs"
+      - "tests/m3-savings-attribution.test.mjs"
       - "package.json"
   workflow_dispatch:
 
