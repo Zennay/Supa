@@ -215,10 +215,11 @@ function restoreStoreObservation(
   if (!isRecord(value) || !isRecord(value.store) || !Array.isArray(value.lines)) {
     return null
   }
-  if (value.lines.length !== canonical.lines.length) return null
+  const rawLines = value.lines
+  if (rawLines.length !== canonical.lines.length) return null
 
   const lines = canonical.lines.map((expectedLine, index) => {
-    const line = value.lines[index]
+    const line = rawLines[index]
     if (!isRecord(line) || !isRecord(line.requirement) || !isRecord(line.observedProduct)) {
       return null
     }
