@@ -15,6 +15,10 @@ on:
       - "package.json"
   workflow_dispatch:
 
+concurrency:
+  group: supa-m3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
