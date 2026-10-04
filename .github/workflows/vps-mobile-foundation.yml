@@ -12,6 +12,7 @@ on:
       - "src/domain/planner.ts"
       - "src/domain/plannerPreferences.ts"
       - "src/domain/basket.ts"
+      - "src/domain/basketComparison.ts"
       - "src/domain/matching.ts"
       - "src/domain/types.ts"
       - "src/data/mock.ts"
@@ -19,6 +20,7 @@ on:
       - "src/lib/**"
       - "tests/planner*.test.*"
       - "tests/m2-core-slice.test.mjs"
+      - "tests/m3-*.test.mjs"
 
 concurrency:
   group: supa-vps-mobile-${{ github.event.pull_request.number || github.ref }}
