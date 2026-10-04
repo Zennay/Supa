@@ -95,3 +95,14 @@ test('invalid offer mechanics fail closed instead of entering savings math', () 
     })
   }
 })
+
+test('invalid zero-sized pack text fails closed instead of producing structured quantity', () => {
+  for (const input of ['0 g', '0 x 1 l', '6 x 0 ml']) {
+    assert.deepEqual(normalizePackText(input), {
+      rawText: input,
+      count: 1,
+      amount: null,
+      unit: 'unknown',
+    })
+  }
+})
