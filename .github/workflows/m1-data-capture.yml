@@ -16,6 +16,8 @@ on:
       - "package.json"
       - "src/data/ingestion.ts"
       - "src/data/normalize.ts"
+      - "src/data/schemaOrgProduct.ts"
+      - "tests/schema-org-product.test.mjs"
       - ".github/workflows/m1-data-capture.yml"
       - "docs/M1_DATA_FEASIBILITY.md"
   workflow_dispatch:
