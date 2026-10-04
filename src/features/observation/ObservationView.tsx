@@ -1,3 +1,4 @@
+import './ObservationView.css'
 import { useMemo, useState } from 'react'
 import {
   buildObservationSheet,
