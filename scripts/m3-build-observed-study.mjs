@@ -7,6 +7,7 @@ import { validateObservedWeekInput } from './m3-assess-observed-week.mjs'
 import { buildObservationSheet } from './m3-create-observation-sheet.mjs'
 
 const ALLOWED_SOURCES = new Set(['manual-cart', 'receipt', 'consented-export'])
+const ALLOWED_PRICE_CONTEXTS = new Set(['in-store', 'online-order'])
 const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
 
 function assert(condition, message) {
@@ -278,6 +279,10 @@ export function buildWeeklyBasketStudyFromObservationSheet(sheet) {
   requireString(sheet.study.population, 'sheet.study.population')
   requireString(sheet.study.region, 'sheet.study.region')
   requireString(sheet.study.weekStart, 'sheet.study.weekStart')
+  assert(
+    ALLOWED_PRICE_CONTEXTS.has(sheet.study.priceContext),
+    'sheet.study.priceContext must be in-store or online-order',
+  )
 
   const study = {
     schemaVersion: 1,
@@ -286,6 +291,7 @@ export function buildWeeklyBasketStudyFromObservationSheet(sheet) {
     population: sheet.study.population.trim(),
     region: sheet.study.region.trim(),
     weekStart: sheet.study.weekStart.trim(),
+    priceContext: sheet.study.priceContext,
     baseline: buildObservedBasket(sheet.baseline, canonical, 'baseline'),
     candidate: buildObservedBasket(sheet.candidate, canonical, 'candidate'),
   }

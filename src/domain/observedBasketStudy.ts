@@ -9,6 +9,8 @@ import {
   type SavingsAttributionEvidence,
 } from './savingsAttribution.ts'
 
+export type ObservedBasketPriceContext = 'in-store' | 'online-order'
+
 export type ObservedBasketSource =
   | 'manual-cart'
   | 'receipt'
@@ -29,6 +31,7 @@ export type WeeklyBasketStudy = {
   population: string
   region: string
   weekStart: string
+  priceContext: ObservedBasketPriceContext
   baseline: ObservedBasketEvidence
   candidate: ObservedBasketEvidence
   attributionEvidence?: SavingsAttributionEvidence[]
@@ -116,6 +119,9 @@ export function assessWeeklyBasketStudy(
   }
   if (!DATE_PATTERN.test(study.weekStart) || Number.isNaN(Date.parse(study.weekStart))) {
     reasons.push('weekStart must be a valid YYYY-MM-DD date')
+  }
+  if (!['in-store', 'online-order'].includes(study.priceContext)) {
+    reasons.push('priceContext must be in-store or online-order')
   }
 
   reasons.push(...validateEvidence('baseline', study.baseline))
