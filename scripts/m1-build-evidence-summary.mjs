@@ -45,7 +45,7 @@ function candidateIndex(index) {
     .filter((id) => isSafeSourceId(id))
   const abstentionIds = abstentionItems
     .map((item) => item?.id)
-    .filter((id) => typeof id === 'string' && id.length > 0)
+    .filter((id) => isSafeSourceId(id))
 
   return {
     candidates: new Set(candidateIds),
