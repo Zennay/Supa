@@ -163,6 +163,13 @@ export function parseSchemaOrgProduct(
   }
 
   const price = extractPrice(offers)
+  if (price !== null && currency === null) {
+    return {
+      type: 'abstain',
+      reason: 'Product JSON-LD priced offer has no explicit currency',
+    }
+  }
+
   const observation: RawProductObservation = {
     supermarket: provenance.supermarket,
     sourceProductId: extractSourceProductId(product),
@@ -175,8 +182,17 @@ export function parseSchemaOrgProduct(
     provenance,
   }
 
-  return {
-    type: 'observation',
-    observation: validateRawProductObservation(observation),
+  try {
+    return {
+      type: 'observation',
+      observation: validateRawProductObservation(observation),
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'unknown validation failure'
+    return {
+      type: 'abstain',
+      reason: `Product JSON-LD observation failed trust validation: ${message}`,
+    }
   }
 }
