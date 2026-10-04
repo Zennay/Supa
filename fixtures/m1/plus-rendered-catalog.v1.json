@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "evidenceType": "plus-browser-rendered-catalog",
+  "source": {
+    "id": "plus-rendered-catalog",
+    "supermarket": "plus",
+    "kind": "catalog",
+    "url": "https://www.plus.nl/producten",
+    "capturedAt": "2026-10-04T18:53:02.645Z",
+    "sha256": "96c4426306753c4f1c9fd337c9bbc49e959e3c47662c9ca9f501d3f56faf3c72"
+  },
+  "browserEvidence": {
+    "runId": 37226107225,
+    "artifactId": 11312390194,
+    "artifactDigest": "sha256:90ea9ef3dabdb97f067a9f8a37f3113db1bc50b2b045bc503a9ae08b9eec8985",
+    "supaSha": "2378d34e36ed199505bd3a535458d7869a3a5b4e",
+    "browser": "Firefox 157.0",
+    "driver": "geckodriver 0.37.1",
+    "selectorContract": {
+      "cardAnchor": "a[href^=\"/product/\"]",
+      "catalogBlock": "ProductList.ProductItem",
+      "offersBlock": "PromotionListFlow.OfferItem",
+      "name": ".plp-item-name h3 span[data-expression]",
+      "pack": ".plp-item-complementary span[data-expression]",
+      "priceInteger": ".product-header-price-integer",
+      "priceDecimals": ".product-header-price-decimals",
+      "previousPrice": ".product-header-price-previous"
+    },
+    "safety": {
+      "login": false,
+      "credentials": false,
+      "privateApiCalls": false,
+      "networkInterception": false,
+      "antiBotBypass": false,
+      "recursiveCrawl": false,
+      "targetCount": 2
+    },
+    "renderedHtmlSha256": "96c4426306753c4f1c9fd337c9bbc49e959e3c47662c9ca9f501d3f56faf3c72",
+    "renderedHtmlBytes": 1558525,
+    "screenshotBytes": 196302,
+    "observedProductLinkCount": 12
+  },
+  "cards": [
+    {
+      "block": "ProductList.ProductItem",
+      "href": "/product/plus-bananen-fairtrade-kg-1000-g-113651",
+      "name": "PLUS Bananen Fairtrade",
+      "packText": "Per 1000 gram",
+      "priceInteger": "2.",
+      "priceDecimals": "29",
+      "previousPriceText": ""
+    },
+    {
+      "block": "ProductList.ProductItem",
+      "href": "/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010",
+      "name": "Zuivelmeester Halfvolle melk",
+      "packText": "Per 1000 ml",
+      "priceInteger": "0.",
+      "priceDecimals": "85",
+      "previousPriceText": ""
+    },
+    {
+      "block": "ProductList.ProductItem",
+      "href": "/product/zuivelmeester-halfvolle-melk-can-2000-ml-145701",
+      "name": "Zuivelmeester Halfvolle melk",
+      "packText": "Per 2000 ml",
+      "priceInteger": "1.",
+      "priceDecimals": "69",
+      "previousPriceText": ""
+    },
+    {
+      "block": "ProductList.ProductItem",
+      "href": "/product/zuivelmeester-karnemelk-pak-1000-ml-579021",
+      "name": "Zuivelmeester Karnemelk",
+      "packText": "Per 1000 ml",
+      "priceInteger": "0.",
+      "priceDecimals": "92",
+      "previousPriceText": ""
+    }
+  ]
+}
