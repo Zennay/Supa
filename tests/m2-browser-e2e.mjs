@@ -215,6 +215,35 @@ try {
   observationText = await waitForText(sessionId, 'details aanvullen')
   assert.match(observationText, /0\/22 regels compleet/)
 
+  const staleDetailsCleared = await execute(
+    sessionId,
+    `
+      const line = document.querySelector('[data-observation-line="rice"]')
+      const select = document.querySelector(
+        'select[aria-label="baseline Basmati rijst beschikbaar"]',
+      )
+      const productName = line?.querySelector('input[placeholder="Exacte productnaam"]')
+      if (!select || !productName) return false
+
+      productName.value = 'Temporary observed product'
+      productName.dispatchEvent(new Event('input', { bubbles: true }))
+      productName.dispatchEvent(new Event('change', { bubbles: true }))
+
+      select.value = 'false'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+      select.value = 'true'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+
+      const restoredName = line.querySelector('input[placeholder="Exacte productnaam"]')
+      return restoredName?.value === ''
+    `,
+  )
+  assert.equal(
+    staleDetailsCleared,
+    true,
+    'M3 availability reset retained stale observed product details',
+  )
+
   const observationChanged = await execute(
     sessionId,
     `
