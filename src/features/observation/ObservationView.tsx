@@ -14,7 +14,10 @@ import {
 } from '../../domain/m3ObservationSheet.ts'
 
 type Side = 'baseline' | 'candidate'
-type StudyTextField = Exclude<keyof ObservationSheet['study'], 'maxObservationWindowHours'>
+type StudyTextField = Exclude<
+  keyof ObservationSheet['study'],
+  'maxObservationWindowHours' | 'priceContext'
+>
 
 const sideLabels: Record<Side, string> = {
   baseline: 'Winkel A · baseline',
@@ -117,6 +120,18 @@ export function ObservationView() {
       study: {
         ...current.study,
         [field]: value,
+      },
+    }))
+  }
+
+  const updatePriceContext = (
+    value: ObservationSheet['study']['priceContext'],
+  ) => {
+    setSheet((current) => ({
+      ...current,
+      study: {
+        ...current.study,
+        priceContext: value,
       },
     }))
   }
@@ -312,6 +327,21 @@ export function ObservationView() {
               onChange={(event) => updateStudy('region', event.target.value)}
               placeholder="Leiden"
             />
+          </label>
+          <label>
+            Prijscontext
+            <select
+              value={sheet.study.priceContext}
+              onChange={(event) =>
+                updatePriceContext(
+                  event.target.value as ObservationSheet['study']['priceContext'],
+                )
+              }
+            >
+              <option value="">Kies dezelfde context voor beide winkels</option>
+              <option value="in-store">In de winkel</option>
+              <option value="online-order">Online bestelling</option>
+            </select>
           </label>
           <label>
             Week start
