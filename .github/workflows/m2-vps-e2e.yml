@@ -1,0 +1,96 @@
+name: M2 browser vertical slice
+
+on:
+  pull_request:
+    paths:
+      - "src/App.tsx"
+      - "src/domain/basket.ts"
+      - "src/data/m2Fixture.ts"
+      - "src/features/planner/**"
+      - "src/features/basket/**"
+      - "src/features/shopping-list/**"
+      - "tests/m2-browser-e2e.mjs"
+      - ".github/workflows/m2-vps-e2e.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: supa-m2-browser-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  browser-e2e:
+    runs-on: self-hosted
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify permanent VPS browser route
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "vps-bb300bba"
+          test -x /usr/bin/firefox
+          command -v geckodriver
+          firefox --version
+          geckodriver --version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run unit and domain regressions
+        run: npm test
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Run rendered M2 planner-to-list browser proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/m2-browser-e2e
+
+          npm run preview -- --host 127.0.0.1 --port 4173             >artifacts/m2-browser-e2e/vite-preview.log 2>&1 &
+          preview_pid=$!
+
+          geckodriver --port 4444 --log debug             >artifacts/m2-browser-e2e/geckodriver.log 2>&1 &
+          driver_pid=$!
+
+          cleanup() {
+            kill "$preview_pid" "$driver_pid" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:4173 >/dev/null
+
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4444/status >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:4444/status             >artifacts/m2-browser-e2e/webdriver-status.json
+
+          M2_BASE_URL=http://127.0.0.1:4173           WEBDRIVER_URL=http://127.0.0.1:4444           M2_E2E_ARTIFACT_DIR=artifacts/m2-browser-e2e             node tests/m2-browser-e2e.mjs
+
+      - name: Upload M2 browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supa-m2-browser-e2e
+          path: artifacts/m2-browser-e2e/
+          if-no-files-found: error
+          retention-days: 14
