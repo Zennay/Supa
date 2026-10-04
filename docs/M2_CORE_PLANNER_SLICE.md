@@ -32,6 +32,10 @@ The current slice connects the three existing mobile surfaces:
 5. **Shopping list**
    - generated from the same basket trace;
    - unresolved ingredients remain visible as manual-selection items.
+6. **Planner continuity**
+   - budget, active days and recipe choice per day persist locally as one v2 preference contract;
+   - malformed/stale storage fails back to the current controlled plan;
+   - an intentionally empty week remains empty instead of being silently repopulated.
 
 ## Default deterministic proof
 
@@ -49,7 +53,9 @@ The default basket is intentionally reproducible:
   another spice.
 
 Changing the active days or recipe selection recalculates the same basket and
-shopping-list state.
+shopping-list state. The complete selected week is restored after a reload when
+browser storage is available; strict privacy/storage failures leave the current
+session usable.
 
 ## Exit criteria still open
 
