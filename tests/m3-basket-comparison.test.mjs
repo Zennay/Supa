@@ -22,13 +22,20 @@ const candidateStore = {
   name: 'M3 candidate store',
 }
 
-function productsForStore(storeId, priceDeltaCents = 0) {
+function productsForStore(
+  storeId,
+  priceDeltaCents = 0,
+  priceKind = 'unknown',
+) {
   return [
     ...m2Products.map((product) => ({
       ...product,
       id: `${storeId}-${product.id}`,
       storeId,
       priceCents: Math.max(0, product.priceCents + priceDeltaCents),
+      priceKind,
+      regularPriceCents:
+        priceKind === 'offer' ? product.priceCents : null,
     })),
     {
       id: `${storeId}-garam-50`,
@@ -38,17 +45,24 @@ function productsForStore(storeId, priceDeltaCents = 0) {
       packUnit: 'g',
       available: true,
       priceCents: 139 + priceDeltaCents,
+      priceKind,
+      regularPriceCents: priceKind === 'offer' ? 139 : null,
     },
   ]
 }
 
-function buildCompleteBasket(store, priceDeltaCents = 0, activeDays = m2DefaultActiveDays) {
+function buildCompleteBasket(
+  store,
+  priceDeltaCents = 0,
+  activeDays = m2DefaultActiveDays,
+  priceKind = 'unknown',
+) {
   return buildOneStoreBasket({
     store,
     plan: m2InitialPlan,
     recipes: m2Recipes,
     activeDays,
-    products: productsForStore(store.id, priceDeltaCents),
+    products: productsForStore(store.id, priceDeltaCents, priceKind),
   })
 }
 
@@ -69,6 +83,8 @@ test('M3 compares the same complete basket against an explicit baseline', () => 
     baseline.totalCents - candidate.totalCents,
   )
   assert.equal(comparison.lineDeltas.length, baseline.matchedLineCount)
+  assert.equal(comparison.attribution.fullyAttributed, false)
+  assert.equal(comparison.attribution.unknownCents, comparison.deltaCents)
   assert.deepEqual(comparison.reasons, [])
 })
 
@@ -138,4 +154,80 @@ test('M3 records a neutral result when comparable baskets cost the same', () => 
   assert.equal(comparison.outcome, 'same')
   assert.equal(comparison.deltaCents, 0)
   assert.equal(comparison.savingsCents, 0)
+})
+
+
+test('M3 attributes a trusted same-pack discount to offers', () => {
+  const baseline = buildCompleteBasket(
+    baselineStore,
+    0,
+    m2DefaultActiveDays,
+    'regular',
+  )
+  const candidate = buildCompleteBasket(
+    candidateStore,
+    -10,
+    m2DefaultActiveDays,
+    'offer',
+  )
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, true)
+  assert.equal(comparison.outcome, 'better')
+  assert.equal(comparison.attribution.fullyAttributed, true)
+  assert.equal(comparison.attribution.packSizeCents, 0)
+  assert.equal(comparison.attribution.planningCents, 0)
+  assert.equal(comparison.attribution.offerCents, comparison.deltaCents)
+  assert.equal(comparison.attribution.unknownCents, 0)
+})
+
+test('M3 attributes same-unit-price overspend to pack size', () => {
+  const baselineProducts = productsForStore(
+    baselineStore.id,
+    0,
+    'regular',
+  )
+  const candidateProducts = productsForStore(
+    candidateStore.id,
+    0,
+    'regular',
+  ).map((product) =>
+    product.id.endsWith('basmati-1kg')
+      ? {
+          ...product,
+          name: 'Basmati rijst 2 kg',
+          packAmount: 2,
+          packUnit: 'kg',
+          priceCents: 498,
+          regularPriceCents: 498,
+        }
+      : product,
+  )
+
+  const baseline = buildOneStoreBasket({
+    store: baselineStore,
+    plan: m2InitialPlan,
+    recipes: m2Recipes,
+    activeDays: m2DefaultActiveDays,
+    products: baselineProducts,
+  })
+  const candidate = buildOneStoreBasket({
+    store: candidateStore,
+    plan: m2InitialPlan,
+    recipes: m2Recipes,
+    activeDays: m2DefaultActiveDays,
+    products: candidateProducts,
+  })
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, true)
+  assert.equal(comparison.outcome, 'worse')
+  assert.equal(comparison.deltaCents, 249)
+  assert.equal(comparison.attribution.fullyAttributed, true)
+  assert.equal(comparison.attribution.packSizeCents, 249)
+  assert.equal(comparison.attribution.offerCents, 0)
+  assert.equal(comparison.attribution.planningCents, 0)
+  assert.equal(comparison.attribution.unknownCents, 0)
 })
