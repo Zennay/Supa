@@ -1,0 +1,29 @@
+name: Diagnose zCloud control plane now
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/zcloud-control-diagnose-now.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, supa, vps]
+    timeout-minutes: 2
+    steps:
+      - name: Read zCloud service state
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "vps-bb300bba"
+          echo "=== SERVICE ==="
+          sudo -n systemctl --no-pager --full status zennay-cloud.service || true
+          echo "=== JOURNAL ==="
+          sudo -n journalctl -u zennay-cloud.service -n 220 --no-pager || true
+          echo "=== API ==="
+          curl -fsS --max-time 4 http://127.0.0.1:8765/api/runner-targets || true
+          echo
+          echo "=== DEPLOY FILES ==="
+          ls -l /home/ubuntu/zennay-cloud/project_runtime.py /home/ubuntu/zennay-cloud/lane_generator.py /home/ubuntu/zennay-cloud/server.py || true
