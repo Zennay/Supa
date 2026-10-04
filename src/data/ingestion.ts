@@ -1,4 +1,4 @@
-export type SupermarketId = 'ah' | 'plus'
+export type SupermarketId = 'ah' | 'plus' | 'dekamarkt'
 
 export type SourcePageKind = 'product' | 'catalog' | 'offers'
 
@@ -49,6 +49,7 @@ export type RawProductObservation = {
 const HOST_BY_SUPERMARKET: Record<SupermarketId, string> = {
   ah: 'www.ah.nl',
   plus: 'www.plus.nl',
+  dekamarkt: 'www.dekamarkt.nl',
 }
 
 const SOURCE_PAGE_KINDS = new Set<SourcePageKind>([
@@ -74,7 +75,7 @@ const AVAILABILITY_VALUES = new Set([
 ])
 
 function isSupermarketId(value: unknown): value is SupermarketId {
-  return value === 'ah' || value === 'plus'
+  return value === 'ah' || value === 'plus' || value === 'dekamarkt'
 }
 
 function validIso(value: unknown): value is string {
