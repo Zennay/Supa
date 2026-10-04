@@ -101,24 +101,27 @@ export function attributeSavingsEffects({
       continue
     }
 
-    if (item.effect === 'planning' && item.deltaCents !== 0) {
+    const validatedItem = item as SavingsAttributionEvidence
+
+    if (validatedItem.effect === 'planning' && validatedItem.deltaCents !== 0) {
       reasons.push(
-        `planning attribution must be zero for same-demand basket comparisons: ${item.lineId}`,
+        `planning attribution must be zero for same-demand basket comparisons: ${validatedItem.lineId}`,
       )
       continue
     }
 
-    const lineDelta = lineById.get(item.lineId)!.deltaCents
+    const lineDelta = lineById.get(validatedItem.lineId)!.deltaCents
     if (
-      (lineDelta > 0 && item.deltaCents < 0) ||
-      (lineDelta < 0 && item.deltaCents > 0) ||
-      (lineDelta === 0 && item.deltaCents !== 0)
+      (lineDelta > 0 && validatedItem.deltaCents < 0) ||
+      (lineDelta < 0 && validatedItem.deltaCents > 0) ||
+      (lineDelta === 0 && validatedItem.deltaCents !== 0)
     ) {
-      reasons.push(`attribution direction conflicts with line delta for ${item.lineId}`)
+      reasons.push(
+        `attribution direction conflicts with line delta for ${validatedItem.lineId}`,
+      )
       continue
     }
 
-    const validatedItem = item as SavingsAttributionEvidence
     const current = evidenceByLine.get(validatedItem.lineId) ?? []
     current.push(validatedItem)
     evidenceByLine.set(validatedItem.lineId, current)
