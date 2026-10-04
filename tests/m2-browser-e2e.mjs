@@ -181,6 +181,68 @@ try {
     observed: 'manual-choice shopping-list row remains usable as a checklist item',
   })
 
+  await clickNav(sessionId, 'Planner')
+  await waitForText(sessionId, 'Plan eerst. Bespaar daarna.')
+
+  const changedPreferences = await execute(
+    sessionId,
+    `
+      const dayButton = document.querySelector('button[aria-label="Do uit planning halen"]')
+      const budgetButton = [...document.querySelectorAll('.budget-chip')]
+        .find((candidate) => candidate.textContent?.includes('40'))
+      if (!dayButton || !budgetButton) return false
+      dayButton.click()
+      budgetButton.click()
+      return true
+    `,
+  )
+  assert.equal(changedPreferences, true, 'planner preferences could not be changed')
+  let preferenceText = await waitForText(sessionId, '3 maaltijden actief')
+  preferenceText = await waitForText(sessionId, '16,52')
+  assert.match(preferenceText, /40,00/)
+  evidence.checks.push({
+    step: 'planner-preferences-change',
+    passed: true,
+    observed:
+      'Tuesday pasta + disabled Thursday recalculated the shared basket to EUR 16.52 while budget changed to EUR 40',
+  })
+
+  await request(`/session/${sessionId}/url`, {
+    method: 'POST',
+    body: JSON.stringify({ url: baseUrl }),
+  })
+
+  let restoredText = await waitForText(sessionId, '3 maaltijden actief')
+  restoredText = await waitForText(sessionId, '16,52')
+  assert.match(restoredText, /40,00/)
+
+  const restored = await execute(
+    sessionId,
+    `
+      return {
+        recipeDi: document.getElementById('recipe-Di')?.value || null,
+        thursdayInactive: Boolean(
+          document.querySelector('button[aria-label="Do aan planning toevoegen"]'),
+        ),
+        budget: document.getElementById('weekbudget-title')?.textContent || null,
+        stored: window.localStorage.getItem('supa:planner-preferences:v2'),
+      }
+    `,
+  )
+
+  assert.equal(restored.recipeDi, 'pasta')
+  assert.equal(restored.thursdayInactive, true)
+  assert.match(restored.budget || '', /40,00/)
+  assert.match(restored.stored || '', /"budget":40/)
+  assert.match(restored.stored || '', /"Di":"pasta"/)
+  await screenshot(sessionId, 'planner-reloaded.png')
+  evidence.checks.push({
+    step: 'planner-preferences-reload',
+    passed: true,
+    observed:
+      'reload restored budget EUR 40, Tuesday pasta, Thursday inactive and the resulting EUR 16.52 basket-backed planner total',
+  })
+
   evidence.passed = true
   await writeFile(
     path.join(artifactDir, 'result.json'),

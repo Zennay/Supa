@@ -32,6 +32,10 @@ The current slice connects the three existing mobile surfaces:
 5. **Shopping list**
    - generated from the same basket trace;
    - unresolved ingredients remain visible as manual-selection items.
+6. **Planner continuity**
+   - budget, active days and recipe choice per day persist as one local v2 preference contract;
+   - malformed/stale storage fails back to current valid defaults;
+   - an intentionally empty week stays empty.
 
 ## Default deterministic proof
 
@@ -49,10 +53,14 @@ The default basket is intentionally reproducible:
   another spice.
 
 Changing the active days or recipe selection recalculates the same basket and
-shopping-list state.
+shopping-list state. The permanent-VPS Firefox proof also reloads the app and
+checks that budget, active days, recipe choices and the resulting basket-backed
+planner total are restored from the same persisted week.
 
 ## Exit criteria still open
 
-This increment proves the connected calculation spine. Full M2 closure still
-requires checking the complete interaction locally and deciding whether the
-current controlled recipe set is enough for the milestone usability proof.
+M2 is ready for milestone closure when the permanent-VPS Firefox workflow is
+green on the exact head: it exercises recipe choice, basket recalculation,
+visible abstention, shopping-list interaction and persisted planner state after
+reload. The controlled fixture remains a proof harness, not a live-price or
+savings claim.
