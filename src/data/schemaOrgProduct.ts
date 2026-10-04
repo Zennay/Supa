@@ -5,7 +5,7 @@ import type {
   SourceSnapshotRef,
 } from './ingestion.ts'
 import { validateRawProductObservation } from './ingestion.ts'
-import { normalizeMoneyToCents } from './normalize.ts'
+import { normalizeMoneyToCents, normalizePackText } from './normalize.ts'
 
 type JsonObject = Record<string, unknown>
 
@@ -64,16 +64,32 @@ function uniqueKnown<T>(values: T[]): T | null {
   return unique.length === 1 ? unique[0] : null
 }
 
+function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
+  const raw = offer.priceSpecification
+  const values = Array.isArray(raw) ? raw : raw == null ? [] : [raw]
+  return values.filter((value): value is JsonObject => isObject(value))
+}
+
 function extractPrice(offers: JsonObject[]): number | null {
   const prices = offers
-    .map((offer) => cents(offer.price ?? offer.lowPrice))
+    .flatMap((offer) => [
+      cents(offer.price ?? offer.lowPrice),
+      ...priceSpecificationCandidates(offer).map((specification) =>
+        cents(specification.price ?? specification.lowPrice),
+      ),
+    ])
     .filter((value): value is number => value !== null)
   return uniqueKnown(prices)
 }
 
 function extractCurrency(offers: JsonObject[]): string | null {
   const currencies = offers
-    .map((offer) => asString(offer.priceCurrency))
+    .flatMap((offer) => [
+      asString(offer.priceCurrency),
+      ...priceSpecificationCandidates(offer).map((specification) =>
+        asString(specification.priceCurrency),
+      ),
+    ])
     .filter((value): value is string => Boolean(value))
     .map((value) => value.toUpperCase())
   return uniqueKnown(currencies)
@@ -111,6 +127,23 @@ function unknownPack(): RawPack {
     rawText: null,
     amount: null,
     unit: 'unknown',
+  }
+}
+
+function extractPack(product: JsonObject): RawPack {
+  const weight = isObject(product.weight) ? product.weight : null
+  const rawValue = weight ? asString(weight.value) : null
+  if (!rawValue) return unknownPack()
+
+  const normalized = normalizePackText(rawValue)
+  if (normalized.amount === null || normalized.unit === 'unknown') {
+    return unknownPack()
+  }
+
+  return {
+    rawText: normalized.rawText,
+    amount: normalized.amount,
+    unit: normalized.unit,
   }
 }
 
@@ -176,7 +209,7 @@ export function parseSchemaOrgProduct(
     name,
     currentPriceCents: price,
     currency: 'EUR',
-    pack: unknownPack(),
+    pack: extractPack(product),
     offer: buildOffer(offers, price),
     availability: extractAvailability(offers),
     provenance,
