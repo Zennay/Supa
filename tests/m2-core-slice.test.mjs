@@ -27,13 +27,12 @@ test('M2 default plan produces a reproducible one-store basket with visible unce
   assert.equal(basket.totalCents, 3008)
   assert.equal(basket.matchedLineCount, 10)
   assert.equal(basket.unresolvedLineCount, 1)
-  assert.deepEqual(getBudgetState(basket.totalCents / 100, 35), {
-    plannedCost: 30.08,
-    budget: 35,
-    remaining: 4.920000000000002,
-    usage: 30.08 / 35,
-    overBudget: false,
-  })
+  const budgetState = getBudgetState(basket.totalCents / 100, 35)
+  assert.equal(budgetState.plannedCost, 30.08)
+  assert.equal(budgetState.budget, 35)
+  assert.ok(Math.abs(budgetState.remaining - 4.92) < 1e-9)
+  assert.ok(Math.abs(budgetState.usage - 30.08 / 35) < 1e-12)
+  assert.equal(budgetState.overBudget, false)
 
   const unresolved = basket.lines.find((line) => line.id === 'garam-masala')
   assert.ok(unresolved)
