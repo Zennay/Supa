@@ -33,6 +33,31 @@ export type ObservedProduct = {
   note: string
 }
 
+function blankObservedProduct(
+  available: ObservedProduct['available'] = null,
+): ObservedProduct {
+  return {
+    productId: '',
+    productName: '',
+    packAmount: null,
+    packUnit: null,
+    packCount: 1,
+    priceCents: null,
+    available,
+    sourceUrl: '',
+    note: '',
+  }
+}
+
+export function withObservedProductAvailability(
+  product: ObservedProduct,
+  available: ObservedProduct['available'],
+): ObservedProduct {
+  return available === true
+    ? { ...product, available: true }
+    : blankObservedProduct(available)
+}
+
 export type StoreObservation = {
   evidenceId: string
   observedAt: string
@@ -93,17 +118,7 @@ function blankStoreObservation(
         amount: requirement.amount,
         unit: requirement.unit,
       },
-      observedProduct: {
-        productId: '',
-        productName: '',
-        packAmount: null,
-        packUnit: null,
-        packCount: 1,
-        priceCents: null,
-        available: null,
-        sourceUrl: '',
-        note: '',
-      },
+      observedProduct: blankObservedProduct(),
     })),
   }
 }
@@ -251,22 +266,25 @@ function restoreStoreObservation(
 
     return {
       ...expectedLine,
-      observedProduct: {
-        productId: stringOrBlank(product.productId),
-        productName: stringOrBlank(product.productName),
-        packAmount: optionalNonNegativeNumber(product.packAmount),
-        packUnit: restoredPackUnit(product.packUnit),
-        packCount,
-        priceCents:
-          typeof product.priceCents === 'number' &&
-          Number.isInteger(product.priceCents) &&
-          product.priceCents >= 0
-            ? product.priceCents
-            : null,
-        available,
-        sourceUrl: stringOrBlank(product.sourceUrl),
-        note: stringOrBlank(product.note),
-      },
+      observedProduct:
+        available === true
+          ? {
+              productId: stringOrBlank(product.productId),
+              productName: stringOrBlank(product.productName),
+              packAmount: optionalNonNegativeNumber(product.packAmount),
+              packUnit: restoredPackUnit(product.packUnit),
+              packCount,
+              priceCents:
+                typeof product.priceCents === 'number' &&
+                Number.isInteger(product.priceCents) &&
+                product.priceCents >= 0
+                  ? product.priceCents
+                  : null,
+              available: true,
+              sourceUrl: stringOrBlank(product.sourceUrl),
+              note: stringOrBlank(product.note),
+            }
+          : blankObservedProduct(available),
     }
   })
 
