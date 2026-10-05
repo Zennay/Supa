@@ -201,7 +201,7 @@ No decision rule overrides the M3 evidence gate or retailer-data permission cons
 ## Execution checklist after M3 closes
 
 - lock protocol version and event vocabulary;
-- prepare participant consent + privacy wording;
+- prepare participant consent + privacy wording using `docs/research/2026-10-05-m4-participant-consent-pack.md`;
 - implement only the instrumentation needed by this protocol;
 - dry-run one internal synthetic session to verify event completeness;
 - recruit target students;
@@ -210,6 +210,12 @@ No decision rule overrides the M3 evidence gate or retailer-data permission cons
 - synthesize quantitative + qualitative evidence;
 - update M4 issue/Notion with the bounded decision.
 
+
+## Participant preparation pack
+
+The gated screener, participant-information wording, consent checklist, pseudonymous enrolment handoff and pre-recruitment go/no-go checklist are versioned in `docs/research/2026-10-05-m4-participant-consent-pack.md`.
+
+This does **not** make M4 eligible: recruitment and consent remain prohibited until PWQ-14 / AUD-003 is closed and the pre-recruitment checklist is green.
 
 ## Executable session contract
 
