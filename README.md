@@ -6,9 +6,21 @@ This repository now contains the first durable implementation baseline recovered
 
 ## Current product phase
 
-Validated concept → technical/outcome proof.
+**M3 — Full-basket comparison & savings proof.**
 
-The UI in this repository is a **foundation/prototype shell**, not proof that live prices, matching or savings are correct. The current proof gate remains supermarket data feasibility and normalization.
+M1 Data Feasibility and M2 Core Planner Vertical Slice are technically closed. The current proof gate is no longer missing comparator or collector code: SUPA now needs one genuine, same-demand **PLUS + DekaMarkt** basket observation pair, captured within 24 hours in one shared price context, and accepted by the existing converter + assessment path.
+
+The canonical exit action is tracked in [issue #78](https://github.com/Zennay/Supa/issues/78). Until that field run exposes a concrete failure, do not add more M3 collector features.
+
+The repository already contains the manual field-run entrypoint:
+
+```bash
+npm run m3:create-observation-sheet
+npm run m3:build-observed-study -- <collector.json> --output evidence/m3/<study>.json
+npm run m3:assess-observed-week -- evidence/m3/<study>.json --output artifacts/m3/<study>-assessment.json
+```
+
+Better, same, worse and unknown are all valid M3 outcomes. One observed week must not be generalized into a public savings claim.
 
 ## Stack
 
@@ -54,4 +66,6 @@ Preferences → weekly planner → smart reuse/combinations → complete basket 
 
 ## Important
 
-Do not treat mock prices or mock savings in the current UI as real product claims. Every future real price must carry source + observed-at metadata and every savings number needs an explicit baseline.
+Do not treat mock prices, mock savings or generated collection templates as real product claims or real-world evidence. Every future real price must carry source + observed-at metadata and every savings number needs an explicit baseline.
+
+Production automated retailer-data reuse remains separately permission-gated; a successful M3 field observation does not grant production scraping or licensing rights.
