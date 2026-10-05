@@ -118,15 +118,21 @@ Thank you.
 For each meaningful response, retain:
 - retailer/data owner;
 - date and channel;
-- responding person/team;
+- responding team (not personal contact details in Git);
 - exact scope discussed;
 - whether the answer covers product content, prices, promotions, availability, automation, or storage;
-- permission outcome: allowed / allowed with conditions / licensed route required / research-only / denied / unclear;
+- permission outcome: allowed / allowed with conditions / licensed route required / research-only / denied / unclear / routed;
 - any rate, retention, attribution, geography/store, or commercial constraints;
-- named next owner/contact if routed;
-- product/architecture/cost consequence for SUPA.
+- next owner/team if routed;
+- product/architecture/cost/source-strategy consequence for SUPA.
 
-Do not copy unnecessary personal information into the public repository.
+The repository-safe contract is executable through:
+
+```bash
+npm run aud005:record-retailer-response -- <private-sanitized-response.json> --output artifacts/aud005/<retailer>-response.json
+```
+
+The validator fails closed when required scope/consequence fields are missing, rejects direct PII-style keys and obvious email/phone content, and always marks generated records as ineligible for public product claims. Keep the original/raw correspondence in an approved private location; commit only the privacy-safe derived record.
 
 ## AUD-005 decision rule
 
