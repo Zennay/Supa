@@ -49,6 +49,26 @@ The validator and its tests are infrastructure for the M3 study. Synthetic regre
 
 ## Manual observation sheet
 
+### Canonical 11-line demand
+
+The field run must keep the current proven `m2-default-week` demand unchanged. The generated observation sheet is canonical, but the list is repeated here so a human collector can verify the run without reconstructing fixture logic:
+
+| Requirement | Amount |
+| --- | ---: |
+| Kippendij | 600 g |
+| Basmati rijst | 450 g |
+| Kokosmelk | 400 ml |
+| Bloemkool | 2 pieces |
+| Garam masala | 20 g |
+| Broccoli | 250 g |
+| Edamame | 150 g |
+| Teriyaki saus | 60 ml |
+| Spaghetti | 250 g |
+| Tomatenblokjes | 400 g |
+| Griekse yoghurt | 100 g |
+
+Treat this list as a collection cross-check only. Do not hand-edit the generated requirement IDs, quantities or units; the converter still requires an exact match with the canonical planner demand.
+
 Generate the exact aggregated demand for the current proven four-meal planner fixture before visiting or manually checking two stores:
 
 ```bash
