@@ -28,6 +28,7 @@ function validSession() {
       {
         type: 'beta_session_started',
         timestamp: '2026-10-10T10:00:00.000Z',
+        participant_id: 'p-001',
         study_week_id: 'week-001',
       },
       {
@@ -235,5 +236,16 @@ test('event timestamps must remain inside the recorded study window', () => {
   assert.throws(
     () => validateBetaSession(session),
     /events\[0\]\.timestamp must fall inside the session window/,
+  )
+})
+
+
+test('session start participant identity must match the pseudonymous participant key', () => {
+  const session = validSession()
+  session.events[0].participant_id = 'p-other'
+
+  assert.throws(
+    () => validateBetaSession(session),
+    /beta_session_started\.participant_id must match participantKey/,
   )
 })
