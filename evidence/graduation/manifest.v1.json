@@ -35,7 +35,9 @@
       "sourceCreatedAt": "2026-08-28T11:25:13Z",
       "archiveState": "library-reference-only",
       "retrievalKey": "Reflectie_Supa_Zennay_500858050.pdf",
-      "verificationNote": "The current Library backend exposes parsed content and stable metadata but does not authorize raw-byte materialization or server-side cloning for this Project file. Do not invent a byte hash; retrieve by exact filename and size until a byte-preserving copy route is available."
+      "lastRawByteVerificationAttemptAt": "2026-10-05T17:43:00Z",
+      "lastRawByteVerificationAttemptResult": "blocked-unauthorized-materialization",
+      "verificationNote": "Rechecked 2026-10-05: Library still resolves the exact 36,056-byte source file, but raw-byte materialization remains unauthorized. Do not invent a byte hash; retrieve by exact filename and size until a byte-preserving copy or materialization route is available."
     }
   ]
 }
