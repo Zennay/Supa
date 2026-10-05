@@ -19,30 +19,62 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 6
     steps:
-      - name: Stop lower-priority compute and start FTMO
+      - name: Repair FTMO governor access and start marathon
         shell: bash
         run: |
-          set -uo pipefail
-          echo "HOST=$(hostname -s)"
+          set -euo pipefail
           test "$(hostname -s)" = "vps-bb300bba"
 
-          echo "=== STOP RAISEAI ==="
+          echo "=== KEEP LOWER-PRIORITY COMPUTE OFF ==="
           sudo -n systemctl stop actions.runner.Zennay-RaiseAI.vps-bb300bba.service || true
           pkill -TERM -f '/home/ubuntu/actions-runner-raiseai/_work/RaiseAI/RaiseAI' || true
-
-          echo "=== PAUSE HAXLAB AUTO-ANALYZER RESTART + STOP ANALYZER ==="
           sudo -n systemctl stop haxlab-autonomy.timer || true
           sudo -n systemctl stop haxlab-analyzer.service || true
 
-          echo "=== CLEAN FTMO MARATHON START ==="
           SERVICE=ftmo-autonomous-marathon.service
+          FTMO_USER="$(systemctl show "$SERVICE" -p User --value)"
+          ZROOT=/home/ubuntu/zennay-cloud
+          echo "ftmo_service_user=$FTMO_USER"
+          test -n "$FTMO_USER"
+          command -v setfacl
+
+          echo "=== BEFORE ACL ==="
+          namei -l "$ZROOT/scripts/zcloud_governed_exec.py" || true
+          ls -l "$ZROOT"/history.db* "$ZROOT/project_runtime.py" "$ZROOT/project-contracts.json" 2>/dev/null || true
+
+          echo "=== MINIMAL FTMO ACL FOR ZCLOUD GOVERNOR ==="
+          sudo -n setfacl -m "u:$FTMO_USER:--x" /home/ubuntu
+          sudo -n setfacl -m "u:$FTMO_USER:r-x" "$ZROOT"
+          sudo -n setfacl -m "u:$FTMO_USER:r-x" "$ZROOT/scripts"
+          sudo -n setfacl -m "u:$FTMO_USER:r--" "$ZROOT/scripts/zcloud_governed_exec.py"
+          sudo -n setfacl -m "u:$FTMO_USER:r--" "$ZROOT/project_runtime.py"
+          sudo -n setfacl -m "u:$FTMO_USER:r--" "$ZROOT/project-contracts.json"
+          sudo -n setfacl -m "u:$FTMO_USER:rw-" "$ZROOT/history.db"
+          for dbside in "$ZROOT/history.db-wal" "$ZROOT/history.db-shm"; do
+            [[ -e "$dbside" ]] && sudo -n setfacl -m "u:$FTMO_USER:rw-" "$dbside"
+          done
+
+          echo "=== VERIFY ACCESS AS FTMO USER ==="
+          sudo -n -u "$FTMO_USER" test -r "$ZROOT/scripts/zcloud_governed_exec.py"
+          sudo -n -u "$FTMO_USER" test -r "$ZROOT/project_runtime.py"
+          sudo -n -u "$FTMO_USER" test -r "$ZROOT/project-contracts.json"
+          sudo -n -u "$FTMO_USER" test -r "$ZROOT/history.db"
+          sudo -n -u "$FTMO_USER" python3 - <<'PY'
+          import sqlite3
+          db='/home/ubuntu/zennay-cloud/history.db'
+          c=sqlite3.connect(db, timeout=5)
+          c.execute('SELECT 1').fetchone()
+          print('FTMO_ZCLOUD_DB_READ_OK')
+          c.close()
+          PY
+
+          echo "=== START FTMO ==="
           sudo -n systemctl stop "$SERVICE" || true
           sudo -n systemctl reset-failed "$SERVICE" || true
-          sudo -n systemctl enable "$SERVICE" || true
-          sudo -n systemctl start --no-block "$SERVICE" || true
+          sudo -n systemctl start --no-block "$SERVICE"
 
           state=""
-          for i in $(seq 1 45); do
+          for i in $(seq 1 30); do
             state="$(systemctl is-active "$SERVICE" 2>/dev/null || true)"
             echo "ftmo_wait=$i state=$state"
             [[ "$state" == "active" ]] && break
@@ -55,15 +87,24 @@ jobs:
           echo "haxlab_autonomy_timer=$(systemctl is-active haxlab-autonomy.timer || true)"
           echo "haxlab_analyzer=$(systemctl is-active haxlab-analyzer.service || true)"
           echo "ftmo_marathon=$state"
-          systemctl show "$SERVICE" -p ActiveState -p SubState -p MainPID -p CPUWeight -p CPUQuotaPerSecUSec -p MemoryCurrent -p NRestarts --no-pager || true
-          sudo -n systemctl status "$SERVICE" --no-pager -n 80 || true
-          sudo -n journalctl -u "$SERVICE" -n 140 --no-pager || true
+          systemctl show "$SERVICE" -p ActiveState -p SubState -p MainPID -p CPUWeight -p CPUQuotaPerSecUSec -p MemoryCurrent -p NRestarts --no-pager
+          sudo -n journalctl -u "$SERVICE" -n 80 --no-pager || true
+          echo "=== RESOURCE LEASE ==="
+          sudo -n -u ubuntu python3 - <<'PY'
+          import sqlite3, json
+          db='/home/ubuntu/zennay-cloud/history.db'
+          c=sqlite3.connect(db)
+          c.row_factory=sqlite3.Row
+          rows=[dict(r) for r in c.execute("SELECT project_id,owner_id,pool,cpu_soft_cores,memory_soft_mb,acquired_at,lease_until FROM resource_leases WHERE project_id='ftmo'")]
+          print(json.dumps(rows, sort_keys=True))
+          c.close()
+          PY
           echo "=== TOP CPU ==="
           uptime
           free -h
-          ps -eo pid,ppid,user,psr,%cpu,%mem,etime,stat,cmd --sort=-%cpu | head -n 45
+          ps -eo pid,ppid,user,psr,%cpu,%mem,etime,stat,cmd --sort=-%cpu | head -n 40
 
+          test "$state" = "active"
           test "$(systemctl is-active actions.runner.Zennay-RaiseAI.vps-bb300bba.service || true)" != "active"
           test "$(systemctl is-active haxlab-autonomy.timer || true)" != "active"
           test "$(systemctl is-active haxlab-analyzer.service || true)" != "active"
-          test "$state" = "active"
