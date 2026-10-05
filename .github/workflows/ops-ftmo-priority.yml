@@ -33,20 +33,18 @@ jobs:
           sudo -n systemctl stop haxlab-analyzer.service || true
           sudo -n systemctl stop "$SERVICE" || true
 
-          echo "=== DIRECT GOVERNOR PROBE 1 ==="
-          set +e
-          sudo -n -u "$FTMO_USER" /usr/bin/python3 "$ZROOT/scripts/zcloud_governed_exec.py"             --db "$ZROOT/history.db" --project ftmo --owner ftmo-permission-probe             --lease-seconds 60 --renew-seconds 10 -- /bin/true
-          probe_rc=$?
-          set -e
-          echo "probe_rc=$probe_rc"
+          echo "=== REAPPLY SQLITE ACLS AT CURRENT INODES ==="
+          sudo -n setfacl -m "u:$FTMO_USER:rwx" "$ZROOT"
+          sudo -n setfacl -d -m "u:$FTMO_USER:rwx" "$ZROOT"
+          sudo -n setfacl -m "u:$FTMO_USER:rw-" "$ZROOT/history.db"
+          for side in "$ZROOT/history.db-wal" "$ZROOT/history.db-shm"; do
+            [[ -e "$side" ]] && sudo -n setfacl -m "u:$FTMO_USER:rw-" "$side"
+          done
+          getfacl -cp "$ZROOT" "$ZROOT/history.db" 2>/dev/null || true
 
-          if [[ "$probe_rc" -ne 0 ]]; then
-            echo "=== APPLY SQLITE DIRECTORY ACL ==="
-            sudo -n setfacl -m "u:$FTMO_USER:rwx" "$ZROOT"
-            sudo -n setfacl -d -m "u:$FTMO_USER:rw-" "$ZROOT"
-            echo "=== DIRECT GOVERNOR PROBE 2 ==="
-            sudo -n -u "$FTMO_USER" /usr/bin/python3 "$ZROOT/scripts/zcloud_governed_exec.py"               --db "$ZROOT/history.db" --project ftmo --owner ftmo-permission-probe               --lease-seconds 60 --renew-seconds 10 -- /bin/true
-          fi
+          echo "=== DIRECT GOVERNOR PROBE ==="
+          sudo -n -u "$FTMO_USER" /usr/bin/python3 "$ZROOT/scripts/zcloud_governed_exec.py"             --db "$ZROOT/history.db" --project ftmo --owner ftmo-permission-probe             --lease-seconds 60 --renew-seconds 10 -- /bin/true
+          echo "FTMO_GOVERNOR_PROBE_GREEN"
 
           echo "=== CLEAN START ==="
           sudo -n systemctl reset-failed "$SERVICE" || true
