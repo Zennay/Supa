@@ -168,6 +168,8 @@ test('M4 beta validator derives privacy-safe metrics from the canonical event vo
   assert.equal(summary.reusedLeftoverEvents, 1)
   assert.equal(summary.wastedLeftoverEvents, 1)
   assert.equal(summary.basketOutcome, 'unknown')
+  assert.equal(summary.recommendationFollowed, false)
+  assert.equal(summary.explanationViewedBeforeDecision, true)
   assert.equal(summary.explanationTrustRating, 4)
   assert.equal(summary.baselineEffortRating, 5)
   assert.equal(summary.weeklyEffortRating, 2)
@@ -248,4 +250,21 @@ test('session start participant identity must match the pseudonymous participant
     () => validateBetaSession(session),
     /beta_session_started\.participant_id must match participantKey/,
   )
+})
+
+
+test('M4 summary derives explanation-before-decision ordering without exposing free-text reasons', () => {
+  const session = validSession()
+  const basket = session.events.find((event) => event.type === 'basket_assessment_viewed')
+  basket.timestamp = '2026-10-16T12:02:00.000Z'
+
+  const summary = buildBetaSessionSummary(session)
+  assert.equal(summary.recommendationFollowed, false)
+  assert.equal(summary.explanationViewedBeforeDecision, false)
+  assert.equal('recommendationReason' in summary, false)
+
+  session.events = session.events.filter((event) => event.type !== 'basket_recommendation_decided')
+  const noDecisionSummary = buildBetaSessionSummary(session)
+  assert.equal(noDecisionSummary.recommendationFollowed, null)
+  assert.equal(noDecisionSummary.explanationViewedBeforeDecision, null)
 })
