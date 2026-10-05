@@ -42,10 +42,10 @@ function requireRecord(value, path) {
   return value
 }
 
-function requireString(value, path, { maxLength = 1000 } = {}) {
+function requireString(value, path, { maxLength = 1000, checkPii = true } = {}) {
   assert(typeof value === 'string' && value.trim().length > 0, `${path} must be a non-empty string`)
   assert(value.length <= maxLength, `${path} must be at most ${maxLength} characters`)
-  rejectLikelyPii(value, path)
+  if (checkPii) rejectLikelyPii(value, path)
   return value.trim()
 }
 
@@ -65,7 +65,7 @@ function requireEnum(value, allowed, path) {
 }
 
 function requireTimestamp(value, path) {
-  const normalized = requireString(value, path, { maxLength: 64 })
+  const normalized = requireString(value, path, { maxLength: 64, checkPii: false })
   assert(Number.isFinite(Date.parse(normalized)), `${path} must be a valid timestamp`)
   return normalized
 }
@@ -137,7 +137,7 @@ export function validateRetailerResponseRecord(input) {
   const responseSummary = requireString(input.responseSummary, 'responseSummary', { maxLength: 1200 })
   const constraints = requireStringArray(input.constraints ?? [], 'constraints', { maxItems: 16, maxLength: 500 })
   const nextOwnerTeam = requireOptionalString(input.nextOwnerTeam, 'nextOwnerTeam', { maxLength: 120 })
-  const evidenceRef = requireString(input.evidenceRef, 'evidenceRef', { maxLength: 240 })
+  const evidenceRef = requireString(input.evidenceRef, 'evidenceRef', { maxLength: 240, checkPii: false })
   const consequences = validateConsequences(input.consequences)
 
   return {
