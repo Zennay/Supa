@@ -219,6 +219,7 @@ export function buildBetaSessionSummary(input) {
   const baseline = latestEvent(session.events, 'baseline_planning_completed')
   const plan = latestEvent(session.events, 'plan_completed')
   const basket = latestEvent(session.events, 'basket_assessment_viewed')
+  const recommendationDecision = latestEvent(session.events, 'basket_recommendation_decided')
   const trust = latestEvent(session.events, 'trust_rating_submitted')
   const weeklyEffort = latestEvent(session.events, 'weekly_effort_submitted')
   const close = latestEvent(session.events, 'beta_week_closed')
@@ -255,6 +256,12 @@ export function buildBetaSessionSummary(input) {
     unknownLeftoverEvents: leftoverEvents.filter((event) => event.outcome === 'unknown').length,
     basketOutcome: basket?.outcome ?? 'unknown',
     basketUnresolvedLineCount: basket?.unresolved_line_count ?? null,
+    recommendationFollowed: recommendationDecision?.followed ?? null,
+    explanationViewedBeforeDecision: recommendationDecision
+      ? eventsOfType(session.events, 'basket_assessment_viewed').some(
+          (event) => Date.parse(event.timestamp) <= Date.parse(recommendationDecision.timestamp),
+        )
+      : null,
     explanationTrustRating: trust?.rating_1_to_5 ?? null,
     uncertaintyUnderstood: trust?.uncertainty_understood ?? null,
     baselineEffortRating: baseline?.effort_rating ?? null,
