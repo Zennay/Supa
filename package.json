@@ -19,7 +19,8 @@
     "m1:source-production-ready": "node scripts/m1-check-source-permission-gate.mjs --require-production-ready",
     "m3:create-observation-sheet": "node --experimental-strip-types scripts/m3-create-observation-sheet.mjs",
     "m3:build-observed-study": "node --experimental-strip-types scripts/m3-build-observed-study.mjs",
-    "m3:assess-observed-week": "node --experimental-strip-types scripts/m3-assess-observed-week.mjs"
+    "m3:assess-observed-week": "node --experimental-strip-types scripts/m3-assess-observed-week.mjs",
+    "m4:validate-beta-session": "node scripts/m4-validate-beta-session.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
