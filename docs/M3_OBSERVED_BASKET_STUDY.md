@@ -47,6 +47,14 @@ The contract does not authorize automated supermarket collection. Production PLU
 
 The validator and its tests are infrastructure for the M3 study. Synthetic regression fixtures are **not** themselves observed savings evidence. AUD-003 stays open until reproducible real-basket records exist with population, time window, positive/negative/unknown outcomes and uncertainty preserved.
 
+## Field-run revision preflight
+
+Before collecting any real PLUS + DekaMarkt observation, start from the current `main` revision and record the exact commit SHA used for that field run. Do not reuse an older merge SHA just because it originally introduced the workflow or collector.
+
+For the GitHub Actions path, dispatch `.github/workflows/m3-observed-week-report.yml` from `main` and retain the workflow run URL/ID alongside the observation metadata. For a local checkout, update `main` first and record `git rev-parse HEAD` before generating the sheet.
+
+This revision pin is provenance only: it does not make the generated sheet evidence and it does not authorize automated retailer reuse. The genuine observation, shared price context, timestamps and converter/assessment gates below remain mandatory.
+
 ## Manual observation sheet
 
 Generate the exact aggregated demand for the current proven four-meal planner fixture before visiting or manually checking two stores:
