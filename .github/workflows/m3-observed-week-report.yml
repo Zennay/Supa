@@ -38,7 +38,6 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Generate M3 field-run observation sheet
-        if: github.event_name == 'workflow_dispatch'
         run: npm run m3:create-observation-sheet -- --output artifacts/m3/observation-sheet.json
       - name: Upload M3 field-run pack
         if: github.event_name == 'workflow_dispatch'
