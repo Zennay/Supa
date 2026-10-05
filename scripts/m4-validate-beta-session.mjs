@@ -73,6 +73,7 @@ function requireEnum(value, allowed, path) {
 function validateEventPayload(event, path) {
   switch (event.type) {
     case 'beta_session_started':
+      requireString(event.participant_id, `${path}.participant_id`)
       requireString(event.study_week_id, `${path}.study_week_id`)
       break
     case 'baseline_planning_completed':
@@ -198,6 +199,12 @@ export function validateBetaSession(input) {
 
   assert(Array.isArray(input.events), 'events must be an array')
   input.events.forEach((event, index) => validateEvent(event, index, startedAt, endedAt))
+  const startEvents = eventsOfType(input.events, 'beta_session_started')
+  assert(startEvents.length === 1, 'sessions require exactly one beta_session_started event')
+  assert(
+    startEvents[0].participant_id === input.participantKey,
+    'beta_session_started.participant_id must match participantKey',
+  )
 
   if (input.sessionOutcome === 'completed') {
     assert(eventsOfType(input.events, 'plan_completed').length > 0, 'completed sessions require a plan_completed event')
