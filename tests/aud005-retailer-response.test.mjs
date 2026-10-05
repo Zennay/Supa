@@ -58,8 +58,19 @@ test('AUD-005 response validator accepts explicit permission but keeps scope bou
   record.constraints = ['Pilot use only; automated retrieval remains separately restricted.']
 
   const summary = buildPrivacySafeRetailerResponse(record)
-  assert.equal(summary.productionReuseApproved, true)
-  assert.match(summary.evidenceBoundary, /exact recorded scope/i)
+  assert.equal(summary.productionReuseApproved, false)
+  assert.equal(summary.productionReuseApprovalStatus, 'requires-explicit-gate-review')
+  assert.match(summary.evidenceBoundary, /separate explicit permission gate/i)
+})
+
+test('AUD-005 response validator never turns an allowed response into runtime authorization', () => {
+  const record = validRecord()
+  record.outcome = 'allowed'
+  record.constraints = []
+
+  const summary = buildPrivacySafeRetailerResponse(record)
+  assert.equal(summary.productionReuseApproved, false)
+  assert.equal(summary.productionReuseApprovalStatus, 'requires-explicit-gate-review')
 })
 
 test('AUD-005 response validator rejects records without a consequence', () => {
