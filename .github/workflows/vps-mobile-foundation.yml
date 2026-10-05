@@ -22,6 +22,9 @@ on:
       - "tests/planner*.test.*"
       - "tests/m2-core-slice.test.mjs"
       - "tests/m3-*.test.mjs"
+      - "scripts/m4-*.mjs"
+      - "tests/m4-*.test.mjs"
+      - "package.json"
 
 concurrency:
   group: supa-vps-mobile-${{ github.event.pull_request.number || github.ref }}

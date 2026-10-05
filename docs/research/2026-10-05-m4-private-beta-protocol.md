@@ -209,3 +209,24 @@ No decision rule overrides the M3 evidence gate or retailer-data permission cons
 - review missingness after each session without changing success criteria mid-study;
 - synthesize quantitative + qualitative evidence;
 - update M4 issue/Notion with the bounded decision.
+
+
+## Executable session contract
+
+Preparatory validation support is versioned in `scripts/m4-validate-beta-session.mjs`.
+
+The validator keeps the protocol fail-closed before beta execution:
+- a real session record is rejected unless `m3Gate.status` is `closed` and an M3/AUD-003 evidence reference is present;
+- completed sessions require an observed `plan-completed` event;
+- abandoned and unknown sessions remain valid evidence states instead of being discarded;
+- event timestamps must fall inside the session window;
+- participant keys stay out of generated summary output;
+- every summary keeps `publicClaimEligible: false`.
+
+After M3 closes, validate one consented session with:
+
+```bash
+npm run m4:validate-beta-session -- evidence/m4/<session>.json --output artifacts/m4/<session>-summary.json
+```
+
+The first executable contract intentionally covers the current primary measures: time to first complete plan, meal decisions, list edits, repair count, leftover/waste events, adherence, effort, reuse acceptability, explanation trust, return intent and observed basket outcome. Expand the event payload only when a real beta need is demonstrated; do not add telemetry speculatively before the M3 gate closes.
