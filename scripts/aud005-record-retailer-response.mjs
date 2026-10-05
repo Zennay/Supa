@@ -163,10 +163,14 @@ export function buildPrivacySafeRetailerResponse(input) {
   return {
     ...record,
     privacySafe: true,
-    productionReuseApproved: record.outcome === 'allowed' || record.outcome === 'allowed-with-conditions',
+    productionReuseApproved: false,
+    productionReuseApprovalStatus:
+      record.outcome === 'allowed' || record.outcome === 'allowed-with-conditions'
+        ? 'requires-explicit-gate-review'
+        : 'not-approved',
     publicClaimEligible: false,
     evidenceBoundary:
-      'This record captures stakeholder permission evidence only. It does not replace M3 observed-basket evidence or authorize uses outside the exact recorded scope and constraints.',
+      'This record captures stakeholder permission evidence only. It does not replace M3 observed-basket evidence or itself authorize production automated reuse. Production reuse remains disabled until the exact recorded scope and constraints pass the separate explicit permission gate.',
   }
 }
 
