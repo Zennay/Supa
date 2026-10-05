@@ -52,6 +52,34 @@ Operational signals:
 
 This means SUPA should **not infer** a permission model from technical accessibility alone.
 
+## Verified outreach endpoints — 2026-10-05
+
+These routes were re-checked against current official pages so AUD-005 outreach can be sent without guessing the receiving channel.
+
+### PLUS
+- **PLUS Consumerservice:** 0800-2224443. Use this as the routing fallback and ask explicitly for the team owning e-commerce/product data or commercial data permissions.
+- **PLUS supplier/product-content route:** PLUS names Brandbank as its partner for webshop product imagery/product information and publishes Brandbank Limited contact details: +31 (0)30 204 0770 and infonl@brandbank.com.
+- **Boundary:** Brandbank is a product-content route. It is not evidence that Brandbank or GS1 can grant rights to reuse PLUS retail prices, promotions or store-level availability. Those questions still need a PLUS-owned permission answer.
+
+Official sources:
+- https://www.plus.nl/organisatie/leveranciers-info
+- https://www.plus.nl/voorwaarden/privacy-statement
+
+### DekaMarkt
+- **Customer-service e-mail:** klantenservice@dekamarkt.nl.
+- **Customer-service phone:** 088-3135555.
+- **General/head-office phone:** 088-3136000.
+- **Head office:** Olieweg 6, 1951 NH Velsen-Noord.
+- DekaMarkt's assortment FAQ says assortment requests sent through customer service are forwarded to purchasing for investigation. For SUPA, the initial message should therefore ask customer service to route the request to the owner of e-commerce/catalog data and price/promotion permissions rather than treating customer service itself as the final approver.
+
+Official sources:
+- https://www.dekamarkt.nl/services/klantenservice
+- https://www.dekamarkt.nl/services/klantenservice/assortiment-en-aanbiedingen
+- https://www.dekamarkt.nl/meer/over-ons
+
+### Outreach handling rule
+Record the **first response path** as evidence too: whether the retailer routes SUPA to e-commerce, purchasing, commercial, product-data, a licensed provider, or rejects the request. A routing response is not permission, but it is useful stakeholder evidence and should be attached to issue #74 with date/channel and next owner.
+
 ## Permission model SUPA should use
 
 ### Lane A — research-only manual observation
