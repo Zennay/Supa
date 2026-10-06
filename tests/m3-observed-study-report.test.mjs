@@ -150,20 +150,20 @@ test('M3 observed input preflight rejects inconsistent observed line money', () 
   )
 })
 
-test('M3 observed input preflight rejects underfilled matched quantities', () => {
+test('M3 observed input preflight rejects a matched pack count that disagrees with demand', () => {
   const study = observedStudy()
   const matchedIndex = study.baseline.basket.lines.findIndex(
-    (line) => line.status === 'matched' && line.packs > 1,
+    (line) => line.status === 'matched',
   )
   assert.ok(matchedIndex >= 0)
 
   const line = study.baseline.basket.lines[matchedIndex]
   study.baseline.basket.lines[matchedIndex] = {
     ...line,
-    packs: line.packs - 1,
-    lineTotalCents: (line.packs - 1) * line.pricePerPackCents,
+    packs: line.packs + 1,
+    lineTotalCents: (line.packs + 1) * line.pricePerPackCents,
   }
-  study.baseline.basket.totalCents -= line.pricePerPackCents
+  study.baseline.basket.totalCents += line.pricePerPackCents
 
   assert.throws(
     () => validateObservedWeekInput(study),
