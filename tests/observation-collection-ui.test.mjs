@@ -53,6 +53,11 @@ test('M3 current-time helper emits ISO evidence time and fails closed for invali
   assert.equal(observationTimestampFromDate(new Date('invalid')), '')
 })
 
+test('M3 current-time helper rejects malformed runtime value types', () => {
+  for (const malformed of [null, undefined, '2026-10-06T07:45:12.345Z', 0, {}, []]) {
+    assert.equal(observationTimestampFromDate(malformed), '')
+  }
+})
 
 test('M3 observed-price helper preserves exact cents and rejects silent rounding', () => {
   assert.equal(observationPriceCents('1'), 100)
@@ -70,4 +75,10 @@ test('M3 observed-price helper preserves exact cents and rejects silent rounding
   assert.equal(observationPriceCents('1e2'), null)
   assert.equal(observationPriceCents(''), null)
   assert.equal(observationPriceCents('90071992547410.00'), null)
+})
+
+test('M3 observed-price helper rejects malformed runtime value types', () => {
+  for (const malformed of [null, undefined, 1.23, {}, [], true]) {
+    assert.equal(observationPriceCents(malformed), null)
+  }
 })
