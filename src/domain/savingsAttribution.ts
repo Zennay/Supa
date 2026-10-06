@@ -46,7 +46,7 @@ export function attributeSavingsEffects({
   evidence,
 }: {
   comparison: BasketComparison
-  evidence: unknown[]
+  evidence: unknown
 }): SavingsAttribution {
   if (!comparison.claimable || comparison.deltaCents === null) {
     return {
@@ -58,6 +58,16 @@ export function attributeSavingsEffects({
         'basket comparison is not claimable',
         ...comparison.reasons,
       ],
+    }
+  }
+
+  if (!Array.isArray(evidence)) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: comparison.deltaCents,
+      effectTotals: emptyTotals(),
+      reasons: ['attribution evidence must be an array'],
     }
   }
 
