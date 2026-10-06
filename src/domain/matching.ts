@@ -268,6 +268,10 @@ export function matchIngredient(
     return abstain('matching candidate data invalid')
   }
 
+  if (new Set(candidates.map((candidate) => candidate.id)).size !== candidates.length) {
+    return abstain('matching candidate identities ambiguous')
+  }
+
   if (hasInvalidKnownAmount(requirement.amount)) {
     return {
       type: 'abstain',
