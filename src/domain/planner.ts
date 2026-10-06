@@ -62,20 +62,36 @@ export function getBudgetState(
   }
 }
 
-export function assessPlannerBudget(
-  knownCost: number,
-  budget: number,
-  unresolvedLineCount: number,
-): PlannerBudgetAssessment {
-  const safeBudget = Math.max(0, budget)
+function isValidBudgetMoney(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
 
-  if (!Number.isInteger(unresolvedLineCount) || unresolvedLineCount !== 0) {
+export function assessPlannerBudget(
+  knownCost: unknown,
+  budget: unknown,
+  unresolvedLineCount: unknown,
+): PlannerBudgetAssessment {
+  const validKnownCost = isValidBudgetMoney(knownCost)
+  const validBudget = isValidBudgetMoney(budget)
+  const safeKnownCost = validKnownCost ? knownCost : 0
+  const safeBudget = validBudget ? budget : 0
+  const validUnresolvedLineCount =
+    typeof unresolvedLineCount === 'number' &&
+    Number.isSafeInteger(unresolvedLineCount) &&
+    unresolvedLineCount >= 0
+
+  if (
+    !validKnownCost ||
+    !validBudget ||
+    !validUnresolvedLineCount ||
+    unresolvedLineCount !== 0
+  ) {
     return {
       status: 'unknown',
-      knownCost,
+      knownCost: safeKnownCost,
       budget: safeBudget,
       unresolvedLineCount:
-        Number.isInteger(unresolvedLineCount) && unresolvedLineCount > 0
+        validUnresolvedLineCount && unresolvedLineCount > 0
           ? unresolvedLineCount
           : 1,
     }
@@ -83,6 +99,6 @@ export function assessPlannerBudget(
 
   return {
     status: 'known',
-    budgetState: getBudgetState(knownCost, safeBudget),
+    budgetState: getBudgetState(safeKnownCost, safeBudget),
   }
 }

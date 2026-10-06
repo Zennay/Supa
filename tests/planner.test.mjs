@@ -129,3 +129,60 @@ test('planner budget outcome treats invalid unresolved counts as unknown', () =>
     assert.equal(assessment.unresolvedLineCount, 1)
   }
 })
+
+test('planner budget outcome rejects malformed runtime money without coercion', () => {
+  for (const malformedKnownCost of [
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    -1,
+    '23.5',
+    null,
+    undefined,
+    true,
+  ]) {
+    const assessment = assessPlannerBudget(malformedKnownCost, 35, 0)
+
+    assert.deepEqual(assessment, {
+      status: 'unknown',
+      knownCost: 0,
+      budget: 35,
+      unresolvedLineCount: 1,
+    })
+  }
+
+  for (const malformedBudget of [
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    -1,
+    '35',
+    null,
+    undefined,
+    true,
+  ]) {
+    const assessment = assessPlannerBudget(23.5, malformedBudget, 0)
+
+    assert.deepEqual(assessment, {
+      status: 'unknown',
+      knownCost: 23.5,
+      budget: 0,
+      unresolvedLineCount: 1,
+    })
+  }
+})
+
+test('planner budget outcome requires a safe non-negative unresolved count', () => {
+  for (const malformedCount of [
+    '0',
+    null,
+    undefined,
+    true,
+    Number.POSITIVE_INFINITY,
+    Number.MAX_SAFE_INTEGER + 1,
+  ]) {
+    const assessment = assessPlannerBudget(23.5, 35, malformedCount)
+
+    assert.equal(assessment.status, 'unknown')
+    assert.equal(assessment.unresolvedLineCount, 1)
+  }
+})
+

@@ -57,6 +57,20 @@ test('direct matcher rejects blank requirement identity and query before scoring
   }
 })
 
+test('direct matcher rejects blank candidate identity and name before scoring', () => {
+  for (const malformedCandidate of [
+    { ...candidate, id: '' },
+    { ...candidate, id: '   ' },
+    { ...candidate, name: '' },
+    { ...candidate, name: '   ' },
+  ]) {
+    expectAbstain(
+      matchIngredient(requirement, [malformedCandidate]),
+      'matching candidate data invalid',
+    )
+  }
+})
+
 test('direct matcher rejects a non-array candidate collection without throwing', () => {
   for (const malformedCandidates of [null, {}, 'candidate', 1]) {
     assert.doesNotThrow(() => {

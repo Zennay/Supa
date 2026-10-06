@@ -76,7 +76,9 @@ function hasValidCandidateShape(value: unknown): value is ProductCandidate {
   const candidate = value as Record<string, unknown>
   return (
     typeof candidate.id === 'string' &&
+    candidate.id.trim().length > 0 &&
     typeof candidate.name === 'string' &&
+    candidate.name.trim().length > 0 &&
     (candidate.packAmount === null || typeof candidate.packAmount === 'number') &&
     isMatchUnit(candidate.packUnit) &&
     (candidate.packCount === undefined ||
