@@ -287,7 +287,7 @@ function restoreStoreObservation(
         : null
     const packCount =
       typeof product.packCount === 'number' &&
-      Number.isInteger(product.packCount) &&
+      Number.isSafeInteger(product.packCount) &&
       product.packCount > 0
         ? product.packCount
         : 1
@@ -304,7 +304,7 @@ function restoreStoreObservation(
               packCount,
               priceCents:
                 typeof product.priceCents === 'number' &&
-                Number.isInteger(product.priceCents) &&
+                Number.isSafeInteger(product.priceCents) &&
                 product.priceCents >= 0
                   ? product.priceCents
                   : null,
@@ -393,10 +393,10 @@ export function observationLineCollectionComplete(
     product.packAmount > 0 &&
     product.packUnit !== null &&
     product.packUnit !== 'unknown' &&
-    Number.isInteger(product.packCount) &&
+    Number.isSafeInteger(product.packCount) &&
     product.packCount > 0 &&
     product.priceCents !== null &&
-    Number.isInteger(product.priceCents) &&
+    Number.isSafeInteger(product.priceCents) &&
     product.priceCents >= 0
   )
 }
@@ -609,14 +609,14 @@ export function observationSheetReadiness(
         issues.push(`${lineLabel}: geldige verpakkingseenheid ontbreekt.`)
       }
       if (
-        !Number.isInteger(product.packCount) ||
+        !Number.isSafeInteger(product.packCount) ||
         product.packCount <= 0
       ) {
         issues.push(`${lineLabel}: aantal per verpakking moet minimaal 1 zijn.`)
       }
       if (
         product.priceCents === null ||
-        !Number.isInteger(product.priceCents) ||
+        !Number.isSafeInteger(product.priceCents) ||
         product.priceCents < 0
       ) {
         issues.push(`${lineLabel}: prijs per verpakking ontbreekt of is ongeldig.`)
