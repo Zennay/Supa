@@ -13,6 +13,9 @@ import { buildObservationSheet } from './m3-create-observation-sheet.mjs'
 const ALLOWED_SOURCES = new Set(['manual-cart', 'receipt', 'consented-export'])
 const ALLOWED_PRICE_CONTEXTS = new Set(['in-store', 'online-order'])
 const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIMESTAMP_PATTERN =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -32,6 +35,43 @@ function requireString(value, path) {
     typeof value === 'string' && value.trim().length > 0,
     `${path} must be a non-empty string`,
   )
+}
+
+function validCalendarDate(value) {
+  if (typeof value !== 'string') return false
+  const match = DATE_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+function validTimestamp(value) {
+  if (typeof value !== 'string') return false
+  const match = TIMESTAMP_PATTERN.exec(value)
+  if (!match || !validCalendarDate(match[1])) return false
+
+  const hour = Number(match[2])
+  const minute = Number(match[3])
+  const second = Number(match[4] ?? '0')
+  if (hour > 23 || minute > 59 || second > 59) return false
+
+  if (match[5] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[5]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return false
+  }
+
+  return Number.isFinite(Date.parse(value))
 }
 
 function sameJson(left, right) {
@@ -214,6 +254,10 @@ function buildObservedBasket(observation, canonical, side) {
   requireString(observation.evidenceId, `${side}.evidenceId`)
   requireString(observation.observedAt, `${side}.observedAt`)
   assert(
+    validTimestamp(observation.observedAt),
+    `${side}.observedAt must be a valid timestamp`,
+  )
+  assert(
     ALLOWED_SOURCES.has(observation.source),
     `${side}.source is not an allowed observed source`,
   )
@@ -295,6 +339,10 @@ export function buildWeeklyBasketStudyFromObservationSheet(sheet) {
   requireString(sheet.study.population, 'sheet.study.population')
   requireString(sheet.study.region, 'sheet.study.region')
   requireString(sheet.study.weekStart, 'sheet.study.weekStart')
+  assert(
+    validCalendarDate(sheet.study.weekStart),
+    'sheet.study.weekStart must be a valid YYYY-MM-DD date',
+  )
   assert(
     ALLOWED_PRICE_CONTEXTS.has(sheet.study.priceContext),
     'sheet.study.priceContext must be in-store or online-order',
