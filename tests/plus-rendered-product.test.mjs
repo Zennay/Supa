@@ -44,6 +44,65 @@ test('PLUS rendered evidence fails closed when browser provenance drifts', async
   })
 })
 
+test('PLUS rendered evidence refuses malformed source provenance', async () => {
+  const cases = [
+    ['non-public product URL', (evidence) => {
+      evidence.source.url = 'https://example.com/product/579010'
+    }],
+    ['invalid capture timestamp', (evidence) => {
+      evidence.source.capturedAt = 'not-a-date'
+    }],
+    ['invalid source digest', (evidence) => {
+      evidence.source.sha256 = 'abc'
+    }],
+  ]
+
+  for (const [label, mutate] of cases) {
+    const evidence = await fixture()
+    mutate(evidence)
+
+    assert.deepEqual(
+      parsePlusRenderedProductEvidence(evidence),
+      {
+        type: 'abstain',
+        reason: 'PLUS rendered evidence source provenance is invalid',
+      },
+      label,
+    )
+  }
+})
+
+test('PLUS rendered evidence refuses malformed browser artifact identity', async () => {
+  const cases = [
+    ['non-positive run id', (evidence) => {
+      evidence.browserEvidence.runId = 0
+    }],
+    ['non-integer artifact id', (evidence) => {
+      evidence.browserEvidence.artifactId = 1.5
+    }],
+    ['invalid artifact digest', (evidence) => {
+      evidence.browserEvidence.artifactDigest = 'sha256:not-a-digest'
+    }],
+    ['invalid Supa SHA', (evidence) => {
+      evidence.browserEvidence.supaSha = 'not-a-commit'
+    }],
+  ]
+
+  for (const [label, mutate] of cases) {
+    const evidence = await fixture()
+    mutate(evidence)
+
+    assert.deepEqual(
+      parsePlusRenderedProductEvidence(evidence),
+      {
+        type: 'abstain',
+        reason: 'PLUS rendered browser artifact identity is invalid',
+      },
+      label,
+    )
+  }
+})
+
 test('PLUS rendered evidence refuses unsafe acquisition metadata', async () => {
   const evidence = await fixture()
   evidence.browserEvidence.safety.networkInterception = true
