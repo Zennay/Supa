@@ -30,6 +30,22 @@ test('malformed money text fails closed instead of being rewritten into another 
   }
 })
 
+test('normalizers fail closed on malformed runtime value types', () => {
+  for (const input of [null, undefined, 42, {}, []]) {
+    assert.equal(normalizeMoneyToCents(input), null)
+    assert.deepEqual(normalizePackText(input), {
+      rawText: null,
+      count: 1,
+      amount: null,
+      unit: 'unknown',
+    })
+    assert.deepEqual(normalizeOfferLabel(input), {
+      type: 'unknown',
+      rawLabel: '',
+    })
+  }
+})
+
 test('normalizes representative AH, PLUS and DekaMarkt pack strings', () => {
   assert.deepEqual(normalizePackText('1 l'), {
     rawText: '1 l',
