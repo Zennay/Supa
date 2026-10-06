@@ -46,7 +46,7 @@ export function PlannerView({
           <span className="eyebrow">Deze week</span>
           <h2>Plan eerst. Vergelijk daarna.</h2>
         </div>
-        <button className="ghost-button" onClick={onReset}>Reset</button>
+        <button type="button" className="ghost-button" onClick={onReset}>Reset</button>
       </div>
 
       <section className="budget-card" aria-labelledby="weekbudget-title">
@@ -76,6 +76,7 @@ export function PlannerView({
         <div className="budget-options" aria-label="Kies je weekbudget">
           {budgetOptions.map((option) => (
             <button
+              type="button"
               key={option}
               className={budget === option ? 'budget-chip active' : 'budget-chip'}
               aria-pressed={budget === option}
