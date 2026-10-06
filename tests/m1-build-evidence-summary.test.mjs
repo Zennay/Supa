@@ -271,3 +271,14 @@ test('empty evidence bundles can never be adapter-ready', () => {
   assert.equal(report.coverageReady, false)
   assert.equal(report.adapterEvidenceReady, false)
 })
+
+
+test('unsafe manifest evidence ids are rejected before bundle attribution', () => {
+  const data = bundle()
+  data.manifest.results[0].id = '../dekamarkt-product'
+
+  assert.throws(
+    () => buildEvidenceSummary(data),
+    /Invalid or duplicate manifest results id/,
+  )
+})
