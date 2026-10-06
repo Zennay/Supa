@@ -140,11 +140,12 @@ export function BasketView({
         </div>
       )}
 
-      <div className="list-card">
+      <div className="list-card" role="list" aria-label="Mandcontrole">
         {basketLines.map((line) => (
           <div
             className={line.status === 'matched' ? 'list-row trace-row' : 'list-row trace-row unresolved-row'}
             key={line.id}
+            role="listitem"
           >
             <div>
               <strong>{line.ingredientLabel}</strong>
