@@ -52,7 +52,11 @@ function baseQuantity(
 }
 
 function validIdentity(value: unknown): value is string {
-  return (\n    typeof value === 'string' &&\n    value.trim().length > 0 &&\n    value === value.trim()\n  )
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function validCanonicalIdentity(value: unknown): value is string {
+  return validIdentity(value) && value === value.trim()
 }
 
 function supportedBasketLine(line: unknown): line is BasketTraceLine {
@@ -125,7 +129,7 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
     reasons.push(`${label} basket contains an unsupported line shape or status`)
   }
 
-  if (!validIdentity(basket.store.id)) {
+  if (!validCanonicalIdentity(basket.store.id)) {
     reasons.push(`${label} basket has an invalid store identity`)
   }
 
