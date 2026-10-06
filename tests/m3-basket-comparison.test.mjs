@@ -338,3 +338,50 @@ test('M3 fails closed when a matched line no longer carries a trusted matcher sc
     /basket contains invalid matched-line economics/,
   )
 })
+
+
+test('M3 fails closed when matched basket identities are not traceable', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(candidateStore, -10)
+
+  for (const basket of [baseline, candidate]) {
+    const matchedIndex = basket.lines.findIndex((line) => line.status === 'matched')
+    assert.ok(matchedIndex >= 0)
+    const line = basket.lines[matchedIndex]
+    assert.equal(line.status, 'matched')
+
+    basket.lines[matchedIndex] = {
+      ...line,
+      productId: '',
+      productName: '   ',
+    }
+  }
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.deltaCents, null)
+  assert.equal(comparison.lineDeltas.length, 0)
+  assert.match(
+    comparison.reasons.join(' '),
+    /basket contains invalid matched-line identity/,
+  )
+})
+
+test('M3 fails closed when a compared basket has no store identity', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(candidateStore, -10)
+
+  baseline.store = { ...baseline.store, id: '' }
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.savingsCents, null)
+  assert.match(
+    comparison.reasons.join(' '),
+    /basket has an invalid store identity/,
+  )
+})
