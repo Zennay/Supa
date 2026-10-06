@@ -89,7 +89,6 @@
   grid-template-columns: 42px 1fr 44px;
   color: var(--ink);
   text-align: left;
-  cursor: pointer;
 }
 
 .meal-config.active {
