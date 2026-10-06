@@ -51,7 +51,6 @@ test('basket fails closed when the selected product identity is blank', () => {
   assert.match(
     basket.lines[0].reasons.join(' '),
     /matching candidate data invalid/,
-
   )
 })
 
