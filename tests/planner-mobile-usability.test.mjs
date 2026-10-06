@@ -21,3 +21,11 @@ test('Planner day toggles meet the 44px touch-target baseline without grid overl
     /\.plan-check\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/,
   )
 })
+
+
+test('Planner recipe selectors meet the 44px touch-target baseline', () => {
+  assert.match(
+    css,
+    /\.meal-copy select\s*\{[\s\S]*?min-height:\s*44px;/,
+  )
+})
