@@ -55,6 +55,20 @@ function validIdentity(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+function supportedBasketLine(line: unknown): line is BasketTraceLine {
+  if (line === null || typeof line !== 'object' || !('status' in line)) {
+    return false
+  }
+
+  const status = (line as { status?: unknown }).status
+  return status === 'matched' || status === 'unresolved'
+}
+
+function basketLines(basket: OneStoreBasket): BasketTraceLine[] {
+  if (!Array.isArray(basket.lines)) return []
+  return basket.lines.filter(supportedBasketLine)
+}
+
 function invalidMatchedLineIdentity(line: MatchedBasketLine): boolean {
   return (
     !validIdentity(line.id) ||
@@ -97,11 +111,19 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
 
 function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   const reasons: string[] = []
-  const ids = basket.lines.map((line) => line.id)
-  const matched = basket.lines.filter(
+  const rawLines: unknown[] = Array.isArray(basket.lines) ? basket.lines : []
+  const lines = rawLines.filter(supportedBasketLine)
+  const ids = lines.map((line) => line.id)
+  const matched = lines.filter(
     (line): line is MatchedBasketLine => line.status === 'matched',
   )
-  const unresolved = basket.lines.filter((line) => line.status === 'unresolved')
+  const unresolved = lines.filter((line) => line.status === 'unresolved')
+
+  if (!Array.isArray(basket.lines)) {
+    reasons.push(`${label} basket lines are not an array`)
+  } else if (rawLines.some((line) => !supportedBasketLine(line))) {
+    reasons.push(`${label} basket contains an unsupported line shape or status`)
+  }
 
   if (!validIdentity(basket.store.id)) {
     reasons.push(`${label} basket has an invalid store identity`)
@@ -204,10 +226,10 @@ export function compareFullBaskets({
     reasons.push('basket plans select a different number of meals')
   }
 
-  const baselineMatched = baseline.lines.filter(
+  const baselineMatched = basketLines(baseline).filter(
     (line): line is MatchedBasketLine => line.status === 'matched',
   )
-  const candidateMatched = candidate.lines.filter(
+  const candidateMatched = basketLines(candidate).filter(
     (line): line is MatchedBasketLine => line.status === 'matched',
   )
 
