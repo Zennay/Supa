@@ -5,6 +5,9 @@ import { pathToFileURL } from 'node:url'
 
 import { parseSchemaOrgProduct } from '../src/data/schemaOrgProduct.ts'
 
+const SUPPORTED_SUPERMARKETS = new Set(['plus', 'dekamarkt'])
+const SUPPORTED_KINDS = new Set(['product', 'catalog', 'offers'])
+
 function sha256(text) {
   return createHash('sha256').update(text).digest('hex')
 }
@@ -113,13 +116,29 @@ export async function inspectCaptureDirectory(rootDir) {
   }
 
   const sources = []
+  const sourceIds = new Set()
   for (const result of manifest.results) {
     if (!isSafePathSegment(result?.id)) {
       throw new Error(`Unsafe capture source id: ${result?.id}`)
     }
+    if (sourceIds.has(result.id)) {
+      throw new Error(`Duplicate capture source id: ${result.id}`)
+    }
+    sourceIds.add(result.id)
+
     if (!isSafePathSegment(result?.supermarket)) {
       throw new Error(
         `Unsafe capture supermarket path segment for ${result.id}: ${result?.supermarket}`,
+      )
+    }
+    if (!SUPPORTED_SUPERMARKETS.has(result.supermarket)) {
+      throw new Error(
+        `Unsupported capture supermarket for ${result.id}: ${result.supermarket}`,
+      )
+    }
+    if (!SUPPORTED_KINDS.has(result?.kind)) {
+      throw new Error(
+        `Unsupported capture source kind for ${result.id}: ${result?.kind}`,
       )
     }
     if (typeof result?.success !== 'boolean') {
