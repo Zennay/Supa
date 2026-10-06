@@ -2,6 +2,10 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
+import {
+  M3_EXPECTED_RETAILERS,
+  observationStoreMatchesExpectedRetailer,
+} from '../src/domain/m3ObservationSheet.ts'
 
 const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
 const ALLOWED_PRICE_CONTEXTS = new Set(['in-store', 'online-order'])
@@ -186,6 +190,20 @@ export function validateObservedWeekInput(study) {
   )
   validateEvidence(study.baseline, 'baseline')
   validateEvidence(study.candidate, 'candidate')
+  assert(
+    observationStoreMatchesExpectedRetailer(
+      'baseline',
+      study.baseline.basket.store.name,
+    ),
+    `baseline.basket.store.name must identify ${M3_EXPECTED_RETAILERS.baseline}`,
+  )
+  assert(
+    observationStoreMatchesExpectedRetailer(
+      'candidate',
+      study.candidate.basket.store.name,
+    ),
+    `candidate.basket.store.name must identify ${M3_EXPECTED_RETAILERS.candidate}`,
+  )
   if (study.attributionEvidence !== undefined) {
     assert(
       Array.isArray(study.attributionEvidence),
