@@ -33,6 +33,25 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function validIso(value: unknown): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+}
+
+function validPublicPlusProductUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'www.plus.nl' &&
+      url.pathname.startsWith('/product/')
+    )
+  } catch {
+    return false
+  }
+}
+
 export function parsePlusRenderedProductEvidence(
   evidence: PlusRenderedProductEvidence,
 ): SchemaOrgParseResult {
@@ -52,8 +71,34 @@ export function parsePlusRenderedProductEvidence(
     }
   }
   if (
-    evidence.browserEvidence?.renderedHtmlSha256 !== evidence.source.sha256 ||
-    evidence.browserEvidence?.finalUrl !== evidence.source.url
+    !validPublicPlusProductUrl(evidence.source.url) ||
+    !validIso(evidence.source.capturedAt) ||
+    !/^[a-f0-9]{64}$/.test(evidence.source.sha256)
+  ) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence source provenance is invalid',
+    }
+  }
+
+  const browserEvidence = evidence.browserEvidence
+  if (
+    !Number.isInteger(browserEvidence?.runId) ||
+    browserEvidence.runId <= 0 ||
+    !Number.isInteger(browserEvidence?.artifactId) ||
+    browserEvidence.artifactId <= 0 ||
+    !/^sha256:[a-f0-9]{64}$/.test(browserEvidence?.artifactDigest ?? '') ||
+    !/^[a-f0-9]{40}$/.test(browserEvidence?.supaSha ?? '')
+  ) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered browser artifact identity is invalid',
+    }
+  }
+
+  if (
+    browserEvidence.renderedHtmlSha256 !== evidence.source.sha256 ||
+    browserEvidence.finalUrl !== evidence.source.url
   ) {
     return {
       type: 'abstain',
@@ -61,7 +106,7 @@ export function parsePlusRenderedProductEvidence(
     }
   }
 
-  const safety = evidence.browserEvidence?.safety
+  const safety = browserEvidence.safety
   if (
     !safety ||
     safety.login !== false ||
