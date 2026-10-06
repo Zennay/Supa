@@ -38,6 +38,24 @@ test('M1 capture rejects supermarkets outside the current technical pair', () =>
   )
 })
 
+test('M1 capture rejects unsafe source ids before they become file paths', () => {
+  for (const id of ['../outside', 'nested/source', 'windows\\source', '.']) {
+    assert.throws(
+      () =>
+        validateSources([
+          {
+            id,
+            supermarket: 'plus',
+            kind: 'product',
+            url: 'https://www.plus.nl/product/example',
+          },
+        ]),
+      /Invalid or duplicate source id/,
+      id,
+    )
+  }
+})
+
 test('M1 capture rejects a URL whose host does not match its supermarket', () => {
   assert.throws(
     () =>
