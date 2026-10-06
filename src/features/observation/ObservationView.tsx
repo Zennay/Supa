@@ -23,6 +23,10 @@ import {
   observationPriceCents,
   observationTimestampFromDate,
 } from './observationCollectionUi.ts'
+import {
+  observationPackAmount,
+  observationPackCount,
+} from './observationNumericInput.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -669,9 +673,9 @@ export function ObservationView() {
                               value={product.packAmount ?? ''}
                               onChange={(event) =>
                                 updateProduct(side, lineIndex, {
-                                  packAmount: event.target.value
-                                    ? Number(event.target.value)
-                                    : null,
+                                  packAmount: observationPackAmount(
+                                    event.target.value,
+                                  ),
                                 })
                               }
                             />
@@ -705,9 +709,8 @@ export function ObservationView() {
                               value={product.packCount}
                               onChange={(event) =>
                                 updateProduct(side, lineIndex, {
-                                  packCount: Math.max(
-                                    1,
-                                    Math.trunc(Number(event.target.value) || 1),
+                                  packCount: observationPackCount(
+                                    event.target.value,
                                   ),
                                 })
                               }
