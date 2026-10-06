@@ -145,6 +145,7 @@ export function PlannerView({
                 <label htmlFor={`recipe-${item.day}`}>Recept</label>
                 <select
                   id={`recipe-${item.day}`}
+                  aria-label={`Recept voor ${item.day}`}
                   value={item.recipeId}
                   onChange={(event) => onRecipeChange(item.day, event.target.value)}
                 >
