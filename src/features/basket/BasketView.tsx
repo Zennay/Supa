@@ -38,6 +38,8 @@ export function BasketView({
   comparisonBaseline: OneStoreBasket
   comparisonCandidate: OneStoreBasket
 }) {
+  const hasUnresolvedCost = basket.unresolvedLineCount > 0
+
   return (
     <section className="screen">
       <div className="section-heading">
@@ -47,15 +49,40 @@ export function BasketView({
         </div>
       </div>
 
-      <div className="hero-total">
-        <span>Deterministisch mandtotaal</span>
-        <strong>{euro.format(basket.totalCents / 100)}</strong>
+      <div
+        className="hero-total"
+        data-basket-total-state={hasUnresolvedCost ? 'minimum' : 'complete'}
+      >
+        <span>
+          {hasUnresolvedCost
+            ? 'Bekend mandminimum'
+            : 'Deterministisch mandtotaal'}
+        </span>
+        <strong>
+          {hasUnresolvedCost
+            ? `min. ${euro.format(basket.totalCents / 100)}`
+            : euro.format(basket.totalCents / 100)}
+        </strong>
         <div className="stat-row">
           <StatPill label="Gematcht" value={String(basket.matchedLineCount)} />
           <StatPill label="Controle" value={String(basket.unresolvedLineCount)} />
         </div>
         <p className="disclaimer">
-          M2 testfixture — geen besparingsclaim en geen productie-liveprijs.
+          {hasUnresolvedCost ? (
+            <>
+              {basket.unresolvedLineCount}{' '}
+              {basket.unresolvedLineCount === 1
+                ? 'productkeuze is'
+                : 'productkeuzes zijn'}{' '}
+              nog niet meegerekend. Dit is alleen het bekende minimum, geen
+              volledig mandtotaal. M2 testfixture — geen productie-liveprijs.
+            </>
+          ) : (
+            <>
+              Volledige deterministische M2 testfixture — geen besparingsclaim
+              en geen productie-liveprijs.
+            </>
+          )}
         </p>
       </div>
 
