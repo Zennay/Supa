@@ -65,7 +65,7 @@ npm run m3:create-observation-sheet -- --output artifacts/m3/observation-sheet.j
 
 The command creates missing output directories automatically. The generated sheet contains the same 11 ingredient requirements for baseline and candidate, plus blank fields for store, timestamp, product, pack, price, availability and provenance. It is deliberately marked `collection-template-not-evidence`: do not prefill or infer supermarket values, and do not treat the generated sheet as savings evidence.
 
-Use the sheet to record one genuine `manual-cart`, `receipt` or `consented-export` observation per store within the 24-hour study window. Missing/unavailable products or prices must stay explicit; do not invent replacements.
+Use the sheet to record one genuine `manual-cart`, `receipt` or `consented-export` observation per store within the 24-hour study window. The canonical field-study sides are **baseline = PLUS** and **candidate = DekaMarkt**; do not swap the retailers or substitute another store, because the converter intentionally fails closed on retailer drift. Missing/unavailable products or prices must stay explicit; do not invent replacements.
 
 ### Mobile `Meten` field flow
 
