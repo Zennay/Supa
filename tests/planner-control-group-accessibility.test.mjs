@@ -25,3 +25,9 @@ test('Planner recipe selectors expose day-specific accessible names', () => {
     /aria-label=\{\`Recept voor \${item\.day}\`\}/,
   )
 })
+
+
+test('Planner user copy does not expose the internal M2 milestone label', () => {
+  assert.doesNotMatch(source, />M2 verticale slice</)
+  assert.match(source, />Van plan naar lijst</)
+})
