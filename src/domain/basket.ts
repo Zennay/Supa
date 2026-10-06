@@ -156,7 +156,6 @@ export function buildOneStoreBasket({
       product !== null &&
       product.storeId === store.id &&
       typeof product.id === 'string' &&
-      Boolean(product.id.trim()) &&
       typeof product.name === 'string' &&
       Boolean(product.name.trim()),
   )
