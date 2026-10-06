@@ -4,13 +4,18 @@ export type StatPillPresentation = {
   accessibleLabel: string
 }
 
-function normalizedText(value: string, fallback: string): string {
-  return typeof value === 'string' && value.trim() ? value.trim() : fallback
+const INVISIBLE_FORMAT_CHARACTERS = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]/g
+
+function normalizedText(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') return fallback
+
+  const visibleText = value.replace(INVISIBLE_FORMAT_CHARACTERS, '').trim()
+  return visibleText || fallback
 }
 
 export function statPillPresentation(
-  label: string,
-  value: string,
+  label: unknown,
+  value: unknown,
 ): StatPillPresentation {
   const safeLabel = normalizedText(label, 'Statistiek')
   const safeValue = normalizedText(value, 'Niet beschikbaar')
@@ -23,8 +28,8 @@ export function statPillPresentation(
 }
 
 export function statPillAccessibleLabel(
-  label: string,
-  value: string,
+  label: unknown,
+  value: unknown,
 ): string {
   return statPillPresentation(label, value).accessibleLabel
 }
