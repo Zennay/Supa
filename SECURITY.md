@@ -12,7 +12,7 @@ Do not include live credentials, authentication tokens, personal information, fu
 
 Testing this repository, local development copies, controlled fixtures, and systems you own or are explicitly authorized to assess is in scope.
 
-SUPA's code, documentation, data adapters, retailer evidence tooling, or public retailer references do **not** grant permission to actively test, probe, bypass controls on, scrape, overload, or otherwise interact intrusively with PLUS, DekaMarkt, or any other third-party system. Obtain explicit authorization from the relevant system owner before active security testing or automated production data reuse.
+SUPA's code, documentation, data adapters, retailer evidence tooling, or public retailer references do not grant permission to actively test, probe, bypass controls on, scrape, overload, or otherwise interact intrusively with PLUS, DekaMarkt, or any other third-party system. Obtain explicit authorization from the relevant system owner before active security testing or automated production data reuse.
 
 Keep proof-of-concept work minimally destructive. Prefer deterministic local fixtures and mocked or consented data whenever they can demonstrate the issue safely.
 
