@@ -350,6 +350,10 @@ test('empty evidence bundles can never be adapter-ready', () => {
   const report = buildEvidenceSummary({
     manifest: {
       milestone: 'M1 Data Feasibility',
+      bounded: true,
+      sourceCount: 0,
+      successCount: 0,
+      failureCount: 0,
       results: [],
     },
     inspection: {
@@ -369,7 +373,8 @@ test('empty evidence bundles can never be adapter-ready', () => {
     },
   })
 
-  assert.equal(report.documentConsistency.consistent, true)
+  assert.equal(report.documentConsistency.boundedSourceScopeMatches, false)
+  assert.equal(report.documentConsistency.consistent, false)
   assert.equal(report.sourceCount, 0)
   assert.equal(report.captureReady, false)
   assert.equal(report.coverageReady, false)
