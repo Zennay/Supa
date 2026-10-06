@@ -73,6 +73,23 @@ test('AUD-005 response validator never turns an allowed response into runtime au
   assert.equal(summary.productionReuseApprovalStatus, 'requires-explicit-gate-review')
 })
 
+test('AUD-005 response validator rejects malformed observation timestamps', () => {
+  for (const observedAt of [
+    '2026-02-30T06:00:00.000Z',
+    '2026-13-05T06:00:00.000Z',
+    '10/05/2026 06:00:00',
+  ]) {
+    const record = validRecord()
+    record.observedAt = observedAt
+
+    assert.throws(
+      () => validateRetailerResponseRecord(record),
+      /observedAt must be a valid ISO timestamp/,
+      observedAt,
+    )
+  }
+})
+
 test('AUD-005 response validator rejects records without a consequence', () => {
   const record = validRecord()
   record.consequences = {
