@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getBudgetState, getPlannedCost } from '../src/domain/planner.ts'
+import {
+  assessPlannerBudget,
+  getBudgetState,
+  getPlannedCost,
+} from '../src/domain/planner.ts'
 
 const recipes = [
   { id: 'cheap', title: 'Cheap', minutes: 10, servings: 2, estimatedCost: 4.5, tags: [] },
@@ -32,4 +36,30 @@ test('budget state caps progress and marks overspend', () => {
   assert.equal(state.remaining, -7)
   assert.equal(state.usage, 1)
   assert.equal(state.overBudget, true)
+})
+
+test('planner budget outcome is claimable only for a complete basket', () => {
+  const assessment = assessPlannerBudget(23.5, 35, 0)
+
+  assert.equal(assessment.status, 'known')
+  assert.equal(assessment.budgetState.remaining, 11.5)
+  assert.equal(assessment.budgetState.overBudget, false)
+})
+
+test('planner budget outcome fails closed when product matches are unresolved', () => {
+  const assessment = assessPlannerBudget(23.5, 35, 2)
+
+  assert.deepEqual(assessment, {
+    status: 'unknown',
+    knownCost: 23.5,
+    budget: 35,
+    unresolvedLineCount: 2,
+  })
+})
+
+test('planner budget outcome treats an invalid unresolved count as unknown', () => {
+  const assessment = assessPlannerBudget(23.5, 35, Number.NaN)
+
+  assert.equal(assessment.status, 'unknown')
+  assert.equal(assessment.unresolvedLineCount, 1)
 })
