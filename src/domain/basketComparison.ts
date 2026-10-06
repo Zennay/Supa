@@ -51,6 +51,18 @@ function baseQuantity(
   return null
 }
 
+function validIdentity(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function invalidMatchedLineIdentity(line: MatchedBasketLine): boolean {
+  return (
+    !validIdentity(line.id) ||
+    !validIdentity(line.ingredientLabel) ||
+    !validIdentity(line.productId)
+  )
+}
+
 function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
   const effectivePackAmount = line.pack.amount * line.pack.count
   const required = baseQuantity(line.requirement.amount, line.requirement.unit)
@@ -90,8 +102,16 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   )
   const unresolved = basket.lines.filter((line) => line.status === 'unresolved')
 
+  if (!validIdentity(basket.store.id)) {
+    reasons.push(`${label} basket has an invalid store identity`)
+  }
+
   if (new Set(ids).size !== ids.length) {
     reasons.push(`${label} basket contains duplicate ingredient ids`)
+  }
+
+  if (matched.some(invalidMatchedLineIdentity)) {
+    reasons.push(`${label} basket contains invalid matched-line identity`)
   }
 
   if (
