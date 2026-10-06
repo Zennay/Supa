@@ -278,3 +278,35 @@ test('M3 fails closed when both baskets expose an invalid selected meal count', 
     /basket has an invalid selected meal count/,
   )
 })
+
+
+test('M3 fails closed when matched basket units cannot prove comparable pack coverage', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(candidateStore, -10)
+
+  for (const basket of [baseline, candidate]) {
+    const matchedIndex = basket.lines.findIndex((line) => line.status === 'matched')
+    assert.ok(matchedIndex >= 0)
+    const line = basket.lines[matchedIndex]
+    assert.equal(line.status, 'matched')
+
+    basket.lines[matchedIndex] = {
+      ...line,
+      pack: {
+        ...line.pack,
+        unit: 'unknown',
+      },
+    }
+  }
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.savingsCents, null)
+  assert.equal(comparison.lineDeltas.length, 0)
+  assert.match(
+    comparison.reasons.join(' '),
+    /basket contains invalid matched-line economics/,
+  )
+})
