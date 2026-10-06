@@ -142,6 +142,36 @@ test('basket fails closed when the selected product name is blank', () => {
   assert.equal(basket.lines[0].status, 'unresolved')
   assert.match(
     basket.lines[0].reasons.join(' '),
-    /matched product name is blank or malformed/,
+    /store catalog contains no product with a trusted name/,
+  )
+})
+
+
+test('basket does not crash on a non-string product name at runtime', () => {
+  const basket = buildOneStoreBasket({
+    store,
+    plan,
+    recipes,
+    activeDays: ['Ma'],
+    products: [
+      {
+        id: 'basmati-150',
+        storeId: store.id,
+        name: null,
+        packAmount: 150,
+        packUnit: 'g',
+        available: true,
+        priceCents: 149,
+      },
+    ],
+  })
+
+  assert.equal(basket.matchedLineCount, 0)
+  assert.equal(basket.unresolvedLineCount, 1)
+  assert.equal(basket.totalCents, 0)
+  assert.equal(basket.lines[0].status, 'unresolved')
+  assert.match(
+    basket.lines[0].reasons.join(' '),
+    /store catalog contains no product with a trusted name/,
   )
 })
