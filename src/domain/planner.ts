@@ -25,19 +25,51 @@ export function getPlannedCost(
   recipes: Recipe[],
   activeDays: string[],
 ): number | null {
+  if (
+    !Array.isArray(plan) ||
+    !Array.isArray(recipes) ||
+    !Array.isArray(activeDays)
+  ) {
+    return null
+  }
+
   const active = new Set(activeDays)
   let total = 0
 
   for (const day of active) {
-    const plannedMeals = plan.filter((candidate) => candidate.day === day)
+    if (typeof day !== 'string') return null
+
+    const plannedMeals = plan.filter((candidate) => {
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        return false
+      }
+
+      return (candidate as { day?: unknown }).day === day
+    })
     if (plannedMeals.length !== 1) return null
 
     const item = plannedMeals[0]
-    const matches = recipes.filter((candidate) => candidate.id === item.recipeId)
+    if (typeof item.recipeId !== 'string' || item.recipeId.length === 0) {
+      return null
+    }
+
+    const matches = recipes.filter((candidate) => {
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        return false
+      }
+
+      return (candidate as { id?: unknown }).id === item.recipeId
+    })
     if (matches.length !== 1) return null
 
     const estimatedCost = matches[0].estimatedCost
-    if (!Number.isFinite(estimatedCost) || estimatedCost < 0) return null
+    if (
+      typeof estimatedCost !== 'number' ||
+      !Number.isFinite(estimatedCost) ||
+      estimatedCost < 0
+    ) {
+      return null
+    }
 
     total += estimatedCost
     if (!Number.isFinite(total)) return null
