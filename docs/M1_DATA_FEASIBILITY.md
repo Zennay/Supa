@@ -582,7 +582,9 @@ Official source reviewed:
 
 A source can become production-enabled only when its permission status is
 `permitted` **and** the versioned evidence includes explicit authorization
-(`written_permission` or an `official_license`). The checker rejects an
+(`written_permission` or an `official_license`). Permission evidence references
+must use credential-free HTTPS authority with the default HTTPS port; embedded
+usernames/passwords and non-default ports fail closed. The checker rejects an
 attempt to enable a source while its status is unresolved, permission-required
 or prohibited.
 
