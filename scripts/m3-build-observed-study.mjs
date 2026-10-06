@@ -3,6 +3,10 @@ import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { matchIngredient } from '../src/domain/matching.ts'
+import {
+  M3_EXPECTED_RETAILERS,
+  observationStoreMatchesExpectedRetailer,
+} from '../src/domain/m3ObservationSheet.ts'
 import { validateObservedWeekInput } from './m3-assess-observed-week.mjs'
 import { buildObservationSheet } from './m3-create-observation-sheet.mjs'
 
@@ -209,6 +213,10 @@ function buildObservedBasket(observation, canonical, side) {
   requireRecord(observation.store, `${side}.store`)
   requireString(observation.store.id, `${side}.store.id`)
   requireString(observation.store.name, `${side}.store.name`)
+  assert(
+    observationStoreMatchesExpectedRetailer(side, observation.store.name),
+    `${side}.store.name must identify ${M3_EXPECTED_RETAILERS[side]}`,
+  )
   assert(Array.isArray(observation.lines), `${side}.lines must be an array`)
   assert(
     observation.lines.length === canonical.requirements.length,
