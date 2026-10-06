@@ -16,38 +16,40 @@ function oneIngredientRecipe() {
   }]
 }
 
-test('basket construction excludes malformed catalog candidate names before matching', () => {
-  const chicken = structuredClone(m2Products[0])
-  chicken.name = null
-
-  const basket = buildOneStoreBasket({
+function buildWithOnlyChicken(chicken) {
+  return buildOneStoreBasket({
     store: m2Store,
     plan: [m2InitialPlan[0]],
     recipes: oneIngredientRecipe(),
     activeDays: ['Ma'],
     products: [chicken],
   })
+}
 
-  assert.equal(basket.lines.length, 1)
-  assert.equal(basket.lines[0].status, 'unresolved')
-  assert.equal(basket.matchedLineCount, 0)
-  assert.equal(basket.unresolvedLineCount, 1)
+test('basket construction excludes malformed catalog candidate names before matching', () => {
+  for (const invalidName of ['', '   ', null, 42]) {
+    const chicken = structuredClone(m2Products[0])
+    chicken.name = invalidName
+
+    const basket = buildWithOnlyChicken(chicken)
+
+    assert.equal(basket.lines.length, 1)
+    assert.equal(basket.lines[0].status, 'unresolved')
+    assert.equal(basket.matchedLineCount, 0)
+    assert.equal(basket.unresolvedLineCount, 1)
+  }
 })
 
 test('basket construction excludes malformed catalog candidate identities before matching', () => {
-  const chicken = structuredClone(m2Products[0])
-  chicken.id = 42
+  for (const invalidId of ['', '   ', null, 42]) {
+    const chicken = structuredClone(m2Products[0])
+    chicken.id = invalidId
 
-  const basket = buildOneStoreBasket({
-    store: m2Store,
-    plan: [m2InitialPlan[0]],
-    recipes: oneIngredientRecipe(),
-    activeDays: ['Ma'],
-    products: [chicken],
-  })
+    const basket = buildWithOnlyChicken(chicken)
 
-  assert.equal(basket.lines.length, 1)
-  assert.equal(basket.lines[0].status, 'unresolved')
-  assert.equal(basket.matchedLineCount, 0)
-  assert.equal(basket.unresolvedLineCount, 1)
+    assert.equal(basket.lines.length, 1)
+    assert.equal(basket.lines[0].status, 'unresolved')
+    assert.equal(basket.matchedLineCount, 0)
+    assert.equal(basket.unresolvedLineCount, 1)
+  }
 })
