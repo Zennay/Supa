@@ -129,6 +129,12 @@ export function aggregatePlanIngredients(
     }
   }
 
+  for (const day of active) {
+    if (!plannedActiveDays.has(day)) {
+      throw new Error(`Missing planned meal for active day: ${day}`)
+    }
+  }
+
   return [...aggregated.values()].sort((a, b) => a.id.localeCompare(b.id))
 }
 
