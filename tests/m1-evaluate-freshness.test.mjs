@@ -56,7 +56,13 @@ test('marks a recent successful capture fresh and preserves validators', () => {
 })
 
 test('capture freshness rejects underspecified timestamps', () => {
-  for (const capturedAt of ['2026-10-04', '2026-10-04 00:00:00Z']) {
+  for (const capturedAt of [
+    '2026-10-04',
+    '2026-10-04 00:00:00Z',
+    '2026-02-31T00:00:00.000Z',
+    '2026-10-04T24:00:00.000Z',
+    '2026-10-04T00:00:00.000+24:00',
+  ]) {
     const report = evaluateManifestFreshness(
       manifest([result({ capturedAt })]),
       {
