@@ -7,6 +7,7 @@ import {
 } from '../src/domain/m3ObservationSheet.ts'
 import {
   nextObservationActionLabel,
+  observationPriceCents,
   observationTimestampFromDate,
 } from '../src/features/observation/observationCollectionUi.ts'
 
@@ -50,4 +51,20 @@ test('M3 current-time helper emits ISO evidence time and fails closed for invali
     '2026-10-06T07:45:12.345Z',
   )
   assert.equal(observationTimestampFromDate(new Date('invalid')), '')
+})
+
+
+test('M3 observed-price helper preserves exact cents and rejects silent rounding', () => {
+  assert.equal(observationPriceCents('1'), 100)
+  assert.equal(observationPriceCents('1.2'), 120)
+  assert.equal(observationPriceCents('1,23'), 123)
+  assert.equal(observationPriceCents('0.00'), 0)
+  assert.equal(observationPriceCents(' 2,50 '), 250)
+
+  assert.equal(observationPriceCents('1.999'), null)
+  assert.equal(observationPriceCents('1,234'), null)
+  assert.equal(observationPriceCents('-1.00'), null)
+  assert.equal(observationPriceCents('1e2'), null)
+  assert.equal(observationPriceCents(''), null)
+  assert.equal(observationPriceCents('90071992547410.00'), null)
 })
