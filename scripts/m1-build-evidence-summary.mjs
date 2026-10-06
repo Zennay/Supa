@@ -12,7 +12,7 @@ function byId(items, label) {
   }
   const map = new Map()
   for (const item of items) {
-    if (!item?.id || map.has(item.id)) {
+    if (!isSafeSourceId(item?.id) || map.has(item.id)) {
       throw new Error(`Invalid or duplicate ${label} id: ${item?.id}`)
     }
     map.set(item.id, item)
