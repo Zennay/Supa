@@ -47,8 +47,20 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function safeIndex(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0
+}
+
+function positiveSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
+function validIso(value: unknown): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
-  if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
+  if (!safeIndex(ref) || ref >= payload.length) {
     return undefined
   }
   return payload[ref as number]
@@ -66,8 +78,8 @@ function oneProductInformationRef(payload: unknown[]): number | null {
   for (const value of payload) {
     if (!isObject(value)) continue
     for (const [key, ref] of Object.entries(value)) {
-      if (/^product-information-\d+$/.test(key) && Number.isInteger(ref)) {
-        refs.push(ref as number)
+      if (/^product-information-\d+$/.test(key) && safeIndex(ref)) {
+        refs.push(ref)
       }
     }
   }
@@ -101,10 +113,31 @@ export function parseDekaMarktSsrProductEvidence(
     return { type: 'abstain', reason: 'DekaMarkt evidence must identify a safe product source' }
   }
 
+  try {
+    const url = new URL(evidence.source.url)
+    if (url.protocol !== 'https:' || url.hostname !== 'www.dekamarkt.nl') {
+      return { type: 'abstain', reason: 'DekaMarkt evidence source must use the public HTTPS host' }
+    }
+  } catch {
+    return { type: 'abstain', reason: 'DekaMarkt evidence source must contain a valid URL' }
+  }
+
+  if (
+    !validIso(evidence.source.capturedAt) ||
+    !/^[a-f0-9]{64}$/.test(evidence.source.sha256)
+  ) {
+    return { type: 'abstain', reason: 'DekaMarkt evidence source provenance is incomplete' }
+  }
+
   const safety = evidence.captureEvidence?.safety
   if (
+    !positiveSafeInteger(evidence.captureEvidence?.runId) ||
+    !positiveSafeInteger(evidence.captureEvidence?.artifactId) ||
+    !/^sha256:[a-f0-9]{64}$/.test(evidence.captureEvidence?.artifactDigest ?? '') ||
+    !/^[a-f0-9]{40}$/.test(evidence.captureEvidence?.supaSha ?? '') ||
     evidence.captureEvidence?.status !== 200 ||
     !evidence.captureEvidence?.contentType?.toLowerCase().includes('text/html') ||
+    !positiveSafeInteger(evidence.captureEvidence?.bytes) ||
     !safety ||
     safety.login !== false ||
     safety.credentials !== false ||
@@ -133,7 +166,7 @@ export function parseDekaMarktSsrProductEvidence(
   const assortment = dereference(payload, product.productAssortment)
 
   if (
-    !Number.isInteger(productId) ||
+    !positiveSafeInteger(productId) ||
     typeof name !== 'string' ||
     !name.trim() ||
     typeof packaging !== 'string' ||
@@ -170,9 +203,11 @@ export function parseDekaMarktSsrProductEvidence(
   const offers = jsonLd && isObject(jsonLd.offers) ? jsonLd.offers : null
   const jsonName = typeof jsonLd?.name === 'string' ? jsonLd.name.trim() : null
   const jsonMpn =
-    typeof jsonLd?.mpn === 'string' || typeof jsonLd?.mpn === 'number'
-      ? String(jsonLd.mpn)
-      : null
+    typeof jsonLd?.mpn === 'string'
+      ? jsonLd.mpn
+      : positiveSafeInteger(jsonLd?.mpn)
+        ? String(jsonLd.mpn)
+        : null
   const jsonCurrency = typeof offers?.priceCurrency === 'string' ? offers.priceCurrency : null
   const observedCapitalPrice = offers?.Price
 
