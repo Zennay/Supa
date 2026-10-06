@@ -2,7 +2,7 @@ import type { StoreProduct } from '../domain/basket.ts'
 import type { Store } from '../domain/types.ts'
 import { m2Products, m2Store } from './m2Fixture.ts'
 
-export const m3BaselineStore = m2Store
+export const m3BaselineStore: Store = { ...m2Store }
 
 export const m3CandidateStore: Store = {
   id: 'm3-candidate-store',
@@ -11,7 +11,7 @@ export const m3CandidateStore: Store = {
 
 function withGaramMasala(products: StoreProduct[], storeId: string): StoreProduct[] {
   return [
-    ...products,
+    ...products.map((product) => ({ ...product })),
     {
       id: `${storeId}-garam-50`,
       storeId,
