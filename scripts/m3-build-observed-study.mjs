@@ -214,6 +214,10 @@ function buildObservedBasket(observation, canonical, side) {
   requireString(observation.evidenceId, `${side}.evidenceId`)
   requireString(observation.observedAt, `${side}.observedAt`)
   assert(
+    Number.isFinite(Date.parse(observation.observedAt)),
+    `${side}.observedAt must be a valid timestamp`,
+  )
+  assert(
     ALLOWED_SOURCES.has(observation.source),
     `${side}.source is not an allowed observed source`,
   )
