@@ -9,11 +9,29 @@ export type NextObservationLine = {
   ingredientId: string
 } | null
 
+function assertNextObservationTarget(
+  value: unknown,
+): asserts value is Exclude<NextObservationLine, null> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid next observation target')
+  }
+
+  const target = value as Record<string, unknown>
+  if (
+    (target.side !== 'baseline' && target.side !== 'candidate') ||
+    typeof target.ingredientId !== 'string' ||
+    !target.ingredientId.trim()
+  ) {
+    throw new Error('Invalid next observation target')
+  }
+}
+
 export function nextObservationActionLabel(
   sheet: ObservationSheet,
   next: NextObservationLine,
 ): string {
-  if (!next) return 'Alle regels zijn gemeten'
+  if (next === null) return 'Alle regels zijn gemeten'
+  assertNextObservationTarget(next)
 
   const retailer = M3_EXPECTED_RETAILERS[next.side]
   const line = sheet[next.side].lines.find(
