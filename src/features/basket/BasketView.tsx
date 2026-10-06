@@ -105,7 +105,7 @@ export function BasketView({
 
       <div className="comparison-card" data-comparison-outcome={comparison.outcome}>
         <span className="eyebrow">Gecontroleerde winkelvergelijking</span>
-        <strong>{comparisonTitle(comparison, comparisonCandidate)}</strong>
+        <strong role="heading" aria-level={3}>{comparisonTitle(comparison, comparisonCandidate)}</strong>
         <div className="comparison-totals">
           <div>
             <span>Baseline · {comparisonBaseline.store.name}</span>
