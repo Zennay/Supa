@@ -30,7 +30,7 @@ test('malformed money text fails closed instead of being rewritten into another 
   }
 })
 
-test('normalizes representative AH and PLUS pack strings', () => {
+test('normalizes representative AH, PLUS and DekaMarkt pack strings', () => {
   assert.deepEqual(normalizePackText('1 l'), {
     rawText: '1 l',
     count: 1,
@@ -55,6 +55,12 @@ test('normalizes representative AH and PLUS pack strings', () => {
     amount: 1,
     unit: 'l',
   })
+  assert.deepEqual(normalizePackText('1 kg (ca. 5 stuks)'), {
+    rawText: '1 kg (ca. 5 stuks)',
+    count: 1,
+    amount: 1,
+    unit: 'kg',
+  })
 })
 
 test('unknown pack text remains explicit instead of guessed', () => {
@@ -64,6 +70,22 @@ test('unknown pack text remains explicit instead of guessed', () => {
     amount: null,
     unit: 'unknown',
   })
+})
+
+test('ambiguous trailing pack text fails closed instead of accepting a parsed prefix', () => {
+  for (const input of [
+    '500 g voordeel',
+    '500 g x 2',
+    '6 x 1 l aanbieding',
+    '1 kg (ca. vijf stuks)',
+  ]) {
+    assert.deepEqual(normalizePackText(input), {
+      rawText: input,
+      count: 1,
+      amount: null,
+      unit: 'unknown',
+    })
+  }
 })
 
 test('normalizes common supermarket offer mechanics without guessing unknown labels', () => {
