@@ -53,3 +53,40 @@ test('basket fails closed when the selected product identity is blank', () => {
     /matched product identity is blank or malformed/,
   )
 })
+
+
+test('basket rejects blank ingredient identities before aggregation', () => {
+  const invalidRecipes = [
+    {
+      ...recipes[0],
+      ingredients: [
+        {
+          ...recipes[0].ingredients[0],
+          id: '   ',
+        },
+      ],
+    },
+  ]
+
+  assert.throws(
+    () =>
+      buildOneStoreBasket({
+        store,
+        plan,
+        recipes: invalidRecipes,
+        activeDays: ['Ma'],
+        products: [
+          {
+            id: 'basmati-150',
+            storeId: store.id,
+            name: 'Basmati rijst',
+            packAmount: 150,
+            packUnit: 'g',
+            available: true,
+            priceCents: 149,
+          },
+        ],
+      }),
+    /Ingredient identity must be non-blank/,
+  )
+})

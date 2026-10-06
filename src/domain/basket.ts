@@ -98,6 +98,10 @@ export function aggregatePlanIngredients(
     const recipe = matchingRecipes[0]
 
     for (const ingredient of recipe.ingredients) {
+      if (typeof ingredient.id !== 'string' || !ingredient.id.trim()) {
+        throw new Error('Ingredient identity must be non-blank')
+      }
+
       const current = aggregated.get(ingredient.id)
       if (!current) {
         aggregated.set(ingredient.id, { ...ingredient })
