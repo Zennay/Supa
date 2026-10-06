@@ -1,16 +1,35 @@
-import type { GroceryRepository } from './repository'
-import { basket, plan, recipes } from './mock'
+import type { GroceryRepository } from './repository.ts'
+import { basket, plan, recipes } from './mock.ts'
+
+function recipeSnapshot() {
+  return recipes.map((recipe) => ({
+    ...recipe,
+    tags: [...recipe.tags],
+  }))
+}
+
+function planSnapshot() {
+  return plan.map((meal) => ({ ...meal }))
+}
+
+function basketSnapshot() {
+  return {
+    ...basket,
+    store: { ...basket.store },
+    lines: basket.lines.map((line) => ({ ...line })),
+  }
+}
 
 export const mockRepository: GroceryRepository = {
   async getRecipes() {
-    return recipes
+    return recipeSnapshot()
   },
 
   async getPlan() {
-    return plan
+    return planSnapshot()
   },
 
   async getBasket() {
-    return basket
+    return basketSnapshot()
   },
 }
