@@ -19,20 +19,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function isCanonicalIdentity(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value === value.trim()
-  )
+function isNonBlankString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
 }
 
 function isMatchUnit(value: unknown): value is string {
   return typeof value === 'string' && matchUnits.has(value)
 }
 
-function isPositiveFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0
+function isPositiveSafeInteger(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value > 0
+  )
 }
 
 function isNonNegativeSafeInteger(value: unknown): value is number {
@@ -43,8 +43,20 @@ function isNonNegativeSafeInteger(value: unknown): value is number {
   )
 }
 
+function isPositiveFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+}
+
+function numberForBasketKey(value: number): number | string {
+  if (Number.isNaN(value)) return '__supa_number__:nan'
+  if (value === Number.POSITIVE_INFINITY) return '__supa_number__:positive_infinity'
+  if (value === Number.NEGATIVE_INFINITY) return '__supa_number__:negative_infinity'
+  if (Object.is(value, -0)) return '__supa_number__:negative_zero'
+  return value
+}
+
 function projectBasketLine(value: unknown): Record<string, unknown> | null {
-  if (!isRecord(value) || !isCanonicalIdentity(value.id)) return null
+  if (!isRecord(value) || !isNonBlankString(value.id)) return null
   if (!isRecord(value.requirement) || !isMatchUnit(value.requirement.unit)) {
     return null
   }
@@ -52,7 +64,7 @@ function projectBasketLine(value: unknown): Record<string, unknown> | null {
   if (value.status === 'unresolved') {
     if (
       value.requirement.amount !== null &&
-      !isPositiveFiniteNumber(value.requirement.amount)
+      typeof value.requirement.amount !== 'number'
     ) {
       return null
     }
@@ -60,7 +72,10 @@ function projectBasketLine(value: unknown): Record<string, unknown> | null {
     return {
       id: value.id,
       status: value.status,
-      amount: value.requirement.amount,
+      amount:
+        value.requirement.amount === null
+          ? null
+          : numberForBasketKey(value.requirement.amount),
       unit: value.requirement.unit,
     }
   }
@@ -68,13 +83,12 @@ function projectBasketLine(value: unknown): Record<string, unknown> | null {
   if (value.status !== 'matched') return null
   if (
     !isPositiveFiniteNumber(value.requirement.amount) ||
-    !isCanonicalIdentity(value.productId) ||
-    !isNonNegativeSafeInteger(value.packs) ||
-    value.packs === 0 ||
+    !isNonBlankString(value.productId) ||
+    !isPositiveSafeInteger(value.packs) ||
     !isRecord(value.pack) ||
     !isPositiveFiniteNumber(value.pack.amount) ||
     !isMatchUnit(value.pack.unit) ||
-    !isPositiveFiniteNumber(value.pack.count) ||
+    !isPositiveSafeInteger(value.pack.count) ||
     !isNonNegativeSafeInteger(value.pricePerPackCents) ||
     !isNonNegativeSafeInteger(value.lineTotalCents)
   ) {
@@ -100,7 +114,7 @@ function shoppingListBasketState(basket: unknown): ShoppingListBasketState | nul
   if (
     !isRecord(basket) ||
     !isRecord(basket.store) ||
-    !isCanonicalIdentity(basket.store.id) ||
+    !isNonBlankString(basket.store.id) ||
     !Array.isArray(basket.lines)
   ) {
     return null
