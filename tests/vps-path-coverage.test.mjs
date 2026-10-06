@@ -2,24 +2,56 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-const workflowPath = '.github/workflows/vps-mobile-foundation.yml'
+function hasQuotedPathTrigger(workflow, path) {
+  return workflow.includes(`- "${path}"`) || workflow.includes(`- '${path}'`)
+}
 
 test('permanent VPS mobile validation watches every domain module', async () => {
-  const workflow = await readFile(workflowPath, 'utf8')
+  const workflow = await readFile(
+    '.github/workflows/vps-mobile-foundation.yml',
+    'utf8',
+  )
 
-  assert.match(
-    workflow,
-    /^\s*- ["']src\/domain\/\*\*["']\s*$/m,
+  assert.equal(
+    hasQuotedPathTrigger(workflow, 'src/domain/**'),
+    true,
     'domain validation must fail safe: every src/domain change should trigger the permanent VPS test/build lane',
   )
 })
 
 test('permanent VPS mobile validation still runs the locked full test/build contract', async () => {
-  const workflow = await readFile(workflowPath, 'utf8')
+  const workflow = await readFile(
+    '.github/workflows/vps-mobile-foundation.yml',
+    'utf8',
+  )
 
   assert.match(workflow, /^\s*runs-on:\s*self-hosted\s*$/m)
   assert.match(workflow, /^\s*- run: npm ci\s*$/m)
   assert.match(workflow, /^\s*- run: npm test\s*$/m)
   assert.match(workflow, /^\s*- run: npm run build\s*$/m)
   assert.match(workflow, /vps-bb300bba/)
+})
+
+test('rendered M2 proof watches every domain dependency in the planner-to-list route', async () => {
+  const workflow = await readFile('.github/workflows/m2-vps-e2e.yml', 'utf8')
+  const requiredDomainPaths = [
+    'src/domain/basket.ts',
+    'src/domain/basketComparison.ts',
+    'src/domain/matching.ts',
+    'src/domain/planner.ts',
+    'src/domain/plannerPreferences.ts',
+    'src/domain/types.ts',
+  ]
+
+  for (const path of requiredDomainPaths) {
+    assert.equal(
+      hasQuotedPathTrigger(workflow, path),
+      true,
+      `rendered M2 proof must trigger when ${path} changes`,
+    )
+  }
+
+  assert.match(workflow, /^\s*runs-on:\s*self-hosted\s*$/m)
+  assert.match(workflow, /vps-bb300bba/)
+  assert.match(workflow, /node tests\/m2-browser-e2e\.mjs/)
 })
