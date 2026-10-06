@@ -3,6 +3,22 @@ import { stat, readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const EVIDENCE_SCRIPT_PREFIX = /^(?:m1:|m3:|m4:|aud005:)/
+const EXPECTED_EVIDENCE_SCRIPTS = [
+  'aud005:record-retailer-response',
+  'm1:compare-captures',
+  'm1:evaluate-freshness',
+  'm1:evidence-summary',
+  'm1:export-candidates',
+  'm1:inspect-captures',
+  'm1:matching-benchmark',
+  'm1:promote-reviewed',
+  'm1:source-permission-gate',
+  'm1:source-production-ready',
+  'm3:assess-observed-week',
+  'm3:build-observed-study',
+  'm3:create-observation-sheet',
+  'm4:validate-beta-session',
+]
 const SAFE_NODE_COMMAND =
   /^node(?: --experimental-strip-types)? (scripts\/[a-z0-9][a-z0-9-]*\.mjs)(?: --[a-z0-9-]+)*$/i
 
@@ -13,10 +29,19 @@ async function readPackageScripts() {
   )
 }
 
+test('required evidence npm scripts cannot silently disappear', async () => {
+  const scripts = await readPackageScripts()
+  const names = scripts.map(([name]) => name).sort()
+
+  assert.deepEqual(
+    names,
+    EXPECTED_EVIDENCE_SCRIPTS,
+    'evidence CLI set changed; review the executable evidence boundary explicitly',
+  )
+})
+
 test('evidence npm scripts stay single checked-in Node entrypoints', async () => {
   const scripts = await readPackageScripts()
-
-  assert.ok(scripts.length > 0, 'expected evidence CLI npm scripts')
 
   for (const [name, command] of scripts) {
     assert.equal(typeof command, 'string', name + ' must remain a string npm command')
