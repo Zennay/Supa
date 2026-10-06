@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { basketCostDisclosure, basketLineExplanation, comparisonWarningCopy } from '../src/features/basket/basketPresentation.ts'
+import {
+  basketCostDisclosure,
+  basketLineExplanation,
+  basketReviewSummary,
+  comparisonWarningCopy,
+  orderBasketLinesForReview,
+} from '../src/features/basket/basketPresentation.ts'
 
 test('basket cost disclosure exposes an exact total only when every line is resolved', () => {
   const display = basketCostDisclosure(3008, 0)
@@ -32,6 +38,41 @@ test('basket cost disclosure fails closed on an invalid unresolved count', () =>
   }
 })
 
+test('basket review summary is explicit only when attention is needed', () => {
+  assert.equal(basketReviewSummary(0), null)
+  assert.equal(
+    basketReviewSummary(1),
+    '1 productkeuze vraagt jouw controle. Die staat bovenaan.',
+  )
+  assert.equal(
+    basketReviewSummary(3),
+    '3 productkeuzes vragen jouw controle. Die staan bovenaan.',
+  )
+  assert.equal(
+    basketReviewSummary(Number.NaN),
+    'Er zijn productkeuzes die jouw controle vragen. Die staan bovenaan.',
+  )
+})
+
+test('basket review ordering moves unresolved choices first without reordering either group', () => {
+  const lines = [
+    { id: 'matched-a', status: 'matched' },
+    { id: 'open-a', status: 'unresolved' },
+    { id: 'matched-b', status: 'matched' },
+    { id: 'open-b', status: 'unresolved' },
+  ]
+
+  assert.deepEqual(
+    orderBasketLinesForReview(lines).map((line) => line.id),
+    ['open-a', 'open-b', 'matched-a', 'matched-b'],
+  )
+  assert.deepEqual(lines.map((line) => line.id), [
+    'matched-a',
+    'open-a',
+    'matched-b',
+    'open-b',
+  ])
+})
 
 test('comparison warning explains unresolved product choices without leaking domain diagnostics', () => {
   assert.equal(
@@ -93,4 +134,3 @@ test('unknown matcher diagnostics stay hidden behind a safe generic explanation'
     'SUPA kan hier niet betrouwbaar automatisch kiezen; kies zelf.',
   )
 })
-
