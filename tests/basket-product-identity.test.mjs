@@ -90,3 +90,28 @@ test('basket rejects blank ingredient identities before aggregation', () => {
     /Ingredient identity must be non-blank/,
   )
 })
+
+
+test('basket rejects a blank store identity before calculation', () => {
+  assert.throws(
+    () =>
+      buildOneStoreBasket({
+        store: { id: '   ', name: 'Unnamed store' },
+        plan,
+        recipes,
+        activeDays: ['Ma'],
+        products: [
+          {
+            id: 'basmati-150',
+            storeId: '   ',
+            name: 'Basmati rijst',
+            packAmount: 150,
+            packUnit: 'g',
+            available: true,
+            priceCents: 149,
+          },
+        ],
+      }),
+    /Store identity must be non-blank/,
+  )
+})
