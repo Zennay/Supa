@@ -62,7 +62,9 @@ function hasValidRequirementShape(value: unknown): value is IngredientRequiremen
   const requirement = value as Record<string, unknown>
   return (
     typeof requirement.id === 'string' &&
+    requirement.id.trim().length > 0 &&
     typeof requirement.query === 'string' &&
+    requirement.query.trim().length > 0 &&
     (requirement.amount === null || typeof requirement.amount === 'number') &&
     isMatchUnit(requirement.unit)
   )
