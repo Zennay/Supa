@@ -154,6 +154,25 @@ test('M3 attribution rejects duplicate evidence items instead of double-counting
   assert.match(result.reasons.join(' '), /duplicate attribution evidence for tomato/)
 })
 
+test('M3 attribution rejects unsafe integer cent evidence', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison(),
+    evidence: [
+      {
+        lineId: 'tomato',
+        effect: 'offer',
+        deltaCents: Number.MAX_SAFE_INTEGER + 1,
+        evidenceRef: 'unsafe-integer-evidence',
+      },
+    ],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /safe integer cents/)
+})
+
 test('M3 attribution fails closed when evidence over-attributes a line', () => {
   const result = attributeSavingsEffects({
     comparison: comparison(),

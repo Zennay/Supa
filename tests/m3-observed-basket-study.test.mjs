@@ -242,6 +242,23 @@ test('M3 observed-basket study carries basket uncertainty into study claimabilit
   assert.match(result.reasons.join(' '), /unresolved ingredients/)
 })
 
+test('M3 observed-basket study fails closed on unsafe monetary integers', () => {
+  const value = study()
+  const line = value.baseline.basket.lines.find(
+    (candidate) => candidate.status === 'matched',
+  )
+  assert.ok(line && line.status === 'matched')
+
+  line.lineTotalCents = Number.MAX_SAFE_INTEGER + 1
+  value.baseline.basket.totalCents = Number.MAX_SAFE_INTEGER + 1
+
+  const result = assessWeeklyBasketStudy(value)
+
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.match(result.reasons.join(' '), /invalid monetary value/)
+})
+
 test('M3 observed-basket study requires pseudonymous path-safe participant keys', () => {
   const result = assessWeeklyBasketStudy(
     study({ participantKey: 'Jane Doe <jane@example.com>' }),

@@ -89,8 +89,8 @@ export function attributeSavingsEffects({
       continue
     }
 
-    if (!Number.isInteger(item.deltaCents)) {
-      reasons.push(`attribution for ${item.lineId} must use integer cents`)
+    if (!Number.isSafeInteger(item.deltaCents)) {
+      reasons.push(`attribution for ${item.lineId} must use safe integer cents`)
       continue
     }
 
@@ -163,6 +163,11 @@ export function attributeSavingsEffects({
       0,
     )
 
+    if (!Number.isSafeInteger(attributedForLine)) {
+      reasons.push(`attribution total exceeds safe integer cents for ${line.id}`)
+      continue
+    }
+
     if (
       (line.deltaCents > 0 && attributedForLine > line.deltaCents) ||
       (line.deltaCents < 0 && attributedForLine < line.deltaCents) ||
@@ -173,11 +178,25 @@ export function attributeSavingsEffects({
     }
 
     for (const item of lineEvidence) {
-      effectTotals[effectKey(item.effect)] += item.deltaCents
+      const key = effectKey(item.effect)
+      const nextEffectTotal = effectTotals[key] + item.deltaCents
+      if (!Number.isSafeInteger(nextEffectTotal)) {
+        reasons.push(`attribution ${item.effect} total exceeds safe integer cents`)
+        continue
+      }
+      effectTotals[key] = nextEffectTotal
     }
 
     const unknownRemainder = line.deltaCents - attributedForLine
-    effectTotals.unknownCents! += unknownRemainder
+    const nextUnknownTotal = effectTotals.unknownCents! + unknownRemainder
+    if (
+      !Number.isSafeInteger(unknownRemainder) ||
+      !Number.isSafeInteger(nextUnknownTotal)
+    ) {
+      reasons.push(`attribution unknown total exceeds safe integer cents for ${line.id}`)
+      continue
+    }
+    effectTotals.unknownCents = nextUnknownTotal
     if (unknownRemainder !== 0) {
       hasUnknownRemainder = true
     }
@@ -198,6 +217,16 @@ export function attributeSavingsEffects({
     effectTotals.offerCents +
     effectTotals.planningCents
   const accountedTotal = knownTotal + effectTotals.unknownCents!
+
+  if (!Number.isSafeInteger(knownTotal) || !Number.isSafeInteger(accountedTotal)) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: comparison.deltaCents,
+      effectTotals: emptyTotals(),
+      reasons: ['attribution aggregate exceeds safe integer cents'],
+    }
+  }
 
   if (accountedTotal !== comparison.deltaCents) {
     return {

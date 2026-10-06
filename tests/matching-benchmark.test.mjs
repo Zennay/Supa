@@ -83,6 +83,25 @@ test('invalid multipack counts fail closed', () => {
   assert.match(decision.reasons.join(' '), /invalid pack count/)
 })
 
+test('unsafe multipack counts fail closed before scoring', () => {
+  const decision = matchIngredient(
+    { id: 'milk', query: 'halfvolle melk', amount: 1, unit: 'l' },
+    [
+      {
+        id: 'unsafe-pack',
+        name: 'Halfvolle melk',
+        packAmount: 1,
+        packUnit: 'l',
+        packCount: Number.MAX_SAFE_INTEGER + 1,
+        available: true,
+      },
+    ],
+  )
+
+  assert.equal(decision.type, 'abstain')
+  assert.match(decision.reasons.join(' '), /invalid pack count/)
+})
+
 test('invalid requirement quantities fail closed before scoring', () => {
   const zeroCase = cases.find(
     (candidate) => candidate.id === 'invalid-requirement-zero-amount',

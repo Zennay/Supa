@@ -150,6 +150,29 @@ test('M3 readiness rejects incomplete product details for an available line', ()
 })
 
 
+test('M3 readiness and progress reject unsafe integer collection values', () => {
+  const sheet = completeSheet()
+  const line = sheet.baseline.lines[0]
+  line.observedProduct.packCount = Number.MAX_SAFE_INTEGER + 1
+  line.observedProduct.priceCents = Number.MAX_SAFE_INTEGER + 1
+
+  const readiness = observationSheetReadiness(sheet)
+  const progress = observationSheetProgress(sheet)
+
+  assert.equal(readiness.ready, false)
+  assert.ok(
+    readiness.issues.some((issue) =>
+      issue.includes('aantal per verpakking moet minimaal 1 zijn'),
+    ),
+  )
+  assert.ok(
+    readiness.issues.some((issue) =>
+      issue.includes('prijs per verpakking ontbreekt of is ongeldig'),
+    ),
+  )
+  assert.equal(progress.completeLines, 21)
+})
+
 test('M3 progress only counts lines complete when required observed product details exist', () => {
   const sheet = buildObservationSheet()
   const unavailable = sheet.baseline.lines[0]

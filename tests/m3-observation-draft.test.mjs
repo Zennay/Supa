@@ -67,6 +67,22 @@ test('M3 local draft recovery sanitizes malformed editable product values', () =
 })
 
 
+test('M3 local draft recovery sanitizes unsafe integer collection values', () => {
+  const sheet = buildObservationSheet()
+  sheet.baseline.lines[0].observedProduct.available = true
+  sheet.baseline.lines[0].observedProduct.productName = 'Observed chicken'
+  sheet.baseline.lines[0].observedProduct.packAmount = 600
+  sheet.baseline.lines[0].observedProduct.packUnit = 'g'
+  sheet.baseline.lines[0].observedProduct.packCount = Number.MAX_SAFE_INTEGER + 1
+  sheet.baseline.lines[0].observedProduct.priceCents = Number.MAX_SAFE_INTEGER + 1
+
+  const restored = restoreObservationSheetDraft(JSON.stringify(sheet))
+
+  assert.ok(restored)
+  assert.equal(restored.baseline.lines[0].observedProduct.packCount, 1)
+  assert.equal(restored.baseline.lines[0].observedProduct.priceCents, null)
+})
+
 test('M3 availability reset clears stale observed product details', () => {
   const sheet = buildObservationSheet()
   const product = sheet.baseline.lines[0].observedProduct

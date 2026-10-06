@@ -91,7 +91,7 @@ function scoreCandidate(
   }
 
   const packCount = candidate.packCount ?? 1
-  if (!Number.isInteger(packCount) || packCount <= 0) {
+  if (!Number.isSafeInteger(packCount) || packCount <= 0) {
     return { score: -100, reasons: ['invalid pack count'] }
   }
 

@@ -30,11 +30,17 @@ function requireString(value, path) {
 }
 
 function requireNonNegativeInteger(value, path) {
-  assert(Number.isInteger(value) && value >= 0, `${path} must be a non-negative integer`)
+  assert(
+    Number.isSafeInteger(value) && value >= 0,
+    `${path} must be a non-negative safe integer`,
+  )
 }
 
 function requirePositiveInteger(value, path) {
-  assert(Number.isInteger(value) && value > 0, `${path} must be a positive integer`)
+  assert(
+    Number.isSafeInteger(value) && value > 0,
+    `${path} must be a positive safe integer`,
+  )
 }
 
 function requirePositiveNumber(value, path) {
@@ -144,6 +150,10 @@ function validateBasket(basket, path) {
     0,
   )
 
+  assert(
+    Number.isSafeInteger(calculatedTotalCents),
+    `${path}.totalCents sum must remain within the safe integer range`,
+  )
   assert(
     basket.totalCents === calculatedTotalCents,
     `${path}.totalCents must equal the sum of matched line totals`,

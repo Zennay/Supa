@@ -179,7 +179,7 @@ export function buildOneStoreBasket({
       !required ||
       !pack ||
       required.family !== pack.family ||
-      !Number.isInteger(product.priceCents) ||
+      !Number.isSafeInteger(product.priceCents) ||
       product.priceCents < 0
     ) {
       return {
@@ -193,6 +193,21 @@ export function buildOneStoreBasket({
     }
 
     const packs = Math.ceil(required.amount / pack.amount)
+    const lineTotalCents = packs * product.priceCents
+    if (!Number.isSafeInteger(packs) || !Number.isSafeInteger(lineTotalCents)) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: [
+          ...decision.reasons,
+          'basket quantity or monetary total exceeds the safe integer range',
+        ],
+        matchScore: decision.score,
+      }
+    }
+
     return {
       id: ingredient.id,
       ingredientLabel: ingredient.label,
@@ -207,7 +222,7 @@ export function buildOneStoreBasket({
         count: packCount,
       },
       pricePerPackCents: product.priceCents,
-      lineTotalCents: packs * product.priceCents,
+      lineTotalCents,
       matchScore: decision.score,
       reasons: decision.reasons,
     }

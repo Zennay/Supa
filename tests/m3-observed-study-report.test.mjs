@@ -205,6 +205,47 @@ test('M3 observed input preflight rejects inconsistent observed line money', () 
   )
 })
 
+test('M3 observed input preflight rejects unsafe monetary integers', () => {
+  const study = observedStudy()
+  const matchedIndex = study.baseline.basket.lines.findIndex(
+    (line) => line.status === 'matched',
+  )
+  assert.ok(matchedIndex >= 0)
+
+  study.baseline.basket.lines[matchedIndex] = {
+    ...study.baseline.basket.lines[matchedIndex],
+    pricePerPackCents: Number.MAX_SAFE_INTEGER + 1,
+    lineTotalCents: Number.MAX_SAFE_INTEGER + 1,
+  }
+  study.baseline.basket.totalCents = Number.MAX_SAFE_INTEGER + 1
+
+  assert.throws(
+    () => validateObservedWeekInput(study),
+    /non-negative safe integer/,
+  )
+})
+
+test('M3 observed input preflight rejects an unsafe aggregate line-total sum', () => {
+  const study = observedStudy()
+  const matchedLines = study.baseline.basket.lines.filter(
+    (line) => line.status === 'matched',
+  )
+  assert.ok(matchedLines.length >= 2)
+
+  for (const line of matchedLines.slice(0, 2)) {
+    line.pricePerPackCents = Math.floor(
+      Number.MAX_SAFE_INTEGER / (2 * line.packs),
+    )
+    line.lineTotalCents = line.packs * line.pricePerPackCents
+  }
+  study.baseline.basket.totalCents = 0
+
+  assert.throws(
+    () => validateObservedWeekInput(study),
+    /sum must remain within the safe integer range/,
+  )
+})
+
 test('M3 observed input preflight rejects a matched pack count that disagrees with demand', () => {
   const study = observedStudy()
   const matchedIndex = study.baseline.basket.lines.findIndex(

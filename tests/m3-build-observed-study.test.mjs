@@ -95,6 +95,19 @@ test('M3 converter preserves a missing observed price as unresolved instead of i
   assert.match(line.reasons.join(' '), /price is unknown/i)
 })
 
+test('M3 converter preserves unsafe cent values as unresolved evidence', () => {
+  const sheet = completedSheet()
+  sheet.baseline.lines[1].observedProduct.priceCents = Number.MAX_SAFE_INTEGER + 1
+
+  const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  const line = study.baseline.basket.lines.find(
+    (candidate) => candidate.id === sheet.requirements[1].id,
+  )
+
+  assert.equal(line.status, 'unresolved')
+  assert.match(line.reasons.join(' '), /price is unknown or invalid/i)
+})
+
 test('M3 converter refuses retailer drift from the canonical PLUS + DekaMarkt pair', () => {
   const wrongBaseline = completedSheet()
   wrongBaseline.baseline.store.name = 'Andere supermarkt'
