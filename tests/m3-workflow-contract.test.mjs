@@ -38,6 +38,9 @@ test('M3 observed-week workflow keeps every evidence-boundary dependency in its 
     'scripts/m3-build-observed-study.mjs',
     'scripts/m3-assess-observed-week.mjs',
     'src/domain/observedBasketStudy.ts',
+    'src/domain/basket.ts',
+    'src/domain/m3ObservationSheet.ts',
+    'src/domain/matching.ts',
     'src/domain/basketComparison.ts',
     'src/domain/savingsAttribution.ts',
     'tests/m3-observation-sheet.test.mjs',
@@ -46,6 +49,7 @@ test('M3 observed-week workflow keeps every evidence-boundary dependency in its 
     'tests/m3-savings-attribution.test.mjs',
     'tests/m3-workflow-contract.test.mjs',
     'package.json',
+    'package-lock.json',
   ]
 
   for (const path of requiredPaths) {
