@@ -78,6 +78,34 @@ function observedStudy(overrides = {}) {
   }
 }
 
+test('M3 report preflight rejects unsafe identifiers before emitting an artifact', () => {
+  assert.throws(
+    () => buildObservedWeekReport(observedStudy({ studyId: 'person@example.com' })),
+    /studyId must be a path-safe study key/,
+  )
+
+  assert.throws(
+    () =>
+      buildObservedWeekReport(
+        observedStudy({
+          participantKey: 'Student Name',
+        }),
+      ),
+    /participantKey must be a pseudonymous path-safe key/,
+  )
+
+  const studyWithUnsafeEvidenceId = observedStudy()
+  studyWithUnsafeEvidenceId.baseline = {
+    ...studyWithUnsafeEvidenceId.baseline,
+    evidenceId: 'receipt for person@example.com',
+  }
+
+  assert.throws(
+    () => buildObservedWeekReport(studyWithUnsafeEvidenceId),
+    /baseline\.evidenceId must be a path-safe evidence key/,
+  )
+})
+
 test('M3 report runner keeps participant key out of the emitted assessment', () => {
   const report = buildObservedWeekReport(observedStudy())
 

@@ -106,6 +106,10 @@ export function compareFullBaskets({
     ...inspectBasket('candidate', candidate),
   ]
 
+  if (baseline.store.id === candidate.store.id) {
+    reasons.push('baseline and candidate stores must differ')
+  }
+
   if (baseline.selectedMealCount !== candidate.selectedMealCount) {
     reasons.push('basket plans select a different number of meals')
   }
@@ -133,6 +137,11 @@ export function compareFullBaskets({
     const candidateLine = candidateById.get(id)
     if (!candidateLine) {
       reasons.push(`candidate basket is missing ingredient ${id}`)
+      continue
+    }
+
+    if (baselineLine.ingredientLabel !== candidateLine.ingredientLabel) {
+      reasons.push(`ingredient label differs for ${id}`)
       continue
     }
 
