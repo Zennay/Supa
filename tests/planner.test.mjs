@@ -116,6 +116,25 @@ test('planned cost fails closed on malformed active runtime identities and entri
   )
 })
 
+test('planned cost rejects whitespace-padded active planner identities', () => {
+  for (const paddedDay of [' Ma', 'Ma ', '\tMa']) {
+    assert.equal(getPlannedCost(plan, recipes, [paddedDay]), null)
+  }
+
+  for (const paddedRecipeId of [' cheap', 'cheap ', '\tcheap']) {
+    const paddedPlan = [{ day: 'Ma', recipeId: paddedRecipeId }]
+    const paddedRecipes = [
+      { ...recipes[0], id: paddedRecipeId },
+      recipes[1],
+    ]
+
+    assert.equal(
+      getPlannedCost(paddedPlan, paddedRecipes, ['Ma']),
+      null,
+    )
+  }
+})
+
 test('budget state exposes remaining money and usage', () => {
   const state = getBudgetState(23.5, 35)
 
