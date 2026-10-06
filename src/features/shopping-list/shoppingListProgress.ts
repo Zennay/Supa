@@ -73,9 +73,15 @@ export function serializeShoppingListProgress(
   doneLineIds: string[],
 ): string {
   const validIds = new Set(basket.lines.map((line) => line.id))
-  const safeDoneLineIds = Array.from(
-    new Set(doneLineIds.filter((id) => validIds.has(id))),
-  )
+  const safeDoneLineIds = Array.isArray(doneLineIds)
+    ? Array.from(
+        new Set(
+          doneLineIds.filter(
+            (id): id is string => typeof id === 'string' && validIds.has(id),
+          ),
+        ),
+      )
+    : []
 
   return JSON.stringify({
     schemaVersion: 1,
