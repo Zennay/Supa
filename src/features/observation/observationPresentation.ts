@@ -1,0 +1,32 @@
+import {
+  M3_EXPECTED_RETAILERS,
+  type M3ObservationSide,
+} from '../../domain/m3ObservationSheet.ts'
+
+export type ObservationRetailerCopy = {
+  eyebrow: string
+  expectedRetailer: string
+  emptyStoreLabel: string
+  storePlaceholder: string
+  guidance: string
+}
+
+export function observationRetailerCopy(
+  side: M3ObservationSide,
+): ObservationRetailerCopy {
+  const expectedRetailer = M3_EXPECTED_RETAILERS[side]
+
+  return {
+    eyebrow:
+      side === 'baseline'
+        ? `Baseline · ${expectedRetailer}`
+        : `Vergelijking · ${expectedRetailer}`,
+    expectedRetailer,
+    emptyStoreLabel: `${expectedRetailer} nog niet ingevuld`,
+    storePlaceholder: `Bijv. ${expectedRetailer} Leiden`,
+    guidance:
+      side === 'baseline'
+        ? 'Voor deze M3-meting hoort de baseline bij PLUS. Een andere supermarkt wordt door de preflight geweigerd.'
+        : 'Voor deze M3-meting hoort de vergelijking bij DekaMarkt. Een andere supermarkt wordt door de preflight geweigerd.',
+  }
+}

@@ -17,17 +17,13 @@ import {
   type ObservedProduct,
   type StoreObservation,
 } from '../../domain/m3ObservationSheet.ts'
+import { observationRetailerCopy } from './observationPresentation.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
   keyof ObservationSheet['study'],
   'maxObservationWindowHours' | 'priceContext'
 >
-
-const sideLabels: Record<Side, string> = {
-  baseline: 'Winkel A · baseline',
-  candidate: 'Winkel B · vergelijking',
-}
 
 const sourceOptions: { value: ObservationSource; label: string }[] = [
   { value: 'manual-cart', label: 'Handmatige winkelmand' },
@@ -469,18 +465,23 @@ export function ObservationView() {
       {(['baseline', 'candidate'] as Side[]).map((side) => {
         const observation = sheet[side]
         const storeProgress = observationStoreProgress(observation)
+        const retailerCopy = observationRetailerCopy(side)
 
         return (
           <div className="observation-card" key={side} data-observation-side={side}>
             <div className="observation-card-heading">
               <div>
-                <span className="eyebrow">{sideLabels[side]}</span>
-                <h3>{observation.store.name || 'Nog geen winkel ingevuld'}</h3>
+                <span className="eyebrow">{retailerCopy.eyebrow}</span>
+                <h3>{observation.store.name || retailerCopy.emptyStoreLabel}</h3>
               </div>
               <span className="observation-count">
                 {storeProgress.completeLines}/{storeProgress.totalLines} compleet
               </span>
             </div>
+
+            <p className="disclaimer">
+              {retailerCopy.guidance}
+            </p>
 
             <div className="field-grid">
               <label>
@@ -490,7 +491,7 @@ export function ObservationView() {
                   onChange={(event) =>
                     updateStore(side, 'name', event.target.value)
                   }
-                  placeholder="Bijv. PLUS"
+                  placeholder={retailerCopy.storePlaceholder}
                 />
               </label>
               <label>
