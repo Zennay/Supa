@@ -120,6 +120,9 @@ test('reviewed fixtures reject malformed review timestamps', () => {
   for (const reviewedAt of [
     '2026-02-30T02:05:00.000Z',
     '2026-13-04T02:05:00.000Z',
+    '2026-10-04T24:00:00.000Z',
+    '2026-10-04T02:60:00.000Z',
+    '2026-10-04T02:05:00+24:00',
     '10/04/2026 02:05:00',
   ]) {
     const reviewed = fixture('ah')
@@ -129,6 +132,24 @@ test('reviewed fixtures reject malformed review timestamps', () => {
       () => validateReviewedLiveProductFixture(reviewed, 'ah'),
       /valid reviewedAt/,
       reviewedAt,
+    )
+  }
+})
+
+test('reviewed fixtures reject malformed capture timestamps before chronology', () => {
+  for (const capturedAt of [
+    '2026-02-30T02:00:00.000Z',
+    '2026-10-04T24:00:00.000Z',
+    '2026-10-04T02:00:00+24:00',
+  ]) {
+    const reviewed = fixture('ah')
+    reviewed.source.capturedAt = capturedAt
+    reviewed.observation.provenance.capturedAt = capturedAt
+
+    assert.throws(
+      () => validateReviewedLiveProductFixture(reviewed, 'ah'),
+      /valid capturedAt/,
+      capturedAt,
     )
   }
 })
