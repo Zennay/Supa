@@ -279,3 +279,24 @@
   flex-wrap: wrap;
   gap: 10px;
 }
+
+
+.observation-field-with-action {
+  display: grid;
+  gap: 8px;
+  align-self: end;
+}
+
+.observation-now-button,
+.observation-next-inline {
+  justify-self: start;
+}
+
+.observation-now-button {
+  padding: 8px 11px;
+  font-size: 12px;
+}
+
+.observation-next-inline {
+  margin-top: -2px;
+}
