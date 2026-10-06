@@ -236,10 +236,16 @@ try {
       const candidateStoreId = candidate?.querySelector(
         'input[placeholder="dekamarkt-leiden-..."]',
       )
-      if (!nowButton || !candidateStoreId) return null
+      const firstSummary = baseline?.querySelector('.observation-line summary')
+      const primaryAction = document.querySelector('.observation-actions .primary-button')
+      if (!nowButton || !candidateStoreId || !firstSummary || !primaryAction) return null
       nowButton.click()
       return {
         candidateStoreIdHint: candidateStoreId.getAttribute('placeholder'),
+        inputFontSize: getComputedStyle(candidateStoreId).fontSize,
+        inputMinHeight: getComputedStyle(candidateStoreId).minHeight,
+        summaryMinHeight: getComputedStyle(firstSummary).minHeight,
+        primaryActionMinHeight: getComputedStyle(primaryAction).minHeight,
       }
     `,
   )
@@ -248,6 +254,10 @@ try {
     observationQuickEntry.candidateStoreIdHint,
     'dekamarkt-leiden-...',
   )
+  assert.equal(observationQuickEntry.inputFontSize, '16px')
+  assert.equal(observationQuickEntry.inputMinHeight, '44px')
+  assert.equal(observationQuickEntry.summaryMinHeight, '44px')
+  assert.equal(observationQuickEntry.primaryActionMinHeight, '44px')
 
   let observationTimestamp = ''
   for (let attempt = 0; attempt < 20 && !observationTimestamp; attempt += 1) {

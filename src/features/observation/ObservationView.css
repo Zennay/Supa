@@ -77,8 +77,9 @@
   background: #fbfaf6;
   color: var(--ink);
   padding: 11px 12px;
+  min-height: 44px;
   font: inherit;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .field-grid input:focus,
@@ -124,6 +125,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-height: 44px;
   padding: 13px 14px;
 }
 
@@ -194,6 +196,7 @@
 }
 
 .primary-button {
+  min-height: 44px;
   border: 0;
   border-radius: 999px;
   padding: 12px 16px;
