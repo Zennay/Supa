@@ -115,6 +115,24 @@ test('AUD-005 response validator rejects direct PII fields', () => {
   )
 })
 
+test('AUD-005 response validator rejects PII inside evidence references', () => {
+  const emailRecord = validRecord()
+  emailRecord.evidenceRef = 'private-response-person@example.com'
+
+  assert.throws(
+    () => validateRetailerResponseRecord(emailRecord),
+    /evidenceRef must not contain an email address/,
+  )
+
+  const phoneRecord = validRecord()
+  phoneRecord.evidenceRef = 'private-response-+31 20 123 4567'
+
+  assert.throws(
+    () => validateRetailerResponseRecord(phoneRecord),
+    /evidenceRef must not contain a phone number/,
+  )
+})
+
 test('AUD-005 response validator rejects email or phone text inside repository-safe fields', () => {
   const emailRecord = validRecord()
   emailRecord.responseSummary = 'Reply from person@example.com approved the pilot.'
