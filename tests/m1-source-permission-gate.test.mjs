@@ -53,6 +53,23 @@ test('cannot enable production while a source still requires permission', async 
   )
 })
 
+test('rejects credential-bearing and non-default-port evidence URLs', async () => {
+  for (const url of [
+    'https://user@example.com/permission',
+    'https://user:secret@example.com/permission',
+    'https://example.com:8443/permission',
+  ]) {
+    const document = await gate()
+    document.sources[0].evidence[0].url = url
+
+    assert.throws(
+      () => evaluateSourcePermissionGate(document),
+      /evidence requires an HTTPS source URL/,
+      url,
+    )
+  }
+})
+
 test('permitted status requires explicit authorization evidence', async () => {
   const document = await gate()
   const deka = document.sources.find((source) => source.supermarket === 'dekamarkt')
