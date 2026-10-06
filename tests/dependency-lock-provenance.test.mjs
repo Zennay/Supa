@@ -71,3 +71,21 @@ test('dependency install-script surface stays explicitly bounded', () => {
 
   assert.deepEqual(installScriptPackages, ['esbuild', 'fsevents'])
 })
+
+test('root package does not execute install-time lifecycle hooks', () => {
+  const installLifecycleHooks = [
+    'preinstall',
+    'install',
+    'postinstall',
+    'prepublish',
+    'preprepare',
+    'prepare',
+    'postprepare',
+  ]
+
+  const presentHooks = installLifecycleHooks.filter((hook) =>
+    Object.hasOwn(packageJson.scripts ?? {}, hook),
+  )
+
+  assert.deepEqual(presentHooks, [])
+})
