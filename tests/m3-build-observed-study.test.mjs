@@ -108,6 +108,18 @@ test('M3 converter preserves unsafe cent values as unresolved evidence', () => {
   assert.match(line.reasons.join(' '), /price is unknown or invalid/i)
 })
 
+test('M3 converter rejects invalid observation timestamps before building study evidence', () => {
+  for (const side of ['baseline', 'candidate']) {
+    const sheet = completedSheet()
+    sheet[side].observedAt = 'not-a-timestamp'
+
+    assert.throws(
+      () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+      new RegExp(`${side}\\.observedAt must be a valid timestamp`),
+    )
+  }
+})
+
 test('M3 converter refuses retailer drift from the canonical PLUS + DekaMarkt pair', () => {
   const wrongBaseline = completedSheet()
   wrongBaseline.baseline.store.name = 'Andere supermarkt'
