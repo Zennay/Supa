@@ -65,6 +65,18 @@ export function evaluateManifestFreshness(
   if (!Array.isArray(manifest.results)) {
     throw new Error('Capture manifest results must be an array')
   }
+  if (manifest.bounded !== true) {
+    throw new Error('Capture manifest must be explicitly bounded')
+  }
+  if (
+    !Number.isSafeInteger(manifest.sourceCount) ||
+    manifest.sourceCount < 0 ||
+    manifest.sourceCount !== manifest.results.length
+  ) {
+    throw new Error(
+      `Capture manifest sourceCount ${manifest.sourceCount} does not match results length ${manifest.results.length}`,
+    )
+  }
   if (!Number.isFinite(maxCaptureAgeHours) || maxCaptureAgeHours <= 0) {
     throw new Error('maxCaptureAgeHours must be a positive number')
   }
