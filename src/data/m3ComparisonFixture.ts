@@ -35,3 +35,11 @@ export const m3CandidateProducts: StoreProduct[] = withGaramMasala(
   })),
   m3CandidateStore.id,
 )
+
+for (const product of m3BaselineProducts) Object.freeze(product)
+for (const product of m3CandidateProducts) Object.freeze(product)
+
+Object.freeze(m3BaselineStore)
+Object.freeze(m3CandidateStore)
+Object.freeze(m3BaselineProducts)
+Object.freeze(m3CandidateProducts)
