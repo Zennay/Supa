@@ -189,6 +189,20 @@ export function matchIngredient(
   const minimumScore = options.minimumScore ?? 65
   const minimumMargin = options.minimumMargin ?? 12
 
+  if (
+    !Number.isFinite(minimumScore) ||
+    minimumScore <= 0 ||
+    !Number.isFinite(minimumMargin) ||
+    minimumMargin <= 0
+  ) {
+    return {
+      type: 'abstain',
+      score: null,
+      runnerUpScore: null,
+      reasons: ['matching trust thresholds invalid'],
+    }
+  }
+
   if (hasInvalidKnownAmount(requirement.amount)) {
     return {
       type: 'abstain',
