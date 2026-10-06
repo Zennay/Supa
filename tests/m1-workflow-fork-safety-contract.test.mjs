@@ -19,7 +19,10 @@ test('M1 permanent runner rejects fork pull-request heads', () => {
 })
 
 test('M1 fork guard keeps the existing permanent-runner evidence contract', () => {
-  assert.match(workflow, /uses:\\s*actions\\/checkout@v4[\\s\\S]*?persist-credentials:\\s*false/)
+  assert.match(
+    workflow,
+    /uses:\s*actions\/checkout@v4[\s\S]*?persist-credentials:\s*false/,
+  )
   assert.match(workflow, /test "\$\(hostname -s\)" = "vps-bb300bba"/)
   assert.match(workflow, /run:\s*npm ci/)
   assert.match(workflow, /run:\s*npm test/)
