@@ -23,6 +23,20 @@ test('M2 fixture keeps canonical unique identities and valid plan references', (
     assert.equal(recipeIds.has(recipe.id), false, `duplicate recipe id: ${recipe.id}`)
     recipeIds.add(recipe.id)
 
+    assert.equal(Number.isSafeInteger(recipe.minutes), true)
+    assert.ok(recipe.minutes > 0)
+    assert.equal(Number.isSafeInteger(recipe.servings), true)
+    assert.ok(recipe.servings > 0)
+    assert.equal(Number.isFinite(recipe.estimatedCost), true)
+    assert.ok(recipe.estimatedCost >= 0)
+
+    const tags = new Set()
+    for (const tag of recipe.tags) {
+      assert.ok(canonical(tag))
+      assert.equal(tags.has(tag), false, `duplicate tag in ${recipe.id}: ${tag}`)
+      tags.add(tag)
+    }
+
     const ingredientIds = new Set()
     for (const ingredient of recipe.ingredients) {
       assert.ok(canonical(ingredient.id))
