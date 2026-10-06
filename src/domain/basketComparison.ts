@@ -40,11 +40,11 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   }
 
   if (
-    !Number.isInteger(basket.totalCents) ||
+    !Number.isSafeInteger(basket.totalCents) ||
     basket.totalCents < 0 ||
     matched.some(
       (line) =>
-        !Number.isInteger(line.lineTotalCents) || line.lineTotalCents < 0,
+        !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0,
     )
   ) {
     reasons.push(`${label} basket contains an invalid monetary value`)
@@ -54,6 +54,9 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
     (total, line) => total + line.lineTotalCents,
     0,
   )
+  if (!Number.isSafeInteger(calculatedTotal)) {
+    reasons.push(`${label} basket monetary total exceeds safe integer range`)
+  }
   if (calculatedTotal !== basket.totalCents) {
     reasons.push(`${label} basket total does not match its line totals`)
   }
