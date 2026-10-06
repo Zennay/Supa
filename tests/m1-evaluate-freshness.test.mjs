@@ -9,10 +9,13 @@ import {
   evaluateManifestFreshness,
 } from '../scripts/m1-evaluate-freshness.mjs'
 
-function manifest(results) {
+function manifest(results, overrides = {}) {
   return {
     milestone: 'M1 Data Feasibility',
+    bounded: true,
+    sourceCount: results.length,
     results,
+    ...overrides,
   }
 }
 
@@ -30,6 +33,28 @@ function result(overrides = {}) {
     ...overrides,
   }
 }
+
+test('freshness rejects unbounded capture manifests', () => {
+  for (const bounded of [false, 'true', null, undefined]) {
+    assert.throws(
+      () =>
+        evaluateManifestFreshness(manifest([result()], { bounded }), {
+          now: new Date('2026-10-04T01:00:00.000Z'),
+        }),
+      /must be explicitly bounded/,
+    )
+  }
+})
+
+test('freshness rejects declared source counts that do not match results', () => {
+  assert.throws(
+    () =>
+      evaluateManifestFreshness(manifest([result()], { sourceCount: 2 }), {
+        now: new Date('2026-10-04T01:00:00.000Z'),
+      }),
+    /sourceCount 2 does not match results length 1/,
+  )
+})
 
 test('empty capture manifests are never freshness-acceptable', () => {
   const report = evaluateManifestFreshness(manifest([]), {
