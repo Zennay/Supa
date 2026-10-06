@@ -84,3 +84,19 @@ test('evidence npm script names stay wired to their own evidence domains', async
     )
   }
 })
+test('production-ready source gate cannot degrade to permission-only mode', async () => {
+  const scripts = Object.fromEntries(await readPackageScripts())
+  const permissionGate = scripts['m1:source-permission-gate']
+  const productionGate = scripts['m1:source-production-ready']
+
+  assert.doesNotMatch(
+    permissionGate,
+    /(?:^|\s)--require-production-ready(?:\s|$)/,
+    'permission-only gate must remain usable without asserting production readiness',
+  )
+  assert.match(
+    productionGate,
+    /(?:^|\s)--require-production-ready(?:\s|$)/,
+    'production-ready alias must preserve the explicit strict-mode flag',
+  )
+})
