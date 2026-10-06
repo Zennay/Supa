@@ -186,6 +186,26 @@ test('duplicate store product IDs fail closed after a trusted match', () => {
   )
 })
 
+test('duplicate recipe IDs fail instead of silently selecting one definition', () => {
+  const duplicateRecipes = [
+    ...m2Recipes,
+    {
+      ...m2Recipes[0],
+      title: 'Conflicting duplicate recipe',
+    },
+  ]
+
+  assert.throws(
+    () =>
+      aggregatePlanIngredients(
+        [{ day: 'Ma', recipeId: m2Recipes[0].id }],
+        duplicateRecipes,
+        ['Ma'],
+      ),
+    /Ambiguous recipe for planned meal/,
+  )
+})
+
 test('inconsistent ingredient definitions fail instead of silently aggregating', () => {
   const inconsistentRecipes = [
     ...m2Recipes,
