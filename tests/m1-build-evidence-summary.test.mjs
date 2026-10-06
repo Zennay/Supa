@@ -32,6 +32,11 @@ function bundle({
       success: id !== failedId,
     })),
   }
+  manifest.bounded = true
+  manifest.sourceCount = manifest.results.length
+  manifest.successCount = manifest.results.filter((result) => result.success === true).length
+  manifest.failureCount = manifest.results.length - manifest.successCount
+
   const inspection = {
     milestone: 'M1 Data Feasibility',
     sources: ids
@@ -87,6 +92,33 @@ test('rejects malformed manifest capture success flags', () => {
       /Invalid manifest success flag/,
     )
   }
+})
+
+test('rejects unbounded capture manifests before readiness calculation', () => {
+  const data = bundle()
+  data.manifest.bounded = false
+
+  assert.throws(
+    () => buildEvidenceSummary(data),
+    /must be explicitly bounded/,
+  )
+})
+
+test('rejects inconsistent capture manifest counters', () => {
+  const sourceCount = bundle()
+  sourceCount.manifest.sourceCount += 1
+  assert.throws(
+    () => buildEvidenceSummary(sourceCount),
+    /sourceCount does not match results length/,
+  )
+
+  const outcomeCounts = bundle()
+  outcomeCounts.manifest.successCount -= 1
+  outcomeCounts.manifest.failureCount += 1
+  assert.throws(
+    () => buildEvidenceSummary(outcomeCounts),
+    /success\/failure counts do not match results/,
+  )
 })
 
 test('fails readiness when one capture failed', () => {
