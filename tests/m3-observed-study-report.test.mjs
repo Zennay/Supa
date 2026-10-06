@@ -150,6 +150,48 @@ test('M3 observed input preflight rejects inconsistent observed line money', () 
   )
 })
 
+test('M3 observed input preflight rejects underfilled matched quantities', () => {
+  const study = observedStudy()
+  const matchedIndex = study.baseline.basket.lines.findIndex(
+    (line) => line.status === 'matched' && line.packs > 1,
+  )
+  assert.ok(matchedIndex >= 0)
+
+  const line = study.baseline.basket.lines[matchedIndex]
+  study.baseline.basket.lines[matchedIndex] = {
+    ...line,
+    packs: line.packs - 1,
+    lineTotalCents: (line.packs - 1) * line.pricePerPackCents,
+  }
+  study.baseline.basket.totalCents -= line.pricePerPackCents
+
+  assert.throws(
+    () => validateObservedWeekInput(study),
+    /packs must equal the quantity required by requirement and pack size/,
+  )
+})
+
+test('M3 observed input preflight rejects matched lines with incompatible units', () => {
+  const study = observedStudy()
+  const matchedIndex = study.candidate.basket.lines.findIndex(
+    (line) => line.status === 'matched',
+  )
+  assert.ok(matchedIndex >= 0)
+
+  study.candidate.basket.lines[matchedIndex] = {
+    ...study.candidate.basket.lines[matchedIndex],
+    pack: {
+      ...study.candidate.basket.lines[matchedIndex].pack,
+      unit: 'piece',
+    },
+  }
+
+  assert.throws(
+    () => validateObservedWeekInput(study),
+    /pack must be compatible with the ingredient requirement/,
+  )
+})
+
 test('M3 observed input preflight rejects duplicate ingredient ids', () => {
   const study = observedStudy()
   study.baseline.basket.lines[1] = {
