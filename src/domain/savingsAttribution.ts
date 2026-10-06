@@ -63,6 +63,15 @@ export function attributeSavingsEffects({
 
   const comparisonLineIds = new Set<string>()
   for (const line of comparison.lineDeltas) {
+    if (typeof line.id !== 'string' || line.id.trim().length === 0) {
+      return {
+        status: 'unknown',
+        fullyAttributed: false,
+        comparisonDeltaCents: comparison.deltaCents,
+        effectTotals: emptyTotals(),
+        reasons: ['basket comparison contains an invalid line identity'],
+      }
+    }
     if (comparisonLineIds.has(line.id)) {
       return {
         status: 'unknown',
