@@ -219,10 +219,14 @@ export function buildEvidenceSummary({
       .filter(Array.isArray)
       .every((values) => values.length === 0)
 
-  const captureReady = sources.every((source) => source.evidenceComplete)
-  const coverageReady = coverage.every((entry) =>
-    requiredKinds.every((kind) => entry.kinds[kind]),
-  )
+  const hasEvidenceSources = sources.length > 0
+  const captureReady =
+    hasEvidenceSources && sources.every((source) => source.evidenceComplete)
+  const coverageReady =
+    hasEvidenceSources &&
+    coverage.every((entry) =>
+      requiredKinds.every((kind) => entry.kinds[kind]),
+    )
 
   const productSources = sources.filter((source) => source.kind === 'product')
   const adapterEvidenceReady =
