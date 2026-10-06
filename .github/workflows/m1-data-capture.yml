@@ -31,6 +31,7 @@ on:
       - "src/data/schemaOrgProduct.ts"
       - "tests/schema-org-product.test.mjs"
       - ".github/workflows/m1-data-capture.yml"
+      - "tests/m1-workflow-fork-safety-contract.test.mjs"
       - "docs/M1_DATA_FEASIBILITY.md"
   workflow_dispatch:
 
