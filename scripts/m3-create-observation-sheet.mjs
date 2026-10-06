@@ -16,13 +16,32 @@ function parseArgs(argv) {
   )
 }
 
+async function writeObservationSheet(output, serialized) {
+  await mkdir(dirname(output), { recursive: true })
+
+  try {
+    await writeFile(output, serialized, { encoding: 'utf8', flag: 'wx' })
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'EEXIST'
+    ) {
+      throw new Error(
+        `refusing to overwrite existing observation sheet: ${output}`,
+      )
+    }
+    throw error
+  }
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const { output } = parseArgs(argv)
   const serialized = `${JSON.stringify(buildObservationSheet(), null, 2)}\n`
 
   if (output) {
-    await mkdir(dirname(output), { recursive: true })
-    await writeFile(output, serialized, 'utf8')
+    await writeObservationSheet(output, serialized)
   } else {
     process.stdout.write(serialized)
   }
