@@ -214,6 +214,20 @@ export function buildOneStoreBasket({
       }
     }
 
+    if (typeof product.name !== 'string' || !product.name.trim()) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: [
+          ...decision.reasons,
+          'matched product name is blank or malformed',
+        ],
+        matchScore: decision.score,
+      }
+    }
+
     const packCount = product.packCount ?? 1
     const required = baseAmount(ingredient.amount, ingredient.unit)
     const pack =
