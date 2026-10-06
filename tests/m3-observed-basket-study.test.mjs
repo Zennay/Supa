@@ -120,6 +120,45 @@ test('M3 observed-basket study fails closed without an explicit price context', 
   assert.match(result.reasons.join(' '), /priceContext/)
 })
 
+
+test('M3 observed-basket study rejects impossible calendar week dates', () => {
+  const result = assessWeeklyBasketStudy(study({ weekStart: '2026-02-31' }))
+
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.match(result.reasons.join(' '), /weekStart must be a valid YYYY-MM-DD date/)
+})
+
+test('M3 observed-basket study rejects date-only observation timestamps', () => {
+  const value = study()
+  value.baseline = {
+    ...value.baseline,
+    observedAt: '2026-10-02',
+  }
+
+  const result = assessWeeklyBasketStudy(value)
+
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.equal(result.observationWindowHours, null)
+  assert.match(result.reasons.join(' '), /baseline observedAt is not a valid timestamp/)
+})
+
+test('M3 observed-basket study rejects impossible observation timestamps', () => {
+  const value = study()
+  value.candidate = {
+    ...value.candidate,
+    observedAt: '2026-02-31T18:15:00Z',
+  }
+
+  const result = assessWeeklyBasketStudy(value)
+
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.equal(result.observationWindowHours, null)
+  assert.match(result.reasons.join(' '), /candidate observedAt is not a valid timestamp/)
+})
+
 test('M3 observed-basket study rejects non-observed fixture-style source labels', () => {
   const value = study()
   value.baseline = {
