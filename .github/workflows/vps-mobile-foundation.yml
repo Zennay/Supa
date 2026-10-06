@@ -9,12 +9,7 @@ on:
       - "src/styles.css"
       - "src/components/**"
       - "src/features/**"
-      - "src/domain/planner.ts"
-      - "src/domain/plannerPreferences.ts"
-      - "src/domain/basket.ts"
-      - "src/domain/basketComparison.ts"
-      - "src/domain/matching.ts"
-      - "src/domain/types.ts"
+      - "src/domain/**"
       - "src/data/mock.ts"
       - "src/data/m2Fixture.ts"
       - "src/data/m3ComparisonFixture.ts"
@@ -25,6 +20,9 @@ on:
       - "scripts/m4-*.mjs"
       - "tests/m4-*.test.mjs"
       - "package.json"
+      - "package-lock.json"
+      - "vite.config.*"
+      - "tsconfig*.json"
 
 concurrency:
   group: supa-vps-mobile-${{ github.event.pull_request.number || github.ref }}

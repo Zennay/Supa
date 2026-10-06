@@ -4,14 +4,26 @@ on:
   pull_request:
     paths:
       - "src/App.tsx"
+      - "src/main.tsx"
+      - "src/styles.css"
+      - "src/components/**"
+      - "src/lib/**"
       - "src/domain/basket.ts"
       - "src/domain/basketComparison.ts"
+      - "src/domain/matching.ts"
+      - "src/domain/planner.ts"
+      - "src/domain/plannerPreferences.ts"
+      - "src/domain/types.ts"
       - "src/data/m2Fixture.ts"
       - "src/data/m3ComparisonFixture.ts"
       - "src/features/planner/**"
       - "src/features/basket/**"
       - "src/features/shopping-list/**"
       - "tests/m2-browser-e2e.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.*"
+      - "tsconfig*.json"
       - ".github/workflows/m2-vps-e2e.yml"
   workflow_dispatch:
 
