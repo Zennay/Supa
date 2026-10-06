@@ -8,6 +8,18 @@ export type PlannerBudgetState = {
   overBudget: boolean
 }
 
+export type PlannerBudgetAssessment =
+  | {
+      status: 'known'
+      budgetState: PlannerBudgetState
+    }
+  | {
+      status: 'unknown'
+      knownCost: number
+      budget: number
+      unresolvedLineCount: number
+    }
+
 export function getPlannedCost(
   plan: PlannedMeal[],
   recipes: Recipe[],
@@ -36,5 +48,30 @@ export function getBudgetState(
     remaining,
     usage: safeBudget === 0 ? 1 : Math.min(plannedCost / safeBudget, 1),
     overBudget: remaining < 0,
+  }
+}
+
+export function assessPlannerBudget(
+  knownCost: number,
+  budget: number,
+  unresolvedLineCount: number,
+): PlannerBudgetAssessment {
+  const safeBudget = Math.max(0, budget)
+
+  if (!Number.isInteger(unresolvedLineCount) || unresolvedLineCount !== 0) {
+    return {
+      status: 'unknown',
+      knownCost,
+      budget: safeBudget,
+      unresolvedLineCount:
+        Number.isInteger(unresolvedLineCount) && unresolvedLineCount > 0
+          ? unresolvedLineCount
+          : 1,
+    }
+  }
+
+  return {
+    status: 'known',
+    budgetState: getBudgetState(knownCost, safeBudget),
   }
 }
