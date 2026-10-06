@@ -78,6 +78,15 @@ function hasInvalidKnownAmount(amount: number | null): boolean {
   return amount !== null && (!Number.isFinite(amount) || amount <= 0)
 }
 
+function hasInvalidBaseUnitAmount(
+  amount: number | null,
+  unit: MatchUnit,
+): boolean {
+  if (amount === null) return false
+  const normalized = baseUnitAmount(amount, unit).amount
+  return normalized !== null && (!Number.isFinite(normalized) || normalized <= 0)
+}
+
 function scoreCandidate(
   requirement: IngredientRequirement,
   candidate: ProductCandidate,
@@ -119,7 +128,21 @@ function scoreCandidate(
   const required = baseUnitAmount(requirement.amount, requirement.unit)
   const effectivePackAmount =
     candidate.packAmount === null ? null : candidate.packAmount * packCount
+
+  if (
+    effectivePackAmount !== null &&
+    (!Number.isFinite(effectivePackAmount) || effectivePackAmount <= 0)
+  ) {
+    return { score: -100, reasons: ['candidate effective pack amount invalid'] }
+  }
+
   const pack = baseUnitAmount(effectivePackAmount, candidate.packUnit)
+  if (
+    pack.amount !== null &&
+    (!Number.isFinite(pack.amount) || pack.amount <= 0)
+  ) {
+    return { score: -100, reasons: ['candidate normalized pack amount invalid'] }
+  }
 
   if (packCount > 1 && candidate.packAmount !== null) {
     reasons.push(`multipack count ${packCount} applied`)
@@ -172,6 +195,15 @@ export function matchIngredient(
       score: null,
       runnerUpScore: null,
       reasons: ['requirement amount invalid'],
+    }
+  }
+
+  if (hasInvalidBaseUnitAmount(requirement.amount, requirement.unit)) {
+    return {
+      type: 'abstain',
+      score: null,
+      runnerUpScore: null,
+      reasons: ['requirement amount invalid after unit conversion'],
     }
   }
 
