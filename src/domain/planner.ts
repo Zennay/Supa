@@ -24,15 +24,20 @@ export function getPlannedCost(
   plan: PlannedMeal[],
   recipes: Recipe[],
   activeDays: string[],
-) {
+): number | null {
   const active = new Set(activeDays)
+  let total = 0
 
-  return plan.reduce((total, item) => {
-    if (!active.has(item.day)) return total
+  for (const item of plan) {
+    if (!active.has(item.day)) continue
 
-    const recipe = recipes.find((candidate) => candidate.id === item.recipeId)
-    return total + (recipe?.estimatedCost ?? 0)
-  }, 0)
+    const matches = recipes.filter((candidate) => candidate.id === item.recipeId)
+    if (matches.length !== 1) return null
+
+    total += matches[0].estimatedCost
+  }
+
+  return total
 }
 
 export function getBudgetState(
