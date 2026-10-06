@@ -1,5 +1,5 @@
 import type { PlannedMeal, Recipe } from '../../domain/types'
-import { getBudgetState } from '../../domain/planner'
+import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
 import './planner.css'
 
@@ -11,6 +11,7 @@ type PlannerViewProps = {
   plannedMeals: PlannedMeal[]
   recipes: Recipe[]
   basketTotalCents: number
+  basketUnresolvedLineCount: number
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
@@ -23,6 +24,7 @@ export function PlannerView({
   plannedMeals,
   recipes,
   basketTotalCents,
+  basketUnresolvedLineCount,
   onBudgetChange,
   onToggleDay,
   onRecipeChange,
@@ -30,6 +32,12 @@ export function PlannerView({
 }: PlannerViewProps) {
   const plannedCost = basketTotalCents / 100
   const budgetState = getBudgetState(plannedCost, budget)
+  const budgetAssessment = assessPlannerBudget(
+    plannedCost,
+    budget,
+    basketUnresolvedLineCount,
+  )
+  const budgetKnown = budgetAssessment.status === 'known'
 
   return (
     <section className="screen">
@@ -47,10 +55,21 @@ export function PlannerView({
             <span className="eyebrow">Voorkeur · weekbudget</span>
             <strong id="weekbudget-title">{euro.format(budget)}</strong>
           </div>
-          <span className={budgetState.overBudget ? 'budget-status warning' : 'budget-status'}>
-            {budgetState.overBudget
-              ? `${euro.format(Math.abs(budgetState.remaining))} boven budget`
-              : `${euro.format(budgetState.remaining)} over`}
+          <span
+            className={
+              budgetKnown && budgetAssessment.budgetState.overBudget
+                ? 'budget-status warning'
+                : budgetKnown
+                  ? 'budget-status'
+                  : 'budget-status warning'
+            }
+            aria-live="polite"
+          >
+            {budgetKnown
+              ? budgetAssessment.budgetState.overBudget
+                ? `${euro.format(Math.abs(budgetAssessment.budgetState.remaining))} boven budget`
+                : `${euro.format(budgetAssessment.budgetState.remaining)} over`
+              : `${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'prijsregel' : 'prijsregels'} open`}
           </span>
         </div>
 
@@ -70,7 +89,11 @@ export function PlannerView({
         <div
           className="budget-progress"
           role="progressbar"
-          aria-label="Gepland deel van het weekbudget"
+          aria-label={
+            budgetKnown
+              ? 'Gepland deel van het weekbudget'
+              : 'Bekend minimum van het weekbudget'
+          }
           aria-valuemin={0}
           aria-valuemax={budget}
           aria-valuenow={Math.min(plannedCost, budget)}
@@ -80,11 +103,28 @@ export function PlannerView({
 
         <div className="budget-summary">
           <span>{activeDays.length} maaltijden actief</span>
-          <strong>{euro.format(plannedCost)}</strong>
+          <strong>
+            {budgetKnown
+              ? euro.format(plannedCost)
+              : `min. ${euro.format(plannedCost)}`}
+          </strong>
         </div>
         <p className="disclaimer">
-          Dit bedrag komt uit exact dezelfde productmatching en
-          verpakkingsberekening als de Mand-tab.
+          {budgetKnown ? (
+            <>
+              Dit bedrag komt uit exact dezelfde productmatching en
+              verpakkingsberekening als de Mand-tab.
+            </>
+          ) : (
+            <>
+              Nog {budgetAssessment.unresolvedLineCount}{' '}
+              {budgetAssessment.unresolvedLineCount === 1
+                ? 'productmatch is'
+                : 'productmatches zijn'}{' '}
+              onopgelost. Daarom is dit alleen het bekende minimum; SUPA claimt
+              nog niet dat je binnen of boven budget zit.
+            </>
+          )}
         </p>
       </section>
 
