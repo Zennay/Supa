@@ -76,3 +76,18 @@ export const m2Products: StoreProduct[] = [
 ]
 
 export const m2DefaultActiveDays = m2InitialPlan.map((meal) => meal.day)
+
+for (const recipe of m2Recipes) {
+  Object.freeze(recipe.tags)
+  for (const ingredient of recipe.ingredients) Object.freeze(ingredient)
+  Object.freeze(recipe.ingredients)
+  Object.freeze(recipe)
+}
+for (const meal of m2InitialPlan) Object.freeze(meal)
+for (const product of m2Products) Object.freeze(product)
+
+Object.freeze(m2Store)
+Object.freeze(m2Recipes)
+Object.freeze(m2InitialPlan)
+Object.freeze(m2Products)
+Object.freeze(m2DefaultActiveDays)
