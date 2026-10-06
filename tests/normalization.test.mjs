@@ -132,6 +132,32 @@ test('normalizes common supermarket offer mechanics without guessing unknown lab
   })
 })
 
+test('percentage bounds are checked before floating-point precision can erase overflow', () => {
+  for (const label of [
+    '100.0000000000000000001% korting',
+    '100,0000000000000000001% korting',
+    '000100.0000000000000000001% korting',
+  ]) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'unknown',
+      rawLabel: label,
+    })
+  }
+
+  assert.deepEqual(normalizeOfferLabel('100% korting'), {
+    type: 'percent_discount',
+    percent: 100,
+  })
+  assert.deepEqual(normalizeOfferLabel('100,0000000000000000000% korting'), {
+    type: 'percent_discount',
+    percent: 100,
+  })
+  assert.deepEqual(normalizeOfferLabel('0.0000000000000000001% korting'), {
+    type: 'percent_discount',
+    percent: 1e-19,
+  })
+})
+
 test('invalid offer mechanics fail closed instead of entering savings math', () => {
   for (const label of [
     '0+1 gratis',
