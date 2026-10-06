@@ -88,6 +88,27 @@ export function buildEvidenceSummary({
       throw new Error(`Invalid manifest success flag for ${id}`)
     }
   }
+  if (manifest.bounded !== true) {
+    throw new Error('Capture manifest must be explicitly bounded')
+  }
+  if (
+    !Number.isSafeInteger(manifest.sourceCount) ||
+    manifest.sourceCount !== manifest.results.length
+  ) {
+    throw new Error('Capture manifest sourceCount does not match results length')
+  }
+  const actualSuccessCount = manifest.results.filter(
+    (result) => result.success === true,
+  ).length
+  const actualFailureCount = manifest.results.length - actualSuccessCount
+  if (
+    !Number.isSafeInteger(manifest.successCount) ||
+    manifest.successCount !== actualSuccessCount ||
+    !Number.isSafeInteger(manifest.failureCount) ||
+    manifest.failureCount !== actualFailureCount
+  ) {
+    throw new Error('Capture manifest success/failure counts do not match results')
+  }
 
   const inspectionById = byId(inspection.sources, 'inspection sources')
   const freshnessById = byId(freshness.sources, 'freshness sources')
