@@ -7,10 +7,18 @@ const contractPath = 'docs/M3_OBSERVED_BASKET_STUDY.md'
 test('M3 field contract keeps the canonical evidence-collection boundary explicit', async () => {
   const contract = await readFile(contractPath, 'utf8')
 
-  assert.match(contract, /current `main` revision/)
-  assert.match(contract, /**baseline = PLUS**/)
-  assert.match(contract, /**candidate = DekaMarkt**/)
-  assert.match(contract, /do not swap the retailers/i)
-  assert.match(contract, /within the 24-hour study window/)
-  assert.match(contract, /`collection-template-not-evidence`/)
+  for (const requiredText of [
+    'current `main` revision',
+    '**baseline = PLUS**',
+    '**candidate = DekaMarkt**',
+    'do not swap the retailers',
+    'within the 24-hour study window',
+    '`collection-template-not-evidence`',
+  ]) {
+    assert.equal(
+      contract.toLowerCase().includes(requiredText.toLowerCase()),
+      true,
+      `missing canonical M3 field-contract text: ${requiredText}`,
+    )
+  }
 })
