@@ -137,6 +137,75 @@ test('unsafe product prices remain unresolved instead of corrupting basket money
   )
 })
 
+test('duplicate store product IDs fail closed after a trusted match', () => {
+  const duplicateId = 'basmati-1kg'
+  const products = [
+    ...m2Products.filter((product) => product.id !== duplicateId),
+    {
+      id: duplicateId,
+      storeId: m2Store.id,
+      name: 'Onverwant product 1 kg',
+      packAmount: 1,
+      packUnit: 'kg',
+      available: true,
+      priceCents: 99,
+    },
+    {
+      id: duplicateId,
+      storeId: m2Store.id,
+      name: 'Basmati rijst 1 kg',
+      packAmount: 1,
+      packUnit: 'kg',
+      available: true,
+      priceCents: 249,
+    },
+  ]
+
+  const basket = buildOneStoreBasket({
+    store: m2Store,
+    plan: [{ day: 'Ma', recipeId: 'tikka' }],
+    recipes: m2Recipes,
+    activeDays: ['Ma'],
+    products,
+  })
+
+  const rice = basket.lines.find((line) => line.id === 'basmati-rice')
+  assert.ok(rice)
+  assert.equal(rice.status, 'unresolved')
+  assert.equal(typeof rice.matchScore, 'number')
+  assert.ok(rice.matchScore >= 65)
+  assert.match(
+    rice.reasons.join(' '),
+    /matched product identity is not unique in store catalog/,
+  )
+  assert.equal(
+    basket.lines.some(
+      (line) => line.status === 'matched' && line.productId === duplicateId,
+    ),
+    false,
+  )
+})
+
+test('duplicate recipe IDs fail instead of silently selecting one definition', () => {
+  const duplicateRecipes = [
+    ...m2Recipes,
+    {
+      ...m2Recipes[0],
+      title: 'Conflicting duplicate recipe',
+    },
+  ]
+
+  assert.throws(
+    () =>
+      aggregatePlanIngredients(
+        [{ day: 'Ma', recipeId: m2Recipes[0].id }],
+        duplicateRecipes,
+        ['Ma'],
+      ),
+    /Ambiguous recipe for planned meal/,
+  )
+})
+
 test('inconsistent ingredient definitions fail instead of silently aggregating', () => {
   const inconsistentRecipes = [
     ...m2Recipes,
