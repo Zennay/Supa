@@ -1,7 +1,7 @@
 import type { OneStoreBasket } from '../../domain/basket'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
-import { basketCostDisclosure } from './basketPresentation'
+import { basketCostDisclosure, comparisonWarningCopy } from './basketPresentation'
 import { StatPill } from '../../components/StatPill'
 
 function quantity(amount: number | null, unit: string) {
@@ -50,6 +50,11 @@ export function BasketView({
   const candidateCost = basketCostDisclosure(
     comparisonCandidate.totalCents,
     comparisonCandidate.unresolvedLineCount,
+  )
+  const comparisonWarning = comparisonWarningCopy(
+    comparisonBaseline.unresolvedLineCount,
+    comparisonCandidate.unresolvedLineCount,
+    comparison.reasons.length,
   )
 
   return (
@@ -115,7 +120,7 @@ export function BasketView({
         ) : (
           <div className="comparison-warning">
             <strong>Geen financieel verschil tonen</strong>
-            <span>{comparison.reasons.join(' · ')}</span>
+            <span>{comparisonWarning}</span>
           </div>
         )}
       </div>
