@@ -77,6 +77,18 @@ test('marks a complete two-source evidence bundle adapter-ready', () => {
   assert.equal(report.evidenceCompleteCount, 6)
 })
 
+test('rejects malformed manifest capture success flags', () => {
+  for (const success of ['false', 1, {}, []]) {
+    const data = bundle()
+    data.manifest.results[0].success = success
+
+    assert.throws(
+      () => buildEvidenceSummary(data),
+      /Invalid manifest success flag/,
+    )
+  }
+})
+
 test('fails readiness when one capture failed', () => {
   const report = buildEvidenceSummary(bundle({ failedId: 'plus-offers' }))
 
