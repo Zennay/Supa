@@ -92,6 +92,20 @@ function rejectLikelyPii(value, path) {
   assert(!PHONE_PATTERN.test(value), `${path} must not contain a phone number`)
 }
 
+function requireEvidenceRef(value, path) {
+  const normalized = requireString(value, path, { maxLength: 240, checkPii: false })
+  assert(!EMAIL_PATTERN.test(normalized), `${path} must not contain an email address`)
+
+  const phoneMatch = PHONE_PATTERN.test(normalized)
+  const onlyPhoneSyntax = /^[+\\d\\s().-]+$/.test(normalized)
+  const explicitlyPhoneFormatted = /[+()\\s]/.test(normalized)
+  assert(
+    !(phoneMatch && (onlyPhoneSyntax || explicitlyPhoneFormatted)),
+    `${path} must not contain a phone number`,
+  )
+  return normalized
+}
+
 function rejectForbiddenKeys(value, path = 'record') {
   if (Array.isArray(value)) {
     value.forEach((item, index) => rejectForbiddenKeys(item, `${path}[${index}]`))
@@ -154,7 +168,7 @@ export function validateRetailerResponseRecord(input) {
   const responseSummary = requireString(input.responseSummary, 'responseSummary', { maxLength: 1200 })
   const constraints = requireStringArray(input.constraints ?? [], 'constraints', { maxItems: 16, maxLength: 500 })
   const nextOwnerTeam = requireOptionalString(input.nextOwnerTeam, 'nextOwnerTeam', { maxLength: 120 })
-  const evidenceRef = requireString(input.evidenceRef, 'evidenceRef', { maxLength: 240 })
+  const evidenceRef = requireEvidenceRef(input.evidenceRef, 'evidenceRef')
   const consequences = validateConsequences(input.consequences)
 
   return {
