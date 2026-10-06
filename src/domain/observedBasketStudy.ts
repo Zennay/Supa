@@ -133,8 +133,19 @@ export function assessWeeklyBasketStudy(
   study: WeeklyBasketStudy,
   options: { maxObservationWindowHours?: number } = {},
 ): WeeklyBasketStudyAssessment {
-  const maxObservationWindowHours = options.maxObservationWindowHours ?? 24
+  const requestedMaxObservationWindowHours =
+    options.maxObservationWindowHours ?? 24
+  const validMaxObservationWindowHours =
+    Number.isFinite(requestedMaxObservationWindowHours) &&
+    requestedMaxObservationWindowHours > 0
+  const maxObservationWindowHours = validMaxObservationWindowHours
+    ? requestedMaxObservationWindowHours
+    : 24
   const reasons: string[] = []
+
+  if (!validMaxObservationWindowHours) {
+    reasons.push('maxObservationWindowHours must be a positive finite number')
+  }
 
   if (study.schemaVersion !== 1) {
     reasons.push('unsupported study schema version')

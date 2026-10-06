@@ -128,6 +128,33 @@ test('M3 observed-basket study fails closed when observations are too far apart'
   assert.match(result.reasons.join(' '), /max is 24h/)
 })
 
+
+test('M3 observed-basket study cannot disable the time window with non-finite configuration', () => {
+  const result = assessWeeklyBasketStudy(study(), {
+    maxObservationWindowHours: Number.POSITIVE_INFINITY,
+  })
+
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.match(
+    result.reasons.join(' '),
+    /maxObservationWindowHours must be a positive finite number/,
+  )
+})
+
+test('M3 observed-basket study rejects non-positive time-window configuration', () => {
+  const result = assessWeeklyBasketStudy(study(), {
+    maxObservationWindowHours: 0,
+  })
+
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.match(
+    result.reasons.join(' '),
+    /maxObservationWindowHours must be a positive finite number/,
+  )
+})
+
 test('M3 observed-basket study fails closed without an explicit price context', () => {
   const value = study()
   value.priceContext = 'mixed-channel'
