@@ -2,15 +2,15 @@
 
 ## Why this baseline exists
 
-The graduation work already established a planner-first product flow. The recent Astra/Work direction was to begin a modern mobile-first implementation without throwing away that architecture.
+The graduation work established a planner-first product flow. The executable product has since closed the bounded M1 data-feasibility gate and the M2 planner-to-basket vertical slice.
 
-This repository therefore starts with a deliberately thin frontend foundation while the Senior Team validates the hardest dependency: current supermarket data.
+The repository is now in M3: prove trustworthy full-basket comparison with genuine same-demand PLUS + DekaMarkt observations while keeping production retailer-data reuse behind explicit permission/licensing gates.
 
 ## Boundaries
 
 ### UI / features
 
-`src/features` owns user-facing flows such as planner, basket and shopping list. Feature components should not scrape, normalize or invent price truth.
+`src/features` owns user-facing flows such as planner, basket, observation collection and shopping list. Feature components should not scrape, normalize or invent price truth.
 
 ### Domain
 
@@ -18,9 +18,9 @@ This repository therefore starts with a deliberately thin frontend foundation wh
 
 ### Data boundary
 
-`src/data` currently supplies mock fixtures. It will become the frontend-facing repository/API boundary.
+`src/data` contains controlled fixtures plus source-specific normalization/adapters used by the bounded M1 proof. Mock data remains isolated from evidence-bearing paths. Production automated retailer-data reuse is not implied by technical capture success and stays permission-gated.
 
-Real data should eventually flow through:
+Evidence-bearing product data flows through:
 
 ```text
 supermarket adapter
@@ -51,4 +51,4 @@ supermarket adapter
 - public savings claims;
 - large-scale recipe ingestion.
 
-Those are gated by M1/M2 evidence, not by UI readiness.
+Those are gated by the current M3/M4 proof sequence and by explicit source/rights constraints, not by UI readiness.
