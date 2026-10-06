@@ -116,13 +116,13 @@ function buildObservedLine(line, requirement, path) {
   }
 
   const packCount = observed.packCount ?? 1
-  if (!Number.isInteger(packCount) || packCount <= 0) {
+  if (!Number.isSafeInteger(packCount) || packCount <= 0) {
     return unresolvedLine(requirement, ['observed pack count is unknown or invalid'])
   }
 
   if (
     observed.priceCents === null ||
-    !Number.isInteger(observed.priceCents) ||
+    !Number.isSafeInteger(observed.priceCents) ||
     observed.priceCents < 0
   ) {
     return unresolvedLine(requirement, ['observed price is unknown or invalid'])
@@ -172,6 +172,14 @@ function buildObservedLine(line, requirement, path) {
   }
 
   const packs = Math.ceil(required.amount / pack.amount)
+  const lineTotalCents = packs * observed.priceCents
+
+  if (!Number.isSafeInteger(packs) || !Number.isSafeInteger(lineTotalCents)) {
+    return unresolvedLine(requirement, [
+      ...decision.reasons,
+      'observed basket quantity or monetary total exceeds the safe integer range',
+    ])
+  }
 
   return {
     id: requirement.id,
@@ -190,7 +198,7 @@ function buildObservedLine(line, requirement, path) {
       count: packCount,
     },
     pricePerPackCents: observed.priceCents,
-    lineTotalCents: packs * observed.priceCents,
+    lineTotalCents,
     matchScore: decision.score,
     reasons: [
       ...decision.reasons,
