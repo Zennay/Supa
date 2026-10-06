@@ -217,7 +217,7 @@ function scoreCandidate(
     required.family === pack.family
   ) {
     if (pack.amount >= required.amount) {
-      const oversupplyRatio = pack.amount / Math.max(required.amount, 1)
+      const oversupplyRatio = pack.amount / required.amount
       if (oversupplyRatio <= 1.5) {
         score += 20
         reasons.push('pack closely covers requirement')
