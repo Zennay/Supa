@@ -64,6 +64,7 @@ export function attributeSavingsEffects({
   const lineById = new Map(comparison.lineDeltas.map((line) => [line.id, line] as const))
   const reasons: string[] = []
   const evidenceByLine = new Map<string, SavingsAttributionEvidence[]>()
+  const seenEvidenceItems = new Set<string>()
 
   for (const rawItem of evidence) {
     if (!rawItem || typeof rawItem !== 'object') {
@@ -102,6 +103,16 @@ export function attributeSavingsEffects({
     }
 
     const validatedItem = item as SavingsAttributionEvidence
+    const evidenceKey = [
+      validatedItem.lineId,
+      validatedItem.effect,
+      validatedItem.evidenceRef.trim(),
+    ].join('\u0000')
+    if (seenEvidenceItems.has(evidenceKey)) {
+      reasons.push(`duplicate attribution evidence for ${validatedItem.lineId}`)
+      continue
+    }
+    seenEvidenceItems.add(evidenceKey)
 
     if (validatedItem.effect === 'planning' && validatedItem.deltaCents !== 0) {
       reasons.push(

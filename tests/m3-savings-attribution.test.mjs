@@ -126,6 +126,34 @@ test('M3 attribution rejects a non-zero planning effect inside a same-demand sto
   )
 })
 
+test('M3 attribution rejects duplicate evidence items instead of double-counting them', () => {
+  const duplicate = {
+    lineId: 'tomato',
+    effect: 'offer',
+    deltaCents: -60,
+    evidenceRef: 'observed-week-2026-10-04:tomato-offer',
+  }
+
+  const result = attributeSavingsEffects({
+    comparison: comparison(),
+    evidence: [
+      duplicate,
+      { ...duplicate },
+      {
+        lineId: 'rice',
+        effect: 'pack-size',
+        deltaCents: 30,
+        evidenceRef: 'observed-week-2026-10-04:rice-pack',
+      },
+    ],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /duplicate attribution evidence for tomato/)
+})
+
 test('M3 attribution fails closed when evidence over-attributes a line', () => {
   const result = attributeSavingsEffects({
     comparison: comparison(),

@@ -19,8 +19,8 @@ function completeSheet() {
   sheet.study.priceContext = 'in-store'
 
   const observations = [
-    ['baseline', 'store-a', 'Store A', 'obs-a', '2026-10-05T10:00:00.000Z'],
-    ['candidate', 'store-b', 'Store B', 'obs-b', '2026-10-05T14:00:00.000Z'],
+    ['baseline', 'plus-leiden-test', 'PLUS Leiden testfiliaal', 'obs-a', '2026-10-05T10:00:00.000Z'],
+    ['candidate', 'dekamarkt-leiden-test', 'DekaMarkt Leiden testfiliaal', 'obs-b', '2026-10-05T14:00:00.000Z'],
   ]
 
   for (const [side, storeId, storeName, evidenceId, observedAt] of observations) {
@@ -59,6 +59,32 @@ test('M3 readiness accepts a structurally complete two-store observation', () =>
     ready: true,
     issues: [],
   })
+})
+
+test('M3 readiness rejects a store outside the canonical retailer pair', () => {
+  const sheet = completeSheet()
+  sheet.baseline.store.name = 'Andere supermarkt'
+
+  const baselineReadiness = observationSheetReadiness(sheet)
+
+  assert.equal(baselineReadiness.ready, false)
+  assert.ok(
+    baselineReadiness.issues.some((issue) =>
+      issue.includes('winkelnaam moet PLUS identificeren'),
+    ),
+  )
+
+  sheet.baseline.store.name = 'PLUS Leiden testfiliaal'
+  sheet.candidate.store.name = 'PLUS tweede filiaal'
+
+  const candidateReadiness = observationSheetReadiness(sheet)
+
+  assert.equal(candidateReadiness.ready, false)
+  assert.ok(
+    candidateReadiness.issues.some((issue) =>
+      issue.includes('winkelnaam moet DekaMarkt identificeren'),
+    ),
+  )
 })
 
 test('M3 readiness rejects a missing shared price context', () => {

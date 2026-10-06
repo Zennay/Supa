@@ -2,10 +2,15 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
+import {
+  M3_EXPECTED_RETAILERS,
+  observationStoreMatchesExpectedRetailer,
+} from '../src/domain/m3ObservationSheet.ts'
 
 const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
 const ALLOWED_PRICE_CONTEXTS = new Set(['in-store', 'online-order'])
 const ALLOWED_SOURCES = new Set(['manual-cart', 'receipt', 'consented-export'])
+const KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,63}$/
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -156,6 +161,10 @@ function validateBasket(basket, path) {
 function validateEvidence(evidence, path) {
   requireRecord(evidence, path)
   requireString(evidence.evidenceId, `${path}.evidenceId`)
+  assert(
+    KEY_PATTERN.test(evidence.evidenceId),
+    `${path}.evidenceId must be a path-safe evidence key`,
+  )
   requireString(evidence.observedAt, `${path}.observedAt`)
   assert(ALLOWED_SOURCES.has(evidence.source), `${path}.source is not an allowed observed source`)
   requireString(evidence.provenanceNote, `${path}.provenanceNote`)
@@ -166,7 +175,12 @@ export function validateObservedWeekInput(study) {
   requireRecord(study, 'study')
   assert(Number.isInteger(study.schemaVersion), 'schemaVersion must be an integer')
   requireString(study.studyId, 'studyId')
+  assert(KEY_PATTERN.test(study.studyId), 'studyId must be a path-safe study key')
   requireString(study.participantKey, 'participantKey')
+  assert(
+    KEY_PATTERN.test(study.participantKey),
+    'participantKey must be a pseudonymous path-safe key',
+  )
   requireString(study.population, 'population')
   requireString(study.region, 'region')
   requireString(study.weekStart, 'weekStart')
@@ -176,6 +190,20 @@ export function validateObservedWeekInput(study) {
   )
   validateEvidence(study.baseline, 'baseline')
   validateEvidence(study.candidate, 'candidate')
+  assert(
+    observationStoreMatchesExpectedRetailer(
+      'baseline',
+      study.baseline.basket.store.name,
+    ),
+    `baseline.basket.store.name must identify ${M3_EXPECTED_RETAILERS.baseline}`,
+  )
+  assert(
+    observationStoreMatchesExpectedRetailer(
+      'candidate',
+      study.candidate.basket.store.name,
+    ),
+    `candidate.basket.store.name must identify ${M3_EXPECTED_RETAILERS.candidate}`,
+  )
   if (study.attributionEvidence !== undefined) {
     assert(
       Array.isArray(study.attributionEvidence),
