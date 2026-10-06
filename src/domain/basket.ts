@@ -74,6 +74,16 @@ export function aggregatePlanIngredients(
   recipes: RecipeWithIngredients[],
   activeDays: string[],
 ): AggregatedIngredient[] {
+  if (!Array.isArray(plan)) {
+    throw new Error('Basket plan must be an array')
+  }
+  if (!Array.isArray(recipes)) {
+    throw new Error('Basket recipes must be an array')
+  }
+  if (!Array.isArray(activeDays)) {
+    throw new Error('Basket active days must be an array')
+  }
+
   const active = new Set(activeDays)
   const aggregated = new Map<string, AggregatedIngredient>()
   const plannedActiveDays = new Set<string>()
@@ -159,6 +169,10 @@ export function buildOneStoreBasket({
   }
 
   const ingredients = aggregatePlanIngredients(plan, recipes, activeDays)
+  if (!Array.isArray(products)) {
+    throw new Error('Basket products must be an array')
+  }
+
   const storeProducts = products.filter(
     (product) =>
       typeof product === 'object' &&
