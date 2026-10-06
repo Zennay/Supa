@@ -146,3 +146,50 @@ test('M3 assessment fails closed on non-string evidence text fields without thro
     assert.match(result.reasons.join(' '), entry.reason)
   }
 })
+
+
+test('M3 assessment fails closed on malformed study containers without throwing', () => {
+  for (const value of [null, [], 'study', 42]) {
+    const result = assessWeeklyBasketStudy(value)
+
+    assert.equal(result.claimable, false)
+    assert.equal(result.comparison.outcome, 'unknown')
+    assert.equal(result.comparison.baselineTotalCents, 0)
+    assert.equal(result.comparison.candidateTotalCents, 0)
+    assert.equal(result.observationWindowHours, null)
+    assert.match(result.reasons.join(' '), /study must be a non-array object/)
+  }
+})
+
+test('M3 assessment fails closed on malformed evidence containers without throwing', () => {
+  const cases = [
+    {
+      mutate: (value) => { value.baseline = null },
+      reason: /baseline evidence must be a non-array object/,
+    },
+    {
+      mutate: (value) => { value.candidate = [] },
+      reason: /candidate evidence must be a non-array object/,
+    },
+    {
+      mutate: (value) => { value.baseline.basket = null },
+      reason: /baseline basket must be a non-array object/,
+    },
+    {
+      mutate: (value) => { value.candidate.basket.store = null },
+      reason: /candidate basket store must be a non-array object/,
+    },
+  ]
+
+  for (const entry of cases) {
+    const value = validStudy()
+    entry.mutate(value)
+
+    const result = assessWeeklyBasketStudy(value)
+
+    assert.equal(result.claimable, false)
+    assert.equal(result.comparison.outcome, 'unknown')
+    assert.equal(result.comparison.savingsCents, null)
+    assert.match(result.reasons.join(' '), entry.reason)
+  }
+})
