@@ -38,6 +38,8 @@ export function evaluateManifestFreshness(
   }
 
   const sources = manifest.results.map((result) => {
+    const successFlagValid = typeof result.success === 'boolean'
+    const captureSucceeded = result.success === true
     const capturedAtMs = parseDate(result.capturedAt)
     const captureAgeHours =
       capturedAtMs === null ? null : hoursBetween(capturedAtMs, nowMs)
@@ -57,7 +59,8 @@ export function evaluateManifestFreshness(
     }
 
     const reasons = []
-    if (!result.success) reasons.push('capture-failed')
+    if (!successFlagValid) reasons.push('invalid-success-flag')
+    if (!captureSucceeded) reasons.push('capture-failed')
     if (capturedAtMs === null) reasons.push('invalid-captured-at')
     else if (captureIsFuture) reasons.push('capture-in-future')
     else if (captureAgeHours > maxCaptureAgeHours) reasons.push('capture-stale')
@@ -69,14 +72,14 @@ export function evaluateManifestFreshness(
       id: result.id,
       supermarket: result.supermarket,
       kind: result.kind,
-      success: Boolean(result.success),
+      success: captureSucceeded,
       status: result.status ?? null,
       capturedAt: result.capturedAt ?? null,
       captureAgeHours:
         captureAgeHours === null ? null : Number(captureAgeHours.toFixed(3)),
       maxCaptureAgeHours,
       freshness:
-        !result.success
+        !captureSucceeded
           ? 'failed'
           : captureIsFuture
             ? 'future'
