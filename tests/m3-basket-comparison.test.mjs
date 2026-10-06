@@ -310,3 +310,31 @@ test('M3 fails closed when matched basket units cannot prove comparable pack cov
     /basket contains invalid matched-line economics/,
   )
 })
+
+
+test('M3 fails closed when a matched line no longer carries a trusted matcher score', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(candidateStore, -10)
+
+  for (const basket of [baseline, candidate]) {
+    const matchedIndex = basket.lines.findIndex((line) => line.status === 'matched')
+    assert.ok(matchedIndex >= 0)
+    const line = basket.lines[matchedIndex]
+    assert.equal(line.status, 'matched')
+
+    basket.lines[matchedIndex] = {
+      ...line,
+      matchScore: 64,
+    }
+  }
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.savingsCents, null)
+  assert.match(
+    comparison.reasons.join(' '),
+    /basket contains invalid matched-line economics/,
+  )
+})
