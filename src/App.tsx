@@ -164,6 +164,7 @@ export function App() {
             plannedMeals={plannedMeals}
             recipes={m2Recipes}
             basketTotalCents={basket.totalCents}
+            basketUnresolvedLineCount={basket.unresolvedLineCount}
             onBudgetChange={(nextBudget) =>
               setPreferences((current) => ({
                 ...current,
