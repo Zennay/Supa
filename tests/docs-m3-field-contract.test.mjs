@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const contractPath = 'docs/M3_OBSERVED_BASKET_STUDY.md'
 const packagePath = 'package.json'
+const workflowPath = '.github/workflows/m3-observed-week-report.yml'
 
 const expectedM3Scripts = [
   'm3:create-observation-sheet',
@@ -16,6 +17,7 @@ test('M3 field contract keeps the canonical evidence-collection boundary explici
 
   for (const requiredText of [
     'current `main` revision',
+    workflowPath,
     '**baseline = PLUS**',
     '**candidate = DekaMarkt**',
     'do not swap the retailers',
@@ -65,5 +67,30 @@ test('documented M3 field commands stay executable through package scripts', asy
       '',
       `documented M3 command has an empty package.json script: ${script}`,
     )
+  }
+})
+
+test('documented M3 execution entrypoints remain backed by repository files', async () => {
+  const [contract, packageJson, workflow] = await Promise.all([
+    readFile(contractPath, 'utf8'),
+    readFile(packagePath, 'utf8').then(JSON.parse),
+    readFile(workflowPath, 'utf8'),
+  ])
+
+  assert.equal(
+    contract.includes(workflowPath),
+    true,
+    'field contract must retain the canonical M3 workflow path',
+  )
+  assert.notEqual(workflow.trim(), '', 'canonical M3 workflow file must not be empty')
+
+  for (const script of expectedM3Scripts) {
+    const command = packageJson.scripts[script]
+    const target = command.match(/\b(scripts\/[^\s]+\.mjs)\b/)?.[1]
+
+    assert.ok(target, `M3 package script must point at a scripts/*.mjs entrypoint: ${script}`)
+
+    const source = await readFile(target, 'utf8')
+    assert.notEqual(source.trim(), '', `M3 script entrypoint must not be empty: ${target}`)
   }
 })
