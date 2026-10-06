@@ -1,6 +1,7 @@
 import type { OneStoreBasket } from '../../domain/basket'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
+import { basketCostDisclosure, comparisonWarningCopy } from './basketPresentation'
 import { StatPill } from '../../components/StatPill'
 
 function quantity(amount: number | null, unit: string) {
@@ -38,6 +39,24 @@ export function BasketView({
   comparisonBaseline: OneStoreBasket
   comparisonCandidate: OneStoreBasket
 }) {
+  const basketCost = basketCostDisclosure(
+    basket.totalCents,
+    basket.unresolvedLineCount,
+  )
+  const baselineCost = basketCostDisclosure(
+    comparisonBaseline.totalCents,
+    comparisonBaseline.unresolvedLineCount,
+  )
+  const candidateCost = basketCostDisclosure(
+    comparisonCandidate.totalCents,
+    comparisonCandidate.unresolvedLineCount,
+  )
+  const comparisonWarning = comparisonWarningCopy(
+    comparisonBaseline.unresolvedLineCount,
+    comparisonCandidate.unresolvedLineCount,
+    comparison.reasons.length,
+  )
+
   return (
     <section className="screen">
       <div className="section-heading">
@@ -47,15 +66,32 @@ export function BasketView({
         </div>
       </div>
 
-      <div className="hero-total">
-        <span>Deterministisch mandtotaal</span>
-        <strong>{euro.format(basket.totalCents / 100)}</strong>
+      <div
+        className="hero-total"
+        data-basket-total-state={basketCost.state}
+      >
+        <span>{basketCost.headline}</span>
+        <strong>{basketCost.amountLabel}</strong>
         <div className="stat-row">
           <StatPill label="Gematcht" value={String(basket.matchedLineCount)} />
-          <StatPill label="Controle" value={String(basket.unresolvedLineCount)} />
+          <StatPill label="Controle" value={String(basketCost.unresolvedLineCount)} />
         </div>
         <p className="disclaimer">
-          M2 testfixture — geen besparingsclaim en geen productie-liveprijs.
+          {basketCost.state === 'minimum' ? (
+            <>
+              {basketCost.unresolvedLineCount}{' '}
+              {basketCost.unresolvedLineCount === 1
+                ? 'productkeuze is'
+                : 'productkeuzes zijn'}{' '}
+              nog niet meegerekend. Dit is alleen het bekende minimum, geen
+              volledig mandtotaal. M2 testfixture — geen productie-liveprijs.
+            </>
+          ) : (
+            <>
+              Volledige deterministische M2 testfixture — geen besparingsclaim
+              en geen productie-liveprijs.
+            </>
+          )}
         </p>
       </div>
 
@@ -65,11 +101,15 @@ export function BasketView({
         <div className="comparison-totals">
           <div>
             <span>Baseline · {comparisonBaseline.store.name}</span>
-            <strong>{euro.format(comparisonBaseline.totalCents / 100)}</strong>
+            <strong data-basket-cost-state={baselineCost.state}>
+              {baselineCost.amountLabel}
+            </strong>
           </div>
           <div>
             <span>Kandidaat · {comparisonCandidate.store.name}</span>
-            <strong>{euro.format(comparisonCandidate.totalCents / 100)}</strong>
+            <strong data-basket-cost-state={candidateCost.state}>
+              {candidateCost.amountLabel}
+            </strong>
           </div>
         </div>
         {comparison.claimable ? (
@@ -80,7 +120,7 @@ export function BasketView({
         ) : (
           <div className="comparison-warning">
             <strong>Geen financieel verschil tonen</strong>
-            <span>{comparison.reasons.join(' · ')}</span>
+            <span>{comparisonWarning}</span>
           </div>
         )}
       </div>

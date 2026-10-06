@@ -136,11 +136,18 @@ try {
   })
 
   await clickNav(sessionId, 'Mand')
-  let basketText = await waitForText(sessionId, 'Deterministisch mandtotaal')
-  basketText = await waitForText(sessionId, '23,30')
+  let basketText = await waitForText(sessionId, 'Bekend mandminimum')
+  basketText = await waitForText(sessionId, 'min. € 23,30')
   assert.match(basketText, /Garam masala/)
   assert.match(basketText, /Controle nodig/)
   assert.match(basketText, /M2 testwinkel/)
+  assert.match(basketText, /1 productkeuze is nog niet meegerekend/)
+  assert.match(basketText, /geen volledig mandtotaal/)
+  const basketTotalState = await execute(
+    sessionId,
+    "return document.querySelector('.hero-total')?.dataset.basketTotalState || null",
+  )
+  assert.equal(basketTotalState, 'minimum')
   assert.match(basketText, /Gecontroleerde winkelvergelijking/i)
   assert.match(basketText, /M3 testwinkel B ligt/)
   assert.match(basketText, /geen live-besparingsclaim/)
@@ -154,7 +161,7 @@ try {
     step: 'basket-recalculation',
     passed: true,
     observed:
-      'recipe change recalculated the one-store basket to EUR 23.30 and kept Garam masala unresolved',
+      'recipe change recalculated the known basket minimum to EUR 23.30, kept Garam masala unresolved and suppressed a complete-total claim',
   })
 
   await clickNav(sessionId, 'Lijst')
