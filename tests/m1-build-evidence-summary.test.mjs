@@ -62,7 +62,11 @@ function bundle({
     milestone: 'M1 Data Feasibility',
     candidateCount: 1,
     abstentionCount: 1,
-    candidates: [{ id: 'dekamarkt-product' }],
+    candidates: [{
+      id: 'dekamarkt-product',
+      file: 'dekamarkt-product.json',
+      candidateSha256: 'a'.repeat(64),
+    }],
     abstentions: [{ id: 'plus-product' }],
   }
   return { manifest, inspection, freshness, candidateIndex }
@@ -272,6 +276,26 @@ test('rejects cross-document source identity mismatches', () => {
   ])
   assert.equal(report.adapterEvidenceReady, false)
   assert.equal(report.nextAction, 'repair-evidence-bundle')
+})
+
+test('candidate index requires exact candidate file and digest metadata', () => {
+  const missingDigest = bundle()
+  delete missingDigest.candidateIndex.candidates[0].candidateSha256
+  const missingDigestReport = buildEvidenceSummary(missingDigest)
+  assert.equal(
+    missingDigestReport.documentConsistency.candidateIndexStructureValid,
+    false,
+  )
+  assert.equal(missingDigestReport.adapterEvidenceReady, false)
+
+  const wrongFile = bundle()
+  wrongFile.candidateIndex.candidates[0].file = '../dekamarkt-product.json'
+  const wrongFileReport = buildEvidenceSummary(wrongFile)
+  assert.equal(
+    wrongFileReport.documentConsistency.candidateIndexStructureValid,
+    false,
+  )
+  assert.equal(wrongFileReport.adapterEvidenceReady, false)
 })
 
 test('unexpected candidate-index decisions make the bundle inconsistent', () => {
