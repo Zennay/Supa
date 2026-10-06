@@ -8,13 +8,13 @@ const plannerViewSource = await readFile(
 )
 
 test('Planner buttons are explicitly non-submit controls', () => {
-  const buttonTags = [...plannerViewSource.matchAll(/<button\\b[\\s\\S]*?>/g)].map(
+  const buttonTags = [...plannerViewSource.matchAll(/<button\b[\s\S]*?>/g)].map(
     ([tag]) => tag,
   )
 
   assert.equal(buttonTags.length, 3)
 
   for (const tag of buttonTags) {
-    assert.match(tag, /\\btype=["']button["']/)
+    assert.match(tag, /\btype=["']button["']/)
   }
 })
