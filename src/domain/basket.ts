@@ -145,6 +145,9 @@ export function buildOneStoreBasket({
   if (typeof store.id !== 'string' || !store.id.trim()) {
     throw new Error('Store identity must be non-blank')
   }
+  if (typeof store.name !== 'string' || !store.name.trim()) {
+    throw new Error('Store name must be non-blank')
+  }
 
   const ingredients = aggregatePlanIngredients(plan, recipes, activeDays)
   const storeProducts = products.filter((product) => product.storeId === store.id)
