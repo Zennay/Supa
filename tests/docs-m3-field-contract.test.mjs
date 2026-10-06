@@ -94,3 +94,20 @@ test('documented M3 execution entrypoints remain backed by repository files', as
     assert.notEqual(source.trim(), '', `M3 script entrypoint must not be empty: ${target}`)
   }
 })
+
+
+test('M3 field command examples preserve artifact versus evidence storage boundaries', async () => {
+  const contract = await readFile(contractPath, 'utf8')
+
+  for (const command of [
+    'npm run m3:create-observation-sheet -- --output artifacts/m3/observation-sheet.json',
+    'npm run m3:build-observed-study -- artifacts/m3/observation-sheet.json --output evidence/m3/<study>.json',
+    'npm run m3:assess-observed-week -- evidence/m3/<study>.json --output artifacts/m3/<study>-assessment.json',
+  ]) {
+    assert.equal(
+      contract.includes(command),
+      true,
+      `missing canonical M3 field command example: ${command}`,
+    )
+  }
+})
