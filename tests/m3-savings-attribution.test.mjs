@@ -126,6 +126,44 @@ test('M3 attribution rejects a non-zero planning effect inside a same-demand sto
   )
 })
 
+test('M3 attribution rejects duplicate comparison line identities instead of reusing evidence twice', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison({
+      deltaCents: -90,
+      savingsCents: 90,
+      lineDeltas: [
+        {
+          id: 'tomato',
+          ingredientLabel: 'Tomato first',
+          baselineLineTotalCents: 300,
+          candidateLineTotalCents: 255,
+          deltaCents: -45,
+        },
+        {
+          id: 'tomato',
+          ingredientLabel: 'Tomato duplicate',
+          baselineLineTotalCents: 300,
+          candidateLineTotalCents: 255,
+          deltaCents: -45,
+        },
+      ],
+    }),
+    evidence: [
+      {
+        lineId: 'tomato',
+        effect: 'offer',
+        deltaCents: -45,
+        evidenceRef: 'observed-week-2026-10-04:tomato-offer',
+      },
+    ],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /duplicate line identity tomato/)
+})
+
 test('M3 attribution rejects duplicate evidence items instead of double-counting them', () => {
   const duplicate = {
     lineId: 'tomato',
