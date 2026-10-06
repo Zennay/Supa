@@ -11,6 +11,7 @@ on:
       - "src/domain/basket.ts"
       - "src/domain/basketComparison.ts"
       - "src/domain/matching.ts"
+      - "src/domain/m3ObservationSheet.ts"
       - "src/domain/savingsAttribution.ts"
       - "src/domain/types.ts"
       - "src/data/m2Fixture.ts"
