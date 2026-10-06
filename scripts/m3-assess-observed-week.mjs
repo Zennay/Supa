@@ -183,7 +183,7 @@ function validateEvidence(evidence, path) {
 
 export function validateObservedWeekInput(study) {
   requireRecord(study, 'study')
-  assert(Number.isInteger(study.schemaVersion), 'schemaVersion must be an integer')
+  assert(study.schemaVersion === 1, 'schemaVersion must be 1')
   requireString(study.studyId, 'studyId')
   assert(KEY_PATTERN.test(study.studyId), 'studyId must be a path-safe study key')
   requireString(study.participantKey, 'participantKey')
