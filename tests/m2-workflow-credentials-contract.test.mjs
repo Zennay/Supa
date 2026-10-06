@@ -23,7 +23,7 @@ test('M2 browser runner keeps its safety and proof gates', () => {
     'test "$(hostname -s)" = "vps-bb300bba"',
     'npm test',
     'npm run build',
-    'npm run m2:browser-e2e',
+    'node tests/m2-browser-e2e.mjs',
     'cancel-in-progress: true',
   ]) {
     assert.ok(workflow.includes(marker), `missing M2 workflow contract: ${marker}`)
