@@ -104,6 +104,26 @@ function validateBasket(basket, path) {
   requireNonNegativeInteger(basket.totalCents, `${path}.totalCents`)
   requireNonNegativeInteger(basket.matchedLineCount, `${path}.matchedLineCount`)
   requireNonNegativeInteger(basket.unresolvedLineCount, `${path}.unresolvedLineCount`)
+
+  const matchedLines = basket.lines.filter((line) => line.status === 'matched')
+  const unresolvedLines = basket.lines.filter((line) => line.status === 'unresolved')
+  const calculatedTotalCents = matchedLines.reduce(
+    (sum, line) => sum + line.lineTotalCents,
+    0,
+  )
+
+  assert(
+    basket.totalCents === calculatedTotalCents,
+    `${path}.totalCents must equal the sum of matched line totals`,
+  )
+  assert(
+    basket.matchedLineCount === matchedLines.length,
+    `${path}.matchedLineCount must equal matched line count`,
+  )
+  assert(
+    basket.unresolvedLineCount === unresolvedLines.length,
+    `${path}.unresolvedLineCount must equal unresolved line count`,
+  )
 }
 
 function validateEvidence(evidence, path) {
