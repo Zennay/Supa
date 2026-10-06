@@ -1,4 +1,4 @@
-import { euro } from '../../lib/money'
+import { euro } from '../../lib/money.ts'
 
 export type BasketCostDisclosure = {
   state: 'complete' | 'minimum'
