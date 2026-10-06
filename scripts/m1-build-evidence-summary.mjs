@@ -12,7 +12,7 @@ function byId(items, label) {
   }
   const map = new Map()
   for (const item of items) {
-    if (!item?.id || map.has(item.id)) {
+    if (!isSafeSourceId(item?.id) || map.has(item.id)) {
       throw new Error(`Invalid or duplicate ${label} id: ${item?.id}`)
     }
     map.set(item.id, item)
@@ -90,6 +90,24 @@ export function buildEvidenceSummary({
   const ids = [...manifestById.keys()].sort()
   const missingInspection = ids.filter((id) => !inspectionById.has(id))
   const missingFreshness = ids.filter((id) => !freshnessById.has(id))
+  const inspectionIdentityMismatches = ids.filter((id) => {
+    const captured = manifestById.get(id)
+    const inspected = inspectionById.get(id)
+    return (
+      inspected &&
+      ((captured.supermarket ?? null) !== (inspected.supermarket ?? null) ||
+        (captured.kind ?? null) !== (inspected.kind ?? null))
+    )
+  })
+  const freshnessIdentityMismatches = ids.filter((id) => {
+    const captured = manifestById.get(id)
+    const fresh = freshnessById.get(id)
+    return (
+      fresh &&
+      ((captured.supermarket ?? null) !== (fresh.supermarket ?? null) ||
+        (captured.kind ?? null) !== (fresh.kind ?? null))
+    )
+  })
 
   const sources = ids.map((id) => {
     const captured = manifestById.get(id)
@@ -177,6 +195,8 @@ export function buildEvidenceSummary({
   const documentConsistency = {
     missingInspection,
     missingFreshness,
+    inspectionIdentityMismatches,
+    freshnessIdentityMismatches,
     unexpectedInspection,
     unexpectedFreshness,
     unexpectedCandidateDecisions,
@@ -199,10 +219,14 @@ export function buildEvidenceSummary({
       .filter(Array.isArray)
       .every((values) => values.length === 0)
 
-  const captureReady = sources.every((source) => source.evidenceComplete)
-  const coverageReady = coverage.every((entry) =>
-    requiredKinds.every((kind) => entry.kinds[kind]),
-  )
+  const hasEvidenceSources = sources.length > 0
+  const captureReady =
+    hasEvidenceSources && sources.every((source) => source.evidenceComplete)
+  const coverageReady =
+    hasEvidenceSources &&
+    coverage.every((entry) =>
+      requiredKinds.every((kind) => entry.kinds[kind]),
+    )
 
   const productSources = sources.filter((source) => source.kind === 'product')
   const adapterEvidenceReady =

@@ -171,6 +171,29 @@ test('inconsistent evidence documents can never be adapter-ready', () => {
   assert.equal(report.nextAction, 'repair-evidence-bundle')
 })
 
+
+test('rejects cross-document source identity mismatches', () => {
+  const data = bundle()
+  data.inspection.sources.find(
+    (source) => source.id === 'plus-catalog',
+  ).supermarket = 'dekamarkt'
+  data.freshness.sources.find(
+    (source) => source.id === 'dekamarkt-offers',
+  ).kind = 'catalog'
+
+  const report = buildEvidenceSummary(data)
+
+  assert.equal(report.documentConsistency.consistent, false)
+  assert.deepEqual(report.documentConsistency.inspectionIdentityMismatches, [
+    'plus-catalog',
+  ])
+  assert.deepEqual(report.documentConsistency.freshnessIdentityMismatches, [
+    'dekamarkt-offers',
+  ])
+  assert.equal(report.adapterEvidenceReady, false)
+  assert.equal(report.nextAction, 'repair-evidence-bundle')
+})
+
 test('unexpected candidate-index decisions make the bundle inconsistent', () => {
   const data = bundle()
   data.candidateIndex.candidates.push({ id: 'ghost-product' })
@@ -216,4 +239,46 @@ test('unsafe candidate-index source ids cannot become adapter-ready', () => {
   assert.equal(report.documentConsistency.consistent, false)
   assert.equal(report.adapterEvidenceReady, false)
   assert.equal(report.nextAction, 'repair-evidence-bundle')
+})
+
+
+test('empty evidence bundles can never be adapter-ready', () => {
+  const report = buildEvidenceSummary({
+    manifest: {
+      milestone: 'M1 Data Feasibility',
+      results: [],
+    },
+    inspection: {
+      milestone: 'M1 Data Feasibility',
+      sources: [],
+    },
+    freshness: {
+      milestone: 'M1 Data Feasibility',
+      sources: [],
+    },
+    candidateIndex: {
+      milestone: 'M1 Data Feasibility',
+      candidateCount: 0,
+      abstentionCount: 0,
+      candidates: [],
+      abstentions: [],
+    },
+  })
+
+  assert.equal(report.documentConsistency.consistent, true)
+  assert.equal(report.sourceCount, 0)
+  assert.equal(report.captureReady, false)
+  assert.equal(report.coverageReady, false)
+  assert.equal(report.adapterEvidenceReady, false)
+})
+
+
+test('unsafe manifest evidence ids are rejected before bundle attribution', () => {
+  const data = bundle()
+  data.manifest.results[0].id = '../dekamarkt-product'
+
+  assert.throws(
+    () => buildEvidenceSummary(data),
+    /Invalid or duplicate manifest results id/,
+  )
 })
