@@ -168,6 +168,13 @@ export function parseSchemaOrgProduct(
   jsonLd: unknown,
   provenance: SourceSnapshotRef,
 ): SchemaOrgParseResult {
+  if (!isObject(provenance)) {
+    return {
+      type: 'abstain',
+      reason: 'Product JSON-LD provenance must be an object',
+    }
+  }
+
   const products = productNodes(jsonLd)
 
   if (products.length === 0) {
