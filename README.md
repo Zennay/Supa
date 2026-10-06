@@ -48,16 +48,20 @@ npm run build
 
 ```text
 src/
-  app/            app shell / navigation
+  App.tsx         app shell / bottom navigation
   components/     reusable UI primitives
-  data/           repository boundary + mock data
+  data/           repository boundary, fixtures and retailer adapters
   domain/         core product types and pure logic
   features/
     planner/
     basket/
+    observation/
     shopping-list/
-docs/
-  ARCHITECTURE.md
+  lib/            shared presentation helpers
+tests/            executable regression and proof contracts
+scripts/          M1/M3/M4 evidence and validation tooling
+docs/             architecture, proof-gate and research notes
+evidence/         durable reviewed evidence only
 ```
 
 ## Product flow
