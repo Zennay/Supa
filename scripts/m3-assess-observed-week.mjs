@@ -101,6 +101,10 @@ function validateBasket(basket, path) {
   requireNonNegativeInteger(basket.selectedMealCount, `${path}.selectedMealCount`)
   assert(Array.isArray(basket.lines), `${path}.lines must be an array`)
   basket.lines.forEach((line, index) => validateBasketLine(line, `${path}.lines[${index}]`))
+  assert(
+    new Set(basket.lines.map((line) => line.id)).size === basket.lines.length,
+    `${path}.lines must contain unique ingredient ids`,
+  )
   requireNonNegativeInteger(basket.totalCents, `${path}.totalCents`)
   requireNonNegativeInteger(basket.matchedLineCount, `${path}.matchedLineCount`)
   requireNonNegativeInteger(basket.unresolvedLineCount, `${path}.unresolvedLineCount`)
