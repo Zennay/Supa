@@ -11,12 +11,37 @@ function parseDate(value) {
   return Number.isFinite(ms) ? ms : null
 }
 
+const CAPTURE_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/
+
 function parseCaptureTimestamp(value) {
+  if (typeof value !== 'string') return null
+  const match = CAPTURE_TIMESTAMP_PATTERN.exec(value)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
+  const second = Number(match[6])
+  if (hour > 23 || minute > 59 || second > 59) return null
+
+  const calendarDate = new Date(Date.UTC(year, month - 1, day))
   if (
-    typeof value !== 'string' ||
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+    calendarDate.getUTCFullYear() !== year ||
+    calendarDate.getUTCMonth() !== month - 1 ||
+    calendarDate.getUTCDate() !== day
   ) {
     return null
+  }
+
+  if (match[7] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[7]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return null
   }
 
   const ms = Date.parse(value)
