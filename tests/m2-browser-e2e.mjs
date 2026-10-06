@@ -137,7 +137,7 @@ try {
 
   await clickNav(sessionId, 'Mand')
   let basketText = await waitForText(sessionId, 'Bekend mandminimum')
-  basketText = await waitForText(sessionId, 'min. € 23,30')
+  basketText = await waitForText(sessionId, 'min. € 23,30')
   assert.match(basketText, /Garam masala/)
   assert.match(basketText, /Controle nodig/)
   assert.match(basketText, /M2 testwinkel/)
