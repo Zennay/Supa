@@ -5,7 +5,10 @@ const euroFormatter = new Intl.NumberFormat('nl-NL', {
 
 export const euro = {
   format(value: number | bigint) {
-    if (typeof value === 'number' && !Number.isFinite(value)) {
+    if (typeof value === 'bigint') {
+      return euroFormatter.format(value)
+    }
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
       return '—'
     }
 
