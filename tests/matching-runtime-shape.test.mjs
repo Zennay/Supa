@@ -78,6 +78,16 @@ test('direct matcher rejects malformed candidate structure before scoring', () =
   }
 })
 
+test('direct matcher rejects duplicate candidate identities', () => {
+  expectAbstain(
+    matchIngredient(requirement, [
+      candidate,
+      { ...candidate, name: 'Halfvolle melk voordeelpak' },
+    ]),
+    'matching candidate identities ambiguous',
+  )
+})
+
 test('null runtime options fail closed instead of throwing', () => {
   assert.doesNotThrow(() => {
     expectAbstain(
