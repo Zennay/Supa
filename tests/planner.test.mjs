@@ -22,6 +22,40 @@ test('planned cost only includes active planner days', () => {
   assert.equal(getPlannedCost(plan, recipes, ['Ma', 'Wo']), 9)
 })
 
+test('planned cost fails closed when an active recipe identity is missing', () => {
+  assert.equal(
+    getPlannedCost([{ day: 'Ma', recipeId: 'missing' }], recipes, ['Ma']),
+    null,
+  )
+})
+
+test('planned cost fails closed when an active recipe identity is ambiguous', () => {
+  const duplicateRecipes = [
+    ...recipes,
+    {
+      id: 'cheap',
+      title: 'Conflicting cheap',
+      minutes: 15,
+      servings: 2,
+      estimatedCost: 99,
+      tags: [],
+    },
+  ]
+
+  assert.equal(getPlannedCost(plan, duplicateRecipes, ['Ma']), null)
+})
+
+test('inactive unresolved recipe identities do not invalidate the active planned cost', () => {
+  assert.equal(
+    getPlannedCost(
+      [...plan, { day: 'Do', recipeId: 'missing' }],
+      recipes,
+      ['Ma'],
+    ),
+    4.5,
+  )
+})
+
 test('budget state exposes remaining money and usage', () => {
   const state = getBudgetState(23.5, 35)
 
