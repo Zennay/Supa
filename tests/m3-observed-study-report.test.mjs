@@ -18,8 +18,11 @@ import {
   m2Recipes,
 } from '../src/data/m2Fixture.ts'
 
-const baselineStore = { id: 'study-a', name: 'Study store A' }
-const candidateStore = { id: 'study-b', name: 'Study store B' }
+const baselineStore = { id: 'plus-study-a', name: 'PLUS Leiden testfiliaal' }
+const candidateStore = {
+  id: 'dekamarkt-study-b',
+  name: 'DekaMarkt Leiden testfiliaal',
+}
 
 function completeProducts(storeId, delta = 0) {
   return [
@@ -77,6 +80,30 @@ function observedStudy(overrides = {}) {
     ...overrides,
   }
 }
+
+test('M3 report preflight rejects retailer drift from the canonical field study', () => {
+  const wrongBaseline = observedStudy()
+  wrongBaseline.baseline.basket.store = {
+    ...wrongBaseline.baseline.basket.store,
+    name: 'Andere supermarkt',
+  }
+
+  assert.throws(
+    () => buildObservedWeekReport(wrongBaseline),
+    /baseline\.basket\.store\.name must identify PLUS/,
+  )
+
+  const wrongCandidate = observedStudy()
+  wrongCandidate.candidate.basket.store = {
+    ...wrongCandidate.candidate.basket.store,
+    name: 'PLUS tweede filiaal',
+  }
+
+  assert.throws(
+    () => buildObservedWeekReport(wrongCandidate),
+    /candidate\.basket\.store\.name must identify DekaMarkt/,
+  )
+})
 
 test('M3 report preflight rejects unsafe identifiers before emitting an artifact', () => {
   assert.throws(
