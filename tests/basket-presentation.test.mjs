@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { basketCostDisclosure, comparisonWarningCopy } from '../src/features/basket/basketPresentation.ts'
+import { basketCostDisclosure, basketLineExplanation, comparisonWarningCopy } from '../src/features/basket/basketPresentation.ts'
 
 test('basket cost disclosure exposes an exact total only when every line is resolved', () => {
   const display = basketCostDisclosure(3008, 0)
@@ -54,3 +54,43 @@ test('comparison warning uses a neutral user-facing fallback for other integrity
     'SUPA kan voor deze manden nog geen betrouwbaar prijsverschil tonen.',
   )
 })
+
+test('matched basket lines use product-facing copy instead of matcher scores', () => {
+  assert.equal(
+    basketLineExplanation('matched', [
+      'query phrase present',
+      'pack closely covers requirement',
+    ]),
+    'Automatisch gekozen op basis van ingrediënt en verpakking.',
+  )
+})
+
+test('unresolved basket lines explain common uncertainty in user language', () => {
+  assert.equal(
+    basketLineExplanation('unresolved', [
+      'pack covers requirement',
+      'score below trust threshold',
+    ]),
+    'Geen productmatch is zeker genoeg; kies zelf.',
+  )
+  assert.equal(
+    basketLineExplanation('unresolved', ['top candidates too close']),
+    'Meerdere producten lijken even passend; kies zelf.',
+  )
+  assert.equal(
+    basketLineExplanation('unresolved', ['no candidates']),
+    'Geen passend product gevonden; kies zelf.',
+  )
+  assert.equal(
+    basketLineExplanation('unresolved', ['basket quantity or price is not trusted']),
+    'Hoeveelheid of verpakking is niet betrouwbaar genoeg; kies zelf.',
+  )
+})
+
+test('unknown matcher diagnostics stay hidden behind a safe generic explanation', () => {
+  assert.equal(
+    basketLineExplanation('unresolved', ['future internal matcher reason']),
+    'SUPA kan hier niet betrouwbaar automatisch kiezen; kies zelf.',
+  )
+})
+
