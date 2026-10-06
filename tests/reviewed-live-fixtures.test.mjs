@@ -116,6 +116,44 @@ test('reviewed fixtures require explicit review identity and timestamp', () => {
   )
 })
 
+test('reviewed fixtures require explicit timezone offsets for evidence timestamps', () => {
+  const timezoneLessReview = fixture('ah')
+  timezoneLessReview.review.reviewedAt = '2026-10-04T02:05:00'
+
+  assert.throws(
+    () => validateReviewedLiveProductFixture(timezoneLessReview, 'ah'),
+    /explicit timezone offset/,
+  )
+
+  const dateOnlyReview = fixture('ah')
+  dateOnlyReview.review.reviewedAt = '2026-10-04'
+
+  assert.throws(
+    () => validateReviewedLiveProductFixture(dateOnlyReview, 'ah'),
+    /explicit timezone offset/,
+  )
+
+  const timezoneLessCapture = fixture('ah')
+  timezoneLessCapture.source.capturedAt = '2026-10-04T02:00:00'
+  timezoneLessCapture.observation.provenance.capturedAt =
+    timezoneLessCapture.source.capturedAt
+
+  assert.throws(
+    () => validateReviewedLiveProductFixture(timezoneLessCapture, 'ah'),
+    /source must include a timestamp with an explicit timezone offset/,
+  )
+})
+
+test('reviewed fixtures accept explicit non-UTC offsets deterministically', () => {
+  const reviewed = fixture('ah')
+  reviewed.source.capturedAt = '2026-10-04T04:00:00+02:00'
+  reviewed.observation.provenance.capturedAt = reviewed.source.capturedAt
+  reviewed.review.reviewedAt = '2026-10-04T04:05:00+02:00'
+
+  const observation = validateReviewedLiveProductFixture(reviewed, 'ah')
+  assert.equal(observation.provenance.capturedAt, reviewed.source.capturedAt)
+})
+
 test('reviewed fixtures reject reviews that predate the captured evidence', () => {
   const reviewed = fixture('ah')
   reviewed.review.reviewedAt = '2026-10-04T01:59:59.999Z'
