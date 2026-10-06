@@ -52,10 +52,6 @@ const MATCH_UNITS: ReadonlySet<string> = new Set([
   'unknown',
 ])
 
-function isNonBlankString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0
-}
-
 function isMatchUnit(value: unknown): value is MatchUnit {
   return typeof value === 'string' && MATCH_UNITS.has(value)
 }
@@ -65,8 +61,8 @@ function hasValidRequirementShape(value: unknown): value is IngredientRequiremen
 
   const requirement = value as Record<string, unknown>
   return (
-    isNonBlankString(requirement.id) &&
-    isNonBlankString(requirement.query) &&
+    typeof requirement.id === 'string' &&
+    typeof requirement.query === 'string' &&
     (requirement.amount === null || typeof requirement.amount === 'number') &&
     isMatchUnit(requirement.unit)
   )
@@ -77,8 +73,8 @@ function hasValidCandidateShape(value: unknown): value is ProductCandidate {
 
   const candidate = value as Record<string, unknown>
   return (
-    isNonBlankString(candidate.id) &&
-    isNonBlankString(candidate.name) &&
+    typeof candidate.id === 'string' &&
+    typeof candidate.name === 'string' &&
     (candidate.packAmount === null || typeof candidate.packAmount === 'number') &&
     isMatchUnit(candidate.packUnit) &&
     (candidate.packCount === undefined ||
@@ -266,10 +262,6 @@ export function matchIngredient(
 
   if (!candidates.every(hasValidCandidateShape)) {
     return abstain('matching candidate data invalid')
-  }
-
-  if (new Set(candidates.map((candidate) => candidate.id)).size !== candidates.length) {
-    return abstain('matching candidate identities ambiguous')
   }
 
   if (hasInvalidKnownAmount(requirement.amount)) {
