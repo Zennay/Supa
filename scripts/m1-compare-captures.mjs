@@ -102,6 +102,9 @@ export function compareInspectionReports(baseline, current) {
       }
     }
 
+    const supermarketChanged =
+      (before.supermarket ?? null) !== (after.supermarket ?? null)
+    const kindChanged = (before.kind ?? null) !== (after.kind ?? null)
     const captureStatusChanged = Boolean(before.success) !== Boolean(after.success)
     const finalUrlChanged = (before.finalUrl ?? null) !== (after.finalUrl ?? null)
     const contentChanged =
@@ -110,6 +113,8 @@ export function compareInspectionReports(baseline, current) {
     const schemaContractChanged = !same(schemaView(before), schemaView(after))
 
     const reasons = []
+    if (supermarketChanged) reasons.push('supermarket-changed')
+    if (kindChanged) reasons.push('source-kind-changed')
     if (captureStatusChanged) reasons.push('capture-status-changed')
     if (finalUrlChanged) reasons.push('final-url-changed')
     if (structureChanged) reasons.push('structured-markup-changed')
