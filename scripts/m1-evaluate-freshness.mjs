@@ -116,9 +116,11 @@ export function evaluateManifestFreshness(
         !source.validators.etagPresent &&
         !source.validators.lastModifiedPresent,
     ).length,
-    acceptable: sources.every(
-      (source) => source.success && source.freshness === 'fresh',
-    ),
+    acceptable:
+      sources.length > 0 &&
+      sources.every(
+        (source) => source.success && source.freshness === 'fresh',
+      ),
     sources,
   }
 }
