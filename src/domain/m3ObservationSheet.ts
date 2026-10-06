@@ -13,6 +13,33 @@ export type ObservationSource =
   | 'receipt'
   | 'consented-export'
 
+export const M3_EXPECTED_RETAILERS = {
+  baseline: 'PLUS',
+  candidate: 'DekaMarkt',
+} as const
+
+export type M3ObservationSide = keyof typeof M3_EXPECTED_RETAILERS
+
+function normalizedRetailerName(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+export function observationStoreMatchesExpectedRetailer(
+  side: M3ObservationSide,
+  storeName: string,
+) {
+  const normalized = normalizedRetailerName(storeName)
+  if (side === 'baseline') {
+    return normalized.split(/\s+/).includes('plus')
+  }
+  return normalized.replace(/\s+/g, '').includes('dekamarkt')
+}
+
 export type ObservationRequirement = {
   id: string
   label: string
@@ -163,6 +190,7 @@ export function buildObservationSheet(): ObservationSheet {
     baseline: blankStoreObservation(requirements),
     candidate: blankStoreObservation(requirements),
     instructions: [
+      'Collect the baseline at PLUS and the candidate at DekaMarkt; do not substitute another retailer.',
       'Observe both stores for the exact same requirement list.',
       'Use one shared price context for both stores: in-store or online order.',
       'Record actual pack, price and availability; do not guess missing values.',
@@ -525,15 +553,19 @@ export function observationSheetReadiness(
     if (!nonBlank(value)) issues.push(`${label} ontbreekt.`)
   }
 
-  const observations: Array<[string, StoreObservation]> = [
-    ['Winkel A', sheet.baseline],
-    ['Winkel B', sheet.candidate],
+  const observations: Array<[string, M3ObservationSide, StoreObservation]> = [
+    ['Winkel A', 'baseline', sheet.baseline],
+    ['Winkel B', 'candidate', sheet.candidate],
   ]
   const observedTimes: number[] = []
 
-  for (const [label, observation] of observations) {
+  for (const [label, side, observation] of observations) {
     if (!nonBlank(observation.store.name)) {
       issues.push(`${label}: winkelnaam ontbreekt.`)
+    } else if (!observationStoreMatchesExpectedRetailer(side, observation.store.name)) {
+      issues.push(
+        `${label}: winkelnaam moet ${M3_EXPECTED_RETAILERS[side]} identificeren.`,
+      )
     }
     if (!nonBlank(observation.store.id)) {
       issues.push(`${label}: winkel-ID ontbreekt.`)
