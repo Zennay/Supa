@@ -25,6 +25,13 @@ test('hosted CI token is explicitly read-only', () => {
   )
 })
 
+test('hosted CI cancels superseded runs for the same PR or ref', () => {
+  assert.match(
+    workflow,
+    /^concurrency:\s*\n  group: supa-ci-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}\s*\n  cancel-in-progress: true\s*$/m,
+  )
+})
+
 test('hosted CI has a bounded execution time', () => {
   assert.match(
     workflow,
