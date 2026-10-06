@@ -1,3 +1,4 @@
+import type { BasketTraceLine } from '../../domain/basket.ts'
 import { euro } from '../../lib/money.ts'
 
 export type BasketCostDisclosure = {
@@ -36,6 +37,34 @@ export function basketCostDisclosure(
       }
 }
 
+export function basketReviewSummary(unresolvedLineCount: number): string | null {
+  if (unresolvedLineCount === 0) return null
+
+  if (Number.isInteger(unresolvedLineCount) && unresolvedLineCount > 0) {
+    return unresolvedLineCount === 1
+      ? '1 productkeuze vraagt jouw controle. Die staat bovenaan.'
+      : `${unresolvedLineCount} productkeuzes vragen jouw controle. Die staan bovenaan.`
+  }
+
+  return 'Er zijn productkeuzes die jouw controle vragen. Die staan bovenaan.'
+}
+
+export function orderBasketLinesForReview(
+  lines: readonly BasketTraceLine[],
+): BasketTraceLine[] {
+  const unresolved: BasketTraceLine[] = []
+  const matched: BasketTraceLine[] = []
+
+  for (const line of lines) {
+    if (line.status === 'unresolved') {
+      unresolved.push(line)
+    } else {
+      matched.push(line)
+    }
+  }
+
+  return [...unresolved, ...matched]
+}
 
 export function comparisonWarningCopy(
   baselineUnresolvedLineCount: number,
@@ -110,4 +139,3 @@ export function basketLineExplanation(
 
   return 'SUPA kan hier niet betrouwbaar automatisch kiezen; kies zelf.'
 }
-
