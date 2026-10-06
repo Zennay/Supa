@@ -6,9 +6,13 @@ import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 
 export { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 
+function validOutputArg(value) {
+  return typeof value === 'string' && Boolean(value.trim()) && !value.trim().startsWith('-')
+}
+
 function parseArgs(argv) {
   if (argv.length === 0) return { output: null }
-  if (argv.length === 2 && argv[0] === '--output' && argv[1]) {
+  if (argv.length === 2 && argv[0] === '--output' && validOutputArg(argv[1])) {
     return { output: argv[1] }
   }
   throw new Error(
