@@ -108,6 +108,35 @@ test('changing a recipe changes the basket while preserving traceability', () =>
   assert.equal(tomatoes.lineTotalCents, 198)
 })
 
+test('unsafe product prices remain unresolved instead of corrupting basket money', () => {
+  const target = m2Products.find((product) => product.storeId === m2Store.id)
+  assert.ok(target)
+
+  const products = m2Products.map((product) =>
+    product.id === target.id
+      ? { ...product, priceCents: Number.MAX_SAFE_INTEGER + 1 }
+      : product,
+  )
+
+  const basket = buildOneStoreBasket({
+    store: m2Store,
+    plan: m2InitialPlan,
+    recipes: m2Recipes,
+    activeDays: m2DefaultActiveDays,
+    products,
+  })
+
+  const affected = basket.lines.find((line) => line.productId === target.id)
+  assert.equal(affected, undefined)
+  assert.ok(
+    basket.lines.some(
+      (line) =>
+        line.status === 'unresolved' &&
+        line.reasons.some((reason) => /quantity or price is not trusted/.test(reason)),
+    ),
+  )
+})
+
 test('inconsistent ingredient definitions fail instead of silently aggregating', () => {
   const inconsistentRecipes = [
     ...m2Recipes,
