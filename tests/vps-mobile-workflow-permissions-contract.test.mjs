@@ -17,6 +17,13 @@ test('permanent VPS mobile workflow uses an explicit read-only token', () => {
   assert.doesNotMatch(workflow, /^\s{2,}[a-z-]+:\s*write\s*$/m)
 })
 
+test('permanent VPS checkout does not persist credentials', () => {
+  assert.match(
+    workflow,
+    /uses: actions\/checkout@v4\s*\n\s*with:\s*\n\s*persist-credentials: false/,
+  )
+})
+
 test('permanent VPS mobile safety and quality gates remain intact', () => {
   for (const marker of [
     'runs-on: self-hosted',
