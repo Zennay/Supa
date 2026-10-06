@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { euro } from '../src/lib/money.ts'
+import { euro, savings } from '../src/lib/money.ts'
 
 test('euro formatting preserves finite values', () => {
   assert.match(euro.format(12.34), /12,34/)
@@ -12,4 +12,16 @@ test('euro formatting fails closed on non-finite numbers', () => {
   assert.equal(euro.format(Number.NaN), '—')
   assert.equal(euro.format(Number.POSITIVE_INFINITY), '—')
   assert.equal(euro.format(Number.NEGATIVE_INFINITY), '—')
+})
+
+test('savings rejects non-finite money inputs', () => {
+  assert.equal(savings(Number.NaN, 10), null)
+  assert.equal(savings(10, Number.NaN), null)
+  assert.equal(savings(Number.POSITIVE_INFINITY, 10), null)
+  assert.equal(savings(10, Number.NEGATIVE_INFINITY), null)
+})
+
+test('savings preserves its positive-only finite contract', () => {
+  assert.equal(savings(40, 31.8), 8.2)
+  assert.equal(savings(31.8, 40), 0)
 })
