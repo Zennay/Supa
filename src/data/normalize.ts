@@ -70,7 +70,7 @@ export function normalizePackText(input: string | null): NormalizedPack {
     .trim()
 
   const multipack = cleaned.match(
-    /^(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)\b/,
+    /^(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)(?:\s+\((?:ca\.\s*)?\d+\s*(?:st|stuk|stuks)\))?$/,
   )
 
   if (multipack) {
@@ -93,7 +93,7 @@ export function normalizePackText(input: string | null): NormalizedPack {
   }
 
   const single = cleaned.match(
-    /^(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)\b/,
+    /^(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)(?:\s+\((?:ca\.\s*)?\d+\s*(?:st|stuk|stuks)\))?$/,
   )
 
   if (single) {
