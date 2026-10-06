@@ -203,3 +203,70 @@ test('rejects non-boolean capture success flags before inspecting artifacts', as
     )
   }
 })
+
+
+test('rejects duplicate capture source ids before building inspection evidence', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-inspect-duplicate-'))
+
+  await writeFile(
+    path.join(root, 'manifest.json'),
+    JSON.stringify({
+      milestone: 'M1 Data Feasibility',
+      bounded: true,
+      sourceCount: 2,
+      results: [
+        {
+          id: 'plus-product',
+          supermarket: 'plus',
+          kind: 'product',
+          success: false,
+        },
+        {
+          id: 'plus-product',
+          supermarket: 'plus',
+          kind: 'product',
+          success: false,
+        },
+      ],
+    }),
+    'utf8',
+  )
+
+  await assert.rejects(
+    () => inspectCaptureDirectory(root),
+    /Duplicate capture source id/,
+  )
+})
+
+test('rejects capture retailers and source kinds outside the bounded M1 contract', async () => {
+  for (const overrides of [
+    { supermarket: 'other-store' },
+    { kind: 'search' },
+  ]) {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-inspect-contract-'))
+
+    await writeFile(
+      path.join(root, 'manifest.json'),
+      JSON.stringify({
+        milestone: 'M1 Data Feasibility',
+        bounded: true,
+        sourceCount: 1,
+        results: [
+          {
+            id: 'bounded-source',
+            supermarket: 'plus',
+            kind: 'product',
+            success: false,
+            ...overrides,
+          },
+        ],
+      }),
+      'utf8',
+    )
+
+    await assert.rejects(
+      () => inspectCaptureDirectory(root),
+      /Unsupported capture (supermarket|source kind)/,
+    )
+  }
+})
