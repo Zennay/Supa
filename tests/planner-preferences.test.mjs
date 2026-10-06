@@ -230,6 +230,41 @@ test('M2 planner preferences fail closed on invalid caller fallbacks', () => {
 })
 
 
+test('M2 planner preferences exclude defaults removed from the current recipe catalog', () => {
+  const currentRecipeIds = recipeIds.filter((recipeId) => recipeId !== 'tikka')
+  const preferences = parsePlannerPreferences(
+    null,
+    m2InitialPlan,
+    currentRecipeIds,
+  )
+
+  assert.deepEqual(preferences, {
+    budget: 35,
+    activeDays: ['Di', 'Wo'],
+    recipeByDay: {
+      Di: 'teriyaki',
+      Wo: 'pasta',
+    },
+  })
+})
+
+test('M2 planner preferences ignore malformed recipe catalog identities', () => {
+  const preferences = parsePlannerPreferences(
+    null,
+    m2InitialPlan,
+    ['tikka', ' teriyaki', 'pasta ', '', null, 42],
+  )
+
+  assert.deepEqual(preferences, {
+    budget: 35,
+    activeDays: ['Ma', 'Do'],
+    recipeByDay: {
+      Ma: 'tikka',
+      Do: 'tikka',
+    },
+  })
+})
+
 test('M2 planner preferences fail closed on duplicate default day identities', () => {
   const ambiguousPlan = [
     { day: 'Ma', recipeId: 'tikka' },
