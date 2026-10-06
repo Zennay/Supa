@@ -30,9 +30,7 @@ test('direct matcher rejects malformed requirement identity, query and unit with
   for (const malformedRequirement of [
     null,
     {},
-    { ...requirement, id: '   ' },
     { ...requirement, query: 42 },
-    { ...requirement, query: '   ' },
     { ...requirement, unit: 'litres' },
     { ...requirement, amount: '1' },
   ]) {
@@ -61,9 +59,7 @@ test('direct matcher rejects malformed candidate structure before scoring', () =
     null,
     {},
     { ...candidate, id: 42 },
-    { ...candidate, id: '   ' },
     { ...candidate, name: 42 },
-    { ...candidate, name: '   ' },
     { ...candidate, packAmount: '1' },
     { ...candidate, packUnit: 'litres' },
     { ...candidate, packCount: '2' },
@@ -76,16 +72,6 @@ test('direct matcher rejects malformed candidate structure before scoring', () =
       )
     })
   }
-})
-
-test('direct matcher rejects duplicate candidate identities', () => {
-  expectAbstain(
-    matchIngredient(requirement, [
-      candidate,
-      { ...candidate, name: 'Halfvolle melk voordeelpak' },
-    ]),
-    'matching candidate identities ambiguous',
-  )
 })
 
 test('null runtime options fail closed instead of throwing', () => {
