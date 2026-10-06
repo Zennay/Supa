@@ -24,11 +24,14 @@ test('euro formatting fails closed on non-finite numbers', () => {
   assert.equal(euro.format(Number.NEGATIVE_INFINITY), '—')
 })
 
-test('savings rejects non-finite money inputs', () => {
+test('savings rejects malformed money inputs', () => {
   assert.equal(savings(Number.NaN, 10), null)
   assert.equal(savings(10, Number.NaN), null)
   assert.equal(savings(Number.POSITIVE_INFINITY, 10), null)
   assert.equal(savings(10, Number.NEGATIVE_INFINITY), null)
+  assert.equal(savings(-1, 10), null)
+  assert.equal(savings(10, -1), null)
+  assert.equal(savings(-1, -5), null)
 })
 
 test('savings preserves its positive-only finite contract', () => {

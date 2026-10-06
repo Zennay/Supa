@@ -17,7 +17,12 @@ export const euro = {
 }
 
 export function savings(baseline: number, total: number): number | null {
-  if (!Number.isFinite(baseline) || !Number.isFinite(total)) {
+  if (
+    !Number.isFinite(baseline) ||
+    !Number.isFinite(total) ||
+    baseline < 0 ||
+    total < 0
+  ) {
     return null
   }
 
