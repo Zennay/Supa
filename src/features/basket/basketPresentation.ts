@@ -35,3 +35,34 @@ export function basketCostDisclosure(
         unresolvedLineCount: safeUnresolvedLineCount,
       }
 }
+
+
+export function comparisonWarningCopy(
+  baselineUnresolvedLineCount: number,
+  candidateUnresolvedLineCount: number,
+  reasonCount: number,
+): string {
+  const baselineOpen =
+    Number.isInteger(baselineUnresolvedLineCount) &&
+    baselineUnresolvedLineCount > 0
+      ? baselineUnresolvedLineCount
+      : 0
+  const candidateOpen =
+    Number.isInteger(candidateUnresolvedLineCount) &&
+    candidateUnresolvedLineCount > 0
+      ? candidateUnresolvedLineCount
+      : 0
+  const openProductChoices = baselineOpen + candidateOpen
+
+  if (openProductChoices > 0) {
+    return `${openProductChoices} ${
+      openProductChoices === 1 ? 'productkeuze moet' : 'productkeuzes moeten'
+    } nog worden opgelost voordat SUPA een prijsverschil betrouwbaar kan tonen.`
+  }
+
+  if (Number.isInteger(reasonCount) && reasonCount > 0) {
+    return 'Deze manden voldoen nog niet aan dezelfde betrouwbare vergelijkingsbasis.'
+  }
+
+  return 'SUPA kan voor deze manden nog geen betrouwbaar prijsverschil tonen.'
+}
