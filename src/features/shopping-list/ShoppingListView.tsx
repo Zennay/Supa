@@ -1,5 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
+import {
+  restoreShoppingListProgress,
+  serializeShoppingListProgress,
+  shoppingListBasketKey,
+  shoppingListProgressStorageKey,
+} from './shoppingListProgress'
 
 function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
   if (line.status === 'unresolved') {
@@ -10,8 +16,48 @@ function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
   return `${line.packs} × ${packPrefix}${line.pack.amount} ${line.pack.unit}`
 }
 
+function readStoredProgress(basket: OneStoreBasket) {
+  if (typeof window === 'undefined') return []
+
+  try {
+    return restoreShoppingListProgress(
+      basket,
+      window.localStorage.getItem(shoppingListProgressStorageKey),
+    )
+  } catch {
+    return []
+  }
+}
+
 export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
-  const [done, setDone] = useState<string[]>([])
+  const basketKey = useMemo(() => shoppingListBasketKey(basket), [basket])
+  const [progress, setProgress] = useState(() => ({
+    basketKey,
+    done: readStoredProgress(basket),
+  }))
+  const done = progress.basketKey === basketKey ? progress.done : []
+
+  useEffect(() => {
+    if (progress.basketKey === basketKey) return
+
+    setProgress({
+      basketKey,
+      done: readStoredProgress(basket),
+    })
+  }, [basket, basketKey, progress.basketKey])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || progress.basketKey !== basketKey) return
+
+    try {
+      window.localStorage.setItem(
+        shoppingListProgressStorageKey,
+        serializeShoppingListProgress(basket, progress.done),
+      )
+    } catch {
+      // Strict privacy modes can deny storage; the active session remains usable.
+    }
+  }, [basket, basketKey, progress])
 
   return (
     <section className="screen">
@@ -48,9 +94,16 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
               }
               key={line.id}
               onClick={() =>
-                setDone((current) =>
-                  checked ? current.filter((id) => id !== line.id) : [...current, line.id],
-                )
+                setProgress((current) => {
+                  const currentDone =
+                    current.basketKey === basketKey ? current.done : []
+                  return {
+                    basketKey,
+                    done: checked
+                      ? currentDone.filter((id) => id !== line.id)
+                      : [...currentDone, line.id],
+                  }
+                })
               }
             >
               <span className="check">{checked ? '✓' : ''}</span>
