@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { buildObservationSheet, M3_EXPECTED_RETAILERS } from '../src/domain/m3ObservationSheet.ts'
 
 const contractPath = 'docs/M3_OBSERVED_BASKET_STUDY.md'
 const packagePath = 'package.json'
@@ -110,4 +111,23 @@ test('M3 field command examples preserve artifact versus evidence storage bounda
       `missing canonical M3 field command example: ${command}`,
     )
   }
+})
+
+
+test('M3 field contract stays aligned with runtime study constants', async () => {
+  const contract = await readFile(contractPath, 'utf8')
+  const sheet = buildObservationSheet()
+
+  assert.equal(sheet.requirements.length, 11)
+  assert.equal(sheet.study.maxObservationWindowHours, 24)
+  assert.equal(sheet.evidenceStatus, 'collection-template-not-evidence')
+  assert.deepEqual(M3_EXPECTED_RETAILERS, {
+    baseline: 'PLUS',
+    candidate: 'DekaMarkt',
+  })
+
+  assert.equal(contract.includes('same 11 ingredient requirements'), true)
+  assert.equal(contract.includes('24-hour study window'), true)
+  assert.equal(contract.includes(`**baseline = ${M3_EXPECTED_RETAILERS.baseline}**`), true)
+  assert.equal(contract.includes(`**candidate = ${M3_EXPECTED_RETAILERS.candidate}**`), true)
 })
