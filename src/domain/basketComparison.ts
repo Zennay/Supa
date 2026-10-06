@@ -125,7 +125,10 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
     reasons.push(`${label} basket contains an unsupported line shape or status`)
   }
 
-  if (!validIdentity(basket.store.id)) {
+  if (
+    !validIdentity(basket.store.id) ||
+    basket.store.id !== basket.store.id.trim()
+  ) {
     reasons.push(`${label} basket has an invalid store identity`)
   }
 
