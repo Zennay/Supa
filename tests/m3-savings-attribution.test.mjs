@@ -304,3 +304,71 @@ test('M3 attribution rejects malformed JSON evidence without throwing', () => {
   assert.match(result.reasons.join(' '), /unsupported effect/)
   assert.match(result.reasons.join(' '), /missing an evidence reference/)
 })
+
+
+test('M3 attribution rejects padded comparison line identities', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison({
+      lineDeltas: [
+        {
+          id: 'tomato',
+          ingredientLabel: 'Tomato',
+          baselineLineTotalCents: 500,
+          candidateLineTotalCents: 380,
+          deltaCents: -120,
+        },
+        {
+          id: 'rice ',
+          ingredientLabel: 'Rice',
+          baselineLineTotalCents: 400,
+          candidateLineTotalCents: 430,
+          deltaCents: 30,
+        },
+      ],
+    }),
+    evidence: [],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /invalid line identity/)
+})
+
+test('M3 attribution rejects padded evidence line identities', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison(),
+    evidence: [
+      {
+        lineId: 'tomato ',
+        effect: 'offer',
+        deltaCents: -120,
+        evidenceRef: 'observed-week-2026-10-04:tomato-offer',
+      },
+    ],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /canonical non-empty string/)
+})
+
+test('M3 attribution rejects padded evidence references', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison(),
+    evidence: [
+      {
+        lineId: 'tomato',
+        effect: 'offer',
+        deltaCents: -120,
+        evidenceRef: ' observed-week-2026-10-04:tomato-offer',
+      },
+    ],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /canonical evidence reference/)
+})

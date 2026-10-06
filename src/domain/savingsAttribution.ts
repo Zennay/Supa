@@ -63,7 +63,11 @@ export function attributeSavingsEffects({
 
   const comparisonLineIds = new Set<string>()
   for (const line of comparison.lineDeltas) {
-    if (typeof line.id !== 'string' || line.id.trim().length === 0) {
+    if (
+      typeof line.id !== 'string' ||
+      line.id.trim().length === 0 ||
+      line.id.trim() !== line.id
+    ) {
       return {
         status: 'unknown',
         fullyAttributed: false,
@@ -101,6 +105,10 @@ export function attributeSavingsEffects({
       reasons.push('attribution evidence lineId must be a non-empty string')
       continue
     }
+    if (item.lineId.trim() !== item.lineId) {
+      reasons.push('attribution evidence lineId must be a canonical non-empty string')
+      continue
+    }
 
     if (!lineById.has(item.lineId)) {
       reasons.push(`attribution references unknown comparison line ${item.lineId}`)
@@ -122,6 +130,10 @@ export function attributeSavingsEffects({
       item.evidenceRef.trim().length === 0
     ) {
       reasons.push(`attribution for ${item.lineId} is missing an evidence reference`)
+      continue
+    }
+    if (item.evidenceRef.trim() !== item.evidenceRef) {
+      reasons.push(`attribution for ${item.lineId} must use a canonical evidence reference`)
       continue
     }
 
