@@ -13,6 +13,10 @@ export const euro = {
   },
 }
 
-export function savings(baseline: number, total: number) {
+export function savings(baseline: number, total: number): number | null {
+  if (!Number.isFinite(baseline) || !Number.isFinite(total)) {
+    return null
+  }
+
   return Math.max(0, baseline - total)
 }
