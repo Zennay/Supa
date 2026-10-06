@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/vps-mobile-foundation.yml"
+      - "index.html"
       - "src/App.tsx"
       - "src/main.tsx"
       - "src/styles.css"
@@ -14,6 +15,7 @@ on:
       - "src/data/m2Fixture.ts"
       - "src/data/m3ComparisonFixture.ts"
       - "src/lib/**"
+      - "tests/mobile-safe-area-contract.test.mjs"
       - "tests/planner*.test.*"
       - "tests/m2-core-slice.test.mjs"
       - "tests/m3-*.test.mjs"
