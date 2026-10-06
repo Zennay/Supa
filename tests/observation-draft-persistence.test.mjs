@@ -12,7 +12,7 @@ test('M3 draft persistence writes the exact key and serialized draft', () => {
   }
 
   assert.equal(
-    persistObservationDraft(storage, 'supa:m3-test', {
+    persistObservationDraft(() => storage, 'supa:m3-test', {
       study: { studyId: 'm3-week-001' },
     }),
     true,
@@ -32,7 +32,7 @@ test('M3 draft persistence fails closed when storage rejects the write', () => {
     },
   }
 
-  assert.equal(persistObservationDraft(storage, 'supa:m3-test', { ok: true }), false)
+  assert.equal(persistObservationDraft(() => storage, 'supa:m3-test', { ok: true }), false)
 })
 
 test('M3 draft persistence fails closed when serialization is impossible', () => {
@@ -45,6 +45,19 @@ test('M3 draft persistence fails closed when serialization is impossible', () =>
     },
   }
 
-  assert.equal(persistObservationDraft(storage, 'supa:m3-test', circular), false)
+  assert.equal(persistObservationDraft(() => storage, 'supa:m3-test', circular), false)
   assert.equal(writeCount, 0)
+})
+
+test('M3 draft persistence fails closed when storage access itself is denied', () => {
+  assert.equal(
+    persistObservationDraft(
+      () => {
+        throw new Error('storage access denied')
+      },
+      'supa:m3-test',
+      { ok: true },
+    ),
+    false,
+  )
 })
