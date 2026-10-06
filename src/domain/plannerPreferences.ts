@@ -1,5 +1,7 @@
 import type { PlannedMeal } from './types.ts'
 
+export const DEFAULT_PLANNER_BUDGET_OPTIONS = [30, 35, 40] as const
+
 export type PlannerPreferences = {
   budget: number
   activeDays: string[]
@@ -24,6 +26,7 @@ export function parsePlannerPreferences(
   defaultPlan: PlannedMeal[],
   validRecipeIds: string[],
   fallbackBudget = 35,
+  validBudgets: readonly number[] = DEFAULT_PLANNER_BUDGET_OPTIONS,
 ): PlannerPreferences {
   const fallback = defaultPlannerPreferences(defaultPlan, fallbackBudget)
   if (!raw) return fallback
@@ -37,31 +40,37 @@ export function parsePlannerPreferences(
       activeDays?: unknown
       recipeByDay?: unknown
     }
-    const validDays = new Set(defaultPlan.map((meal) => meal.day))
+    const canonicalDays = Array.from(new Set(defaultPlan.map((meal) => meal.day)))
+    const validDays = new Set(canonicalDays)
     const validRecipes = new Set(validRecipeIds)
+    const supportedBudgets = new Set(
+      validBudgets.filter(
+        (budget) => Number.isFinite(budget) && budget > 0,
+      ),
+    )
 
     const budget =
       typeof candidate.budget === 'number' &&
-      Number.isFinite(candidate.budget) &&
-      candidate.budget > 0
+      supportedBudgets.has(candidate.budget)
         ? candidate.budget
         : fallbackBudget
 
     let activeDays = fallback.activeDays
     if (Array.isArray(candidate.activeDays)) {
-      const filteredDays = Array.from(
-        new Set(
-          candidate.activeDays.filter(
-            (day): day is string =>
-              typeof day === 'string' && validDays.has(day),
-          ),
+      const persistedDays = new Set(
+        candidate.activeDays.filter(
+          (day): day is string =>
+            typeof day === 'string' && validDays.has(day),
         ),
+      )
+      const orderedDays = canonicalDays.filter((day) =>
+        persistedDays.has(day),
       )
 
       activeDays =
-        candidate.activeDays.length > 0 && filteredDays.length === 0
+        candidate.activeDays.length > 0 && orderedDays.length === 0
           ? fallback.activeDays
-          : filteredDays
+          : orderedDays
     }
 
     const persistedRecipes =
