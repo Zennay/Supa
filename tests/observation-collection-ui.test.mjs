@@ -58,6 +58,9 @@ test('M3 observed-price helper preserves exact cents and rejects silent rounding
   assert.equal(observationPriceCents('1'), 100)
   assert.equal(observationPriceCents('1.2'), 120)
   assert.equal(observationPriceCents('1,23'), 123)
+  assert.equal(observationPriceCents('.99'), 99)
+  assert.equal(observationPriceCents(',99'), 99)
+  assert.equal(observationPriceCents('1.'), 100)
   assert.equal(observationPriceCents('0.00'), 0)
   assert.equal(observationPriceCents(' 2,50 '), 250)
 
