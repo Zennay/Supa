@@ -4,10 +4,17 @@ type Props = {
 }
 
 export function StatPill({ label, value }: Props) {
+  const accessibleLabel = `${label}: ${value}`
+
   return (
-    <div className="stat-pill">
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div
+      className="stat-pill"
+      role="group"
+      aria-label={accessibleLabel}
+      data-stat-label={label}
+    >
+      <span aria-hidden="true">{label}</span>
+      <strong aria-hidden="true">{value}</strong>
     </div>
   )
 }
