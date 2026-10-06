@@ -14,6 +14,8 @@ function isSafeSourceId(value) {
   )
 }
 
+const EXPECTED_SUPERMARKETS = new Set(['dekamarkt', 'plus'])
+
 function requireSafeUniqueProductSources(sources) {
   const seen = new Set()
 
@@ -28,6 +30,11 @@ function requireSafeUniqueProductSources(sources) {
     if (seen.has(source.id)) {
       throw new Error(
         `Inspection contains a duplicate product source id: ${source.id}`,
+      )
+    }
+    if (!EXPECTED_SUPERMARKETS.has(source.supermarket)) {
+      throw new Error(
+        `Inspection contains an out-of-scope product supermarket: ${source.supermarket}`,
       )
     }
     if (typeof source.success !== 'boolean') {
