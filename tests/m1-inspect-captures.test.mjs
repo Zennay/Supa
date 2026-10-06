@@ -116,3 +116,60 @@ test('fails loudly on capture hash mismatch', async () => {
     /integrity mismatch/,
   )
 })
+
+
+test('rejects unsafe source ids before resolving capture file paths', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-inspect-id-'))
+
+  await writeFile(
+    path.join(root, 'manifest.json'),
+    JSON.stringify({
+      milestone: 'M1 Data Feasibility',
+      bounded: true,
+      sourceCount: 1,
+      results: [
+        {
+          id: '../outside',
+          supermarket: 'plus',
+          kind: 'product',
+          success: true,
+          sha256: 'a'.repeat(64),
+        },
+      ],
+    }),
+    'utf8',
+  )
+
+  await assert.rejects(
+    () => inspectCaptureDirectory(root),
+    /Unsafe capture source id/,
+  )
+})
+
+test('rejects unsafe supermarket path segments before reading HTML', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-inspect-store-'))
+
+  await writeFile(
+    path.join(root, 'manifest.json'),
+    JSON.stringify({
+      milestone: 'M1 Data Feasibility',
+      bounded: true,
+      sourceCount: 1,
+      results: [
+        {
+          id: 'plus-product',
+          supermarket: '..',
+          kind: 'product',
+          success: true,
+          sha256: 'a'.repeat(64),
+        },
+      ],
+    }),
+    'utf8',
+  )
+
+  await assert.rejects(
+    () => inspectCaptureDirectory(root),
+    /Unsafe capture supermarket path segment/,
+  )
+})
