@@ -12,8 +12,11 @@ export function defaultPlannerPreferences(
   defaultPlan: PlannedMeal[],
   fallbackBudget = 35,
 ): PlannerPreferences {
+  const safeFallbackBudget =
+    Number.isFinite(fallbackBudget) && fallbackBudget > 0 ? fallbackBudget : 35
+
   return {
-    budget: fallbackBudget,
+    budget: safeFallbackBudget,
     activeDays: defaultPlan.map((meal) => meal.day),
     recipeByDay: Object.fromEntries(
       defaultPlan.map((meal) => [meal.day, meal.recipeId]),
@@ -28,7 +31,17 @@ export function parsePlannerPreferences(
   fallbackBudget = 35,
   validBudgets: readonly number[] = DEFAULT_PLANNER_BUDGET_OPTIONS,
 ): PlannerPreferences {
-  const fallback = defaultPlannerPreferences(defaultPlan, fallbackBudget)
+  const supportedBudgets = Array.from(
+    new Set(
+      validBudgets.filter(
+        (budget) => Number.isFinite(budget) && budget > 0,
+      ),
+    ),
+  )
+  const safeFallbackBudget = supportedBudgets.includes(fallbackBudget)
+    ? fallbackBudget
+    : (supportedBudgets[0] ?? 35)
+  const fallback = defaultPlannerPreferences(defaultPlan, safeFallbackBudget)
   if (!raw) return fallback
 
   try {
@@ -43,17 +56,13 @@ export function parsePlannerPreferences(
     const canonicalDays = Array.from(new Set(defaultPlan.map((meal) => meal.day)))
     const validDays = new Set(canonicalDays)
     const validRecipes = new Set(validRecipeIds)
-    const supportedBudgets = new Set(
-      validBudgets.filter(
-        (budget) => Number.isFinite(budget) && budget > 0,
-      ),
-    )
+    const supportedBudgetSet = new Set(supportedBudgets)
 
     const budget =
       typeof candidate.budget === 'number' &&
-      supportedBudgets.has(candidate.budget)
+      supportedBudgetSet.has(candidate.budget)
         ? candidate.budget
-        : fallbackBudget
+        : safeFallbackBudget
 
     let activeDays = fallback.activeDays
     if (Array.isArray(candidate.activeDays)) {
