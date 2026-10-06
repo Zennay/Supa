@@ -306,6 +306,21 @@ test('M3 attribution rejects malformed JSON evidence without throwing', () => {
 })
 
 
+test('M3 attribution rejects malformed top-level evidence containers without throwing', () => {
+  for (const evidence of [null, {}, 'not-an-evidence-array']) {
+    const result = attributeSavingsEffects({
+      comparison: comparison(),
+      evidence,
+    })
+
+    assert.equal(result.status, 'unknown')
+    assert.equal(result.fullyAttributed, false)
+    assert.equal(result.comparisonDeltaCents, -90)
+    assert.equal(result.effectTotals.unknownCents, null)
+    assert.match(result.reasons.join(' '), /evidence must be an array/)
+  }
+})
+
 test('M3 attribution rejects padded comparison line identities', () => {
   const result = attributeSavingsEffects({
     comparison: comparison({
