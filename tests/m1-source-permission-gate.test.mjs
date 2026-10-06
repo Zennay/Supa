@@ -43,6 +43,16 @@ test('rejects impossible calendar dates in permission review metadata', async ()
   }
 })
 
+test('rejects future-dated permission review metadata', async () => {
+  const document = await gate()
+  document.reviewedAt = '2999-01-01'
+
+  assert.throws(
+    () => evaluateSourcePermissionGate(document),
+    /review date cannot be in the future/,
+  )
+})
+
 test('cannot enable production while a source still requires permission', async () => {
   const document = await gate()
   document.sources.find((source) => source.supermarket === 'plus').productionEnabled = true
