@@ -16,6 +16,10 @@ function decimal(value: string): number {
   return Number(value.replace(',', '.'))
 }
 
+function isSafePositiveNumber(value: number): boolean {
+  return Number.isFinite(value) && value > 0 && value <= Number.MAX_SAFE_INTEGER
+}
+
 export function normalizeMoneyToCents(input: string): number | null {
   const cleaned = input
     .trim()
@@ -36,7 +40,9 @@ export function normalizeMoneyToCents(input: string): number | null {
   }
 
   const cents = Math.round(value * 100)
-  return Math.abs(value * 100 - cents) < 1e-6 ? cents : null
+  return Number.isSafeInteger(cents) && Math.abs(value * 100 - cents) < 1e-6
+    ? cents
+    : null
 }
 
 export type NormalizedPack = RawPack & {
@@ -63,10 +69,9 @@ export function normalizePackText(input: string | null): NormalizedPack {
     const count = Number(multipack[1])
     const amount = decimal(multipack[2])
     if (
-      Number.isInteger(count) &&
+      Number.isSafeInteger(count) &&
       count > 0 &&
-      Number.isFinite(amount) &&
-      amount > 0
+      isSafePositiveNumber(amount)
     ) {
       return {
         rawText,
@@ -85,7 +90,7 @@ export function normalizePackText(input: string | null): NormalizedPack {
 
   if (single) {
     const amount = decimal(single[1])
-    if (Number.isFinite(amount) && amount > 0) {
+    if (isSafePositiveNumber(amount)) {
       return {
         rawText,
         count: 1,
@@ -116,7 +121,12 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
   if (buyFree) {
     const buy = Number(buyFree[1])
     const free = Number(buyFree[2])
-    if (buy > 0 && free > 0) {
+    if (
+      Number.isSafeInteger(buy) &&
+      buy > 0 &&
+      Number.isSafeInteger(free) &&
+      free > 0
+    ) {
       return {
         type: 'buy_x_get_y_free',
         buy,
@@ -131,7 +141,12 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
   if (quantityForPrice) {
     const quantity = Number(quantityForPrice[1])
     const totalPriceCents = normalizeMoneyToCents(quantityForPrice[2])
-    if (quantity > 0 && totalPriceCents !== null && totalPriceCents > 0) {
+    if (
+      Number.isSafeInteger(quantity) &&
+      quantity > 0 &&
+      totalPriceCents !== null &&
+      totalPriceCents > 0
+    ) {
       return {
         type: 'quantity_for_price',
         quantity,
@@ -165,4 +180,3 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
 
   return { type: 'unknown', rawLabel }
 }
-
