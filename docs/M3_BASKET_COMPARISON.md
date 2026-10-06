@@ -31,6 +31,23 @@ Line-level deltas are retained for a claimable comparison so later M3 work can
 separate pack-size, offer and planning effects rather than hiding them in one
 headline number.
 
+## Explanation boundary
+
+A claimable line delta proves only **where** the candidate basket total differs
+from the baseline for the same ingredient demand. Product copy may state that a
+specific candidate line is a bounded euro amount higher or lower and may rank
+the largest absolute contributors.
+
+A line delta does **not** by itself prove **why** the difference exists. Do not
+label a delta as a pack-size, offer, planning, unit-price or reuse effect unless
+the separate savings-attribution contract has explicit evidence for that cause.
+If causal evidence is absent, keep the explanation descriptive rather than
+inferential.
+
+For `unknown` or otherwise non-claimable comparisons, suppress both the overall
+financial delta and any line-level financial breakdown. Do not use a partial
+line breakdown to imply a savings result that the full-basket gate rejected.
+
 ## Evidence boundary
 
 The regression fixtures prove calculation behavior only. They are not evidence
