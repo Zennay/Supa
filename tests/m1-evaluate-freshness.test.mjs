@@ -31,6 +31,16 @@ function result(overrides = {}) {
   }
 }
 
+test('empty capture manifests are never freshness-acceptable', () => {
+  const report = evaluateManifestFreshness(manifest([]), {
+    now: new Date('2026-10-04T01:00:00.000Z'),
+  })
+
+  assert.equal(report.sourceCount, 0)
+  assert.equal(report.freshCount, 0)
+  assert.equal(report.acceptable, false)
+})
+
 test('marks a recent successful capture fresh and preserves validators', () => {
   const report = evaluateManifestFreshness(manifest([result()]), {
     now: new Date('2026-10-04T01:00:00.000Z'),
