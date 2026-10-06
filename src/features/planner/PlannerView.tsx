@@ -73,7 +73,7 @@ export function PlannerView({
           </span>
         </div>
 
-        <div className="budget-options" aria-label="Kies je weekbudget">
+        <div className="budget-options" role="group" aria-label="Kies je weekbudget">
           {budgetOptions.map((option) => (
             <button
               type="button"
@@ -129,7 +129,7 @@ export function PlannerView({
         </p>
       </section>
 
-      <div className="day-grid" aria-label="Geplande maaltijden">
+      <div className="day-grid" role="group" aria-label="Geplande maaltijden">
         {plannedMeals.map((item) => {
           const recipe = recipes.find((candidate) => candidate.id === item.recipeId)
           if (!recipe) return null
