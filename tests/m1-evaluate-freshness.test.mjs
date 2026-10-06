@@ -55,6 +55,23 @@ test('marks a recent successful capture fresh and preserves validators', () => {
   assert.equal(report.sources[0].upstreamLastModifiedAgeHours, 2)
 })
 
+test('capture freshness rejects underspecified timestamps', () => {
+  for (const capturedAt of ['2026-10-04', '2026-10-04 00:00:00Z']) {
+    const report = evaluateManifestFreshness(
+      manifest([result({ capturedAt })]),
+      {
+        now: new Date('2026-10-04T01:00:00.000Z'),
+      },
+    )
+
+    assert.equal(report.acceptable, false)
+    assert.equal(report.staleCount, 1)
+    assert.equal(report.sources[0].captureAgeHours, null)
+    assert.equal(report.sources[0].freshness, 'stale')
+    assert.ok(report.sources[0].reasons.includes('invalid-captured-at'))
+  }
+})
+
 test('marks an old capture stale without pretending Last-Modified proves freshness', () => {
   const report = evaluateManifestFreshness(
     manifest([
