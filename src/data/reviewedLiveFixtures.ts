@@ -23,11 +23,31 @@ function validIso(value: unknown): value is string {
   if (typeof value !== 'string') return false
 
   const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/,
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(?:Z|([+-])(\d{2}):(\d{2}))$/,
   )
   if (!match || !Number.isFinite(Date.parse(value))) return false
 
-  const [, year, month, day] = match
+  const [
+    ,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    offsetSign,
+    offsetHour,
+    offsetMinute,
+  ] = match
+  if (
+    Number(hour) > 23 ||
+    Number(minute) > 59 ||
+    Number(second) > 59 ||
+    (offsetSign && (Number(offsetHour) > 23 || Number(offsetMinute) > 59))
+  ) {
+    return false
+  }
+
   const calendarDate = `${year}-${month}-${day}`
   const parsedCalendarDate = new Date(`${calendarDate}T00:00:00.000Z`)
   return (
@@ -95,6 +115,9 @@ export function validateReviewedLiveProductFixture(
     throw new Error(
       `Reviewed live fixture supermarket mismatch: expected=${expectedSupermarket} actual=${fixture.source.supermarket}`,
     )
+  }
+  if (!validIso(fixture.source?.capturedAt)) {
+    throw new Error('Reviewed live fixture must include a valid capturedAt')
   }
 
   const observation = validateRawProductObservation(fixture.observation)
