@@ -58,7 +58,7 @@ export function assessPlannerBudget(
 ): PlannerBudgetAssessment {
   const safeBudget = Math.max(0, budget)
 
-  if (!Number.isInteger(unresolvedLineCount) || unresolvedLineCount > 0) {
+  if (!Number.isInteger(unresolvedLineCount) || unresolvedLineCount !== 0) {
     return {
       status: 'unknown',
       knownCost,
