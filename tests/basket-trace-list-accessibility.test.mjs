@@ -27,3 +27,10 @@ test('every rendered basket trace row exposes listitem semantics', () => {
     'listitem semantics must stay on each keyed trace row',
   )
 })
+
+test('basket comparison result is available to heading navigation', () => {
+  assert.match(
+    source,
+    /<strong role="heading" aria-level=\{3\}>\{comparisonTitle\(comparison, comparisonCandidate\)\}<\/strong>/,
+  )
+})
