@@ -36,6 +36,18 @@ function requirePositiveNumber(value, path) {
   assert(typeof value === 'number' && Number.isFinite(value) && value > 0, `${path} must be a positive finite number`)
 }
 
+function baseAmount(amount, unit) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+    return null
+  }
+  if (unit === 'kg') return { amount: amount * 1000, family: 'mass' }
+  if (unit === 'g') return { amount, family: 'mass' }
+  if (unit === 'l') return { amount: amount * 1000, family: 'volume' }
+  if (unit === 'ml') return { amount, family: 'volume' }
+  if (unit === 'piece') return { amount, family: 'piece' }
+  return null
+}
+
 function validateRequirement(requirement, path, { allowNullAmount = false } = {}) {
   requireRecord(requirement, path)
   const amountValid =
@@ -62,6 +74,17 @@ function validateMatchedLine(line, path) {
   requirePositiveInteger(line.pack.count, `${path}.pack.count`)
   requireNonNegativeInteger(line.pricePerPackCents, `${path}.pricePerPackCents`)
   requireNonNegativeInteger(line.lineTotalCents, `${path}.lineTotalCents`)
+
+  const required = baseAmount(line.requirement.amount, line.requirement.unit)
+  const pack = baseAmount(line.pack.amount * line.pack.count, line.pack.unit)
+  assert(
+    required && pack && required.family === pack.family,
+    `${path}.pack must be compatible with the ingredient requirement`,
+  )
+  assert(
+    line.packs === Math.ceil(required.amount / pack.amount),
+    `${path}.packs must equal the quantity required by requirement and pack size`,
+  )
   assert(
     line.lineTotalCents === line.packs * line.pricePerPackCents,
     `${path}.lineTotalCents must equal packs × pricePerPackCents`,
@@ -101,9 +124,33 @@ function validateBasket(basket, path) {
   requireNonNegativeInteger(basket.selectedMealCount, `${path}.selectedMealCount`)
   assert(Array.isArray(basket.lines), `${path}.lines must be an array`)
   basket.lines.forEach((line, index) => validateBasketLine(line, `${path}.lines[${index}]`))
+  assert(
+    new Set(basket.lines.map((line) => line.id)).size === basket.lines.length,
+    `${path}.lines must contain unique ingredient ids`,
+  )
   requireNonNegativeInteger(basket.totalCents, `${path}.totalCents`)
   requireNonNegativeInteger(basket.matchedLineCount, `${path}.matchedLineCount`)
   requireNonNegativeInteger(basket.unresolvedLineCount, `${path}.unresolvedLineCount`)
+
+  const matchedLines = basket.lines.filter((line) => line.status === 'matched')
+  const unresolvedLines = basket.lines.filter((line) => line.status === 'unresolved')
+  const calculatedTotalCents = matchedLines.reduce(
+    (sum, line) => sum + line.lineTotalCents,
+    0,
+  )
+
+  assert(
+    basket.totalCents === calculatedTotalCents,
+    `${path}.totalCents must equal the sum of matched line totals`,
+  )
+  assert(
+    basket.matchedLineCount === matchedLines.length,
+    `${path}.matchedLineCount must equal matched line count`,
+  )
+  assert(
+    basket.unresolvedLineCount === unresolvedLines.length,
+    `${path}.unresolvedLineCount must equal unresolved line count`,
+  )
 }
 
 function validateEvidence(evidence, path) {
