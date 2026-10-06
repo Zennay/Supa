@@ -169,3 +169,21 @@ test('writes drift.json for repeatable capture comparison', async () => {
   assert.equal(result.contentOnlyCount, 1)
   assert.equal(written.reviewRequired, false)
 })
+
+
+test('rejects unsafe source ids before drift attribution', () => {
+  const baseline = report([source({ id: '../ah-product' })])
+  const current = report([source({ id: '../ah-product' })])
+
+  assert.throws(
+    () => compareInspectionReports(baseline, current),
+    /Invalid or duplicate source id/,
+  )
+})
+
+test('rejects two empty inspection reports instead of claiming no drift', () => {
+  assert.throws(
+    () => compareInspectionReports(report([]), report([])),
+    /Cannot compare empty M1 inspection reports/,
+  )
+})
