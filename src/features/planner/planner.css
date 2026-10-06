@@ -44,6 +44,7 @@
 }
 
 .budget-chip {
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
@@ -85,7 +86,7 @@
 
 .meal-config {
   width: 100%;
-  grid-template-columns: 42px 1fr 32px;
+  grid-template-columns: 42px 1fr 44px;
   color: var(--ink);
   text-align: left;
   cursor: pointer;
@@ -128,8 +129,8 @@
 }
 
 .plan-check {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
