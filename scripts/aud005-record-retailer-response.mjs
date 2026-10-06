@@ -97,8 +97,8 @@ function requireEvidenceRef(value, path) {
   assert(!EMAIL_PATTERN.test(normalized), `${path} must not contain an email address`)
 
   const phoneMatch = PHONE_PATTERN.test(normalized)
-  const onlyPhoneSyntax = /^[+\\d\\s().-]+$/.test(normalized)
-  const explicitlyPhoneFormatted = /[+()\\s]/.test(normalized)
+  const onlyPhoneSyntax = /^[+\d\s().-]+$/.test(normalized)
+  const explicitlyPhoneFormatted = /[+()\s]/.test(normalized)
   assert(
     !(phoneMatch && (onlyPhoneSyntax || explicitlyPhoneFormatted)),
     `${path} must not contain a phone number`,
