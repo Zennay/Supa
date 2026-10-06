@@ -20,6 +20,14 @@ export type PlannerBudgetAssessment =
       unresolvedLineCount: number
     }
 
+function isCanonicalIdentity(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value === value.trim()
+  )
+}
+
 export function getPlannedCost(
   plan: PlannedMeal[],
   recipes: Recipe[],
@@ -37,7 +45,7 @@ export function getPlannedCost(
   let total = 0
 
   for (const day of active) {
-    if (typeof day !== 'string') return null
+    if (!isCanonicalIdentity(day)) return null
 
     const plannedMeals = plan.filter((candidate) => {
       if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
@@ -49,7 +57,7 @@ export function getPlannedCost(
     if (plannedMeals.length !== 1) return null
 
     const item = plannedMeals[0]
-    if (typeof item.recipeId !== 'string' || item.recipeId.length === 0) {
+    if (!isCanonicalIdentity(item.recipeId)) {
       return null
     }
 
