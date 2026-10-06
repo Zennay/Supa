@@ -1,11 +1,30 @@
+export type StatPillPresentation = {
+  label: string
+  value: string
+  accessibleLabel: string
+}
+
+function normalizedText(value: string, fallback: string): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback
+}
+
+export function statPillPresentation(
+  label: string,
+  value: string,
+): StatPillPresentation {
+  const safeLabel = normalizedText(label, 'Statistiek')
+  const safeValue = normalizedText(value, 'Niet beschikbaar')
+
+  return {
+    label: safeLabel,
+    value: safeValue,
+    accessibleLabel: `${safeLabel}: ${safeValue}`,
+  }
+}
+
 export function statPillAccessibleLabel(
   label: string,
   value: string,
 ): string {
-  const safeLabel =
-    typeof label === 'string' && label.trim() ? label.trim() : 'Statistiek'
-  const safeValue =
-    typeof value === 'string' && value.trim() ? value.trim() : 'Niet beschikbaar'
-
-  return `${safeLabel}: ${safeValue}`
+  return statPillPresentation(label, value).accessibleLabel
 }
