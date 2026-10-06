@@ -81,6 +81,15 @@ function observedStudy(overrides = {}) {
   }
 }
 
+test('M3 observed input preflight rejects unsupported schema versions', () => {
+  for (const schemaVersion of [0, 2, 1.5, '1', null]) {
+    assert.throws(
+      () => validateObservedWeekInput(observedStudy({ schemaVersion })),
+      /schemaVersion must be 1/,
+    )
+  }
+})
+
 test('M3 report preflight rejects retailer drift from the canonical field study', () => {
   const wrongBaseline = observedStudy()
   wrongBaseline.baseline.basket.store = {
