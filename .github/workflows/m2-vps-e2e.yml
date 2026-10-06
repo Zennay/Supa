@@ -3,6 +3,7 @@ name: M2 browser vertical slice
 on:
   pull_request:
     paths:
+      - "index.html"
       - "src/App.tsx"
       - "src/main.tsx"
       - "src/styles.css"
@@ -19,6 +20,7 @@ on:
       - "src/features/planner/**"
       - "src/features/basket/**"
       - "src/features/shopping-list/**"
+      - "tests/mobile-safe-area-contract.test.mjs"
       - "tests/m2-browser-e2e.mjs"
       - "package.json"
       - "package-lock.json"
