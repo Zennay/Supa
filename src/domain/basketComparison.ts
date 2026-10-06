@@ -59,7 +59,8 @@ function invalidMatchedLineIdentity(line: MatchedBasketLine): boolean {
   return (
     !validIdentity(line.id) ||
     !validIdentity(line.ingredientLabel) ||
-    !validIdentity(line.productId)
+    !validIdentity(line.productId) ||
+    !validIdentity(line.productName)
   )
 }
 
