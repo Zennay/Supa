@@ -145,6 +145,42 @@ test('fails readiness when one source is stale', () => {
   )
 })
 
+test('rejects evidence scope outside the bounded PLUS and DekaMarkt source matrix', () => {
+  const thirdRetailer = bundle()
+  for (const document of [
+    thirdRetailer.manifest.results,
+    thirdRetailer.inspection.sources,
+    thirdRetailer.freshness.sources,
+  ]) {
+    document.find((source) => source.id === 'dekamarkt-catalog').supermarket = 'ah'
+  }
+
+  const thirdRetailerReport = buildEvidenceSummary(thirdRetailer)
+  assert.equal(
+    thirdRetailerReport.documentConsistency.boundedSourceScopeMatches,
+    false,
+  )
+  assert.equal(thirdRetailerReport.documentConsistency.consistent, false)
+  assert.equal(thirdRetailerReport.adapterEvidenceReady, false)
+
+  const duplicateLane = bundle()
+  for (const document of [
+    duplicateLane.manifest.results,
+    duplicateLane.inspection.sources,
+    duplicateLane.freshness.sources,
+  ]) {
+    document.find((source) => source.id === 'dekamarkt-offers').kind = 'catalog'
+  }
+
+  const duplicateLaneReport = buildEvidenceSummary(duplicateLane)
+  assert.equal(
+    duplicateLaneReport.documentConsistency.boundedSourceScopeMatches,
+    false,
+  )
+  assert.equal(duplicateLaneReport.documentConsistency.consistent, false)
+  assert.equal(duplicateLaneReport.adapterEvidenceReady, false)
+})
+
 test('detects inconsistent evidence documents', () => {
   const report = buildEvidenceSummary(
     bundle({ missingInspectionId: 'dekamarkt-offers' }),
