@@ -150,7 +150,15 @@ export function buildOneStoreBasket({
   }
 
   const ingredients = aggregatePlanIngredients(plan, recipes, activeDays)
-  const storeProducts = products.filter((product) => product.storeId === store.id)
+  const storeProducts = products.filter(
+    (product) =>
+      typeof product === 'object' &&
+      product !== null &&
+      product.storeId === store.id &&
+      typeof product.id === 'string' &&
+      typeof product.name === 'string' &&
+      Boolean(product.name.trim()),
+  )
 
   const lines: BasketTraceLine[] = ingredients.map((ingredient) => {
     if (
