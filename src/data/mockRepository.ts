@@ -1,5 +1,5 @@
-import type { GroceryRepository } from './repository'
-import { basket, plan, recipes } from './mock'
+import type { GroceryRepository } from './repository.ts'
+import { basket, plan, recipes } from './mock.ts'
 
 function recipeSnapshot() {
   return recipes.map((recipe) => ({
