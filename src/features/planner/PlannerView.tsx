@@ -44,7 +44,7 @@ export function PlannerView({
       <div className="section-heading">
         <div>
           <span className="eyebrow">Deze week</span>
-          <h2>Plan eerst. Bespaar daarna.</h2>
+          <h2>Plan eerst. Vergelijk daarna.</h2>
         </div>
         <button className="ghost-button" onClick={onReset}>Reset</button>
       </div>
