@@ -20,6 +20,20 @@ function isSafePositiveNumber(value: number): boolean {
   return Number.isFinite(value) && value > 0 && value <= Number.MAX_SAFE_INTEGER
 }
 
+function isPercentTextWithinBounds(value: string): boolean {
+  const normalized = value.replace(',', '.')
+  const [integerPart, fractionPart = ''] = normalized.split('.')
+  const canonicalInteger = integerPart.replace(/^0+(?=\d)/, '')
+  const hasPositiveDigit = /[1-9]/.test(integerPart + fractionPart)
+
+  if (!hasPositiveDigit) return false
+  if (canonicalInteger.length > 3) return false
+  if (canonicalInteger.length === 3 && canonicalInteger > '100') return false
+  if (canonicalInteger === '100' && /[1-9]/.test(fractionPart)) return false
+
+  return true
+}
+
 export function normalizeMoneyToCents(input: unknown): number | null {
   if (typeof input !== 'string') return null
 
@@ -170,9 +184,9 @@ export function normalizeOfferLabel(label: unknown): NormalizedOfferMechanic {
   }
 
   const percent = cleaned.match(/^(\d+(?:[.,]\d+)?)%\s+korting$/)
-  if (percent) {
+  if (percent && isPercentTextWithinBounds(percent[1])) {
     const percentValue = decimal(percent[1])
-    if (percentValue > 0 && percentValue <= 100) {
+    if (Number.isFinite(percentValue) && percentValue > 0) {
       return {
         type: 'percent_discount',
         percent: percentValue,
