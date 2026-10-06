@@ -168,7 +168,10 @@ export function buildOneStoreBasket({
       }
     }
 
-    const decision = matchIngredient(ingredient, storeProducts)
+    const namedStoreProducts = storeProducts.filter(
+      (product) => typeof product.name === 'string' && product.name.trim(),
+    )
+    const decision = matchIngredient(ingredient, namedStoreProducts)
     if (decision.type === 'abstain') {
       return {
         id: ingredient.id,
