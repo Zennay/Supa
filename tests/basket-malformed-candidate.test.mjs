@@ -40,6 +40,23 @@ test('basket construction excludes malformed catalog candidate names before matc
   }
 })
 
+test('basket construction excludes non-object catalog entries before matching', () => {
+  for (const invalidCandidate of [null, undefined]) {
+    const basket = buildOneStoreBasket({
+      store: m2Store,
+      plan: [m2InitialPlan[0]],
+      recipes: oneIngredientRecipe(),
+      activeDays: ['Ma'],
+      products: [invalidCandidate],
+    })
+
+    assert.equal(basket.lines.length, 1)
+    assert.equal(basket.lines[0].status, 'unresolved')
+    assert.equal(basket.matchedLineCount, 0)
+    assert.equal(basket.unresolvedLineCount, 1)
+  }
+})
+
 test('basket construction excludes malformed catalog candidate identities before matching', () => {
   for (const invalidId of ['', '   ', null, 42]) {
     const chicken = structuredClone(m2Products[0])
