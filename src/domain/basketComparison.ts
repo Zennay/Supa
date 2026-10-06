@@ -27,6 +27,29 @@ export type BasketComparison = {
   reasons: string[]
 }
 
+function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
+  const effectivePackAmount = line.pack.amount * line.pack.count
+  const expectedLineTotalCents = line.packs * line.pricePerPackCents
+
+  return (
+    !Number.isFinite(line.requirement.amount) ||
+    line.requirement.amount <= 0 ||
+    !Number.isFinite(line.pack.amount) ||
+    line.pack.amount <= 0 ||
+    !Number.isSafeInteger(line.pack.count) ||
+    line.pack.count <= 0 ||
+    !Number.isSafeInteger(line.packs) ||
+    line.packs <= 0 ||
+    !Number.isSafeInteger(line.pricePerPackCents) ||
+    line.pricePerPackCents < 0 ||
+    !Number.isFinite(effectivePackAmount) ||
+    effectivePackAmount <= 0 ||
+    !Number.isSafeInteger(expectedLineTotalCents) ||
+    expectedLineTotalCents !== line.lineTotalCents ||
+    !Number.isFinite(line.matchScore)
+  )
+}
+
 function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   const reasons: string[] = []
   const ids = basket.lines.map((line) => line.id)
@@ -48,6 +71,10 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
     )
   ) {
     reasons.push(`${label} basket contains an invalid monetary value`)
+  }
+
+  if (matched.some(invalidMatchedLineEconomics)) {
+    reasons.push(`${label} basket contains invalid matched-line economics`)
   }
 
   const calculatedTotal = matched.reduce(
