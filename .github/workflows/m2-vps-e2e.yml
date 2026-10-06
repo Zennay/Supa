@@ -20,6 +20,10 @@ on:
       - "src/features/basket/**"
       - "src/features/shopping-list/**"
       - "tests/m2-browser-e2e.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.*"
+      - "tsconfig*.json"
       - ".github/workflows/m2-vps-e2e.yml"
   workflow_dispatch:
 
