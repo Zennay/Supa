@@ -71,6 +71,22 @@ test('direct matcher rejects blank candidate identity and name before scoring', 
   }
 })
 
+test('direct matcher rejects whitespace-padded runtime identities before scoring', () => {
+  for (const paddedRequirementId of [' milk', 'milk ', '\tmilk']) {
+    expectAbstain(
+      matchIngredient({ ...requirement, id: paddedRequirementId }, [candidate]),
+      'matching requirement invalid',
+    )
+  }
+
+  for (const paddedCandidateId of [' milk-1l', 'milk-1l ', '\tmilk-1l']) {
+    expectAbstain(
+      matchIngredient(requirement, [{ ...candidate, id: paddedCandidateId }]),
+      'matching candidate data invalid',
+    )
+  }
+})
+
 test('direct matcher rejects a non-array candidate collection without throwing', () => {
   for (const malformedCandidates of [null, {}, 'candidate', 1]) {
     assert.doesNotThrow(() => {
