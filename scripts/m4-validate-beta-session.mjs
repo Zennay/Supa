@@ -59,8 +59,44 @@ function requireRating(value, path) {
   assert(Number.isInteger(value) && value >= 1 && value <= 5, `${path} must be an integer from 1 to 5`)
 }
 
+const DATE_PATTERN = /^(\\d{4})-(\\d{2})-(\\d{2})$/
+const TIMESTAMP_PATTERN =
+  /^(\\d{4}-\\d{2}-\\d{2})T(\\d{2}):(\\d{2})(?::(\\d{2})(?:\\.\\d{1,9})?)?(Z|[+-]\\d{2}:\\d{2})$/
+
+function validCalendarDate(value) {
+  const match = DATE_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
 function parseTimestamp(value, path) {
   requireString(value, path)
+  const match = TIMESTAMP_PATTERN.exec(value)
+  assert(match && validCalendarDate(match[1]), `${path} must be a valid timestamp`)
+
+  const hour = Number(match[2])
+  const minute = Number(match[3])
+  const second = Number(match[4] ?? '0')
+  assert(hour <= 23 && minute <= 59 && second <= 59, `${path} must be a valid timestamp`)
+
+  if (match[5] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[5]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    assert(offsetHour <= 23 && offsetMinute <= 59, `${path} must be a valid timestamp`)
+  }
+
   const parsed = Date.parse(value)
   assert(Number.isFinite(parsed), `${path} must be a valid timestamp`)
   return parsed
