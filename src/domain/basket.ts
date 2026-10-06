@@ -104,6 +104,9 @@ export function aggregatePlanIngredients(
       if (typeof ingredient.label !== 'string' || !ingredient.label.trim()) {
         throw new Error('Ingredient label must be non-blank')
       }
+      if (typeof ingredient.query !== 'string' || !ingredient.query.trim()) {
+        throw new Error('Ingredient query must be non-blank')
+      }
 
       const current = aggregated.get(ingredient.id)
       if (!current) {
