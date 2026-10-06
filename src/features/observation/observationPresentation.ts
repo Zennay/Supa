@@ -8,6 +8,7 @@ export type ObservationRetailerCopy = {
   expectedRetailer: string
   emptyStoreLabel: string
   storePlaceholder: string
+  storeIdPlaceholder: string
   guidance: string
 }
 
@@ -24,6 +25,8 @@ export function observationRetailerCopy(
     expectedRetailer,
     emptyStoreLabel: `${expectedRetailer} nog niet ingevuld`,
     storePlaceholder: `Bijv. ${expectedRetailer} Leiden`,
+    storeIdPlaceholder:
+      side === 'baseline' ? 'plus-leiden-...' : 'dekamarkt-leiden-...',
     guidance:
       side === 'baseline'
         ? 'Voor deze M3-meting hoort de baseline bij PLUS. Een andere supermarkt wordt door de preflight geweigerd.'
