@@ -27,15 +27,41 @@ export type BasketComparison = {
   reasons: string[]
 }
 
+function baseQuantity(
+  amount: number,
+  unit: MatchedBasketLine['requirement']['unit'],
+): { amount: number; family: 'mass' | 'volume' | 'piece' } | null {
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  if (unit === 'kg') {
+    const converted = amount * 1000
+    return Number.isFinite(converted) && converted > 0
+      ? { amount: converted, family: 'mass' }
+      : null
+  }
+  if (unit === 'g') return { amount, family: 'mass' }
+  if (unit === 'l') {
+    const converted = amount * 1000
+    return Number.isFinite(converted) && converted > 0
+      ? { amount: converted, family: 'volume' }
+      : null
+  }
+  if (unit === 'ml') return { amount, family: 'volume' }
+  if (unit === 'piece') return { amount, family: 'piece' }
+  return null
+}
+
 function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
   const effectivePackAmount = line.pack.amount * line.pack.count
+  const required = baseQuantity(line.requirement.amount, line.requirement.unit)
+  const pack = baseQuantity(effectivePackAmount, line.pack.unit)
+  const expectedPacks =
+    required && pack && required.family === pack.family
+      ? Math.ceil(required.amount / pack.amount)
+      : null
   const expectedLineTotalCents = line.packs * line.pricePerPackCents
 
   return (
-    !Number.isFinite(line.requirement.amount) ||
-    line.requirement.amount <= 0 ||
-    !Number.isFinite(line.pack.amount) ||
-    line.pack.amount <= 0 ||
     !Number.isSafeInteger(line.pack.count) ||
     line.pack.count <= 0 ||
     !Number.isSafeInteger(line.packs) ||
@@ -44,6 +70,10 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
     line.pricePerPackCents < 0 ||
     !Number.isFinite(effectivePackAmount) ||
     effectivePackAmount <= 0 ||
+    expectedPacks === null ||
+    !Number.isSafeInteger(expectedPacks) ||
+    expectedPacks <= 0 ||
+    expectedPacks !== line.packs ||
     !Number.isSafeInteger(expectedLineTotalCents) ||
     expectedLineTotalCents !== line.lineTotalCents ||
     !Number.isFinite(line.matchScore)
@@ -60,6 +90,13 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
 
   if (new Set(ids).size !== ids.length) {
     reasons.push(`${label} basket contains duplicate ingredient ids`)
+  }
+
+  if (
+    !Number.isSafeInteger(basket.selectedMealCount) ||
+    basket.selectedMealCount < 0
+  ) {
+    reasons.push(`${label} basket has an invalid selected meal count`)
   }
 
   if (
