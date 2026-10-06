@@ -11,6 +11,18 @@ function parseDate(value) {
   return Number.isFinite(ms) ? ms : null
 }
 
+function parseCaptureTimestamp(value) {
+  if (
+    typeof value !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+  ) {
+    return null
+  }
+
+  const ms = Date.parse(value)
+  return Number.isFinite(ms) ? ms : null
+}
+
 function hoursBetween(olderMs, newerMs) {
   return Math.max(0, (newerMs - olderMs) / 3_600_000)
 }
@@ -40,7 +52,7 @@ export function evaluateManifestFreshness(
   const sources = manifest.results.map((result) => {
     const successFlagValid = typeof result.success === 'boolean'
     const captureSucceeded = result.success === true
-    const capturedAtMs = parseDate(result.capturedAt)
+    const capturedAtMs = parseCaptureTimestamp(result.capturedAt)
     const captureAgeHours =
       capturedAtMs === null ? null : hoursBetween(capturedAtMs, nowMs)
     const captureIsFuture =
