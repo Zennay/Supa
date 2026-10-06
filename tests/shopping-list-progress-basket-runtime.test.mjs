@@ -51,7 +51,7 @@ test('shopping progress rejects invalid basket containers at its runtime boundar
   }
 })
 
-test('shopping progress rejects invalid nested basket identity and numeric state', () => {
+test('shopping progress rejects structurally invalid nested basket state', () => {
   const basket = defaultBasket()
   const matchedIndex = basket.lines.findIndex((line) => line.status === 'matched')
   assert.notEqual(matchedIndex, -1)
@@ -59,7 +59,7 @@ test('shopping progress rejects invalid nested basket identity and numeric state
   const invalidBaskets = [
     {
       ...basket,
-      store: { ...basket.store, id: ` ${basket.store.id}` },
+      store: { ...basket.store, id: '' },
     },
     {
       ...basket,
@@ -103,6 +103,47 @@ test('shopping progress rejects invalid nested basket identity and numeric state
       /Invalid shopping list basket runtime shape/,
     )
   }
+})
+
+test('shopping progress preserves fail-closed unresolved numeric states without key collisions', () => {
+  const basket = defaultBasket()
+  const unresolvedIndex = basket.lines.findIndex(
+    (line) => line.status === 'unresolved',
+  )
+  assert.notEqual(unresolvedIndex, -1)
+
+  const keys = new Set()
+  for (const amount of [
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    -0,
+    0,
+    -1,
+    null,
+  ]) {
+    const changedBasket = {
+      ...basket,
+      lines: basket.lines.map((line, index) =>
+        index === unresolvedIndex
+          ? {
+              ...line,
+              requirement: { ...line.requirement, amount },
+            }
+          : line,
+      ),
+    }
+
+    assert.doesNotThrow(() => shoppingListBasketKey(changedBasket))
+    const key = shoppingListBasketKey(changedBasket)
+    keys.add(key)
+
+    const doneId = changedBasket.lines[unresolvedIndex].id
+    const raw = serializeShoppingListProgress(changedBasket, [doneId])
+    assert.deepEqual(restoreShoppingListProgress(changedBasket, raw), [doneId])
+  }
+
+  assert.equal(keys.size, 7)
 })
 
 test('shopping progress preserves the existing valid basket key and round-trip contract', () => {
