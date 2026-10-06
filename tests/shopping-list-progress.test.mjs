@@ -56,28 +56,38 @@ test('shopping progress fails closed when the basket demand changes', () => {
   assert.deepEqual(restoreShoppingListProgress(changedBasket, raw), [])
 })
 
-test('shopping progress resets when a matched product or quantity changes', () => {
+test('shopping progress resets when matched price or pack details change', () => {
   const basket = defaultBasket()
-  const raw = serializeShoppingListProgress(basket, [basket.lines[0].id])
+  const basmatiLine = basket.lines.find((line) => line.id === 'basmati-rice')
+  assert.ok(basmatiLine)
+  const raw = serializeShoppingListProgress(basket, [basmatiLine.id])
 
-  const changedProducts = m2Products.map((product) =>
-    product.id === 'basmati-1kg'
-      ? { ...product, priceCents: product.priceCents + 1 }
-      : product,
-  )
-  const changedBasket = buildOneStoreBasket({
-    store: m2Store,
-    plan: m2InitialPlan,
-    recipes: m2Recipes,
-    activeDays: m2DefaultActiveDays,
-    products: changedProducts,
-  })
+  for (const changedProducts of [
+    m2Products.map((product) =>
+      product.id === 'basmati-1kg'
+        ? { ...product, priceCents: product.priceCents + 1 }
+        : product,
+    ),
+    m2Products.map((product) =>
+      product.id === 'basmati-1kg'
+        ? { ...product, packAmount: 1000, packUnit: 'g' }
+        : product,
+    ),
+  ]) {
+    const changedBasket = buildOneStoreBasket({
+      store: m2Store,
+      plan: m2InitialPlan,
+      recipes: m2Recipes,
+      activeDays: m2DefaultActiveDays,
+      products: changedProducts,
+    })
 
-  assert.notEqual(
-    shoppingListBasketKey(changedBasket),
-    shoppingListBasketKey(basket),
-  )
-  assert.deepEqual(restoreShoppingListProgress(changedBasket, raw), [])
+    assert.notEqual(
+      shoppingListBasketKey(changedBasket),
+      shoppingListBasketKey(basket),
+    )
+    assert.deepEqual(restoreShoppingListProgress(changedBasket, raw), [])
+  }
 })
 
 test('shopping progress rejects malformed or mismatched persisted state', () => {
