@@ -11,6 +11,9 @@ const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
 const ALLOWED_PRICE_CONTEXTS = new Set(['in-store', 'online-order'])
 const ALLOWED_SOURCES = new Set(['manual-cart', 'receipt', 'consented-export'])
 const KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,63}$/
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIMESTAMP_PATTERN =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -27,6 +30,43 @@ function requireRecord(value, path) {
 
 function requireString(value, path) {
   assert(typeof value === 'string' && value.trim().length > 0, `${path} must be a non-empty string`)
+}
+
+function validCalendarDate(value) {
+  if (typeof value !== 'string') return false
+  const match = DATE_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+function validTimestamp(value) {
+  if (typeof value !== 'string') return false
+  const match = TIMESTAMP_PATTERN.exec(value)
+  if (!match || !validCalendarDate(match[1])) return false
+
+  const hour = Number(match[2])
+  const minute = Number(match[3])
+  const second = Number(match[4] ?? '0')
+  if (hour > 23 || minute > 59 || second > 59) return false
+
+  if (match[5] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[5]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return false
+  }
+
+  return Number.isFinite(Date.parse(value))
 }
 
 function requireNonNegativeInteger(value, path) {
@@ -176,6 +216,10 @@ function validateEvidence(evidence, path) {
     `${path}.evidenceId must be a path-safe evidence key`,
   )
   requireString(evidence.observedAt, `${path}.observedAt`)
+  assert(
+    validTimestamp(evidence.observedAt),
+    `${path}.observedAt must be a valid timestamp`,
+  )
   assert(ALLOWED_SOURCES.has(evidence.source), `${path}.source is not an allowed observed source`)
   requireString(evidence.provenanceNote, `${path}.provenanceNote`)
   validateBasket(evidence.basket, `${path}.basket`)
@@ -194,6 +238,10 @@ export function validateObservedWeekInput(study) {
   requireString(study.population, 'population')
   requireString(study.region, 'region')
   requireString(study.weekStart, 'weekStart')
+  assert(
+    validCalendarDate(study.weekStart),
+    'weekStart must be a valid YYYY-MM-DD date',
+  )
   assert(
     ALLOWED_PRICE_CONTEXTS.has(study.priceContext),
     'priceContext must be in-store or online-order',
