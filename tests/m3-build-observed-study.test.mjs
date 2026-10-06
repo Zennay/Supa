@@ -108,16 +108,33 @@ test('M3 converter preserves unsafe cent values as unresolved evidence', () => {
   assert.match(line.reasons.join(' '), /price is unknown or invalid/i)
 })
 
-test('M3 converter rejects invalid observation timestamps before building study evidence', () => {
+test('M3 converter rejects invalid or underspecified observation timestamps before building study evidence', () => {
   for (const side of ['baseline', 'candidate']) {
-    const sheet = completedSheet()
-    sheet[side].observedAt = 'not-a-timestamp'
+    for (const observedAt of [
+      'not-a-timestamp',
+      '2026-10-04',
+      '2026-02-31T12:00:00Z',
+      '2026-10-04T12:00:00+24:00',
+    ]) {
+      const sheet = completedSheet()
+      sheet[side].observedAt = observedAt
 
-    assert.throws(
-      () => buildWeeklyBasketStudyFromObservationSheet(sheet),
-      new RegExp(`${side}\\.observedAt must be a valid timestamp`),
-    )
+      assert.throws(
+        () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+        new RegExp(`${side}\\.observedAt must be a valid timestamp`),
+      )
+    }
   }
+})
+
+test('M3 converter rejects impossible study week dates', () => {
+  const sheet = completedSheet()
+  sheet.study.weekStart = '2026-02-31'
+
+  assert.throws(
+    () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+    /sheet\.study\.weekStart must be a valid YYYY-MM-DD date/,
+  )
 })
 
 test('M3 converter refuses retailer drift from the canonical PLUS + DekaMarkt pair', () => {
