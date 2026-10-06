@@ -9,6 +9,14 @@ function sha256(text) {
   return createHash('sha256').update(text).digest('hex')
 }
 
+
+function isSafePathSegment(value) {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  )
+}
+
 function decodeHtmlEntities(value) {
   return value
     .replace(/&quot;/g, '"')
@@ -106,6 +114,15 @@ export async function inspectCaptureDirectory(rootDir) {
 
   const sources = []
   for (const result of manifest.results) {
+    if (!isSafePathSegment(result?.id)) {
+      throw new Error(`Unsafe capture source id: ${result?.id}`)
+    }
+    if (!isSafePathSegment(result?.supermarket)) {
+      throw new Error(
+        `Unsafe capture supermarket path segment for ${result.id}: ${result?.supermarket}`,
+      )
+    }
+
     const record = {
       id: result.id,
       supermarket: result.supermarket,
