@@ -240,3 +240,34 @@ test('unsafe candidate-index source ids cannot become adapter-ready', () => {
   assert.equal(report.adapterEvidenceReady, false)
   assert.equal(report.nextAction, 'repair-evidence-bundle')
 })
+
+
+test('empty evidence bundles can never be adapter-ready', () => {
+  const report = buildEvidenceSummary({
+    manifest: {
+      milestone: 'M1 Data Feasibility',
+      results: [],
+    },
+    inspection: {
+      milestone: 'M1 Data Feasibility',
+      sources: [],
+    },
+    freshness: {
+      milestone: 'M1 Data Feasibility',
+      sources: [],
+    },
+    candidateIndex: {
+      milestone: 'M1 Data Feasibility',
+      candidateCount: 0,
+      abstentionCount: 0,
+      candidates: [],
+      abstentions: [],
+    },
+  })
+
+  assert.equal(report.documentConsistency.consistent, true)
+  assert.equal(report.sourceCount, 0)
+  assert.equal(report.captureReady, false)
+  assert.equal(report.coverageReady, false)
+  assert.equal(report.adapterEvidenceReady, false)
+})
