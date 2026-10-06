@@ -80,10 +80,17 @@ export function aggregatePlanIngredients(
   for (const meal of plan) {
     if (!active.has(meal.day)) continue
 
-    const recipe = recipes.find((candidate) => candidate.id === meal.recipeId)
-    if (!recipe) {
+    const matchingRecipes = recipes.filter(
+      (candidate) => candidate.id === meal.recipeId,
+    )
+    if (matchingRecipes.length === 0) {
       throw new Error(`Missing recipe for planned meal: ${meal.recipeId}`)
     }
+    if (matchingRecipes.length > 1) {
+      throw new Error(`Ambiguous recipe for planned meal: ${meal.recipeId}`)
+    }
+
+    const recipe = matchingRecipes[0]
 
     for (const ingredient of recipe.ingredients) {
       const current = aggregated.get(ingredient.id)
@@ -154,19 +161,25 @@ export function buildOneStoreBasket({
       }
     }
 
-    const product = storeProducts.find(
+    const matchedProducts = storeProducts.filter(
       (candidate) => candidate.id === decision.productId,
     )
-    if (!product) {
+    if (matchedProducts.length !== 1) {
       return {
         id: ingredient.id,
         ingredientLabel: ingredient.label,
         requirement: { amount: ingredient.amount, unit: ingredient.unit },
         status: 'unresolved',
-        reasons: ['matched product missing from store catalog'],
+        reasons: [
+          matchedProducts.length === 0
+            ? 'matched product missing from store catalog'
+            : 'matched product identity is not unique in store catalog',
+        ],
         matchScore: decision.score,
       }
     }
+
+    const product = matchedProducts[0]
 
     const packCount = product.packCount ?? 1
     const required = baseAmount(ingredient.amount, ingredient.unit)
