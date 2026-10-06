@@ -20,7 +20,9 @@ function isSafePositiveNumber(value: number): boolean {
   return Number.isFinite(value) && value > 0 && value <= Number.MAX_SAFE_INTEGER
 }
 
-export function normalizeMoneyToCents(input: string): number | null {
+export function normalizeMoneyToCents(input: unknown): number | null {
+  if (typeof input !== 'string') return null
+
   const cleaned = input.trim().replace(/^€\s*/, '')
 
   if (!cleaned || /\s/.test(cleaned)) {
@@ -57,8 +59,8 @@ export type NormalizedPack = RawPack & {
   count: number
 }
 
-export function normalizePackText(input: string | null): NormalizedPack {
-  const rawText = input?.trim() || null
+export function normalizePackText(input: unknown): NormalizedPack {
+  const rawText = typeof input === 'string' ? input.trim() || null : null
 
   if (!rawText) {
     return { rawText, count: 1, amount: null, unit: 'unknown' }
@@ -121,7 +123,11 @@ export type NormalizedOfferMechanic =
   | { type: 'second_half_price' }
   | { type: 'unknown'; rawLabel: string }
 
-export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
+export function normalizeOfferLabel(label: unknown): NormalizedOfferMechanic {
+  if (typeof label !== 'string') {
+    return { type: 'unknown', rawLabel: '' }
+  }
+
   const rawLabel = label.trim()
   const cleaned = rawLabel.toLowerCase().replace(/\s+/g, ' ')
 
