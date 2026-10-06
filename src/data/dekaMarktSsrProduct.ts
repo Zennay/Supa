@@ -47,6 +47,25 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function validIso(value: unknown): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+}
+
+function validPublicDekaMarktProductUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'www.dekamarkt.nl' &&
+      url.pathname.startsWith('/producten/')
+    )
+  } catch {
+    return false
+  }
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
   if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
     return undefined
@@ -100,11 +119,27 @@ export function parseDekaMarktSsrProductEvidence(
   ) {
     return { type: 'abstain', reason: 'DekaMarkt evidence must identify a safe product source' }
   }
-
-  const safety = evidence.captureEvidence?.safety
   if (
-    evidence.captureEvidence?.status !== 200 ||
-    !evidence.captureEvidence?.contentType?.toLowerCase().includes('text/html') ||
+    !validPublicDekaMarktProductUrl(evidence.source.url) ||
+    !validIso(evidence.source.capturedAt) ||
+    !/^[a-f0-9]{64}$/.test(evidence.source.sha256)
+  ) {
+    return { type: 'abstain', reason: 'DekaMarkt evidence source provenance is invalid' }
+  }
+
+  const capture = evidence.captureEvidence
+  const safety = capture?.safety
+  if (
+    !Number.isInteger(capture?.runId) ||
+    capture.runId <= 0 ||
+    !Number.isInteger(capture?.artifactId) ||
+    capture.artifactId <= 0 ||
+    !/^sha256:[a-f0-9]{64}$/.test(capture?.artifactDigest ?? '') ||
+    !/^[a-f0-9]{40}$/.test(capture?.supaSha ?? '') ||
+    capture?.status !== 200 ||
+    !capture?.contentType?.toLowerCase().includes('text/html') ||
+    !Number.isInteger(capture?.bytes) ||
+    capture.bytes <= 0 ||
     !safety ||
     safety.login !== false ||
     safety.credentials !== false ||
