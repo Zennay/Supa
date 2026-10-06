@@ -19,6 +19,30 @@ test('permanent VPS mobile validation watches every domain module', async () => 
   )
 })
 
+test('mobile shell changes trigger both permanent VPS product gates', async () => {
+  const mobileWorkflow = await readFile(
+    '.github/workflows/vps-mobile-foundation.yml',
+    'utf8',
+  )
+  const browserWorkflow = await readFile(
+    '.github/workflows/m2-vps-e2e.yml',
+    'utf8',
+  )
+
+  for (const path of ['index.html', 'tests/mobile-safe-area-contract.test.mjs']) {
+    assert.equal(
+      hasQuotedPathTrigger(mobileWorkflow, path),
+      true,
+      `permanent VPS mobile validation must trigger when ${path} changes`,
+    )
+    assert.equal(
+      hasQuotedPathTrigger(browserWorkflow, path),
+      true,
+      `rendered browser proof must trigger when ${path} changes`,
+    )
+  }
+})
+
 test('permanent VPS mobile validation still runs the locked full test/build contract', async () => {
   const workflow = await readFile(
     '.github/workflows/vps-mobile-foundation.yml',
