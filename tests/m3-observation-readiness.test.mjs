@@ -3,6 +3,8 @@ import test from 'node:test'
 
 import {
   buildObservationSheet,
+  nextIncompleteObservationLine,
+  observationSheetHasUserInput,
   observationSheetProgress,
   observationSheetReadiness,
 } from '../src/domain/m3ObservationSheet.ts'
@@ -142,4 +144,46 @@ test('M3 progress only counts lines complete when required observed product deta
 
   progress = observationSheetProgress(sheet)
   assert.equal(progress.completeLines, 2)
+})
+
+
+test('M3 collection helper points to the first incomplete line across both stores', () => {
+  const sheet = buildObservationSheet()
+
+  assert.deepEqual(nextIncompleteObservationLine(sheet), {
+    side: 'baseline',
+    ingredientId: sheet.baseline.lines[0].ingredientId,
+  })
+
+  sheet.baseline.lines.forEach((line) => {
+    line.observedProduct.available = false
+  })
+
+  assert.deepEqual(nextIncompleteObservationLine(sheet), {
+    side: 'candidate',
+    ingredientId: sheet.candidate.lines[0].ingredientId,
+  })
+
+  sheet.candidate.lines.forEach((line) => {
+    line.observedProduct.available = false
+  })
+
+  assert.equal(nextIncompleteObservationLine(sheet), null)
+})
+
+test('M3 draft protection only arms after real user input exists', () => {
+  const sheet = buildObservationSheet()
+
+  assert.equal(observationSheetHasUserInput(sheet), false)
+
+  sheet.study.studyId = 'm3-week-001'
+  assert.equal(observationSheetHasUserInput(sheet), true)
+
+  const availabilityOnly = buildObservationSheet()
+  availabilityOnly.baseline.lines[0].observedProduct.available = false
+  assert.equal(observationSheetHasUserInput(availabilityOnly), true)
+
+  const changedSource = buildObservationSheet()
+  changedSource.candidate.source = 'receipt'
+  assert.equal(observationSheetHasUserInput(changedSource), true)
 })

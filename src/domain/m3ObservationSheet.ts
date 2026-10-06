@@ -373,6 +373,65 @@ export function observationLineCollectionComplete(
   )
 }
 
+export type ObservationLineTarget = {
+  side: 'baseline' | 'candidate'
+  ingredientId: string
+}
+
+export function nextIncompleteObservationLine(
+  sheet: ObservationSheet,
+): ObservationLineTarget | null {
+  for (const side of ['baseline', 'candidate'] as const) {
+    const line = sheet[side].lines.find(
+      (candidate) => !observationLineCollectionComplete(candidate),
+    )
+    if (line) {
+      return {
+        side,
+        ingredientId: line.ingredientId,
+      }
+    }
+  }
+
+  return null
+}
+
+export function observationSheetHasUserInput(sheet: ObservationSheet): boolean {
+  const studyValues = [
+    sheet.study.studyId,
+    sheet.study.participantKey,
+    sheet.study.population,
+    sheet.study.region,
+    sheet.study.weekStart,
+    sheet.study.priceContext,
+  ]
+  if (studyValues.some(nonBlank)) return true
+
+  return ([sheet.baseline, sheet.candidate] as StoreObservation[]).some(
+    (observation) =>
+      nonBlank(observation.evidenceId) ||
+      nonBlank(observation.observedAt) ||
+      observation.source !== 'manual-cart' ||
+      nonBlank(observation.provenanceNote) ||
+      nonBlank(observation.store.id) ||
+      nonBlank(observation.store.name) ||
+      observation.lines.some((line) => {
+        const product = line.observedProduct
+        return (
+          product.available !== null ||
+          nonBlank(product.productId) ||
+          nonBlank(product.productName) ||
+          product.packAmount !== null ||
+          product.packUnit !== null ||
+          product.packCount !== 1 ||
+          product.priceCents !== null ||
+          nonBlank(product.sourceUrl) ||
+          nonBlank(product.note)
+        )
+      }),
+  )
+}
+
 export function observationStoreProgress(observation: StoreObservation) {
   return {
     totalLines: observation.lines.length,
