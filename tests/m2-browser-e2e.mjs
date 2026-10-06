@@ -140,6 +140,8 @@ try {
   basketText = await waitForText(sessionId, 'min. € 23,30')
   assert.match(basketText, /Garam masala/)
   assert.match(basketText, /Controle nodig/)
+  assert.match(basketText, /Eerst controleren/)
+  assert.match(basketText, /1 productkeuze vraagt jouw controle\. Die staat bovenaan\./)
   assert.match(basketText, /Geen productmatch is zeker genoeg; kies zelf\./)
   assert.match(basketText, /Automatisch gekozen op basis van ingrediënt en verpakking\./)
   assert.doesNotMatch(basketText, /score below trust threshold/)
@@ -153,6 +155,19 @@ try {
     "return document.querySelector('.hero-total')?.dataset.basketTotalState || null",
   )
   assert.equal(basketTotalState, 'minimum')
+  const prioritizedReview = await execute(
+    sessionId,
+    `
+      const rows = [...document.querySelectorAll('.list-card .trace-row')]
+      return {
+        priorityVisible:
+          document.querySelector('[data-basket-review-priority="true"]') !== null,
+        firstRow: rows[0]?.textContent || '',
+      }
+    `,
+  )
+  assert.equal(prioritizedReview.priorityVisible, true)
+  assert.match(prioritizedReview.firstRow, /Garam masala/)
   assert.match(basketText, /Gecontroleerde winkelvergelijking/i)
   assert.match(basketText, /M3 testwinkel B ligt/)
   assert.match(basketText, /geen live-besparingsclaim/)
@@ -166,7 +181,7 @@ try {
     step: 'basket-recalculation',
     passed: true,
     observed:
-      'recipe change recalculated the known basket minimum to EUR 23.30, kept Garam masala unresolved with user-facing guidance, hid matcher diagnostics and suppressed a complete-total claim',
+      'recipe change recalculated the known basket minimum to EUR 23.30, prioritized the unresolved Garam masala choice, kept user-facing guidance, hid matcher diagnostics and suppressed a complete-total claim',
   })
 
   await clickNav(sessionId, 'Lijst')
