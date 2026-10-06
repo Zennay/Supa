@@ -8,6 +8,11 @@ test('euro formatting preserves finite values', () => {
   assert.doesNotMatch(euro.format(12.34), /NaN|∞/)
 })
 
+test('euro formatting normalizes signed zero', () => {
+  assert.equal(euro.format(-0), euro.format(0))
+  assert.notEqual(euro.format(-1), euro.format(1))
+})
+
 test('euro formatting rejects malformed runtime value types', () => {
   for (const malformed of [null, undefined, '12.34', {}, []]) {
     assert.equal(euro.format(malformed), '—')
