@@ -171,6 +171,29 @@ test('inconsistent evidence documents can never be adapter-ready', () => {
   assert.equal(report.nextAction, 'repair-evidence-bundle')
 })
 
+
+test('rejects cross-document source identity mismatches', () => {
+  const data = bundle()
+  data.inspection.sources.find(
+    (source) => source.id === 'plus-catalog',
+  ).supermarket = 'dekamarkt'
+  data.freshness.sources.find(
+    (source) => source.id === 'dekamarkt-offers',
+  ).kind = 'catalog'
+
+  const report = buildEvidenceSummary(data)
+
+  assert.equal(report.documentConsistency.consistent, false)
+  assert.deepEqual(report.documentConsistency.inspectionIdentityMismatches, [
+    'plus-catalog',
+  ])
+  assert.deepEqual(report.documentConsistency.freshnessIdentityMismatches, [
+    'dekamarkt-offers',
+  ])
+  assert.equal(report.adapterEvidenceReady, false)
+  assert.equal(report.nextAction, 'repair-evidence-bundle')
+})
+
 test('unexpected candidate-index decisions make the bundle inconsistent', () => {
   const data = bundle()
   data.candidateIndex.candidates.push({ id: 'ghost-product' })
