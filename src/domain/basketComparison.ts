@@ -52,7 +52,7 @@ function baseQuantity(
 }
 
 function validIdentity(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0
+  return (\n    typeof value === 'string' &&\n    value.trim().length > 0 &&\n    value === value.trim()\n  )
 }
 
 function supportedBasketLine(line: unknown): line is BasketTraceLine {
