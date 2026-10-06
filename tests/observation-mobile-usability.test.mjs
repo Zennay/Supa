@@ -27,3 +27,13 @@ test('M3 observation controls keep mobile tap targets and input text usable', ()
   assert.ok(primaryButton)
   assert.match(primaryButton[1], /min-height:\s*44px;/)
 })
+
+
+test('M3 JSON import exposes a visible keyboard focus indicator', () => {
+  const importFocus = css.match(
+    /\.observation-import-button:focus-within \{([\s\S]*?)\n\}/,
+  )
+  assert.ok(importFocus)
+  assert.match(importFocus[1], /outline:\s*2px solid var\(--accent\);/)
+  assert.match(importFocus[1], /outline-offset:\s*1px;/)
+})

@@ -180,6 +180,11 @@
   pointer-events: none;
 }
 
+.observation-import-button:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .observation-import-status {
   margin: 0;
   padding: 10px 12px;

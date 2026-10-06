@@ -259,6 +259,32 @@ try {
   assert.equal(observationQuickEntry.summaryMinHeight, '44px')
   assert.equal(observationQuickEntry.primaryActionMinHeight, '44px')
 
+  const importKeyboardFocus = await execute(
+    sessionId,
+    `
+      const control = document.querySelector('.observation-import-button')
+      const input = control?.querySelector('input[type="file"]')
+      if (!control || !input) return null
+      input.focus()
+      const style = getComputedStyle(control)
+      return {
+        inputFocused: document.activeElement === input,
+        outlineStyle: style.outlineStyle,
+        outlineWidth: style.outlineWidth,
+      }
+    `,
+  )
+  assert.ok(importKeyboardFocus, 'M3 JSON import control is missing')
+  assert.equal(importKeyboardFocus.inputFocused, true)
+  assert.equal(importKeyboardFocus.outlineStyle, 'solid')
+  assert.equal(importKeyboardFocus.outlineWidth, '2px')
+  evidence.checks.push({
+    step: 'm3-import-keyboard-focus',
+    passed: true,
+    observed:
+      'keyboard focus on the hidden JSON file input is visibly projected onto the rendered import control',
+  })
+
   let observationTimestamp = ''
   for (let attempt = 0; attempt < 20 && !observationTimestamp; attempt += 1) {
     observationTimestamp = await execute(
