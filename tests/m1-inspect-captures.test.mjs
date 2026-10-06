@@ -173,3 +173,33 @@ test('rejects unsafe supermarket path segments before reading HTML', async () =>
     /Unsafe capture supermarket path segment/,
   )
 })
+
+
+test('rejects non-boolean capture success flags before inspecting artifacts', async () => {
+  for (const success of ['false', 1, {}, []]) {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-inspect-success-'))
+
+    await writeFile(
+      path.join(root, 'manifest.json'),
+      JSON.stringify({
+        milestone: 'M1 Data Feasibility',
+        bounded: true,
+        sourceCount: 1,
+        results: [
+          {
+            id: 'plus-product',
+            supermarket: 'plus',
+            kind: 'product',
+            success,
+          },
+        ],
+      }),
+      'utf8',
+    )
+
+    await assert.rejects(
+      () => inspectCaptureDirectory(root),
+      /boolean success flag/,
+    )
+  }
+})
