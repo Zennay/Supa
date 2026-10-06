@@ -56,3 +56,18 @@ test('locked packages stay registry-backed and integrity-pinned', () => {
 
   assert.deepEqual(violations, [])
 })
+
+test('dependency install-script surface stays explicitly bounded', () => {
+  const installScriptPackages = Object.entries(packageLock.packages ?? {})
+    .filter(
+      ([location, entry]) =>
+        location.startsWith('node_modules/') &&
+        entry &&
+        typeof entry === 'object' &&
+        entry.hasInstallScript === true,
+    )
+    .map(([location]) => location.slice('node_modules/'.length))
+    .sort()
+
+  assert.deepEqual(installScriptPackages, ['esbuild', 'fsevents'])
+})
