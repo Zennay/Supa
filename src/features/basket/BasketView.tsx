@@ -1,7 +1,13 @@
 import type { OneStoreBasket } from '../../domain/basket'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
-import { basketCostDisclosure, basketLineExplanation, comparisonWarningCopy } from './basketPresentation'
+import {
+  basketCostDisclosure,
+  basketLineExplanation,
+  basketReviewSummary,
+  comparisonWarningCopy,
+  orderBasketLinesForReview,
+} from './basketPresentation'
 import { StatPill } from '../../components/StatPill'
 
 function quantity(amount: number | null, unit: string) {
@@ -56,6 +62,8 @@ export function BasketView({
     comparisonCandidate.unresolvedLineCount,
     comparison.reasons.length,
   )
+  const reviewSummary = basketReviewSummary(basket.unresolvedLineCount)
+  const basketLines = orderBasketLinesForReview(basket.lines)
 
   return (
     <section className="screen">
@@ -125,8 +133,15 @@ export function BasketView({
         )}
       </div>
 
+      {reviewSummary && (
+        <div className="attention-card" data-basket-review-priority="true">
+          <strong>Eerst controleren</strong>
+          <span>{reviewSummary}</span>
+        </div>
+      )}
+
       <div className="list-card">
-        {basket.lines.map((line) => (
+        {basketLines.map((line) => (
           <div
             className={line.status === 'matched' ? 'list-row trace-row' : 'list-row trace-row unresolved-row'}
             key={line.id}
