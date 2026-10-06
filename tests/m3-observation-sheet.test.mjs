@@ -8,6 +8,7 @@ import test from 'node:test'
 import { buildObservationSheet } from '../scripts/m3-create-observation-sheet.mjs'
 import {
   observationSheetProgress,
+  observationSheetReadiness,
   observationWindowSummary,
 } from '../src/domain/m3ObservationSheet.ts'
 
@@ -142,3 +143,67 @@ test('M3 observation window exposes the second-store deadline after the first me
   assert.equal(expiredPair.deltaHours, 24.5)
 })
 
+
+
+test('M3 collection readiness rejects timestamps the evidence converter cannot accept', () => {
+  for (const observedAt of [
+    '2026-10-02',
+    '2026-02-30T17:00:00Z',
+    '2026-10-02T24:00:00Z',
+    '2026-10-02T17:00:00+24:00',
+  ]) {
+    const sheet = buildObservationSheet()
+    sheet.baseline.observedAt = observedAt
+
+    const readiness = observationSheetReadiness(sheet)
+
+    assert.equal(readiness.ready, false)
+    assert.match(
+      readiness.issues.join(' '),
+      /Winkel A: geldige observatietijd ontbreekt\./,
+      observedAt,
+    )
+  }
+})
+
+test('M3 observation window ignores malformed timestamps instead of normalizing them', () => {
+  const sheet = buildObservationSheet()
+  sheet.baseline.observedAt = '2026-10-02T24:00:00Z'
+
+  assert.deepEqual(observationWindowSummary(sheet), { state: 'not-started' })
+
+  sheet.candidate.observedAt = '2026-10-03T10:00:00Z'
+  const summary = observationWindowSummary(sheet)
+
+  assert.equal(summary.state, 'single-observation')
+  assert.equal(summary.firstSide, 'candidate')
+  assert.equal(summary.firstObservedAt, '2026-10-03T10:00:00.000Z')
+})
+
+test('M3 collection readiness mirrors converter metadata identity boundaries', () => {
+  const sheet = buildObservationSheet()
+  sheet.study.studyId = 'person@example.com'
+  sheet.study.participantKey = 'Student Name'
+  sheet.study.weekStart = '2026-02-30'
+  sheet.study.priceContext = 'in-store'
+  sheet.baseline.evidenceId = 'receipt/person'
+  sheet.candidate.evidenceId = 'candidate-ok'
+
+  const readiness = observationSheetReadiness(sheet)
+  const issues = readiness.issues.join(' ')
+
+  assert.equal(readiness.ready, false)
+  assert.match(issues, /Study ID moet een padveilige sleutel zijn\./)
+  assert.match(
+    issues,
+    /Participant key moet een pseudonieme padveilige sleutel zijn\./,
+  )
+  assert.match(
+    issues,
+    /Week start moet een geldige datum in YYYY-MM-DD-formaat zijn\./,
+  )
+  assert.match(
+    issues,
+    /Winkel A: evidence ID moet een padveilige sleutel zijn\./,
+  )
+})
