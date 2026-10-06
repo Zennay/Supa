@@ -27,6 +27,7 @@ import {
   observationPackAmount,
   observationPackCount,
 } from './observationNumericInput.ts'
+import { persistObservationDraft } from './observationDraftPersistence.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -95,6 +96,7 @@ export function ObservationView() {
   } | null>(null)
   const [resetArmed, setResetArmed] = useState(false)
   const [pendingImport, setPendingImport] = useState<ObservationSheet | null>(null)
+  const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
   const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
   const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
@@ -104,14 +106,13 @@ export function ObservationView() {
   )
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(
+    setDraftPersistenceFailed(
+      !persistObservationDraft(
+        () => window.localStorage,
         OBSERVATION_DRAFT_STORAGE_KEY,
-        JSON.stringify(sheet),
-      )
-    } catch {
-      // Local draft persistence is best-effort; manual JSON export stays available.
-    }
+        sheet,
+      ),
+    )
   }, [sheet])
 
   useEffect(() => {
@@ -804,6 +805,13 @@ export function ObservationView() {
           {resetArmed ? 'Bevestig wissen' : 'Alles wissen'}
         </button>
       </div>
+
+      {draftPersistenceFailed && (
+        <p className="observation-import-status is-warning" role="status">
+          Automatisch bewaren is mislukt. Bewaar dit concept handmatig als JSON
+          voordat je deze pagina sluit.
+        </p>
+      )}
 
       {importStatus && (
         <p
