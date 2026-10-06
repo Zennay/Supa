@@ -66,3 +66,48 @@ export function comparisonWarningCopy(
 
   return 'SUPA kan voor deze manden nog geen betrouwbaar prijsverschil tonen.'
 }
+
+export function basketLineExplanation(
+  status: 'matched' | 'unresolved',
+  reasons: string[],
+): string {
+  if (status === 'matched') {
+    return 'Automatisch gekozen op basis van ingrediënt en verpakking.'
+  }
+
+  if (reasons.includes('top candidates too close')) {
+    return 'Meerdere producten lijken even passend; kies zelf.'
+  }
+
+  if (reasons.includes('score below trust threshold')) {
+    return 'Geen productmatch is zeker genoeg; kies zelf.'
+  }
+
+  if (reasons.includes('no candidates')) {
+    return 'Geen passend product gevonden; kies zelf.'
+  }
+
+  if (reasons.includes('candidate unavailable')) {
+    return 'Geen betrouwbaar beschikbaar product gevonden; kies zelf.'
+  }
+
+  if (
+    reasons.some((reason) =>
+      [
+        'amount',
+        'quantity',
+        'unit family mismatch',
+        'pack',
+      ].some((marker) => reason.includes(marker)),
+    )
+  ) {
+    return 'Hoeveelheid of verpakking is niet betrouwbaar genoeg; kies zelf.'
+  }
+
+  if (reasons.includes('matched product missing from store catalog')) {
+    return 'De gekozen productinformatie ontbreekt; kies zelf.'
+  }
+
+  return 'SUPA kan hier niet betrouwbaar automatisch kiezen; kies zelf.'
+}
+
