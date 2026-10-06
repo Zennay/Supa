@@ -157,3 +157,24 @@ test('malformed external JSON-LD abstains instead of throwing through the parser
   assert.match(result.reason, /failed trust validation/)
   assert.match(result.reason, /validFrom/)
 })
+
+
+test('unsafe numeric schema.org product identifiers are not stringified', () => {
+  const result = parseSchemaOrgProduct(
+    {
+      '@type': 'Product',
+      name: 'Milk',
+      sku: Number.MAX_SAFE_INTEGER + 1,
+      offers: {
+        '@type': 'Offer',
+        price: '1.29',
+        priceCurrency: 'EUR',
+      },
+    },
+    provenance,
+  )
+
+  assert.equal(result.type, 'observation')
+  assert.equal(result.observation.sourceProductId, null)
+  assert.equal(result.observation.currentPriceCents, 129)
+})
