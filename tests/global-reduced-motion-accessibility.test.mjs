@@ -7,18 +7,36 @@ const css = readFileSync(
   'utf8',
 )
 
-test('global CSS preserves the reduced-motion accessibility fallback', () => {
-  const marker = '@media (prefers-reduced-motion: reduce)'
-  const start = css.indexOf(marker)
+function extractCssBlock(source, marker) {
+  const markerIndex = source.indexOf(marker)
+  assert.notEqual(markerIndex, -1, `missing CSS marker: ${marker}`)
 
-  assert.notEqual(
-    start,
-    -1,
-    'global CSS must expose a prefers-reduced-motion: reduce fallback',
+  const openBrace = source.indexOf('{', markerIndex)
+  assert.notEqual(openBrace, -1, `missing opening brace after: ${marker}`)
+
+  let depth = 0
+  for (let index = openBrace; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}') depth -= 1
+
+    if (depth === 0) {
+      return source.slice(markerIndex, index + 1)
+    }
+  }
+
+  assert.fail(`unterminated CSS block after: ${marker}`)
+}
+
+test('global CSS preserves the reduced-motion accessibility fallback', () => {
+  const reducedMotionCss = extractCssBlock(
+    css,
+    '@media (prefers-reduced-motion: reduce)',
   )
 
-  const reducedMotionCss = css.slice(start)
-
+  assert.match(
+    reducedMotionCss,
+    /\*\s*,\s*\*::before\s*,\s*\*::after\s*\{/,
+  )
   assert.match(reducedMotionCss, /scroll-behavior:\s*auto\s*!important\s*;/)
   assert.match(reducedMotionCss, /animation-duration:\s*\.01ms\s*!important\s*;/)
   assert.match(reducedMotionCss, /animation-iteration-count:\s*1\s*!important\s*;/)
