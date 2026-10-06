@@ -233,26 +233,38 @@ try {
             (button) => button.textContent?.trim() === 'Gebruik huidige tijd',
           )
         : null
-      const timeInput = baseline?.querySelector('input[type="datetime-local"]')
       const candidateStoreId = candidate?.querySelector(
         'input[placeholder="dekamarkt-leiden-..."]',
       )
-      if (!nowButton || !timeInput || !candidateStoreId) return null
+      if (!nowButton || !candidateStoreId) return null
       nowButton.click()
       return {
-        timestamp: timeInput.value,
         candidateStoreIdHint: candidateStoreId.getAttribute('placeholder'),
       }
     `,
   )
   assert.ok(observationQuickEntry, 'M3 quick-entry controls are missing')
-  assert.match(
-    observationQuickEntry.timestamp,
-    /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}/,
-  )
   assert.equal(
     observationQuickEntry.candidateStoreIdHint,
     'dekamarkt-leiden-...',
+  )
+
+  let observationTimestamp = ''
+  for (let attempt = 0; attempt < 20 && !observationTimestamp; attempt += 1) {
+    observationTimestamp = await execute(
+      sessionId,
+      `
+        const baseline = document.querySelector('[data-observation-side="baseline"]')
+        return baseline?.querySelector('input[type="datetime-local"]')?.value || ''
+      `,
+    )
+    if (!observationTimestamp) {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  }
+  assert.match(
+    observationTimestamp,
+    /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}/,
   )
 
   const incompleteObservationChanged = await execute(
