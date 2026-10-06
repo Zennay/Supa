@@ -3,6 +3,10 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const indexHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8')
+const plannerViewSource = await readFile(
+  new URL('../src/features/planner/PlannerView.tsx', import.meta.url),
+  'utf8',
+)
 
 function metaDescription(html) {
   const tag = html.match(/<meta\b[^>]*\bname=["']description["'][^>]*>/i)?.[0] ?? ''
@@ -16,4 +20,12 @@ test('public metadata describes the M3 product without claiming proven savings',
   assert.match(description, /vergelijk boodschappenmanden/i)
   assert.match(description, /onzekerheid/i)
   assert.doesNotMatch(description, /goedkoper|bespaar|besparing|voordeel/i)
+})
+
+test('public Planner copy stays neutral until observed savings evidence exists', () => {
+  assert.ok(plannerViewSource.includes('Plan eerst. Vergelijk daarna.'))
+  assert.doesNotMatch(
+    plannerViewSource,
+    /goedkoper|bespaar|besparing|voordeel/i,
+  )
 })

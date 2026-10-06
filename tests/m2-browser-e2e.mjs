@@ -110,7 +110,7 @@ try {
     body: JSON.stringify({ url: baseUrl }),
   })
 
-  const plannerText = await waitForText(sessionId, 'Plan eerst. Bespaar daarna.')
+  const plannerText = await waitForText(sessionId, 'Plan eerst. Vergelijk daarna.')
   assert.match(plannerText, /4 maaltijden actief/)
   evidence.checks.push({
     step: 'planner-default',
@@ -409,7 +409,7 @@ try {
   })
 
   await clickNav(sessionId, 'Planner')
-  await waitForText(sessionId, 'Plan eerst. Bespaar daarna.')
+  await waitForText(sessionId, 'Plan eerst. Vergelijk daarna.')
 
   const changedPreferences = await execute(
     sessionId,
