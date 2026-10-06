@@ -28,3 +28,17 @@ export function nextObservationActionLabel(
 export function observationTimestampFromDate(value: Date): string {
   return Number.isFinite(value.getTime()) ? value.toISOString() : ''
 }
+
+export function observationPriceCents(value: string): number | null {
+  const normalized = value.trim().replace(',', '.')
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(normalized)
+  if (!match) return null
+
+  const euros = Number(match[1])
+  const fractionalCents = Number((match[2] ?? '').padEnd(2, '0'))
+  const cents = euros * 100 + fractionalCents
+
+  return Number.isSafeInteger(euros) && Number.isSafeInteger(cents)
+    ? cents
+    : null
+}
