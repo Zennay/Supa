@@ -11,7 +11,10 @@ function sha256Text(value) {
   return createHash('sha256').update(value, 'utf8').digest('hex')
 }
 
-async function setupPromotion(reviewedAt) {
+async function setupPromotion(
+  reviewedAt,
+  capturedAt = '2026-10-04T02:00:00.000Z',
+) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-review-time-'))
   const sanitizedDir = path.join(root, 'sanitized-candidates')
   await mkdir(sanitizedDir, { recursive: true })
@@ -21,7 +24,7 @@ async function setupPromotion(reviewedAt) {
     supermarket: 'plus',
     kind: 'product',
     url: 'https://www.plus.nl/product/example',
-    capturedAt: '2026-10-04T02:00:00.000Z',
+    capturedAt,
     sha256: 'a'.repeat(64),
   }
   const candidate = {
@@ -87,6 +90,9 @@ test('rejects impossible calendar timestamps in promotion reviews', async () => 
   for (const reviewedAt of [
     '2026-02-30T02:05:00.000Z',
     '2026-13-04T02:05:00.000Z',
+    '2026-10-04T24:00:00.000Z',
+    '2026-10-04T02:60:00.000Z',
+    '2026-10-04T02:05:00+24:00',
   ]) {
     const { root, reviewFile } = await setupPromotion(reviewedAt)
 
@@ -94,6 +100,25 @@ test('rejects impossible calendar timestamps in promotion reviews', async () => 
       () => promoteReviewedCandidates(root, reviewFile, path.join(root, 'fixtures')),
       /approval must include valid reviewedAt/,
       reviewedAt,
+    )
+  }
+})
+
+test('rejects malformed capture timestamps before promotion chronology', async () => {
+  for (const capturedAt of [
+    '2026-02-30T02:00:00.000Z',
+    '2026-10-04T24:00:00.000Z',
+    '2026-10-04T02:00:00+24:00',
+  ]) {
+    const { root, reviewFile } = await setupPromotion(
+      '2026-10-05T02:05:00.000Z',
+      capturedAt,
+    )
+
+    await assert.rejects(
+      () => promoteReviewedCandidates(root, reviewFile, path.join(root, 'fixtures')),
+      /must include valid capturedAt/,
+      capturedAt,
     )
   }
 })
