@@ -145,6 +145,44 @@ function isHtmlContentType(value) {
   return mediaType === 'text/html' || mediaType === 'application/xhtml+xml'
 }
 
+export async function readBoundedResponseBody(response, maxBytes = MAX_BYTES) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
+    throw new Error('Response byte limit must be a positive safe integer')
+  }
+
+  if (!response?.body) {
+    return { body: '', bytes: 0 }
+  }
+
+  const reader = response.body.getReader()
+  const chunks = []
+  let bytes = 0
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!(value instanceof Uint8Array)) {
+        throw new Error('Response stream yielded a non-byte chunk')
+      }
+
+      bytes += value.byteLength
+      if (bytes > maxBytes) {
+        await reader.cancel()
+        throw new Error(`Response exceeded ${maxBytes} bytes while streaming`)
+      }
+      chunks.push(Buffer.from(value))
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  return {
+    body: Buffer.concat(chunks, bytes).toString('utf8'),
+    bytes,
+  }
+}
+
 async function captureSource(source, rootDir) {
   const capturedAt = new Date().toISOString()
   const controller = new AbortController()
@@ -199,8 +237,7 @@ async function captureSource(source, rootDir) {
       throw new Error(`Declared response size exceeded ${MAX_BYTES} bytes: ${contentLength}`)
     }
 
-    const body = await response.text()
-    const bytes = Buffer.byteLength(body, 'utf8')
+    const { body, bytes } = await readBoundedResponseBody(response)
     Object.assign(metadata, {
       finalUrl: response.url,
       status: response.status,
@@ -211,10 +248,6 @@ async function captureSource(source, rootDir) {
       bytes,
       sha256: sha256(body),
     })
-
-    if (bytes > MAX_BYTES) {
-      throw new Error(`Response exceeded ${MAX_BYTES} bytes: ${bytes}`)
-    }
 
     const dir = path.join(rootDir, source.supermarket)
     await mkdir(dir, { recursive: true })
