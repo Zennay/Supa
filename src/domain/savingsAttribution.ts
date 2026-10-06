@@ -61,6 +61,29 @@ export function attributeSavingsEffects({
     }
   }
 
+  const comparisonLineIds = new Set<string>()
+  for (const line of comparison.lineDeltas) {
+    if (typeof line.id !== 'string' || line.id.trim().length === 0) {
+      return {
+        status: 'unknown',
+        fullyAttributed: false,
+        comparisonDeltaCents: comparison.deltaCents,
+        effectTotals: emptyTotals(),
+        reasons: ['basket comparison contains an invalid line identity'],
+      }
+    }
+    if (comparisonLineIds.has(line.id)) {
+      return {
+        status: 'unknown',
+        fullyAttributed: false,
+        comparisonDeltaCents: comparison.deltaCents,
+        effectTotals: emptyTotals(),
+        reasons: [`basket comparison contains duplicate line identity ${line.id}`],
+      }
+    }
+    comparisonLineIds.add(line.id)
+  }
+
   const lineById = new Map(comparison.lineDeltas.map((line) => [line.id, line] as const))
   const reasons: string[] = []
   const evidenceByLine = new Map<string, SavingsAttributionEvidence[]>()
