@@ -168,10 +168,27 @@ export function buildOneStoreBasket({
       }
     }
 
-    const namedStoreProducts = storeProducts.filter(
+    const identifiedStoreProducts = storeProducts.filter(
+      (product) => typeof product.id === 'string' && product.id.trim(),
+    )
+    if (storeProducts.length > 0 && identifiedStoreProducts.length === 0) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: ['store catalog contains no product with a trusted identity'],
+        matchScore: null,
+      }
+    }
+
+    const namedStoreProducts = identifiedStoreProducts.filter(
       (product) => typeof product.name === 'string' && product.name.trim(),
     )
-    if (storeProducts.length > 0 && namedStoreProducts.length === 0) {
+    if (
+      identifiedStoreProducts.length > 0 &&
+      namedStoreProducts.length === 0
+    ) {
       return {
         id: ingredient.id,
         ingredientLabel: ingredient.label,
