@@ -106,3 +106,32 @@ test('invalid zero-sized pack text fails closed instead of producing structured 
     })
   }
 })
+
+test('unsafe numeric normalization inputs fail closed before precision can be lost', () => {
+  assert.equal(normalizeMoneyToCents('90071992547409.92'), null)
+
+  for (const input of [
+    '9007199254740992 g',
+    '9007199254740992 x 1 g',
+    '1 x 9007199254740992 ml',
+  ]) {
+    assert.deepEqual(normalizePackText(input), {
+      rawText: input,
+      count: 1,
+      amount: null,
+      unit: 'unknown',
+    })
+  }
+
+  for (const label of [
+    '9007199254740992+1 gratis',
+    '1+9007199254740992 gratis',
+    '9007199254740992 voor 5.00',
+    'voor 90071992547409.92',
+  ]) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'unknown',
+      rawLabel: label,
+    })
+  }
+})
