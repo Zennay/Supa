@@ -140,6 +140,11 @@ try {
   basketText = await waitForText(sessionId, 'min. € 23,30')
   assert.match(basketText, /Garam masala/)
   assert.match(basketText, /Controle nodig/)
+  assert.match(basketText, /Geen productmatch is zeker genoeg; kies zelf\./)
+  assert.match(basketText, /Automatisch gekozen op basis van ingrediënt en verpakking\./)
+  assert.doesNotMatch(basketText, /score below trust threshold/)
+  assert.doesNotMatch(basketText, /query phrase present/)
+  assert.doesNotMatch(basketText, /Match \d+/)
   assert.match(basketText, /M2 testwinkel/)
   assert.match(basketText, /1 productkeuze is nog niet meegerekend/)
   assert.match(basketText, /geen volledig mandtotaal/)
@@ -161,7 +166,7 @@ try {
     step: 'basket-recalculation',
     passed: true,
     observed:
-      'recipe change recalculated the known basket minimum to EUR 23.30, kept Garam masala unresolved and suppressed a complete-total claim',
+      'recipe change recalculated the known basket minimum to EUR 23.30, kept Garam masala unresolved with user-facing guidance, hid matcher diagnostics and suppressed a complete-total claim',
   })
 
   await clickNav(sessionId, 'Lijst')

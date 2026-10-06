@@ -1,7 +1,7 @@
 import type { OneStoreBasket } from '../../domain/basket'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
-import { basketCostDisclosure, comparisonWarningCopy } from './basketPresentation'
+import { basketCostDisclosure, basketLineExplanation, comparisonWarningCopy } from './basketPresentation'
 import { StatPill } from '../../components/StatPill'
 
 function quantity(amount: number | null, unit: string) {
@@ -140,12 +140,12 @@ export function BasketView({
                     → {line.productName} · {line.packs} verpakking{line.packs === 1 ? '' : 'en'}
                   </span>
                   <small className="trace-note">
-                    Match {line.matchScore} · {line.reasons.join(' · ')}
+                    {basketLineExplanation(line.status, line.reasons)}
                   </small>
                 </>
               ) : (
                 <small className="trace-note">
-                  Controle nodig · {line.reasons.join(' · ')}
+                  Controle nodig · {basketLineExplanation(line.status, line.reasons)}
                 </small>
               )}
             </div>
