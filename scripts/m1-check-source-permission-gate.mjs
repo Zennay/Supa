@@ -26,6 +26,15 @@ function safeHttpsUrl(value) {
   }
 }
 
+function validIsoDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
 export function evaluateSourcePermissionGate(document) {
   assert(document?.version === 1, 'source permission gate must use version 1')
   assert(
@@ -33,9 +42,8 @@ export function evaluateSourcePermissionGate(document) {
     'source permission gate must target M1 Data Feasibility',
   )
   assert(
-    typeof document?.reviewedAt === 'string' &&
-      /^\d{4}-\d{2}-\d{2}$/.test(document.reviewedAt),
-    'source permission gate requires an ISO review date',
+    validIsoDate(document?.reviewedAt),
+    'source permission gate requires a valid ISO review date',
   )
   assert(Array.isArray(document?.sources), 'source permission gate sources must be an array')
 
