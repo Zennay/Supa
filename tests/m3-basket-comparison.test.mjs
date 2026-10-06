@@ -229,3 +229,52 @@ test('M3 fails closed when matched line totals do not match pack economics', () 
     /basket contains invalid matched-line economics/,
   )
 })
+
+
+test('M3 fails closed when pack metadata cannot cover the recorded demand', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(candidateStore, -10)
+
+  for (const basket of [baseline, candidate]) {
+    const matchedIndex = basket.lines.findIndex((line) => line.status === 'matched')
+    assert.ok(matchedIndex >= 0)
+    const line = basket.lines[matchedIndex]
+    assert.equal(line.status, 'matched')
+
+    basket.lines[matchedIndex] = {
+      ...line,
+      pack: {
+        ...line.pack,
+        amount: line.pack.amount / 1000,
+      },
+    }
+  }
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.savingsCents, null)
+  assert.match(
+    comparison.reasons.join(' '),
+    /basket contains invalid matched-line economics/,
+  )
+})
+
+test('M3 fails closed when both baskets expose an invalid selected meal count', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(candidateStore, -10)
+
+  baseline.selectedMealCount = Number.POSITIVE_INFINITY
+  candidate.selectedMealCount = Number.POSITIVE_INFINITY
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.deltaCents, null)
+  assert.match(
+    comparison.reasons.join(' '),
+    /basket has an invalid selected meal count/,
+  )
+})
