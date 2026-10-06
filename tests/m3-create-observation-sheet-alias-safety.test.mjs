@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { link, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -68,6 +69,23 @@ test('M3 observation generator refuses a hardlink alias to an existing field she
       /refusing to overwrite existing observation sheet/,
     )
     assert.equal(await readFile(genuine, 'utf8'), original)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('M3 observation generator rejects padded output paths before writing', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-generator-alias-'))
+  const paddedOutput = join(directory, ' observation-sheet.json ')
+  const trimmedOutput = join(directory, 'observation-sheet.json')
+
+  try {
+    const result = runGenerator(directory, paddedOutput)
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /usage: m3:create-observation-sheet/)
+    assert.equal(existsSync(paddedOutput), false)
+    assert.equal(existsSync(trimmedOutput), false)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
