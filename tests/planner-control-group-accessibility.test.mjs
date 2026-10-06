@@ -17,3 +17,11 @@ test('Planner exposes planned meals as a named control group', () => {
     /<div className="day-grid" role="group" aria-label="Geplande maaltijden">/,
   )
 })
+
+
+test('Planner recipe selectors expose day-specific accessible names', () => {
+  assert.match(
+    source,
+    /aria-label=\{\`Recept voor \${item\.day}\`\}/,
+  )
+})
