@@ -154,19 +154,25 @@ export function buildOneStoreBasket({
       }
     }
 
-    const product = storeProducts.find(
+    const matchedProducts = storeProducts.filter(
       (candidate) => candidate.id === decision.productId,
     )
-    if (!product) {
+    if (matchedProducts.length !== 1) {
       return {
         id: ingredient.id,
         ingredientLabel: ingredient.label,
         requirement: { amount: ingredient.amount, unit: ingredient.unit },
         status: 'unresolved',
-        reasons: ['matched product missing from store catalog'],
+        reasons: [
+          matchedProducts.length === 0
+            ? 'matched product missing from store catalog'
+            : 'matched product identity is not unique in store catalog',
+        ],
         matchScore: decision.score,
       }
     }
+
+    const product = matchedProducts[0]
 
     const packCount = product.packCount ?? 1
     const required = baseAmount(ingredient.amount, ingredient.unit)
