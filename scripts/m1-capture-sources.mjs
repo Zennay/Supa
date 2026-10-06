@@ -74,7 +74,7 @@ function expectedHost(supermarket) {
 }
 
 export function validateSources(sources = SOURCES) {
-  if (!Array.isArray(sources) || sources.length !== EXPECTED_SOURCE_KEYS.size) {
+  if (!Array.isArray(sources)) {
     throw new Error(
       `M1 capture source matrix must contain exactly ${EXPECTED_SOURCE_KEYS.size} sources`,
     )
@@ -115,6 +115,12 @@ export function validateSources(sources = SOURCES) {
         `Source does not match supermarket allowlist (${source.supermarket} -> https://${host}): ${source.url}`,
       )
     }
+  }
+
+  if (sources.length !== EXPECTED_SOURCE_KEYS.size) {
+    throw new Error(
+      `M1 capture source matrix must contain exactly ${EXPECTED_SOURCE_KEYS.size} sources`,
+    )
   }
 
   const missing = [...EXPECTED_SOURCE_KEYS].filter((key) => !sourceKeys.has(key))
