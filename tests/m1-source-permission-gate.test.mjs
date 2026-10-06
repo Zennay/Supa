@@ -30,6 +30,19 @@ test('current technical pair is valid but deliberately not production-ready', as
   )
 })
 
+test('rejects impossible calendar dates in permission review metadata', async () => {
+  for (const reviewedAt of ['2026-02-29', '2026-04-31', '2026-13-01']) {
+    const document = await gate()
+    document.reviewedAt = reviewedAt
+
+    assert.throws(
+      () => evaluateSourcePermissionGate(document),
+      /requires a valid ISO review date/,
+      reviewedAt,
+    )
+  }
+})
+
 test('cannot enable production while a source still requires permission', async () => {
   const document = await gate()
   document.sources.find((source) => source.supermarket === 'plus').productionEnabled = true
