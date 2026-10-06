@@ -13,6 +13,20 @@ const expectedM3Scripts = [
   'm3:assess-observed-week',
 ]
 
+const canonicalM3Demand = [
+  { id: 'basmati-rice', label: 'Basmati rijst', query: 'basmati rijst', amount: 450, unit: 'g' },
+  { id: 'broccoli', label: 'Broccoli', query: 'broccoli', amount: 250, unit: 'g' },
+  { id: 'cauliflower', label: 'Bloemkool', query: 'bloemkool', amount: 2, unit: 'piece' },
+  { id: 'chicken-thigh', label: 'Kippendij', query: 'kippendij', amount: 600, unit: 'g' },
+  { id: 'coconut-milk', label: 'Kokosmelk', query: 'kokosmelk', amount: 400, unit: 'ml' },
+  { id: 'edamame', label: 'Edamame', query: 'edamame', amount: 150, unit: 'g' },
+  { id: 'garam-masala', label: 'Garam masala', query: 'garam masala', amount: 20, unit: 'g' },
+  { id: 'greek-yogurt', label: 'Griekse yoghurt', query: 'griekse yoghurt', amount: 100, unit: 'g' },
+  { id: 'spaghetti', label: 'Spaghetti', query: 'spaghetti', amount: 250, unit: 'g' },
+  { id: 'teriyaki-sauce', label: 'Teriyaki saus', query: 'teriyaki saus', amount: 60, unit: 'ml' },
+  { id: 'tomato-cubes', label: 'Tomatenblokjes', query: 'tomatenblokjes', amount: 400, unit: 'g' },
+]
+
 test('M3 field contract keeps the canonical evidence-collection boundary explicit', async () => {
   const contract = await readFile(contractPath, 'utf8')
 
@@ -96,7 +110,6 @@ test('documented M3 execution entrypoints remain backed by repository files', as
   }
 })
 
-
 test('M3 field command examples preserve artifact versus evidence storage boundaries', async () => {
   const contract = await readFile(contractPath, 'utf8')
 
@@ -112,7 +125,6 @@ test('M3 field command examples preserve artifact versus evidence storage bounda
     )
   }
 })
-
 
 test('M3 field contract stays aligned with runtime study constants', async () => {
   const contract = await readFile(contractPath, 'utf8')
@@ -130,4 +142,33 @@ test('M3 field contract stays aligned with runtime study constants', async () =>
   assert.equal(contract.includes('24-hour study window'), true)
   assert.equal(contract.includes(`**baseline = ${M3_EXPECTED_RETAILERS.baseline}**`), true)
   assert.equal(contract.includes(`**candidate = ${M3_EXPECTED_RETAILERS.candidate}**`), true)
+})
+
+test('M3 field run keeps the exact canonical 11-line demand until genuine evidence is captured', () => {
+  const sheet = buildObservationSheet()
+
+  assert.equal(sheet.selectedMealCount, 4)
+  assert.deepEqual(
+    sheet.requirements,
+    canonicalM3Demand,
+    'canonical issue #78 demand changed; revise the field-study contract deliberately before collecting evidence',
+  )
+  assert.deepEqual(
+    sheet.baseline.lines.map((line) => ({
+      id: line.ingredientId,
+      label: line.ingredientLabel,
+      amount: line.requirement.amount,
+      unit: line.requirement.unit,
+    })),
+    canonicalM3Demand.map(({ id, label, amount, unit }) => ({ id, label, amount, unit })),
+  )
+  assert.deepEqual(
+    sheet.candidate.lines.map((line) => ({
+      id: line.ingredientId,
+      label: line.ingredientLabel,
+      amount: line.requirement.amount,
+      unit: line.requirement.unit,
+    })),
+    canonicalM3Demand.map(({ id, label, amount, unit }) => ({ id, label, amount, unit })),
+  )
 })
