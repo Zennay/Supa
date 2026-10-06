@@ -25,6 +25,14 @@ test('hosted CI token is explicitly read-only', () => {
   )
 })
 
+test('hosted CI has a bounded execution time', () => {
+  assert.match(
+    workflow,
+    /^\s{4}timeout-minutes:\s*15\s*$/m,
+    'hosted CI must fail a hung job within 15 minutes',
+  )
+})
+
 test('hosted CI keeps the complete quality gate order', () => {
   const requiredSteps = [
     'npm ci',
