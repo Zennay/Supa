@@ -115,3 +115,33 @@ test('basket rejects a blank store identity before calculation', () => {
     /Store identity must be non-blank/,
   )
 })
+
+
+test('basket fails closed when the selected product name is blank', () => {
+  const basket = buildOneStoreBasket({
+    store,
+    plan,
+    recipes,
+    activeDays: ['Ma'],
+    products: [
+      {
+        id: 'basmati-150',
+        storeId: store.id,
+        name: '   ',
+        packAmount: 150,
+        packUnit: 'g',
+        available: true,
+        priceCents: 149,
+      },
+    ],
+  })
+
+  assert.equal(basket.matchedLineCount, 0)
+  assert.equal(basket.unresolvedLineCount, 1)
+  assert.equal(basket.totalCents, 0)
+  assert.equal(basket.lines[0].status, 'unresolved')
+  assert.match(
+    basket.lines[0].reasons.join(' '),
+    /matched product name is blank or malformed/,
+  )
+})
