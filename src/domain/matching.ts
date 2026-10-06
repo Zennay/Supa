@@ -43,6 +43,60 @@ const STOP_TOKENS = new Set([
   'doos',
 ])
 
+const MATCH_UNITS: ReadonlySet<string> = new Set([
+  'g',
+  'kg',
+  'ml',
+  'l',
+  'piece',
+  'unknown',
+])
+
+function isNonBlankString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isMatchUnit(value: unknown): value is MatchUnit {
+  return typeof value === 'string' && MATCH_UNITS.has(value)
+}
+
+function hasValidRequirementShape(value: unknown): value is IngredientRequirement {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+
+  const requirement = value as Record<string, unknown>
+  return (
+    isNonBlankString(requirement.id) &&
+    isNonBlankString(requirement.query) &&
+    (requirement.amount === null || typeof requirement.amount === 'number') &&
+    isMatchUnit(requirement.unit)
+  )
+}
+
+function hasValidCandidateShape(value: unknown): value is ProductCandidate {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+
+  const candidate = value as Record<string, unknown>
+  return (
+    isNonBlankString(candidate.id) &&
+    isNonBlankString(candidate.name) &&
+    (candidate.packAmount === null || typeof candidate.packAmount === 'number') &&
+    isMatchUnit(candidate.packUnit) &&
+    (candidate.packCount === undefined ||
+      candidate.packCount === null ||
+      typeof candidate.packCount === 'number') &&
+    typeof candidate.available === 'boolean'
+  )
+}
+
+function abstain(reason: string): MatchDecision {
+  return {
+    type: 'abstain',
+    score: null,
+    runnerUpScore: null,
+    reasons: [reason],
+  }
+}
+
 function textTokens(value: string): string[] {
   return value
     .normalize('NFD')
@@ -186,6 +240,10 @@ export function matchIngredient(
   candidates: ProductCandidate[],
   options: { minimumScore?: number; minimumMargin?: number } = {},
 ): MatchDecision {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) {
+    return abstain('matching trust thresholds invalid')
+  }
+
   const minimumScore = options.minimumScore ?? 65
   const minimumMargin = options.minimumMargin ?? 12
 
@@ -195,12 +253,19 @@ export function matchIngredient(
     !Number.isFinite(minimumMargin) ||
     minimumMargin <= 0
   ) {
-    return {
-      type: 'abstain',
-      score: null,
-      runnerUpScore: null,
-      reasons: ['matching trust thresholds invalid'],
-    }
+    return abstain('matching trust thresholds invalid')
+  }
+
+  if (!hasValidRequirementShape(requirement)) {
+    return abstain('matching requirement invalid')
+  }
+
+  if (!Array.isArray(candidates)) {
+    return abstain('matching candidates invalid')
+  }
+
+  if (!candidates.every(hasValidCandidateShape)) {
+    return abstain('matching candidate data invalid')
   }
 
   if (hasInvalidKnownAmount(requirement.amount)) {
