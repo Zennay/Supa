@@ -59,9 +59,9 @@ function requireRating(value, path) {
   assert(Number.isInteger(value) && value >= 1 && value <= 5, `${path} must be an integer from 1 to 5`)
 }
 
-const DATE_PATTERN = /^(\\d{4})-(\\d{2})-(\\d{2})$/
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const TIMESTAMP_PATTERN =
-  /^(\\d{4}-\\d{2}-\\d{2})T(\\d{2}):(\\d{2})(?::(\\d{2})(?:\\.\\d{1,9})?)?(Z|[+-]\\d{2}:\\d{2})$/
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
 
 function validCalendarDate(value) {
   const match = DATE_PATTERN.exec(value)
