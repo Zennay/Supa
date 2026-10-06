@@ -122,12 +122,17 @@ export async function inspectCaptureDirectory(rootDir) {
         `Unsafe capture supermarket path segment for ${result.id}: ${result?.supermarket}`,
       )
     }
+    if (typeof result?.success !== 'boolean') {
+      throw new Error(
+        `Capture result must use a boolean success flag for ${result.id}`,
+      )
+    }
 
     const record = {
       id: result.id,
       supermarket: result.supermarket,
       kind: result.kind,
-      success: Boolean(result.success),
+      success: result.success,
       requestedUrl: result.requestedUrl,
       finalUrl: result.finalUrl ?? null,
       capturedAt: result.capturedAt,
