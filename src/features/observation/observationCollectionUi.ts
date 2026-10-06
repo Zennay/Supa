@@ -25,11 +25,15 @@ export function nextObservationActionLabel(
     : `Volgende open regel bij ${retailer}`
 }
 
-export function observationTimestampFromDate(value: Date): string {
+export function observationTimestampFromDate(value: unknown): string {
+  if (!(value instanceof Date)) return ''
+
   return Number.isFinite(value.getTime()) ? value.toISOString() : ''
 }
 
-export function observationPriceCents(value: string): number | null {
+export function observationPriceCents(value: unknown): number | null {
+  if (typeof value !== 'string') return null
+
   const normalized = value.trim().replace(',', '.')
   if (!/^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(normalized)) {
     return null
