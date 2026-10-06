@@ -44,13 +44,13 @@ function completedSheet() {
   sheet.study.weekStart = '2026-09-28'
   sheet.study.priceContext = 'in-store'
   fillSide(sheet, 'baseline', {
-    storeId: 'store-a',
-    storeName: 'Store A',
+    storeId: 'plus-leiden-test',
+    storeName: 'PLUS Leiden testfiliaal',
     priceOffset: 10,
   })
   fillSide(sheet, 'candidate', {
-    storeId: 'store-b',
-    storeName: 'Store B',
+    storeId: 'dekamarkt-leiden-test',
+    storeName: 'DekaMarkt Leiden testfiliaal',
     priceOffset: 0,
   })
   return sheet
@@ -93,6 +93,24 @@ test('M3 converter preserves a missing observed price as unresolved instead of i
 
   assert.equal(line.status, 'unresolved')
   assert.match(line.reasons.join(' '), /price is unknown/i)
+})
+
+test('M3 converter refuses retailer drift from the canonical PLUS + DekaMarkt pair', () => {
+  const wrongBaseline = completedSheet()
+  wrongBaseline.baseline.store.name = 'Andere supermarkt'
+
+  assert.throws(
+    () => buildWeeklyBasketStudyFromObservationSheet(wrongBaseline),
+    /baseline\.store\.name must identify PLUS/,
+  )
+
+  const wrongCandidate = completedSheet()
+  wrongCandidate.candidate.store.name = 'PLUS tweede filiaal'
+
+  assert.throws(
+    () => buildWeeklyBasketStudyFromObservationSheet(wrongCandidate),
+    /candidate\.store\.name must identify DekaMarkt/,
+  )
 })
 
 test('M3 converter refuses a missing price context', () => {
