@@ -83,6 +83,12 @@ export function buildEvidenceSummary({
   }
 
   const manifestById = byId(manifest.results, 'manifest results')
+  for (const [id, captured] of manifestById) {
+    if (typeof captured.success !== 'boolean') {
+      throw new Error(`Invalid manifest success flag for ${id}`)
+    }
+  }
+
   const inspectionById = byId(inspection.sources, 'inspection sources')
   const freshnessById = byId(freshness.sources, 'freshness sources')
   const candidateSets = candidateIndex(candidates)
