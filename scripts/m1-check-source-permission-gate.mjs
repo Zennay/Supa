@@ -51,6 +51,10 @@ export function evaluateSourcePermissionGate(document) {
     validIsoDate(document?.reviewedAt),
     'source permission gate requires a valid ISO review date',
   )
+  assert(
+    document.reviewedAt <= new Date().toISOString().slice(0, 10),
+    'source permission gate review date cannot be in the future',
+  )
   assert(Array.isArray(document?.sources), 'source permission gate sources must be an array')
 
   const seen = new Set()
