@@ -6,6 +6,7 @@ const readme = await readFile('README.md', 'utf8')
 
 test('README structure map matches the current executable source layout', () => {
   assert.doesNotMatch(readme, /^\s*app\/\s+app shell \/ navigation$/m)
+  assert.doesNotMatch(readme, /Astra\/Work/)
 
   for (const expected of [
     'App.tsx         app shell / bottom navigation',
