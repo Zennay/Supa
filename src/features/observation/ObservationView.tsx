@@ -17,17 +17,17 @@ import {
   type ObservedProduct,
   type StoreObservation,
 } from '../../domain/m3ObservationSheet.ts'
+import {
+  nextObservationActionLabel,
+  observationSidePresentation,
+  observationTimestampFromDate,
+} from './observationCollectionUi.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
   keyof ObservationSheet['study'],
   'maxObservationWindowHours' | 'priceContext'
 >
-
-const sideLabels: Record<Side, string> = {
-  baseline: 'Winkel A · baseline',
-  candidate: 'Winkel B · vergelijking',
-}
 
 const sourceOptions: { value: ObservationSource; label: string }[] = [
   { value: 'manual-cart', label: 'Handmatige winkelmand' },
@@ -335,7 +335,7 @@ export function ObservationView() {
           onClick={jumpToNextIncomplete}
           disabled={!nextIncomplete}
         >
-          {nextIncomplete ? 'Ga naar volgende open regel' : 'Alle regels zijn gemeten'}
+          {nextObservationActionLabel(sheet, nextIncomplete)}
         </button>
         {windowSummary.state === 'single-observation' && (
           <p>
@@ -469,13 +469,16 @@ export function ObservationView() {
       {(['baseline', 'candidate'] as Side[]).map((side) => {
         const observation = sheet[side]
         const storeProgress = observationStoreProgress(observation)
+        const sidePresentation = observationSidePresentation(side)
 
         return (
           <div className="observation-card" key={side} data-observation-side={side}>
             <div className="observation-card-heading">
               <div>
-                <span className="eyebrow">{sideLabels[side]}</span>
-                <h3>{observation.store.name || 'Nog geen winkel ingevuld'}</h3>
+                <span className="eyebrow">{sidePresentation.eyebrow}</span>
+                <h3>
+                  {observation.store.name || `Nog geen ${sidePresentation.expectedRetailer} ingevuld`}
+                </h3>
               </div>
               <span className="observation-count">
                 {storeProgress.completeLines}/{storeProgress.totalLines} compleet
@@ -490,7 +493,7 @@ export function ObservationView() {
                   onChange={(event) =>
                     updateStore(side, 'name', event.target.value)
                   }
-                  placeholder="Bijv. PLUS"
+                  placeholder={`Bijv. ${sidePresentation.expectedRetailer}`}
                 />
               </label>
               <label>
@@ -500,7 +503,7 @@ export function ObservationView() {
                   onChange={(event) =>
                     updateStore(side, 'id', event.target.value)
                   }
-                  placeholder="plus-leiden-..."
+                  placeholder={sidePresentation.storeIdPlaceholder}
                 />
               </label>
               <label>
@@ -513,18 +516,32 @@ export function ObservationView() {
                   placeholder="obs-..."
                 />
               </label>
-              <label>
-                Geobserveerd op
-                <input
-                  type="datetime-local"
-                  value={toLocalDateTimeValue(observation.observedAt)}
-                  onChange={(event) =>
+              <div className="observation-field-with-action">
+                <label>
+                  Geobserveerd op
+                  <input
+                    type="datetime-local"
+                    value={toLocalDateTimeValue(observation.observedAt)}
+                    onChange={(event) =>
+                      updateObservation(side, {
+                        observedAt: toIsoDateTime(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <button
+                  className="ghost-button observation-now-button"
+                  type="button"
+                  aria-label={`Gebruik huidige tijd voor ${sidePresentation.expectedRetailer}`}
+                  onClick={() =>
                     updateObservation(side, {
-                      observedAt: toIsoDateTime(event.target.value),
+                      observedAt: observationTimestampFromDate(new Date()),
                     })
                   }
-                />
-              </label>
+                >
+                  Gebruik huidige tijd
+                </button>
+              </div>
               <label>
                 Bron
                 <select
@@ -747,6 +764,16 @@ export function ObservationView() {
                 )
               })}
             </div>
+
+            <button
+              className="ghost-button observation-next-button observation-next-inline"
+              type="button"
+              data-observation-next="inline"
+              onClick={jumpToNextIncomplete}
+              disabled={!nextIncomplete}
+            >
+              {nextObservationActionLabel(sheet, nextIncomplete)}
+            </button>
           </div>
         )
       })}
