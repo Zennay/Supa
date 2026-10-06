@@ -181,7 +181,22 @@ export function buildEvidenceSummary({
   })
 
   const supermarkets = [...new Set(sources.map((source) => source.supermarket))].sort()
+  const expectedSupermarkets = ['dekamarkt', 'plus']
   const requiredKinds = ['product', 'catalog', 'offers']
+  const expectedSourceKeys = new Set(
+    expectedSupermarkets.flatMap((supermarket) =>
+      requiredKinds.map((kind) => `${supermarket}:${kind}`),
+    ),
+  )
+  const actualSourceKeys = sources.map(
+    (source) => `${source.supermarket}:${source.kind}`,
+  )
+  const boundedSourceScopeMatches =
+    JSON.stringify(supermarkets) === JSON.stringify(expectedSupermarkets) &&
+    actualSourceKeys.length === expectedSourceKeys.size &&
+    new Set(actualSourceKeys).size === actualSourceKeys.length &&
+    actualSourceKeys.every((key) => expectedSourceKeys.has(key))
+
   const coverage = supermarkets.map((supermarket) => ({
     supermarket,
     kinds: Object.fromEntries(
@@ -233,12 +248,14 @@ export function buildEvidenceSummary({
     candidateIndexStructureValid: candidateSets.structureValid,
     candidateIndexMilestoneMatches: candidateSets.milestoneMatches,
     candidateIndexCountsMatch: candidateSets.countsMatch,
+    boundedSourceScopeMatches,
     sourceCountsMatch:
       manifest.results.length === inspection.sources.length &&
       manifest.results.length === freshness.sources.length,
   }
   documentConsistency.consistent =
     documentConsistency.sourceCountsMatch &&
+    documentConsistency.boundedSourceScopeMatches &&
     documentConsistency.candidateIndexStructureValid &&
     documentConsistency.candidateIndexMilestoneMatches &&
     documentConsistency.candidateIndexCountsMatch &&
