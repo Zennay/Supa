@@ -103,6 +103,24 @@ test('failed captures are never freshness-acceptable', () => {
   assert.ok(report.sources[0].reasons.includes('capture-failed'))
 })
 
+test('malformed truthy success flags cannot make capture evidence acceptable', () => {
+  for (const success of ['false', 1, {}, []]) {
+    const report = evaluateManifestFreshness(
+      manifest([result({ success })]),
+      {
+        now: new Date('2026-10-04T01:00:00.000Z'),
+      },
+    )
+
+    assert.equal(report.acceptable, false)
+    assert.equal(report.failedCount, 1)
+    assert.equal(report.sources[0].success, false)
+    assert.equal(report.sources[0].freshness, 'failed')
+    assert.ok(report.sources[0].reasons.includes('invalid-success-flag'))
+    assert.ok(report.sources[0].reasons.includes('capture-failed'))
+  }
+})
+
 test('writes freshness.json into the capture artifact', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-freshness-'))
   await writeFile(
