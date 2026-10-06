@@ -118,6 +118,35 @@ test('direct matcher rejects malformed candidate structure before scoring', () =
   }
 })
 
+test('matcher preserves the true oversupply ratio for sub-unit requirements', () => {
+  const decision = matchIngredient(
+    {
+      id: 'paprika-powder',
+      query: 'paprika powder',
+      amount: 0.5,
+      unit: 'g',
+    },
+    [
+      {
+        id: 'paprika-powder-1g',
+        name: 'Powder paprika',
+        packAmount: 1,
+        packUnit: 'g',
+        packCount: 1,
+        available: true,
+      },
+    ],
+  )
+
+  assert.equal(decision.type, 'abstain')
+  assert.equal(decision.score, 60)
+  assert.deepEqual(decision.reasons, [
+    '2/2 query tokens present',
+    'pack covers requirement',
+    'score below trust threshold',
+  ])
+})
+
 test('null runtime options fail closed instead of throwing', () => {
   assert.doesNotThrow(() => {
     expectAbstain(
