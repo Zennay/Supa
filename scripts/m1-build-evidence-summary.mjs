@@ -90,6 +90,24 @@ export function buildEvidenceSummary({
   const ids = [...manifestById.keys()].sort()
   const missingInspection = ids.filter((id) => !inspectionById.has(id))
   const missingFreshness = ids.filter((id) => !freshnessById.has(id))
+  const inspectionIdentityMismatches = ids.filter((id) => {
+    const captured = manifestById.get(id)
+    const inspected = inspectionById.get(id)
+    return (
+      inspected &&
+      ((captured.supermarket ?? null) !== (inspected.supermarket ?? null) ||
+        (captured.kind ?? null) !== (inspected.kind ?? null))
+    )
+  })
+  const freshnessIdentityMismatches = ids.filter((id) => {
+    const captured = manifestById.get(id)
+    const fresh = freshnessById.get(id)
+    return (
+      fresh &&
+      ((captured.supermarket ?? null) !== (fresh.supermarket ?? null) ||
+        (captured.kind ?? null) !== (fresh.kind ?? null))
+    )
+  })
 
   const sources = ids.map((id) => {
     const captured = manifestById.get(id)
@@ -177,6 +195,8 @@ export function buildEvidenceSummary({
   const documentConsistency = {
     missingInspection,
     missingFreshness,
+    inspectionIdentityMismatches,
+    freshnessIdentityMismatches,
     unexpectedInspection,
     unexpectedFreshness,
     unexpectedCandidateDecisions,
