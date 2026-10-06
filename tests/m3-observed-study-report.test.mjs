@@ -150,6 +150,34 @@ test('M3 observed input preflight rejects inconsistent observed line money', () 
   )
 })
 
+test('M3 observed input preflight rejects a basket total that disagrees with line totals', () => {
+  const study = observedStudy()
+  study.candidate.basket.totalCents += 1
+
+  assert.throws(
+    () => buildObservedWeekReport(study),
+    /candidate\.basket\.totalCents must equal the sum of matched line totals/,
+  )
+})
+
+test('M3 observed input preflight rejects stale matched and unresolved counters', () => {
+  const matchedCountStudy = observedStudy()
+  matchedCountStudy.baseline.basket.matchedLineCount += 1
+
+  assert.throws(
+    () => validateObservedWeekInput(matchedCountStudy),
+    /baseline\.basket\.matchedLineCount must equal matched line count/,
+  )
+
+  const unresolvedCountStudy = observedStudy()
+  unresolvedCountStudy.candidate.basket.unresolvedLineCount += 1
+
+  assert.throws(
+    () => validateObservedWeekInput(unresolvedCountStudy),
+    /candidate\.basket\.unresolvedLineCount must equal unresolved line count/,
+  )
+})
+
 test('M3 CLI writes a reproducible assessment report file', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'supa-m3-report-'))
   const input = join(directory, 'study.json')
