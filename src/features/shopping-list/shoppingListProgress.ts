@@ -70,11 +70,16 @@ export function restoreShoppingListProgress(
 
 export function serializeShoppingListProgress(
   basket: OneStoreBasket,
-  doneLineIds: string[],
+  doneLineIds: unknown,
 ): string {
   const validIds = new Set(basket.lines.map((line) => line.id))
+  const runtimeDoneLineIds = Array.isArray(doneLineIds) ? doneLineIds : []
   const safeDoneLineIds = Array.from(
-    new Set(doneLineIds.filter((id) => validIds.has(id))),
+    new Set(
+      runtimeDoneLineIds.filter(
+        (id): id is string => typeof id === 'string' && validIds.has(id),
+      ),
+    ),
   )
 
   return JSON.stringify({
