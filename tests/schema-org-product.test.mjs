@@ -157,3 +157,31 @@ test('malformed external JSON-LD abstains instead of throwing through the parser
   assert.match(result.reason, /failed trust validation/)
   assert.match(result.reason, /validFrom/)
 })
+
+test('non-object runtime provenance abstains before property access', () => {
+  const product = {
+    '@type': 'Product',
+    name: 'Milk',
+  }
+
+  for (const malformed of [null, undefined, 'snapshot', 42, true, []]) {
+    assert.deepEqual(parseSchemaOrgProduct(product, malformed), {
+      type: 'abstain',
+      reason: 'Product JSON-LD provenance must be an object',
+    })
+  }
+})
+
+test('malformed provenance objects stay inside the parser abstention contract', () => {
+  const result = parseSchemaOrgProduct(
+    {
+      '@type': 'Product',
+      name: 'Milk',
+    },
+    {},
+  )
+
+  assert.equal(result.type, 'abstain')
+  assert.match(result.reason, /failed trust validation/)
+  assert.match(result.reason, /supermarket/)
+})
