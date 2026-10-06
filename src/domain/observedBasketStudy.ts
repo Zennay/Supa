@@ -89,9 +89,14 @@ function validTimestamp(value: string) {
 
 function validateEvidence(
   label: 'baseline' | 'candidate',
-  evidence: ObservedBasketEvidence,
+  evidence: unknown,
 ) {
   const reasons: string[] = []
+
+  if (!isRecord(evidence)) {
+    reasons.push(`${label} evidence must be a non-array object`)
+    return reasons
+  }
 
   if (
     typeof evidence.evidenceId !== 'string' ||
@@ -118,19 +123,25 @@ function validateEvidence(
     reasons.push(`${label} observedAt is not a valid timestamp`)
   }
 
+  if (!isRecord(evidence.basket)) {
+    reasons.push(`${label} basket must be a non-array object`)
+  } else if (!isRecord(evidence.basket.store)) {
+    reasons.push(`${label} basket store must be a non-array object`)
+  }
+
   return reasons
 }
 
 function unknownComparison(
-  baseline: OneStoreBasket,
-  candidate: OneStoreBasket,
+  baseline: unknown,
+  candidate: unknown,
   reasons: string[],
 ): BasketComparison {
   return {
     outcome: 'unknown',
     claimable: false,
-    baselineTotalCents: baseline.totalCents,
-    candidateTotalCents: candidate.totalCents,
+    baselineTotalCents: safeBasketTotal(baseline),
+    candidateTotalCents: safeBasketTotal(candidate),
     deltaCents: null,
     savingsCents: null,
     lineDeltas: [],
@@ -163,6 +174,18 @@ export function assessWeeklyBasketStudy(
     reasons.push('assessment options must be a non-array object')
   } else if (!validMaxObservationWindowHours) {
     reasons.push('maxObservationWindowHours must be a positive finite number')
+  }
+
+  if (!isRecord(study)) {
+    reasons.push('study must be a non-array object')
+    const comparison = unknownComparison(null, null, reasons)
+    return {
+      claimable: false,
+      reasons,
+      comparison,
+      attribution: attributeSavingsEffects({ comparison, evidence: [] }),
+      observationWindowHours: null,
+    }
   }
 
   if (study.schemaVersion !== 1) {
@@ -206,15 +229,48 @@ export function assessWeeklyBasketStudy(
     reasons.push('attributionEvidence must be an array when provided')
   }
 
-  if (study.baseline.evidenceId === study.candidate.evidenceId) {
+  const baselineEvidence = isRecord(study.baseline) ? study.baseline : null
+  const candidateEvidence = isRecord(study.candidate) ? study.candidate : null
+  const baselineBasket =
+    baselineEvidence && isRecord(baselineEvidence.basket)
+      ? baselineEvidence.basket
+      : null
+  const candidateBasket =
+    candidateEvidence && isRecord(candidateEvidence.basket)
+      ? candidateEvidence.basket
+      : null
+  const baselineStore =
+    baselineBasket && isRecord(baselineBasket.store)
+      ? baselineBasket.store
+      : null
+  const candidateStore =
+    candidateBasket && isRecord(candidateBasket.store)
+      ? candidateBasket.store
+      : null
+
+  if (
+    baselineEvidence &&
+    candidateEvidence &&
+    baselineEvidence.evidenceId === candidateEvidence.evidenceId
+  ) {
     reasons.push('baseline and candidate evidence IDs must differ')
   }
-  if (study.baseline.basket.store.id === study.candidate.basket.store.id) {
+  if (
+    baselineStore &&
+    candidateStore &&
+    baselineStore.id === candidateStore.id
+  ) {
     reasons.push('baseline and candidate stores must differ')
   }
 
-  const baselineObservedAt = validTimestamp(study.baseline.observedAt)
-  const candidateObservedAt = validTimestamp(study.candidate.observedAt)
+  const baselineObservedAt =
+    baselineEvidence && typeof baselineEvidence.observedAt === 'string'
+      ? validTimestamp(baselineEvidence.observedAt)
+      : null
+  const candidateObservedAt =
+    candidateEvidence && typeof candidateEvidence.observedAt === 'string'
+      ? validTimestamp(candidateEvidence.observedAt)
+      : null
   let observationWindowHours: number | null = null
 
   if (baselineObservedAt !== null && candidateObservedAt !== null) {
@@ -227,10 +283,13 @@ export function assessWeeklyBasketStudy(
     }
   }
 
-  const comparison = compareFullBaskets({
-    baseline: study.baseline.basket,
-    candidate: study.candidate.basket,
-  })
+  const comparison =
+    baselineBasket && candidateBasket && baselineStore && candidateStore
+      ? compareFullBaskets({
+          baseline: study.baseline.basket,
+          candidate: study.candidate.basket,
+        })
+      : unknownComparison(baselineBasket, candidateBasket, reasons)
 
   if (!comparison.claimable) {
     reasons.push(...comparison.reasons)
