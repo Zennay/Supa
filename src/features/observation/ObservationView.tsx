@@ -28,6 +28,7 @@ import {
   observationPackCount,
 } from './observationNumericInput.ts'
 import { persistObservationDraft } from './observationDraftPersistence.ts'
+import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -269,6 +270,15 @@ export function ObservationView() {
 
   const importDraft = async (file: File | undefined) => {
     if (!file) return
+
+    if (!observationDraftFileSizeAllowed(file.size)) {
+      setPendingImport(null)
+      setImportStatus({
+        kind: 'error',
+        message: 'Import geweigerd: het JSON-concept is groter dan 1 MB.',
+      })
+      return
+    }
 
     try {
       const restored = restoreObservationSheetDraft(await file.text())
