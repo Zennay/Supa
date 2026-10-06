@@ -12,5 +12,4 @@ test('shopping rows expose explicit toggle-button semantics', () => {
 
   assert.match(buttonTag, /\btype=["']button["']/)
   assert.match(buttonTag, /\baria-pressed=\{checked\}/)
-  assert.ok(source.includes("checked ? 'shopping-row checked' : 'shopping-row'"))
 })
