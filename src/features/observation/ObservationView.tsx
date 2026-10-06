@@ -108,7 +108,7 @@ export function ObservationView() {
   useEffect(() => {
     setDraftPersistenceFailed(
       !persistObservationDraft(
-        window.localStorage,
+        () => window.localStorage,
         OBSERVATION_DRAFT_STORAGE_KEY,
         sheet,
       ),
