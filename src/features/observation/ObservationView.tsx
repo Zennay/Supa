@@ -18,6 +18,10 @@ import {
   type StoreObservation,
 } from '../../domain/m3ObservationSheet.ts'
 import { observationRetailerCopy } from './observationPresentation.ts'
+import {
+  nextObservationActionLabel,
+  observationTimestampFromDate,
+} from './observationCollectionUi.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -331,7 +335,7 @@ export function ObservationView() {
           onClick={jumpToNextIncomplete}
           disabled={!nextIncomplete}
         >
-          {nextIncomplete ? 'Ga naar volgende open regel' : 'Alle regels zijn gemeten'}
+          {nextObservationActionLabel(sheet, nextIncomplete)}
         </button>
         {windowSummary.state === 'single-observation' && (
           <p>
@@ -501,7 +505,7 @@ export function ObservationView() {
                   onChange={(event) =>
                     updateStore(side, 'id', event.target.value)
                   }
-                  placeholder="plus-leiden-..."
+                  placeholder={retailerCopy.storeIdPlaceholder}
                 />
               </label>
               <label>
@@ -514,18 +518,32 @@ export function ObservationView() {
                   placeholder="obs-..."
                 />
               </label>
-              <label>
-                Geobserveerd op
-                <input
-                  type="datetime-local"
-                  value={toLocalDateTimeValue(observation.observedAt)}
-                  onChange={(event) =>
+              <div className="observation-field-with-action">
+                <label>
+                  Geobserveerd op
+                  <input
+                    type="datetime-local"
+                    value={toLocalDateTimeValue(observation.observedAt)}
+                    onChange={(event) =>
+                      updateObservation(side, {
+                        observedAt: toIsoDateTime(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <button
+                  className="ghost-button observation-now-button"
+                  type="button"
+                  aria-label={`Gebruik huidige tijd voor ${retailerCopy.expectedRetailer}`}
+                  onClick={() =>
                     updateObservation(side, {
-                      observedAt: toIsoDateTime(event.target.value),
+                      observedAt: observationTimestampFromDate(new Date()),
                     })
                   }
-                />
-              </label>
+                >
+                  Gebruik huidige tijd
+                </button>
+              </div>
               <label>
                 Bron
                 <select
@@ -743,6 +761,20 @@ export function ObservationView() {
                           </label>
                         </>
                       )}
+
+                      <button
+                        className="ghost-button observation-line-next field-wide"
+                        type="button"
+                        onClick={jumpToNextIncomplete}
+                        disabled={
+                          !observationLineCollectionComplete(line) ||
+                          !nextIncomplete
+                        }
+                      >
+                        {observationLineCollectionComplete(line)
+                          ? nextObservationActionLabel(sheet, nextIncomplete)
+                          : 'Vul deze regel eerst af'}
+                      </button>
                     </div>
                   </details>
                 )

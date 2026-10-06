@@ -9,6 +9,7 @@ test('observation retailer copy pins the canonical PLUS baseline', () => {
     expectedRetailer: 'PLUS',
     emptyStoreLabel: 'PLUS nog niet ingevuld',
     storePlaceholder: 'Bijv. PLUS Leiden',
+    storeIdPlaceholder: 'plus-leiden-...',
     guidance:
       'Voor deze M3-meting hoort de baseline bij PLUS. Een andere supermarkt wordt door de preflight geweigerd.',
   })
@@ -20,6 +21,7 @@ test('observation retailer copy pins the canonical DekaMarkt comparison side', (
     expectedRetailer: 'DekaMarkt',
     emptyStoreLabel: 'DekaMarkt nog niet ingevuld',
     storePlaceholder: 'Bijv. DekaMarkt Leiden',
+    storeIdPlaceholder: 'dekamarkt-leiden-...',
     guidance:
       'Voor deze M3-meting hoort de vergelijking bij DekaMarkt. Een andere supermarkt wordt door de preflight geweigerd.',
   })
