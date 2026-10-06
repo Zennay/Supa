@@ -172,7 +172,7 @@ export function PlannerView({
       </div>
 
       <div className="insight-card">
-        <span className="eyebrow">M2 verticale slice</span>
+        <span className="eyebrow">Van plan naar lijst</span>
         <strong>Je receptkeuzes sturen nu dezelfde mand en boodschappenlijst aan.</strong>
         <p>
           Onzekere productmatches worden niet ingevuld: ze blijven zichtbaar
