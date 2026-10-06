@@ -8,6 +8,9 @@ on:
       - "scripts/m3-build-observed-study.mjs"
       - "scripts/m3-assess-observed-week.mjs"
       - "src/domain/observedBasketStudy.ts"
+      - "src/domain/basket.ts"
+      - "src/domain/m3ObservationSheet.ts"
+      - "src/domain/matching.ts"
       - "src/domain/basketComparison.ts"
       - "src/domain/savingsAttribution.ts"
       - "tests/m3-observation-sheet.test.mjs"
@@ -16,6 +19,7 @@ on:
       - "tests/m3-savings-attribution.test.mjs"
       - "tests/m3-workflow-contract.test.mjs"
       - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 concurrency:
