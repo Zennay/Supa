@@ -18,9 +18,23 @@ export type ReviewedLiveProductFixture = {
 }
 
 const MAX_REVIEW_CLOCK_SKEW_MS = 5 * 60 * 1000
+const EXPLICIT_OFFSET_TIMESTAMP =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/
 
-function validIso(value: unknown): value is string {
-  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+function validEvidenceTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string' || !EXPLICIT_OFFSET_TIMESTAMP.test(value)) {
+    return false
+  }
+
+  const offset = value.match(/([+-])(\d{2}):(\d{2})$/)
+  if (
+    offset &&
+    (Number(offset[2]) > 23 || Number(offset[3]) > 59)
+  ) {
+    return false
+  }
+
+  return Number.isFinite(Date.parse(value))
 }
 
 function isSafeSourceId(value: unknown): value is string {
@@ -75,6 +89,11 @@ export function validateReviewedLiveProductFixture(
   if (!isSafeSourceId(fixture.source?.id)) {
     throw new Error('Reviewed live fixture must use a path-safe source id')
   }
+  if (!validEvidenceTimestamp(fixture.source?.capturedAt)) {
+    throw new Error(
+      'Reviewed live fixture source must include a timestamp with an explicit timezone offset',
+    )
+  }
   if (fixture.source.kind !== 'product') {
     throw new Error('Reviewed live product fixture must come from a product source')
   }
@@ -99,8 +118,10 @@ export function validateReviewedLiveProductFixture(
   if (typeof fixture.review?.reviewer !== 'string' || !fixture.review.reviewer.trim()) {
     throw new Error('Reviewed live fixture must identify a reviewer')
   }
-  if (!validIso(fixture.review?.reviewedAt)) {
-    throw new Error('Reviewed live fixture must include a valid reviewedAt')
+  if (!validEvidenceTimestamp(fixture.review?.reviewedAt)) {
+    throw new Error(
+      'Reviewed live fixture must include a valid reviewedAt with an explicit timezone offset',
+    )
   }
 
   validateReviewChronology(fixture)
