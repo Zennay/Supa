@@ -12,7 +12,8 @@ export const euro = {
       return '—'
     }
 
-    return euroFormatter.format(value)
+    const normalizedValue = Object.is(value, -0) ? 0 : value
+    return euroFormatter.format(normalizedValue)
   },
 }
 
