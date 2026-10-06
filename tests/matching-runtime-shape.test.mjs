@@ -43,6 +43,20 @@ test('direct matcher rejects malformed requirement identity, query and unit with
   }
 })
 
+test('direct matcher rejects blank requirement identity and query before scoring', () => {
+  for (const malformedRequirement of [
+    { ...requirement, id: '' },
+    { ...requirement, id: '   ' },
+    { ...requirement, query: '' },
+    { ...requirement, query: '   ' },
+  ]) {
+    expectAbstain(
+      matchIngredient(malformedRequirement, [candidate]),
+      'matching requirement invalid',
+    )
+  }
+})
+
 test('direct matcher rejects a non-array candidate collection without throwing', () => {
   for (const malformedCandidates of [null, {}, 'candidate', 1]) {
     assert.doesNotThrow(() => {
