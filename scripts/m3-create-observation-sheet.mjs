@@ -7,7 +7,10 @@ import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 export { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 
 function validOutputArg(value) {
-  return typeof value === 'string' && Boolean(value.trim()) && !value.trim().startsWith('-')
+  if (typeof value !== 'string') return false
+
+  const trimmed = value.trim()
+  return Boolean(trimmed) && trimmed === value && !trimmed.startsWith('-')
 }
 
 function parseArgs(argv) {
