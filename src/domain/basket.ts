@@ -80,10 +80,17 @@ export function aggregatePlanIngredients(
   for (const meal of plan) {
     if (!active.has(meal.day)) continue
 
-    const recipe = recipes.find((candidate) => candidate.id === meal.recipeId)
-    if (!recipe) {
+    const matchingRecipes = recipes.filter(
+      (candidate) => candidate.id === meal.recipeId,
+    )
+    if (matchingRecipes.length === 0) {
       throw new Error(`Missing recipe for planned meal: ${meal.recipeId}`)
     }
+    if (matchingRecipes.length > 1) {
+      throw new Error(`Ambiguous recipe for planned meal: ${meal.recipeId}`)
+    }
+
+    const recipe = matchingRecipes[0]
 
     for (const ingredient of recipe.ingredients) {
       const current = aggregated.get(ingredient.id)
