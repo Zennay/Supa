@@ -130,6 +130,34 @@ test('records product abstentions without exporting guessed fixtures', async () 
   ])
 })
 
+test('rejects malformed product success flags before candidate export', async () => {
+  for (const success of ['false', 1, {}, []]) {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-success-'))
+    const source = {
+      id: 'plus-product',
+      supermarket: 'plus',
+      kind: 'product',
+      success,
+      integrity: 'verified',
+      requestedUrl: 'https://www.plus.nl/product/example',
+      finalUrl: 'https://www.plus.nl/product/example',
+      capturedAt: '2026-10-04T00:00:30.000Z',
+      manifestSha256: 'b'.repeat(64),
+    }
+    source.schemaOrgProduct = {
+      type: 'observation',
+      observation: observationFor(source),
+    }
+
+    await writeInspection(root, [source])
+
+    await assert.rejects(
+      () => exportSanitizedCandidates(root),
+      /invalid product success flag/,
+    )
+  }
+})
+
 test('rejects unsafe product source ids before writing sanitized candidate paths', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-unsafe-'))
   const source = {
