@@ -256,7 +256,7 @@ test('M3 attribution fails closed when evidence over-attributes a line', () => {
   assert.match(result.reasons.join(' '), /exceeds line delta/)
 })
 
-test('M3 attribution refuses to decompose an unclaimable basket comparison', () => {
+test('M3 attribution refuses to decompose an unclaimable basket comparison before reading evidence', () => {
   const result = attributeSavingsEffects({
     comparison: comparison({
       outcome: 'unknown',
@@ -266,7 +266,7 @@ test('M3 attribution refuses to decompose an unclaimable basket comparison', () 
       lineDeltas: [],
       reasons: ['candidate basket has unresolved ingredients: garam'],
     }),
-    evidence: [],
+    evidence: null,
   })
 
   assert.equal(result.status, 'unknown')
