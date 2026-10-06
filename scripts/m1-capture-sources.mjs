@@ -58,11 +58,18 @@ function expectedHost(supermarket) {
   return host
 }
 
+function isSafeSourceId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  )
+}
+
 export function validateSources(sources = SOURCES) {
   const ids = new Set()
   for (const source of sources) {
-    if (!source.id || ids.has(source.id)) {
-      throw new Error(`Invalid or duplicate source id: ${source.id}`)
+    if (!isSafeSourceId(source?.id) || ids.has(source.id)) {
+      throw new Error(`Invalid or duplicate source id: ${source?.id}`)
     }
     ids.add(source.id)
 
