@@ -14,6 +14,7 @@ test('M3 field contract keeps the canonical evidence-collection boundary explici
     'do not swap the retailers',
     'within the 24-hour study window',
     '`collection-template-not-evidence`',
+    'rejects blank or option-like `--output` values before any filesystem write',
   ]) {
     assert.equal(
       contract.toLowerCase().includes(requiredText.toLowerCase()),
