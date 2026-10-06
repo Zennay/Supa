@@ -253,3 +253,29 @@
   margin: 0;
   padding-left: 18px;
 }
+
+
+.observation-next-button {
+  justify-self: start;
+}
+
+.observation-next-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.observation-actions .is-danger {
+  border-color: #9f342f;
+  color: #8a2c28;
+}
+
+.observation-import-status.is-warning {
+  border-color: #b77c1f;
+}
+
+
+.observation-import-confirmation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

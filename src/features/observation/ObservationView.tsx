@@ -2,8 +2,10 @@ import './ObservationView.css'
 import { useEffect, useMemo, useState } from 'react'
 import {
   buildObservationSheet,
+  nextIncompleteObservationLine,
   OBSERVATION_DRAFT_STORAGE_KEY,
   observationLineCollectionComplete,
+  observationSheetHasUserInput,
   observationSheetProgress,
   observationSheetReadiness,
   observationStoreProgress,
@@ -91,12 +93,18 @@ export function ObservationView() {
     }
   })
   const [importStatus, setImportStatus] = useState<{
-    kind: 'success' | 'error'
+    kind: 'success' | 'warning' | 'error'
     message: string
   } | null>(null)
+  const [resetArmed, setResetArmed] = useState(false)
+  const [pendingImport, setPendingImport] = useState<ObservationSheet | null>(null)
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
   const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
   const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
+  const nextIncomplete = useMemo(
+    () => nextIncompleteObservationLine(sheet),
+    [sheet],
+  )
 
   useEffect(() => {
     try {
@@ -109,14 +117,53 @@ export function ObservationView() {
     }
   }, [sheet])
 
+  useEffect(() => {
+    setResetArmed(false)
+  }, [sheet])
+
   const clearDraft = () => {
+    if (observationSheetHasUserInput(sheet) && !resetArmed) {
+      setResetArmed(true)
+      setImportStatus({
+        kind: 'warning',
+        message:
+          'Wissen is beveiligd: klik nogmaals op “Bevestig wissen” om dit lokale concept definitief leeg te maken.',
+      })
+      return
+    }
+
     try {
       window.localStorage.removeItem(OBSERVATION_DRAFT_STORAGE_KEY)
     } catch {
       // Keep reset usable even when storage is unavailable.
     }
     setSheet(buildObservationSheet())
-    setImportStatus(null)
+    setResetArmed(false)
+    setPendingImport(null)
+    setImportStatus({
+      kind: 'success',
+      message: 'Lokaal concept gewist. Er is een nieuwe lege M3-meting gestart.',
+    })
+  }
+
+  const jumpToNextIncomplete = () => {
+    if (!nextIncomplete) return
+
+    const side = document.querySelector<HTMLElement>(
+      `[data-observation-side="${nextIncomplete.side}"]`,
+    )
+    const line = Array.from(
+      side?.querySelectorAll<HTMLDetailsElement>('[data-observation-line]') ?? [],
+    ).find(
+      (candidate) =>
+        candidate.dataset.observationLine === nextIncomplete.ingredientId,
+    )
+
+    if (!line) return
+
+    line.open = true
+    line.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    line.querySelector<HTMLSelectElement>('select')?.focus({ preventScroll: true })
   }
 
   const updateStudy = (
@@ -212,12 +259,23 @@ export function ObservationView() {
     URL.revokeObjectURL(href)
   }
 
+  const applyImportedDraft = (restored: ObservationSheet) => {
+    setSheet(restored)
+    setPendingImport(null)
+    setImportStatus({
+      kind: 'success',
+      message:
+        'Concept veilig geïmporteerd. De inhoud blijft collection-template-not-evidence tot converter en assessment slagen.',
+    })
+  }
+
   const importDraft = async (file: File | undefined) => {
     if (!file) return
 
     try {
       const restored = restoreObservationSheetDraft(await file.text())
       if (!restored) {
+        setPendingImport(null)
         setImportStatus({
           kind: 'error',
           message:
@@ -226,13 +284,19 @@ export function ObservationView() {
         return
       }
 
-      setSheet(restored)
-      setImportStatus({
-        kind: 'success',
-        message:
-          'Concept veilig geïmporteerd. De inhoud blijft collection-template-not-evidence tot converter en assessment slagen.',
-      })
+      if (observationSheetHasUserInput(sheet)) {
+        setPendingImport(restored)
+        setImportStatus({
+          kind: 'warning',
+          message:
+            'Dit apparaat bevat al een ingevuld concept. Kies expliciet of het geïmporteerde concept dit lokale werk mag vervangen.',
+        })
+        return
+      }
+
+      applyImportedDraft(restored)
     } catch {
+      setPendingImport(null)
       setImportStatus({
         kind: 'error',
         message: 'Import mislukt: het JSON-bestand kon niet worden gelezen.',
@@ -265,6 +329,14 @@ export function ObservationView() {
           Je concept wordt automatisch lokaal op dit apparaat bewaard, zodat een
           refresh of gesloten tab je winkelmeting niet wist.
         </p>
+        <button
+          className="ghost-button observation-next-button"
+          type="button"
+          onClick={jumpToNextIncomplete}
+          disabled={!nextIncomplete}
+        >
+          {nextIncomplete ? 'Ga naar volgende open regel' : 'Alle regels zijn gemeten'}
+        </button>
         {windowSummary.state === 'single-observation' && (
           <p>
             <strong>24u-venster:</strong> meet de andere winkel uiterlijk{' '}
@@ -696,11 +768,11 @@ export function ObservationView() {
           />
         </label>
         <button
-          className="ghost-button"
+          className={`ghost-button ${resetArmed ? 'is-danger' : ''}`}
           type="button"
           onClick={clearDraft}
         >
-          Alles wissen
+          {resetArmed ? 'Bevestig wissen' : 'Alles wissen'}
         </button>
       </div>
 
@@ -711,6 +783,28 @@ export function ObservationView() {
         >
           {importStatus.message}
         </p>
+      )}
+
+      {pendingImport && (
+        <div className="observation-import-confirmation" role="group" aria-label="Import bevestigen">
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => applyImportedDraft(pendingImport)}
+          >
+            Huidig concept vervangen
+          </button>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => {
+              setPendingImport(null)
+              setImportStatus(null)
+            }}
+          >
+            Import annuleren
+          </button>
+        </div>
       )}
 
       <p className="disclaimer">

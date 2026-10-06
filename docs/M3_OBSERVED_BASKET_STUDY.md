@@ -67,6 +67,17 @@ The command creates missing output directories automatically. The generated shee
 
 Use the sheet to record one genuine `manual-cart`, `receipt` or `consented-export` observation per store within the 24-hour study window. Missing/unavailable products or prices must stay explicit; do not invent replacements.
 
+### Mobile `Meten` field flow
+
+The in-app `Meten` tab uses the same canonical 11-line demand and autosaves the current collection draft locally on the device.
+
+- Use **Ga naar volgende open regel** to open, scroll to and focus the first incomplete requirement, baseline first and then candidate. This is navigation only; it does not mark a line complete or infer availability.
+- **Alles wissen** is deliberately protected once any study/store/product input exists. The first click only arms the reset and shows a warning; a second explicit **Bevestig wissen** click clears the local draft.
+- Importing a valid JSON draft over existing local input is also protected: the imported draft remains pending until **Huidig concept vervangen** is explicitly chosen, or the import is cancelled.
+- A refresh or closed tab should restore the local draft, but keep the JSON export as the portable fallback before leaving the field run.
+
+These controls reduce collection friction and accidental data loss without changing the evidence boundary: the draft remains `collection-template-not-evidence` until the converter and assessment pass.
+
 Convert the verified filled sheet into the canonical `WeeklyBasketStudy` contract with:
 
 ```bash
