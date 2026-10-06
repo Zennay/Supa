@@ -41,7 +41,7 @@ export function BasketView({
 }) {
   const basketCost = basketCostDisclosure(
     basket.totalCents,
-    basketCost.unresolvedLineCount,
+    basket.unresolvedLineCount,
   )
   const baselineCost = basketCostDisclosure(
     comparisonBaseline.totalCents,
