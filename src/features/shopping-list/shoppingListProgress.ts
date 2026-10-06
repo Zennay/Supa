@@ -20,6 +20,10 @@ export function shoppingListBasketKey(basket: OneStoreBasket): string {
             unit: line.requirement.unit,
             productId: line.productId,
             packs: line.packs,
+            packAmount: line.pack.amount,
+            packUnit: line.pack.unit,
+            packCount: line.pack.count,
+            pricePerPackCents: line.pricePerPackCents,
             lineTotalCents: line.lineTotalCents,
           }
         : {
