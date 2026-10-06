@@ -228,7 +228,30 @@ export function buildOneStoreBasket({
     }
   })
 
-  const matched = lines.filter(
+  let totalCents = 0
+  const guardedLines: BasketTraceLine[] = lines.map((line) => {
+    if (line.status === 'unresolved') return line
+
+    const nextTotalCents = totalCents + line.lineTotalCents
+    if (!Number.isSafeInteger(nextTotalCents)) {
+      return {
+        id: line.id,
+        ingredientLabel: line.ingredientLabel,
+        requirement: line.requirement,
+        status: 'unresolved',
+        reasons: [
+          ...line.reasons,
+          'basket monetary total exceeds the safe integer range',
+        ],
+        matchScore: line.matchScore,
+      }
+    }
+
+    totalCents = nextTotalCents
+    return line
+  })
+
+  const matched = guardedLines.filter(
     (line): line is Extract<BasketTraceLine, { status: 'matched' }> =>
       line.status === 'matched',
   )
@@ -236,9 +259,9 @@ export function buildOneStoreBasket({
   return {
     store,
     selectedMealCount: plan.filter((meal) => activeDays.includes(meal.day)).length,
-    lines,
-    totalCents: matched.reduce((total, line) => total + line.lineTotalCents, 0),
+    lines: guardedLines,
+    totalCents,
     matchedLineCount: matched.length,
-    unresolvedLineCount: lines.length - matched.length,
+    unresolvedLineCount: guardedLines.length - matched.length,
   }
 }
