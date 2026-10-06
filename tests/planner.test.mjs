@@ -57,9 +57,11 @@ test('planner budget outcome fails closed when product matches are unresolved', 
   })
 })
 
-test('planner budget outcome treats an invalid unresolved count as unknown', () => {
-  const assessment = assessPlannerBudget(23.5, 35, Number.NaN)
+test('planner budget outcome treats invalid unresolved counts as unknown', () => {
+  for (const unresolvedLineCount of [Number.NaN, -1]) {
+    const assessment = assessPlannerBudget(23.5, 35, unresolvedLineCount)
 
-  assert.equal(assessment.status, 'unknown')
-  assert.equal(assessment.unresolvedLineCount, 1)
+    assert.equal(assessment.status, 'unknown')
+    assert.equal(assessment.unresolvedLineCount, 1)
+  }
 })
