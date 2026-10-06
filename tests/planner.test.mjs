@@ -86,6 +86,36 @@ test('planned cost fails closed on malformed active recipe estimates', () => {
   }
 })
 
+test('planned cost rejects malformed runtime collection containers without throwing', () => {
+  for (const [runtimePlan, runtimeRecipes, runtimeActiveDays] of [
+    [null, recipes, ['Ma']],
+    [{}, recipes, ['Ma']],
+    [plan, null, ['Ma']],
+    [plan, 'recipes', ['Ma']],
+    [plan, recipes, null],
+    [plan, recipes, 'Ma'],
+  ]) {
+    assert.doesNotThrow(() => {
+      assert.equal(
+        getPlannedCost(runtimePlan, runtimeRecipes, runtimeActiveDays),
+        null,
+      )
+    })
+  }
+})
+
+test('planned cost fails closed on malformed active runtime identities and entries', () => {
+  assert.equal(getPlannedCost(plan, recipes, [42]), null)
+  assert.equal(
+    getPlannedCost([{ day: 'Ma' }], recipes, ['Ma']),
+    null,
+  )
+  assert.equal(
+    getPlannedCost([null, ...plan], [null, ...recipes], ['Ma']),
+    4.5,
+  )
+})
+
 test('budget state exposes remaining money and usage', () => {
   const state = getBudgetState(23.5, 35)
 
