@@ -90,6 +90,32 @@ test('M3 observed input preflight rejects unsupported schema versions', () => {
   }
 })
 
+test('M3 report preflight rejects malformed study calendar dates', () => {
+  assert.throws(
+    () => validateObservedWeekInput(observedStudy({ weekStart: '2026-02-31' })),
+    /weekStart must be a valid YYYY-MM-DD date/,
+  )
+})
+
+test('M3 report preflight rejects malformed observation timestamps', () => {
+  for (const side of ['baseline', 'candidate']) {
+    for (const observedAt of [
+      '2026-10-04',
+      '2026-02-31T12:00:00Z',
+      '2026-10-04T24:00:00Z',
+      '2026-10-04T12:00:00+24:00',
+    ]) {
+      const value = observedStudy()
+      value[side].observedAt = observedAt
+
+      assert.throws(
+        () => validateObservedWeekInput(value),
+        new RegExp(`${side}\\.observedAt must be a valid timestamp`),
+      )
+    }
+  }
+})
+
 test('M3 report preflight rejects retailer drift from the canonical field study', () => {
   const wrongBaseline = observedStudy()
   wrongBaseline.baseline.basket.store = {
