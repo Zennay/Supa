@@ -15,6 +15,7 @@ separate from production reuse permission.
 The current slice connects the three existing mobile surfaces:
 
 1. **Planner**
+   - each active day resolves to exactly one planned meal; duplicate active day identities fail closed instead of silently double-counting demand;
    - choose a week budget;
    - activate/deactivate meal days;
    - choose a recipe per planned day.
