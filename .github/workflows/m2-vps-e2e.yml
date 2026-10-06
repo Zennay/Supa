@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "src/App.tsx"
+      - "src/main.tsx"
+      - "src/styles.css"
+      - "src/components/**"
+      - "src/lib/**"
       - "src/domain/basket.ts"
       - "src/domain/basketComparison.ts"
       - "src/domain/matching.ts"
