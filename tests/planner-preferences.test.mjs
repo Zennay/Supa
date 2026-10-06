@@ -196,3 +196,35 @@ test('M2 planner preferences allow an explicit caller-specific budget contract',
 
   assert.equal(preferences.budget, 50)
 })
+
+
+test('M2 planner preferences fail closed on invalid caller fallbacks', () => {
+  for (const fallbackBudget of [Number.NaN, Number.POSITIVE_INFINITY, 0, -10]) {
+    assert.equal(
+      defaultPlannerPreferences(m2InitialPlan, fallbackBudget).budget,
+      35,
+    )
+  }
+
+  const customFallback = parsePlannerPreferences(
+    null,
+    m2InitialPlan,
+    recipeIds,
+    999,
+    [45, 50, 55],
+  )
+  assert.equal(customFallback.budget, 45)
+
+  const malformedContractFallback = parsePlannerPreferences(
+    JSON.stringify({
+      budget: 999,
+      activeDays: ['Ma'],
+      recipeByDay: {},
+    }),
+    m2InitialPlan,
+    recipeIds,
+    Number.NaN,
+    [Number.NaN, -1, 40],
+  )
+  assert.equal(malformedContractFallback.budget, 40)
+})
