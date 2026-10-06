@@ -44,6 +44,68 @@ test('DekaMarkt evidence fails closed on Nuxt/JSON-LD price disagreement', async
   })
 })
 
+test('DekaMarkt evidence rejects malformed source provenance', async () => {
+  const cases = [
+    ['non-public product URL', (evidence) => {
+      evidence.source.url = 'https://example.com/product/115873'
+    }],
+    ['invalid capture timestamp', (evidence) => {
+      evidence.source.capturedAt = 'not-a-date'
+    }],
+    ['invalid source digest', (evidence) => {
+      evidence.source.sha256 = 'abc'
+    }],
+  ]
+
+  for (const [label, mutate] of cases) {
+    const evidence = await fixture()
+    mutate(evidence)
+
+    assert.deepEqual(
+      parseDekaMarktSsrProductEvidence(evidence),
+      {
+        type: 'abstain',
+        reason: 'DekaMarkt evidence source provenance is invalid',
+      },
+      label,
+    )
+  }
+})
+
+test('DekaMarkt evidence rejects malformed capture artifact identity', async () => {
+  const cases = [
+    ['non-positive run id', (evidence) => {
+      evidence.captureEvidence.runId = 0
+    }],
+    ['non-integer artifact id', (evidence) => {
+      evidence.captureEvidence.artifactId = 1.5
+    }],
+    ['invalid artifact digest', (evidence) => {
+      evidence.captureEvidence.artifactDigest = 'sha256:not-a-digest'
+    }],
+    ['invalid Supa SHA', (evidence) => {
+      evidence.captureEvidence.supaSha = 'not-a-commit'
+    }],
+    ['non-positive byte count', (evidence) => {
+      evidence.captureEvidence.bytes = 0
+    }],
+  ]
+
+  for (const [label, mutate] of cases) {
+    const evidence = await fixture()
+    mutate(evidence)
+
+    assert.deepEqual(
+      parseDekaMarktSsrProductEvidence(evidence),
+      {
+        type: 'abstain',
+        reason: 'DekaMarkt evidence violates the bounded capture contract',
+      },
+      label,
+    )
+  }
+})
+
 test('DekaMarkt evidence rejects unsafe acquisition metadata', async () => {
   const evidence = await fixture()
   evidence.captureEvidence.safety.antiBotBypass = true
