@@ -45,6 +45,40 @@ test('M3 collection guidance names the exact next retailer and ingredient', () =
   )
 })
 
+test('M3 collection guidance preserves the generic fallback for a missing valid line', () => {
+  const sheet = buildObservationSheet()
+
+  assert.equal(
+    nextObservationActionLabel(sheet, {
+      side: 'baseline',
+      ingredientId: 'missing-but-valid-id',
+    }),
+    'Volgende open regel bij PLUS',
+  )
+})
+
+test('M3 collection guidance fails closed on malformed runtime targets', () => {
+  const sheet = buildObservationSheet()
+
+  for (const malformed of [
+    undefined,
+    false,
+    0,
+    '',
+    {},
+    [],
+    { side: 'other', ingredientId: 'rice' },
+    { side: 'baseline', ingredientId: '' },
+    { side: 'baseline', ingredientId: '   ' },
+    { side: 'baseline', ingredientId: 42 },
+  ]) {
+    assert.throws(
+      () => nextObservationActionLabel(sheet, malformed),
+      /Invalid next observation target/,
+    )
+  }
+})
+
 test('M3 current-time helper emits ISO evidence time and fails closed for invalid dates', () => {
   assert.equal(
     observationTimestampFromDate(new Date('2026-10-06T07:45:12.345Z')),
