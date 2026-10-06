@@ -8,6 +8,35 @@ import test from 'node:test'
 
 const generatorScript = resolve('scripts/m3-create-observation-sheet.mjs')
 
+test('M3 observation generator writes a valid nested output path', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-generator-'))
+  const output = join(directory, 'nested-output', 'observation-sheet.json')
+
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        generatorScript,
+        '--output',
+        output,
+      ],
+      {
+        cwd: directory,
+        encoding: 'utf8',
+      },
+    )
+
+    assert.equal(result.status, 0, result.stderr)
+    const sheet = JSON.parse(await readFile(output, 'utf8'))
+    assert.equal(sheet.sheetType, 'm3-manual-cart-observation-sheet')
+    assert.equal(sheet.evidenceStatus, 'collection-template-not-evidence')
+    assert.equal(sheet.requirements.length, 11)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('M3 observation generator refuses to overwrite an existing field sheet', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'supa-m3-generator-'))
   const output = join(directory, 'observation-sheet.json')
