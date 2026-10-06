@@ -170,3 +170,62 @@ test('M3 records a neutral result when comparable baskets cost the same', () => 
   assert.equal(comparison.deltaCents, 0)
   assert.equal(comparison.savingsCents, 0)
 })
+
+
+test('M3 fails closed when matched demand metadata is non-finite in both baskets', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(candidateStore, -10)
+
+  for (const basket of [baseline, candidate]) {
+    const matchedIndex = basket.lines.findIndex((line) => line.status === 'matched')
+    assert.ok(matchedIndex >= 0)
+    const line = basket.lines[matchedIndex]
+    assert.equal(line.status, 'matched')
+
+    basket.lines[matchedIndex] = {
+      ...line,
+      requirement: {
+        ...line.requirement,
+        amount: Number.POSITIVE_INFINITY,
+      },
+    }
+  }
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.savingsCents, null)
+  assert.match(
+    comparison.reasons.join(' '),
+    /basket contains invalid matched-line economics/,
+  )
+})
+
+test('M3 fails closed when matched line totals do not match pack economics', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(candidateStore, -10)
+
+  for (const basket of [baseline, candidate]) {
+    const matchedIndex = basket.lines.findIndex((line) => line.status === 'matched')
+    assert.ok(matchedIndex >= 0)
+    const line = basket.lines[matchedIndex]
+    assert.equal(line.status, 'matched')
+
+    basket.lines[matchedIndex] = {
+      ...line,
+      pricePerPackCents: line.pricePerPackCents + 1,
+    }
+  }
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.deltaCents, null)
+  assert.equal(comparison.lineDeltas.length, 0)
+  assert.match(
+    comparison.reasons.join(' '),
+    /basket contains invalid matched-line economics/,
+  )
+})
