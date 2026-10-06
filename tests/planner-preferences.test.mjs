@@ -135,3 +135,64 @@ test('M2 planner preferences fall back on malformed storage and round-trip safel
     changed,
   )
 })
+
+
+test('M2 planner preferences reject positive budgets the current planner cannot select', () => {
+  for (const unsupportedBudget of [33, 0.01, 10_000]) {
+    const preferences = parsePlannerPreferences(
+      JSON.stringify({
+        budget: unsupportedBudget,
+        activeDays: ['Ma'],
+        recipeByDay: {},
+      }),
+      m2InitialPlan,
+      recipeIds,
+    )
+
+    assert.equal(preferences.budget, 35)
+  }
+
+  for (const supportedBudget of [30, 35, 40]) {
+    const preferences = parsePlannerPreferences(
+      JSON.stringify({
+        budget: supportedBudget,
+        activeDays: ['Ma'],
+        recipeByDay: {},
+      }),
+      m2InitialPlan,
+      recipeIds,
+    )
+
+    assert.equal(preferences.budget, supportedBudget)
+  }
+})
+
+test('M2 planner preferences restore active days in canonical planner order', () => {
+  const preferences = parsePlannerPreferences(
+    JSON.stringify({
+      budget: 35,
+      activeDays: ['Do', 'Ma', 'Do', 'Wo'],
+      recipeByDay: {},
+    }),
+    m2InitialPlan,
+    recipeIds,
+  )
+
+  assert.deepEqual(preferences.activeDays, ['Ma', 'Wo', 'Do'])
+})
+
+test('M2 planner preferences allow an explicit caller-specific budget contract', () => {
+  const preferences = parsePlannerPreferences(
+    JSON.stringify({
+      budget: 50,
+      activeDays: ['Ma'],
+      recipeByDay: {},
+    }),
+    m2InitialPlan,
+    recipeIds,
+    45,
+    [45, 50, 55],
+  )
+
+  assert.equal(preferences.budget, 50)
+})
