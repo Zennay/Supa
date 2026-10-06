@@ -26,3 +26,10 @@ test('observation retailer copy pins the canonical DekaMarkt comparison side', (
       'Voor deze M3-meting hoort de vergelijking bij DekaMarkt. Een andere supermarkt wordt door de preflight geweigerd.',
   })
 })
+
+test('observation retailer copy rejects an unknown runtime side', () => {
+  assert.throws(
+    () => observationRetailerCopy('baseline-copy' ),
+    /Unknown M3 observation side/,
+  )
+})

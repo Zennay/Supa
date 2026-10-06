@@ -12,9 +12,16 @@ export type ObservationRetailerCopy = {
   guidance: string
 }
 
+function assertObservationSide(side: unknown): asserts side is M3ObservationSide {
+  if (side !== 'baseline' && side !== 'candidate') {
+    throw new Error('Unknown M3 observation side')
+  }
+}
+
 export function observationRetailerCopy(
   side: M3ObservationSide,
 ): ObservationRetailerCopy {
+  assertObservationSide(side)
   const expectedRetailer = M3_EXPECTED_RETAILERS[side]
 
   return {
