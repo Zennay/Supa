@@ -21,18 +21,26 @@ function isSafePositiveNumber(value: number): boolean {
 }
 
 export function normalizeMoneyToCents(input: string): number | null {
-  const cleaned = input
-    .trim()
-    .replace(/\s/g, '')
-    .replace(/^€/, '')
+  const cleaned = input.trim().replace(/^€\s*/, '')
 
-  if (!cleaned) {
+  if (!cleaned || /\s/.test(cleaned)) {
     return null
   }
 
-  const normalized = cleaned.includes(',')
-    ? cleaned.replace(/\./g, '').replace(',', '.')
-    : cleaned
+  let normalized: string
+  if (cleaned.includes(',')) {
+    if (!/^(?:\d{1,3}(?:\.\d{3})+|\d+),\d{1,2}$/.test(cleaned)) {
+      return null
+    }
+
+    normalized = cleaned.replace(/\./g, '').replace(',', '.')
+  } else {
+    if (!/^\d+(?:\.\d{1,2})?$/.test(cleaned)) {
+      return null
+    }
+
+    normalized = cleaned
+  }
 
   const value = Number(normalized)
   if (!Number.isFinite(value) || value < 0) {

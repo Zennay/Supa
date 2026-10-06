@@ -11,8 +11,23 @@ test('normalizes Dutch and dot-decimal prices into integer cents', () => {
   assert.equal(normalizeMoneyToCents('€ 1,29'), 129)
   assert.equal(normalizeMoneyToCents('0.89'), 89)
   assert.equal(normalizeMoneyToCents('2,49'), 249)
+  assert.equal(normalizeMoneyToCents('€ 1.234,56'), 123456)
   assert.equal(normalizeMoneyToCents(''), null)
   assert.equal(normalizeMoneyToCents('n/a'), null)
+})
+
+test('malformed money text fails closed instead of being rewritten into another amount', () => {
+  for (const input of [
+    '1 2,34',
+    '12,3 4',
+    '1.2,34',
+    '12.34,56',
+    '1,2,3',
+    '+1.00',
+    '1.234',
+  ]) {
+    assert.equal(normalizeMoneyToCents(input), null, input)
+  }
 })
 
 test('normalizes representative AH and PLUS pack strings', () => {
