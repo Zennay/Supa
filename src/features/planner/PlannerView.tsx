@@ -69,7 +69,7 @@ export function PlannerView({
               ? budgetAssessment.budgetState.overBudget
                 ? `${euro.format(Math.abs(budgetAssessment.budgetState.remaining))} boven budget`
                 : `${euro.format(budgetAssessment.budgetState.remaining)} over`
-              : `${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'prijsregel' : 'prijsregels'} open`}
+              : `${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`}
           </span>
         </div>
 
