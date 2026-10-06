@@ -76,9 +76,14 @@ export function aggregatePlanIngredients(
 ): AggregatedIngredient[] {
   const active = new Set(activeDays)
   const aggregated = new Map<string, AggregatedIngredient>()
+  const plannedActiveDays = new Set<string>()
 
   for (const meal of plan) {
     if (!active.has(meal.day)) continue
+    if (plannedActiveDays.has(meal.day)) {
+      throw new Error(`Ambiguous planned day: ${meal.day}`)
+    }
+    plannedActiveDays.add(meal.day)
 
     const matchingRecipes = recipes.filter(
       (candidate) => candidate.id === meal.recipeId,
