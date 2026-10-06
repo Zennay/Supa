@@ -93,7 +93,10 @@ function validateEvidence(
 ) {
   const reasons: string[] = []
 
-  if (!KEY_PATTERN.test(evidence.evidenceId)) {
+  if (
+    typeof evidence.evidenceId !== 'string' ||
+    !KEY_PATTERN.test(evidence.evidenceId)
+  ) {
     reasons.push(`${label} evidenceId is not a path-safe evidence key`)
   }
 
@@ -101,11 +104,17 @@ function validateEvidence(
     reasons.push(`${label} evidence source is not an allowed observed source`)
   }
 
-  if (!evidence.provenanceNote.trim()) {
+  if (
+    typeof evidence.provenanceNote !== 'string' ||
+    !evidence.provenanceNote.trim()
+  ) {
     reasons.push(`${label} evidence provenance note is required`)
   }
 
-  if (validTimestamp(evidence.observedAt) === null) {
+  if (
+    typeof evidence.observedAt !== 'string' ||
+    validTimestamp(evidence.observedAt) === null
+  ) {
     reasons.push(`${label} observedAt is not a valid timestamp`)
   }
 
@@ -159,19 +168,28 @@ export function assessWeeklyBasketStudy(
   if (study.schemaVersion !== 1) {
     reasons.push('unsupported study schema version')
   }
-  if (!KEY_PATTERN.test(study.studyId)) {
+  if (
+    typeof study.studyId !== 'string' ||
+    !KEY_PATTERN.test(study.studyId)
+  ) {
     reasons.push('studyId is not a path-safe study key')
   }
-  if (!KEY_PATTERN.test(study.participantKey)) {
+  if (
+    typeof study.participantKey !== 'string' ||
+    !KEY_PATTERN.test(study.participantKey)
+  ) {
     reasons.push('participantKey must be a pseudonymous path-safe key')
   }
-  if (!study.population.trim()) {
+  if (typeof study.population !== 'string' || !study.population.trim()) {
     reasons.push('population is required')
   }
-  if (!study.region.trim()) {
+  if (typeof study.region !== 'string' || !study.region.trim()) {
     reasons.push('region is required')
   }
-  if (!validCalendarDate(study.weekStart)) {
+  if (
+    typeof study.weekStart !== 'string' ||
+    !validCalendarDate(study.weekStart)
+  ) {
     reasons.push('weekStart must be a valid YYYY-MM-DD date')
   }
   if (!['in-store', 'online-order'].includes(study.priceContext)) {
