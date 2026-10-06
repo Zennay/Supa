@@ -29,3 +29,10 @@ test('Planner recipe selectors meet the mobile control baseline', () => {
   assert.match(selector[1], /min-height:\s*44px;/)
   assert.match(selector[1], /font-size:\s*16px;/)
 })
+
+
+test('Planner meal cards do not advertise clickability on dead space', () => {
+  const mealConfig = css.match(/\.meal-config\s*\{([\s\S]*?)\n\}/)
+  assert.ok(mealConfig)
+  assert.doesNotMatch(mealConfig[1], /cursor:\s*pointer/)
+})
