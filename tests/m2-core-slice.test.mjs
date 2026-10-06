@@ -206,6 +206,42 @@ test('duplicate recipe IDs fail instead of silently selecting one definition', (
   )
 })
 
+test('duplicate active planned days fail instead of double-counting basket demand', () => {
+  const duplicateDayPlan = [
+    { day: 'Ma', recipeId: 'tikka' },
+    { day: 'Ma', recipeId: 'teriyaki' },
+  ]
+
+  assert.throws(
+    () =>
+      aggregatePlanIngredients(
+        duplicateDayPlan,
+        m2Recipes,
+        ['Ma'],
+      ),
+    /Ambiguous planned day: Ma/,
+  )
+})
+
+test('duplicate inactive planned days do not affect the selected basket', () => {
+  const plan = [
+    ...m2InitialPlan,
+    { day: 'Vr', recipeId: 'tikka' },
+    { day: 'Vr', recipeId: 'teriyaki' },
+  ]
+
+  const basket = buildOneStoreBasket({
+    store: m2Store,
+    plan,
+    recipes: m2Recipes,
+    activeDays: m2DefaultActiveDays,
+    products: m2Products,
+  })
+
+  assert.equal(basket.selectedMealCount, 4)
+  assert.equal(basket.totalCents, 3008)
+})
+
 test('inconsistent ingredient definitions fail instead of silently aggregating', () => {
   const inconsistentRecipes = [
     ...m2Recipes,
