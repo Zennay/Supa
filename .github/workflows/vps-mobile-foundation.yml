@@ -20,6 +20,9 @@ on:
       - "scripts/m4-*.mjs"
       - "tests/m4-*.test.mjs"
       - "package.json"
+      - "package-lock.json"
+      - "vite.config.*"
+      - "tsconfig*.json"
 
 concurrency:
   group: supa-vps-mobile-${{ github.event.pull_request.number || github.ref }}
