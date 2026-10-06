@@ -131,11 +131,18 @@ function unknownComparison(
 
 export function assessWeeklyBasketStudy(
   study: WeeklyBasketStudy,
-  options: { maxObservationWindowHours?: number } = {},
+  options: unknown = {},
 ): WeeklyBasketStudyAssessment {
-  const requestedMaxObservationWindowHours =
-    options.maxObservationWindowHours ?? 24
+  const validOptionsContainer =
+    options !== null &&
+    typeof options === 'object' &&
+    !Array.isArray(options)
+  const requestedMaxObservationWindowHours = validOptionsContainer
+    ? ((options as { maxObservationWindowHours?: unknown })
+        .maxObservationWindowHours ?? 24)
+    : 24
   const validMaxObservationWindowHours =
+    typeof requestedMaxObservationWindowHours === 'number' &&
     Number.isFinite(requestedMaxObservationWindowHours) &&
     requestedMaxObservationWindowHours > 0
   const maxObservationWindowHours = validMaxObservationWindowHours
@@ -143,7 +150,9 @@ export function assessWeeklyBasketStudy(
     : 24
   const reasons: string[] = []
 
-  if (!validMaxObservationWindowHours) {
+  if (!validOptionsContainer) {
+    reasons.push('assessment options must be a non-array object')
+  } else if (!validMaxObservationWindowHours) {
     reasons.push('maxObservationWindowHours must be a positive finite number')
   }
 
