@@ -80,6 +80,25 @@ test('M3 observed-basket study accepts comparable evidence in one time window', 
   assert.deepEqual(result.reasons, [])
 })
 
+
+test('M3 observed-basket study accepts explicit timezone offsets', () => {
+  const value = study()
+  value.baseline = {
+    ...value.baseline,
+    observedAt: '2026-10-02T19:00:00+02:00',
+  }
+  value.candidate = {
+    ...value.candidate,
+    observedAt: '2026-10-02T20:15:00+02:00',
+  }
+
+  const result = assessWeeklyBasketStudy(value)
+
+  assert.equal(result.claimable, true)
+  assert.equal(result.observationWindowHours, 1.25)
+  assert.deepEqual(result.reasons, [])
+})
+
 test('M3 observed-basket study preserves a worse observed outcome', () => {
   const value = study()
   value.candidate = {
