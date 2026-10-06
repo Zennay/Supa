@@ -154,7 +154,7 @@ export function validateRetailerResponseRecord(input) {
   const responseSummary = requireString(input.responseSummary, 'responseSummary', { maxLength: 1200 })
   const constraints = requireStringArray(input.constraints ?? [], 'constraints', { maxItems: 16, maxLength: 500 })
   const nextOwnerTeam = requireOptionalString(input.nextOwnerTeam, 'nextOwnerTeam', { maxLength: 120 })
-  const evidenceRef = requireString(input.evidenceRef, 'evidenceRef', { maxLength: 240, checkPii: false })
+  const evidenceRef = requireString(input.evidenceRef, 'evidenceRef', { maxLength: 240 })
   const consequences = validateConsequences(input.consequences)
 
   return {
