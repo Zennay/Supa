@@ -8,6 +8,16 @@ test('euro formatting preserves finite values', () => {
   assert.doesNotMatch(euro.format(12.34), /NaN|∞/)
 })
 
+test('euro formatting rejects malformed runtime value types', () => {
+  for (const malformed of [null, undefined, '12.34', {}, []]) {
+    assert.equal(euro.format(malformed), '—')
+  }
+})
+
+test('euro formatting preserves bigint values', () => {
+  assert.match(euro.format(1234n), /1\.234/)
+})
+
 test('euro formatting fails closed on non-finite numbers', () => {
   assert.equal(euro.format(Number.NaN), '—')
   assert.equal(euro.format(Number.POSITIVE_INFINITY), '—')
