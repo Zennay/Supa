@@ -22,7 +22,7 @@ Two large core PDFs have byte-preserving canonical copies there. Their SHA-256 v
 - Do not infer or synthesize a checksum from parsed text.
 - Duplicate historical uploads are not silently treated as the same version even when filenames look similar.
 - The manifest records the exact source filename and upload timestamp used for each canonical artifact.
-- The reflection remains retrievable in Library by exact filename and size, but the current backend does not expose a raw-byte clone/materialization path for that Project file. Its missing SHA-256 is therefore an explicit open evidence item, not hidden uncertainty.
+- The reflection remains retrievable in Library as exact file `file_000000006154820d8689de4f81ee8784`, version `1`, filename `Reflectie_Supa_Zennay_500858050.pdf`, size 36,056 bytes. The current backend still does not expose an authorized raw-byte clone/materialization path for that Project file. Its missing SHA-256 is therefore an explicit open evidence item, not hidden uncertainty.
 
 ## Continuation rule
 
@@ -31,7 +31,7 @@ When a future worker needs graduation evidence:
 1. read `evidence/graduation/manifest.v1.json`;
 2. retrieve the canonical Library copies by exact path/filename;
 3. verify SHA-256 before using the Design Rationale or Productbiografie as exact evidence;
-4. for the reflection, retrieve `Reflectie_Supa_Zennay_500858050.pdf` by exact filename and confirm 36,056 bytes until a byte-verifiable canonical copy exists;
+4. for the reflection, retrieve file `file_000000006154820d8689de4f81ee8784` version `1` (filename `Reflectie_Supa_Zennay_500858050.pdf`) and confirm 36,056 bytes until a byte-verifiable canonical copy exists;
 5. never replace these with a similarly named historical duplicate without updating the manifest and documenting why.
 
 This closes the chat-dependency part of M0 continuity while keeping the unresolved reflection byte-integrity gap explicit.
