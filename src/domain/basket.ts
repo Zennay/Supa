@@ -186,6 +186,20 @@ export function buildOneStoreBasket({
 
     const product = matchedProducts[0]
 
+    if (typeof product.id !== 'string' || !product.id.trim()) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: [
+          ...decision.reasons,
+          'matched product identity is blank or malformed',
+        ],
+        matchScore: decision.score,
+      }
+    }
+
     const packCount = product.packCount ?? 1
     const required = baseAmount(ingredient.amount, ingredient.unit)
     const pack =
