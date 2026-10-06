@@ -116,6 +116,23 @@ test('reviewed fixtures require explicit review identity and timestamp', () => {
   )
 })
 
+test('reviewed fixtures reject malformed review timestamps', () => {
+  for (const reviewedAt of [
+    '2026-02-30T02:05:00.000Z',
+    '2026-13-04T02:05:00.000Z',
+    '10/04/2026 02:05:00',
+  ]) {
+    const reviewed = fixture('ah')
+    reviewed.review.reviewedAt = reviewedAt
+
+    assert.throws(
+      () => validateReviewedLiveProductFixture(reviewed, 'ah'),
+      /valid reviewedAt/,
+      reviewedAt,
+    )
+  }
+})
+
 test('reviewed fixtures reject reviews that predate the captured evidence', () => {
   const reviewed = fixture('ah')
   reviewed.review.reviewedAt = '2026-10-04T01:59:59.999Z'
