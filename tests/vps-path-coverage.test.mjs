@@ -30,6 +30,14 @@ test('permanent VPS mobile validation still runs the locked full test/build cont
   assert.match(workflow, /^\s*- run: npm test\s*$/m)
   assert.match(workflow, /^\s*- run: npm run build\s*$/m)
   assert.match(workflow, /vps-bb300bba/)
+
+  for (const path of ['package.json', 'package-lock.json', 'vite.config.*', 'tsconfig*.json']) {
+    assert.equal(
+      hasQuotedPathTrigger(workflow, path),
+      true,
+      `permanent VPS mobile validation must trigger when ${path} changes`,
+    )
+  }
 })
 
 test('rendered M2 proof watches every domain dependency in the planner-to-list route', async () => {
@@ -45,6 +53,10 @@ test('rendered M2 proof watches every domain dependency in the planner-to-list r
     'src/domain/planner.ts',
     'src/domain/plannerPreferences.ts',
     'src/domain/types.ts',
+    'package.json',
+    'package-lock.json',
+    'vite.config.*',
+    'tsconfig*.json',
   ]
 
   for (const path of requiredRoutePaths) {
