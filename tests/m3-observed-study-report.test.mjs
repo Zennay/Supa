@@ -150,6 +150,19 @@ test('M3 observed input preflight rejects inconsistent observed line money', () 
   )
 })
 
+test('M3 observed input preflight rejects duplicate ingredient ids', () => {
+  const study = observedStudy()
+  study.baseline.basket.lines[1] = {
+    ...study.baseline.basket.lines[1],
+    id: study.baseline.basket.lines[0].id,
+  }
+
+  assert.throws(
+    () => validateObservedWeekInput(study),
+    /baseline\.basket\.lines must contain unique ingredient ids/,
+  )
+})
+
 test('M3 observed input preflight rejects a basket total that disagrees with line totals', () => {
   const study = observedStudy()
   study.candidate.basket.totalCents += 1
