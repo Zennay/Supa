@@ -8,32 +8,133 @@ type ShoppingListProgress = {
   doneLineIds: string[]
 }
 
+const matchUnits = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
+
+type ShoppingListBasketState = {
+  basketKey: string
+  validIds: Set<string>
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isCanonicalIdentity(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value === value.trim()
+  )
+}
+
+function isMatchUnit(value: unknown): value is string {
+  return typeof value === 'string' && matchUnits.has(value)
+}
+
+function isPositiveFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= 0
+  )
+}
+
+function projectBasketLine(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value) || !isCanonicalIdentity(value.id)) return null
+  if (!isRecord(value.requirement) || !isMatchUnit(value.requirement.unit)) {
+    return null
+  }
+
+  if (value.status === 'unresolved') {
+    if (
+      value.requirement.amount !== null &&
+      !isPositiveFiniteNumber(value.requirement.amount)
+    ) {
+      return null
+    }
+
+    return {
+      id: value.id,
+      status: value.status,
+      amount: value.requirement.amount,
+      unit: value.requirement.unit,
+    }
+  }
+
+  if (value.status !== 'matched') return null
+  if (
+    !isPositiveFiniteNumber(value.requirement.amount) ||
+    !isCanonicalIdentity(value.productId) ||
+    !isNonNegativeSafeInteger(value.packs) ||
+    value.packs === 0 ||
+    !isRecord(value.pack) ||
+    !isPositiveFiniteNumber(value.pack.amount) ||
+    !isMatchUnit(value.pack.unit) ||
+    !isPositiveFiniteNumber(value.pack.count) ||
+    !isNonNegativeSafeInteger(value.pricePerPackCents) ||
+    !isNonNegativeSafeInteger(value.lineTotalCents)
+  ) {
+    return null
+  }
+
+  return {
+    id: value.id,
+    status: value.status,
+    amount: value.requirement.amount,
+    unit: value.requirement.unit,
+    productId: value.productId,
+    packs: value.packs,
+    packAmount: value.pack.amount,
+    packUnit: value.pack.unit,
+    packCount: value.pack.count,
+    pricePerPackCents: value.pricePerPackCents,
+    lineTotalCents: value.lineTotalCents,
+  }
+}
+
+function shoppingListBasketState(basket: unknown): ShoppingListBasketState | null {
+  if (
+    !isRecord(basket) ||
+    !isRecord(basket.store) ||
+    !isCanonicalIdentity(basket.store.id) ||
+    !Array.isArray(basket.lines)
+  ) {
+    return null
+  }
+
+  const validIds = new Set<string>()
+  const lines: Record<string, unknown>[] = []
+
+  for (const value of basket.lines) {
+    const line = projectBasketLine(value)
+    if (!line || typeof line.id !== 'string' || validIds.has(line.id)) {
+      return null
+    }
+
+    validIds.add(line.id)
+    lines.push(line)
+  }
+
+  return {
+    basketKey: JSON.stringify({
+      storeId: basket.store.id,
+      lines,
+    }),
+    validIds,
+  }
+}
+
 export function shoppingListBasketKey(basket: OneStoreBasket): string {
-  return JSON.stringify({
-    storeId: basket.store.id,
-    lines: basket.lines.map((line) =>
-      line.status === 'matched'
-        ? {
-            id: line.id,
-            status: line.status,
-            amount: line.requirement.amount,
-            unit: line.requirement.unit,
-            productId: line.productId,
-            packs: line.packs,
-            packAmount: line.pack.amount,
-            packUnit: line.pack.unit,
-            packCount: line.pack.count,
-            pricePerPackCents: line.pricePerPackCents,
-            lineTotalCents: line.lineTotalCents,
-          }
-        : {
-            id: line.id,
-            status: line.status,
-            amount: line.requirement.amount,
-            unit: line.requirement.unit,
-          },
-    ),
-  })
+  const state = shoppingListBasketState(basket)
+  if (!state) {
+    throw new Error('Invalid shopping list basket runtime shape')
+  }
+
+  return state.basketKey
 }
 
 export function restoreShoppingListProgress(
@@ -43,23 +144,26 @@ export function restoreShoppingListProgress(
   if (!raw) return []
 
   try {
+    const basketState = shoppingListBasketState(basket)
+    if (!basketState) return []
+
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return []
 
     const candidate = parsed as Partial<ShoppingListProgress>
     if (
       candidate.schemaVersion !== 1 ||
-      candidate.basketKey !== shoppingListBasketKey(basket) ||
+      candidate.basketKey !== basketState.basketKey ||
       !Array.isArray(candidate.doneLineIds)
     ) {
       return []
     }
 
-    const validIds = new Set(basket.lines.map((line) => line.id))
     return Array.from(
       new Set(
         candidate.doneLineIds.filter(
-          (id): id is string => typeof id === 'string' && validIds.has(id),
+          (id): id is string =>
+            typeof id === 'string' && basketState.validIds.has(id),
         ),
       ),
     )
@@ -72,19 +176,24 @@ export function serializeShoppingListProgress(
   basket: OneStoreBasket,
   doneLineIds: unknown,
 ): string {
-  const validIds = new Set(basket.lines.map((line) => line.id))
+  const basketState = shoppingListBasketState(basket)
+  if (!basketState) {
+    throw new Error('Invalid shopping list basket runtime shape')
+  }
+
   const runtimeDoneLineIds = Array.isArray(doneLineIds) ? doneLineIds : []
   const safeDoneLineIds = Array.from(
     new Set(
       runtimeDoneLineIds.filter(
-        (id): id is string => typeof id === 'string' && validIds.has(id),
+        (id): id is string =>
+          typeof id === 'string' && basketState.validIds.has(id),
       ),
     ),
   )
 
   return JSON.stringify({
     schemaVersion: 1,
-    basketKey: shoppingListBasketKey(basket),
+    basketKey: basketState.basketKey,
     doneLineIds: safeDoneLineIds,
   } satisfies ShoppingListProgress)
 }
