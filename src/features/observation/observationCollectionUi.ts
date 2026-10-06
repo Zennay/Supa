@@ -31,11 +31,13 @@ export function observationTimestampFromDate(value: Date): string {
 
 export function observationPriceCents(value: string): number | null {
   const normalized = value.trim().replace(',', '.')
-  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(normalized)
-  if (!match) return null
+  if (!/^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(normalized)) {
+    return null
+  }
 
-  const euros = Number(match[1])
-  const fractionalCents = Number((match[2] ?? '').padEnd(2, '0'))
+  const [eurosPart, fractionalPart = ''] = normalized.split('.')
+  const euros = eurosPart === '' ? 0 : Number(eurosPart)
+  const fractionalCents = Number(fractionalPart.padEnd(2, '0'))
   const cents = euros * 100 + fractionalCents
 
   return Number.isSafeInteger(euros) && Number.isSafeInteger(cents)
