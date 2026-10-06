@@ -1,4 +1,4 @@
-import { statPillAccessibleLabel } from './statPillPresentation'
+import { statPillPresentation } from './statPillPresentation'
 
 type Props = {
   label: string
@@ -6,15 +6,17 @@ type Props = {
 }
 
 export function StatPill({ label, value }: Props) {
+  const presentation = statPillPresentation(label, value)
+
   return (
     <div
       className="stat-pill"
       role="group"
-      aria-label={statPillAccessibleLabel(label, value)}
-      data-stat-label={label}
+      aria-label={presentation.accessibleLabel}
+      data-stat-label={presentation.label}
     >
-      <span aria-hidden="true">{label}</span>
-      <strong aria-hidden="true">{value}</strong>
+      <span aria-hidden="true">{presentation.label}</span>
+      <strong aria-hidden="true">{presentation.value}</strong>
     </div>
   )
 }
