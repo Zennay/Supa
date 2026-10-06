@@ -50,7 +50,9 @@ const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const TIMESTAMP_PATTERN =
   /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
 
-function validCalendarDate(value: string) {
+function validCalendarDate(value: unknown) {
+  if (typeof value !== 'string') return false
+
   const match = DATE_PATTERN.exec(value)
   if (!match) return false
 
@@ -66,7 +68,9 @@ function validCalendarDate(value: string) {
   )
 }
 
-function validTimestamp(value: string) {
+function validTimestamp(value: unknown) {
+  if (typeof value !== 'string') return null
+
   const match = TIMESTAMP_PATTERN.exec(value)
   if (!match || !validCalendarDate(match[1])) return null
 
@@ -93,15 +97,24 @@ function validateEvidence(
 ) {
   const reasons: string[] = []
 
-  if (!KEY_PATTERN.test(evidence.evidenceId)) {
+  if (
+    typeof evidence.evidenceId !== 'string' ||
+    !KEY_PATTERN.test(evidence.evidenceId)
+  ) {
     reasons.push(`${label} evidenceId is not a path-safe evidence key`)
   }
 
-  if (!['manual-cart', 'receipt', 'consented-export'].includes(evidence.source)) {
+  if (
+    typeof evidence.source !== 'string' ||
+    !['manual-cart', 'receipt', 'consented-export'].includes(evidence.source)
+  ) {
     reasons.push(`${label} evidence source is not an allowed observed source`)
   }
 
-  if (!evidence.provenanceNote.trim()) {
+  if (
+    typeof evidence.provenanceNote !== 'string' ||
+    !evidence.provenanceNote.trim()
+  ) {
     reasons.push(`${label} evidence provenance note is required`)
   }
 
@@ -150,16 +163,22 @@ export function assessWeeklyBasketStudy(
   if (study.schemaVersion !== 1) {
     reasons.push('unsupported study schema version')
   }
-  if (!KEY_PATTERN.test(study.studyId)) {
+  if (
+    typeof study.studyId !== 'string' ||
+    !KEY_PATTERN.test(study.studyId)
+  ) {
     reasons.push('studyId is not a path-safe study key')
   }
-  if (!KEY_PATTERN.test(study.participantKey)) {
+  if (
+    typeof study.participantKey !== 'string' ||
+    !KEY_PATTERN.test(study.participantKey)
+  ) {
     reasons.push('participantKey must be a pseudonymous path-safe key')
   }
-  if (!study.population.trim()) {
+  if (typeof study.population !== 'string' || !study.population.trim()) {
     reasons.push('population is required')
   }
-  if (!study.region.trim()) {
+  if (typeof study.region !== 'string' || !study.region.trim()) {
     reasons.push('region is required')
   }
   if (!validCalendarDate(study.weekStart)) {
