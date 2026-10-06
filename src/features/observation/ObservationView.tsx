@@ -98,6 +98,7 @@ export function ObservationView() {
   const [resetArmed, setResetArmed] = useState(false)
   const [pendingImport, setPendingImport] = useState<ObservationSheet | null>(null)
   const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
+  const [resetPersistenceFailed, setResetPersistenceFailed] = useState(false)
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
   const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
   const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
@@ -107,13 +108,13 @@ export function ObservationView() {
   )
 
   useEffect(() => {
-    setDraftPersistenceFailed(
-      !persistObservationDraft(
-        () => window.localStorage,
-        OBSERVATION_DRAFT_STORAGE_KEY,
-        sheet,
-      ),
+    const persisted = persistObservationDraft(
+      () => window.localStorage,
+      OBSERVATION_DRAFT_STORAGE_KEY,
+      sheet,
     )
+    setDraftPersistenceFailed(!persisted)
+    if (persisted) setResetPersistenceFailed(false)
   }, [sheet])
 
   useEffect(() => {
@@ -131,18 +132,27 @@ export function ObservationView() {
       return
     }
 
-    try {
-      window.localStorage.removeItem(OBSERVATION_DRAFT_STORAGE_KEY)
-    } catch {
-      // Keep reset usable even when storage is unavailable.
-    }
-    setSheet(buildObservationSheet())
+    const fresh = buildObservationSheet()
+    const persisted = persistObservationDraft(
+      () => window.localStorage,
+      OBSERVATION_DRAFT_STORAGE_KEY,
+      fresh,
+    )
+
+    setDraftPersistenceFailed(!persisted)
+    setResetPersistenceFailed(!persisted)
+    setSheet(fresh)
     setResetArmed(false)
     setPendingImport(null)
-    setImportStatus({
-      kind: 'success',
-      message: 'Lokaal concept gewist. Er is een nieuwe lege M3-meting gestart.',
-    })
+    setImportStatus(
+      persisted
+        ? {
+            kind: 'success',
+            message:
+              'Lokaal concept gewist. Er is een nieuwe lege M3-meting gestart.',
+          }
+        : null,
+    )
   }
 
   const jumpToNextIncomplete = () => {
@@ -816,7 +826,15 @@ export function ObservationView() {
         </button>
       </div>
 
-      {draftPersistenceFailed && (
+      {resetPersistenceFailed && (
+        <p className="observation-import-status is-warning" role="status">
+          Het scherm is gewist, maar de eerder opgeslagen lokale kopie kon niet
+          veilig worden overschreven. Herlaad de pagina nog niet en probeer
+          opnieuw zodra lokale opslag beschikbaar is.
+        </p>
+      )}
+
+      {draftPersistenceFailed && !resetPersistenceFailed && (
         <p className="observation-import-status is-warning" role="status">
           Automatisch bewaren is mislukt. Bewaar dit concept handmatig als JSON
           voordat je deze pagina sluit.
