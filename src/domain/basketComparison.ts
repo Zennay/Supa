@@ -76,7 +76,9 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
     expectedPacks !== line.packs ||
     !Number.isSafeInteger(expectedLineTotalCents) ||
     expectedLineTotalCents !== line.lineTotalCents ||
-    !Number.isFinite(line.matchScore)
+    !Number.isSafeInteger(line.matchScore) ||
+    line.matchScore < 65 ||
+    line.matchScore > 110
   )
 }
 
