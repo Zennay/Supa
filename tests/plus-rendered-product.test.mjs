@@ -53,3 +53,42 @@ test('PLUS rendered evidence refuses unsafe acquisition metadata', async () => {
     reason: 'PLUS rendered evidence violates the bounded browser safety contract',
   })
 })
+
+
+test('PLUS rendered product rejects unsafe integer browser metadata', async () => {
+  const original = await fixture()
+
+  for (const field of ['runId', 'artifactId']) {
+    const evidence = structuredClone(original)
+    evidence.browserEvidence[field] = Number.MAX_SAFE_INTEGER + 1
+
+    assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence provenance does not match browser artifact',
+    })
+  }
+})
+
+test('PLUS rendered product rejects incomplete source and browser provenance', async () => {
+  const badHost = await fixture()
+  badHost.source.url = 'https://example.com/product/579010'
+  badHost.browserEvidence.finalUrl = badHost.source.url
+  assert.deepEqual(parsePlusRenderedProductEvidence(badHost), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence source provenance is incomplete',
+  })
+
+  const badTimestamp = await fixture()
+  badTimestamp.source.capturedAt = 'not-a-timestamp'
+  assert.deepEqual(parsePlusRenderedProductEvidence(badTimestamp), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence source provenance is incomplete',
+  })
+
+  const badDigest = await fixture()
+  badDigest.browserEvidence.artifactDigest = 'sha256:not-a-digest'
+  assert.deepEqual(parsePlusRenderedProductEvidence(badDigest), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence provenance does not match browser artifact',
+  })
+})
