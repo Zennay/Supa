@@ -221,6 +221,39 @@ try {
   assert.match(observationText, /0\/22 regels compleet/)
   assert.match(observationText, /collection-template-not-evidence/)
   assert.match(observationText, /JSON-concept openen/)
+  assert.match(observationText, /Volgende: PLUS · Basmati rijst/)
+
+  const observationQuickEntry = await execute(
+    sessionId,
+    `
+      const baseline = document.querySelector('[data-observation-side="baseline"]')
+      const candidate = document.querySelector('[data-observation-side="candidate"]')
+      const nowButton = baseline
+        ? [...baseline.querySelectorAll('button')].find(
+            (button) => button.textContent?.trim() === 'Gebruik huidige tijd',
+          )
+        : null
+      const timeInput = baseline?.querySelector('input[type="datetime-local"]')
+      const candidateStoreId = candidate?.querySelector(
+        'input[placeholder="dekamarkt-leiden-..."]',
+      )
+      if (!nowButton || !timeInput || !candidateStoreId) return null
+      nowButton.click()
+      return {
+        timestamp: timeInput.value,
+        candidateStoreIdHint: candidateStoreId.getAttribute('placeholder'),
+      }
+    `,
+  )
+  assert.ok(observationQuickEntry, 'M3 quick-entry controls are missing')
+  assert.match(
+    observationQuickEntry.timestamp,
+    /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}/,
+  )
+  assert.equal(
+    observationQuickEntry.candidateStoreIdHint,
+    'dekamarkt-leiden-...',
+  )
 
   const incompleteObservationChanged = await execute(
     sessionId,
@@ -321,13 +354,36 @@ try {
     'M3 observation availability could not be recorded',
   )
   observationText = await waitForText(sessionId, '1/22 regels compleet')
+  observationText = await waitForText(sessionId, 'Volgende: PLUS · Broccoli')
   assert.match(observationText, /Basmati rijst/)
+
+  const jumpedToNextObservation = await execute(
+    sessionId,
+    `
+      const baseline = document.querySelector('[data-observation-side="baseline"]')
+      const basmati = baseline?.querySelector('[data-observation-line="basmati-rice"]')
+      const nextButton = basmati?.querySelector('button.observation-line-next')
+      if (!nextButton || nextButton.disabled) return false
+      nextButton.click()
+      const broccoli = baseline.querySelector('[data-observation-line="broccoli"]')
+      const focused = document.activeElement?.getAttribute('aria-label')
+      return Boolean(
+        broccoli?.open &&
+          focused === 'baseline Broccoli beschikbaar',
+      )
+    `,
+  )
+  assert.equal(
+    jumpedToNextObservation,
+    true,
+    'completed M3 line did not jump focus to the next open observation',
+  )
   await screenshot(sessionId, 'm3-observation-entry.png')
   evidence.checks.push({
     step: 'm3-observation-entry',
     passed: true,
     observed:
-      'rendered M3 collector exposes the canonical 22 store/ingredient observations and records explicit unavailable state without inventing product data',
+      'rendered M3 collector exposes the canonical 22 store/ingredient observations, supports one-tap timestamps, uses retailer-specific store hints and jumps from a completed line to the next open observation',
   })
 
   await clickNav(sessionId, 'Planner')
