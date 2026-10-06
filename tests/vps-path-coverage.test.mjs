@@ -34,7 +34,11 @@ test('permanent VPS mobile validation still runs the locked full test/build cont
 
 test('rendered M2 proof watches every domain dependency in the planner-to-list route', async () => {
   const workflow = await readFile('.github/workflows/m2-vps-e2e.yml', 'utf8')
-  const requiredDomainPaths = [
+  const requiredRoutePaths = [
+    'src/main.tsx',
+    'src/styles.css',
+    'src/components/**',
+    'src/lib/**',
     'src/domain/basket.ts',
     'src/domain/basketComparison.ts',
     'src/domain/matching.ts',
@@ -43,7 +47,7 @@ test('rendered M2 proof watches every domain dependency in the planner-to-list r
     'src/domain/types.ts',
   ]
 
-  for (const path of requiredDomainPaths) {
+  for (const path of requiredRoutePaths) {
     assert.equal(
       hasQuotedPathTrigger(workflow, path),
       true,
