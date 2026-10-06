@@ -3,12 +3,15 @@ export type ObservationDraftStorage = {
 }
 
 export function persistObservationDraft(
-  storage: ObservationDraftStorage,
+  getStorage: () => ObservationDraftStorage,
   key: string,
   draft: unknown,
 ): boolean {
   try {
-    storage.setItem(key, JSON.stringify(draft))
+    const serialized = JSON.stringify(draft)
+    if (typeof serialized !== 'string') return false
+
+    getStorage().setItem(key, serialized)
     return true
   } catch {
     return false
