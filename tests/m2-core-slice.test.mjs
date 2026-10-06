@@ -206,6 +206,25 @@ test('duplicate recipe IDs fail instead of silently selecting one definition', (
   )
 })
 
+test('missing active planned days fail instead of producing a partial basket', () => {
+  const missingDay = m2DefaultActiveDays[m2DefaultActiveDays.length - 1]
+  assert.ok(missingDay)
+
+  const incompletePlan = m2InitialPlan.filter((meal) => meal.day !== missingDay)
+
+  assert.throws(
+    () =>
+      buildOneStoreBasket({
+        store: m2Store,
+        plan: incompletePlan,
+        recipes: m2Recipes,
+        activeDays: m2DefaultActiveDays,
+        products: m2Products,
+      }),
+    /Missing planned meal for active day/,
+  )
+})
+
 test('duplicate active planned days fail instead of double-counting basket demand', () => {
   const duplicateDayPlan = [
     { day: 'Ma', recipeId: 'tikka' },
