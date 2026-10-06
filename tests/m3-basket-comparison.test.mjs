@@ -128,6 +128,37 @@ test('M3 returns unknown when the compared baskets represent different meal dema
   )
 })
 
+test('M3 returns unknown when baseline and candidate use the same store', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(baselineStore, -10)
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.savingsCents, null)
+  assert.match(comparison.reasons.join(' '), /baseline and candidate stores must differ/)
+})
+
+test('M3 returns unknown when an ingredient id maps to a different label', () => {
+  const baseline = buildCompleteBasket(baselineStore, 0)
+  const candidate = buildCompleteBasket(candidateStore, -10)
+  const matchedIndex = candidate.lines.findIndex((line) => line.status === 'matched')
+  assert.ok(matchedIndex >= 0)
+
+  candidate.lines[matchedIndex] = {
+    ...candidate.lines[matchedIndex],
+    ingredientLabel: `${candidate.lines[matchedIndex].ingredientLabel} gewijzigd`,
+  }
+
+  const comparison = compareFullBaskets({ baseline, candidate })
+
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+  assert.equal(comparison.savingsCents, null)
+  assert.match(comparison.reasons.join(' '), /ingredient label differs/)
+})
+
 test('M3 records a neutral result when comparable baskets cost the same', () => {
   const baseline = buildCompleteBasket(baselineStore, 0)
   const candidate = buildCompleteBasket(candidateStore, 0)
