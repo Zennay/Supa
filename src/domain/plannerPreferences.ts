@@ -8,6 +8,43 @@ export type PlannerPreferences = {
   recipeByDay: Record<string, string>
 }
 
+function isCanonicalIdentity(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value === value.trim()
+  )
+}
+
+function canonicalizeDefaultPlan(defaultPlan: unknown): PlannedMeal[] | null {
+  if (!Array.isArray(defaultPlan)) return null
+
+  const canonicalPlan: PlannedMeal[] = []
+  const seenDays = new Set<string>()
+
+  for (const entry of defaultPlan) {
+    if (!entry || typeof entry !== 'object') return null
+
+    const { day, recipeId } = entry as {
+      day?: unknown
+      recipeId?: unknown
+    }
+
+    if (
+      !isCanonicalIdentity(day) ||
+      !isCanonicalIdentity(recipeId) ||
+      seenDays.has(day)
+    ) {
+      return null
+    }
+
+    seenDays.add(day)
+    canonicalPlan.push({ day, recipeId })
+  }
+
+  return canonicalPlan
+}
+
 export function defaultPlannerPreferences(
   defaultPlan: PlannedMeal[],
   fallbackBudget = 35,
@@ -15,11 +52,13 @@ export function defaultPlannerPreferences(
   const safeFallbackBudget =
     Number.isFinite(fallbackBudget) && fallbackBudget > 0 ? fallbackBudget : 35
 
+  const canonicalPlan = canonicalizeDefaultPlan(defaultPlan) ?? []
+
   return {
     budget: safeFallbackBudget,
-    activeDays: defaultPlan.map((meal) => meal.day),
+    activeDays: canonicalPlan.map((meal) => meal.day),
     recipeByDay: Object.fromEntries(
-      defaultPlan.map((meal) => [meal.day, meal.recipeId]),
+      canonicalPlan.map((meal) => [meal.day, meal.recipeId]),
     ),
   }
 }
@@ -41,7 +80,11 @@ export function parsePlannerPreferences(
   const safeFallbackBudget = supportedBudgets.includes(fallbackBudget)
     ? fallbackBudget
     : (supportedBudgets[0] ?? 35)
-  const fallback = defaultPlannerPreferences(defaultPlan, safeFallbackBudget)
+  const canonicalDefaultPlan = canonicalizeDefaultPlan(defaultPlan) ?? []
+  const fallback = defaultPlannerPreferences(
+    canonicalDefaultPlan,
+    safeFallbackBudget,
+  )
   if (!raw) return fallback
 
   try {
@@ -53,7 +96,7 @@ export function parsePlannerPreferences(
       activeDays?: unknown
       recipeByDay?: unknown
     }
-    const canonicalDays = Array.from(new Set(defaultPlan.map((meal) => meal.day)))
+    const canonicalDays = canonicalDefaultPlan.map((meal) => meal.day)
     const validDays = new Set(canonicalDays)
     const validRecipes = new Set(validRecipeIds)
     const supportedBudgetSet = new Set(supportedBudgets)
@@ -90,7 +133,7 @@ export function parsePlannerPreferences(
         : {}
 
     const recipeByDay = Object.fromEntries(
-      defaultPlan.map((meal) => {
+      canonicalDefaultPlan.map((meal) => {
         const persisted = persistedRecipes[meal.day]
         return [
           meal.day,

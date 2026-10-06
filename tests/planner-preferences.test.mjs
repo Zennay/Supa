@@ -228,3 +228,51 @@ test('M2 planner preferences fail closed on invalid caller fallbacks', () => {
   )
   assert.equal(malformedContractFallback.budget, 40)
 })
+
+
+test('M2 planner preferences fail closed on duplicate default day identities', () => {
+  const ambiguousPlan = [
+    { day: 'Ma', recipeId: 'tikka' },
+    { day: 'Ma', recipeId: 'pasta' },
+  ]
+
+  const expected = {
+    budget: 35,
+    activeDays: [],
+    recipeByDay: {},
+  }
+
+  assert.deepEqual(defaultPlannerPreferences(ambiguousPlan), expected)
+  assert.deepEqual(
+    parsePlannerPreferences(null, ambiguousPlan, recipeIds),
+    expected,
+  )
+})
+
+test('M2 planner preferences fail closed on non-canonical or malformed defaults', () => {
+  const malformedPlans = [
+    [{ day: ' Ma', recipeId: 'tikka' }],
+    [{ day: 'Ma ', recipeId: 'tikka' }],
+    [{ day: 'Ma', recipeId: ' tikka' }],
+    [{ day: 'Ma', recipeId: 'tikka ' }],
+    [{ day: '', recipeId: 'tikka' }],
+    [{ day: 'Ma', recipeId: '' }],
+    [null],
+  ]
+
+  for (const malformedPlan of malformedPlans) {
+    assert.deepEqual(defaultPlannerPreferences(malformedPlan), {
+      budget: 35,
+      activeDays: [],
+      recipeByDay: {},
+    })
+    assert.deepEqual(
+      parsePlannerPreferences(null, malformedPlan, recipeIds),
+      {
+        budget: 35,
+        activeDays: [],
+        recipeByDay: {},
+      },
+    )
+  }
+})
