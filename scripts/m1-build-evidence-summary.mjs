@@ -43,6 +43,13 @@ function candidateIndex(index) {
   const candidateIds = candidateItems
     .map((item) => item?.id)
     .filter((id) => isSafeSourceId(id))
+  const candidateEntriesValid = candidateItems.every(
+    (item) =>
+      isSafeSourceId(item?.id) &&
+      item?.file === `${item.id}.json` &&
+      typeof item?.candidateSha256 === 'string' &&
+      /^[a-f0-9]{64}$/.test(item.candidateSha256),
+  )
   const abstentionIds = abstentionItems
     .map((item) => item?.id)
     .filter((id) => isSafeSourceId(id))
@@ -56,7 +63,8 @@ function candidateIndex(index) {
       Array.isArray(index?.candidates) &&
       Array.isArray(index?.abstentions) &&
       candidateIds.length === candidateItems.length &&
-      abstentionIds.length === abstentionItems.length,
+      abstentionIds.length === abstentionItems.length &&
+      candidateEntriesValid,
     milestoneMatches: index?.milestone === 'M1 Data Feasibility',
     countsMatch:
       index?.candidateCount === candidateItems.length &&
