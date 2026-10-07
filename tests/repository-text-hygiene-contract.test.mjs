@@ -44,12 +44,16 @@ function assertEditorConfigDefaults(source) {
     1,
     'expected exactly one global [*] EditorConfig section',
   )
-  assert.deepEqual(values(null, 'root'), ['true'])
-  assert.deepEqual(values('*', 'charset'), ['utf-8'])
-  assert.deepEqual(values('*', 'end_of_line'), ['lf'])
-  assert.deepEqual(values('*', 'insert_final_newline'), ['true'])
-  assert.deepEqual(values('*', 'indent_style'), [])
-  assert.deepEqual(values('*', 'indent_size'), [])
+  assert.deepEqual(values(null, 'root'), ['true'], 'root must appear exactly once as true')
+  assert.deepEqual(values('*', 'charset'), ['utf-8'], 'charset must appear exactly once as utf-8')
+  assert.deepEqual(values('*', 'end_of_line'), ['lf'], 'end_of_line must appear exactly once as lf')
+  assert.deepEqual(
+    values('*', 'insert_final_newline'),
+    ['true'],
+    'insert_final_newline must appear exactly once as true',
+  )
+  assert.deepEqual(values('*', 'indent_style'), [], 'global indent_style policy is forbidden')
+  assert.deepEqual(values('*', 'indent_size'), [], 'global indent_size policy is forbidden')
 }
 
 test('repository text checkouts are normalized to LF without forcing binary files to text', () => {
