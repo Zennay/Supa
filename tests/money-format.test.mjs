@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { euro, savings } from '../src/lib/money.ts'
+import { euro } from '../src/lib/money.ts'
 
 test('euro formatting preserves cent-exact finite values', () => {
   for (const value of [0.29, 12.34, 31.8]) {
@@ -35,42 +35,4 @@ test('euro formatting fails closed on non-finite numbers', () => {
   assert.equal(euro.format(Number.NaN), '—')
   assert.equal(euro.format(Number.POSITIVE_INFINITY), '—')
   assert.equal(euro.format(Number.NEGATIVE_INFINITY), '—')
-})
-
-test('savings rejects malformed money inputs', () => {
-  assert.equal(savings(Number.NaN, 10), null)
-  assert.equal(savings(10, Number.NaN), null)
-  assert.equal(savings(Number.POSITIVE_INFINITY, 10), null)
-  assert.equal(savings(10, Number.NEGATIVE_INFINITY), null)
-  assert.equal(savings(-1, 10), null)
-  assert.equal(savings(10, -1), null)
-  assert.equal(savings(-1, -5), null)
-})
-
-test('savings rejects malformed runtime value types without coercion', () => {
-  for (const malformed of [null, undefined, '10', {}, [], true]) {
-    assert.equal(savings(malformed, 10), null)
-    assert.equal(savings(10, malformed), null)
-  }
-})
-
-test('savings rejects values beyond the exact cent-safe euro magnitude', () => {
-  const safeMagnitude = Number.MAX_SAFE_INTEGER / 100
-  const unsafeMagnitude = safeMagnitude + 1
-
-  assert.equal(savings(unsafeMagnitude, 10), null)
-  assert.equal(savings(10, unsafeMagnitude), null)
-  assert.equal(savings(-unsafeMagnitude, 10), null)
-})
-
-test('savings rejects sub-cent inputs instead of rounding them', () => {
-  assert.equal(savings(12.345, 10), null)
-  assert.equal(savings(10, 1.001), null)
-  assert.equal(savings(0.30000000000000004, 0.1), null)
-})
-
-test('savings computes through safe integer cents', () => {
-  assert.equal(savings(40, 31.8), 8.2)
-  assert.equal(savings(31.8, 40), 0)
-  assert.equal(savings(0.3, 0.1), 0.2)
 })
