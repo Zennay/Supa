@@ -3,12 +3,18 @@ const euroFormatter = new Intl.NumberFormat('nl-NL', {
   currency: 'EUR',
 })
 
+const MAX_SAFE_EURO_MAGNITUDE = Number.MAX_SAFE_INTEGER / 100
+
 export const euro = {
   format(value: number | bigint) {
     if (typeof value === 'bigint') {
       return euroFormatter.format(value)
     }
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
+    if (
+      typeof value !== 'number' ||
+      !Number.isFinite(value) ||
+      Math.abs(value) > MAX_SAFE_EURO_MAGNITUDE
+    ) {
       return '—'
     }
 
