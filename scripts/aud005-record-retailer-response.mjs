@@ -10,6 +10,7 @@ const OUTCOMES = new Set([
   'licensed-route-required',
   'research-only',
   'denied',
+  'no-suitable-route',
   'unclear',
   'routed',
 ])

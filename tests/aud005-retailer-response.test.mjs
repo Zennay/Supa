@@ -52,6 +52,20 @@ test('AUD-005 response validator emits privacy-safe bounded evidence', () => {
   assert.equal(summary.respondentTeam, 'e-commerce product data team')
 })
 
+test('AUD-005 response validator preserves no-suitable-route as non-approval evidence', () => {
+  const record = validRecord()
+  record.outcome = 'no-suitable-route'
+  record.nextOwnerTeam = null
+  record.constraints = ['No licensed, official, or reviewed lawful route is currently available.']
+
+  const summary = buildPrivacySafeRetailerResponse(record)
+
+  assert.equal(summary.outcome, 'no-suitable-route')
+  assert.equal(summary.productionReuseApproved, false)
+  assert.equal(summary.productionReuseApprovalStatus, 'not-approved')
+  assert.equal(summary.publicClaimEligible, false)
+})
+
 test('AUD-005 response validator accepts explicit permission but keeps scope bounded', () => {
   const record = validRecord()
   record.retailer = 'DekaMarkt'
