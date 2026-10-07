@@ -370,6 +370,21 @@ function parseOffersCard(
   }
 }
 
+function hasDuplicateProductIdentity(
+  observations: RawProductObservation[],
+): boolean {
+  const seen = new Set<string>()
+
+  for (const observation of observations) {
+    const sourceProductId = observation.sourceProductId
+    if (!sourceProductId) continue
+    if (seen.has(sourceProductId)) return true
+    seen.add(sourceProductId)
+  }
+
+  return false
+}
+
 export function parsePlusRenderedCatalogEvidence(
   evidence: PlusRenderedCatalogEvidence,
 ): PlusRenderedListingsParseResult {
@@ -388,6 +403,13 @@ export function parsePlusRenderedCatalogEvidence(
     return {
       type: 'abstain',
       reason: 'PLUS rendered catalog yielded no trusted product observations',
+    }
+  }
+
+  if (hasDuplicateProductIdentity(observations)) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered catalog contains duplicate product identities',
     }
   }
 
@@ -416,6 +438,13 @@ export function parsePlusRenderedOffersEvidence(
     return {
       type: 'abstain',
       reason: 'PLUS rendered offers yielded no trusted product observations',
+    }
+  }
+
+  if (hasDuplicateProductIdentity(observations)) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered offers contains duplicate product identities',
     }
   }
 
