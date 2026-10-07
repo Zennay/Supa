@@ -232,3 +232,25 @@ test('DekaMarkt listing evidence rejects non-default ports but accepts canonical
 
   assert.equal(parseDekaMarktSsrCatalogEvidence(explicitDefault).type, 'observations')
 })
+
+test('DekaMarkt listing evidence requires a timezone-bearing capture timestamp', async () => {
+  for (const capturedAt of [
+    '2026-10-04',
+    '2026-10-04T18:15:29.695',
+    '2026-02-30T18:15:29.695Z',
+    '2026-10-04T24:00:00Z',
+    '2026-10-04T18:15:29+24:00',
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    evidence.source.capturedAt = capturedAt
+
+    assert.deepEqual(parseDekaMarktSsrCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence source provenance is incomplete',
+    })
+  }
+
+  const offset = await fixture(catalogUrl)
+  offset.source.capturedAt = '2026-10-04T20:15:29.695+02:00'
+  assert.equal(parseDekaMarktSsrCatalogEvidence(offset).type, 'observations')
+})
