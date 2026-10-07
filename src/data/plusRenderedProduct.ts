@@ -157,7 +157,7 @@ function declaredProductUrl(jsonLd: unknown): DeclaredProductUrl {
   if (products.length !== 1) return { type: 'invalid' }
 
   const raw = products[0].url
-  if (raw === undefined || raw === null) return { type: 'absent' }
+  if (raw === undefined) return { type: 'absent' }
   if (typeof raw !== 'string' || !raw.trim()) return { type: 'invalid' }
 
   return { type: 'value', value: raw.trim() }
