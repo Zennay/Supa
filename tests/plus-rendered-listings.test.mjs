@@ -166,3 +166,24 @@ test('PLUS listing evidence binds catalog and offers kinds to their public route
     reason: 'PLUS rendered evidence must identify a valid catalog source',
   })
 })
+
+
+test('PLUS listing evidence rejects credential-bearing public source URLs', async () => {
+  for (const sourceUrl of [
+    'https://reporter@www.plus.nl/producten',
+    'https://:secret@www.plus.nl/aanbiedingen',
+  ]) {
+    const evidence = await fixture(
+      sourceUrl.endsWith('/aanbiedingen') ? offersUrl : catalogUrl,
+    )
+    evidence.source.url = sourceUrl
+
+    const result =
+      evidence.source.kind === 'offers'
+        ? parsePlusRenderedOffersEvidence(evidence)
+        : parsePlusRenderedCatalogEvidence(evidence)
+
+    assert.equal(result.type, 'abstain')
+    assert.match(result.reason, /must identify a valid (catalog|offers) source/)
+  }
+})
