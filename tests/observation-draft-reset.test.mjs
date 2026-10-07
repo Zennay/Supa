@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-import { removeObservationDraft } from '../src/features/observation/observationDraftPersistence.ts'
+import {\n  persistObservationDraft,\n  removeObservationDraft,\n} from '../src/features/observation/observationDraftPersistence.ts'
 
 const source = await readFile(
   new URL('../src/features/observation/ObservationView.tsx', import.meta.url),
@@ -25,7 +25,6 @@ test('draft removal reports durable storage success and failure explicitly', () 
   assert.deepEqual(removed, ['supa:m3:draft'])
 
   let recovered = false
-  const { persistObservationDraft } = await import('../src/features/observation/observationDraftPersistence.ts')
   assert.equal(
     persistObservationDraft(
       () => ({ setItem() {} }),
