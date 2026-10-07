@@ -91,6 +91,24 @@ test('cross-page evidence corroborates the observed PLUS banana original price',
   assert.equal(offerBananas.currentPriceCents, 99)
 })
 
+test('PLUS listing evidence rejects duplicate trusted product identities', async () => {
+  const catalog = await fixture(catalogUrl)
+  catalog.cards[1].href = catalog.cards[0].href
+
+  assert.deepEqual(parsePlusRenderedCatalogEvidence(catalog), {
+    type: 'abstain',
+    reason: 'PLUS rendered catalog contains duplicate product identities',
+  })
+
+  const offers = await fixture(offersUrl)
+  offers.cards[1].href = offers.cards[0].href
+
+  assert.deepEqual(parsePlusRenderedOffersEvidence(offers), {
+    type: 'abstain',
+    reason: 'PLUS rendered offers contains duplicate product identities',
+  })
+})
+
 test('listing parser fails closed when the observed block marker drifts', async () => {
   const evidence = await fixture(catalogUrl)
   evidence.cards[0].block = 'ProductList.FutureItem'
