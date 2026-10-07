@@ -154,7 +154,7 @@ function findExecutableEmbeddedContent(source, filename = 'candidate.tsx') {
     }
 
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-      const tag = node.tagName.getText(sourceFile).toLowerCase()
+      const tag = node.tagName.getText(sourceFile)
       if (executableTags.has(tag)) {
         finding = {
           kind: 'executable JSX element',
