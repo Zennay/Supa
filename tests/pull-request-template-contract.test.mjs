@@ -22,6 +22,7 @@ test('pull request template requires scope ownership and exact-head validation e
     'checked the current open pull requests',
     'Exact head SHA:',
     'Validation commands executed on that exact head:',
+    'npm audit --audit-level=high',
     'Required gates / run IDs and conclusions:',
     'Hosted CI:',
     'Path-selected permanent workflow(s), if applicable:',
