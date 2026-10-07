@@ -303,7 +303,7 @@ h3, p { margin: 0; }
     min-height: calc(100vh - 48px);
     min-height: calc(100dvh - 48px);
     border-radius: 34px;
-    overflow: hidden;
+    overflow: clip;
     box-shadow: 0 30px 90px rgba(34, 39, 33, .12);
   }
 }
