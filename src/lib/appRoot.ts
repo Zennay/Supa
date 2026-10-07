@@ -1,8 +1,4 @@
-type AppRootDocument = Pick<Document, 'getElementById'>
-
-export function requireAppRoot(documentLike: AppRootDocument): HTMLElement {
-  const root = documentLike.getElementById('root')
-
+export function requireAppRoot(root: HTMLElement | null): HTMLElement {
   if (!root) {
     throw new Error('SUPA app root #root is missing')
   }
