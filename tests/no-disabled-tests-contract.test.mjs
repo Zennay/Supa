@@ -185,28 +185,57 @@ function resolveOptionsObject(argument, bindings) {
   return null
 }
 
-function findPermanentDisableProperty(options, bindings, visited = new Set()) {
-  if (visited.has(options)) return null
-  visited.add(options)
+function resolveFinalOption(options, optionName, bindings, visited = new Set()) {
+  if (visited.has(options)) return { found: false, property: null }
+  const nextVisited = new Set(visited)
+  nextVisited.add(options)
 
-  for (const property of options.properties) {
+  for (let index = options.properties.length - 1; index >= 0; index -= 1) {
+    const property = options.properties[index]
+
     if (ts.isPropertyAssignment(property)) {
       const name = staticName(property.name)
-      if (
-        disabledMemberNames.has(name) &&
-        isPermanentDisableValue(property.initializer)
-      ) {
-        return property
+      if (name === optionName) {
+        return {
+          found: true,
+          property: isPermanentDisableValue(property.initializer) ? property : null,
+        }
+      }
+
+      if (name === null) {
+        return { found: true, property: null }
+      }
+      continue
+    }
+
+    if (ts.isShorthandPropertyAssignment(property)) {
+      if (property.name.text === optionName) {
+        return { found: true, property: null }
       }
       continue
     }
 
     if (ts.isSpreadAssignment(property)) {
       const spreadOptions = resolveOptionsObject(property.expression, bindings)
-      if (!spreadOptions) continue
-      const finding = findPermanentDisableProperty(spreadOptions, bindings, visited)
-      if (finding) return finding
+      if (!spreadOptions) return { found: true, property: null }
+
+      const spreadResult = resolveFinalOption(
+        spreadOptions,
+        optionName,
+        bindings,
+        nextVisited,
+      )
+      if (spreadResult.found) return spreadResult
     }
+  }
+
+  return { found: false, property: null }
+}
+
+function findPermanentDisableProperty(options, bindings) {
+  for (const optionName of disabledMemberNames) {
+    const result = resolveFinalOption(options, optionName, bindings)
+    if (result.property) return result.property
   }
 
   return null
@@ -376,7 +405,10 @@ test('disabled-test guard rejects literal options only on test API calls', () =>
 
   for (const source of [
     "test('case', {skip: false}, () => {})",
-    "test('case', {skip: process.platform === 'win32'}, () => {})",
+    "const disabled = {skip: true}; test('case', {...disabled, skip: false}, () => {})",
+    "const disabled = {skip: true}; const enabled = {skip: false}; test('case', {...disabled, ...enabled}, () => {})",
+    "const disabled = {skip: true}; test('case', {...disabled, ...runtimeOptions}, () => {})",
+    "test('case', {skip: process.platform === 'win32'}, () => {})"
     "test('case', {todo: shouldSkip}, () => {})",
     "test('case', {skip: ''}, () => {})",
     emptyTemplate,
