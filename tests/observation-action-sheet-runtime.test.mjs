@@ -36,6 +36,13 @@ test('observation action label never reports completion from malformed or incomp
     /observation sheet is not complete/,
   )
 
+  const malformedLineSheet = buildObservationSheet()
+  malformedLineSheet.baseline.lines = [null, ...malformedLineSheet.baseline.lines]
+  assert.throws(
+    () => nextObservationActionLabel(malformedLineSheet, null),
+    /invalid observation sheet/,
+  )
+
   const complete = buildObservationSheet()
   for (const side of ['baseline', 'candidate']) {
     complete[side].lines.forEach((line) => {
