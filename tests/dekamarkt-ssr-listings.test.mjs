@@ -162,3 +162,31 @@ test('listing evidence rejects unsafe acquisition metadata', async () => {
     reason: 'DekaMarkt evidence violates the bounded capture contract',
   })
 })
+
+
+test('DekaMarkt listing evidence binds catalog and offers kinds to their public routes', async () => {
+  const catalogOnOffersRoute = await fixture(catalogUrl)
+  catalogOnOffersRoute.source.url = 'https://www.dekamarkt.nl/aanbiedingen'
+
+  assert.deepEqual(parseDekaMarktSsrCatalogEvidence(catalogOnOffersRoute), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source route does not match catalog',
+  })
+
+  const offersOnCatalogRoute = await fixture(offersUrl)
+  offersOnCatalogRoute.source.url =
+    'https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk'
+
+  assert.deepEqual(parseDekaMarktSsrOffersEvidence(offersOnCatalogRoute), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source route does not match offers',
+  })
+
+  const catalogRootOnly = await fixture(catalogUrl)
+  catalogRootOnly.source.url = 'https://www.dekamarkt.nl/producten'
+
+  assert.deepEqual(parseDekaMarktSsrCatalogEvidence(catalogRootOnly), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source route does not match catalog',
+  })
+})
