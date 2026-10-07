@@ -50,7 +50,17 @@ const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const TIMESTAMP_PATTERN =
   /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
 
-function validCalendarDate(value: string) {
+function isPathSafeKey(value: unknown) {
+  return typeof value === 'string' && KEY_PATTERN.test(value)
+}
+
+function hasNonEmptyText(value: unknown) {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function validCalendarDate(value: unknown) {
+  if (typeof value !== 'string') return false
+
   const match = DATE_PATTERN.exec(value)
   if (!match) return false
 
@@ -66,7 +76,9 @@ function validCalendarDate(value: string) {
   )
 }
 
-function validTimestamp(value: string) {
+function validTimestamp(value: unknown) {
+  if (typeof value !== 'string') return null
+
   const match = TIMESTAMP_PATTERN.exec(value)
   if (!match || !validCalendarDate(match[1])) return null
 
@@ -93,7 +105,7 @@ function validateEvidence(
 ) {
   const reasons: string[] = []
 
-  if (!KEY_PATTERN.test(evidence.evidenceId)) {
+  if (!isPathSafeKey(evidence.evidenceId)) {
     reasons.push(`${label} evidenceId is not a path-safe evidence key`)
   }
 
@@ -101,7 +113,7 @@ function validateEvidence(
     reasons.push(`${label} evidence source is not an allowed observed source`)
   }
 
-  if (!evidence.provenanceNote.trim()) {
+  if (!hasNonEmptyText(evidence.provenanceNote)) {
     reasons.push(`${label} evidence provenance note is required`)
   }
 
@@ -159,16 +171,16 @@ export function assessWeeklyBasketStudy(
   if (study.schemaVersion !== 1) {
     reasons.push('unsupported study schema version')
   }
-  if (!KEY_PATTERN.test(study.studyId)) {
+  if (!isPathSafeKey(study.studyId)) {
     reasons.push('studyId is not a path-safe study key')
   }
-  if (!KEY_PATTERN.test(study.participantKey)) {
+  if (!isPathSafeKey(study.participantKey)) {
     reasons.push('participantKey must be a pseudonymous path-safe key')
   }
-  if (!study.population.trim()) {
+  if (!hasNonEmptyText(study.population)) {
     reasons.push('population is required')
   }
-  if (!study.region.trim()) {
+  if (!hasNonEmptyText(study.region)) {
     reasons.push('region is required')
   }
   if (!validCalendarDate(study.weekStart)) {
