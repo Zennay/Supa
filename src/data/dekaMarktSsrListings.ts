@@ -112,8 +112,13 @@ function validateEvidenceBoundary(
 
   try {
     const url = new URL(evidence.source.url)
-    if (url.protocol !== 'https:' || url.hostname !== 'www.dekamarkt.nl') {
-      return 'DekaMarkt evidence source must use the public HTTPS host'
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname !== 'www.dekamarkt.nl' ||
+      url.username ||
+      url.password
+    ) {
+      return 'DekaMarkt evidence source must use the credential-free public HTTPS host'
     }
     const routeMatches =
       expectedKind === 'catalog'
