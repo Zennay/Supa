@@ -33,10 +33,43 @@ function sourceImportsNodeTest(source) {
   const createRequireAliases = new Set()
   const nodeModuleNamespaceAliases = new Set()
   const nodeModuleDefaultAliases = new Set()
+  const nodeModuleRuntimeAliases = new Set()
   const runtimeRequireAliases = new Set()
 
   function isNodeTestSpecifier(node) {
     return ts.isStringLiteralLike(node) && node.text === 'node:test'
+  }
+
+  function isNodeModuleSpecifier(node) {
+    return ts.isStringLiteralLike(node) && node.text === 'node:module'
+  }
+
+  function isModuleRequireCallee(callee) {
+    return (
+      (ts.isPropertyAccessExpression(callee) &&
+        ts.isIdentifier(callee.expression) &&
+        callee.expression.text === 'module' &&
+        callee.name.text === 'require') ||
+      (ts.isElementAccessExpression(callee) &&
+        ts.isIdentifier(callee.expression) &&
+        callee.expression.text === 'module' &&
+        ts.isStringLiteralLike(callee.argumentExpression) &&
+        callee.argumentExpression.text === 'require')
+    )
+  }
+
+  function isProcessGetBuiltinModuleCallee(callee) {
+    return (
+      (ts.isPropertyAccessExpression(callee) &&
+        ts.isIdentifier(callee.expression) &&
+        callee.expression.text === 'process' &&
+        callee.name.text === 'getBuiltinModule') ||
+      (ts.isElementAccessExpression(callee) &&
+        ts.isIdentifier(callee.expression) &&
+        callee.expression.text === 'process' &&
+        ts.isStringLiteralLike(callee.argumentExpression) &&
+        callee.argumentExpression.text === 'getBuiltinModule')
+    )
   }
 
   function collectCreateRequireImports(node) {
@@ -70,22 +103,55 @@ function sourceImportsNodeTest(source) {
     ts.forEachChild(node, collectCreateRequireImports)
   }
 
+  function isNodeModuleLoadCall(node, allowDynamicImport = false) {
+    if (!ts.isCallExpression(node) || node.arguments.length === 0) return false
+
+    const [specifier] = node.arguments
+    if (!isNodeModuleSpecifier(specifier)) return false
+
+    const callee = node.expression
+    return (
+      (allowDynamicImport && callee.kind === ts.SyntaxKind.ImportKeyword) ||
+      (ts.isIdentifier(callee) && callee.text === 'require') ||
+      isModuleRequireCallee(callee) ||
+      isProcessGetBuiltinModuleCallee(callee)
+    )
+  }
+
   function isNodeModuleObjectAlias(node) {
     return (
       ts.isIdentifier(node) &&
       (nodeModuleNamespaceAliases.has(node.text) ||
-        nodeModuleDefaultAliases.has(node.text))
+        nodeModuleDefaultAliases.has(node.text) ||
+        nodeModuleRuntimeAliases.has(node.text))
     )
+  }
+
+  function isNodeModuleObjectExpression(node) {
+    if (isNodeModuleObjectAlias(node)) return true
+
+    if (ts.isParenthesizedExpression(node)) {
+      return isNodeModuleObjectExpression(node.expression)
+    }
+
+    if (ts.isAwaitExpression(node)) {
+      return (
+        isNodeModuleLoadCall(node.expression, true) ||
+        isNodeModuleObjectExpression(node.expression)
+      )
+    }
+
+    return isNodeModuleLoadCall(node)
   }
 
   function isCreateRequireCallee(node) {
     return (
       (ts.isIdentifier(node) && createRequireAliases.has(node.text)) ||
       (ts.isPropertyAccessExpression(node) &&
-        isNodeModuleObjectAlias(node.expression) &&
+        isNodeModuleObjectExpression(node.expression) &&
         node.name.text === 'createRequire') ||
       (ts.isElementAccessExpression(node) &&
-        isNodeModuleObjectAlias(node.expression) &&
+        isNodeModuleObjectExpression(node.expression) &&
         ts.isStringLiteralLike(node.argumentExpression) &&
         node.argumentExpression.text === 'createRequire')
     )
@@ -108,9 +174,18 @@ function sourceImportsNodeTest(source) {
   function collectRuntimeRequireAliases(node) {
     if (
       ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      isNodeModuleObjectExpression(node.initializer)
+    ) {
+      nodeModuleRuntimeAliases.add(node.name.text)
+    }
+
+    if (
+      ts.isVariableDeclaration(node) &&
       ts.isObjectBindingPattern(node.name) &&
       node.initializer &&
-      isNodeModuleObjectAlias(node.initializer)
+      isNodeModuleObjectExpression(node.initializer)
     ) {
       for (const element of node.name.elements) {
         if (isCreateRequireBinding(element)) {
@@ -184,26 +259,8 @@ function sourceImportsNodeTest(source) {
       const isDirectCreateRequireLoad =
         ts.isCallExpression(callee) &&
         isCreateRequireCallee(callee.expression)
-      const isModuleRequire =
-        (ts.isPropertyAccessExpression(callee) &&
-          ts.isIdentifier(callee.expression) &&
-          callee.expression.text === 'module' &&
-          callee.name.text === 'require') ||
-        (ts.isElementAccessExpression(callee) &&
-          ts.isIdentifier(callee.expression) &&
-          callee.expression.text === 'module' &&
-          ts.isStringLiteralLike(callee.argumentExpression) &&
-          callee.argumentExpression.text === 'require')
-      const isProcessGetBuiltinModule =
-        (ts.isPropertyAccessExpression(callee) &&
-          ts.isIdentifier(callee.expression) &&
-          callee.expression.text === 'process' &&
-          callee.name.text === 'getBuiltinModule') ||
-        (ts.isElementAccessExpression(callee) &&
-          ts.isIdentifier(callee.expression) &&
-          callee.expression.text === 'process' &&
-          ts.isStringLiteralLike(callee.argumentExpression) &&
-          callee.argumentExpression.text === 'getBuiltinModule')
+      const isModuleRequire = isModuleRequireCallee(callee)
+      const isProcessGetBuiltinModule = isProcessGetBuiltinModuleCallee(callee)
 
       if (
         (isDynamicImport ||
@@ -335,6 +392,13 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import * as moduleApi from 'node:module'; const { createRequire: makeRequire } = moduleApi; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
     "import moduleApi from 'node:module'; const { createRequire } = moduleApi; const load = createRequire(import.meta.url); const testApi = load('node:test')",
     "import moduleApi from 'node:module'; const { 'createRequire': makeRequire } = moduleApi; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
+    "const moduleApi = await import('node:module'); const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
+    "const moduleApi = require('node:module'); const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
+    "const moduleApi = module.require('node:module'); const { createRequire: makeRequire } = moduleApi; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
+    "const moduleApi = process.getBuiltinModule('node:module'); const load = moduleApi['createRequire'](import.meta.url); const testApi = load('node:test')",
+    "const { createRequire } = await import('node:module'); const load = createRequire(import.meta.url); const testApi = load('node:test')",
+    "const testApi = require('node:module').createRequire(import.meta.url)('node:test')",
+    "const testApi = (await import('node:module')).createRequire(import.meta.url)('node:test')",
     "import { createRequire } from 'node:module'; const testApi = createRequire(import.meta.url)('node:test')",
     "const testApi = process.getBuiltinModule('node:test')",
     'const testApi = process["getBuiltinModule"]("node:test")',
@@ -361,6 +425,9 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import * as helper from './helper.mjs'; const { createRequire: makeRequire } = helper; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
     "import type moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
     "import type * as moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
+    "const moduleApiPromise = import('node:module'); const load = moduleApiPromise.createRequire(import.meta.url); const testApi = load('node:test')",
+    "const moduleApi = await import('./node-module-helper.mjs'); const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
+    "const moduleApi = helper.require('node:module'); const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
     "import { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const fs = load('node:fs')",
     "const fs = process.getBuiltinModule('node:fs')",
     "const testApi = helper.getBuiltinModule('node:test')",
