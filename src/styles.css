@@ -309,8 +309,19 @@ h3, p { margin: 0; }
 }
 
 
-.trace-row > div {
+.trace-row > div,
+.shopping-row > span:last-child {
   min-width: 0;
+}
+
+.section-heading h2,
+.trace-row strong,
+.trace-row span,
+.shopping-row strong,
+.shopping-row small,
+.comparison-card > strong,
+.comparison-totals span {
+  overflow-wrap: anywhere;
 }
 
 .trace-row .trace-note {
@@ -375,6 +386,7 @@ h3, p { margin: 0; }
 }
 
 .comparison-totals > div {
+  min-width: 0;
   display: grid;
   gap: 4px;
   padding: 12px;
