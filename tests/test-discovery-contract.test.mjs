@@ -73,6 +73,16 @@ function sourceImportsNodeTest(source) {
       const callee = node.expression
       const isDynamicImport = callee.kind === ts.SyntaxKind.ImportKeyword
       const isRequire = ts.isIdentifier(callee) && callee.text === 'require'
+      const isModuleRequire =
+        (ts.isPropertyAccessExpression(callee) &&
+          ts.isIdentifier(callee.expression) &&
+          callee.expression.text === 'module' &&
+          callee.name.text === 'require') ||
+        (ts.isElementAccessExpression(callee) &&
+          ts.isIdentifier(callee.expression) &&
+          callee.expression.text === 'module' &&
+          ts.isStringLiteralLike(callee.argumentExpression) &&
+          callee.argumentExpression.text === 'require')
       const isProcessGetBuiltinModule =
         (ts.isPropertyAccessExpression(callee) &&
           ts.isIdentifier(callee.expression) &&
@@ -85,7 +95,10 @@ function sourceImportsNodeTest(source) {
           callee.argumentExpression.text === 'getBuiltinModule')
 
       if (
-        (isDynamicImport || isRequire || isProcessGetBuiltinModule) &&
+        (isDynamicImport ||
+          isRequire ||
+          isModuleRequire ||
+          isProcessGetBuiltinModule) &&
         isNodeTestSpecifier(specifier)
       ) {
         importsNodeTest = true
@@ -193,6 +206,8 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "const testApi = await import/* discovery */(/* source */'node:test'/* end */)",
     "const testApi = require/* discovery */(/* source */'node:test'/* end */)",
     'const testApi = require( "node:test" )',
+    "const testApi = module.require('node:test')",
+    'const testApi = module["require"]("node:test")',
     "const testApi = process.getBuiltinModule('node:test')",
     'const testApi = process["getBuiltinModule"]("node:test")',
     "import check = require('node:test')",
@@ -208,6 +223,8 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import type * as testApi from 'node:test'",
     "import { type TestContext } from 'node:test'",
     "const label = 'node:test'",
+    "const fs = module.require('node:fs')",
+    "const testApi = helper.require('node:test')",
     "const fs = process.getBuiltinModule('node:fs')",
     "const testApi = helper.getBuiltinModule('node:test')",
     "// import check from 'node:test'",
