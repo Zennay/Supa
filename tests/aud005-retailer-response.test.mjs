@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -9,6 +9,7 @@ import {
   buildPrivacySafeRetailerResponse,
   main,
   MAX_RESPONSE_INPUT_BYTES,
+  readBoundedRegularFile,
   validateRetailerResponseRecord,
 } from '../scripts/aud005-record-retailer-response.mjs'
 
@@ -312,6 +313,19 @@ test('AUD-005 CLI rejects non-file response input paths before reading', async (
   await assert.rejects(
     () => main([directory]),
     /response JSON input must be a regular file/,
+  )
+})
+
+test('AUD-005 CLI refuses symlinked response inputs instead of following them', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-input-symlink-'))
+  const target = join(directory, 'private-response.json')
+  const link = join(directory, 'response.json')
+  await writeFile(target, JSON.stringify(validRecord()), 'utf8')
+  await symlink(target, link)
+
+  await assert.rejects(
+    () => readBoundedRegularFile(link),
+    (error) => error?.code === 'ELOOP',
   )
 })
 
