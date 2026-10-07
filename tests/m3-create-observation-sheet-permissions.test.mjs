@@ -24,11 +24,12 @@ function runGenerator(directory, output) {
 }
 
 test(
-  'M3 observation generator creates new field-run directories and sheets owner-only',
+  'M3 observation generator creates all new field-run directories and sheets owner-only',
   { skip: process.platform === 'win32' },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), 'supa-m3-private-sheet-'))
-    const outputDirectory = join(directory, 'private-field-run')
+    const fieldRunDirectory = join(directory, 'private-field-run')
+    const outputDirectory = join(fieldRunDirectory, 'nested')
     const output = join(outputDirectory, 'observation-sheet.json')
 
     try {
@@ -36,12 +37,14 @@ test(
 
       assert.equal(result.status, 0, result.stderr)
 
-      const directoryStat = await stat(outputDirectory)
-      assert.equal(
-        directoryStat.mode & 0o777,
-        0o700,
-        'new M3 field-run directories must not be group/world accessible',
-      )
+      for (const createdDirectory of [fieldRunDirectory, outputDirectory]) {
+        const directoryStat = await stat(createdDirectory)
+        assert.equal(
+          directoryStat.mode & 0o777,
+          0o700,
+          `new M3 field-run directory must not be group/world accessible: ${createdDirectory}`,
+        )
+      }
 
       const fileStat = await stat(output)
       assert.equal(
@@ -59,25 +62,34 @@ test(
 )
 
 test(
-  'M3 observation generator preserves permissions on pre-existing output directories',
+  'M3 observation generator preserves existing directory permissions while securing new descendants',
   { skip: process.platform === 'win32' },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), 'supa-m3-existing-dir-'))
-    const outputDirectory = join(directory, 'existing-field-run')
+    const existingDirectory = join(directory, 'existing-field-run')
+    const outputDirectory = join(existingDirectory, 'private-child')
     const output = join(outputDirectory, 'observation-sheet.json')
 
     try {
-      await mkdir(outputDirectory)
-      await chmod(outputDirectory, 0o750)
+      await mkdir(existingDirectory)
+      await chmod(existingDirectory, 0o750)
 
       const result = runGenerator(directory, output)
 
       assert.equal(result.status, 0, result.stderr)
-      const directoryStat = await stat(outputDirectory)
+
+      const existingDirectoryStat = await stat(existingDirectory)
       assert.equal(
-        directoryStat.mode & 0o777,
+        existingDirectoryStat.mode & 0o777,
         0o750,
         'generator must not chmod a directory that already exists',
+      )
+
+      const outputDirectoryStat = await stat(outputDirectory)
+      assert.equal(
+        outputDirectoryStat.mode & 0o777,
+        0o700,
+        'new descendant directories must still be owner-only',
       )
 
       const fileStat = await stat(output)
