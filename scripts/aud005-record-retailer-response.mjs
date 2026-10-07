@@ -1,4 +1,5 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { mkdir, open, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -42,6 +43,46 @@ const PHONE_PATTERN = /(?:\+?\d[\d\s().-]{7,}\d)/
 const MAX_RESPONSE_CLOCK_SKEW_MS = 5 * 60 * 1000
 const MAX_RESPONSE_NESTING_DEPTH = 64
 export const MAX_RESPONSE_INPUT_BYTES = 256 * 1024
+
+export async function readBoundedRegularFile(path) {
+  let handle
+  try {
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+    const metadata = await handle.stat()
+    assert(metadata.isFile(), 'response JSON input must be a regular file')
+    assert(
+      metadata.size <= MAX_RESPONSE_INPUT_BYTES,
+      `response JSON input exceeds the ${MAX_RESPONSE_INPUT_BYTES}-byte limit`,
+    )
+
+    const chunks = []
+    let totalBytes = 0
+    while (true) {
+      const remaining = MAX_RESPONSE_INPUT_BYTES + 1 - totalBytes
+      if (remaining <= 0) {
+        throw new Error(
+          `response JSON input exceeds the ${MAX_RESPONSE_INPUT_BYTES}-byte limit`,
+        )
+      }
+
+      const buffer = Buffer.allocUnsafe(Math.min(64 * 1024, remaining))
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, null)
+      if (bytesRead === 0) break
+
+      totalBytes += bytesRead
+      if (totalBytes > MAX_RESPONSE_INPUT_BYTES) {
+        throw new Error(
+          `response JSON input exceeds the ${MAX_RESPONSE_INPUT_BYTES}-byte limit`,
+        )
+      }
+      chunks.push(buffer.subarray(0, bytesRead))
+    }
+
+    return Buffer.concat(chunks, totalBytes).toString('utf8')
+  } finally {
+    await handle?.close()
+  }
+}
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -321,13 +362,7 @@ export async function main(argv = process.argv.slice(2)) {
   let raw
 
   try {
-    const inputMetadata = await stat(input)
-    assert(inputMetadata.isFile(), 'response JSON input must be a regular file')
-    assert(
-      inputMetadata.size <= MAX_RESPONSE_INPUT_BYTES,
-      `response JSON input exceeds the ${MAX_RESPONSE_INPUT_BYTES}-byte limit`,
-    )
-    raw = JSON.parse(await readFile(input, 'utf8'))
+    raw = JSON.parse(await readBoundedRegularFile(input))
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     throw new Error(`response JSON could not be read/parsed: ${message}`)
