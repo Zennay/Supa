@@ -69,3 +69,8 @@ Preferences → weekly planner → smart reuse/combinations → complete basket 
 Do not treat mock prices, mock savings or generated collection templates as real product claims or real-world evidence. Every future real price must carry source + observed-at metadata and every savings number needs an explicit baseline.
 
 Production automated retailer-data reuse remains separately permission-gated; a successful M3 field observation does not grant production scraping or licensing rights.
+
+
+## Security
+
+Report vulnerabilities through the guidance in [SECURITY.md](SECURITY.md). Keep sensitive details, credentials and personal data out of public issues, and do not actively test or scrape third-party retailer systems without explicit authorization.
