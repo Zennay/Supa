@@ -97,5 +97,10 @@ test('AUD-005 evidence contract preserves non-approval outcomes instead of coerc
     routing,
     /denial, licensing requirement, or “no suitable route” is useful evidence/i,
   )
+  assert.match(
+    routing,
+    /permission outcome:.*no suitable route/i,
+    'response-capture vocabulary must preserve no suitable route explicitly',
+  )
   assert.match(routing, /must be preserved rather than reinterpreted as approval/i)
 })
