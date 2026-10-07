@@ -63,12 +63,12 @@ export const m2InitialPlan: PlannedMeal[] = [
 
 export const m2Products: StoreProduct[] = [
   { id: 'chicken-400', storeId: m2Store.id, name: 'Kippendij 400 g', packAmount: 400, packUnit: 'g', available: true, priceCents: 479 },
-  { id: 'basmati-1kg', storeId: m2Store.id, name: 'Basmati rijst 1 kg', packAmount: 1, packUnit: 'kg', available: true, priceCents: 249 },
+  { id: 'basmati-1kg', storeId: m2Store.id, name: 'Basmatirijst 1 kg', packAmount: 1, packUnit: 'kg', available: true, priceCents: 249 },
   { id: 'coconut-400', storeId: m2Store.id, name: 'Kokosmelk 400 ml', packAmount: 400, packUnit: 'ml', available: true, priceCents: 159 },
   { id: 'cauliflower-1', storeId: m2Store.id, name: 'Bloemkool', packAmount: 1, packUnit: 'piece', available: true, priceCents: 199 },
   { id: 'broccoli-500', storeId: m2Store.id, name: 'Broccoli 500 g', packAmount: 500, packUnit: 'g', available: true, priceCents: 229 },
   { id: 'edamame-300', storeId: m2Store.id, name: 'Edamame 300 g', packAmount: 300, packUnit: 'g', available: true, priceCents: 299 },
-  { id: 'teriyaki-250', storeId: m2Store.id, name: 'Teriyaki saus 250 ml', packAmount: 250, packUnit: 'ml', available: true, priceCents: 249 },
+  { id: 'teriyaki-250', storeId: m2Store.id, name: 'Teriyakisaus 250 ml', packAmount: 250, packUnit: 'ml', available: true, priceCents: 249 },
   { id: 'spaghetti-500', storeId: m2Store.id, name: 'Spaghetti 500 g', packAmount: 500, packUnit: 'g', available: true, priceCents: 139 },
   { id: 'tomato-400', storeId: m2Store.id, name: 'Tomatenblokjes 400 g', packAmount: 400, packUnit: 'g', available: true, priceCents: 99 },
   { id: 'yogurt-500', storeId: m2Store.id, name: 'Griekse yoghurt 500 g', packAmount: 500, packUnit: 'g', available: true, priceCents: 229 },
