@@ -25,6 +25,14 @@ test('hosted CI token is explicitly read-only', () => {
   )
 })
 
+test('hosted CI checkout does not persist credentials', () => {
+  assert.match(
+    workflow,
+    /uses: actions\/checkout@[0-9a-f]{40}\s+#\s+v\d+\.\d+\.\d+\s*\n\s*with:\s*\n\s*persist-credentials: false/,
+    'hosted CI checkout must not leave GITHUB_TOKEN credentials in local git config',
+  )
+})
+
 test('hosted CI cancels superseded runs for the same PR or ref', () => {
   assert.match(
     workflow,
@@ -61,7 +69,6 @@ test('hosted CI keeps the complete quality gate order', () => {
     'hosted CI quality gates must keep their current fail-fast order',
   )
 })
-
 
 test('hosted CI pins GitHub-maintained actions to immutable commits', () => {
   const actionUses = [...workflow.matchAll(
