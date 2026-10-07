@@ -118,6 +118,52 @@ try {
     observed: 'planner rendered with four active meals',
   })
 
+  await request(`/session/${sessionId}/window/rect`, {
+    method: 'POST',
+    body: JSON.stringify({ width: 800, height: 640 }),
+  })
+  const desktopStickyTopbar = await execute(
+    sessionId,
+    `
+      const shell = document.querySelector('.app-shell')
+      const topbar = document.querySelector('.topbar')
+      if (!shell || !topbar) return null
+
+      const initialTop = topbar.getBoundingClientRect().top
+      window.scrollTo(0, 240)
+      const stickyTop = topbar.getBoundingClientRect().top
+
+      return {
+        desktopMedia: matchMedia('(min-width: 700px)').matches,
+        shellOverflow: getComputedStyle(shell).overflow,
+        topbarPosition: getComputedStyle(topbar).position,
+        initialTop,
+        stickyTop,
+        scrollY: window.scrollY,
+      }
+    `,
+  )
+  assert.ok(desktopStickyTopbar, 'desktop sticky topbar could not be inspected')
+  assert.equal(desktopStickyTopbar.desktopMedia, true)
+  assert.equal(desktopStickyTopbar.shellOverflow, 'clip')
+  assert.equal(desktopStickyTopbar.topbarPosition, 'sticky')
+  assert.ok(desktopStickyTopbar.scrollY > 0, 'desktop page did not scroll')
+  assert.ok(
+    Math.abs(desktopStickyTopbar.stickyTop) <= 1,
+    `desktop topbar did not remain sticky at the viewport top: ${desktopStickyTopbar.stickyTop}`,
+  )
+  await execute(sessionId, 'window.scrollTo(0, 0); return window.scrollY')
+  await request(`/session/${sessionId}/window/rect`, {
+    method: 'POST',
+    body: JSON.stringify({ width: 430, height: 932 }),
+  })
+  evidence.checks.push({
+    step: 'desktop-sticky-topbar',
+    passed: true,
+    observed:
+      'Firefox desktop viewport keeps the topbar sticky at the viewport top while the rounded app shell clips with overflow: clip',
+  })
+
   const changed = await execute(
     sessionId,
     `
