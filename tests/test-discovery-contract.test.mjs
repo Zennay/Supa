@@ -39,12 +39,23 @@ function sourceImportsNodeTest(source) {
     if (importsNodeTest) return
 
     if (ts.isImportDeclaration(node) && isNodeTestSpecifier(node.moduleSpecifier)) {
-      importsNodeTest = true
-      return
+      const clause = node.importClause
+      const namedBindings = clause?.namedBindings
+      const typeOnlyNamedImport =
+        namedBindings &&
+        ts.isNamedImports(namedBindings) &&
+        namedBindings.elements.length > 0 &&
+        namedBindings.elements.every((element) => element.isTypeOnly)
+
+      if (!clause?.isTypeOnly && !typeOnlyNamedImport) {
+        importsNodeTest = true
+        return
+      }
     }
 
     if (
       ts.isImportEqualsDeclaration(node) &&
+      !node.isTypeOnly &&
       ts.isExternalModuleReference(node.moduleReference) &&
       node.moduleReference.expression &&
       isNodeTestSpecifier(node.moduleReference.expression)
@@ -155,6 +166,7 @@ test('test discovery recognizes node:test modules even without test-like filenam
   for (const source of [
     "import check from 'node:test'",
     "import { test as check } from 'node:test'",
+    "import { type TestContext, test as check } from 'node:test'",
     "import 'node:test'",
     "const testApi = await import( 'node:test' )",
     "import check from/* discovery */'node:test'",
@@ -171,6 +183,9 @@ test('test discovery recognizes node:test modules even without test-like filenam
   for (const source of [
     "import check from './node-test-helper.mjs'",
     "import/* discovery */'./node-test-helper.mjs'",
+    "import type { TestContext } from 'node:test'",
+    "import type * as testApi from 'node:test'",
+    "import { type TestContext } from 'node:test'",
     "const label = 'node:test'",
     "// import check from 'node:test'",
     "/* const testApi = import('node:test') */",
