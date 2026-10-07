@@ -5,10 +5,12 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const testsDirectory = dirname(fileURLToPath(import.meta.url))
+const repositoryRoot = dirname(testsDirectory)
 const packageJson = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8'),
 )
 const TEST_LIKE_FILENAME = /\.(?:test|spec)\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
+const NON_SOURCE_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage'])
 
 async function collectTestLikeFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -18,7 +20,9 @@ async function collectTestLikeFiles(directory) {
     const entryPath = join(directory, entry.name)
 
     if (entry.isDirectory()) {
-      files.push(...await collectTestLikeFiles(entryPath))
+      if (!NON_SOURCE_DIRECTORIES.has(entry.name)) {
+        files.push(...await collectTestLikeFiles(entryPath))
+      }
       continue
     }
 
@@ -30,13 +34,20 @@ async function collectTestLikeFiles(directory) {
   return files
 }
 
-function isSelectedByCanonicalNpmTestGlob(relativePath) {
-  const normalizedPath = relativePath.split(sep).join('/')
+function isSelectedByCanonicalNpmTestGlob(repositoryRelativePath) {
+  const normalizedPath = repositoryRelativePath.split(sep).join('/')
+  const testsPrefix = 'tests/'
+
+  if (!normalizedPath.startsWith(testsPrefix)) {
+    return false
+  }
+
+  const testsRelativePath = normalizedPath.slice(testsPrefix.length)
 
   return (
-    !normalizedPath.includes('/') &&
-    !normalizedPath.startsWith('.') &&
-    normalizedPath.endsWith('.test.mjs')
+    !testsRelativePath.includes('/') &&
+    !testsRelativePath.startsWith('.') &&
+    testsRelativePath.endsWith('.test.mjs')
   )
 }
 
@@ -47,10 +58,10 @@ test('npm test keeps the explicit top-level Node test glob', () => {
   )
 })
 
-test('every test-like file remains discoverable by the top-level test glob', async () => {
-  const testLikeFiles = await collectTestLikeFiles(testsDirectory)
+test('every repository test-like file remains discoverable by the top-level test glob', async () => {
+  const testLikeFiles = await collectTestLikeFiles(repositoryRoot)
   const undiscoveredTests = testLikeFiles
-    .map((path) => relative(testsDirectory, path))
+    .map((path) => relative(repositoryRoot, path))
     .filter((path) => !isSelectedByCanonicalNpmTestGlob(path))
 
   assert.deepEqual(
@@ -75,15 +86,18 @@ test('test discovery recognizes common JS, TS and React test extensions', () => 
   }
 })
 
-test('test discovery rejects hidden, nested and wrong-suffix tests outside the canonical glob', () => {
+test('test discovery rejects hidden, nested and out-of-directory tests outside the canonical glob', () => {
   for (const undiscovered of [
-    '.hidden.test.mjs',
-    'example.spec.mjs',
-    'example.test.js',
-    'example.test.ts',
-    'example.test.jsx',
-    'example.test.tsx',
-    join('nested', 'example.test.mjs'),
+    'tests/.hidden.test.mjs',
+    'tests/example.spec.mjs',
+    'tests/example.test.js',
+    'tests/example.test.ts',
+    'tests/example.test.jsx',
+    'tests/example.test.tsx',
+    join('tests', 'nested', 'example.test.mjs'),
+    join('src', 'example.test.mjs'),
+    join('src', 'example.test.ts'),
+    join('scripts', 'example.spec.mjs'),
   ]) {
     assert.equal(
       isSelectedByCanonicalNpmTestGlob(undiscovered),
@@ -93,7 +107,7 @@ test('test discovery rejects hidden, nested and wrong-suffix tests outside the c
   }
 
   assert.equal(
-    isSelectedByCanonicalNpmTestGlob('example.test.mjs'),
+    isSelectedByCanonicalNpmTestGlob(join('tests', 'example.test.mjs')),
     true,
   )
 })
