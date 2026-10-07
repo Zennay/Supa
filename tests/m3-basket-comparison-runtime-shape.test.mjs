@@ -101,3 +101,33 @@ test('M3 comparison returns unknown instead of throwing when runtime lines are n
   assert.equal(comparison.savingsCents, null)
   assert.match(comparison.reasons.join(' '), /lines are not an array/)
 })
+
+
+test('M3 comparison fails closed when whitespace padding disguises the same store identity', () => {
+  for (const paddedStoreId of [
+    ` ${baselineStore.id}`,
+    `${baselineStore.id} `,
+  ]) {
+    const baseline = buildCompleteBasket(baselineStore, 0)
+    const candidate = buildCompleteBasket(
+      {
+        ...candidateStore,
+        id: paddedStoreId,
+      },
+      -10,
+    )
+
+    const comparison = compareFullBaskets({ baseline, candidate })
+
+    assert.equal(comparison.claimable, false)
+    assert.equal(comparison.outcome, 'unknown')
+    assert.equal(comparison.deltaCents, null)
+    assert.equal(comparison.savingsCents, null)
+    assert.equal(comparison.lineDeltas.length, 0)
+    assert.match(comparison.reasons.join(' '), /invalid store identity/)
+    assert.match(
+      comparison.reasons.join(' '),
+      /baseline and candidate stores must differ/,
+    )
+  }
+})

@@ -55,6 +55,10 @@ function validIdentity(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+function canonicalIdentity(value: unknown): value is string {
+  return validIdentity(value) && value === value.trim()
+}
+
 function supportedBasketLine(line: unknown): line is BasketTraceLine {
   if (line === null || typeof line !== 'object' || !('status' in line)) {
     return false
@@ -125,7 +129,7 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
     reasons.push(`${label} basket contains an unsupported line shape or status`)
   }
 
-  if (!validIdentity(basket.store.id)) {
+  if (!canonicalIdentity(basket.store.id)) {
     reasons.push(`${label} basket has an invalid store identity`)
   }
 
@@ -218,7 +222,11 @@ export function compareFullBaskets({
     ...inspectBasket('candidate', candidate),
   ]
 
-  if (baseline.store.id === candidate.store.id) {
+  if (
+    typeof baseline.store.id === 'string' &&
+    typeof candidate.store.id === 'string' &&
+    baseline.store.id.trim() === candidate.store.id.trim()
+  ) {
     reasons.push('baseline and candidate stores must differ')
   }
 
