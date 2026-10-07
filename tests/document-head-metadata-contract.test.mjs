@@ -68,7 +68,7 @@ function charsetDeclarations(source) {
 }
 
 function titleTexts(source) {
-  return [...source.matchAll(/<title\b[^>]*>\s*([^<]+?)\s*<\/title>/gi)]
+  return [...source.matchAll(/<title\b[^>]*>\s*([^<]*?)\s*<\/title>/gi)]
     .map((match) => match[1].trim())
 }
 
@@ -86,6 +86,13 @@ test('title parser exposes attributed duplicate declarations', () => {
   assert.deepEqual(
     titleTexts('<title>SUPA</title><title data-source="duplicate">Other</title>'),
     ['SUPA', 'Other'],
+  )
+})
+
+test('title parser exposes empty duplicate declarations', () => {
+  assert.deepEqual(
+    titleTexts('<title>SUPA</title><title data-source="duplicate"></title>'),
+    ['SUPA', ''],
   )
 })
 
