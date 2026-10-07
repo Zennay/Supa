@@ -39,6 +39,13 @@ test('savings rejects malformed money inputs', () => {
   assert.equal(savings(-1, -5), null)
 })
 
+test('savings rejects malformed runtime value types without coercion', () => {
+  for (const malformed of [null, undefined, '10', {}, [], true]) {
+    assert.equal(savings(malformed, 10), null)
+    assert.equal(savings(10, malformed), null)
+  }
+})
+
 test('savings preserves its positive-only finite contract', () => {
   assert.equal(savings(40, 31.8), 8.2)
   assert.equal(savings(31.8, 40), 0)
