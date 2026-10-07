@@ -29,19 +29,3 @@ export const euro = {
     return euroFormatter.format(normalizedValue)
   },
 }
-
-export function savings(baseline: number, total: number): number | null {
-  const baselineCents = toSafeCents(baseline)
-  const totalCents = toSafeCents(total)
-
-  if (
-    baselineCents === null ||
-    totalCents === null ||
-    baselineCents < 0 ||
-    totalCents < 0
-  ) {
-    return null
-  }
-
-  return Math.max(0, baselineCents - totalCents) / 100
-}
