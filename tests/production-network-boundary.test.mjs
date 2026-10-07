@@ -77,6 +77,61 @@ function isNavigatorObject(node) {
   )
 }
 
+function networkReferenceName(node) {
+  const current = unwrapExpression(node)
+
+  if (isBrowserGlobalMember(current, 'fetch')) return 'fetch'
+
+  for (const constructorName of networkConstructors) {
+    if (isBrowserGlobalMember(current, constructorName)) {
+      return constructorName
+    }
+  }
+
+  if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
+    if (
+      memberName(current) === 'sendBeacon' &&
+      isNavigatorObject(current.expression)
+    ) {
+      return 'navigator.sendBeacon'
+    }
+  }
+
+  return null
+}
+
+function isSyntaxName(node) {
+  const parent = node.parent
+  if (!parent) return false
+
+  return (
+    (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+    (ts.isElementAccessExpression(parent) && parent.argumentExpression === node) ||
+    (ts.isPropertyAssignment(parent) && parent.name === node) ||
+    (ts.isMethodDeclaration(parent) && parent.name === node) ||
+    (ts.isPropertyDeclaration(parent) && parent.name === node) ||
+    (ts.isVariableDeclaration(parent) && parent.name === node) ||
+    (ts.isParameter(parent) && parent.name === node) ||
+    (ts.isFunctionDeclaration(parent) && parent.name === node) ||
+    (ts.isFunctionExpression(parent) && parent.name === node) ||
+    (ts.isClassDeclaration(parent) && parent.name === node) ||
+    (ts.isClassExpression(parent) && parent.name === node) ||
+    (ts.isImportClause(parent) && parent.name === node) ||
+    (ts.isImportSpecifier(parent) && parent.name === node) ||
+    (ts.isBindingElement(parent) && parent.name === node)
+  )
+}
+
+function isDirectNetworkInvocationTarget(node) {
+  const parent = node.parent
+  if (!parent) return false
+
+  return (
+    ((ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+      unwrapExpression(parent.expression) === node)
+  )
+}
+
 function scriptKindFor(filename) {
   switch (path.extname(filename)) {
     case '.tsx':
@@ -137,6 +192,23 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
           }
           return
         }
+      }
+    }
+
+    if (
+      (ts.isIdentifier(node) ||
+        ts.isPropertyAccessExpression(node) ||
+        ts.isElementAccessExpression(node)) &&
+      !isSyntaxName(node) &&
+      !isDirectNetworkInvocationTarget(node)
+    ) {
+      const referenceName = networkReferenceName(node)
+      if (referenceName) {
+        finding = {
+          kind: referenceName + ' detached reference',
+          text: node.getText(sourceFile),
+        }
+        return
       }
     }
 
@@ -203,6 +275,23 @@ test('network boundary catches direct browser networking primitives', () => {
   }
 })
 
+test('network boundary catches detached browser networking references', () => {
+  for (const source of [
+    'const request = fetch',
+    "const request = window['fetch']",
+    'const Socket = globalThis.WebSocket',
+    'const Xhr = XMLHttpRequest',
+    'const stream = self.WebSocketStream',
+    'const transport = window.WebTransport',
+    'const peer = RTCPeerConnection',
+    'const events = globalThis.EventSource',
+    'const beacon = navigator.sendBeacon',
+    "const beacon = window.navigator['sendBeacon']",
+  ]) {
+    assert.ok(findDirectProductionNetworkAccess(source), source)
+  }
+})
+
 test('network boundary ignores comments, strings and unrelated object methods', () => {
   for (const source of [
     "// fetch('/example')",
@@ -210,6 +299,12 @@ test('network boundary ignores comments, strings and unrelated object methods', 
     "api.fetch('/local-abstraction')",
     "client.XMLHttpRequest()",
     "telemetry.sendBeacon('/local-abstraction')",
+    'const request = api.fetch',
+    'const Socket = transport.WebSocket',
+    'const beacon = telemetry.sendBeacon',
+    "const config = { fetch: 'local', WebSocket: 'local' }",
+    'const fetch = 1',
+    'class WebSocket {}',
     "const fetchCount = 1",
   ]) {
     assert.equal(findDirectProductionNetworkAccess(source), null, source)
