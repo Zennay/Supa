@@ -53,3 +53,37 @@ test('PLUS rendered evidence refuses unsafe acquisition metadata', async () => {
     reason: 'PLUS rendered evidence violates the bounded browser safety contract',
   })
 })
+
+test('PLUS rendered evidence rejects malformed source provenance', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.source.url = 'http://www.plus.nl/product/579010' },
+    (evidence) => { evidence.source.url = 'https://plus.nl/product/579010' },
+    (evidence) => { evidence.source.url = 'https://user:pass@www.plus.nl/product/579010' },
+    (evidence) => { evidence.source.capturedAt = 'not-a-timestamp' },
+    (evidence) => { evidence.source.sha256 = 'not-a-sha' },
+  ]) {
+    const evidence = await fixture()
+    mutate(evidence)
+    assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid source provenance',
+    })
+  }
+})
+
+test('PLUS rendered evidence rejects malformed browser artifact identity', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.browserEvidence.runId = 0 },
+    (evidence) => { evidence.browserEvidence.runId = 1.5 },
+    (evidence) => { evidence.browserEvidence.artifactId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.artifactDigest = 'sha256:not-a-digest' },
+    (evidence) => { evidence.browserEvidence.supaSha = 'f'.repeat(39) },
+  ]) {
+    const evidence = await fixture()
+    mutate(evidence)
+    assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid browser artifact identity',
+    })
+  }
+})
