@@ -6,7 +6,7 @@ import type {
 
 export const m2Store: Store = {
   id: 'm2-one-store',
-  name: 'Voorbeeldwinkel',
+  name: 'Voorbeeldwinkel · demo',
 }
 
 export const m2Recipes: RecipeWithIngredients[] = [
