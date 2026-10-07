@@ -19,7 +19,7 @@ If your change touches a path with a dedicated GitHub Actions workflow, require 
 
 ## Scope and ownership
 
-- Check open pull requests before editing a file that may already have an active owner.
+- Check open pull requests and relevant active branches before editing a file that may already have an owner.
 - Keep changes inside the smallest coherent scope.
 - Record the exact head SHA and the validation run(s) used to justify landing.
 - Do not overwrite or absorb another active worker's branch without explicit coordination.
