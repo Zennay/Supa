@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -400,5 +400,31 @@ test('AUD-005 CLI rejects malformed output arguments before emitting evidence', 
         join(directory, 'second.json'),
       ]),
     /--output may only be specified once/,
+  )
+})
+
+
+test('AUD-005 CLI creates stakeholder evidence in an owner-only path', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-private-mode-'))
+  const input = join(directory, 'input.json')
+  const outputDirectory = join(directory, 'private')
+  const output = join(outputDirectory, 'response.json')
+  await writeFile(input, JSON.stringify(validRecord()), 'utf8')
+
+  await main([input, '--output', output])
+
+  const [directoryMetadata, fileMetadata] = await Promise.all([
+    stat(outputDirectory),
+    stat(output),
+  ])
+  assert.equal(
+    directoryMetadata.mode & 0o777,
+    0o700,
+    'new stakeholder-evidence directories must be owner-only',
+  )
+  assert.equal(
+    fileMetadata.mode & 0o777,
+    0o600,
+    'privacy-safe stakeholder evidence must be owner-readable/writable only',
   )
 })
