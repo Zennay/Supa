@@ -190,3 +190,27 @@ test('DekaMarkt listing evidence binds catalog and offers kinds to their public 
     reason: 'DekaMarkt evidence source route does not match catalog',
   })
 })
+
+
+test('DekaMarkt listing evidence rejects credential-bearing public source URLs', async () => {
+  for (const [fixtureUrl, sourceUrl, parse] of [
+    [
+      catalogUrl,
+      'https://reporter@www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk',
+      parseDekaMarktSsrCatalogEvidence,
+    ],
+    [
+      offersUrl,
+      'https://:secret@www.dekamarkt.nl/aanbiedingen',
+      parseDekaMarktSsrOffersEvidence,
+    ],
+  ]) {
+    const evidence = await fixture(fixtureUrl)
+    evidence.source.url = sourceUrl
+
+    assert.deepEqual(parse(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence source must use the credential-free public HTTPS host',
+    })
+  }
+})
