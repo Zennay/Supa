@@ -142,6 +142,37 @@ test('observation action label rejects stale targets whose matching line is alre
   )
 })
 
+test('observation action label rejects later incomplete targets while an earlier line remains open', () => {
+  const sheet = buildObservationSheet()
+
+  assert.throws(
+    () =>
+      nextObservationActionLabel(sheet, {
+        side: 'baseline',
+        ingredientId: 'broccoli',
+      }),
+    /invalid next observation target/,
+  )
+
+  sheet.baseline.lines.forEach((line) => {
+    line.observedProduct.available = false
+  })
+
+  assert.throws(
+    () =>
+      nextObservationActionLabel(sheet, {
+        side: 'candidate',
+        ingredientId: 'broccoli',
+      }),
+    /invalid next observation target/,
+  )
+
+  assert.equal(
+    nextObservationActionLabel(sheet, nextCandidateRice),
+    'Volgende: DekaMarkt · Basmati rijst',
+  )
+})
+
 test('observation action label rejects ambiguous duplicate incomplete matches', () => {
   const sheet = buildObservationSheet()
   const matching = sheet.baseline.lines.find(
