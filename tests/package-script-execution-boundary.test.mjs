@@ -24,10 +24,62 @@ const forbidden = [
   },
 ]
 
+const reviewedDirectExecutables = new Map([
+  ['node', null],
+  ['npm', null],
+  ['vite', 'vite'],
+  ['tsc', 'typescript'],
+])
+
 function violationsFor(name, command) {
   return forbidden
     .filter(({ pattern }) => pattern.test(command))
     .map(({ label }) => `${name}: ${label} via ${JSON.stringify(command)}`)
+}
+
+function commandExecutables(command) {
+  return command
+    .split(/\s*(?:&&|\|\||;|\|)\s*/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .map((segment) => {
+      const words = segment.split(/\s+/)
+      let index = 0
+      while (
+        index < words.length &&
+        /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index])
+      ) {
+        index += 1
+      }
+      return words[index] ?? null
+    })
+    .filter(Boolean)
+}
+
+function executableViolationsFor(name, command, manifest = packageJson) {
+  const declaredPackages = new Set([
+    ...Object.keys(manifest.dependencies ?? {}),
+    ...Object.keys(manifest.devDependencies ?? {}),
+  ])
+  const violations = []
+
+  for (const executable of commandExecutables(command)) {
+    if (!reviewedDirectExecutables.has(executable)) {
+      violations.push(
+        `${name}: unreviewed direct executable ${JSON.stringify(executable)}`,
+      )
+      continue
+    }
+
+    const packageName = reviewedDirectExecutables.get(executable)
+    if (packageName !== null && !declaredPackages.has(packageName)) {
+      violations.push(
+        `${name}: ${JSON.stringify(executable)} requires declared package ${JSON.stringify(packageName)}`,
+      )
+    }
+  }
+
+  return violations
 }
 
 test('root package scripts stay on reviewed local executables', () => {
@@ -46,12 +98,13 @@ test('root package scripts stay on reviewed local executables', () => {
       `package script ${name} must remain a string command`,
     )
     violations.push(...violationsFor(name, command))
+    violations.push(...executableViolationsFor(name, command))
   }
 
   assert.deepEqual(
     violations,
     [],
-    'package scripts must not add ad-hoc remote executors, downloaders, remote URLs, or opaque shell wrappers',
+    'package scripts must use reviewed local executables and must not add remote execution or download paths',
   )
 })
 
@@ -75,6 +128,38 @@ test('package-script boundary catches unreviewed remote execution primitives', (
   }
 })
 
+test('package-script boundary rejects undeclared or globally assumed executables', () => {
+  for (const command of [
+    'prettier .',
+    'python scripts/check.py',
+    'git status',
+    'node scripts/check.mjs && eslint .',
+  ]) {
+    assert.notDeepEqual(
+      executableViolationsFor('candidate', command),
+      [],
+      command,
+    )
+  }
+
+  assert.notDeepEqual(
+    executableViolationsFor(
+      'candidate',
+      'vite build',
+      { dependencies: {}, devDependencies: {} },
+    ),
+    [],
+  )
+  assert.notDeepEqual(
+    executableViolationsFor(
+      'candidate',
+      'tsc -b',
+      { dependencies: {}, devDependencies: {} },
+    ),
+    [],
+  )
+})
+
 test('package-script boundary preserves current local command patterns', () => {
   const safe = [
     ['node', 'node scripts/check.mjs'],
@@ -83,9 +168,11 @@ test('package-script boundary preserves current local command patterns', () => {
     ['vite-preview', 'vite preview'],
     ['tsc-build', 'tsc -b && vite build'],
     ['npm-run', 'npm run m3:assess-observed-week -- evidence/m3/study.json'],
+    ['env-prefix', 'NODE_ENV=test vite build'],
   ]
 
   for (const [name, command] of safe) {
     assert.deepEqual(violationsFor(name, command), [], command)
+    assert.deepEqual(executableViolationsFor(name, command), [], command)
   }
 })
