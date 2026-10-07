@@ -8,6 +8,7 @@ Use Node 22 and the locked dependency graph.
 
 ```bash
 npm ci
+npm audit --audit-level=high
 npm test
 npm run m1:matching-benchmark
 npm run m1:source-permission-gate

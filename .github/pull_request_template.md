@@ -33,6 +33,7 @@ Validation commands executed on that exact head:
 
 ```text
 npm ci
+npm audit --audit-level=high
 npm test
 npm run m1:matching-benchmark
 npm run m1:source-permission-gate

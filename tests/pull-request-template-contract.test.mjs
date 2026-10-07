@@ -22,11 +22,16 @@ test('pull request template requires scope ownership and exact-head validation e
     'checked the current open pull requests',
     'Exact head SHA:',
     'Validation commands executed on that exact head:',
+    'npm ci',
+    'npm audit --audit-level=high',
+    'npm test',
     'Required gates / run IDs and conclusions:',
     'Hosted CI:',
     'Path-selected permanent workflow(s), if applicable:',
     'did not reuse an older green run',
   )
+
+  assert.match(template, /npm ci\s+\n?npm audit --audit-level=high\s+\n?npm test/)
 })
 
 test('pull request template preserves the M3 genuine-evidence boundary', () => {

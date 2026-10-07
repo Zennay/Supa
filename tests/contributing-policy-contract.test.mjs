@@ -9,6 +9,7 @@ test('contributor guide locks validation and evidence boundaries', async () => {
 
   for (const command of [
     'npm ci',
+    'npm audit --audit-level=high',
     'npm test',
     'npm run m1:matching-benchmark',
     'npm run m1:source-permission-gate',
@@ -17,6 +18,7 @@ test('contributor guide locks validation and evidence boundaries', async () => {
     assert.match(guide, new RegExp(command.replace(/[.*+?^$()|[\]{}\\]/g, '\\$&')))
   }
 
+  assert.match(guide, /npm ci\s+\n?npm audit --audit-level=high\s+\n?npm test/)
   assert.match(guide, /exact (PR )?head/i)
   assert.match(guide, /mock, generated, deterministic, replayed, or fixture data/i)
   assert.match(guide, /not.*genuine retailer evidence/i)
