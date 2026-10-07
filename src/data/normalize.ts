@@ -171,11 +171,21 @@ export function normalizeOfferLabel(label: unknown): NormalizedOfferMechanic {
 
   const percent = cleaned.match(/^(\d+(?:[.,]\d+)?)%\s+korting$/)
   if (percent) {
-    const percentValue = decimal(percent[1])
-    if (percentValue > 0 && percentValue <= 100) {
-      return {
-        type: 'percent_discount',
-        percent: percentValue,
+    const normalizedPercent = percent[1].replace(',', '.')
+    const [wholeText, fractionText = ''] = normalizedPercent.split('.')
+    const whole = Number(wholeText)
+    const fractionIsZero = fractionText === '' || /^0+$/.test(fractionText)
+    const withinTextualBound =
+      (Number.isSafeInteger(whole) && whole >= 0 && whole < 100) ||
+      (whole === 100 && fractionIsZero)
+
+    if (withinTextualBound) {
+      const percentValue = Number(normalizedPercent)
+      if (Number.isFinite(percentValue) && percentValue > 0) {
+        return {
+          type: 'percent_discount',
+          percent: percentValue,
+        }
       }
     }
   }
