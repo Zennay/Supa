@@ -53,3 +53,37 @@ test('DekaMarkt evidence rejects unsafe acquisition metadata', async () => {
     reason: 'DekaMarkt evidence violates the bounded capture contract',
   })
 })
+
+test('DekaMarkt evidence rejects malformed source provenance', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.source.url = 'http://www.dekamarkt.nl/producten/115873' },
+    (evidence) => { evidence.source.url = 'https://dekamarkt.nl/producten/115873' },
+    (evidence) => { evidence.source.url = 'https://user:pass@www.dekamarkt.nl/producten/115873' },
+    (evidence) => { evidence.source.capturedAt = 'not-a-timestamp' },
+    (evidence) => { evidence.source.sha256 = 'not-a-sha' },
+  ]) {
+    const evidence = await fixture()
+    mutate(evidence)
+    assert.deepEqual(parseDekaMarktSsrProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence has invalid source provenance',
+    })
+  }
+})
+
+test('DekaMarkt evidence rejects malformed capture artifact identity', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.captureEvidence.runId = 0 },
+    (evidence) => { evidence.captureEvidence.artifactId = 1.5 },
+    (evidence) => { evidence.captureEvidence.artifactDigest = 'sha256:not-a-digest' },
+    (evidence) => { evidence.captureEvidence.supaSha = 'f'.repeat(39) },
+    (evidence) => { evidence.captureEvidence.bytes = Number.MAX_SAFE_INTEGER + 1 },
+  ]) {
+    const evidence = await fixture()
+    mutate(evidence)
+    assert.deepEqual(parseDekaMarktSsrProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence has invalid capture artifact identity',
+    })
+  }
+})
