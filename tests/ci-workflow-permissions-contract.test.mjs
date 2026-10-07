@@ -51,6 +51,7 @@ test('hosted CI has a bounded execution time', () => {
 test('hosted CI keeps the complete quality gate order', () => {
   const requiredSteps = [
     'npm ci',
+    'npm audit --audit-level=high',
     'npm test',
     'npm run m1:matching-benchmark',
     'npm run m1:source-permission-gate',
