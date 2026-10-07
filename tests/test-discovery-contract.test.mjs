@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import * as ts from 'typescript'
 
 const testsDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = dirname(testsDirectory)
@@ -11,8 +12,6 @@ const packageJson = JSON.parse(
 )
 const TEST_LIKE_FILENAME = /\.(?:test|spec)\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
 const NODE_TEST_SOURCE_FILENAME = /\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
-const NODE_TEST_IMPORT_PATTERN =
-  /(?:\bfrom(?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"]|\bimport(?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"]|\bimport(?:\s|\/\*[\s\S]*?\*\/)*\((?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"](?:\s|\/\*[\s\S]*?\*\/)*\)|\brequire(?:\s|\/\*[\s\S]*?\*\/)*\((?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"](?:\s|\/\*[\s\S]*?\*\/)*\))/
 const NON_SOURCE_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage'])
 
 function isTestLikeEntry(entry) {
@@ -23,7 +22,53 @@ function isTestLikeEntry(entry) {
 }
 
 function sourceImportsNodeTest(source) {
-  return NODE_TEST_IMPORT_PATTERN.test(source)
+  const sourceFile = ts.createSourceFile(
+    'candidate.tsx',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  )
+  let importsNodeTest = false
+
+  function isNodeTestSpecifier(node) {
+    return ts.isStringLiteralLike(node) && node.text === 'node:test'
+  }
+
+  function visit(node) {
+    if (importsNodeTest) return
+
+    if (ts.isImportDeclaration(node) && isNodeTestSpecifier(node.moduleSpecifier)) {
+      importsNodeTest = true
+      return
+    }
+
+    if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression &&
+      isNodeTestSpecifier(node.moduleReference.expression)
+    ) {
+      importsNodeTest = true
+      return
+    }
+
+    if (ts.isCallExpression(node) && node.arguments.length > 0) {
+      const [specifier] = node.arguments
+      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword
+      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require'
+
+      if ((isDynamicImport || isRequire) && isNodeTestSpecifier(specifier)) {
+        importsNodeTest = true
+        return
+      }
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return importsNodeTest
 }
 
 async function collectTestLikeFiles(directory) {
@@ -117,6 +162,8 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "const testApi = await import/* discovery */(/* source */'node:test'/* end */)",
     "const testApi = require/* discovery */(/* source */'node:test'/* end */)",
     'const testApi = require( "node:test" )',
+    "import check = require('node:test')",
+    "const dynamic = `${await import('node:test')}`",
   ]) {
     assert.equal(sourceImportsNodeTest(source), true, source)
   }
@@ -125,6 +172,10 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import check from './node-test-helper.mjs'",
     "import/* discovery */'./node-test-helper.mjs'",
     "const label = 'node:test'",
+    "// import check from 'node:test'",
+    "/* const testApi = import('node:test') */",
+    "const example = \"import('node:test')\"",
+    "const example = `require('node:test')`",
   ]) {
     assert.equal(sourceImportsNodeTest(source), false, source)
   }
