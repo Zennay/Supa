@@ -52,6 +52,7 @@ function collectBindings(sourceFile) {
   const disabledCallableAliases = new Set()
   const namespaceAliases = new Set()
   const optionObjects = new Map()
+  const permanentDisableValueAliases = new Set()
 
   function addNamedBinding(sourceName, localName) {
     if (
@@ -74,6 +75,18 @@ function collectBindings(sourceFile) {
     const isConstBinding =
       ts.isVariableDeclarationList(node.parent) &&
       (node.parent.flags & ts.NodeFlags.Const) !== 0
+
+    if (isConstBinding && ts.isIdentifier(node.name)) {
+      if (isPermanentDisableValue(unwrappedInitializer)) {
+        permanentDisableValueAliases.add(node.name.text)
+      } else if (
+        ts.isIdentifier(unwrappedInitializer) &&
+        permanentDisableValueAliases.has(unwrappedInitializer.text)
+      ) {
+        permanentDisableValueAliases.add(node.name.text)
+      }
+    }
+
     if (
       isConstBinding &&
       ts.isIdentifier(node.name) &&
@@ -198,6 +211,7 @@ function collectBindings(sourceFile) {
     disabledCallableAliases,
     namespaceAliases,
     optionObjects,
+    permanentDisableValueAliases,
   }
 }
 
@@ -267,6 +281,15 @@ function resolveOptionsObject(argument, bindings) {
   return null
 }
 
+function resolvesToPermanentDisableValue(node, bindings) {
+  const value = unwrapExpression(node)
+  if (isPermanentDisableValue(value)) return true
+  return (
+    ts.isIdentifier(value) &&
+    bindings.permanentDisableValueAliases.has(value.text)
+  )
+}
+
 function resolveFinalOption(options, optionName, bindings, visited = new Set()) {
   if (visited.has(options)) return { found: false, property: null }
   const nextVisited = new Set(visited)
@@ -280,7 +303,9 @@ function resolveFinalOption(options, optionName, bindings, visited = new Set()) 
       if (name === optionName) {
         return {
           found: true,
-          property: isPermanentDisableValue(property.initializer) ? property : null,
+          property: resolvesToPermanentDisableValue(property.initializer, bindings)
+            ? property
+            : null,
         }
       }
 
@@ -292,7 +317,12 @@ function resolveFinalOption(options, optionName, bindings, visited = new Set()) 
 
     if (ts.isShorthandPropertyAssignment(property)) {
       if (property.name.text === optionName) {
-        return { found: true, property: null }
+        return {
+          found: true,
+          property: bindings.permanentDisableValueAliases.has(property.name.text)
+            ? property
+            : null,
+        }
       }
       continue
     }
@@ -545,11 +575,26 @@ test('disabled-test guard rejects literal options only on test API calls', () =>
     assert.ok(findDisabledTest(source), source)
   }
 
+  for (const source of [
+    "const disabled = true; test('case', {skip: disabled}, () => {})",
+    "const reason = 'pending regression'; test('case', {todo: reason}, () => {})",
+    "const reason = 'pending regression'; const disabled = reason; test('case', {skip: disabled}, () => {})",
+    "const skip = true; test('case', {skip}, () => {})",
+    "const todo = 'pending regression'; test('case', {todo}, () => {})",
+  ]) {
+    assert.ok(findDisabledTest(source), source)
+  }
+
   const emptyTemplate =
     "test('case', {todo: " + tick + tick + "}, () => {})"
 
   for (const source of [
     "test('case', {skip: false}, () => {})",
+    "const disabled = false; test('case', {skip: disabled}, () => {})",
+    "const skip = false; test('case', {skip}, () => {})",
+    "const todo = ''; test('case', {todo}, () => {})",
+    "let disabled = true; disabled = false; test('case', {skip: disabled}, () => {})",
+    "const disabled = shouldSkip; test('case', {skip: disabled}, () => {})",
     "const disabled = {skip: true}; test('case', {...disabled, skip: false}, () => {})",
     "const disabled = {skip: true}; const enabled = {skip: false}; test('case', {...disabled, ...enabled}, () => {})",
     "const disabled = {skip: true}; const enabled = {...disabled, skip: false}; const options = enabled; test('case', options, () => {})",
