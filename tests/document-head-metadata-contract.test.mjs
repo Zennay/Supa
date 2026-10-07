@@ -5,11 +5,53 @@ import test from 'node:test'
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
 
 function attributes(tag) {
-  return Object.fromEntries(
-    [...tag.matchAll(/([\w-]+)\s*=\s*["']([^"']*)["']/g)].map(
-      ([, name, value]) => [name.toLowerCase(), value],
-    ),
-  )
+  const result = {}
+  const tagName = tag.match(/^<\s*[^\s/>]+/)
+  if (!tagName) return result
+
+  let index = tagName[0].length
+
+  while (index < tag.length) {
+    while (index < tag.length && /\s/.test(tag[index])) index += 1
+    if (index >= tag.length || tag[index] === '>') break
+    if (tag[index] === '/') {
+      index += 1
+      continue
+    }
+
+    const nameStart = index
+    while (index < tag.length && !/[\s=/>]/.test(tag[index])) index += 1
+    const name = tag.slice(nameStart, index).toLowerCase()
+    if (!name) {
+      index += 1
+      continue
+    }
+
+    while (index < tag.length && /\s/.test(tag[index])) index += 1
+
+    let value = ''
+    if (tag[index] === '=') {
+      index += 1
+      while (index < tag.length && /\s/.test(tag[index])) index += 1
+
+      const quote = tag[index] === '"' || tag[index] === "'" ? tag[index] : null
+      if (quote) {
+        index += 1
+        const valueStart = index
+        while (index < tag.length && tag[index] !== quote) index += 1
+        value = tag.slice(valueStart, index)
+        if (tag[index] === quote) index += 1
+      } else {
+        const valueStart = index
+        while (index < tag.length && !/[\s>]/.test(tag[index])) index += 1
+        value = tag.slice(valueStart, index)
+      }
+    }
+
+    result[name] = value
+  }
+
+  return result
 }
 
 function namedMeta(name) {
@@ -19,11 +61,10 @@ function namedMeta(name) {
 }
 
 function charsetDeclarations(source) {
-  return [
-    ...source.matchAll(
-      /<meta\b[^>]*\bcharset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))[^>]*>/gi,
-    ),
-  ].map((match) => match[1] ?? match[2] ?? match[3] ?? '')
+  return [...source.matchAll(/<meta\b[^>]*>/gi)]
+    .map(([tag]) => attributes(tag))
+    .filter((attrs) => Object.hasOwn(attrs, 'charset'))
+    .map((attrs) => attrs.charset)
 }
 
 test('document head keeps one UTF-8 charset and SUPA title', () => {
