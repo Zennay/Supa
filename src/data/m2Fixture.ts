@@ -33,7 +33,7 @@ export const m2Recipes: RecipeWithIngredients[] = [
     estimatedCost: 5.8,
     tags: ['snel', 'reuse'],
     ingredients: [
-      { id: 'basmati-rice', label: 'Basmati rijst', query: 'basmati rijst', amount: 150, unit: 'g' },
+      { id: 'basmati-rice', label: 'Basmatirijst', query: 'basmati rijst', amount: 150, unit: 'g' },
       { id: 'broccoli', label: 'Broccoli', query: 'broccoli', amount: 250, unit: 'g' },
       { id: 'edamame', label: 'Edamame', query: 'edamame', amount: 150, unit: 'g' },
       { id: 'teriyaki-sauce', label: 'Teriyakisaus', query: 'teriyaki saus', amount: 60, unit: 'ml' },
