@@ -139,3 +139,22 @@ test('listing evidence rejects selector-contract or acquisition-safety drift', a
     'PromotionListFlow.OfferItem',
   )
 })
+
+
+test('listing evidence rejects cross-route relabeling', async () => {
+  const catalog = await fixture(catalogUrl)
+  catalog.source.url = 'https://www.plus.nl/aanbiedingen'
+
+  assert.deepEqual(parsePlusRenderedCatalogEvidence(catalog), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid catalog source',
+  })
+
+  const offers = await fixture(offersUrl)
+  offers.source.url = 'https://www.plus.nl/producten'
+
+  assert.deepEqual(parsePlusRenderedOffersEvidence(offers), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid offers source',
+  })
+})
