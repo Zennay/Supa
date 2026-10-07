@@ -1,29 +1,40 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 
-const gitignore = await readFile(new URL('../.gitignore', import.meta.url), 'utf8')
+const repoRoot = new URL('..', import.meta.url)
 
-function activeIgnoreRules(source) {
-  return new Set(
-    source
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#')),
+function assertIgnored(path) {
+  const result = spawnSync(
+    'git',
+    ['check-ignore', '--no-index', '--quiet', '--', path],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    },
+  )
+
+  assert.equal(
+    result.error,
+    undefined,
+    `failed to execute git check-ignore for ${path}: ${result.error?.message ?? 'unknown error'}`,
+  )
+  assert.equal(
+    result.status,
+    0,
+    `expected .gitignore to ignore ${path}; stderr=${result.stderr.trim() || '<empty>'}`,
   )
 }
 
-test('generated dependency, build and compiler artifacts remain ignored', () => {
-  const rules = activeIgnoreRules(gitignore)
-
-  for (const required of [
-    'node_modules',
-    'dist',
-    '*.log',
-    '*.tsbuildinfo',
+test('generated dependency, build and compiler artifacts remain effectively ignored', () => {
+  for (const path of [
+    'node_modules/example.js',
+    'dist/index.js',
+    'supa-validation.log',
+    'tsconfig.tsbuildinfo',
     'vite.config.js',
     'vite.config.d.ts',
   ]) {
-    assert.ok(rules.has(required), `missing .gitignore rule: ${required}`)
+    assertIgnored(path)
   }
 })
