@@ -23,13 +23,23 @@ test('Dependabot keeps both npm and GitHub Actions update lanes', () => {
   assert.deepEqual(ecosystems.sort(), ['github-actions', 'npm'])
 })
 
-test('dependency update lanes stay bounded, weekly and rooted at the repository', () => {
-  for (const ecosystem of ['npm', 'github-actions']) {
+test('dependency update lanes stay bounded, weekly and staggered', () => {
+  const expectedTimes = new Map([
+    ['npm', '06:00'],
+    ['github-actions', '06:15'],
+  ])
+
+  for (const [ecosystem, expectedTime] of expectedTimes) {
     const block = ecosystemBlock(ecosystem)
 
     assert.match(block, /^\s*directory:\s*"\/"\s*$/m)
     assert.match(block, /^\s*interval:\s*"weekly"\s*$/m)
     assert.match(block, /^\s*day:\s*"monday"\s*$/m)
+    assert.match(
+      block,
+      new RegExp(`^\\s*time:\\s*"${expectedTime}"\\s*$`, 'm'),
+      `${ecosystem} must keep its staggered update time`,
+    )
     assert.match(block, /^\s*timezone:\s*"Europe\/Amsterdam"\s*$/m)
 
     const limit = block.match(/^\s*open-pull-requests-limit:\s*(\d+)\s*$/m)
