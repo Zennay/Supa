@@ -26,6 +26,32 @@ function unwrapExpression(node) {
   return current
 }
 
+function isModuleRequireCallee(callee) {
+  return (
+    (ts.isPropertyAccessExpression(callee) &&
+      ts.isIdentifier(callee.expression) &&
+      callee.expression.text === 'module' &&
+      callee.name.text === 'require') ||
+    (ts.isElementAccessExpression(callee) &&
+      ts.isIdentifier(callee.expression) &&
+      callee.expression.text === 'module' &&
+      staticName(callee.argumentExpression) === 'require')
+  )
+}
+
+function isProcessGetBuiltinModuleCallee(callee) {
+  return (
+    (ts.isPropertyAccessExpression(callee) &&
+      ts.isIdentifier(callee.expression) &&
+      callee.expression.text === 'process' &&
+      callee.name.text === 'getBuiltinModule') ||
+    (ts.isElementAccessExpression(callee) &&
+      ts.isIdentifier(callee.expression) &&
+      callee.expression.text === 'process' &&
+      staticName(callee.argumentExpression) === 'getBuiltinModule')
+  )
+}
+
 function nodeTestBindingKind(initializer) {
   if (!initializer) return null
   const expression = unwrapExpression(initializer)
@@ -40,7 +66,12 @@ function nodeTestBindingKind(initializer) {
     return 'namespace'
   }
 
-  if (ts.isIdentifier(expression.expression) && expression.expression.text === 'require') {
+  if (
+    (ts.isIdentifier(expression.expression) &&
+      expression.expression.text === 'require') ||
+    isModuleRequireCallee(expression.expression) ||
+    isProcessGetBuiltinModuleCallee(expression.expression)
+  ) {
     return 'commonjs'
   }
 
@@ -464,17 +495,24 @@ test('disabled-test guard follows static, dynamic and CommonJS node:test aliases
     "import { test as check } /* before from */ from/* source */'node:test'; check/* member */.skip('disabled', () => {})",
     "const testApi = await import/* call */('node:test'); testApi.test/* member */['todo']('disabled', () => {})",
     "const check = require('node:test'); check.skip('disabled', () => {})",
+    "const check = module.require('node:test'); check.todo('disabled', () => {})",
+    "const testApi = module['require']('node:test'); testApi.describe.skip('disabled', () => {})",
+    "const check = process.getBuiltinModule('node:test'); check.skip('disabled', () => {})",
+    "const { suite: group } = process['getBuiltinModule']('node:test'); group.todo('disabled', () => {})",
     "import check = require('node:test'); check.todo('disabled', () => {})",
   ]) {
     assert.ok(findDisabledTest(source), source)
   }
 
-  assert.equal(
-    findDisabledTest(
-      "import check from './helper.js'; check.skip('not a node:test API', () => {})",
-    ),
-    null,
-  )
+  for (const source of [
+    "import check from './helper.js'; check.skip('not a node:test API', () => {})",
+    "const check = helper.require('node:test'); check.skip('not a node:test API', () => {})",
+    "const check = helper.getBuiltinModule('node:test'); check.skip('not a node:test API', () => {})",
+    "const check = module.require('node:fs'); check.skip('not node:test', () => {})",
+    "const check = process.getBuiltinModule('node:fs'); check.skip('not node:test', () => {})",
+  ]) {
+    assert.equal(findDisabledTest(source), null, source)
+  }
 })
 
 test('disabled-test guard follows local const aliases of known test callables', () => {
