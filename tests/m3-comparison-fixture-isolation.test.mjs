@@ -20,6 +20,21 @@ test('M3 baseline fixture does not alias M2 store or product objects', () => {
   }
 })
 
+test('M3 comparison fixture binds every product to its declared store', () => {
+  assert.equal(
+    m3BaselineProducts.every(
+      (product) => product.storeId === m3BaselineStore.id,
+    ),
+    true,
+  )
+  assert.equal(
+    m3CandidateProducts.every(
+      (product) => product.storeId === m3CandidateStore.id,
+    ),
+    true,
+  )
+})
+
 test('M3 candidate fixture remains independent from M2 product objects', () => {
   for (const m2Product of m2Products) {
     const candidate = m3CandidateProducts.find(
