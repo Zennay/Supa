@@ -80,6 +80,10 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function safePositiveInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const TIMESTAMP_PATTERN =
   /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
@@ -185,23 +189,18 @@ function validateEvidenceBoundary(
   const browserEvidence = evidence.browserEvidence
   const safety = browserEvidence?.safety
   if (
-    !Number.isInteger(browserEvidence?.runId) ||
-    browserEvidence.runId <= 0 ||
-    !Number.isInteger(browserEvidence?.artifactId) ||
-    browserEvidence.artifactId <= 0 ||
+    !safePositiveInteger(browserEvidence?.runId) ||
+    !safePositiveInteger(browserEvidence?.artifactId) ||
     !/^sha256:[a-f0-9]{64}$/.test(browserEvidence?.artifactDigest ?? '') ||
     !/^[a-f0-9]{40}$/.test(browserEvidence?.supaSha ?? '') ||
     browserEvidence?.renderedHtmlSha256 !== evidence.source.sha256 ||
-    !Number.isInteger(browserEvidence?.renderedHtmlBytes) ||
-    browserEvidence.renderedHtmlBytes <= 0 ||
-    !Number.isInteger(browserEvidence?.screenshotBytes) ||
-    browserEvidence.screenshotBytes <= 0 ||
+    !safePositiveInteger(browserEvidence?.renderedHtmlBytes) ||
+    !safePositiveInteger(browserEvidence?.screenshotBytes) ||
     typeof browserEvidence?.browser !== 'string' ||
     !browserEvidence.browser.trim() ||
     typeof browserEvidence?.driver !== 'string' ||
     !browserEvidence.driver.trim() ||
-    !Number.isInteger(browserEvidence?.observedProductLinkCount) ||
-    browserEvidence.observedProductLinkCount <= 0 ||
+    !safePositiveInteger(browserEvidence?.observedProductLinkCount) ||
     !selectorContractMatches(browserEvidence?.selectorContract) ||
     !safety ||
     safety.login !== false ||
