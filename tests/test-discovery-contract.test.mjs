@@ -11,10 +11,8 @@ const packageJson = JSON.parse(
 )
 const TEST_LIKE_FILENAME = /\.(?:test|spec)\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
 const NODE_TEST_SOURCE_FILENAME = /\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
-const JS_BLOCK_COMMENT_TRIVIA = String.raw`(?:\\s|\\/\\*[\\s\\S]*?\\*\\/)*`
-const NODE_TEST_IMPORT_PATTERN = new RegExp(
-  String.raw`(?:\\bfrom${JS_BLOCK_COMMENT_TRIVIA}['"]node:test['"]|\\bimport${JS_BLOCK_COMMENT_TRIVIA}['"]node:test['"]|\\bimport${JS_BLOCK_COMMENT_TRIVIA}\\(${JS_BLOCK_COMMENT_TRIVIA}['"]node:test['"]${JS_BLOCK_COMMENT_TRIVIA}\\)|\\brequire${JS_BLOCK_COMMENT_TRIVIA}\\(${JS_BLOCK_COMMENT_TRIVIA}['"]node:test['"]${JS_BLOCK_COMMENT_TRIVIA}\\))`,
-)
+const NODE_TEST_IMPORT_PATTERN =
+  /(?:\bfrom(?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"]|\bimport(?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"]|\bimport(?:\s|\/\*[\s\S]*?\*\/)*\((?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"](?:\s|\/\*[\s\S]*?\*\/)*\)|\brequire(?:\s|\/\*[\s\S]*?\*\/)*\((?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"](?:\s|\/\*[\s\S]*?\*\/)*\))/
 const NON_SOURCE_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage'])
 
 function isTestLikeEntry(entry) {
