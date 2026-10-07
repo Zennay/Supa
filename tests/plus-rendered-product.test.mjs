@@ -111,3 +111,22 @@ test('PLUS rendered product requires a timezone-bearing capture timestamp', asyn
   offset.source.capturedAt = '2026-10-04T20:08:57.837+02:00'
   assert.equal(parsePlusRenderedProductEvidence(offset).type, 'observation')
 })
+
+test('PLUS rendered evidence binds parsed product identity to the source URL', async () => {
+  const wrongSku = await fixture()
+  wrongSku.jsonLd.sku = '999999'
+
+  assert.deepEqual(parsePlusRenderedProductEvidence(wrongSku), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence product identity does not match source URL',
+  })
+
+  const missingUrlId = await fixture()
+  missingUrlId.source.url = 'https://www.plus.nl/product/zuivelmeester-halfvolle-melk'
+  missingUrlId.browserEvidence.finalUrl = missingUrlId.source.url
+
+  assert.deepEqual(parsePlusRenderedProductEvidence(missingUrlId), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence product identity does not match source URL',
+  })
+})
