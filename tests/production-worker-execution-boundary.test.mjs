@@ -109,6 +109,37 @@ function findSecondaryBrowserExecution(source, filename = 'candidate.tsx') {
   function visit(node) {
     if (finding) return
 
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      for (const constructorName of workerConstructors) {
+        if (isBrowserGlobalMember(node, constructorName)) {
+          finding = {
+            kind: constructorName + ' browser-global reference',
+            text: node.getText(sourceFile),
+          }
+          return
+        }
+      }
+
+      if (isBrowserGlobalMember(node, 'importScripts')) {
+        finding = {
+          kind: 'worker importScripts reference',
+          text: node.getText(sourceFile),
+        }
+        return
+      }
+
+      if (
+        isServiceWorkerObject(node.expression) &&
+        memberName(node) === 'register'
+      ) {
+        finding = {
+          kind: 'service-worker registration reference',
+          text: node.getText(sourceFile),
+        }
+        return
+      }
+    }
+
     if (ts.isNewExpression(node)) {
       for (const constructorName of workerConstructors) {
         if (isBrowserGlobalMember(node.expression, constructorName)) {
@@ -202,6 +233,9 @@ test('worker execution boundary catches direct browser execution primitives', ()
     "window.navigator['serviceWorker']['register']('/sw.js')",
     "importScripts('/runtime.js')",
     "self['importScripts']('/runtime.js')",
+    "const WorkerCtor = window.Worker",
+    "const register = navigator.serviceWorker.register",
+    "const loader = self.importScripts",
   ]) {
     assert.ok(findSecondaryBrowserExecution(source), source)
   }
