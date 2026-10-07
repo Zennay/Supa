@@ -8,6 +8,7 @@ const srcDir = new URL('../src/', import.meta.url)
 const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx'])
 const browserRoots = new Set(['globalThis', 'self', 'window'])
 const persistentStores = new Set(['caches', 'indexedDB'])
+const persistentNavigatorStores = new Set(['storage'])
 
 function staticName(node) {
   if (!node) return null
@@ -35,6 +36,22 @@ function unwrapExpression(node) {
   return current
 }
 
+function isNavigatorObject(node) {
+  const current = unwrapExpression(node)
+  if (ts.isIdentifier(current)) return current.text === 'navigator'
+
+  if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
+    return false
+  }
+
+  const base = unwrapExpression(current.expression)
+  return (
+    ts.isIdentifier(base) &&
+    browserRoots.has(base.text) &&
+    memberName(current) === 'navigator'
+  )
+}
+
 function isPersistentBrowserStore(node) {
   const current = unwrapExpression(node)
 
@@ -47,10 +64,36 @@ function isPersistentBrowserStore(node) {
   }
 
   const base = unwrapExpression(current.expression)
-  return (
+
+  if (
     ts.isIdentifier(base) &&
     browserRoots.has(base.text) &&
     persistentStores.has(memberName(current))
+  ) {
+    return true
+  }
+
+  return (
+    isNavigatorObject(base) &&
+    persistentNavigatorStores.has(memberName(current))
+  )
+}
+
+function isPersistentNavigatorStoreBinding(node) {
+  if (!ts.isBindingElement(node) || node.dotDotDotToken) return false
+
+  const pattern = node.parent
+  if (!ts.isObjectBindingPattern(pattern)) return false
+
+  const declaration = pattern.parent
+  if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) {
+    return false
+  }
+
+  const key = staticName(node.propertyName ?? node.name)
+  return (
+    persistentNavigatorStores.has(key) &&
+    isNavigatorObject(declaration.initializer)
   )
 }
 
@@ -80,6 +123,14 @@ function findPersistentBrowserStore(source, filename = 'candidate.ts') {
 
   function visit(node) {
     if (finding) return
+
+    if (isPersistentNavigatorStoreBinding(node)) {
+      finding = {
+        kind: 'navigator.storage destructured reference',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
 
     if (ts.isIdentifier(node) && persistentStores.has(node.text)) {
       const parent = node.parent
@@ -161,6 +212,11 @@ test('persistent-store boundary catches IndexedDB and CacheStorage entry points'
     "caches.open('supa-runtime')",
     "self['caches'].match('/basket')",
     "const cacheStorage = window.caches",
+    "navigator.storage.getDirectory()",
+    "window.navigator.storage.persist()",
+    "const storageManager = self.navigator['storage']",
+    "const { storage } = navigator",
+    "const { storage: persistence } = globalThis.navigator",
   ]) {
     assert.ok(findPersistentBrowserStore(source), source)
   }
@@ -174,6 +230,10 @@ test('persistent-store boundary preserves local lookalikes and inert text', () =
     "const cachesEnabled = false",
     "const example = \"indexedDB.open('example')\"",
     "// caches.open('example')",
+    "app.navigator.storage.getDirectory()",
+    "storageClient.storage.persist()",
+    "const storage = app.storage",
+    "navigator.language",
   ]) {
     assert.equal(findPersistentBrowserStore(source), null, source)
   }
