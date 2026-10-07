@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-import {\n  persistObservationDraft,\n  removeObservationDraft,\n} from '../src/features/observation/observationDraftPersistence.ts'
+import {
+  persistObservationDraft,
+  removeObservationDraft,
+} from '../src/features/observation/observationDraftPersistence.ts'
 
 const source = await readFile(
   new URL('../src/features/observation/ObservationView.tsx', import.meta.url),
