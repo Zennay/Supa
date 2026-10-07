@@ -33,7 +33,7 @@ test('M2 browser runner keeps its safety and proof gates', () => {
 
 test('M2 browser workflow pins GitHub-maintained actions to immutable commits', () => {
   const actionUses = [...workflow.matchAll(
-    /^\s*- uses:\s*(actions\/[^@\s]+)@([^\s#]+)\s+#\s+(v\d+\.\d+\.\d+)\s*$/gm,
+    /^\s*(?:-\s*)?uses:\s*(actions\/[^@\s]+)@([^\s#]+)\s+#\s+(v\d+\.\d+\.\d+)\s*$/gm,
   )]
 
   assert.equal(actionUses.length, 3)
@@ -41,5 +41,5 @@ test('M2 browser workflow pins GitHub-maintained actions to immutable commits', 
     assert.match(ref, /^[0-9a-f]{40}$/i, `${action} must use a full commit SHA`)
     assert.match(release, /^v\d+\.\d+\.\d+$/)
   }
-  assert.doesNotMatch(workflow, /^\s*- uses:\s*actions\/[^@\s]+@v\d+(?:\.\d+){0,2}\s*$/gm)
+  assert.doesNotMatch(workflow, /^\s*(?:-\s*)?uses:\s*actions\/[^@\s]+@v\d+(?:\.\d+){0,2}\s*$/gm)
 })
