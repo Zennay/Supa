@@ -115,12 +115,12 @@ function validateEvidenceBoundary(
     if (url.protocol !== 'https:' || url.hostname !== 'www.dekamarkt.nl') {
       return 'DekaMarkt evidence source must use the public HTTPS host'
     }
-    const expectedRoute =
-      expectedKind === 'catalog' ? '/producten' : '/aanbiedingen'
-    if (
-      url.pathname !== expectedRoute &&
-      !url.pathname.startsWith(`${expectedRoute}/`)
-    ) {
+    const routeMatches =
+      expectedKind === 'catalog'
+        ? url.pathname.startsWith('/producten/')
+        : url.pathname === '/aanbiedingen' ||
+          url.pathname.startsWith('/aanbiedingen/')
+    if (!routeMatches) {
       return `DekaMarkt evidence source route does not match ${expectedKind}`
     }
   } catch {
