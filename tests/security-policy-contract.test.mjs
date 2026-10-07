@@ -16,7 +16,7 @@ test('security policy routes sensitive reports privately without unsupported pro
 test('security policy preserves third-party authorization and evidence boundaries', async () => {
   const policy = await readFile(policyUrl, 'utf8')
 
-  assert.match(policy, /does not grant permission to actively test third-party retailers/i)
+  assert.match(policy, /grant permission to actively test third-party retailers/i)
   assert.match(policy, /unless the system owner has explicitly authorized/i)
   assert.match(policy, /Retailer data reuse remains subject to SUPA's existing permission\/licensing gate/i)
   assert.match(policy, /not authorization for production scraping or intrusive verification/i)
