@@ -237,6 +237,22 @@ test('AUD-005 response validator preserves allowed team identity fields', () => 
   assert.equal(normalized.nextOwnerTeam, 'e-commerce partnerships team')
 })
 
+test('AUD-005 response validator bounds deeply nested input before stack exhaustion', () => {
+  const record = validRecord()
+  let cursor = {}
+  record.extraMetadata = cursor
+
+  for (let depth = 0; depth < 20_000; depth += 1) {
+    cursor.next = {}
+    cursor = cursor.next
+  }
+
+  assert.throws(
+    () => validateRetailerResponseRecord(record),
+    /exceeds the maximum supported AUD-005 nesting depth/,
+  )
+})
+
 test('AUD-005 response validator rejects PII inside evidence references', () => {
   const emailRecord = validRecord()
   emailRecord.evidenceRef = 'private-response-person@example.com'
