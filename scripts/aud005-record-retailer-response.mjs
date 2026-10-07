@@ -28,6 +28,7 @@ const FORBIDDEN_KEYS = new Set([
 const CONSEQUENCE_KEYS = ['architecture', 'product', 'operatingCost', 'sourceStrategy']
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 const PHONE_PATTERN = /(?:\+?\d[\d\s().-]{7,}\d)/
+const MAX_RESPONSE_CLOCK_SKEW_MS = 5 * 60 * 1000
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -100,6 +101,15 @@ function isValidIsoTimestamp(value) {
 function requireTimestamp(value, path) {
   const normalized = requireString(value, path, { maxLength: 64, checkPii: false })
   assert(isValidIsoTimestamp(normalized), `${path} must be a valid ISO timestamp`)
+  return normalized
+}
+
+function requireObservedAt(value, path, now = Date.now()) {
+  const normalized = requireTimestamp(value, path)
+  assert(
+    Date.parse(normalized) <= now + MAX_RESPONSE_CLOCK_SKEW_MS,
+    `${path} must not be implausibly in the future`,
+  )
   return normalized
 }
 
@@ -176,7 +186,7 @@ export function validateRetailerResponseRecord(input) {
   assert(input.recordType === 'aud005-retailer-response', 'recordType must equal aud005-retailer-response')
 
   const retailer = requireEnum(input.retailer, RETAILERS, 'retailer')
-  const observedAt = requireTimestamp(input.observedAt, 'observedAt')
+  const observedAt = requireObservedAt(input.observedAt, 'observedAt')
   const channel = requireEnum(input.channel, CHANNELS, 'channel')
   const respondentTeam = requireString(input.respondentTeam, 'respondentTeam', { maxLength: 120 })
   const scope = validateScope(input.scope)
