@@ -5,6 +5,7 @@ import test from 'node:test'
 import * as ts from 'typescript'
 
 const srcDir = new URL('../src/', import.meta.url)
+const alwaysInteractiveTags = new Set(['button', 'input', 'select', 'textarea'])
 
 function parseSource(source, filename = 'candidate.tsx') {
   return ts.createSourceFile(
@@ -25,6 +26,21 @@ function attributeByName(attributes, expectedName) {
   )
 }
 
+function unwrapExpression(node) {
+  let current = node
+
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression
+  }
+
+  return current
+}
+
 function staticNumberFromAttribute(attribute) {
   if (!attribute?.initializer) return null
 
@@ -37,15 +53,7 @@ function staticNumberFromAttribute(attribute) {
     return null
   }
 
-  let expression = attribute.initializer.expression
-  while (
-    ts.isParenthesizedExpression(expression) ||
-    ts.isAsExpression(expression) ||
-    ts.isTypeAssertionExpression(expression) ||
-    ts.isNonNullExpression(expression)
-  ) {
-    expression = expression.expression
-  }
+  const expression = unwrapExpression(attribute.initializer.expression)
 
   if (ts.isNumericLiteral(expression)) return Number(expression.text)
 
@@ -76,7 +84,7 @@ function staticBooleanFromAttribute(attribute) {
     return null
   }
 
-  const expression = attribute.initializer.expression
+  const expression = unwrapExpression(attribute.initializer.expression)
   if (expression.kind === ts.SyntaxKind.TrueKeyword) return true
   if (expression.kind === ts.SyntaxKind.FalseKeyword) return false
   return null
@@ -91,9 +99,10 @@ function hasStaticHref(attributes) {
     return false
   }
 
+  const expression = unwrapExpression(href.initializer.expression)
   return (
-    ts.isStringLiteralLike(href.initializer.expression) ||
-    ts.isNoSubstitutionTemplateLiteral(href.initializer.expression)
+    ts.isStringLiteralLike(expression) ||
+    ts.isNoSubstitutionTemplateLiteral(expression)
   )
 }
 
@@ -134,9 +143,8 @@ function findFocusAccessibilityEscapeHatch(source, filename = 'candidate.tsx') {
     if (staticBooleanFromAttribute(ariaHidden) !== true) return
 
     const tagName = intrinsicTagName(node)
-    const alwaysInteractive = new Set(['button', 'input', 'select', 'textarea'])
     const isInteractive =
-      (tagName !== null && alwaysInteractive.has(tagName)) ||
+      (tagName !== null && alwaysInteractiveTags.has(tagName)) ||
       (tagName === 'a' && hasStaticHref(node.attributes))
 
     if (isInteractive) {
@@ -215,9 +223,11 @@ test('focus accessibility guard rejects hiding intrinsic interactive controls', 
   for (const source of [
     '<button aria-hidden="true">Hidden</button>',
     '<input aria-hidden={true} />',
+    '<button aria-hidden={(true)}>Hidden</button>',
     '<select aria-hidden="true"><option>One</option></select>',
     '<textarea aria-hidden={true} />',
     '<a href="/help" aria-hidden="true">Help</a>',
+    "<a href={('/help')} aria-hidden={(true)}>Help</a>",
   ]) {
     assert.ok(findFocusAccessibilityEscapeHatch(source), source)
   }
