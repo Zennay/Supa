@@ -97,6 +97,37 @@ test('observation action label rejects targets that do not exist in the selected
   )
 })
 
+test('observation action label rejects stale targets whose matching line is already complete', () => {
+  const sheet = buildObservationSheet()
+  const matching = sheet.baseline.lines.find(
+    (line) => line.ingredientId === nextBaselineRice.ingredientId,
+  )
+
+  matching.observedProduct.available = false
+
+  assert.throws(
+    () => nextObservationActionLabel(sheet, nextBaselineRice),
+    /invalid next observation target/,
+  )
+})
+
+test('observation action label ignores completed duplicate copy when an incomplete match remains', () => {
+  const sheet = buildObservationSheet()
+  const matching = sheet.baseline.lines.find(
+    (line) => line.ingredientId === nextBaselineRice.ingredientId,
+  )
+  const completedDuplicate = structuredClone(matching)
+
+  completedDuplicate.ingredientLabel = 'Verkeerde voltooide regel'
+  completedDuplicate.observedProduct.available = false
+  sheet.baseline.lines.push(completedDuplicate)
+
+  assert.equal(
+    nextObservationActionLabel(sheet, nextBaselineRice),
+    'Volgende: PLUS · Basmati rijst',
+  )
+})
+
 test('observation action label ignores malformed line entries and keeps valid copy', () => {
   const sheet = buildObservationSheet()
   sheet.baseline.lines = [
