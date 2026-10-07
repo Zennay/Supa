@@ -65,6 +65,58 @@ function isBrowserOpen(node) {
   return isBrowserRoot(current.expression) && memberName(current) === 'open'
 }
 
+function addBindingNames(name, bindings) {
+  if (ts.isIdentifier(name)) {
+    bindings.add(name.text)
+    return
+  }
+
+  if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+    for (const element of name.elements) {
+      if (ts.isBindingElement(element)) addBindingNames(element.name, bindings)
+    }
+  }
+}
+
+function collectDeclaredNames(sourceFile) {
+  const bindings = new Set()
+
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) || ts.isParameter(node)) {
+      addBindingNames(node.name, bindings)
+    } else if (
+      (ts.isFunctionDeclaration(node) ||
+        ts.isClassDeclaration(node) ||
+        ts.isFunctionExpression(node) ||
+        ts.isClassExpression(node) ||
+        ts.isImportEqualsDeclaration(node)) &&
+      node.name
+    ) {
+      bindings.add(node.name.text)
+    } else if (ts.isImportClause(node) && node.name) {
+      bindings.add(node.name.text)
+    } else if (ts.isImportSpecifier(node) || ts.isNamespaceImport(node)) {
+      bindings.add(node.name.text)
+    } else if (ts.isCatchClause(node) && node.variableDeclaration) {
+      addBindingNames(node.variableDeclaration.name, bindings)
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return bindings
+}
+
+function isUnboundBrowserOpen(node, declaredNames) {
+  const current = unwrapExpression(node)
+  return (
+    ts.isIdentifier(current) &&
+    current.text === 'open' &&
+    !declaredNames.has('open')
+  )
+}
+
 function isLocationHref(node) {
   const current = unwrapExpression(node)
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
@@ -108,6 +160,7 @@ function findImperativeBrowserNavigation(source, filename = 'candidate.tsx') {
     true,
     scriptKindFor(filename),
   )
+  const declaredNames = collectDeclaredNames(sourceFile)
 
   let finding = null
 
@@ -122,6 +175,29 @@ function findImperativeBrowserNavigation(source, filename = 'candidate.tsx') {
       finding = {
         kind: 'browser location alias',
         text: node.getText(sourceFile),
+      }
+      return
+    }
+
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.initializer &&
+      isUnboundBrowserOpen(node.initializer, declaredNames)
+    ) {
+      finding = {
+        kind: 'bare browser open alias',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
+
+    if (
+      ts.isCallExpression(node) &&
+      isUnboundBrowserOpen(node.expression, declaredNames)
+    ) {
+      finding = {
+        kind: 'bare browser open call',
+        text: node.expression.getText(sourceFile),
       }
       return
     }
@@ -206,6 +282,10 @@ test('navigation boundary catches direct browser navigation primitives', () => {
     "window.open('https://example.test')",
     "self['open']('/elsewhere')",
     "globalThis.open('/elsewhere')",
+    "open('https://example.test')",
+    "open?.('/elsewhere')",
+    "const launch = open",
+    "const launch = (open)",
     "location.assign('/elsewhere')",
     "window.location.replace('/elsewhere')",
     "self['location']['assign']('/elsewhere')",
@@ -232,6 +312,8 @@ test('navigation boundary preserves inert text and app-local navigation abstract
     "history.pushState({}, '', '/planner')",
     "history.replaceState({}, '', '/planner')",
     "const open = () => {}; open('/planner')",
+    "function navigate(open) { open('/planner') }",
+    "import { open } from './router'; open('/planner')",
     "const href = '/planner'",
     "const target = router.location",
     "const target = navigation.location",
