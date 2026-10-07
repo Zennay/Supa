@@ -67,6 +67,12 @@ function safeCapturedAt(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
 }
 
+function safeHtmlContentType(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const mediaType = value.split(';', 1)[0]?.trim().toLowerCase()
+  return mediaType === 'text/html'
+}
+
 function safeDekaMarktProductUrl(value: unknown): value is string {
   if (typeof value !== 'string') return false
   try {
@@ -157,7 +163,7 @@ export function parseDekaMarktSsrProductEvidence(
   const safety = evidence.captureEvidence?.safety
   if (
     evidence.captureEvidence?.status !== 200 ||
-    !evidence.captureEvidence?.contentType?.toLowerCase().includes('text/html') ||
+    !safeHtmlContentType(evidence.captureEvidence?.contentType) ||
     !safety ||
     safety.login !== false ||
     safety.credentials !== false ||
