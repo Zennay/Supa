@@ -11,13 +11,26 @@ export type NextObservationLine = {
 
 export function nextObservationActionLabel(
   sheet: ObservationSheet,
-  next: NextObservationLine,
+  next: unknown,
 ): string {
-  if (!next) return 'Alle regels zijn gemeten'
+  if (next === null) return 'Alle regels zijn gemeten'
 
-  const retailer = M3_EXPECTED_RETAILERS[next.side]
-  const line = sheet[next.side].lines.find(
-    (candidate) => candidate.ingredientId === next.ingredientId,
+  if (!next || typeof next !== 'object' || Array.isArray(next)) {
+    throw new Error('invalid next observation target')
+  }
+
+  const candidate = next as Partial<Exclude<NextObservationLine, null>>
+  if (
+    (candidate.side !== 'baseline' && candidate.side !== 'candidate') ||
+    typeof candidate.ingredientId !== 'string' ||
+    candidate.ingredientId.trim() === ''
+  ) {
+    throw new Error('invalid next observation target')
+  }
+
+  const retailer = M3_EXPECTED_RETAILERS[candidate.side]
+  const line = sheet[candidate.side].lines.find(
+    (lineCandidate) => lineCandidate.ingredientId === candidate.ingredientId,
   )
 
   return line
