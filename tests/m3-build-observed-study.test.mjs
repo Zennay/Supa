@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { link, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -95,6 +95,26 @@ test('M3 converter preserves a missing observed price as unresolved instead of i
   assert.match(line.reasons.join(' '), /price is unknown/i)
 })
 
+test('M3 converter preserves missing pack counts as unresolved evidence', () => {
+  for (const packCount of [undefined, null]) {
+    const sheet = completedSheet()
+    if (packCount === undefined) {
+      delete sheet.baseline.lines[0].observedProduct.packCount
+    } else {
+      sheet.baseline.lines[0].observedProduct.packCount = packCount
+    }
+
+    const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+    const assessment = assessWeeklyBasketStudy(study)
+    const line = study.baseline.basket.lines[0]
+
+    assert.equal(line.status, 'unresolved')
+    assert.match(line.reasons.join(' '), /pack count is unknown or invalid/i)
+    assert.equal(assessment.claimable, false)
+    assert.equal(assessment.comparison.outcome, 'unknown')
+  }
+})
+
 test('M3 converter preserves unsafe cent values as unresolved evidence', () => {
   const sheet = completedSheet()
   sheet.baseline.lines[1].observedProduct.priceCents = Number.MAX_SAFE_INTEGER + 1
@@ -155,6 +175,39 @@ test('M3 converter refuses retailer drift from the canonical PLUS + DekaMarkt pa
   )
 })
 
+test('M3 converter rejects reused evidence identity across retailer observations', () => {
+  const sheet = completedSheet()
+  sheet.candidate.evidenceId = sheet.baseline.evidenceId
+
+  assert.throws(
+    () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+    /baseline and candidate evidence IDs must differ/,
+  )
+})
+
+test('M3 converter rejects a shared store identity across retailer observations', () => {
+  const sheet = completedSheet()
+  sheet.candidate.store.id = sheet.baseline.store.id
+
+  assert.throws(
+    () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+    /baseline and candidate stores must differ/,
+  )
+})
+
+test('M3 converter preserves out-of-window observations as downstream unknown evidence', () => {
+  const sheet = completedSheet()
+  sheet.baseline.observedAt = '2026-10-04T12:00:00Z'
+  sheet.candidate.observedAt = '2026-10-05T12:00:01Z'
+
+  const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  const assessment = assessWeeklyBasketStudy(study)
+
+  assert.equal(assessment.claimable, false)
+  assert.equal(assessment.comparison.outcome, 'unknown')
+  assert.match(assessment.reasons.join(' '), /max is 24h/)
+})
+
 test('M3 converter refuses a missing price context', () => {
   const sheet = completedSheet()
   sheet.study.priceContext = ''
@@ -183,6 +236,181 @@ test('M3 converter refuses ambiguous availability types', () => {
     () => buildWeeklyBasketStudyFromObservationSheet(sheet),
     /available must be true or false/,
   )
+})
+
+test('M3 converter CLI rejects missing, option-like, and duplicate output paths', () => {
+  const cases = [
+    ['unused-observation-sheet.json', '--output'],
+    ['unused-observation-sheet.json', '--output', '--bogus'],
+    [
+      'unused-observation-sheet.json',
+      '--output',
+      'first-study.json',
+      '--output',
+      'second-study.json',
+    ],
+  ]
+
+  for (const args of cases) {
+    const result = spawnSync(
+      process.execPath,
+      ['--experimental-strip-types', 'scripts/m3-build-observed-study.mjs', ...args],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      },
+    )
+
+    assert.notEqual(result.status, 0)
+    assert.match(
+      result.stderr,
+      /--output (?:requires a file path|may only be provided once)/,
+    )
+  }
+})
+
+test('M3 converter CLI refuses a hardlink alias that targets the raw observation sheet', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-study-hardlink-'))
+  const input = join(directory, 'observation-sheet.json')
+  const output = join(directory, 'study-hardlink.json')
+  const original = `${JSON.stringify(completedSheet(), null, 2)}\n`
+
+  try {
+    await writeFile(input, original, 'utf8')
+    await link(input, output)
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        'scripts/m3-build-observed-study.mjs',
+        input,
+        '--output',
+        output,
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      },
+    )
+
+    assert.notEqual(result.status, 0)
+    assert.match(
+      result.stderr,
+      /--output must not overwrite the observation sheet input/,
+    )
+    assert.equal(await readFile(input, 'utf8'), original)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('M3 converter CLI refuses a symlink alias that targets the raw observation sheet', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-study-symlink-'))
+  const input = join(directory, 'observation-sheet.json')
+  const output = join(directory, 'study-alias.json')
+  const original = `${JSON.stringify(completedSheet(), null, 2)}\n`
+
+  try {
+    await writeFile(input, original, 'utf8')
+    await symlink(input, output)
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        'scripts/m3-build-observed-study.mjs',
+        input,
+        '--output',
+        output,
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      },
+    )
+
+    assert.notEqual(result.status, 0)
+    assert.match(
+      result.stderr,
+      /--output must not overwrite the observation sheet input/,
+    )
+    assert.equal(await readFile(input, 'utf8'), original)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('M3 converter CLI refuses to overwrite the raw observation sheet', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-study-source-'))
+  const input = join(directory, 'observation-sheet.json')
+  const original = `${JSON.stringify(completedSheet(), null, 2)}\n`
+
+  try {
+    await writeFile(input, original, 'utf8')
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        'scripts/m3-build-observed-study.mjs',
+        input,
+        '--output',
+        input,
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      },
+    )
+
+    assert.notEqual(result.status, 0)
+    assert.match(
+      result.stderr,
+      /--output must not overwrite the observation sheet input/,
+    )
+    assert.equal(await readFile(input, 'utf8'), original)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('M3 converter CLI preserves an existing study output instead of overwriting it', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-study-existing-'))
+  const input = join(directory, 'observation-sheet.json')
+  const output = join(directory, 'study.json')
+  const originalInput = `${JSON.stringify(completedSheet(), null, 2)}\n`
+  const originalOutput = '{"existing":"evidence"}\n'
+
+  try {
+    await writeFile(input, originalInput, 'utf8')
+    await writeFile(output, originalOutput, 'utf8')
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        'scripts/m3-build-observed-study.mjs',
+        input,
+        '--output',
+        output,
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      },
+    )
+
+    assert.notEqual(result.status, 0)
+    assert.match(
+      result.stderr,
+      /--output already exists; refusing to overwrite existing study evidence/,
+    )
+    assert.equal(await readFile(input, 'utf8'), originalInput)
+    assert.equal(await readFile(output, 'utf8'), originalOutput)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 test('M3 converter CLI writes a nested WeeklyBasketStudy output', async () => {

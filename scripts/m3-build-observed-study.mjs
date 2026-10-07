@@ -1,5 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { matchIngredient } from '../src/domain/matching.ts'
@@ -155,7 +155,7 @@ function buildObservedLine(line, requirement, path) {
     return unresolvedLine(requirement, ['observed pack quantity is unknown or invalid'])
   }
 
-  const packCount = observed.packCount ?? 1
+  const packCount = observed.packCount
   if (!Number.isSafeInteger(packCount) || packCount <= 0) {
     return unresolvedLine(requirement, ['observed pack count is unknown or invalid'])
   }
@@ -360,6 +360,15 @@ export function buildWeeklyBasketStudyFromObservationSheet(sheet) {
     candidate: buildObservedBasket(sheet.candidate, canonical, 'candidate'),
   }
 
+  assert(
+    study.baseline.evidenceId !== study.candidate.evidenceId,
+    'baseline and candidate evidence IDs must differ',
+  )
+  assert(
+    study.baseline.basket.store.id !== study.candidate.basket.store.id,
+    'baseline and candidate stores must differ',
+  )
+
   validateObservedWeekInput(study)
   return study
 }
@@ -367,11 +376,21 @@ export function buildWeeklyBasketStudyFromObservationSheet(sheet) {
 function parseArgs(argv) {
   const positional = []
   let output = null
+  let outputSeen = false
 
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]
     if (value === '--output') {
-      output = argv[index + 1] ?? null
+      assert(!outputSeen, '--output may only be provided once')
+      const candidate = argv[index + 1]
+      assert(
+        typeof candidate === 'string' &&
+          candidate.trim().length > 0 &&
+          !candidate.startsWith('--'),
+        '--output requires a file path',
+      )
+      output = candidate
+      outputSeen = true
       index += 1
       continue
     }
@@ -382,13 +401,61 @@ function parseArgs(argv) {
     positional.length === 1,
     'usage: m3:build-observed-study <observation-sheet.json> [--output study.json]',
   )
-  assert(!output || output.trim().length > 0, '--output requires a file path')
 
   return { input: positional[0], output }
 }
 
+async function statIfExists(path) {
+  try {
+    return await stat(path)
+  } catch (error) {
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
+      return null
+    }
+    throw error
+  }
+}
+
+async function writeNewEvidenceFile(path, content) {
+  try {
+    await writeFile(path, content, { encoding: 'utf8', flag: 'wx' })
+  } catch (error) {
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'EEXIST'
+    ) {
+      throw new Error('--output already exists; refusing to overwrite existing study evidence')
+    }
+    throw error
+  }
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const { input, output } = parseArgs(argv)
+  assert(
+    !output || resolve(input) !== resolve(output),
+    '--output must not overwrite the observation sheet input',
+  )
+  if (output) {
+    const [inputStat, outputStat] = await Promise.all([
+      statIfExists(input),
+      statIfExists(output),
+    ])
+    assert(
+      !inputStat ||
+        !outputStat ||
+        inputStat.dev !== outputStat.dev ||
+        inputStat.ino !== outputStat.ino,
+      '--output must not overwrite the observation sheet input',
+    )
+  }
   let sheet
 
   try {
@@ -403,7 +470,7 @@ export async function main(argv = process.argv.slice(2)) {
 
   if (output) {
     await mkdir(dirname(output), { recursive: true })
-    await writeFile(output, serialized, 'utf8')
+    await writeNewEvidenceFile(output, serialized)
   } else {
     process.stdout.write(serialized)
   }
