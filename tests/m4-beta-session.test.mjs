@@ -242,6 +242,25 @@ test('event timestamps must remain inside the recorded study window', () => {
 })
 
 
+test('M4 timestamps require timezone-bearing real calendar instants', () => {
+  for (const startedAt of [
+    '2026-10-10',
+    '2026-10-10T10:00:00',
+    '2026-02-30T10:00:00Z',
+    '2026-10-10T24:00:00Z',
+    '2026-10-10T10:00:00+24:00',
+  ]) {
+    const session = validSession()
+    session.startedAt = startedAt
+
+    assert.throws(
+      () => validateBetaSession(session),
+      /startedAt must be a valid timestamp/,
+      startedAt,
+    )
+  }
+})
+
 test('session start participant identity must match the pseudonymous participant key', () => {
   const session = validSession()
   session.events[0].participant_id = 'p-other'
