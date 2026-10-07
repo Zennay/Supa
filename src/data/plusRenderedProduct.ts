@@ -60,6 +60,7 @@ function safePlusProductUrl(value: unknown): value is string {
     return (
       url.protocol === 'https:' &&
       url.hostname === 'www.plus.nl' &&
+      url.port === '' &&
       url.username === '' &&
       url.password === ''
     )
