@@ -8,7 +8,7 @@ const disabledMembers = ['skip', 'todo']
 const disabledCallPattern = new RegExp(
   `\\b(?:${aliases.join('|')})\\s*\\.\\s*(?:${disabledMembers.join('|')})\\s*\\(`,
 )
-const permanentlySkippedOptionPattern = /\bskip\s*:\s*true\b/
+const permanentlyDisabledOptionPattern = /\b(?:skip|todo)\s*:\s*true\b/
 
 test('canonical regression suite contains no explicitly disabled tests', async () => {
   const files = (await readdir(testsDir))
@@ -20,7 +20,7 @@ test('canonical regression suite contains no explicitly disabled tests', async (
   for (const file of files) {
     const source = await readFile(new URL(file, testsDir), 'utf8')
     const disabledCall = source.match(disabledCallPattern)
-    const permanentSkip = source.match(permanentlySkippedOptionPattern)
+    const permanentDisable = source.match(permanentlyDisabledOptionPattern)
 
     assert.equal(
       disabledCall,
@@ -28,17 +28,19 @@ test('canonical regression suite contains no explicitly disabled tests', async (
       `${file} explicitly disables a regression with ${disabledCall?.[0] ?? 'unknown call'}`,
     )
     assert.equal(
-      permanentSkip,
+      permanentDisable,
       null,
-      `${file} permanently disables a regression with a literal skip option`,
+      `${file} permanently disables a regression with a literal test option`,
     )
   }
 })
 
-test('disabled-test guard permits conditional skip options but rejects literal true', () => {
+test('disabled-test guard permits conditional skips but rejects literal disabled options', () => {
   const literalSkip = ['skip', ': true'].join('')
+  const literalTodo = ['todo', ': true'].join('')
   const conditionalSkip = ['skip', ": process.platform === 'win32'"].join('')
 
-  assert.match(literalSkip, permanentlySkippedOptionPattern)
-  assert.doesNotMatch(conditionalSkip, permanentlySkippedOptionPattern)
+  assert.match(literalSkip, permanentlyDisabledOptionPattern)
+  assert.match(literalTodo, permanentlyDisabledOptionPattern)
+  assert.doesNotMatch(conditionalSkip, permanentlyDisabledOptionPattern)
 })
