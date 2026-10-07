@@ -173,6 +173,23 @@ test('DekaMarkt offers require timezone-bearing real-calendar validity timestamp
   assert.equal(result.observations[0].offer.validTo, '2026-10-05T02:00:00+02:00')
 })
 
+test('DekaMarkt offer products fall back to the trusted outer validity window', async () => {
+  const evidence = await fixture(offersUrl)
+  const invalidStartRef = evidence.nuxtPayload.push('2026-09-29') - 1
+  const invalidEndRef = evidence.nuxtPayload.push('2026-10-05T00:00:00') - 1
+
+  evidence.nuxtPayload[15].startDate = invalidStartRef
+  evidence.nuxtPayload[15].endDate = invalidEndRef
+
+  const result = parseDekaMarktSsrOffersEvidence(evidence)
+
+  assert.equal(result.type, 'observations')
+  assert.equal(result.abstained, 0)
+  assert.equal(result.observations[0].sourceProductId, '47936')
+  assert.equal(result.observations[0].offer.validFrom, '2026-09-29T00:00:00.000Z')
+  assert.equal(result.observations[0].offer.validTo, '2026-10-05T00:00:00.000Z')
+})
+
 test('offers parser skips price disagreement instead of inferring weight-price semantics', async () => {
   const evidence = await fixture(offersUrl)
   // First linked product is payload index 15. Its offerPrice ref normally points
