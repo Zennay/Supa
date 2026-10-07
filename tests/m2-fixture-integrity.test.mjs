@@ -14,6 +14,13 @@ const canonical = (value) =>
   typeof value === 'string' && value.length > 0 && value === value.trim()
 
 test('M2 fixture keeps canonical unique identities and valid plan references', () => {
+  assert.ok(m2Recipes.length > 0, 'canonical M2 fixture must keep at least one recipe')
+  assert.ok(m2InitialPlan.length > 0, 'canonical M2 fixture must keep at least one planned meal')
+  assert.ok(
+    m2DefaultActiveDays.length > 0,
+    'canonical M2 fixture must keep at least one default active day',
+  )
+
   assert.ok(canonical(m2Store.id))
   assert.ok(canonical(m2Store.name))
 
@@ -42,6 +49,11 @@ test('M2 fixture keeps canonical unique identities and valid plan references', (
       assert.equal(tags.has(tag), false, `duplicate tag in ${recipe.id}: ${tag}`)
       tags.add(tag)
     }
+
+    assert.ok(
+      recipe.ingredients.length > 0,
+      `controlled recipe must keep at least one ingredient: ${recipe.id}`,
+    )
 
     const ingredientIds = new Set()
     for (const ingredient of recipe.ingredients) {
@@ -74,6 +86,11 @@ test('M2 fixture keeps canonical unique identities and valid plan references', (
 })
 
 test('M2 fixture products remain safe deterministic basket inputs', () => {
+  assert.ok(
+    m2Products.length > 0,
+    'canonical M2 fixture must keep at least one deterministic store product',
+  )
+
   const productIds = new Set()
 
   for (const product of m2Products) {
