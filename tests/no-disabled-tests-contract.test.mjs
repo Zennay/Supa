@@ -8,6 +8,7 @@ const disabledMembers = ['skip', 'todo']
 const disabledCallPattern = new RegExp(
   `\\b(?:${aliases.join('|')})\\s*\\.\\s*(?:${disabledMembers.join('|')})\\s*\\(`,
 )
+const permanentlySkippedOptionPattern = /\bskip\s*:\s*true\b/
 
 test('canonical regression suite contains no explicitly disabled tests', async () => {
   const files = (await readdir(testsDir))
@@ -18,12 +19,26 @@ test('canonical regression suite contains no explicitly disabled tests', async (
 
   for (const file of files) {
     const source = await readFile(new URL(file, testsDir), 'utf8')
-    const match = source.match(disabledCallPattern)
+    const disabledCall = source.match(disabledCallPattern)
+    const permanentSkip = source.match(permanentlySkippedOptionPattern)
 
     assert.equal(
-      match,
+      disabledCall,
       null,
-      `${file} explicitly disables a regression with ${match?.[0] ?? 'unknown call'}`,
+      `${file} explicitly disables a regression with ${disabledCall?.[0] ?? 'unknown call'}`,
+    )
+    assert.equal(
+      permanentSkip,
+      null,
+      `${file} permanently disables a regression with a literal skip option`,
     )
   }
+})
+
+test('disabled-test guard permits conditional skip options but rejects literal true', () => {
+  const literalSkip = ['skip', ': true'].join('')
+  const conditionalSkip = ['skip', ": process.platform === 'win32'"].join('')
+
+  assert.match(literalSkip, permanentlySkippedOptionPattern)
+  assert.doesNotMatch(conditionalSkip, permanentlySkippedOptionPattern)
 })
