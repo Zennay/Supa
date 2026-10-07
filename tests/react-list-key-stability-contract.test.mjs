@@ -90,6 +90,18 @@ function findMapIndexKey(source, filename = 'candidate.tsx') {
       if (finding) return
 
       if (
+        node !== callback &&
+        (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
+        node.parameters.some(
+          (parameter) =>
+            ts.isIdentifier(parameter.name) &&
+            parameter.name.text === indexName,
+        )
+      ) {
+        return
+      }
+
+      if (
         ts.isJsxAttribute(node) &&
         ts.isIdentifier(node.name) &&
         node.name.text === 'key' &&
