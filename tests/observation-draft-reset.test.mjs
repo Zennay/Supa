@@ -24,6 +24,21 @@ test('draft removal reports durable storage success and failure explicitly', () 
   )
   assert.deepEqual(removed, ['supa:m3:draft'])
 
+  let recovered = false
+  const { persistObservationDraft } = await import('../src/features/observation/observationDraftPersistence.ts')
+  assert.equal(
+    persistObservationDraft(
+      () => ({ setItem() {} }),
+      'supa:m3:draft',
+      { clean: true },
+      () => {
+        recovered = true
+      },
+    ),
+    true,
+  )
+  assert.equal(recovered, true)
+
   assert.equal(
     removeObservationDraft(
       () => {
@@ -65,7 +80,7 @@ test('M3 reset never claims success when local draft removal fails', () => {
 test('a later successful persistence recovers the reset-removal warning', () => {
   assert.match(
     source,
-    /const persisted = persistObservationDraft\([\s\S]*?if \(persisted\) setDraftResetRemovalFailed\(false\)/,
+    /persistObservationDraft\([\s\S]*?\(\) => setDraftResetRemovalFailed\(false\)/,
   )
   assert.match(
     source,
