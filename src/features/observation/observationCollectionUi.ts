@@ -1,6 +1,8 @@
 import {
   M3_EXPECTED_RETAILERS,
+  nextIncompleteObservationLine,
   type M3ObservationSide,
+  type ObservationSheet,
 } from '../../domain/m3ObservationSheet.ts'
 
 export type NextObservationLine = {
@@ -40,6 +42,18 @@ export function nextObservationActionLabel(
   if (next === null) {
     observationLinesForSide(sheet, 'baseline')
     observationLinesForSide(sheet, 'candidate')
+
+    let pending: ReturnType<typeof nextIncompleteObservationLine>
+    try {
+      pending = nextIncompleteObservationLine(sheet as ObservationSheet)
+    } catch {
+      throw new Error('invalid observation sheet')
+    }
+
+    if (pending !== null) {
+      throw new Error('observation sheet is not complete')
+    }
+
     return 'Alle regels zijn gemeten'
   }
 
