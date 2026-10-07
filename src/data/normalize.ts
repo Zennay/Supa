@@ -20,6 +20,23 @@ function isSafePositiveNumber(value: number): boolean {
   return Number.isFinite(value) && value > 0 && value <= Number.MAX_SAFE_INTEGER
 }
 
+function isTextWithinMaxSafeNumber(value: string): boolean {
+  const normalized = value.replace(',', '.')
+  const [wholeText, fractionText = ''] = normalized.split('.')
+  const canonicalWhole = wholeText.replace(/^0+(?=\d)/, '')
+  const maxSafeText = String(Number.MAX_SAFE_INTEGER)
+
+  if (canonicalWhole.length !== maxSafeText.length) {
+    return canonicalWhole.length < maxSafeText.length
+  }
+
+  if (canonicalWhole !== maxSafeText) {
+    return canonicalWhole < maxSafeText
+  }
+
+  return fractionText === '' || /^0+$/.test(fractionText)
+}
+
 export function normalizeMoneyToCents(input: unknown): number | null {
   if (typeof input !== 'string') return null
 
@@ -81,6 +98,7 @@ export function normalizePackText(input: unknown): NormalizedPack {
     if (
       Number.isSafeInteger(count) &&
       count > 0 &&
+      isTextWithinMaxSafeNumber(multipack[2]) &&
       isSafePositiveNumber(amount)
     ) {
       return {
@@ -100,7 +118,10 @@ export function normalizePackText(input: unknown): NormalizedPack {
 
   if (single) {
     const amount = decimal(single[1])
-    if (isSafePositiveNumber(amount)) {
+    if (
+      isTextWithinMaxSafeNumber(single[1]) &&
+      isSafePositiveNumber(amount)
+    ) {
       return {
         rawText,
         count: 1,
