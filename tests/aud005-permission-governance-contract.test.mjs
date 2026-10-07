@@ -45,8 +45,8 @@ test('AUD-005 documentation keeps production permission separate from technical 
   )
   assert.match(
     routing,
-    /artifacts\/aud005\/<retailer>-<response-id>\.json/,
-    'routing contract must use a unique per-response evidence path',
+    /evidence\/aud005\/<retailer>-<response-id>\.json/,
+    'routing contract must use a unique tracked per-response evidence path',
   )
   assert.match(
     routing,
