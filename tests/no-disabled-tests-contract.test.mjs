@@ -126,6 +126,23 @@ function collectBindings(sourceFile) {
       }
     }
 
+    if (isConstBinding && ts.isObjectBindingPattern(node.name)) {
+      const sourceIsTestCallable = isTestCallableExpression(
+        unwrappedInitializer,
+        { callableAliases, namespaceAliases },
+      )
+
+      if (sourceIsTestCallable) {
+        for (const element of node.name.elements) {
+          if (!ts.isIdentifier(element.name)) continue
+          const sourceName = staticName(element.propertyName) ?? element.name.text
+          if (disabledMemberNames.has(sourceName)) {
+            disabledCallableAliases.add(element.name.text)
+          }
+        }
+      }
+    }
+
     const bindingKind = nodeTestBindingKind(node.initializer)
     if (!bindingKind) return
 
@@ -467,6 +484,25 @@ test('disabled-test guard follows const aliases of disabled test members', () =>
     "let skipped = test.skip; skipped = helper; skipped('unrelated helper', () => {})",
     "const helper = { skip() {} }; const skipped = helper.skip; skipped('unrelated helper', () => {})",
     "import * as testApi from 'node:test'; const helper = testApi.mock; const skipped = helper.skip; skipped('unrelated helper', () => {})",
+  ]) {
+    assert.equal(findDisabledTest(source), null, source)
+  }
+})
+
+test('disabled-test guard follows destructured disabled members from test callables', () => {
+  for (const source of [
+    "const { skip } = test; skip('disabled', () => {})",
+    "const { todo: pending } = test; pending('disabled', () => {})",
+    "import { test as check } from 'node:test'; const { skip: skipped } = check; skipped('disabled', () => {})",
+    "import * as testApi from 'node:test'; const { todo: pending } = testApi.describe; pending('disabled', () => {})",
+  ]) {
+    assert.ok(findDisabledTest(source), source)
+  }
+
+  for (const source of [
+    "let { skip } = test; skip = helper; skip('unrelated helper', () => {})",
+    "const helper = { skip() {} }; const { skip } = helper; skip('unrelated helper', () => {})",
+    "import * as testApi from 'node:test'; const { skip } = testApi.mock; skip('unrelated helper', () => {})",
   ]) {
     assert.equal(findDisabledTest(source), null, source)
   }
