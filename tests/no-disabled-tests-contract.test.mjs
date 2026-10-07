@@ -47,6 +47,27 @@ function importedNodeTestDisabledCall(source) {
     }
   }
 
+  const dynamicNamespaceImportPattern =
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*await\s+import\s*\(\s*['\"]node:test['\"]\s*\)/g
+  for (const match of source.matchAll(dynamicNamespaceImportPattern)) {
+    for (const apiName of aliases) {
+      importedAliases.push(
+        escapeRegex(match[1]) + '\\s*\\.\\s*' + escapeRegex(apiName),
+      )
+    }
+  }
+
+  const dynamicNamedImportPattern =
+    /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*await\s+import\s*\(\s*['\"]node:test['\"]\s*\)/g
+  for (const match of source.matchAll(dynamicNamedImportPattern)) {
+    for (const specifier of match[1].split(',')) {
+      const named = specifier
+        .trim()
+        .match(/^(test|it|describe|suite)(?:\s*:\s*([A-Za-z_$][\w$]*))?$/)
+      if (named) importedAliases.push(escapeRegex(named[2] ?? named[1]))
+    }
+  }
+
   const disabledMemberAccess =
     "\\s*(?:\\.\\s*(?:skip|todo)|\\[\\s*(?:'(?:skip|todo)'|\\\"(?:skip|todo)\\\"|`(?:skip|todo)`)\\s*\\])\\s*\\("
 
@@ -120,6 +141,14 @@ test('disabled-test guard follows aliases imported from node:test', () => {
     "import * as testApi from 'node:test'",
     ['testApi', '.', 'test', '.skip', "('disabled', () => {})"].join(''),
   ].join('\n')
+  const dynamicNamedAliasSource = [
+    "const { test: check, describe: group } = await import('node:test')",
+    ['check', '.skip', "('disabled', () => {})"].join(''),
+  ].join('\n')
+  const dynamicNamespaceAliasSource = [
+    "const testApi = await import('node:test')",
+    ['testApi', '.', 'suite', '[\"todo\"]', "('disabled', () => {})"].join(''),
+  ].join('\n')
   const unrelatedAliasSource = [
     "import check from './helper.js'",
     ['check', '.skip', "('not a node:test API', () => {})"].join(''),
@@ -128,6 +157,8 @@ test('disabled-test guard follows aliases imported from node:test', () => {
   assert.ok(importedNodeTestDisabledCall(defaultAliasSource), defaultAliasSource)
   assert.ok(importedNodeTestDisabledCall(namedAliasSource), namedAliasSource)
   assert.ok(importedNodeTestDisabledCall(namespaceAliasSource), namespaceAliasSource)
+  assert.ok(importedNodeTestDisabledCall(dynamicNamedAliasSource), dynamicNamedAliasSource)
+  assert.ok(importedNodeTestDisabledCall(dynamicNamespaceAliasSource), dynamicNamespaceAliasSource)
   assert.equal(importedNodeTestDisabledCall(unrelatedAliasSource), null)
 })
 test('disabled-test guard permits conditional skips but rejects literal disabled options', () => {
