@@ -39,6 +39,21 @@ test('AUD-005 documentation keeps production permission separate from technical 
     /npm run aud005:record-retailer-response/,
     'routing contract must retain the repository-safe response recorder',
   )
+  assert.match(
+    routing,
+    /artifacts\/aud005\/<retailer>-<response-id>\.json/,
+    'routing contract must use a unique per-response evidence path',
+  )
+  assert.match(
+    routing,
+    /fails if the output path already exists/i,
+    'routing contract must explain the no-clobber recorder boundary',
+  )
+  assert.match(
+    routing,
+    /do not delete, overwrite, or reuse a prior response artifact/i,
+    'routing contract must preserve prior stakeholder evidence',
+  )
 })
 
 test('AUD-005 evidence contract preserves non-approval outcomes instead of coercing them to permission', async () => {
