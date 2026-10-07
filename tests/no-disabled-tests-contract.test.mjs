@@ -49,6 +49,7 @@ function nodeTestBindingKind(initializer) {
 
 function collectBindings(sourceFile) {
   const callableAliases = new Set(canonicalApiNames)
+  const disabledCallableAliases = new Set()
   const namespaceAliases = new Set()
   const optionObjects = new Map()
 
@@ -83,6 +84,9 @@ function collectBindings(sourceFile) {
       if (callableAliases.has(unwrappedInitializer.text)) {
         callableAliases.add(node.name.text)
       }
+      if (disabledCallableAliases.has(unwrappedInitializer.text)) {
+        disabledCallableAliases.add(node.name.text)
+      }
     }
 
     if (
@@ -98,6 +102,14 @@ function collectBindings(sourceFile) {
         canonicalApiNames.has(memberName(unwrappedInitializer))
       ) {
         callableAliases.add(node.name.text)
+      }
+
+      if (
+        disabledMemberNames.has(memberName(unwrappedInitializer)) &&
+        base &&
+        isTestCallableExpression(base, { callableAliases, namespaceAliases })
+      ) {
+        disabledCallableAliases.add(node.name.text)
       }
     }
 
@@ -164,7 +176,12 @@ function collectBindings(sourceFile) {
   }
 
   visit(sourceFile)
-  return { callableAliases, namespaceAliases, optionObjects }
+  return {
+    callableAliases,
+    disabledCallableAliases,
+    namespaceAliases,
+    optionObjects,
+  }
 }
 
 function memberName(expression) {
@@ -203,6 +220,10 @@ function isTestCallableExpression(expression, bindings) {
 
 function isDisabledTestCallee(expression, bindings) {
   const current = unwrapExpression(expression)
+  if (ts.isIdentifier(current)) {
+    return bindings.disabledCallableAliases.has(current.text)
+  }
+
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return false
   }
@@ -426,6 +447,26 @@ test('disabled-test guard follows local const aliases of known test callables', 
     "const helper = { skip() {} }; const check = helper; check.skip('unrelated helper', () => {})",
     "import * as testApi from 'node:test'; const helper = testApi.mock; helper.skip('unrelated helper', () => {})",
     "import * as testApi from 'node:test'; const { mock: helper } = testApi; helper.skip('unrelated helper', () => {})",
+  ]) {
+    assert.equal(findDisabledTest(source), null, source)
+  }
+})
+
+test('disabled-test guard follows const aliases of disabled test members', () => {
+  for (const source of [
+    "const skipped = test.skip; skipped('disabled', () => {})",
+    "const skipped = test.skip; const disabled = skipped; disabled('disabled', () => {})",
+    "import * as testApi from 'node:test'; const skipped = testApi.test.skip; skipped('disabled', () => {})",
+    "const testApi = await import('node:test'); const pending = testApi.describe.todo; pending('disabled', () => {})",
+    "import { test as check } from 'node:test'; const skipped = check['skip']; skipped('disabled', () => {})",
+  ]) {
+    assert.ok(findDisabledTest(source), source)
+  }
+
+  for (const source of [
+    "let skipped = test.skip; skipped = helper; skipped('unrelated helper', () => {})",
+    "const helper = { skip() {} }; const skipped = helper.skip; skipped('unrelated helper', () => {})",
+    "import * as testApi from 'node:test'; const helper = testApi.mock; const skipped = helper.skip; skipped('unrelated helper', () => {})",
   ]) {
     assert.equal(findDisabledTest(source), null, source)
   }
