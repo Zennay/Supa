@@ -51,7 +51,8 @@ export function nextObservationActionLabel(
   if (
     (candidate.side !== 'baseline' && candidate.side !== 'candidate') ||
     typeof candidate.ingredientId !== 'string' ||
-    candidate.ingredientId.trim() === ''
+    candidate.ingredientId.trim() === '' ||
+    candidate.ingredientId !== candidate.ingredientId.trim()
   ) {
     throw new Error('invalid next observation target')
   }
