@@ -7,7 +7,14 @@ import * as ts from 'typescript'
 const srcDir = new URL('../src/', import.meta.url)
 const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx'])
 const browserRoots = new Set(['globalThis', 'self', 'window'])
-const networkConstructors = new Set(['EventSource', 'WebSocket', 'XMLHttpRequest'])
+const networkConstructors = new Set([
+  'EventSource',
+  'RTCPeerConnection',
+  'WebSocket',
+  'WebSocketStream',
+  'WebTransport',
+  'XMLHttpRequest',
+])
 
 function staticName(node) {
   if (!node) return null
