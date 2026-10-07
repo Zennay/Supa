@@ -41,13 +41,17 @@ function sourceImportsNodeTest(source) {
     if (ts.isImportDeclaration(node) && isNodeTestSpecifier(node.moduleSpecifier)) {
       const clause = node.importClause
       const namedBindings = clause?.namedBindings
-      const typeOnlyNamedImport =
+      const namedImportsAreTypeOnly =
         namedBindings &&
         ts.isNamedImports(namedBindings) &&
         namedBindings.elements.length > 0 &&
         namedBindings.elements.every((element) => element.isTypeOnly)
+      const hasRuntimeDefaultImport = Boolean(clause?.name)
 
-      if (!clause?.isTypeOnly && !typeOnlyNamedImport) {
+      if (
+        !clause?.isTypeOnly &&
+        (hasRuntimeDefaultImport || !namedImportsAreTypeOnly)
+      ) {
         importsNodeTest = true
         return
       }
@@ -167,6 +171,7 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import check from 'node:test'",
     "import { test as check } from 'node:test'",
     "import { type TestContext, test as check } from 'node:test'",
+    "import check, { type TestContext } from 'node:test'",
     "import 'node:test'",
     "const testApi = await import( 'node:test' )",
     "import check from/* discovery */'node:test'",
