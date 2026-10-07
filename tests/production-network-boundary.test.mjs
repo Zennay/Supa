@@ -42,7 +42,7 @@ function unwrapExpression(node) {
   return current
 }
 
-function isBrowserGlobalMember(node, expectedName) {
+function isBrowserGlobalMember(node, expectedName, rootAliases = browserRoots) {
   const current = unwrapExpression(node)
 
   if (ts.isIdentifier(current)) {
@@ -56,34 +56,43 @@ function isBrowserGlobalMember(node, expectedName) {
   const base = unwrapExpression(current.expression)
   return (
     ts.isIdentifier(base) &&
-    browserRoots.has(base.text) &&
+    rootAliases.has(base.text) &&
     memberName(current) === expectedName
   )
 }
 
-function isNavigatorObject(node) {
+function isBrowserRoot(node, rootAliases = browserRoots) {
   const current = unwrapExpression(node)
-  if (ts.isIdentifier(current)) return current.text === 'navigator'
+  return ts.isIdentifier(current) && rootAliases.has(current.text)
+}
+
+function isNavigatorObject(
+  node,
+  rootAliases = browserRoots,
+  navigatorAliases = new Set(),
+) {
+  const current = unwrapExpression(node)
+  if (ts.isIdentifier(current)) {
+    return current.text === 'navigator' || navigatorAliases.has(current.text)
+  }
 
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return false
   }
 
-  const base = unwrapExpression(current.expression)
   return (
-    ts.isIdentifier(base) &&
-    browserRoots.has(base.text) &&
+    isBrowserRoot(current.expression, rootAliases) &&
     memberName(current) === 'navigator'
   )
 }
 
-function networkReferenceName(node) {
+function networkReferenceName(node, bindings) {
   const current = unwrapExpression(node)
 
-  if (isBrowserGlobalMember(current, 'fetch')) return 'fetch'
+  if (isBrowserGlobalMember(current, 'fetch', bindings.rootAliases)) return 'fetch'
 
   for (const constructorName of networkConstructors) {
-    if (isBrowserGlobalMember(current, constructorName)) {
+    if (isBrowserGlobalMember(current, constructorName, bindings.rootAliases)) {
       return constructorName
     }
   }
@@ -91,7 +100,11 @@ function networkReferenceName(node) {
   if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
     if (
       memberName(current) === 'sendBeacon' &&
-      isNavigatorObject(current.expression)
+      isNavigatorObject(
+        current.expression,
+        bindings.rootAliases,
+        bindings.navigatorAliases,
+      )
     ) {
       return 'navigator.sendBeacon'
     }
@@ -100,12 +113,7 @@ function networkReferenceName(node) {
   return null
 }
 
-function isBrowserRoot(node) {
-  const current = unwrapExpression(node)
-  return ts.isIdentifier(current) && browserRoots.has(current.text)
-}
-
-function bindingElementNetworkReference(node) {
+function bindingElementNetworkReference(node, bindings) {
   if (!ts.isBindingElement(node) || node.dotDotDotToken) return null
 
   const pattern = node.parent
@@ -121,13 +129,16 @@ function bindingElementNetworkReference(node) {
 
   const source = unwrapExpression(declaration.initializer)
   if (
-    isBrowserRoot(source) &&
+    isBrowserRoot(source, bindings.rootAliases) &&
     (key === 'fetch' || networkConstructors.has(key))
   ) {
     return key
   }
 
-  if (key === 'sendBeacon' && isNavigatorObject(source)) {
+  if (
+    key === 'sendBeacon' &&
+    isNavigatorObject(source, bindings.rootAliases, bindings.navigatorAliases)
+  ) {
     return 'navigator.sendBeacon'
   }
 
@@ -167,6 +178,63 @@ function isDirectNetworkInvocationTarget(node) {
   )
 }
 
+function collectBrowserAliases(sourceFile) {
+  const rootAliases = new Set(browserRoots)
+  const navigatorAliases = new Set()
+  let changed = true
+
+  while (changed) {
+    changed = false
+
+    function visit(node) {
+      if (ts.isVariableDeclaration(node) && node.initializer) {
+        const initializer = unwrapExpression(node.initializer)
+
+        if (ts.isIdentifier(node.name)) {
+          const alias = node.name.text
+
+          if (
+            !rootAliases.has(alias) &&
+            isBrowserRoot(initializer, rootAliases)
+          ) {
+            rootAliases.add(alias)
+            changed = true
+          }
+
+          if (
+            !navigatorAliases.has(alias) &&
+            isNavigatorObject(initializer, rootAliases, navigatorAliases)
+          ) {
+            navigatorAliases.add(alias)
+            changed = true
+          }
+        } else if (
+          ts.isObjectBindingPattern(node.name) &&
+          isBrowserRoot(initializer, rootAliases)
+        ) {
+          for (const element of node.name.elements) {
+            if (!ts.isIdentifier(element.name)) continue
+            const sourceName = staticName(element.propertyName) ?? element.name.text
+            if (
+              sourceName === 'navigator' &&
+              !navigatorAliases.has(element.name.text)
+            ) {
+              navigatorAliases.add(element.name.text)
+              changed = true
+            }
+          }
+        }
+      }
+
+      ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+  }
+
+  return { rootAliases, navigatorAliases }
+}
+
 function scriptKindFor(filename) {
   switch (path.extname(filename)) {
     case '.tsx':
@@ -189,13 +257,14 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
     scriptKindFor(filename),
   )
 
+  const bindings = collectBrowserAliases(sourceFile)
   let finding = null
 
   function visit(node) {
     if (finding) return
 
     if (ts.isCallExpression(node)) {
-      if (isBrowserGlobalMember(node.expression, 'fetch')) {
+      if (isBrowserGlobalMember(node.expression, 'fetch', bindings.rootAliases)) {
         finding = {
           kind: 'fetch call',
           text: node.expression.getText(sourceFile),
@@ -207,7 +276,11 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
       if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
         if (
           memberName(callee) === 'sendBeacon' &&
-          isNavigatorObject(callee.expression)
+          isNavigatorObject(
+            callee.expression,
+            bindings.rootAliases,
+            bindings.navigatorAliases,
+          )
         ) {
           finding = {
             kind: 'sendBeacon call',
@@ -220,7 +293,13 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
 
     if (ts.isNewExpression(node)) {
       for (const constructorName of networkConstructors) {
-        if (isBrowserGlobalMember(node.expression, constructorName)) {
+        if (
+          isBrowserGlobalMember(
+            node.expression,
+            constructorName,
+            bindings.rootAliases,
+          )
+        ) {
           finding = {
             kind: constructorName + ' construction',
             text: node.expression.getText(sourceFile),
@@ -231,7 +310,7 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
     }
 
     if (ts.isBindingElement(node)) {
-      const referenceName = bindingElementNetworkReference(node)
+      const referenceName = bindingElementNetworkReference(node, bindings)
       if (referenceName) {
         finding = {
           kind: referenceName + ' destructured reference',
@@ -248,7 +327,7 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
       !isSyntaxName(node) &&
       !isDirectNetworkInvocationTarget(node)
     ) {
-      const referenceName = networkReferenceName(node)
+      const referenceName = networkReferenceName(node, bindings)
       if (referenceName) {
         finding = {
           kind: referenceName + ' detached reference',
@@ -333,6 +412,11 @@ test('network boundary catches detached browser networking references', () => {
     'const events = globalThis.EventSource',
     'const beacon = navigator.sendBeacon',
     "const beacon = window.navigator['sendBeacon']",
+    "const root = window; const request = root.fetch",
+    "const root = globalThis; const Socket = root.WebSocket",
+    "const root = self; const next = root; const Xhr = next.XMLHttpRequest",
+    "const nav = navigator; const beacon = nav.sendBeacon",
+    "const root = window; const nav = root.navigator; const beacon = nav.sendBeacon",
   ]) {
     assert.ok(findDirectProductionNetworkAccess(source), source)
   }
@@ -346,6 +430,9 @@ test('network boundary binds destructured references to browser globals', () => 
     'const { XMLHttpRequest: Xhr } = window',
     'const { sendBeacon: beacon } = navigator',
     "const { ['sendBeacon']: beacon } = globalThis.navigator",
+    "const root = window; const { fetch: request } = root",
+    "const root = self; const { WebSocket: Socket } = root",
+    "const { navigator: nav } = globalThis; const { sendBeacon: beacon } = nav",
   ]) {
     assert.ok(findDirectProductionNetworkAccess(source), source)
   }
@@ -365,6 +452,9 @@ test('network boundary ignores comments, strings and unrelated object methods', 
     'const { WebSocket: Socket } = transport',
     'const { sendBeacon: beacon } = telemetry',
     "const config = { fetch: 'local', WebSocket: 'local' }",
+    'const root = app.window; const request = root.fetch',
+    'const nav = app.navigator; const beacon = nav.sendBeacon',
+    'const { navigator: nav } = app; const beacon = nav.sendBeacon',
     'const fetch = 1',
     'class WebSocket {}',
     "const fetchCount = 1",
