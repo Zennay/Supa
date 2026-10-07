@@ -12,7 +12,7 @@ const packageJson = JSON.parse(
 const TEST_LIKE_FILENAME = /\.(?:test|spec)\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
 const NODE_TEST_SOURCE_FILENAME = /\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
 const NODE_TEST_IMPORT_PATTERN =
-  /(?:\bfrom\s*['"]node:test['"]|\bimport\s*['"]node:test['"]|\bimport\s*\(\s*['"]node:test['"]\s*\)|\brequire\s*\(\s*['"]node:test['"]\s*\))/
+  /(?:\bfrom(?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"]|\bimport(?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"]|\bimport(?:\s|\/\*[\s\S]*?\*\/)*\((?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"](?:\s|\/\*[\s\S]*?\*\/)*\)|\brequire(?:\s|\/\*[\s\S]*?\*\/)*\((?:\s|\/\*[\s\S]*?\*\/)*['"]node:test['"](?:\s|\/\*[\s\S]*?\*\/)*\))/
 const NON_SOURCE_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage'])
 
 function isTestLikeEntry(entry) {
@@ -112,6 +112,10 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import { test as check } from 'node:test'",
     "import 'node:test'",
     "const testApi = await import( 'node:test' )",
+    "import check from/* discovery */'node:test'",
+    "import/* discovery */'node:test'",
+    "const testApi = await import/* discovery */(/* source */'node:test'/* end */)",
+    "const testApi = require/* discovery */(/* source */'node:test'/* end */)",
     'const testApi = require( "node:test" )',
   ]) {
     assert.equal(sourceImportsNodeTest(source), true, source)
@@ -119,6 +123,7 @@ test('test discovery recognizes node:test modules even without test-like filenam
 
   for (const source of [
     "import check from './node-test-helper.mjs'",
+    "import/* discovery */'./node-test-helper.mjs'",
     "const label = 'node:test'",
   ]) {
     assert.equal(sourceImportsNodeTest(source), false, source)
