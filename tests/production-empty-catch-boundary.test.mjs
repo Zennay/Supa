@@ -20,6 +20,20 @@ function scriptKindFor(filename) {
   }
 }
 
+function hasExplanatoryComment(source) {
+  const comments = source.match(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g) ?? []
+
+  return comments.some((comment) => {
+    const text = comment.startsWith('//')
+      ? comment.slice(2)
+      : comment
+          .slice(2, -2)
+          .replace(/^\s*\*\s?/gm, '')
+
+    return /[\p{L}\p{N}]/u.test(text)
+  })
+}
+
 function findUndocumentedEmptyCatch(source, filename = 'candidate.tsx') {
   const sourceFile = ts.createSourceFile(
     filename,
@@ -35,10 +49,15 @@ function findUndocumentedEmptyCatch(source, filename = 'candidate.tsx') {
     if (finding) return
 
     if (ts.isCatchClause(node) && node.block.statements.length === 0) {
-      const inner = source.slice(node.block.getStart(sourceFile) + 1, node.block.getEnd() - 1)
+      const inner = source.slice(
+        node.block.getStart(sourceFile) + 1,
+        node.block.getEnd() - 1,
+      )
 
-      if (inner.trim() === '') {
-        const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+      if (!hasExplanatoryComment(inner)) {
+        const { line, character } = sourceFile.getLineAndCharacterOfPosition(
+          node.getStart(sourceFile),
+        )
         finding = {
           line: line + 1,
           column: character + 1,
@@ -61,7 +80,10 @@ async function listProductionSources(directory, relative = '') {
 
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     const childRelative = relative ? path.join(relative, entry.name) : entry.name
-    const childUrl = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory)
+    const childUrl = new URL(
+      entry.name + (entry.isDirectory() ? '/' : ''),
+      directory,
+    )
 
     if (entry.isDirectory()) {
       files.push(...await listProductionSources(childUrl, childRelative))
@@ -88,16 +110,19 @@ test('production source contains no undocumented empty catch blocks', async () =
       finding,
       null,
       finding
-        ? `${file.relativePath}:${finding.line}:${finding.column} silently swallows an error with an empty catch block`
+        ? `${file.relativePath}:${finding.line}:${finding.column} silently swallows an error with an undocumented empty catch block`
         : `${file.relativePath} contains an undocumented empty catch block`,
     )
   }
 })
 
-test('empty-catch guard rejects completely empty catches', () => {
+test('empty-catch guard rejects catches without explanatory content', () => {
   for (const source of [
     'try { risky() } catch {}',
     'try { risky() } catch (error) {   }',
+    'try { risky() } catch { /**/ }',
+    'try { risky() } catch { /*   */ }',
+    'try { risky() } catch { //   \n }',
   ]) {
     assert.ok(findUndocumentedEmptyCatch(source), source)
   }
@@ -109,6 +134,7 @@ test('empty-catch guard preserves deliberate recovery and documented best-effort
     'try { risky() } catch { throw new Error("failed") }',
     'try { risky() } catch { /* best effort only */ }',
     'try { risky() } catch { // storage may be unavailable\n }',
+    'try { risky() } catch { /* opslag kan geblokkeerd zijn */ }',
   ]) {
     assert.equal(findUndocumentedEmptyCatch(source), null, source)
   }
