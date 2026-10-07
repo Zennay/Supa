@@ -240,7 +240,7 @@ export function parseDekaMarktSsrProductEvidence(
   const assortment = dereference(payload, product.productAssortment)
 
   if (
-    !Number.isInteger(productId) ||
+    !safePositiveInteger(productId) ||
     typeof name !== 'string' ||
     !name.trim() ||
     typeof packaging !== 'string' ||
