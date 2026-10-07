@@ -27,7 +27,10 @@ import {
   observationPackAmount,
   observationPackCount,
 } from './observationNumericInput.ts'
-import { persistObservationDraft } from './observationDraftPersistence.ts'
+import {
+  persistObservationDraft,
+  removeObservationDraft,
+} from './observationDraftPersistence.ts'
 import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
 
 type Side = 'baseline' | 'candidate'
@@ -98,6 +101,7 @@ export function ObservationView() {
   const [resetArmed, setResetArmed] = useState(false)
   const [pendingImport, setPendingImport] = useState<ObservationSheet | null>(null)
   const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
+  const [draftResetRemovalFailed, setDraftResetRemovalFailed] = useState(false)
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
   const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
   const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
@@ -112,6 +116,7 @@ export function ObservationView() {
         () => window.localStorage,
         OBSERVATION_DRAFT_STORAGE_KEY,
         sheet,
+        () => setDraftResetRemovalFailed(false),
       ),
     )
   }, [sheet])
@@ -131,18 +136,22 @@ export function ObservationView() {
       return
     }
 
-    try {
-      window.localStorage.removeItem(OBSERVATION_DRAFT_STORAGE_KEY)
-    } catch {
-      // Keep reset usable even when storage is unavailable.
-    }
+    const removed = removeObservationDraft(
+      () => window.localStorage,
+      OBSERVATION_DRAFT_STORAGE_KEY,
+    )
+    setDraftResetRemovalFailed(!removed)
     setSheet(buildObservationSheet())
     setResetArmed(false)
     setPendingImport(null)
-    setImportStatus({
-      kind: 'success',
-      message: 'Lokaal concept gewist. Er is een nieuwe lege M3-meting gestart.',
-    })
+    setImportStatus(
+      removed
+        ? {
+            kind: 'success',
+            message: 'Lokaal concept gewist. Er is een nieuwe lege M3-meting gestart.',
+          }
+        : null,
+    )
   }
 
   const jumpToNextIncomplete = () => {
@@ -820,6 +829,15 @@ export function ObservationView() {
         <p className="observation-import-status is-warning" role="status">
           Automatisch bewaren is mislukt. Bewaar dit concept handmatig als JSON
           voordat je deze pagina sluit.
+        </p>
+      )}
+
+      {draftResetRemovalFailed && (
+        <p className="observation-import-status is-warning" role="status">
+          Het scherm is leeggemaakt, maar het eerder opgeslagen lokale concept
+          kon niet worden verwijderd. Bewaar zo nodig handmatig een JSON-kopie
+          en probeer opnieuw; een volgende succesvolle lokale opslag herstelt
+          deze waarschuwing automatisch.
         </p>
       )}
 
