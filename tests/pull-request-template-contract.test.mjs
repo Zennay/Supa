@@ -28,6 +28,11 @@ test('pull request template requires scope ownership and exact-head validation e
     'Path-selected permanent workflow(s), if applicable:',
     'did not reuse an older green run',
   )
+  assert.match(
+    template,
+    /npm ci\nnpm audit --audit-level=high\nnpm test/,
+    'PR exact-head checklist must audit immediately after the locked install',
+  )
 })
 
 test('pull request template preserves the M3 genuine-evidence boundary', () => {
