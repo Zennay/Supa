@@ -9,7 +9,7 @@ const disabledCallPattern = new RegExp(
   `\\b(?:${aliases.join('|')})\\s*(?:\\.\\s*(?:${disabledMembers.join('|')})|\\[\\s*(?:'(?:${disabledMembers.join('|')})'|"(?:${disabledMembers.join('|')})"|\`(?:${disabledMembers.join('|')})\`)\\s*\\])\\s*\\(`,
 )
 const permanentlyDisabledOptionPattern =
-  /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
+  /(?:\b(?:skip|todo)|['"](?:skip|todo)['"]|\[\s*(?:'(?:skip|todo)'|"(?:skip|todo)"|`(?:skip|todo)`)\s*\])\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
 
 function escapeRegex(value) {
   const special = new Set(['\\', '^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|'])
@@ -141,6 +141,12 @@ test('disabled-test guard permits conditional skips but rejects literal disabled
   const emptyTemplateSkip = ['skip', ': ``'].join('')
   const conditionalSkip = ['skip', ": process.platform === 'win32'"].join('')
   const conditionalTemplateSkip = ['skip', ': `${process.platform}`'].join('')
+  const quotedSkip = ["'", 'skip', "'", ': true'].join('')
+  const quotedTodo = ['"', 'todo', '"', ': "pending regression"'].join('')
+  const computedSkip = ["['", 'skip', "']", ': true'].join('')
+  const computedTodo = ['[`', 'todo', '`]', ': `pending regression`'].join('')
+  const conditionalQuotedSkip = ["'", 'skip', "'", ": process.platform === 'win32'"].join('')
+  const conditionalComputedTodo = ['["', 'todo', '"]', ': shouldSkip'].join('')
 
   assert.match(literalSkip, permanentlyDisabledOptionPattern)
   assert.match(literalTodo, permanentlyDisabledOptionPattern)
@@ -148,8 +154,14 @@ test('disabled-test guard permits conditional skips but rejects literal disabled
   assert.match(literalStringTodo, permanentlyDisabledOptionPattern)
   assert.match(literalTemplateSkip, permanentlyDisabledOptionPattern)
   assert.match(literalTemplateTodo, permanentlyDisabledOptionPattern)
+  assert.match(quotedSkip, permanentlyDisabledOptionPattern)
+  assert.match(quotedTodo, permanentlyDisabledOptionPattern)
+  assert.match(computedSkip, permanentlyDisabledOptionPattern)
+  assert.match(computedTodo, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(emptyStringSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(emptyTemplateSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(conditionalSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(conditionalTemplateSkip, permanentlyDisabledOptionPattern)
+  assert.doesNotMatch(conditionalQuotedSkip, permanentlyDisabledOptionPattern)
+  assert.doesNotMatch(conditionalComputedTodo, permanentlyDisabledOptionPattern)
 })
