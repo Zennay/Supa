@@ -53,6 +53,8 @@ select:focus-visible {
   align-items: center;
   justify-content: space-between;
   padding: calc(18px + env(safe-area-inset-top)) 20px 12px;
+  padding-left: calc(20px + env(safe-area-inset-left));
+  padding-right: calc(20px + env(safe-area-inset-right));
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   backdrop-filter: blur(16px);
 }
@@ -86,7 +88,11 @@ select:focus-visible {
   min-height: 44px;
 }
 
-.content { padding: 8px 18px 32px; }
+.content {
+  padding: 8px 18px 32px;
+  padding-left: calc(18px + env(safe-area-inset-left));
+  padding-right: calc(18px + env(safe-area-inset-right));
+}
 
 .screen { display: grid; gap: 18px; }
 
@@ -258,6 +264,13 @@ h3, p { margin: 0; }
   left: 50%;
   transform: translateX(-50%);
   width: min(calc(100% - 28px), 532px);
+  width: min(
+    calc(
+      100% - 28px - max(env(safe-area-inset-left), env(safe-area-inset-right)) -
+        max(env(safe-area-inset-left), env(safe-area-inset-right))
+    ),
+    532px
+  );
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   padding: 6px;
