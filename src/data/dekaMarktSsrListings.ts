@@ -256,7 +256,7 @@ function parseCatalogProduct(
   const price = dereference(payload, product.price)
 
   if (
-    !Number.isInteger(productId) ||
+    !safePositiveInteger(productId) ||
     typeof name !== 'string' ||
     !name.trim() ||
     typeof packaging !== 'string' ||
@@ -376,7 +376,7 @@ function parseOfferProduct(
   const information = dereference(payload, product.productInformation)
 
   if (
-    !Number.isInteger(productId) ||
+    !safePositiveInteger(productId) ||
     productNormalPrice !== outerNormalPrice ||
     productOfferPrice !== outerOfferPrice ||
     !isObject(information)
