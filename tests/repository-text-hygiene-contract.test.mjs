@@ -4,6 +4,11 @@ import test from 'node:test'
 
 const attributes = await readFile(new URL('../.gitattributes', import.meta.url), 'utf8')
 const editorConfig = await readFile(new URL('../.editorconfig', import.meta.url), 'utf8')
+const repositoryTextKeys = new Set([
+  'charset',
+  'end_of_line',
+  'insert_final_newline',
+])
 
 function parseEditorConfig(source) {
   const sections = []
@@ -54,6 +59,15 @@ function assertEditorConfigDefaults(source) {
   )
   assert.deepEqual(values('*', 'indent_style'), [], 'global indent_style policy is forbidden')
   assert.deepEqual(values('*', 'indent_size'), [], 'global indent_size policy is forbidden')
+
+  const scopedTextSettings = settings.filter(
+    (entry) => entry.section !== '*' && repositoryTextKeys.has(entry.key),
+  )
+  assert.deepEqual(
+    scopedTextSettings,
+    [],
+    'repository text defaults must be declared only in the global [*] section',
+  )
 }
 
 test('repository text checkouts are normalized to LF without forcing binary files to text', () => {
@@ -86,4 +100,20 @@ test('editor defaults reject duplicate or shadowing global declarations', () => 
     ),
     /exactly one global \[\*\]/,
   )
+})
+
+test('editor defaults reject scoped text-policy overrides', () => {
+  for (const [key, value] of [
+    ['charset', 'latin1'],
+    ['end_of_line', 'crlf'],
+    ['insert_final_newline', 'false'],
+  ]) {
+    assert.throws(
+      () => assertEditorConfigDefaults(
+        `${editorConfig.trimEnd()}\n\n[*.md]\n${key} = ${value}\n`,
+      ),
+      /declared only in the global \[\*\] section/,
+      key,
+    )
+  }
 })
