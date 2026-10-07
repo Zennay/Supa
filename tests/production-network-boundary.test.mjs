@@ -77,6 +77,79 @@ function isNavigatorObject(node) {
   )
 }
 
+function directNetworkReference(node, sourceFile) {
+  const current = unwrapExpression(node)
+
+  if (isBrowserGlobalMember(current, 'fetch')) {
+    return {
+      kind: 'fetch reference',
+      text: current.getText(sourceFile),
+    }
+  }
+
+  for (const constructorName of networkConstructors) {
+    if (isBrowserGlobalMember(current, constructorName)) {
+      return {
+        kind: constructorName + ' reference',
+        text: current.getText(sourceFile),
+      }
+    }
+  }
+
+  if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
+    if (
+      memberName(current) === 'sendBeacon' &&
+      isNavigatorObject(current.expression)
+    ) {
+      return {
+        kind: 'sendBeacon reference',
+        text: current.getText(sourceFile),
+      }
+    }
+  }
+
+  return null
+}
+
+function findDetachedNetworkReference(expression, sourceFile) {
+  let finding = null
+
+  function inspect(node) {
+    if (finding) return
+
+    const current = unwrapExpression(node)
+    const direct = directNetworkReference(current, sourceFile)
+    if (direct) {
+      finding = direct
+      return
+    }
+
+    if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
+      return
+    }
+
+    if (ts.isPropertyAssignment(current)) {
+      inspect(current.initializer)
+      return
+    }
+
+    if (ts.isShorthandPropertyAssignment(current)) {
+      inspect(current.name)
+      return
+    }
+
+    if (ts.isCallExpression(current) || ts.isNewExpression(current)) {
+      for (const argument of current.arguments ?? []) inspect(argument)
+      return
+    }
+
+    ts.forEachChild(current, inspect)
+  }
+
+  inspect(expression)
+  return finding
+}
+
 function scriptKindFor(filename) {
   switch (path.extname(filename)) {
     case '.tsx':
@@ -101,8 +174,31 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
 
   let finding = null
 
+  function recordDetached(expression) {
+    if (finding || !expression) return
+    finding = findDetachedNetworkReference(expression, sourceFile)
+  }
+
   function visit(node) {
     if (finding) return
+
+    if (ts.isVariableDeclaration(node)) {
+      recordDetached(node.initializer)
+      if (finding) return
+    }
+
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    ) {
+      recordDetached(node.right)
+      if (finding) return
+    }
+
+    if (ts.isReturnStatement(node)) {
+      recordDetached(node.expression)
+      if (finding) return
+    }
 
     if (ts.isCallExpression(node)) {
       if (isBrowserGlobalMember(node.expression, 'fetch')) {
@@ -126,6 +222,11 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
           return
         }
       }
+
+      for (const argument of node.arguments) {
+        recordDetached(argument)
+        if (finding) return
+      }
     }
 
     if (ts.isNewExpression(node)) {
@@ -137,6 +238,11 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
           }
           return
         }
+      }
+
+      for (const argument of node.arguments ?? []) {
+        recordDetached(argument)
+        if (finding) return
       }
     }
 
@@ -203,6 +309,25 @@ test('network boundary catches direct browser networking primitives', () => {
   }
 })
 
+test('network boundary catches detached browser networking references', () => {
+  for (const source of [
+    'const request = fetch',
+    'const request = window.fetch',
+    "const request = self['fetch']",
+    'const Socket = WebSocket',
+    "const Socket = globalThis['WebSocket']",
+    'const beacon = navigator.sendBeacon',
+    "const beacon = window.navigator['sendBeacon']",
+    'const handlers = { request: fetch }',
+    'const transports = [EventSource, window.WebTransport]',
+    'register(globalThis.XMLHttpRequest)',
+    'function getBeacon() { return navigator.sendBeacon }',
+    'let request; request = globalThis.fetch',
+  ]) {
+    assert.ok(findDirectProductionNetworkAccess(source), source)
+  }
+})
+
 test('network boundary ignores comments, strings and unrelated object methods', () => {
   for (const source of [
     "// fetch('/example')",
@@ -211,6 +336,11 @@ test('network boundary ignores comments, strings and unrelated object methods', 
     "client.XMLHttpRequest()",
     "telemetry.sendBeacon('/local-abstraction')",
     "const fetchCount = 1",
+    'const request = api.fetch',
+    'const Socket = client.WebSocket',
+    'const beacon = telemetry.sendBeacon',
+    'const fetch = api.fetch',
+    'const WebSocket = localSocket',
   ]) {
     assert.equal(findDirectProductionNetworkAccess(source), null, source)
   }
