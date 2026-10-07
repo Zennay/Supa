@@ -32,7 +32,7 @@ test('contributor guide locks validation and evidence boundaries', async () => {
 test('contributor guide preserves active-owner coordination', async () => {
   const guide = await readFile(guideUrl, 'utf8')
 
-  assert.match(guide, /Check open pull requests/i)
-  assert.match(guide, /active owner/i)
+  assert.match(guide, /Check open pull requests and relevant active branches/i)
+  assert.match(guide, /may already have an owner/i)
   assert.match(guide, /Do not overwrite or absorb another active worker/i)
 })
