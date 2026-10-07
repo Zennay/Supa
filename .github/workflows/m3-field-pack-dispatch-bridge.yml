@@ -1,0 +1,61 @@
+name: One-shot M3 field-pack dispatch bridge
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m3-field-pack-dispatch-bridge.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: self-hosted
+    timeout-minutes: 3
+    steps:
+      - name: Verify permanent VPS runner
+        run: test "$(hostname -s)" = "vps-bb300bba"
+      - name: Dispatch canonical M3 field-pack workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          repo = os.environ["REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+
+          def request(method, path, payload=None):
+              data = None if payload is None else json.dumps(payload).encode()
+              req = urllib.request.Request(
+                  f"https://api.github.com{path}",
+                  data=data,
+                  method=method,
+                  headers={**headers, "Content-Type": "application/json"},
+              )
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  body = response.read().decode()
+                  return response.status, json.loads(body) if body else None
+
+          _, commit = request("GET", f"/repos/{repo}/commits/main")
+          main_sha = commit["sha"]
+
+          status, _ = request(
+              "POST",
+              f"/repos/{repo}/actions/workflows/m3-observed-week-report.yml/dispatches",
+              {"ref": "main"},
+          )
+          if status != 204:
+              raise SystemExit(f"workflow dispatch returned HTTP {status}")
+
+          print(f"M3_FIELD_PACK_DISPATCHED main_sha={main_sha}")
+          PY
