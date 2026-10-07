@@ -259,7 +259,7 @@ export async function main(argv = process.argv.slice(2)) {
 
   if (output) {
     await mkdir(dirname(output), { recursive: true })
-    await writeFile(output, serialized, 'utf8')
+    await writeFile(output, serialized, { encoding: 'utf8', flag: 'wx' })
   } else {
     process.stdout.write(serialized)
   }
