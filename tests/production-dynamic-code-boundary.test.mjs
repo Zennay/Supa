@@ -96,6 +96,18 @@ function findDynamicCodeExecution(source, filename = 'candidate.tsx') {
   function visit(node) {
     if (finding) return
 
+    if (ts.isVariableDeclaration(node) && node.initializer) {
+      for (const globalName of dynamicGlobals) {
+        if (isBrowserGlobalMember(node.initializer, globalName)) {
+          finding = {
+            kind: globalName + ' capability alias',
+            text: node.getText(sourceFile),
+          }
+          return
+        }
+      }
+    }
+
     if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
       for (const globalName of dynamicGlobals) {
         if (isBrowserGlobalMember(node.expression, globalName)) {
@@ -175,6 +187,10 @@ test('dynamic-code guard catches direct eval, Function constructors and string t
     "Function('return globalThis')()",
     "new Function('return globalThis')",
     "new self['Function']('return globalThis')",
+    "const execute = eval",
+    "const execute = (window['eval'] as typeof eval)",
+    "const Compiler = globalThis.Function",
+    "const Compiler = (self['Function'])",
     "setTimeout('globalThis.compromised = true', 0)",
     "window['setInterval'](`globalThis.compromised = true`, 1000)",
   ]) {
@@ -190,6 +206,9 @@ test('dynamic-code guard ignores inert text, callback timers and unrelated metho
     "window.setInterval(() => refresh(), 1000)",
     "sandbox.eval('expression')",
     "factory.Function('template')",
+    "const execute = sandbox.eval",
+    "const Compiler = factory.Function",
+    "const schedule = setTimeout",
     "const FunctionName = 'safe label'",
   ]) {
     assert.equal(findDynamicCodeExecution(source), null, source)
