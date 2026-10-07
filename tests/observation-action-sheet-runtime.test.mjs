@@ -18,6 +18,25 @@ test('observation action label rejects malformed sheet containers deterministica
   }
 })
 
+test('observation action label never reports completion from a malformed sheet', () => {
+  for (const malformed of [
+    null,
+    {},
+    { baseline: { lines: [] }, candidate: null },
+    { baseline: { lines: [] }, candidate: { lines: null } },
+  ]) {
+    assert.throws(
+      () => nextObservationActionLabel(malformed, null),
+      /invalid observation sheet/,
+    )
+  }
+
+  assert.equal(
+    nextObservationActionLabel(buildObservationSheet(), null),
+    'Alle regels zijn gemeten',
+  )
+})
+
 test('observation action label rejects malformed selected-side containers', () => {
   for (const baseline of [null, undefined, false, 0, '', [], { lines: null }]) {
     assert.throws(
