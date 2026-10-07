@@ -1,7 +1,6 @@
 import {
   M3_EXPECTED_RETAILERS,
   type M3ObservationSide,
-  type ObservationSheet,
 } from '../../domain/m3ObservationSheet.ts'
 
 export type NextObservationLine = {
@@ -9,11 +8,40 @@ export type NextObservationLine = {
   ingredientId: string
 } | null
 
+function observationLinesForSide(
+  sheet: unknown,
+  side: M3ObservationSide,
+): unknown[] {
+  if (!sheet || typeof sheet !== 'object' || Array.isArray(sheet)) {
+    throw new Error('invalid observation sheet')
+  }
+
+  const observation = (sheet as Partial<Record<M3ObservationSide, unknown>>)[side]
+  if (
+    !observation ||
+    typeof observation !== 'object' ||
+    Array.isArray(observation)
+  ) {
+    throw new Error('invalid observation sheet')
+  }
+
+  const lines = (observation as { lines?: unknown }).lines
+  if (!Array.isArray(lines)) {
+    throw new Error('invalid observation sheet')
+  }
+
+  return lines
+}
+
 export function nextObservationActionLabel(
-  sheet: ObservationSheet,
+  sheet: unknown,
   next: unknown,
 ): string {
-  if (next === null) return 'Alle regels zijn gemeten'
+  if (next === null) {
+    observationLinesForSide(sheet, 'baseline')
+    observationLinesForSide(sheet, 'candidate')
+    return 'Alle regels zijn gemeten'
+  }
 
   if (!next || typeof next !== 'object' || Array.isArray(next)) {
     throw new Error('invalid next observation target')
@@ -23,18 +51,31 @@ export function nextObservationActionLabel(
   if (
     (candidate.side !== 'baseline' && candidate.side !== 'candidate') ||
     typeof candidate.ingredientId !== 'string' ||
-    candidate.ingredientId.trim() === ''
+    candidate.ingredientId.trim() === '' ||
+    candidate.ingredientId !== candidate.ingredientId.trim()
   ) {
     throw new Error('invalid next observation target')
   }
 
   const retailer = M3_EXPECTED_RETAILERS[candidate.side]
-  const line = sheet[candidate.side].lines.find(
-    (lineCandidate) => lineCandidate.ingredientId === candidate.ingredientId,
+  const line = observationLinesForSide(sheet, candidate.side).find(
+    (lineCandidate) =>
+      Boolean(lineCandidate) &&
+      typeof lineCandidate === 'object' &&
+      !Array.isArray(lineCandidate) &&
+      (lineCandidate as { ingredientId?: unknown }).ingredientId ===
+        candidate.ingredientId &&
+      typeof (lineCandidate as { ingredientLabel?: unknown }).ingredientLabel ===
+        'string' &&
+      (lineCandidate as { ingredientLabel: string }).ingredientLabel.trim() !== '',
   )
 
-  return line
-    ? `Volgende: ${retailer} · ${line.ingredientLabel}`
+  const ingredientLabel = line
+    ? (line as { ingredientLabel: string }).ingredientLabel.trim()
+    : ''
+
+  return ingredientLabel
+    ? `Volgende: ${retailer} · ${ingredientLabel}`
     : `Volgende open regel bij ${retailer}`
 }
 
