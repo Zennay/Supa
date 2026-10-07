@@ -111,29 +111,10 @@ export function normalizeSchemaOrgAvailability(
   const raw = asString(value)
   if (!raw) return 'unknown'
 
-  try {
-    const url = new URL(raw)
-    if (
-      (url.protocol !== 'http:' && url.protocol !== 'https:') ||
-      url.hostname !== 'schema.org' ||
-      url.port ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash
-    ) {
-      return 'unknown'
-    }
+  const match = /^https?:\/\/schema\.org\/([^/?#]+)\/?$/i.exec(raw)
+  if (!match) return 'unknown'
 
-    const pathSegments = url.pathname.split('/').filter(Boolean)
-    if (pathSegments.length !== 1) return 'unknown'
-
-    return (
-      SCHEMA_ORG_AVAILABILITY.get(pathSegments[0].toLowerCase()) ?? 'unknown'
-    )
-  } catch {
-    return 'unknown'
-  }
+  return SCHEMA_ORG_AVAILABILITY.get(match[1].toLowerCase()) ?? 'unknown'
 }
 
 function extractAvailability(
