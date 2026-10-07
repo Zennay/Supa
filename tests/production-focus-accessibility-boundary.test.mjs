@@ -142,6 +142,15 @@ function findFocusAccessibilityEscapeHatch(source, filename = 'candidate.tsx') {
       return
     }
 
+    const accessKey = attributeByName(node.attributes, 'accessKey')
+    if (accessKey) {
+      finding = {
+        kind: 'accessKey',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
+
     const tagName = intrinsicTagName(node)
     const isInteractive =
       (tagName !== null && alwaysInteractiveTags.has(tagName)) ||
@@ -222,12 +231,14 @@ test('production TSX avoids keyboard and accessibility escape hatches', async ()
   }
 })
 
-test('focus accessibility guard rejects positive tab order and automatic focus', () => {
+test('focus accessibility guard rejects positive tab order, automatic focus, and access keys', () => {
   for (const source of [
     '<button tabIndex={2}>Open</button>',
     '<div tabIndex="3">Priority</div>',
     '<input autoFocus />',
     '<select autoFocus={false}><option>One</option></select>',
+    '<button accessKey="s">Save</button>',
+    '<div accessKey={"x"}>Shortcut</div>',
   ]) {
     assert.ok(findFocusAccessibilityEscapeHatch(source), source)
   }
@@ -260,7 +271,7 @@ test('focus accessibility guard preserves intentional non-positive focus and pre
     '<button aria-hidden={false}>Visible</button>',
     '<div role="presentation">Decorative wrapper</div>',
     '<span role="none">Decorative text</span>',
-    'const note = "tabIndex={2} autoFocus aria-hidden=true"',
+    'const note = "tabIndex={2} autoFocus accessKey aria-hidden=true"',
   ]) {
     assert.equal(findFocusAccessibilityEscapeHatch(source), null, source)
   }
