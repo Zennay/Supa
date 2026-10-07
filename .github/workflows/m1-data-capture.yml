@@ -30,6 +30,7 @@ on:
       - "src/data/normalize.ts"
       - "src/data/schemaOrgProduct.ts"
       - "tests/schema-org-product.test.mjs"
+      - "tests/m1-workflow-fork-safety-contract.test.mjs"
       - ".github/workflows/m1-data-capture.yml"
       - "docs/M1_DATA_FEASIBILITY.md"
   workflow_dispatch:
@@ -43,11 +44,13 @@ permissions:
 
 jobs:
   capture:
-    if: github.event_name == 'workflow_dispatch' || github.base_ref == 'main'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Verify permanent VPS runner
         run: |
