@@ -90,7 +90,7 @@ function collectConsoleBindingScopes(sourceFile) {
       register(nearestBindingScope(node, false), node.name)
     }
 
-    if (ts.isVariableDeclaration(node)) {
+    if (ts.isVariableDeclaration(node) && !ts.isCatchClause(node.parent)) {
       const declarationList = node.parent
       const blockScoped = ts.isVariableDeclarationList(declarationList) &&
         (declarationList.flags & ts.NodeFlags.BlockScoped) !== 0
@@ -275,6 +275,7 @@ test('production diagnostic guard catches executable console and debugger syntax
     'const { log } = console',
     'const { error: emitError } = (console as Console)',
     "{ const console = logger; console.log('ok') }\nconsole.warn('debug')",
+    "try {} catch (console) { console.error('ok') }\nconsole.warn('debug')",
     'debugger;',
   ]) {
     assert.ok(findForbiddenProductionDiagnostic(source), source)
