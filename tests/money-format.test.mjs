@@ -73,3 +73,14 @@ test('numeric euro formatting stays aligned with exact cent presentation', () =>
     assert.equal(euro.format(value), euro.formatCents(Math.round(value * 100)))
   }
 })
+
+test('cent-native formatting normalizes signed zero', () => {
+  assert.equal(euro.formatCents(-0), euro.formatCents(0))
+})
+
+test('cent-native formatting preserves both safe integer boundaries exactly', () => {
+  for (const cents of [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]) {
+    assert.equal(euro.formatCents(cents), euro.formatCents(BigInt(cents)))
+  }
+})
+
