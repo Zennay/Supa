@@ -9,7 +9,11 @@ test('shared product surfaces contain long store and grocery copy on narrow layo
 
   assert.match(
     css,
-    /\.trace-row > div,\s*\.shopping-row > span:last-child,\s*\.comparison-totals > div\s*{\s*min-width:\s*0;/,
+    /\.trace-row > div,\s*\.shopping-row > span:last-child\s*{\s*min-width:\s*0;/,
+  )
+  assert.match(
+    css,
+    /\.comparison-totals > div\s*{\s*min-width:\s*0;[\s\S]*?background:\s*#f0efe9;/,
   )
   assert.match(
     css,
