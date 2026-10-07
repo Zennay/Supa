@@ -173,6 +173,25 @@ test('AUD-005 response validator rejects direct PII fields', () => {
   )
 })
 
+test('AUD-005 response validator rejects case and separator variants of forbidden PII keys', () => {
+  for (const key of [
+    'Email',
+    'EMAIL_ADDRESS',
+    'respondent-name',
+    'Contact Details',
+    'phone_number',
+  ]) {
+    const record = validRecord()
+    record[key] = 'redacted-private-field'
+
+    assert.throws(
+      () => validateRetailerResponseRecord(record),
+      /is not allowed in a repository-safe AUD-005 record/,
+      key,
+    )
+  }
+})
+
 test('AUD-005 response validator rejects PII inside evidence references', () => {
   const emailRecord = validRecord()
   emailRecord.evidenceRef = 'private-response-person@example.com'
