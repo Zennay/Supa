@@ -23,7 +23,7 @@ test('Dependabot keeps both npm and GitHub Actions update lanes', () => {
   assert.deepEqual(ecosystems.sort(), ['github-actions', 'npm'])
 })
 
-test('dependency update lanes stay bounded, weekly and rooted at the repository', () => {
+test('dependency update lanes stay bounded, weekly, rooted and non-major', () => {
   for (const ecosystem of ['npm', 'github-actions']) {
     const block = ecosystemBlock(ecosystem)
 
@@ -31,6 +31,8 @@ test('dependency update lanes stay bounded, weekly and rooted at the repository'
     assert.match(block, /^\s*interval:\s*"weekly"\s*$/m)
     assert.match(block, /^\s*day:\s*"monday"\s*$/m)
     assert.match(block, /^\s*timezone:\s*"Europe\/Amsterdam"\s*$/m)
+    assert.match(block, /^\s*- dependency-name:\s*"\*"\s*$/m)
+    assert.match(block, /^\s*- "version-update:semver-major"\s*$/m)
 
     const limit = block.match(/^\s*open-pull-requests-limit:\s*(\d+)\s*$/m)
     assert.ok(limit, `${ecosystem} must bound open update pull requests`)
