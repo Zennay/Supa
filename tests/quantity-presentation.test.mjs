@@ -6,10 +6,11 @@ import {
   quantityUnitNameNl,
 } from '../src/lib/quantityPresentation.ts'
 
-test('localizes the canonical piece unit name without changing its stored value', () => {
+test('localizes canonical quantity unit names without changing stored values', () => {
   assert.equal(quantityUnitNameNl('piece'), 'stuk')
+  assert.equal(quantityUnitNameNl('unknown'), 'onbekend')
 
-  for (const unit of ['g', 'kg', 'ml', 'l', 'unknown']) {
+  for (const unit of ['g', 'kg', 'ml', 'l']) {
     assert.equal(quantityUnitNameNl(unit), unit)
   }
 })
@@ -21,16 +22,19 @@ test('localizes canonical piece quantities for Dutch singular and plural copy', 
   assert.equal(quantityUnitLabelNl('piece', null), 'stuks')
 })
 
-test('preserves non-piece canonical quantity labels', () => {
-  for (const unit of ['g', 'kg', 'ml', 'l', 'unknown']) {
+test('preserves measurement-unit labels and localizes the unknown fallback', () => {
+  for (const unit of ['g', 'kg', 'ml', 'l']) {
     assert.equal(quantityUnitLabelNl(unit, 1), unit)
     assert.equal(quantityUnitLabelNl(unit, 2), unit)
   }
+
+  assert.equal(quantityUnitLabelNl('unknown', 1), 'onbekend')
+  assert.equal(quantityUnitLabelNl('unknown', 2), 'onbekend')
 })
 
 test('fails closed unsupported runtime units instead of reflecting them into copy', () => {
-  for (const unit of ['pcs', ' piece', 'piece ', '', null, undefined, 1, {}, []]) {
-    assert.equal(quantityUnitNameNl(unit), 'unknown')
-    assert.equal(quantityUnitLabelNl(unit, 2), 'unknown')
+  for (const unit of ['pcs', ' piece', 'piece ', 'unknown ', 'UNKNOWN', '', null, undefined, 1, Symbol('piece'), {}, []]) {
+    assert.equal(quantityUnitNameNl(unit), 'onbekend')
+    assert.equal(quantityUnitLabelNl(unit, 2), 'onbekend')
   }
 })
