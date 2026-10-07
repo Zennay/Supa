@@ -192,6 +192,51 @@ test('AUD-005 response validator rejects case and separator variants of forbidde
   }
 })
 
+test('AUD-005 response validator rejects composite PII key aliases recursively', () => {
+  for (const key of [
+    'respondentFullName',
+    'respondent_email_address',
+    'respondentPhoneNumber',
+    'contactName',
+    'contact-email-address',
+    'contact_phone_number',
+    'personFullName',
+    'personMobileNumber',
+  ]) {
+    const record = validRecord()
+    record[key] = 'redacted-private-field'
+
+    assert.throws(
+      () => validateRetailerResponseRecord(record),
+      /is not allowed in a repository-safe AUD-005 record/,
+      key,
+    )
+  }
+
+  const nested = validRecord()
+  nested.extraMetadata = {
+    audit: {
+      contactMobileNumber: 'redacted-private-field',
+    },
+  }
+
+  assert.throws(
+    () => validateRetailerResponseRecord(nested),
+    /record\.extraMetadata\.audit\.contactMobileNumber is not allowed/,
+  )
+})
+
+test('AUD-005 response validator preserves allowed team identity fields', () => {
+  const record = validRecord()
+  record.respondentTeam = 'retailer data governance team'
+  record.nextOwnerTeam = 'e-commerce partnerships team'
+
+  const normalized = validateRetailerResponseRecord(record)
+
+  assert.equal(normalized.respondentTeam, 'retailer data governance team')
+  assert.equal(normalized.nextOwnerTeam, 'e-commerce partnerships team')
+})
+
 test('AUD-005 response validator rejects PII inside evidence references', () => {
   const emailRecord = validRecord()
   emailRecord.evidenceRef = 'private-response-person@example.com'

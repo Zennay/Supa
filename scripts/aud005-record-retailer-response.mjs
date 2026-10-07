@@ -26,6 +26,16 @@ const FORBIDDEN_KEY_TOKENS = new Set([
   'contactdetails',
   'person',
 ])
+const FORBIDDEN_IDENTITY_KEY_PREFIXES = ['respondent', 'contact', 'person']
+const FORBIDDEN_IDENTITY_KEY_SUFFIXES = [
+  'name',
+  'email',
+  'emailaddress',
+  'phone',
+  'phonenumber',
+  'mobile',
+  'mobilenumber',
+]
 const CONSEQUENCE_KEYS = ['architecture', 'product', 'operatingCost', 'sourceStrategy']
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 const PHONE_PATTERN = /(?:\+?\d[\d\s().-]{7,}\d)/
@@ -138,6 +148,16 @@ function canonicalFieldKey(key) {
   return key.replace(/[^a-z0-9]/gi, '').toLowerCase()
 }
 
+function isForbiddenFieldKey(key) {
+  const canonical = canonicalFieldKey(key)
+  if (FORBIDDEN_KEY_TOKENS.has(canonical)) return true
+
+  return (
+    FORBIDDEN_IDENTITY_KEY_PREFIXES.some((prefix) => canonical.startsWith(prefix)) &&
+    FORBIDDEN_IDENTITY_KEY_SUFFIXES.some((suffix) => canonical.endsWith(suffix))
+  )
+}
+
 function rejectForbiddenKeys(value, path = 'record') {
   if (Array.isArray(value)) {
     value.forEach((item, index) => rejectForbiddenKeys(item, `${path}[${index}]`))
@@ -147,7 +167,7 @@ function rejectForbiddenKeys(value, path = 'record') {
 
   for (const [key, child] of Object.entries(value)) {
     assert(
-      !FORBIDDEN_KEY_TOKENS.has(canonicalFieldKey(key)),
+      !isForbiddenFieldKey(key),
       `${path}.${key} is not allowed in a repository-safe AUD-005 record`,
     )
     rejectForbiddenKeys(child, `${path}.${key}`)
