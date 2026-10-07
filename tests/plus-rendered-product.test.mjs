@@ -89,3 +89,25 @@ test('PLUS rendered evidence rejects malformed browser artifact identity', async
     })
   }
 })
+
+test('PLUS rendered product requires a timezone-bearing capture timestamp', async () => {
+  for (const capturedAt of [
+    '2026-10-04',
+    '2026-10-04T18:08:57.837',
+    '2026-02-30T18:08:57.837Z',
+    '2026-10-04T24:00:00Z',
+    '2026-10-04T18:08:57+24:00',
+  ]) {
+    const evidence = await fixture()
+    evidence.source.capturedAt = capturedAt
+
+    assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid source provenance',
+    })
+  }
+
+  const offset = await fixture()
+  offset.source.capturedAt = '2026-10-04T20:08:57.837+02:00'
+  assert.equal(parsePlusRenderedProductEvidence(offset).type, 'observation')
+})
