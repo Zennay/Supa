@@ -74,6 +74,8 @@ function safeDekaMarktProductUrl(value: unknown): value is string {
     return (
       url.protocol === 'https:' &&
       url.hostname === 'www.dekamarkt.nl' &&
+      url.port === '' &&
+      url.pathname.startsWith('/producten/') &&
       url.username === '' &&
       url.password === ''
     )
