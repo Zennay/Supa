@@ -64,6 +64,12 @@ function safePositiveInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) > 0
 }
 
+function validHtmlContentType(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const [mediaType] = value.split(';', 1)
+  return mediaType.trim().toLowerCase() === 'text/html'
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
   if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
     return undefined
@@ -194,7 +200,7 @@ function validateEvidenceBoundary(
     !/^sha256:[a-f0-9]{64}$/.test(capture?.artifactDigest ?? '') ||
     !/^[a-f0-9]{40}$/.test(capture?.supaSha ?? '') ||
     capture?.status !== 200 ||
-    !capture?.contentType?.toLowerCase().includes('text/html') ||
+    !validHtmlContentType(capture?.contentType) ||
     !safePositiveInteger(capture?.bytes) ||
     !safety ||
     safety.login !== false ||
