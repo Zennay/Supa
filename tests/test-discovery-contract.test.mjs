@@ -35,6 +35,7 @@ function isSelectedByCanonicalNpmTestGlob(relativePath) {
 
   return (
     !normalizedPath.includes('/') &&
+    !normalizedPath.startsWith('.') &&
     normalizedPath.endsWith('.test.mjs')
   )
 }
@@ -74,8 +75,9 @@ test('test discovery recognizes common JS, TS and React test extensions', () => 
   }
 })
 
-test('test discovery rejects common wrong suffixes and nested canonical tests', () => {
+test('test discovery rejects hidden, nested and wrong-suffix tests outside the canonical glob', () => {
   for (const undiscovered of [
+    '.hidden.test.mjs',
     'example.spec.mjs',
     'example.test.js',
     'example.test.ts',
