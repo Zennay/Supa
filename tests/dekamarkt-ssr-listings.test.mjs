@@ -270,3 +270,24 @@ test('DekaMarkt listing evidence rejects unsafe integer capture metadata', async
     })
   }
 })
+
+test('DekaMarkt listing evidence requires an exact HTML media type', async () => {
+  for (const contentType of [
+    'application/text/html+json',
+    'text/html-malformed',
+    'application/json; profile="text/html"',
+    null,
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    evidence.captureEvidence.contentType = contentType
+
+    assert.deepEqual(parseDekaMarktSsrCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence violates the bounded capture contract',
+    })
+  }
+
+  const parameterized = await fixture(catalogUrl)
+  parameterized.captureEvidence.contentType = ' TEXT/HTML ; charset=UTF-8 '
+  assert.equal(parseDekaMarktSsrCatalogEvidence(parameterized).type, 'observations')
+})
