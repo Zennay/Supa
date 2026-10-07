@@ -3,9 +3,11 @@ import test from 'node:test'
 
 import { euro, savings } from '../src/lib/money.ts'
 
-test('euro formatting preserves finite values', () => {
-  assert.match(euro.format(12.34), /12,34/)
-  assert.doesNotMatch(euro.format(12.34), /NaN|∞/)
+test('euro formatting preserves cent-exact finite values', () => {
+  for (const value of [0.29, 12.34, 31.8]) {
+    assert.notEqual(euro.format(value), '—', String(value))
+    assert.doesNotMatch(euro.format(value), /NaN|∞/, String(value))
+  }
 })
 
 test('euro formatting normalizes signed zero', () => {
@@ -16,6 +18,12 @@ test('euro formatting normalizes signed zero', () => {
 test('euro formatting rejects malformed runtime value types', () => {
   for (const malformed of [null, undefined, '12.34', {}, []]) {
     assert.equal(euro.format(malformed), '—')
+  }
+})
+
+test('euro formatting rejects sub-cent numeric values', () => {
+  for (const subCent of [12.345, 0.001, 0.30000000000000004]) {
+    assert.equal(euro.format(subCent), '—', String(subCent))
   }
 })
 
@@ -55,7 +63,14 @@ test('savings rejects values beyond the exact cent-safe euro magnitude', () => {
   assert.equal(savings(-unsafeMagnitude, 10), null)
 })
 
-test('savings preserves its positive-only finite contract', () => {
+test('savings rejects sub-cent inputs instead of rounding them', () => {
+  assert.equal(savings(12.345, 10), null)
+  assert.equal(savings(10, 1.001), null)
+  assert.equal(savings(0.30000000000000004, 0.1), null)
+})
+
+test('savings computes through safe integer cents', () => {
   assert.equal(savings(40, 31.8), 8.2)
   assert.equal(savings(31.8, 40), 0)
+  assert.equal(savings(0.3, 0.1), 0.2)
 })
