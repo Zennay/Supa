@@ -7,6 +7,53 @@ const workflow = readFileSync(
   'utf8',
 )
 
+function githubMaintainedActionUses(source) {
+  const uses = []
+
+  for (const line of source.split(/\r?\n/)) {
+    const declaration = line.match(/^\s*-\s+uses:\s+(.+?)\s*$/)
+    if (!declaration) continue
+
+    let raw = declaration[1]
+    const releaseMatch = raw.match(/\s+#\s+(v\d+\.\d+\.\d+)\s*$/)
+    const release = releaseMatch?.[1] ?? null
+    if (releaseMatch) raw = raw.slice(0, releaseMatch.index).trim()
+
+    const quoted = raw.match(/^(['"])(.*)\1$/)
+    const actionUse = (quoted ? quoted[2] : raw).match(
+      /^(actions\/[^@\s]+)@([^\s#]+)$/,
+    )
+    if (!actionUse) continue
+
+    uses.push({
+      action: actionUse[1],
+      ref: actionUse[2],
+      release,
+    })
+  }
+
+  return uses
+}
+
+function assertPinnedGithubMaintainedActions(source, expectedCount) {
+  const actionUses = githubMaintainedActionUses(source)
+
+  assert.equal(
+    actionUses.length,
+    expectedCount,
+    'CI must keep the expected GitHub-maintained action set pinned',
+  )
+
+  for (const { action, ref, release } of actionUses) {
+    assert.match(ref, /^[0-9a-f]{40}$/i, `${action} must use a full commit SHA`)
+    assert.match(
+      release ?? '',
+      /^v\d+\.\d+\.\d+$/,
+      `${action} must retain a readable release comment`,
+    )
+  }
+}
+
 test('hosted CI token is explicitly read-only', () => {
   assert.match(
     workflow,
@@ -72,19 +119,21 @@ test('hosted CI keeps the complete quality gate order', () => {
 })
 
 test('hosted CI pins GitHub-maintained actions to immutable commits', () => {
-  const actionUses = [...workflow.matchAll(
-    /^\s*- uses:\s*(actions\/[^@\s]+)@([^\s#]+)\s+#\s+(v\d+\.\d+\.\d+)\s*$/gm,
-  )]
+  assertPinnedGithubMaintainedActions(workflow, 2)
+})
 
-  assert.equal(actionUses.length, 2, 'CI must keep both GitHub-maintained actions pinned')
-  for (const [, action, ref, release] of actionUses) {
-    assert.match(ref, /^[0-9a-f]{40}$/i, `${action} must use a full commit SHA`)
-    assert.match(release, /^v\d+\.\d+\.\d+$/, `${action} must retain a readable release comment`)
-  }
-
-  assert.doesNotMatch(
-    workflow,
-    /^\s*- uses:\s*actions\/[^@\s]+@v\d+(?:\.\d+){0,2}\s*$/gm,
-    'CI must not use mutable actions/* version tags',
+test('action pinning contract rejects quoted mutable GitHub action refs', () => {
+  assert.throws(
+    () =>
+      assertPinnedGithubMaintainedActions(
+        `
+        steps:
+          - uses: "actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" # v4.2.2
+          - uses: 'actions/setup-node@v4' # v4.4.0
+          - uses: "owner/custom-action@v1"
+        `,
+        2,
+      ),
+    /actions\/setup-node must use a full commit SHA/,
   )
 })
