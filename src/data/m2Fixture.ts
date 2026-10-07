@@ -19,7 +19,7 @@ export const m2Recipes: RecipeWithIngredients[] = [
     tags: ['budget', 'meal-prep'],
     ingredients: [
       { id: 'chicken-thigh', label: 'Kippendij', query: 'kippendij', amount: 300, unit: 'g' },
-      { id: 'basmati-rice', label: 'Basmati rijst', query: 'basmati rijst', amount: 150, unit: 'g' },
+      { id: 'basmati-rice', label: 'Basmatirijst', query: 'basmati rijst', amount: 150, unit: 'g' },
       { id: 'coconut-milk', label: 'Kokosmelk', query: 'kokosmelk', amount: 200, unit: 'ml' },
       { id: 'cauliflower', label: 'Bloemkool', query: 'bloemkool', amount: 1, unit: 'piece' },
       { id: 'garam-masala', label: 'Garam masala', query: 'garam masala', amount: 10, unit: 'g' },
@@ -36,7 +36,7 @@ export const m2Recipes: RecipeWithIngredients[] = [
       { id: 'basmati-rice', label: 'Basmati rijst', query: 'basmati rijst', amount: 150, unit: 'g' },
       { id: 'broccoli', label: 'Broccoli', query: 'broccoli', amount: 250, unit: 'g' },
       { id: 'edamame', label: 'Edamame', query: 'edamame', amount: 150, unit: 'g' },
-      { id: 'teriyaki-sauce', label: 'Teriyaki saus', query: 'teriyaki saus', amount: 60, unit: 'ml' },
+      { id: 'teriyaki-sauce', label: 'Teriyakisaus', query: 'teriyaki saus', amount: 60, unit: 'ml' },
     ],
   },
   {
