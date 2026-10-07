@@ -72,6 +72,33 @@ test('M3 comparison rejects malformed basket runtime containers before field acc
   )
 })
 
+test('M3 comparison fails closed on malformed matched nested containers', () => {
+  for (const [field, malformed] of [
+    ['pack', null],
+    ['requirement', []],
+  ]) {
+    const { baseline, candidate } = completeComparisonInput()
+    const index = baseline.lines.findIndex((line) => line.status === 'matched')
+    assert.ok(index >= 0)
+
+    baseline.lines[index] = {
+      ...baseline.lines[index],
+      [field]: malformed,
+    }
+
+    const comparison = compareFullBaskets({ baseline, candidate })
+
+    assert.equal(comparison.claimable, false)
+    assert.equal(comparison.outcome, 'unknown')
+    assert.equal(comparison.deltaCents, null)
+    assert.equal(comparison.savingsCents, null)
+    assert.match(
+      comparison.reasons.join(' '),
+      /unsupported line shape or status/,
+    )
+  }
+})
+
 test('M3 comparison preserves valid comparison behavior after container validation', () => {
   const comparison = compareFullBaskets(completeComparisonInput())
 
