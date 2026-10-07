@@ -136,6 +136,8 @@
 .observation-line summary > div {
   display: grid;
   gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .observation-line summary span {
