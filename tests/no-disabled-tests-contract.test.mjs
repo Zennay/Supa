@@ -11,6 +11,55 @@ const disabledCallPattern = new RegExp(
 const permanentlyDisabledOptionPattern =
   /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\const permanentlyDisabledOptionPattern =
+  /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
+')
+}
+
+function importedNodeTestDisabledCall(source) {
+  const importedAliases = []
+
+  const defaultImportPattern =
+    /\bimport\s+([A-Za-z_$][\w$]*)\s*(?:,\s*(?:\{[^}]*\}|\*\s+as\s+[A-Za-z_$][\w$]*))?\s+from\s+['\"]node:test['\"]/g
+  for (const match of source.matchAll(defaultImportPattern)) {
+    importedAliases.push(escapeRegex(match[1]))
+  }
+
+  const namedImportPattern =
+    /\bimport\s+(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}\s+from\s+['\"]node:test['\"]/g
+  for (const match of source.matchAll(namedImportPattern)) {
+    for (const specifier of match[1].split(',')) {
+      const named = specifier
+        .trim()
+        .match(/^(test|it|describe|suite)(?:\s+as\s+([A-Za-z_$][\w$]*))?$/)
+      if (named) importedAliases.push(escapeRegex(named[2] ?? named[1]))
+    }
+  }
+
+  const namespaceImportPattern =
+    /\bimport\s+(?:[A-Za-z_$][\w$]*\s*,\s*)?\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]node:test['\"]/g
+  for (const match of source.matchAll(namespaceImportPattern)) {
+    for (const apiName of aliases) {
+      importedAliases.push(
+        escapeRegex(match[1]) + '\\s*\\.\\s*' + escapeRegex(apiName),
+      )
+    }
+  }
+
+  const disabledMemberAccess =
+    "\\s*(?:\\.\\s*(?:skip|todo)|\\[\\s*(?:'(?:skip|todo)'|\\\"(?:skip|todo)\\\"|`(?:skip|todo)`)\\s*\\])\\s*\\("
+
+  for (const aliasPattern of importedAliases) {
+    const disabledCall = source.match(
+      new RegExp('\\b' + aliasPattern + disabledMemberAccess),
+    )
+    if (disabledCall) return disabledCall
+  }
+
+  return null
+}
+
 test('canonical regression suite contains no explicitly disabled tests', async () => {
   const files = (await readdir(testsDir))
     .filter((name) => name.endsWith('.test.mjs'))
@@ -20,7 +69,8 @@ test('canonical regression suite contains no explicitly disabled tests', async (
 
   for (const file of files) {
     const source = await readFile(new URL(file, testsDir), 'utf8')
-    const disabledCall = source.match(disabledCallPattern)
+    const disabledCall =
+      source.match(disabledCallPattern) ?? importedNodeTestDisabledCall(source)
     const permanentDisable = source.match(permanentlyDisabledOptionPattern)
 
     assert.equal(
@@ -57,6 +107,29 @@ test('disabled-test guard rejects dot and static bracket member calls', () => {
   }
 })
 
+test('disabled-test guard follows aliases imported from node:test', () => {
+  const defaultAliasSource = [
+    "import check from 'node:test'",
+    ['check', '.skip', "('disabled', () => {})"].join(''),
+  ].join('\n')
+  const namedAliasSource = [
+    "import { test as check, describe as group } from 'node:test'",
+    ['group', '[\"todo\"]', "('disabled', () => {})"].join(''),
+  ].join('\n')
+  const namespaceAliasSource = [
+    "import * as testApi from 'node:test'",
+    ['testApi', '.', 'test', '.skip', "('disabled', () => {})"].join(''),
+  ].join('\n')
+  const unrelatedAliasSource = [
+    "import check from './helper.js'",
+    ['check', '.skip', "('not a node:test API', () => {})"].join(''),
+  ].join('\n')
+
+  assert.ok(importedNodeTestDisabledCall(defaultAliasSource), defaultAliasSource)
+  assert.ok(importedNodeTestDisabledCall(namedAliasSource), namedAliasSource)
+  assert.ok(importedNodeTestDisabledCall(namespaceAliasSource), namespaceAliasSource)
+  assert.equal(importedNodeTestDisabledCall(unrelatedAliasSource), null)
+})
 test('disabled-test guard permits conditional skips but rejects literal disabled options', () => {
   const literalSkip = ['skip', ': true'].join('')
   const literalTodo = ['todo', ': true'].join('')
