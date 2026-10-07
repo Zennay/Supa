@@ -46,6 +46,15 @@ test('savings rejects malformed runtime value types without coercion', () => {
   }
 })
 
+test('savings rejects values beyond the exact cent-safe euro magnitude', () => {
+  const safeMagnitude = Number.MAX_SAFE_INTEGER / 100
+  const unsafeMagnitude = safeMagnitude + 1
+
+  assert.equal(savings(unsafeMagnitude, 10), null)
+  assert.equal(savings(10, unsafeMagnitude), null)
+  assert.equal(savings(-unsafeMagnitude, 10), null)
+})
+
 test('savings preserves its positive-only finite contract', () => {
   assert.equal(savings(40, 31.8), 8.2)
   assert.equal(savings(31.8, 40), 0)
