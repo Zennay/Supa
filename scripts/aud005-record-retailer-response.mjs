@@ -14,16 +14,16 @@ const OUTCOMES = new Set([
   'unclear',
   'routed',
 ])
-const FORBIDDEN_KEYS = new Set([
+const FORBIDDEN_KEY_TOKENS = new Set([
   'name',
-  'fullName',
-  'respondentName',
+  'fullname',
+  'respondentname',
   'email',
-  'emailAddress',
+  'emailaddress',
   'phone',
-  'phoneNumber',
+  'phonenumber',
   'contact',
-  'contactDetails',
+  'contactdetails',
   'person',
 ])
 const CONSEQUENCE_KEYS = ['architecture', 'product', 'operatingCost', 'sourceStrategy']
@@ -134,6 +134,10 @@ function requireEvidenceRef(value, path) {
   return normalized
 }
 
+function canonicalFieldKey(key) {
+  return key.replace(/[^a-z0-9]/gi, '').toLowerCase()
+}
+
 function rejectForbiddenKeys(value, path = 'record') {
   if (Array.isArray(value)) {
     value.forEach((item, index) => rejectForbiddenKeys(item, `${path}[${index}]`))
@@ -142,7 +146,10 @@ function rejectForbiddenKeys(value, path = 'record') {
   if (!isRecord(value)) return
 
   for (const [key, child] of Object.entries(value)) {
-    assert(!FORBIDDEN_KEYS.has(key), `${path}.${key} is not allowed in a repository-safe AUD-005 record`)
+    assert(
+      !FORBIDDEN_KEY_TOKENS.has(canonicalFieldKey(key)),
+      `${path}.${key} is not allowed in a repository-safe AUD-005 record`,
+    )
     rejectForbiddenKeys(child, `${path}.${key}`)
   }
 }
