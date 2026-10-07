@@ -64,20 +64,77 @@ function isBrowserGlobalMember(node, expectedName) {
   )
 }
 
-function isNavigatorObject(node) {
-  return isBrowserGlobalMember(node, 'navigator')
+function isNavigatorObject(node, navigatorAliases = new Set()) {
+  const current = unwrapExpression(node)
+
+  if (ts.isIdentifier(current)) {
+    return current.text === 'navigator' || navigatorAliases.has(current.text)
+  }
+
+  return isBrowserGlobalMember(current, 'navigator')
 }
 
-function navigatorCapabilityName(node) {
+function navigatorCapabilityName(
+  node,
+  navigatorAliases = new Set(),
+  capabilityAliases = new Map(),
+) {
   const current = unwrapExpression(node)
+
+  if (ts.isIdentifier(current)) {
+    return capabilityAliases.get(current.text) ?? null
+  }
+
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return null
   }
 
-  if (!isNavigatorObject(current.expression)) return null
+  if (!isNavigatorObject(current.expression, navigatorAliases)) return null
 
   const name = memberName(current)
   return privilegedNavigatorMethods.has(name) ? name : null
+}
+
+function collectNavigatorAliases(sourceFile) {
+  const navigatorAliases = new Set()
+  const capabilityAliases = new Map()
+  let changed = true
+
+  while (changed) {
+    changed = false
+
+    function visit(node) {
+      if (
+        ts.isVariableDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        node.initializer
+      ) {
+        const alias = node.name.text
+        const initializer = unwrapExpression(node.initializer)
+
+        if (!navigatorAliases.has(alias) && isNavigatorObject(initializer, navigatorAliases)) {
+          navigatorAliases.add(alias)
+          changed = true
+        }
+
+        const capability = navigatorCapabilityName(
+          initializer,
+          navigatorAliases,
+          capabilityAliases,
+        )
+        if (capability && capabilityAliases.get(alias) !== capability) {
+          capabilityAliases.set(alias, capability)
+          changed = true
+        }
+      }
+
+      ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+  }
+
+  return { navigatorAliases, capabilityAliases }
 }
 
 function scriptKindFor(filename) {
@@ -101,6 +158,7 @@ function findPrivilegedBrowserCapability(source, filename = 'candidate.tsx') {
     true,
     scriptKindFor(filename),
   )
+  const { navigatorAliases, capabilityAliases } = collectNavigatorAliases(sourceFile)
 
   let finding = null
 
@@ -116,10 +174,17 @@ function findPrivilegedBrowserCapability(source, filename = 'candidate.tsx') {
     }
 
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-      const capability = navigatorCapabilityName(node.expression)
+      const capability = navigatorCapabilityName(
+        node.expression,
+        navigatorAliases,
+        capabilityAliases,
+      )
       const method = memberName(node)
 
-      if (isNavigatorObject(node.expression) && directPrivilegedNavigatorMethods.has(method)) {
+      if (
+        isNavigatorObject(node.expression, navigatorAliases) &&
+        directPrivilegedNavigatorMethods.has(method)
+      ) {
         finding = {
           kind: 'navigator.' + method + ' reference',
           text: node.getText(sourceFile),
@@ -220,6 +285,18 @@ test('privileged-capability boundary catches direct calls and detached browser a
   }
 })
 
+test('privileged-capability boundary follows navigator and capability aliases', () => {
+  for (const source of [
+    'const nav = navigator; nav.share({ title: "SUPA" })',
+    'const nav = window.navigator; const next = nav; next.bluetooth.requestDevice({ filters: [] })',
+    'const clipboard = navigator.clipboard; clipboard.readText()',
+    'const nav = self.navigator; const media = nav.mediaDevices; media.getUserMedia({ audio: true })',
+    'let hardware = navigator.usb; hardware.requestDevice({ filters: [] })',
+  ]) {
+    assert.ok(findPrivilegedBrowserCapability(source), source)
+  }
+})
+
 test('privileged-capability boundary preserves unrelated local APIs and inert text', () => {
   for (const source of [
     'locationClient.geolocation.getCurrentPosition(onPosition)',
@@ -233,10 +310,12 @@ test('privileged-capability boundary preserves unrelated local APIs and inert te
     'input.hid.requestDevice(options)',
     'directory.contacts.select(fields)',
     'screen.wakeLock.request("screen")',
+    'const nav = app.navigator; nav.share(payload)',
+    'const clipboard = editor.clipboard; clipboard.readText()',
     "notifications.requestPermission('local')",
     "new notifier.Notification('local')",
-    "const example = \"navigator.share({ title: 'SUPA' })\"",
-    "// navigator.bluetooth.requestDevice({ filters: [] })",
+    "const example = \"const nav = navigator; nav.share({ title: 'SUPA' })\"",
+    "// const usb = navigator.usb; usb.requestDevice({ filters: [] })",
     'const NotificationLike = class {}; new NotificationLike()',
     'navigator.language',
   ]) {
