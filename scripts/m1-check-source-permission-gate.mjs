@@ -20,7 +20,13 @@ function assert(condition, message) {
 function safeHttpsUrl(value) {
   if (typeof value !== 'string') return false
   try {
-    return new URL(value).protocol === 'https:'
+    const url = new URL(value)
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port
+    )
   } catch {
     return false
   }
