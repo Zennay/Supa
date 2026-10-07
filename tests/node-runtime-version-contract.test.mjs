@@ -14,12 +14,47 @@ const packageJson = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 )
 
-test('local Node runtime pin matches hosted CI', () => {
+function assertHostedCiNodeVersions(workflowSource, expectedVersion) {
+  const declarations = [
+    ...workflowSource.matchAll(/^\s+node-version:\s*([^#\r\n]+?)\s*(?:#.*)?$/gm),
+  ].map((match) => match[1].trim().replace(/^['"]|['"]$/g, ''))
+
+  assert.ok(
+    declarations.length > 0,
+    'hosted CI must declare at least one explicit Node runtime version',
+  )
+  assert.deepEqual(
+    declarations,
+    declarations.map(() => expectedVersion),
+    'every hosted CI Node runtime declaration must match .nvmrc',
+  )
+}
+
+test('local Node runtime pin matches every hosted CI declaration', () => {
   assert.equal(nodeVersion, '22')
-  assert.match(
-    ciWorkflow,
-    /^\s+node-version:\s*22\s*$/m,
-    'hosted CI must stay on the same Node major as .nvmrc',
+  assertHostedCiNodeVersions(ciWorkflow, nodeVersion)
+})
+
+test('runtime contract rejects a conflicting duplicate hosted CI Node declaration', () => {
+  assert.throws(
+    () =>
+      assertHostedCiNodeVersions(
+        `
+        with:
+          node-version: 22
+        with:
+          node-version: 20
+        `,
+        '22',
+      ),
+    /every hosted CI Node runtime declaration must match \.nvmrc/,
+  )
+})
+
+test('runtime contract rejects hosted CI with no explicit Node declaration', () => {
+  assert.throws(
+    () => assertHostedCiNodeVersions('steps:\n  - run: npm test\n', '22'),
+    /hosted CI must declare at least one explicit Node runtime version/,
   )
 })
 
