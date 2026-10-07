@@ -225,3 +225,18 @@ test('PLUS listing evidence requires a timezone-bearing capture timestamp', asyn
   offset.source.capturedAt = '2026-10-04T20:08:57.837+02:00'
   assert.equal(parsePlusRenderedCatalogEvidence(offset).type, 'observations')
 })
+
+test('PLUS listing cards reject product hrefs that escape the product route after normalization', async () => {
+  const evidence = await fixture(catalogUrl)
+  evidence.cards[0].href = '/product/../aanbiedingen-113651'
+
+  const result = parsePlusRenderedCatalogEvidence(evidence)
+
+  assert.equal(result.type, 'observations')
+  assert.equal(result.observations.length, 3)
+  assert.equal(result.abstained, 1)
+  assert.equal(
+    result.observations.some((observation) => observation.sourceProductId === '113651'),
+    false,
+  )
+})
