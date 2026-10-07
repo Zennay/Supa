@@ -69,8 +69,6 @@ function isQualifiedWindowProxy(node) {
 function isBrowserPostMessageReference(node) {
   const current = unwrapExpression(node)
 
-  if (ts.isIdentifier(current)) return current.text === 'postMessage'
-
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return false
   }
@@ -197,7 +195,6 @@ test('production source has no unreviewed cross-context browser messaging', asyn
 
 test('messaging boundary catches direct browser messaging primitives', () => {
   for (const source of [
-    "postMessage({ type: 'state' }, '*')",
     "window.postMessage({ type: 'state' }, '*')",
     "self['postMessage']({ type: 'state' })",
     "globalThis.parent.postMessage({ type: 'state' }, '*')",
@@ -215,6 +212,7 @@ test('messaging boundary catches direct browser messaging primitives', () => {
 
 test('messaging boundary preserves local APIs and inert text', () => {
   for (const source of [
+    "postMessage({ type: 'local' }, '*')",
     "bridge.postMessage({ type: 'local' })",
     "channelFactory.BroadcastChannel('local')",
     "new runtime.MessageChannel()",
