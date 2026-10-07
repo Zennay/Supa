@@ -24,7 +24,57 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function validIso(value: unknown): value is string {
-  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+  if (typeof value !== 'string') return false
+
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/.exec(
+      value,
+    )
+  if (!match) return false
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, zone] =
+    match
+  const year = Number(yearText)
+  const month = Number(monthText)
+  const day = Number(dayText)
+  const hour = Number(hourText)
+  const minute = Number(minuteText)
+  const second = Number(secondText)
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [
+    31,
+    leapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ]
+
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth[month - 1] ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    return false
+  }
+
+  if (zone !== 'Z') {
+    const offsetHour = Number(zone.slice(1, 3))
+    const offsetMinute = Number(zone.slice(4, 6))
+    if (offsetHour > 23 || offsetMinute > 59) return false
+  }
+
+  return Number.isFinite(Date.parse(value))
 }
 
 function isSafeSourceId(value: unknown): value is string {
