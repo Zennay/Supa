@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a reproducible SUPA defect without publishing sensitive evidence
+title: "[Bug]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a defect. Do not include credentials, personal data, tokens, full receipt images, or sensitive retailer data. Mock/generated data is not genuine retailer evidence or savings proof. The M3 exit gate remains issue #78: one genuine same-demand PLUS + DekaMarkt field observation pair under the existing protocol.
+
+  - type: input
+    id: revision
+    attributes:
+      label: Exact commit or ref
+      description: Provide the exact SUPA commit SHA or ref where you reproduced the defect.
+      placeholder: a4783c6923a1db7db7589414e5726a3874965269
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Use deterministic local fixtures or privacy-safe inputs where possible.
+      placeholder: |
+        1. Start from...
+        2. Run...
+        3. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation context
+      description: Include relevant npm commands, workflow run IDs, browser/OS details, and whether the defect reproduces on current main.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: evidenceImpact
+    attributes:
+      label: Does this affect retailer evidence, basket economics, or savings claims?
+      options:
+        - "No"
+        - "Yes — explain below without publishing sensitive evidence"
+        - "Unknown"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidenceNotes
+    attributes:
+      label: Evidence-boundary notes
+      description: If relevant, explain the affected evidence/claim boundary. Do not paste private or sensitive source material.
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety and privacy checks
+      options:
+        - label: I did not include credentials, tokens, personal data, full receipt images, or sensitive exploit details.
+          required: true
+        - label: I did not treat mock/generated data as genuine retailer evidence or savings proof.
+          required: true
+        - label: I understand this report does not authorize active testing or scraping of third-party retailer systems.
+          required: true
