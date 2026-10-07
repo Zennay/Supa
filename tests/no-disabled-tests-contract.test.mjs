@@ -101,6 +101,19 @@ function collectBindings(sourceFile) {
       }
     }
 
+    if (
+      isConstBinding &&
+      ts.isObjectBindingPattern(node.name) &&
+      ts.isIdentifier(unwrappedInitializer) &&
+      namespaceAliases.has(unwrappedInitializer.text)
+    ) {
+      for (const element of node.name.elements) {
+        if (!ts.isIdentifier(element.name)) continue
+        const sourceName = staticName(element.propertyName) ?? element.name.text
+        addNamedBinding(sourceName, element.name.text)
+      }
+    }
+
     const bindingKind = nodeTestBindingKind(node.initializer)
     if (!bindingKind) return
 
@@ -402,6 +415,8 @@ test('disabled-test guard follows local const aliases of known test callables', 
     "const primary = test; const check = primary; check.todo('disabled', () => {})",
     "import * as testApi from 'node:test'; const check = testApi.test; check.skip('disabled', () => {})",
     "const testApi = await import('node:test'); const group = testApi.describe; group.todo('disabled', () => {})",
+    "import * as testApi from 'node:test'; const { test: check } = testApi; check.skip('disabled', () => {})",
+    "const testApi = require('node:test'); const { suite: group } = testApi; group.todo('disabled', () => {})",
   ]) {
     assert.ok(findDisabledTest(source), source)
   }
@@ -410,6 +425,7 @@ test('disabled-test guard follows local const aliases of known test callables', 
     "let check = test; check = helper; check.skip('unrelated helper', () => {})",
     "const helper = { skip() {} }; const check = helper; check.skip('unrelated helper', () => {})",
     "import * as testApi from 'node:test'; const helper = testApi.mock; helper.skip('unrelated helper', () => {})",
+    "import * as testApi from 'node:test'; const { mock: helper } = testApi; helper.skip('unrelated helper', () => {})",
   ]) {
     assert.equal(findDisabledTest(source), null, source)
   }
