@@ -1,5 +1,5 @@
 import { constants } from 'node:fs'
-import { mkdir, open, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, open, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -360,7 +360,8 @@ function parseArgs(argv) {
 async function ensurePrivateOutputDirectory(outputPath) {
   const outputDirectory = dirname(outputPath)
   await mkdir(outputDirectory, { recursive: true, mode: 0o700 })
-  const metadata = await stat(outputDirectory)
+  const metadata = await lstat(outputDirectory)
+  assert(!metadata.isSymbolicLink(), 'response output directory must not be a symlink')
   assert(metadata.isDirectory(), 'response output parent must be a directory')
   assert(
     (metadata.mode & 0o077) === 0,
