@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a reproducible SUPA defect without leaking sensitive or non-evidence data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a reproducible SUPA defect.
+
+        Do not include credentials, personal data, receipt images, private account data, or sensitive retailer data. For sensitive security findings, follow [SECURITY.md](https://github.com/Zennay/Supa/blob/main/SECURITY.md) instead of filing a public issue.
+
+        Mock, generated, deterministic, replayed, or fixture data is test material only. It is not genuine retailer evidence and is not proof of savings. Issue #78 remains the genuine same-demand PLUS baseline + DekaMarkt candidate M3 field-evidence gate.
+  - type: input
+    id: revision
+    attributes:
+      label: Exact commit or ref
+      description: Provide the exact SUPA commit SHA, branch, tag, or deployed revision where you reproduced the defect.
+      placeholder: e.g. 56377d8b28839dd84d03005ea844145a1623119f
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Give the smallest deterministic sequence that reproduces the defect. Redact or replace sensitive data.
+      placeholder: |
+        1. Start from...
+        2. Enter/select...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead? Include only privacy-safe logs or screenshots.
+    validations:
+      required: true
+  - type: textarea
+    id: validation-context
+    attributes:
+      label: Validation context
+      description: Record commands, tests, workflow runs, browser/device context, or other checks already performed.
+      placeholder: |
+        Commands:
+        Workflow/run IDs:
+        Browser/device:
+        Other validation:
+    validations:
+      required: true
+  - type: textarea
+    id: evidence-boundary
+    attributes:
+      label: Evidence and claim boundary
+      description: State what the reproduction proves and what it does not prove, especially for retailer data, basket outcomes, or savings claims.
+      placeholder: This reproduces a product/runtime defect only; it creates no genuine retailer observation or savings outcome.
+    validations:
+      required: true
+  - type: checkboxes
+    id: reporter-confirmations
+    attributes:
+      label: Reporter confirmations
+      options:
+        - label: I removed credentials, personal data, receipt images, private account data, and sensitive retailer data from this public report.
+          required: true
+        - label: I understand that mock/generated/replayed/fixture data is not genuine retailer evidence or savings proof.
+          required: true
+        - label: I understand that issue #78 remains the genuine M3 field-evidence gate unless its canonical observation and assessment requirements are actually satisfied.
+          required: true
