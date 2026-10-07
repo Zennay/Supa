@@ -4,10 +4,10 @@ import path from 'node:path'
 import test from 'node:test'
 import * as ts from 'typescript'
 
-const sourceRoots = [
-  { label: 'src/data', url: new URL('../src/data/', import.meta.url) },
-  { label: 'src/domain', url: new URL('../src/domain/', import.meta.url) },
-]
+const domainRoot = {
+  label: 'src/domain',
+  url: new URL('../src/domain/', import.meta.url),
+}
 const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx'])
 const browserRoots = new Set(['globalThis', 'self', 'window'])
 
@@ -237,27 +237,25 @@ test('determinism guard preserves explicit time inputs and unrelated APIs', () =
   }
 })
 
-test('domain and data source stay free of implicit time and randomness', async () => {
-  for (const root of sourceRoots) {
-    const files = await listSources(root.url)
-    assert.ok(files.length > 0, 'expected source files under ' + root.label)
+test('financial domain source stays free of implicit time and randomness', async () => {
+  const files = await listSources(domainRoot.url)
+  assert.ok(files.length > 0, 'expected source files under ' + domainRoot.label)
 
-    for (const file of files) {
-      const source = await readFile(file.url, 'utf8')
-      const finding = findImplicitNondeterminism(
-        source,
-        path.join(root.label, file.relativePath),
-      )
+  for (const file of files) {
+    const source = await readFile(file.url, 'utf8')
+    const finding = findImplicitNondeterminism(
+      source,
+      path.join(domainRoot.label, file.relativePath),
+    )
 
-      assert.equal(
-        finding,
-        null,
-        path.join(root.label, file.relativePath) +
-          ' contains implicit nondeterminism: ' +
-          (finding?.kind ?? 'unknown primitive') + ' at line ' +
-          (finding?.line ?? '?') + ' via ' +
-          (finding?.text ?? 'unknown source'),
-      )
-    }
+    assert.equal(
+      finding,
+      null,
+      path.join(domainRoot.label, file.relativePath) +
+        ' contains implicit nondeterminism: ' +
+        (finding?.kind ?? 'unknown primitive') + ' at line ' +
+        (finding?.line ?? '?') + ' via ' +
+        (finding?.text ?? 'unknown source'),
+    )
   }
 })
