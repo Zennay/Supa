@@ -202,3 +202,30 @@ test('AUD-005 CLI preserves an existing privacy-safe output byte-for-byte', asyn
 
   assert.equal(await readFile(output, 'utf8'), existing)
 })
+
+
+test('AUD-005 CLI rejects malformed output arguments before emitting evidence', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-output-args-'))
+  const input = join(directory, 'input.json')
+  await writeFile(input, JSON.stringify(validRecord()), 'utf8')
+
+  await assert.rejects(
+    () => main([input, '--output']),
+    /--output requires a file path/,
+  )
+  await assert.rejects(
+    () => main([input, '--output', '--unexpected']),
+    /--output requires a file path/,
+  )
+  await assert.rejects(
+    () =>
+      main([
+        input,
+        '--output',
+        join(directory, 'first.json'),
+        '--output',
+        join(directory, 'second.json'),
+      ]),
+    /--output may only be specified once/,
+  )
+})
