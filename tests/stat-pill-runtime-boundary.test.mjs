@@ -10,9 +10,9 @@ test('StatPill keeps runtime-unknown props behind the presentation sanitizer', a
     'utf8',
   )
 
-  assert.match(source, /label:\\s*unknown/)
-  assert.match(source, /value:\\s*unknown/)
-  assert.match(source, /statPillPresentation\\(label, value\\)/)
+  assert.match(source, /label:\s*unknown/)
+  assert.match(source, /value:\s*unknown/)
+  assert.match(source, /statPillPresentation\(label, value\)/)
 })
 
 test('malformed dynamic StatPill values resolve to the existing safe fallbacks', () => {
