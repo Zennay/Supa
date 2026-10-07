@@ -67,14 +67,26 @@ function charsetDeclarations(source) {
     .map((attrs) => attrs.charset)
 }
 
+function titleTexts(source) {
+  return [...source.matchAll(/<title\b[^>]*>\s*([^<]+?)\s*<\/title>/gi)]
+    .map((match) => match[1].trim())
+}
+
 test('document head keeps one UTF-8 charset and SUPA title', () => {
   const charsets = charsetDeclarations(html)
-  const titles = [...html.matchAll(/<title>\s*([^<]+?)\s*<\/title>/gi)]
+  const titles = titleTexts(html)
 
   assert.equal(charsets.length, 1, 'expected exactly one charset meta declaration')
   assert.equal(charsets[0].trim().toLowerCase(), 'utf-8')
   assert.equal(titles.length, 1, 'expected exactly one document title')
-  assert.equal(titles[0][1].trim(), 'SUPA')
+  assert.equal(titles[0], 'SUPA')
+})
+
+test('title parser exposes attributed duplicate declarations', () => {
+  assert.deepEqual(
+    titleTexts('<title>SUPA</title><title data-source="duplicate">Other</title>'),
+    ['SUPA', 'Other'],
+  )
 })
 
 test('charset parser exposes conflicting quoted and unquoted declarations', () => {
