@@ -20,14 +20,29 @@ function memberName(node) {
   return null
 }
 
-function isGlobalConsoleObject(node) {
-  if (ts.isIdentifier(node)) return node.text === 'console'
+function unwrapExpression(node) {
+  let current = node
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression
+  }
+  return current
+}
 
-  if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+function isGlobalConsoleObject(node) {
+  const current = unwrapExpression(node)
+
+  if (ts.isIdentifier(current)) return current.text === 'console'
+
+  if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
     return (
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === 'globalThis' &&
-      memberName(node) === 'console'
+      ts.isIdentifier(current.expression) &&
+      current.expression.text === 'globalThis' &&
+      memberName(current) === 'console'
     )
   }
 
@@ -64,6 +79,18 @@ function findForbiddenProductionDiagnostic(source, filename = 'candidate.tsx') {
     if (ts.isDebuggerStatement(node)) {
       finding = {
         kind: 'debugger statement',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
+
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.initializer &&
+      isGlobalConsoleObject(node.initializer)
+    ) {
+      finding = {
+        kind: 'console alias',
         text: node.getText(sourceFile),
       }
       return
@@ -133,6 +160,10 @@ test('production diagnostic guard catches executable console and debugger syntax
     "globalThis['console']['log']('debug')",
     'const emit = console.info',
     'const globalConsole = globalThis.console',
+    'const debugConsole = console',
+    'const parenthesizedConsole = (console)',
+    'const { log } = console',
+    'const { error: emitError } = (console as Console)',
     'debugger;',
   ]) {
     assert.ok(findForbiddenProductionDiagnostic(source), source)
@@ -144,6 +175,8 @@ test('production diagnostic guard ignores comments, strings and unrelated logger
     "// console.log('example')",
     "const example = \"debugger; console.error('example')\"",
     "const logger = { console: { log() {} } }; logger.console.log()",
+    "const debugConsole = logger.console",
+    "const { log } = logger.console",
     "const consoleLike = { log() {} }; consoleLike.log('ok')",
   ]) {
     assert.equal(findForbiddenProductionDiagnostic(source), null, source)
