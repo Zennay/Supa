@@ -4,7 +4,7 @@ import { App } from './App'
 import { requireAppRoot } from './lib/appRoot'
 import './styles.css'
 
-createRoot(requireAppRoot(document)).render(
+createRoot(requireAppRoot(document.getElementById('root'))).render(
   <StrictMode>
     <App />
   </StrictMode>,
