@@ -153,7 +153,7 @@ export function App() {
           <span className="brand-mark">S</span>
           <strong>SUPA</strong>
         </div>
-        <button className="avatar" aria-label="Profiel">ZE</button>
+        <button type="button" className="avatar" aria-label="Profiel">ZE</button>
       </header>
 
       <div className="content">
@@ -192,7 +192,9 @@ export function App() {
         {tabs.map((item) => (
           <button
             key={item.id}
+            type="button"
             className={tab === item.id ? 'active' : ''}
+            aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => setTab(item.id)}
           >
             {item.label}
