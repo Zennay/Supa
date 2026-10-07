@@ -12,7 +12,40 @@ function sha256Text(value) {
 }
 
 function validIso(value) {
-  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+  if (typeof value !== 'string') return false
+
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(?:Z|([+-])(\d{2}):(\d{2}))$/,
+  )
+  if (!match || !Number.isFinite(Date.parse(value))) return false
+
+  const [
+    ,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    offsetSign,
+    offsetHour,
+    offsetMinute,
+  ] = match
+  if (
+    Number(hour) > 23 ||
+    Number(minute) > 59 ||
+    Number(second) > 59 ||
+    (offsetSign && (Number(offsetHour) > 23 || Number(offsetMinute) > 59))
+  ) {
+    return false
+  }
+
+  const calendarDate = `${year}-${month}-${day}`
+  const parsedCalendarDate = new Date(`${calendarDate}T00:00:00.000Z`)
+  return (
+    !Number.isNaN(parsedCalendarDate.getTime()) &&
+    parsedCalendarDate.toISOString().slice(0, 10) === calendarDate
+  )
 }
 
 function isSafeSourceId(value) {
@@ -175,6 +208,11 @@ function requireTrustedCandidate(candidate, entry) {
   if (candidate.source.kind !== 'product') {
     throw new Error(
       `Sanitized candidate must come from a product source: ${entry.id}`,
+    )
+  }
+  if (!validIso(candidate.source.capturedAt)) {
+    throw new Error(
+      `Sanitized candidate must include valid capturedAt: ${entry.id}`,
     )
   }
 
