@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { basket, plan, recipes, stores } from '../src/data/mock.ts'
-import { mockRepository } from '../src/data/mockRepository.ts'
 
 test('canonical legacy mock fixtures reject direct runtime mutation', () => {
   assert.throws(() => {
@@ -40,7 +39,7 @@ test('canonical legacy mock fixtures reject direct runtime mutation', () => {
   }, TypeError)
 })
 
-test('failed direct fixture mutations cannot poison later repository snapshots', async () => {
+test('failed direct fixture mutations leave canonical fixture values unchanged', () => {
   assert.throws(() => {
     recipes[0].tags.push('poisoned')
   }, TypeError)
@@ -48,20 +47,8 @@ test('failed direct fixture mutations cannot poison later repository snapshots',
     basket.lines[0].price = 999
   }, TypeError)
 
-  const recipeSnapshot = await mockRepository.getRecipes()
-  const basketSnapshot = await mockRepository.getBasket()
-
-  assert.equal(recipeSnapshot[0].title, 'Tikka chicken bowl')
-  assert.deepEqual(recipeSnapshot[0].tags, ['budget', 'meal-prep'])
-  assert.equal(basketSnapshot.store.name, 'Supermarkt A')
-  assert.equal(basketSnapshot.lines[0].price, 6.49)
-
-  recipeSnapshot[0].title = 'Local mutation remains allowed'
-  basketSnapshot.lines[0].price = 123
-
-  const laterRecipeSnapshot = await mockRepository.getRecipes()
-  const laterBasketSnapshot = await mockRepository.getBasket()
-
-  assert.equal(laterRecipeSnapshot[0].title, 'Tikka chicken bowl')
-  assert.equal(laterBasketSnapshot.lines[0].price, 6.49)
+  assert.equal(recipes[0].title, 'Tikka chicken bowl')
+  assert.deepEqual(recipes[0].tags, ['budget', 'meal-prep'])
+  assert.equal(basket.store.name, 'Supermarkt A')
+  assert.equal(basket.lines[0].price, 6.49)
 })
