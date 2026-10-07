@@ -258,3 +258,32 @@ test('PLUS listing evidence rejects unsafe integer browser metadata', async () =
     })
   }
 })
+
+
+test('PLUS rendered catalog fails closed on duplicate trusted product identities', async () => {
+  const evidence = await fixture(catalogUrl)
+  evidence.cards[1] = {
+    ...evidence.cards[0],
+    name: 'Conflicting duplicate catalog identity',
+    priceInteger: '9.',
+    priceDecimals: '99',
+  }
+
+  assert.deepEqual(parsePlusRenderedCatalogEvidence(evidence), {
+    type: 'abstain',
+    reason: 'PLUS rendered catalog contains duplicate trusted product identities',
+  })
+})
+
+test('PLUS rendered offers fails closed on duplicate trusted product identities', async () => {
+  const evidence = await fixture(offersUrl)
+  evidence.cards[1] = {
+    ...evidence.cards[0],
+    name: 'Conflicting duplicate offer identity',
+  }
+
+  assert.deepEqual(parsePlusRenderedOffersEvidence(evidence), {
+    type: 'abstain',
+    reason: 'PLUS rendered offers contains duplicate trusted product identities',
+  })
+})
