@@ -70,6 +70,18 @@ function collectBindings(sourceFile) {
       optionObjects.set(node.name.text, unwrappedInitializer)
     }
 
+    const isConstBinding =
+      ts.isVariableDeclarationList(node.parent) &&
+      (node.parent.flags & ts.NodeFlags.Const) !== 0
+    if (
+      isConstBinding &&
+      ts.isIdentifier(node.name) &&
+      ts.isIdentifier(unwrappedInitializer)
+    ) {
+      const aliasedOptions = optionObjects.get(unwrappedInitializer.text)
+      if (aliasedOptions) optionObjects.set(node.name.text, aliasedOptions)
+    }
+
     const bindingKind = nodeTestBindingKind(node.initializer)
     if (!bindingKind) return
 
@@ -396,6 +408,8 @@ test('disabled-test guard rejects literal options only on test API calls', () =>
     "const disabled = { skip: true }; test('case', {...disabled}, () => {})",
     "test('case', {...{todo: 'pending regression'}}, () => {})",
     "const disabled = { todo: true }; const options = {...disabled}; test('case', options, () => {})",
+    "const disabled = { skip: true }; const options = disabled; test('case', options, () => {})",
+    "const disabled = { todo: 'pending regression' }; const alias = disabled; const options = alias; test('case', options, () => {})",
   ]) {
     assert.ok(findDisabledTest(source), source)
   }
@@ -407,6 +421,8 @@ test('disabled-test guard rejects literal options only on test API calls', () =>
     "test('case', {skip: false}, () => {})",
     "const disabled = {skip: true}; test('case', {...disabled, skip: false}, () => {})",
     "const disabled = {skip: true}; const enabled = {skip: false}; test('case', {...disabled, ...enabled}, () => {})",
+    "const disabled = {skip: true}; const enabled = {...disabled, skip: false}; const options = enabled; test('case', options, () => {})",
+    "const disabled = {skip: true}; let options = disabled; options = {skip: false}; test('case', options, () => {})",
     "const disabled = {skip: true}; test('case', {...disabled, ...runtimeOptions}, () => {})",
     "test('case', {skip: process.platform === 'win32'}, () => {})",
     "test('case', {todo: shouldSkip}, () => {})",
