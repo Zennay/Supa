@@ -20,6 +20,21 @@ function isSafePositiveNumber(value: number): boolean {
   return Number.isFinite(value) && value > 0 && value <= Number.MAX_SAFE_INTEGER
 }
 
+function decimalTextAtMost(value: string, maximum: number): boolean {
+  const normalized = value.replace(',', '.')
+  const [whole, fraction = ''] = normalized.split('.')
+  const canonicalWhole = whole.replace(/^0+(?=\d)/, '')
+  const maximumText = String(maximum)
+
+  if (canonicalWhole.length !== maximumText.length) {
+    return canonicalWhole.length < maximumText.length
+  }
+
+  if (canonicalWhole < maximumText) return true
+  if (canonicalWhole > maximumText) return false
+  return !/[1-9]/.test(fraction)
+}
+
 export function normalizeMoneyToCents(input: unknown): number | null {
   if (typeof input !== 'string') return null
 
@@ -170,9 +185,9 @@ export function normalizeOfferLabel(label: unknown): NormalizedOfferMechanic {
   }
 
   const percent = cleaned.match(/^(\d+(?:[.,]\d+)?)%\s+korting$/)
-  if (percent) {
+  if (percent && decimalTextAtMost(percent[1], 100)) {
     const percentValue = decimal(percent[1])
-    if (percentValue > 0 && percentValue <= 100) {
+    if (percentValue > 0) {
       return {
         type: 'percent_discount',
         percent: percentValue,
