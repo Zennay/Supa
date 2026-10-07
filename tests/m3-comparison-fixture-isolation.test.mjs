@@ -35,6 +35,37 @@ test('M3 comparison fixture binds every product to its declared store', () => {
   )
 })
 
+test('M3 candidate fixture changes only candidate identity, store and price', () => {
+  for (const m2Product of m2Products) {
+    const candidate = m3CandidateProducts.find(
+      (product) => product.id === `m3-b-${m2Product.id}`,
+    )
+
+    assert.ok(candidate)
+    assert.deepEqual(candidate, {
+      ...m2Product,
+      id: `m3-b-${m2Product.id}`,
+      storeId: m3CandidateStore.id,
+      priceCents: Math.max(0, m2Product.priceCents - 10),
+    })
+  }
+
+  const baselineGaram = m3BaselineProducts.find(
+    (product) => product.id === `${m3BaselineStore.id}-garam-50`,
+  )
+  const candidateGaram = m3CandidateProducts.find(
+    (product) => product.id === `${m3CandidateStore.id}-garam-50`,
+  )
+
+  assert.ok(baselineGaram)
+  assert.ok(candidateGaram)
+  assert.deepEqual(candidateGaram, {
+    ...baselineGaram,
+    id: `${m3CandidateStore.id}-garam-50`,
+    storeId: m3CandidateStore.id,
+  })
+})
+
 test('M3 candidate fixture remains independent from M2 product objects', () => {
   for (const m2Product of m2Products) {
     const candidate = m3CandidateProducts.find(
