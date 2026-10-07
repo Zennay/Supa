@@ -17,8 +17,22 @@ test('mobile viewport enables the safe-area contract used by fixed navigation', 
 
   assert.match(styles, /env\(safe-area-inset-top\)/)
   assert.match(styles, /env\(safe-area-inset-bottom\)/)
+  assert.match(styles, /env\(safe-area-inset-left\)/)
+  assert.match(styles, /env\(safe-area-inset-right\)/)
   assert.match(
     styles,
     /\.topbar\s*{[\s\S]*?padding:\s*calc\(18px \+ env\(safe-area-inset-top\)\) 20px 12px;/,
+  )
+  assert.match(
+    styles,
+    /\.topbar\s*{[\s\S]*?padding-left:\s*calc\(20px \+ env\(safe-area-inset-left\)\);[\s\S]*?padding-right:\s*calc\(20px \+ env\(safe-area-inset-right\)\);/,
+  )
+  assert.match(
+    styles,
+    /\.content\s*{[\s\S]*?padding-left:\s*calc\(18px \+ env\(safe-area-inset-left\)\);[\s\S]*?padding-right:\s*calc\(18px \+ env\(safe-area-inset-right\)\);/,
+  )
+  assert.match(
+    styles,
+    /\.bottom-nav\s*{[\s\S]*?width:\s*min\(calc\(100% - 28px\), 532px\);[\s\S]*?max\(env\(safe-area-inset-left\), env\(safe-area-inset-right\)\)[\s\S]*?max\(env\(safe-area-inset-left\), env\(safe-area-inset-right\)\)/,
   )
 })
