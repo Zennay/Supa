@@ -375,8 +375,10 @@ function hasDuplicateTrustedProductIdentity(
 ): boolean {
   const sourceProductIds = new Set<string>()
   for (const observation of observations) {
-    if (sourceProductIds.has(observation.sourceProductId)) return true
-    sourceProductIds.add(observation.sourceProductId)
+    const sourceProductId = observation.sourceProductId
+    if (sourceProductId === null) continue
+    if (sourceProductIds.has(sourceProductId)) return true
+    sourceProductIds.add(sourceProductId)
   }
   return false
 }
