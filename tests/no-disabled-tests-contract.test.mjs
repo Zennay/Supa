@@ -185,15 +185,12 @@ function resolveOptionsObject(argument, bindings) {
   return null
 }
 
-function findPermanentDisableOption(call, bindings) {
-  if (!isTestCallableExpression(call.expression, bindings)) return null
+function findPermanentDisableProperty(options, bindings, visited = new Set()) {
+  if (visited.has(options)) return null
+  visited.add(options)
 
-  for (const argument of call.arguments) {
-    const options = resolveOptionsObject(argument, bindings)
-    if (!options) continue
-
-    for (const property of options.properties) {
-      if (!ts.isPropertyAssignment(property)) continue
+  for (const property of options.properties) {
+    if (ts.isPropertyAssignment(property)) {
       const name = staticName(property.name)
       if (
         disabledMemberNames.has(name) &&
@@ -201,7 +198,29 @@ function findPermanentDisableOption(call, bindings) {
       ) {
         return property
       }
+      continue
     }
+
+    if (ts.isSpreadAssignment(property)) {
+      const spreadOptions = resolveOptionsObject(property.expression, bindings)
+      if (!spreadOptions) continue
+      const finding = findPermanentDisableProperty(spreadOptions, bindings, visited)
+      if (finding) return finding
+    }
+  }
+
+  return null
+}
+
+function findPermanentDisableOption(call, bindings) {
+  if (!isTestCallableExpression(call.expression, bindings)) return null
+
+  for (const argument of call.arguments) {
+    const options = resolveOptionsObject(argument, bindings)
+    if (!options) continue
+
+    const finding = findPermanentDisableProperty(options, bindings)
+    if (finding) return finding
   }
 
   return null
@@ -343,6 +362,14 @@ test('disabled-test guard rejects literal options only on test API calls', () =>
   const variableOptions =
     "const options = { skip: true }; test('case', options, () => {})"
   assert.ok(findDisabledTest(variableOptions), variableOptions)
+
+  for (const source of [
+    "const disabled = { skip: true }; test('case', {...disabled}, () => {})",
+    "test('case', {...{todo: 'pending regression'}}, () => {})",
+    "const disabled = { todo: true }; const options = {...disabled}; test('case', options, () => {})",
+  ]) {
+    assert.ok(findDisabledTest(source), source)
+  }
 
   const emptyTemplate =
     "test('case', {todo: " + tick + tick + "}, () => {})"
