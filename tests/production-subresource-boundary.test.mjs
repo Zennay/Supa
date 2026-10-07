@@ -11,6 +11,7 @@ const resourceAttributes = new Map([
   ['image', new Set(['href', 'xlinkHref'])],
   ['img', new Set(['src', 'srcSet'])],
   ['link', new Set(['href'])],
+  ['script', new Set(['src'])],
   ['source', new Set(['src', 'srcSet'])],
   ['track', new Set(['src'])],
   ['use', new Set(['href', 'xlinkHref'])],
@@ -208,6 +209,8 @@ test('subresource boundary catches intrinsic browser resource loads', () => {
     'const view = <img src={url} alt="" />',
     'const view = <img srcSet={srcSet} alt="" />',
     'const view = <link rel="stylesheet" href={url} />',
+    'const view = <script src={url}></script>',
+    'const view = <script {...props}></script>',
     'const view = <video poster={posterUrl} />',
     'const view = <audio src={url} />',
     'const view = <source srcSet={srcSet} />',
@@ -217,6 +220,7 @@ test('subresource boundary catches intrinsic browser resource loads', () => {
     'const view = <img {...props} />',
     "React.createElement('img', { src: url })",
     "React.createElement('link', props)",
+    "React.createElement('script', { src: url })",
   ]) {
     assert.ok(findBrowserSubresource(source), source)
   }
@@ -227,6 +231,8 @@ test('subresource boundary preserves non-loading markup and React components', (
     'const view = <img alt="placeholder" />',
     'const view = <video controls />',
     'const view = <link rel="canonical" />',
+    'const view = <script>const message = "inline example"</script>',
+    'const view = <Script src={url} />',
     'const view = <Image src={url} />',
     'const view = <Source src={url} />',
     'const view = <div data-src={url} />',
