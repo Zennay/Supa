@@ -1,0 +1,215 @@
+import assert from 'node:assert/strict'
+import { readdir, readFile } from 'node:fs/promises'
+import path from 'node:path'
+import test from 'node:test'
+import * as ts from 'typescript'
+
+const srcDir = new URL('../src/', import.meta.url)
+const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx'])
+const browserRoots = new Set(['globalThis', 'self', 'window'])
+const privilegedNavigatorMethods = new Map([
+  ['clipboard', new Set(['read', 'readText', 'write', 'writeText'])],
+  ['credentials', new Set(['create', 'get', 'preventSilentAccess', 'store'])],
+  ['geolocation', new Set(['getCurrentPosition', 'watchPosition'])],
+  ['mediaDevices', new Set(['getDisplayMedia', 'getUserMedia'])],
+])
+
+function staticName(node) {
+  if (!node) return null
+  if (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) return node.text
+  if (ts.isComputedPropertyName(node)) return staticName(node.expression)
+  return null
+}
+
+function memberName(node) {
+  if (ts.isPropertyAccessExpression(node)) return node.name.text
+  if (ts.isElementAccessExpression(node)) return staticName(node.argumentExpression)
+  return null
+}
+
+function unwrapExpression(node) {
+  let current = node
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression
+  }
+  return current
+}
+
+function isBrowserGlobalMember(node, expectedName) {
+  const current = unwrapExpression(node)
+
+  if (ts.isIdentifier(current)) return current.text === expectedName
+
+  if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
+    return false
+  }
+
+  const base = unwrapExpression(current.expression)
+  return (
+    ts.isIdentifier(base) &&
+    browserRoots.has(base.text) &&
+    memberName(current) === expectedName
+  )
+}
+
+function isNavigatorObject(node) {
+  return isBrowserGlobalMember(node, 'navigator')
+}
+
+function navigatorCapabilityName(node) {
+  const current = unwrapExpression(node)
+  if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
+    return null
+  }
+
+  if (!isNavigatorObject(current.expression)) return null
+
+  const name = memberName(current)
+  return privilegedNavigatorMethods.has(name) ? name : null
+}
+
+function scriptKindFor(filename) {
+  switch (path.extname(filename)) {
+    case '.tsx':
+      return ts.ScriptKind.TSX
+    case '.jsx':
+      return ts.ScriptKind.JSX
+    case '.js':
+      return ts.ScriptKind.JS
+    default:
+      return ts.ScriptKind.TS
+  }
+}
+
+function findPrivilegedBrowserCapability(source, filename = 'candidate.tsx') {
+  const sourceFile = ts.createSourceFile(
+    filename,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKindFor(filename),
+  )
+
+  let finding = null
+
+  function visit(node) {
+    if (finding) return
+
+    if (ts.isNewExpression(node) && isBrowserGlobalMember(node.expression, 'Notification')) {
+      finding = {
+        kind: 'Notification construction',
+        text: node.expression.getText(sourceFile),
+      }
+      return
+    }
+
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const capability = navigatorCapabilityName(node.expression)
+      const method = memberName(node)
+
+      if (capability && privilegedNavigatorMethods.get(capability)?.has(method)) {
+        finding = {
+          kind: capability + '.' + method + ' reference',
+          text: node.getText(sourceFile),
+        }
+        return
+      }
+
+      if (
+        isBrowserGlobalMember(node.expression, 'Notification') &&
+        method === 'requestPermission'
+      ) {
+        finding = {
+          kind: 'Notification.requestPermission reference',
+          text: node.getText(sourceFile),
+        }
+        return
+      }
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return finding
+}
+
+async function listProductionSources(directory, relative = '') {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const files = []
+
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    const childRelative = relative ? path.join(relative, entry.name) : entry.name
+    const childUrl = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory)
+
+    if (entry.isDirectory()) {
+      files.push(...await listProductionSources(childUrl, childRelative))
+      continue
+    }
+
+    if (entry.isFile() && sourceExtensions.has(path.extname(entry.name))) {
+      files.push({ relativePath: childRelative, url: childUrl })
+    }
+  }
+
+  return files
+}
+
+test('production source has no unreviewed privileged browser capabilities', async () => {
+  const files = await listProductionSources(srcDir)
+  assert.ok(files.length > 0, 'expected at least one production source file')
+
+  for (const file of files) {
+    const source = await readFile(file.url, 'utf8')
+    const finding = findPrivilegedBrowserCapability(source, file.relativePath)
+
+    assert.equal(
+      finding,
+      null,
+      file.relativePath + ' contains an unreviewed privileged browser capability: ' +
+        (finding?.kind ?? 'unknown primitive') + ' via ' +
+        (finding?.text ?? 'unknown source'),
+    )
+  }
+})
+
+test('privileged-capability boundary catches direct calls and detached browser aliases', () => {
+  for (const source of [
+    'navigator.geolocation.getCurrentPosition(onPosition)',
+    "window.navigator['geolocation']['watchPosition'](onPosition)",
+    'navigator.clipboard.readText()',
+    'const copy = globalThis.navigator.clipboard.writeText',
+    'navigator.mediaDevices.getUserMedia({ audio: true })',
+    "self.navigator['mediaDevices']['getDisplayMedia']()",
+    'navigator.credentials.get(options)',
+    'const store = window.navigator.credentials.store',
+    "new Notification('SUPA')",
+    "new window['Notification']('SUPA')",
+    'Notification.requestPermission()',
+    'const ask = globalThis.Notification.requestPermission',
+  ]) {
+    assert.ok(findPrivilegedBrowserCapability(source), source)
+  }
+})
+
+test('privileged-capability boundary preserves unrelated local APIs and inert text', () => {
+  for (const source of [
+    'locationClient.geolocation.getCurrentPosition(onPosition)',
+    'editor.clipboard.writeText(text)',
+    'mediaDevices.getUserMedia(options)',
+    'auth.credentials.get(options)',
+    "notifications.requestPermission('local')",
+    "new notifier.Notification('local')",
+    "const example = \"navigator.clipboard.readText()\"",
+    "// navigator.geolocation.watchPosition(onPosition)",
+    'const NotificationLike = class {}; new NotificationLike()',
+    'navigator.language',
+  ]) {
+    assert.equal(findPrivilegedBrowserCapability(source), null, source)
+  }
+})
