@@ -18,6 +18,12 @@ test('contributor guide locks validation and evidence boundaries', async () => {
     assert.match(guide, new RegExp(command.replace(/[.*+?^$()|[\]{}\\]/g, '\\$&')))
   }
 
+  assert.match(
+    guide,
+    /npm ci\nnpm audit --audit-level=high\nnpm test/,
+    'contributor validation must audit immediately after the locked install',
+  )
+
   assert.match(guide, /exact (PR )?head/i)
   assert.match(guide, /mock, generated, deterministic, replayed, or fixture data/i)
   assert.match(guide, /not.*genuine retailer evidence/i)
