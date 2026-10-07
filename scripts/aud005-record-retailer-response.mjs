@@ -68,17 +68,33 @@ function isValidIsoTimestamp(value) {
   if (typeof value !== 'string') return false
 
   const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/,
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/,
   )
   if (!match || !Number.isFinite(Date.parse(value))) return false
 
-  const [, year, month, day] = match
+  const [, year, month, day, hour, minute, second, offset] = match
   const calendarDate = `${year}-${month}-${day}`
   const parsedCalendarDate = new Date(`${calendarDate}T00:00:00.000Z`)
-  return (
-    !Number.isNaN(parsedCalendarDate.getTime()) &&
-    parsedCalendarDate.toISOString().slice(0, 10) === calendarDate
-  )
+  if (
+    Number.isNaN(parsedCalendarDate.getTime()) ||
+    parsedCalendarDate.toISOString().slice(0, 10) !== calendarDate
+  ) {
+    return false
+  }
+
+  if (Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59) {
+    return false
+  }
+
+  if (offset !== 'Z') {
+    const [offsetHour, offsetMinute] = offset
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return false
+  }
+
+  return true
 }
 
 function requireTimestamp(value, path) {
