@@ -6,6 +6,9 @@ const testsDir = new URL('./', import.meta.url)
 const self = new URL(import.meta.url).pathname.split('/').at(-1)
 const aliases = ['test', 'it', 'describe', 'suite']
 const disabledMembers = ['skip', 'todo']
+const disabledCallPattern = new RegExp(
+  `\\b(?:${aliases.join('|')})\\s*\\.\\s*(?:${disabledMembers.join('|')})\\s*\\(`,
+)
 
 test('canonical regression suite contains no explicitly disabled tests', async () => {
   const files = (await readdir(testsDir))
@@ -16,16 +19,12 @@ test('canonical regression suite contains no explicitly disabled tests', async (
 
   for (const file of files) {
     const source = await readFile(new URL(file, testsDir), 'utf8')
+    const match = source.match(disabledCallPattern)
 
-    for (const alias of aliases) {
-      for (const member of disabledMembers) {
-        const needle = alias + '.' + member
-        assert.equal(
-          source.includes(needle),
-          false,
-          `${file} explicitly disables a regression with ${needle}`,
-        )
-      }
-    }
+    assert.equal(
+      match,
+      null,
+      `${file} explicitly disables a regression with ${match?.[0] ?? 'unknown call'}`,
+    )
   }
 })
