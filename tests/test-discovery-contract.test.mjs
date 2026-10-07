@@ -8,7 +8,7 @@ const testsDirectory = dirname(fileURLToPath(import.meta.url))
 const packageJson = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8'),
 )
-const TEST_LIKE_FILENAME = /\.(?:test|spec)\.(?:mjs|cjs|js|mts|cts|ts)$/i
+const TEST_LIKE_FILENAME = /\.(?:test|spec)\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
 
 async function collectTestLikeFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -59,11 +59,28 @@ test('every test-like file remains discoverable by the top-level test glob', asy
   )
 })
 
+test('test discovery recognizes common JS, TS and React test extensions', () => {
+  for (const testLikeFile of [
+    'example.test.js',
+    'example.spec.mjs',
+    'example.test.ts',
+    'example.spec.cts',
+    'example.test.jsx',
+    'example.spec.jsx',
+    'example.test.tsx',
+    'example.spec.tsx',
+  ]) {
+    assert.match(testLikeFile, TEST_LIKE_FILENAME, testLikeFile)
+  }
+})
+
 test('test discovery rejects common wrong suffixes and nested canonical tests', () => {
   for (const undiscovered of [
     'example.spec.mjs',
     'example.test.js',
     'example.test.ts',
+    'example.test.jsx',
+    'example.test.tsx',
     join('nested', 'example.test.mjs'),
   ]) {
     assert.equal(
