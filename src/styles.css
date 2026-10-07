@@ -230,8 +230,10 @@ h3, p { margin: 0; }
 
 .shopping-row:last-child { border-bottom: 0; }
 .shopping-row > span:last-child { display: grid; gap: 3px; }
-.shopping-row.checked { opacity: .5; }
-.shopping-row.checked strong { text-decoration: line-through; }
+.shopping-row.checked strong {
+  color: var(--muted);
+  text-decoration: line-through;
+}
 
 .check {
   width: 24px;
