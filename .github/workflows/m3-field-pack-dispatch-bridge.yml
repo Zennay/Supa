@@ -22,6 +22,7 @@ jobs:
           python3 - <<'PY'
           import json
           import os
+          import urllib.error
           import urllib.parse
           import urllib.request
 
@@ -44,6 +45,18 @@ jobs:
               with urllib.request.urlopen(req, timeout=30) as response:
                   body = response.read().decode()
                   return response.status, json.loads(body) if body else None
+
+          stale_run_id = 37568130197
+          try:
+              status, _ = request(
+                  "POST",
+                  f"/repos/{repo}/actions/runs/{stale_run_id}/cancel",
+              )
+              print(f"STALE_BRIDGE_CANCEL status={status} run_id={stale_run_id}")
+          except urllib.error.HTTPError as exc:
+              if exc.code not in (409, 422):
+                  raise
+              print(f"STALE_BRIDGE_ALREADY_TERMINAL status={exc.code} run_id={stale_run_id}")
 
           _, commit = request("GET", f"/repos/{repo}/commits/main")
           main_sha = commit["sha"]
