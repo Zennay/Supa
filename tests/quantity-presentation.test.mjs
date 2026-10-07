@@ -33,7 +33,7 @@ test('preserves measurement-unit labels and localizes the unknown fallback', () 
 })
 
 test('fails closed unsupported runtime units instead of reflecting them into copy', () => {
-  for (const unit of ['pcs', ' piece', 'piece ', '', null, undefined, 1, {}, []]) {
+  for (const unit of ['pcs', ' piece', 'piece ', 'unknown ', 'UNKNOWN', '', null, undefined, 1, Symbol('piece'), {}, []]) {
     assert.equal(quantityUnitNameNl(unit), 'onbekend')
     assert.equal(quantityUnitLabelNl(unit, 2), 'onbekend')
   }
