@@ -8,6 +8,12 @@ const config = JSON.parse(
 const packageJson = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 )
+const appConfig = JSON.parse(
+  readFileSync(new URL('../tsconfig.app.json', import.meta.url), 'utf8'),
+)
+const nodeConfig = JSON.parse(
+  readFileSync(new URL('../tsconfig.node.json', import.meta.url), 'utf8'),
+)
 
 test('root TypeScript build keeps both project references', () => {
   assert.deepEqual(config.files, [])
@@ -22,4 +28,9 @@ test('root TypeScript build keeps both project references', () => {
 
 test('production build typechecks both projects before Vite bundling', () => {
   assert.equal(packageJson.scripts.build, 'tsc -b && vite build')
+})
+
+test('TypeScript project includes keep full app and build-config coverage', () => {
+  assert.deepEqual(appConfig.include, ['src'])
+  assert.deepEqual(nodeConfig.include, ['vite.config.ts'])
 })
