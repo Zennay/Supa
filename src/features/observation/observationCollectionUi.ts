@@ -75,7 +75,7 @@ export function nextObservationActionLabel(
   const retailer = M3_EXPECTED_RETAILERS[candidate.side]
   const lines = observationLinesForSide(sheet, candidate.side)
   let matchingLineExists = false
-  let matchingIncompleteLineExists = false
+  let matchingIncompleteLineCount = 0
   let ingredientLabel = ''
 
   for (const lineCandidate of lines) {
@@ -104,14 +104,18 @@ export function nextObservationActionLabel(
       continue
     }
 
-    matchingIncompleteLineExists = true
+    matchingIncompleteLineCount += 1
+    if (matchingIncompleteLineCount > 1) {
+      throw new Error('invalid next observation target')
+    }
+
     const label = (lineCandidate as { ingredientLabel?: unknown }).ingredientLabel
     if (typeof label === 'string' && label.trim() !== '') {
       ingredientLabel = label.trim()
     }
   }
 
-  if (!matchingLineExists || !matchingIncompleteLineExists) {
+  if (!matchingLineExists || matchingIncompleteLineCount !== 1) {
     throw new Error('invalid next observation target')
   }
 
