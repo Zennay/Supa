@@ -59,6 +59,23 @@ test('M3 current-time helper rejects malformed runtime value types', () => {
   }
 })
 
+test('M3 current-time helper rejects Date-prototype spoofing and ignores poisoned instance methods', () => {
+  assert.equal(observationTimestampFromDate(Object.create(Date.prototype)), '')
+
+  const poisoned = new Date('2026-10-06T07:45:12.345Z')
+  poisoned.getTime = () => {
+    throw new Error('poisoned getTime')
+  }
+  poisoned.toISOString = () => {
+    throw new Error('poisoned toISOString')
+  }
+
+  assert.equal(
+    observationTimestampFromDate(poisoned),
+    '2026-10-06T07:45:12.345Z',
+  )
+})
+
 test('M3 observed-price helper preserves exact cents and rejects silent rounding', () => {
   assert.equal(observationPriceCents('1'), 100)
   assert.equal(observationPriceCents('1.2'), 120)
