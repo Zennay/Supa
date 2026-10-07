@@ -254,3 +254,64 @@ test('DekaMarkt listing evidence requires a timezone-bearing capture timestamp',
   offset.source.capturedAt = '2026-10-04T20:15:29.695+02:00'
   assert.equal(parseDekaMarktSsrCatalogEvidence(offset).type, 'observations')
 })
+
+test('DekaMarkt listing evidence rejects unsafe integer capture metadata', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.captureEvidence.runId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.captureEvidence.artifactId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.captureEvidence.bytes = Number.MAX_SAFE_INTEGER + 1 },
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    mutate(evidence)
+
+    assert.deepEqual(parseDekaMarktSsrCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence violates the bounded capture contract',
+    })
+  }
+})
+
+test('DekaMarkt listing evidence requires an exact HTML media type', async () => {
+  for (const contentType of [
+    'application/text/html+json',
+    'text/html-malformed',
+    'application/json; profile="text/html"',
+    null,
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    evidence.captureEvidence.contentType = contentType
+
+    assert.deepEqual(parseDekaMarktSsrCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence violates the bounded capture contract',
+    })
+  }
+
+  const parameterized = await fixture(catalogUrl)
+  parameterized.captureEvidence.contentType = ' TEXT/HTML ; charset=UTF-8 '
+  assert.equal(parseDekaMarktSsrCatalogEvidence(parameterized).type, 'observations')
+})
+
+test('DekaMarkt catalog skips invalid numeric product identities', async () => {
+  for (const productId of [-1, 0, Number.MAX_SAFE_INTEGER + 1]) {
+    const evidence = await fixture(catalogUrl)
+    const product = evidence.nuxtPayload.find(
+      (value) =>
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Number.isInteger(value.productId) &&
+        Number.isInteger(value.headerText) &&
+        Number.isInteger(value.packaging) &&
+        Number.isInteger(value.price),
+    )
+    assert.ok(product)
+    evidence.nuxtPayload[product.productId] = productId
+
+    const result = parseDekaMarktSsrCatalogEvidence(evidence)
+
+    assert.equal(result.type, 'observations')
+    assert.equal(result.observations.length, 2)
+    assert.equal(result.abstained, 1)
+  }
+})

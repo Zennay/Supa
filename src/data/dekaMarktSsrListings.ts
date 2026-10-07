@@ -60,6 +60,16 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function safePositiveInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
+function validHtmlContentType(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const [mediaType] = value.split(';', 1)
+  return mediaType.trim().toLowerCase() === 'text/html'
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
   if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
     return undefined
@@ -185,16 +195,13 @@ function validateEvidenceBoundary(
   const capture = evidence.captureEvidence
   const safety = capture?.safety
   if (
-    !Number.isInteger(capture?.runId) ||
-    capture.runId <= 0 ||
-    !Number.isInteger(capture?.artifactId) ||
-    capture.artifactId <= 0 ||
+    !safePositiveInteger(capture?.runId) ||
+    !safePositiveInteger(capture?.artifactId) ||
     !/^sha256:[a-f0-9]{64}$/.test(capture?.artifactDigest ?? '') ||
     !/^[a-f0-9]{40}$/.test(capture?.supaSha ?? '') ||
     capture?.status !== 200 ||
-    !capture?.contentType?.toLowerCase().includes('text/html') ||
-    !Number.isInteger(capture?.bytes) ||
-    capture.bytes <= 0 ||
+    !validHtmlContentType(capture?.contentType) ||
+    !safePositiveInteger(capture?.bytes) ||
     !safety ||
     safety.login !== false ||
     safety.credentials !== false ||
@@ -249,7 +256,7 @@ function parseCatalogProduct(
   const price = dereference(payload, product.price)
 
   if (
-    !Number.isInteger(productId) ||
+    !safePositiveInteger(productId) ||
     typeof name !== 'string' ||
     !name.trim() ||
     typeof packaging !== 'string' ||
@@ -369,7 +376,7 @@ function parseOfferProduct(
   const information = dereference(payload, product.productInformation)
 
   if (
-    !Number.isInteger(productId) ||
+    !safePositiveInteger(productId) ||
     productNormalPrice !== outerNormalPrice ||
     productOfferPrice !== outerOfferPrice ||
     !isObject(information)

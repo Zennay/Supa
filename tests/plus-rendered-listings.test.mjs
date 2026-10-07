@@ -240,3 +240,21 @@ test('PLUS listing cards reject product hrefs that escape the product route afte
     false,
   )
 })
+
+test('PLUS listing evidence rejects unsafe integer browser metadata', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.browserEvidence.runId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.artifactId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.renderedHtmlBytes = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.screenshotBytes = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.observedProductLinkCount = Number.MAX_SAFE_INTEGER + 1 },
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    mutate(evidence)
+
+    assert.deepEqual(parsePlusRenderedCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence violates the bounded browser trust contract',
+    })
+  }
+})
