@@ -27,6 +27,7 @@ This is a feasibility spike, not a production crawler. The original M1 pair was 
 - Maximum response size is 5 MiB per page.
 - One request per fixed source per run.
 - Failed/changed sources fail visibly instead of silently substituting guessed data.
+- DekaMarkt SSR product evidence is trusted only when the declared response media type is exactly `text/html` (case-insensitive, with ordinary parameters allowed); substring lookalikes and other media types fail closed.
 
 ## Evidence produced
 
