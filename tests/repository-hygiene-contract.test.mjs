@@ -6,6 +6,7 @@ import test from 'node:test'
 
 const execFileAsync = promisify(execFile)
 const gitignoreUrl = new URL('../.gitignore', import.meta.url)
+const repositoryUrl = new URL('../', import.meta.url)
 
 const requiredIgnoreRules = [
   'node_modules',
@@ -22,6 +23,16 @@ const requiredIgnoreRules = [
   'vite.config.d.ts',
   'artifacts/',
 ]
+
+async function trackedPaths() {
+  const { stdout } = await execFileAsync('git', ['ls-files', '-z'], {
+    cwd: repositoryUrl,
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024,
+  })
+
+  return stdout.split('\0').filter(Boolean)
+}
 
 function forbiddenTrackedPath(path) {
   const segments = path.split('/')
@@ -62,21 +73,36 @@ test('gitignore keeps the repository local-artifact boundary explicit', async ()
 })
 
 test('tracked files do not contain ignored local or secret-adjacent artifacts', async () => {
-  const { stdout } = await execFileAsync('git', ['ls-files', '-z'], {
-    cwd: new URL('../', import.meta.url),
-    encoding: 'utf8',
-    maxBuffer: 1024 * 1024,
-  })
-
-  const forbidden = stdout
-    .split('\0')
-    .filter(Boolean)
-    .filter(forbiddenTrackedPath)
-    .sort()
+  const forbidden = (await trackedPaths()).filter(forbiddenTrackedPath).sort()
 
   assert.deepEqual(
     forbidden,
     [],
     `tracked local/secret-adjacent artifacts must be removed: ${forbidden.join(', ')}`,
+  )
+})
+
+test('tracked paths stay unique on case-insensitive Unicode-normalizing filesystems', async () => {
+  const seen = new Map()
+  const collisions = []
+
+  for (const path of await trackedPaths()) {
+    const portableKey = path.normalize('NFC').toLowerCase()
+    const previous = seen.get(portableKey)
+
+    if (previous && previous !== path) {
+      collisions.push([previous, path])
+      continue
+    }
+
+    seen.set(portableKey, path)
+  }
+
+  assert.deepEqual(
+    collisions,
+    [],
+    `tracked paths must not collide cross-platform: ${collisions
+      .map(([left, right]) => `${left} <-> ${right}`)
+      .join(', ')}`,
   )
 })
