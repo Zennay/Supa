@@ -116,6 +116,42 @@ test('reviewed fixtures require explicit review identity and timestamp', () => {
   )
 })
 
+test('reviewed fixtures reject parser-coerced or impossible review timestamps', () => {
+  for (const reviewedAt of [
+    'October 4, 2026 02:05:00 GMT',
+    '2026-10-04',
+    '2026-02-29T02:05:00.000Z',
+    '2026-04-31T02:05:00.000Z',
+    '2026-10-04T24:01:00.000Z',
+    '2026-10-04T02:60:00.000Z',
+  ]) {
+    const reviewed = fixture('ah')
+    reviewed.review.reviewedAt = reviewedAt
+
+    assert.throws(
+      () => validateReviewedLiveProductFixture(reviewed, 'ah'),
+      /valid reviewedAt/,
+      reviewedAt,
+    )
+  }
+})
+
+test('reviewed fixtures accept explicit UTC and offset ISO review timestamps', () => {
+  for (const reviewedAt of [
+    '2026-10-04T02:05:00Z',
+    '2026-10-04T04:05:00+02:00',
+  ]) {
+    const reviewed = fixture('ah')
+    reviewed.review.reviewedAt = reviewedAt
+
+    assert.equal(
+      validateReviewedLiveProductFixture(reviewed, 'ah').sourceProductId,
+      'wi1525',
+      reviewedAt,
+    )
+  }
+})
+
 test('reviewed fixtures reject reviews that predate the captured evidence', () => {
   const reviewed = fixture('ah')
   reviewed.review.reviewedAt = '2026-10-04T01:59:59.999Z'
