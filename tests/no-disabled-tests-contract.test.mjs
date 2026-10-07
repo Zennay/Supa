@@ -5,11 +5,12 @@ import test from 'node:test'
 const testsDir = new URL('./', import.meta.url)
 const aliases = ['test', 'it', 'describe', 'suite']
 const disabledMembers = ['skip', 'todo']
+const jsTriviaPattern = String.raw`(?:\s|\/\*[\s\S]*?\*\/)*`
 const disabledCallPattern = new RegExp(
-  `\\b(?:${aliases.join('|')})\\s*(?:\\.\\s*(?:${disabledMembers.join('|')})|\\[\\s*(?:'(?:${disabledMembers.join('|')})'|"(?:${disabledMembers.join('|')})"|\`(?:${disabledMembers.join('|')})\`)\\s*\\])\\s*\\(`,
+  `\\b(?:${aliases.join('|')})${jsTriviaPattern}(?:\\.${jsTriviaPattern}(?:${disabledMembers.join('|')})|\\[${jsTriviaPattern}(?:'(?:${disabledMembers.join('|')})'|"(?:${disabledMembers.join('|')})"|\`(?:${disabledMembers.join('|')})\`)${jsTriviaPattern}\\])${jsTriviaPattern}\\(`,
 )
 const permanentlyDisabledOptionPattern =
-  /(?:\b(?:skip|todo)|['"](?:skip|todo)['"]|\[\s*(?:'(?:skip|todo)'|"(?:skip|todo)"|`(?:skip|todo)`)\s*\])\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
+  /(?:\b(?:skip|todo)|['"](?:skip|todo)['"]|\[(?:\s|\/\*[\s\S]*?\*\/)*(?:'(?:skip|todo)'|"(?:skip|todo)"|`(?:skip|todo)`)(?:\s|\/\*[\s\S]*?\*\/)*\])(?:\s|\/\*[\s\S]*?\*\/)*:(?:\s|\/\*[\s\S]*?\*\/)*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
 
 function escapeRegex(value) {
   const special = new Set(['\\', '^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|'])
@@ -21,13 +22,13 @@ function importedNodeTestDisabledCall(source) {
   const importedAliases = []
 
   const defaultImportPattern =
-    /\bimport\s+([A-Za-z_$][\w$]*)\s*(?:,\s*(?:\{[^}]*\}|\*\s+as\s+[A-Za-z_$][\w$]*))?\s+from\s+['\"]node:test['\"]/g
+    /\bimport\s+([A-Za-z_$][\w$]*)\s*(?:,\s*(?:\{[^}]*\}|\*\s+as\s+[A-Za-z_$][\w$]*))?(?:\s|\/\*[\s\S]*?\*\/)+from(?:\s|\/\*[\s\S]*?\*\/)+['\"]node:test['\"]/g
   for (const match of source.matchAll(defaultImportPattern)) {
     importedAliases.push(escapeRegex(match[1]))
   }
 
   const namedImportPattern =
-    /\bimport\s+(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}\s+from\s+['\"]node:test['\"]/g
+    /\bimport\s+(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}(?:\s|\/\*[\s\S]*?\*\/)+from(?:\s|\/\*[\s\S]*?\*\/)+['\"]node:test['\"]/g
   for (const match of source.matchAll(namedImportPattern)) {
     for (const specifier of match[1].split(',')) {
       const named = specifier
@@ -38,7 +39,7 @@ function importedNodeTestDisabledCall(source) {
   }
 
   const namespaceImportPattern =
-    /\bimport\s+(?:[A-Za-z_$][\w$]*\s*,\s*)?\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]node:test['\"]/g
+    /\bimport\s+(?:[A-Za-z_$][\w$]*\s*,\s*)?\*\s+as\s+([A-Za-z_$][\w$]*)(?:\s|\/\*[\s\S]*?\*\/)+from(?:\s|\/\*[\s\S]*?\*\/)+['\"]node:test['\"]/g
   for (const match of source.matchAll(namespaceImportPattern)) {
     for (const apiName of aliases) {
       importedAliases.push(
@@ -48,7 +49,7 @@ function importedNodeTestDisabledCall(source) {
   }
 
   const dynamicNamespaceImportPattern =
-    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*await\s+import\s*\(\s*['\"]node:test['\"]\s*\)/g
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*await\s+import(?:\s|\/\*[\s\S]*?\*\/)*\(\s*['\"]node:test['\"]\s*\)/g
   for (const match of source.matchAll(dynamicNamespaceImportPattern)) {
     for (const apiName of aliases) {
       importedAliases.push(
@@ -58,7 +59,7 @@ function importedNodeTestDisabledCall(source) {
   }
 
   const dynamicNamedImportPattern =
-    /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*await\s+import\s*\(\s*['\"]node:test['\"]\s*\)/g
+    /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*await\s+import(?:\s|\/\*[\s\S]*?\*\/)*\(\s*['\"]node:test['\"]\s*\)/g
   for (const match of source.matchAll(dynamicNamedImportPattern)) {
     for (const specifier of match[1].split(',')) {
       const named = specifier
@@ -69,7 +70,7 @@ function importedNodeTestDisabledCall(source) {
   }
 
   const disabledMemberAccess =
-    "\\s*(?:\\.\\s*(?:skip|todo)|\\[\\s*(?:'(?:skip|todo)'|\\\"(?:skip|todo)\\\"|`(?:skip|todo)`)\\s*\\])\\s*\\("
+    `${jsTriviaPattern}(?:\\.${jsTriviaPattern}(?:skip|todo)|\\[${jsTriviaPattern}(?:'(?:skip|todo)'|\"(?:skip|todo)\"|\`(?:skip|todo)\`)${jsTriviaPattern}\\])${jsTriviaPattern}\\(`
 
   for (const aliasPattern of importedAliases) {
     const disabledCall = source.match(
@@ -113,6 +114,8 @@ test('disabled-test guard rejects dot and static bracket member calls', () => {
     ['it', "['skip']", "('disabled', () => {})"].join(''),
     ['describe', '["todo"]', '("disabled", () => {})'].join(''),
     ['suite', '[`skip`]', '("disabled", () => {})'].join(''),
+    ['test', '/* trivia */', '.', 'skip', "('disabled', () => {})"].join(''),
+    ['describe', '/* trivia */', '[`todo`]', '/* call */', '("disabled", () => {})'].join(''),
   ]
 
   for (const disabledCall of disabledCalls) {
@@ -149,6 +152,14 @@ test('disabled-test guard follows aliases imported from node:test', () => {
     "const testApi = await import('node:test')",
     ['testApi', '.', 'suite', '[\"todo\"]', "('disabled', () => {})"].join(''),
   ].join('\n')
+  const commentedStaticAliasSource = [
+    "import { test as check } /* before from */ from/* source */'node:test'",
+    ['check', '/* member */', '.', 'skip', "('disabled', () => {})"].join(''),
+  ].join('\n')
+  const commentedDynamicAliasSource = [
+    "const testApi = await import/* call */('node:test')",
+    ['testApi', '.', 'test', '/* member */', '[`todo`]', "('disabled', () => {})"].join(''),
+  ].join('\n')
   const unrelatedAliasSource = [
     "import check from './helper.js'",
     ['check', '.skip', "('not a node:test API', () => {})"].join(''),
@@ -159,6 +170,8 @@ test('disabled-test guard follows aliases imported from node:test', () => {
   assert.ok(importedNodeTestDisabledCall(namespaceAliasSource), namespaceAliasSource)
   assert.ok(importedNodeTestDisabledCall(dynamicNamedAliasSource), dynamicNamedAliasSource)
   assert.ok(importedNodeTestDisabledCall(dynamicNamespaceAliasSource), dynamicNamespaceAliasSource)
+  assert.ok(importedNodeTestDisabledCall(commentedStaticAliasSource), commentedStaticAliasSource)
+  assert.ok(importedNodeTestDisabledCall(commentedDynamicAliasSource), commentedDynamicAliasSource)
   assert.equal(importedNodeTestDisabledCall(unrelatedAliasSource), null)
 })
 test('disabled-test guard permits conditional skips but rejects literal disabled options', () => {
@@ -178,6 +191,8 @@ test('disabled-test guard permits conditional skips but rejects literal disabled
   const computedTodo = ['[`', 'todo', '`]', ': `pending regression`'].join('')
   const conditionalQuotedSkip = ["'", 'skip', "'", ": process.platform === 'win32'"].join('')
   const conditionalComputedTodo = ['["', 'todo', '"]', ': shouldSkip'].join('')
+  const commentedLiteralSkip = ["['", 'skip', "']", '/* key */', ':', '/* value */', ' true'].join('')
+  const commentedConditionalTodo = ['"', 'todo', '"', '/* key */', ':', '/* value */', ' shouldSkip'].join('')
 
   assert.match(literalSkip, permanentlyDisabledOptionPattern)
   assert.match(literalTodo, permanentlyDisabledOptionPattern)
@@ -189,10 +204,12 @@ test('disabled-test guard permits conditional skips but rejects literal disabled
   assert.match(quotedTodo, permanentlyDisabledOptionPattern)
   assert.match(computedSkip, permanentlyDisabledOptionPattern)
   assert.match(computedTodo, permanentlyDisabledOptionPattern)
+  assert.match(commentedLiteralSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(emptyStringSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(emptyTemplateSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(conditionalSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(conditionalTemplateSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(conditionalQuotedSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(conditionalComputedTodo, permanentlyDisabledOptionPattern)
+  assert.doesNotMatch(commentedConditionalTodo, permanentlyDisabledOptionPattern)
 })
