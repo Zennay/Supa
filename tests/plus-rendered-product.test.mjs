@@ -60,6 +60,7 @@ test('PLUS rendered evidence rejects malformed source provenance', async () => {
     (evidence) => { evidence.source.url = 'https://plus.nl/product/579010' },
     (evidence) => { evidence.source.url = 'https://user:pass@www.plus.nl/product/579010' },
     (evidence) => { evidence.source.url = 'https://www.plus.nl:8443/product/579010' },
+    (evidence) => { evidence.source.url = 'https://www.plus.nl/aanbiedingen' },
     (evidence) => { evidence.source.capturedAt = 'not-a-timestamp' },
     (evidence) => { evidence.source.sha256 = 'not-a-sha' },
   ]) {
