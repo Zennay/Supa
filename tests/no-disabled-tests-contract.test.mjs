@@ -408,7 +408,7 @@ test('disabled-test guard rejects literal options only on test API calls', () =>
     "const disabled = {skip: true}; test('case', {...disabled, skip: false}, () => {})",
     "const disabled = {skip: true}; const enabled = {skip: false}; test('case', {...disabled, ...enabled}, () => {})",
     "const disabled = {skip: true}; test('case', {...disabled, ...runtimeOptions}, () => {})",
-    "test('case', {skip: process.platform === 'win32'}, () => {})"
+    "test('case', {skip: process.platform === 'win32'}, () => {})",
     "test('case', {todo: shouldSkip}, () => {})",
     "test('case', {skip: ''}, () => {})",
     emptyTemplate,
