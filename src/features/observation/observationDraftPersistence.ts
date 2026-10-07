@@ -10,12 +10,14 @@ export function persistObservationDraft(
   getStorage: () => ObservationDraftWriteStorage,
   key: string,
   draft: unknown,
+  onSuccess?: () => void,
 ): boolean {
   try {
     const serialized = JSON.stringify(draft)
     if (typeof serialized !== 'string') return false
 
     getStorage().setItem(key, serialized)
+    onSuccess?.()
     return true
   } catch {
     return false
