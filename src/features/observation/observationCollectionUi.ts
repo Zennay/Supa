@@ -36,6 +36,49 @@ function observationLinesForSide(
   return lines
 }
 
+function firstUsableIncompleteObservationLine(
+  baselineLines: unknown[],
+  candidateLines: unknown[],
+): Exclude<NextObservationLine, null> | null {
+  for (const [side, lines] of [
+    ['baseline', baselineLines],
+    ['candidate', candidateLines],
+  ] as const) {
+    for (const lineCandidate of lines) {
+      if (
+        !lineCandidate ||
+        typeof lineCandidate !== 'object' ||
+        Array.isArray(lineCandidate)
+      ) {
+        continue
+      }
+
+      const ingredientId = (lineCandidate as { ingredientId?: unknown }).ingredientId
+      if (
+        typeof ingredientId !== 'string' ||
+        ingredientId.trim() === '' ||
+        ingredientId !== ingredientId.trim()
+      ) {
+        continue
+      }
+
+      try {
+        if (
+          !observationLineCollectionComplete(
+            lineCandidate as ObservationSheet['baseline']['lines'][number],
+          )
+        ) {
+          return { side, ingredientId }
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  return null
+}
+
 export function nextObservationActionLabel(
   sheet: unknown,
   next: unknown,
@@ -68,6 +111,18 @@ export function nextObservationActionLabel(
     typeof candidate.ingredientId !== 'string' ||
     candidate.ingredientId.trim() === '' ||
     candidate.ingredientId !== candidate.ingredientId.trim()
+  ) {
+    throw new Error('invalid next observation target')
+  }
+
+  const expectedNext = firstUsableIncompleteObservationLine(
+    baselineLines,
+    candidateLines,
+  )
+  if (
+    expectedNext === null ||
+    expectedNext.side !== candidate.side ||
+    expectedNext.ingredientId !== candidate.ingredientId
   ) {
     throw new Error('invalid next observation target')
   }
