@@ -119,13 +119,9 @@ function findRawHtmlSink(source, filename = 'candidate.tsx') {
         return
       }
 
-      if (
-        htmlCallSinks.has(name) &&
-        ts.isCallExpression(node.parent) &&
-        node.parent.expression === node
-      ) {
+      if (htmlCallSinks.has(name)) {
         finding = {
-          kind: name + ' call',
+          kind: name + ' callable reference',
           text: node.getText(sourceFile),
         }
         return
@@ -133,12 +129,10 @@ function findRawHtmlSink(source, filename = 'candidate.tsx') {
 
       if (
         documentWriteSinks.has(name) &&
-        isDocumentObject(node.expression) &&
-        ts.isCallExpression(node.parent) &&
-        node.parent.expression === node
+        isDocumentObject(node.expression)
       ) {
         finding = {
-          kind: 'document.' + name + ' call',
+          kind: 'document.' + name + ' callable reference',
           text: node.getText(sourceFile),
         }
         return
@@ -212,6 +206,11 @@ test('raw HTML guard catches React and DOM injection sinks', () => {
     "const doc = (window.document)",
     "const doc = (globalThis['document'] as Document)",
     "const { write } = self.document",
+    "const writeHtml = document.write",
+    "const writeLine = window.document['writeln']",
+    "const inject = node.insertAdjacentHTML",
+    "const fragment = range.createContextualFragment",
+    "const setUnsafe = shadowRoot['setHTMLUnsafe']",
   ]) {
     assert.ok(findRawHtmlSink(source), source)
   }
