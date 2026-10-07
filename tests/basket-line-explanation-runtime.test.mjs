@@ -24,6 +24,20 @@ test('basket explanation preserves known diagnostics after runtime validation', 
   )
 })
 
+test('basket explanation preserves valid diagnostics inside mixed runtime arrays', () => {
+  assert.equal(
+    basketLineExplanation('unresolved', [null, 'no candidates', 42]),
+    'Geen passend product gevonden; kies zelf.',
+  )
+  assert.equal(
+    basketLineExplanation('unresolved', [
+      { internal: true },
+      'basket quantity or price is not trusted',
+    ]),
+    'Hoeveelheid of verpakking is niet betrouwbaar genoeg; kies zelf.',
+  )
+})
+
 test('matched basket explanation does not depend on runtime diagnostics', () => {
   assert.equal(
     basketLineExplanation('matched', null),
