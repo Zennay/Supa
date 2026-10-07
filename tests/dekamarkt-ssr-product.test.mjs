@@ -34,6 +34,20 @@ test('parses exact public DekaMarkt SSR evidence into a trusted observation', as
   )
 })
 
+test('DekaMarkt availability ignores non-Schema.org lookalike identifiers', async () => {
+  const evidence = await fixture()
+  evidence.jsonLdProduct.offers.availability = 'https://example.invalid/InStock'
+
+  const result = parseDekaMarktSsrProductEvidence(evidence)
+  assert.equal(result.type, 'observation')
+  assert.equal(result.observation.availability, 'unknown')
+
+  evidence.jsonLdProduct.offers.availability = 'https://schema.org/OutOfStock'
+  const canonical = parseDekaMarktSsrProductEvidence(evidence)
+  assert.equal(canonical.type, 'observation')
+  assert.equal(canonical.observation.availability, 'unavailable')
+})
+
 test('DekaMarkt evidence fails closed on Nuxt/JSON-LD price disagreement', async () => {
   const evidence = await fixture()
   evidence.jsonLdProduct.offers.Price = 0.99
