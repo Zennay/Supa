@@ -8,6 +8,7 @@ import test from 'node:test'
 import {
   buildPrivacySafeRetailerResponse,
   main,
+  MAX_RESPONSE_INPUT_BYTES,
   validateRetailerResponseRecord,
 } from '../scripts/aud005-record-retailer-response.mjs'
 
@@ -205,6 +206,32 @@ test('AUD-005 response validator rejects email or phone text inside repository-s
   assert.throws(
     () => validateRetailerResponseRecord(phoneRecord),
     /must not contain a phone number/,
+  )
+})
+
+
+test('AUD-005 CLI rejects oversized response JSON before parsing', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-input-size-'))
+  const input = join(directory, 'oversized.json')
+  const oversized = {
+    ...validRecord(),
+    ignoredPadding: 'x'.repeat(MAX_RESPONSE_INPUT_BYTES),
+  }
+
+  await writeFile(input, JSON.stringify(oversized), 'utf8')
+
+  await assert.rejects(
+    () => main([input]),
+    new RegExp(`response JSON input exceeds the ${MAX_RESPONSE_INPUT_BYTES}-byte limit`),
+  )
+})
+
+test('AUD-005 CLI rejects non-file response input paths before reading', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-input-kind-'))
+
+  await assert.rejects(
+    () => main([directory]),
+    /response JSON input must be a regular file/,
   )
 })
 
