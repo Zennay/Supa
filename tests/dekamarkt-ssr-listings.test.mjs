@@ -162,3 +162,22 @@ test('listing evidence rejects unsafe acquisition metadata', async () => {
     reason: 'DekaMarkt evidence violates the bounded capture contract',
   })
 })
+
+
+test('listing evidence rejects cross-route relabeling', async () => {
+  const catalog = await fixture(catalogUrl)
+  catalog.source.url = 'https://www.dekamarkt.nl/aanbiedingen'
+
+  assert.deepEqual(parseDekaMarktSsrCatalogEvidence(catalog), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source route does not match catalog evidence',
+  })
+
+  const offers = await fixture(offersUrl)
+  offers.source.url = 'https://www.dekamarkt.nl/producten/zuivel-kaas'
+
+  assert.deepEqual(parseDekaMarktSsrOffersEvidence(offers), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source route does not match offers evidence',
+  })
+})
