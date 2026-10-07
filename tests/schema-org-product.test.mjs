@@ -98,6 +98,33 @@ test('keeps multi-offer availability unknown when any explicit identifier is unt
   assert.equal(result.observation.availability, 'unknown')
 })
 
+test('keeps multi-offer availability unknown when canonical states disagree', () => {
+  const result = parseSchemaOrgProduct(
+    {
+      '@type': 'Product',
+      name: 'Milk',
+      offers: [
+        {
+          '@type': 'Offer',
+          price: '1.29',
+          priceCurrency: 'EUR',
+          availability: 'https://schema.org/InStock',
+        },
+        {
+          '@type': 'Offer',
+          price: '1.29',
+          priceCurrency: 'EUR',
+          availability: 'https://schema.org/OutOfStock',
+        },
+      ],
+    },
+    provenance,
+  )
+
+  assert.equal(result.type, 'observation')
+  assert.equal(result.observation.availability, 'unknown')
+})
+
 test('finds a Product inside an @graph', () => {
   const result = parseSchemaOrgProduct(
     {
