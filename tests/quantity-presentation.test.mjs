@@ -27,3 +27,10 @@ test('preserves non-piece canonical quantity labels', () => {
     assert.equal(quantityUnitLabelNl(unit, 2), unit)
   }
 })
+
+test('fails closed unsupported runtime units instead of reflecting them into copy', () => {
+  for (const unit of ['pcs', ' piece', 'piece ', '', null, undefined, 1, {}, []]) {
+    assert.equal(quantityUnitNameNl(unit), 'unknown')
+    assert.equal(quantityUnitLabelNl(unit, 2), 'unknown')
+  }
+})
