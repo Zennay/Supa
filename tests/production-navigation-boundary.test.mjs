@@ -114,6 +114,18 @@ function findImperativeBrowserNavigation(source, filename = 'candidate.tsx') {
   function visit(node) {
     if (finding) return
 
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.initializer &&
+      isBrowserLocation(node.initializer)
+    ) {
+      finding = {
+        kind: 'browser location alias',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
+
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       if (isBrowserOpen(node)) {
         finding = {
@@ -202,6 +214,10 @@ test('navigation boundary catches direct browser navigation primitives', () => {
     "globalThis['location']['href'] += '?next=1'",
     "const launch = window.open",
     "const navigate = location.assign",
+    "const target = location",
+    "const target = (window.location)",
+    "const target = (globalThis['location'] as Location)",
+    "const { assign } = self.location",
   ]) {
     assert.ok(findImperativeBrowserNavigation(source), source)
   }
@@ -217,6 +233,9 @@ test('navigation boundary preserves inert text and app-local navigation abstract
     "history.replaceState({}, '', '/planner')",
     "const open = () => {}; open('/planner')",
     "const href = '/planner'",
+    "const target = router.location",
+    "const target = navigation.location",
+    "const locationState = { assign() {} }",
   ]) {
     assert.equal(findImperativeBrowserNavigation(source), null, source)
   }
