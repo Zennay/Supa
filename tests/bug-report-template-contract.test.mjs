@@ -21,3 +21,13 @@ test('bug intake preserves privacy and M3 evidence boundaries', () => {
   assert.match(form, /PLUS \+ DekaMarkt/)
   assert.match(form, /does not authorize active testing or scraping of third-party retailer systems/i)
 })
+
+
+const issueConfig = await readFile('.github/ISSUE_TEMPLATE/config.yml', 'utf8')
+
+test('issue intake disables blank bypass and routes security reports privately', () => {
+  assert.match(issueConfig, /blank_issues_enabled:\s*false/)
+  assert.match(issueConfig, /Security vulnerability/)
+  assert.match(issueConfig, /https:\/\/github\.com\/Zennay\/Supa\/security\/advisories\/new/)
+  assert.match(issueConfig, /privately instead of opening a public issue/i)
+})
