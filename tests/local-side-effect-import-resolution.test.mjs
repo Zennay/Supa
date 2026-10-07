@@ -80,6 +80,16 @@ test('extractor selects relative side-effect imports without binding imports', (
   ])
 })
 
+test('resolver distinguishes existing and missing local side-effect targets', async () => {
+  const importer = path.join(sourceRoot, 'main.tsx')
+
+  assert.equal(await resolvesToFile(importer, './styles.css'), true)
+  assert.equal(
+    await resolvesToFile(importer, './definitely-missing-supa-contract.css'),
+    false,
+  )
+})
+
 test('every relative source side-effect import resolves to a real file', async () => {
   const files = (await collectExecutableFiles(sourceRoot)).sort()
   assert.ok(files.length > 0, 'expected executable source files under src/')
