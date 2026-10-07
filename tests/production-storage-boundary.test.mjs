@@ -102,13 +102,21 @@ function parseSource(source, filename = 'candidate.tsx') {
   )
 }
 
+function isConstVariableDeclaration(node) {
+  return (
+    ts.isVariableDeclaration(node) &&
+    ts.isVariableDeclarationList(node.parent) &&
+    (node.parent.flags & ts.NodeFlags.Const) !== 0
+  )
+}
+
 function collectScopedStorageKeyBindings(source, filename = 'candidate.tsx') {
   const sourceFile = parseSource(source, filename)
   const bindings = new Set()
 
   function visit(node) {
     if (
-      ts.isVariableDeclaration(node) &&
+      isConstVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
       node.initializer
     ) {
@@ -121,6 +129,177 @@ function collectScopedStorageKeyBindings(source, filename = 'candidate.tsx') {
 
   visit(sourceFile)
   return bindings
+}
+
+function collectExportedScopedStorageKeyBindings(
+  source,
+  filename = 'candidate.tsx',
+) {
+  const sourceFile = parseSource(source, filename)
+  const bindings = new Set()
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    if (
+      !statement.modifiers?.some(
+        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      )
+    ) {
+      continue
+    }
+
+    if ((statement.declarationList.flags & ts.NodeFlags.Const) === 0) {
+      continue
+    }
+
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue
+      const value = staticString(declaration.initializer)
+      if (value?.startsWith('supa:')) bindings.add(declaration.name.text)
+    }
+  }
+
+  return bindings
+}
+
+function collectRelativeNamedImports(source, filename = 'candidate.tsx') {
+  const sourceFile = parseSource(source, filename)
+  const imports = []
+
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteralLike(statement.moduleSpecifier) ||
+      !statement.moduleSpecifier.text.startsWith('.')
+    ) {
+      continue
+    }
+
+    const namedBindings = statement.importClause?.namedBindings
+    if (!namedBindings || !ts.isNamedImports(namedBindings)) continue
+
+    for (const element of namedBindings.elements) {
+      imports.push({
+        specifier: statement.moduleSpecifier.text,
+        importedName: element.propertyName?.text ?? element.name.text,
+        localName: element.name.text,
+      })
+    }
+  }
+
+  return imports
+}
+
+function collectValueBindingCounts(source, filename = 'candidate.tsx') {
+  const sourceFile = parseSource(source, filename)
+  const counts = new Map()
+
+  function addBinding(name) {
+    if (!name) return
+    counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      addBinding(node.name.text)
+    } else if (ts.isBindingElement(node) && ts.isIdentifier(node.name)) {
+      addBinding(node.name.text)
+    } else if (ts.isParameter(node) && ts.isIdentifier(node.name)) {
+      addBinding(node.name.text)
+    } else if (ts.isImportSpecifier(node)) {
+      addBinding(node.name.text)
+    } else if (ts.isImportClause(node) && node.name) {
+      addBinding(node.name.text)
+    } else if (ts.isNamespaceImport(node)) {
+      addBinding(node.name.text)
+    } else if (
+      (ts.isFunctionDeclaration(node) ||
+        ts.isFunctionExpression(node) ||
+        ts.isClassDeclaration(node) ||
+        ts.isClassExpression(node)) &&
+      node.name
+    ) {
+      addBinding(node.name.text)
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return counts
+}
+
+function normalizedSourcePath(relativePath) {
+  return relativePath.split(path.sep).join('/')
+}
+
+function resolveRelativeSource(importerPath, specifier, sourcePaths) {
+  const importer = normalizedSourcePath(importerPath)
+  const base = path.posix.normalize(
+    path.posix.join(path.posix.dirname(importer), specifier),
+  )
+  const candidates = [
+    base,
+    ...[...sourceExtensions].map((extension) => base + extension),
+    ...[...sourceExtensions].map(
+      (extension) => path.posix.join(base, 'index' + extension),
+    ),
+  ]
+
+  return candidates.find((candidate) => sourcePaths.has(candidate)) ?? null
+}
+
+function buildScopedStorageKeyBindingsByFile(sources) {
+  const normalizedSources = sources.map((file) => ({
+    ...file,
+    relativePath: normalizedSourcePath(file.relativePath),
+  }))
+  const sourcePaths = new Set(
+    normalizedSources.map((file) => file.relativePath),
+  )
+  const exportedBindings = new Map(
+    normalizedSources.map((file) => [
+      file.relativePath,
+      collectExportedScopedStorageKeyBindings(file.source, file.relativePath),
+    ]),
+  )
+  const bindingsByFile = new Map(
+    normalizedSources.map((file) => [
+      file.relativePath,
+      collectScopedStorageKeyBindings(file.source, file.relativePath),
+    ]),
+  )
+
+  for (const file of normalizedSources) {
+    const bindings = bindingsByFile.get(file.relativePath)
+
+    for (const imported of collectRelativeNamedImports(
+      file.source,
+      file.relativePath,
+    )) {
+      const resolved = resolveRelativeSource(
+        file.relativePath,
+        imported.specifier,
+        sourcePaths,
+      )
+      if (
+        resolved &&
+        exportedBindings.get(resolved)?.has(imported.importedName)
+      ) {
+        bindings.add(imported.localName)
+      }
+    }
+
+    const bindingCounts = collectValueBindingCounts(
+      file.source,
+      file.relativePath,
+    )
+    for (const name of [...bindings]) {
+      if (bindingCounts.get(name) !== 1) bindings.delete(name)
+    }
+  }
+
+  return bindingsByFile
 }
 
 function storageKeyIsScoped(node, scopedKeyBindings) {
@@ -235,19 +414,15 @@ test('production browser storage stays scoped to SUPA data', async () => {
       source: await readFile(file.url, 'utf8'),
     })),
   )
-  const scopedKeyBindings = new Set()
+  const scopedKeyBindingsByFile =
+    buildScopedStorageKeyBindingsByFile(sources)
 
   for (const file of sources) {
-    for (const binding of collectScopedStorageKeyBindings(file.source, file.relativePath)) {
-      scopedKeyBindings.add(binding)
-    }
-  }
-
-  for (const file of sources) {
+    const relativePath = normalizedSourcePath(file.relativePath)
     const finding = findUnsafeStorageAccess(
       file.source,
-      file.relativePath,
-      scopedKeyBindings,
+      relativePath,
+      scopedKeyBindingsByFile.get(relativePath) ?? new Set(),
     )
 
     assert.equal(
@@ -258,6 +433,163 @@ test('production browser storage stays scoped to SUPA data', async () => {
         (finding?.text ?? 'unknown source'),
     )
   }
+})
+
+test('storage guard keeps scoped key trust module-bound and import-proven', () => {
+  const sources = [
+    {
+      relativePath: 'keys.ts',
+      source: "export const sharedKey = 'supa:shared:v1'",
+    },
+    {
+      relativePath: 'consumer.ts',
+      source:
+        "import { sharedKey as importedKey } from './keys'\n" +
+        'localStorage.getItem(importedKey)',
+    },
+    {
+      relativePath: 'collision.ts',
+      source:
+        'const sharedKey = getRuntimeKey()\n' +
+        'localStorage.getItem(sharedKey)',
+    },
+    {
+      relativePath: 'private-key.ts',
+      source: "const privateKey = 'supa:private:v1'",
+    },
+    {
+      relativePath: 'private-consumer.ts',
+      source:
+        "import { privateKey } from './private-key'\n" +
+        'localStorage.getItem(privateKey)',
+    },
+    {
+      relativePath: 'dynamic-key.ts',
+      source: 'export const dynamicKey = buildRuntimeKey()',
+    },
+    {
+      relativePath: 'dynamic-consumer.ts',
+      source:
+        "import { dynamicKey } from './dynamic-key'\n" +
+        'localStorage.getItem(dynamicKey)',
+    },
+  ]
+  const bindingsByFile = buildScopedStorageKeyBindingsByFile(sources)
+  const sourceByPath = new Map(
+    sources.map((file) => [file.relativePath, file.source]),
+  )
+
+  assert.equal(
+    findUnsafeStorageAccess(
+      sourceByPath.get('consumer.ts'),
+      'consumer.ts',
+      bindingsByFile.get('consumer.ts'),
+    ),
+    null,
+  )
+
+  for (const relativePath of [
+    'collision.ts',
+    'private-consumer.ts',
+    'dynamic-consumer.ts',
+  ]) {
+    assert.ok(
+      findUnsafeStorageAccess(
+        sourceByPath.get(relativePath),
+        relativePath,
+        bindingsByFile.get(relativePath),
+      ),
+      relativePath,
+    )
+  }
+})
+
+test('storage guard does not trust mutable scoped key bindings', () => {
+  const sources = [
+    {
+      relativePath: 'mutable-local.ts',
+      source:
+        "let storageKey = 'supa:local:v1'\n" +
+        'storageKey = getRuntimeKey()\n' +
+        'localStorage.getItem(storageKey)',
+    },
+    {
+      relativePath: 'mutable-keys.ts',
+      source: "export let sharedKey = 'supa:shared:v1'",
+    },
+    {
+      relativePath: 'mutable-consumer.ts',
+      source:
+        "import { sharedKey } from './mutable-keys'\n" +
+        'localStorage.getItem(sharedKey)',
+    },
+  ]
+  const bindingsByFile = buildScopedStorageKeyBindingsByFile(sources)
+  const sourceByPath = new Map(
+    sources.map((file) => [file.relativePath, file.source]),
+  )
+
+  for (const relativePath of ['mutable-local.ts', 'mutable-consumer.ts']) {
+    assert.ok(
+      findUnsafeStorageAccess(
+        sourceByPath.get(relativePath),
+        relativePath,
+        bindingsByFile.get(relativePath),
+      ),
+      relativePath,
+    )
+  }
+})
+
+test('storage guard revokes trust when a proven key name is shadowed', () => {
+  const sources = [
+    {
+      relativePath: 'keys.ts',
+      source: "export const sharedKey = 'supa:shared:v1'",
+    },
+    {
+      relativePath: 'local-shadow.ts',
+      source:
+        "const storageKey = 'supa:local:v1'\n" +
+        'function read(storageKey) { return localStorage.getItem(storageKey) }',
+    },
+    {
+      relativePath: 'import-shadow.ts',
+      source:
+        "import { sharedKey as importedKey } from './keys'\n" +
+        'function read(importedKey) { return localStorage.getItem(importedKey) }',
+    },
+    {
+      relativePath: 'safe-import.ts',
+      source:
+        "import { sharedKey as importedKey } from './keys'\n" +
+        'localStorage.getItem(importedKey)',
+    },
+  ]
+  const bindingsByFile = buildScopedStorageKeyBindingsByFile(sources)
+  const sourceByPath = new Map(
+    sources.map((file) => [file.relativePath, file.source]),
+  )
+
+  for (const relativePath of ['local-shadow.ts', 'import-shadow.ts']) {
+    assert.ok(
+      findUnsafeStorageAccess(
+        sourceByPath.get(relativePath),
+        relativePath,
+        bindingsByFile.get(relativePath),
+      ),
+      relativePath,
+    )
+  }
+
+  assert.equal(
+    findUnsafeStorageAccess(
+      sourceByPath.get('safe-import.ts'),
+      'safe-import.ts',
+      bindingsByFile.get('safe-import.ts'),
+    ),
+    null,
+  )
 })
 
 test('storage guard rejects origin-wide clears and unscoped or unverifiable keys', () => {
