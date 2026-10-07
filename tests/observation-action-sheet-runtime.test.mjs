@@ -50,6 +50,21 @@ test('observation action label rejects malformed selected-side containers', () =
   }
 })
 
+test('observation action label rejects padded ingredient IDs', () => {
+  const sheet = buildObservationSheet()
+
+  for (const ingredientId of [' basmati-rice', 'basmati-rice ']) {
+    assert.throws(
+      () =>
+        nextObservationActionLabel(sheet, {
+          side: 'baseline',
+          ingredientId,
+        }),
+      /invalid next observation target/,
+    )
+  }
+})
+
 test('observation action label ignores malformed line entries and keeps valid copy', () => {
   const sheet = buildObservationSheet()
   sheet.baseline.lines = [
