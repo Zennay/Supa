@@ -96,11 +96,18 @@ function selectorContractMatches(value: unknown): value is SelectorContract {
   )
 }
 
-function validHttpsPlusUrl(value: unknown): value is string {
+function validHttpsPlusListingUrl(
+  value: unknown,
+  expectedKind: SourcePageKind,
+): value is string {
   if (typeof value !== 'string') return false
   try {
     const url = new URL(value)
-    return url.protocol === 'https:' && url.hostname === 'www.plus.nl'
+    if (url.protocol !== 'https:' || url.hostname !== 'www.plus.nl') return false
+
+    return expectedKind === 'catalog'
+      ? url.pathname === '/producten' || url.pathname.startsWith('/producten/')
+      : url.pathname === '/aanbiedingen' || url.pathname.startsWith('/aanbiedingen/')
   } catch {
     return false
   }
@@ -123,7 +130,7 @@ function validateEvidenceBoundary(
     !safeSourceId(evidence.source?.id) ||
     evidence.source.supermarket !== 'plus' ||
     evidence.source.kind !== expectedKind ||
-    !validHttpsPlusUrl(evidence.source.url) ||
+    !validHttpsPlusListingUrl(evidence.source.url, expectedKind) ||
     !validIso(evidence.source.capturedAt) ||
     !/^[a-f0-9]{64}$/.test(evidence.source.sha256)
   ) {
