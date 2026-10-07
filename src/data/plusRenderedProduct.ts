@@ -158,9 +158,11 @@ function declaredProductUrl(jsonLd: unknown): DeclaredProductUrl {
 
   const raw = products[0].url
   if (raw === undefined) return { type: 'absent' }
-  if (typeof raw !== 'string' || !raw.trim()) return { type: 'invalid' }
+  if (typeof raw !== 'string' || !raw.trim() || raw !== raw.trim()) {
+    return { type: 'invalid' }
+  }
 
-  return { type: 'value', value: raw.trim() }
+  return { type: 'value', value: raw }
 }
 
 function matchesSourceProductUrl(
