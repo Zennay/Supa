@@ -73,6 +73,72 @@ test('DekaMarkt evidence rejects malformed source provenance', async () => {
   }
 })
 
+test('DekaMarkt evidence accepts canonical HTML media type with ordinary parameters', async () => {
+  const evidence = await fixture()
+  evidence.captureEvidence.contentType = ' Text/HTML ; charset=UTF-8 '
+
+  assert.equal(parseDekaMarktSsrProductEvidence(evidence).type, 'observation')
+})
+
+test('DekaMarkt evidence rejects deceptive non-HTML content types', async () => {
+  for (const contentType of [
+    'application/text/html+json',
+    'text/html-malformed',
+    'text/plain; note=text/html',
+    null,
+  ]) {
+    const evidence = await fixture()
+    evidence.captureEvidence.contentType = contentType
+
+    assert.deepEqual(parseDekaMarktSsrProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence violates the bounded capture contract',
+    })
+  }
+})
+
+test('DekaMarkt product requires a timezone-bearing capture timestamp', async () => {
+  for (const capturedAt of [
+    '2026-10-04',
+    '2026-10-04T18:15:29.695',
+    '2026-02-30T18:15:29.695Z',
+    '2026-10-04T24:00:00Z',
+    '2026-10-04T18:15:29+24:00',
+  ]) {
+    const evidence = await fixture()
+    evidence.source.capturedAt = capturedAt
+
+    assert.deepEqual(parseDekaMarktSsrProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence has invalid source provenance',
+    })
+  }
+
+  const offset = await fixture()
+  offset.source.capturedAt = '2026-10-04T20:15:29.695+02:00'
+  assert.equal(parseDekaMarktSsrProductEvidence(offset).type, 'observation')
+})
+
+test('DekaMarkt product binds corroborated identity to the source URL', async () => {
+  const wrongUrlId = await fixture()
+  wrongUrlId.source.url =
+    'https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk/zuivelmeester-halfvolle-melk-1-liter/999999'
+
+  assert.deepEqual(parseDekaMarktSsrProductEvidence(wrongUrlId), {
+    type: 'abstain',
+    reason: 'DekaMarkt product identity does not match source URL',
+  })
+
+  const missingUrlId = await fixture()
+  missingUrlId.source.url =
+    'https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk/zuivelmeester-halfvolle-melk'
+
+  assert.deepEqual(parseDekaMarktSsrProductEvidence(missingUrlId), {
+    type: 'abstain',
+    reason: 'DekaMarkt product identity does not match source URL',
+  })
+})
+
 test('DekaMarkt evidence rejects malformed capture artifact identity', async () => {
   for (const mutate of [
     (evidence) => { evidence.captureEvidence.runId = 0 },
