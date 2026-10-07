@@ -291,3 +291,27 @@ test('DekaMarkt listing evidence requires an exact HTML media type', async () =>
   parameterized.captureEvidence.contentType = ' TEXT/HTML ; charset=UTF-8 '
   assert.equal(parseDekaMarktSsrCatalogEvidence(parameterized).type, 'observations')
 })
+
+test('DekaMarkt catalog skips invalid numeric product identities', async () => {
+  for (const productId of [-1, 0, Number.MAX_SAFE_INTEGER + 1]) {
+    const evidence = await fixture(catalogUrl)
+    const product = evidence.nuxtPayload.find(
+      (value) =>
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Number.isInteger(value.productId) &&
+        Number.isInteger(value.headerText) &&
+        Number.isInteger(value.packaging) &&
+        Number.isInteger(value.price),
+    )
+    assert.ok(product)
+    evidence.nuxtPayload[product.productId] = productId
+
+    const result = parseDekaMarktSsrCatalogEvidence(evidence)
+
+    assert.equal(result.type, 'observations')
+    assert.equal(result.observations.length, 2)
+    assert.equal(result.abstained, 1)
+  }
+})
