@@ -6,10 +6,10 @@ const testsDir = new URL('./', import.meta.url)
 const aliases = ['test', 'it', 'describe', 'suite']
 const disabledMembers = ['skip', 'todo']
 const disabledCallPattern = new RegExp(
-  `\\b(?:${aliases.join('|')})\\s*\\.\\s*(?:${disabledMembers.join('|')})\\s*\\(`,
+  `\\b(?:${aliases.join('|')})\\s*(?:\\.\\s*(?:${disabledMembers.join('|')})|\\[\\s*(?:'(?:${disabledMembers.join('|')})'|"(?:${disabledMembers.join('|')})"|\`(?:${disabledMembers.join('|')})\`)\\s*\\])\\s*\\(`,
 )
 const permanentlyDisabledOptionPattern =
-  /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\$\{)[^`\r\n]+`)/
+  /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
 
 test('canonical regression suite contains no explicitly disabled tests', async () => {
   const files = (await readdir(testsDir))
@@ -33,6 +33,27 @@ test('canonical regression suite contains no explicitly disabled tests', async (
       null,
       `${file} permanently disables a regression with a literal test option`,
     )
+  }
+})
+
+test('disabled-test guard rejects dot and static bracket member calls', () => {
+  const disabledCalls = [
+    ['test', '.skip', "('disabled', () => {})"].join(''),
+    ['it', "['skip']", "('disabled', () => {})"].join(''),
+    ['describe', '["todo"]', '("disabled", () => {})'].join(''),
+    ['suite', '[`skip`]', '("disabled", () => {})'].join(''),
+  ]
+
+  for (const disabledCall of disabledCalls) {
+    assert.match(disabledCall, disabledCallPattern, disabledCall)
+  }
+
+  for (const enabledCall of [
+    "test('enabled', () => {})",
+    "it['runs']('enabled', () => {})",
+    "describe[member]('dynamic', () => {})",
+  ]) {
+    assert.doesNotMatch(enabledCall, disabledCallPattern, enabledCall)
   }
 })
 
