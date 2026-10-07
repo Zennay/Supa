@@ -35,7 +35,46 @@ function memberName(node) {
   return null
 }
 
-function findDirectMapIndexKey(source, filename = 'candidate.tsx') {
+function expressionReferencesIdentifier(expression, identifierName) {
+  let found = false
+
+  function visit(node) {
+    if (found) return
+
+    if (
+      (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
+      node.parameters.some(
+        (parameter) =>
+          ts.isIdentifier(parameter.name) &&
+          parameter.name.text === identifierName,
+      )
+    ) {
+      return
+    }
+
+    if (ts.isIdentifier(node) && node.text === identifierName) {
+      const parent = node.parent
+      const isPropertyName =
+        ts.isPropertyAccessExpression(parent) && parent.name === node
+      const isObjectPropertyName =
+        ts.isPropertyAssignment(parent) &&
+        parent.name === node &&
+        parent.initializer !== node
+
+      if (!isPropertyName && !isObjectPropertyName) {
+        found = true
+        return
+      }
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(expression)
+  return found
+}
+
+function findMapIndexKey(source, filename = 'candidate.tsx') {
   const sourceFile = ts.createSourceFile(
     filename,
     source,
@@ -56,16 +95,14 @@ function findDirectMapIndexKey(source, filename = 'candidate.tsx') {
         node.name.text === 'key' &&
         node.initializer &&
         ts.isJsxExpression(node.initializer) &&
-        node.initializer.expression
+        node.initializer.expression &&
+        expressionReferencesIdentifier(node.initializer.expression, indexName)
       ) {
-        const expression = unwrapExpression(node.initializer.expression)
-        if (ts.isIdentifier(expression) && expression.text === indexName) {
-          finding = {
-            indexName,
-            text: node.getText(sourceFile),
-          }
-          return
+        finding = {
+          indexName,
+          text: node.getText(sourceFile),
         }
+        return
       }
 
       ts.forEachChild(node, visit)
@@ -126,41 +163,55 @@ async function listProductionTsx(directory, relative = '') {
   return files
 }
 
-test('production React lists do not key rendered items directly by map index', async () => {
+test('production React list keys stay independent from map position', async () => {
   const files = await listProductionTsx(srcDir)
   assert.ok(files.length > 0, 'expected at least one production TSX file')
 
   for (const file of files) {
     const source = await readFile(file.url, 'utf8')
-    const finding = findDirectMapIndexKey(source, file.relativePath)
+    const finding = findMapIndexKey(source, file.relativePath)
 
     assert.equal(
       finding,
       null,
-      file.relativePath + ' keys a rendered list item by map position: ' +
+      file.relativePath + ' keys a rendered list item using map position: ' +
         (finding?.text ?? 'unknown key'),
     )
   }
 })
 
-test('list-key contract catches direct and wrapped map-index keys', () => {
+test('list-key contract catches direct, wrapped and composite map-index keys', () => {
   for (const source of [
     'items.map((item, index) => <Row key={index} item={item} />)',
     'items.map(function (item, position) { return <Row key={(position)} item={item} /> })',
     'items.map((item, offset) => <Row key={offset as number} item={item} />)',
+    'items.map((item, index) => <Row key={item.id + ":" + index} item={item} />)',
+    'items.map((item, index) => <Row key={`${item.id}-${index}`} item={item} />)',
+    'items.map((item, index) => <Row key={String(index)} item={item} />)',
   ]) {
-    assert.ok(findDirectMapIndexKey(source), source)
+    assert.ok(findMapIndexKey(source), source)
   }
 })
 
-test('list-key contract preserves stable semantic keys and unrelated index identifiers', () => {
+test('list-key contract preserves stable semantic keys and property names', () => {
   for (const source of [
     'items.map((item, index) => <Row key={item.id} item={item} />)',
-    'items.map((item, index) => <Row key={item.slug + index.toString()} item={item} />)',
+    'items.map((item, index) => <Row key={item.index} item={item} />)',
+    'items.map((item, index) => <Row key={item.slug + ":" + item.version} item={item} />)',
     'const index = "stable"; const row = <Row key={index} />',
     'items.map((item) => <Row key={item.id} item={item} />)',
     'items["map"]((item, position) => <Row key={item.id} item={item} />)',
   ]) {
-    assert.equal(findDirectMapIndexKey(source), null, source)
+    assert.equal(findMapIndexKey(source), null, source)
   }
+})
+
+test('list-key contract does not confuse a nested shadowed identifier with the outer map index', () => {
+  const source = `
+    items.map((item, index) =>
+      values.map((index) => <Row key={index.id} item={item} />)
+    )
+  `
+
+  assert.equal(findMapIndexKey(source), null)
 })
