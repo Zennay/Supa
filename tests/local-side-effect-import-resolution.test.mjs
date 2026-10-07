@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readdir, stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -85,9 +85,7 @@ test('every relative source side-effect import resolves to a real file', async (
   assert.ok(files.length > 0, 'expected executable source files under src/')
 
   for (const file of files) {
-    const source = await import('node:fs/promises').then(({ readFile }) =>
-      readFile(file, 'utf8'),
-    )
+    const source = await readFile(file, 'utf8')
 
     for (const specifier of extractRelativeSideEffectImports(source)) {
       assert.equal(
