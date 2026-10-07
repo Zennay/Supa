@@ -19,7 +19,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - name: Cancel stale runs from closed Dependabot major PRs
+      - name: Cancel stale or intentionally parked Dependabot runs
         shell: bash
         run: |
           set -euo pipefail
@@ -29,6 +29,7 @@ jobs:
             37574625082 37574625091 37574625124 37574625114
             37574637522 37574637505 37574637497 37574637487
             37574654907 37574654945 37574654908 37574654896
+            37574663342 37574663327 37574663354 37574663334
           )
           for run_id in "${runs[@]}"; do
             status="$(gh api "repos/$GH_REPO/actions/runs/$run_id" --jq .status)"
