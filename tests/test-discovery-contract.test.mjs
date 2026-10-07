@@ -8,8 +8,9 @@ const testsDirectory = dirname(fileURLToPath(import.meta.url))
 const packageJson = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8'),
 )
+const TEST_LIKE_FILENAME = /\.(?:test|spec)\.(?:mjs|cjs|js|mts|cts|ts)$/i
 
-async function collectTestFiles(directory) {
+async function collectTestLikeFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
   const files = []
 
@@ -17,16 +18,25 @@ async function collectTestFiles(directory) {
     const entryPath = join(directory, entry.name)
 
     if (entry.isDirectory()) {
-      files.push(...await collectTestFiles(entryPath))
+      files.push(...await collectTestLikeFiles(entryPath))
       continue
     }
 
-    if (entry.isFile() && entry.name.endsWith('.test.mjs')) {
+    if (entry.isFile() && TEST_LIKE_FILENAME.test(entry.name)) {
       files.push(entryPath)
     }
   }
 
   return files
+}
+
+function isSelectedByCanonicalNpmTestGlob(relativePath) {
+  const normalizedPath = relativePath.split(sep).join('/')
+
+  return (
+    !normalizedPath.includes('/') &&
+    normalizedPath.endsWith('.test.mjs')
+  )
 }
 
 test('npm test keeps the explicit top-level Node test glob', () => {
@@ -36,15 +46,35 @@ test('npm test keeps the explicit top-level Node test glob', () => {
   )
 })
 
-test('every Node test remains discoverable by the top-level test glob', async () => {
-  const testFiles = await collectTestFiles(testsDirectory)
-  const nestedTests = testFiles
+test('every test-like file remains discoverable by the top-level test glob', async () => {
+  const testLikeFiles = await collectTestLikeFiles(testsDirectory)
+  const undiscoveredTests = testLikeFiles
     .map((path) => relative(testsDirectory, path))
-    .filter((path) => path.includes(sep))
+    .filter((path) => !isSelectedByCanonicalNpmTestGlob(path))
 
   assert.deepEqual(
-    nestedTests,
+    undiscoveredTests,
     [],
-    `nested Node tests are not selected by npm test: ${nestedTests.join(', ')}`,
+    `test-like files are not selected by npm test: ${undiscoveredTests.join(', ')}`,
+  )
+})
+
+test('test discovery rejects common wrong suffixes and nested canonical tests', () => {
+  for (const undiscovered of [
+    'example.spec.mjs',
+    'example.test.js',
+    'example.test.ts',
+    join('nested', 'example.test.mjs'),
+  ]) {
+    assert.equal(
+      isSelectedByCanonicalNpmTestGlob(undiscovered),
+      false,
+      undiscovered,
+    )
+  }
+
+  assert.equal(
+    isSelectedByCanonicalNpmTestGlob('example.test.mjs'),
+    true,
   )
 })
