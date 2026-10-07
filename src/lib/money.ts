@@ -3,14 +3,17 @@ const euroFormatter = new Intl.NumberFormat('nl-NL', {
   currency: 'EUR',
 })
 
-const MAX_SAFE_EURO_MAGNITUDE = Number.MAX_SAFE_INTEGER / 100
+function toSafeCents(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null
+  }
 
-function isSafeEuroNumber(value: unknown): value is number {
-  return (
-    typeof value === 'number' &&
-    Number.isFinite(value) &&
-    Math.abs(value) <= MAX_SAFE_EURO_MAGNITUDE
-  )
+  const cents = Math.round(value * 100)
+  if (!Number.isSafeInteger(cents) || value !== cents / 100) {
+    return null
+  }
+
+  return cents
 }
 
 export const euro = {
@@ -18,7 +21,7 @@ export const euro = {
     if (typeof value === 'bigint') {
       return euroFormatter.format(value)
     }
-    if (!isSafeEuroNumber(value)) {
+    if (toSafeCents(value) === null) {
       return '—'
     }
 
@@ -28,14 +31,17 @@ export const euro = {
 }
 
 export function savings(baseline: number, total: number): number | null {
+  const baselineCents = toSafeCents(baseline)
+  const totalCents = toSafeCents(total)
+
   if (
-    !isSafeEuroNumber(baseline) ||
-    !isSafeEuroNumber(total) ||
-    baseline < 0 ||
-    total < 0
+    baselineCents === null ||
+    totalCents === null ||
+    baselineCents < 0 ||
+    totalCents < 0
   ) {
     return null
   }
 
-  return Math.max(0, baseline - total)
+  return Math.max(0, baselineCents - totalCents) / 100
 }
