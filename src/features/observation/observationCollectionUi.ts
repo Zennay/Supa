@@ -40,10 +40,10 @@ export function nextObservationActionLabel(
   sheet: unknown,
   next: unknown,
 ): string {
-  if (next === null) {
-    observationLinesForSide(sheet, 'baseline')
-    observationLinesForSide(sheet, 'candidate')
+  const baselineLines = observationLinesForSide(sheet, 'baseline')
+  const candidateLines = observationLinesForSide(sheet, 'candidate')
 
+  if (next === null) {
     let pending: ReturnType<typeof nextIncompleteObservationLine>
     try {
       pending = nextIncompleteObservationLine(sheet as ObservationSheet)
@@ -73,7 +73,8 @@ export function nextObservationActionLabel(
   }
 
   const retailer = M3_EXPECTED_RETAILERS[candidate.side]
-  const lines = observationLinesForSide(sheet, candidate.side)
+  const lines =
+    candidate.side === 'baseline' ? baselineLines : candidateLines
   let matchingLineExists = false
   let matchingIncompleteLineCount = 0
   let ingredientLabel = ''

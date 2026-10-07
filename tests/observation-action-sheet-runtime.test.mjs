@@ -9,6 +9,11 @@ const nextBaselineRice = {
   ingredientId: 'basmati-rice',
 }
 
+const nextCandidateRice = {
+  side: 'candidate',
+  ingredientId: 'basmati-rice',
+}
+
 test('observation action label rejects malformed sheet containers deterministically', () => {
   for (const malformed of [null, undefined, false, 0, '', [], {}]) {
     assert.throws(
@@ -63,6 +68,32 @@ test('observation action label rejects malformed selected-side containers', () =
         nextObservationActionLabel(
           { baseline, candidate: { lines: [] } },
           nextBaselineRice,
+        ),
+      /invalid observation sheet/,
+    )
+  }
+})
+
+test('observation action label rejects malformed unselected-side containers', () => {
+  const sheet = buildObservationSheet()
+
+  for (const candidate of [null, undefined, false, 0, '', [], { lines: null }]) {
+    assert.throws(
+      () =>
+        nextObservationActionLabel(
+          { baseline: sheet.baseline, candidate },
+          nextBaselineRice,
+        ),
+      /invalid observation sheet/,
+    )
+  }
+
+  for (const baseline of [null, undefined, false, 0, '', [], { lines: null }]) {
+    assert.throws(
+      () =>
+        nextObservationActionLabel(
+          { baseline, candidate: sheet.candidate },
+          nextCandidateRice,
         ),
       /invalid observation sheet/,
     )
