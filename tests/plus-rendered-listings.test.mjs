@@ -187,3 +187,19 @@ test('PLUS listing evidence rejects credential-bearing public source URLs', asyn
     assert.match(result.reason, /must identify a valid (catalog|offers) source/)
   }
 })
+
+
+test('PLUS listing evidence rejects non-default ports but accepts canonical HTTPS 443', async () => {
+  const nonDefault = await fixture(catalogUrl)
+  nonDefault.source.url = 'https://www.plus.nl:8443/producten'
+
+  assert.deepEqual(parsePlusRenderedCatalogEvidence(nonDefault), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid catalog source',
+  })
+
+  const explicitDefault = await fixture(catalogUrl)
+  explicitDefault.source.url = 'https://www.plus.nl:443/producten'
+
+  assert.equal(parsePlusRenderedCatalogEvidence(explicitDefault).type, 'observations')
+})

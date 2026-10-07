@@ -102,6 +102,7 @@ function validHttpsPlusUrl(
     if (
       url.protocol !== 'https:' ||
       url.hostname !== 'www.plus.nl' ||
+      url.port ||
       url.username ||
       url.password
     ) {

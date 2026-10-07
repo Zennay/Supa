@@ -214,3 +214,21 @@ test('DekaMarkt listing evidence rejects credential-bearing public source URLs',
     })
   }
 })
+
+
+test('DekaMarkt listing evidence rejects non-default ports but accepts canonical HTTPS 443', async () => {
+  const nonDefault = await fixture(catalogUrl)
+  nonDefault.source.url =
+    'https://www.dekamarkt.nl:8443/producten/zuivel-kaas/melk-karnemelk'
+
+  assert.deepEqual(parseDekaMarktSsrCatalogEvidence(nonDefault), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source must use the credential-free public HTTPS host',
+  })
+
+  const explicitDefault = await fixture(catalogUrl)
+  explicitDefault.source.url =
+    'https://www.dekamarkt.nl:443/producten/zuivel-kaas/melk-karnemelk'
+
+  assert.equal(parseDekaMarktSsrCatalogEvidence(explicitDefault).type, 'observations')
+})

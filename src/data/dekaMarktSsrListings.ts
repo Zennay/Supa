@@ -115,6 +115,7 @@ function validateEvidenceBoundary(
     if (
       url.protocol !== 'https:' ||
       url.hostname !== 'www.dekamarkt.nl' ||
+      url.port ||
       url.username ||
       url.password
     ) {
