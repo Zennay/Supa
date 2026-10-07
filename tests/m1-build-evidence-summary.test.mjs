@@ -32,6 +32,11 @@ function bundle({
       success: id !== failedId,
     })),
   }
+  manifest.bounded = true
+  manifest.sourceCount = manifest.results.length
+  manifest.successCount = manifest.results.filter((result) => result.success === true).length
+  manifest.failureCount = manifest.results.length - manifest.successCount
+
   const inspection = {
     milestone: 'M1 Data Feasibility',
     sources: ids
@@ -57,7 +62,11 @@ function bundle({
     milestone: 'M1 Data Feasibility',
     candidateCount: 1,
     abstentionCount: 1,
-    candidates: [{ id: 'dekamarkt-product' }],
+    candidates: [{
+      id: 'dekamarkt-product',
+      file: 'dekamarkt-product.json',
+      candidateSha256: 'a'.repeat(64),
+    }],
     abstentions: [{ id: 'plus-product' }],
   }
   return { manifest, inspection, freshness, candidateIndex }
@@ -75,6 +84,45 @@ test('marks a complete two-source evidence bundle adapter-ready', () => {
     'review-product-candidates-and-build-source-specific-adapters',
   )
   assert.equal(report.evidenceCompleteCount, 6)
+})
+
+test('rejects malformed manifest capture success flags', () => {
+  for (const success of ['false', 1, {}, []]) {
+    const data = bundle()
+    data.manifest.results[0].success = success
+
+    assert.throws(
+      () => buildEvidenceSummary(data),
+      /Invalid manifest success flag/,
+    )
+  }
+})
+
+test('rejects unbounded capture manifests before readiness calculation', () => {
+  const data = bundle()
+  data.manifest.bounded = false
+
+  assert.throws(
+    () => buildEvidenceSummary(data),
+    /must be explicitly bounded/,
+  )
+})
+
+test('rejects inconsistent capture manifest counters', () => {
+  const sourceCount = bundle()
+  sourceCount.manifest.sourceCount += 1
+  assert.throws(
+    () => buildEvidenceSummary(sourceCount),
+    /sourceCount does not match results length/,
+  )
+
+  const outcomeCounts = bundle()
+  outcomeCounts.manifest.successCount -= 1
+  outcomeCounts.manifest.failureCount += 1
+  assert.throws(
+    () => buildEvidenceSummary(outcomeCounts),
+    /success\/failure counts do not match results/,
+  )
 })
 
 test('fails readiness when one capture failed', () => {
@@ -99,6 +147,42 @@ test('fails readiness when one source is stale', () => {
       .find((source) => source.id === 'dekamarkt-catalog')
       .reasons.includes('freshness-stale'),
   )
+})
+
+test('rejects evidence scope outside the bounded PLUS and DekaMarkt source matrix', () => {
+  const thirdRetailer = bundle()
+  for (const document of [
+    thirdRetailer.manifest.results,
+    thirdRetailer.inspection.sources,
+    thirdRetailer.freshness.sources,
+  ]) {
+    document.find((source) => source.id === 'dekamarkt-catalog').supermarket = 'ah'
+  }
+
+  const thirdRetailerReport = buildEvidenceSummary(thirdRetailer)
+  assert.equal(
+    thirdRetailerReport.documentConsistency.boundedSourceScopeMatches,
+    false,
+  )
+  assert.equal(thirdRetailerReport.documentConsistency.consistent, false)
+  assert.equal(thirdRetailerReport.adapterEvidenceReady, false)
+
+  const duplicateLane = bundle()
+  for (const document of [
+    duplicateLane.manifest.results,
+    duplicateLane.inspection.sources,
+    duplicateLane.freshness.sources,
+  ]) {
+    document.find((source) => source.id === 'dekamarkt-offers').kind = 'catalog'
+  }
+
+  const duplicateLaneReport = buildEvidenceSummary(duplicateLane)
+  assert.equal(
+    duplicateLaneReport.documentConsistency.boundedSourceScopeMatches,
+    false,
+  )
+  assert.equal(duplicateLaneReport.documentConsistency.consistent, false)
+  assert.equal(duplicateLaneReport.adapterEvidenceReady, false)
 })
 
 test('detects inconsistent evidence documents', () => {
@@ -194,6 +278,26 @@ test('rejects cross-document source identity mismatches', () => {
   assert.equal(report.nextAction, 'repair-evidence-bundle')
 })
 
+test('candidate index requires exact candidate file and digest metadata', () => {
+  const missingDigest = bundle()
+  delete missingDigest.candidateIndex.candidates[0].candidateSha256
+  const missingDigestReport = buildEvidenceSummary(missingDigest)
+  assert.equal(
+    missingDigestReport.documentConsistency.candidateIndexStructureValid,
+    false,
+  )
+  assert.equal(missingDigestReport.adapterEvidenceReady, false)
+
+  const wrongFile = bundle()
+  wrongFile.candidateIndex.candidates[0].file = '../dekamarkt-product.json'
+  const wrongFileReport = buildEvidenceSummary(wrongFile)
+  assert.equal(
+    wrongFileReport.documentConsistency.candidateIndexStructureValid,
+    false,
+  )
+  assert.equal(wrongFileReport.adapterEvidenceReady, false)
+})
+
 test('unexpected candidate-index decisions make the bundle inconsistent', () => {
   const data = bundle()
   data.candidateIndex.candidates.push({ id: 'ghost-product' })
@@ -246,6 +350,10 @@ test('empty evidence bundles can never be adapter-ready', () => {
   const report = buildEvidenceSummary({
     manifest: {
       milestone: 'M1 Data Feasibility',
+      bounded: true,
+      sourceCount: 0,
+      successCount: 0,
+      failureCount: 0,
       results: [],
     },
     inspection: {
@@ -265,7 +373,8 @@ test('empty evidence bundles can never be adapter-ready', () => {
     },
   })
 
-  assert.equal(report.documentConsistency.consistent, true)
+  assert.equal(report.documentConsistency.boundedSourceScopeMatches, false)
+  assert.equal(report.documentConsistency.consistent, false)
   assert.equal(report.sourceCount, 0)
   assert.equal(report.captureReady, false)
   assert.equal(report.coverageReady, false)

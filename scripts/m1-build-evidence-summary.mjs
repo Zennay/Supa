@@ -43,6 +43,13 @@ function candidateIndex(index) {
   const candidateIds = candidateItems
     .map((item) => item?.id)
     .filter((id) => isSafeSourceId(id))
+  const candidateEntriesValid = candidateItems.every(
+    (item) =>
+      isSafeSourceId(item?.id) &&
+      item?.file === `${item.id}.json` &&
+      typeof item?.candidateSha256 === 'string' &&
+      /^[a-f0-9]{64}$/.test(item.candidateSha256),
+  )
   const abstentionIds = abstentionItems
     .map((item) => item?.id)
     .filter((id) => isSafeSourceId(id))
@@ -56,7 +63,8 @@ function candidateIndex(index) {
       Array.isArray(index?.candidates) &&
       Array.isArray(index?.abstentions) &&
       candidateIds.length === candidateItems.length &&
-      abstentionIds.length === abstentionItems.length,
+      abstentionIds.length === abstentionItems.length &&
+      candidateEntriesValid,
     milestoneMatches: index?.milestone === 'M1 Data Feasibility',
     countsMatch:
       index?.candidateCount === candidateItems.length &&
@@ -83,6 +91,33 @@ export function buildEvidenceSummary({
   }
 
   const manifestById = byId(manifest.results, 'manifest results')
+  for (const [id, captured] of manifestById) {
+    if (typeof captured.success !== 'boolean') {
+      throw new Error(`Invalid manifest success flag for ${id}`)
+    }
+  }
+  if (manifest.bounded !== true) {
+    throw new Error('Capture manifest must be explicitly bounded')
+  }
+  if (
+    !Number.isSafeInteger(manifest.sourceCount) ||
+    manifest.sourceCount !== manifest.results.length
+  ) {
+    throw new Error('Capture manifest sourceCount does not match results length')
+  }
+  const actualSuccessCount = manifest.results.filter(
+    (result) => result.success === true,
+  ).length
+  const actualFailureCount = manifest.results.length - actualSuccessCount
+  if (
+    !Number.isSafeInteger(manifest.successCount) ||
+    manifest.successCount !== actualSuccessCount ||
+    !Number.isSafeInteger(manifest.failureCount) ||
+    manifest.failureCount !== actualFailureCount
+  ) {
+    throw new Error('Capture manifest success/failure counts do not match results')
+  }
+
   const inspectionById = byId(inspection.sources, 'inspection sources')
   const freshnessById = byId(freshness.sources, 'freshness sources')
   const candidateSets = candidateIndex(candidates)
@@ -154,7 +189,22 @@ export function buildEvidenceSummary({
   })
 
   const supermarkets = [...new Set(sources.map((source) => source.supermarket))].sort()
+  const expectedSupermarkets = ['dekamarkt', 'plus']
   const requiredKinds = ['product', 'catalog', 'offers']
+  const expectedSourceKeys = new Set(
+    expectedSupermarkets.flatMap((supermarket) =>
+      requiredKinds.map((kind) => `${supermarket}:${kind}`),
+    ),
+  )
+  const actualSourceKeys = sources.map(
+    (source) => `${source.supermarket}:${source.kind}`,
+  )
+  const boundedSourceScopeMatches =
+    JSON.stringify(supermarkets) === JSON.stringify(expectedSupermarkets) &&
+    actualSourceKeys.length === expectedSourceKeys.size &&
+    new Set(actualSourceKeys).size === actualSourceKeys.length &&
+    actualSourceKeys.every((key) => expectedSourceKeys.has(key))
+
   const coverage = supermarkets.map((supermarket) => ({
     supermarket,
     kinds: Object.fromEntries(
@@ -206,12 +256,14 @@ export function buildEvidenceSummary({
     candidateIndexStructureValid: candidateSets.structureValid,
     candidateIndexMilestoneMatches: candidateSets.milestoneMatches,
     candidateIndexCountsMatch: candidateSets.countsMatch,
+    boundedSourceScopeMatches,
     sourceCountsMatch:
       manifest.results.length === inspection.sources.length &&
       manifest.results.length === freshness.sources.length,
   }
   documentConsistency.consistent =
     documentConsistency.sourceCountsMatch &&
+    documentConsistency.boundedSourceScopeMatches &&
     documentConsistency.candidateIndexStructureValid &&
     documentConsistency.candidateIndexMilestoneMatches &&
     documentConsistency.candidateIndexCountsMatch &&
