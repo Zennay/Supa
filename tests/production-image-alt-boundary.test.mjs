@@ -82,9 +82,21 @@ function findImageWithoutAlt(source, filename = 'candidate.tsx') {
 
     if (!isImage) return
 
-    if (!attributeByName(node.attributes, 'alt')) {
+    const alt = attributeByName(node.attributes, 'alt')
+    if (!alt || !alt.initializer) {
       finding = {
         kind: tagName === 'img' ? 'img without alt' : 'image input without alt',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
+
+    if (
+      tagName === 'input' &&
+      staticStringFromAttribute(alt)?.trim() === ''
+    ) {
+      finding = {
+        kind: 'image input with empty alt',
         text: node.getText(sourceFile),
       }
     }
@@ -150,6 +162,9 @@ test('image-alt guard rejects intrinsic images without alt', () => {
     '<input type="image" src="/submit.png" />',
     '<input type={"IMAGE"} src={submitImage} />',
     "<input type={('image')} src={submitImage} />",
+    '<input type="image" src="/submit.png" alt="" />',
+    '<input type="image" src="/submit.png" alt="   " />',
+    '<img src="/meal.png" alt />',
   ]) {
     assert.ok(findImageWithoutAlt(source), source)
   }
@@ -160,6 +175,7 @@ test('image-alt guard preserves declared decorative and meaningful alternatives'
     '<img src="/decorative.png" alt="" />',
     '<img src={imageUrl} alt={description} />',
     '<input type="image" src="/submit.png" alt="Opslaan" />',
+    '<input type="image" src={submitImage} alt={submitLabel} />',
     '<input type={inputType} src={submitImage} />',
     '<input type="text" />',
     '<Image src={imageUrl} />',
