@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, stat, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -403,6 +403,30 @@ test('AUD-005 CLI rejects malformed output arguments before emitting evidence', 
   )
 })
 
+
+test('AUD-005 CLI rejects a permissive existing output directory before writing evidence', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-permissive-output-'))
+  const input = join(directory, 'input.json')
+  const outputDirectory = join(directory, 'shared')
+  const output = join(outputDirectory, 'response.json')
+  await writeFile(input, JSON.stringify(validRecord()), 'utf8')
+  await mkdir(outputDirectory, { mode: 0o755 })
+  await chmod(outputDirectory, 0o755)
+
+  await assert.rejects(
+    () => main([input, '--output', output]),
+    /response output directory must be owner-only/,
+  )
+  await assert.rejects(
+    () => stat(output),
+    (error) => error?.code === 'ENOENT',
+  )
+  assert.equal(
+    (await stat(outputDirectory)).mode & 0o777,
+    0o755,
+    'the CLI must not mutate permissions on a caller-owned existing directory',
+  )
+})
 
 test('AUD-005 CLI creates stakeholder evidence in an owner-only path', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-private-mode-'))
