@@ -111,6 +111,22 @@ test('observation action label rejects stale targets whose matching line is alre
   )
 })
 
+test('observation action label rejects ambiguous duplicate incomplete matches', () => {
+  const sheet = buildObservationSheet()
+  const matching = sheet.baseline.lines.find(
+    (line) => line.ingredientId === nextBaselineRice.ingredientId,
+  )
+  const duplicate = structuredClone(matching)
+
+  duplicate.ingredientLabel = 'Misleidende dubbele regel'
+  sheet.baseline.lines.push(duplicate)
+
+  assert.throws(
+    () => nextObservationActionLabel(sheet, nextBaselineRice),
+    /invalid next observation target/,
+  )
+})
+
 test('observation action label ignores completed duplicate copy when an incomplete match remains', () => {
   const sheet = buildObservationSheet()
   const matching = sheet.baseline.lines.find(
