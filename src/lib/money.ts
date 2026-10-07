@@ -5,16 +5,20 @@ const euroFormatter = new Intl.NumberFormat('nl-NL', {
 
 const MAX_SAFE_EURO_MAGNITUDE = Number.MAX_SAFE_INTEGER / 100
 
+function isSafeEuroNumber(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    Math.abs(value) <= MAX_SAFE_EURO_MAGNITUDE
+  )
+}
+
 export const euro = {
   format(value: number | bigint) {
     if (typeof value === 'bigint') {
       return euroFormatter.format(value)
     }
-    if (
-      typeof value !== 'number' ||
-      !Number.isFinite(value) ||
-      Math.abs(value) > MAX_SAFE_EURO_MAGNITUDE
-    ) {
+    if (!isSafeEuroNumber(value)) {
       return '—'
     }
 
@@ -25,8 +29,8 @@ export const euro = {
 
 export function savings(baseline: number, total: number): number | null {
   if (
-    !Number.isFinite(baseline) ||
-    !Number.isFinite(total) ||
+    !isSafeEuroNumber(baseline) ||
+    !isSafeEuroNumber(total) ||
     baseline < 0 ||
     total < 0
   ) {
