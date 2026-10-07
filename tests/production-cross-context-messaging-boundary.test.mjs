@@ -80,6 +80,29 @@ function isBrowserPostMessageReference(node) {
   return isQualifiedWindowProxy(base)
 }
 
+function isSyntaxName(node) {
+  const parent = node.parent
+  if (!parent) return false
+
+  return (
+    (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+    (ts.isElementAccessExpression(parent) && parent.argumentExpression === node) ||
+    (ts.isPropertyAssignment(parent) && parent.name === node) ||
+    (ts.isMethodDeclaration(parent) && parent.name === node) ||
+    (ts.isPropertyDeclaration(parent) && parent.name === node) ||
+    (ts.isVariableDeclaration(parent) && parent.name === node) ||
+    (ts.isParameter(parent) && parent.name === node) ||
+    (ts.isFunctionDeclaration(parent) && parent.name === node) ||
+    (ts.isFunctionExpression(parent) && parent.name === node) ||
+    (ts.isClassDeclaration(parent) && parent.name === node) ||
+    (ts.isClassExpression(parent) && parent.name === node) ||
+    (ts.isImportClause(parent) && parent.name === node) ||
+    (ts.isImportSpecifier(parent) && parent.name === node) ||
+    (ts.isBindingElement(parent) &&
+      (parent.name === node || parent.propertyName === node))
+  )
+}
+
 function scriptKindFor(filename) {
   switch (path.extname(filename)) {
     case '.tsx':
@@ -147,6 +170,18 @@ function findCrossContextMessaging(source, filename = 'candidate.tsx') {
       }
     }
 
+    if (
+      ts.isIdentifier(node) &&
+      messagingConstructors.has(node.text) &&
+      !isSyntaxName(node)
+    ) {
+      finding = {
+        kind: node.text + ' detached reference',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
+
     ts.forEachChild(node, visit)
   }
 
@@ -210,12 +245,27 @@ test('messaging boundary catches direct browser messaging primitives', () => {
   }
 })
 
+test('messaging boundary catches bare detached messaging constructors', () => {
+  for (const source of [
+    'const Channel = BroadcastChannel',
+    'const Pair = MessageChannel',
+    'const Channel = (BroadcastChannel)',
+    'const Pair = MessageChannel as typeof MessageChannel',
+  ]) {
+    assert.ok(findCrossContextMessaging(source), source)
+  }
+})
+
 test('messaging boundary preserves local APIs and inert text', () => {
   for (const source of [
     "postMessage({ type: 'local' }, '*')",
     "bridge.postMessage({ type: 'local' })",
     "channelFactory.BroadcastChannel('local')",
     "new runtime.MessageChannel()",
+    'const Channel = channelFactory.BroadcastChannel',
+    'const Pair = runtime.MessageChannel',
+    'class BroadcastChannel {}',
+    'const MessageChannel = factory',
     "const postMessage = () => {}; postMessage('local')",
     "const example = \"window.postMessage({ ok: true }, '*')\"",
     "// new BroadcastChannel('example')",
