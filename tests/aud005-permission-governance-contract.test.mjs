@@ -4,11 +4,15 @@ import test from 'node:test'
 
 const permissionPath = 'docs/research/2026-10-05-retailer-permission-path.md'
 const routingPath = 'docs/research/2026-10-05-retailer-outreach-routing.md'
+const evidenceReadmePath = 'evidence/aud005/README.md'
+const gitignorePath = '.gitignore'
 
 test('AUD-005 documentation keeps production permission separate from technical accessibility', async () => {
-  const [permission, routing] = await Promise.all([
+  const [permission, routing, evidenceReadme, gitignore] = await Promise.all([
     readFile(permissionPath, 'utf8'),
     readFile(routingPath, 'utf8'),
+    readFile(evidenceReadmePath, 'utf8'),
+    readFile(gitignorePath, 'utf8'),
   ])
 
   for (const [documentName, document] of [
@@ -54,6 +58,20 @@ test('AUD-005 documentation keeps production permission separate from technical 
     /do not delete, overwrite, or reuse a prior response artifact/i,
     'routing contract must preserve prior stakeholder evidence',
   )
+  assert.match(
+    routing,
+    /--output evidence\/aud005\/<retailer>-<response-id>\.json/,
+    'durable AUD-005 responses must use the tracked evidence lane',
+  )
+  assert.doesNotMatch(
+    routing,
+    /--output artifacts\/aud005\//,
+    'ignored generated artifacts must not be the durable retailer-response record',
+  )
+  assert.match(gitignore, /^artifacts\/$/m)
+  assert.match(evidenceReadme, /durable, privacy-safe derived stakeholder-response records/i)
+  assert.match(evidenceReadme, /do \*\*not\*\*.*authorize production automated retailer-data reuse/is)
+  assert.match(evidenceReadme, /do \*\*not\*\*.*count as M3 observed-basket evidence/is)
 })
 
 test('AUD-005 evidence contract preserves non-approval outcomes instead of coercing them to permission', async () => {
