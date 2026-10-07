@@ -20,3 +20,11 @@ test('canonical App mount remains wrapped in StrictMode', () => {
     /<StrictMode>\s*<App\s*\/>\s*<\/StrictMode>/,
   )
 })
+
+test('production bootstrap keeps the canonical global stylesheet import', () => {
+  const styleImports = mainSource.match(
+    /^import\s+['"]\.\/styles\.css['"]\s*$/gm,
+  )
+
+  assert.equal(styleImports?.length, 1)
+})
