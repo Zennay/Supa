@@ -20,7 +20,7 @@ function setupNodeVersions(workflowSource) {
 
   for (let index = 0; index < lines.length; index += 1) {
     const setupNode = lines[index].match(
-      /^(\s*)-\s+uses:\s+actions\/setup-node@[^\s#]+(?:\s+#.*)?$/,
+      /^(\s*)-\s+uses:\s+(?:(['"])actions\/setup-node@[^'"]+\2|actions\/setup-node@[^\s#]+)(?:\s+#.*)?$/,
     )
     if (!setupNode) continue
 
@@ -101,6 +101,41 @@ test('runtime contract rejects a conflicting duplicate setup-node declaration', 
         '22',
       ),
     /every hosted CI setup-node Node runtime declaration must match \.nvmrc/,
+  )
+})
+
+test('runtime contract recognizes quoted setup-node steps', () => {
+  assert.deepEqual(
+    setupNodeVersions(`
+      steps:
+        - uses: "actions/setup-node@v4"
+          with:
+            node-version: 22
+        - uses: 'actions/setup-node@v4'
+          with:
+            node-version: 22
+        - uses: actions/checkout@v4
+    `),
+    ['22', '22'],
+  )
+})
+
+test('runtime contract rejects quoted setup-node without its own Node declaration', () => {
+  assert.throws(
+    () =>
+      assertHostedCiNodeVersions(
+        `
+        steps:
+          - uses: "actions/setup-node@v4"
+            with:
+              node-version: 22
+          - uses: 'actions/setup-node@v4'
+            with:
+              cache: npm
+        `,
+        '22',
+      ),
+    /every hosted CI setup-node step must declare its own explicit Node runtime version/,
   )
 })
 
