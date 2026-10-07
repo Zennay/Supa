@@ -118,6 +118,64 @@ function plusProductIdFromUrl(value: string): string | null {
   }
 }
 
+type JsonObject = Record<string, unknown>
+
+function isObject(value: unknown): value is JsonObject {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function schemaTypes(value: unknown): string[] {
+  if (!isObject(value)) return []
+  const raw = value['@type']
+  if (Array.isArray(raw)) return raw.map(String)
+  return raw == null ? [] : [String(raw)]
+}
+
+function productJsonLdNodes(value: unknown): JsonObject[] {
+  if (Array.isArray(value)) return value.flatMap(productJsonLdNodes)
+  if (!isObject(value)) return []
+
+  const direct = schemaTypes(value).some(
+    (candidate) => candidate.toLowerCase() === 'product',
+  )
+    ? [value]
+    : []
+  const graph = Array.isArray(value['@graph'])
+    ? value['@graph'].flatMap(productJsonLdNodes)
+    : []
+
+  return [...direct, ...graph]
+}
+
+type DeclaredProductUrl =
+  | { type: 'absent' }
+  | { type: 'invalid' }
+  | { type: 'value'; value: string }
+
+function declaredProductUrl(jsonLd: unknown): DeclaredProductUrl {
+  const products = productJsonLdNodes(jsonLd)
+  if (products.length !== 1) return { type: 'invalid' }
+
+  const raw = products[0].url
+  if (raw === undefined) return { type: 'absent' }
+  if (typeof raw !== 'string' || !raw.trim()) return { type: 'invalid' }
+
+  return { type: 'value', value: raw.trim() }
+}
+
+function matchesSourceProductUrl(
+  declaredUrl: string,
+  sourceUrl: string,
+): boolean {
+  if (!safePlusProductUrl(declaredUrl)) return false
+
+  try {
+    return new URL(declaredUrl).href === new URL(sourceUrl).href
+  } catch {
+    return false
+  }
+}
+
 export function parsePlusRenderedProductEvidence(
   evidence: PlusRenderedProductEvidence,
 ): SchemaOrgParseResult {
@@ -194,6 +252,18 @@ export function parsePlusRenderedProductEvidence(
     return {
       type: 'abstain',
       reason: 'PLUS rendered evidence product identity does not match source URL',
+    }
+  }
+
+  const productUrl = declaredProductUrl(evidence.jsonLd)
+  if (
+    productUrl.type === 'invalid' ||
+    (productUrl.type === 'value' &&
+      !matchesSourceProductUrl(productUrl.value, evidence.source.url))
+  ) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence Product JSON-LD URL does not match source URL',
     }
   }
 
