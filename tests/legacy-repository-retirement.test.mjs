@@ -6,6 +6,7 @@ import test from 'node:test'
 const removedLegacyFiles = [
   'src/data/repository.ts',
   'src/data/mockRepository.ts',
+  'src/data/mock.ts',
 ]
 
 async function sourceFiles(root) {
@@ -24,7 +25,7 @@ async function sourceFiles(root) {
   return files
 }
 
-test('legacy repository abstraction stays retired from product source', async () => {
+test('legacy repository and mock fixture stay retired from product source', async () => {
   for (const file of removedLegacyFiles) {
     await assert.rejects(
       access(file),
@@ -33,14 +34,17 @@ test('legacy repository abstraction stays retired from product source', async ()
     )
   }
 
-  await access('src/data/mock.ts')
-
   for (const file of await sourceFiles('src')) {
     const source = await readFile(file, 'utf8')
     assert.doesNotMatch(
       source,
       /\b(?:GroceryRepository|mockRepository)\b/,
       `${file} must not depend on the retired repository abstraction`,
+    )
+    assert.doesNotMatch(
+      source,
+      /(?:from|import)\s*['"][^'"]*\/data\/mock(?:\.ts)?['"]/,
+      `${file} must not import the retired legacy mock fixture`,
     )
   }
 })
