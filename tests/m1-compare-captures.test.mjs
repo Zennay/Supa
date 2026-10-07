@@ -94,6 +94,37 @@ test('requires review when capture success regresses', () => {
   assert.ok(result.changes[0].reasons.includes('capture-status-changed'))
 })
 
+
+test('requires review when a stable source id changes supermarket identity', () => {
+  const baseline = report([source()])
+  const current = report([
+    source({
+      supermarket: 'dekamarkt',
+      manifestSha256: 'b'.repeat(64),
+    }),
+  ])
+
+  const result = compareInspectionReports(baseline, current)
+  assert.equal(result.reviewRequired, true)
+  assert.equal(result.reviewCount, 1)
+  assert.ok(result.changes[0].reasons.includes('supermarket-changed'))
+})
+
+test('requires review when a stable source id changes source kind', () => {
+  const baseline = report([source()])
+  const current = report([
+    source({
+      kind: 'listing',
+      manifestSha256: 'b'.repeat(64),
+    }),
+  ])
+
+  const result = compareInspectionReports(baseline, current)
+  assert.equal(result.reviewRequired, true)
+  assert.equal(result.reviewCount, 1)
+  assert.ok(result.changes[0].reasons.includes('source-kind-changed'))
+})
+
 test('ignores volatile application/json byte counts in the structural signature', () => {
   const baseline = report([source()])
   const current = report([
@@ -137,4 +168,22 @@ test('writes drift.json for repeatable capture comparison', async () => {
 
   assert.equal(result.contentOnlyCount, 1)
   assert.equal(written.reviewRequired, false)
+})
+
+
+test('rejects unsafe source ids before drift attribution', () => {
+  const baseline = report([source({ id: '../ah-product' })])
+  const current = report([source({ id: '../ah-product' })])
+
+  assert.throws(
+    () => compareInspectionReports(baseline, current),
+    /Invalid or duplicate source id/,
+  )
+})
+
+test('rejects two empty inspection reports instead of claiming no drift', () => {
+  assert.throws(
+    () => compareInspectionReports(report([]), report([])),
+    /Cannot compare empty M1 inspection reports/,
+  )
 })
