@@ -37,7 +37,11 @@ export function nextObservationActionLabel(
   sheet: unknown,
   next: unknown,
 ): string {
-  if (next === null) return 'Alle regels zijn gemeten'
+  if (next === null) {
+    observationLinesForSide(sheet, 'baseline')
+    observationLinesForSide(sheet, 'candidate')
+    return 'Alle regels zijn gemeten'
+  }
 
   if (!next || typeof next !== 'object' || Array.isArray(next)) {
     throw new Error('invalid next observation target')
