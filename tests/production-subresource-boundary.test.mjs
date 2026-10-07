@@ -57,70 +57,84 @@ function isReactModuleSpecifier(node) {
   return ts.isStringLiteralLike(node) && node.text === 'react'
 }
 
-function collectReactCreateElementBindings(sourceFile) {
-  const namespaceAliases = new Set(['React'])
-  const callableAliases = new Set()
+function bindingIdentifierNames(name, names = []) {
+  if (!name) return names
 
-  function visit(node) {
-    if (ts.isImportDeclaration(node) && isReactModuleSpecifier(node.moduleSpecifier)) {
-      const clause = node.importClause
-      if (clause?.name) namespaceAliases.add(clause.name.text)
-
-      const bindings = clause?.namedBindings
-      if (bindings && ts.isNamespaceImport(bindings)) {
-        namespaceAliases.add(bindings.name.text)
-      } else if (bindings && ts.isNamedImports(bindings)) {
-        for (const element of bindings.elements) {
-          const sourceName = element.propertyName?.text ?? element.name.text
-          if (sourceName === 'createElement') callableAliases.add(element.name.text)
-        }
-      }
-    }
-
-    if (
-      ts.isVariableDeclaration(node) &&
-      node.initializer &&
-      ts.isVariableDeclarationList(node.parent) &&
-      (node.parent.flags & ts.NodeFlags.Const) !== 0
-    ) {
-      const initializer = unwrapExpression(node.initializer)
-
-      if (ts.isIdentifier(node.name)) {
-        if (
-          ts.isIdentifier(initializer) &&
-          callableAliases.has(initializer.text)
-        ) {
-          callableAliases.add(node.name.text)
-        } else if (isReactCreateElement(initializer, { namespaceAliases, callableAliases })) {
-          callableAliases.add(node.name.text)
-        }
-      }
-
-      if (
-        ts.isObjectBindingPattern(node.name) &&
-        ts.isIdentifier(initializer) &&
-        namespaceAliases.has(initializer.text)
-      ) {
-        for (const element of node.name.elements) {
-          if (!ts.isIdentifier(element.name)) continue
-          const sourceName = staticName(element.propertyName) ?? element.name.text
-          if (sourceName === 'createElement') callableAliases.add(element.name.text)
-        }
-      }
-    }
-
-    ts.forEachChild(node, visit)
+  if (ts.isIdentifier(name)) {
+    names.push(name.text)
+    return names
   }
 
-  visit(sourceFile)
-  return { namespaceAliases, callableAliases }
+  if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+    for (const element of name.elements) {
+      if (ts.isBindingElement(element)) {
+        bindingIdentifierNames(element.name, names)
+      }
+    }
+  }
+
+  return names
+}
+
+function nearestBindingScope(node, blockScoped = true) {
+  let current = node.parent
+
+  while (current) {
+    if (
+      ts.isSourceFile(current) ||
+      ts.isFunctionLike(current) ||
+      (blockScoped && (
+        ts.isBlock(current) ||
+        ts.isModuleBlock(current) ||
+        ts.isCatchClause(current)
+      ))
+    ) {
+      return current
+    }
+
+    current = current.parent
+  }
+
+  return null
+}
+
+function setBindingKind(bindings, scope, name, kind) {
+  if (!scope || !name) return false
+
+  const byScope = bindings.get(name) ?? new Map()
+  const previous = byScope.get(scope)
+  if (previous === kind) return false
+
+  byScope.set(scope, kind)
+  bindings.set(name, byScope)
+  return true
+}
+
+function registerBindingName(bindings, scope, name, kind) {
+  let changed = false
+  for (const identifier of bindingIdentifierNames(name)) {
+    changed = setBindingKind(bindings, scope, identifier, kind) || changed
+  }
+  return changed
+}
+
+function bindingKindAt(node, name, bindings) {
+  let current = node.parent
+
+  while (current) {
+    const kind = bindings.get(name)?.get(current)
+    if (kind) return kind
+    current = current.parent
+  }
+
+  return name === 'React' ? 'react-namespace' : null
 }
 
 function isReactCreateElement(node, bindings) {
   const current = unwrapExpression(node)
 
   if (ts.isIdentifier(current)) {
-    return bindings.callableAliases.has(current.text)
+    return bindingKindAt(current, current.text, bindings) === 'react-callable'
   }
 
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
@@ -130,9 +144,158 @@ function isReactCreateElement(node, bindings) {
   const base = unwrapExpression(current.expression)
   return (
     ts.isIdentifier(base) &&
-    bindings.namespaceAliases.has(base.text) &&
+    bindingKindAt(base, base.text, bindings) === 'react-namespace' &&
     memberName(current) === 'createElement'
   )
+}
+
+function collectReactCreateElementBindings(sourceFile) {
+  const bindings = new Map()
+  const constDeclarations = []
+
+  function collect(node) {
+    if (ts.isImportDeclaration(node)) {
+      const clause = node.importClause
+      const reactImport = isReactModuleSpecifier(node.moduleSpecifier)
+
+      if (clause?.name) {
+        setBindingKind(
+          bindings,
+          sourceFile,
+          clause.name.text,
+          reactImport ? 'react-namespace' : 'local',
+        )
+      }
+
+      const namedBindings = clause?.namedBindings
+      if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+        setBindingKind(
+          bindings,
+          sourceFile,
+          namedBindings.name.text,
+          reactImport ? 'react-namespace' : 'local',
+        )
+      } else if (namedBindings && ts.isNamedImports(namedBindings)) {
+        for (const element of namedBindings.elements) {
+          const sourceName = element.propertyName?.text ?? element.name.text
+          setBindingKind(
+            bindings,
+            sourceFile,
+            element.name.text,
+            reactImport && sourceName === 'createElement'
+              ? 'react-callable'
+              : 'local',
+          )
+        }
+      }
+    }
+
+    if (ts.isParameter(node)) {
+      registerBindingName(
+        bindings,
+        nearestBindingScope(node, false),
+        node.name,
+        'local',
+      )
+    }
+
+    if (ts.isVariableDeclaration(node) && !ts.isCatchClause(node.parent)) {
+      const declarationList = node.parent
+      const blockScoped = ts.isVariableDeclarationList(declarationList) &&
+        (declarationList.flags & ts.NodeFlags.BlockScoped) !== 0
+      const scope = nearestBindingScope(node, blockScoped)
+
+      registerBindingName(bindings, scope, node.name, 'local')
+
+      if (
+        node.initializer &&
+        ts.isVariableDeclarationList(declarationList) &&
+        (declarationList.flags & ts.NodeFlags.Const) !== 0
+      ) {
+        constDeclarations.push({ node, scope })
+      }
+    }
+
+    if (
+      (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
+      node.name
+    ) {
+      setBindingKind(
+        bindings,
+        nearestBindingScope(node, true),
+        node.name.text,
+        'local',
+      )
+    }
+
+    if (
+      (ts.isFunctionExpression(node) || ts.isClassExpression(node)) &&
+      node.name
+    ) {
+      setBindingKind(bindings, node, node.name.text, 'local')
+    }
+
+    if (ts.isCatchClause(node) && node.variableDeclaration) {
+      registerBindingName(bindings, node, node.variableDeclaration.name, 'local')
+    }
+
+    ts.forEachChild(node, collect)
+  }
+
+  collect(sourceFile)
+
+  let changed = true
+  while (changed) {
+    changed = false
+
+    for (const { node, scope } of constDeclarations) {
+      const initializer = unwrapExpression(node.initializer)
+
+      if (ts.isIdentifier(node.name)) {
+        let kind = null
+
+        if (isReactCreateElement(initializer, bindings)) {
+          kind = 'react-callable'
+        } else if (ts.isIdentifier(initializer)) {
+          const initializerKind = bindingKindAt(
+            initializer,
+            initializer.text,
+            bindings,
+          )
+          if (initializerKind === 'react-callable') {
+            kind = 'react-callable'
+          } else if (initializerKind === 'react-namespace') {
+            kind = 'react-namespace'
+          }
+        }
+
+        if (kind) {
+          changed = setBindingKind(bindings, scope, node.name.text, kind) || changed
+        }
+      }
+
+      if (
+        ts.isObjectBindingPattern(node.name) &&
+        ts.isIdentifier(initializer) &&
+        bindingKindAt(initializer, initializer.text, bindings) === 'react-namespace'
+      ) {
+        for (const element of node.name.elements) {
+          if (!ts.isIdentifier(element.name)) continue
+          const sourceName = staticName(element.propertyName) ?? element.name.text
+          if (sourceName === 'createElement') {
+            changed = setBindingKind(
+              bindings,
+              scope,
+              element.name.text,
+              'react-callable',
+            ) || changed
+          }
+        }
+      }
+    }
+  }
+
+  return bindings
 }
 
 function scriptKindFor(filename) {
@@ -299,6 +462,29 @@ test('subresource boundary catches intrinsic browser resource loads', () => {
     "const h = React.createElement; h('script', { src: url })",
     "const { createElement: h } = React; h('img', { src: url })",
     "const h = React.createElement; const render = h; render('script', { src: url })",
+  ]) {
+    assert.ok(findBrowserSubresource(source), source)
+  }
+})
+
+test('subresource boundary respects lexical shadowing of React aliases', () => {
+  for (const source of [
+    "import { createElement as h } from 'react'; function local(h) { h('img', { src: url }) }",
+    "import * as ReactApi from 'react'; function local(ReactApi) { ReactApi.createElement('img', { src: url }) }",
+    "import React from 'react'; function local(React) { React.createElement('img', { src: url }) }",
+    "const h = React.createElement; { const h = elementFactory.createElement; h('img', { src: url }) }",
+    "const { createElement: h } = React; function local(h) { h('img', { src: url }) }",
+    "try {} catch (React) { React.createElement('img', { src: url }) }",
+  ]) {
+    assert.equal(findBrowserSubresource(source), null, source)
+  }
+})
+
+test('subresource boundary resumes React aliases outside a shadowing scope', () => {
+  for (const source of [
+    "import { createElement as h } from 'react'; function local(h) { h('div') } h('img', { src: url })",
+    "import React from 'react'; { const React = elementFactory; React.createElement('div') } React.createElement('img', { src: url })",
+    "const h = React.createElement; { const h = elementFactory.createElement; h('div') } h('script', { src: url })",
   ]) {
     assert.ok(findBrowserSubresource(source), source)
   }
