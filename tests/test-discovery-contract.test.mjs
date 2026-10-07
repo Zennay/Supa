@@ -30,9 +30,48 @@ function sourceImportsNodeTest(source) {
     ts.ScriptKind.TSX,
   )
   let importsNodeTest = false
+  const createRequireAliases = new Set()
+  const runtimeRequireAliases = new Set()
 
   function isNodeTestSpecifier(node) {
     return ts.isStringLiteralLike(node) && node.text === 'node:test'
+  }
+
+  function collectCreateRequireImports(node) {
+    if (
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteralLike(node.moduleSpecifier) &&
+      node.moduleSpecifier.text === 'node:module' &&
+      !node.importClause?.isTypeOnly
+    ) {
+      const bindings = node.importClause?.namedBindings
+      if (bindings && ts.isNamedImports(bindings)) {
+        for (const element of bindings.elements) {
+          if (element.isTypeOnly) continue
+          const sourceName = element.propertyName?.text ?? element.name.text
+          if (sourceName === 'createRequire') {
+            createRequireAliases.add(element.name.text)
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, collectCreateRequireImports)
+  }
+
+  function collectRuntimeRequireAliases(node) {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      ts.isCallExpression(node.initializer) &&
+      ts.isIdentifier(node.initializer.expression) &&
+      createRequireAliases.has(node.initializer.expression.text)
+    ) {
+      runtimeRequireAliases.add(node.name.text)
+    }
+
+    ts.forEachChild(node, collectRuntimeRequireAliases)
   }
 
   function visit(node) {
@@ -73,6 +112,12 @@ function sourceImportsNodeTest(source) {
       const callee = node.expression
       const isDynamicImport = callee.kind === ts.SyntaxKind.ImportKeyword
       const isRequire = ts.isIdentifier(callee) && callee.text === 'require'
+      const isCreateRequireAlias =
+        ts.isIdentifier(callee) && runtimeRequireAliases.has(callee.text)
+      const isDirectCreateRequireLoad =
+        ts.isCallExpression(callee) &&
+        ts.isIdentifier(callee.expression) &&
+        createRequireAliases.has(callee.expression.text)
       const isModuleRequire =
         (ts.isPropertyAccessExpression(callee) &&
           ts.isIdentifier(callee.expression) &&
@@ -97,6 +142,8 @@ function sourceImportsNodeTest(source) {
       if (
         (isDynamicImport ||
           isRequire ||
+          isCreateRequireAlias ||
+          isDirectCreateRequireLoad ||
           isModuleRequire ||
           isProcessGetBuiltinModule) &&
         isNodeTestSpecifier(specifier)
@@ -109,6 +156,8 @@ function sourceImportsNodeTest(source) {
     ts.forEachChild(node, visit)
   }
 
+  collectCreateRequireImports(sourceFile)
+  collectRuntimeRequireAliases(sourceFile)
   visit(sourceFile)
   return importsNodeTest
 }
@@ -208,6 +257,9 @@ test('test discovery recognizes node:test modules even without test-like filenam
     'const testApi = require( "node:test" )',
     "const testApi = module.require('node:test')",
     'const testApi = module["require"]("node:test")',
+    "import { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const testApi = load('node:test')",
+    "import { createRequire as makeRequire } from 'node:module'; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
+    "import { createRequire } from 'node:module'; const testApi = createRequire(import.meta.url)('node:test')",
     "const testApi = process.getBuiltinModule('node:test')",
     'const testApi = process["getBuiltinModule"]("node:test")',
     "import check = require('node:test')",
@@ -225,6 +277,9 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "const label = 'node:test'",
     "const fs = module.require('node:fs')",
     "const testApi = helper.require('node:test')",
+    "import type { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const testApi = load('node:test')",
+    "import { createRequire } from './helper.mjs'; const load = createRequire(import.meta.url); const testApi = load('node:test')",
+    "import { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const fs = load('node:fs')",
     "const fs = process.getBuiltinModule('node:fs')",
     "const testApi = helper.getBuiltinModule('node:test')",
     "// import check from 'node:test'",
