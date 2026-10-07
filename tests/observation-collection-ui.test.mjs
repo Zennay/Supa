@@ -153,3 +153,32 @@ test('M3 collection guidance rejects malformed or duplicate line identities befo
     )
   }
 })
+
+
+test('M3 collection guidance rejects cross-store demand identity drift before claiming completion', () => {
+  for (const mutate of [
+    (sheet) => {
+      sheet.candidate.lines[0].ingredientId = 'different-ingredient'
+    },
+    (sheet) => {
+      ;[sheet.candidate.lines[0], sheet.candidate.lines[1]] = [
+        sheet.candidate.lines[1],
+        sheet.candidate.lines[0],
+      ]
+    },
+  ]) {
+    const sheet = buildObservationSheet()
+    sheet.baseline.lines.forEach((line) => {
+      line.observedProduct.available = false
+    })
+    sheet.candidate.lines.forEach((line) => {
+      line.observedProduct.available = false
+    })
+    mutate(sheet)
+
+    assert.throws(
+      () => nextObservationActionLabel(sheet, null),
+      /invalid observation sheet: demand identity mismatch/,
+    )
+  }
+})

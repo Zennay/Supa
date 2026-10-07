@@ -39,8 +39,9 @@ function observationLinesForSide(
 function validateObservationLineIdentities(
   lines: unknown[],
   side: M3ObservationSide,
-): void {
+): string[] {
   const seen = new Set<string>()
+  const identities: string[] = []
 
   for (const lineCandidate of lines) {
     if (
@@ -62,11 +63,14 @@ function validateObservationLineIdentities(
     }
 
     seen.add(ingredientId)
+    identities.push(ingredientId)
   }
 
   if (seen.size !== lines.length) {
     throw new Error(`invalid observation sheet: ${side} line identities`)
   }
+
+  return identities
 }
 
 function firstUsableIncompleteObservationLine(
@@ -120,8 +124,23 @@ export function nextObservationActionLabel(
   const candidateLines = observationLinesForSide(sheet, 'candidate')
 
   if (next === null) {
-    validateObservationLineIdentities(baselineLines, 'baseline')
-    validateObservationLineIdentities(candidateLines, 'candidate')
+    const baselineIdentities = validateObservationLineIdentities(
+      baselineLines,
+      'baseline',
+    )
+    const candidateIdentities = validateObservationLineIdentities(
+      candidateLines,
+      'candidate',
+    )
+    if (
+      baselineIdentities.length !== candidateIdentities.length ||
+      baselineIdentities.some(
+        (ingredientId, index) => candidateIdentities[index] !== ingredientId,
+      )
+    ) {
+      throw new Error('invalid observation sheet: demand identity mismatch')
+    }
+
     let pending: ReturnType<typeof nextIncompleteObservationLine>
     try {
       pending = nextIncompleteObservationLine(sheet as ObservationSheet)
