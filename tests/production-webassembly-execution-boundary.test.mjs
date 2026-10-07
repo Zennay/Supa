@@ -41,28 +41,146 @@ function unwrapExpression(node) {
   return current
 }
 
-function isWebAssemblyObject(node) {
+function bindingIdentifierNames(name, names = []) {
+  if (!name) return names
+  if (ts.isIdentifier(name)) {
+    names.push(name.text)
+    return names
+  }
+  if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+    for (const element of name.elements) {
+      if (ts.isBindingElement(element)) bindingIdentifierNames(element.name, names)
+    }
+  }
+  return names
+}
+
+function nearestBindingScope(node, blockScoped = true) {
+  let current = node.parent
+  while (current) {
+    if (
+      ts.isSourceFile(current) ||
+      ts.isFunctionLike(current) ||
+      (blockScoped && (
+        ts.isBlock(current) ||
+        ts.isModuleBlock(current) ||
+        ts.isCatchClause(current)
+      ))
+    ) {
+      return current
+    }
+    current = current.parent
+  }
+  return null
+}
+
+function collectLocalBindingScopes(sourceFile) {
+  const scopesByName = new Map()
+
+  function register(scope, name) {
+    if (!scope) return
+    for (const identifier of bindingIdentifierNames(name)) {
+      const scopes = scopesByName.get(identifier) ?? new Set()
+      scopes.add(scope)
+      scopesByName.set(identifier, scopes)
+    }
+  }
+
+  function visit(node) {
+    if (ts.isImportDeclaration(node) && node.importClause) {
+      register(sourceFile, node.importClause.name)
+      const bindings = node.importClause.namedBindings
+      if (bindings && ts.isNamespaceImport(bindings)) {
+        register(sourceFile, bindings.name)
+      } else if (bindings && ts.isNamedImports(bindings)) {
+        for (const element of bindings.elements) register(sourceFile, element.name)
+      }
+    }
+
+    if (ts.isParameter(node)) {
+      register(nearestBindingScope(node, false), node.name)
+    }
+
+    if (ts.isVariableDeclaration(node) && !ts.isCatchClause(node.parent)) {
+      const declarationList = node.parent
+      const blockScoped = ts.isVariableDeclarationList(declarationList) &&
+        (declarationList.flags & ts.NodeFlags.BlockScoped) !== 0
+      register(nearestBindingScope(node, blockScoped), node.name)
+    }
+
+    if (
+      (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
+      node.name
+    ) {
+      register(nearestBindingScope(node, true), node.name)
+    }
+
+    if (
+      (ts.isFunctionExpression(node) || ts.isClassExpression(node)) &&
+      node.name
+    ) {
+      register(node, node.name)
+    }
+
+    if (ts.isCatchClause(node) && node.variableDeclaration) {
+      register(node, node.variableDeclaration.name)
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return scopesByName
+}
+
+function isLocallyBoundIdentifier(node, scopesByName) {
+  if (!ts.isIdentifier(node)) return false
+  const scopes = scopesByName.get(node.text)
+  if (!scopes) return false
+
+  let current = node.parent
+  while (current) {
+    if (scopes.has(current)) return true
+    current = current.parent
+  }
+  return false
+}
+
+function isBrowserRoot(node, localBindings) {
   const current = unwrapExpression(node)
-  if (ts.isIdentifier(current)) return current.text === 'WebAssembly'
+  return (
+    ts.isIdentifier(current) &&
+    browserRoots.has(current.text) &&
+    !isLocallyBoundIdentifier(current, localBindings)
+  )
+}
+
+function isWebAssemblyObject(node, localBindings) {
+  const current = unwrapExpression(node)
+
+  if (ts.isIdentifier(current)) {
+    return (
+      current.text === 'WebAssembly' &&
+      !isLocallyBoundIdentifier(current, localBindings)
+    )
+  }
 
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return false
   }
 
-  const base = unwrapExpression(current.expression)
   return (
-    ts.isIdentifier(base) &&
-    browserRoots.has(base.text) &&
+    isBrowserRoot(current.expression, localBindings) &&
     memberName(current) === 'WebAssembly'
   )
 }
 
-function webAssemblyMember(node) {
+function webAssemblyMember(node, localBindings) {
   const current = unwrapExpression(node)
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return null
   }
-  if (!isWebAssemblyObject(current.expression)) return null
+  if (!isWebAssemblyObject(current.expression, localBindings)) return null
   return memberName(current)
 }
 
@@ -88,6 +206,7 @@ function findWebAssemblyExecution(source, filename = 'candidate.ts') {
     scriptKindFor(filename),
   )
 
+  const localBindings = collectLocalBindingScopes(sourceFile)
   let finding = null
 
   function visit(node) {
@@ -96,7 +215,7 @@ function findWebAssemblyExecution(source, filename = 'candidate.ts') {
     if (
       ts.isVariableDeclaration(node) &&
       node.initializer &&
-      isWebAssemblyObject(node.initializer)
+      isWebAssemblyObject(node.initializer, localBindings)
     ) {
       finding = {
         kind: 'WebAssembly namespace alias',
@@ -106,7 +225,7 @@ function findWebAssemblyExecution(source, filename = 'candidate.ts') {
     }
 
     if (ts.isCallExpression(node)) {
-      const name = webAssemblyMember(node.expression)
+      const name = webAssemblyMember(node.expression, localBindings)
       if (name && executableMethods.has(name)) {
         finding = {
           kind: 'WebAssembly.' + name + ' call',
@@ -117,7 +236,7 @@ function findWebAssemblyExecution(source, filename = 'candidate.ts') {
     }
 
     if (ts.isNewExpression(node)) {
-      const name = webAssemblyMember(node.expression)
+      const name = webAssemblyMember(node.expression, localBindings)
       if (name && executableConstructors.has(name)) {
         finding = {
           kind: 'WebAssembly.' + name + ' construction',
@@ -128,7 +247,7 @@ function findWebAssemblyExecution(source, filename = 'candidate.ts') {
     }
 
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-      const name = webAssemblyMember(node)
+      const name = webAssemblyMember(node, localBindings)
       if (
         name &&
         (executableMethods.has(name) || executableConstructors.has(name))
@@ -202,6 +321,29 @@ test('WebAssembly boundary catches compilation and execution primitives', () => 
     'const wasm = (window.WebAssembly)',
     "const wasm = (globalThis['WebAssembly'] as typeof WebAssembly)",
     'const { compile } = self.WebAssembly',
+  ]) {
+    assert.ok(findWebAssemblyExecution(source), source)
+  }
+})
+
+test('WebAssembly boundary respects locally bound runtime names', () => {
+  for (const source of [
+    "const WebAssembly = runtime.WebAssembly; WebAssembly.compile(bytes)",
+    "function compile(WebAssembly) { WebAssembly.instantiate(bytes) }",
+    "import WebAssembly from './runtime'; new WebAssembly.Module(bytes)",
+    "const window = runtime; window.WebAssembly.compile(bytes)",
+    "function run(globalThis) { globalThis.WebAssembly.instantiate(bytes) }",
+    "try {} catch (WebAssembly) { WebAssembly.compile(bytes) }",
+  ]) {
+    assert.equal(findWebAssemblyExecution(source), null, source)
+  }
+})
+
+test('WebAssembly boundary keeps local shadowing scoped', () => {
+  for (const source of [
+    "{ const WebAssembly = runtime.WebAssembly; WebAssembly.compile(bytes) }\nWebAssembly.compile(bytes)",
+    "function local(window) { window.WebAssembly.compile(bytes) }\nwindow.WebAssembly.compile(bytes)",
+    "try {} catch (WebAssembly) { WebAssembly.compile(bytes) }\nWebAssembly.instantiate(bytes)",
   ]) {
     assert.ok(findWebAssemblyExecution(source), source)
   }
