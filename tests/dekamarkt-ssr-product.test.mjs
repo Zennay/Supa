@@ -139,6 +139,21 @@ test('DekaMarkt product binds corroborated identity to the source URL', async ()
   })
 })
 
+test('DekaMarkt product rejects unsafe numeric product identities', async () => {
+  for (const productId of [0, Number.MAX_SAFE_INTEGER + 1]) {
+    const evidence = await fixture()
+    evidence.nuxtPayload[5] = productId
+    evidence.jsonLdProduct.mpn = productId
+    evidence.source.url =
+      `https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk/test-product/${productId}`
+
+    assert.deepEqual(parseDekaMarktSsrProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt Nuxt product fields are incomplete',
+    })
+  }
+})
+
 test('DekaMarkt evidence rejects malformed capture artifact identity', async () => {
   for (const mutate of [
     (evidence) => { evidence.captureEvidence.runId = 0 },
