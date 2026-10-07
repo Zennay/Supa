@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -30,6 +30,7 @@ const CONSEQUENCE_KEYS = ['architecture', 'product', 'operatingCost', 'sourceStr
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 const PHONE_PATTERN = /(?:\+?\d[\d\s().-]{7,}\d)/
 const MAX_RESPONSE_CLOCK_SKEW_MS = 5 * 60 * 1000
+export const MAX_RESPONSE_INPUT_BYTES = 256 * 1024
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -282,6 +283,12 @@ export async function main(argv = process.argv.slice(2)) {
   let raw
 
   try {
+    const inputMetadata = await stat(input)
+    assert(inputMetadata.isFile(), 'response JSON input must be a regular file')
+    assert(
+      inputMetadata.size <= MAX_RESPONSE_INPUT_BYTES,
+      `response JSON input exceeds the ${MAX_RESPONSE_INPUT_BYTES}-byte limit`,
+    )
     raw = JSON.parse(await readFile(input, 'utf8'))
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
