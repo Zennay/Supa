@@ -42,38 +42,162 @@ function unwrapExpression(node) {
   return current
 }
 
-function isBrowserGlobalMember(node, expectedName, rootAliases = browserRoots) {
+function bindingIdentifierNames(name, names = []) {
+  if (!name) return names
+
+  if (ts.isIdentifier(name)) {
+    names.push(name.text)
+    return names
+  }
+
+  if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+    for (const element of name.elements) {
+      if (ts.isBindingElement(element)) {
+        bindingIdentifierNames(element.name, names)
+      }
+    }
+  }
+
+  return names
+}
+
+function nearestBindingScope(node, blockScoped = true) {
+  let current = node.parent
+
+  while (current) {
+    if (
+      ts.isSourceFile(current) ||
+      ts.isFunctionLike(current) ||
+      (blockScoped && (
+        ts.isBlock(current) ||
+        ts.isModuleBlock(current) ||
+        ts.isCatchClause(current)
+      ))
+    ) {
+      return current
+    }
+
+    current = current.parent
+  }
+
+  return null
+}
+
+function collectLocalBindingScopes(sourceFile) {
+  const scopesByName = new Map()
+
+  function register(scope, name) {
+    if (!scope) return
+
+    for (const identifier of bindingIdentifierNames(name)) {
+      const scopes = scopesByName.get(identifier) ?? new Set()
+      scopes.add(scope)
+      scopesByName.set(identifier, scopes)
+    }
+  }
+
+  function visit(node) {
+    if (ts.isImportDeclaration(node) && node.importClause) {
+      register(sourceFile, node.importClause.name)
+
+      const bindings = node.importClause.namedBindings
+      if (bindings && ts.isNamespaceImport(bindings)) {
+        register(sourceFile, bindings.name)
+      } else if (bindings && ts.isNamedImports(bindings)) {
+        for (const element of bindings.elements) register(sourceFile, element.name)
+      }
+    }
+
+    if (ts.isParameter(node)) {
+      register(nearestBindingScope(node, false), node.name)
+    }
+
+    if (ts.isVariableDeclaration(node) && !ts.isCatchClause(node.parent)) {
+      const declarationList = node.parent
+      const blockScoped = ts.isVariableDeclarationList(declarationList) &&
+        (declarationList.flags & ts.NodeFlags.BlockScoped) !== 0
+      register(nearestBindingScope(node, blockScoped), node.name)
+    }
+
+    if (
+      (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
+      node.name
+    ) {
+      register(nearestBindingScope(node, true), node.name)
+    }
+
+    if (
+      (ts.isFunctionExpression(node) || ts.isClassExpression(node)) &&
+      node.name
+    ) {
+      register(node, node.name)
+    }
+
+    if (ts.isCatchClause(node) && node.variableDeclaration) {
+      register(node, node.variableDeclaration.name)
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return scopesByName
+}
+
+function isLocallyBoundIdentifier(node, scopesByName) {
+  if (!ts.isIdentifier(node)) return false
+
+  const scopes = scopesByName.get(node.text)
+  if (!scopes) return false
+
+  let current = node.parent
+  while (current) {
+    if (scopes.has(current)) return true
+    current = current.parent
+  }
+
+  return false
+}
+
+function isBrowserGlobalMember(node, expectedName, bindings) {
   const current = unwrapExpression(node)
 
   if (ts.isIdentifier(current)) {
-    return current.text === expectedName
+    return (
+      current.text === expectedName &&
+      !isLocallyBoundIdentifier(current, bindings.localBindings)
+    )
   }
 
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return false
   }
 
-  const base = unwrapExpression(current.expression)
   return (
-    ts.isIdentifier(base) &&
-    rootAliases.has(base.text) &&
+    isBrowserRoot(current.expression, bindings) &&
     memberName(current) === expectedName
   )
 }
 
-function isBrowserRoot(node, rootAliases = browserRoots) {
+function isBrowserRoot(node, bindings) {
   const current = unwrapExpression(node)
-  return ts.isIdentifier(current) && rootAliases.has(current.text)
+  if (!ts.isIdentifier(current)) return false
+
+  if (browserRoots.has(current.text)) {
+    return !isLocallyBoundIdentifier(current, bindings.localBindings)
+  }
+
+  return bindings.rootAliases.has(current.text)
 }
 
-function isNavigatorObject(
-  node,
-  rootAliases = browserRoots,
-  navigatorAliases = new Set(),
-) {
+function isNavigatorObject(node, bindings) {
   const current = unwrapExpression(node)
   if (ts.isIdentifier(current)) {
-    return current.text === 'navigator' || navigatorAliases.has(current.text)
+    if (current.text === 'navigator') {
+      return !isLocallyBoundIdentifier(current, bindings.localBindings)
+    }
+
+    return bindings.navigatorAliases.has(current.text)
   }
 
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
@@ -81,7 +205,7 @@ function isNavigatorObject(
   }
 
   return (
-    isBrowserRoot(current.expression, rootAliases) &&
+    isBrowserRoot(current.expression, bindings) &&
     memberName(current) === 'navigator'
   )
 }
@@ -89,10 +213,10 @@ function isNavigatorObject(
 function networkReferenceName(node, bindings) {
   const current = unwrapExpression(node)
 
-  if (isBrowserGlobalMember(current, 'fetch', bindings.rootAliases)) return 'fetch'
+  if (isBrowserGlobalMember(current, 'fetch', bindings)) return 'fetch'
 
   for (const constructorName of networkConstructors) {
-    if (isBrowserGlobalMember(current, constructorName, bindings.rootAliases)) {
+    if (isBrowserGlobalMember(current, constructorName, bindings)) {
       return constructorName
     }
   }
@@ -100,11 +224,7 @@ function networkReferenceName(node, bindings) {
   if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
     if (
       memberName(current) === 'sendBeacon' &&
-      isNavigatorObject(
-        current.expression,
-        bindings.rootAliases,
-        bindings.navigatorAliases,
-      )
+      isNavigatorObject(current.expression, bindings)
     ) {
       return 'navigator.sendBeacon'
     }
@@ -129,7 +249,7 @@ function bindingElementNetworkReference(node, bindings) {
 
   const source = unwrapExpression(declaration.initializer)
   if (
-    isBrowserRoot(source, bindings.rootAliases) &&
+    isBrowserRoot(source, bindings) &&
     (key === 'fetch' || networkConstructors.has(key))
   ) {
     return key
@@ -137,7 +257,7 @@ function bindingElementNetworkReference(node, bindings) {
 
   if (
     key === 'sendBeacon' &&
-    isNavigatorObject(source, bindings.rootAliases, bindings.navigatorAliases)
+    isNavigatorObject(source, bindings)
   ) {
     return 'navigator.sendBeacon'
   }
@@ -178,9 +298,10 @@ function isDirectNetworkInvocationTarget(node) {
   )
 }
 
-function collectBrowserAliases(sourceFile) {
+function collectBrowserAliases(sourceFile, localBindings) {
   const rootAliases = new Set(browserRoots)
   const navigatorAliases = new Set()
+  const bindings = { rootAliases, navigatorAliases, localBindings }
   let changed = true
 
   while (changed) {
@@ -195,7 +316,7 @@ function collectBrowserAliases(sourceFile) {
 
           if (
             !rootAliases.has(alias) &&
-            isBrowserRoot(initializer, rootAliases)
+            isBrowserRoot(initializer, bindings)
           ) {
             rootAliases.add(alias)
             changed = true
@@ -203,14 +324,14 @@ function collectBrowserAliases(sourceFile) {
 
           if (
             !navigatorAliases.has(alias) &&
-            isNavigatorObject(initializer, rootAliases, navigatorAliases)
+            isNavigatorObject(initializer, bindings)
           ) {
             navigatorAliases.add(alias)
             changed = true
           }
         } else if (
           ts.isObjectBindingPattern(node.name) &&
-          isBrowserRoot(initializer, rootAliases)
+          isBrowserRoot(initializer, bindings)
         ) {
           for (const element of node.name.elements) {
             if (!ts.isIdentifier(element.name)) continue
@@ -232,7 +353,7 @@ function collectBrowserAliases(sourceFile) {
     visit(sourceFile)
   }
 
-  return { rootAliases, navigatorAliases }
+  return bindings
 }
 
 function scriptKindFor(filename) {
@@ -257,14 +378,15 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
     scriptKindFor(filename),
   )
 
-  const bindings = collectBrowserAliases(sourceFile)
+  const localBindings = collectLocalBindingScopes(sourceFile)
+  const bindings = collectBrowserAliases(sourceFile, localBindings)
   let finding = null
 
   function visit(node) {
     if (finding) return
 
     if (ts.isCallExpression(node)) {
-      if (isBrowserGlobalMember(node.expression, 'fetch', bindings.rootAliases)) {
+      if (isBrowserGlobalMember(node.expression, 'fetch', bindings)) {
         finding = {
           kind: 'fetch call',
           text: node.expression.getText(sourceFile),
@@ -276,11 +398,7 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
       if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
         if (
           memberName(callee) === 'sendBeacon' &&
-          isNavigatorObject(
-            callee.expression,
-            bindings.rootAliases,
-            bindings.navigatorAliases,
-          )
+          isNavigatorObject(callee.expression, bindings)
         ) {
           finding = {
             kind: 'sendBeacon call',
@@ -294,11 +412,7 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
     if (ts.isNewExpression(node)) {
       for (const constructorName of networkConstructors) {
         if (
-          isBrowserGlobalMember(
-            node.expression,
-            constructorName,
-            bindings.rootAliases,
-          )
+          isBrowserGlobalMember(node.expression, constructorName, bindings)
         ) {
           finding = {
             kind: constructorName + ' construction',
@@ -433,6 +547,34 @@ test('network boundary binds destructured references to browser globals', () => 
     "const root = window; const { fetch: request } = root",
     "const root = self; const { WebSocket: Socket } = root",
     "const { navigator: nav } = globalThis; const { sendBeacon: beacon } = nav",
+  ]) {
+    assert.ok(findDirectProductionNetworkAccess(source), source)
+  }
+})
+
+test('network boundary respects locally bound browser-global names', () => {
+  for (const source of [
+    "const fetch = api.fetch; fetch('/local')",
+    "function request(fetch) { fetch('/local') }",
+    "import { fetch } from './client'; fetch('/local')",
+    "class WebSocket {}; new WebSocket('/local')",
+    "function connect(WebSocket) { new WebSocket('/local') }",
+    "import WebSocket from './socket'; new WebSocket('/local')",
+    "const navigator = telemetry; navigator.sendBeacon('/local')",
+    "function ping(navigator) { navigator.sendBeacon('/local') }",
+    "const window = appWindow; window.fetch('/local')",
+    "function run(globalThis) { globalThis.fetch('/local') }",
+    "try {} catch (navigator) { navigator.sendBeacon('/local') }",
+  ]) {
+    assert.equal(findDirectProductionNetworkAccess(source), null, source)
+  }
+})
+
+test('network boundary keeps local shadowing scoped', () => {
+  for (const source of [
+    "{ const fetch = api.fetch; fetch('/local') }\nfetch('/api')",
+    "function local(window) { window.fetch('/local') }\nwindow.fetch('/api')",
+    "try {} catch (navigator) { navigator.sendBeacon('/local') }\nnavigator.sendBeacon('/api')",
   ]) {
     assert.ok(findDirectProductionNetworkAccess(source), source)
   }
