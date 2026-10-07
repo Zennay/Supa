@@ -114,28 +114,24 @@ function findImperativeBrowserNavigation(source, filename = 'candidate.tsx') {
   function visit(node) {
     if (finding) return
 
-    if (ts.isCallExpression(node)) {
-      const callee = unwrapExpression(node.expression)
-
-      if (isBrowserOpen(callee)) {
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      if (isBrowserOpen(node)) {
         finding = {
-          kind: 'new browsing context',
-          text: callee.getText(sourceFile),
+          kind: 'new browsing context primitive',
+          text: node.getText(sourceFile),
         }
         return
       }
 
-      if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
-        if (
-          isBrowserLocation(callee.expression) &&
-          locationMethods.has(memberName(callee))
-        ) {
-          finding = {
-            kind: 'imperative document navigation',
-            text: callee.getText(sourceFile),
-          }
-          return
+      if (
+        isBrowserLocation(node.expression) &&
+        locationMethods.has(memberName(node))
+      ) {
+        finding = {
+          kind: 'imperative document navigation primitive',
+          text: node.getText(sourceFile),
         }
+        return
       }
     }
 
@@ -204,6 +200,8 @@ test('navigation boundary catches direct browser navigation primitives', () => {
     "location.href = '/elsewhere'",
     "window.location = '/elsewhere'",
     "globalThis['location']['href'] += '?next=1'",
+    "const launch = window.open",
+    "const navigate = location.assign",
   ]) {
     assert.ok(findImperativeBrowserNavigation(source), source)
   }
