@@ -15,8 +15,26 @@ function scriptElements(html) {
 }
 
 function evaluateScriptBoundary(html) {
-  const scripts = scriptElements(html)
+  const markup = html.replace(/<!--[\s\S]*?-->/g, '')
+  const scripts = scriptElements(markup)
   const issues = []
+
+  const inlineHandler = markup.match(/\s(on[a-z][a-z0-9:_-]*)\s*=/i)
+  if (inlineHandler) {
+    issues.push('inline event handler is forbidden: ' + inlineHandler[1])
+  }
+
+  if (/\ssrcdoc\s*=/i.test(markup)) {
+    issues.push('srcdoc is forbidden in the app shell')
+  }
+
+  if (
+    /\b(?:href|src|action|formaction)\s*=\s*(?:"\s*javascript\s*:|'\s*javascript\s*:|javascript\s*:)/i.test(
+      markup,
+    )
+  ) {
+    issues.push('javascript: URL is forbidden in the app shell')
+  }
 
   if (scripts.length !== 1) {
     issues.push(`expected exactly one script element, found ${scripts.length}`)
@@ -53,6 +71,11 @@ test('script boundary rejects extra, external and inline execution paths', () =>
     '<script type="module" src="//cdn.example.test/main.js"></script>',
     '<script type="module" src="data:text/javascript,alert(1)"></script>',
     '<script type="module" src="/src/main.tsx">alert(1)</script>',
+    '<body onload="alert(1)"><script type="module" src="/src/main.tsx"></script></body>',
+    '<a href="javascript:alert(1)">x</a><script type="module" src="/src/main.tsx"></script>',
+    "<form action=javascript:alert(1)><script type=\"module\" src=\"/src/main.tsx\"></script></form>",
+    '<iframe srcdoc="<p>unsafe</p>"></iframe><script type="module" src="/src/main.tsx"></script>',
+    '<script type="module" src="/src/main.tsx" onload="alert(1)"></script>',
     '<script src="/src/main.tsx"></script>',
     '<script type="module"></script>',
     '',
@@ -61,11 +84,12 @@ test('script boundary rejects extra, external and inline execution paths', () =>
   }
 })
 
-test('script boundary accepts the reviewed canonical shell shape', () => {
-  assert.deepEqual(
-    evaluateScriptBoundary(
-      '<!doctype html><html><body><script type="module" src="/src/main.tsx"></script></body></html>',
-    ),
-    [],
-  )
+test('script boundary accepts the reviewed canonical shell shape and inert markup', () => {
+  for (const html of [
+    '<!doctype html><html><body><script type="module" src="/src/main.tsx"></script></body></html>',
+    '<body><a href="/planner" data-onload="label">Planner</a><script type="module" src="/src/main.tsx"></script></body>',
+    '<!-- <div onclick="ignored()"></div> --><script type="module" src="/src/main.tsx"></script>',
+  ]) {
+    assert.deepEqual(evaluateScriptBoundary(html), [], html)
+  }
 })
