@@ -27,7 +27,10 @@ import {
   observationPackAmount,
   observationPackCount,
 } from './observationNumericInput.ts'
-import {\n  persistObservationDraft,\n  removeObservationDraft,\n} from './observationDraftPersistence.ts'
+import {
+  persistObservationDraft,
+  removeObservationDraft,
+} from './observationDraftPersistence.ts'
 import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
 
 type Side = 'baseline' | 'candidate'
@@ -98,6 +101,7 @@ export function ObservationView() {
   const [resetArmed, setResetArmed] = useState(false)
   const [pendingImport, setPendingImport] = useState<ObservationSheet | null>(null)
   const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
+  const [draftResetRemovalFailed, setDraftResetRemovalFailed] = useState(false)
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
   const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
   const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
