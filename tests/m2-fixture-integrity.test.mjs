@@ -8,6 +8,7 @@ import {
   m2Recipes,
   m2Store,
 } from '../src/data/m2Fixture.ts'
+import { euro } from '../src/lib/money.ts'
 
 const canonical = (value) =>
   typeof value === 'string' && value.length > 0 && value === value.trim()
@@ -29,6 +30,11 @@ test('M2 fixture keeps canonical unique identities and valid plan references', (
     assert.ok(recipe.servings > 0)
     assert.equal(Number.isFinite(recipe.estimatedCost), true)
     assert.ok(recipe.estimatedCost >= 0)
+    assert.notEqual(
+      euro.format(recipe.estimatedCost),
+      '—',
+      `recipe estimated cost must stay cent-exact and renderable: ${recipe.id}`,
+    )
 
     const tags = new Set()
     for (const tag of recipe.tags) {
