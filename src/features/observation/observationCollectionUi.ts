@@ -36,6 +36,39 @@ function observationLinesForSide(
   return lines
 }
 
+function validateObservationLineIdentities(
+  lines: unknown[],
+  side: M3ObservationSide,
+): void {
+  const seen = new Set<string>()
+
+  for (const lineCandidate of lines) {
+    if (
+      !lineCandidate ||
+      typeof lineCandidate !== 'object' ||
+      Array.isArray(lineCandidate)
+    ) {
+      throw new Error('invalid observation sheet')
+    }
+
+    const ingredientId = (lineCandidate as { ingredientId?: unknown }).ingredientId
+    if (
+      typeof ingredientId !== 'string' ||
+      ingredientId.trim() === '' ||
+      ingredientId !== ingredientId.trim() ||
+      seen.has(ingredientId)
+    ) {
+      throw new Error('invalid observation sheet')
+    }
+
+    seen.add(ingredientId)
+  }
+
+  if (seen.size !== lines.length) {
+    throw new Error(`invalid observation sheet: ${side} line identities`)
+  }
+}
+
 function firstUsableIncompleteObservationLine(
   baselineLines: unknown[],
   candidateLines: unknown[],
@@ -87,6 +120,8 @@ export function nextObservationActionLabel(
   const candidateLines = observationLinesForSide(sheet, 'candidate')
 
   if (next === null) {
+    validateObservationLineIdentities(baselineLines, 'baseline')
+    validateObservationLineIdentities(candidateLines, 'candidate')
     let pending: ReturnType<typeof nextIncompleteObservationLine>
     try {
       pending = nextIncompleteObservationLine(sheet as ObservationSheet)

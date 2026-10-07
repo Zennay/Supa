@@ -122,3 +122,34 @@ test('M3 collection guidance fails closed on malformed next-observation targets'
     )
   }
 })
+
+
+test('M3 collection guidance rejects malformed or duplicate line identities before claiming completion', () => {
+  for (const mutate of [
+    (sheet) => {
+      sheet.baseline.lines[0].ingredientId = '   '
+    },
+    (sheet) => {
+      sheet.baseline.lines[0].ingredientId =
+        `${sheet.baseline.lines[0].ingredientId} `
+    },
+    (sheet) => {
+      sheet.baseline.lines[1].ingredientId =
+        sheet.baseline.lines[0].ingredientId
+    },
+  ]) {
+    const sheet = buildObservationSheet()
+    sheet.baseline.lines.forEach((line) => {
+      line.observedProduct.available = false
+    })
+    sheet.candidate.lines.forEach((line) => {
+      line.observedProduct.available = false
+    })
+    mutate(sheet)
+
+    assert.throws(
+      () => nextObservationActionLabel(sheet, null),
+      /invalid observation sheet/,
+    )
+  }
+})
