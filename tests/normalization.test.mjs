@@ -199,8 +199,11 @@ test('unsafe numeric normalization inputs fail closed before precision can be lo
 
   for (const input of [
     '9007199254740992 g',
+    '9007199254740991.0000000000000001 g',
+    '9007199254740991,0000000000000001 l',
     '9007199254740992 x 1 g',
     '1 x 9007199254740992 ml',
+    '1 x 9007199254740991.0000000000000001 ml',
   ]) {
     assert.deepEqual(normalizePackText(input), {
       rawText: input,
@@ -221,4 +224,11 @@ test('unsafe numeric normalization inputs fail closed before precision can be lo
       rawLabel: label,
     })
   }
+
+  assert.deepEqual(normalizePackText('9007199254740991.0000 g'), {
+    rawText: '9007199254740991.0000 g',
+    count: 1,
+    amount: Number.MAX_SAFE_INTEGER,
+    unit: 'g',
+  })
 })
