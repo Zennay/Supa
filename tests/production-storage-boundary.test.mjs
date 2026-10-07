@@ -54,6 +54,22 @@ function storageName(node) {
   return storageNames.has(name) ? name : null
 }
 
+function isBrowserGlobalObject(node, expectedName) {
+  const current = unwrapExpression(node)
+  if (ts.isIdentifier(current)) return current.text === expectedName
+
+  if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
+    return false
+  }
+
+  const base = unwrapExpression(current.expression)
+  return (
+    ts.isIdentifier(base) &&
+    browserRoots.has(base.text) &&
+    memberName(current) === expectedName
+  )
+}
+
 function staticString(node) {
   if (!node) return null
   const current = unwrapExpression(node)
@@ -129,6 +145,29 @@ function findUnsafeStorageAccess(
 
   function visit(node) {
     if (finding) return
+
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const name = memberName(node)
+
+      if (name === 'cookie' && isBrowserGlobalObject(node.expression, 'document')) {
+        finding = {
+          kind: 'document.cookie access',
+          text: node.getText(sourceFile),
+        }
+        return
+      }
+
+      if (
+        isBrowserGlobalObject(node, 'cookieStore') ||
+        isBrowserGlobalObject(node.expression, 'cookieStore')
+      ) {
+        finding = {
+          kind: 'client cookieStore access',
+          text: node.getText(sourceFile),
+        }
+        return
+      }
+    }
 
     if (ts.isCallExpression(node)) {
       const callee = unwrapExpression(node.expression)
@@ -231,6 +270,11 @@ test('storage guard rejects origin-wide clears and unscoped or unverifiable keys
     "self['sessionStorage'].removeItem(`draft`)",
     'localStorage.setItem(storageKey, payload)',
     'window.localStorage.getItem(buildStorageKey())',
+    "document.cookie = 'session=unsafe'",
+    "const raw = window['document'].cookie",
+    "cookieStore.set('session', 'unsafe')",
+    "window.cookieStore.get('session')",
+    "globalThis['cookieStore']['delete']('session')",
   ]) {
     const bindings = collectScopedStorageKeyBindings(source)
     assert.ok(findUnsafeStorageAccess(source, 'candidate.tsx', bindings), source)
@@ -246,6 +290,11 @@ test('storage guard permits proven SUPA keys and unrelated storage objects', () 
     "const storageKey = 'supa:list:v1'; window.localStorage.getItem(storageKey)",
     'cache.clear()',
     "storage.setItem('planner', '{}')",
+    "jar.cookie = 'local-only'",
+    "const cookie = 'local label'",
+    "cookies.set('session', 'local-only')",
+    "jar.cookieStore.get('session')",
+    "// document.cookie = 'example=1'",
     "// localStorage.clear()",
     "const example = \"localStorage.setItem('planner', '{}')\"",
   ]) {
