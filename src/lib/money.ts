@@ -9,7 +9,8 @@ function isSafeEuroNumber(value: unknown): value is number {
   return (
     typeof value === 'number' &&
     Number.isFinite(value) &&
-    Math.abs(value) <= MAX_SAFE_EURO_MAGNITUDE
+    Math.abs(value) <= MAX_SAFE_EURO_MAGNITUDE &&
+    Number(value.toFixed(2)) === value
   )
 }
 
