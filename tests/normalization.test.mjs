@@ -132,6 +132,27 @@ test('normalizes common supermarket offer mechanics without guessing unknown lab
   })
 })
 
+test('percentage offers enforce the textual 100% ceiling before numeric conversion', () => {
+  for (const label of ['100.0000000000000000001% korting', '100,0000000000000000001% korting']) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'unknown',
+      rawLabel: label,
+    })
+  }
+
+  for (const label of ['100% korting', '100.000% korting', '100,000% korting']) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'percent_discount',
+      percent: 100,
+    })
+  }
+
+  assert.deepEqual(normalizeOfferLabel('99.5% korting'), {
+    type: 'percent_discount',
+    percent: 99.5,
+  })
+})
+
 test('invalid offer mechanics fail closed instead of entering savings math', () => {
   for (const label of [
     '0+1 gratis',
