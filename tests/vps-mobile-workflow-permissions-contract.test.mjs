@@ -20,7 +20,7 @@ test('permanent VPS mobile workflow uses an explicit read-only token', () => {
 test('permanent VPS checkout does not persist credentials', () => {
   assert.match(
     workflow,
-    /uses: actions\/checkout@[0-9a-f]{40}\\s+#\\s+v\\d+\\.\\d+\\.\\d+\\s*\\n\\s*with:\\s*\\n\\s*persist-credentials: false/,
+    /uses: actions\/checkout@[0-9a-f]{40}\s+#\s+v\d+\.\d+\.\d+\s*\n\s*with:\s*\n\s*persist-credentials: false/,
   )
 })
 
