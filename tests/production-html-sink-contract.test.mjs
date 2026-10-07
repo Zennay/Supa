@@ -9,6 +9,12 @@ const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx'])
 const browserRoots = new Set(['globalThis', 'self', 'window'])
 const htmlPropertySinks = new Set(['innerHTML', 'outerHTML', 'srcdoc'])
 const documentWriteSinks = new Set(['write', 'writeln'])
+const htmlCallSinks = new Set([
+  'createContextualFragment',
+  'insertAdjacentHTML',
+  'parseHTMLUnsafe',
+  'setHTMLUnsafe',
+])
 
 function staticName(node) {
   if (!node) return null
@@ -102,12 +108,12 @@ function findRawHtmlSink(source, filename = 'candidate.tsx') {
       }
 
       if (
-        name === 'insertAdjacentHTML' &&
+        htmlCallSinks.has(name) &&
         ts.isCallExpression(node.parent) &&
         node.parent.expression === node
       ) {
         finding = {
-          kind: 'insertAdjacentHTML call',
+          kind: name + ' call',
           text: node.getText(sourceFile),
         }
         return
@@ -182,6 +188,10 @@ test('raw HTML guard catches React and DOM injection sinks', () => {
     "const embedded = iframe['srcdoc']",
     "node.insertAdjacentHTML('beforeend', html)",
     "node['insertAdjacentHTML']('afterbegin', html)",
+    "range.createContextualFragment(html)",
+    "element.setHTMLUnsafe(html)",
+    "Document.parseHTMLUnsafe(html)",
+    "shadowRoot['setHTMLUnsafe'](html)",
     "document.write(html)",
     "document['writeln'](html)",
     "window.document.write(html)",
@@ -199,6 +209,9 @@ test('raw HTML guard ignores comments, strings and non-sink identifiers', () => 
     "const srcdoc = sanitizedText",
     "const payload = { innerHTML: sanitizedText, srcdoc: sanitizedText }",
     "const insertAdjacentHTML = () => 'example'",
+    "const createContextualFragment = () => 'example'",
+    "const setHTMLUnsafe = () => 'example'",
+    "const parseHTMLUnsafe = () => 'example'",
     "printer.write(html)",
     "writer.writeln(html)",
     "const write = () => 'example'",
