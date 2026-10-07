@@ -7,6 +7,7 @@ import test from 'node:test'
 
 import {
   buildPrivacySafeRetailerResponse,
+  main,
   validateRetailerResponseRecord,
 } from '../scripts/aud005-record-retailer-response.mjs'
 
@@ -180,4 +181,24 @@ test('AUD-005 CLI writes nested privacy-safe output', async () => {
   const report = JSON.parse(await readFile(output, 'utf8'))
   assert.equal(report.privacySafe, true)
   assert.equal(report.evidenceRef, 'private-response-plus-2026-10-05-001')
+})
+
+
+test('AUD-005 CLI preserves an existing privacy-safe output byte-for-byte', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-no-clobber-'))
+  const input = join(directory, 'input.json')
+  const output = join(directory, 'response.json')
+  const existing = '{"existing":"stakeholder evidence"}\n'
+
+  await Promise.all([
+    writeFile(input, JSON.stringify(validRecord()), 'utf8'),
+    writeFile(output, existing, 'utf8'),
+  ])
+
+  await assert.rejects(
+    () => main([input, '--output', output]),
+    (error) => error?.code === 'EEXIST',
+  )
+
+  assert.equal(await readFile(output, 'utf8'), existing)
 })
