@@ -15,12 +15,22 @@ const directIdentifierKeys = new Set([
 ])
 const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 
+function assertNoEvidenceSymlink(entry, path) {
+  assert.equal(
+    entry.isSymbolicLink(),
+    false,
+    `symbolic links are not allowed in durable M3 evidence: ${relative(evidenceDir, path)}`,
+  )
+}
+
 async function listFiles(root) {
   const entries = await readdir(root, { withFileTypes: true })
   const files = []
 
   for (const entry of entries) {
     const path = join(root, entry.name)
+    assertNoEvidenceSymlink(entry, path)
+
     if (entry.isDirectory()) {
       files.push(...await listFiles(path))
     } else if (entry.isFile()) {
@@ -75,6 +85,23 @@ test('M3 durable evidence zone contains only reviewable text evidence formats', 
       `non-reviewable/raw field artifact must not be committed under evidence/m3: ${relative(evidenceDir, path)}`,
     )
   }
+})
+
+test('M3 durable evidence rejects symbolic links without traversing them', () => {
+  const symlinkEntry = {
+    isSymbolicLink: () => true,
+  }
+  const regularFileEntry = {
+    isSymbolicLink: () => false,
+  }
+
+  assert.throws(
+    () => assertNoEvidenceSymlink(symlinkEntry, join(evidenceDir, 'linked-study.json')),
+    /symbolic links are not allowed in durable M3 evidence: linked-study\.json/,
+  )
+  assert.doesNotThrow(() =>
+    assertNoEvidenceSymlink(regularFileEntry, join(evidenceDir, 'study.json')),
+  )
 })
 
 test('committed M3 study JSON stays structurally identifiable and privacy-safe', async () => {
