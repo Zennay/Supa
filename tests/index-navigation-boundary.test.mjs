@@ -15,7 +15,7 @@ function openingTags(html, tagName) {
 
 function attributeValue(tag, name) {
   const pattern = new RegExp(
-    '\\b' + name + '\\s*=\\s*(?:"([^"]*)"|\\'([^\\']*)\\'|([^\\s>]+))',
+    '\\b' + name + '\\s*=\\s*(?:"([^"]*)"|\\x27([^\\x27]*)\\x27|([^\\s>]+))',
     'i',
   )
   const match = tag.match(pattern)
