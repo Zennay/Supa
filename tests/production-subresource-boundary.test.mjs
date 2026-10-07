@@ -53,8 +53,76 @@ function staticString(node) {
   return null
 }
 
-function isReactCreateElement(node) {
+function isReactModuleSpecifier(node) {
+  return ts.isStringLiteralLike(node) && node.text === 'react'
+}
+
+function collectReactCreateElementBindings(sourceFile) {
+  const namespaceAliases = new Set(['React'])
+  const callableAliases = new Set()
+
+  function visit(node) {
+    if (ts.isImportDeclaration(node) && isReactModuleSpecifier(node.moduleSpecifier)) {
+      const clause = node.importClause
+      if (clause?.name) namespaceAliases.add(clause.name.text)
+
+      const bindings = clause?.namedBindings
+      if (bindings && ts.isNamespaceImport(bindings)) {
+        namespaceAliases.add(bindings.name.text)
+      } else if (bindings && ts.isNamedImports(bindings)) {
+        for (const element of bindings.elements) {
+          const sourceName = element.propertyName?.text ?? element.name.text
+          if (sourceName === 'createElement') callableAliases.add(element.name.text)
+        }
+      }
+    }
+
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.initializer &&
+      ts.isVariableDeclarationList(node.parent) &&
+      (node.parent.flags & ts.NodeFlags.Const) !== 0
+    ) {
+      const initializer = unwrapExpression(node.initializer)
+
+      if (ts.isIdentifier(node.name)) {
+        if (
+          ts.isIdentifier(initializer) &&
+          callableAliases.has(initializer.text)
+        ) {
+          callableAliases.add(node.name.text)
+        } else if (isReactCreateElement(initializer, { namespaceAliases, callableAliases })) {
+          callableAliases.add(node.name.text)
+        }
+      }
+
+      if (
+        ts.isObjectBindingPattern(node.name) &&
+        ts.isIdentifier(initializer) &&
+        namespaceAliases.has(initializer.text)
+      ) {
+        for (const element of node.name.elements) {
+          if (!ts.isIdentifier(element.name)) continue
+          const sourceName = staticName(element.propertyName) ?? element.name.text
+          if (sourceName === 'createElement') callableAliases.add(element.name.text)
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return { namespaceAliases, callableAliases }
+}
+
+function isReactCreateElement(node, bindings) {
   const current = unwrapExpression(node)
+
+  if (ts.isIdentifier(current)) {
+    return bindings.callableAliases.has(current.text)
+  }
+
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return false
   }
@@ -62,7 +130,7 @@ function isReactCreateElement(node) {
   const base = unwrapExpression(current.expression)
   return (
     ts.isIdentifier(base) &&
-    base.text === 'React' &&
+    bindings.namespaceAliases.has(base.text) &&
     memberName(current) === 'createElement'
   )
 }
@@ -136,6 +204,7 @@ function findBrowserSubresource(source, filename = 'candidate.tsx') {
     scriptKindFor(filename),
   )
 
+  const reactBindings = collectReactCreateElementBindings(sourceFile)
   let finding = null
 
   function visit(node) {
@@ -147,7 +216,10 @@ function findBrowserSubresource(source, filename = 'candidate.tsx') {
       return
     }
 
-    if (ts.isCallExpression(node) && isReactCreateElement(node.expression)) {
+    if (
+      ts.isCallExpression(node) &&
+      isReactCreateElement(node.expression, reactBindings)
+    ) {
       const tag = staticString(node.arguments[0])
       if (tag !== null && resourceAttributes.has(tag)) {
         finding = {
@@ -221,6 +293,12 @@ test('subresource boundary catches intrinsic browser resource loads', () => {
     "React.createElement('img', { src: url })",
     "React.createElement('link', props)",
     "React.createElement('script', { src: url })",
+    "import Runtime from 'react'; Runtime.createElement('img', { src: url })",
+    "import * as ReactApi from 'react'; ReactApi.createElement('script', { src: url })",
+    "import { createElement as h } from 'react'; h('img', { src: url })",
+    "const h = React.createElement; h('script', { src: url })",
+    "const { createElement: h } = React; h('img', { src: url })",
+    "const h = React.createElement; const render = h; render('script', { src: url })",
   ]) {
     assert.ok(findBrowserSubresource(source), source)
   }
@@ -239,6 +317,9 @@ test('subresource boundary preserves non-loading markup and React components', (
     'const example = "<img src=/example.png>"',
     '// const view = <img src={url} />',
     'elementFactory.img({ src: url })',
+    "import { createElement as h } from './factory.js'; h('img', { src: url })",
+    "const h = elementFactory.createElement; h('img', { src: url })",
+    "const h = React.createElement; h('div', { 'data-src': url })",
   ]) {
     assert.equal(findBrowserSubresource(source), null, source)
   }
