@@ -1,5 +1,5 @@
 import { constants } from 'node:fs'
-import { mkdir, open, writeFile } from 'node:fs/promises'
+import { mkdir, open, stat, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -357,6 +357,17 @@ function parseArgs(argv) {
   return { input: positional[0], output }
 }
 
+async function ensurePrivateOutputDirectory(outputPath) {
+  const outputDirectory = dirname(outputPath)
+  await mkdir(outputDirectory, { recursive: true, mode: 0o700 })
+  const metadata = await stat(outputDirectory)
+  assert(metadata.isDirectory(), 'response output parent must be a directory')
+  assert(
+    (metadata.mode & 0o077) === 0,
+    'response output directory must be owner-only',
+  )
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const { input, output } = parseArgs(argv)
   let raw
@@ -372,7 +383,7 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(report, null, 2)}\n`
 
   if (output) {
-    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
+    await ensurePrivateOutputDirectory(output)
     await writeFile(output, serialized, {
       encoding: 'utf8',
       flag: 'wx',
