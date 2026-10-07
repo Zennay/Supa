@@ -34,3 +34,13 @@ test('TypeScript project includes keep full app and build-config coverage', () =
   assert.deepEqual(appConfig.include, ['src'])
   assert.deepEqual(nodeConfig.include, ['vite.config.ts'])
 })
+
+test('Vite build config remains a strict no-emit referenced TypeScript project', () => {
+  const options = nodeConfig.compilerOptions ?? {}
+
+  assert.equal(options.composite, true)
+  assert.equal(options.noEmit, true)
+  assert.equal(options.strict, true)
+  assert.equal(options.module, 'ESNext')
+  assert.equal(options.moduleResolution, 'Bundler')
+})
