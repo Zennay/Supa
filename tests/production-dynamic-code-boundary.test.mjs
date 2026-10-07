@@ -313,7 +313,7 @@ test('dynamic-code guard respects locally bound global-looking names', () => {
   for (const source of [
     "const eval = sandbox.eval; eval('local expression')",
     "function run(eval) { eval('local expression') }",
-    "import { eval as evaluate } from './sandbox'; evaluate('local expression')",
+    "import evaluate from './sandbox'; const eval = evaluate; eval('local expression')",
     "const Function = factory.Function; new Function('local template')",
     "function build(Function) { Function('local template') }",
     "const setTimeout = scheduler.setTimeout; setTimeout('local task', 0)",
