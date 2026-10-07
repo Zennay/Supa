@@ -111,13 +111,14 @@ export function ObservationView() {
   )
 
   useEffect(() => {
-    const persisted = persistObservationDraft(
-      () => window.localStorage,
-      OBSERVATION_DRAFT_STORAGE_KEY,
-      sheet,
+    setDraftPersistenceFailed(
+      !persistObservationDraft(
+        () => window.localStorage,
+        OBSERVATION_DRAFT_STORAGE_KEY,
+        sheet,
+        () => setDraftResetRemovalFailed(false),
+      ),
     )
-    setDraftPersistenceFailed(!persisted)
-    if (persisted) setDraftResetRemovalFailed(false)
   }, [sheet])
 
   useEffect(() => {
