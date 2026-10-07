@@ -6,7 +6,9 @@ import * as ts from 'typescript'
 
 const srcDir = new URL('../src/', import.meta.url)
 const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx'])
-const htmlPropertySinks = new Set(['innerHTML', 'outerHTML'])
+const browserRoots = new Set(['globalThis', 'self', 'window'])
+const htmlPropertySinks = new Set(['innerHTML', 'outerHTML', 'srcdoc'])
+const documentWriteSinks = new Set(['write', 'writeln'])
 
 function staticName(node) {
   if (!node) return null
@@ -19,6 +21,35 @@ function memberName(node) {
   if (ts.isPropertyAccessExpression(node)) return node.name.text
   if (ts.isElementAccessExpression(node)) return staticName(node.argumentExpression)
   return null
+}
+
+function unwrapExpression(node) {
+  let current = node
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression
+  }
+  return current
+}
+
+function isDocumentObject(node) {
+  const current = unwrapExpression(node)
+  if (ts.isIdentifier(current)) return current.text === 'document'
+
+  if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
+    return false
+  }
+
+  const base = unwrapExpression(current.expression)
+  return (
+    ts.isIdentifier(base) &&
+    browserRoots.has(base.text) &&
+    memberName(current) === 'document'
+  )
 }
 
 function scriptKindFor(filename) {
@@ -81,6 +112,19 @@ function findRawHtmlSink(source, filename = 'candidate.tsx') {
         }
         return
       }
+
+      if (
+        documentWriteSinks.has(name) &&
+        isDocumentObject(node.expression) &&
+        ts.isCallExpression(node.parent) &&
+        node.parent.expression === node
+      ) {
+        finding = {
+          kind: 'document.' + name + ' call',
+          text: node.getText(sourceFile),
+        }
+        return
+      }
     }
 
     ts.forEachChild(node, visit)
@@ -134,8 +178,14 @@ test('raw HTML guard catches React and DOM injection sinks', () => {
     "const view = <div dangerouslySetInnerHTML={{ __html: html }} />",
     "node.innerHTML = html",
     "const previous = node['outerHTML']",
+    "iframe.srcdoc = html",
+    "const embedded = iframe['srcdoc']",
     "node.insertAdjacentHTML('beforeend', html)",
     "node['insertAdjacentHTML']('afterbegin', html)",
+    "document.write(html)",
+    "document['writeln'](html)",
+    "window.document.write(html)",
+    "globalThis['document']['writeln'](html)",
   ]) {
     assert.ok(findRawHtmlSink(source), source)
   }
@@ -143,11 +193,15 @@ test('raw HTML guard catches React and DOM injection sinks', () => {
 
 test('raw HTML guard ignores comments, strings and non-sink identifiers', () => {
   for (const source of [
-    "// node.innerHTML = html",
-    "const example = \"dangerouslySetInnerHTML node.outerHTML\"",
+    "// document.write(html)",
+    "const example = \"dangerouslySetInnerHTML node.outerHTML iframe.srcdoc\"",
     "const innerHTML = sanitizedText",
-    "const payload = { innerHTML: sanitizedText }",
+    "const srcdoc = sanitizedText",
+    "const payload = { innerHTML: sanitizedText, srcdoc: sanitizedText }",
     "const insertAdjacentHTML = () => 'example'",
+    "printer.write(html)",
+    "writer.writeln(html)",
+    "const write = () => 'example'",
   ]) {
     assert.equal(findRawHtmlSink(source), null, source)
   }
