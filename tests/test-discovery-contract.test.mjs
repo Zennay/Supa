@@ -32,6 +32,7 @@ function sourceImportsNodeTest(source) {
   let importsNodeTest = false
   const createRequireAliases = new Set()
   const nodeModuleNamespaceAliases = new Set()
+  const nodeModuleDefaultAliases = new Set()
   const runtimeRequireAliases = new Set()
 
   function isNodeTestSpecifier(node) {
@@ -45,6 +46,11 @@ function sourceImportsNodeTest(source) {
       node.moduleSpecifier.text === 'node:module' &&
       !node.importClause?.isTypeOnly
     ) {
+      const defaultBinding = node.importClause?.name
+      if (defaultBinding) {
+        nodeModuleDefaultAliases.add(defaultBinding.text)
+      }
+
       const bindings = node.importClause?.namedBindings
       if (bindings && ts.isNamedImports(bindings)) {
         for (const element of bindings.elements) {
@@ -69,11 +75,13 @@ function sourceImportsNodeTest(source) {
       (ts.isIdentifier(node) && createRequireAliases.has(node.text)) ||
       (ts.isPropertyAccessExpression(node) &&
         ts.isIdentifier(node.expression) &&
-        nodeModuleNamespaceAliases.has(node.expression.text) &&
+        (nodeModuleNamespaceAliases.has(node.expression.text) ||
+          nodeModuleDefaultAliases.has(node.expression.text)) &&
         node.name.text === 'createRequire') ||
       (ts.isElementAccessExpression(node) &&
         ts.isIdentifier(node.expression) &&
-        nodeModuleNamespaceAliases.has(node.expression.text) &&
+        (nodeModuleNamespaceAliases.has(node.expression.text) ||
+          nodeModuleDefaultAliases.has(node.expression.text)) &&
         ts.isStringLiteralLike(node.argumentExpression) &&
         node.argumentExpression.text === 'createRequire')
     )
@@ -279,6 +287,8 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import { createRequire as makeRequire } from 'node:module'; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
     "import * as moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
     "import * as moduleApi from 'node:module'; const testApi = moduleApi['createRequire'](import.meta.url)('node:test')",
+    "import moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
+    "import moduleApi from 'node:module'; const testApi = moduleApi['createRequire'](import.meta.url)('node:test')",
     "import { createRequire } from 'node:module'; const testApi = createRequire(import.meta.url)('node:test')",
     "const testApi = process.getBuiltinModule('node:test')",
     'const testApi = process["getBuiltinModule"]("node:test")',
@@ -300,6 +310,8 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import type { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const testApi = load('node:test')",
     "import { createRequire } from './helper.mjs'; const load = createRequire(import.meta.url); const testApi = load('node:test')",
     "import * as helper from './helper.mjs'; const load = helper.createRequire(import.meta.url); const testApi = load('node:test')",
+    "import helper from './helper.mjs'; const load = helper.createRequire(import.meta.url); const testApi = load('node:test')",
+    "import type moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
     "import type * as moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
     "import { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const fs = load('node:fs')",
     "const fs = process.getBuiltinModule('node:fs')",
