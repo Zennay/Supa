@@ -29,7 +29,7 @@ test('parses reviewed PLUS rendered catalog cards from exact observed DOM contra
   assert.equal(result.observations.length, 4)
 
   const milk = result.observations.find(
-    (observation) => observation.sourceProductId === '579010',
+    (observation) => observation.sourceProductId === '113651',
   )
   assert.ok(milk)
   assert.equal(milk.name, 'Zuivelmeester Halfvolle melk')
@@ -228,7 +228,7 @@ test('PLUS listing evidence requires a timezone-bearing capture timestamp', asyn
 
 test('PLUS listing cards reject product hrefs that escape the product route after normalization', async () => {
   const evidence = await fixture(catalogUrl)
-  evidence.cards[0].href = '/product/../aanbiedingen-579010'
+  evidence.cards[0].href = '/product/../aanbiedingen-113651'
 
   const result = parsePlusRenderedCatalogEvidence(evidence)
 
