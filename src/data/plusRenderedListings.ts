@@ -228,9 +228,21 @@ function validateEvidenceBoundary(
 
 function productIdFromHref(href: string): string | null {
   if (typeof href !== 'string' || !href.startsWith('/product/')) return null
-  const path = href.split(/[?#]/, 1)[0]
-  const match = path.match(/-(\d+)$/)
-  return match ? match[1] : null
+
+  try {
+    const url = new URL(href, 'https://www.plus.nl')
+    if (
+      url.origin !== 'https://www.plus.nl' ||
+      !url.pathname.startsWith('/product/')
+    ) {
+      return null
+    }
+
+    const match = url.pathname.match(/-(\d+)$/)
+    return match ? match[1] : null
+  } catch {
+    return null
+  }
 }
 
 function currentPriceCents(card: PlusRenderedListingCard): number | null {
