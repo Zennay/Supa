@@ -86,6 +86,55 @@ test('planned cost fails closed on malformed active recipe estimates', () => {
   }
 })
 
+test('planned cost rejects malformed runtime collection containers without throwing', () => {
+  for (const [runtimePlan, runtimeRecipes, runtimeActiveDays] of [
+    [null, recipes, ['Ma']],
+    [{}, recipes, ['Ma']],
+    [plan, null, ['Ma']],
+    [plan, 'recipes', ['Ma']],
+    [plan, recipes, null],
+    [plan, recipes, 'Ma'],
+  ]) {
+    assert.doesNotThrow(() => {
+      assert.equal(
+        getPlannedCost(runtimePlan, runtimeRecipes, runtimeActiveDays),
+        null,
+      )
+    })
+  }
+})
+
+test('planned cost fails closed on malformed active runtime identities and entries', () => {
+  assert.equal(getPlannedCost(plan, recipes, [42]), null)
+  assert.equal(
+    getPlannedCost([{ day: 'Ma' }], recipes, ['Ma']),
+    null,
+  )
+  assert.equal(
+    getPlannedCost([null, ...plan], [null, ...recipes], ['Ma']),
+    4.5,
+  )
+})
+
+test('planned cost rejects whitespace-padded active planner identities', () => {
+  for (const paddedDay of [' Ma', 'Ma ', '\tMa']) {
+    assert.equal(getPlannedCost(plan, recipes, [paddedDay]), null)
+  }
+
+  for (const paddedRecipeId of [' cheap', 'cheap ', '\tcheap']) {
+    const paddedPlan = [{ day: 'Ma', recipeId: paddedRecipeId }]
+    const paddedRecipes = [
+      { ...recipes[0], id: paddedRecipeId },
+      recipes[1],
+    ]
+
+    assert.equal(
+      getPlannedCost(paddedPlan, paddedRecipes, ['Ma']),
+      null,
+    )
+  }
+})
+
 test('budget state exposes remaining money and usage', () => {
   const state = getBudgetState(23.5, 35)
 
@@ -129,3 +178,60 @@ test('planner budget outcome treats invalid unresolved counts as unknown', () =>
     assert.equal(assessment.unresolvedLineCount, 1)
   }
 })
+
+test('planner budget outcome rejects malformed runtime money without coercion', () => {
+  for (const malformedKnownCost of [
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    -1,
+    '23.5',
+    null,
+    undefined,
+    true,
+  ]) {
+    const assessment = assessPlannerBudget(malformedKnownCost, 35, 0)
+
+    assert.deepEqual(assessment, {
+      status: 'unknown',
+      knownCost: 0,
+      budget: 35,
+      unresolvedLineCount: 1,
+    })
+  }
+
+  for (const malformedBudget of [
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    -1,
+    '35',
+    null,
+    undefined,
+    true,
+  ]) {
+    const assessment = assessPlannerBudget(23.5, malformedBudget, 0)
+
+    assert.deepEqual(assessment, {
+      status: 'unknown',
+      knownCost: 23.5,
+      budget: 0,
+      unresolvedLineCount: 1,
+    })
+  }
+})
+
+test('planner budget outcome requires a safe non-negative unresolved count', () => {
+  for (const malformedCount of [
+    '0',
+    null,
+    undefined,
+    true,
+    Number.POSITIVE_INFINITY,
+    Number.MAX_SAFE_INTEGER + 1,
+  ]) {
+    const assessment = assessPlannerBudget(23.5, 35, malformedCount)
+
+    assert.equal(assessment.status, 'unknown')
+    assert.equal(assessment.unresolvedLineCount, 1)
+  }
+})
+

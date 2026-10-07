@@ -181,6 +181,26 @@ test('M2 planner preferences restore active days in canonical planner order', ()
   assert.deepEqual(preferences.activeDays, ['Ma', 'Wo', 'Do'])
 })
 
+test('M2 planner preferences fail closed on malformed budget contract containers', () => {
+  for (const malformedContract of [null, {}, '45,50,55', 50, true]) {
+    assert.doesNotThrow(() => {
+      const preferences = parsePlannerPreferences(
+        JSON.stringify({
+          budget: 40,
+          activeDays: ['Ma'],
+          recipeByDay: {},
+        }),
+        m2InitialPlan,
+        recipeIds,
+        35,
+        malformedContract,
+      )
+
+      assert.equal(preferences.budget, 40)
+    })
+  }
+})
+
 test('M2 planner preferences allow an explicit caller-specific budget contract', () => {
   const preferences = parsePlannerPreferences(
     JSON.stringify({

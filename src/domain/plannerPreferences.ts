@@ -70,9 +70,12 @@ export function parsePlannerPreferences(
   fallbackBudget = 35,
   validBudgets: readonly number[] = DEFAULT_PLANNER_BUDGET_OPTIONS,
 ): PlannerPreferences {
+  const runtimeValidBudgets = Array.isArray(validBudgets)
+    ? validBudgets
+    : DEFAULT_PLANNER_BUDGET_OPTIONS
   const supportedBudgets = Array.from(
     new Set(
-      validBudgets.filter(
+      runtimeValidBudgets.filter(
         (budget) => Number.isFinite(budget) && budget > 0,
       ),
     ),

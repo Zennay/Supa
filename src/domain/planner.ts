@@ -20,24 +20,64 @@ export type PlannerBudgetAssessment =
       unresolvedLineCount: number
     }
 
+function isCanonicalIdentity(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value === value.trim()
+  )
+}
+
 export function getPlannedCost(
   plan: PlannedMeal[],
   recipes: Recipe[],
   activeDays: string[],
 ): number | null {
+  if (
+    !Array.isArray(plan) ||
+    !Array.isArray(recipes) ||
+    !Array.isArray(activeDays)
+  ) {
+    return null
+  }
+
   const active = new Set(activeDays)
   let total = 0
 
   for (const day of active) {
-    const plannedMeals = plan.filter((candidate) => candidate.day === day)
+    if (!isCanonicalIdentity(day)) return null
+
+    const plannedMeals = plan.filter((candidate) => {
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        return false
+      }
+
+      return (candidate as { day?: unknown }).day === day
+    })
     if (plannedMeals.length !== 1) return null
 
     const item = plannedMeals[0]
-    const matches = recipes.filter((candidate) => candidate.id === item.recipeId)
+    if (!isCanonicalIdentity(item.recipeId)) {
+      return null
+    }
+
+    const matches = recipes.filter((candidate) => {
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        return false
+      }
+
+      return (candidate as { id?: unknown }).id === item.recipeId
+    })
     if (matches.length !== 1) return null
 
     const estimatedCost = matches[0].estimatedCost
-    if (!Number.isFinite(estimatedCost) || estimatedCost < 0) return null
+    if (
+      typeof estimatedCost !== 'number' ||
+      !Number.isFinite(estimatedCost) ||
+      estimatedCost < 0
+    ) {
+      return null
+    }
 
     total += estimatedCost
     if (!Number.isFinite(total)) return null
@@ -62,20 +102,36 @@ export function getBudgetState(
   }
 }
 
-export function assessPlannerBudget(
-  knownCost: number,
-  budget: number,
-  unresolvedLineCount: number,
-): PlannerBudgetAssessment {
-  const safeBudget = Math.max(0, budget)
+function isValidBudgetMoney(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
 
-  if (!Number.isInteger(unresolvedLineCount) || unresolvedLineCount !== 0) {
+export function assessPlannerBudget(
+  knownCost: unknown,
+  budget: unknown,
+  unresolvedLineCount: unknown,
+): PlannerBudgetAssessment {
+  const validKnownCost = isValidBudgetMoney(knownCost)
+  const validBudget = isValidBudgetMoney(budget)
+  const safeKnownCost = validKnownCost ? knownCost : 0
+  const safeBudget = validBudget ? budget : 0
+  const validUnresolvedLineCount =
+    typeof unresolvedLineCount === 'number' &&
+    Number.isSafeInteger(unresolvedLineCount) &&
+    unresolvedLineCount >= 0
+
+  if (
+    !validKnownCost ||
+    !validBudget ||
+    !validUnresolvedLineCount ||
+    unresolvedLineCount !== 0
+  ) {
     return {
       status: 'unknown',
-      knownCost,
+      knownCost: safeKnownCost,
       budget: safeBudget,
       unresolvedLineCount:
-        Number.isInteger(unresolvedLineCount) && unresolvedLineCount > 0
+        validUnresolvedLineCount && unresolvedLineCount > 0
           ? unresolvedLineCount
           : 1,
     }
@@ -83,6 +139,6 @@ export function assessPlannerBudget(
 
   return {
     status: 'known',
-    budgetState: getBudgetState(knownCost, safeBudget),
+    budgetState: getBudgetState(safeKnownCost, safeBudget),
   }
 }
