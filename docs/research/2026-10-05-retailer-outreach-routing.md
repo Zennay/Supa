@@ -121,7 +121,7 @@ For each meaningful response, retain:
 - responding team (not personal contact details in Git);
 - exact scope discussed;
 - whether the answer covers product content, prices, promotions, availability, automation, or storage;
-- permission outcome: allowed / allowed with conditions / licensed route required / research-only / denied / unclear / routed;
+- permission outcome: allowed / allowed with conditions / licensed route required / research-only / denied / no suitable route / unclear / routed;
 - any rate, retention, attribution, geography/store, or commercial constraints;
 - next owner/team if routed;
 - product/architecture/cost/source-strategy consequence for SUPA.
