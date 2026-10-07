@@ -83,7 +83,6 @@ test('M3 observed-price helper rejects malformed runtime value types', () => {
   }
 })
 
-
 test('M3 collection guidance fails closed on malformed next-observation targets', () => {
   const sheet = buildObservationSheet()
 
@@ -98,18 +97,11 @@ test('M3 collection guidance fails closed on malformed next-observation targets'
     { side: 'baseline', ingredientId: '' },
     { side: 'baseline', ingredientId: '   ' },
     { side: 'baseline', ingredientId: 42 },
+    { side: 'baseline', ingredientId: 'missing-ingredient' },
   ]) {
     assert.throws(
       () => nextObservationActionLabel(sheet, malformed),
       /invalid next observation target/,
     )
   }
-
-  assert.equal(
-    nextObservationActionLabel(sheet, {
-      side: 'baseline',
-      ingredientId: 'missing-ingredient',
-    }),
-    'Volgende open regel bij PLUS',
-  )
 })

@@ -72,21 +72,32 @@ export function nextObservationActionLabel(
   }
 
   const retailer = M3_EXPECTED_RETAILERS[candidate.side]
-  const line = observationLinesForSide(sheet, candidate.side).find(
-    (lineCandidate) =>
-      Boolean(lineCandidate) &&
-      typeof lineCandidate === 'object' &&
-      !Array.isArray(lineCandidate) &&
-      (lineCandidate as { ingredientId?: unknown }).ingredientId ===
-        candidate.ingredientId &&
-      typeof (lineCandidate as { ingredientLabel?: unknown }).ingredientLabel ===
-        'string' &&
-      (lineCandidate as { ingredientLabel: string }).ingredientLabel.trim() !== '',
-  )
+  const lines = observationLinesForSide(sheet, candidate.side)
+  let matchingLineExists = false
+  let ingredientLabel = ''
 
-  const ingredientLabel = line
-    ? (line as { ingredientLabel: string }).ingredientLabel.trim()
-    : ''
+  for (const lineCandidate of lines) {
+    if (
+      !lineCandidate ||
+      typeof lineCandidate !== 'object' ||
+      Array.isArray(lineCandidate) ||
+      (lineCandidate as { ingredientId?: unknown }).ingredientId !==
+        candidate.ingredientId
+    ) {
+      continue
+    }
+
+    matchingLineExists = true
+    const label = (lineCandidate as { ingredientLabel?: unknown }).ingredientLabel
+    if (typeof label === 'string' && label.trim() !== '') {
+      ingredientLabel = label.trim()
+      break
+    }
+  }
+
+  if (!matchingLineExists) {
+    throw new Error('invalid next observation target')
+  }
 
   return ingredientLabel
     ? `Volgende: ${retailer} · ${ingredientLabel}`
