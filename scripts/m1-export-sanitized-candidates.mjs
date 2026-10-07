@@ -14,7 +14,9 @@ function isSafeSourceId(value) {
   )
 }
 
-function requireSafeUniqueProductSourceIds(sources) {
+const EXPECTED_SUPERMARKETS = new Set(['dekamarkt', 'plus'])
+
+function requireSafeUniqueProductSources(sources) {
   const seen = new Set()
 
   for (const source of sources) {
@@ -28,6 +30,16 @@ function requireSafeUniqueProductSourceIds(sources) {
     if (seen.has(source.id)) {
       throw new Error(
         `Inspection contains a duplicate product source id: ${source.id}`,
+      )
+    }
+    if (!EXPECTED_SUPERMARKETS.has(source.supermarket)) {
+      throw new Error(
+        `Inspection contains an out-of-scope product supermarket: ${source.supermarket}`,
+      )
+    }
+    if (typeof source.success !== 'boolean') {
+      throw new Error(
+        `Inspection contains an invalid product success flag for ${source.id}`,
       )
     }
     seen.add(source.id)
@@ -69,7 +81,7 @@ export async function exportSanitizedCandidates(rootDir) {
     throw new Error('Inspection sources must be an array')
   }
 
-  requireSafeUniqueProductSourceIds(report.sources)
+  requireSafeUniqueProductSources(report.sources)
 
   const outputDir = path.join(rootDir, 'sanitized-candidates')
   await mkdir(outputDir, { recursive: true })
@@ -82,7 +94,7 @@ export async function exportSanitizedCandidates(rootDir) {
 
     const schemaResult = source.schemaOrgProduct
     if (
-      source.success &&
+      source.success === true &&
       source.integrity === 'verified' &&
       schemaResult?.type === 'observation'
     ) {
@@ -112,7 +124,7 @@ export async function exportSanitizedCandidates(rootDir) {
     abstentions.push({
       id: source.id,
       supermarket: source.supermarket,
-      success: Boolean(source.success),
+      success: source.success,
       integrity: source.integrity ?? null,
       reasons:
         schemaResult?.type === 'abstain'
