@@ -372,8 +372,12 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(report, null, 2)}\n`
 
   if (output) {
-    await mkdir(dirname(output), { recursive: true })
-    await writeFile(output, serialized, { encoding: 'utf8', flag: 'wx' })
+    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
+    await writeFile(output, serialized, {
+      encoding: 'utf8',
+      flag: 'wx',
+      mode: 0o600,
+    })
   } else {
     process.stdout.write(serialized)
   }
