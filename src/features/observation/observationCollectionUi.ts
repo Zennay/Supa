@@ -59,14 +59,15 @@ export function nextObservationActionLabel(
       typeof lineCandidate === 'object' &&
       !Array.isArray(lineCandidate) &&
       (lineCandidate as { ingredientId?: unknown }).ingredientId ===
-        candidate.ingredientId,
+        candidate.ingredientId &&
+      typeof (lineCandidate as { ingredientLabel?: unknown }).ingredientLabel ===
+        'string' &&
+      (lineCandidate as { ingredientLabel: string }).ingredientLabel.trim() !== '',
   )
 
-  const ingredientLabel =
-    line &&
-    typeof (line as { ingredientLabel?: unknown }).ingredientLabel === 'string'
-      ? (line as { ingredientLabel: string }).ingredientLabel.trim()
-      : ''
+  const ingredientLabel = line
+    ? (line as { ingredientLabel: string }).ingredientLabel.trim()
+    : ''
 
   return ingredientLabel
     ? `Volgende: ${retailer} · ${ingredientLabel}`
