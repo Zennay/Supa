@@ -48,8 +48,15 @@ function attributeName(name) {
   return null
 }
 
+function normalizeSchemeInput(value) {
+  return value
+    .replace(/[\\t\\n\\r]/g, '')
+    .replace(/^[\\u0000-\\u0020]+/, '')
+    .toLowerCase()
+}
+
 function isExecutableUrl(value) {
-  return value.trimStart().toLowerCase().startsWith('javascript:')
+  return normalizeSchemeInput(value).startsWith('javascript:')
 }
 
 function scriptKindFor(filename) {
@@ -137,6 +144,8 @@ test('JSX URL guard rejects static executable schemes', () => {
     '<form action={`javascript:alert(1)`} />',
     '<button formAction={"  javascript:submit()"} />',
     '<use xlinkHref="javascript:alert(1)" />',
+    '<a href={"java\\nscript:alert(1)"}>x</a>',
+    '<a href={"\\u0000javascript:alert(1)"}>x</a>',
   ]) {
     assert.ok(findExecutableStaticJsxUrl(source), source)
   }
