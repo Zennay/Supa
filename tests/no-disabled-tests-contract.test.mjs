@@ -80,6 +80,25 @@ function collectBindings(sourceFile) {
     ) {
       const aliasedOptions = optionObjects.get(unwrappedInitializer.text)
       if (aliasedOptions) optionObjects.set(node.name.text, aliasedOptions)
+      if (callableAliases.has(unwrappedInitializer.text)) {
+        callableAliases.add(node.name.text)
+      }
+    }
+
+    if (
+      isConstBinding &&
+      ts.isIdentifier(node.name) &&
+      (ts.isPropertyAccessExpression(unwrappedInitializer) ||
+        ts.isElementAccessExpression(unwrappedInitializer))
+    ) {
+      const base = unwrapExpression(unwrappedInitializer.expression)
+      if (
+        ts.isIdentifier(base) &&
+        namespaceAliases.has(base.text) &&
+        canonicalApiNames.has(memberName(unwrappedInitializer))
+      ) {
+        callableAliases.add(node.name.text)
+      }
     }
 
     const bindingKind = nodeTestBindingKind(node.initializer)
@@ -375,6 +394,25 @@ test('disabled-test guard follows static, dynamic and CommonJS node:test aliases
     ),
     null,
   )
+})
+
+test('disabled-test guard follows local const aliases of known test callables', () => {
+  for (const source of [
+    "const check = test; check.skip('disabled', () => {})",
+    "const primary = test; const check = primary; check.todo('disabled', () => {})",
+    "import * as testApi from 'node:test'; const check = testApi.test; check.skip('disabled', () => {})",
+    "const testApi = await import('node:test'); const group = testApi.describe; group.todo('disabled', () => {})",
+  ]) {
+    assert.ok(findDisabledTest(source), source)
+  }
+
+  for (const source of [
+    "let check = test; check = helper; check.skip('unrelated helper', () => {})",
+    "const helper = { skip() {} }; const check = helper; check.skip('unrelated helper', () => {})",
+    "import * as testApi from 'node:test'; const helper = testApi.mock; helper.skip('unrelated helper', () => {})",
+  ]) {
+    assert.equal(findDisabledTest(source), null, source)
+  }
 })
 
 test('disabled-test guard rejects literal options only on test API calls', () => {
