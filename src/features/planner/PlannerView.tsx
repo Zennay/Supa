@@ -73,7 +73,7 @@ export function PlannerView({
           </span>
         </div>
 
-        <div className="budget-options" aria-label="Kies je weekbudget">
+        <div className="budget-options" role="group" aria-label="Kies je weekbudget">
           {budgetOptions.map((option) => (
             <button
               type="button"
@@ -129,7 +129,7 @@ export function PlannerView({
         </p>
       </section>
 
-      <div className="day-grid" aria-label="Geplande maaltijden">
+      <div className="day-grid" role="group" aria-label="Geplande maaltijden">
         {plannedMeals.map((item) => {
           const recipe = recipes.find((candidate) => candidate.id === item.recipeId)
           if (!recipe) return null
@@ -145,6 +145,7 @@ export function PlannerView({
                 <label htmlFor={`recipe-${item.day}`}>Recept</label>
                 <select
                   id={`recipe-${item.day}`}
+                  aria-label={`Recept voor ${item.day}`}
                   value={item.recipeId}
                   onChange={(event) => onRecipeChange(item.day, event.target.value)}
                 >
@@ -171,7 +172,7 @@ export function PlannerView({
       </div>
 
       <div className="insight-card">
-        <span className="eyebrow">M2 verticale slice</span>
+        <span className="eyebrow">Van plan naar lijst</span>
         <strong>Je receptkeuzes sturen nu dezelfde mand en boodschappenlijst aan.</strong>
         <p>
           Onzekere productmatches worden niet ingevuld: ze blijven zichtbaar
