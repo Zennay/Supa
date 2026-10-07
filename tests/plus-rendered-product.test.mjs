@@ -137,6 +137,7 @@ test('PLUS rendered evidence binds declared Product JSON-LD URL to the source pa
     'https://www.plus.nl/product/andere-slug-579010',
     'https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-999999',
     'https://example.invalid/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010',
+    ' https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010 ',
     '',
     null,
     579010,
