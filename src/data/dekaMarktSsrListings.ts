@@ -60,8 +60,16 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function safeIndex(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0
+}
+
+function positiveSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
-  if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
+  if (!safeIndex(ref) || ref >= payload.length) {
     return undefined
   }
   return payload[ref as number]
@@ -129,16 +137,13 @@ function validateEvidenceBoundary(
   const capture = evidence.captureEvidence
   const safety = capture?.safety
   if (
-    !Number.isInteger(capture?.runId) ||
-    capture.runId <= 0 ||
-    !Number.isInteger(capture?.artifactId) ||
-    capture.artifactId <= 0 ||
+    !positiveSafeInteger(capture?.runId) ||
+    !positiveSafeInteger(capture?.artifactId) ||
     !/^sha256:[a-f0-9]{64}$/.test(capture?.artifactDigest ?? '') ||
     !/^[a-f0-9]{40}$/.test(capture?.supaSha ?? '') ||
     capture?.status !== 200 ||
     !capture?.contentType?.toLowerCase().includes('text/html') ||
-    !Number.isInteger(capture?.bytes) ||
-    capture.bytes <= 0 ||
+    !positiveSafeInteger(capture?.bytes) ||
     !safety ||
     safety.login !== false ||
     safety.credentials !== false ||
@@ -163,13 +168,13 @@ function catalogProductRefs(payload: unknown[]): number[] | null {
   for (const value of payload) {
     if (!isObject(value)) continue
     for (const [key, ref] of Object.entries(value)) {
-      if (!/^webgroup-(?!filters-)/.test(key) || !Number.isInteger(ref)) continue
+      if (!/^webgroup-(?!filters-)/.test(key) || !safeIndex(ref)) continue
       const webgroup = dereference(payload, ref)
       if (!isObject(webgroup)) continue
       const products = dereference(payload, webgroup.products)
       if (
         Array.isArray(products) &&
-        products.every((productRef) => Number.isInteger(productRef))
+        products.every((productRef) => safeIndex(productRef))
       ) {
         candidates.push(products as number[])
       }
@@ -193,7 +198,7 @@ function parseCatalogProduct(
   const price = dereference(payload, product.price)
 
   if (
-    !Number.isInteger(productId) ||
+    !positiveSafeInteger(productId) ||
     typeof name !== 'string' ||
     !name.trim() ||
     typeof packaging !== 'string' ||
@@ -247,21 +252,21 @@ function offerRecordRefs(payload: unknown[]): number[] | null {
   for (const value of payload) {
     if (!isObject(value)) continue
     const ref = value['offers-overview-/aanbiedingen']
-    if (Number.isInteger(ref)) overviewRefs.push(ref as number)
+    if (safeIndex(ref)) overviewRefs.push(ref)
   }
 
   const unique = [...new Set(overviewRefs)]
   if (unique.length !== 1) return null
 
   const sections = dereference(payload, unique[0])
-  if (!Array.isArray(sections) || !sections.every((ref) => Number.isInteger(ref))) {
+  if (!Array.isArray(sections) || !sections.every((ref) => safeIndex(ref))) {
     return null
   }
 
   const offers: number[] = []
   for (const sectionRef of sections) {
     const section = dereference(payload, sectionRef)
-    if (!Array.isArray(section) || !section.every((ref) => Number.isInteger(ref))) {
+    if (!Array.isArray(section) || !section.every((ref) => safeIndex(ref))) {
       return null
     }
     offers.push(...(section as number[]))
@@ -313,7 +318,7 @@ function parseOfferProduct(
   const information = dereference(payload, product.productInformation)
 
   if (
-    !Number.isInteger(productId) ||
+    !positiveSafeInteger(productId) ||
     productNormalPrice !== outerNormalPrice ||
     productOfferPrice !== outerOfferPrice ||
     !isObject(information)
@@ -437,7 +442,7 @@ export function parseDekaMarktSsrOffersEvidence(
     }
 
     const products = dereference(evidence.nuxtPayload, offerRecord.products)
-    if (!Array.isArray(products) || !products.every((ref) => Number.isInteger(ref))) {
+    if (!Array.isArray(products) || !products.every((ref) => safeIndex(ref))) {
       candidateCount += 1
       continue
     }

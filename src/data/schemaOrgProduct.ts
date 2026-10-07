@@ -114,9 +114,17 @@ function extractAvailability(
   return 'unknown'
 }
 
+function sourceIdentifier(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) {
+    return String(value)
+  }
+  return null
+}
+
 function extractSourceProductId(product: JsonObject): string | null {
   for (const key of ['sku', 'gtin13', 'gtin14', 'gtin12', 'gtin']) {
-    const value = asString(product[key])
+    const value = sourceIdentifier(product[key])
     if (value) return value
   }
   return null
