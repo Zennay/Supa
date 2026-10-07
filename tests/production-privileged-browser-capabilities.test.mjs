@@ -98,33 +98,71 @@ function navigatorCapabilityName(
 function collectNavigatorAliases(sourceFile) {
   const navigatorAliases = new Set()
   const capabilityAliases = new Map()
+  const methodAliases = new Set()
   let changed = true
+
+  function bindObjectPattern(pattern, initializer) {
+    const navigatorObject = isNavigatorObject(initializer, navigatorAliases)
+    const capability = navigatorCapabilityName(
+      initializer,
+      navigatorAliases,
+      capabilityAliases,
+    )
+
+    for (const element of pattern.elements) {
+      if (!ts.isIdentifier(element.name)) continue
+      const sourceName = staticName(element.propertyName) ?? element.name.text
+      const alias = element.name.text
+
+      if (navigatorObject && directPrivilegedNavigatorMethods.has(sourceName)) {
+        if (!methodAliases.has(alias)) {
+          methodAliases.add(alias)
+          changed = true
+        }
+      }
+
+      if (navigatorObject && privilegedNavigatorMethods.has(sourceName)) {
+        if (capabilityAliases.get(alias) !== sourceName) {
+          capabilityAliases.set(alias, sourceName)
+          changed = true
+        }
+      }
+
+      if (capability && privilegedNavigatorMethods.get(capability)?.has(sourceName)) {
+        if (!methodAliases.has(alias)) {
+          methodAliases.add(alias)
+          changed = true
+        }
+      }
+    }
+  }
 
   while (changed) {
     changed = false
 
     function visit(node) {
-      if (
-        ts.isVariableDeclaration(node) &&
-        ts.isIdentifier(node.name) &&
-        node.initializer
-      ) {
-        const alias = node.name.text
+      if (ts.isVariableDeclaration(node) && node.initializer) {
         const initializer = unwrapExpression(node.initializer)
 
-        if (!navigatorAliases.has(alias) && isNavigatorObject(initializer, navigatorAliases)) {
-          navigatorAliases.add(alias)
-          changed = true
-        }
+        if (ts.isIdentifier(node.name)) {
+          const alias = node.name.text
 
-        const capability = navigatorCapabilityName(
-          initializer,
-          navigatorAliases,
-          capabilityAliases,
-        )
-        if (capability && capabilityAliases.get(alias) !== capability) {
-          capabilityAliases.set(alias, capability)
-          changed = true
+          if (!navigatorAliases.has(alias) && isNavigatorObject(initializer, navigatorAliases)) {
+            navigatorAliases.add(alias)
+            changed = true
+          }
+
+          const capability = navigatorCapabilityName(
+            initializer,
+            navigatorAliases,
+            capabilityAliases,
+          )
+          if (capability && capabilityAliases.get(alias) !== capability) {
+            capabilityAliases.set(alias, capability)
+            changed = true
+          }
+        } else if (ts.isObjectBindingPattern(node.name)) {
+          bindObjectPattern(node.name, initializer)
         }
       }
 
@@ -134,7 +172,7 @@ function collectNavigatorAliases(sourceFile) {
     visit(sourceFile)
   }
 
-  return { navigatorAliases, capabilityAliases }
+  return { navigatorAliases, capabilityAliases, methodAliases }
 }
 
 function scriptKindFor(filename) {
@@ -158,12 +196,25 @@ function findPrivilegedBrowserCapability(source, filename = 'candidate.tsx') {
     true,
     scriptKindFor(filename),
   )
-  const { navigatorAliases, capabilityAliases } = collectNavigatorAliases(sourceFile)
+  const { navigatorAliases, capabilityAliases, methodAliases } =
+    collectNavigatorAliases(sourceFile)
 
   let finding = null
 
   function visit(node) {
     if (finding) return
+
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(unwrapExpression(node.expression)) &&
+      methodAliases.has(unwrapExpression(node.expression).text)
+    ) {
+      finding = {
+        kind: 'aliased privileged navigator method call',
+        text: node.expression.getText(sourceFile),
+      }
+      return
+    }
 
     if (ts.isNewExpression(node) && isBrowserGlobalMember(node.expression, 'Notification')) {
       finding = {
@@ -292,6 +343,11 @@ test('privileged-capability boundary follows navigator and capability aliases', 
     'const clipboard = navigator.clipboard; clipboard.readText()',
     'const nav = self.navigator; const media = nav.mediaDevices; media.getUserMedia({ audio: true })',
     'let hardware = navigator.usb; hardware.requestDevice({ filters: [] })',
+    'const { share } = navigator; share({ title: "SUPA" })',
+    'const { clipboard } = navigator; clipboard.readText()',
+    'const nav = window.navigator; const { usb } = nav; usb.requestDevice({ filters: [] })',
+    'const { mediaDevices: media } = self.navigator; media.getUserMedia({ audio: true })',
+    'const clipboard = navigator.clipboard; const { readText } = clipboard; readText()',
   ]) {
     assert.ok(findPrivilegedBrowserCapability(source), source)
   }
@@ -312,6 +368,9 @@ test('privileged-capability boundary preserves unrelated local APIs and inert te
     'screen.wakeLock.request("screen")',
     'const nav = app.navigator; nav.share(payload)',
     'const clipboard = editor.clipboard; clipboard.readText()',
+    'const { share } = sharing; share(payload)',
+    'const { clipboard } = editor; clipboard.readText()',
+    'const { readText } = editor.clipboard; readText()',
     "notifications.requestPermission('local')",
     "new notifier.Notification('local')",
     "const example = \"const nav = navigator; nav.share({ title: 'SUPA' })\"",
