@@ -12,6 +12,13 @@ const packageJson = JSON.parse(
 const TEST_LIKE_FILENAME = /\.(?:test|spec)\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
 const NON_SOURCE_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage'])
 
+function isTestLikeEntry(entry) {
+  return (
+    (entry.isFile() || entry.isSymbolicLink()) &&
+    TEST_LIKE_FILENAME.test(entry.name)
+  )
+}
+
 async function collectTestLikeFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
   const files = []
@@ -26,7 +33,7 @@ async function collectTestLikeFiles(directory) {
       continue
     }
 
-    if (entry.isFile() && TEST_LIKE_FILENAME.test(entry.name)) {
+    if (isTestLikeEntry(entry)) {
       files.push(entryPath)
     }
   }
@@ -84,6 +91,28 @@ test('test discovery recognizes common JS, TS and React test extensions', () => 
   ]) {
     assert.match(testLikeFile, TEST_LIKE_FILENAME, testLikeFile)
   }
+})
+
+test('test discovery treats test-like symlink entries as candidates', () => {
+  const regularTest = {
+    name: 'example.test.mjs',
+    isFile: () => true,
+    isSymbolicLink: () => false,
+  }
+  const symlinkedTest = {
+    name: 'hidden.spec.mjs',
+    isFile: () => false,
+    isSymbolicLink: () => true,
+  }
+  const symlinkedDirectory = {
+    name: 'nested-tests',
+    isFile: () => false,
+    isSymbolicLink: () => true,
+  }
+
+  assert.equal(isTestLikeEntry(regularTest), true)
+  assert.equal(isTestLikeEntry(symlinkedTest), true)
+  assert.equal(isTestLikeEntry(symlinkedDirectory), false)
 })
 
 test('test discovery rejects hidden, nested and out-of-directory tests outside the canonical glob', () => {
