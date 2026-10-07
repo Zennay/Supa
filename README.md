@@ -2,7 +2,7 @@
 
 Mobile-first grocery planning and savings product for students.
 
-This repository now contains the first durable implementation baseline recovered from the recent Astra/Work direction: keep the validated planner-first product flow, use a modern mobile-first web foundation, and separate UI from domain/data concerns so real supermarket data can replace mock data without rewriting the app.
+This repository contains the durable executable continuation of the validated graduation product: keep the planner-first flow, use a modern mobile-first web foundation, and separate UI from domain/data concerns so evidence-backed supermarket data can replace controlled fixtures without rewriting the app.
 
 ## Current product phase
 
@@ -48,16 +48,20 @@ npm run build
 
 ```text
 src/
-  app/            app shell / navigation
+  App.tsx         app shell / bottom navigation
   components/     reusable UI primitives
-  data/           repository boundary + mock data
+  data/           repository boundary, fixtures and retailer adapters
   domain/         core product types and pure logic
   features/
     planner/
     basket/
+    observation/
     shopping-list/
-docs/
-  ARCHITECTURE.md
+  lib/            shared presentation helpers
+tests/            executable regression and proof contracts
+scripts/          M1/M3/M4 evidence and validation tooling
+docs/             architecture, proof-gate and research notes
+evidence/         durable reviewed evidence only
 ```
 
 ## Product flow
