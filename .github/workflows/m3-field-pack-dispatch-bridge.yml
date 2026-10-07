@@ -11,11 +11,9 @@ permissions:
 
 jobs:
   dispatch:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Verify permanent VPS runner
-        run: test "$(hostname -s)" = "vps-bb300bba"
       - name: Dispatch canonical M3 field-pack workflow on main
         env:
           GH_TOKEN: ${{ github.token }}
@@ -24,6 +22,7 @@ jobs:
           python3 - <<'PY'
           import json
           import os
+          import urllib.parse
           import urllib.request
 
           repo = os.environ["REPOSITORY"]
@@ -48,6 +47,30 @@ jobs:
 
           _, commit = request("GET", f"/repos/{repo}/commits/main")
           main_sha = commit["sha"]
+
+          query = urllib.parse.urlencode({
+              "event": "workflow_dispatch",
+              "branch": "main",
+              "per_page": 20,
+          })
+          _, runs = request(
+              "GET",
+              f"/repos/{repo}/actions/workflows/m3-observed-week-report.yml/runs?{query}",
+          )
+          existing = next(
+              (
+                  run for run in runs.get("workflow_runs", [])
+                  if run.get("head_sha") == main_sha
+                  and run.get("event") == "workflow_dispatch"
+              ),
+              None,
+          )
+          if existing:
+              print(
+                  "M3_FIELD_PACK_ALREADY_DISPATCHED "
+                  f"main_sha={main_sha} run_id={existing['id']} status={existing['status']}"
+              )
+              raise SystemExit(0)
 
           status, _ = request(
               "POST",
