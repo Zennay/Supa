@@ -126,9 +126,12 @@ export function nextObservationActionLabel(
 }
 
 export function observationTimestampFromDate(value: unknown): string {
-  if (!(value instanceof Date)) return ''
-
-  return Number.isFinite(value.getTime()) ? value.toISOString() : ''
+  try {
+    const timestamp = Date.prototype.getTime.call(value)
+    return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : ''
+  } catch {
+    return ''
+  }
 }
 
 export function observationPriceCents(value: unknown): number | null {
