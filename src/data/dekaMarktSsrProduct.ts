@@ -4,6 +4,7 @@ import type {
 } from './ingestion.ts'
 import { validateRawProductObservation } from './ingestion.ts'
 import { normalizeMoneyToCents, normalizePackText } from './normalize.ts'
+import { normalizeSchemaOrgAvailability } from './schemaOrgProduct.ts'
 
 type JsonObject = Record<string, unknown>
 
@@ -166,15 +167,6 @@ function oneProductInformationRef(payload: unknown[]): number | null {
   return unique.length === 1 ? unique[0] : null
 }
 
-function availabilityFromJsonLd(product: JsonObject): RawProductObservation['availability'] {
-  const offers = isObject(product.offers) ? product.offers : null
-  const raw = typeof offers?.availability === 'string' ? offers.availability : ''
-  const normalized = raw.split('/').pop()?.toLowerCase()
-  if (normalized === 'instock' || normalized === 'limitedavailability') return 'available'
-  if (normalized === 'outofstock' || normalized === 'soldout') return 'unavailable'
-  return 'unknown'
-}
-
 export function parseDekaMarktSsrProductEvidence(
   evidence: DekaMarktSsrProductEvidence,
 ): DekaMarktParseResult {
@@ -315,7 +307,7 @@ export function parseDekaMarktSsrProductEvidence(
       unit: normalizedPack.unit,
     },
     offer: null,
-    availability: availabilityFromJsonLd(jsonLd),
+    availability: normalizeSchemaOrgAvailability(offers?.availability),
     provenance: evidence.source,
   }
 
