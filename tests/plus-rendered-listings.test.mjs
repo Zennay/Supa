@@ -139,3 +139,30 @@ test('listing evidence rejects selector-contract or acquisition-safety drift', a
     'PromotionListFlow.OfferItem',
   )
 })
+
+
+test('PLUS listing evidence binds catalog and offers kinds to their public routes', async () => {
+  const catalogOnOffersRoute = await fixture(catalogUrl)
+  catalogOnOffersRoute.source.url = 'https://www.plus.nl/aanbiedingen'
+
+  assert.deepEqual(parsePlusRenderedCatalogEvidence(catalogOnOffersRoute), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid catalog source',
+  })
+
+  const offersOnCatalogRoute = await fixture(offersUrl)
+  offersOnCatalogRoute.source.url = 'https://www.plus.nl/producten/zuivel'
+
+  assert.deepEqual(parsePlusRenderedOffersEvidence(offersOnCatalogRoute), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid offers source',
+  })
+
+  const misleadingPrefix = await fixture(catalogUrl)
+  misleadingPrefix.source.url = 'https://www.plus.nl/producten-archive'
+
+  assert.deepEqual(parsePlusRenderedCatalogEvidence(misleadingPrefix), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid catalog source',
+  })
+})
