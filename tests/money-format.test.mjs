@@ -67,3 +67,9 @@ test('cent-native formatting preserves bigint cents outside Number range', () =>
 
   assert.match(euro.formatCents(cents), /,42$/)
 })
+
+test('numeric euro formatting stays aligned with exact cent presentation', () => {
+  for (const value of [0, 0.29, 12.34, -12.34, 31.8]) {
+    assert.equal(euro.format(value), euro.formatCents(Math.round(value * 100)))
+  }
+})
