@@ -9,7 +9,7 @@ const disabledCallPattern = new RegExp(
   `\\b(?:${aliases.join('|')})\\s*(?:\\.\\s*(?:${disabledMembers.join('|')})|\\[\\s*(?:'(?:${disabledMembers.join('|')})'|"(?:${disabledMembers.join('|')})"|\`(?:${disabledMembers.join('|')})\`)\\s*\\])\\s*\\(`,
 )
 const permanentlyDisabledOptionPattern =
-  /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
+  /(?:\b(?:skip|todo)|['"](?:skip|todo)['"]|\[\s*(?:'(?:skip|todo)'|"(?:skip|todo)"|`(?:skip|todo)`)\s*\])\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
 
 function escapeRegex(value) {
   const special = new Set(['\\', '^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|'])
@@ -44,6 +44,27 @@ function importedNodeTestDisabledCall(source) {
       importedAliases.push(
         escapeRegex(match[1]) + '\\s*\\.\\s*' + escapeRegex(apiName),
       )
+    }
+  }
+
+  const dynamicNamespaceImportPattern =
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*await\s+import\s*\(\s*['\"]node:test['\"]\s*\)/g
+  for (const match of source.matchAll(dynamicNamespaceImportPattern)) {
+    for (const apiName of aliases) {
+      importedAliases.push(
+        escapeRegex(match[1]) + '\\s*\\.\\s*' + escapeRegex(apiName),
+      )
+    }
+  }
+
+  const dynamicNamedImportPattern =
+    /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*await\s+import\s*\(\s*['\"]node:test['\"]\s*\)/g
+  for (const match of source.matchAll(dynamicNamedImportPattern)) {
+    for (const specifier of match[1].split(',')) {
+      const named = specifier
+        .trim()
+        .match(/^(test|it|describe|suite)(?:\s*:\s*([A-Za-z_$][\w$]*))?$/)
+      if (named) importedAliases.push(escapeRegex(named[2] ?? named[1]))
     }
   }
 
@@ -120,6 +141,14 @@ test('disabled-test guard follows aliases imported from node:test', () => {
     "import * as testApi from 'node:test'",
     ['testApi', '.', 'test', '.skip', "('disabled', () => {})"].join(''),
   ].join('\n')
+  const dynamicNamedAliasSource = [
+    "const { test: check, describe: group } = await import('node:test')",
+    ['check', '.skip', "('disabled', () => {})"].join(''),
+  ].join('\n')
+  const dynamicNamespaceAliasSource = [
+    "const testApi = await import('node:test')",
+    ['testApi', '.', 'suite', '[\"todo\"]', "('disabled', () => {})"].join(''),
+  ].join('\n')
   const unrelatedAliasSource = [
     "import check from './helper.js'",
     ['check', '.skip', "('not a node:test API', () => {})"].join(''),
@@ -128,6 +157,8 @@ test('disabled-test guard follows aliases imported from node:test', () => {
   assert.ok(importedNodeTestDisabledCall(defaultAliasSource), defaultAliasSource)
   assert.ok(importedNodeTestDisabledCall(namedAliasSource), namedAliasSource)
   assert.ok(importedNodeTestDisabledCall(namespaceAliasSource), namespaceAliasSource)
+  assert.ok(importedNodeTestDisabledCall(dynamicNamedAliasSource), dynamicNamedAliasSource)
+  assert.ok(importedNodeTestDisabledCall(dynamicNamespaceAliasSource), dynamicNamespaceAliasSource)
   assert.equal(importedNodeTestDisabledCall(unrelatedAliasSource), null)
 })
 test('disabled-test guard permits conditional skips but rejects literal disabled options', () => {
@@ -141,6 +172,12 @@ test('disabled-test guard permits conditional skips but rejects literal disabled
   const emptyTemplateSkip = ['skip', ': ``'].join('')
   const conditionalSkip = ['skip', ": process.platform === 'win32'"].join('')
   const conditionalTemplateSkip = ['skip', ': `${process.platform}`'].join('')
+  const quotedSkip = ["'", 'skip', "'", ': true'].join('')
+  const quotedTodo = ['"', 'todo', '"', ': "pending regression"'].join('')
+  const computedSkip = ["['", 'skip', "']", ': true'].join('')
+  const computedTodo = ['[`', 'todo', '`]', ': `pending regression`'].join('')
+  const conditionalQuotedSkip = ["'", 'skip', "'", ": process.platform === 'win32'"].join('')
+  const conditionalComputedTodo = ['["', 'todo', '"]', ': shouldSkip'].join('')
 
   assert.match(literalSkip, permanentlyDisabledOptionPattern)
   assert.match(literalTodo, permanentlyDisabledOptionPattern)
@@ -148,8 +185,14 @@ test('disabled-test guard permits conditional skips but rejects literal disabled
   assert.match(literalStringTodo, permanentlyDisabledOptionPattern)
   assert.match(literalTemplateSkip, permanentlyDisabledOptionPattern)
   assert.match(literalTemplateTodo, permanentlyDisabledOptionPattern)
+  assert.match(quotedSkip, permanentlyDisabledOptionPattern)
+  assert.match(quotedTodo, permanentlyDisabledOptionPattern)
+  assert.match(computedSkip, permanentlyDisabledOptionPattern)
+  assert.match(computedTodo, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(emptyStringSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(emptyTemplateSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(conditionalSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(conditionalTemplateSkip, permanentlyDisabledOptionPattern)
+  assert.doesNotMatch(conditionalQuotedSkip, permanentlyDisabledOptionPattern)
+  assert.doesNotMatch(conditionalComputedTodo, permanentlyDisabledOptionPattern)
 })
