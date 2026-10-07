@@ -36,3 +36,34 @@ test('euro formatting fails closed on non-finite numbers', () => {
   assert.equal(euro.format(Number.POSITIVE_INFINITY), '—')
   assert.equal(euro.format(Number.NEGATIVE_INFINITY), '—')
 })
+
+test('cent-native formatting preserves safe integer cents without float conversion', () => {
+  const cents = 9_007_199_253_740_993
+
+  assert.notEqual(Math.round((cents / 100) * 100), cents)
+  assert.equal(euro.formatCents(cents), euro.formatCents(BigInt(cents)))
+  assert.match(euro.formatCents(cents), /,93$/)
+})
+
+test('cent-native formatting preserves sub-euro and negative cent values', () => {
+  assert.match(euro.formatCents(23), /0,23$/)
+  assert.match(euro.formatCents(-23), /-0,23$/)
+  assert.match(euro.formatCents(1234), /12,34$/)
+  assert.match(euro.formatCents(-1234), /-12,34$/)
+})
+
+test('cent-native formatting rejects malformed numeric cent values', () => {
+  for (const malformed of [12.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(euro.formatCents(malformed), '—', String(malformed))
+  }
+
+  for (const malformed of [null, undefined, '1234', {}, []]) {
+    assert.equal(euro.formatCents(malformed), '—')
+  }
+})
+
+test('cent-native formatting preserves bigint cents outside Number range', () => {
+  const cents = BigInt(Number.MAX_SAFE_INTEGER) * 100n + 42n
+
+  assert.match(euro.formatCents(cents), /,42$/)
+})
