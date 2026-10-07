@@ -47,6 +47,41 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function safePositiveInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
+function safeSha256(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
+}
+
+function safeArtifactDigest(value: unknown): value is string {
+  return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/i.test(value)
+}
+
+function safeSupaSha(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{40}$/i.test(value)
+}
+
+function safeCapturedAt(value: unknown): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+}
+
+function safeDekaMarktProductUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'www.dekamarkt.nl' &&
+      url.username === '' &&
+      url.password === ''
+    )
+  } catch {
+    return false
+  }
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
   if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
     return undefined
@@ -99,6 +134,22 @@ export function parseDekaMarktSsrProductEvidence(
     evidence.source.kind !== 'product'
   ) {
     return { type: 'abstain', reason: 'DekaMarkt evidence must identify a safe product source' }
+  }
+  if (
+    !safeDekaMarktProductUrl(evidence.source.url) ||
+    !safeCapturedAt(evidence.source.capturedAt) ||
+    !safeSha256(evidence.source.sha256)
+  ) {
+    return { type: 'abstain', reason: 'DekaMarkt evidence has invalid source provenance' }
+  }
+  if (
+    !safePositiveInteger(evidence.captureEvidence?.runId) ||
+    !safePositiveInteger(evidence.captureEvidence?.artifactId) ||
+    !safeArtifactDigest(evidence.captureEvidence?.artifactDigest) ||
+    !safeSupaSha(evidence.captureEvidence?.supaSha) ||
+    !safePositiveInteger(evidence.captureEvidence?.bytes)
+  ) {
+    return { type: 'abstain', reason: 'DekaMarkt evidence has invalid capture artifact identity' }
   }
 
   const safety = evidence.captureEvidence?.safety
