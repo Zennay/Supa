@@ -162,8 +162,8 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "const testApi = await import/* discovery */(/* source */'node:test'/* end */)",
     "const testApi = require/* discovery */(/* source */'node:test'/* end */)",
     'const testApi = require( "node:test" )',
-    "import check = require('node:test')"
-    "const dynamic = `${await import('node:test')}`"
+    "import check = require('node:test')",
+    "const dynamic = `${await import('node:test')}`",
   ]) {
     assert.equal(sourceImportsNodeTest(source), true, source)
   }
