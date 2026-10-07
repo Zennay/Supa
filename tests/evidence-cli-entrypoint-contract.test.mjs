@@ -19,6 +19,31 @@ const EXPECTED_EVIDENCE_SCRIPTS = [
   'm3:create-observation-sheet',
   'm4:validate-beta-session',
 ]
+const EXPECTED_EVIDENCE_COMMANDS = {
+  'aud005:record-retailer-response':
+    'node scripts/aud005-record-retailer-response.mjs',
+  'm1:compare-captures': 'node scripts/m1-compare-captures.mjs',
+  'm1:evaluate-freshness': 'node scripts/m1-evaluate-freshness.mjs',
+  'm1:evidence-summary': 'node scripts/m1-build-evidence-summary.mjs',
+  'm1:export-candidates': 'node scripts/m1-export-sanitized-candidates.mjs',
+  'm1:inspect-captures':
+    'node --experimental-strip-types scripts/m1-inspect-captures.mjs',
+  'm1:matching-benchmark':
+    'node --experimental-strip-types scripts/m1-run-matching-benchmark.mjs',
+  'm1:promote-reviewed':
+    'node --experimental-strip-types scripts/m1-promote-reviewed-candidates.mjs',
+  'm1:source-permission-gate':
+    'node scripts/m1-check-source-permission-gate.mjs',
+  'm1:source-production-ready':
+    'node scripts/m1-check-source-permission-gate.mjs --require-production-ready',
+  'm3:assess-observed-week':
+    'node --experimental-strip-types scripts/m3-assess-observed-week.mjs',
+  'm3:build-observed-study':
+    'node --experimental-strip-types scripts/m3-build-observed-study.mjs',
+  'm3:create-observation-sheet':
+    'node --experimental-strip-types scripts/m3-create-observation-sheet.mjs',
+  'm4:validate-beta-session': 'node scripts/m4-validate-beta-session.mjs',
+}
 const SAFE_NODE_COMMAND =
   /^node(?: --experimental-strip-types)? (scripts\/[a-z0-9][a-z0-9-]*\.mjs)(?: --[a-z0-9-]+)*$/i
 
@@ -37,6 +62,16 @@ test('required evidence npm scripts cannot silently disappear', async () => {
     names,
     EXPECTED_EVIDENCE_SCRIPTS,
     'evidence CLI set changed; review the executable evidence boundary explicitly',
+  )
+})
+
+test('evidence npm scripts stay pinned to their reviewed exact commands', async () => {
+  const scripts = Object.fromEntries(await readPackageScripts())
+
+  assert.deepEqual(
+    scripts,
+    EXPECTED_EVIDENCE_COMMANDS,
+    'evidence CLI command changed; review entrypoint and flags explicitly',
   )
 })
 
