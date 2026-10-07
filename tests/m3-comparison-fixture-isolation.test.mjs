@@ -36,6 +36,9 @@ test('M3 comparison fixture binds every product to its declared store', () => {
 })
 
 test('M3 candidate fixture changes only candidate identity, store and price', () => {
+  assert.equal(m3CandidateProducts.length, m2Products.length + 1)
+  assert.equal(m3CandidateProducts.length, m3BaselineProducts.length)
+
   for (const m2Product of m2Products) {
     const candidate = m3CandidateProducts.find(
       (product) => product.id === `m3-b-${m2Product.id}`,
