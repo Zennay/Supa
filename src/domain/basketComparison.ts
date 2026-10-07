@@ -206,13 +206,43 @@ function unknownComparison(
   }
 }
 
-export function compareFullBaskets({
-  baseline,
-  candidate,
-}: {
+function requireBasketContainer(
+  value: unknown,
+  label: 'baseline' | 'candidate',
+): OneStoreBasket {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} basket container invalid`)
+  }
+
+  const basket = value as { store?: unknown }
+  if (
+    basket.store === null ||
+    typeof basket.store !== 'object' ||
+    Array.isArray(basket.store)
+  ) {
+    throw new Error(`${label} basket store container invalid`)
+  }
+
+  return value as OneStoreBasket
+}
+
+function requireBasketComparisonRequest(input: unknown): {
   baseline: OneStoreBasket
   candidate: OneStoreBasket
-}): BasketComparison {
+} {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Basket comparison input invalid')
+  }
+
+  const request = input as { baseline?: unknown; candidate?: unknown }
+  return {
+    baseline: requireBasketContainer(request.baseline, 'baseline'),
+    candidate: requireBasketContainer(request.candidate, 'candidate'),
+  }
+}
+
+export function compareFullBaskets(input: unknown): BasketComparison {
+  const { baseline, candidate } = requireBasketComparisonRequest(input)
   const reasons = [
     ...inspectBasket('baseline', baseline),
     ...inspectBasket('candidate', candidate),
