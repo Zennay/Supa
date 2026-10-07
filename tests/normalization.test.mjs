@@ -145,11 +145,18 @@ test('precision-rounded percentages above 100 percent fail closed', () => {
     })
   }
 
+  for (const label of ['99.999999999999999999% korting']) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'unknown',
+      rawLabel: label,
+    })
+  }
+
   for (const [label, percent] of [
     ['100% korting', 100],
     ['100.0% korting', 100],
     ['100,000% korting', 100],
-    ['99.999999999999999999% korting', 100],
+    ['99.9% korting', 99.9],
     ['0.5% korting', 0.5],
   ]) {
     assert.deepEqual(normalizeOfferLabel(label), {
