@@ -37,12 +37,14 @@ test('canonical regression suite contains no explicitly disabled tests', async (
 })
 
 test('disabled-test guard rejects dot and static bracket member calls', () => {
-  for (const disabledCall of [
-    "test.skip('disabled', () => {})",
-    "it['skip']('disabled', () => {})",
-    'describe["todo"]("disabled", () => {})',
-    'suite[`skip`]("disabled", () => {})',
-  ]) {
+  const disabledCalls = [
+    ['test', '.skip', "('disabled', () => {})"].join(''),
+    ['it', "['skip']", "('disabled', () => {})"].join(''),
+    ['describe', '["todo"]', '("disabled", () => {})'].join(''),
+    ['suite', '[`skip`]', '("disabled", () => {})'].join(''),
+  ]
+
+  for (const disabledCall of disabledCalls) {
     assert.match(disabledCall, disabledCallPattern, disabledCall)
   }
 
