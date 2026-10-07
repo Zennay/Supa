@@ -7,11 +7,18 @@ import * as ts from 'typescript'
 const srcDir = new URL('../src/', import.meta.url)
 const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx'])
 const browserRoots = new Set(['globalThis', 'self', 'window'])
+const directPrivilegedNavigatorMethods = new Set(['share'])
 const privilegedNavigatorMethods = new Map([
+  ['bluetooth', new Set(['requestDevice'])],
   ['clipboard', new Set(['read', 'readText', 'write', 'writeText'])],
+  ['contacts', new Set(['select'])],
   ['credentials', new Set(['create', 'get', 'preventSilentAccess', 'store'])],
   ['geolocation', new Set(['getCurrentPosition', 'watchPosition'])],
+  ['hid', new Set(['requestDevice'])],
   ['mediaDevices', new Set(['getDisplayMedia', 'getUserMedia'])],
+  ['serial', new Set(['requestPort'])],
+  ['usb', new Set(['requestDevice'])],
+  ['wakeLock', new Set(['request'])],
 ])
 
 function staticName(node) {
@@ -112,6 +119,14 @@ function findPrivilegedBrowserCapability(source, filename = 'candidate.tsx') {
       const capability = navigatorCapabilityName(node.expression)
       const method = memberName(node)
 
+      if (isNavigatorObject(node.expression) && directPrivilegedNavigatorMethods.has(method)) {
+        finding = {
+          kind: 'navigator.' + method + ' reference',
+          text: node.getText(sourceFile),
+        }
+        return
+      }
+
       if (capability && privilegedNavigatorMethods.get(capability)?.has(method)) {
         finding = {
           kind: capability + '.' + method + ' reference',
@@ -188,6 +203,14 @@ test('privileged-capability boundary catches direct calls and detached browser a
     "self.navigator['mediaDevices']['getDisplayMedia']()",
     'navigator.credentials.get(options)',
     'const store = window.navigator.credentials.store',
+    'navigator.share({ title: "SUPA" })',
+    'const share = globalThis.navigator.share',
+    'navigator.bluetooth.requestDevice({ filters: [] })',
+    "window.navigator['usb']['requestDevice']({ filters: [] })",
+    'const choosePort = navigator.serial.requestPort',
+    'navigator.hid.requestDevice({ filters: [] })',
+    'navigator.contacts.select(["name"])',
+    'const keepAwake = self.navigator.wakeLock.request',
     "new Notification('SUPA')",
     "new window['Notification']('SUPA')",
     'Notification.requestPermission()',
@@ -203,10 +226,17 @@ test('privileged-capability boundary preserves unrelated local APIs and inert te
     'editor.clipboard.writeText(text)',
     'mediaDevices.getUserMedia(options)',
     'auth.credentials.get(options)',
+    'sharing.share(payload)',
+    'device.bluetooth.requestDevice(options)',
+    'hardware.usb.requestDevice(options)',
+    'ports.serial.requestPort()',
+    'input.hid.requestDevice(options)',
+    'directory.contacts.select(fields)',
+    'screen.wakeLock.request("screen")',
     "notifications.requestPermission('local')",
     "new notifier.Notification('local')",
-    "const example = \"navigator.clipboard.readText()\"",
-    "// navigator.geolocation.watchPosition(onPosition)",
+    "const example = \"navigator.share({ title: 'SUPA' })\"",
+    "// navigator.bluetooth.requestDevice({ filters: [] })",
     'const NotificationLike = class {}; new NotificationLike()',
     'navigator.language',
   ]) {
