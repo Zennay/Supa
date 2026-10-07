@@ -40,6 +40,7 @@ const CONSEQUENCE_KEYS = ['architecture', 'product', 'operatingCost', 'sourceStr
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 const PHONE_PATTERN = /(?:\+?\d[\d\s().-]{7,}\d)/
 const MAX_RESPONSE_CLOCK_SKEW_MS = 5 * 60 * 1000
+const MAX_RESPONSE_NESTING_DEPTH = 64
 export const MAX_RESPONSE_INPUT_BYTES = 256 * 1024
 
 function assert(condition, message) {
@@ -158,19 +159,29 @@ function isForbiddenFieldKey(key) {
   )
 }
 
-function rejectForbiddenKeys(value, path = 'record') {
+function rejectForbiddenKeys(value, path = 'record', depth = 0) {
   if (Array.isArray(value)) {
-    value.forEach((item, index) => rejectForbiddenKeys(item, `${path}[${index}]`))
+    assert(
+      depth <= MAX_RESPONSE_NESTING_DEPTH,
+      `${path} exceeds the maximum supported AUD-005 nesting depth`,
+    )
+    value.forEach((item, index) =>
+      rejectForbiddenKeys(item, `${path}[${index}]`, depth + 1),
+    )
     return
   }
   if (!isRecord(value)) return
 
+  assert(
+    depth <= MAX_RESPONSE_NESTING_DEPTH,
+    `${path} exceeds the maximum supported AUD-005 nesting depth`,
+  )
   for (const [key, child] of Object.entries(value)) {
     assert(
       !isForbiddenFieldKey(key),
       `${path}.${key} is not allowed in a repository-safe AUD-005 record`,
     )
-    rejectForbiddenKeys(child, `${path}.${key}`)
+    rejectForbiddenKeys(child, `${path}.${key}`, depth + 1)
   }
 }
 
