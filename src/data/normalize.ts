@@ -175,13 +175,20 @@ export function normalizeOfferLabel(label: unknown): NormalizedOfferMechanic {
     const [wholeText, fractionText = ''] = normalizedPercent.split('.')
     const whole = Number(wholeText)
     const fractionIsZero = fractionText === '' || /^0+$/.test(fractionText)
-    const withinTextualBound =
-      (Number.isSafeInteger(whole) && whole >= 0 && whole < 100) ||
-      (whole === 100 && fractionIsZero)
+    const isTextuallyExactHundred = whole === 100 && fractionIsZero
+    const isTextuallyBelowHundred =
+      Number.isSafeInteger(whole) && whole >= 0 && whole < 100
 
-    if (withinTextualBound) {
+    if (isTextuallyBelowHundred || isTextuallyExactHundred) {
       const percentValue = Number(normalizedPercent)
-      if (Number.isFinite(percentValue) && percentValue > 0) {
+      const preservesUpperBound =
+        isTextuallyExactHundred ? percentValue === 100 : percentValue < 100
+
+      if (
+        Number.isFinite(percentValue) &&
+        percentValue > 0 &&
+        preservesUpperBound
+      ) {
         return {
           type: 'percent_discount',
           percent: percentValue,
