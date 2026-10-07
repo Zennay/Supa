@@ -1,0 +1,41 @@
+name: Cancel stale closed-PR runs
+
+on:
+  push:
+    branches:
+      - ops/cancel-stale-dependabot-runs-20261007
+    paths:
+      - ".github/workflows/cancel-stale-dependabot-runs.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Cancel stale runs from closed Dependabot major PRs
+        shell: bash
+        run: |
+          set -euo pipefail
+          runs=(
+            37574613153 37574613160
+            37574623345 37574623310 37574623284 37574623278
+            37574625082 37574625091 37574625124 37574625114
+            37574637522 37574637505 37574637497 37574637487
+            37574654907 37574654945 37574654908 37574654896
+          )
+          for run_id in "${runs[@]}"; do
+            status="$(gh api "repos/$GH_REPO/actions/runs/$run_id" --jq .status)"
+            if [[ "$status" != "completed" ]]; then
+              gh api --method POST "repos/$GH_REPO/actions/runs/$run_id/cancel" >/dev/null
+              echo "cancelled $run_id ($status)"
+            else
+              echo "skip $run_id (completed)"
+            fi
+          done
