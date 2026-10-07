@@ -132,6 +132,40 @@ test('normalizes common supermarket offer mechanics without guessing unknown lab
   })
 })
 
+test('precision-rounded percentages above 100 percent fail closed', () => {
+  for (const label of [
+    '100.0000000000000000001% korting',
+    '100,0000000000000000001% korting',
+    '100.000000000000000001% korting',
+    '101.0000000000000000001% korting',
+  ]) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'unknown',
+      rawLabel: label,
+    })
+  }
+
+  for (const label of ['99.999999999999999999% korting']) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'unknown',
+      rawLabel: label,
+    })
+  }
+
+  for (const [label, percent] of [
+    ['100% korting', 100],
+    ['100.0% korting', 100],
+    ['100,000% korting', 100],
+    ['99.9% korting', 99.9],
+    ['0.5% korting', 0.5],
+  ]) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'percent_discount',
+      percent,
+    })
+  }
+})
+
 test('invalid offer mechanics fail closed instead of entering savings math', () => {
   for (const label of [
     '0+1 gratis',
@@ -165,8 +199,11 @@ test('unsafe numeric normalization inputs fail closed before precision can be lo
 
   for (const input of [
     '9007199254740992 g',
+    '9007199254740991.0000000000000001 g',
+    '9007199254740991,0000000000000001 l',
     '9007199254740992 x 1 g',
     '1 x 9007199254740992 ml',
+    '1 x 9007199254740991.0000000000000001 ml',
   ]) {
     assert.deepEqual(normalizePackText(input), {
       rawText: input,
@@ -187,4 +224,11 @@ test('unsafe numeric normalization inputs fail closed before precision can be lo
       rawLabel: label,
     })
   }
+
+  assert.deepEqual(normalizePackText('9007199254740991.0000 g'), {
+    rawText: '9007199254740991.0000 g',
+    count: 1,
+    amount: Number.MAX_SAFE_INTEGER,
+    unit: 'g',
+  })
 })
