@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { M3_EXPECTED_RETAILERS } from '../src/domain/m3ObservationSheet.ts'
@@ -48,4 +49,17 @@ test('observation retailer copy rejects an unknown runtime side', () => {
     () => observationRetailerCopy('baseline-copy'),
     /Unknown M3 observation side/,
   )
+})
+
+
+test('observation presentation source does not duplicate canonical retailer brand names', async () => {
+  const source = await readFile(
+    new URL('../src/features/observation/observationPresentation.ts', import.meta.url),
+    'utf8',
+  )
+
+  for (const retailer of Object.values(M3_EXPECTED_RETAILERS)) {
+    assert.equal(source.includes(`'${retailer}`), false)
+    assert.equal(source.includes(`\"${retailer}`), false)
+  }
 })
