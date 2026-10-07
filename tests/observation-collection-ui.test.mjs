@@ -182,3 +182,15 @@ test('M3 collection guidance rejects cross-store demand identity drift before cl
     )
   }
 })
+
+
+test('M3 collection guidance rejects an empty demand before claiming completion', () => {
+  const sheet = buildObservationSheet()
+  sheet.baseline.lines = []
+  sheet.candidate.lines = []
+
+  assert.throws(
+    () => nextObservationActionLabel(sheet, null),
+    /invalid observation sheet: baseline lines/,
+  )
+})
