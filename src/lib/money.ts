@@ -50,12 +50,9 @@ export const euro = {
     if (typeof value === 'bigint') {
       return euroFormatter.format(value)
     }
-    if (toSafeCents(value) === null) {
-      return '—'
-    }
 
-    const normalizedValue = Object.is(value, -0) ? 0 : value
-    return euroFormatter.format(normalizedValue)
+    const cents = toSafeCents(value)
+    return cents === null ? '—' : formatIntegerCents(BigInt(cents))
   },
 
   formatCents(value: number | bigint) {
