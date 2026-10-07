@@ -3,7 +3,6 @@ import { readdir, readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const testsDir = new URL('./', import.meta.url)
-const self = new URL(import.meta.url).pathname.split('/').at(-1)
 const aliases = ['test', 'it', 'describe', 'suite']
 const disabledMembers = ['skip', 'todo']
 const disabledCallPattern = new RegExp(
@@ -12,7 +11,7 @@ const disabledCallPattern = new RegExp(
 
 test('canonical regression suite contains no explicitly disabled tests', async () => {
   const files = (await readdir(testsDir))
-    .filter((name) => name.endsWith('.test.mjs') && name !== self)
+    .filter((name) => name.endsWith('.test.mjs'))
     .sort()
 
   assert.ok(files.length > 0, 'expected at least one canonical regression file')
