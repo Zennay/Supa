@@ -3,29 +3,15 @@ import test from 'node:test'
 
 import { requireAppRoot } from '../src/lib/appRoot.ts'
 
-test('requireAppRoot returns the canonical root element', () => {
+test('requireAppRoot returns the provided canonical root element', () => {
   const root = { id: 'root' }
-  const requestedIds = []
-  const documentLike = {
-    getElementById(id) {
-      requestedIds.push(id)
-      return root
-    },
-  }
 
-  assert.equal(requireAppRoot(documentLike), root)
-  assert.deepEqual(requestedIds, ['root'])
+  assert.equal(requireAppRoot(root), root)
 })
 
 test('requireAppRoot fails explicitly when the canonical root is missing', () => {
-  const documentLike = {
-    getElementById() {
-      return null
-    },
-  }
-
   assert.throws(
-    () => requireAppRoot(documentLike),
+    () => requireAppRoot(null),
     /SUPA app root #root is missing/,
   )
 })
