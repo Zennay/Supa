@@ -36,7 +36,7 @@ export function observationRetailerCopy(
       side === 'baseline' ? 'plus-leiden-...' : 'dekamarkt-leiden-...',
     guidance:
       side === 'baseline'
-        ? 'Meet deze mand eerst bij PLUS. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.'
-        : 'Meet daarna dezelfde mand bij DekaMarkt. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.',
+        ? `Meet deze mand eerst bij ${expectedRetailer}. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`
+        : `Meet daarna dezelfde mand bij ${expectedRetailer}. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`,
   }
 }
