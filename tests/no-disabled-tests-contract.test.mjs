@@ -12,11 +12,11 @@ const permanentlyDisabledOptionPattern =
   /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
 
 function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\const permanentlyDisabledOptionPattern =
-  /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\${)[^`\r\n]+`)/
-')
+  const special = new Set(['\\', '^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|'])
+  return [...value]
+    .map((character) => special.has(character) ? `\\${character}` : character)
+    .join('')
 }
-
 function importedNodeTestDisabledCall(source) {
   const importedAliases = []
 
