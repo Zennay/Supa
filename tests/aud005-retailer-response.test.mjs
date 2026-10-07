@@ -95,6 +95,23 @@ test('AUD-005 response validator rejects malformed observation timestamps', () =
   }
 })
 
+test('AUD-005 response validator rejects implausibly future-dated evidence', () => {
+  const record = validRecord()
+  record.observedAt = '2999-01-01T00:00:00.000Z'
+
+  assert.throws(
+    () => validateRetailerResponseRecord(record),
+    /observedAt must not be implausibly in the future/,
+  )
+})
+
+test('AUD-005 response validator allows small response-clock skew', () => {
+  const record = validRecord()
+  record.observedAt = new Date(Date.now() + 4 * 60 * 1000).toISOString()
+
+  assert.doesNotThrow(() => validateRetailerResponseRecord(record))
+})
+
 test('AUD-005 response validator rejects records without a consequence', () => {
   const record = validRecord()
   record.consequences = {
