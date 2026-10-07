@@ -141,9 +141,10 @@ function collectBindings(sourceFile) {
     ) {
       const base = unwrapExpression(unwrappedInitializer.expression)
       if (
-        ts.isIdentifier(base) &&
-        namespaceAliases.has(base.text) &&
-        canonicalApiNames.has(memberName(unwrappedInitializer))
+        isTestCallableExpression(unwrappedInitializer, {
+          callableAliases,
+          namespaceAliases,
+        })
       ) {
         callableAliases.add(node.name.text)
       }
@@ -200,7 +201,12 @@ function collectBindings(sourceFile) {
       for (const element of node.name.elements) {
         if (!ts.isIdentifier(element.name)) continue
         const sourceName = staticName(element.propertyName) ?? element.name.text
-        addNamedBinding(sourceName, element.name.text)
+
+        if (bindingKind === 'namespace' && sourceName === 'default') {
+          callableAliases.add(element.name.text)
+        } else {
+          addNamedBinding(sourceName, element.name.text)
+        }
       }
     }
   }
@@ -268,12 +274,27 @@ function isTestCallableExpression(expression, bindings) {
     return bindings.callableAliases.has(current.text)
   }
 
+  if (nodeTestBindingKind(current) === 'commonjs') {
+    return true
+  }
+
   if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
     const base = unwrapExpression(current.expression)
-    return (
+    const name = memberName(current)
+
+    if (
       ts.isIdentifier(base) &&
       bindings.namespaceAliases.has(base.text) &&
-      canonicalApiNames.has(memberName(current))
+      canonicalApiNames.has(name)
+    ) {
+      return true
+    }
+
+    const directBindingKind = nodeTestBindingKind(base)
+    return (
+      directBindingKind !== null &&
+      (canonicalApiNames.has(name) ||
+        (directBindingKind === 'namespace' && name === 'default'))
     )
   }
 
@@ -499,6 +520,12 @@ test('disabled-test guard follows static, dynamic and CommonJS node:test aliases
     "const testApi = module['require']('node:test'); testApi.describe.skip('disabled', () => {})",
     "const check = process.getBuiltinModule('node:test'); check.skip('disabled', () => {})",
     "const { suite: group } = process['getBuiltinModule']('node:test'); group.todo('disabled', () => {})",
+    "const skipped = require('node:test').skip; skipped('disabled', () => {})",
+    "const { skip } = require('node:test'); skip('disabled', () => {})",
+    "const skipped = module.require('node:test')['todo']; skipped('disabled', () => {})",
+    "const group = (await import('node:test')).describe; group.skip('disabled', () => {})",
+    "const check = (await import('node:test')).default; check.todo('disabled', () => {})",
+    "const { default: check } = await import('node:test'); check.skip('disabled', () => {})",
     "import check = require('node:test'); check.todo('disabled', () => {})",
   ]) {
     assert.ok(findDisabledTest(source), source)
@@ -510,6 +537,8 @@ test('disabled-test guard follows static, dynamic and CommonJS node:test aliases
     "const check = helper.getBuiltinModule('node:test'); check.skip('not a node:test API', () => {})",
     "const check = module.require('node:fs'); check.skip('not node:test', () => {})",
     "const check = process.getBuiltinModule('node:fs'); check.skip('not node:test', () => {})",
+    "const skipped = helper.require('node:test').skip; skipped('not a node:test API', () => {})",
+    "const group = (await import('./helper.js')).describe; group.skip('not a node:test API', () => {})",
   ]) {
     assert.equal(findDisabledTest(source), null, source)
   }
