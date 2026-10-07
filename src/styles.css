@@ -20,6 +20,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   background: #efeee9;
 }
 
@@ -36,6 +37,7 @@ select:focus-visible {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   max-width: 560px;
   margin: 0 auto;
   background: var(--surface);
@@ -286,6 +288,7 @@ h3, p { margin: 0; }
   body { padding: 24px 0; }
   .app-shell {
     min-height: calc(100vh - 48px);
+    min-height: calc(100dvh - 48px);
     border-radius: 34px;
     overflow: hidden;
     box-shadow: 0 30px 90px rgba(34, 39, 33, .12);
