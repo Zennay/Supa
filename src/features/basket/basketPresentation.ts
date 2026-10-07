@@ -97,9 +97,8 @@ export function comparisonWarningCopy(
 }
 
 function safeBasketLineReasons(reasons: unknown): string[] {
-  return Array.isArray(reasons) &&
-    reasons.every((reason) => typeof reason === 'string')
-    ? reasons
+  return Array.isArray(reasons)
+    ? reasons.filter((reason): reason is string => typeof reason === 'string')
     : []
 }
 
