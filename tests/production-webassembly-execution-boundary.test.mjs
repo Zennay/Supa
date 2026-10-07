@@ -93,6 +93,18 @@ function findWebAssemblyExecution(source, filename = 'candidate.ts') {
   function visit(node) {
     if (finding) return
 
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.initializer &&
+      isWebAssemblyObject(node.initializer)
+    ) {
+      finding = {
+        kind: 'WebAssembly namespace alias',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
+
     if (ts.isCallExpression(node)) {
       const name = webAssemblyMember(node.expression)
       if (name && executableMethods.has(name)) {
@@ -186,6 +198,10 @@ test('WebAssembly boundary catches compilation and execution primitives', () => 
     'new WebAssembly.Module(bytes)',
     "new globalThis['WebAssembly']['Instance'](module)",
     'const ModuleCtor = self.WebAssembly.Module',
+    'const wasm = WebAssembly',
+    'const wasm = (window.WebAssembly)',
+    "const wasm = (globalThis['WebAssembly'] as typeof WebAssembly)",
+    'const { compile } = self.WebAssembly',
   ]) {
     assert.ok(findWebAssemblyExecution(source), source)
   }
@@ -200,6 +216,8 @@ test('WebAssembly boundary preserves inert text and non-execution local APIs', (
     'new runtime.Module(bytes)',
     'WebAssembly.Memory',
     'WebAssembly.Table',
+    'const wasm = runtime.WebAssembly',
+    'const wasm = { compile() {}, instantiate() {} }',
     'const webAssemblySupported = true',
   ]) {
     assert.equal(findWebAssemblyExecution(source), null, source)
