@@ -95,23 +95,61 @@ function extractCurrency(offers: JsonObject[]): string | null {
   return uniqueKnown(currencies)
 }
 
+const SCHEMA_ORG_AVAILABILITY = new Map<
+  string,
+  RawProductObservation['availability']
+>([
+  ['instock', 'available'],
+  ['limitedavailability', 'available'],
+  ['outofstock', 'unavailable'],
+  ['soldout', 'unavailable'],
+])
+
+export function normalizeSchemaOrgAvailability(
+  value: unknown,
+): RawProductObservation['availability'] {
+  const raw = asString(value)
+  if (!raw) return 'unknown'
+
+  try {
+    const url = new URL(raw)
+    if (
+      (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+      url.hostname !== 'schema.org' ||
+      url.port ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      return 'unknown'
+    }
+
+    const pathSegments = url.pathname.split('/').filter(Boolean)
+    if (pathSegments.length !== 1) return 'unknown'
+
+    return (
+      SCHEMA_ORG_AVAILABILITY.get(pathSegments[0].toLowerCase()) ?? 'unknown'
+    )
+  } catch {
+    return 'unknown'
+  }
+}
+
 function extractAvailability(
   offers: JsonObject[],
 ): RawProductObservation['availability'] {
-  const values = offers
+  const explicitValues = offers
     .map((offer) => asString(offer.availability))
     .filter((value): value is string => Boolean(value))
-    .map((value) => value.split('/').pop()?.toLowerCase() ?? value.toLowerCase())
+
+  if (explicitValues.length === 0) return 'unknown'
+
+  const values = explicitValues.map(normalizeSchemaOrgAvailability)
+  if (values.some((value) => value === 'unknown')) return 'unknown'
 
   const unique = [...new Set(values)]
-  if (unique.length !== 1) return 'unknown'
-  if (unique[0] === 'instock' || unique[0] === 'limitedavailability') {
-    return 'available'
-  }
-  if (unique[0] === 'outofstock' || unique[0] === 'soldout') {
-    return 'unavailable'
-  }
-  return 'unknown'
+  return unique.length === 1 ? unique[0] : 'unknown'
 }
 
 function extractSourceProductId(product: JsonObject): string | null {
