@@ -74,6 +74,15 @@ function findUnsafeStaticNewTabLink(source, filename = 'candidate.tsx') {
 
       if (targetValue?.trim().toLowerCase() === '_blank') {
         const relAttribute = getJsxAttribute(opening, 'rel')
+
+        if (!relAttribute) {
+          finding = {
+            text: opening.getText(sourceFile),
+            relValue: null,
+          }
+          return
+        }
+
         const relValue = staticJsxAttributeValue(relAttribute)
 
         if (relValue !== null) {
