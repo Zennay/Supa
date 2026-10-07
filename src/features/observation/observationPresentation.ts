@@ -18,11 +18,21 @@ function assertObservationSide(side: unknown): asserts side is M3ObservationSide
   }
 }
 
+function retailerStoreIdPrefix(retailer: string): string {
+  return retailer
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 export function observationRetailerCopy(
   side: M3ObservationSide,
 ): ObservationRetailerCopy {
   assertObservationSide(side)
   const expectedRetailer = M3_EXPECTED_RETAILERS[side]
+  const storeIdPrefix = retailerStoreIdPrefix(expectedRetailer)
 
   return {
     eyebrow:
@@ -32,8 +42,7 @@ export function observationRetailerCopy(
     expectedRetailer,
     emptyStoreLabel: `${expectedRetailer} nog niet ingevuld`,
     storePlaceholder: `Bijv. ${expectedRetailer} Leiden`,
-    storeIdPlaceholder:
-      side === 'baseline' ? 'plus-leiden-...' : 'dekamarkt-leiden-...',
+    storeIdPlaceholder: `${storeIdPrefix}-leiden-...`,
     guidance:
       side === 'baseline'
         ? `Meet deze mand eerst bij ${expectedRetailer}. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`
