@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const webdriver = process.env.WEBDRIVER_URL || 'http://127.0.0.1:4444'
@@ -97,14 +97,71 @@ const created = await request('/session', {
 const sessionId = created?.sessionId
 if (!sessionId) throw new Error('No Firefox WebDriver session id returned')
 
+async function readGithubProvenance() {
+  const provenance = {
+    checkoutSha: process.env.GITHUB_SHA || null,
+    runId: process.env.GITHUB_RUN_ID || null,
+    runAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
+    eventName: process.env.GITHUB_EVENT_NAME || null,
+    ref: process.env.GITHUB_REF || null,
+    headRef: process.env.GITHUB_HEAD_REF || null,
+    pullRequestHeadSha: null,
+    pullRequestBaseSha: null,
+  }
+
+  if (process.env.GITHUB_EVENT_PATH) {
+    const event = JSON.parse(
+      await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'),
+    )
+    provenance.pullRequestHeadSha = event?.pull_request?.head?.sha ?? null
+    provenance.pullRequestBaseSha = event?.pull_request?.base?.sha ?? null
+  }
+
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    assert.match(
+      provenance.checkoutSha ?? '',
+      /^[0-9a-f]{40}$/i,
+      'GitHub Actions evidence requires a checkout SHA',
+    )
+    assert.match(
+      provenance.runId ?? '',
+      /^\d+$/,
+      'GitHub Actions evidence requires a numeric run ID',
+    )
+    assert.match(
+      provenance.runAttempt ?? '',
+      /^\d+$/,
+      'GitHub Actions evidence requires a numeric run attempt',
+    )
+
+    if (provenance.eventName === 'pull_request') {
+      assert.match(
+        provenance.pullRequestHeadSha ?? '',
+        /^[0-9a-f]{40}$/i,
+        'pull-request evidence requires the candidate head SHA',
+      )
+      assert.match(
+        provenance.pullRequestBaseSha ?? '',
+        /^[0-9a-f]{40}$/i,
+        'pull-request evidence requires the base SHA',
+      )
+    }
+  }
+
+  return provenance
+}
+
 const evidence = {
   schemaVersion: 1,
   milestone: 'M2 Core Planner Vertical Slice',
   baseUrl,
+  provenance: null,
   checks: [],
 }
 
 try {
+  evidence.provenance = await readGithubProvenance()
+
   await request(`/session/${sessionId}/url`, {
     method: 'POST',
     body: JSON.stringify({ url: baseUrl }),
