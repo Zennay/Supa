@@ -122,3 +122,48 @@ test('M3 collection guidance fails closed on malformed next-observation targets'
     )
   }
 })
+
+
+test('M3 collection guidance rejects malformed or duplicate line identities before claiming completion', () => {
+  const blankIdentitySheet = buildObservationSheet()
+  blankIdentitySheet.baseline.lines.forEach((line) => {
+    line.observedProduct.available = false
+  })
+  blankIdentitySheet.candidate.lines.forEach((line) => {
+    line.observedProduct.available = false
+  })
+  blankIdentitySheet.baseline.lines[0].ingredientId = '   '
+
+  assert.throws(
+    () => nextObservationActionLabel(blankIdentitySheet, null),
+    /invalid observation sheet/,
+  )
+
+  const paddedIdentitySheet = buildObservationSheet()
+  paddedIdentitySheet.baseline.lines[0].ingredientId =
+    `${paddedIdentitySheet.baseline.lines[0].ingredientId} `
+
+  assert.throws(
+    () =>
+      nextObservationActionLabel(
+        paddedIdentitySheet,
+        nextIncompleteObservationLine(paddedIdentitySheet),
+      ),
+    /invalid observation sheet/,
+  )
+
+  const duplicateIdentitySheet = buildObservationSheet()
+  duplicateIdentitySheet.baseline.lines.forEach((line) => {
+    line.observedProduct.available = false
+  })
+  duplicateIdentitySheet.candidate.lines.forEach((line) => {
+    line.observedProduct.available = false
+  })
+  duplicateIdentitySheet.baseline.lines[1].ingredientId =
+    duplicateIdentitySheet.baseline.lines[0].ingredientId
+
+  assert.throws(
+    () => nextObservationActionLabel(duplicateIdentitySheet, null),
+    /invalid observation sheet/,
+  )
+})
