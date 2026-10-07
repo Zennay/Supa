@@ -404,6 +404,26 @@ test('AUD-005 CLI rejects malformed output arguments before emitting evidence', 
 })
 
 
+test('AUD-005 CLI refuses symlinked output directories before writing evidence', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-output-symlink-'))
+  const input = join(directory, 'input.json')
+  const privateTarget = join(directory, 'private-target')
+  const outputDirectory = join(directory, 'linked-output')
+  const output = join(outputDirectory, 'response.json')
+  await writeFile(input, JSON.stringify(validRecord()), 'utf8')
+  await mkdir(privateTarget, { mode: 0o700 })
+  await symlink(privateTarget, outputDirectory)
+
+  await assert.rejects(
+    () => main([input, '--output', output]),
+    /response output directory must not be a symlink/,
+  )
+  await assert.rejects(
+    () => stat(join(privateTarget, 'response.json')),
+    (error) => error?.code === 'ENOENT',
+  )
+})
+
 test('AUD-005 CLI rejects a permissive existing output directory before writing evidence', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'supa-aud005-permissive-output-'))
   const input = join(directory, 'input.json')
