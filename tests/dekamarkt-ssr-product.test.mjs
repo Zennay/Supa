@@ -54,6 +54,31 @@ test('DekaMarkt evidence rejects unsafe acquisition metadata', async () => {
   })
 })
 
+test('DekaMarkt evidence accepts canonical HTML media type with ordinary parameters', async () => {
+  const evidence = await fixture()
+  evidence.captureEvidence.contentType = ' Text/HTML ; charset=UTF-8 '
+
+  const result = parseDekaMarktSsrProductEvidence(evidence)
+  assert.equal(result.type, 'observation')
+})
+
+test('DekaMarkt evidence rejects deceptive non-HTML content types', async () => {
+  for (const contentType of [
+    'application/text/html+json',
+    'text/html-malformed',
+    'text/plain; note=text/html',
+    null,
+  ]) {
+    const evidence = await fixture()
+    evidence.captureEvidence.contentType = contentType
+
+    assert.deepEqual(parseDekaMarktSsrProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence violates the bounded capture contract',
+    })
+  }
+})
+
 test('DekaMarkt evidence rejects malformed source provenance', async () => {
   for (const mutate of [
     (evidence) => { evidence.source.url = 'http://www.dekamarkt.nl/producten/115873' },
