@@ -203,3 +203,25 @@ test('PLUS listing evidence rejects non-default ports but accepts canonical HTTP
 
   assert.equal(parsePlusRenderedCatalogEvidence(explicitDefault).type, 'observations')
 })
+
+test('PLUS listing evidence requires a timezone-bearing capture timestamp', async () => {
+  for (const capturedAt of [
+    '2026-10-04',
+    '2026-10-04T18:08:57.837',
+    '2026-02-30T18:08:57.837Z',
+    '2026-10-04T24:00:00Z',
+    '2026-10-04T18:08:57+24:00',
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    evidence.source.capturedAt = capturedAt
+
+    assert.deepEqual(parsePlusRenderedCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence must identify a valid catalog source',
+    })
+  }
+
+  const offset = await fixture(catalogUrl)
+  offset.source.capturedAt = '2026-10-04T20:08:57.837+02:00'
+  assert.equal(parsePlusRenderedCatalogEvidence(offset).type, 'observations')
+})
