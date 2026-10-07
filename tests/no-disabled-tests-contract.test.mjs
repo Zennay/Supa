@@ -9,7 +9,7 @@ const disabledCallPattern = new RegExp(
   `\\b(?:${aliases.join('|')})\\s*\\.\\s*(?:${disabledMembers.join('|')})\\s*\\(`,
 )
 const permanentlyDisabledOptionPattern =
-  /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+")/
+  /\b(?:skip|todo)\s*:\s*(?:true\b|'[^'\r\n]+'|"[^"\r\n]+"|`(?![^`\r\n]*\$\{)[^`\r\n]+`)/
 
 test('canonical regression suite contains no explicitly disabled tests', async () => {
   const files = (await readdir(testsDir))
@@ -41,13 +41,21 @@ test('disabled-test guard permits conditional skips but rejects literal disabled
   const literalTodo = ['todo', ': true'].join('')
   const literalStringSkip = ['skip', ": 'flaky regression'"].join('')
   const literalStringTodo = ['todo', ': "pending regression"'].join('')
+  const literalTemplateSkip = ['skip', ': `flaky regression`'].join('')
+  const literalTemplateTodo = ['todo', ': `pending regression`'].join('')
   const emptyStringSkip = ['skip', ": ''"].join('')
+  const emptyTemplateSkip = ['skip', ': ``'].join('')
   const conditionalSkip = ['skip', ": process.platform === 'win32'"].join('')
+  const conditionalTemplateSkip = ['skip', ': `${process.platform}`'].join('')
 
   assert.match(literalSkip, permanentlyDisabledOptionPattern)
   assert.match(literalTodo, permanentlyDisabledOptionPattern)
   assert.match(literalStringSkip, permanentlyDisabledOptionPattern)
   assert.match(literalStringTodo, permanentlyDisabledOptionPattern)
+  assert.match(literalTemplateSkip, permanentlyDisabledOptionPattern)
+  assert.match(literalTemplateTodo, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(emptyStringSkip, permanentlyDisabledOptionPattern)
+  assert.doesNotMatch(emptyTemplateSkip, permanentlyDisabledOptionPattern)
   assert.doesNotMatch(conditionalSkip, permanentlyDisabledOptionPattern)
+  assert.doesNotMatch(conditionalTemplateSkip, permanentlyDisabledOptionPattern)
 })
