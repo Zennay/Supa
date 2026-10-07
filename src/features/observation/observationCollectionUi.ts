@@ -43,6 +43,10 @@ function validateObservationLineIdentities(
   const seen = new Set<string>()
   const identities: string[] = []
 
+  if (lines.length === 0) {
+    throw new Error(`invalid observation sheet: ${side} lines`)
+  }
+
   for (const lineCandidate of lines) {
     if (
       !lineCandidate ||
