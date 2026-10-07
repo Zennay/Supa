@@ -54,8 +54,8 @@ function attributes(tag) {
   return result
 }
 
-function namedMeta(name) {
-  return [...html.matchAll(/<meta\b[^>]*>/gi)]
+function namedMeta(name, source = html) {
+  return [...source.matchAll(/<meta\b[^>]*>/gi)]
     .map(([tag]) => attributes(tag))
     .filter((attrs) => attrs.name?.toLowerCase() === name)
 }
@@ -83,6 +83,24 @@ test('charset parser exposes conflicting quoted and unquoted declarations', () =
       '<meta charset="UTF-8"><meta charset=windows-1252><meta name="description" content="charset=ignored">',
     ),
     ['UTF-8', 'windows-1252'],
+  )
+})
+
+test('named metadata parser discovers quoted and unquoted declarations without value bleed', () => {
+  const source = [
+    '<meta name="theme-color" content="#f7f6f1">',
+    '<meta name=theme-color content=#ffffff>',
+    '<meta name=description content=kort>',
+    '<meta data-note="name=description content=ignored">',
+  ].join('')
+
+  assert.deepEqual(
+    namedMeta('theme-color', source).map((attrs) => attrs.content),
+    ['#f7f6f1', '#ffffff'],
+  )
+  assert.deepEqual(
+    namedMeta('description', source).map((attrs) => attrs.content),
+    ['kort'],
   )
 })
 
