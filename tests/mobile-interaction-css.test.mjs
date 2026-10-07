@@ -9,6 +9,15 @@ test('mobile chrome reserves bottom safe-area space', () => {
   assert.match(css, /bottom:\s*calc\(14px \+ env\(safe-area-inset-bottom\)\)/)
 })
 
+test('mobile shell prefers the dynamic viewport with a vh fallback', () => {
+  assert.match(css, /body\s*{[\s\S]*?min-height:\s*100vh;[\s\S]*?min-height:\s*100dvh;/)
+  assert.match(css, /\.app-shell\s*{[\s\S]*?min-height:\s*100vh;[\s\S]*?min-height:\s*100dvh;/)
+  assert.match(
+    css,
+    /@media \(min-width: 700px\)[\s\S]*?\.app-shell\s*{[\s\S]*?min-height:\s*calc\(100vh - 48px\);[\s\S]*?min-height:\s*calc\(100dvh - 48px\);/,
+  )
+})
+
 test('interactive controls expose visible keyboard focus', () => {
   assert.match(css, /button:focus-visible[\s\S]*input:focus-visible[\s\S]*select:focus-visible/)
   assert.match(css, /outline:\s*3px solid var\(--ink\)/)
