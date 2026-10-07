@@ -136,6 +136,37 @@ test('parses exact DekaMarkt offer SSR records with explicit source prices and v
   )
 })
 
+test('DekaMarkt offers require timezone-bearing real-calendar validity timestamps', async () => {
+  for (const validFrom of [
+    '2026-09-29',
+    '2026-09-29T00:00:00.000',
+    '2026-02-30T00:00:00.000Z',
+    '2026-09-29T24:00:00Z',
+    '2026-09-29T00:00:00+24:00',
+  ]) {
+    const evidence = await fixture(offersUrl)
+    evidence.nuxtPayload[9] = validFrom
+
+    const result = parseDekaMarktSsrOffersEvidence(evidence)
+
+    assert.equal(result.type, 'observations')
+    assert.equal(result.observations.length, 2)
+    assert.equal(result.abstained, 1)
+    assert.deepEqual(
+      result.observations.map((observation) => observation.sourceProductId),
+      ['4579', '57593'],
+    )
+  }
+
+  const offset = await fixture(offersUrl)
+  offset.nuxtPayload[9] = '2026-09-29T02:00:00+02:00'
+  const result = parseDekaMarktSsrOffersEvidence(offset)
+
+  assert.equal(result.type, 'observations')
+  assert.equal(result.abstained, 0)
+  assert.equal(result.observations[0].offer.validFrom, '2026-09-29T02:00:00+02:00')
+})
+
 test('offers parser skips price disagreement instead of inferring weight-price semantics', async () => {
   const evidence = await fixture(offersUrl)
   // First linked product is payload index 15. Its offerPrice ref normally points
