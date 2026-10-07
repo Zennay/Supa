@@ -310,8 +310,7 @@ h3, p { margin: 0; }
 
 
 .trace-row > div,
-.shopping-row > span:last-child,
-.comparison-totals > div {
+.shopping-row > span:last-child {
   min-width: 0;
 }
 
@@ -387,6 +386,7 @@ h3, p { margin: 0; }
 }
 
 .comparison-totals > div {
+  min-width: 0;
   display: grid;
   gap: 4px;
   padding: 12px;
