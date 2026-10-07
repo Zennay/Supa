@@ -15,5 +15,10 @@ test('mobile viewport enables the safe-area contract used by fixed navigation', 
   assert.match(viewportContent, /(?:^|,)\s*initial-scale=1(?:\.0)?\s*(?:,|$)/i)
   assert.match(viewportContent, /(?:^|,)\s*viewport-fit=cover\s*(?:,|$)/i)
 
+  assert.match(styles, /env\(safe-area-inset-top\)/)
   assert.match(styles, /env\(safe-area-inset-bottom\)/)
+  assert.match(
+    styles,
+    /\.topbar\s*{[\s\S]*?padding:\s*calc\(18px \+ env\(safe-area-inset-top\)\) 20px 12px;/,
+  )
 })
