@@ -60,6 +60,7 @@ test('DekaMarkt evidence rejects malformed source provenance', async () => {
     (evidence) => { evidence.source.url = 'https://dekamarkt.nl/producten/115873' },
     (evidence) => { evidence.source.url = 'https://user:pass@www.dekamarkt.nl/producten/115873' },
     (evidence) => { evidence.source.url = 'https://www.dekamarkt.nl:8443/producten/115873' },
+    (evidence) => { evidence.source.url = 'https://www.dekamarkt.nl/aanbiedingen' },
     (evidence) => { evidence.source.capturedAt = 'not-a-timestamp' },
     (evidence) => { evidence.source.sha256 = 'not-a-sha' },
   ]) {
