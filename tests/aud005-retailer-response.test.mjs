@@ -74,6 +74,27 @@ test('AUD-005 response validator never turns an allowed response into runtime au
   assert.equal(summary.productionReuseApprovalStatus, 'requires-explicit-gate-review')
 })
 
+test('AUD-005 response validator requires conditions for conditional permission', () => {
+  const record = validRecord()
+  record.outcome = 'allowed-with-conditions'
+  record.constraints = []
+
+  assert.throws(
+    () => validateRetailerResponseRecord(record),
+    /constraints must include at least one condition/,
+  )
+})
+
+test('AUD-005 response validator requires a next owner for routed outcomes', () => {
+  const record = validRecord()
+  record.nextOwnerTeam = null
+
+  assert.throws(
+    () => validateRetailerResponseRecord(record),
+    /nextOwnerTeam is required when outcome is routed/,
+  )
+})
+
 test('AUD-005 response validator rejects malformed observation timestamps', () => {
   for (const observedAt of [
     '2026-02-30T06:00:00.000Z',

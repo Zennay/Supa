@@ -194,6 +194,20 @@ export function validateRetailerResponseRecord(input) {
   const responseSummary = requireString(input.responseSummary, 'responseSummary', { maxLength: 1200 })
   const constraints = requireStringArray(input.constraints ?? [], 'constraints', { maxItems: 16, maxLength: 500 })
   const nextOwnerTeam = requireOptionalString(input.nextOwnerTeam, 'nextOwnerTeam', { maxLength: 120 })
+
+  if (outcome === 'allowed-with-conditions') {
+    assert(
+      constraints.length > 0,
+      'constraints must include at least one condition when outcome is allowed-with-conditions',
+    )
+  }
+  if (outcome === 'routed') {
+    assert(
+      nextOwnerTeam !== null,
+      'nextOwnerTeam is required when outcome is routed',
+    )
+  }
+
   const evidenceRef = requireEvidenceRef(input.evidenceRef, 'evidenceRef')
   const consequences = validateConsequences(input.consequences)
 
