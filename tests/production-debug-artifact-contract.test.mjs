@@ -34,6 +34,7 @@ function unwrapExpression(node) {
 }
 
 function bindingContainsName(name, expected) {
+  if (!name) return false
   if (ts.isIdentifier(name)) return name.text === expected
 
   if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
