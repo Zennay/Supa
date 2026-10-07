@@ -1,6 +1,7 @@
 import {
   M3_EXPECTED_RETAILERS,
   nextIncompleteObservationLine,
+  observationLineCollectionComplete,
   type M3ObservationSide,
   type ObservationSheet,
 } from '../../domain/m3ObservationSheet.ts'
@@ -74,6 +75,7 @@ export function nextObservationActionLabel(
   const retailer = M3_EXPECTED_RETAILERS[candidate.side]
   const lines = observationLinesForSide(sheet, candidate.side)
   let matchingLineExists = false
+  let matchingIncompleteLineExists = false
   let ingredientLabel = ''
 
   for (const lineCandidate of lines) {
@@ -88,14 +90,28 @@ export function nextObservationActionLabel(
     }
 
     matchingLineExists = true
+
+    let lineIncomplete = false
+    try {
+      lineIncomplete = !observationLineCollectionComplete(
+        lineCandidate as ObservationSheet['baseline']['lines'][number],
+      )
+    } catch {
+      continue
+    }
+
+    if (!lineIncomplete) {
+      continue
+    }
+
+    matchingIncompleteLineExists = true
     const label = (lineCandidate as { ingredientLabel?: unknown }).ingredientLabel
     if (typeof label === 'string' && label.trim() !== '') {
       ingredientLabel = label.trim()
-      break
     }
   }
 
-  if (!matchingLineExists) {
+  if (!matchingLineExists || !matchingIncompleteLineExists) {
     throw new Error('invalid next observation target')
   }
 
