@@ -55,13 +55,22 @@ function validIdentity(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+function isObjectContainer(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 function supportedBasketLine(line: unknown): line is BasketTraceLine {
-  if (line === null || typeof line !== 'object' || !('status' in line)) {
+  if (!isObjectContainer(line) || !('status' in line)) {
     return false
   }
 
-  const status = (line as { status?: unknown }).status
-  return status === 'matched' || status === 'unresolved'
+  if (line.status === 'unresolved') return true
+  if (line.status !== 'matched') return false
+
+  return (
+    isObjectContainer(line.requirement) &&
+    isObjectContainer(line.pack)
+  )
 }
 
 function basketLines(basket: OneStoreBasket): BasketTraceLine[] {
