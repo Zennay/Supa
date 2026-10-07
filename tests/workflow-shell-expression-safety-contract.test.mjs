@@ -17,7 +17,7 @@ function shellRunBodies(source) {
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
-    const match = /^(\s*)run:\s*(.*)$/.exec(line)
+    const match = /^(\s*)(?:-\s+)?run:\s*(.*)$/.exec(line)
     if (!match) continue
 
     const indent = match[1].length
