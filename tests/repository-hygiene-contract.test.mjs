@@ -132,3 +132,30 @@ test('tracked path segments remain checkout-safe across common filesystems', asy
     `tracked paths must use cross-platform-safe names: ${unsafe.sort().join(', ')}`,
   )
 })
+
+test('tracked entries stay regular files rather than symlinks or gitlinks', async () => {
+  const { stdout } = await execFileAsync('git', ['ls-files', '--stage', '-z'], {
+    cwd: repositoryUrl,
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024,
+  })
+
+  const nonRegular = stdout
+    .split('\0')
+    .filter(Boolean)
+    .map((entry) => {
+      const [metadata, path] = entry.split('\t')
+      const [mode] = metadata.split(' ')
+      return { mode, path }
+    })
+    .filter(({ mode }) => mode === '120000' || mode === '160000')
+    .sort((left, right) => left.path.localeCompare(right.path))
+
+  assert.deepEqual(
+    nonRegular,
+    [],
+    `tracked symlink/gitlink entries require explicit review: ${nonRegular
+      .map(({ mode, path }) => `${mode} ${path}`)
+      .join(', ')}`,
+  )
+})
