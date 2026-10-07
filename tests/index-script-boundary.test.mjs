@@ -4,20 +4,12 @@ import test from 'node:test'
 
 const indexHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8')
 
-function attributeValue(attributes, name) {
-  const match = attributes.match(
-    new RegExp('\\\\b' + name + '=(["\\\'])(.*?)\\\\1', 'i'),
-  )
-  return match?.[2] ?? null
-}
-
 function scriptElements(html) {
   return Array.from(
     html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi),
     (match) => ({
       attributes: match[1],
       body: match[2],
-      source: match[0],
     }),
   )
 }
@@ -32,8 +24,10 @@ function evaluateScriptBoundary(html) {
   }
 
   const [entry] = scripts
-  const type = attributeValue(entry.attributes, 'type')
-  const src = attributeValue(entry.attributes, 'src')
+  const type =
+    entry.attributes.match(/\btype\s*=\s*["']([^"']*)["']/i)?.[1] ?? null
+  const src =
+    entry.attributes.match(/\bsrc\s*=\s*["']([^"']*)["']/i)?.[1] ?? null
 
   if (type !== 'module') {
     issues.push('entry script must use type="module"')
@@ -67,7 +61,7 @@ test('script boundary rejects extra, external and inline execution paths', () =>
   }
 })
 
-test('script boundary accepts only the reviewed canonical shell shape', () => {
+test('script boundary accepts the reviewed canonical shell shape', () => {
   assert.deepEqual(
     evaluateScriptBoundary(
       '<!doctype html><html><body><script type="module" src="/src/main.tsx"></script></body></html>',
