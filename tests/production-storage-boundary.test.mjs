@@ -76,15 +76,55 @@ function scriptKindFor(filename) {
   }
 }
 
-function findUnsafeStorageAccess(source, filename = 'candidate.tsx') {
-  const sourceFile = ts.createSourceFile(
+function parseSource(source, filename = 'candidate.tsx') {
+  return ts.createSourceFile(
     filename,
     source,
     ts.ScriptTarget.Latest,
     true,
     scriptKindFor(filename),
   )
+}
 
+function collectScopedStorageKeyBindings(source, filename = 'candidate.tsx') {
+  const sourceFile = parseSource(source, filename)
+  const bindings = new Set()
+
+  function visit(node) {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer
+    ) {
+      const value = staticString(node.initializer)
+      if (value?.startsWith('supa:')) bindings.add(node.name.text)
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return bindings
+}
+
+function storageKeyIsScoped(node, scopedKeyBindings) {
+  const value = staticString(node)
+  if (value !== null) return value.startsWith('supa:')
+
+  const current = node ? unwrapExpression(node) : null
+  return (
+    current !== null &&
+    ts.isIdentifier(current) &&
+    scopedKeyBindings.has(current.text)
+  )
+}
+
+function findUnsafeStorageAccess(
+  source,
+  filename = 'candidate.tsx',
+  scopedKeyBindings = new Set(),
+) {
+  const sourceFile = parseSource(source, filename)
   let finding = null
 
   function visit(node) {
@@ -104,15 +144,16 @@ function findUnsafeStorageAccess(source, filename = 'candidate.tsx') {
           return
         }
 
-        if (storage && keyedMethods.has(method)) {
-          const key = staticString(node.arguments[0])
-          if (key !== null && !key.startsWith('supa:')) {
-            finding = {
-              kind: 'unscoped storage key',
-              text: node.getText(sourceFile),
-            }
-            return
+        if (
+          storage &&
+          keyedMethods.has(method) &&
+          !storageKeyIsScoped(node.arguments[0], scopedKeyBindings)
+        ) {
+          finding = {
+            kind: 'unscoped or unverifiable storage key',
+            text: node.getText(sourceFile),
           }
+          return
         }
       }
     }
@@ -149,9 +190,26 @@ test('production browser storage stays scoped to SUPA data', async () => {
   const files = await listProductionSources(srcDir)
   assert.ok(files.length > 0, 'expected at least one production source file')
 
-  for (const file of files) {
-    const source = await readFile(file.url, 'utf8')
-    const finding = findUnsafeStorageAccess(source, file.relativePath)
+  const sources = await Promise.all(
+    files.map(async (file) => ({
+      ...file,
+      source: await readFile(file.url, 'utf8'),
+    })),
+  )
+  const scopedKeyBindings = new Set()
+
+  for (const file of sources) {
+    for (const binding of collectScopedStorageKeyBindings(file.source, file.relativePath)) {
+      scopedKeyBindings.add(binding)
+    }
+  }
+
+  for (const file of sources) {
+    const finding = findUnsafeStorageAccess(
+      file.source,
+      file.relativePath,
+      scopedKeyBindings,
+    )
 
     assert.equal(
       finding,
@@ -163,7 +221,7 @@ test('production browser storage stays scoped to SUPA data', async () => {
   }
 })
 
-test('storage guard rejects origin-wide clears and unscoped literal keys', () => {
+test('storage guard rejects origin-wide clears and unscoped or unverifiable keys', () => {
   for (const source of [
     'localStorage.clear()',
     "window['localStorage']['clear']()",
@@ -171,23 +229,31 @@ test('storage guard rejects origin-wide clears and unscoped literal keys', () =>
     "localStorage.setItem('planner', '{}')",
     'window.localStorage.getItem("shopping-list")',
     "self['sessionStorage'].removeItem(`draft`)",
+    'localStorage.setItem(storageKey, payload)',
+    'window.localStorage.getItem(buildStorageKey())',
   ]) {
-    assert.ok(findUnsafeStorageAccess(source), source)
+    const bindings = collectScopedStorageKeyBindings(source)
+    assert.ok(findUnsafeStorageAccess(source, 'candidate.tsx', bindings), source)
   }
 })
 
-test('storage guard permits SUPA literal keys, named keys and unrelated storage objects', () => {
+test('storage guard permits proven SUPA keys and unrelated storage objects', () => {
   for (const source of [
     "localStorage.setItem('supa:planner-preferences:v2', '{}')",
     "window.localStorage.getItem('supa:shopping-list:v1')",
     "sessionStorage.removeItem('supa:temporary:v1')",
-    'localStorage.setItem(storageKey, payload)',
-    'window.localStorage.getItem(storageKey)',
+    "const storageKey = 'supa:planner:v1'; localStorage.setItem(storageKey, payload)",
+    "const storageKey = 'supa:list:v1'; window.localStorage.getItem(storageKey)",
     'cache.clear()',
     "storage.setItem('planner', '{}')",
     "// localStorage.clear()",
     "const example = \"localStorage.setItem('planner', '{}')\"",
   ]) {
-    assert.equal(findUnsafeStorageAccess(source), null, source)
+    const bindings = collectScopedStorageKeyBindings(source)
+    assert.equal(
+      findUnsafeStorageAccess(source, 'candidate.tsx', bindings),
+      null,
+      source,
+    )
   }
 })
