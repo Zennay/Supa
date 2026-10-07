@@ -33,6 +33,41 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function safePositiveInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
+function safeSha256(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
+}
+
+function safeArtifactDigest(value: unknown): value is string {
+  return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/i.test(value)
+}
+
+function safeSupaSha(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{40}$/i.test(value)
+}
+
+function safeCapturedAt(value: unknown): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+}
+
+function safePlusProductUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'www.plus.nl' &&
+      url.username === '' &&
+      url.password === ''
+    )
+  } catch {
+    return false
+  }
+}
+
 export function parsePlusRenderedProductEvidence(
   evidence: PlusRenderedProductEvidence,
 ): SchemaOrgParseResult {
@@ -52,7 +87,29 @@ export function parsePlusRenderedProductEvidence(
     }
   }
   if (
-    evidence.browserEvidence?.renderedHtmlSha256 !== evidence.source.sha256 ||
+    !safePlusProductUrl(evidence.source.url) ||
+    !safeCapturedAt(evidence.source.capturedAt) ||
+    !safeSha256(evidence.source.sha256)
+  ) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid source provenance',
+    }
+  }
+  if (
+    !safePositiveInteger(evidence.browserEvidence?.runId) ||
+    !safePositiveInteger(evidence.browserEvidence?.artifactId) ||
+    !safeArtifactDigest(evidence.browserEvidence?.artifactDigest) ||
+    !safeSupaSha(evidence.browserEvidence?.supaSha)
+  ) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid browser artifact identity',
+    }
+  }
+  if (
+    !safeSha256(evidence.browserEvidence?.renderedHtmlSha256) ||
+    evidence.browserEvidence.renderedHtmlSha256 !== evidence.source.sha256 ||
     evidence.browserEvidence?.finalUrl !== evidence.source.url
   ) {
     return {
