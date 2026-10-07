@@ -193,6 +193,7 @@ export function App() {
           <button
             key={item.id}
             className={tab === item.id ? 'active' : ''}
+            aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => setTab(item.id)}
           >
             {item.label}
