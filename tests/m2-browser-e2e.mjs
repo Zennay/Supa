@@ -147,7 +147,8 @@ try {
   assert.doesNotMatch(basketText, /score below trust threshold/)
   assert.doesNotMatch(basketText, /query phrase present/)
   assert.doesNotMatch(basketText, /Match \d+/)
-  assert.match(basketText, /M2 testwinkel/)
+  assert.match(basketText, /Voorbeeldwinkel/)
+  assert.doesNotMatch(basketText, /M2 testwinkel/)
   assert.match(basketText, /1 productkeuze is nog niet meegerekend/)
   assert.match(basketText, /geen volledig mandtotaal/)
   const basketTotalState = await execute(
