@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
-import path from 'node:path'
 import test from 'node:test'
 import * as ts from 'typescript'
 
@@ -8,10 +7,16 @@ const testsDir = new URL('./', import.meta.url)
 const disabledModes = new Set(['only', 'skip', 'todo'])
 const nodeTestExports = new Set(['describe', 'it', 'suite', 'test'])
 
-function staticName(node) {
+function propertyName(node) {
   if (!node) return null
   if (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) return node.text
   return null
+}
+
+function elementName(node) {
+  if (!node) return null
+  const current = unwrapExpression(node)
+  return ts.isStringLiteralLike(current) ? current.text : null
 }
 
 function unwrapExpression(node) {
@@ -60,23 +65,35 @@ function nodeTestBindings(sourceFile) {
   return bindings
 }
 
+function disablingLiteral(name, initializer) {
+  const value = unwrapExpression(initializer)
+
+  if (value.kind === ts.SyntaxKind.TrueKeyword) return true
+
+  return (
+    (name === 'skip' || name === 'todo') &&
+    ts.isStringLiteralLike(value)
+  )
+}
+
 function literalDisabledOption(call, sourceFile) {
-  if (call.arguments.length < 2) return null
+  for (const argument of call.arguments.slice(0, 2)) {
+    const options = unwrapExpression(argument)
+    if (!ts.isObjectLiteralExpression(options)) continue
 
-  const options = unwrapExpression(call.arguments[1])
-  if (!ts.isObjectLiteralExpression(options)) return null
+    for (const property of options.properties) {
+      if (!ts.isPropertyAssignment(property)) continue
 
-  for (const property of options.properties) {
-    if (!ts.isPropertyAssignment(property)) continue
-
-    const name = staticName(property.name)
-    if (!name || !disabledModes.has(name)) continue
-
-    const value = unwrapExpression(property.initializer)
-    if (value.kind === ts.SyntaxKind.TrueKeyword) {
-      return {
-        mode: name,
-        text: property.getText(sourceFile),
+      const name = propertyName(property.name)
+      if (
+        name &&
+        disabledModes.has(name) &&
+        disablingLiteral(name, property.initializer)
+      ) {
+        return {
+          mode: name,
+          text: property.getText(sourceFile),
+        }
       }
     }
   }
@@ -118,7 +135,7 @@ function findDisabledNodeTests(source, filename = 'candidate.test.mjs') {
         const base = unwrapExpression(callee.expression)
         const member = ts.isPropertyAccessExpression(callee)
           ? callee.name.text
-          : staticName(callee.argumentExpression)
+          : elementName(callee.argumentExpression)
 
         if (
           ts.isIdentifier(base) &&
@@ -146,25 +163,28 @@ test('disabled-test detector catches node:test skip, todo and focused cases', ()
     test['todo']('todo', () => {})
     it.only('focused', () => {})
     group('disabled options', { skip: true }, () => {})
-    test('todo options', { todo: true }, () => {})
+    test('todo options', { todo: 'pending' }, () => {})
     test('focused options', { only: true }, () => {})
+    group({ skip: 'not supported here' }, () => {})
   `
 
   assert.deepEqual(
     findDisabledNodeTests(source).map(({ mode }) => mode),
-    ['skip', 'todo', 'only', 'skip', 'todo', 'only'],
+    ['skip', 'todo', 'only', 'skip', 'todo', 'only', 'skip'],
   )
 })
 
-test('disabled-test detector ignores inert text and unrelated local APIs', () => {
+test('disabled-test detector ignores inert text and unrelated or dynamic APIs', () => {
   const source = `
     import test from 'node:test'
 
     // test.skip('comment only')
     const example = "test.todo('string only')"
+    const mode = 'skip'
     helper.skip('local helper')
+    test[mode]('dynamic member', () => {})
     test('ordinary test', () => {})
-    test('false literal stays enabled', { skip: false }, () => {})
+    test('false literals stay enabled', { skip: false, todo: false, only: false }, () => {})
   `
 
   assert.deepEqual(findDisabledNodeTests(source), [])
