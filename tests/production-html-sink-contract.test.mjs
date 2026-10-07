@@ -86,6 +86,18 @@ function findRawHtmlSink(source, filename = 'candidate.tsx') {
     if (finding) return
 
     if (
+      ts.isVariableDeclaration(node) &&
+      node.initializer &&
+      isDocumentObject(node.initializer)
+    ) {
+      finding = {
+        kind: 'document alias',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
+
+    if (
       ts.isJsxAttribute(node) &&
       staticName(node.name) === 'dangerouslySetInnerHTML'
     ) {
@@ -196,6 +208,10 @@ test('raw HTML guard catches React and DOM injection sinks', () => {
     "document['writeln'](html)",
     "window.document.write(html)",
     "globalThis['document']['writeln'](html)",
+    "const doc = document",
+    "const doc = (window.document)",
+    "const doc = (globalThis['document'] as Document)",
+    "const { write } = self.document",
   ]) {
     assert.ok(findRawHtmlSink(source), source)
   }
@@ -214,6 +230,8 @@ test('raw HTML guard ignores comments, strings and non-sink identifiers', () => 
     "const parseHTMLUnsafe = () => 'example'",
     "printer.write(html)",
     "writer.writeln(html)",
+    "const doc = runtime.document",
+    "const doc = { write() {}, writeln() {} }",
     "const write = () => 'example'",
   ]) {
     assert.equal(findRawHtmlSink(source), null, source)
