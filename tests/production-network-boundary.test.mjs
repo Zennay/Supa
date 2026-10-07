@@ -100,6 +100,40 @@ function networkReferenceName(node) {
   return null
 }
 
+function isBrowserRoot(node) {
+  const current = unwrapExpression(node)
+  return ts.isIdentifier(current) && browserRoots.has(current.text)
+}
+
+function bindingElementNetworkReference(node) {
+  if (!ts.isBindingElement(node) || node.dotDotDotToken) return null
+
+  const pattern = node.parent
+  if (!ts.isObjectBindingPattern(pattern)) return null
+
+  const declaration = pattern.parent
+  if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) {
+    return null
+  }
+
+  const key = staticName(node.propertyName ?? node.name)
+  if (!key) return null
+
+  const source = unwrapExpression(declaration.initializer)
+  if (
+    isBrowserRoot(source) &&
+    (key === 'fetch' || networkConstructors.has(key))
+  ) {
+    return key
+  }
+
+  if (key === 'sendBeacon' && isNavigatorObject(source)) {
+    return 'navigator.sendBeacon'
+  }
+
+  return null
+}
+
 function isSyntaxName(node) {
   const parent = node.parent
   if (!parent) return false
@@ -118,7 +152,8 @@ function isSyntaxName(node) {
     (ts.isClassExpression(parent) && parent.name === node) ||
     (ts.isImportClause(parent) && parent.name === node) ||
     (ts.isImportSpecifier(parent) && parent.name === node) ||
-    (ts.isBindingElement(parent) && parent.name === node)
+    (ts.isBindingElement(parent) &&
+      (parent.name === node || parent.propertyName === node))
   )
 }
 
@@ -192,6 +227,17 @@ function findDirectProductionNetworkAccess(source, filename = 'candidate.tsx') {
           }
           return
         }
+      }
+    }
+
+    if (ts.isBindingElement(node)) {
+      const referenceName = bindingElementNetworkReference(node)
+      if (referenceName) {
+        finding = {
+          kind: referenceName + ' destructured reference',
+          text: node.getText(sourceFile),
+        }
+        return
       }
     }
 
@@ -292,6 +338,19 @@ test('network boundary catches detached browser networking references', () => {
   }
 })
 
+test('network boundary binds destructured references to browser globals', () => {
+  for (const source of [
+    'const { fetch: request } = window',
+    'const { fetch } = globalThis',
+    'const { WebSocket: Socket } = self',
+    'const { XMLHttpRequest: Xhr } = window',
+    'const { sendBeacon: beacon } = navigator',
+    "const { ['sendBeacon']: beacon } = globalThis.navigator",
+  ]) {
+    assert.ok(findDirectProductionNetworkAccess(source), source)
+  }
+})
+
 test('network boundary ignores comments, strings and unrelated object methods', () => {
   for (const source of [
     "// fetch('/example')",
@@ -302,6 +361,9 @@ test('network boundary ignores comments, strings and unrelated object methods', 
     'const request = api.fetch',
     'const Socket = transport.WebSocket',
     'const beacon = telemetry.sendBeacon',
+    'const { fetch: request } = api',
+    'const { WebSocket: Socket } = transport',
+    'const { sendBeacon: beacon } = telemetry',
     "const config = { fetch: 'local', WebSocket: 'local' }",
     'const fetch = 1',
     'class WebSocket {}',
