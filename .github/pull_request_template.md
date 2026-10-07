@@ -25,6 +25,8 @@ What this evidence does **not** prove:
 
 ## Exact-head validation
 
+Exact base SHA:
+
 Exact head SHA:
 
 Validation commands executed on that exact head:
@@ -45,6 +47,14 @@ Required gates / run IDs and conclusions:
 
 - [ ] Every validation result cited above belongs to the exact head SHA written above; I did not reuse an older green run after changing the branch.
 - [ ] Any dedicated path-selected workflow required by the changed paths passed on the exact PR head, or I explained why no such workflow applies.
+
+## Current-main compatibility
+
+Current `main` SHA at landing check:
+
+Branch relation to current `main` (`ahead / behind`):
+
+- [ ] I rechecked current `main` after validation. If it moved since the recorded base, I either replayed/rebased the isolated change onto current `main` and reran required exact-head validation, or documented why the existing head remains safe and merge-compatible.
 
 ## M3 claim impact
 
