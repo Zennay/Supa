@@ -69,6 +69,21 @@ function staticNumberFromAttribute(attribute) {
   return null
 }
 
+function staticStringFromAttribute(attribute) {
+  if (!attribute?.initializer) return null
+
+  if (ts.isStringLiteral(attribute.initializer)) {
+    return attribute.initializer.text
+  }
+
+  if (!ts.isJsxExpression(attribute.initializer) || !attribute.initializer.expression) {
+    return null
+  }
+
+  const expression = unwrapExpression(attribute.initializer.expression)
+  return ts.isStringLiteralLike(expression) ? expression.text : null
+}
+
 function staticBooleanFromAttribute(attribute) {
   if (!attribute) return null
   if (!attribute.initializer) return true
@@ -91,19 +106,7 @@ function staticBooleanFromAttribute(attribute) {
 }
 
 function hasStaticHref(attributes) {
-  const href = attributeByName(attributes, 'href')
-  if (!href?.initializer) return false
-
-  if (ts.isStringLiteral(href.initializer)) return true
-  if (!ts.isJsxExpression(href.initializer) || !href.initializer.expression) {
-    return false
-  }
-
-  const expression = unwrapExpression(href.initializer.expression)
-  return (
-    ts.isStringLiteralLike(expression) ||
-    ts.isNoSubstitutionTemplateLiteral(expression)
-  )
+  return staticStringFromAttribute(attributeByName(attributes, 'href')) !== null
 }
 
 function intrinsicTagName(node) {
@@ -139,15 +142,26 @@ function findFocusAccessibilityEscapeHatch(source, filename = 'candidate.tsx') {
       return
     }
 
-    const ariaHidden = attributeByName(node.attributes, 'aria-hidden')
-    if (staticBooleanFromAttribute(ariaHidden) !== true) return
-
     const tagName = intrinsicTagName(node)
     const isInteractive =
       (tagName !== null && alwaysInteractiveTags.has(tagName)) ||
       (tagName === 'a' && hasStaticHref(node.attributes))
 
-    if (isInteractive) {
+    if (!isInteractive) return
+
+    const role = staticStringFromAttribute(attributeByName(node.attributes, 'role'))
+      ?.trim()
+      .toLowerCase()
+    if (role === 'none' || role === 'presentation') {
+      finding = {
+        kind: 'interactive element with suppressed native role',
+        text: node.getText(sourceFile),
+      }
+      return
+    }
+
+    const ariaHidden = attributeByName(node.attributes, 'aria-hidden')
+    if (staticBooleanFromAttribute(ariaHidden) === true) {
       finding = {
         kind: 'aria-hidden interactive element',
         text: node.getText(sourceFile),
@@ -219,7 +233,7 @@ test('focus accessibility guard rejects positive tab order and automatic focus',
   }
 })
 
-test('focus accessibility guard rejects hiding intrinsic interactive controls', () => {
+test('focus accessibility guard rejects hiding or suppressing intrinsic interactive controls', () => {
   for (const source of [
     '<button aria-hidden="true">Hidden</button>',
     '<input aria-hidden={true} />',
@@ -228,6 +242,9 @@ test('focus accessibility guard rejects hiding intrinsic interactive controls', 
     '<textarea aria-hidden={true} />',
     '<a href="/help" aria-hidden="true">Help</a>',
     "<a href={('/help')} aria-hidden={(true)}>Help</a>",
+    '<button role="presentation">Hidden semantics</button>',
+    '<input role={"none"} />',
+    '<a href="/help" role="none">Help</a>',
   ]) {
     assert.ok(findFocusAccessibilityEscapeHatch(source), source)
   }
@@ -241,6 +258,8 @@ test('focus accessibility guard preserves intentional non-positive focus and pre
     '<strong aria-hidden={true}>Presentation copy</strong>',
     '<a aria-hidden="true">Not a link</a>',
     '<button aria-hidden={false}>Visible</button>',
+    '<div role="presentation">Decorative wrapper</div>',
+    '<span role="none">Decorative text</span>',
     'const note = "tabIndex={2} autoFocus aria-hidden=true"',
   ]) {
     assert.equal(findFocusAccessibilityEscapeHatch(source), null, source)
