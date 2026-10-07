@@ -15,7 +15,7 @@ Ownership or coordination notes:
 
 ## Evidence boundary
 
-- [ ] Mock, generated, deterministic, replayed, or fixture data in this PR is test material only; it is **not** genuine retailer evidence and is **not** proof of savings.
+- [ ] Mock, generated, deterministic, replayed, or fixture data in this PR is test material only; it is not genuine retailer evidence and is not proof of savings.
 - [ ] I did not infer or fabricate retailer observations, prices, pack data, basket outcomes, stakeholder responses, user evidence, or savings results.
 - [ ] M3 remains open unless the genuine same-demand **PLUS baseline + DekaMarkt candidate** observation required by issue #78 has been collected in one valid price context and accepted by the canonical converter/assessment path.
 
