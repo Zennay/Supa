@@ -130,3 +130,45 @@ test('PLUS rendered evidence binds parsed product identity to the source URL', a
     reason: 'PLUS rendered evidence product identity does not match source URL',
   })
 })
+
+
+test('PLUS rendered evidence binds declared Product JSON-LD URL to the source page', async () => {
+  for (const productUrl of [
+    'https://www.plus.nl/product/andere-slug-579010',
+    'https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-999999',
+    'https://example.invalid/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010',
+    '',
+    null,
+    579010,
+  ]) {
+    const evidence = await fixture()
+    evidence.jsonLd.url = productUrl
+
+    assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence Product JSON-LD URL does not match source URL',
+    })
+  }
+
+  const withoutDeclaredUrl = await fixture()
+  delete withoutDeclaredUrl.jsonLd.url
+  assert.equal(parsePlusRenderedProductEvidence(withoutDeclaredUrl).type, 'observation')
+})
+
+
+test('PLUS Product URL binding also applies to supported @graph JSON-LD', async () => {
+  const evidence = await fixture()
+  evidence.jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [evidence.jsonLd],
+  }
+
+  assert.equal(parsePlusRenderedProductEvidence(evidence).type, 'observation')
+
+  evidence.jsonLd['@graph'][0].url =
+    'https://www.plus.nl/product/andere-slug-579010'
+  assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence Product JSON-LD URL does not match source URL',
+  })
+})
