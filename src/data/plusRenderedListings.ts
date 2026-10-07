@@ -99,7 +99,12 @@ function validHttpsPlusUrl(
   if (typeof value !== 'string') return false
   try {
     const url = new URL(value)
-    if (url.protocol !== 'https:' || url.hostname !== 'www.plus.nl') {
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname !== 'www.plus.nl' ||
+      url.username ||
+      url.password
+    ) {
       return false
     }
 
