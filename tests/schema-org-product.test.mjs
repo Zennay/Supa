@@ -38,6 +38,63 @@ test('parses one conservative schema.org Product observation', () => {
   assert.equal(result.observation.offer.offerPriceCents, 129)
 })
 
+test('trusts availability only from canonical Schema.org enum identifiers', () => {
+  for (const [availability, expected] of [
+    ['http://schema.org/InStock', 'available'],
+    ['https://schema.org/LimitedAvailability', 'available'],
+    ['https://schema.org/OutOfStock', 'unavailable'],
+    ['https://schema.org/SoldOut', 'unavailable'],
+    ['https://example.invalid/InStock', 'unknown'],
+    ['https://schema.org/InStock?source=other', 'unknown'],
+    ['https://schema.org/catalog/InStock', 'unknown'],
+    ['InStock', 'unknown'],
+  ]) {
+    const result = parseSchemaOrgProduct(
+      {
+        '@type': 'Product',
+        name: 'Milk',
+        offers: {
+          '@type': 'Offer',
+          price: '1.29',
+          priceCurrency: 'EUR',
+          availability,
+        },
+      },
+      provenance,
+    )
+
+    assert.equal(result.type, 'observation')
+    assert.equal(result.observation.availability, expected)
+  }
+})
+
+test('keeps multi-offer availability unknown when any explicit identifier is untrusted', () => {
+  const result = parseSchemaOrgProduct(
+    {
+      '@type': 'Product',
+      name: 'Milk',
+      offers: [
+        {
+          '@type': 'Offer',
+          price: '1.29',
+          priceCurrency: 'EUR',
+          availability: 'https://schema.org/InStock',
+        },
+        {
+          '@type': 'Offer',
+          price: '1.29',
+          priceCurrency: 'EUR',
+          availability: 'https://example.invalid/InStock',
+        },
+      ],
+    },
+    provenance,
+  )
+
+  assert.equal(result.type, 'observation')
+  assert.equal(result.observation.availability, 'unknown')
+})
+
 test('finds a Product inside an @graph', () => {
   const result = parseSchemaOrgProduct(
     {
