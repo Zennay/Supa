@@ -25,7 +25,7 @@ function unwrapExpression(node) {
 function staticAttributeValue(initializer) {
   if (!initializer) return null
 
-  if (ts.isStringLiteral(initializer)) return initializer.text
+  if (ts.isStringLiteralLike(initializer)) return initializer.text
 
   if (ts.isJsxExpression(initializer) && initializer.expression) {
     const expression = unwrapExpression(initializer.expression)
@@ -50,8 +50,8 @@ function attributeName(name) {
 
 function normalizeSchemeInput(value) {
   return value
-    .replace(/[\\t\\n\\r]/g, '')
-    .replace(/^[\\u0000-\\u0020]+/, '')
+    .replace(/[\t\n\r]/g, '')
+    .replace(/^[\u0000-\u0020]+/, '')
     .toLowerCase()
 }
 
