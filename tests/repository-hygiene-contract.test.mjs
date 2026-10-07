@@ -34,6 +34,9 @@ async function trackedPaths() {
   return stdout.split('\0').filter(Boolean)
 }
 
+const windowsReservedName = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu
+const crossPlatformForbiddenCharacters = /[<>:"\\|?*\u0000-\u001f\u007f]/u
+
 function forbiddenTrackedPath(path) {
   const segments = path.split('/')
   const filename = segments.at(-1) ?? ''
@@ -104,5 +107,28 @@ test('tracked paths stay unique on case-insensitive Unicode-normalizing filesyst
     `tracked paths must not collide cross-platform: ${collisions
       .map(([left, right]) => `${left} <-> ${right}`)
       .join(', ')}`,
+  )
+})
+
+test('tracked path segments remain checkout-safe across common filesystems', async () => {
+  const unsafe = []
+
+  for (const path of await trackedPaths()) {
+    for (const segment of path.split('/')) {
+      if (
+        crossPlatformForbiddenCharacters.test(segment) ||
+        /[ .]$/u.test(segment) ||
+        windowsReservedName.test(segment)
+      ) {
+        unsafe.push(path)
+        break
+      }
+    }
+  }
+
+  assert.deepEqual(
+    unsafe.sort(),
+    [],
+    `tracked paths must use cross-platform-safe names: ${unsafe.sort().join(', ')}`,
   )
 })
