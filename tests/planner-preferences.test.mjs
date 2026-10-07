@@ -311,3 +311,38 @@ test('M2 planner preferences fail closed on non-canonical or malformed defaults'
     )
   }
 })
+
+
+test('M2 planner preferences fall back to canonical budgets for malformed runtime budget contracts', () => {
+  for (const malformedContract of [null, {}, '30,35,40', 35, true]) {
+    const preferences = parsePlannerPreferences(
+      JSON.stringify({
+        budget: 40,
+        activeDays: ['Ma'],
+        recipeByDay: {},
+      }),
+      m2InitialPlan,
+      recipeIds,
+      35,
+      malformedContract,
+    )
+
+    assert.equal(preferences.budget, 40)
+  }
+})
+
+test('M2 planner preferences filter malformed entries from array budget contracts', () => {
+  const preferences = parsePlannerPreferences(
+    JSON.stringify({
+      budget: 55,
+      activeDays: ['Ma'],
+      recipeByDay: {},
+    }),
+    m2InitialPlan,
+    recipeIds,
+    45,
+    [null, '50', Number.NaN, 45, 55, Number.POSITIVE_INFINITY],
+  )
+
+  assert.equal(preferences.budget, 55)
+})
