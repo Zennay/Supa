@@ -92,6 +92,15 @@ function sourceImportsNodeTest(source) {
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
       node.initializer &&
+      isCreateRequireCallee(node.initializer)
+    ) {
+      createRequireAliases.add(node.name.text)
+    }
+
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
       ts.isCallExpression(node.initializer) &&
       isCreateRequireCallee(node.initializer.expression)
     ) {
@@ -289,6 +298,9 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import * as moduleApi from 'node:module'; const testApi = moduleApi['createRequire'](import.meta.url)('node:test')",
     "import moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
     "import moduleApi from 'node:module'; const testApi = moduleApi['createRequire'](import.meta.url)('node:test')",
+    "import { createRequire } from 'node:module'; const makeRequire = createRequire; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
+    "import * as moduleApi from 'node:module'; const makeRequire = moduleApi.createRequire; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
+    "import moduleApi from 'node:module'; const makeRequire = moduleApi['createRequire']; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
     "import { createRequire } from 'node:module'; const testApi = createRequire(import.meta.url)('node:test')",
     "const testApi = process.getBuiltinModule('node:test')",
     'const testApi = process["getBuiltinModule"]("node:test")',
@@ -311,6 +323,7 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "import { createRequire } from './helper.mjs'; const load = createRequire(import.meta.url); const testApi = load('node:test')",
     "import * as helper from './helper.mjs'; const load = helper.createRequire(import.meta.url); const testApi = load('node:test')",
     "import helper from './helper.mjs'; const load = helper.createRequire(import.meta.url); const testApi = load('node:test')",
+    "import * as helper from './helper.mjs'; const makeRequire = helper.createRequire; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
     "import type moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
     "import type * as moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
     "import { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const fs = load('node:fs')",
