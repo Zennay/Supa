@@ -31,6 +31,7 @@ function sourceImportsNodeTest(source) {
   )
   let importsNodeTest = false
   const createRequireAliases = new Set()
+  const nodeModuleNamespaceAliases = new Set()
   const runtimeRequireAliases = new Set()
 
   function isNodeTestSpecifier(node) {
@@ -54,9 +55,28 @@ function sourceImportsNodeTest(source) {
           }
         }
       }
+
+      if (bindings && ts.isNamespaceImport(bindings)) {
+        nodeModuleNamespaceAliases.add(bindings.name.text)
+      }
     }
 
     ts.forEachChild(node, collectCreateRequireImports)
+  }
+
+  function isCreateRequireCallee(node) {
+    return (
+      (ts.isIdentifier(node) && createRequireAliases.has(node.text)) ||
+      (ts.isPropertyAccessExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        nodeModuleNamespaceAliases.has(node.expression.text) &&
+        node.name.text === 'createRequire') ||
+      (ts.isElementAccessExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        nodeModuleNamespaceAliases.has(node.expression.text) &&
+        ts.isStringLiteralLike(node.argumentExpression) &&
+        node.argumentExpression.text === 'createRequire')
+    )
   }
 
   function collectRuntimeRequireAliases(node) {
@@ -65,8 +85,7 @@ function sourceImportsNodeTest(source) {
       ts.isIdentifier(node.name) &&
       node.initializer &&
       ts.isCallExpression(node.initializer) &&
-      ts.isIdentifier(node.initializer.expression) &&
-      createRequireAliases.has(node.initializer.expression.text)
+      isCreateRequireCallee(node.initializer.expression)
     ) {
       runtimeRequireAliases.add(node.name.text)
     }
@@ -116,8 +135,7 @@ function sourceImportsNodeTest(source) {
         ts.isIdentifier(callee) && runtimeRequireAliases.has(callee.text)
       const isDirectCreateRequireLoad =
         ts.isCallExpression(callee) &&
-        ts.isIdentifier(callee.expression) &&
-        createRequireAliases.has(callee.expression.text)
+        isCreateRequireCallee(callee.expression)
       const isModuleRequire =
         (ts.isPropertyAccessExpression(callee) &&
           ts.isIdentifier(callee.expression) &&
@@ -259,6 +277,8 @@ test('test discovery recognizes node:test modules even without test-like filenam
     'const testApi = module["require"]("node:test")',
     "import { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const testApi = load('node:test')",
     "import { createRequire as makeRequire } from 'node:module'; const load = makeRequire(import.meta.url); const testApi = load('node:test')",
+    "import * as moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
+    "import * as moduleApi from 'node:module'; const testApi = moduleApi['createRequire'](import.meta.url)('node:test')",
     "import { createRequire } from 'node:module'; const testApi = createRequire(import.meta.url)('node:test')",
     "const testApi = process.getBuiltinModule('node:test')",
     'const testApi = process["getBuiltinModule"]("node:test")',
@@ -279,6 +299,8 @@ test('test discovery recognizes node:test modules even without test-like filenam
     "const testApi = helper.require('node:test')",
     "import type { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const testApi = load('node:test')",
     "import { createRequire } from './helper.mjs'; const load = createRequire(import.meta.url); const testApi = load('node:test')",
+    "import * as helper from './helper.mjs'; const load = helper.createRequire(import.meta.url); const testApi = load('node:test')",
+    "import type * as moduleApi from 'node:module'; const load = moduleApi.createRequire(import.meta.url); const testApi = load('node:test')",
     "import { createRequire } from 'node:module'; const load = createRequire(import.meta.url); const fs = load('node:fs')",
     "const fs = process.getBuiltinModule('node:fs')",
     "const testApi = helper.getBuiltinModule('node:test')",
