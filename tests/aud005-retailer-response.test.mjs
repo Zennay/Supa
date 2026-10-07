@@ -77,6 +77,10 @@ test('AUD-005 response validator rejects malformed observation timestamps', () =
   for (const observedAt of [
     '2026-02-30T06:00:00.000Z',
     '2026-13-05T06:00:00.000Z',
+    '2026-10-05T24:00:00.000Z',
+    '2026-10-05T06:60:00.000Z',
+    '2026-10-05T06:00:60.000Z',
+    '2026-10-05T06:00:00.000+24:00',
     '10/05/2026 06:00:00',
   ]) {
     const record = validRecord()
