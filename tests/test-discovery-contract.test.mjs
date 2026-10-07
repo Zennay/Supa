@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
-import { dirname, relative, sep } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -14,15 +14,15 @@ async function collectTestFiles(directory) {
   const files = []
 
   for (const entry of entries) {
-    const path = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, directory.endsWith('/') ? directory : `${directory}/`)
+    const entryPath = join(directory, entry.name)
 
     if (entry.isDirectory()) {
-      files.push(...await collectTestFiles(fileURLToPath(path)))
+      files.push(...await collectTestFiles(entryPath))
       continue
     }
 
     if (entry.isFile() && entry.name.endsWith('.test.mjs')) {
-      files.push(fileURLToPath(path))
+      files.push(entryPath)
     }
   }
 
