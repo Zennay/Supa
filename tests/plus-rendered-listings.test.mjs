@@ -29,7 +29,7 @@ test('parses reviewed PLUS rendered catalog cards from exact observed DOM contra
   assert.equal(result.observations.length, 4)
 
   const milk = result.observations.find(
-    (observation) => observation.sourceProductId === '113651',
+    (observation) => observation.sourceProductId === '579010',
   )
   assert.ok(milk)
   assert.equal(milk.name, 'Zuivelmeester Halfvolle melk')
@@ -236,7 +236,7 @@ test('PLUS listing cards reject product hrefs that escape the product route afte
   assert.equal(result.observations.length, 3)
   assert.equal(result.abstained, 1)
   assert.equal(
-    result.observations.some((observation) => observation.sourceProductId === '579010'),
+    result.observations.some((observation) => observation.sourceProductId === '113651'),
     false,
   )
 })
