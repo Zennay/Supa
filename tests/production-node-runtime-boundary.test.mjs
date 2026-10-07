@@ -6,6 +6,7 @@ import * as ts from 'typescript'
 
 const srcDir = new URL('../src/', import.meta.url)
 const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx'])
+const browserRoots = new Set(['globalThis', 'self', 'window'])
 
 function scriptKindFor(filename) {
   switch (path.extname(filename)) {
@@ -143,6 +144,8 @@ function findNodeRuntimeUsage(source, filename = 'candidate.tsx') {
 
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const base = unwrapExpression(node.expression)
+      const member = staticMemberName(node)
+
       if (ts.isIdentifier(base) && base.text === 'process') {
         record('Node process reference', node)
         return
@@ -151,15 +154,25 @@ function findNodeRuntimeUsage(source, filename = 'candidate.tsx') {
         record('Node Buffer reference', node)
         return
       }
+      if (
+        ts.isIdentifier(base) &&
+        browserRoots.has(base.text) &&
+        (member === 'process' || member === 'Buffer')
+      ) {
+        record('browser-root Node runtime reference', node)
+        return
+      }
     }
 
-    if (
-      ts.isIdentifier(node) &&
-      isIdentifierReference(node) &&
-      (node.text === '__dirname' || node.text === '__filename')
-    ) {
-      record('Node path global reference', node)
-      return
+    if (ts.isIdentifier(node) && isIdentifierReference(node)) {
+      if (node.text === 'process' || node.text === 'Buffer') {
+        record('detached Node runtime global reference', node)
+        return
+      }
+      if (node.text === '__dirname' || node.text === '__filename') {
+        record('Node path global reference', node)
+        return
+      }
     }
 
     ts.forEachChild(node, visit)
@@ -215,7 +228,11 @@ test('Node-runtime boundary rejects browser-incompatible production primitives',
     "const fs = await import('node:fs')",
     "process.env.SUPA_TOKEN",
     "process['argv'][0]",
+    "const runtimeProcess = process",
+    "window.process.env.SUPA_TOKEN",
     "Buffer.from('abc')",
+    "const RuntimeBuffer = Buffer",
+    "globalThis['Buffer'].from('abc')",
     "new Buffer(16)",
     "require('node:path')",
     "module['require']('node:fs')",
