@@ -10,6 +10,9 @@ const packageJson = JSON.parse(
   await readFile(new URL('../package.json', import.meta.url), 'utf8'),
 )
 const TEST_LIKE_FILENAME = /\.(?:test|spec)\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
+const NODE_TEST_SOURCE_FILENAME = /\.(?:mjs|cjs|js|jsx|mts|cts|ts|tsx)$/i
+const NODE_TEST_IMPORT_PATTERN =
+  /(?:\bfrom\s*['"]node:test['"]|\bimport\s*['"]node:test['"]|\bimport\s*\(\s*['"]node:test['"]\s*\)|\brequire\s*\(\s*['"]node:test['"]\s*\))/
 const NON_SOURCE_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage'])
 
 function isTestLikeEntry(entry) {
@@ -17,6 +20,10 @@ function isTestLikeEntry(entry) {
     (entry.isFile() || entry.isSymbolicLink()) &&
     TEST_LIKE_FILENAME.test(entry.name)
   )
+}
+
+function sourceImportsNodeTest(source) {
+  return NODE_TEST_IMPORT_PATTERN.test(source)
 }
 
 async function collectTestLikeFiles(directory) {
@@ -35,6 +42,12 @@ async function collectTestLikeFiles(directory) {
 
     if (isTestLikeEntry(entry)) {
       files.push(entryPath)
+      continue
+    }
+
+    if (entry.isFile() && NODE_TEST_SOURCE_FILENAME.test(entry.name)) {
+      const source = await readFile(entryPath, 'utf8')
+      if (sourceImportsNodeTest(source)) files.push(entryPath)
     }
   }
 
@@ -93,6 +106,29 @@ test('test discovery recognizes common JS, TS and React test extensions', () => 
   }
 })
 
+test('test discovery recognizes node:test modules even without test-like filenames', () => {
+  for (const source of [
+    "import check from 'node:test'",
+    "import { test as check } from 'node:test'",
+    "import 'node:test'",
+    "const testApi = await import( 'node:test' )",
+    'const testApi = require( "node:test" )',
+  ]) {
+    assert.equal(sourceImportsNodeTest(source), true, source)
+  }
+
+  for (const source of [
+    "import check from './node-test-helper.mjs'",
+    "const label = 'node:test'",
+  ]) {
+    assert.equal(sourceImportsNodeTest(source), false, source)
+  }
+
+  assert.equal(
+    isSelectedByCanonicalNpmTestGlob(join('tests', 'regression.mjs')),
+    false,
+  )
+})
 test('test discovery classifies test-like symlinks without following symlink directories', () => {
   const symlinkedTest = {
     name: 'hidden.spec.mjs',
