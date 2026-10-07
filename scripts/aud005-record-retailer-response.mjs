@@ -224,11 +224,21 @@ export function buildPrivacySafeRetailerResponse(input) {
 function parseArgs(argv) {
   const positional = []
   let output = null
+  let outputSeen = false
 
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]
     if (value === '--output') {
-      output = argv[index + 1] ?? null
+      assert(!outputSeen, '--output may only be specified once')
+      const candidate = argv[index + 1]
+      assert(
+        typeof candidate === 'string' &&
+          candidate.trim().length > 0 &&
+          !candidate.startsWith('--'),
+        '--output requires a file path',
+      )
+      output = candidate
+      outputSeen = true
       index += 1
       continue
     }
@@ -239,7 +249,6 @@ function parseArgs(argv) {
     positional.length === 1,
     'usage: aud005-record-retailer-response <response.json> [--output privacy-safe.json]',
   )
-  assert(!output || output.trim().length > 0, '--output requires a file path')
   return { input: positional[0], output }
 }
 
