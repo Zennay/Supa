@@ -108,6 +108,16 @@ function safePlusProductUrl(value: unknown): value is string {
   }
 }
 
+function plusProductIdFromUrl(value: string): string | null {
+  try {
+    const url = new URL(value)
+    const match = url.pathname.match(/(?:-|\/)(\d+)\/?$/)
+    return match ? match[1] : null
+  } catch {
+    return null
+  }
+}
+
 export function parsePlusRenderedProductEvidence(
   evidence: PlusRenderedProductEvidence,
 ): SchemaOrgParseResult {
@@ -173,5 +183,19 @@ export function parsePlusRenderedProductEvidence(
     }
   }
 
-  return parseSchemaOrgProduct(evidence.jsonLd, evidence.source)
+  const parsed = parseSchemaOrgProduct(evidence.jsonLd, evidence.source)
+  if (parsed.type !== 'observation') return parsed
+
+  const expectedProductId = plusProductIdFromUrl(evidence.source.url)
+  if (
+    expectedProductId === null ||
+    parsed.observation.sourceProductId !== expectedProductId
+  ) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence product identity does not match source URL',
+    }
+  }
+
+  return parsed
 }
