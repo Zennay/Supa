@@ -16,7 +16,10 @@ function canonicalPresentationUnit(unit: unknown): MatchUnit {
  */
 export function quantityUnitNameNl(unit: unknown): string {
   const canonicalUnit = canonicalPresentationUnit(unit)
-  return canonicalUnit === 'piece' ? 'stuk' : canonicalUnit
+
+  if (canonicalUnit === 'piece') return 'stuk'
+  if (canonicalUnit === 'unknown') return 'onbekend'
+  return canonicalUnit
 }
 
 export function quantityUnitLabelNl(unit: unknown, amount: number | null): string {
