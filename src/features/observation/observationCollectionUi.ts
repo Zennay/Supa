@@ -118,10 +118,10 @@ export function nextObservationActionLabel(
 ): string {
   const baselineLines = observationLinesForSide(sheet, 'baseline')
   const candidateLines = observationLinesForSide(sheet, 'candidate')
-  validateObservationLineIdentities(baselineLines, 'baseline')
-  validateObservationLineIdentities(candidateLines, 'candidate')
 
   if (next === null) {
+    validateObservationLineIdentities(baselineLines, 'baseline')
+    validateObservationLineIdentities(candidateLines, 'candidate')
     let pending: ReturnType<typeof nextIncompleteObservationLine>
     try {
       pending = nextIncompleteObservationLine(sheet as ObservationSheet)
