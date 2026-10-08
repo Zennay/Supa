@@ -35,3 +35,30 @@ test('only exactly one piece is singular at the presentation boundary', () => {
   }
   assert.equal(quantityUnitLabelNl('piece', 1), 'stuk')
 })
+
+test('hostile object inputs cannot invoke conversion hooks in quantity labels', () => {
+  const hostile = Object.create(null)
+  Object.defineProperty(hostile, 'toString', {
+    get() { throw new Error('Unexpected toString access') },
+  })
+  Object.defineProperty(hostile, Symbol.toPrimitive, {
+    get() { throw new Error('Unexpected coercion access') },
+  })
+
+  for (const unit of [hostile, Symbol('piece'), 1n, new String('piece')]) {
+    assert.doesNotThrow(() => quantityUnitNameNl(unit))
+    assert.equal(quantityUnitNameNl(unit), 'onbekend')
+    assert.equal(quantityUnitLabelNl(unit, 1), 'onbekend')
+  }
+})
+
+test('presentation unit allowlist is exact for every canonical unit', () => {
+  const expected = new Map([
+    ['g', 'g'], ['kg', 'kg'], ['ml', 'ml'], ['l', 'l'],
+    ['piece', 'stuk'], ['unknown', 'onbekend'],
+  ])
+  for (const [unit, label] of expected) {
+    assert.equal(quantityUnitNameNl(unit), label)
+    assert.equal(quantityUnitLabelNl(unit, 1), label)
+  }
+})
