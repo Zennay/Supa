@@ -53,3 +53,34 @@ test('building the basket does not mutate caller-owned source snapshots', () => 
 
   assert.deepEqual({ plan, recipes, products, activeDays }, snapshots)
 })
+
+test('unrelated retailer products cannot influence a selected-store basket', () => {
+  const baseline = basketFor()
+  const foreignProducts = m2Products.map((product, index) => ({
+    ...product,
+    id: `foreign-product-${index}`,
+    storeId: 'other-store',
+    priceCents: 1,
+  }))
+  const basket = basketFor({
+    products: [...foreignProducts, ...m2Products],
+  })
+  assert.deepEqual(basket, baseline)
+})
+
+test('repeat basket evaluations preserve frozen input snapshots', () => {
+  const freezeDeep = (value) => {
+    if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+      Object.values(value).forEach(freezeDeep)
+      Object.freeze(value)
+    }
+    return value
+  }
+  const plan = freezeDeep(structuredClone(m2InitialPlan))
+  const recipes = freezeDeep(structuredClone(m2Recipes))
+  const products = freezeDeep(structuredClone(m2Products))
+  const activeDays = freezeDeep(structuredClone(m2DefaultActiveDays))
+  const first = basketFor({ plan, recipes, products, activeDays })
+  const second = basketFor({ plan, recipes, products, activeDays })
+  assert.deepEqual(second, first)
+})
