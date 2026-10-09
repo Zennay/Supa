@@ -14,6 +14,11 @@ function validateLockfile(value, pkg) {
   for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
     if (JSON.stringify(root?.[section] ?? {}) !== JSON.stringify(pkg[section] ?? {})) errors.push(`root ${section} differs from manifest`);
   }
+  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+    for (const name of Object.keys(pkg[section] ?? {})) {
+      if (!Object.hasOwn(value.packages, `node_modules/${name}`)) errors.push(`missing direct dependency: ${name}`);
+    }
+  }
   const entries = Object.entries(value.packages).filter(([path]) => path !== '');
   if (entries.length === 0) errors.push('empty dependency graph');
   for (const [path, dependency] of entries) {
@@ -46,6 +51,8 @@ test('reject tampered registry URL, weakened integrity and manifest drift', () =
   const copy = () => structuredClone(fixture);
   const outside = copy(); outside.packages['node_modules/react'].resolved = 'https://example.com/react.tgz';
   assert.match(validateLockfile(outside, pkg).join(' '), /non-registry source/);
+  const missingDirect = copy(); delete missingDirect.packages['node_modules/react'];
+  assert.match(validateLockfile(missingDirect, pkg).join(' '), /missing direct dependency: react/);
   const shortHash = copy(); shortHash.packages['node_modules/react'].integrity = 'sha512-YWJjZA==';
   assert.match(validateLockfile(shortHash, pkg).join(' '), /missing sha512 integrity/);
   const weak = copy(); weak.packages['node_modules/react'].integrity = 'sha1-YWJjZA==';
