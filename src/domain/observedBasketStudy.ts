@@ -149,10 +149,13 @@ export function assessWeeklyBasketStudy(
     options !== null &&
     typeof options === 'object' &&
     !Array.isArray(options)
-  const requestedMaxObservationWindowHours = validOptionsContainer
-    ? ((options as { maxObservationWindowHours?: unknown })
-        .maxObservationWindowHours ?? 24)
-    : 24
+  const configuredWindow = validOptionsContainer
+    ? (options as { maxObservationWindowHours?: unknown })
+        .maxObservationWindowHours
+    : undefined
+  // Missing means the canonical default; explicit null is malformed input.
+  const requestedMaxObservationWindowHours =
+    configuredWindow === undefined ? 24 : configuredWindow
   const validMaxObservationWindowHours =
     typeof requestedMaxObservationWindowHours === 'number' &&
     Number.isFinite(requestedMaxObservationWindowHours) &&
