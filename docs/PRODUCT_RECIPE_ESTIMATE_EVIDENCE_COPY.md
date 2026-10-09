@@ -26,7 +26,8 @@ assessment economics should be changed to hide this presentation defect.
   no mutation of the source fixtures.
 - `src/features/planner/RecipeEstimateDisclosure.ts` is an opt-in React
   element that exposes the truthful short label visually and the longer
-  explanation through a screen-reader-accessible `aria-label`.
+  explanation as a named semantic `role="note"` with an `aria-label`, not
+  just an unreliable hover tooltip.
 - `tests/product-recipe-estimate-rendered-disclosure.test.mjs` validates
   actual React server-rendered HTML including invalid-price and accessibility
   outcomes; no browser or retailer access is needed.
