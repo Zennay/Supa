@@ -52,3 +52,30 @@ test('M3 sheet refuses to overwrite an existing observation without altering byt
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test('M3 CLI template keeps demand identical for both retailers and observations unfilled', () => {
+  const result = execute()
+  assert.equal(result.status, 0, result.stderr)
+  const sheet = JSON.parse(result.stdout)
+  const expected = sheet.requirements.map(({ amount, unit }) => ({ amount, unit }))
+  assert.equal(sheet.requirements.length, 11)
+  for (const side of ['baseline', 'candidate']) {
+    assert.deepEqual(sheet[side].lines.map(({ requirement }) => requirement), expected)
+    assert.equal(sheet[side].evidenceId, '')
+    assert.equal(sheet[side].observedAt, '')
+    assert.equal(sheet[side].store.id, '')
+    for (const line of sheet[side].lines) {
+      assert.equal(line.observedProduct.priceCents, null)
+      assert.equal(line.observedProduct.available, null)
+    }
+  }
+  assert.equal(sheet.evidenceStatus, 'collection-template-not-evidence')
+})
+
+test('M3 CLI output is deterministic across independent invocations', () => {
+  const first = execute()
+  const second = execute()
+  assert.equal(first.status, 0, first.stderr)
+  assert.equal(second.status, 0, second.stderr)
+  assert.equal(first.stdout, second.stdout)
+})
