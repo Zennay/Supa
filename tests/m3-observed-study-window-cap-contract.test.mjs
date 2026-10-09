@@ -141,3 +141,27 @@ test('M3 cannot claim a populated basket whose meal count is zero', () => {
   assert.equal(assessment.comparison.savingsCents, null)
   assert.match(assessment.reasons.join(' '), /at least one selected meal/)
 })
+
+
+test('M3 rejects an explicitly null assessment window instead of treating it as omitted', () => {
+  const assessment = assessWeeklyBasketStudy(
+    controlledStudy('2026-10-02T11:00:00Z'),
+    { maxObservationWindowHours: null },
+  )
+
+  assert.equal(assessment.claimable, false)
+  assert.equal(assessment.comparison.outcome, 'unknown')
+  assert.equal(assessment.comparison.savingsCents, null)
+  assert.match(assessment.reasons.join(' '), /maxObservationWindowHours/)
+})
+
+test('M3 preserves the canonical default for an omitted window override', () => {
+  const assessment = assessWeeklyBasketStudy(
+    controlledStudy('2026-10-03T10:00:00Z'),
+    {},
+  )
+
+  assert.equal(assessment.observationWindowHours, 24)
+  assert.equal(assessment.claimable, true)
+  assert.equal(assessment.comparison.outcome, 'better')
+})
