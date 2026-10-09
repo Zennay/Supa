@@ -33,3 +33,11 @@ test('npm lifecycle guard preserves explicit dev, build and test commands', () =
   }), [])
   assert.deepEqual(forbiddenLifecycleHooks({}), [])
 })
+
+test('root package remains explicitly private to prevent accidental npm publication', async () => {
+  const manifest = JSON.parse(await readFile(manifestUrl, 'utf8'))
+  assert.equal(manifest.private, true, 'private must be the literal boolean true')
+  for (const privateFlag of [false, 'true', 1, null, undefined]) {
+    assert.notEqual(privateFlag, true)
+  }
+})
