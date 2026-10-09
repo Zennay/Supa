@@ -24,6 +24,12 @@ assessment economics should be changed to hide this presentation defect.
 - `tests/product-recipe-estimate-evidence-copy.test.mjs` validates current
   controlled recipe fixtures, edge amounts, false-value rejection and
   no mutation of the source fixtures.
+- `src/features/planner/RecipeEstimateDisclosure.ts` is an opt-in React
+  element that exposes the truthful short label visually and the longer
+  explanation through a screen-reader-accessible `aria-label`.
+- `tests/product-recipe-estimate-rendered-disclosure.test.mjs` validates
+  actual React server-rendered HTML including invalid-price and accessibility
+  outcomes; no browser or retailer access is needed.
 
 ## Owner-only production integration
 
@@ -33,15 +39,16 @@ presentation adapter **in the owner's branch** after reviewing the copy.
 Example (in the currently owned `PlannerView.tsx`, NOT modified here):
 
 ```tsx
-const recipeEstimate = recipeEstimatePresentation(recipe.estimatedCost)
-<small title={recipeEstimate.explanation}>{recipeEstimate.label}</small>
+<RecipeEstimateDisclosure estimatedCost={recipe.estimatedCost} />
 ```
 
-A title tooltip is NOT sufficient on its own as a discoverable explanation.
-The integrator should prefer a visible helper sentence or keyboard/screen
-reader accessible disclosure, using the returned `explanation`. It should
-also add rendered Firefox/DOM regression proving the screen cannot reintroduce
-the unqualified numeric `€… / recept` text.
+The component's `aria-label` makes the longer explanation available to
+screen readers without hover, while the short visible label openly says
+`Richtprijs`. A title tooltip is NOT sufficient for all sighted keyboard or
+touch users, so the integrator should consider a visible, keyboard-accessible
+`Waarom een richtprijs?` explanation in the final Planner UI. Add rendered
+Firefox/DOM regression proving the screen cannot reintroduce unqualified
+numeric `€… / recept` copy.
 
 **HOLD / not fixed for real users:** this branch deliberately changes only
 new files; the existing PlannerView is untouched to preserve #423 ownership.
