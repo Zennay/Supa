@@ -20,6 +20,9 @@ export function RecipeEstimateDisclosure({
   return createElement(
     'small',
     {
+      // A generic <small> has no guaranteed accessible name; role=note gives
+      // the explanation a named semantic node instead of relying on title.
+      role: 'note',
       'data-recipe-cost-kind': presentation.kind,
       title: presentation.explanation,
       'aria-label': `${presentation.label}. ${presentation.explanation}`,
