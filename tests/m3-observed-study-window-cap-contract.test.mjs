@@ -103,3 +103,41 @@ test('M3 permits stricter configured windows but still rejects late evidence', (
   assert.equal(assessment.comparison.outcome, 'unknown')
   assert.match(assessment.reasons.join(' '), /max is 12h/)
 })
+
+
+test('M3 cannot claim a mathematically neutral empty observed week', () => {
+  const value = controlledStudy('2026-10-02T11:00:00Z')
+  for (const side of ['baseline', 'candidate']) {
+    value[side].basket = {
+      ...value[side].basket,
+      selectedMealCount: 0,
+      lines: [],
+      matchedLineCount: 0,
+      unresolvedLineCount: 0,
+      totalCents: 0,
+    }
+  }
+
+  const assessment = assessWeeklyBasketStudy(value)
+
+  assert.equal(assessment.claimable, false)
+  assert.equal(assessment.comparison.outcome, 'unknown')
+  assert.equal(assessment.comparison.deltaCents, null)
+  assert.equal(assessment.comparison.savingsCents, null)
+  assert.deepEqual(assessment.comparison.lineDeltas, [])
+  assert.match(assessment.reasons.join(' '), /at least one selected meal/)
+  assert.match(assessment.reasons.join(' '), /at least one ingredient line/)
+})
+
+test('M3 cannot claim a populated basket whose meal count is zero', () => {
+  const value = controlledStudy('2026-10-02T11:00:00Z')
+  value.baseline.basket.selectedMealCount = 0
+  value.candidate.basket.selectedMealCount = 0
+
+  const assessment = assessWeeklyBasketStudy(value)
+
+  assert.equal(assessment.claimable, false)
+  assert.equal(assessment.comparison.outcome, 'unknown')
+  assert.equal(assessment.comparison.savingsCents, null)
+  assert.match(assessment.reasons.join(' '), /at least one selected meal/)
+})
