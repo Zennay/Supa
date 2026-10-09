@@ -102,3 +102,20 @@ test('M2: cent-exact non-integer euro budget is supported without sub-cent coerc
   assert.equal(result.remainingCents, 14)
   assert.equal(result.remainingLabel, euro.formatCents(14))
 })
+
+test('M2: every cent in a normal weekly basket range remains displayable', () => {
+  for (const budgetEuros of [30, 35, 40]) {
+    const budgetCents = budgetEuros * 100
+    for (let basketCents = 0; basketCents <= 6000; basketCents += 1) {
+      const result = assessPlannerBudgetCents(basketCents, budgetEuros, 0)
+      assert.equal(result.status, 'known')
+      assert.equal(result.remainingCents, budgetCents - basketCents)
+      assert.equal(
+        result.remainingLabel,
+        euro.formatCents(budgetCents - basketCents),
+      )
+      assert.notEqual(result.remainingLabel, '—')
+      assert.equal(result.overBudget, basketCents > budgetCents)
+    }
+  }
+})
