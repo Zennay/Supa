@@ -17,23 +17,20 @@ import {
 
 // Synthetic fixture assurance only. This is not a real PLUS/DekaMarkt field observation.
 const recipeChoices = m2Recipes.map((recipe) => recipe.id)
-const planVariants = [
-  { name: 'canonical', meals: m2InitialPlan },
-  {
-    name: 'all-second-recipe',
-    meals: m2InitialPlan.map((meal) => ({
-      ...meal,
-      recipeId: recipeChoices[1],
-    })),
-  },
-  {
-    name: 'rotated-recipes',
-    meals: m2InitialPlan.map((meal, index) => ({
-      ...meal,
-      recipeId: recipeChoices[(index + 1) % recipeChoices.length],
-    })),
-  },
-]
+function allPlannerRecipeChoices(plan, recipeIds) {
+  return plan.reduce(
+    (variants, meal) =>
+      variants.flatMap((variant) =>
+        recipeIds.map((recipeId) => ({
+          name: variant.name ? `${variant.name},${recipeId}` : recipeId,
+          meals: [...variant.meals, { ...meal, recipeId }],
+        })),
+      ),
+    [{ name: '', meals: [] }],
+  )
+}
+
+const planVariants = allPlannerRecipeChoices(m2InitialPlan, recipeChoices)
 
 function nonemptyDaySubsets(days) {
   return Array.from({ length: (1 << days.length) - 1 }, (_, index) => {
@@ -98,11 +95,15 @@ test('M3 synthetic product flow keeps equivalent demand across every active-day 
   }
 
   assert.equal(daySubsets.length, 15)
-  assert.equal(evaluated, 45)
+  assert.equal(planVariants.length, recipeChoices.length ** m2InitialPlan.length)
+  assert.equal(evaluated, 15 * (recipeChoices.length ** m2InitialPlan.length))
 })
 
 test('M3 synthetic product flow abstains when a valid planned basket loses a candidate product', () => {
-  const plan = planVariants[2].meals
+  const plan = planVariants.find(({ meals }) =>
+    new Set(meals.map((meal) => meal.recipeId)).size > 1,
+  )?.meals
+  assert.ok(plan)
   const activeDays = m2DefaultActiveDays
   const baseline = basketFor(m3BaselineStore, m3BaselineProducts, plan, activeDays)
   const completeCandidate = basketFor(
