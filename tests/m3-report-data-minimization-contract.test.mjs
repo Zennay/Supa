@@ -116,7 +116,7 @@ function observedStudy() {
   return study
 }
 
-function assertMinimised(report) {
+function assertMinimised(report, expectedClaimable = true, expectedOutcome = 'better') {
   assert.deepEqual(Object.keys(report).sort(), expectedReportFields)
   assert.deepEqual(Object.keys(report.baseline).sort(), expectedStoreFields)
   assert.deepEqual(Object.keys(report.candidate).sort(), expectedStoreFields)
@@ -124,8 +124,8 @@ function assertMinimised(report) {
     'comparisonDeltaCents', 'effectTotals', 'fullyAttributed', 'reasons', 'status',
   ])
   assert.equal(report.publicSavingsClaimEligible, false)
-  assert.equal(report.claimable, true, 'fixture exercises the claimable data path')
-  assert.equal(report.outcome, 'better')
+  assert.equal(report.claimable, expectedClaimable)
+  assert.equal(report.outcome, expectedOutcome)
 
   const serialized = JSON.stringify(report)
   for (const secret of secrets) {
@@ -135,6 +135,34 @@ function assertMinimised(report) {
 
 test('M3 report exposes only the explicitly reviewed summary schema, not raw observations', () => {
   assertMinimised(buildObservedWeekReport(observedStudy()))
+})
+
+test('M3 unknown evidence does not echo raw line diagnostics or invent a savings claim', () => {
+  const study = observedStudy()
+  const incomplete = study.candidate.basket
+  const matchedLine = incomplete.lines.find((line) => line.status === 'matched')
+  assert.ok(matchedLine)
+
+  // The synthetic candidate now has an explicitly unresolved observed ingredient.
+  incomplete.totalCents -= matchedLine.lineTotalCents
+  incomplete.matchedLineCount -= 1
+  incomplete.unresolvedLineCount += 1
+  matchedLine.status = 'unresolved'
+  matchedLine.matchScore = null
+  matchedLine.reasons = [secrets[3]]
+  delete matchedLine.productId
+  delete matchedLine.productName
+  delete matchedLine.packs
+  delete matchedLine.pack
+  delete matchedLine.pricePerPackCents
+  delete matchedLine.lineTotalCents
+  delete study.attributionEvidence
+
+  const report = buildObservedWeekReport(study)
+  assertMinimised(report, false, 'unknown')
+  assert.equal(report.deltaCents, null)
+  assert.equal(report.savingsCents, null)
+  assert.equal(report.attribution.status, 'unknown')
 })
 
 test('M3 CLI redacts private observation fields in stdout and output-file modes', async () => {
