@@ -193,3 +193,35 @@ test('M3 report CLI stdout and file paths agree for better, equal and worse bask
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('M3 rejected study metadata never leaks private source strings to CLI output', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-report-private-error-'))
+  const input = join(dir, 'study.json')
+  const output = join(dir, 'report.json')
+  const privateMarkers = [
+    'synthetic_private_participant_007',
+    'synthetic_private_receipt_marker_482',
+    'synthetic_private_product_marker_694',
+  ]
+
+  try {
+    const study = validStudy()
+    study.participantKey = privateMarkers[0]
+    study.candidate.provenanceNote = privateMarkers[1]
+    study.baseline.basket.lines[0].ingredientLabel = privateMarkers[2]
+    study.priceContext = 'mixed-inconsistent'
+    await writeFile(input, JSON.stringify(study), 'utf8')
+
+    const result = invoke(input, output)
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /priceContext must be in-store or online-order/)
+    assert.equal(result.stdout, '')
+    for (const marker of privateMarkers) {
+      assert.equal(result.stderr.includes(marker), false, `stderr leaked ${marker}`)
+      assert.equal(result.stdout.includes(marker), false, `stdout leaked ${marker}`)
+    }
+    await assert.rejects(readFile(output, 'utf8'), { code: 'ENOENT' })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
