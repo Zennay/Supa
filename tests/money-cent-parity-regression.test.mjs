@@ -29,3 +29,16 @@ test('bigint cents preserve precision beyond the safe number range', () => {
   assert.match(formatted, /01/)
   assert.notEqual(formatted, negativeFormatted)
 })
+
+test('euro amount formatter rejects floating artifacts instead of silently rounding', () => {
+  for (const value of [0.1 + 0.2, 1.005, -1.005, 0.001, -0.001, Number.MAX_SAFE_INTEGER]) {
+    assert.equal(euro.format(value), '—', `amount=${value}`)
+  }
+})
+
+test('one-cent boundaries remain signed and distinct', () => {
+  assert.notEqual(euro.formatCents(-1), euro.formatCents(0))
+  assert.notEqual(euro.formatCents(0), euro.formatCents(1))
+  assert.equal(euro.formatCents(1n), euro.format(0.01))
+  assert.equal(euro.formatCents(-1n), euro.format(-0.01))
+})
