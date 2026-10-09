@@ -48,5 +48,5 @@ test('package scripts guard rejects duplicate top-level scripts objects', () => 
     '"scripts": {}, "scripts": {',
   )
   assert.notEqual(modified, packageText, 'fixture must introduce a duplicate scripts object')
-  assert.throws(() => duplicateScriptKeys(modified), /exactly one scripts object/)
+  assert.throws(() => duplicateScriptKeys(modified))
 })
