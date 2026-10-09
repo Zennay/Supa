@@ -149,14 +149,18 @@ export function assessWeeklyBasketStudy(
     options !== null &&
     typeof options === 'object' &&
     !Array.isArray(options)
-  const requestedMaxObservationWindowHours = validOptionsContainer
-    ? ((options as { maxObservationWindowHours?: unknown })
-        .maxObservationWindowHours ?? 24)
-    : 24
+  const configuredWindow = validOptionsContainer
+    ? (options as { maxObservationWindowHours?: unknown })
+        .maxObservationWindowHours
+    : undefined
+  // Missing means the canonical default; explicit null is malformed input.
+  const requestedMaxObservationWindowHours =
+    configuredWindow === undefined ? 24 : configuredWindow
   const validMaxObservationWindowHours =
     typeof requestedMaxObservationWindowHours === 'number' &&
     Number.isFinite(requestedMaxObservationWindowHours) &&
-    requestedMaxObservationWindowHours > 0
+    requestedMaxObservationWindowHours > 0 &&
+    requestedMaxObservationWindowHours <= 24
   const maxObservationWindowHours = validMaxObservationWindowHours
     ? requestedMaxObservationWindowHours
     : 24
@@ -165,7 +169,7 @@ export function assessWeeklyBasketStudy(
   if (!validOptionsContainer) {
     reasons.push('assessment options must be a non-array object')
   } else if (!validMaxObservationWindowHours) {
-    reasons.push('maxObservationWindowHours must be a positive finite number')
+    reasons.push('maxObservationWindowHours must be a positive finite number no greater than 24')
   }
 
   if (study.schemaVersion !== 1) {
@@ -192,6 +196,23 @@ export function assessWeeklyBasketStudy(
 
   reasons.push(...validateEvidence('baseline', study.baseline))
   reasons.push(...validateEvidence('candidate', study.candidate))
+
+  // A mathematically equal zero-demand pair is not a meaningful weekly basket.
+  // Reject it at the observed-evidence boundary without changing planner semantics.
+  if (
+    study.baseline.basket.selectedMealCount === 0 ||
+    study.candidate.basket.selectedMealCount === 0
+  ) {
+    reasons.push('observed baskets require at least one selected meal')
+  }
+  if (
+    !Array.isArray(study.baseline.basket.lines) ||
+    !Array.isArray(study.candidate.basket.lines) ||
+    study.baseline.basket.lines.length === 0 ||
+    study.candidate.basket.lines.length === 0
+  ) {
+    reasons.push('observed baskets require at least one ingredient line')
+  }
 
   if (
     study.attributionEvidence !== undefined &&
