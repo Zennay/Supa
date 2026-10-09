@@ -65,7 +65,7 @@ function basket(store, priceAdjustment) {
   })
 }
 
-function observedStudy() {
+function observedStudy(candidatePriceAdjustment = -10) {
   const baselineStore = { id: 'plus-privacy-fixture', name: 'PLUS synthetic fixture' }
   const candidateStore = { id: 'dekamarkt-privacy-fixture', name: 'DekaMarkt synthetic fixture' }
 
@@ -89,7 +89,7 @@ function observedStudy() {
       observedAt: '2026-10-02T18:00:00Z',
       source: 'manual-cart',
       provenanceNote: secrets[1],
-      basket: basket(candidateStore, -10),
+      basket: basket(candidateStore, candidatePriceAdjustment),
     },
   }
 
@@ -135,6 +135,24 @@ function assertMinimised(report, expectedClaimable = true, expectedOutcome = 'be
 
 test('M3 report exposes only the explicitly reviewed summary schema, not raw observations', () => {
   assertMinimised(buildObservedWeekReport(observedStudy()))
+})
+
+test('M3 same and worse results preserve privacy-safe summary-only report shape', () => {
+  for (const [candidatePriceAdjustment, expectedOutcome] of [
+    [0, 'same'],
+    [25, 'worse'],
+  ]) {
+    const study = observedStudy(candidatePriceAdjustment)
+    const report = buildObservedWeekReport(study)
+    assertMinimised(report, true, expectedOutcome)
+    if (expectedOutcome === 'same') {
+      assert.equal(report.savingsCents, 0)
+      assert.equal(report.deltaCents, 0)
+    } else {
+      assert.ok(report.savingsCents < 0)
+      assert.ok(report.deltaCents > 0)
+    }
+  }
 })
 
 function incompleteObservedStudy() {
