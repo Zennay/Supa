@@ -47,3 +47,22 @@ test('empty active days yield no demand even if inactive recipes are missing', (
   assert.equal(result.matchedLineCount, 0)
   assert.equal(result.unresolvedLineCount, 0)
 })
+
+test('repeating a recipe on two distinct active days accumulates demand exactly once per day', () => {
+  const secondDay = '__second_active_day__'
+  const twoDayPlan = [activeMeal, { day: secondDay, recipeId: activeMeal.recipeId }]
+  const once = aggregatePlanIngredients([activeMeal], m2Recipes, [activeDay])
+  const twice = aggregatePlanIngredients(twoDayPlan, m2Recipes, [activeDay, secondDay])
+  assert.deepEqual(twice.map(({ id, amount }) => [id, amount]), once.map(({ id, amount }) => [
+    id,
+    amount === null ? null : amount * 2,
+  ]))
+  assert.equal(basket(twoDayPlan, [activeDay, secondDay]).selectedMealCount, 2)
+})
+
+test('two planned meals on one active day are rejected instead of double charged', () => {
+  assert.throws(
+    () => basket([activeMeal, { ...activeMeal }]),
+    /Ambiguous planned day/,
+  )
+})
