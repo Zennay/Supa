@@ -99,6 +99,64 @@ test('M3 synthetic product flow keeps equivalent demand across every active-day 
   assert.equal(evaluated, 15 * (recipeChoices.length ** m2InitialPlan.length))
 })
 
+test('M3 full-basket results stay neutral or honestly worse across all synthetic planner choices', () => {
+  const priceByName = new Map(m3BaselineProducts.map((product) => [
+    product.name,
+    product.priceCents,
+  ]))
+  assert.equal(priceByName.size, m3BaselineProducts.length)
+
+  for (const { name, meals } of planVariants) {
+    for (const activeDays of nonemptyDaySubsets(m2DefaultActiveDays)) {
+      const baseline = basketFor(
+        m3BaselineStore,
+        m3BaselineProducts,
+        meals,
+        activeDays,
+      )
+      const context = `${name} / ${activeDays.join(',')}`
+
+      for (const { surchargeCents, expectedOutcome } of [
+        { surchargeCents: 0, expectedOutcome: 'same' },
+        { surchargeCents: 25, expectedOutcome: 'worse' },
+      ]) {
+        const candidateProducts = m3CandidateProducts.map((product) => {
+          const baselinePriceCents = priceByName.get(product.name)
+          assert.notEqual(baselinePriceCents, undefined, product.name)
+          return {
+            ...product,
+            priceCents: baselinePriceCents + surchargeCents,
+          }
+        })
+        const candidate = basketFor(
+          m3CandidateStore,
+          candidateProducts,
+          meals,
+          activeDays,
+        )
+        const result = compareFullBaskets({ baseline, candidate })
+
+        assert.equal(candidate.unresolvedLineCount, 0, context)
+        assert.equal(result.claimable, true, `${context}: ${result.reasons.join('; ')}`)
+        assert.equal(result.outcome, expectedOutcome, context)
+        assert.equal(result.deltaCents, candidate.totalCents - baseline.totalCents, context)
+        assert.equal(result.savingsCents, -result.deltaCents, context)
+        assert.equal(
+          result.lineDeltas.reduce((sum, line) => sum + line.deltaCents, 0),
+          result.deltaCents,
+          context,
+        )
+        if (expectedOutcome === 'same') {
+          assert.equal(result.savingsCents, 0, context)
+        } else {
+          assert.ok(result.savingsCents < 0, context)
+          assert.ok(result.deltaCents > 0, context)
+        }
+      }
+    }
+  }
+})
+
 test('M3 synthetic product flow abstains when a valid planned basket loses a candidate product', () => {
   const plan = planVariants.find(({ meals }) =>
     new Set(meals.map((meal) => meal.recipeId)).size > 1,
