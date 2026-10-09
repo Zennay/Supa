@@ -78,7 +78,7 @@ test('M3 synthetic product flow keeps equivalent demand across every active-day 
       assert.equal(result.outcome, 'better', context)
       assert.ok(result.savingsCents > 0, context)
       assert.equal(result.deltaCents, candidate.totalCents - baseline.totalCents, context)
-      assert.equal(result.savingsCents, -result.deltaCents, context)
+      assert.equal(result.savingsCents, result.deltaCents === 0 ? 0 : -result.deltaCents, context)
       assert.equal(result.lineDeltas.length, baseline.matchedLineCount, context)
       assert.deepEqual(
         baseline.lines.map(({ id, requirement }) => ({ id, requirement })),
@@ -140,7 +140,7 @@ test('M3 full-basket results stay neutral or honestly worse across all synthetic
         assert.equal(result.claimable, true, `${context}: ${result.reasons.join('; ')}`)
         assert.equal(result.outcome, expectedOutcome, context)
         assert.equal(result.deltaCents, candidate.totalCents - baseline.totalCents, context)
-        assert.equal(result.savingsCents, -result.deltaCents, context)
+        assert.equal(result.savingsCents, result.deltaCents === 0 ? 0 : -result.deltaCents, context)
         assert.equal(
           result.lineDeltas.reduce((sum, line) => sum + line.deltaCents, 0),
           result.deltaCents,
