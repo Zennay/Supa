@@ -148,3 +148,48 @@ test('M3 report CLI writes a valid report only after successful validation', asy
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('M3 report CLI stdout and file paths agree for better, equal and worse baskets', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-report-outcome-parity-'))
+  const input = join(dir, 'study.json')
+  const output = join(dir, 'assessment.json')
+
+  try {
+    for (const [offset, outcome, savingsSign] of [
+      [-10, 'better', 1],
+      [0, 'same', 0],
+      [10, 'worse', -1],
+    ]) {
+      const study = validStudy()
+      study.candidate.basket = observedBasket(
+        { id: 'dekamarkt-integrity', name: 'DekaMarkt testfiliaal' },
+        offset,
+      )
+      const original = `${JSON.stringify(study, null, 2)}\n`
+      await writeFile(input, original, 'utf8')
+
+      const stdoutResult = spawnSync(
+        process.execPath,
+        ['--experimental-strip-types', CLI, input],
+        { cwd: process.cwd(), encoding: 'utf8' },
+      )
+      assert.equal(stdoutResult.status, 0, stdoutResult.stderr)
+      assert.equal(stdoutResult.stderr, '')
+
+      const fileResult = invoke(input, output)
+      assert.equal(fileResult.status, 0, fileResult.stderr)
+      assert.equal(fileResult.stdout, '')
+
+      const bytes = await readFile(output, 'utf8')
+      assert.equal(stdoutResult.stdout, bytes, `${outcome}: report delivery paths must agree byte-for-byte`)
+      const report = JSON.parse(bytes)
+      assert.equal(report.outcome, outcome)
+      assert.equal(report.claimable, true)
+      assert.equal(report.publicSavingsClaimEligible, false)
+      assert.equal(Math.sign(report.savingsCents), savingsSign)
+      assert.equal(await readFile(input, 'utf8'), original)
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
