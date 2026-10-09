@@ -194,6 +194,23 @@ export function assessWeeklyBasketStudy(
   reasons.push(...validateEvidence('baseline', study.baseline))
   reasons.push(...validateEvidence('candidate', study.candidate))
 
+  // A mathematically equal zero-demand pair is not a meaningful weekly basket.
+  // Reject it at the observed-evidence boundary without changing planner semantics.
+  if (
+    study.baseline.basket.selectedMealCount === 0 ||
+    study.candidate.basket.selectedMealCount === 0
+  ) {
+    reasons.push('observed baskets require at least one selected meal')
+  }
+  if (
+    !Array.isArray(study.baseline.basket.lines) ||
+    !Array.isArray(study.candidate.basket.lines) ||
+    study.baseline.basket.lines.length === 0 ||
+    study.candidate.basket.lines.length === 0
+  ) {
+    reasons.push('observed baskets require at least one ingredient line')
+  }
+
   if (
     study.attributionEvidence !== undefined &&
     !Array.isArray(study.attributionEvidence)
