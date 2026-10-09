@@ -10,10 +10,12 @@ function duplicateScriptKeys(source) {
   assert.equal(parsed.parseDiagnostics.length, 0, 'package.json must parse without errors')
   const root = parsed.statements[0]?.expression
   assert.ok(root && ts.isObjectLiteralExpression(root), 'package.json must be an object')
-  const scripts = root.properties.find(
+  const scriptEntries = root.properties.filter(
     (entry) => ts.isPropertyAssignment(entry) && entry.name.text === 'scripts',
   )
-  assert.ok(scripts && ts.isObjectLiteralExpression(scripts.initializer), 'scripts must be an object')
+  assert.equal(scriptEntries.length, 1, 'package.json must contain exactly one scripts object')
+  const [scripts] = scriptEntries
+  assert.ok(ts.isObjectLiteralExpression(scripts.initializer), 'scripts must be an object')
 
   const seen = new Set()
   const duplicates = []
@@ -38,4 +40,13 @@ test('package scripts duplicate-key guard rejects overwritten npm commands', () 
   )
   assert.notEqual(modified, packageText, 'fixture must insert a duplicate script')
   assert.deepEqual(duplicateScriptKeys(modified), ['test'])
+})
+
+test('package scripts guard rejects duplicate top-level scripts objects', () => {
+  const modified = packageText.replace(
+    '"scripts": {',
+    '"scripts": {}, "scripts": {',
+  )
+  assert.notEqual(modified, packageText, 'fixture must introduce a duplicate scripts object')
+  assert.throws(() => duplicateScriptKeys(modified), /exactly one scripts object/)
 })
