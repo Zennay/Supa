@@ -137,13 +137,13 @@ test('M3 report exposes only the explicitly reviewed summary schema, not raw obs
   assertMinimised(buildObservedWeekReport(observedStudy()))
 })
 
-test('M3 unknown evidence does not echo raw line diagnostics or invent a savings claim', () => {
+function incompleteObservedStudy() {
   const study = observedStudy()
   const incomplete = study.candidate.basket
   const matchedLine = incomplete.lines.find((line) => line.status === 'matched')
   assert.ok(matchedLine)
 
-  // The synthetic candidate now has an explicitly unresolved observed ingredient.
+  // Preserve a realistic unknown outcome without recording any real participant data.
   incomplete.totalCents -= matchedLine.lineTotalCents
   incomplete.matchedLineCount -= 1
   incomplete.unresolvedLineCount += 1
@@ -157,13 +157,47 @@ test('M3 unknown evidence does not echo raw line diagnostics or invent a savings
   delete matchedLine.pricePerPackCents
   delete matchedLine.lineTotalCents
   delete study.attributionEvidence
+  return study
+}
 
-  const report = buildObservedWeekReport(study)
+function assertUnknownReport(report) {
   assertMinimised(report, false, 'unknown')
   assert.equal(report.deltaCents, null)
   assert.equal(report.savingsCents, null)
   assert.equal(report.attribution.status, 'unknown')
+}
+
+test('M3 unknown evidence does not echo raw line diagnostics or invent a savings claim', () => {
+  assertUnknownReport(buildObservedWeekReport(incompleteObservedStudy()))
 })
+
+test('M3 CLI incomplete evidence emits an unknown privacy-safe report on both delivery paths', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-report-unknown-'))
+  const input = join(directory, 'incomplete.json')
+  const output = join(directory, 'unknown-report.json')
+
+  try {
+    await writeFile(input, JSON.stringify(incompleteObservedStudy()), 'utf8')
+    const run = (extraArgs) => spawnSync(
+      process.execPath,
+      ['--experimental-strip-types', 'scripts/m3-assess-observed-week.mjs', input, ...extraArgs],
+      { cwd: process.cwd(), encoding: 'utf8' },
+    )
+    const stdoutResult = run([])
+    assert.equal(stdoutResult.status, 0, stdoutResult.stderr)
+    assertUnknownReport(JSON.parse(stdoutResult.stdout))
+
+    const fileResult = run(['--output', output])
+    assert.equal(fileResult.status, 0, fileResult.stderr)
+    assert.equal(fileResult.stdout, '')
+    const fileReport = JSON.parse(await readFile(output, 'utf8'))
+    assertUnknownReport(fileReport)
+    assert.deepEqual(fileReport, JSON.parse(stdoutResult.stdout))
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 
 test('M3 CLI redacts private observation fields in stdout and output-file modes', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'supa-m3-report-privacy-'))
