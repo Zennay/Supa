@@ -50,3 +50,12 @@ test('package scripts guard rejects duplicate top-level scripts objects', () => 
   assert.notEqual(modified, packageText, 'fixture must introduce a duplicate scripts object')
   assert.throws(() => duplicateScriptKeys(modified))
 })
+
+test('package scripts guard recognizes escaped duplicate JSON names', () => {
+  const modified = packageText.replace(
+    '"scripts": {',
+    '"scripts": { "te\\u0073t": "node --version",',
+  )
+  assert.notEqual(modified, packageText, 'fixture must insert an escaped script key')
+  assert.deepEqual(duplicateScriptKeys(modified), ['test'])
+})
