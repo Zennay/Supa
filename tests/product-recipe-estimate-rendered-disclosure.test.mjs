@@ -12,6 +12,7 @@ test('rendered helper marks fixture values as estimates, never exact store total
     createElement(RecipeEstimateDisclosure, { estimatedCost: 4.5 }),
   )
   assert.match(html, /^<small[^>]+>/)
+  assert.match(html, /role="note"/)
   assert.match(html, /data-recipe-cost-kind="indicative"/)
   assert.match(html, />Richtprijs:.*\/ recept<\/small>$/)
   assert.match(html, /aria-label="Richtprijs:/)
