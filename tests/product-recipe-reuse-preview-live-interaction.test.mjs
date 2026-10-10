@@ -125,21 +125,62 @@ test('day and recipe choices preview without committing selection or changing mo
   assert.equal(m2InitialPlan.find(meal => meal.day === 'Di').recipeId, 'teriyaki')
 })
 
-test('a changed active plan drops the old day and candidate without stale preview', () => {
-  const ui = makeHarness()
+test('a changed active plan cannot silently apply a different day and candidate', () => {
+  const applied = []
+  const ui = makeHarness({
+    onChooseRecipe(day, recipeId) { applied.push([day, recipeId]) },
+  })
   ui.collect(ui.render(), 'button')[0].props.onClick()
   let tree = ui.render()
   ui.collect(tree, 'select')[0].props.onChange({ target: { value: 'Di' } })
   tree = ui.render()
   ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+
   tree = ui.update({ activeDays: ['Wo'] })
   const selects = ui.collect(tree, 'select')
   assert.equal(selects[0].props.value, 'Wo')
   assert.equal(selects[1].props.value, 'tikka')
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 2, 'only toggle and refresh, no apply')
+  assert.match(JSON.stringify(tree), /planning is veranderd/)
+  assert.deepEqual(applied, [])
+
+  ui.collect(tree, 'button')[1].props.onClick()
+  tree = ui.render()
   const preview = ui.collect(tree, PreviewCard)[0].props.preview
   assert.equal(preview.day, 'Wo')
   assert.equal(preview.previousRecipeId, 'pasta')
   assert.equal(preview.nextRecipeId, 'tikka')
+  const buttons = ui.collect(tree, 'button')
+  assert.equal(buttons.length, 2, 'toggle and explicit apply after fresh preview')
+  buttons[1].props.onClick()
+  assert.deepEqual(applied, [['Wo', 'tikka']])
+})
+
+test('same active day with changed current recipe cannot apply a stale alternative', () => {
+  const applied = []
+  const ui = makeHarness({
+    onChooseRecipe(day, recipeId) { applied.push([day, recipeId]) },
+  })
+  ui.collect(ui.render(), 'button')[0].props.onClick()
+  let tree = ui.render()
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'pasta')
+
+  const changedPlan = m2InitialPlan.map((meal) =>
+    meal.day === 'Ma' ? { ...meal, recipeId: 'pasta' } : meal)
+  tree = ui.update({ plannedMeals: changedPlan })
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 2)
+  assert.deepEqual(applied, [])
+
+  ui.collect(tree, 'button')[1].props.onClick()
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.previousRecipeId, 'pasta')
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'tikka')
+  ui.collect(tree, 'button')[1].props.onClick()
+  assert.deepEqual(applied, [['Ma', 'tikka']])
 })
 
 test('invalid or empty week exposes no fake preview controls', () => {
