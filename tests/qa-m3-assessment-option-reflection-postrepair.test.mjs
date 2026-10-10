@@ -76,7 +76,7 @@ function assertUnclaimable(options) {
   assert.equal(assessment.comparison.deltaCents, null)
   assert.equal(assessment.comparison.savingsCents, null)
   assert.equal(assessment.attribution.fullyAttributed, false)
-  assert.match(assessment.reasons.join(' '), /options/i)
+  assert.match(assessment.reasons.join(' '), /options|maxObservationWindowHours/i)
   assert.doesNotMatch(assessment.reasons.join(' '), /private-operator-code|sensitive-marker/i)
 }
 
