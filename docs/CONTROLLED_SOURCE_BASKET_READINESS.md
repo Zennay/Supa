@@ -6,6 +6,10 @@ This is an **opt-in structural product-core bridge** between the controlled two-
 
 The predecessor proof in #1147 exercises all eleven demands using **one real projection shape plus leftover M2 fixtures**. That is a useful arithmetic regression but it can hide missing product coverage when someone tries to treat controlled source observations as a complete shop. The new `assessControlledSourceBasketReadiness` deliberately consumes **only** products created from the supplied, individually provenance-validated and 24h-fresh store observations. It has **no fixture fallback**.
 
+## M3-specific retailer-order adapter
+
+The generic `assessControlledSourceBasketReadiness` remains reusable for any two distinct supported supermarkets. **M3 preparation must use `assessM3ControlledPlusDekaBasketReadiness` instead.** This additional opt-in entry point rejects reversed or alternative retailer roles *before* any catalog projection: baseline must be canonical `plus`, candidate canonical `dekamarkt`. Input display labels are ignored and cannot rename source identities. Even M3-specific `structural-pass` always has `releaseEligible: false`. It is not the canonical genuine human field-study converter/assessor and does not bypass issue #78.
+
 ## Contract
 
 1. The caller explicitly supplies two different source-bound stores, the meal plan, recipes, active days, a reference clock, and complete product-level observations for each retailer.
