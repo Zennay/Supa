@@ -55,6 +55,7 @@ test('rendered complete change explains direction, affected items and input-only
   const html = render(previewPlanRecipeSwap(scenario))
   assert.match(html, /aria-label="Voorvertoning receptwijziging"/)
   assert.match(html, /aria-live="polite"/)
+  assert.equal((html.match(/aria-live=/g) ?? []).length, 1)
   assert.match(html, /data-price-state="known"/)
   assert.match(html, /5,59/)
   assert.match(html, /lager/)
@@ -109,4 +110,20 @@ test('very large yet safe cent deltas render their exact fractional cents', () =
   const negative = render({ ...preview, deltaCents: -extreme })
   assert.match(negative, /lager/)
   assert.ok(negative.includes(euro.formatCents(extreme)))
+})
+
+test('rendered shared-ingredient reuse shows changed demand even when pack count stays one', () => {
+  const preview = previewPlanRecipeSwap({
+    ...scenario,
+    plan: [{ day: 'Ma', recipeId: 'teriyaki' }, { day: 'Di', recipeId: 'teriyaki' }],
+    activeDays: ['Ma', 'Di'],
+  })
+  assert.equal(preview.status, 'ready')
+  const rice = preview.changes.find((line) => line.ingredientId === 'basmati-rice')
+  assert.equal(rice.before.packs, 1)
+  assert.equal(rice.after.packs, 1)
+  const html = render(preview)
+  assert.match(html, /300 g[^<]*·[^<]*1 × Basmati rijst/)
+  assert.match(html, /150 g[^<]*·[^<]*1 × Basmati rijst/)
+  assert.equal((html.match(/aria-live=/g) ?? []).length, 1)
 })
