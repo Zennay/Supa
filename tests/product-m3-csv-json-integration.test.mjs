@@ -6,6 +6,7 @@ import { parseM3FieldCsv, reviewM3FieldCsv } from '../scripts/m3-review-field-cs
 import { buildObservationSheet, observationSheetReadiness, observationWindowSummary } from '../src/domain/m3ObservationSheet.ts'
 import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
+import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
 
 // All inputs are invented. Explicit unavailable lines mean NO retailer price,
 // receipt, product identity or participant claim is ever represented as evidence.
@@ -140,3 +141,62 @@ test('M3 cross-format 24h+1ms window cannot become a claim, even with structural
   assert.equal(result.comparison.outcome, 'unknown')
   assert.equal(result.comparison.savingsCents, null)
 })
+
+function matchingSyntheticPair(candidateUnitCents) {
+  const { sheet, csv } = pairedSyntheticInputs(
+    '2026-10-04T12:00:00Z', '2026-10-04T13:00:00Z',
+  )
+  const rows = parseM3FieldCsv(csv)
+  for (let i = 1; i <= 22; i++) {
+    const side = i <= 11 ? 'baseline' : 'candidate'
+    const index = (i - 1) % 11
+    const requirement = sheet.requirements[index]
+    const observed = sheet[side].lines[index].observedProduct
+    const cents = side === 'baseline' ? 200 : candidateUnitCents
+    Object.assign(observed, {
+      productId: `${side}-fictional-${requirement.id}`,
+      productName: requirement.query,
+      packAmount: requirement.amount,
+      packUnit: requirement.unit,
+      packCount: 1,
+      priceCents: cents,
+      available: true,
+      sourceUrl: '',
+      note: 'Synthetic test fixture; not a product price.',
+    })
+    rows[i][9] = requirement.query
+    rows[i][10] = String(requirement.amount)
+    rows[i][11] = requirement.unit
+    rows[i][12] = '1'
+    rows[i][13] = String(cents)
+    rows[i][14] = 'ja'
+  }
+  const filledCsv = rows.map(row => row.map(value =>
+    '"' + String(value).replaceAll('"', '""') + '"'
+  ).join(',')).join('\n') + '\n'
+  return { sheet, csv: filledCsv }
+}
+
+for (const [expectedOutcome, candidateUnitCents, expectedSavingsCents] of [
+  ['better', 100, 1100],
+  ['same', 200, 0],
+  ['worse', 300, -1100],
+]) {
+  test(`M3 integrated synthetic full basket: ${expectedOutcome} is financially correct but never a public claim`, () => {
+    const { sheet, csv } = matchingSyntheticPair(candidateUnitCents)
+    assert.equal(review(csv).status, 'requires-canonical-human-verification')
+    assert.equal(observationSheetReadiness(sheet).ready, true)
+    const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+    assert.equal(study.baseline.basket.matchedLineCount, 11)
+    assert.equal(study.candidate.basket.matchedLineCount, 11)
+    const report = buildObservedWeekReport(study)
+    assert.equal(report.outcome, expectedOutcome)
+    assert.equal(report.claimable, true) // mathematical comparison gate, NOT human proof
+    assert.equal(report.savingsCents, expectedSavingsCents)
+    assert.equal(report.deltaCents, -expectedSavingsCents)
+    assert.equal(report.publicSavingsClaimEligible, false)
+    assert.equal(report.priceContext, 'in-store')
+    assert.ok(report.evidenceBoundary.includes('never sufficient'))
+    assert.ok(!Object.hasOwn(report, 'participantKey'))
+  })
+}
