@@ -6,7 +6,7 @@ import * as ts from 'typescript'
 
 const srcDir = new URL('../src/', import.meta.url)
 const labelledControlTags = new Set(['input', 'select', 'textarea'])
-const selfNamingInputTypes = new Set(['button', 'hidden', 'image', 'reset', 'submit'])
+const defaultNamedInputTypes = new Set(['hidden', 'reset', 'submit'])
 
 function parseSource(source, filename = 'candidate.tsx') {
   return ts.createSourceFile(
@@ -106,7 +106,13 @@ function isSelfNamingInput(node) {
   if (intrinsicTagName(node) !== 'input') return false
 
   const type = staticStringFromAttribute(attributeByName(node.attributes, 'type'))
-  return type !== null && selfNamingInputTypes.has(type.trim().toLowerCase())
+  if (type === null) return false
+  const normalizedType = type.trim().toLowerCase()
+  if (defaultNamedInputTypes.has(normalizedType)) return true
+  // input[type=button] has no fallback label; input[type=image] needs alt.
+  if (normalizedType === 'button') return hasUsableNameAttribute(node, 'value')
+  if (normalizedType === 'image') return hasUsableNameAttribute(node, 'alt')
+  return false
 }
 
 function findUnlabelledFormControl(source, filename = 'candidate.tsx') {
@@ -212,6 +218,10 @@ test('form-label guard rejects unlabelled controls and mismatched explicit label
     '<input aria-label="   " />',
     '<input id="email" /><label htmlFor="other">Email</label>',
     '<input type={inputType} />',
+    '<input type="button" />',
+    '<input type="button" value="" />',
+    '<input type="image" />',
+    '<input type="image" alt="  " />',
   ]) {
     assert.ok(findUnlabelledFormControl(source), source)
   }
@@ -229,6 +239,8 @@ test('form-label guard preserves wrapping, explicit, ARIA, and self-naming contr
     '<input type="submit" value="Save" />',
     '<input type="reset" value="Reset" />',
     '<input type="image" alt="Save" />',
+    '<input type="button" aria-label="Open" />',
+    '<input type="image" aria-label="Save" />',
     '<Field onChange={change} />',
     'const example = "<input />"',
     '// <select><option>One</option></select>',
