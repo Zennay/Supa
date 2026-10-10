@@ -6,7 +6,7 @@ export const m3BaselineStore: Store = { ...m2Store }
 
 export const m3CandidateStore: Store = {
   id: 'm3-candidate-store',
-  name: 'M3 testwinkel B',
+  name: 'Voorbeeldwinkel B',
 }
 
 function withGaramMasala(products: StoreProduct[], storeId: string): StoreProduct[] {
