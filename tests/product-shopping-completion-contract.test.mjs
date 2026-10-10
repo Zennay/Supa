@@ -137,6 +137,7 @@ test('tampered list, duplicate identity, counters and malformed packs fail close
     { ...original, unresolvedLineCount: 1 },
     { ...original, matchedLineCount: Number.NaN },
     { ...original, selectedMealCount: -1 },
+    { ...original, selectedMealCount: 0 },
     { ...original, lines: [line, line], matchedLineCount: 2 },
     { ...original, lines: [{ ...line, id: ' ' }] },
     { ...original, lines: [{ ...line, status: 'unknown' }] },
@@ -158,14 +159,22 @@ test('reordered and repriced basket lines alone do not alter current checked-ID 
   const basket = fixture()
   const picked = basket.lines.find((line) => line.status === 'matched')
   assert.ok(picked)
+  const currentRepricedBasket = buildOneStoreBasket({
+    store: m2Store,
+    plan: m2InitialPlan,
+    recipes: m2Recipes,
+    activeDays: m2DefaultActiveDays,
+    products: m2Products.map((product) =>
+      product.id === picked.productId
+        ? { ...product, priceCents: product.priceCents + 1 }
+        : product,
+    ),
+  })
   const repriced = {
-    ...basket,
-    lines: basket.lines.map((line) =>
-      line.id === picked.id && line.status === 'matched'
-        ? { ...line, lineTotalCents: line.lineTotalCents + 1 }
-        : line,
-    ).reverse(),
+    ...currentRepricedBasket,
+    lines: [...currentRepricedBasket.lines].reverse(),
   }
+  assert.notEqual(repriced.totalCents, basket.totalCents)
   const before = shoppingListCompletion(basket, [picked.id])
   const after = shoppingListCompletion(repriced, [picked.id])
   assert.equal(after.checkedCount, before.checkedCount)
