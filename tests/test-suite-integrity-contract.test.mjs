@@ -34,6 +34,7 @@ function unwrapExpression(node) {
 
 function nodeTestBindings(sourceFile) {
   const bindings = new Set()
+  const namespaceBindings = new Set()
 
   for (const statement of sourceFile.statements) {
     if (
@@ -52,6 +53,10 @@ function nodeTestBindings(sourceFile) {
     }
 
     const namedBindings = clause.namedBindings
+    if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+      namespaceBindings.add(namedBindings.name.text)
+      continue
+    }
     if (!namedBindings || !ts.isNamedImports(namedBindings)) continue
 
     for (const element of namedBindings.elements) {
@@ -62,7 +67,27 @@ function nodeTestBindings(sourceFile) {
     }
   }
 
-  return bindings
+  return { bindings, namespaceBindings }
+}
+
+// Only literal members of an imported node:test namespace are trusted test APIs.
+// Do not treat arbitrary objects with a .test property as node:test.
+function isNodeTestCallee(callee, bindings, namespaceBindings) {
+  const current = unwrapExpression(callee)
+  if (ts.isIdentifier(current)) return bindings.has(current.text)
+  if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
+    return false
+  }
+
+  const receiver = unwrapExpression(current.expression)
+  const member = ts.isPropertyAccessExpression(current)
+    ? current.name.text
+    : elementName(current.argumentExpression)
+  return (
+    ts.isIdentifier(receiver) &&
+    namespaceBindings.has(receiver.text) &&
+    (nodeTestExports.has(member) || member === 'default')
+  )
 }
 
 function disablingLiteral(name, initializer) {
@@ -109,7 +134,7 @@ function findDisabledNodeTests(source, filename = 'candidate.test.mjs') {
     true,
     ts.ScriptKind.JS,
   )
-  const bindings = nodeTestBindings(sourceFile)
+  const { bindings, namespaceBindings } = nodeTestBindings(sourceFile)
   const findings = []
 
   function record(mode, node) {
@@ -125,7 +150,7 @@ function findDisabledNodeTests(source, filename = 'candidate.test.mjs') {
     if (ts.isCallExpression(node)) {
       const callee = unwrapExpression(node.expression)
 
-      if (ts.isIdentifier(callee) && bindings.has(callee.text)) {
+      if (isNodeTestCallee(callee, bindings, namespaceBindings)) {
         const option = literalDisabledOption(node, sourceFile)
         if (option) record(option.mode, node)
       } else if (
@@ -138,8 +163,7 @@ function findDisabledNodeTests(source, filename = 'candidate.test.mjs') {
           : elementName(callee.argumentExpression)
 
         if (
-          ts.isIdentifier(base) &&
-          bindings.has(base.text) &&
+          isNodeTestCallee(base, bindings, namespaceBindings) &&
           member &&
           disabledModes.has(member)
         ) {
@@ -174,15 +198,37 @@ test('disabled-test detector catches node:test skip, todo and focused cases', ()
   )
 })
 
+test('disabled-test detector rejects namespace-imported test methods and options', () => {
+  const source = `
+    import * as nodeTest from 'node:test'
+    nodeTest.test.skip('disabled', () => {})
+    nodeTest['it']['only']('focused', () => {})
+    nodeTest.describe('todo via options', { todo: 'later' }, () => {})
+    nodeTest['test']('skipped via options', { skip: true }, () => {})
+    nodeTest.default.todo('todo via default export', () => {})
+  `
+
+  assert.deepEqual(
+    findDisabledNodeTests(source).map(({ mode }) => mode),
+    ['skip', 'only', 'todo', 'skip', 'todo'],
+  )
+})
+
 test('disabled-test detector ignores inert text and unrelated or dynamic APIs', () => {
   const source = `
     import test from 'node:test'
+    import * as nodeTest from 'node:test'
 
     // test.skip('comment only')
     const example = "test.todo('string only')"
     const mode = 'skip'
     helper.skip('local helper')
     test[mode]('dynamic member', () => {})
+    unrelated.test.skip('other library', () => {})
+    unrelated['it']('normal', { only: true }, () => {})
+    const name = 'test'
+    nodeTest[name].skip('dynamic namespace key', () => {})
+    nodeTest.test[mode]('dynamic mode', () => {})
     test('ordinary test', () => {})
     test('false literals stay enabled', { skip: false, todo: false, only: false }, () => {})
   `
