@@ -136,6 +136,8 @@ export function reviewM3FieldCsv(input, { validateUnits = false } = {}) {
       priceCents, available, source, sourceUrl, note].some(value => !safeText(value))) {
       warnings.add('unsafe-observation-cell')
     }
+    const validContext = context === 'in-store' || context === 'online-order'
+    if (context && !validContext) warnings.add('invalid-price-context')
     if (context) contexts.add(context)
     if (sourceUrl && !validSourceUrl(sourceUrl)) {
       warnings.add('invalid-source-url')
@@ -150,7 +152,7 @@ export function reviewM3FieldCsv(input, { validateUnits = false } = {}) {
     }
     const yes = ['ja', 'yes', 'true'].includes(state)
     const no = ['nee', 'no', 'false'].includes(state)
-    const required = Boolean(observedAt && meaningfulText(context) && meaningfulText(source) && (yes || no))
+    const required = Boolean(observedAt && validContext && meaningfulText(source) && (yes || no))
     const unitCompatible = !validateUnits || sameM3QuantityFamily(row[6], packUnit)
     if (validateUnits && yes && packUnit && !unitCompatible) {
       warnings.add('incompatible-pack-unit')
