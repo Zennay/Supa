@@ -262,11 +262,9 @@ function hasCanonicalRequirements(
       if (!isRecord(item)) return false
       const expected = canonical[index]
       return (
-        item.id === expected.id &&
-        item.label === expected.label &&
-        item.query === expected.query &&
-        item.amount === expected.amount &&
-        item.unit === expected.unit
+        // Match the converter's exact JSON identity; extra or reordered
+        // fields must not become a misleading collector export-ready result.
+        JSON.stringify(item) === JSON.stringify(expected)
       )
     })
   )
@@ -645,8 +643,8 @@ export function observationSheetReadiness(
         line.ingredientId !== expected[index].ingredientId ||
         line.ingredientLabel !== expected[index].ingredientLabel ||
         !line.requirement ||
-        line.requirement.amount !== expected[index].requirement.amount ||
-        line.requirement.unit !== expected[index].requirement.unit,
+        JSON.stringify(line.requirement) !==
+          JSON.stringify(expected[index].requirement),
       )
     ) {
       issues.push(`${side === 'baseline' ? 'Winkel A' : 'Winkel B'}: ingrediëntenlijst wijkt af van de vaste weekplanning.`)
