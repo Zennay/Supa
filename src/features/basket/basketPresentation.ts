@@ -22,7 +22,7 @@ export function basketCostDisclosure(
       : complete
         ? 0
         : 1
-  const formattedAmount = euro.format(totalCents / 100)
+  const formattedAmount = euro.formatCents(totalCents)
 
   return complete
     ? {
@@ -99,7 +99,7 @@ export function comparisonLineHighlights(
       id: line.id,
       ingredientLabel: line.ingredientLabel,
       direction: line.deltaCents < 0 ? 'lower' : 'higher',
-      amountLabel: euro.format(Math.abs(line.deltaCents) / 100),
+      amountLabel: euro.formatCents(Math.abs(line.deltaCents)),
     }))
 }
 
@@ -145,7 +145,7 @@ export function comparisonLineBreakdown(
       id: line.id,
       ingredientLabel: line.ingredientLabel,
       direction: line.deltaCents < 0 ? 'lower' : 'higher',
-      amountLabel: euro.format(Math.abs(line.deltaCents) / 100),
+      amountLabel: euro.formatCents(Math.abs(line.deltaCents)),
     }))
 }
 
