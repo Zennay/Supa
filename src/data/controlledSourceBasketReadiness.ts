@@ -1,6 +1,7 @@
-import { buildOneStoreBasket, type OneStoreBasket, type RecipeWithIngredients } from '../domain/basket.ts'
+import { aggregatePlanIngredients, buildOneStoreBasket, type OneStoreBasket, type RecipeWithIngredients } from '../domain/basket.ts'
 import { compareFullBaskets, type BasketComparisonOutcome } from '../domain/basketComparison.ts'
 import type { PlannedMeal } from '../domain/types.ts'
+import { buildObservationSheet } from '../domain/m3ObservationSheet.ts'
 import {
   projectFreshControlledComparisonCatalogs,
   type ControlledComparisonInputs,
@@ -140,6 +141,30 @@ export function assessControlledSourceBasketReadiness(
 }
 
 /**
+ * Compare the actual aggregated demand against the canonical M3 observation
+ * sheet (11 ingredients / four selected meals). We deliberately use the
+ * sheet's requirement definitions, not M2 demo product prices. Reordered but
+ * quantity-equivalent plans are acceptable; changed demand is not.
+ */
+function hasCanonicalM3Demand(input: ControlledSourceBasketInputs): boolean {
+  if (!Array.isArray(input.plan) || !Array.isArray(input.recipes) ||
+      !Array.isArray(input.activeDays)) return false
+  const sheet = buildObservationSheet()
+  const actual = aggregatePlanIngredients(input.plan, input.recipes, input.activeDays)
+  const selectedMeals = input.plan.filter(meal => input.activeDays.includes(meal.day)).length
+  return selectedMeals === sheet.selectedMealCount &&
+    actual.length === sheet.requirements.length &&
+    actual.every((item, index) => {
+      const expected = sheet.requirements[index]
+      return item.id === expected.id &&
+        item.label === expected.label &&
+        item.query === expected.query &&
+        item.amount === expected.amount &&
+        item.unit === expected.unit
+    })
+}
+
+/**
  * M3-specific retailer order: PLUS is the baseline, DekaMarkt the candidate.
  * A generic two-store structural pass must never certify swapped field roles.
  * This remains synthetic/source-only preparation, NOT an observed-week gate.
@@ -151,7 +176,8 @@ export function assessM3ControlledPlusDekaBasketReadiness(
     if (
       !input || typeof input !== 'object' || Array.isArray(input) ||
       input.baselineStore?.supermarket !== 'plus' ||
-      input.candidateStore?.supermarket !== 'dekamarkt'
+      input.candidateStore?.supermarket !== 'dekamarkt' ||
+      !hasCanonicalM3Demand(input)
     ) return FAILURE
     return assessControlledSourceBasketReadiness(input)
   } catch {
