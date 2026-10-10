@@ -86,6 +86,9 @@ for (const [label, invalidReasons] of [
       evidence: [],
     })
     expectNoAttributedMoney(result)
+    // A non-array string must not be spread into a list of one-character
+    // explanations, which would indirectly disclose the supplied text.
+    assert.ok(result.reasons.length <= 5, 'malformed reasons must not expand into arbitrary fragments')
     assert.doesNotMatch(result.reasons.join(' '), /sensitive-untrusted-payload/)
   })
 }
