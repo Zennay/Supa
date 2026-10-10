@@ -22,10 +22,15 @@ export type ControlledComparisonCatalogs = {
 /** Require a real, timezone-explicit ISO timestamp, not local-time Date.parse. */
 function timestampMillis(value: unknown): number | null {
   if (typeof value !== 'string') return null
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value)
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value)
   if (!match) return null
 
-  const [, yearText, monthText, dayText, hourText, minuteText, secondText, , , offsetHourText, offsetMinuteText] = match
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, fractionText, , , offsetHourText, offsetMinuteText] = match
+  // Date.parse only retains milliseconds. Reject any nonzero extra digits
+  // instead of rounding a future/stale capture or a caller's reference clock.
+  // Trailing zeros remain precisely representable, including 9-digit ISO input.
+  if (fractionText && /[1-9]/.test(fractionText.slice(3))) return null
+
   const year = Number(yearText)
   const month = Number(monthText)
   const day = Number(dayText)
