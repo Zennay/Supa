@@ -102,3 +102,41 @@ for (const [label, baselineAt, candidateAt, expectedComplete] of [
     )
   })
 }
+
+for (const [name, baselineAt, candidateAt, expectedHours] of [
+  ['explicit negative UTC offset', '2026-10-04T12:00:00Z', '2026-10-04T08:30:00-04:00', 0.5],
+  ['exact inclusive 24h with positive UTC offset', '2026-10-04T12:00:00Z', '2026-10-05T13:00:00+01:00', 24],
+]) {
+  test(`M3 cross-format valid observation offsets remain exactly comparable: ${name}`, () => {
+    const { sheet, csv } = pairedSyntheticInputs(baselineAt, candidateAt)
+    assert.equal(review(csv).status, 'requires-canonical-human-verification')
+    assert.deepEqual(observationSheetReadiness(sheet), { ready: true, issues: [] })
+    const window = observationWindowSummary(sheet)
+    assert.equal(window.state, 'within-window')
+    assert.equal(window.deltaHours, expectedHours)
+    const assessment = assessWeeklyBasketStudy(
+      buildWeeklyBasketStudyFromObservationSheet(sheet),
+    )
+    assert.equal(assessment.observationWindowHours, expectedHours)
+    assert.equal(assessment.claimable, false)
+    assert.equal(assessment.comparison.savingsCents, null)
+  })
+}
+
+test('M3 cross-format 24h+1ms window cannot become a claim, even with structurally complete rows', () => {
+  const { sheet, csv } = pairedSyntheticInputs(
+    '2026-10-04T12:00:00.000Z', '2026-10-05T12:00:00.001Z',
+  )
+  const field = review(csv)
+  assert.equal(field.completeRows, 22)
+  assert.ok(field.warnings.includes('capture-window-over-24-hours'))
+  assert.equal(field.status, 'incomplete-or-needs-review')
+  assert.equal(observationSheetReadiness(sheet).ready, false)
+  assert.equal(observationWindowSummary(sheet).state, 'outside-window')
+  const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  const result = assessWeeklyBasketStudy(study)
+  assert.ok(result.observationWindowHours > 24)
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.equal(result.comparison.savingsCents, null)
+})
