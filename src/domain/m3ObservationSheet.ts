@@ -262,11 +262,9 @@ function hasCanonicalRequirements(
       if (!isRecord(item)) return false
       const expected = canonical[index]
       return (
-        item.id === expected.id &&
-        item.label === expected.label &&
-        item.query === expected.query &&
-        item.amount === expected.amount &&
-        item.unit === expected.unit
+        // Match the converter's exact JSON identity; extra or reordered
+        // fields must not become a misleading collector export-ready result.
+        JSON.stringify(item) === JSON.stringify(expected)
       )
     })
   )
@@ -294,8 +292,8 @@ function restoreStoreObservation(
     if (
       line.ingredientId !== expectedLine.ingredientId ||
       line.ingredientLabel !== expectedLine.ingredientLabel ||
-      line.requirement.amount !== expectedLine.requirement.amount ||
-      line.requirement.unit !== expectedLine.requirement.unit
+      // Do not erase forged demand metadata during draft recovery.
+      JSON.stringify(line.requirement) !== JSON.stringify(expectedLine.requirement)
     ) {
       return null
     }
@@ -379,6 +377,7 @@ export function restoreObservationSheetDraft(
       value.evidenceStatus !== canonical.evidenceStatus ||
       value.plannerFixture !== canonical.plannerFixture ||
       value.selectedMealCount !== canonical.selectedMealCount ||
+      value.study.maxObservationWindowHours !== 24 ||
       !hasCanonicalRequirements(value.requirements, canonical.requirements)
     ) {
       return null
@@ -557,8 +556,8 @@ export type ObservationSheetReadiness = {
   issues: string[]
 }
 
-function nonBlank(value: string) {
-  return value.trim().length > 0
+function nonBlank(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
 }
 
 function validCalendarDate(value: string) {
@@ -604,6 +603,14 @@ export function observationSheetReadiness(
   sheet: ObservationSheet,
 ): ObservationSheetReadiness {
   const issues: string[] = []
+  if (
+    !isRecord(sheet) ||
+    !isRecord(sheet.study) ||
+    !isRecord(sheet.baseline) ||
+    !isRecord(sheet.candidate)
+  ) {
+    return { ready: false, issues: ['Meetblad: basis- of winkelgegevens zijn ongeldig.'] }
+  }
 
   const studyFields: Array<[string, string]> = [
     ['Study ID', sheet.study.studyId],
@@ -645,8 +652,8 @@ export function observationSheetReadiness(
         line.ingredientId !== expected[index].ingredientId ||
         line.ingredientLabel !== expected[index].ingredientLabel ||
         !line.requirement ||
-        line.requirement.amount !== expected[index].requirement.amount ||
-        line.requirement.unit !== expected[index].requirement.unit,
+        JSON.stringify(line.requirement) !==
+          JSON.stringify(expected[index].requirement),
       )
     ) {
       issues.push(`${side === 'baseline' ? 'Winkel A' : 'Winkel B'}: ingrediëntenlijst wijkt af van de vaste weekplanning.`)
@@ -679,6 +686,10 @@ export function observationSheetReadiness(
   const observedTimes: number[] = []
 
   for (const [label, side, observation] of observations) {
+    if (!isRecord(observation.store) || !Array.isArray(observation.lines)) {
+      issues.push(`${label}: winkel- of ingrediëntenstructuur is ongeldig.`)
+      continue
+    }
     if (!nonBlank(observation.store.name)) {
       issues.push(`${label}: winkelnaam ontbreekt.`)
     } else if (!observationStoreMatchesExpectedRetailer(side, observation.store.name)) {
@@ -708,7 +719,11 @@ export function observationSheetReadiness(
       observedTimes.push(observedAt)
     }
 
-    observation.lines.forEach((line) => {
+    observation.lines.forEach((line, index) => {
+      if (!isRecord(line) || !isRecord(line.observedProduct)) {
+        issues.push(`${label}: ingrediëntregel ${index + 1} is ongeldig.`)
+        return
+      }
       const product = line.observedProduct
       const lineLabel = `${label} · ${line.ingredientLabel}`
 
@@ -749,6 +764,8 @@ export function observationSheetReadiness(
   }
 
   if (
+    isRecord(sheet.baseline.store) &&
+    isRecord(sheet.candidate.store) &&
     nonBlank(sheet.baseline.store.id) &&
     nonBlank(sheet.candidate.store.id) &&
     sheet.baseline.store.id.trim() === sheet.candidate.store.id.trim()
