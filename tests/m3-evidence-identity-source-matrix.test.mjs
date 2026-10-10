@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
+import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
 import {
   m2DefaultActiveDays,
   m2InitialPlan,
@@ -157,4 +158,60 @@ test('M3 validity is independent from the order of distinct source/evidence iden
   assert.equal(forward.comparison.deltaCents, -reverse.comparison.deltaCents)
   assert.equal(forward.observationWindowHours, reverse.observationWindowHours)
   assert.deepEqual(study, original)
+})
+
+test('M3 report keeps public savings claims disabled for every allowed evidence source pair', () => {
+  let reports = 0
+  for (const priceContext of ['in-store', 'online-order']) {
+    for (const baselineSource of ['manual-cart', 'receipt', 'consented-export']) {
+      for (const candidateSource of ['manual-cart', 'receipt', 'consented-export']) {
+        const study = syntheticStudy()
+        study.priceContext = priceContext
+        study.baseline.source = baselineSource
+        study.candidate.source = candidateSource
+        // Retailer labels satisfy the structural identity gate; prices remain synthetic.
+        study.baseline.basket.store.name = 'PLUS synthetic QA only'
+        study.candidate.basket.store.name = 'DekaMarkt synthetic QA only'
+        const original = structuredClone(study)
+        const report = buildObservedWeekReport(study)
+        const json = JSON.stringify(report)
+
+        assert.equal(report.reportType, 'm3-observed-week-assessment')
+        assert.equal(report.claimable, true)
+        assert.equal(report.outcome, 'better')
+        assert.equal(report.publicSavingsClaimEligible, false)
+        assert.equal(report.baseline.source, baselineSource)
+        assert.equal(report.candidate.source, candidateSource)
+        assert.equal(report.priceContext, priceContext)
+        assert.ok(!json.includes(study.participantKey), 'participant key must not leak into report')
+        assert.match(report.evidenceBoundary, /never sufficient by itself for a public savings claim/)
+        assert.deepEqual(study, original, 'report building must not change evidence')
+        reports++
+      }
+    }
+  }
+  assert.equal(reports, 18)
+})
+
+test('M3 report rejects unapproved source labels and anonymizes invalid evidence IDs', () => {
+  const incorrectSource = syntheticStudy()
+  incorrectSource.baseline.basket.store.name = 'PLUS synthetic QA only'
+  incorrectSource.candidate.basket.store.name = 'DekaMarkt synthetic QA only'
+  incorrectSource.candidate.source = 'mock-price-source'
+  assert.throws(
+    () => buildObservedWeekReport(incorrectSource),
+    /candidate.source is not an allowed observed source/,
+  )
+
+  const collision = syntheticStudy()
+  collision.baseline.basket.store.name = 'PLUS synthetic QA only'
+  collision.candidate.basket.store.name = 'DekaMarkt synthetic QA only'
+  collision.candidate.evidenceId = collision.baseline.evidenceId
+  const report = buildObservedWeekReport(collision)
+  assert.equal(report.claimable, false)
+  assert.equal(report.outcome, 'unknown')
+  assert.equal(report.deltaCents, null)
+  assert.equal(report.savingsCents, null)
+  assert.equal(report.publicSavingsClaimEligible, false)
+  assert.match(report.reasons.join(' '), /evidence IDs must differ/)
 })
