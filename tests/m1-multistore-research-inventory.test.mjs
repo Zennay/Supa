@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import test from 'node:test'
 
 import { RESEARCH_SOURCES } from '../scripts/m1-multistore-research.mjs'
@@ -107,5 +108,27 @@ test('invalid operator clock fails closed and does not scan private content', as
     assert.equal(report.status, 'rejected')
     assert.equal(report.totals.manualReview, 0)
     assert.equal(report.publicSavingsClaimEligible, false)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test('operator CLI distinguishes empty (2), accepted (0), and corrupted (1) without printing private data', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-inventory-cli-'))
+  try {
+    const program = resolve('scripts/m1-research-snapshot-inventory.mjs')
+    const command = () => spawnSync(process.execPath, [program, '--inventory'],
+      { cwd: dir, encoding: 'utf8', timeout: 10_000 })
+    const noFiles = command()
+    assert.equal(noFiles.status, 2)
+    assert.equal(JSON.parse(noFiles.stdout).status, 'no-captures')
+    const root = join(dir, 'artifacts', 'm1-multistore-research')
+    await capture(root, RESEARCH_SOURCES[0], 1791676680789)
+    const accepted = command()
+    assert.equal(accepted.status, 0)
+    assert.equal(JSON.parse(accepted.stdout).totals.manualReview, 1)
+    await writeFile(join(root, 'unexpected-private.txt'), 'secret payload should not print')
+    const rejected = command()
+    assert.equal(rejected.status, 1)
+    assert.equal(JSON.parse(rejected.stdout).status, 'rejected')
+    assert.doesNotMatch(rejected.stdout, /secret payload|unexpected-private|https:\/\//)
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
