@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
 
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
@@ -214,4 +218,83 @@ test('M3 report rejects unapproved source labels and anonymizes invalid evidence
   assert.equal(report.savingsCents, null)
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.match(report.reasons.join(' '), /evidence IDs must differ/)
+})
+
+test('M3 assessment CLI keeps stdout and file reports equivalent and pseudonymous', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-source-qa-'))
+  const input = join(directory, 'synthetic-study.json')
+  const output = join(directory, 'synthetic-report.json')
+  const study = syntheticStudy()
+  study.baseline.basket.store.name = 'PLUS synthetic QA only'
+  study.candidate.basket.store.name = 'DekaMarkt synthetic QA only'
+  study.baseline.source = 'receipt'
+  study.candidate.source = 'consented-export'
+  // Deliberately place a private sentinel where an unchecked report could leak it.
+  const privateMarker = 'synthetic-private-evidence-not-for-report'
+  study.baseline.provenanceNote = privateMarker
+  study.candidate.provenanceNote = privateMarker
+
+  try {
+    await writeFile(input, JSON.stringify(study), { encoding: 'utf8', mode: 0o600 })
+    const stdout = spawnSync(process.execPath, [
+      '--experimental-strip-types',
+      'scripts/m3-assess-observed-week.mjs',
+      input,
+    ], { encoding: 'utf8', cwd: process.cwd() })
+    assert.equal(stdout.status, 0, stdout.stderr)
+    const direct = JSON.parse(stdout.stdout)
+
+    const fileRun = spawnSync(process.execPath, [
+      '--experimental-strip-types',
+      'scripts/m3-assess-observed-week.mjs',
+      input,
+      '--output',
+      output,
+    ], { encoding: 'utf8', cwd: process.cwd() })
+    assert.equal(fileRun.status, 0, fileRun.stderr)
+    assert.equal(fileRun.stdout, '')
+    const saved = JSON.parse(await readFile(output, 'utf8'))
+
+    assert.deepEqual(saved, direct)
+    assert.equal(saved.publicSavingsClaimEligible, false)
+    assert.equal(saved.claimable, true)
+    assert.equal(saved.baseline.source, 'receipt')
+    assert.equal(saved.candidate.source, 'consented-export')
+    for (const reportText of [stdout.stdout, JSON.stringify(saved)]) {
+      assert.ok(!reportText.includes(study.participantKey))
+      assert.ok(!reportText.includes(privateMarker))
+      assert.ok(!reportText.includes(study.baseline.basket.lines[0].productId))
+    }
+  } finally {
+    await rm(directory, { force: true, recursive: true })
+  }
+})
+
+test('M3 invalid CLI input leaves an existing report untouched and emits no savings', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-failed-qa-'))
+  const input = join(directory, 'invalid-study.json')
+  const output = join(directory, 'prior-reviewed-report.json')
+  const originalReport = 'KEEP PRIOR REVIEWED OUTPUT\\n'
+  const invalid = syntheticStudy()
+  invalid.baseline.basket.store.name = 'PLUS synthetic QA only'
+  invalid.candidate.basket.store.name = 'DekaMarkt synthetic QA only'
+  invalid.candidate.source = 'unapproved-fixture'
+
+  try {
+    await writeFile(input, JSON.stringify(invalid), { encoding: 'utf8', mode: 0o600 })
+    await writeFile(output, originalReport, { encoding: 'utf8', mode: 0o600 })
+    const result = spawnSync(process.execPath, [
+      '--experimental-strip-types',
+      'scripts/m3-assess-observed-week.mjs',
+      input,
+      '--output',
+      output,
+    ], { encoding: 'utf8', cwd: process.cwd() })
+    assert.notEqual(result.status, 0)
+    assert.equal(result.stdout, '')
+    assert.match(result.stderr, /candidate.source is not an allowed observed source/)
+    assert.equal(await readFile(output, 'utf8'), originalReport)
+  } finally {
+    await rm(directory, { force: true, recursive: true })
+  }
 })
