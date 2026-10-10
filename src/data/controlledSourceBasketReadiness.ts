@@ -44,6 +44,22 @@ const SUPERMARKET_LABELS = Object.freeze({
   dekamarkt: 'DekaMarkt',
 })
 
+/**
+ * A canonical ingredient is aggregated by its own id. Distinct ingredient IDs
+ * may nevertheless select the SAME retailer product: pricing that product twice
+ * is not proof of the correct shared-pack quantity. Until a basket owner has a
+ * cross-ingredient pack allocator, this source-only gate must abstain.
+ */
+function basketReusesProductAcrossIngredients(basket: OneStoreBasket): boolean {
+  const selectedProducts = new Set<string>()
+  for (const line of basket.lines) {
+    if (line.status !== 'matched') continue
+    if (selectedProducts.has(line.productId)) return true
+    selectedProducts.add(line.productId)
+  }
+  return false
+}
+
 const FAILURE: ControlledSourceBasketReadiness = Object.freeze({
   status: 'structural-fail',
   releaseEligible: false,
@@ -94,7 +110,9 @@ export function assessControlledSourceBasketReadiness(
       baseline.lines.length === 0 ||
       baseline.lines.length !== candidate.lines.length ||
       baseline.unresolvedLineCount !== 0 ||
-      candidate.unresolvedLineCount !== 0
+      candidate.unresolvedLineCount !== 0 ||
+      basketReusesProductAcrossIngredients(baseline) ||
+      basketReusesProductAcrossIngredients(candidate)
     ) return FAILURE
 
     const comparison = compareFullBaskets({ baseline, candidate })
