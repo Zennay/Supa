@@ -8,8 +8,8 @@ import {
 export type ReuseTransition = {
   ingredientId: string
   label: string
-  beforeMealCount: number
-  afterMealCount: number
+  beforeSharedMealCount: number | null
+  afterSharedMealCount: number | null
   beforeDays: string[]
   afterDays: string[]
 }
@@ -88,8 +88,8 @@ export function previewRecipeReuseChange({
     const transition: ReuseTransition = {
       ingredientId,
       label: newUsage?.label ?? oldUsage!.label,
-      beforeMealCount: oldUsage?.mealCount ?? 0,
-      afterMealCount: newUsage?.mealCount ?? 0,
+      beforeSharedMealCount: oldUsage?.mealCount ?? null,
+      afterSharedMealCount: newUsage?.mealCount ?? null,
       beforeDays: oldUsage ? [...oldUsage.days] : [],
       afterDays: newUsage ? [...newUsage.days] : [],
     }
