@@ -75,6 +75,9 @@ function validObservationTime(value) {
   // Date.parse can silently normalize 30 February into March. Calendar and
   // explicit offset validation must precede any freshness arithmetic.
   const datePart = value.slice(0, 10)
+  const [hoursOfDay, minutesOfHour, secondsOfMinute] =
+    value.slice(11, 19).split(':').map(Number)
+  if (hoursOfDay > 23 || minutesOfHour > 59 || secondsOfMinute > 59) return null
   const midnight = Date.parse(datePart + 'T00:00:00Z')
   if (!Number.isFinite(midnight) ||
       new Date(midnight).toISOString().slice(0, 10) !== datePart) return null
