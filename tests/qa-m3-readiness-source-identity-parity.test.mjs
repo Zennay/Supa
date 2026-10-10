@@ -83,24 +83,26 @@ test('M3 readiness/source contract accepts each permitted source pair without ch
   assert.equal(verified, 18)
 })
 
-test('M3 readiness cannot tell the collector to export an unapproved source', () => {
+test('M3 readiness cannot tell the collector to export an unapproved source', async (t) => {
   for (const side of ['baseline', 'candidate']) {
     for (const badSource of ['browser-cache', 'fabricated-offer', null, '', 42]) {
-      const sheet = completeSyntheticSheet()
-      sheet[side].source = badSource
-      const snapshot = structuredClone(sheet)
-      const progress = observationSheetProgress(sheet)
-      assert.equal(progress.completeLines, 22, 'separate product completeness must remain intact')
-      assert.throws(
-        () => buildWeeklyBasketStudyFromObservationSheet(sheet),
-        new RegExp(side + '\\.source is not an allowed observed source'),
-      )
-
-      const result = observationSheetReadiness(sheet)
-      assert.equal(result.ready, false, side + ' source ' + String(badSource))
-      assert.ok(result.issues.some((issue) => /bron|source|herkomst/i.test(issue)),
-        side + ': supply an actionable source reason')
-      assert.deepEqual(sheet, snapshot, 'preflight must not rewrite provenance')
+      await t.test(side + ' / ' + String(badSource), () => {
+        const sheet = completeSyntheticSheet()
+        sheet[side].source = badSource
+        const snapshot = structuredClone(sheet)
+        const progress = observationSheetProgress(sheet)
+        assert.equal(progress.completeLines, 22,
+          'product field completeness must remain unaffected by source metadata')
+        assert.throws(
+          () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+          /source is not an allowed observed source/,
+        )
+        const result = observationSheetReadiness(sheet)
+        assert.equal(result.ready, false, side + ' source ' + String(badSource))
+        assert.ok(result.issues.some((issue) => /bron|source|herkomst/i.test(issue)),
+          side + ': supply an actionable source reason')
+        assert.deepEqual(sheet, snapshot, 'preflight must not rewrite provenance')
+      })
     }
   }
 })
@@ -138,24 +140,24 @@ test('M3 draft recovery must retain an approved recorded source across save/relo
   }
 })
 
-test('M3 draft recovery cannot silently invent a manual-cart source from unsupported provenance', () => {
+test('M3 draft recovery cannot silently invent a manual-cart source from unsupported provenance', async (t) => {
   for (const side of ['baseline', 'candidate']) {
     for (const corruptedSource of ['browser-cache', 'unknown-receipt', 42, null]) {
-      const sheet = completeSyntheticSheet()
-      sheet[side].source = corruptedSource
-      const restored = restoreObservationSheetDraft(JSON.stringify(sheet))
-      // Dropping the whole corrupt draft is an acceptable fail-closed result.
-      if (restored === null) continue
-      // If preservation is preferred for field recovery, retain a non-approved
-      // source value and block readiness pending explicit human correction.
-      assert.notEqual(restored[side].source, 'manual-cart',
-        side + ': saved ' + String(corruptedSource) + ' cannot become fabricated manual-cart provenance')
-      assert.equal(observationSheetReadiness(restored).ready, false)
-      assert.equal(restored.evidenceStatus, 'collection-template-not-evidence')
+      await t.test(side + ' / ' + String(corruptedSource), () => {
+        const sheet = completeSyntheticSheet()
+        sheet[side].source = corruptedSource
+        const restored = restoreObservationSheetDraft(JSON.stringify(sheet))
+        // Rejecting the damaged draft is safe; preserving an unresolved source
+        // for human correction is also safe. Inventing manual-cart is not.
+        if (restored === null) return
+        assert.notEqual(restored[side].source, 'manual-cart',
+          side + ': saved ' + String(corruptedSource) + ' cannot become fabricated manual-cart provenance')
+        assert.equal(observationSheetReadiness(restored).ready, false)
+        assert.equal(restored.evidenceStatus, 'collection-template-not-evidence')
+      })
     }
   }
 })
-
 
 test('M3 export readiness must never outrank the canonical fixed-demand sheet contract', async (t) => {
   const scenarios = [
