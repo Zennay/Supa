@@ -96,7 +96,9 @@ function validTimestamp(value: unknown) {
   }
 
   const timestamp = Date.parse(value)
-  return Number.isFinite(timestamp) ? timestamp : null
+  // The assessment itself is a financial-claim boundary. Do not rely on
+  // optional collection or CSV preflights having already checked the clock.
+  return Number.isFinite(timestamp) && timestamp <= Date.now() ? timestamp : null
 }
 
 function validateEvidence(
