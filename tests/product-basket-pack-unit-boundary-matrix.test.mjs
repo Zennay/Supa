@@ -179,3 +179,38 @@ test('missing compatible packs or invalid prices are unresolved, not zero-price 
     assert.equal(basket.totalCents, 0, 'unknown amount must not become a quoted complete basket')
   }
 })
+
+
+test('pack rounding stays on the correct side of 160 integer-boundary cases', () => {
+  const scenarios = [
+    { name: 'grams into half-kilo', unit: 'g', packUnit: 'kg', packAmount: 0.5, divisor: 500, required: (step) => step * 37 },
+    { name: 'millilitres into half-litre', unit: 'ml', packUnit: 'l', packAmount: 0.5, divisor: 500, required: (step) => step * 29 },
+    { name: 'quarter-kilos into half-kilo', unit: 'kg', packUnit: 'kg', packAmount: 0.5, divisor: 2, required: (step) => step / 4, expected: (step) => Math.ceil(step / 2) },
+    { name: 'pieces into five-count packs', unit: 'piece', packUnit: 'piece', packAmount: 5, divisor: 5, required: (step) => step },
+  ]
+
+  let inspected = 0
+  for (const scenario of scenarios) {
+    for (let step = 1; step <= 40; step += 1) {
+      const amount = scenario.required(step)
+      const packs = scenario.expected
+        ? scenario.expected(step)
+        : Math.ceil(amount / scenario.divisor)
+      const basket = oneIngredientBasket({
+        amount, unit: scenario.unit,
+        packAmount: scenario.packAmount, packUnit: scenario.packUnit,
+        priceCents: 101,
+      })
+      const label = `${scenario.name} at input ${step}`
+      assert.equal(basket.unresolvedLineCount, 0, label)
+      assert.equal(basket.matchedLineCount, 1, label)
+      assert.equal(basket.lines[0].status, 'matched', label)
+      assert.equal(basket.lines[0].packs, packs, label)
+      assert.equal(basket.lines[0].lineTotalCents, packs * 101, label)
+      assert.equal(basket.totalCents, packs * 101, label)
+      inspected += 1
+    }
+  }
+
+  assert.equal(inspected, 160)
+})
