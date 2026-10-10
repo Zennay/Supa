@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   buildObservationSheet,
   observationSheetProgress,
+  observationSheetReadiness,
 } from '../src/domain/m3ObservationSheet.ts'
 
 // Independent QA contract for an untrusted in-memory collector state.
@@ -37,6 +38,7 @@ function filledProgressSheet() {
 
 test('M3 progress baseline counts exactly the valid synthetic fields', () => {
   const sheet = filledProgressSheet()
+  assert.deepEqual(observationSheetReadiness(sheet), { ready: true, issues: [] })
   assert.deepEqual(observationSheetProgress(sheet), {
     totalLines: 22,
     availabilityRecorded: 22,
@@ -63,6 +65,10 @@ test('M3 progress handles non-string metadata as incomplete, not as a UI crash (
         const sheet = filledProgressSheet()
         select(sheet)[key] = invalid
         const snapshot = structuredClone(sheet)
+        const readiness = observationSheetReadiness(sheet)
+        assert.equal(readiness.ready, false,
+          'invalid metadata must not authorize a converter-ready collection')
+        assert.ok(readiness.issues.length > 0)
         const progress = observationSheetProgress(sheet)
         assert.equal(progress.metadataTotal, 16)
         assert.equal(progress.metadataCompleted, 15,
@@ -87,6 +93,10 @@ test('M3 progress never treats a malformed measurement line as collected', async
       const sheet = filledProgressSheet()
       corrupt(sheet)
       const snapshot = structuredClone(sheet)
+      const readiness = observationSheetReadiness(sheet)
+      assert.equal(readiness.ready, false,
+        'broken measurement containers must revoke export-ready')
+      assert.ok(readiness.issues.length > 0)
       const progress = observationSheetProgress(sheet)
       assert.equal(progress.totalLines, 22)
       assert.ok(progress.completeLines < 22,
