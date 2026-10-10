@@ -92,6 +92,10 @@ test('malformed or ambiguous choices fail closed instead of altering the input',
     { activeDays: ['Yesterday'] },
     { plan: [...m2InitialPlan, { day: 'Di', recipeId: 'pasta' }] },
     { plan: m2InitialPlan.filter((entry) => entry.day !== 'Di') },
+    { plan: m2InitialPlan.map((entry) =>
+      entry.day === 'Di' ? { ...entry, recipeId: 'retired-recipe' } : entry) },
+    { plan: m2InitialPlan.map((entry) =>
+      entry.day === 'Di' ? { ...entry, recipeId: 'retired-recipe' } : entry), activeDays: [] },
     { recipes: [...m2Recipes, m2Recipes[2]] },
     { store: { ...m2Store, id: ' ' } },
     { products: null },
@@ -115,4 +119,27 @@ test('preview reports a per-line price-only change without miscalling it recipe 
   assert.equal(after.deltaCents, before.deltaCents + 1)
   assert.equal(after.priceEvidence, 'input-snapshot-only')
   assert.deepEqual(after.changes.map((line) => line.ingredientId), before.changes.map((line) => line.ingredientId))
+})
+
+test('changing an inactive day does not rewrite active-week ingredients or invent savings', () => {
+  const result = previewPlanRecipeSwap({
+    ...base, activeDays: ['Wo'], day: 'Di', replacementRecipeId: 'tikka',
+  })
+  assert.equal(result.status, 'ready')
+  assert.equal(result.deltaCents, 0)
+  assert.deepEqual(result.changes, [])
+  assert.equal(result.before.totalCents, result.after.totalCents)
+  assert.equal(result.nextPlan.find((meal) => meal.day === 'Di').recipeId, 'tikka')
+  assert.equal(base.plan.find((meal) => meal.day === 'Di').recipeId, 'teriyaki')
+})
+
+test('known price delta is not the difference between recipe estimatedCost values', () => {
+  const result = previewPlanRecipeSwap(base)
+  assert.equal(result.status, 'ready')
+  const estimateChangeCents = Math.round(
+    (m2Recipes.find((r) => r.id === 'pasta').estimatedCost -
+     m2Recipes.find((r) => r.id === 'teriyaki').estimatedCost) * 100,
+  )
+  assert.notEqual(result.deltaCents, estimateChangeCents)
+  assert.equal(result.deltaCents, result.after.totalCents - result.before.totalCents)
 })
