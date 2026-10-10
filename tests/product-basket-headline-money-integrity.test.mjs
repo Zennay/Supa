@@ -27,6 +27,7 @@ test('product comparison headline displays only validated exact signed cent diff
     basketComparisonHeadline({
       ...baseline,
       outcome: 'worse',
+      candidateTotalCents: 12875,
       deltaCents: 375,
       savingsCents: -375,
     }, candidate),
