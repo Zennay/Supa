@@ -27,7 +27,7 @@ test('canonical distinct store identities do not make an empty week financially 
 })
 
 test('padded store identity never establishes a claimable second store', () => {
-  for (const padded of ['plus ', ' plus', ' plus ', '\\tplus', 'plus\\n']) {
+  for (const padded of ['plus ', ' plus', ' plus ', '\tplus', 'plus\n']) {
     const result = compareFullBaskets({
       baseline: emptyBasket('plus'),
       candidate: emptyBasket(padded),
