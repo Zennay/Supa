@@ -154,6 +154,53 @@ test('reviewed fixtures reject malformed capture timestamps before chronology', 
   }
 })
 
+test('reviewed fixtures accept canonical UTC and offset timestamps when chronology is valid', () => {
+  for (const reviewedAt of [
+    '2026-10-04T02:05:00Z',
+    '2026-10-04T02:05:00.0Z',
+    '2026-10-04T02:05:00.00Z',
+    '2026-10-04T02:05:00.000Z',
+    '2026-10-04T04:05:00+02:00',
+    '2026-10-04T01:05:00-01:00',
+  ]) {
+    const reviewed = fixture('ah')
+    reviewed.review.reviewedAt = reviewedAt
+    assert.doesNotThrow(
+      () => validateReviewedLiveProductFixture(reviewed, 'ah'),
+      reviewedAt,
+    )
+  }
+})
+
+test('reviewed fixtures preserve true instants across offset boundaries', () => {
+  const reviewed = fixture('plus')
+  reviewed.source.capturedAt = '2026-10-04T04:00:00+02:00'
+  reviewed.observation.provenance.capturedAt = reviewed.source.capturedAt
+  reviewed.review.reviewedAt = '2026-10-03T23:05:00-03:00'
+
+  assert.doesNotThrow(() => validateReviewedLiveProductFixture(reviewed, 'plus'))
+
+  reviewed.review.reviewedAt = '2026-10-03T23:59:59+00:00'
+  assert.throws(
+    () => validateReviewedLiveProductFixture(reviewed, 'plus'),
+    /cannot predate its capture/,
+  )
+})
+
+test('reviewed fixtures distinguish valid leap days from impossible calendar days', () => {
+  const reviewed = fixture('ah')
+  reviewed.source.capturedAt = '2024-02-29T02:00:00Z'
+  reviewed.observation.provenance.capturedAt = reviewed.source.capturedAt
+  reviewed.review.reviewedAt = '2024-02-29T02:05:00Z'
+  assert.doesNotThrow(() => validateReviewedLiveProductFixture(reviewed, 'ah'))
+
+  reviewed.review.reviewedAt = '2025-02-29T02:05:00Z'
+  assert.throws(
+    () => validateReviewedLiveProductFixture(reviewed, 'ah'),
+    /valid reviewedAt/,
+  )
+})
+
 test('reviewed fixtures reject reviews that predate the captured evidence', () => {
   const reviewed = fixture('ah')
   reviewed.review.reviewedAt = '2026-10-04T01:59:59.999Z'
