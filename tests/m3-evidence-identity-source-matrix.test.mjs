@@ -298,3 +298,36 @@ test('M3 invalid CLI input leaves an existing report untouched and emits no savi
     await rm(directory, { force: true, recursive: true })
   }
 })
+
+test('M3 report rejects misleading financial certainty across incomplete source pairs', () => {
+  const sources = ['manual-cart', 'receipt', 'consented-export']
+  let cases = 0
+  for (const baselineSource of sources) {
+    for (const candidateSource of sources) {
+      for (const priceContext of ['in-store', 'online-order']) {
+        const study = syntheticStudy()
+        study.baseline.basket.store.name = 'PLUS synthetic QA only'
+        study.candidate.basket.store.name = 'DekaMarkt synthetic QA only'
+        study.baseline.source = baselineSource
+        study.candidate.source = candidateSource
+        study.priceContext = priceContext
+        study.candidate.evidenceId = study.baseline.evidenceId
+        const original = structuredClone(study)
+        const report = buildObservedWeekReport(study)
+
+        assert.equal(report.claimable, false)
+        assert.equal(report.outcome, 'unknown')
+        assert.equal(report.deltaCents, null)
+        assert.equal(report.savingsCents, null)
+        assert.equal(report.publicSavingsClaimEligible, false)
+        assert.equal(report.baseline.source, baselineSource)
+        assert.equal(report.candidate.source, candidateSource)
+        assert.match(report.reasons.join(' '), /evidence IDs must differ/)
+        assert.ok(!JSON.stringify(report).includes(study.participantKey))
+        assert.deepEqual(study, original)
+        cases++
+      }
+    }
+  }
+  assert.equal(cases, 18)
+})
