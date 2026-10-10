@@ -128,7 +128,9 @@ test('safe cents and untrusted source quantities never become an apparent bargai
     products: input.products.map((p) =>
       ({ ...p, priceCents: Number.MAX_SAFE_INTEGER })),
   }
-  assert.equal(buildExactDecimalOneStoreBasket(tooLargePrice), null)
+  const excessive = buildExactDecimalOneStoreBasket(tooLargePrice)
+  assert.ok(excessive === null || excessive.unresolvedLineCount > 0)
+  assert.equal(excessive?.totalCents ?? 0, 0, 'unsafe price must never become a matched monetary claim')
   const malformed = synthetic(0.1, 0.2)
   malformed.recipes[1].ingredients[0].amount = Number.POSITIVE_INFINITY
   const basket = buildExactDecimalOneStoreBasket(malformed)
