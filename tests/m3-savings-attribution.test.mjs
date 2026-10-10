@@ -372,3 +372,41 @@ test('M3 attribution rejects padded evidence references', () => {
   assert.equal(result.effectTotals.unknownCents, null)
   assert.match(result.reasons.join(' '), /canonical evidence reference/)
 })
+
+test('M3 attribution rejects malformed top-level evidence without throwing or fabricating effects', () => {
+  for (const evidence of [null, undefined, {}, 'not-an-evidence-array', 42, true]) {
+    const result = attributeSavingsEffects({
+      comparison: comparison(),
+      evidence,
+    })
+    assert.equal(result.status, 'unknown')
+    assert.equal(result.fullyAttributed, false)
+    assert.equal(result.comparisonDeltaCents, -90)
+    assert.deepEqual(result.effectTotals, {
+      packSizeCents: 0,
+      offerCents: 0,
+      planningCents: 0,
+      unknownCents: null,
+    })
+    assert.deepEqual(result.reasons, ['attribution evidence must be an array'])
+  }
+})
+
+test('M3 attribution continues to preserve unclaimable comparison before parsing malformed evidence', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison({
+      claimable: false,
+      outcome: 'unknown',
+      deltaCents: null,
+      savingsCents: null,
+      lineDeltas: [],
+      reasons: ['candidate basket unresolved'],
+    }),
+    evidence: null,
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.comparisonDeltaCents, null)
+  assert.match(result.reasons.join(' '), /candidate basket unresolved/)
+  assert.doesNotMatch(result.reasons.join(' '), /evidence must be an array/)
+})
