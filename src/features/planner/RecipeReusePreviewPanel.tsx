@@ -61,9 +61,12 @@ export function RecipeReusePreviewPanel({
   // The proposed overlap depends on *all* active meals, not just the
   // selected day's source recipe. A change on Tuesday can alter a Monday
   // proposal too; require a fresh user confirmation before enabling Apply.
+  // Build a primitive-only identity: unexpected runtime objects cannot turn
+  // JSON.stringify into a crash or an authorization for an old proposal.
   const weekKey = JSON.stringify(activeDays.map((activeDay) => [
-    activeDay,
-    plannedMeals.filter((meal) => meal?.day === activeDay).map((meal) => meal.recipeId),
+    typeof activeDay === 'string' ? activeDay : null,
+    plannedMeals.filter((meal) => meal?.day === activeDay)
+      .map((meal) => typeof meal?.recipeId === 'string' ? meal.recipeId : null),
   ]))
 
   // A previously chosen day/recipe may disappear when the real plan changes.
