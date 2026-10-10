@@ -26,9 +26,9 @@ node --experimental-strip-types scripts/m3-check-field-readiness.mjs /private/lo
 
 The command reads but does **not** modify the sheet, create files, print raw prices, source URLs, participant identifiers or provenance. Its JSON output can be inspected locally:
 
-- `needs-field-input`: count and canonical labels for missing work, plus the 24-hour window state. Finish or explicitly record unavailable products; never invent answers.
+- `needs-field-input` (**exit code 2**): count and canonical labels for missing work, plus the 24-hour window state. The nonzero code prevents shell/VPS automation from mistaking an unfinished collection for a completed readiness check. Finish or explicitly record unavailable products; never invent answers.
 - `invalid` (exit code 1): a malformed sheet, structural drift, coerced restored values or unreadable JSON. Preserve the original; investigate before continuing.
-- `ready-for-human-review`: all 22 availability/line slots and metadata passed the existing shape and converter preflight. It is **still not independently verified retailer evidence**, and **not proof of savings**.
+- `ready-for-human-review` (**exit code 0**): all 22 availability/line slots and metadata passed the existing shape and converter preflight. It is **still not independently verified retailer evidence**, and **not proof of savings**.
 
 No status asserts that the person actually visited the retailers, used a permitted source, established current prices or justified publishing financial claims. That requires source-specific human review and the existing evidence acceptance rubric.
 
