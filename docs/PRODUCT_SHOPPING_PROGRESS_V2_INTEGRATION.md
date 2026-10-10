@@ -8,7 +8,7 @@ The current v1 `shoppingListBasketKey()` includes `pricePerPackCents` and `lineT
 
 New isolated modules:
 
-- `src/features/shopping-list/shoppingListDemandIdentity.ts`: validated v2 identity of *store + ordered line ids + requirements + match decision + product identity + whole-pack shopping quantities*. Ignores money, labels, match scores, and explanation text.
+- `src/features/shopping-list/shoppingListDemandIdentity.ts`: validated v2 identity of *store + canonicalized line ids + requirements + match decision + product identity + whole-pack shopping quantities*. Ignores money, labels, match scores, and explanation text.
 - `src/features/shopping-list/shoppingListProgressV2.ts`: explicit v2 local-storage namespace, fail-closed serialize/restore and same-session reconciliation. It **never** interprets or upgrades v1 persisted JSON.
 
 ### Expected behavior
@@ -16,7 +16,7 @@ New isolated modules:
 | Transition | Checked list |
 | --- | --- |
 | Price changes while all physical purchase decisions remain equal | Keep checked items |
-| Product label, confidence, or trace text changes only | Keep checked items |
+| Product label, confidence, or trace text changes only | Keep checked items |\n| Shopping rows are reordered for presentation | Keep checked items |
 | Store changes | Reset |
 | Recipe demand changes quantity or line count | Reset |
 | Different selected product, packs, or pack size | Reset |
@@ -24,7 +24,7 @@ New isolated modules:
 | Unknown/malformed runtime basket or old v1 state | Ignore persisted state |
 | User starts an empty week | Never resurrect previous checkmarks |
 
-The intentionally conservative key includes line order, like v1. Expanding cross-order preservation requires a separate explicit product decision. It also treats a genuinely different fractional demand as different, rather than rounding quantities to hide a mismatch.
+The v2 identity sorts projected shopping lines by validated stable id, unlike v1. This preserves user progress when rows are reordered but still resets on removed/added lines or changed actual quantities. It also treats a genuinely different fractional demand as different, rather than rounding quantities to hide a mismatch.
 
 ## Owner-controlled wiring plan
 
