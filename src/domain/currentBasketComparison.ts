@@ -12,11 +12,12 @@ function strictMatchedPackMetadata(lines: unknown[]): boolean {
     if (!line || typeof line !== 'object' || Array.isArray(line)) return false
     if (!('status' in line) || line.status !== 'matched') return true
 
-    const pack = line.pack
+    const pack = 'pack' in line ? line.pack : null
     return (
       pack !== null &&
       typeof pack === 'object' &&
       !Array.isArray(pack) &&
+      'amount' in pack &&
       typeof pack.amount === 'number' &&
       Number.isFinite(pack.amount) &&
       pack.amount > 0
