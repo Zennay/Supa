@@ -1,0 +1,30 @@
+.shopping-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.shopping-copy__button {
+  min-height: 44px;
+  min-width: 44px;
+  max-width: 100%;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  color: inherit;
+  background: transparent;
+  padding: 10px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.shopping-copy__button:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+.shopping-copy__status {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
