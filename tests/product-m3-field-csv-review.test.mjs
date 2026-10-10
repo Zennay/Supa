@@ -74,7 +74,7 @@ test('mutating canonical demand, retailer role, evidence marker or row count fai
 test('overly precise timestamps, mixed contexts and >24h separation never pass', () => {
   const scenarios = [
     [7, '2026-10-10T10:00:00.000000001Z', 'invalid-timestamp'],
-    [7, '2026-10-12T11:00:00Z', 'capture-window-over-24-hours'],
+    [7, '2026-10-08T10:00:00Z', 'capture-window-over-24-hours'],
     [8, 'online-order', 'mixed-price-context'],
   ]
   for (const [column, value, reason] of scenarios) {
@@ -173,7 +173,7 @@ test('strict ISO calendar/offset rules do not normalize impossible field timesta
   for (const valid of [
     '2024-02-29T10:00:00Z',
     '2026-10-10T10:00:00.123+14:00',
-    '2026-10-10T10:00:00-12:00',
+    '2026-10-09T10:00:00-12:00',
   ]) {
     const rows = syntheticFilledRows()
     for (let i = 1; i < rows.length; i++) rows[i][7] = valid
