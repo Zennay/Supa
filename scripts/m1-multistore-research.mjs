@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url'
 export const RESEARCH_SOURCES = Object.freeze([
   { id: 'ah-halfvolle-melk', store: 'ah', kind: 'product', url: 'https://www.ah.nl/producten/product/wi1525/halfvolle-melk' },
   { id: 'dirk-boodschappen', store: 'dirk', kind: 'catalog', url: 'https://www.dirk.nl/boodschappen' },
+  { id: 'dirk-halvarine', store: 'dirk', kind: 'product', url: 'https://www.dirk.nl/boodschappen/zuivel-kaas/boter-margarine/1%20de%20beste%20halvarine/113861' },
   { id: 'hoogvliet-magere-melk', store: 'hoogvliet', kind: 'product', url: 'https://www.hoogvliet.com/product/melkan-magere-melk' },
   { id: 'jumbo-halfvolle-melk', store: 'jumbo', kind: 'product', url: 'https://www.jumbo.com/producten/jumbo-halfvolle-melk-500ml-753539PAK' },
 ])
