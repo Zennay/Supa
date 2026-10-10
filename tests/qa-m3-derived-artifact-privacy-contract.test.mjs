@@ -315,3 +315,29 @@ test('M3 converter makes only newly created nested output directories owner-priv
     assert.equal((await stat(output)).mode & 0o777, 0o600)
   })
 })
+
+test('M3 assessor creates missing nested private report directories without chmodding existing ancestors', {
+  skip: process.platform === 'win32',
+}, async () => {
+  await inScratch('assessor-private-directories', async (root) => {
+    const input = join(root, 'synthetic-study.json')
+    const existing = join(root, 'existing-report-parent')
+    const fresh = join(existing, 'private-observations')
+    const deeper = join(fresh, 'assessment-output')
+    const output = join(deeper, 'assessment.json')
+    await writeFile(input, JSON.stringify(
+      buildWeeklyBasketStudyFromObservationSheet(syntheticSheet()),
+    ))
+    await mkdir(existing)
+    await chmod(existing, 0o755)
+
+    const result = runCli('scripts/m3-assess-observed-week.mjs', input, output)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal((await stat(existing)).mode & 0o777, 0o755)
+    for (const directory of [fresh, deeper]) {
+      assert.equal((await stat(directory)).mode & 0o777, 0o700)
+    }
+    assert.equal((await stat(output)).mode & 0o777, 0o600)
+    assert.equal(JSON.parse(await readFile(output, 'utf8')).publicSavingsClaimEligible, false)
+  })
+})
