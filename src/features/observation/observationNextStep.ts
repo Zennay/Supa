@@ -2,6 +2,7 @@ import {
   M3_EXPECTED_RETAILERS,
   nextIncompleteObservationLine,
   observationSheetReadiness,
+  observationWindowSummary,
   observationStoreMatchesExpectedRetailer,
   type M3ObservationSide,
   type ObservationSheet,
@@ -81,6 +82,17 @@ function chooseStoreAction(
         detail,
       }
     }
+
+    // A non-empty but unparsable date is an actionable field error.
+    if (key === 'observedAt' && !Number.isFinite(Date.parse(value))) {
+      return {
+        stage: 'store',
+        side,
+        title: 'Controleer de datum en tijd van ' + retailer,
+        detail:
+          'Gebruik het echte meetmoment. Vul geen geschatte tijd in; beide winkels moeten binnen 24 uur worden gemeten.',
+      }
+    }
   }
 
   return null
@@ -116,6 +128,16 @@ function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
         detail:
           'Controleer beschikbaarheid, product, verpakking en prijs. Laat onbekende gegevens open; vul niets op basis van een gok in.',
       }
+    }
+  }
+
+  // Surface a concrete, safe remedy rather than a raw evidence error count.
+  if (observationWindowSummary(sheet).state === 'outside-window') {
+    return {
+      stage: 'review',
+      title: 'Meet beide winkels binnen 24 uur',
+      detail:
+        'Deze winkelmetingen liggen te ver uit elkaar om eerlijk te vergelijken. Verzamel nieuwe echte metingen voor dezelfde boodschappenlijst en prijscontext; pas de tijden niet kunstmatig aan.',
     }
   }
 
