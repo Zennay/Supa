@@ -14,7 +14,7 @@ function fictionalCsvWithUrl(sourceUrl) {
     row[12] = '1'
     row[13] = '199'
     row[14] = 'ja'
-    row[15] = 'synthetic QA; not real evidence'
+    row[15] = 'manual-cart'
     row[16] = sourceUrl
   }
   return rows.map(row => row.map(cell => '"' +
