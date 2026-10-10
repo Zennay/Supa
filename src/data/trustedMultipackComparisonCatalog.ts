@@ -34,9 +34,11 @@ function timestampMillis(value: unknown): number | null {
   const second = Number(secondText)
   const offsetHour = offsetHourText === undefined ? 0 : Number(offsetHourText)
   const offsetMinute = offsetMinuteText === undefined ? 0 : Number(offsetMinuteText)
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
   if (
     year < 1 || month < 1 || month > 12 ||
-    day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate() ||
+    day < 1 || day > days[month - 1] ||
     hour > 23 || minute > 59 || second > 59 ||
     offsetHour > 14 || offsetMinute > 59 ||
     (offsetHour === 14 && offsetMinute !== 0)
@@ -54,20 +56,26 @@ function timestampMillis(value: unknown): number | null {
  * A full catalog is rejected if ANY row is future-dated, stale, date-ambiguous,
  * out of the 24-hour cross-store window, or belongs to a wrong retailer.
  */
-export function projectFreshControlledComparisonCatalogs({
-  baselineObservations,
-  candidateObservations,
-  baselineStore,
-  candidateStore,
-  referenceTime,
-}: {
+export type ControlledComparisonInputs = {
   baselineObservations: unknown
   candidateObservations: unknown
   baselineStore: ControlledSourceStore
   candidateStore: ControlledSourceStore
   referenceTime: string
-}): ControlledComparisonCatalogs | null {
+}
+
+export function projectFreshControlledComparisonCatalogs(
+  options: ControlledComparisonInputs | null,
+): ControlledComparisonCatalogs | null {
   try {
+    if (!options || typeof options !== 'object' || Array.isArray(options)) return null
+    const {
+      baselineObservations,
+      candidateObservations,
+      baselineStore,
+      candidateStore,
+      referenceTime,
+    } = options
     const referenceMillis = timestampMillis(referenceTime)
     if (referenceMillis === null) return null
     if (
