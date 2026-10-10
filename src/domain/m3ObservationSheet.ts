@@ -532,7 +532,9 @@ function nonBlank(value: string) {
 function validObservedAt(value: string) {
   if (!nonBlank(value)) return null
   const timestamp = Date.parse(value)
-  return Number.isFinite(timestamp) ? timestamp : null
+  // A future calendar instant cannot represent a completed collection.
+  // Compare UTC instants (including parsed offsets) at the collection gate.
+  return Number.isFinite(timestamp) && timestamp <= Date.now() ? timestamp : null
 }
 
 export function observationSheetReadiness(
