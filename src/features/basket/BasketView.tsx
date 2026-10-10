@@ -95,12 +95,12 @@ export function BasketView({
                 ? 'productkeuze is'
                 : 'productkeuzes zijn'}{' '}
               nog niet meegerekend. Dit is alleen het bekende minimum, geen
-              volledig mandtotaal. M2 testfixture — geen productie-liveprijs.
+              volledig mandtotaal. Dit zijn voorbeeldprijzen, geen actuele winkelprijzen of bewezen besparing.
             </>
           ) : (
             <>
-              Volledige deterministische M2 testfixture — geen besparingsclaim
-              en geen productie-liveprijs.
+              Dit is een volledig voorbeeldmandje met gecontroleerde voorbeeldprijzen.
+              Geen actuele winkelprijzen of bewezen besparing.
             </>
           )}
         </p>
@@ -150,8 +150,8 @@ export function BasketView({
 
         {comparison.claimable ? (
           <p className="disclaimer">
-            M3 controlled testdata · zelfde week en volledige mand · geen
-            live-besparingsclaim.
+            Vergelijking van voorbeeldprijzen voor dezelfde week en een volledige mand.
+            Geen actuele winkelprijzen of bewezen besparing.
           </p>
         ) : (
           <div className="comparison-warning">
