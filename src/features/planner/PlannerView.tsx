@@ -223,6 +223,7 @@ export function PlannerView({
           plannedMeals={plannedMeals}
           activeDays={activeDays}
           recipes={ingredientRecipes}
+          onChooseRecipe={onRecipeChange}
         />
       )}
 
