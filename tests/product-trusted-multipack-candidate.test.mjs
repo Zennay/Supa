@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { projectTrustedPackForMatching } from '../src/data/trustedMultipackCandidate.ts'
+import { projectTrustedPackForMatching, projectTrustedObservationPack } from '../src/data/trustedMultipackCandidate.ts'
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 
 const observedPack = (rawText, amount, unit) => ({ rawText, amount, unit })
@@ -110,5 +110,43 @@ test('fails closed on oversized counts, effective volume and malformed runtime i
     observedPack('6 x 1 l', 1, 'pack'),
   ]) {
     assert.equal(projectTrustedPackForMatching(pack), null)
+  }
+})
+
+test('requires valid raw observation provenance before exposing a pack candidate', () => {
+  const source = {
+    supermarket: 'plus',
+    sourceProductId: 'synthetic-water',
+    name: 'Water',
+    currentPriceCents: 199,
+    currency: 'EUR',
+    pack: observedPack('6 x 1 l', 1, 'l'),
+    offer: null,
+    availability: 'available',
+    provenance: {
+      supermarket: 'plus',
+      kind: 'product',
+      url: 'https://www.plus.nl/synthetic-water',
+      capturedAt: '2026-10-10T12:00:00.000Z',
+      sha256: 'a'.repeat(64),
+    },
+  }
+  const snapshot = structuredClone(source)
+  const candidate = projectTrustedObservationPack(source)
+  assert.deepEqual(candidate, { packAmount: 1, packUnit: 'l', packCount: 6 })
+  assert.deepEqual(source, snapshot)
+  assert.equal(basketForLitres(4, candidate).totalCents, 199)
+
+  for (const invalid of [
+    { ...source, provenance: { ...source.provenance, supermarket: 'dekamarkt' } },
+    { ...source, provenance: { ...source.provenance, url: 'https://invalid.example/water' } },
+    { ...source, pack: { ...source.pack, count: 1 } },
+    { ...source, currency: 'USD' },
+    { ...source, currentPriceCents: 1.5 },
+    { ...source, pack: { ...source.pack, rawText: null } },
+    null,
+    [],
+  ]) {
+    assert.equal(projectTrustedObservationPack(invalid), null)
   }
 })
