@@ -4,6 +4,7 @@ import { euro } from '../../lib/money'
 import {
   basketCostDisclosure,
   basketComparisonHeadline,
+  basketComparisonCanShowMoney,
   basketLineExplanation,
   basketReviewSummary,
   comparisonLineHighlightCopy,
@@ -45,7 +46,13 @@ export function BasketView({
     comparisonCandidate.unresolvedLineCount,
     comparison.reasons.length,
   )
-  const comparisonHighlights = comparisonLineHighlights(comparison)
+  const comparisonCanShowMoney = basketComparisonCanShowMoney(
+    comparison,
+    comparisonCandidate,
+  )
+  const comparisonHighlights = comparisonCanShowMoney
+    ? comparisonLineHighlights(comparison)
+    : []
   const reviewSummary = basketReviewSummary(basket.unresolvedLineCount)
   const basketLines = orderBasketLinesForReview(basket.lines)
 
@@ -87,7 +94,7 @@ export function BasketView({
         </p>
       </div>
 
-      <div className="comparison-card" data-comparison-outcome={comparison.outcome}>
+      <div className="comparison-card" data-comparison-outcome={comparisonCanShowMoney ? comparison.outcome : 'unknown'}>
         <span className="eyebrow">Gecontroleerde winkelvergelijking</span>
         <strong>{basketComparisonHeadline(comparison, comparisonCandidate)}</strong>
         <div className="comparison-totals">
@@ -129,7 +136,7 @@ export function BasketView({
           </div>
         )}
 
-        {comparison.claimable ? (
+        {comparisonCanShowMoney ? (
           <p className="disclaimer">
             Vergelijking van voorbeeldprijzen voor dezelfde week en een volledige mand.
             Geen actuele winkelprijzen of bewezen besparing.
