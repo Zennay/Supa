@@ -90,6 +90,43 @@ test('an untrusted snapshot, corrupt pack, changed counts or stale checks fail c
   }), null)
 })
 
+test('stale pack coverage and cross-family pack drift cannot be copied as valid quantities', () => {
+  const current = basket()
+  const matched = current.lines.find(line => line.status === 'matched' && line.requirement.unit === 'g')
+  assert.ok(matched)
+  const staleDemand = {
+    ...current,
+    lines: current.lines.map(line => line.id === matched.id
+      ? { ...line, requirement: { amount: 1000000, unit: 'g' } }
+      : line),
+  }
+  assert.equal(buildShoppingListCopyText(staleDemand), null)
+
+  const switchedUnit = {
+    ...current,
+    lines: current.lines.map(line => line.id === matched.id
+      ? { ...line, pack: { ...line.pack, unit: 'ml' } }
+      : line),
+  }
+  assert.equal(buildShoppingListCopyText(switchedUnit), null)
+})
+
+test('tiny representable demand is not rounded down to a fictional zero', () => {
+  const current = basket()
+  const matched = current.lines.find(line => line.status === 'matched' && line.requirement.unit === 'g')
+  assert.ok(matched)
+  const tiny = {
+    ...current,
+    lines: current.lines.map(line => line.id === matched.id
+      ? { ...line, requirement: { amount: 1e-16, unit: 'g' } }
+      : line),
+  }
+  const output = buildShoppingListCopyText(tiny)
+  assert.ok(output)
+  assert.ok(output.includes('nodig: 1e-16 g'))
+  assert.ok(!output.includes('nodig: 0 g'))
+})
+
 test('product label line breaks and bidirectional controls cannot insert checkbox rows', () => {
   const current = basket()
   const firstMatched = current.lines.find(line => line.status === 'matched')
