@@ -24,19 +24,30 @@ export function parseM3FieldRunCommitSha(value: unknown): string | null {
  * neither participant identity nor other observation data into a CI log.
  */
 export function requireM3FieldRunCommitSha(study: unknown): string {
-  if (!study || typeof study !== 'object' || Array.isArray(study)) {
-    throw new Error('M3 field-run code revision missing or invalid')
+  const errorMessage = 'M3 field-run code revision missing or invalid'
+  try {
+    if (!study || typeof study !== 'object' || Array.isArray(study)) {
+      throw new Error(errorMessage)
+    }
+
+    // An inherited SHA is not an observed field-run revision. Do not execute
+    // getters on a JS object or trust accessor-returned provenance.
+    const descriptor = Object.getOwnPropertyDescriptor(
+      study,
+      M3_FIELD_RUN_REVISION_KEY,
+    )
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(errorMessage)
+    }
+
+    const sha = parseM3FieldRunCommitSha(descriptor.value)
+    if (sha === null) throw new Error(errorMessage)
+    return sha
+  } catch {
+    // Never leak errors thrown by proxies, custom getters or malformed data
+    // into CLI logs that might be linked to real field observation metadata.
+    throw new Error(errorMessage)
   }
-
-  const sha = parseM3FieldRunCommitSha(
-    (study as Record<string, unknown>)[M3_FIELD_RUN_REVISION_KEY],
-  )
-
-  if (sha === null) {
-    throw new Error('M3 field-run code revision missing or invalid')
-  }
-
-  return sha
 }
 
 /**
