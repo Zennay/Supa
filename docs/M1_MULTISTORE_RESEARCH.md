@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | AH | https://www.ah.nl/producten/product/wi1525/halfvolle-melk | Product |
 | Dirk | https://www.dirk.nl/boodschappen | Catalog |
+| Dirk detail | https://www.dirk.nl/boodschappen/zuivel-kaas/boter-margarine/1%20de%20beste%20halvarine/113861 | Product |
 | Hoogvliet | https://www.hoogvliet.com/product/melkan-magere-melk | Product |
 | Jumbo | https://www.jumbo.com/producten/jumbo-halfvolle-melk-500ml-753539PAK | Product |
 
