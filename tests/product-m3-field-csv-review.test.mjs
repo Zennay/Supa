@@ -171,7 +171,7 @@ test('strict ISO calendar/offset rules do not normalize impossible field timesta
   }
 
   for (const valid of [
-    '2028-02-29T10:00:00Z',
+    '2024-02-29T10:00:00Z',
     '2026-10-10T10:00:00.123+14:00',
     '2026-10-10T10:00:00-12:00',
   ]) {
