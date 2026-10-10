@@ -16,6 +16,8 @@ An unknown/full-basket comparison currently says only that no financial differen
 - `review-data` for malformed, inconsistent or non-claimable inputs;
 - `comparison-ready` **only** for a complete, nonempty, internally consistent, canonical claimable two-store comparison.
 
+Each ingredient's baseline/candidate totals, label, identity and signed delta are checked. Duplicate/missing/forged traces and arithmetic overflow fail closed; line reordering is accepted. The adapter never changes the canonical comparator result.
+
 Every state has a Dutch heading, explanation and next action. The only state with `canShowDifference: true` explicitly describes the two baskets as **controlled test data**, not live prices or proven customer savings. Raw technical comparator reasons (which may include ingredient identifiers) never become displayed text. This adapter never computes or changes financial values.
 
 ## Ownership-preserving integration
@@ -40,3 +42,5 @@ Tests use only known, synthetic M2 product fixtures. No genuine PLUS/DekaMarkt p
 ## Passive card contract
 
 New `tests/product-comparison-next-action-card-contract.test.mjs` AST-checks the actual standalone TSX markup, status semantics, no misleading interactive controls and the long-text responsive layout. This is a source/layout contract, not a claim of rendered Firefox proof. The new CSS is imported **only** by the standalone card; existing BasketView layout is unchanged until owner integration.
+
+The expanded synthetic product regression also verifies that a manipulated claimable summary cannot unlock a difference when line deltas are missing, duplicated, mislabeled, inflated, non-array or attached to the wrong ingredient. A pure line-order permutation still produces the same state. The tested data remain synthetic, not retail observations.
