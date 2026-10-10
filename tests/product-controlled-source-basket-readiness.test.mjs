@@ -206,12 +206,10 @@ test('malformed caller shapes and hostile getter never disclose diagnostic or th
   assert.doesNotMatch(JSON.stringify(result), /PRIVATE_PARTICIPANT_KEY/)
 })
 
-test('M3 preparation binds PLUS baseline and DekaMarkt candidate even if generic two-store arithmetic passes', () => {
-  const correct = assessM3ControlledPlusDekaBasketReadiness(input())
-  assert.equal(correct.status, 'structural-pass')
-  assert.equal(correct.releaseEligible, false)
-  assert.equal(correct.baseline.store.name, 'PLUS')
-  assert.equal(correct.candidate.store.name, 'DekaMarkt')
+test('M3 preparation rejects noncanonical one-ingredient plans and swapped/other store roles', () => {
+  const oneDemandOnly = assessM3ControlledPlusDekaBasketReadiness(input())
+  assert.equal(oneDemandOnly.status, 'structural-fail')
+  assert.equal(oneDemandOnly.releaseEligible, false)
 
   const switched = input({
     baselineStore: candidateStore,
