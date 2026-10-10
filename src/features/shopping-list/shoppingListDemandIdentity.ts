@@ -54,7 +54,8 @@ export function shoppingListDemandIdentity(basket: OneStoreBasket): string | nul
       !identifier(line.id) ||
       seen.has(line.id) ||
       !requirement ||
-      !MATCH_UNITS.has(String(requirement.unit)) ||
+      typeof requirement.unit !== 'string' ||
+      !MATCH_UNITS.has(requirement.unit) ||
       (requirement.amount !== null && !amount(requirement.amount))
     ) {
       return null
@@ -81,7 +82,8 @@ export function shoppingListDemandIdentity(basket: OneStoreBasket): string | nul
       !wholePacks(line.packs) ||
       !pack ||
       !amount(pack.amount) ||
-      !PACK_UNITS.has(String(pack.unit)) ||
+      typeof pack.unit !== 'string' ||
+      !PACK_UNITS.has(pack.unit) ||
       !wholePacks(pack.count)
     ) {
       return null
