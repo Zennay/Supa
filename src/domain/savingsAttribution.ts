@@ -86,6 +86,23 @@ export function attributeSavingsEffects({
 
   const comparisonLineIds = new Set<string>()
   for (const line of comparison.lineDeltas) {
+    // Loaded comparisons may bypass TypeScript and contain malformed entries.
+    // Null entries throw on property access, while coercible cent strings can
+    // otherwise make an empty effect set appear completely reconciled.
+    if (
+      !line ||
+      typeof line !== 'object' ||
+      Array.isArray(line) ||
+      !Number.isSafeInteger(line.deltaCents)
+    ) {
+      return {
+        status: 'unknown',
+        fullyAttributed: false,
+        comparisonDeltaCents: comparison.deltaCents,
+        effectTotals: emptyTotals(),
+        reasons: ['basket comparison contains an invalid monetary line delta'],
+      }
+    }
     if (
       typeof line.id !== 'string' ||
       line.id.trim().length === 0 ||
