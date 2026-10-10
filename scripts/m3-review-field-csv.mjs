@@ -110,7 +110,7 @@ function validObservationTime(value) {
   return millis
 }
 
-export function reviewM3FieldCsv(input) {
+export function reviewM3FieldCsv(input, { validateUnits = false } = {}) {
   const rows = parseM3FieldCsv(input)
   const expected = parseM3FieldCsv(buildBlankM3FieldChecklistCsv())
   if (rows.length !== expected.length || rows.length !== 23 ||
@@ -151,14 +151,14 @@ export function reviewM3FieldCsv(input) {
     const yes = ['ja', 'yes', 'true'].includes(state)
     const no = ['nee', 'no', 'false'].includes(state)
     const required = Boolean(observedAt && meaningfulText(context) && meaningfulText(source) && (yes || no))
-    const unitCompatible = yes && sameM3QuantityFamily(row[6], packUnit)
-    if (yes && packUnit && !unitCompatible) {
+    const unitCompatible = !validateUnits || sameM3QuantityFamily(row[6], packUnit)
+    if (validateUnits && yes && packUnit && !unitCompatible) {
       warnings.add('incompatible-pack-unit')
     }
     const coherent = no
       ? !product && !packAmount && !packUnit && !packCount && !priceCents
       : yes && unitCompatible && Boolean(meaningfulText(product) && packAmount && packUnit && packCount && priceCents) &&
-        validM3PackPieceAmount(packAmount, packUnit) &&
+        (!validateUnits || validM3PackPieceAmount(packAmount, packUnit)) &&
         positiveDecimal.test(packAmount) && Number.isFinite(Number(packAmount)) &&
         Number(packAmount) > 0 && Number.isSafeInteger(Math.ceil(Number(packAmount))) &&
         ['g', 'kg', 'ml', 'l', 'piece'].includes(packUnit) &&
@@ -190,14 +190,17 @@ export function reviewM3FieldCsv(input) {
 }
 
 export function main(argv = process.argv.slice(2)) {
-  if (argv.length !== 1 || !argv[0] || argv[0].startsWith('-')) {
+  const validateUnits = argv[0] === '--validate-units'
+  const filePath = validateUnits ? argv[1] : argv[0]
+  if ((validateUnits ? argv.length !== 2 : argv.length !== 1) ||
+      !filePath || filePath.startsWith('-')) {
     throw new Error('M3 field CSV review failed')
   }
-  const stat = lstatSync(argv[0])
+  const stat = lstatSync(filePath)
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > LIMIT_BYTES) {
     throw new Error('M3 field CSV review failed')
   }
-  const result = reviewM3FieldCsv(readFileSync(argv[0], 'utf8'))
+  const result = reviewM3FieldCsv(readFileSync(filePath, 'utf8'), { validateUnits })
   process.stdout.write(JSON.stringify(result) + '\n')
 }
 
