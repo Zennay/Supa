@@ -57,7 +57,7 @@ export function assessFieldWindow({ baselineAt, candidateAt = null, nowMs = Date
     const remainingMs = baseline + MAX_FIELD_WINDOW_MS - nowMs
     return remainingMs < 0
       ? { status: 'expired', reason: '24-hour window has elapsed; recollect both stores' }
-      : { status: 'pending', remainingMinutes: Math.floor(remainingMs / 60_000) }
+      : { status: 'pending', remainingMinutes: Math.ceil(remainingMs / 60_000) }
   }
 
   const candidate = parseFieldInstant(candidateAt)
@@ -95,7 +95,9 @@ export function main(args = process.argv.slice(2), write = console.log, nowMs = 
     return 0
   }
   if (result.status === 'pending') {
-    write('PENDING: second store is not yet recorded. Preserve one price context; the 24-hour deadline is still open. No savings evidence.')
+    const hours = Math.floor(result.remainingMinutes / 60)
+    const minutes = result.remainingMinutes % 60
+    write(`PENDING: DekaMarkt nog niet gemeten; maximaal ${hours} uur en ${minutes} minuten over voor dezelfde prijscontext. Nog geen besparingsbewijs.`)
     return 2
   }
   write('NOT READY: invalid or expired observation window. Verify/recollect genuine observations; no savings claim.')
