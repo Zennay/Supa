@@ -69,6 +69,7 @@ const isoInstant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\
 const whole = /^(?:0|[1-9]\d*)$/
 const positiveDecimal = /^(?:(?:0|[1-9]\d*)(?:\.\d+)?|\.\d+)$/
 const safeText = value => !/^[\s]*[=+@-]/.test(value)
+const meaningfulText = value => typeof value === 'string' && value.trim().length > 0
 
 function validObservationTime(value) {
   if (!isoInstant.test(value)) return null
@@ -135,13 +136,15 @@ export function reviewM3FieldCsv(input) {
     }
     const yes = ['ja', 'yes', 'true'].includes(state)
     const no = ['nee', 'no', 'false'].includes(state)
-    const required = Boolean(observedAt && context && source && (yes || no))
+    const required = Boolean(observedAt && meaningfulText(context) && meaningfulText(source) && (yes || no))
     const coherent = no
       ? !product && !packAmount && !packUnit && !packCount && !priceCents
-      : yes && Boolean(product && packAmount && packUnit && packCount && priceCents) &&
-        positiveDecimal.test(packAmount) && Number(packAmount) > 0 &&
+      : yes && Boolean(meaningfulText(product) && packAmount && packUnit && packCount && priceCents) &&
+        positiveDecimal.test(packAmount) && Number.isFinite(Number(packAmount)) &&
+        Number(packAmount) > 0 && Number.isSafeInteger(Math.ceil(Number(packAmount))) &&
         ['g', 'kg', 'ml', 'l', 'piece'].includes(packUnit) &&
-        whole.test(packCount) && Number(packCount) > 0 &&
+        whole.test(packCount) && Number.isSafeInteger(Number(packCount)) &&
+        Number(packCount) > 0 &&
         whole.test(priceCents) && Number.isSafeInteger(Number(priceCents))
     if ((yes || no) && !coherent) warnings.add('inconsistent-product-fields')
     if (required && coherent && timestamp !== null) completeRows++
