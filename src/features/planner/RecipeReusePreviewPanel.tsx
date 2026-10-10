@@ -58,16 +58,31 @@ export function RecipeReusePreviewPanel({
     requestedRecipe !== null && alternatives.some((recipe) => recipe.id === requestedRecipe)
       ? requestedRecipe : alternatives[0].id
 
-  // The proposed overlap depends on *all* active meals, not just the
-  // selected day's source recipe. A change on Tuesday can alter a Monday
-  // proposal too; require a fresh user confirmation before enabling Apply.
-  // Build a primitive-only identity: unexpected runtime objects cannot turn
-  // JSON.stringify into a crash or an authorization for an old proposal.
-  const weekKey = JSON.stringify(activeDays.map((activeDay) => [
-    typeof activeDay === 'string' ? activeDay : null,
-    plannedMeals.filter((meal) => meal?.day === activeDay)
-      .map((meal) => typeof meal?.recipeId === 'string' ? meal.recipeId : null),
-  ]))
+  // Proposed ingredient overlap depends on the whole active week AND the
+  // ingredient definitions behind each candidate. Recipe IDs can remain
+  // unchanged while an imported/catalog recipe's ingredients are updated.
+  // Snapshot only primitive fields, so malformed nested runtime values cannot
+  // smuggle circular objects into JSON.stringify or reauthorize old previews.
+  const weekKey = JSON.stringify({
+    active: activeDays.map((activeDay) => [
+      typeof activeDay === 'string' ? activeDay : null,
+      plannedMeals.filter((meal) => meal?.day === activeDay)
+        .map((meal) => typeof meal?.recipeId === 'string' ? meal.recipeId : null),
+    ]),
+    recipes: recipes.map((recipe) => [
+      typeof recipe?.id === 'string' ? recipe.id : null,
+      Array.isArray(recipe?.ingredients)
+        ? recipe.ingredients.map((ingredient) => [
+            typeof ingredient?.id === 'string' ? ingredient.id : null,
+            typeof ingredient?.label === 'string' ? ingredient.label : null,
+            typeof ingredient?.query === 'string' ? ingredient.query : null,
+            typeof ingredient?.amount === 'number' && Number.isFinite(ingredient.amount)
+              ? ingredient.amount : null,
+            typeof ingredient?.unit === 'string' ? ingredient.unit : null,
+          ])
+        : null,
+    ]),
+  })
 
   // A previously chosen day/recipe may disappear when the real plan changes.
   // Do not silently turn an old proposal into an actionable different one.
