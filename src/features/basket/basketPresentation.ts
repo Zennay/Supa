@@ -4,8 +4,8 @@ import type { BasketComparison } from '../../domain/basketComparison.ts'
 import { euro } from '../../lib/money.ts'
 
 export type BasketCostDisclosure = {
-  state: 'complete' | 'minimum'
-  headline: 'Deterministisch mandtotaal' | 'Bekend mandminimum'
+  state: 'complete' | 'minimum' | 'unknown'
+  headline: 'Deterministisch mandtotaal' | 'Bekend mandminimum' | 'Mandtotaal niet beschikbaar'
   amountLabel: string
   unresolvedLineCount: number
 }
@@ -22,6 +22,15 @@ export function basketCostDisclosure(
       : complete
         ? 0
         : 1
+  if (!Number.isSafeInteger(totalCents) || totalCents < 0) {
+    return {
+      state: 'unknown',
+      headline: 'Mandtotaal niet beschikbaar',
+      amountLabel: '—',
+      unresolvedLineCount: safeUnresolvedLineCount,
+    }
+  }
+
   const formattedAmount = euro.formatCents(totalCents)
 
   return complete
