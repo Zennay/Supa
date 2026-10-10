@@ -35,11 +35,25 @@ export function RecipeReusePreviewPanel({
 
   if (!Array.isArray(plannedMeals) || !Array.isArray(activeDays) ||
       !Array.isArray(recipes) || activeDays.length === 0 || recipes.length < 2 ||
-      activeDays.some((day) => typeof day !== 'string' || !day.trim()) ||
+      activeDays.some((day) => typeof day !== 'string' || !day.trim() || day !== day.trim()) ||
       new Set(activeDays).size !== activeDays.length) {
     // A duplicate/invalid active-day identity must not render duplicate
     // select keys or permit a misleading alternative-recipe action.
     return null
+  }
+
+  // A duplicate recipe id makes a select option ambiguous even if the
+  // preview engine later abstains. A missing/non-text title can render an
+  // unusable option (or throw in React). Reject the catalog as a whole;
+  // do not silently pick one conflicting recipe or mutate the week.
+  const recipeIds = new Set<string>()
+  for (const recipe of recipes) {
+    if (typeof recipe?.id !== 'string' || !recipe.id.trim() ||
+        recipe.id !== recipe.id.trim() || recipeIds.has(recipe.id) ||
+        typeof recipe.title !== 'string' || !recipe.title.trim()) {
+      return null
+    }
+    recipeIds.add(recipe.id)
   }
 
   const days = activeDays.filter((day) =>
@@ -53,7 +67,8 @@ export function RecipeReusePreviewPanel({
   const day = requestedDay !== null && days.includes(requestedDay)
     ? requestedDay : days[0]
   const currentMeal = plannedMeals.find((meal) => meal?.day === day)
-  if (!currentMeal) return null
+  if (!currentMeal || typeof currentMeal.recipeId !== 'string' ||
+      !recipeIds.has(currentMeal.recipeId)) return null
   const alternatives = recipes.filter((recipe) =>
     typeof recipe?.id === 'string' && recipe.id !== currentMeal.recipeId,
   )
