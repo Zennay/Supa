@@ -82,12 +82,21 @@ export function shoppingListCompletion(
       !line.productId.trim() ||
       typeof line.productName !== 'string' ||
       !line.productName.trim() ||
+      !Number.isFinite(line.requirement?.amount) ||
+      line.requirement.amount <= 0 ||
+      !Number.isFinite(line.pack?.amount) ||
+      line.pack.amount <= 0 ||
+      !['g', 'kg', 'ml', 'l', 'piece'].includes(line.requirement.unit) ||
+      !['g', 'kg', 'ml', 'l', 'piece'].includes(line.pack.unit) ||
       !Number.isSafeInteger(line.packs) ||
       line.packs < 1 ||
       !Number.isSafeInteger(line.pack?.count) ||
       line.pack.count < 1 ||
+      !Number.isSafeInteger(line.pricePerPackCents) ||
+      line.pricePerPackCents < 0 ||
       !Number.isSafeInteger(line.lineTotalCents) ||
-      line.lineTotalCents < 0
+      line.lineTotalCents < 0 ||
+      line.lineTotalCents !== line.packs * line.pricePerPackCents
     ) {
       return { ...invalid }
     }
