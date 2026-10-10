@@ -230,11 +230,10 @@ export function basketLineExplanation(
  *
  * This is a presentation trust boundary, not evidence of live shop prices.
  */
-export function basketComparisonHeadline(
+export function basketComparisonCanShowMoney(
   comparison: BasketComparison,
   candidate: { store: { name: string } },
-): string {
-  const abstain = 'Nog geen betrouwbare vergelijking'
+): boolean {
   const storeName = candidate?.store?.name
   if (
     !comparison || typeof comparison !== 'object' ||
@@ -251,7 +250,7 @@ export function basketComparisonHeadline(
     !Number.isSafeInteger(comparison.deltaCents) ||
     !Number.isSafeInteger(comparison.savingsCents)
   ) {
-    return abstain
+    return false
   }
 
   const expectedDelta =
@@ -261,22 +260,33 @@ export function basketComparisonHeadline(
     comparison.deltaCents !== expectedDelta ||
     comparison.savingsCents !== -expectedDelta
   ) {
-    return abstain
+    return false
+  }
+
+  if (comparison.outcome === 'same') return expectedDelta === 0
+  if (comparison.outcome === 'better') return expectedDelta < 0
+  if (comparison.outcome === 'worse') return expectedDelta > 0
+  return false
+}
+
+export function basketComparisonHeadline(
+  comparison: BasketComparison,
+  candidate: { store: { name: string } },
+): string {
+  if (!basketComparisonCanShowMoney(comparison, candidate)) {
+    return 'Nog geen betrouwbare vergelijking'
   }
 
   if (comparison.outcome === 'same') {
-    return expectedDelta === 0 ? 'Beide testmanden zijn even duur' : abstain
-  }
-  if (
-    (comparison.outcome !== 'better' || expectedDelta >= 0) &&
-    (comparison.outcome !== 'worse' || expectedDelta <= 0)
-  ) {
-    return abstain
+    return 'Beide testmanden zijn even duur'
   }
 
-  const amount = euro.formatCents(Math.abs(expectedDelta))
-  if (amount === '—') return abstain
+  const difference = euro.formatCents(
+    Math.abs(comparison.candidateTotalCents - comparison.baselineTotalCents),
+  )
+  if (difference === '—') return 'Nog geen betrouwbare vergelijking'
+
   return comparison.outcome === 'better'
-    ? `${storeName} ligt ${amount} lager`
-    : `${storeName} ligt ${amount} hoger`
+    ? `${candidate.store.name} ligt ${difference} lager`
+    : `${candidate.store.name} ligt ${difference} hoger`
 }
