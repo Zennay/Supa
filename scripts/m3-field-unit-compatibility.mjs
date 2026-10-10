@@ -17,3 +17,12 @@ export function sameM3QuantityFamily(requiredUnit, observedPackUnit) {
   return typeof required === 'string' &&
     required === UNIT_FAMILY[observedPackUnit]
 }
+
+// A product sold as discrete pieces cannot claim e.g. 0.5 pieces inside a
+// package; other families may use fractional weights and volumes.
+export function validM3PackPieceAmount(amount, unit) {
+  if (unit !== 'piece') return true
+  if (typeof amount !== 'string' || !/^(?:0|[1-9]\\d*)$/.test(amount)) return false
+  const count = Number(amount)
+  return Number.isSafeInteger(count) && count > 0
+}
