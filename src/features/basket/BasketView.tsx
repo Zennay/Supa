@@ -3,6 +3,7 @@ import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import {
   basketCostDisclosure,
+  basketComparisonHeadline,
   basketLineExplanation,
   basketReviewSummary,
   comparisonLineHighlightCopy,
@@ -14,24 +15,6 @@ import { StatPill } from '../../components/StatPill'
 
 function quantity(amount: number | null, unit: string) {
   return amount === null ? `? ${unit}` : `${amount} ${unit}`
-}
-
-function comparisonTitle(
-  comparison: BasketComparison,
-  candidate: OneStoreBasket,
-) {
-  if (!comparison.claimable || comparison.outcome === 'unknown') {
-    return 'Nog geen betrouwbare vergelijking'
-  }
-
-  if (comparison.outcome === 'same') {
-    return 'Beide testmanden zijn even duur'
-  }
-
-  const difference = euro.formatCents(Math.abs(comparison.savingsCents ?? 0))
-  return comparison.outcome === 'better'
-    ? `${candidate.store.name} ligt ${difference} lager`
-    : `${candidate.store.name} ligt ${difference} hoger`
 }
 
 export function BasketView({
@@ -106,7 +89,7 @@ export function BasketView({
 
       <div className="comparison-card" data-comparison-outcome={comparison.outcome}>
         <span className="eyebrow">Gecontroleerde winkelvergelijking</span>
-        <strong>{comparisonTitle(comparison, comparisonCandidate)}</strong>
+        <strong>{basketComparisonHeadline(comparison, comparisonCandidate)}</strong>
         <div className="comparison-totals">
           <div>
             <span>Baseline · {comparisonBaseline.store.name}</span>
