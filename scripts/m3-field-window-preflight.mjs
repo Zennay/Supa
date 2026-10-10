@@ -1,3 +1,5 @@
+import { pathToFileURL } from 'node:url'
+
 /**
  * Read-only M3 field-session clock. A timing check is not retailer evidence,
  * proof of price-context equality, or permission for a savings claim.
@@ -100,7 +102,7 @@ export function main(args = process.argv.slice(2), write = console.log, nowMs = 
   return 1
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     process.exitCode = main()
   } catch {
