@@ -169,3 +169,37 @@ test('new copy stays consumer-facing and returns a concrete next action in every
     )
   }
 })
+
+test('claimable money must retain a complete ingredient-level trace, not merely consistent totals', () => {
+  const value = scenario(basket(baselineStore), basket(candidateStore, { priceDelta: -10 }))
+  const lines = value.comparison.lineDeltas
+  assert.ok(lines.length >= 2)
+  assert.equal(comparisonNextStep(value).canShowDifference, true)
+  const initialSnapshot = JSON.stringify(value)
+  const variants = [
+    lines.slice(1),
+    null,
+    [...lines.slice(0, -1), { ...lines.at(-1), id: 'not-a-basket-line' }],
+    [...lines.slice(0, -1), { ...lines.at(-1), ingredientLabel: 'Wrong label' }],
+    [...lines.slice(0, -1), { ...lines.at(-1), deltaCents: lines.at(-1).deltaCents + 1 }],
+    [...lines.slice(0, -1), { ...lines.at(-1), candidateLineTotalCents: lines.at(-1).candidateLineTotalCents + 1 }],
+    [lines[0], ...lines.slice(0, -1)],
+  ]
+  for (const lineDeltas of variants) {
+    const guidance = comparisonNextStep({
+      ...value,
+      comparison: { ...value.comparison, lineDeltas },
+    })
+    assert.equal(guidance.code, 'review-data')
+    assert.equal(guidance.canShowDifference, false)
+  }
+  assert.equal(
+    comparisonNextStep({
+      ...value,
+      comparison: { ...value.comparison, lineDeltas: [...lines].reverse() },
+    }).canShowDifference,
+    true,
+    'order should not affect the same valid per-ingredient trace',
+  )
+  assert.equal(JSON.stringify(value), initialSnapshot, 'presentation guidance cannot mutate inputs')
+})
