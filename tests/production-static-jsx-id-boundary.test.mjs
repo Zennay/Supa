@@ -17,7 +17,8 @@ function staticStringExpression(node, depth = 0) {
     ts.isParenthesizedExpression(current) ||
     ts.isAsExpression(current) ||
     ts.isNonNullExpression(current) ||
-    ts.isTypeAssertionExpression(current)
+    ts.isTypeAssertionExpression(current) ||
+    ts.isSatisfiesExpression(current)
   ) current = current.expression
 
   if (ts.isStringLiteralLike(current)) return current.text
@@ -231,6 +232,17 @@ test('static id guard detects composed literal IDs but not dynamic interpolation
 
   assert.equal(duplicates.length, 2)
   assert.deepEqual(duplicates.map(({ id }) => id), ['account-name', 'account-name'])
+})
+
+test('static id guard resolves typed constant ids without evaluating variable references', () => {
+  const sources = [
+    { filename: 'a.tsx', source: '<input id="typed-duplicate" />' },
+    { filename: 'b.tsx', source: '<label id={(("typed" + "-duplicate") satisfies string)} />' },
+    { filename: 'c.tsx', source: '<label id={(dynamicId satisfies string)} />' },
+  ]
+  const duplicates = duplicateStaticIds(sources)
+  assert.equal(duplicates.length, 1)
+  assert.equal(duplicates[0].id, 'typed-duplicate')
 })
 
 test('static id guard handles no-substitution template ids', () => {
