@@ -97,6 +97,7 @@ export function assessControlledSourceBasketReadiness(
     if (
       !comparison.claimable ||
       comparison.outcome === 'unknown' ||
+      comparison.deltaCents === null ||
       !Number.isSafeInteger(comparison.deltaCents)
     ) return FAILURE
 
