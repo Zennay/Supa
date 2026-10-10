@@ -71,7 +71,10 @@ function validTimestamp(value) {
     if (offsetHour > 23 || offsetMinute > 59) return false
   }
 
-  return Number.isFinite(Date.parse(value))
+  // A future instant is not a completed human field observation. Treat the
+  // explicit timezone offset as part of the instant, never as a clock label.
+  const observedMs = Date.parse(value)
+  return Number.isFinite(observedMs) && observedMs <= Date.now()
 }
 
 function sameJson(left, right) {
