@@ -173,3 +173,38 @@ test('M3 rejects invalid timezone/date fields without inferring a savings outcom
     }
   }
 })
+
+
+test('M3 spring-time transition uses elapsed UTC time, not apparent 25h local time', () => {
+  const baselineAt = '2026-03-29T01:30:00+01:00'
+  const exactEnd = '2026-03-30T02:30:00+02:00'
+  const beforeEnd = '2026-03-30T02:29:59.999+02:00'
+  const afterEnd = '2026-03-30T02:30:00.001+02:00'
+
+  for (const candidateAt of [beforeEnd, exactEnd]) {
+    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt))
+    assert.equal(result.claimable, true, candidateAt)
+    assert.equal(result.comparison.outcome, 'better')
+    assert.ok(result.observationWindowHours <= 24)
+    assert.equal(result.observationWindowHours, Math.abs(Date.parse(candidateAt) - Date.parse(baselineAt)) / 3_600_000)
+  }
+
+  const over = assessWeeklyBasketStudy(study(baselineAt, afterEnd))
+  assertUnknownAtWindowBoundary(over)
+  assert.ok(over.observationWindowHours > 24)
+})
+
+test('M3 accepts whole- and half-hour offset representations of the same instant', () => {
+  const baselineAt = '2026-03-29T01:30:00+01:00'
+  for (const candidateAt of [
+    '2026-03-29T00:30:00Z',
+    '2026-03-29T06:00:00+05:30',
+    '2026-03-28T19:30:00-05:00',
+  ]) {
+    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt))
+    assert.equal(result.claimable, true, candidateAt)
+    assert.equal(result.observationWindowHours, 0, candidateAt)
+    assert.equal(result.comparison.outcome, 'better')
+    assert.ok(result.comparison.savingsCents > 0)
+  }
+})
