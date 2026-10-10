@@ -6,7 +6,11 @@ import type { PlannedMeal, Store } from './types.ts'
  * fixtures: deltaCents is never evidence of live prices or customer savings.
  */
 type EvaluatedSwap = {
+  previousPlan: PlannedMeal[]
   nextPlan: PlannedMeal[]
+  activeDaysSnapshot: string[]
+  changedDay: string
+  replacementRecipeId: string
   before: OneStoreBasket
   after: OneStoreBasket
   changes: Array<{
@@ -157,7 +161,11 @@ export function previewPlanRecipeSwap(input: PlanRecipeSwapInput): PlanRecipeSwa
   const complete = safeCompleteBasket(before) && safeCompleteBasket(after)
   const delta = after.totalCents - before.totalCents
   const snapshot: EvaluatedSwap = {
+    previousPlan: plan.map((meal) => ({ day: meal.day, recipeId: meal.recipeId })),
     nextPlan,
+    activeDaysSnapshot: [...activeDays],
+    changedDay: day,
+    replacementRecipeId,
     before,
     after,
     changes,
@@ -175,5 +183,71 @@ export function previewPlanRecipeSwap(input: PlanRecipeSwapInput): PlanRecipeSwa
         ? 'no active meals to price'
         : 'unresolved or unsafe basket prices',
     deltaCents: null,
+  }
+}
+
+/**
+ * Only call this on an explicit user-confirmation event. A preview is advisory:
+ * if the live planner/day selection has changed meanwhile, require a fresh
+ * preview instead of applying a stale proposal or resetting shopping progress.
+ * This function only returns a new plan; persistence is owned by the caller.
+ */
+export type AcceptedPlanRecipeSwap =
+  | { status: 'applied'; plan: PlannedMeal[] }
+  | { status: 'stale' | 'invalid'; plan: null; reason: string }
+
+export function acceptPlanRecipeSwap(
+  preview: PlanRecipeSwapPreview,
+  currentPlan: PlannedMeal[],
+  currentActiveDays: string[],
+): AcceptedPlanRecipeSwap {
+  if (!preview || preview.status === 'invalid') {
+    return { status: 'invalid', plan: null, reason: 'no valid preview to accept' }
+  }
+
+  if (!Array.isArray(currentPlan) || !Array.isArray(currentActiveDays)) {
+    return { status: 'stale', plan: null, reason: 'planner context unavailable' }
+  }
+
+  const samePlan =
+    currentPlan.length === preview.previousPlan.length &&
+    currentPlan.every((meal, index) =>
+      meal && canonical(meal.day) && canonical(meal.recipeId) &&
+      meal.day === preview.previousPlan[index]?.day &&
+      meal.recipeId === preview.previousPlan[index]?.recipeId,
+    )
+  const sameDays =
+    currentActiveDays.length === preview.activeDaysSnapshot.length &&
+    new Set(currentActiveDays).size === currentActiveDays.length &&
+    currentActiveDays.every((day) =>
+      canonical(day) && preview.activeDaysSnapshot.includes(day),
+    )
+
+  if (!samePlan || !sameDays) {
+    return { status: 'stale', plan: null, reason: 'planning changed since preview' }
+  }
+
+  const expected = preview.previousPlan.map((meal) =>
+    meal.day === preview.changedDay
+      ? { day: meal.day, recipeId: preview.replacementRecipeId }
+      : { day: meal.day, recipeId: meal.recipeId },
+  )
+  if (
+    !canonical(preview.changedDay) ||
+    !canonical(preview.replacementRecipeId) ||
+    !preview.previousPlan.some((meal) => meal.day === preview.changedDay) ||
+    !Array.isArray(preview.nextPlan) ||
+    preview.nextPlan.length !== expected.length ||
+    !preview.nextPlan.every((meal, index) =>
+      meal && meal.day === expected[index].day &&
+      meal.recipeId === expected[index].recipeId,
+    )
+  ) {
+    return { status: 'invalid', plan: null, reason: 'preview proposal was altered' }
+  }
+
+  return {
+    status: 'applied',
+    plan: expected.map((meal) => ({ ...meal })),
   }
 }
