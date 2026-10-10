@@ -57,6 +57,9 @@ test('unresolved product is explicitly manual without invented product identity'
   }
   const snapshot = {
     ...current, lines: [unresolved],
+    // This synthetic one-line review-only basket has zero matched purchases;
+    // do not inherit the cost of unrelated dropped original M2 lines.
+    totalCents: 0,
     matchedLineCount: 0, unresolvedLineCount: 1,
   }
   const output = buildShoppingListCopyText(snapshot)
@@ -117,8 +120,14 @@ test('tiny representable demand is not rounded down to a fictional zero', () => 
   assert.ok(matched)
   const tiny = {
     ...current,
+    // Keep synthetic money/whole-pack arithmetic physically consistent:
+    // a tiny but positive demand needs exactly one physical pack.
+    totalCents: current.totalCents - matched.lineTotalCents + matched.pricePerPackCents,
     lines: current.lines.map(line => line.id === matched.id
-      ? { ...line, requirement: { amount: 1e-16, unit: 'g' } }
+      ? {
+          ...line, requirement: { amount: 1e-16, unit: 'g' },
+          packs: 1, lineTotalCents: line.pricePerPackCents,
+        }
       : line),
   }
   const output = buildShoppingListCopyText(tiny)
