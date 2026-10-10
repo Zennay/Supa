@@ -114,6 +114,11 @@ export function ObservationView() {
     () => nextIncompleteObservationLine(sheet),
     [sheet],
   )
+  const canJumpToNextLine =
+    nextAction.stage === 'line' &&
+    nextIncomplete !== null &&
+    nextIncomplete.side === nextAction.side &&
+    nextIncomplete.ingredientId === nextAction.ingredientId
 
   useEffect(() => {
     setDraftPersistenceFailed(
@@ -160,7 +165,9 @@ export function ObservationView() {
   }
 
   const jumpToNextIncomplete = () => {
-    if (!nextIncomplete) return
+    // A line jump must follow the current canonical task, never skip
+    // incomplete study/store metadata or jump to a stale ingredient.
+    if (!canJumpToNextLine || !nextIncomplete) return
 
     const side = document.querySelector<HTMLElement>(
       `[data-observation-side="${nextIncomplete.side}"]`,
@@ -355,14 +362,15 @@ export function ObservationView() {
           Je concept wordt automatisch lokaal op dit apparaat bewaard, zodat een
           refresh of gesloten tab je winkelmeting niet wist.
         </p>
-        <button
-          className="ghost-button observation-next-button"
-          type="button"
-          onClick={jumpToNextIncomplete}
-          disabled={!nextIncomplete}
-        >
-          {nextObservationActionLabel(sheet, nextIncomplete)}
-        </button>
+        {canJumpToNextLine && (
+          <button
+            className="ghost-button observation-next-button"
+            type="button"
+            onClick={jumpToNextIncomplete}
+          >
+            {nextObservationActionLabel(sheet, nextIncomplete)}
+          </button>
+        )}
         {windowSummary.state === 'single-observation' && (
           <p>
             <strong>24u-venster:</strong> meet de andere winkel uiterlijk{' '}
