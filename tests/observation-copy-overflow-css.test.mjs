@@ -36,9 +36,9 @@ test('observation rows contain long ingredient copy on narrow cards', async () =
 
 test('overflow repair leaves existing touch and readability contracts intact', async () => {
   const css = await readFile(cssUrl, 'utf8')
-  assert.match(css, /\\.observation-line summary\\s*\\{[^}]*min-height:\\s*44px;/s)
-  assert.match(css, /\\.observation-line summary > div\\s*\\{[^}]*min-width:\\s*0;[^}]*overflow-wrap:\\s*anywhere;/s)
-  assert.match(css, /\\.observation-card-heading h3\\s*\\{[^}]*overflow-wrap:\\s*anywhere;/s)
-  assert.match(css, /\\.observation-count\\s*\\{[^}]*flex:\\s*0\\s+0\\s+auto;/s)
-  assert.match(css, /\\.line-state\\s*\\{[^}]*flex:\\s*0\\s+0\\s+auto;/s)
+  assert.match(css, /\.observation-line summary\s*\{[^}]*min-height:\s*44px;/s)
+  assert.match(css, /\.observation-line summary > div\s*\{[^}]*min-width:\s*0;[^}]*overflow-wrap:\s*anywhere;/s)
+  assert.match(css, /\.observation-card-heading h3\s*\{[^}]*overflow-wrap:\s*anywhere;/s)
+  assert.match(css, /\.observation-count\s*\{[^}]*flex:\s*0\s+0\s+auto;/s)
+  assert.match(css, /\.line-state\s*\{[^}]*flex:\s*0\s+0\s+auto;/s)
 })
