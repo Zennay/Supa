@@ -71,8 +71,38 @@ export function attributeSavingsEffects({
     }
   }
 
+  // An empty week contains no physical basket comparison to attribute.
+  // Reject malformed direct-API comparison lines rather than throwing, and
+  // never mark vacuous 0-cent evidence as fully accounted for.
+  if (!Array.isArray(comparison.lineDeltas) || comparison.lineDeltas.length === 0) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: comparison.deltaCents,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison requires nonempty ingredient line deltas'],
+    }
+  }
+
   const comparisonLineIds = new Set<string>()
   for (const line of comparison.lineDeltas) {
+    // Loaded comparisons may bypass TypeScript and contain malformed entries.
+    // Null entries throw on property access, while coercible cent strings can
+    // otherwise make an empty effect set appear completely reconciled.
+    if (
+      !line ||
+      typeof line !== 'object' ||
+      Array.isArray(line) ||
+      !Number.isSafeInteger(line.deltaCents)
+    ) {
+      return {
+        status: 'unknown',
+        fullyAttributed: false,
+        comparisonDeltaCents: comparison.deltaCents,
+        effectTotals: emptyTotals(),
+        reasons: ['basket comparison contains an invalid monetary line delta'],
+      }
+    }
     if (
       typeof line.id !== 'string' ||
       line.id.trim().length === 0 ||
