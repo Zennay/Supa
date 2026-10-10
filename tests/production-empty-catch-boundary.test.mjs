@@ -30,7 +30,13 @@ function hasExplanatoryComment(source) {
           .slice(2, -2)
           .replace(/^\s*\*\s?/gm, '')
 
-    return /[\p{L}\p{N}]/u.test(text)
+    const explanation = text.trim()
+    // A placeholder or a lint suppression is not an error-handling rationale.
+    if (/^(?:todo|fixme|tbd|xxx)(?:\b|\s*[:!-])/i.test(explanation)) return false
+    if (/^(?:eslint-disable|tslint-disable|@ts-ignore|@ts-expect-error)\b/i.test(explanation)) {
+      return false
+    }
+    return /[\p{L}\p{N}]/u.test(explanation)
   })
 }
 
@@ -123,6 +129,10 @@ test('empty-catch guard rejects catches without explanatory content', () => {
     'try { risky() } catch { /**/ }',
     'try { risky() } catch { /*   */ }',
     'try { risky() } catch { //   \n }',
+    'try { risky() } catch { /* TODO */ }',
+    'try { risky() } catch { // FIXME: handle later\n }',
+    'try { risky() } catch { /* eslint-disable no-empty */ }',
+    'try { risky() } catch { /* @ts-ignore */ }',
   ]) {
     assert.ok(findUndocumentedEmptyCatch(source), source)
   }
