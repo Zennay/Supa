@@ -13,6 +13,7 @@ import {
 } from '../src/features/shopping-list/shoppingListProgress.ts'
 import { shoppingListDemandIdentity } from '../src/features/shopping-list/shoppingListDemandIdentity.ts'
 import { isTrustworthyShoppingBasket } from '../src/features/shopping-list/shoppingListPhysicalValidity.ts'
+import { shoppingListCompletion } from '../src/features/shopping-list/shoppingListCompletion.ts'
 import {
   reconcileTrustedShoppingProgressV2, restoreTrustedShoppingProgressV2,
   serializeTrustedShoppingProgressV2, toggleTrustedShoppingProgressV2,
@@ -32,13 +33,26 @@ const compiled = ts.transpileModule(source, {
   reportDiagnostics: true,
 })
 assert.deepEqual(compiled.diagnostics, [])
+const bannerSource = readFileSync(
+  new URL('../src/features/shopping-list/ShoppingListCompletionBanner.tsx', import.meta.url),
+  'utf8',
+)
+const compiledBanner = ts.transpileModule(bannerSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX,
+    target: ts.ScriptTarget.ES2022,
+  },
+  fileName: 'ShoppingListCompletionBanner.tsx',
+  reportDiagnostics: true,
+})
+assert.deepEqual(compiledBanner.diagnostics, [])
 
-function basket({ store = m2Store, products = m2Products } = {}) {
+function basket({ store = m2Store, products = m2Products, activeDays = m2DefaultActiveDays } = {}) {
   return buildOneStoreBasket({
     store, products,
     plan: m2InitialPlan,
     recipes: m2Recipes,
-    activeDays: m2DefaultActiveDays,
+    activeDays,
   })
 }
 
@@ -61,6 +75,15 @@ function makeHarness(initialBasket, localStorage) {
   let effects = []
   let dirty = false
   const createNode = (type, props) => ({ type, props })
+  // Evaluate the ACTUAL completion banner component instead of mocking status.
+  const bannerModule = { exports: {} }
+  new Function('module', 'exports', 'require', compiledBanner.outputText)(
+    bannerModule, bannerModule.exports, (name) => {
+      if (name === 'react/jsx-runtime') return { jsx: createNode, jsxs: createNode }
+      if (name === './shoppingListCompletion.ts') return { shoppingListCompletion }
+      throw new Error('unexpected completion import: ' + name)
+    },
+  )
 
   const react = {
     useMemo(calculate) { cursor++; return calculate() },
@@ -94,6 +117,7 @@ function makeHarness(initialBasket, localStorage) {
       upgradeTrustedLegacyProgressV1,
     },
     './shoppingListProgress': { shoppingListProgressStorageKey },
+    './ShoppingListCompletionBanner.tsx': { ShoppingListCompletionBanner: bannerModule.exports.ShoppingListCompletionBanner },
   }
   const module = { exports: {} }
   new Function('module', 'exports', 'require', compiled.outputText)(
@@ -121,14 +145,30 @@ function makeHarness(initialBasket, localStorage) {
     function visit(node) {
       if (Array.isArray(node)) return node.forEach(visit)
       if (!node || typeof node !== 'object') return
+      if (typeof node.type === 'function') return visit(node.type(node.props))
       if (node.type === 'button' && typeof node.props?.onClick === 'function') nodes.push(node)
       visit(node.props?.children)
     }
     visit(root)
     return nodes
   }
+  function completion(root) {
+    const states = []
+    function visit(node) {
+      if (Array.isArray(node)) return node.forEach(visit)
+      if (!node || typeof node !== 'object') return
+      if (typeof node.type === 'function') return visit(node.type(node.props))
+      if (node.props?.['data-shopping-progress-state']) states.push(node.props)
+      visit(node.props?.children)
+    }
+    visit(root)
+    assert.equal(states.length, 1, 'one live completion status per shopping screen')
+    assert.equal(states[0].role, 'status')
+    assert.equal(states[0]['aria-live'], 'polite')
+    return states[0]['data-shopping-progress-state']
+  }
   return {
-    render, buttons,
+    render, buttons, completion,
     setBasket(next) { basketInput = next; return render() },
     dispose() {
       if (savedWindow === undefined) delete globalThis.window
@@ -229,4 +269,49 @@ test('real ShoppingListView: legacy migration requires an exact priced basket an
   const blocked = makeHarness(original, existingV2)
   t.after(() => blocked.dispose())
   assert.equal(blocked.buttons(blocked.render())[0].props['aria-pressed'], false)
+})
+
+test('real ShoppingListView: trusted completed Tuesday shopping basket exposes one accessible complete status', (t) => {
+  const source = basket({ activeDays: ['Di'] })
+  assert.equal(source.unresolvedLineCount, 0)
+  const ui = makeHarness(source, storage())
+  t.after(() => ui.dispose())
+  assert.equal(ui.completion(ui.render()), 'in-progress')
+  const count = ui.buttons(ui.render()).length
+  assert.ok(count > 0)
+  for (let i = 0; i < count; i++) {
+    ui.buttons(ui.render())[i].props.onClick()
+    ui.render()
+  }
+  assert.equal(ui.completion(ui.render()), 'complete')
+})
+
+test('real ShoppingListView: checked unresolved choices still need review, not a finished purchase', (t) => {
+  const source = basket()
+  assert.ok(source.unresolvedLineCount > 0)
+  const ui = makeHarness(source, storage())
+  t.after(() => ui.dispose())
+  const count = ui.buttons(ui.render()).length
+  for (let i = 0; i < count; i++) {
+    ui.buttons(ui.render())[i].props.onClick()
+    ui.render()
+  }
+  assert.equal(ui.completion(ui.render()), 'review-needed')
+})
+
+test('real ShoppingListView: mutated quantity cannot show completed shopping', (t) => {
+  const source = basket({ activeDays: ['Di'] })
+  const ui = makeHarness(source, storage())
+  t.after(() => ui.dispose())
+  const count = ui.buttons(ui.render()).length
+  for (let i = 0; i < count; i++) {
+    ui.buttons(ui.render())[i].props.onClick()
+    ui.render()
+  }
+  assert.equal(ui.completion(ui.render()), 'complete')
+  const changed = structuredClone(source)
+  const matched = changed.lines.find((line) => line.status === 'matched')
+  matched.requirement.amount *= 1000
+  assert.equal(ui.completion(ui.setBasket(changed)), 'invalid')
+  assert.ok(ui.buttons(ui.render()).every((button) => button.props['aria-pressed'] === false))
 })
