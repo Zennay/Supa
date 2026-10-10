@@ -193,7 +193,7 @@ for (const [expectedOutcome, candidateUnitCents, expectedSavingsCents] of [
     assert.equal(report.outcome, expectedOutcome)
     assert.equal(report.claimable, true) // mathematical comparison gate, NOT human proof
     assert.equal(report.savingsCents, expectedSavingsCents)
-    assert.equal(report.deltaCents, -expectedSavingsCents)
+    assert.equal(report.deltaCents, expectedSavingsCents === 0 ? 0 : -expectedSavingsCents)
     assert.equal(report.publicSavingsClaimEligible, false)
     assert.equal(report.priceContext, 'in-store')
     assert.ok(report.evidenceBoundary.includes('never sufficient'))
