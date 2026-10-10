@@ -32,6 +32,8 @@ import {
   removeObservationDraft,
 } from './observationDraftPersistence.ts'
 import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
+import { observationNextAction } from './observationNextStep.ts'
+import { ObservationNextActionCard } from './ObservationNextActionCard.tsx'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -102,6 +104,9 @@ export function ObservationView() {
   const [pendingImport, setPendingImport] = useState<ObservationSheet | null>(null)
   const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
   const [draftResetRemovalFailed, setDraftResetRemovalFailed] = useState(false)
+  // Task-first guidance is derived from the CURRENT draft; the canonical
+  // readiness and export gates below remain authoritative.
+  const nextAction = useMemo(() => observationNextAction(sheet), [sheet])
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
   const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
   const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
@@ -329,6 +334,10 @@ export function ObservationView() {
           <h2>Meten zonder gokken.</h2>
         </div>
       </div>
+
+      {/* Read-only collection guidance. No autofill, auto-export or evidence
+          approval: actual user input and the existing gates remain required. */}
+      <ObservationNextActionCard action={nextAction} />
 
       <div className="observation-status">
         <strong>
