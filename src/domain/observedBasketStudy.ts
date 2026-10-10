@@ -156,7 +156,8 @@ export function assessWeeklyBasketStudy(
   const validMaxObservationWindowHours =
     typeof requestedMaxObservationWindowHours === 'number' &&
     Number.isFinite(requestedMaxObservationWindowHours) &&
-    requestedMaxObservationWindowHours > 0
+    requestedMaxObservationWindowHours > 0 &&
+    requestedMaxObservationWindowHours <= 24
   const maxObservationWindowHours = validMaxObservationWindowHours
     ? requestedMaxObservationWindowHours
     : 24
@@ -165,7 +166,7 @@ export function assessWeeklyBasketStudy(
   if (!validOptionsContainer) {
     reasons.push('assessment options must be a non-array object')
   } else if (!validMaxObservationWindowHours) {
-    reasons.push('maxObservationWindowHours must be a positive finite number')
+    reasons.push('maxObservationWindowHours must be a positive finite number no greater than 24h')
   }
 
   if (study.schemaVersion !== 1) {
