@@ -28,9 +28,7 @@ function comparisonTitle(
     return 'Beide testmanden zijn even duur'
   }
 
-  const difference = euro.format(
-    Math.abs(comparison.savingsCents ?? 0) / 100,
-  )
+  const difference = euro.formatCents(Math.abs(comparison.savingsCents ?? 0))
   return comparison.outcome === 'better'
     ? `${candidate.store.name} ligt ${difference} lager`
     : `${candidate.store.name} ligt ${difference} hoger`
@@ -194,7 +192,7 @@ export function BasketView({
             </div>
             <strong>
               {line.status === 'matched'
-                ? euro.format(line.lineTotalCents / 100)
+                ? euro.formatCents(line.lineTotalCents)
                 : '—'}
             </strong>
           </div>
