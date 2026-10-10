@@ -28,6 +28,7 @@ const ALLOWED_OBSERVATION_SOURCES = new Set<ObservationSource>([
   'receipt',
   'consented-export',
 ])
+const ALLOWED_OBSERVED_PACK_UNITS = new Set<MatchUnit>(['g', 'kg', 'ml', 'l', 'piece'])
 
 export type M3ObservationSide = keyof typeof M3_EXPECTED_RETAILERS
 
@@ -423,7 +424,7 @@ export function observationLineCollectionComplete(
     Number.isFinite(product.packAmount) &&
     product.packAmount > 0 &&
     product.packUnit !== null &&
-    product.packUnit !== 'unknown' &&
+    ALLOWED_OBSERVED_PACK_UNITS.has(product.packUnit) &&
     Number.isSafeInteger(product.packCount) &&
     product.packCount > 0 &&
     product.priceCents !== null &&
@@ -728,7 +729,7 @@ export function observationSheetReadiness(
       ) {
         issues.push(`${lineLabel}: verpakkingshoeveelheid moet groter dan 0 zijn.`)
       }
-      if (product.packUnit === null || product.packUnit === 'unknown') {
+      if (!ALLOWED_OBSERVED_PACK_UNITS.has(product.packUnit as MatchUnit)) {
         issues.push(`${lineLabel}: geldige verpakkingseenheid ontbreekt.`)
       }
       if (
