@@ -1,4 +1,4 @@
-import type { RawPack } from './ingestion.ts'
+import { validateRawProductObservation, type RawPack, type RawProductObservation } from './ingestion.ts'
 import { normalizePackText } from './normalize.ts'
 import type { ProductCandidate } from '../domain/matching.ts'
 
@@ -54,5 +54,20 @@ export function projectTrustedPackForMatching(
     packAmount: normalized.amount,
     packUnit: normalized.unit,
     packCount: normalized.count,
+  }
+}
+
+/**
+ * Source-bound entry point: refuses a malformed or provenance-inconsistent
+ * observation before projecting its pack. Does not waive source-use permission.
+ */
+export function projectTrustedObservationPack(
+  observation: RawProductObservation,
+): Pick<ProductCandidate, 'packAmount' | 'packUnit' | 'packCount'> | null {
+  try {
+    validateRawProductObservation(observation)
+    return projectTrustedPackForMatching(observation.pack)
+  } catch {
+    return null
   }
 }
