@@ -168,6 +168,20 @@ function malformedObservedStudyContainers(study: unknown): string[] {
     if (!isRecord(basket.store)) {
       reasons.push(`${side} basket store must be a non-array object`)
     }
+
+    // Malformed persisted matched-line internals must be refused before
+    // compareFullBaskets evaluates pack.amount / requirement.amount.
+    // Keep this shape guard narrow: comparator still owns economic checks.
+    if (Array.isArray(basket.lines)) {
+      for (const line of basket.lines) {
+        if (isRecord(line) && line.status === 'matched') {
+          if (!isRecord(line.pack) || !isRecord(line.requirement)) {
+            reasons.push(`${side} matched line has invalid pack or requirement shape`)
+            break
+          }
+        }
+      }
+    }
   }
   return reasons
 }
