@@ -115,6 +115,32 @@ test('M3 guidance refuses to label invalid outside-window evidence ready', () =>
   assert.equal(observationNextAction(sheet).stage, 'review')
 })
 
+test('M3 invalid recorded time points to the actual field instead of encouraging guessed evidence', () => {
+  const sheet = buildObservationSheet()
+  fillStudy(sheet)
+  fillStore(sheet, 'baseline', 'not-a-real-time')
+  assert.deepEqual(observationNextAction(sheet), {
+    stage: 'store',
+    side: 'baseline',
+    title: 'Controleer de datum en tijd van PLUS',
+    detail:
+      'Gebruik het echte meetmoment. Vul geen geschatte tijd in; beide winkels moeten binnen 24 uur worden gemeten.',
+  })
+})
+
+test('M3 out-of-window measurements receive a concrete recollection instruction', () => {
+  const sheet = buildObservationSheet()
+  fillStudy(sheet)
+  fillStore(sheet, 'baseline', '2026-10-08T09:00:00Z')
+  fillStore(sheet, 'candidate', '2026-10-10T10:00:00Z')
+  fillAllUnavailable(sheet)
+  const action = observationNextAction(sheet)
+  assert.equal(action.stage, 'review')
+  assert.equal(action.title, 'Meet beide winkels binnen 24 uur')
+  assert.match(action.detail, /nieuwe echte metingen/)
+  assert.match(action.detail, /pas de tijden niet kunstmatig aan/)
+})
+
 test('M3 partially filled matched product is still a collection task', () => {
   const sheet = buildObservationSheet()
   fillStudy(sheet)
