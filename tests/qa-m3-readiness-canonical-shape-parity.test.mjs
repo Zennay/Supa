@@ -93,3 +93,34 @@ test('canonical sheet header and demand schema must be validated before prefligh
     })
   }
 })
+
+test('malformed nested M3 sheet data should yield preflight issues, not crash the collection flow', async (t) => {
+  const cases = [
+    ['missing study metadata object', (sheet) => { sheet.study = null }],
+    ['missing baseline observation', (sheet) => { sheet.baseline = null }],
+    ['missing baseline store', (sheet) => { sheet.baseline.store = null }],
+    ['non-array candidate lines', (sheet) => { sheet.candidate.lines = null }],
+    ['null candidate observation line', (sheet) => { sheet.candidate.lines[0] = null }],
+    ['missing canonical requirements', (sheet) => { sheet.requirements = null }],
+  ]
+  for (const [name, mutate] of cases) {
+    await t.test(name, () => {
+      const sheet = completeSyntheticSheet()
+      mutate(sheet)
+      const before = structuredClone(sheet)
+      assert.throws(
+        () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+        undefined,
+        name + ': converter must reject a structurally broken field sheet',
+      )
+      let readiness
+      assert.doesNotThrow(
+        () => { readiness = observationSheetReadiness(sheet) },
+        name + ': a broken local draft should show a safe error, not crash the UI',
+      )
+      assert.equal(readiness.ready, false, name)
+      assert.ok(readiness.issues.length > 0, name + ': expose meaningful recovery guidance')
+      assert.deepEqual(sheet, before, name + ': preflight must not rewrite the broken draft')
+    })
+  }
+})
