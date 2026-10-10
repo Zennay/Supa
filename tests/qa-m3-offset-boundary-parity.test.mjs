@@ -84,14 +84,17 @@ for (const offset of INVALID_OFFSETS) {
       assert.notEqual(observationWindowSummary(sheet).state, 'within-window')
     })
 
-    test(`M3 JSON conversion and direct financial assessment reject ${offset} on ${side} independently`, () => {
+    test(`M3 canonical JSON converter independently rejects ${offset} on ${side}`, () => {
       const { sheet } = inputs(baselineAt, candidateAt)
       assert.throws(
         () => buildWeeklyBasketStudyFromObservationSheet(sheet),
         /observedAt must be a valid timestamp/,
       )
-      // Must exercise the assessment independently of any converter preflight:
-      // a direct caller can load untrusted JSON without going via the collector.
+    })
+
+    test(`M3 direct financial assessment independently rejects ${offset} on ${side}`, () => {
+      // Do NOT use a malformed sheet with the converter here: conversion
+      // might (correctly) throw before the final claim boundary is exercised.
       const validStudy = buildWeeklyBasketStudyFromObservationSheet(inputs().sheet)
       validStudy[side].observedAt = invalid
       const result = assessWeeklyBasketStudy(validStudy)
