@@ -15,6 +15,7 @@ separate from production reuse permission.
 The current slice connects the three existing mobile surfaces:
 
 1. **Planner**
+   - each active day resolves to exactly one planned meal; duplicate active day identities fail closed instead of silently double-counting demand;
    - choose a week budget;
    - activate/deactivate meal days;
    - choose a recipe per planned day.
@@ -57,10 +58,14 @@ shopping-list state. The permanent-VPS Firefox proof also reloads the app and
 checks that budget, active days, recipe choices and the resulting basket-backed
 planner total are restored from the same persisted week.
 
-## Exit criteria still open
+## Milestone status — closed
 
-M2 is ready for milestone closure when the permanent-VPS Firefox workflow is
-green on the exact head: it exercises recipe choice, basket recalculation,
-visible abstention, shopping-list interaction and persisted planner state after
-reload. The controlled fixture remains a proof harness, not a live-price or
-savings claim.
+M2 is technically closed on `main`. The deterministic planner → ingredient
+mapping → one-store basket → shopping-list flow is implemented and has rendered
+Firefox/geckodriver proof on the permanent VPS, including persisted planner
+state after reload.
+
+Do not reopen M2 for speculative feature work. The controlled fixture remains a
+proof harness, not live-price evidence or a savings claim. Current product proof
+work belongs to M3: trustworthy full-basket comparison against genuine observed
+PLUS + DekaMarkt evidence.

@@ -19,6 +19,10 @@ export type ReviewedLiveProductFixture = {
 
 const MAX_REVIEW_CLOCK_SKEW_MS = 5 * 60 * 1000
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 function validIso(value: unknown): value is string {
   if (typeof value !== 'string') return false
 
@@ -96,50 +100,72 @@ function validateReviewChronology(
 }
 
 export function validateReviewedLiveProductFixture(
-  fixture: ReviewedLiveProductFixture,
+  fixture: unknown,
   expectedSupermarket: SupermarketId,
 ): RawProductObservation {
-  if (fixture.version !== 1) {
+  if (!isRecord(fixture)) {
+    throw new Error('Reviewed live fixture must be an object')
+  }
+  if (!isRecord(fixture.source)) {
+    throw new Error('Reviewed live fixture must include a source object')
+  }
+  if (!isRecord(fixture.review)) {
+    throw new Error('Reviewed live fixture must include a review object')
+  }
+
+  const reviewedFixture = fixture as ReviewedLiveProductFixture
+
+  if (reviewedFixture.version !== 1) {
     throw new Error('Reviewed live fixture must use version 1')
   }
-  if (fixture.fixtureType !== 'reviewed-live-product-observation') {
+  if (reviewedFixture.fixtureType !== 'reviewed-live-product-observation') {
     throw new Error('Unexpected reviewed live fixture type')
   }
-  if (!isSafeSourceId(fixture.source?.id)) {
+  if (!isSafeSourceId(reviewedFixture.source.id)) {
     throw new Error('Reviewed live fixture must use a path-safe source id')
   }
-  if (fixture.source.kind !== 'product') {
+  if (reviewedFixture.source.kind !== 'product') {
     throw new Error('Reviewed live product fixture must come from a product source')
   }
-  if (fixture.source.supermarket !== expectedSupermarket) {
+  if (reviewedFixture.source.supermarket !== expectedSupermarket) {
     throw new Error(
-      `Reviewed live fixture supermarket mismatch: expected=${expectedSupermarket} actual=${fixture.source.supermarket}`,
+      `Reviewed live fixture supermarket mismatch: expected=${expectedSupermarket} actual=${reviewedFixture.source.supermarket}`,
     )
   }
-  if (!validIso(fixture.source?.capturedAt)) {
+
+  if (!validIso(reviewedFixture.source.capturedAt)) {
     throw new Error('Reviewed live fixture must include a valid capturedAt')
   }
 
-  const observation = validateRawProductObservation(fixture.observation)
+  const observation = validateRawProductObservation(reviewedFixture.observation)
   if (observation.supermarket !== expectedSupermarket) {
     throw new Error(
       `Reviewed live observation supermarket mismatch: expected=${expectedSupermarket} actual=${observation.supermarket}`,
     )
   }
-  if (!sourceExactlyMatchesObservation(fixture.source, observation)) {
+  if (!sourceExactlyMatchesObservation(reviewedFixture.source, observation)) {
     throw new Error(
-      `Reviewed live fixture provenance does not exactly match observation: ${fixture.source.id}`,
+      `Reviewed live fixture provenance does not exactly match observation: ${reviewedFixture.source.id}`,
     )
   }
 
-  if (typeof fixture.review?.reviewer !== 'string' || !fixture.review.reviewer.trim()) {
+  if (
+    typeof reviewedFixture.review.reviewer !== 'string' ||
+    !reviewedFixture.review.reviewer.trim()
+  ) {
     throw new Error('Reviewed live fixture must identify a reviewer')
   }
-  if (!validIso(fixture.review?.reviewedAt)) {
+  if (!validIso(reviewedFixture.review.reviewedAt)) {
     throw new Error('Reviewed live fixture must include a valid reviewedAt')
   }
+  if (
+    reviewedFixture.review.notes !== null &&
+    typeof reviewedFixture.review.notes !== 'string'
+  ) {
+    throw new Error('Reviewed live fixture review notes must be null or a string')
+  }
 
-  validateReviewChronology(fixture)
+  validateReviewChronology(reviewedFixture)
   return observation
 }
 

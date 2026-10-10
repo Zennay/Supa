@@ -19,6 +19,30 @@ test('permanent VPS mobile validation watches every domain module', async () => 
   )
 })
 
+test('mobile shell changes trigger both permanent VPS product gates', async () => {
+  const mobileWorkflow = await readFile(
+    '.github/workflows/vps-mobile-foundation.yml',
+    'utf8',
+  )
+  const browserWorkflow = await readFile(
+    '.github/workflows/m2-vps-e2e.yml',
+    'utf8',
+  )
+
+  for (const path of ['index.html', 'tests/mobile-safe-area-contract.test.mjs']) {
+    assert.equal(
+      hasQuotedPathTrigger(mobileWorkflow, path),
+      true,
+      `permanent VPS mobile validation must trigger when ${path} changes`,
+    )
+    assert.equal(
+      hasQuotedPathTrigger(browserWorkflow, path),
+      true,
+      `rendered browser proof must trigger when ${path} changes`,
+    )
+  }
+})
+
 test('permanent VPS mobile validation still runs the locked full test/build contract', async () => {
   const workflow = await readFile(
     '.github/workflows/vps-mobile-foundation.yml',
@@ -50,9 +74,11 @@ test('rendered M2 proof watches every domain dependency in the planner-to-list r
     'src/domain/basket.ts',
     'src/domain/basketComparison.ts',
     'src/domain/matching.ts',
+    'src/domain/m3ObservationSheet.ts',
     'src/domain/planner.ts',
     'src/domain/plannerPreferences.ts',
     'src/domain/types.ts',
+    'src/features/observation/**',
     'package.json',
     'package-lock.json',
     'vite.config.*',

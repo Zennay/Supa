@@ -50,6 +50,13 @@ const SUPPORTED_KINDS = new Set(['product', 'catalog', 'offers'])
 const MAX_BYTES = 5 * 1024 * 1024
 const TIMEOUT_MS = 20_000
 
+function isSafeSourceId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  )
+}
+
 function expectedHost(supermarket) {
   const host = HOST_BY_SUPERMARKET.get(supermarket)
   if (!host) {
@@ -61,16 +68,22 @@ function expectedHost(supermarket) {
 export function validateSources(sources = SOURCES) {
   const ids = new Set()
   for (const source of sources) {
-    if (!source.id || ids.has(source.id)) {
+    if (!isSafeSourceId(source.id) || ids.has(source.id)) {
       throw new Error(`Invalid or duplicate source id: ${source.id}`)
     }
     ids.add(source.id)
 
     const host = expectedHost(source.supermarket)
     const url = new URL(source.url)
-    if (url.protocol !== 'https:' || url.hostname !== host) {
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname !== host ||
+      url.port !== '' ||
+      url.username !== '' ||
+      url.password !== ''
+    ) {
       throw new Error(
-        `Source does not match supermarket allowlist (${source.supermarket} -> ${host}): ${source.url}`,
+        `Source does not match supermarket allowlist (${source.supermarket} -> https://${host}): ${source.url}`,
       )
     }
     if (!SUPPORTED_KINDS.has(source.kind)) {
@@ -121,9 +134,15 @@ async function captureSource(source, rootDir) {
     })
 
     const finalUrl = new URL(response.url)
-    if (finalUrl.protocol !== 'https:' || finalUrl.hostname !== host) {
+    if (
+      finalUrl.protocol !== 'https:' ||
+      finalUrl.hostname !== host ||
+      finalUrl.port !== '' ||
+      finalUrl.username !== '' ||
+      finalUrl.password !== ''
+    ) {
       throw new Error(
-        `Redirected outside supermarket allowlist (${source.supermarket} -> ${host}): ${response.url}`,
+        `Redirected outside supermarket allowlist (${source.supermarket} -> https://${host}): ${response.url}`,
       )
     }
 

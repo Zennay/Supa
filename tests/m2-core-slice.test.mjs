@@ -137,6 +137,130 @@ test('unsafe product prices remain unresolved instead of corrupting basket money
   )
 })
 
+test('duplicate store product IDs fail closed after a trusted match', () => {
+  const duplicateId = 'basmati-1kg'
+  const products = [
+    ...m2Products.filter((product) => product.id !== duplicateId),
+    {
+      id: duplicateId,
+      storeId: m2Store.id,
+      name: 'Onverwant product 1 kg',
+      packAmount: 1,
+      packUnit: 'kg',
+      available: true,
+      priceCents: 99,
+    },
+    {
+      id: duplicateId,
+      storeId: m2Store.id,
+      name: 'Basmati rijst 1 kg',
+      packAmount: 1,
+      packUnit: 'kg',
+      available: true,
+      priceCents: 249,
+    },
+  ]
+
+  const basket = buildOneStoreBasket({
+    store: m2Store,
+    plan: [{ day: 'Ma', recipeId: 'tikka' }],
+    recipes: m2Recipes,
+    activeDays: ['Ma'],
+    products,
+  })
+
+  const rice = basket.lines.find((line) => line.id === 'basmati-rice')
+  assert.ok(rice)
+  assert.equal(rice.status, 'unresolved')
+  assert.equal(typeof rice.matchScore, 'number')
+  assert.ok(rice.matchScore >= 65)
+  assert.match(
+    rice.reasons.join(' '),
+    /matched product identity is not unique in store catalog/,
+  )
+  assert.equal(
+    basket.lines.some(
+      (line) => line.status === 'matched' && line.productId === duplicateId,
+    ),
+    false,
+  )
+})
+
+test('duplicate recipe IDs fail instead of silently selecting one definition', () => {
+  const duplicateRecipes = [
+    ...m2Recipes,
+    {
+      ...m2Recipes[0],
+      title: 'Conflicting duplicate recipe',
+    },
+  ]
+
+  assert.throws(
+    () =>
+      aggregatePlanIngredients(
+        [{ day: 'Ma', recipeId: m2Recipes[0].id }],
+        duplicateRecipes,
+        ['Ma'],
+      ),
+    /Ambiguous recipe for planned meal/,
+  )
+})
+
+test('missing active planned days fail instead of producing a partial basket', () => {
+  const missingDay = m2DefaultActiveDays[m2DefaultActiveDays.length - 1]
+  assert.ok(missingDay)
+
+  const incompletePlan = m2InitialPlan.filter((meal) => meal.day !== missingDay)
+
+  assert.throws(
+    () =>
+      buildOneStoreBasket({
+        store: m2Store,
+        plan: incompletePlan,
+        recipes: m2Recipes,
+        activeDays: m2DefaultActiveDays,
+        products: m2Products,
+      }),
+    /Missing planned meal for active day/,
+  )
+})
+
+test('duplicate active planned days fail instead of double-counting basket demand', () => {
+  const duplicateDayPlan = [
+    { day: 'Ma', recipeId: 'tikka' },
+    { day: 'Ma', recipeId: 'teriyaki' },
+  ]
+
+  assert.throws(
+    () =>
+      aggregatePlanIngredients(
+        duplicateDayPlan,
+        m2Recipes,
+        ['Ma'],
+      ),
+    /Ambiguous planned day: Ma/,
+  )
+})
+
+test('duplicate inactive planned days do not affect the selected basket', () => {
+  const plan = [
+    ...m2InitialPlan,
+    { day: 'Vr', recipeId: 'tikka' },
+    { day: 'Vr', recipeId: 'teriyaki' },
+  ]
+
+  const basket = buildOneStoreBasket({
+    store: m2Store,
+    plan,
+    recipes: m2Recipes,
+    activeDays: m2DefaultActiveDays,
+    products: m2Products,
+  })
+
+  assert.equal(basket.selectedMealCount, 4)
+  assert.equal(basket.totalCents, 3008)
+})
+
 test('inconsistent ingredient definitions fail instead of silently aggregating', () => {
   const inconsistentRecipes = [
     ...m2Recipes,

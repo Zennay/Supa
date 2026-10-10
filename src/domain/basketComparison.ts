@@ -27,16 +27,121 @@ export type BasketComparison = {
   reasons: string[]
 }
 
+function baseQuantity(
+  amount: number,
+  unit: MatchedBasketLine['requirement']['unit'],
+): { amount: number; family: 'mass' | 'volume' | 'piece' } | null {
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  if (unit === 'kg') {
+    const converted = amount * 1000
+    return Number.isFinite(converted) && converted > 0
+      ? { amount: converted, family: 'mass' }
+      : null
+  }
+  if (unit === 'g') return { amount, family: 'mass' }
+  if (unit === 'l') {
+    const converted = amount * 1000
+    return Number.isFinite(converted) && converted > 0
+      ? { amount: converted, family: 'volume' }
+      : null
+  }
+  if (unit === 'ml') return { amount, family: 'volume' }
+  if (unit === 'piece') return { amount, family: 'piece' }
+  return null
+}
+
+function validIdentity(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function supportedBasketLine(line: unknown): line is BasketTraceLine {
+  if (line === null || typeof line !== 'object' || !('status' in line)) {
+    return false
+  }
+
+  const status = (line as { status?: unknown }).status
+  return status === 'matched' || status === 'unresolved'
+}
+
+function basketLines(basket: OneStoreBasket): BasketTraceLine[] {
+  if (!Array.isArray(basket.lines)) return []
+  return basket.lines.filter(supportedBasketLine)
+}
+
+function invalidMatchedLineIdentity(line: MatchedBasketLine): boolean {
+  return (
+    !validIdentity(line.id) ||
+    !validIdentity(line.ingredientLabel) ||
+    !validIdentity(line.productId) ||
+    !validIdentity(line.productName)
+  )
+}
+
+function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
+  const effectivePackAmount = line.pack.amount * line.pack.count
+  const required = baseQuantity(line.requirement.amount, line.requirement.unit)
+  const pack = baseQuantity(effectivePackAmount, line.pack.unit)
+  const expectedPacks =
+    required && pack && required.family === pack.family
+      ? Math.ceil(required.amount / pack.amount)
+      : null
+  const expectedLineTotalCents = line.packs * line.pricePerPackCents
+
+  return (
+    !Number.isSafeInteger(line.pack.count) ||
+    line.pack.count <= 0 ||
+    !Number.isSafeInteger(line.packs) ||
+    line.packs <= 0 ||
+    !Number.isSafeInteger(line.pricePerPackCents) ||
+    line.pricePerPackCents < 0 ||
+    !Number.isFinite(effectivePackAmount) ||
+    effectivePackAmount <= 0 ||
+    expectedPacks === null ||
+    !Number.isSafeInteger(expectedPacks) ||
+    expectedPacks <= 0 ||
+    expectedPacks !== line.packs ||
+    !Number.isSafeInteger(expectedLineTotalCents) ||
+    expectedLineTotalCents !== line.lineTotalCents ||
+    !Number.isSafeInteger(line.matchScore) ||
+    line.matchScore < 65 ||
+    line.matchScore > 110
+  )
+}
+
 function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   const reasons: string[] = []
-  const ids = basket.lines.map((line) => line.id)
-  const matched = basket.lines.filter(
+  const rawLines: unknown[] = Array.isArray(basket.lines) ? basket.lines : []
+  const lines = rawLines.filter(supportedBasketLine)
+  const ids = lines.map((line) => line.id)
+  const matched = lines.filter(
     (line): line is MatchedBasketLine => line.status === 'matched',
   )
-  const unresolved = basket.lines.filter((line) => line.status === 'unresolved')
+  const unresolved = lines.filter((line) => line.status === 'unresolved')
+
+  if (!Array.isArray(basket.lines)) {
+    reasons.push(`${label} basket lines are not an array`)
+  } else if (rawLines.some((line) => !supportedBasketLine(line))) {
+    reasons.push(`${label} basket contains an unsupported line shape or status`)
+  }
+
+  if (!validIdentity(basket.store.id)) {
+    reasons.push(`${label} basket has an invalid store identity`)
+  }
 
   if (new Set(ids).size !== ids.length) {
     reasons.push(`${label} basket contains duplicate ingredient ids`)
+  }
+
+  if (matched.some(invalidMatchedLineIdentity)) {
+    reasons.push(`${label} basket contains invalid matched-line identity`)
+  }
+
+  if (
+    !Number.isSafeInteger(basket.selectedMealCount) ||
+    basket.selectedMealCount < 0
+  ) {
+    reasons.push(`${label} basket has an invalid selected meal count`)
   }
 
   if (
@@ -48,6 +153,10 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
     )
   ) {
     reasons.push(`${label} basket contains an invalid monetary value`)
+  }
+
+  if (matched.some(invalidMatchedLineEconomics)) {
+    reasons.push(`${label} basket contains invalid matched-line economics`)
   }
 
   const calculatedTotal = matched.reduce(
@@ -117,10 +226,10 @@ export function compareFullBaskets({
     reasons.push('basket plans select a different number of meals')
   }
 
-  const baselineMatched = baseline.lines.filter(
+  const baselineMatched = basketLines(baseline).filter(
     (line): line is MatchedBasketLine => line.status === 'matched',
   )
-  const candidateMatched = candidate.lines.filter(
+  const candidateMatched = basketLines(candidate).filter(
     (line): line is MatchedBasketLine => line.status === 'matched',
   )
 

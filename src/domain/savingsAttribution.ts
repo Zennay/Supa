@@ -61,6 +61,33 @@ export function attributeSavingsEffects({
     }
   }
 
+  const comparisonLineIds = new Set<string>()
+  for (const line of comparison.lineDeltas) {
+    if (
+      typeof line.id !== 'string' ||
+      line.id.trim().length === 0 ||
+      line.id.trim() !== line.id
+    ) {
+      return {
+        status: 'unknown',
+        fullyAttributed: false,
+        comparisonDeltaCents: comparison.deltaCents,
+        effectTotals: emptyTotals(),
+        reasons: ['basket comparison contains an invalid line identity'],
+      }
+    }
+    if (comparisonLineIds.has(line.id)) {
+      return {
+        status: 'unknown',
+        fullyAttributed: false,
+        comparisonDeltaCents: comparison.deltaCents,
+        effectTotals: emptyTotals(),
+        reasons: [`basket comparison contains duplicate line identity ${line.id}`],
+      }
+    }
+    comparisonLineIds.add(line.id)
+  }
+
   const lineById = new Map(comparison.lineDeltas.map((line) => [line.id, line] as const))
   const reasons: string[] = []
   const evidenceByLine = new Map<string, SavingsAttributionEvidence[]>()
@@ -76,6 +103,10 @@ export function attributeSavingsEffects({
 
     if (typeof item.lineId !== 'string' || item.lineId.trim().length === 0) {
       reasons.push('attribution evidence lineId must be a non-empty string')
+      continue
+    }
+    if (item.lineId.trim() !== item.lineId) {
+      reasons.push('attribution evidence lineId must be a canonical non-empty string')
       continue
     }
 
@@ -99,6 +130,10 @@ export function attributeSavingsEffects({
       item.evidenceRef.trim().length === 0
     ) {
       reasons.push(`attribution for ${item.lineId} is missing an evidence reference`)
+      continue
+    }
+    if (item.evidenceRef.trim() !== item.evidenceRef) {
+      reasons.push(`attribution for ${item.lineId} must use a canonical evidence reference`)
       continue
     }
 

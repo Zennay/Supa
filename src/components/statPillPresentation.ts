@@ -1,11 +1,35 @@
-export function statPillAccessibleLabel(
-  label: string,
-  value: string,
-): string {
-  const safeLabel =
-    typeof label === 'string' && label.trim() ? label.trim() : 'Statistiek'
-  const safeValue =
-    typeof value === 'string' && value.trim() ? value.trim() : 'Niet beschikbaar'
+export type StatPillPresentation = {
+  label: string
+  value: string
+  accessibleLabel: string
+}
 
-  return `${safeLabel}: ${safeValue}`
+const INVISIBLE_FORMAT_CHARACTERS = /\p{Cf}/gu
+
+function normalizedText(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') return fallback
+
+  const visibleText = value.replace(INVISIBLE_FORMAT_CHARACTERS, '').trim()
+  return visibleText || fallback
+}
+
+export function statPillPresentation(
+  label: unknown,
+  value: unknown,
+): StatPillPresentation {
+  const safeLabel = normalizedText(label, 'Statistiek')
+  const safeValue = normalizedText(value, 'Niet beschikbaar')
+
+  return {
+    label: safeLabel,
+    value: safeValue,
+    accessibleLabel: `${safeLabel}: ${safeValue}`,
+  }
+}
+
+export function statPillAccessibleLabel(
+  label: unknown,
+  value: unknown,
+): string {
+  return statPillPresentation(label, value).accessibleLabel
 }

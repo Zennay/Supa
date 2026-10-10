@@ -16,19 +16,48 @@ function decimal(value: string): number {
   return Number(value.replace(',', '.'))
 }
 
-export function normalizeMoneyToCents(input: string): number | null {
-  const cleaned = input
-    .trim()
-    .replace(/\s/g, '')
-    .replace(/^€/, '')
+function isSafePositiveNumber(value: number): boolean {
+  return Number.isFinite(value) && value > 0 && value <= Number.MAX_SAFE_INTEGER
+}
 
-  if (!cleaned) {
+function decimalTextAtMost(value: string, maximum: number): boolean {
+  const normalized = value.replace(',', '.')
+  const [whole, fraction = ''] = normalized.split('.')
+  const canonicalWhole = whole.replace(/^0+(?=\d)/, '')
+  const maximumText = String(maximum)
+
+  if (canonicalWhole.length !== maximumText.length) {
+    return canonicalWhole.length < maximumText.length
+  }
+
+  if (canonicalWhole < maximumText) return true
+  if (canonicalWhole > maximumText) return false
+  return !/[1-9]/.test(fraction)
+}
+
+export function normalizeMoneyToCents(input: unknown): number | null {
+  if (typeof input !== 'string') return null
+
+  const cleaned = input.trim().replace(/^€\s*/, '')
+
+  if (!cleaned || /\s/.test(cleaned)) {
     return null
   }
 
-  const normalized = cleaned.includes(',')
-    ? cleaned.replace(/\./g, '').replace(',', '.')
-    : cleaned
+  let normalized: string
+  if (cleaned.includes(',')) {
+    if (!/^(?:\d{1,3}(?:\.\d{3})+|\d+),\d{1,2}$/.test(cleaned)) {
+      return null
+    }
+
+    normalized = cleaned.replace(/\./g, '').replace(',', '.')
+  } else {
+    if (!/^\d+(?:\.\d{1,2})?$/.test(cleaned)) {
+      return null
+    }
+
+    normalized = cleaned
+  }
 
   const value = Number(normalized)
   if (!Number.isFinite(value) || value < 0) {
@@ -36,15 +65,17 @@ export function normalizeMoneyToCents(input: string): number | null {
   }
 
   const cents = Math.round(value * 100)
-  return Math.abs(value * 100 - cents) < 1e-6 ? cents : null
+  return Number.isSafeInteger(cents) && Math.abs(value * 100 - cents) < 1e-6
+    ? cents
+    : null
 }
 
 export type NormalizedPack = RawPack & {
   count: number
 }
 
-export function normalizePackText(input: string | null): NormalizedPack {
-  const rawText = input?.trim() || null
+export function normalizePackText(input: unknown): NormalizedPack {
+  const rawText = typeof input === 'string' ? input.trim() || null : null
 
   if (!rawText) {
     return { rawText, count: 1, amount: null, unit: 'unknown' }
@@ -56,17 +87,16 @@ export function normalizePackText(input: string | null): NormalizedPack {
     .trim()
 
   const multipack = cleaned.match(
-    /^(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)\b/,
+    /^(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)(?:\s+\((?:ca\.\s*)?\d+\s*(?:st|stuk|stuks)\))?$/,
   )
 
   if (multipack) {
     const count = Number(multipack[1])
     const amount = decimal(multipack[2])
     if (
-      Number.isInteger(count) &&
+      Number.isSafeInteger(count) &&
       count > 0 &&
-      Number.isFinite(amount) &&
-      amount > 0
+      isSafePositiveNumber(amount)
     ) {
       return {
         rawText,
@@ -80,12 +110,12 @@ export function normalizePackText(input: string | null): NormalizedPack {
   }
 
   const single = cleaned.match(
-    /^(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)\b/,
+    /^(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)(?:\s+\((?:ca\.\s*)?\d+\s*(?:st|stuk|stuks)\))?$/,
   )
 
   if (single) {
     const amount = decimal(single[1])
-    if (Number.isFinite(amount) && amount > 0) {
+    if (isSafePositiveNumber(amount)) {
       return {
         rawText,
         count: 1,
@@ -108,7 +138,11 @@ export type NormalizedOfferMechanic =
   | { type: 'second_half_price' }
   | { type: 'unknown'; rawLabel: string }
 
-export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
+export function normalizeOfferLabel(label: unknown): NormalizedOfferMechanic {
+  if (typeof label !== 'string') {
+    return { type: 'unknown', rawLabel: '' }
+  }
+
   const rawLabel = label.trim()
   const cleaned = rawLabel.toLowerCase().replace(/\s+/g, ' ')
 
@@ -116,7 +150,12 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
   if (buyFree) {
     const buy = Number(buyFree[1])
     const free = Number(buyFree[2])
-    if (buy > 0 && free > 0) {
+    if (
+      Number.isSafeInteger(buy) &&
+      buy > 0 &&
+      Number.isSafeInteger(free) &&
+      free > 0
+    ) {
       return {
         type: 'buy_x_get_y_free',
         buy,
@@ -131,7 +170,12 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
   if (quantityForPrice) {
     const quantity = Number(quantityForPrice[1])
     const totalPriceCents = normalizeMoneyToCents(quantityForPrice[2])
-    if (quantity > 0 && totalPriceCents !== null && totalPriceCents > 0) {
+    if (
+      Number.isSafeInteger(quantity) &&
+      quantity > 0 &&
+      totalPriceCents !== null &&
+      totalPriceCents > 0
+    ) {
       return {
         type: 'quantity_for_price',
         quantity,
@@ -141,9 +185,9 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
   }
 
   const percent = cleaned.match(/^(\d+(?:[.,]\d+)?)%\s+korting$/)
-  if (percent) {
+  if (percent && decimalTextAtMost(percent[1], 100)) {
     const percentValue = decimal(percent[1])
-    if (percentValue > 0 && percentValue <= 100) {
+    if (percentValue > 0) {
       return {
         type: 'percent_discount',
         percent: percentValue,
@@ -165,4 +209,3 @@ export function normalizeOfferLabel(label: string): NormalizedOfferMechanic {
 
   return { type: 'unknown', rawLabel }
 }
-

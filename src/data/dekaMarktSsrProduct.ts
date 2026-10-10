@@ -4,6 +4,7 @@ import type {
 } from './ingestion.ts'
 import { validateRawProductObservation } from './ingestion.ts'
 import { normalizeMoneyToCents, normalizePackText } from './normalize.ts'
+import { normalizeSchemaOrgAvailability } from './schemaOrgProduct.ts'
 
 type JsonObject = Record<string, unknown>
 
@@ -47,6 +48,97 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function safePositiveInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
+function safeSha256(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
+}
+
+function safeArtifactDigest(value: unknown): value is string {
+  return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/i.test(value)
+}
+
+function safeSupaSha(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{40}$/i.test(value)
+}
+
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIMESTAMP_PATTERN =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
+
+function validCalendarDate(value: string) {
+  const match = DATE_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+function safeCapturedAt(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+
+  const match = TIMESTAMP_PATTERN.exec(value)
+  if (!match || !validCalendarDate(match[1])) return false
+
+  const hour = Number(match[2])
+  const minute = Number(match[3])
+  const second = Number(match[4] ?? '0')
+  if (hour > 23 || minute > 59 || second > 59) return false
+
+  if (match[5] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[5]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return false
+  }
+
+  return Number.isFinite(Date.parse(value))
+}
+
+function safeHtmlContentType(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const mediaType = value.split(';', 1)[0]?.trim().toLowerCase()
+  return mediaType === 'text/html'
+}
+
+function safeDekaMarktProductUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'www.dekamarkt.nl' &&
+      url.port === '' &&
+      url.pathname.startsWith('/producten/') &&
+      url.username === '' &&
+      url.password === ''
+    )
+  } catch {
+    return false
+  }
+}
+
+function dekaMarktProductIdFromUrl(value: string): string | null {
+  try {
+    const url = new URL(value)
+    const match = url.pathname.match(/\/(\d+)\/?$/)
+    return match ? match[1] : null
+  } catch {
+    return null
+  }
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
   if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
     return undefined
@@ -75,15 +167,6 @@ function oneProductInformationRef(payload: unknown[]): number | null {
   return unique.length === 1 ? unique[0] : null
 }
 
-function availabilityFromJsonLd(product: JsonObject): RawProductObservation['availability'] {
-  const offers = isObject(product.offers) ? product.offers : null
-  const raw = typeof offers?.availability === 'string' ? offers.availability : ''
-  const normalized = raw.split('/').pop()?.toLowerCase()
-  if (normalized === 'instock' || normalized === 'limitedavailability') return 'available'
-  if (normalized === 'outofstock' || normalized === 'soldout') return 'unavailable'
-  return 'unknown'
-}
-
 export function parseDekaMarktSsrProductEvidence(
   evidence: DekaMarktSsrProductEvidence,
 ): DekaMarktParseResult {
@@ -100,11 +183,27 @@ export function parseDekaMarktSsrProductEvidence(
   ) {
     return { type: 'abstain', reason: 'DekaMarkt evidence must identify a safe product source' }
   }
+  if (
+    !safeDekaMarktProductUrl(evidence.source.url) ||
+    !safeCapturedAt(evidence.source.capturedAt) ||
+    !safeSha256(evidence.source.sha256)
+  ) {
+    return { type: 'abstain', reason: 'DekaMarkt evidence has invalid source provenance' }
+  }
+  if (
+    !safePositiveInteger(evidence.captureEvidence?.runId) ||
+    !safePositiveInteger(evidence.captureEvidence?.artifactId) ||
+    !safeArtifactDigest(evidence.captureEvidence?.artifactDigest) ||
+    !safeSupaSha(evidence.captureEvidence?.supaSha) ||
+    !safePositiveInteger(evidence.captureEvidence?.bytes)
+  ) {
+    return { type: 'abstain', reason: 'DekaMarkt evidence has invalid capture artifact identity' }
+  }
 
   const safety = evidence.captureEvidence?.safety
   if (
     evidence.captureEvidence?.status !== 200 ||
-    !evidence.captureEvidence?.contentType?.toLowerCase().includes('text/html') ||
+    !safeHtmlContentType(evidence.captureEvidence?.contentType) ||
     !safety ||
     safety.login !== false ||
     safety.credentials !== false ||
@@ -133,13 +232,21 @@ export function parseDekaMarktSsrProductEvidence(
   const assortment = dereference(payload, product.productAssortment)
 
   if (
-    !Number.isInteger(productId) ||
+    !safePositiveInteger(productId) ||
     typeof name !== 'string' ||
     !name.trim() ||
     typeof packaging !== 'string' ||
     !isObject(assortment)
   ) {
     return { type: 'abstain', reason: 'DekaMarkt Nuxt product fields are incomplete' }
+  }
+
+  const expectedProductId = dekaMarktProductIdFromUrl(evidence.source.url)
+  if (expectedProductId === null || String(productId) !== expectedProductId) {
+    return {
+      type: 'abstain',
+      reason: 'DekaMarkt product identity does not match source URL',
+    }
   }
 
   const assortmentProductId = scalar(payload, assortment.productId)
@@ -200,7 +307,7 @@ export function parseDekaMarktSsrProductEvidence(
       unit: normalizedPack.unit,
     },
     offer: null,
-    availability: availabilityFromJsonLd(jsonLd),
+    availability: normalizeSchemaOrgAvailability(offers?.availability),
     provenance: evidence.source,
   }
 

@@ -76,16 +76,38 @@ export function aggregatePlanIngredients(
 ): AggregatedIngredient[] {
   const active = new Set(activeDays)
   const aggregated = new Map<string, AggregatedIngredient>()
+  const plannedActiveDays = new Set<string>()
 
   for (const meal of plan) {
     if (!active.has(meal.day)) continue
+    if (plannedActiveDays.has(meal.day)) {
+      throw new Error(`Ambiguous planned day: ${meal.day}`)
+    }
+    plannedActiveDays.add(meal.day)
 
-    const recipe = recipes.find((candidate) => candidate.id === meal.recipeId)
-    if (!recipe) {
+    const matchingRecipes = recipes.filter(
+      (candidate) => candidate.id === meal.recipeId,
+    )
+    if (matchingRecipes.length === 0) {
       throw new Error(`Missing recipe for planned meal: ${meal.recipeId}`)
     }
+    if (matchingRecipes.length > 1) {
+      throw new Error(`Ambiguous recipe for planned meal: ${meal.recipeId}`)
+    }
+
+    const recipe = matchingRecipes[0]
 
     for (const ingredient of recipe.ingredients) {
+      if (typeof ingredient.id !== 'string' || !ingredient.id.trim()) {
+        throw new Error('Ingredient identity must be non-blank')
+      }
+      if (typeof ingredient.label !== 'string' || !ingredient.label.trim()) {
+        throw new Error('Ingredient label must be non-blank')
+      }
+      if (typeof ingredient.query !== 'string' || !ingredient.query.trim()) {
+        throw new Error('Ingredient query must be non-blank')
+      }
+
       const current = aggregated.get(ingredient.id)
       if (!current) {
         aggregated.set(ingredient.id, { ...ingredient })
@@ -107,6 +129,12 @@ export function aggregatePlanIngredients(
     }
   }
 
+  for (const day of active) {
+    if (!plannedActiveDays.has(day)) {
+      throw new Error(`Missing planned meal for active day: ${day}`)
+    }
+  }
+
   return [...aggregated.values()].sort((a, b) => a.id.localeCompare(b.id))
 }
 
@@ -123,8 +151,23 @@ export function buildOneStoreBasket({
   activeDays: string[]
   products: StoreProduct[]
 }): OneStoreBasket {
+  if (typeof store.id !== 'string' || !store.id.trim()) {
+    throw new Error('Store identity must be non-blank')
+  }
+  if (typeof store.name !== 'string' || !store.name.trim()) {
+    throw new Error('Store name must be non-blank')
+  }
+
   const ingredients = aggregatePlanIngredients(plan, recipes, activeDays)
-  const storeProducts = products.filter((product) => product.storeId === store.id)
+  const storeProducts = products.filter(
+    (product) =>
+      typeof product === 'object' &&
+      product !== null &&
+      product.storeId === store.id &&
+      typeof product.id === 'string' &&
+      typeof product.name === 'string' &&
+      Boolean(product.name.trim()),
+  )
 
   const lines: BasketTraceLine[] = ingredients.map((ingredient) => {
     if (
@@ -154,16 +197,36 @@ export function buildOneStoreBasket({
       }
     }
 
-    const product = storeProducts.find(
+    const matchedProducts = storeProducts.filter(
       (candidate) => candidate.id === decision.productId,
     )
-    if (!product) {
+    if (matchedProducts.length !== 1) {
       return {
         id: ingredient.id,
         ingredientLabel: ingredient.label,
         requirement: { amount: ingredient.amount, unit: ingredient.unit },
         status: 'unresolved',
-        reasons: ['matched product missing from store catalog'],
+        reasons: [
+          matchedProducts.length === 0
+            ? 'matched product missing from store catalog'
+            : 'matched product identity is not unique in store catalog',
+        ],
+        matchScore: decision.score,
+      }
+    }
+
+    const product = matchedProducts[0]
+
+    if (typeof product.id !== 'string' || !product.id.trim()) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: [
+          ...decision.reasons,
+          'matched product identity is blank or malformed',
+        ],
         matchScore: decision.score,
       }
     }

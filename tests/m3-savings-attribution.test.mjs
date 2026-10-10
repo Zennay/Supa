@@ -126,6 +126,70 @@ test('M3 attribution rejects a non-zero planning effect inside a same-demand sto
   )
 })
 
+test('M3 attribution rejects blank comparison line identities before evidence lookup', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison({
+      baselineTotalCents: 100,
+      candidateTotalCents: 100,
+      deltaCents: 0,
+      savingsCents: 0,
+      lineDeltas: [
+        {
+          id: '   ',
+          ingredientLabel: 'Unknown ingredient',
+          baselineLineTotalCents: 100,
+          candidateLineTotalCents: 100,
+          deltaCents: 0,
+        },
+      ],
+    }),
+    evidence: [],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /invalid line identity/)
+})
+
+test('M3 attribution rejects duplicate comparison line identities instead of reusing evidence twice', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison({
+      deltaCents: -90,
+      savingsCents: 90,
+      lineDeltas: [
+        {
+          id: 'tomato',
+          ingredientLabel: 'Tomato first',
+          baselineLineTotalCents: 300,
+          candidateLineTotalCents: 255,
+          deltaCents: -45,
+        },
+        {
+          id: 'tomato',
+          ingredientLabel: 'Tomato duplicate',
+          baselineLineTotalCents: 300,
+          candidateLineTotalCents: 255,
+          deltaCents: -45,
+        },
+      ],
+    }),
+    evidence: [
+      {
+        lineId: 'tomato',
+        effect: 'offer',
+        deltaCents: -45,
+        evidenceRef: 'observed-week-2026-10-04:tomato-offer',
+      },
+    ],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /duplicate line identity tomato/)
+})
+
 test('M3 attribution rejects duplicate evidence items instead of double-counting them', () => {
   const duplicate = {
     lineId: 'tomato',
@@ -239,4 +303,72 @@ test('M3 attribution rejects malformed JSON evidence without throwing', () => {
   assert.match(result.reasons.join(' '), /must be an object/)
   assert.match(result.reasons.join(' '), /unsupported effect/)
   assert.match(result.reasons.join(' '), /missing an evidence reference/)
+})
+
+
+test('M3 attribution rejects padded comparison line identities', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison({
+      lineDeltas: [
+        {
+          id: 'tomato',
+          ingredientLabel: 'Tomato',
+          baselineLineTotalCents: 500,
+          candidateLineTotalCents: 380,
+          deltaCents: -120,
+        },
+        {
+          id: 'rice ',
+          ingredientLabel: 'Rice',
+          baselineLineTotalCents: 400,
+          candidateLineTotalCents: 430,
+          deltaCents: 30,
+        },
+      ],
+    }),
+    evidence: [],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /invalid line identity/)
+})
+
+test('M3 attribution rejects padded evidence line identities', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison(),
+    evidence: [
+      {
+        lineId: 'tomato ',
+        effect: 'offer',
+        deltaCents: -120,
+        evidenceRef: 'observed-week-2026-10-04:tomato-offer',
+      },
+    ],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /canonical non-empty string/)
+})
+
+test('M3 attribution rejects padded evidence references', () => {
+  const result = attributeSavingsEffects({
+    comparison: comparison(),
+    evidence: [
+      {
+        lineId: 'tomato',
+        effect: 'offer',
+        deltaCents: -120,
+        evidenceRef: ' observed-week-2026-10-04:tomato-offer',
+      },
+    ],
+  })
+
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.fullyAttributed, false)
+  assert.equal(result.effectTotals.unknownCents, null)
+  assert.match(result.reasons.join(' '), /canonical evidence reference/)
 })

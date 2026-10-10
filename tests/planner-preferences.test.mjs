@@ -196,3 +196,153 @@ test('M2 planner preferences allow an explicit caller-specific budget contract',
 
   assert.equal(preferences.budget, 50)
 })
+
+
+test('M2 planner preferences fail closed on invalid caller fallbacks', () => {
+  for (const fallbackBudget of [Number.NaN, Number.POSITIVE_INFINITY, 0, -10]) {
+    assert.equal(
+      defaultPlannerPreferences(m2InitialPlan, fallbackBudget).budget,
+      35,
+    )
+  }
+
+  const customFallback = parsePlannerPreferences(
+    null,
+    m2InitialPlan,
+    recipeIds,
+    999,
+    [45, 50, 55],
+  )
+  assert.equal(customFallback.budget, 45)
+
+  const malformedContractFallback = parsePlannerPreferences(
+    JSON.stringify({
+      budget: 999,
+      activeDays: ['Ma'],
+      recipeByDay: {},
+    }),
+    m2InitialPlan,
+    recipeIds,
+    Number.NaN,
+    [Number.NaN, -1, 40],
+  )
+  assert.equal(malformedContractFallback.budget, 40)
+})
+
+
+test('M2 planner preferences exclude defaults removed from the current recipe catalog', () => {
+  const currentRecipeIds = recipeIds.filter((recipeId) => recipeId !== 'tikka')
+  const preferences = parsePlannerPreferences(
+    null,
+    m2InitialPlan,
+    currentRecipeIds,
+  )
+
+  assert.deepEqual(preferences, {
+    budget: 35,
+    activeDays: ['Di', 'Wo'],
+    recipeByDay: {
+      Di: 'teriyaki',
+      Wo: 'pasta',
+    },
+  })
+})
+
+test('M2 planner preferences ignore malformed recipe catalog identities', () => {
+  const preferences = parsePlannerPreferences(
+    null,
+    m2InitialPlan,
+    ['tikka', ' teriyaki', 'pasta ', '', null, 42],
+  )
+
+  assert.deepEqual(preferences, {
+    budget: 35,
+    activeDays: ['Ma', 'Do'],
+    recipeByDay: {
+      Ma: 'tikka',
+      Do: 'tikka',
+    },
+  })
+})
+
+test('M2 planner preferences fail closed on duplicate default day identities', () => {
+  const ambiguousPlan = [
+    { day: 'Ma', recipeId: 'tikka' },
+    { day: 'Ma', recipeId: 'pasta' },
+  ]
+
+  const expected = {
+    budget: 35,
+    activeDays: [],
+    recipeByDay: {},
+  }
+
+  assert.deepEqual(defaultPlannerPreferences(ambiguousPlan), expected)
+  assert.deepEqual(
+    parsePlannerPreferences(null, ambiguousPlan, recipeIds),
+    expected,
+  )
+})
+
+test('M2 planner preferences fail closed on non-canonical or malformed defaults', () => {
+  const malformedPlans = [
+    [{ day: ' Ma', recipeId: 'tikka' }],
+    [{ day: 'Ma ', recipeId: 'tikka' }],
+    [{ day: 'Ma', recipeId: ' tikka' }],
+    [{ day: 'Ma', recipeId: 'tikka ' }],
+    [{ day: '', recipeId: 'tikka' }],
+    [{ day: 'Ma', recipeId: '' }],
+    [null],
+  ]
+
+  for (const malformedPlan of malformedPlans) {
+    assert.deepEqual(defaultPlannerPreferences(malformedPlan), {
+      budget: 35,
+      activeDays: [],
+      recipeByDay: {},
+    })
+    assert.deepEqual(
+      parsePlannerPreferences(null, malformedPlan, recipeIds),
+      {
+        budget: 35,
+        activeDays: [],
+        recipeByDay: {},
+      },
+    )
+  }
+})
+
+
+test('M2 planner preferences fall back to canonical budgets for malformed runtime budget contracts', () => {
+  for (const malformedContract of [null, {}, '30,35,40', 35, true]) {
+    const preferences = parsePlannerPreferences(
+      JSON.stringify({
+        budget: 40,
+        activeDays: ['Ma'],
+        recipeByDay: {},
+      }),
+      m2InitialPlan,
+      recipeIds,
+      35,
+      malformedContract,
+    )
+
+    assert.equal(preferences.budget, 40)
+  }
+})
+
+test('M2 planner preferences filter malformed entries from array budget contracts', () => {
+  const preferences = parsePlannerPreferences(
+    JSON.stringify({
+      budget: 55,
+      activeDays: ['Ma'],
+      recipeByDay: {},
+    }),
+    m2InitialPlan,
+    recipeIds,
+    45,
+    [null, '50', Number.NaN, 45, 55, Number.POSITIVE_INFINITY],
+  )
+
+  assert.equal(preferences.budget, 55)
+})

@@ -53,3 +53,80 @@ test('PLUS rendered evidence refuses unsafe acquisition metadata', async () => {
     reason: 'PLUS rendered evidence violates the bounded browser safety contract',
   })
 })
+
+test('PLUS rendered evidence rejects malformed source provenance', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.source.url = 'http://www.plus.nl/product/579010' },
+    (evidence) => { evidence.source.url = 'https://plus.nl/product/579010' },
+    (evidence) => { evidence.source.url = 'https://user:pass@www.plus.nl/product/579010' },
+    (evidence) => { evidence.source.url = 'https://www.plus.nl:8443/product/579010' },
+    (evidence) => { evidence.source.url = 'https://www.plus.nl/aanbiedingen' },
+    (evidence) => { evidence.source.capturedAt = 'not-a-timestamp' },
+    (evidence) => { evidence.source.sha256 = 'not-a-sha' },
+  ]) {
+    const evidence = await fixture()
+    mutate(evidence)
+    assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid source provenance',
+    })
+  }
+})
+
+test('PLUS rendered evidence rejects malformed browser artifact identity', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.browserEvidence.runId = 0 },
+    (evidence) => { evidence.browserEvidence.runId = 1.5 },
+    (evidence) => { evidence.browserEvidence.artifactId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.artifactDigest = 'sha256:not-a-digest' },
+    (evidence) => { evidence.browserEvidence.supaSha = 'f'.repeat(39) },
+  ]) {
+    const evidence = await fixture()
+    mutate(evidence)
+    assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid browser artifact identity',
+    })
+  }
+})
+
+test('PLUS rendered product requires a timezone-bearing capture timestamp', async () => {
+  for (const capturedAt of [
+    '2026-10-04',
+    '2026-10-04T18:08:57.837',
+    '2026-02-30T18:08:57.837Z',
+    '2026-10-04T24:00:00Z',
+    '2026-10-04T18:08:57+24:00',
+  ]) {
+    const evidence = await fixture()
+    evidence.source.capturedAt = capturedAt
+
+    assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid source provenance',
+    })
+  }
+
+  const offset = await fixture()
+  offset.source.capturedAt = '2026-10-04T20:08:57.837+02:00'
+  assert.equal(parsePlusRenderedProductEvidence(offset).type, 'observation')
+})
+
+test('PLUS rendered evidence binds parsed product identity to the source URL', async () => {
+  const wrongSku = await fixture()
+  wrongSku.jsonLd.sku = '999999'
+
+  assert.deepEqual(parsePlusRenderedProductEvidence(wrongSku), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence product identity does not match source URL',
+  })
+
+  const missingUrlId = await fixture()
+  missingUrlId.source.url = 'https://www.plus.nl/product/zuivelmeester-halfvolle-melk'
+  missingUrlId.browserEvidence.finalUrl = missingUrlId.source.url
+
+  assert.deepEqual(parsePlusRenderedProductEvidence(missingUrlId), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence product identity does not match source URL',
+  })
+})

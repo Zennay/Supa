@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const webdriver = process.env.WEBDRIVER_URL || 'http://127.0.0.1:4444'
@@ -97,25 +97,128 @@ const created = await request('/session', {
 const sessionId = created?.sessionId
 if (!sessionId) throw new Error('No Firefox WebDriver session id returned')
 
+async function readGithubProvenance() {
+  const provenance = {
+    checkoutSha: process.env.GITHUB_SHA || null,
+    runId: process.env.GITHUB_RUN_ID || null,
+    runAttempt: process.env.GITHUB_RUN_ATTEMPT || null,
+    eventName: process.env.GITHUB_EVENT_NAME || null,
+    ref: process.env.GITHUB_REF || null,
+    headRef: process.env.GITHUB_HEAD_REF || null,
+    pullRequestHeadSha: null,
+    pullRequestBaseSha: null,
+  }
+
+  if (process.env.GITHUB_EVENT_PATH) {
+    const event = JSON.parse(
+      await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'),
+    )
+    provenance.pullRequestHeadSha = event?.pull_request?.head?.sha ?? null
+    provenance.pullRequestBaseSha = event?.pull_request?.base?.sha ?? null
+  }
+
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    assert.match(
+      provenance.checkoutSha ?? '',
+      /^[0-9a-f]{40}$/i,
+      'GitHub Actions evidence requires a checkout SHA',
+    )
+    assert.match(
+      provenance.runId ?? '',
+      /^\d+$/,
+      'GitHub Actions evidence requires a numeric run ID',
+    )
+    assert.match(
+      provenance.runAttempt ?? '',
+      /^\d+$/,
+      'GitHub Actions evidence requires a numeric run attempt',
+    )
+
+    if (provenance.eventName === 'pull_request') {
+      assert.match(
+        provenance.pullRequestHeadSha ?? '',
+        /^[0-9a-f]{40}$/i,
+        'pull-request evidence requires the candidate head SHA',
+      )
+      assert.match(
+        provenance.pullRequestBaseSha ?? '',
+        /^[0-9a-f]{40}$/i,
+        'pull-request evidence requires the base SHA',
+      )
+    }
+  }
+
+  return provenance
+}
+
 const evidence = {
   schemaVersion: 1,
   milestone: 'M2 Core Planner Vertical Slice',
   baseUrl,
+  provenance: null,
   checks: [],
 }
 
 try {
+  evidence.provenance = await readGithubProvenance()
+
   await request(`/session/${sessionId}/url`, {
     method: 'POST',
     body: JSON.stringify({ url: baseUrl }),
   })
 
-  const plannerText = await waitForText(sessionId, 'Plan eerst. Bespaar daarna.')
+  const plannerText = await waitForText(sessionId, 'Plan eerst. Vergelijk daarna.')
   assert.match(plannerText, /4 maaltijden actief/)
   evidence.checks.push({
     step: 'planner-default',
     passed: true,
     observed: 'planner rendered with four active meals',
+  })
+
+  await request(`/session/${sessionId}/window/rect`, {
+    method: 'POST',
+    body: JSON.stringify({ width: 800, height: 640 }),
+  })
+  const desktopStickyTopbar = await execute(
+    sessionId,
+    `
+      const shell = document.querySelector('.app-shell')
+      const topbar = document.querySelector('.topbar')
+      if (!shell || !topbar) return null
+
+      const initialTop = topbar.getBoundingClientRect().top
+      window.scrollTo(0, 240)
+      const stickyTop = topbar.getBoundingClientRect().top
+
+      return {
+        desktopMedia: matchMedia('(min-width: 700px)').matches,
+        shellOverflow: getComputedStyle(shell).overflow,
+        topbarPosition: getComputedStyle(topbar).position,
+        initialTop,
+        stickyTop,
+        scrollY: window.scrollY,
+      }
+    `,
+  )
+  assert.ok(desktopStickyTopbar, 'desktop sticky topbar could not be inspected')
+  assert.equal(desktopStickyTopbar.desktopMedia, true)
+  assert.equal(desktopStickyTopbar.shellOverflow, 'clip')
+  assert.equal(desktopStickyTopbar.topbarPosition, 'sticky')
+  assert.ok(desktopStickyTopbar.scrollY > 0, 'desktop page did not scroll')
+  assert.ok(
+    Math.abs(desktopStickyTopbar.stickyTop) <= 1,
+    `desktop topbar did not remain sticky at the viewport top: ${desktopStickyTopbar.stickyTop}`,
+  )
+  await execute(sessionId, 'window.scrollTo(0, 0); return window.scrollY')
+  await request(`/session/${sessionId}/window/rect`, {
+    method: 'POST',
+    body: JSON.stringify({ width: 430, height: 932 }),
+  })
+  evidence.checks.push({
+    step: 'desktop-sticky-topbar',
+    passed: true,
+    observed:
+      'Firefox desktop viewport keeps the topbar sticky at the viewport top while the rounded app shell clips with overflow: clip',
   })
 
   const changed = await execute(
@@ -147,7 +250,8 @@ try {
   assert.doesNotMatch(basketText, /score below trust threshold/)
   assert.doesNotMatch(basketText, /query phrase present/)
   assert.doesNotMatch(basketText, /Match \d+/)
-  assert.match(basketText, /M2 testwinkel/)
+  assert.match(basketText, /Voorbeeldwinkel · demo/)
+  assert.doesNotMatch(basketText, /M2 testwinkel/)
   assert.match(basketText, /1 productkeuze is nog niet meegerekend/)
   assert.match(basketText, /geen volledig mandtotaal/)
   const basketTotalState = await execute(
@@ -236,10 +340,16 @@ try {
       const candidateStoreId = candidate?.querySelector(
         'input[placeholder="dekamarkt-leiden-..."]',
       )
-      if (!nowButton || !candidateStoreId) return null
+      const firstSummary = baseline?.querySelector('.observation-line summary')
+      const primaryAction = document.querySelector('.observation-actions .primary-button')
+      if (!nowButton || !candidateStoreId || !firstSummary || !primaryAction) return null
       nowButton.click()
       return {
         candidateStoreIdHint: candidateStoreId.getAttribute('placeholder'),
+        inputFontSize: getComputedStyle(candidateStoreId).fontSize,
+        inputMinHeight: getComputedStyle(candidateStoreId).minHeight,
+        summaryMinHeight: getComputedStyle(firstSummary).minHeight,
+        primaryActionMinHeight: getComputedStyle(primaryAction).minHeight,
       }
     `,
   )
@@ -248,6 +358,10 @@ try {
     observationQuickEntry.candidateStoreIdHint,
     'dekamarkt-leiden-...',
   )
+  assert.equal(observationQuickEntry.inputFontSize, '16px')
+  assert.equal(observationQuickEntry.inputMinHeight, '44px')
+  assert.equal(observationQuickEntry.summaryMinHeight, '44px')
+  assert.equal(observationQuickEntry.primaryActionMinHeight, '44px')
 
   let observationTimestamp = ''
   for (let attempt = 0; attempt < 20 && !observationTimestamp; attempt += 1) {
@@ -399,7 +513,7 @@ try {
   })
 
   await clickNav(sessionId, 'Planner')
-  await waitForText(sessionId, 'Plan eerst. Bespaar daarna.')
+  await waitForText(sessionId, 'Plan eerst. Vergelijk daarna.')
 
   const changedPreferences = await execute(
     sessionId,

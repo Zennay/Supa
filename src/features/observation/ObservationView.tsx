@@ -20,6 +20,7 @@ import {
 import { observationRetailerCopy } from './observationPresentation.ts'
 import {
   nextObservationActionLabel,
+  observationPriceCents,
   observationTimestampFromDate,
 } from './observationCollectionUi.ts'
 
@@ -53,14 +54,6 @@ function toIsoDateTime(value: string) {
 
 function euroValue(priceCents: number | null) {
   return priceCents === null ? '' : (priceCents / 100).toFixed(2)
-}
-
-function priceCents(value: string) {
-  if (!value.trim()) return null
-  const parsed = Number(value.replace(',', '.'))
-  return Number.isFinite(parsed) && parsed >= 0
-    ? Math.round(parsed * 100)
-    : null
 }
 
 function safeFilePart(value: string) {
@@ -729,7 +722,7 @@ export function ObservationView() {
                               value={euroValue(product.priceCents)}
                               onChange={(event) =>
                                 updateProduct(side, lineIndex, {
-                                  priceCents: priceCents(event.target.value),
+                                  priceCents: observationPriceCents(event.target.value),
                                 })
                               }
                             />

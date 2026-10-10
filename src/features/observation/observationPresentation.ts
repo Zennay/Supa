@@ -12,16 +12,23 @@ export type ObservationRetailerCopy = {
   guidance: string
 }
 
+function assertObservationSide(side: unknown): asserts side is M3ObservationSide {
+  if (side !== 'baseline' && side !== 'candidate') {
+    throw new Error('Unknown M3 observation side')
+  }
+}
+
 export function observationRetailerCopy(
   side: M3ObservationSide,
 ): ObservationRetailerCopy {
+  assertObservationSide(side)
   const expectedRetailer = M3_EXPECTED_RETAILERS[side]
 
   return {
     eyebrow:
       side === 'baseline'
-        ? `Baseline · ${expectedRetailer}`
-        : `Vergelijking · ${expectedRetailer}`,
+        ? `Eerste winkel · ${expectedRetailer}`
+        : `Vergelijkwinkel · ${expectedRetailer}`,
     expectedRetailer,
     emptyStoreLabel: `${expectedRetailer} nog niet ingevuld`,
     storePlaceholder: `Bijv. ${expectedRetailer} Leiden`,
@@ -29,7 +36,7 @@ export function observationRetailerCopy(
       side === 'baseline' ? 'plus-leiden-...' : 'dekamarkt-leiden-...',
     guidance:
       side === 'baseline'
-        ? 'Voor deze M3-meting hoort de baseline bij PLUS. Een andere supermarkt wordt door de preflight geweigerd.'
-        : 'Voor deze M3-meting hoort de vergelijking bij DekaMarkt. Een andere supermarkt wordt door de preflight geweigerd.',
+        ? 'Meet deze mand eerst bij PLUS. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.'
+        : 'Meet daarna dezelfde mand bij DekaMarkt. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.',
   }
 }

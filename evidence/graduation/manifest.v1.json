@@ -35,9 +35,11 @@
       "sourceCreatedAt": "2026-08-28T11:25:13Z",
       "archiveState": "library-reference-only",
       "retrievalKey": "Reflectie_Supa_Zennay_500858050.pdf",
-      "lastRawByteVerificationAttemptAt": "2026-10-05T17:43:00Z",
+      "lastRawByteVerificationAttemptAt": "2026-10-06T11:53:47Z",
       "lastRawByteVerificationAttemptResult": "blocked-unauthorized-materialization",
-      "verificationNote": "Rechecked 2026-10-05: Library still resolves the exact 36,056-byte source file, but raw-byte materialization remains unauthorized. Do not invent a byte hash; retrieve by exact filename and size until a byte-preserving copy or materialization route is available."
+      "verificationNote": "Rechecked 2026-10-06: Library resolves the exact 36,056-byte source file as file_000000006154820d8689de4f81ee8784 version 1, but raw-byte materialization is still unauthorized. No SHA-256 is claimed or inferred; retrieve this exact file/version until a byte-preserving copy or authorized raw-byte route exists.",
+      "sourceFileId": "file_000000006154820d8689de4f81ee8784",
+      "sourceVersionId": "1"
     }
   ]
 }

@@ -33,6 +33,91 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function safePositiveInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
+function safeSha256(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
+}
+
+function safeArtifactDigest(value: unknown): value is string {
+  return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/i.test(value)
+}
+
+function safeSupaSha(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{40}$/i.test(value)
+}
+
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIMESTAMP_PATTERN =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
+
+function validCalendarDate(value: string) {
+  const match = DATE_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+function safeCapturedAt(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+
+  const match = TIMESTAMP_PATTERN.exec(value)
+  if (!match || !validCalendarDate(match[1])) return false
+
+  const hour = Number(match[2])
+  const minute = Number(match[3])
+  const second = Number(match[4] ?? '0')
+  if (hour > 23 || minute > 59 || second > 59) return false
+
+  if (match[5] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[5]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return false
+  }
+
+  return Number.isFinite(Date.parse(value))
+}
+
+function safePlusProductUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'www.plus.nl' &&
+      url.port === '' &&
+      url.pathname.startsWith('/product/') &&
+      url.username === '' &&
+      url.password === ''
+    )
+  } catch {
+    return false
+  }
+}
+
+function plusProductIdFromUrl(value: string): string | null {
+  try {
+    const url = new URL(value)
+    const match = url.pathname.match(/(?:-|\/)(\d+)\/?$/)
+    return match ? match[1] : null
+  } catch {
+    return null
+  }
+}
+
 export function parsePlusRenderedProductEvidence(
   evidence: PlusRenderedProductEvidence,
 ): SchemaOrgParseResult {
@@ -52,7 +137,29 @@ export function parsePlusRenderedProductEvidence(
     }
   }
   if (
-    evidence.browserEvidence?.renderedHtmlSha256 !== evidence.source.sha256 ||
+    !safePlusProductUrl(evidence.source.url) ||
+    !safeCapturedAt(evidence.source.capturedAt) ||
+    !safeSha256(evidence.source.sha256)
+  ) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid source provenance',
+    }
+  }
+  if (
+    !safePositiveInteger(evidence.browserEvidence?.runId) ||
+    !safePositiveInteger(evidence.browserEvidence?.artifactId) ||
+    !safeArtifactDigest(evidence.browserEvidence?.artifactDigest) ||
+    !safeSupaSha(evidence.browserEvidence?.supaSha)
+  ) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence has invalid browser artifact identity',
+    }
+  }
+  if (
+    !safeSha256(evidence.browserEvidence?.renderedHtmlSha256) ||
+    evidence.browserEvidence.renderedHtmlSha256 !== evidence.source.sha256 ||
     evidence.browserEvidence?.finalUrl !== evidence.source.url
   ) {
     return {
@@ -76,5 +183,19 @@ export function parsePlusRenderedProductEvidence(
     }
   }
 
-  return parseSchemaOrgProduct(evidence.jsonLd, evidence.source)
+  const parsed = parseSchemaOrgProduct(evidence.jsonLd, evidence.source)
+  if (parsed.type !== 'observation') return parsed
+
+  const expectedProductId = plusProductIdFromUrl(evidence.source.url)
+  if (
+    expectedProductId === null ||
+    parsed.observation.sourceProductId !== expectedProductId
+  ) {
+    return {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence product identity does not match source URL',
+    }
+  }
+
+  return parsed
 }

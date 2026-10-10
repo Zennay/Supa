@@ -6,13 +6,13 @@ import type {
 
 export const m2Store: Store = {
   id: 'm2-one-store',
-  name: 'M2 testwinkel',
+  name: 'Voorbeeldwinkel · demo',
 }
 
 export const m2Recipes: RecipeWithIngredients[] = [
   {
     id: 'tikka',
-    title: 'Tikka chicken bowl',
+    title: 'Tikka-bowl met kip',
     minutes: 25,
     servings: 2,
     estimatedCost: 6.4,
@@ -27,7 +27,7 @@ export const m2Recipes: RecipeWithIngredients[] = [
   },
   {
     id: 'teriyaki',
-    title: 'Teriyaki veggie bowl',
+    title: 'Teriyaki-bowl met groenten',
     minutes: 20,
     servings: 2,
     estimatedCost: 5.8,
@@ -41,7 +41,7 @@ export const m2Recipes: RecipeWithIngredients[] = [
   },
   {
     id: 'pasta',
-    title: 'Creamy tomato pasta',
+    title: 'Romige tomatenpasta',
     minutes: 18,
     servings: 2,
     estimatedCost: 4.9,
@@ -76,3 +76,18 @@ export const m2Products: StoreProduct[] = [
 ]
 
 export const m2DefaultActiveDays = m2InitialPlan.map((meal) => meal.day)
+
+for (const recipe of m2Recipes) {
+  Object.freeze(recipe.tags)
+  for (const ingredient of recipe.ingredients) Object.freeze(ingredient)
+  Object.freeze(recipe.ingredients)
+  Object.freeze(recipe)
+}
+for (const meal of m2InitialPlan) Object.freeze(meal)
+for (const product of m2Products) Object.freeze(product)
+
+Object.freeze(m2Store)
+Object.freeze(m2Recipes)
+Object.freeze(m2InitialPlan)
+Object.freeze(m2Products)
+Object.freeze(m2DefaultActiveDays)

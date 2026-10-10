@@ -164,6 +164,7 @@ export function App() {
             plannedMeals={plannedMeals}
             recipes={m2Recipes}
             basketTotalCents={basket.totalCents}
+            basketUnresolvedLineCount={basket.unresolvedLineCount}
             onBudgetChange={(nextBudget) =>
               setPreferences((current) => ({
                 ...current,
@@ -192,6 +193,7 @@ export function App() {
           <button
             key={item.id}
             className={tab === item.id ? 'active' : ''}
+            aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => setTab(item.id)}
           >
             {item.label}

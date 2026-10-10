@@ -82,3 +82,49 @@ test('M1 capture rejects unsupported source kinds', () => {
     /Unsupported source kind/,
   )
 })
+
+
+test('M1 capture rejects unsafe source ids before they can become file names', () => {
+  assert.throws(
+    () =>
+      validateSources([
+        {
+          id: '../plus-product',
+          supermarket: 'plus',
+          kind: 'product',
+          url: 'https://www.plus.nl/producten',
+        },
+      ]),
+    /Invalid or duplicate source id/,
+  )
+})
+
+test('M1 capture rejects non-default HTTPS ports', () => {
+  assert.throws(
+    () =>
+      validateSources([
+        {
+          id: 'plus-alt-port',
+          supermarket: 'plus',
+          kind: 'catalog',
+          url: 'https://www.plus.nl:444/producten',
+        },
+      ]),
+    /does not match supermarket allowlist/,
+  )
+})
+
+test('M1 capture rejects credential-bearing allowlisted URLs', () => {
+  assert.throws(
+    () =>
+      validateSources([
+        {
+          id: 'plus-credential-url',
+          supermarket: 'plus',
+          kind: 'catalog',
+          url: 'https://user:secret@www.plus.nl/producten',
+        },
+      ]),
+    /does not match supermarket allowlist/,
+  )
+})
