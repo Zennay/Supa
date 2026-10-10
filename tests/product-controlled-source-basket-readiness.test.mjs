@@ -65,6 +65,8 @@ test('source-only full-demand pair produces structural pass but NEVER release/sa
   assert.equal(result.captureWindowHours, 0)
   assert.equal(result.baseline.totalCents, 249)
   assert.equal(result.candidate.totalCents, 299)
+  assert.equal(result.baseline.store.name, 'PLUS')
+  assert.equal(result.candidate.store.name, 'DekaMarkt')
   assert.equal(result.baseline.lines.length, 1)
   assert.equal(result.candidate.lines[0].pack.count, 6)
   assert.equal(result.candidate.lines[0].packs, 1)
@@ -177,9 +179,19 @@ test('valid full 24h window and timezone offset preserve structurally comparable
   assert.equal(result.captureWindowHours, 24)
 })
 
+test('retailer display labels come from bound sources, not caller-supplied misleading names', () => {
+  const result = assessControlledSourceBasketReadiness(input({
+    baselineStoreName: 'DekaMarkt', candidateStoreName: 'PLUS',
+  }))
+  assert.equal(result.status, 'structural-pass')
+  assert.equal(result.baseline.store.name, 'PLUS')
+  assert.equal(result.candidate.store.name, 'DekaMarkt')
+})
+
 test('malformed caller shapes and hostile getter never disclose diagnostic or throw', () => {
   for (const value of [null, [], {}, { ...input(), baselineStore: null },
-    input({ plan: 'not-an-array' }), input({ baselineStoreName: '' }),
+    input({ plan: 'not-an-array' }), input({ activeDays: ['Ma', 'Ma'] }),
+    input({ activeDays: [' Ma'] }),
   ]) {
     assert.equal(assessControlledSourceBasketReadiness(value).status, 'structural-fail')
   }
