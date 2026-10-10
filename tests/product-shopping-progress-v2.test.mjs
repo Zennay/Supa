@@ -13,6 +13,7 @@ import {
   restoreShoppingProgressV2,
   serializeShoppingProgressV2,
   shoppingListProgressV2StorageKey,
+  toggleShoppingProgressV2,
 } from '../src/features/shopping-list/shoppingListProgressV2.ts'
 import { serializeShoppingListProgress } from '../src/features/shopping-list/shoppingListProgress.ts'
 
@@ -148,4 +149,44 @@ test('display reordering retains completed items in memory and on reload', () =>
   assert.deepEqual(reconcileShoppingProgressV2(before, after, completed), completed)
   assert.deepEqual(restoreShoppingProgressV2(after, raw), completed)
   assert.deepEqual(restoreShoppingProgressV2(before, serializeShoppingProgressV2(after, completed)), completed)
+})
+
+test('v2 toggle checks and unchecks only current lines without phantom progress', () => {
+  const before = basket()
+  const first = before.lines[0].id
+  const second = before.lines[1].id
+
+  assert.deepEqual(toggleShoppingProgressV2(before, [], first), [first])
+  assert.deepEqual(toggleShoppingProgressV2(before, [first], second), [first, second])
+  assert.deepEqual(toggleShoppingProgressV2(before, [first, second], first), [second])
+
+  for (const invalidId of ['stale-line', null, false, 0, {}]) {
+    assert.deepEqual(
+      toggleShoppingProgressV2(before, [second, second, 'stale-line'], invalidId),
+      [second],
+    )
+  }
+})
+
+test('v2 toggle safely rejects malformed basket shapes and non-array completion', () => {
+  const before = basket()
+  const id = before.lines[0].id
+  assert.deepEqual(toggleShoppingProgressV2(before, null, id), [id])
+  for (const malformed of [
+    { ...before, store: null },
+    { ...before, lines: null },
+    { ...before, lines: [null] },
+  ]) {
+    assert.deepEqual(toggleShoppingProgressV2(malformed, [id], id), [])
+  }
+})
+
+test('reordered rows keep their checks and toggling a valid id retains stable order', () => {
+  const before = basket()
+  const id = before.lines[0].id
+  const reordered = structuredClone(before)
+  reordered.lines.reverse()
+  assert.deepEqual(toggleShoppingProgressV2(reordered, [id], reordered.lines[0].id),
+    id === reordered.lines[0].id ? [] : [id, reordered.lines[0].id],
+  )
 })
