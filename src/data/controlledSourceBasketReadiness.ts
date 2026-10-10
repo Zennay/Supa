@@ -15,8 +15,6 @@ import {
  * or a permission to publish a savings claim.
  */
 export type ControlledSourceBasketInputs = ControlledComparisonInputs & {
-  baselineStoreName: string
-  candidateStoreName: string
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
@@ -40,6 +38,12 @@ export type ControlledSourceBasketReadiness =
       candidateMinusBaselineCents: number
     }
 
+const SUPERMARKET_LABELS = Object.freeze({
+  ah: 'Albert Heijn',
+  plus: 'PLUS',
+  dekamarkt: 'DekaMarkt',
+})
+
 const FAILURE: ControlledSourceBasketReadiness = Object.freeze({
   status: 'structural-fail',
   releaseEligible: false,
@@ -53,14 +57,14 @@ export function assessControlledSourceBasketReadiness(
   try {
     if (!input || typeof input !== 'object' || Array.isArray(input)) return FAILURE
     if (
-      typeof input.baselineStoreName !== 'string' ||
-      !input.baselineStoreName.trim() ||
-      typeof input.candidateStoreName !== 'string' ||
-      !input.candidateStoreName.trim() ||
       !Array.isArray(input.plan) ||
       !Array.isArray(input.recipes) ||
       !Array.isArray(input.activeDays) ||
-      input.activeDays.length === 0
+      input.activeDays.length === 0 ||
+      input.activeDays.some(day =>
+        typeof day !== 'string' || !day.trim() || day !== day.trim(),
+      ) ||
+      new Set(input.activeDays).size !== input.activeDays.length
     ) return FAILURE
 
     const catalogs = projectFreshControlledComparisonCatalogs(input)
@@ -73,12 +77,12 @@ export function assessControlledSourceBasketReadiness(
     }
     const baseline = buildOneStoreBasket({
       ...common,
-      store: { id: input.baselineStore.id, name: input.baselineStoreName },
+      store: { id: input.baselineStore.id, name: SUPERMARKET_LABELS[input.baselineStore.supermarket] },
       products: catalogs.baseline,
     })
     const candidate = buildOneStoreBasket({
       ...common,
-      store: { id: input.candidateStore.id, name: input.candidateStoreName },
+      store: { id: input.candidateStore.id, name: SUPERMARKET_LABELS[input.candidateStore.supermarket] },
       products: catalogs.candidate,
     })
 
