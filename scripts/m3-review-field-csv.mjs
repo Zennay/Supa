@@ -78,7 +78,7 @@ function validObservationTime(value) {
   const midnight = Date.parse(datePart + 'T00:00:00Z')
   if (!Number.isFinite(midnight) ||
       new Date(midnight).toISOString().slice(0, 10) !== datePart) return null
-  const offset = value.match(/([+-])(\\d{2}):(\\d{2})$/)
+  const offset = value.match(/([+-])(\d{2}):(\d{2})$/)
   if (offset) {
     const hours = Number(offset[2])
     const minutes = Number(offset[3])
