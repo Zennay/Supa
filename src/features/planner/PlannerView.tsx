@@ -1,6 +1,7 @@
 import type { PlannedMeal, Recipe } from '../../domain/types'
 import { euro } from '../../lib/money'
 import { assessPlannerBudgetCents } from '../../lib/plannerBudgetCents.ts'
+import { RecipeEstimateDisclosure } from './RecipeEstimateDisclosure.ts'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -177,7 +178,8 @@ export function PlannerView({
                     </option>
                   ))}
                 </select>
-                <small>{recipe.minutes} min · {euro.format(recipe.estimatedCost)} / recept</small>
+                <small>{recipe.minutes} min</small>
+                <RecipeEstimateDisclosure estimatedCost={recipe.estimatedCost} />
               </span>
               <button
                 type="button"
@@ -192,6 +194,12 @@ export function PlannerView({
           )
         })}
       </div>
+
+      <p className="disclaimer" data-recipe-estimate-explanation>
+        Richtprijzen zijn indicatief en komen uit voorbeeldrecepten.
+        De Mand-tab toont apart welke productkosten echt zijn berekend;
+        onbekende productkeuzes blijven daar zichtbaar.
+      </p>
 
       <div className="insight-card">
         <span className="eyebrow">Van plan naar lijst</span>
