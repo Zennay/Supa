@@ -2,6 +2,7 @@ import type { PlannedMeal, Recipe } from '../../domain/types'
 import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { IngredientReuseCard } from './IngredientReuseCard.tsx'
+import { RecipeReusePreviewPanel } from './RecipeReusePreviewPanel.tsx'
 import { euro } from '../../lib/money'
 import { assessPlannerBudgetCents } from '../../lib/plannerBudgetCents.ts'
 import { RecipeEstimateDisclosure } from './RecipeEstimateDisclosure.ts'
@@ -217,6 +218,13 @@ export function PlannerView({
       </div>
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
+      {hasIngredientData && (
+        <RecipeReusePreviewPanel
+          plannedMeals={plannedMeals}
+          activeDays={activeDays}
+          recipes={ingredientRecipes}
+        />
+      )}
 
       <p className="disclaimer" data-recipe-estimate-explanation>
         Richtprijzen zijn indicatief en komen uit voorbeeldrecepten.
