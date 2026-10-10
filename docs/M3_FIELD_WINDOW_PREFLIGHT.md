@@ -23,7 +23,7 @@ This helper accepts only exact date/time with seconds and a real explicit timezo
 ## Outcomes, not savings claims
 
 - Exit **0** / `WINDOW ONLY`: both instants fall within 24h. This checks the clock **only**; it does not validate the basket, sources, permission, quantities, contexts or prices, and does not make savings claimable.
-- Exit **2** / `PENDING`: the candidate instant is missing but the baseline clock remains within the 24-hour deadline. Never treat as collected evidence.
+- Exit **2** / `PENDING`: the candidate instant is missing but the baseline clock remains within the 24-hour deadline. The CLI displays **hours and rounded-up remaining minutes** (never the captured timestamp); a single remaining second is shown as one minute to avoid implying there is no time left. A displayed 0 minutes means the cutoff is *exactly* now, not that the second observation was already captured. Never treat as collected evidence.
 - Exit **1** / `NOT READY`: invalid/future instants, elapsed window >24h, or missing/invalid parameters. Recollect when needed; do not silently substitute fixture values.
 
 The CLI intentionally does **not** print the supplied input timestamps, person keys, URLs, amounts or prices. Keep any real filled sheet, receipts and original provenance outside Git and CI logs. This auxiliary preflight does **not** replace the canonical `m3:build-observed-study` and `m3:assess-observed-week` validation/report path. Both the real measurement and those gates are still required for M3 exit, and even a successful single field study does not authorize a public savings claim.
