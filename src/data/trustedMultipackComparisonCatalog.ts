@@ -22,10 +22,10 @@ export type ControlledComparisonCatalogs = {
 /** Require a real, timezone-explicit ISO timestamp, not local-time Date.parse. */
 function timestampMillis(value: unknown): number | null {
   if (typeof value !== 'string') return null
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value)
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value)
   if (!match) return null
 
-  const [, yearText, monthText, dayText, hourText, minuteText, secondText, , , offsetHourText, offsetMinuteText] = match
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, fractionDigits, , , offsetHourText, offsetMinuteText] = match
   const year = Number(yearText)
   const month = Number(monthText)
   const day = Number(dayText)
@@ -42,6 +42,16 @@ function timestampMillis(value: unknown): number | null {
     hour > 23 || minute > 59 || second > 59 ||
     offsetHour > 14 || offsetMinute > 59 ||
     (offsetHour === 14 && offsetMinute !== 0)
+  ) return null
+
+  // Date.parse has millisecond precision: silently dropping nonzero digits
+  // beyond the third would falsely accept sub-millisecond *future* captures.
+  // Retain compatibility with trailing-zero extended ISO fractions, but
+  // refuse any precision the gate cannot represent instead of rounding.
+  if (
+    fractionDigits !== undefined &&
+    fractionDigits.length > 3 &&
+    /[1-9]/.test(fractionDigits.slice(3))
   ) return null
 
   const millis = Date.parse(value)
