@@ -31,3 +31,9 @@ These fixture values are **never** genuine PLUS/DekaMarkt observed prices or sav
 - Independently, human M3 field exit #78 still requires **real same-demand 11-product PLUS baseline + DekaMarkt candidate within 24h**; synthetic basket fixtures are not financial claim evidence.
 
 **DRAFT / HOLD / NO MERGE / NO DEPLOY** until the above owner and validation conditions hold.
+
+### All-or-nothing controlled candidate catalog
+
+`projectTrustedObservationCatalogForBasket(observations, store)` accepts a nonempty bounded array (at most 5000 explicitly selected observations) and returns a deterministic ID-sorted basket product set. **Any** invalid, unavailable, mismatched-store, unpriced, promotional, or duplicate source product row rejects the **whole** batch with `null` instead of silently shrinking the catalog and reporting false coverage or an artificially cheap basket. This is intentional: a partial source set must never be labeled complete by this preparation helper. The caller must still establish genuine completeness and source-use permission separately; this helper does neither.
+
+Standalone tests demonstrate duplicate IDs with contradictory cent prices, a corrupt element after a valid one, mixed source identities, input immutability and stable ordering. A synthetic rejection is not actual evidence about retailer catalogs.
