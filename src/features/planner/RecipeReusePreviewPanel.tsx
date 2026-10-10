@@ -16,10 +16,12 @@ export function RecipeReusePreviewPanel({
   plannedMeals,
   activeDays,
   recipes,
+  onChooseRecipe,
 }: {
   plannedMeals: PlannedMeal[]
   activeDays: string[]
   recipes: RecipeWithIngredients[]
+  onChooseRecipe: (day: string, recipeId: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [requestedDay, setRequestedDay] = useState<string | null>(null)
@@ -105,6 +107,19 @@ export function RecipeReusePreviewPanel({
             geen boodschappenprijzen of bewezen besparing.
           </p>
           <IngredientReusePreviewCard preview={preview} />
+          {preview !== null && (
+            <button
+              type="button"
+              className="recipe-reuse-preview-apply"
+              onClick={() => {
+                // Only a confirmed, current proposal can mutate the week.
+                onChooseRecipe(day, recipeId)
+                setExpanded(false)
+              }}
+            >
+              Kies {alternatives.find((recipe) => recipe.id === recipeId)?.title} voor {day}
+            </button>
+          )}
         </div>
       )}
     </section>
