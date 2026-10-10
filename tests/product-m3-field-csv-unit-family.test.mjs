@@ -1,0 +1,88 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { sameM3QuantityFamily } from '../scripts/m3-field-unit-compatibility.mjs'
+import { buildBlankM3FieldChecklistCsv } from '../scripts/m3-export-blank-field-checklist.mjs'
+import { parseM3FieldCsv, reviewM3FieldCsv } from '../scripts/m3-review-field-csv.mjs'
+
+const quote = text => '"' + String(text).replaceAll('"', '""') + '"'
+const csv = rows => rows.map(row => row.map(quote).join(',')).join('\n') + '\n'
+
+function fictionalObservations() {
+  const rows = parseM3FieldCsv(buildBlankM3FieldChecklistCsv())
+  for (let i = 1; i < rows.length; i++) {
+    rows[i][7] = i <= 11 ? '2026-10-10T10:00:00Z' : '2026-10-10T11:00:00Z'
+    rows[i][8] = 'in-store'
+    rows[i][9] = 'synthetic product — never actual retailer data'
+    rows[i][10] = '500'
+    rows[i][11] = rows[i][6]
+    rows[i][12] = '1'
+    rows[i][13] = '199'
+    rows[i][14] = 'ja'
+    rows[i][15] = 'synthetic test-only source'
+  }
+  return rows
+}
+
+test('M3 physical unit families must agree with existing matching semantics', () => {
+  for (const [need,pack] of [
+    ['g','g'], ['g','kg'], ['kg','g'], ['kg','kg'],
+    ['ml','ml'], ['ml','l'], ['l','ml'], ['l','l'], ['piece','piece'],
+  ]) assert.equal(sameM3QuantityFamily(need,pack), true, `${need}/${pack}`)
+  for (const [need,pack] of [
+    ['g','ml'], ['kg','l'], ['ml','kg'], ['l','g'],
+    ['piece','g'], ['g','piece'], ['piece','ml'],
+    ['unknown','g'], ['g','unknown'], [null,'piece'],
+    ['g',{}], ['__proto__','g'], ['g','constructor'],
+  ]) assert.equal(sameM3QuantityFamily(need,pack), false, `${need}/${String(pack)}`)
+})
+
+test('M3 field reviewer rejects mismatched packaging dimension in either store', () => {
+  for (const index of [1, 12]) {
+    const rows = fictionalObservations()
+    const required = rows[index][6]
+    rows[index][11] = ['g','kg'].includes(required) ? 'ml' : 'g'
+    const report = reviewM3FieldCsv(csv(rows))
+    assert.equal(report.completeRows, 21)
+    assert.ok(report.warnings.includes('incompatible-pack-unit'))
+    assert.equal(report.status, 'incomplete-or-needs-review')
+    assert.equal(report.evidenceVerified, false)
+    assert.equal(report.releaseEligible, false)
+    assert.equal(report.claimable, false)
+    assert.equal(report.savingsCents, null)
+    assert.doesNotMatch(JSON.stringify(report), /synthetic product|synthetic test-only source|199/)
+  }
+})
+
+test('M3 preflight allows cross-unit packs and correctly leaves actual pack purchase to basket engine', () => {
+  const rows = fictionalObservations()
+  for (let i = 1; i < rows.length; i++) {
+    const need = rows[i][6]
+    rows[i][11] = ({ g:'kg', kg:'g', ml:'l', l:'ml', piece:'piece' })[need]
+    // A 100g single-SKU pack may be purchased more than once for a 1kg
+    // requirement; pack_count is inner multipack count, not a purchase count.
+    rows[i][10] = '0.1'
+    rows[i][12] = '1'
+  }
+  const report = reviewM3FieldCsv(csv(rows))
+  assert.equal(report.completeRows, 22)
+  assert.deepEqual(report.warnings, [])
+  assert.equal(report.status, 'requires-canonical-human-verification')
+  assert.equal(report.evidenceVerified, false)
+  assert.equal(report.releaseEligible, false)
+  assert.equal(report.claimable, false)
+  assert.equal(report.savingsCents, null)
+})
+
+test('M3 explicitly unavailable lines have no pack-unit compatibility requirement', () => {
+  const rows = fictionalObservations()
+  for (const index of [1, 12]) {
+    rows[index][14] = 'nee'
+    for (const column of [9,10,11,12,13]) rows[index][column] = ''
+  }
+  const report = reviewM3FieldCsv(csv(rows))
+  assert.equal(report.completeRows, 22)
+  assert.deepEqual(report.warnings, [])
+  assert.equal(report.status, 'requires-canonical-human-verification')
+  assert.equal(report.evidenceVerified, false)
+  assert.equal(report.claimable, false)
+})
