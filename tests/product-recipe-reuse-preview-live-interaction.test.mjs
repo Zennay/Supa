@@ -183,6 +183,52 @@ test('same active day with changed current recipe cannot apply a stale alternati
   assert.deepEqual(applied, [['Ma', 'tikka']])
 })
 
+test('external current-recipe change invalidates a still-selectable proposal', () => {
+  const chosen = []
+  const ui = makeHarness({
+    onChooseRecipe(day, recipeId) { chosen.push([day, recipeId]) },
+  })
+  ui.collect(ui.render(), 'button')[0].props.onClick()
+  let tree = ui.render()
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.previousRecipeId, 'tikka')
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'pasta')
+
+  // Another planner control changed the current Ma recipe, but pasta remains a
+  // valid alternative. Valid target alone is not consent for the new baseline.
+  const updated = m2InitialPlan.map((meal) =>
+    meal.day === 'Ma' ? { ...meal, recipeId: 'teriyaki' } : meal)
+  tree = ui.update({ plannedMeals: updated })
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 2)
+  assert.deepEqual(chosen, [])
+
+  ui.collect(tree, 'button')[1].props.onClick() // explicit refresh
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.previousRecipeId, 'teriyaki')
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'pasta')
+  ui.collect(tree, 'button')[1].props.onClick()
+  assert.deepEqual(chosen, [['Ma', 'pasta']])
+})
+
+test('reopening a preview after selecting another day uses the fresh default day', () => {
+  const ui = makeHarness()
+  ui.collect(ui.render(), 'button')[0].props.onClick()
+  let tree = ui.render()
+  ui.collect(tree, 'select')[0].props.onChange({ target: { value: 'Di' } })
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.day, 'Di')
+  ui.collect(tree, 'button')[0].props.onClick() // collapse
+  tree = ui.render()
+  ui.collect(tree, 'button')[0].props.onClick() // fresh session
+  tree = ui.render()
+  assert.equal(ui.collect(tree, 'select')[0].props.value, 'Ma')
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.day, 'Ma')
+})
+
 test('invalid or empty week exposes no fake preview controls', () => {
   const examples = [
     { activeDays: [] },
