@@ -59,11 +59,11 @@ function safeCount(value: unknown): value is number {
  * already-aggregated demand must not be treated as an exact fit. Upstream
  * fractional ingredient aggregation (#1053) remains separately owned.
  */
-export function isTrustworthyShoppingBasket(basket: unknown): basket is OneStoreBasket {
+function validateShoppingBasket(basket: unknown, checkMoney: boolean): basket is OneStoreBasket {
   if (!record(basket) || !record(basket.store) ||
       !identifier(basket.store.id) || !Array.isArray(basket.lines) ||
       basket.lines.length > 10000 ||
-      !safeNonnegativeCents(basket.totalCents) ||
+      (checkMoney && !safeNonnegativeCents(basket.totalCents)) ||
       !safeNonnegativeCents(basket.selectedMealCount) ||
       !safeNonnegativeCents(basket.matchedLineCount) ||
       !safeNonnegativeCents(basket.unresolvedLineCount) ||
@@ -93,8 +93,8 @@ export function isTrustworthyShoppingBasket(basket: unknown): basket is OneStore
     if (value.status !== 'matched' || !identifier(value.productId) ||
         !identifier(value.productName) || !record(value.pack) ||
         !safeCount(value.pack.count) || !safeCount(value.packs) ||
-        !safeNonnegativeCents(value.pricePerPackCents) ||
-        !safeNonnegativeCents(value.lineTotalCents)) return false
+        (checkMoney && (!safeNonnegativeCents(value.pricePerPackCents) ||
+                        !safeNonnegativeCents(value.lineTotalCents)))) return false
 
     const required = quantity(value.requirement.amount, value.requirement.unit)
     const packageQuantity = quantity(value.pack.amount, value.pack.unit)
@@ -105,14 +105,26 @@ export function isTrustworthyShoppingBasket(basket: unknown): basket is OneStore
 
     const minimumPacks = Math.ceil(required.value / effective)
     if (!safeCount(minimumPacks) || minimumPacks !== value.packs ||
-        value.packs * value.pricePerPackCents !== value.lineTotalCents) return false
+        (checkMoney && value.packs * value.pricePerPackCents !== value.lineTotalCents)) return false
 
-    summedCents += value.lineTotalCents
-    if (!Number.isSafeInteger(summedCents)) return false
+    if (checkMoney) {
+      summedCents += value.lineTotalCents
+      if (!Number.isSafeInteger(summedCents)) return false
+    }
     matched++
   }
 
   return matched === basket.matchedLineCount &&
     unresolved === basket.unresolvedLineCount &&
-    summedCents === basket.totalCents
+    (!checkMoney || summedCents === basket.totalCents)
+}
+
+/** A pure physical shopping-task identity never depends on price or cents. */
+export function isPhysicallyTrustworthyShoppingBasket(basket: unknown): basket is OneStoreBasket {
+  return validateShoppingBasket(basket, false)
+}
+
+/** Persisted checkmarks require both physical coverage and coherent money. */
+export function isTrustworthyShoppingBasket(basket: unknown): basket is OneStoreBasket {
+  return validateShoppingBasket(basket, true)
 }
