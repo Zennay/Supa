@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import ts from 'typescript'
 import { previewPlanRecipeSwap } from '../src/domain/planRecipeSwapPreview.ts'
+import { euro } from '../src/lib/money.ts'
 import { m2InitialPlan, m2Products, m2Recipes, m2Store } from '../src/data/m2Fixture.ts'
 
 const require = createRequire(import.meta.url)
@@ -29,6 +30,7 @@ assert.deepEqual(compiled.diagnostics ?? [], [])
 const componentModule = { exports: {} }
 const trustedRequire = (name) => {
   if (name === 'react/jsx-runtime') return require(name)
+  if (name === '../../lib/money') return { euro }
   if (name === './recipeSwapImpactCard.css') return {}
   throw new Error(`Unexpected runtime import from UI component: ${name}`)
 }
@@ -93,4 +95,18 @@ test('preview layout is responsive and has no fake hidden selection controls', (
   assert.match(cssSource, /max-width:\s*100%/)
   assert.match(cssSource, /@media\s*\(max-width:\s*480px\)/)
   assert.doesNotMatch(componentSource, /localStorage|sessionStorage|\.push\(|\.splice\(/)
+})
+
+// A cent-native display must never round a safe integer-cent value via /100.
+test('very large yet safe cent deltas render their exact fractional cents', () => {
+  const preview = previewPlanRecipeSwap(scenario)
+  assert.equal(preview.status, 'ready')
+  const extreme = 9007199254740991
+  const html = render({ ...preview, deltaCents: extreme })
+  assert.match(html, new RegExp(euro.formatCents(extreme).replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&')))
+  assert.match(html, /data-price-state="known"/)
+  assert.doesNotMatch(html, /—/)
+  const negative = render({ ...preview, deltaCents: -extreme })
+  assert.match(negative, /lager/)
+  assert.ok(negative.includes(euro.formatCents(extreme)))
 })
