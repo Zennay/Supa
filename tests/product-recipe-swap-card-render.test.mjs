@@ -103,7 +103,7 @@ test('very large yet safe cent deltas render their exact fractional cents', () =
   assert.equal(preview.status, 'ready')
   const extreme = 9007199254740991
   const html = render({ ...preview, deltaCents: extreme })
-  assert.match(html, new RegExp(euro.formatCents(extreme).replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&')))
+  assert.ok(html.includes(euro.formatCents(extreme)))
   assert.match(html, /data-price-state="known"/)
   assert.doesNotMatch(html, /—/)
   const negative = render({ ...preview, deltaCents: -extreme })
