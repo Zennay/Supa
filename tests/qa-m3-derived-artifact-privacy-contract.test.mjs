@@ -163,3 +163,48 @@ for (const [label, script] of [
     })
   })
 }
+
+test('M3 assessment refuses --output without a destination instead of printing evidence', async () => {
+  await inScratch('report-missing-output', async (root) => {
+    const input = join(root, 'synthetic-study.json')
+    await writeFile(input, JSON.stringify(
+      buildWeeklyBasketStudyFromObservationSheet(syntheticSheet()),
+    ))
+
+    const result = spawnSync(
+      process.execPath,
+      ['--experimental-strip-types', 'scripts/m3-assess-observed-week.mjs', input, '--output'],
+      { cwd: process.cwd(), encoding: 'utf8' },
+    )
+    assert.notEqual(result.status, 0, 'missing --output value must be a usage error')
+    assert.equal(result.stdout, '', 'a malformed output option must never expose a report')
+  })
+})
+
+test('M3 assessment refuses duplicate --output options before writing any report', async () => {
+  await inScratch('report-duplicate-output', async (root) => {
+    const input = join(root, 'synthetic-study.json')
+    const first = join(root, 'first-report.json')
+    const second = join(root, 'second-report.json')
+    await writeFile(input, JSON.stringify(
+      buildWeeklyBasketStudyFromObservationSheet(syntheticSheet()),
+    ))
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        'scripts/m3-assess-observed-week.mjs',
+        input,
+        '--output', first,
+        '--output', second,
+      ],
+      { cwd: process.cwd(), encoding: 'utf8' },
+    )
+    assert.notEqual(result.status, 0, 'duplicate output options must be rejected')
+    assert.equal(result.stdout, '', 'a rejected command must never expose a report')
+    for (const output of [first, second]) {
+      await assert.rejects(stat(output), { code: 'ENOENT' })
+    }
+  })
+})
