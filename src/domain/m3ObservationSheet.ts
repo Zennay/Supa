@@ -529,6 +529,24 @@ function nonBlank(value: string) {
   return value.trim().length > 0
 }
 
+// Collector export readiness must match the canonical JSON converter and the
+// final assessment. Nonblank text by itself cannot prove a valid field date,
+// price context or pseudonymous path-safe identifier.
+const M3_STUDY_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,63}$/
+const M3_WEEK_START_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function validM3WeekStart(value: string): boolean {
+  const match = M3_WEEK_START_PATTERN.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+}
+
 // Keep the collector's export readiness and window guidance in lockstep with
 // the canonical M3 JSON converter, not JavaScript Date.parse's loose fallback.
 // Both require a real calendar day and an explicit, valid ISO UTC offset.
@@ -583,6 +601,21 @@ export function observationSheetReadiness(
 
   for (const [label, value] of studyFields) {
     if (!nonBlank(value)) issues.push(`${label} ontbreekt.`)
+  }
+  if (nonBlank(sheet.study.studyId) && !M3_STUDY_KEY_PATTERN.test(sheet.study.studyId)) {
+    issues.push('Study ID moet een veilige pseudonieme sleutel zijn.')
+  }
+  if (nonBlank(sheet.study.participantKey) &&
+      !M3_STUDY_KEY_PATTERN.test(sheet.study.participantKey)) {
+    issues.push('Participant key moet een veilige pseudonieme sleutel zijn.')
+  }
+  if (nonBlank(sheet.study.weekStart) && !validM3WeekStart(sheet.study.weekStart)) {
+    issues.push('Week start moet een geldige datum in JJJJ-MM-DD zijn.')
+  }
+  if (nonBlank(sheet.study.priceContext) &&
+      sheet.study.priceContext !== 'in-store' &&
+      sheet.study.priceContext !== 'online-order') {
+    issues.push('Prijscontext moet in-store of online-order zijn.')
   }
 
   const observations: Array<[string, M3ObservationSide, StoreObservation]> = [
