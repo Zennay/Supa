@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {\n  assessControlledSourceBasketReadiness,\n  assessM3ControlledPlusDekaBasketReadiness,\n} from '../src/data/controlledSourceBasketReadiness.ts'
+import {
+  assessControlledSourceBasketReadiness,
+  assessM3ControlledPlusDekaBasketReadiness,
+} from '../src/data/controlledSourceBasketReadiness.ts'
 
 // ALL retailer names, prices, captures, provenance hashes and products here
 // are synthetic contract fixtures, NOT real PLUS/DekaMarkt observations.
