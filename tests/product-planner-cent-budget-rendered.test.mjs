@@ -8,6 +8,7 @@ import ts from 'typescript'
 
 import { euro } from '../src/lib/money.ts'
 import { assessPlannerBudgetCents } from '../src/lib/plannerBudgetCents.ts'
+import { RecipeEstimateDisclosure } from '../src/features/planner/RecipeEstimateDisclosure.ts'
 
 // SSR the actual PlannerView, not a reimplementation of its budget label.
 const require = createRequire(import.meta.url)
@@ -28,6 +29,7 @@ const pageModule = { exports: {} }
 const localRequire = (moduleName) => {
   if (moduleName === '../../lib/plannerBudgetCents.ts') return { assessPlannerBudgetCents }
   if (moduleName === '../../lib/money') return { euro }
+  if (moduleName === './RecipeEstimateDisclosure.ts') return { RecipeEstimateDisclosure }
   if (moduleName === 'react/jsx-runtime') return require(moduleName)
   throw new Error(`Unexpected PlannerView dependency: ${moduleName}`)
 }
