@@ -62,3 +62,22 @@
   color: var(--muted, #515f51);
   overflow-wrap: anywhere;
 }
+
+.recipe-reuse-preview-apply {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 44px;
+  padding: .7rem 1rem;
+  font: inherit;
+  border: 1px solid var(--border, #d9dfd7);
+  border-radius: .7rem;
+  background: var(--surface, #fff);
+  color: inherit;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.recipe-reuse-preview-apply:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
