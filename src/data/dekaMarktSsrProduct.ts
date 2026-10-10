@@ -256,10 +256,15 @@ export function parseDekaMarktSsrProductEvidence(
     return { type: 'abstain', reason: 'DekaMarkt Nuxt product/assortment identity mismatch' }
   }
 
-  const selectedPrice =
-    typeof offerPrice === 'number' && Number.isFinite(offerPrice) && offerPrice > 0
-      ? offerPrice
-      : normalPrice
+  if (
+    typeof offerPrice !== 'number' ||
+    !Number.isFinite(offerPrice) ||
+    offerPrice < 0
+  ) {
+    return { type: 'abstain', reason: 'DekaMarkt Nuxt offer price is malformed' }
+  }
+
+  const selectedPrice = offerPrice > 0 ? offerPrice : normalPrice
   const currentPriceCents =
     typeof selectedPrice === 'number'
       ? normalizeMoneyToCents(String(selectedPrice))
