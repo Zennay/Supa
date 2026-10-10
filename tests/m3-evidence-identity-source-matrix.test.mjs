@@ -334,47 +334,58 @@ test('M3 report rejects misleading financial certainty across incomplete source 
   assert.equal(cases, 18)
 })
 
+
+function syntheticCollectedSheet({
+  priceContext = 'in-store',
+  baselineSource = 'manual-cart',
+  candidateSource = 'manual-cart',
+} = {}) {
+  const sheet = buildObservationSheet()
+  sheet.study.studyId = 'synthetic-converter-matrix-001'
+  sheet.study.participantKey = 'synthetic-student-qa-001'
+  sheet.study.population = 'Synthetic student test population'
+  sheet.study.region = 'Synthetic test region'
+  sheet.study.weekStart = '2026-10-05'
+  sheet.study.priceContext = priceContext
+
+  for (const [side, source, time, priceOffset] of [
+    ['baseline', baselineSource, '2026-10-05T11:00:00Z', 50],
+    ['candidate', candidateSource, '2026-10-05T12:00:00Z', 0],
+  ]) {
+    const observation = sheet[side]
+    observation.evidenceId = `synthetic-${side}-evidence-001`
+    observation.observedAt = time
+    observation.source = source
+    observation.provenanceNote = 'Controlled synthetic contract test, no live measurement.'
+    observation.store.id = `${side}-synthetic-store`
+    observation.store.name = side === 'baseline'
+      ? 'PLUS synthetic QA only'
+      : 'DekaMarkt synthetic QA only'
+    observation.lines.forEach((line, index) => {
+      const requirement = sheet.requirements[index]
+      line.observedProduct = {
+        productId: `${side}-synthetic-${requirement.id}`,
+        productName: requirement.query,
+        packAmount: requirement.amount,
+        packUnit: requirement.unit,
+        packCount: 1,
+        priceCents: 150 + index + priceOffset,
+        available: true,
+        sourceUrl: '',
+        note: 'Synthetic values: not field observations.',
+      }
+    })
+  }
+
+  return sheet
+}
+
 test('M3 observation sheet to study to report retains all permitted source combinations', () => {
   let cases = 0
   for (const priceContext of ['in-store', 'online-order']) {
     for (const baselineSource of ['manual-cart', 'receipt', 'consented-export']) {
       for (const candidateSource of ['manual-cart', 'receipt', 'consented-export']) {
-        const sheet = buildObservationSheet()
-        sheet.study.studyId = 'synthetic-converter-matrix-001'
-        sheet.study.participantKey = 'synthetic-student-qa-001'
-        sheet.study.population = 'Synthetic student test population'
-        sheet.study.region = 'Synthetic test region'
-        sheet.study.weekStart = '2026-10-05'
-        sheet.study.priceContext = priceContext
-
-        for (const [side, source, time, priceOffset] of [
-          ['baseline', baselineSource, '2026-10-05T11:00:00Z', 50],
-          ['candidate', candidateSource, '2026-10-05T12:00:00Z', 0],
-        ]) {
-          const observation = sheet[side]
-          observation.evidenceId = `synthetic-${side}-evidence-001`
-          observation.observedAt = time
-          observation.source = source
-          observation.provenanceNote = 'Controlled synthetic contract test, no live measurement.'
-          observation.store.id = `${side}-synthetic-store`
-          observation.store.name = side === 'baseline'
-            ? 'PLUS synthetic QA only'
-            : 'DekaMarkt synthetic QA only'
-          observation.lines.forEach((line, index) => {
-            const requirement = sheet.requirements[index]
-            line.observedProduct = {
-              productId: `${side}-synthetic-${requirement.id}`,
-              productName: requirement.query,
-              packAmount: requirement.amount,
-              packUnit: requirement.unit,
-              packCount: 1,
-              priceCents: 150 + index + priceOffset,
-              available: true,
-              sourceUrl: '',
-              note: 'Synthetic values: not field observations.',
-            }
-          })
-        }
+        const sheet = syntheticCollectedSheet({ priceContext, baselineSource, candidateSource })
         const snapshot = structuredClone(sheet)
         const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
         const report = buildObservedWeekReport(study)
@@ -395,4 +406,41 @@ test('M3 observation sheet to study to report retains all permitted source combi
     }
   }
   assert.equal(cases, 18)
+})
+
+test('M3 sheet-to-report evidence gaps remain non-claimable across source pairings', () => {
+  const gaps = [
+    ['unavailable', (product) => { product.available = false }],
+    ['unknown price', (product) => { product.priceCents = null }],
+    ['missing product identity', (product) => { product.productName = '' }],
+  ]
+  let cases = 0
+  for (const priceContext of ['in-store', 'online-order']) {
+    for (const baselineSource of ['manual-cart', 'receipt', 'consented-export']) {
+      for (const candidateSource of ['manual-cart', 'receipt', 'consented-export']) {
+        for (const [description, invalidate] of gaps) {
+          const sheet = syntheticCollectedSheet({ priceContext, baselineSource, candidateSource })
+          invalidate(sheet.candidate.lines[0].observedProduct)
+          const before = structuredClone(sheet)
+          const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+          const report = buildObservedWeekReport(study)
+
+          assert.equal(study.candidate.basket.unresolvedLineCount, 1, description)
+          assert.equal(report.claimable, false, description)
+          assert.equal(report.outcome, 'unknown', description)
+          assert.equal(report.deltaCents, null, description)
+          assert.equal(report.savingsCents, null, description)
+          assert.equal(report.publicSavingsClaimEligible, false, description)
+          assert.equal(report.baseline.source, baselineSource)
+          assert.equal(report.candidate.source, candidateSource)
+          assert.equal(report.priceContext, priceContext)
+          assert.match(report.reasons.join(' '), /unresolved ingredients/)
+          assert.ok(!JSON.stringify(report).includes(sheet.study.participantKey))
+          assert.deepEqual(sheet, before, 'invalid evidence must never be mutated')
+          cases++
+        }
+      }
+    }
+  }
+  assert.equal(cases, 54)
 })
