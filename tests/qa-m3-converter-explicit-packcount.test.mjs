@@ -151,3 +151,28 @@ test('M3 JSON CLI cannot turn an absent pack count into a claimable observed-wee
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+
+test('M3 evidence gate rejects omitted/null pack count on either retailer side, irrespective of comparison direction', () => {
+  for (const side of ['baseline', 'candidate']) {
+    for (const omission of ['null', 'missing']) {
+      const sheet = completeSyntheticSheet()
+      const observed = sheet[side].lines.at(-1).observedProduct
+      if (omission === 'null') observed.packCount = null
+      else delete observed.packCount
+      const original = structuredClone(sheet)
+      const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+      const report = assessWeeklyBasketStudy(study)
+      const lastLine = study[side].basket.lines.at(-1)
+
+      assert.equal(lastLine.status, 'unresolved', side + ':' + omission)
+      assert.equal(study[side].basket.unresolvedLineCount, 1)
+      assert.equal(report.claimable, false, side + ':' + omission)
+      assert.equal(report.comparison.outcome, 'unknown')
+      assert.equal(report.comparison.deltaCents, null)
+      assert.equal(report.comparison.savingsCents, null)
+      assert.deepEqual(report.comparison.lineDeltas, [])
+      assert.deepEqual(sheet, original)
+    }
+  }
+})
