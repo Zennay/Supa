@@ -4,7 +4,7 @@ export type StatPillPresentation = {
   accessibleLabel: string
 }
 
-const INVISIBLE_FORMAT_CHARACTERS = /\p{Cf}/gu
+const INVISIBLE_FORMAT_CHARACTERS = /[\p{Cf}\u180E]/gu
 
 function normalizedText(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback
