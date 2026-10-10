@@ -144,7 +144,11 @@ export function RecipeReusePreviewPanel({
                 onClick={() => {
                   setRequestedDay(null)
                   setRequestedRecipe(null)
-                  setConfirmedSource({ day, recipeId: currentMeal.recipeId })
+                  const freshDay = days[0]
+                  setConfirmedSource({
+                    day: freshDay,
+                    recipeId: plannedMeals.find((meal) => meal?.day === freshDay)?.recipeId ?? '',
+                  })
                 }}
               >
                 Werk voorbeeld bij
