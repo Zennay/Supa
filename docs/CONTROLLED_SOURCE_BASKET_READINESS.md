@@ -21,6 +21,12 @@ The generic `assessControlledSourceBasketReadiness` remains reusable for any two
 
 The new tests use entirely **synthetic** retailer-shaped records, including `6 x 500 g`, missing ingredient coverage, malformed sources, 24h boundary/offset equivalence, empty weeks, duplicate active days, hostile accessors and swapped caller-provided retailer labels. A second integration test uses the actual four-meal M2 **demand** with 11 synthetic source observations on **each** store side and exhaustively rejects removing any single source item; it never supplies M2 fixture prices to the bridge.
 
+## Two distinct time checks (proposed precision correction)
+
+The reference clock is a **freshness cutoff** only. Every retailer observation must be no later than the explicitly supplied reference instant and no older than 24 elapsed hours. The separate `captureWindowHours` field means **latest observed retailer capture minus earliest observed retailer capture**, across both catalogs; it must not include the reference clock as though a shop was observed at that instant. Two stores captured together 23 hours before the reference therefore yield `0` capture-window hours, not `23`. An actual one-hour capture separation yields `1`, while a genuinely empty catalog pair fails closed. Timezone-equivalent timestamps compare as the same instant.
+
+These are synthetic contract assertions for an isolated source-ownership handoff. They do **not** change permission, legal reuse, human field collection, conversion or savings-claim eligibility. The upstream source owner must review this correction before any safe branch integration.
+
 ## Explicit non-goals / release gate
 
 - It does **not** fix count loss in original ingestion/adapters (owners #117 and #122 / issue #168), check licensing or authorize automated use of PLUS/DekaMarkt data.
