@@ -111,6 +111,13 @@ test('the actual ObservationView renders one task-first accessible guide on a fr
   assert.match(html, /Geef deze meting een code/)
   assert.match(html, /Kies een herkenbare code/)
   assert.match(html, /Meten zonder gokken/)
+  assert.match(html, /Echte winkelprijzen verzamelen/)
+  assert.match(html, /Controle voor bewaren/)
+  assert.match(html, /Gegevens van deze meting/)
+  assert.match(html, /Anonieme deelnemerscode/)
+  assert.doesNotMatch(html, />Preflight<|>Study ID<|>Pseudonieme participant key</)
+  assert.doesNotMatch(html, />Klaar voor de M3-converter</)
+
   assert.doesNotMatch(html, /class="ghost-button observation-next-button"/, 'no jump past study metadata')
   assert.match(html, /Nog .* controle/)
   assert.deepEqual(sheet, before, 'render never mutates input evidence')
@@ -123,7 +130,7 @@ test('a completed actual observation form still calls draft export a review step
   assert.equal((html.match(/class="observation-next-action"/g) || []).length, 1)
   assert.match(html, /Bewaar de ingevulde winkelmetingen/)
   assert.match(html, /nog geen besparing/)
-  assert.match(html, /Pas de bestaande converter en assessment/)
+  assert.match(html, /Een aparte controle/)
   assert.doesNotMatch(
     html.match(/class="observation-next-action"[\s\S]*?<\/div>/)?.[0] ?? '',
     /besparing bewezen|100%|klaar voor publicatie/i,
