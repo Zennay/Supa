@@ -270,6 +270,7 @@ test('changing ingredients behind the same recipe identity revokes a visible pro
   pasta.ingredients[0].query = 'nieuw ingredient'
   tree = ui.update({ recipes: changed })
   assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.match(JSON.stringify(tree), /planning is veranderd of receptgegevens zijn bijgewerkt/)
   assert.equal(ui.collect(tree, 'button').length, 2, 'cannot apply before a refreshed explanation')
   assert.deepEqual(chosen, [])
 
