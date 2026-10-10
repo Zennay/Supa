@@ -1,0 +1,175 @@
+import { lstatSync, readFileSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
+import { buildBlankM3FieldChecklistCsv } from './m3-export-blank-field-checklist.mjs'
+
+const LIMIT_BYTES = 128 * 1024
+const IMMUTABLE = Object.freeze([0, 1, 2, 3, 4, 5, 6, 18])
+const FIELDS = Object.freeze([
+  'retailer_role', 'retailer', 'ingredient_id', 'ingredient_label',
+  'search_query', 'required_amount', 'required_unit', 'observed_at',
+  'price_context', 'product_name', 'pack_amount', 'pack_unit',
+  'pack_count', 'price_cents', 'available', 'source', 'source_url',
+  'note', 'evidence_status',
+])
+
+// Strict single-line RFC4180 subset. The canonical exporter never writes
+// multiline cells: reject them instead of quietly changing evidence rows.
+export function parseM3FieldCsv(input) {
+  if (typeof input !== 'string' || Buffer.byteLength(input, 'utf8') > LIMIT_BYTES ||
+      /[\u0000-\u0009\u000b-\u001f\u007f]/.test(input)) {
+    throw new Error('M3 field CSV structure invalid')
+  }
+  const content = input.startsWith('\ufeff') ? input.slice(1) : input
+  const rows = []
+  let row = [], cell = '', quoted = false, closed = false, atStart = true
+  function field() {
+    row.push(cell)
+    cell = ''
+    closed = false
+    atStart = true
+  }
+  function record() {
+    field()
+    rows.push(row)
+    row = []
+  }
+  for (let i = 0; i < content.length; i++) {
+    const c = content[i]
+    if (quoted) {
+      if (c === '"') {
+        if (content[i + 1] === '"') { cell += '"'; i++ }
+        else { quoted = false; closed = true }
+      } else {
+        if (c === '\r' || c === '\n') throw new Error('M3 field CSV structure invalid')
+        cell += c
+      }
+      continue
+    }
+    if (c === ',') { field(); continue }
+    if (c === '\n' || c === '\r') {
+      if (c === '\r') {
+        if (content[i + 1] !== '\n') throw new Error('M3 field CSV structure invalid')
+        i++
+      }
+      record()
+      continue
+    }
+    if (closed) throw new Error('M3 field CSV structure invalid')
+    if (c === '"' && atStart) { quoted = true; atStart = false; continue }
+    if (c === '"') throw new Error('M3 field CSV structure invalid')
+    cell += c
+    atStart = false
+  }
+  if (quoted) throw new Error('M3 field CSV structure invalid')
+  if (row.length || cell || closed || !atStart) record()
+  return rows
+}
+
+const isoInstant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/
+const whole = /^(?:0|[1-9]\d*)$/
+const positiveDecimal = /^(?:(?:0|[1-9]\d*)(?:\.\d+)?|\.\d+)$/
+const safeText = value => !/^[\s]*[=+@-]/.test(value)
+
+function validObservationTime(value) {
+  if (!isoInstant.test(value)) return null
+  const millis = Date.parse(value)
+  if (!Number.isFinite(millis)) return null
+  // An over-precise timestamp is never silently truncated to milliseconds.
+  const match = value.match(/\.([0-9]+)(?:Z|[+-])/)
+  if (match && match[1].length > 3) return null
+  return millis
+}
+
+export function reviewM3FieldCsv(input) {
+  const rows = parseM3FieldCsv(input)
+  const expected = parseM3FieldCsv(buildBlankM3FieldChecklistCsv())
+  if (rows.length !== expected.length || rows.length !== 23 ||
+      rows.some(row => row.length !== FIELDS.length) ||
+      FIELDS.some((field, index) => rows[0][index] !== field)) {
+    throw new Error('M3 field CSV structure invalid')
+  }
+
+  const warnings = new Set()
+  let completeRows = 0
+  const timestamps = []
+  const contexts = new Set()
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]
+    for (const column of IMMUTABLE) {
+      if (row[column] !== expected[i][column]) {
+        throw new Error('M3 field CSV structure invalid')
+      }
+    }
+    const [observedAt, context, product, packAmount, packUnit, packCount,
+      priceCents, available, source, sourceUrl, note] = row.slice(7, 18)
+    if ([observedAt, context, product, packAmount, packUnit, packCount,
+      priceCents, available, source, sourceUrl, note].some(value => !safeText(value))) {
+      warnings.add('unsafe-observation-cell')
+    }
+    if (context) contexts.add(context)
+    if (sourceUrl && !/^https:\/\/[^\s/@]+(?:\/|$)/i.test(sourceUrl)) {
+      warnings.add('invalid-source-url')
+    }
+    const timestamp = observedAt ? validObservationTime(observedAt) : null
+    if (observedAt && timestamp === null) warnings.add('invalid-timestamp')
+    if (timestamp !== null) timestamps.push(timestamp)
+
+    const state = available.toLowerCase()
+    if (state && !['ja', 'nee', 'yes', 'no', 'true', 'false'].includes(state)) {
+      warnings.add('invalid-availability')
+    }
+    const yes = ['ja', 'yes', 'true'].includes(state)
+    const no = ['nee', 'no', 'false'].includes(state)
+    const required = Boolean(observedAt && context && source && (yes || no))
+    const coherent = no
+      ? !product && !packAmount && !packUnit && !packCount && !priceCents
+      : yes && Boolean(product && packAmount && packUnit && packCount && priceCents) &&
+        positiveDecimal.test(packAmount) && Number(packAmount) > 0 &&
+        ['g', 'kg', 'ml', 'l', 'piece'].includes(packUnit) &&
+        whole.test(packCount) && Number(packCount) > 0 &&
+        whole.test(priceCents) && Number.isSafeInteger(Number(priceCents))
+    if ((yes || no) && !coherent) warnings.add('inconsistent-product-fields')
+    if (required && coherent && timestamp !== null) completeRows++
+  }
+  if (contexts.size > 1) warnings.add('mixed-price-context')
+  if (timestamps.length > 1 &&
+      Math.max(...timestamps) - Math.min(...timestamps) > 24 * 60 * 60 * 1000) {
+    warnings.add('capture-window-over-24-hours')
+  }
+  if (completeRows < 22) warnings.add('missing-or-incomplete-observations')
+  return {
+    status: completeRows === 22 && warnings.size === 0
+      ? 'requires-canonical-human-verification'
+      : 'incomplete-or-needs-review',
+    expectedRows: 22,
+    completeRows,
+    // No participant, product, URL, store note, observation, or price is returned.
+    warnings: [...warnings].sort(),
+    evidenceVerified: false,
+    releaseEligible: false,
+    claimable: false,
+    savingsCents: null,
+  }
+}
+
+export function main(argv = process.argv.slice(2)) {
+  if (argv.length !== 1 || !argv[0] || argv[0].startsWith('-')) {
+    throw new Error('M3 field CSV review failed')
+  }
+  const stat = lstatSync(argv[0])
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > LIMIT_BYTES) {
+    throw new Error('M3 field CSV review failed')
+  }
+  const result = reviewM3FieldCsv(readFileSync(argv[0], 'utf8'))
+  process.stdout.write(JSON.stringify(result) + '\n')
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main()
+  } catch {
+    // Never echo raw study observations, CSV cells, filenames or stack traces.
+    console.error('M3 field CSV review failed; check the canonical template and local file')
+    process.exitCode = 1
+  }
+}
