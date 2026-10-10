@@ -97,6 +97,8 @@ function consistentLineTrace(
     return false
   }
 
+  if (!baseline.lines.every(record) || !candidate.lines.every(record)) return false
+
   const baselineLines = baseline.lines.filter((line) => line.status === 'matched')
   const candidateLines = candidate.lines.filter((line) => line.status === 'matched')
   const before = new Map(baselineLines.map((line) => [line.id, line] as const))
