@@ -85,7 +85,7 @@ function validSourceUrl(value) {
   }
 }
 
-function validObservationTime(value) {
+function validObservationTime(value, referenceNowMs) {
   if (!isoInstant.test(value)) return null
   // Date.parse can silently normalize 30 February into March. Calendar and
   // explicit offset validation must precede any freshness arithmetic.
@@ -103,14 +103,17 @@ function validObservationTime(value) {
     if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) return null
   }
   const millis = Date.parse(value)
-  if (!Number.isFinite(millis)) return null
+  // Future timestamps are not genuine observed field captures. Compare
+  // parsed instants, not clock labels, to respect explicit timezone offsets.
+  if (!Number.isFinite(millis) || millis > referenceNowMs) return null
   // An over-precise timestamp is never silently truncated to milliseconds.
   const match = value.match(/\.([0-9]+)(?:Z|[+-])/)
   if (match && match[1].length > 3) return null
   return millis
 }
 
-export function reviewM3FieldCsv(input, { validateUnits = false } = {}) {
+export function reviewM3FieldCsv(input, { validateUnits = false, referenceNowMs = Date.now() } = {}) {
+  if (!Number.isFinite(referenceNowMs)) throw new Error('M3 field CSV structure invalid')
   const rows = parseM3FieldCsv(input)
   const expected = parseM3FieldCsv(buildBlankM3FieldChecklistCsv())
   if (rows.length !== expected.length || rows.length !== 23 ||
@@ -142,7 +145,7 @@ export function reviewM3FieldCsv(input, { validateUnits = false } = {}) {
     if (sourceUrl && !validSourceUrl(sourceUrl)) {
       warnings.add('invalid-source-url')
     }
-    const timestamp = observedAt ? validObservationTime(observedAt) : null
+    const timestamp = observedAt ? validObservationTime(observedAt, referenceNowMs) : null
     if (observedAt && timestamp === null) warnings.add('invalid-timestamp')
     if (timestamp !== null) timestamps.push(timestamp)
 
