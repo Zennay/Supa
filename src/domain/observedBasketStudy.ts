@@ -185,7 +185,7 @@ export function assessWeeklyBasketStudy(
   if (!validOptionsContainer) {
     reasons.push('assessment options must be a non-array object')
   } else if (!validOptionsDescriptor) {
-    reasons.push('assessment window option must be an own data property')
+    reasons.push('assessment options require an own data-backed window property')
   } else if (!validMaxObservationWindowHours) {
     reasons.push('maxObservationWindowHours must be a positive finite number')
   }
