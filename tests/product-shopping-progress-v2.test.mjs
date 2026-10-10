@@ -14,6 +14,7 @@ import {
   serializeShoppingProgressV2,
   shoppingListProgressV2StorageKey,
   toggleShoppingProgressV2,
+  upgradeLegacyShoppingProgressV1,
 } from '../src/features/shopping-list/shoppingListProgressV2.ts'
 import { serializeShoppingListProgress } from '../src/features/shopping-list/shoppingListProgress.ts'
 
@@ -189,4 +190,55 @@ test('reordered rows keep their checks and toggling a valid id retains stable or
   assert.deepEqual(toggleShoppingProgressV2(reordered, [id], reordered.lines[0].id),
     id === reordered.lines[0].id ? [] : [id, reordered.lines[0].id],
   )
+})
+
+test('explicit legacy upgrade preserves current valid v1 ticks without accepting obsolete prices', () => {
+  const before = basket()
+  const id = before.lines[0].id
+  const v1 = serializeShoppingListProgress(before, [id, id, 'stale-id'])
+  const upgraded = upgradeLegacyShoppingProgressV1(before, v1)
+  assert.ok(upgraded)
+  assert.equal(JSON.parse(upgraded).schemaVersion, 2)
+  assert.deepEqual(restoreShoppingProgressV2(before, upgraded), [id])
+
+  const reprice = repricedBasket(before)
+  assert.notEqual(before.totalCents, reprice.totalCents)
+  assert.equal(upgradeLegacyShoppingProgressV1(reprice, v1), null)
+  assert.deepEqual(restoreShoppingProgressV2(reprice, upgraded), [id])
+})
+
+test('explicit legacy upgrade fails closed on stale store, malformed JSON or invalid schema', () => {
+  const before = basket()
+  const stored = serializeShoppingListProgress(before, [before.lines[0].id])
+  const differentStore = structuredClone(before)
+  differentStore.store.id = 'other'
+  assert.equal(upgradeLegacyShoppingProgressV1(differentStore, stored), null)
+  const staleLines = structuredClone(before)
+  staleLines.lines.pop()
+  assert.equal(upgradeLegacyShoppingProgressV1(staleLines, stored), null)
+  for (const raw of [null, '', 'bad-json', '[]', '{}', 'null']) {
+    assert.equal(upgradeLegacyShoppingProgressV1(before, raw), null)
+  }
+
+  const fake = JSON.parse(stored)
+  fake.schemaVersion = 2
+  assert.equal(upgradeLegacyShoppingProgressV1(before, JSON.stringify(fake)), null)
+  fake.schemaVersion = 1
+  fake.basketKey = 'stale'
+  assert.equal(upgradeLegacyShoppingProgressV1(before, JSON.stringify(fake)), null)
+  fake.basketKey = JSON.parse(stored).basketKey
+  fake.doneLineIds = 'bad'
+  assert.equal(upgradeLegacyShoppingProgressV1(before, JSON.stringify(fake)), null)
+})
+
+test('legacy upgrade requires a valid current runtime basket', () => {
+  const before = basket()
+  const stored = serializeShoppingListProgress(before, [before.lines[0].id])
+  for (const malformed of [
+    { ...before, store: null },
+    { ...before, lines: null },
+    { ...before, lines: [null] },
+  ]) {
+    assert.equal(upgradeLegacyShoppingProgressV1(malformed, stored), null)
+  }
 })
