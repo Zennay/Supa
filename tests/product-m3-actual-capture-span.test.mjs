@@ -104,3 +104,22 @@ test('empty source catalogs never manufacture a comparable captured-hour span', 
     ...plus, baselineObservations: [], candidateObservations: [],
   }), null)
 })
+
+test('span uses the oldest and newest product captures across BOTH multi-row catalogs', () => {
+  const observations = input('2026-10-09T20:00:00Z', '2026-10-10T11:00:00Z')
+  observations.baselineObservations.push({
+    ...row('plus', '2026-10-09T12:00:00Z'),
+    sourceProductId: 'second-fixture-product',
+    name: 'Basmati rijst tweede verpakking',
+  })
+  observations.candidateObservations.push({
+    ...row('dekamarkt', '2026-10-10T10:00:00Z'),
+    sourceProductId: 'second-fixture-product',
+    name: 'Basmati rijst tweede verpakking',
+  })
+  const output = projectFreshControlledComparisonCatalogs(observations)
+  assert.ok(output)
+  assert.equal(output.baseline.length, 2)
+  assert.equal(output.candidate.length, 2)
+  assert.equal(output.captureWindowHours, 23)
+})
