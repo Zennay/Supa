@@ -132,3 +132,16 @@ test('operator CLI distinguishes empty (2), accepted (0), and corrupted (1) with
     assert.doesNotMatch(rejected.stdout, /secret payload|unexpected-private|https:\/\//)
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
+
+test('bounded root enumeration fails closed on an unexpected file flood', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-inventory-root-limit-'))
+  try {
+    await Promise.all(Array.from({ length: 101 }, (_, index) =>
+      writeFile(join(dir, `unregistered-${index}`), 'synthetic')))
+    const report = await inventoryResearchSnapshots({ outputDir: dir, nowMs })
+    assert.equal(report.status, 'rejected')
+    assert.equal(report.totals.manualReview, 0)
+    assert.equal(report.totals.unexpected, 101)
+    assert.equal(report.publicSavingsClaimEligible, false)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
