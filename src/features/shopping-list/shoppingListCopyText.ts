@@ -93,10 +93,10 @@ export function buildShoppingListCopyText(
 
     // Reject stale demand with too few physical packs, without pricing anything.
     const required = baseQuantity(requirement.amount, requirement.unit)
-    const perPack = baseQuantity(line.pack.amount, line.pack.unit)
-    const available = perPack === null ? 0 :
-      perPack.amount * line.pack.count * line.packs
-    if (!required || !perPack || required.family !== perPack.family ||
+    const perPackQuantity = baseQuantity(line.pack.amount, line.pack.unit)
+    const available = perPackQuantity === null ? 0 :
+      perPackQuantity.amount * line.pack.count * line.packs
+    if (!required || !perPackQuantity || required.family !== perPackQuantity.family ||
         !safePositive(available) || required.amount > available) return null
 
     matchedCount += 1
