@@ -14,6 +14,7 @@ import {
 } from './shoppingListTrustedProgressV2.ts'
 import { shoppingListProgressStorageKey } from './shoppingListProgress'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner.tsx'
+import { ShoppingListCopyButton } from './ShoppingListCopyButton.tsx'
 
 function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
   if (line.status === 'unresolved') {
@@ -161,6 +162,10 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       {/* Completion follows the *current* trusted basket-scoped checked IDs.
           An unresolved match is never represented as a finished purchase. */}
       <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
+
+      {/* Export is scoped to the SAME current trusted v2 checkmarks; no stale
+          progress or copied retailer-price/savings claim is permitted. */}
+      <ShoppingListCopyButton basket={basket} doneLineIds={done} />
     </section>
   )
 }

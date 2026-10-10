@@ -118,6 +118,9 @@ function makeHarness(initialBasket, localStorage) {
     },
     './shoppingListProgress': { shoppingListProgressStorageKey },
     './ShoppingListCompletionBanner.tsx': { ShoppingListCompletionBanner: bannerModule.exports.ShoppingListCompletionBanner },
+    // This harness isolates actual trusted progress and completion handling.
+    // The copy interaction is exercised separately against its real JSX.
+    './ShoppingListCopyButton.tsx': { ShoppingListCopyButton: () => null },
   }
   const module = { exports: {} }
   new Function('module', 'exports', 'require', compiled.outputText)(
