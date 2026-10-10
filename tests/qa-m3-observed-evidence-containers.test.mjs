@@ -114,3 +114,38 @@ for (const [caseName, alter] of [
     expectUnclaimable(value, caseName)
   })
 }
+
+for (const [caseName, alter] of [
+  ['null baseline basket', (study) => { study.baseline.basket = null }],
+  ['missing candidate basket', (study) => { delete study.candidate.basket }],
+  ['numeric baseline basket', (study) => { study.baseline.basket = 17 }],
+  ['array candidate basket', (study) => { study.candidate.basket = [] }],
+  ['null baseline store', (study) => { study.baseline.basket.store = null }],
+  ['missing candidate store', (study) => { delete study.candidate.basket.store }],
+  ['array baseline store', (study) => { study.baseline.basket.store = [] }],
+  ['numeric candidate store', (study) => { study.candidate.basket.store = 6 }],
+]) {
+  test(`QA M3 observed-study rejects ${caseName} without throwing`, () => {
+    const value = validStudy()
+    alter(value)
+    expectUnclaimable(value, caseName)
+  })
+}
+
+// A malformed side must not be rescued by well-formed evidence on the other
+// side, nor by apparently valid same-window timestamps.
+test('QA M3 invalid candidate basket cannot yield a financial comparison despite valid timestamps', () => {
+  const value = validStudy()
+  value.candidate.basket = undefined
+  const before = structuredClone(value)
+  let result
+  assert.doesNotThrow(() => {
+    result = assessWeeklyBasketStudy(value)
+  })
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.equal(result.comparison.deltaCents, null)
+  assert.equal(result.comparison.savingsCents, null)
+  assert.deepEqual(result.comparison.lineDeltas, [])
+  assert.deepEqual(value, before)
+})
