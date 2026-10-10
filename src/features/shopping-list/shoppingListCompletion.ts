@@ -26,6 +26,36 @@ function reviewMessage(count: number): string {
     : `${count} productkeuzes vragen nog jouw controle.`
 }
 
+type PhysicalFamily = 'mass' | 'volume' | 'piece'
+
+/**
+ * Mirror the basket builder's base-unit conversion and pack arithmetic.
+ * Treat incomparable units, overflow and stale pack counts as untrusted.
+ */
+function baseQuantity(
+  amount: number,
+  unit: string,
+): { amount: number; family: PhysicalFamily } | null {
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  let scaled: number
+  let family: PhysicalFamily
+  if (unit === 'g' || unit === 'kg') {
+    family = 'mass'
+    scaled = unit === 'kg' ? amount * 1000 : amount
+  } else if (unit === 'ml' || unit === 'l') {
+    family = 'volume'
+    scaled = unit === 'l' ? amount * 1000 : amount
+  } else if (unit === 'piece') {
+    family = 'piece'
+    scaled = amount
+  } else {
+    return null
+  }
+
+  return Number.isFinite(scaled) && scaled > 0 ? { amount: scaled, family } : null
+}
+
 /**
  * Derive shopping progress exclusively from the current basket and current
  * checked IDs. Checking an unresolved row is not proof of a product match.
@@ -44,6 +74,8 @@ export function shoppingListCompletion(
 
   const { lines } = basket
   if (
+    !Number.isSafeInteger(basket.totalCents) ||
+    basket.totalCents < 0 ||
     !Number.isSafeInteger(basket.selectedMealCount) ||
     basket.selectedMealCount < 0 ||
     !Number.isSafeInteger(basket.matchedLineCount) ||
@@ -59,6 +91,7 @@ export function shoppingListCompletion(
   const ids = new Set<string>()
   let matched = 0
   let unresolved = 0
+  let verifiedTotalCents = 0
 
   for (const line of lines) {
     if (
@@ -100,10 +133,33 @@ export function shoppingListCompletion(
     ) {
       return { ...invalid }
     }
+    // Exact physical coverage: a valid integer pack count must be the
+    // same minimum quantity the canonical basket builder would purchase.
+    const required = baseQuantity(line.requirement.amount, line.requirement.unit)
+    const effectivePackAmount = line.pack.amount * line.pack.count
+    const supplied = baseQuantity(effectivePackAmount, line.pack.unit)
+    if (
+      !required ||
+      !supplied ||
+      required.family !== supplied.family ||
+      !Number.isSafeInteger(Math.ceil(required.amount / supplied.amount)) ||
+      Math.ceil(required.amount / supplied.amount) !== line.packs
+    ) {
+      return { ...invalid }
+    }
+
+    // A row can have consistent line arithmetic while the basket total is
+    // stale. Reconcile against all matched lines, not only checked rows.
+    verifiedTotalCents += line.lineTotalCents
+    if (!Number.isSafeInteger(verifiedTotalCents)) return { ...invalid }
     matched += 1
   }
 
-  if (matched !== basket.matchedLineCount || unresolved !== basket.unresolvedLineCount) {
+  if (
+    matched !== basket.matchedLineCount ||
+    unresolved !== basket.unresolvedLineCount ||
+    verifiedTotalCents !== basket.totalCents
+  ) {
     return { ...invalid }
   }
 
