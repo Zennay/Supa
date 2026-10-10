@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { euro } from '../src/lib/money.ts'
-import { basketComparisonHeadline } from '../src/features/basket/basketPresentation.ts'
+import { basketComparisonCanShowMoney, basketComparisonHeadline } from '../src/features/basket/basketPresentation.ts'
 
 const baseline = {
   claimable: true,
@@ -19,6 +19,7 @@ const candidate = { store: { id: 'store-b', name: 'DekaMarkt' } }
 const neutral = 'Nog geen betrouwbare vergelijking'
 
 test('product comparison headline displays only validated exact signed cent differences', () => {
+  assert.equal(basketComparisonCanShowMoney(baseline, candidate), true)
   assert.equal(
     basketComparisonHeadline(baseline, candidate),
     `DekaMarkt ligt ${euro.formatCents(250)} lager`,
@@ -80,6 +81,7 @@ test('financial headline abstains on missing, coerced, unsafe or contradictory c
     { reasons: ['stale comparison'] },
   ]
   for (const mutation of invalid) {
+    assert.equal(basketComparisonCanShowMoney({ ...baseline, ...mutation }, candidate), false)
     assert.equal(
       basketComparisonHeadline({ ...baseline, ...mutation }, candidate),
       neutral,
@@ -88,6 +90,7 @@ test('financial headline abstains on missing, coerced, unsafe or contradictory c
   }
 
   for (const unusable of [null, {}, { store: null }, { store: { name: '' } }]) {
+    assert.equal(basketComparisonCanShowMoney(baseline, unusable), false)
     assert.equal(basketComparisonHeadline(baseline, unusable), neutral)
   }
   assert.equal(basketComparisonHeadline(null, candidate), neutral)
