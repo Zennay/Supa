@@ -413,22 +413,23 @@ export function restoreObservationSheetDraft(
 export function observationLineCollectionComplete(
   line: StoreObservation['lines'][number],
 ) {
+  // Runtime JSON and partially restored drafts are not guaranteed to obey TS
+  // types. Invalid observations must remain incomplete, not crash rendering.
+  if (!isRecord(line) || !isRecord(line.observedProduct)) return false
   const product = line.observedProduct
   if (typeof product.available !== 'boolean') return false
   if (!product.available) return true
 
   return (
     nonBlank(product.productName) &&
-    product.packAmount !== null &&
+    typeof product.packAmount === 'number' &&
     Number.isFinite(product.packAmount) &&
     product.packAmount > 0 &&
-    product.packUnit !== null &&
-    ALLOWED_OBSERVED_PACK_UNITS.has(product.packUnit) &&
+    ALLOWED_OBSERVED_PACK_UNITS.has(product.packUnit as MatchUnit) &&
     Number.isSafeInteger(product.packCount) &&
-    product.packCount > 0 &&
-    product.priceCents !== null &&
+    (product.packCount as number) > 0 &&
     Number.isSafeInteger(product.priceCents) &&
-    product.priceCents >= 0
+    (product.priceCents as number) >= 0
   )
 }
 
@@ -440,22 +441,30 @@ export type ObservationLineTarget = {
 export function nextIncompleteObservationLine(
   sheet: ObservationSheet,
 ): ObservationLineTarget | null {
+  if (!isRecord(sheet)) return null
+  const expected = buildObservationSheet()
   for (const side of ['baseline', 'candidate'] as const) {
-    const line = sheet[side].lines.find(
-      (candidate) => !observationLineCollectionComplete(candidate),
-    )
-    if (line) {
-      return {
-        side,
-        ingredientId: line.ingredientId,
+    const store = sheet[side]
+    if (!isRecord(store) || !Array.isArray(store.lines) ||
+        store.lines.length !== expected[side].lines.length) {
+      return null
+    }
+    for (const line of store.lines) {
+      // A broken row cannot supply a safe navigation target. The separate
+      // readiness gate prevents it from being exported or marked complete.
+      if (!isRecord(line) || !nonBlank(line.ingredientId)) return null
+      if (!observationLineCollectionComplete(line as StoreObservation['lines'][number])) {
+        return { side, ingredientId: line.ingredientId }
       }
     }
   }
-
   return null
 }
 
 export function observationSheetHasUserInput(sheet: ObservationSheet): boolean {
+  // On malformed drafts, require a confirmation rather than silently assuming
+  // there is nothing to lose. The normal empty sheet still returns false.
+  if (!isRecord(sheet) || !isRecord(sheet.study)) return true
   const studyValues = [
     sheet.study.studyId,
     sheet.study.participantKey,
@@ -466,86 +475,103 @@ export function observationSheetHasUserInput(sheet: ObservationSheet): boolean {
   ]
   if (studyValues.some(nonBlank)) return true
 
-  return ([sheet.baseline, sheet.candidate] as StoreObservation[]).some(
-    (observation) =>
+  for (const side of ['baseline', 'candidate'] as const) {
+    const observation = sheet[side]
+    if (!isRecord(observation) || !isRecord(observation.store) ||
+        !Array.isArray(observation.lines)) return true
+    if (
       nonBlank(observation.evidenceId) ||
       nonBlank(observation.observedAt) ||
       observation.source !== 'manual-cart' ||
       nonBlank(observation.provenanceNote) ||
       nonBlank(observation.store.id) ||
-      nonBlank(observation.store.name) ||
-      observation.lines.some((line) => {
-        const product = line.observedProduct
-        return (
-          product.available !== null ||
-          nonBlank(product.productId) ||
-          nonBlank(product.productName) ||
-          product.packAmount !== null ||
-          product.packUnit !== null ||
-          product.packCount !== 1 ||
-          product.priceCents !== null ||
-          nonBlank(product.sourceUrl) ||
-          nonBlank(product.note)
-        )
-      }),
-  )
+      nonBlank(observation.store.name)
+    ) return true
+    for (const line of observation.lines) {
+      if (!isRecord(line) || !isRecord(line.observedProduct)) return true
+      const product = line.observedProduct
+      if (
+        product.available !== null ||
+        nonBlank(product.productId) ||
+        nonBlank(product.productName) ||
+        product.packAmount !== null ||
+        product.packUnit !== null ||
+        product.packCount !== 1 ||
+        product.priceCents !== null ||
+        nonBlank(product.sourceUrl) ||
+        nonBlank(product.note)
+      ) return true
+    }
+  }
+  return false
 }
 
 export function observationStoreProgress(observation: StoreObservation) {
+  const expectedLines = buildObservationSheet().baseline.lines
+  const expectedCount = expectedLines.length
+  const lines = isRecord(observation) && Array.isArray(observation.lines)
+    ? observation.lines
+    : []
+  // The counter is not allowed to certify copied availability against a
+  // different ingredient or changed demand than the canonical M3 planner.
+  const validShape = lines.length === expectedCount
+  const safeLines = validShape ? lines.filter((line, index) => {
+    const expected = expectedLines[index]
+    if (!isRecord(line) || !isRecord(line.observedProduct) ||
+        !isRecord(line.requirement)) return false
+    const keys = Object.keys(line.requirement)
+    return (
+      line.ingredientId === expected.ingredientId &&
+      line.ingredientLabel === expected.ingredientLabel &&
+      keys.length === 2 &&
+      keys[0] === 'amount' &&
+      keys[1] === 'unit' &&
+      line.requirement.amount === expected.requirement.amount &&
+      line.requirement.unit === expected.requirement.unit
+    )
+  }) : []
   return {
-    totalLines: observation.lines.length,
-    availabilityRecorded: observation.lines.filter(
+    totalLines: expectedCount,
+    availabilityRecorded: safeLines.filter(
       (line) => typeof line.observedProduct.available === 'boolean',
     ).length,
-    completeLines: observation.lines.filter(observationLineCollectionComplete)
-      .length,
+    completeLines: safeLines.filter(observationLineCollectionComplete).length,
   }
 }
 
 export function observationSheetProgress(sheet: ObservationSheet) {
-  const observations = [sheet.baseline, sheet.candidate]
-  const totalLines = observations.reduce(
-    (total, observation) => total + observation.lines.length,
-    0,
-  )
-  const availabilityRecorded = observations.reduce(
-    (total, observation) =>
-      total + observationStoreProgress(observation).availabilityRecorded,
-    0,
-  )
-  const completeLines = observations.reduce(
-    (total, observation) =>
-      total + observationStoreProgress(observation).completeLines,
-    0,
-  )
-
+  const baseline = isRecord(sheet) ? sheet.baseline : null
+  const candidate = isRecord(sheet) ? sheet.candidate : null
+  const storeA = observationStoreProgress(baseline as StoreObservation)
+  const storeB = observationStoreProgress(candidate as StoreObservation)
+  const study = isRecord(sheet) && isRecord(sheet.study) ? sheet.study : null
+  const a = isRecord(baseline) ? baseline : null
+  const b = isRecord(candidate) ? candidate : null
+  const aStore = a && isRecord(a.store) ? a.store : null
+  const bStore = b && isRecord(b.store) ? b.store : null
   const metadataValues = [
-    sheet.study.studyId,
-    sheet.study.participantKey,
-    sheet.study.population,
-    sheet.study.region,
-    sheet.study.weekStart,
-    sheet.study.priceContext,
-    sheet.baseline.evidenceId,
-    sheet.baseline.observedAt,
-    sheet.baseline.provenanceNote,
-    sheet.baseline.store.id,
-    sheet.baseline.store.name,
-    sheet.candidate.evidenceId,
-    sheet.candidate.observedAt,
-    sheet.candidate.provenanceNote,
-    sheet.candidate.store.id,
-    sheet.candidate.store.name,
+    study?.studyId,
+    study?.participantKey,
+    study?.population,
+    study?.region,
+    study?.weekStart,
+    study?.priceContext,
+    a?.evidenceId,
+    a?.observedAt,
+    a?.provenanceNote,
+    aStore?.id,
+    aStore?.name,
+    b?.evidenceId,
+    b?.observedAt,
+    b?.provenanceNote,
+    bStore?.id,
+    bStore?.name,
   ]
-  const metadataCompleted = metadataValues.filter(
-    (value) => value.trim().length > 0,
-  ).length
-
   return {
-    totalLines,
-    availabilityRecorded,
-    completeLines,
-    metadataCompleted,
+    totalLines: storeA.totalLines + storeB.totalLines,
+    availabilityRecorded: storeA.availabilityRecorded + storeB.availabilityRecorded,
+    completeLines: storeA.completeLines + storeB.completeLines,
+    metadataCompleted: metadataValues.filter(nonBlank).length,
     metadataTotal: metadataValues.length,
   }
 }
@@ -811,6 +837,9 @@ export type ObservationWindowSummary =
 export function observationWindowSummary(
   sheet: ObservationSheet,
 ): ObservationWindowSummary {
+  if (!isRecord(sheet) || !isRecord(sheet.baseline) ||
+      !isRecord(sheet.candidate)) return { state: 'not-started' }
+
   const baselineAt = validObservedAt(sheet.baseline.observedAt)
   const candidateAt = validObservedAt(sheet.candidate.observedAt)
 
@@ -821,30 +850,19 @@ export function observationWindowSummary(
   if (baselineAt === null || candidateAt === null) {
     const firstSide = baselineAt !== null ? 'baseline' : 'candidate'
     const firstObservedAt = baselineAt ?? candidateAt
-
-    if (firstObservedAt === null) {
-      return { state: 'not-started' }
-    }
+    if (firstObservedAt === null) return { state: 'not-started' }
 
     return {
       state: 'single-observation',
       firstSide,
       firstObservedAt: new Date(firstObservedAt).toISOString(),
-      deadlineAt: new Date(
-        firstObservedAt + 24 * 60 * 60 * 1000,
-      ).toISOString(),
+      deadlineAt: new Date(firstObservedAt + 24 * 60 * 60 * 1000).toISOString(),
     }
   }
 
-  const deltaHours =
-    Math.abs(baselineAt - candidateAt) / (60 * 60 * 1000)
-
+  const deltaHours = Math.abs(baselineAt - candidateAt) / (60 * 60 * 1000)
   return {
-    state:
-      deltaHours <= 24
-        ? 'within-window'
-        : 'outside-window',
+    state: deltaHours <= 24 ? 'within-window' : 'outside-window',
     deltaHours,
   }
 }
-
