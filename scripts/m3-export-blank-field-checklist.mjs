@@ -60,6 +60,27 @@ export function buildBlankM3FieldChecklistCsv() {
     throw new Error('M3 checklist canonical sheet contract changed')
   }
 
+  // The 22-slot field gate requires ELEVEN distinct, meaningful canonical
+  // demands; repeated IDs would make two filled rows look like extra coverage.
+  const requirementIds = new Set()
+  for (const requirement of requirements) {
+    if (
+      !requirement || typeof requirement !== 'object' ||
+      typeof requirement.id !== 'string' ||
+      requirement.id !== requirement.id.trim() ||
+      !requirement.id ||
+      typeof requirement.label !== 'string' ||
+      !requirement.label.trim() ||
+      typeof requirement.query !== 'string' ||
+      !requirement.query.trim() ||
+      !['g', 'kg', 'ml', 'l', 'piece'].includes(requirement.unit) ||
+      !Number.isFinite(requirement.amount) ||
+      requirement.amount <= 0 ||
+      requirementIds.has(requirement.id)
+    ) throw new Error('M3 checklist requires eleven distinct valid demands')
+    requirementIds.add(requirement.id)
+  }
+
   const rows = [csvRow(HEADERS)]
   for (const role of ['baseline', 'candidate']) {
     const retailer = M3_EXPECTED_RETAILERS[role]
