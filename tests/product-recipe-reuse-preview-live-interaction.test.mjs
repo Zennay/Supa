@@ -240,16 +240,23 @@ test('a change to another active meal invalidates a proposal for the selected da
   assert.equal(ui.collect(tree, 'button').length, 2)
 })
 
-test('malformed inactive day identity never crashes the preview boundary', () => {
+test('malformed cyclic active day identity does not render invalid controls', () => {
   const odd = {}
   odd.self = odd
   const ui = makeHarness({ activeDays: ['Ma', odd] })
-  const start = ui.render()
-  assert.ok(start)
-  ui.collect(start, 'button')[0].props.onClick()
-  const tree = ui.render()
-  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
-  assert.equal(ui.collect(tree, 'button').length, 1)
+  assert.equal(ui.render(), null)
+})
+
+test('null or malformed plan rows never crash the preview during actual render', () => {
+  for (const badRow of [null, undefined, { recipeId: 'tikka' }, 0]) {
+    const ui = makeHarness({ plannedMeals: [...m2InitialPlan, badRow] })
+    const initial = ui.render()
+    assert.ok(initial, 'malformed inactive row must not crash initial render')
+    ui.collect(initial, 'button')[0].props.onClick()
+    const tree = ui.render()
+    assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+    assert.equal(ui.collect(tree, 'button').length, 1, 'unknown input never permits Apply')
+  }
 })
 
 test('changing ingredients behind the same recipe identity revokes a visible proposal', () => {
@@ -357,13 +364,9 @@ test('invalid or empty week exposes no fake preview controls', () => {
   }
 })
 
-test('invalid duplicate active day still fails closed after opening panel', () => {
+test('invalid duplicate active day hides the entire unusable preview selector', () => {
   const ui = makeHarness({ activeDays: ['Ma', 'Ma'] })
-  const button = ui.collect(ui.render(), 'button')[0]
-  assert.ok(button)
-  button.props.onClick()
-  const preview = ui.collect(ui.render(), PreviewCard)[0].props.preview
-  assert.equal(preview, null)
+  assert.equal(ui.render(), null)
 })
 
 test('accessible touch controls and narrow text are enforced by original CSS', () => {
@@ -407,15 +410,13 @@ test('the chosen recipe only changes after an explicit validated confirmation', 
   assert.deepEqual(m2InitialPlan, before, 'parent callback alone owns the actual update')
 })
 
-test('invalid preview does not offer a confirm action', () => {
+test('invalid preview never offers controls or confirms a recipe change', () => {
   const chosen = []
   const ui = makeHarness({
     activeDays: ['Ma', 'Ma'],
     onChooseRecipe(day, recipeId) { chosen.push([day, recipeId]) },
   })
-  ui.collect(ui.render(), 'button')[0].props.onClick()
   const tree = ui.render()
-  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
-  assert.equal(ui.collect(tree, 'button').length, 1)
+  assert.equal(tree, null)
   assert.deepEqual(chosen, [])
 })
