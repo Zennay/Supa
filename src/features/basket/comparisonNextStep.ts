@@ -80,6 +80,65 @@ function safeNonnegativeInteger(value: unknown): value is number {
  * No raw comparator reasons or ingredient IDs are displayed: internal messages
  * can contain technical jargon and user-derived labels.
  */
+/**
+ * A comparison must trace each reported change back to one real matched
+ * ingredient in *both* baskets; totals alone do not prove coverage.
+ */
+function consistentLineTrace(
+  comparison: BasketComparison,
+  baseline: OneStoreBasket,
+  candidate: OneStoreBasket,
+): boolean {
+  if (
+    !Array.isArray(comparison.lineDeltas) ||
+    comparison.lineDeltas.length !== baseline.matchedLineCount ||
+    comparison.lineDeltas.length !== candidate.matchedLineCount
+  ) {
+    return false
+  }
+
+  const baselineLines = baseline.lines.filter((line) => line.status === 'matched')
+  const candidateLines = candidate.lines.filter((line) => line.status === 'matched')
+  const before = new Map(baselineLines.map((line) => [line.id, line] as const))
+  const after = new Map(candidateLines.map((line) => [line.id, line] as const))
+  if (
+    before.size !== baseline.matchedLineCount ||
+    after.size !== candidate.matchedLineCount
+  ) {
+    return false
+  }
+
+  const seen = new Set<string>()
+  let summedDifference = 0
+
+  for (const delta of comparison.lineDeltas) {
+    if (!record(delta) || typeof delta.id !== 'string' || seen.has(delta.id)) {
+      return false
+    }
+    const baselineLine = before.get(delta.id)
+    const candidateLine = after.get(delta.id)
+    if (
+      !baselineLine ||
+      !candidateLine ||
+      delta.ingredientLabel !== baselineLine.ingredientLabel ||
+      delta.ingredientLabel !== candidateLine.ingredientLabel ||
+      !Number.isSafeInteger(delta.baselineLineTotalCents) ||
+      !Number.isSafeInteger(delta.candidateLineTotalCents) ||
+      !Number.isSafeInteger(delta.deltaCents) ||
+      delta.baselineLineTotalCents !== baselineLine.lineTotalCents ||
+      delta.candidateLineTotalCents !== candidateLine.lineTotalCents ||
+      delta.deltaCents !== delta.candidateLineTotalCents - delta.baselineLineTotalCents
+    ) {
+      return false
+    }
+    seen.add(delta.id)
+    summedDifference += delta.deltaCents
+    if (!Number.isSafeInteger(summedDifference)) return false
+  }
+
+  return summedDifference === comparison.deltaCents
+}
+
 export function comparisonNextStep(input: {
   comparison: BasketComparison
   baseline: OneStoreBasket
@@ -166,7 +225,8 @@ export function comparisonNextStep(input: {
     baseline.matchedLineCount === 0 ||
     candidate.matchedLineCount === 0 ||
     baseline.matchedLineCount !== baseline.lines.length ||
-    candidate.matchedLineCount !== candidate.lines.length
+    candidate.matchedLineCount !== candidate.lines.length ||
+    !consistentLineTrace(comparison, baseline, candidate)
   ) {
     return step('review-data')
   }
