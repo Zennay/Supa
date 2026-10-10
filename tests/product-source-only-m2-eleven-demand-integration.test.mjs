@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {\n  assessControlledSourceBasketReadiness, assessM3ControlledPlusDekaBasketReadiness,\n} from '../src/data/controlledSourceBasketReadiness.ts'
+import {
+  assessControlledSourceBasketReadiness, assessM3ControlledPlusDekaBasketReadiness,
+} from '../src/data/controlledSourceBasketReadiness.ts'
 import {
   m2DefaultActiveDays, m2InitialPlan, m2Products, m2Recipes,
 } from '../src/data/m2Fixture.ts'
