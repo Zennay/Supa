@@ -411,7 +411,8 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(study, null, 2)}\n`
 
   if (output) {
-    await mkdir(dirname(output), { recursive: true })
+    // Restrict only newly created ancestors; do not mutate pre-existing paths.
+    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
     // Exclusive creation protects original collection evidence and prior study files.
     // The mode applies only to a newly created file; never chmod existing evidence.
     try {
