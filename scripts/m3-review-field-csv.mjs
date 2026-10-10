@@ -152,7 +152,11 @@ export function reviewM3FieldCsv(input, { validateUnits = false } = {}) {
     }
     const yes = ['ja', 'yes', 'true'].includes(state)
     const no = ['nee', 'no', 'false'].includes(state)
-    const required = Boolean(observedAt && validContext && meaningfulText(source) && (yes || no))
+    // Provenance channel is an exact contract, not arbitrary free text. A
+    // syntactically filled fictional source may never pass preflight.
+    const validSource = ['manual-cart', 'receipt', 'consented-export'].includes(source)
+    if (source && !validSource) warnings.add('invalid-observation-source')
+    const required = Boolean(observedAt && validContext && validSource && (yes || no))
     const unitCompatible = !validateUnits || sameM3QuantityFamily(row[6], packUnit)
     if (validateUnits && yes && packUnit && !unitCompatible) {
       warnings.add('incompatible-pack-unit')
