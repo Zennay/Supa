@@ -507,15 +507,29 @@ export function observationSheetHasUserInput(sheet: ObservationSheet): boolean {
 }
 
 export function observationStoreProgress(observation: StoreObservation) {
-  const expectedCount = buildObservationSheet().requirements.length
+  const expectedLines = buildObservationSheet().baseline.lines
+  const expectedCount = expectedLines.length
   const lines = isRecord(observation) && Array.isArray(observation.lines)
     ? observation.lines
     : []
-  // A missing/extra array must never render as fully collected.
+  // The counter is not allowed to certify copied availability against a
+  // different ingredient or changed demand than the canonical M3 planner.
   const validShape = lines.length === expectedCount
-  const safeLines = validShape ? lines.filter(
-    (line) => isRecord(line) && isRecord(line.observedProduct),
-  ) : []
+  const safeLines = validShape ? lines.filter((line, index) => {
+    const expected = expectedLines[index]
+    if (!isRecord(line) || !isRecord(line.observedProduct) ||
+        !isRecord(line.requirement)) return false
+    const keys = Object.keys(line.requirement)
+    return (
+      line.ingredientId === expected.ingredientId &&
+      line.ingredientLabel === expected.ingredientLabel &&
+      keys.length === 2 &&
+      keys[0] === 'amount' &&
+      keys[1] === 'unit' &&
+      line.requirement.amount === expected.requirement.amount &&
+      line.requirement.unit === expected.requirement.unit
+    )
+  }) : []
   return {
     totalLines: expectedCount,
     availabilityRecorded: safeLines.filter(
