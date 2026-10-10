@@ -22,21 +22,43 @@ function unwrapExpression(node) {
   return current
 }
 
-function staticAttributeValue(initializer) {
-  if (!initializer) return null
+// This is deliberately a bounded, purely syntactic evaluator. It recognizes
+// literal-only concatenation/template expressions but never executes code,
+// follows variables, or guesses the value of a dynamic interpolation.
+function staticStringExpression(node, depth = 0) {
+  if (depth > 20) return null
 
-  if (ts.isStringLiteralLike(initializer)) return initializer.text
+  const expression = unwrapExpression(node)
+  if (ts.isStringLiteralLike(expression)) return expression.text
 
-  if (ts.isJsxExpression(initializer) && initializer.expression) {
-    const expression = unwrapExpression(initializer.expression)
-    if (
-      ts.isStringLiteralLike(expression) ||
-      ts.isNoSubstitutionTemplateLiteral(expression)
-    ) {
-      return expression.text
-    }
+  if (
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.PlusToken
+  ) {
+    const left = staticStringExpression(expression.left, depth + 1)
+    const right = staticStringExpression(expression.right, depth + 1)
+    return left === null || right === null ? null : left + right
   }
 
+  if (ts.isTemplateExpression(expression)) {
+    let value = expression.head.text
+    for (const span of expression.templateSpans) {
+      const part = staticStringExpression(span.expression, depth + 1)
+      if (part === null) return null
+      value += part + span.literal.text
+    }
+    return value
+  }
+
+  return null
+}
+
+function staticAttributeValue(initializer) {
+  if (!initializer) return null
+  if (ts.isStringLiteralLike(initializer)) return initializer.text
+  if (ts.isJsxExpression(initializer) && initializer.expression) {
+    return staticStringExpression(initializer.expression)
+  }
   return null
 }
 
@@ -146,6 +168,10 @@ test('JSX URL guard rejects static executable schemes', () => {
     '<use xlinkHref="javascript:alert(1)" />',
     '<a href={"java\\nscript:alert(1)"}>x</a>',
     '<a href={"\\u0000javascript:alert(1)"}>x</a>',
+    '<a href={\'java\' + \'script:alert(1)\'}>x</a>',
+    '<a href={(\'ja\' + (\'va\' + \'script:alert(1)\'))}>x</a>',
+    '<a href={\`java\${\'script\'}:alert(1)\`}>x</a>',
+    '<img src={\`java\${\'scr\' + \'ipt\'}:alert(1)\`} />',
   ]) {
     assert.ok(findExecutableStaticJsxUrl(source), source)
   }
@@ -156,6 +182,8 @@ test('JSX URL guard preserves safe, dynamic and inert values', () => {
     '<a href="/planner">Planner</a>',
     '<a href={"https://example.test"}>Extern</a>',
     '<img src={assetUrl} alt="" />',
+    '<a href={\'java\' + dynamicSuffix}>x</a>',
+    '<a href={\`java\${dynamicSuffix}:alert(1)\`}>x</a>',
     '<form action={submitUrl}></form>',
     '<div data-href="javascript:example">tekst</div>',
     "const example = '<a href=\"javascript:alert(1)\">x</a>'",
