@@ -6,25 +6,49 @@ import * as ts from 'typescript'
 
 const srcDir = new URL('../src/', import.meta.url)
 
-function staticAttributeValue(initializer) {
-  if (!initializer) return null
+// Evaluate only literal-only expressions; never execute code or resolve
+// variables. Static IDs wrapped in parentheses or concatenated in source are
+// still static and must not bypass duplicate-id accessibility validation.
+function staticStringExpression(node, depth = 0) {
+  if (depth > 20) return null
+  let current = node
 
-  if (ts.isStringLiteral(initializer)) {
-    return initializer.text
-  }
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isNonNullExpression(current) ||
+    ts.isTypeAssertionExpression(current)
+  ) current = current.expression
 
-  if (!ts.isJsxExpression(initializer) || !initializer.expression) {
-    return null
-  }
+  if (ts.isStringLiteralLike(current)) return current.text
 
   if (
-    ts.isStringLiteralLike(initializer.expression) ||
-    ts.isNoSubstitutionTemplateLiteral(initializer.expression)
+    ts.isBinaryExpression(current) &&
+    current.operatorToken.kind === ts.SyntaxKind.PlusToken
   ) {
-    return initializer.expression.text
+    const left = staticStringExpression(current.left, depth + 1)
+    const right = staticStringExpression(current.right, depth + 1)
+    return left === null || right === null ? null : left + right
+  }
+
+  if (ts.isTemplateExpression(current)) {
+    let value = current.head.text
+    for (const span of current.templateSpans) {
+      const part = staticStringExpression(span.expression, depth + 1)
+      if (part === null) return null
+      value += part + span.literal.text
+    }
+    return value
   }
 
   return null
+}
+
+function staticAttributeValue(initializer) {
+  if (!initializer) return null
+  if (ts.isStringLiteralLike(initializer)) return initializer.text
+  if (!ts.isJsxExpression(initializer) || !initializer.expression) return null
+  return staticStringExpression(initializer.expression)
 }
 
 function isIntrinsicIdAttribute(node) {
@@ -186,6 +210,27 @@ test('static id guard ignores dynamic ids and custom component props', () => {
   ])
 
   assert.deepEqual(duplicates, [])
+})
+
+test('static id guard detects composed literal IDs but not dynamic interpolations', () => {
+  const duplicates = duplicateStaticIds([
+    {
+      filename: 'first.tsx',
+      source: '<label id="account-name" />',
+    },
+    {
+      filename: 'second.tsx',
+      source: [
+        "const a = <input id={('account' + '-name')} />",
+        "const b = <input id={`account-${'name'}`} />",
+        "const c = <input id={dynamicPrefix + '-name'} />",
+        "const d = <input id={`account-${dynamicName}`} />",
+      ].join('\\n'),
+    },
+  ])
+
+  assert.equal(duplicates.length, 2)
+  assert.deepEqual(duplicates.map(({ id }) => id), ['account-name', 'account-name'])
 })
 
 test('static id guard handles no-substitution template ids', () => {
