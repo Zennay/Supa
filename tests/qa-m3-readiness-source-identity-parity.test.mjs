@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   buildObservationSheet,
+  restoreObservationSheetDraft,
   observationSheetReadiness,
   observationSheetProgress,
 } from '../src/domain/m3ObservationSheet.ts'
@@ -120,4 +121,37 @@ test('M3 readiness refuses duplicate evidence IDs before marking collection expo
   assert.equal(result.ready, false)
   assert.match(result.issues.join(' '), /evidence|bewij|duplicaat|verschil/i)
   assert.deepEqual(sheet, snapshot)
+})
+
+
+test('M3 draft recovery must retain an approved recorded source across save/reload', () => {
+  for (const side of ['baseline', 'candidate']) {
+    for (const approvedSource of SOURCE_TYPES) {
+      const sheet = completeSyntheticSheet()
+      sheet[side].source = approvedSource
+      const restored = restoreObservationSheetDraft(JSON.stringify(sheet))
+      assert.ok(restored, side + ': valid source draft must survive')
+      assert.equal(restored[side].source, approvedSource)
+      assert.equal(restored.evidenceStatus, 'collection-template-not-evidence')
+      assert.deepEqual(observationSheetReadiness(restored), { ready: true, issues: [] })
+    }
+  }
+})
+
+test('M3 draft recovery cannot silently invent a manual-cart source from unsupported provenance', () => {
+  for (const side of ['baseline', 'candidate']) {
+    for (const corruptedSource of ['browser-cache', 'unknown-receipt', 42, null]) {
+      const sheet = completeSyntheticSheet()
+      sheet[side].source = corruptedSource
+      const restored = restoreObservationSheetDraft(JSON.stringify(sheet))
+      // Dropping the whole corrupt draft is an acceptable fail-closed result.
+      if (restored === null) continue
+      // If preservation is preferred for field recovery, retain a non-approved
+      // source value and block readiness pending explicit human correction.
+      assert.notEqual(restored[side].source, 'manual-cart',
+        side + ': saved ' + String(corruptedSource) + ' cannot become fabricated manual-cart provenance')
+      assert.equal(observationSheetReadiness(restored).ready, false)
+      assert.equal(restored.evidenceStatus, 'collection-template-not-evidence')
+    }
+  }
 })
