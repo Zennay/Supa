@@ -79,7 +79,7 @@ test('store, product, quantity, pack or match transition forces new shopping ide
   }
 })
 
-test('different active demands, lines, or line order cannot re-use old completion', () => {
+test('different active demands or lines reset completion, but display reorder is safe', () => {
   const before = basket(['Di'])
   const identity = shoppingListDemandIdentity(before)
   assert.ok(identity)
@@ -91,7 +91,7 @@ test('different active demands, lines, or line order cannot re-use old completio
   if (before.lines.length > 1) {
     const reordered = structuredClone(before)
     reordered.lines.reverse()
-    assert.notEqual(shoppingListDemandIdentity(reordered), identity)
+    assert.equal(shoppingListDemandIdentity(reordered), identity)
   }
 })
 
