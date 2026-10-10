@@ -6,6 +6,7 @@ Deze opt-in controle is een uitbreiding op de bestaande, **niet-bewijskrachtige*
 
 - Bij **beschikbaar = ja** hoort de verpakkingshoeveelheid bij dezelfde soort grootheid als het ingredient: gram/kilogram (massa), milliliter/liter (volume), of stuk (aantal).
 - `g` en `kg` zijn onderling compatibel; `ml` en `l` ook. Een hoeveelheid in `g` kan **niet** worden afgehandeld met `ml`, of andersom. `piece` kan alleen met `piece`.
+- Een verpakking die in `piece` is beschreven heeft een **positief, veilig geheel aantal stuks** (geen 0,5 stuks). Massa en volume mogen wel een decimale hoeveelheid hebben.
 - Een onjuiste combinatie krijgt uitsluitend de neutrale `incompatible-pack-unit` waarschuwingscode. De betreffende rij telt niet mee als compleet.
 - Expliciet niet-beschikbare producten hebben geen verpakkingsgegevens nodig en geven dus niet vanwege hun lege eenheid een fout.
 
