@@ -105,7 +105,7 @@ test('calendar-impossible explicit UTC day must not be normalized into an observ
   sheet.candidate.observedAt = '2026-03-03T12:30:00Z'
   assert.throws(
     () => buildWeeklyBasketStudyFromObservationSheet(sheet),
-    /baseline\\.observedAt must be a valid timestamp/,
+    /baseline\.observedAt must be a valid timestamp/,
   )
   assert.equal(observationSheetReadiness(sheet).ready, false)
   assert.notEqual(observationWindowSummary(sheet).state, 'within-window')
