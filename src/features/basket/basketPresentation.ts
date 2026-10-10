@@ -98,30 +98,35 @@ export function comparisonWarningCopy(
 
 export function basketLineExplanation(
   status: 'matched' | 'unresolved',
-  reasons: string[],
+  reasons: unknown,
 ): string {
   if (status === 'matched') {
     return 'Automatisch gekozen op basis van ingrediënt en verpakking.'
   }
 
-  if (reasons.includes('top candidates too close')) {
+  const safeReasons =
+    Array.isArray(reasons) && reasons.every((reason) => typeof reason === 'string')
+      ? reasons
+      : []
+
+  if (safeReasons.includes('top candidates too close')) {
     return 'Meerdere producten lijken even passend; kies zelf.'
   }
 
-  if (reasons.includes('score below trust threshold')) {
+  if (safeReasons.includes('score below trust threshold')) {
     return 'Geen productmatch is zeker genoeg; kies zelf.'
   }
 
-  if (reasons.includes('no candidates')) {
+  if (safeReasons.includes('no candidates')) {
     return 'Geen passend product gevonden; kies zelf.'
   }
 
-  if (reasons.includes('candidate unavailable')) {
+  if (safeReasons.includes('candidate unavailable')) {
     return 'Geen betrouwbaar beschikbaar product gevonden; kies zelf.'
   }
 
   if (
-    reasons.some((reason) =>
+    safeReasons.some((reason) =>
       [
         'amount',
         'quantity',
@@ -133,7 +138,7 @@ export function basketLineExplanation(
     return 'Hoeveelheid of verpakking is niet betrouwbaar genoeg; kies zelf.'
   }
 
-  if (reasons.includes('matched product missing from store catalog')) {
+  if (safeReasons.includes('matched product missing from store catalog')) {
     return 'De gekozen productinformatie ontbreekt; kies zelf.'
   }
 

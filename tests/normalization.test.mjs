@@ -30,6 +30,22 @@ test('malformed money text fails closed instead of being rewritten into another 
   }
 })
 
+test('normalizers fail closed on malformed runtime value types', () => {
+  for (const input of [null, undefined, 42, {}, []]) {
+    assert.equal(normalizeMoneyToCents(input), null)
+    assert.deepEqual(normalizePackText(input), {
+      rawText: null,
+      count: 1,
+      amount: null,
+      unit: 'unknown',
+    })
+    assert.deepEqual(normalizeOfferLabel(input), {
+      type: 'unknown',
+      rawLabel: '',
+    })
+  }
+})
+
 test('normalizes representative AH, PLUS and DekaMarkt pack strings', () => {
   assert.deepEqual(normalizePackText('1 l'), {
     rawText: '1 l',
@@ -113,6 +129,27 @@ test('normalizes common supermarket offer mechanics without guessing unknown lab
   assert.deepEqual(normalizeOfferLabel('ACTIE'), {
     type: 'unknown',
     rawLabel: 'ACTIE',
+  })
+})
+
+test('percentage offers enforce the textual 100% ceiling before numeric conversion', () => {
+  for (const label of ['100.0000000000000000001% korting', '100,0000000000000000001% korting']) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'unknown',
+      rawLabel: label,
+    })
+  }
+
+  for (const label of ['100% korting', '100.000% korting', '100,000% korting']) {
+    assert.deepEqual(normalizeOfferLabel(label), {
+      type: 'percent_discount',
+      percent: 100,
+    })
+  }
+
+  assert.deepEqual(normalizeOfferLabel('99.5% korting'), {
+    type: 'percent_discount',
+    percent: 99.5,
   })
 })
 

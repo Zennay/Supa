@@ -30,7 +30,11 @@ export async function main(argv = process.argv.slice(2)) {
   if (output) {
     await mkdir(dirname(output), { recursive: true })
     try {
-      await writeFile(output, serialized, { encoding: 'utf8', flag: 'wx' })
+      await writeFile(output, serialized, {
+        encoding: 'utf8',
+        flag: 'wx',
+        mode: 0o600,
+      })
     } catch (error) {
       if (
         error !== null &&

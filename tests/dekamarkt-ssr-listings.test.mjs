@@ -162,3 +162,156 @@ test('listing evidence rejects unsafe acquisition metadata', async () => {
     reason: 'DekaMarkt evidence violates the bounded capture contract',
   })
 })
+
+
+test('DekaMarkt listing evidence binds catalog and offers kinds to their public routes', async () => {
+  const catalogOnOffersRoute = await fixture(catalogUrl)
+  catalogOnOffersRoute.source.url = 'https://www.dekamarkt.nl/aanbiedingen'
+
+  assert.deepEqual(parseDekaMarktSsrCatalogEvidence(catalogOnOffersRoute), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source route does not match catalog',
+  })
+
+  const offersOnCatalogRoute = await fixture(offersUrl)
+  offersOnCatalogRoute.source.url =
+    'https://www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk'
+
+  assert.deepEqual(parseDekaMarktSsrOffersEvidence(offersOnCatalogRoute), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source route does not match offers',
+  })
+
+  const catalogRootOnly = await fixture(catalogUrl)
+  catalogRootOnly.source.url = 'https://www.dekamarkt.nl/producten'
+
+  assert.deepEqual(parseDekaMarktSsrCatalogEvidence(catalogRootOnly), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source route does not match catalog',
+  })
+})
+
+
+test('DekaMarkt listing evidence rejects credential-bearing public source URLs', async () => {
+  for (const [fixtureUrl, sourceUrl, parse] of [
+    [
+      catalogUrl,
+      'https://reporter@www.dekamarkt.nl/producten/zuivel-kaas/melk-karnemelk',
+      parseDekaMarktSsrCatalogEvidence,
+    ],
+    [
+      offersUrl,
+      'https://:secret@www.dekamarkt.nl/aanbiedingen',
+      parseDekaMarktSsrOffersEvidence,
+    ],
+  ]) {
+    const evidence = await fixture(fixtureUrl)
+    evidence.source.url = sourceUrl
+
+    assert.deepEqual(parse(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence source must use the credential-free public HTTPS host',
+    })
+  }
+})
+
+
+test('DekaMarkt listing evidence rejects non-default ports but accepts canonical HTTPS 443', async () => {
+  const nonDefault = await fixture(catalogUrl)
+  nonDefault.source.url =
+    'https://www.dekamarkt.nl:8443/producten/zuivel-kaas/melk-karnemelk'
+
+  assert.deepEqual(parseDekaMarktSsrCatalogEvidence(nonDefault), {
+    type: 'abstain',
+    reason: 'DekaMarkt evidence source must use the credential-free public HTTPS host',
+  })
+
+  const explicitDefault = await fixture(catalogUrl)
+  explicitDefault.source.url =
+    'https://www.dekamarkt.nl:443/producten/zuivel-kaas/melk-karnemelk'
+
+  assert.equal(parseDekaMarktSsrCatalogEvidence(explicitDefault).type, 'observations')
+})
+
+test('DekaMarkt listing evidence requires a timezone-bearing capture timestamp', async () => {
+  for (const capturedAt of [
+    '2026-10-04',
+    '2026-10-04T18:15:29.695',
+    '2026-02-30T18:15:29.695Z',
+    '2026-10-04T24:00:00Z',
+    '2026-10-04T18:15:29+24:00',
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    evidence.source.capturedAt = capturedAt
+
+    assert.deepEqual(parseDekaMarktSsrCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence source provenance is incomplete',
+    })
+  }
+
+  const offset = await fixture(catalogUrl)
+  offset.source.capturedAt = '2026-10-04T20:15:29.695+02:00'
+  assert.equal(parseDekaMarktSsrCatalogEvidence(offset).type, 'observations')
+})
+
+test('DekaMarkt listing evidence rejects unsafe integer capture metadata', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.captureEvidence.runId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.captureEvidence.artifactId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.captureEvidence.bytes = Number.MAX_SAFE_INTEGER + 1 },
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    mutate(evidence)
+
+    assert.deepEqual(parseDekaMarktSsrCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence violates the bounded capture contract',
+    })
+  }
+})
+
+test('DekaMarkt listing evidence requires an exact HTML media type', async () => {
+  for (const contentType of [
+    'application/text/html+json',
+    'text/html-malformed',
+    'application/json; profile="text/html"',
+    null,
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    evidence.captureEvidence.contentType = contentType
+
+    assert.deepEqual(parseDekaMarktSsrCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt evidence violates the bounded capture contract',
+    })
+  }
+
+  const parameterized = await fixture(catalogUrl)
+  parameterized.captureEvidence.contentType = ' TEXT/HTML ; charset=UTF-8 '
+  assert.equal(parseDekaMarktSsrCatalogEvidence(parameterized).type, 'observations')
+})
+
+test('DekaMarkt catalog skips invalid numeric product identities', async () => {
+  for (const productId of [-1, 0, Number.MAX_SAFE_INTEGER + 1]) {
+    const evidence = await fixture(catalogUrl)
+    const product = evidence.nuxtPayload.find(
+      (value) =>
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Number.isInteger(value.productId) &&
+        Number.isInteger(value.headerText) &&
+        Number.isInteger(value.packaging) &&
+        Number.isInteger(value.price),
+    )
+    assert.ok(product)
+    evidence.nuxtPayload[product.productId] = productId
+
+    const result = parseDekaMarktSsrCatalogEvidence(evidence)
+
+    assert.equal(result.type, 'observations')
+    assert.equal(result.observations.length, 2)
+    assert.equal(result.abstained, 1)
+  }
+})

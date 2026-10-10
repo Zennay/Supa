@@ -60,6 +60,16 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
+function safePositiveInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
+function validHtmlContentType(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const [mediaType] = value.split(';', 1)
+  return mediaType.trim().toLowerCase() === 'text/html'
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
   if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
     return undefined
@@ -89,6 +99,48 @@ function validIso(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
 }
 
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIMESTAMP_PATTERN =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
+
+function validCalendarDate(value: string) {
+  const match = DATE_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+function validCapturedAt(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+
+  const match = TIMESTAMP_PATTERN.exec(value)
+  if (!match || !validCalendarDate(match[1])) return false
+
+  const hour = Number(match[2])
+  const minute = Number(match[3])
+  const second = Number(match[4] ?? '0')
+  if (hour > 23 || minute > 59 || second > 59) return false
+
+  if (match[5] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[5]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return false
+  }
+
+  return Number.isFinite(Date.parse(value))
+}
+
 function validateEvidenceBoundary(
   evidence: DekaMarktListingEvidenceBase & { evidenceType?: unknown },
   expectedType:
@@ -112,15 +164,29 @@ function validateEvidenceBoundary(
 
   try {
     const url = new URL(evidence.source.url)
-    if (url.protocol !== 'https:' || url.hostname !== 'www.dekamarkt.nl') {
-      return 'DekaMarkt evidence source must use the public HTTPS host'
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname !== 'www.dekamarkt.nl' ||
+      url.port ||
+      url.username ||
+      url.password
+    ) {
+      return 'DekaMarkt evidence source must use the credential-free public HTTPS host'
+    }
+    const routeMatches =
+      expectedKind === 'catalog'
+        ? url.pathname.startsWith('/producten/')
+        : url.pathname === '/aanbiedingen' ||
+          url.pathname.startsWith('/aanbiedingen/')
+    if (!routeMatches) {
+      return `DekaMarkt evidence source route does not match ${expectedKind}`
     }
   } catch {
     return 'DekaMarkt evidence source must contain a valid URL'
   }
 
   if (
-    !validIso(evidence.source.capturedAt) ||
+    !validCapturedAt(evidence.source.capturedAt) ||
     !/^[a-f0-9]{64}$/.test(evidence.source.sha256)
   ) {
     return 'DekaMarkt evidence source provenance is incomplete'
@@ -129,16 +195,13 @@ function validateEvidenceBoundary(
   const capture = evidence.captureEvidence
   const safety = capture?.safety
   if (
-    !Number.isInteger(capture?.runId) ||
-    capture.runId <= 0 ||
-    !Number.isInteger(capture?.artifactId) ||
-    capture.artifactId <= 0 ||
+    !safePositiveInteger(capture?.runId) ||
+    !safePositiveInteger(capture?.artifactId) ||
     !/^sha256:[a-f0-9]{64}$/.test(capture?.artifactDigest ?? '') ||
     !/^[a-f0-9]{40}$/.test(capture?.supaSha ?? '') ||
     capture?.status !== 200 ||
-    !capture?.contentType?.toLowerCase().includes('text/html') ||
-    !Number.isInteger(capture?.bytes) ||
-    capture.bytes <= 0 ||
+    !validHtmlContentType(capture?.contentType) ||
+    !safePositiveInteger(capture?.bytes) ||
     !safety ||
     safety.login !== false ||
     safety.credentials !== false ||
@@ -193,7 +256,7 @@ function parseCatalogProduct(
   const price = dereference(payload, product.price)
 
   if (
-    !Number.isInteger(productId) ||
+    !safePositiveInteger(productId) ||
     typeof name !== 'string' ||
     !name.trim() ||
     typeof packaging !== 'string' ||
@@ -313,7 +376,7 @@ function parseOfferProduct(
   const information = dereference(payload, product.productInformation)
 
   if (
-    !Number.isInteger(productId) ||
+    !safePositiveInteger(productId) ||
     productNormalPrice !== outerNormalPrice ||
     productOfferPrice !== outerOfferPrice ||
     !isObject(information)

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "scope": {
+    "branch": "main"
+  },
+  "status": {
+    "kind": "descriptive-target",
+    "enforced": false,
+    "trackingIssue": 411
+  },
+  "landing": {
+    "requirePullRequest": true,
+    "requiredHostedChecks": [
+      "test-build"
+    ],
+    "pathConditionalPermanentChecksGloballyRequired": false
+  },
+  "history": {
+    "allowForcePush": false,
+    "allowDeletion": false
+  },
+  "recovery": {
+    "repositoryAdministratorMayTemporarilyAdjust": true,
+    "reasonMustBeRecorded": true,
+    "restorePolicyAfterRecovery": true
+  }
+}

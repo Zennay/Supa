@@ -230,6 +230,41 @@ test('M2 planner preferences fail closed on invalid caller fallbacks', () => {
 })
 
 
+test('M2 planner preferences exclude defaults removed from the current recipe catalog', () => {
+  const currentRecipeIds = recipeIds.filter((recipeId) => recipeId !== 'tikka')
+  const preferences = parsePlannerPreferences(
+    null,
+    m2InitialPlan,
+    currentRecipeIds,
+  )
+
+  assert.deepEqual(preferences, {
+    budget: 35,
+    activeDays: ['Di', 'Wo'],
+    recipeByDay: {
+      Di: 'teriyaki',
+      Wo: 'pasta',
+    },
+  })
+})
+
+test('M2 planner preferences ignore malformed recipe catalog identities', () => {
+  const preferences = parsePlannerPreferences(
+    null,
+    m2InitialPlan,
+    ['tikka', ' teriyaki', 'pasta ', '', null, 42],
+  )
+
+  assert.deepEqual(preferences, {
+    budget: 35,
+    activeDays: ['Ma', 'Do'],
+    recipeByDay: {
+      Ma: 'tikka',
+      Do: 'tikka',
+    },
+  })
+})
+
 test('M2 planner preferences fail closed on duplicate default day identities', () => {
   const ambiguousPlan = [
     { day: 'Ma', recipeId: 'tikka' },
@@ -275,4 +310,39 @@ test('M2 planner preferences fail closed on non-canonical or malformed defaults'
       },
     )
   }
+})
+
+
+test('M2 planner preferences fall back to canonical budgets for malformed runtime budget contracts', () => {
+  for (const malformedContract of [null, {}, '30,35,40', 35, true]) {
+    const preferences = parsePlannerPreferences(
+      JSON.stringify({
+        budget: 40,
+        activeDays: ['Ma'],
+        recipeByDay: {},
+      }),
+      m2InitialPlan,
+      recipeIds,
+      35,
+      malformedContract,
+    )
+
+    assert.equal(preferences.budget, 40)
+  }
+})
+
+test('M2 planner preferences filter malformed entries from array budget contracts', () => {
+  const preferences = parsePlannerPreferences(
+    JSON.stringify({
+      budget: 55,
+      activeDays: ['Ma'],
+      recipeByDay: {},
+    }),
+    m2InitialPlan,
+    recipeIds,
+    45,
+    [null, '50', Number.NaN, 45, 55, Number.POSITIVE_INFINITY],
+  )
+
+  assert.equal(preferences.budget, 55)
 })

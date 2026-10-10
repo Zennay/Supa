@@ -121,7 +121,7 @@ For each meaningful response, retain:
 - responding team (not personal contact details in Git);
 - exact scope discussed;
 - whether the answer covers product content, prices, promotions, availability, automation, or storage;
-- permission outcome: allowed / allowed with conditions / licensed route required / research-only / denied / unclear / routed;
+- permission outcome: allowed / allowed with conditions / licensed route required / research-only / denied / no suitable route / unclear / routed;
 - any rate, retention, attribution, geography/store, or commercial constraints;
 - next owner/team if routed;
 - product/architecture/cost/source-strategy consequence for SUPA.
@@ -129,10 +129,10 @@ For each meaningful response, retain:
 The repository-safe contract is executable through:
 
 ```bash
-npm run aud005:record-retailer-response -- <private-sanitized-response.json> --output artifacts/aud005/<retailer>-response.json
+npm run aud005:record-retailer-response -- <private-sanitized-response.json> --output evidence/aud005/<retailer>-<response-id>.json
 ```
 
-The validator fails closed when required scope/consequence fields are missing, rejects direct PII-style keys and obvious email/phone content, and always marks generated records as ineligible for public product claims. Keep the original/raw correspondence in an approved private location; commit only the privacy-safe derived record.
+Use a new, stable `response-id` for every meaningful response so each privacy-safe artifact has its own tracked path under `evidence/aud005/`. The recorder intentionally fails if the output path already exists; do not delete, overwrite, or reuse a prior response artifact just to make a later capture succeed. Follow `evidence/aud005/README.md` for the durable storage boundary; generated/local material under ignored `artifacts/` is not the repository record. The validator fails closed when required scope/consequence fields are missing, rejects direct PII-style keys and obvious email/phone content, and always marks generated records as ineligible for public product claims. Keep the original/raw correspondence in an approved private location; commit only the privacy-safe derived record.
 
 ## AUD-005 decision rule
 
