@@ -121,7 +121,9 @@ test('operator CLI distinguishes empty (2), accepted (0), and corrupted (1) with
     assert.equal(noFiles.status, 2)
     assert.equal(JSON.parse(noFiles.stdout).status, 'no-captures')
     const root = join(dir, 'artifacts', 'm1-multistore-research')
-    await capture(root, RESEARCH_SOURCES[0], 1791676680789)
+    await capture(root, RESEARCH_SOURCES[0], 1791676680789, {
+      observedAt: new Date(Date.now() - 60_000).toISOString(),
+    })
     const accepted = command()
     assert.equal(accepted.status, 0)
     assert.equal(JSON.parse(accepted.stdout).totals.manualReview, 1)
