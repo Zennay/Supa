@@ -145,14 +145,34 @@ export function assessWeeklyBasketStudy(
   study: WeeklyBasketStudy,
   options: unknown = {},
 ): WeeklyBasketStudyAssessment {
-  const validOptionsContainer =
-    options !== null &&
-    typeof options === 'object' &&
-    !Array.isArray(options)
-  const requestedMaxObservationWindowHours = validOptionsContainer
-    ? ((options as { maxObservationWindowHours?: unknown })
-        .maxObservationWindowHours ?? 24)
-    : 24
+  // Never evaluate caller-supplied accessors while deciding claimability.
+  // Both Array.isArray and reflection can throw on revoked or hostile Proxies.
+  let validOptionsContainer = false
+  let validOptionsDescriptor = false
+  let requestedMaxObservationWindowHours: unknown = 24
+
+  if (options !== null && typeof options === 'object') {
+    try {
+      if (!Array.isArray(options)) {
+        const prototype = Object.getPrototypeOf(options)
+        validOptionsContainer = true
+        if (prototype === Object.prototype || prototype === null) {
+          const descriptor = Object.getOwnPropertyDescriptor(
+            options,
+            'maxObservationWindowHours',
+          )
+          if (descriptor === undefined || 'value' in descriptor) {
+            validOptionsDescriptor = true
+            requestedMaxObservationWindowHours = descriptor?.value ?? 24
+          }
+        }
+      }
+    } catch {
+      // Do not surface reflected values, thrown errors or private caller data.
+      validOptionsContainer = false
+      validOptionsDescriptor = false
+    }
+  }
   const validMaxObservationWindowHours =
     typeof requestedMaxObservationWindowHours === 'number' &&
     Number.isFinite(requestedMaxObservationWindowHours) &&
@@ -164,6 +184,8 @@ export function assessWeeklyBasketStudy(
 
   if (!validOptionsContainer) {
     reasons.push('assessment options must be a non-array object')
+  } else if (!validOptionsDescriptor) {
+    reasons.push('assessment window option must be an own data property')
   } else if (!validMaxObservationWindowHours) {
     reasons.push('maxObservationWindowHours must be a positive finite number')
   }
