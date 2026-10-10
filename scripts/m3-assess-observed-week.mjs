@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
@@ -278,7 +279,16 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]
     if (value === '--output') {
-      output = argv[index + 1] ?? null
+      assert(output === null, '--output may be specified only once')
+      const destination = argv[index + 1]
+      assert(
+        typeof destination === 'string' &&
+          destination.length > 0 &&
+          destination === destination.trim() &&
+          !destination.startsWith('-'),
+        '--output requires exactly one non-option destination path',
+      )
+      output = destination
       index += 1
       continue
     }
@@ -286,7 +296,7 @@ function parseArgs(argv) {
   }
 
   assert(positional.length === 1, 'usage: m3-assess-observed-week <study.json> [--output report.json]')
-  assert(!output || output.trim().length > 0, '--output requires a file path')
+
 
   return {
     input: positional[0],
@@ -309,7 +319,23 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(report, null, 2)}\n`
 
   if (output) {
-    await writeFile(output, serialized, 'utf8')
+    // Missing output directories must not break a genuine M3 report run.
+    // Preserve existing directory permissions; private mode applies to new ones.
+    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
+    // Never clobber a reviewed report or follow a pre-existing output symlink.
+    // Newly created reports contain field metadata: restrict them to the owner.
+    try {
+      await writeFile(output, serialized, {
+        encoding: 'utf8',
+        flag: 'wx',
+        mode: 0o600,
+      })
+    } catch (error) {
+      if (error?.code === 'EEXIST') {
+        throw new Error('refusing to overwrite an existing M3 assessment report')
+      }
+      throw error
+    }
   } else {
     process.stdout.write(serialized)
   }

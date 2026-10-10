@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -206,5 +206,138 @@ test('M3 assessment refuses duplicate --output options before writing any report
     for (const output of [first, second]) {
       await assert.rejects(stat(output), { code: 'ENOENT' })
     }
+  })
+})
+
+for (const [label, script] of [
+  ['converter', 'scripts/m3-build-observed-study.mjs'],
+  ['assessment', 'scripts/m3-assess-observed-week.mjs'],
+]) {
+  async function syntheticInput(root) {
+    const input = join(root, 'synthetic-input.json')
+    const sheet = syntheticSheet()
+    const data = label === 'converter'
+      ? sheet
+      : buildWeeklyBasketStudyFromObservationSheet(sheet)
+    await writeFile(input, JSON.stringify(data))
+    return input
+  }
+
+  test(`M3 ${label} explicitly preserves stdout-only mode without --output`, async () => {
+    await inScratch(`${label}-stdout-positive`, async (root) => {
+      const input = await syntheticInput(root)
+      const result = spawnSync(
+        process.execPath,
+        ['--experimental-strip-types', script, input],
+        { cwd: process.cwd(), encoding: 'utf8' },
+      )
+      assert.equal(result.status, 0, result.stderr)
+      assert.equal(result.stderr, '')
+      const json = JSON.parse(result.stdout)
+      assert.equal(json.schemaVersion, 1)
+      if (label === 'assessment') {
+        assert.equal(json.publicSavingsClaimEligible, false)
+      } else {
+        assert.equal(json.studyId, 'synthetic-artifact-qa')
+      }
+    })
+  })
+
+  test(`M3 ${label} rejects option-like --output values without exposing study data`, async () => {
+    await inScratch(`${label}-optionlike-output`, async (root) => {
+      const input = await syntheticInput(root)
+      const result = spawnSync(
+        process.execPath,
+        ['--experimental-strip-types', script, input, '--output', '--debug'],
+        { cwd: process.cwd(), encoding: 'utf8' },
+      )
+      assert.notEqual(result.status, 0)
+      assert.equal(result.stdout, '')
+    })
+  })
+}
+
+test('M3 converter rejects missing --output instead of printing derived study JSON', async () => {
+  await inScratch('converter-missing-output', async (root) => {
+    const input = join(root, 'synthetic-sheet.json')
+    await writeFile(input, JSON.stringify(syntheticSheet()))
+    const result = spawnSync(
+      process.execPath,
+      ['--experimental-strip-types', 'scripts/m3-build-observed-study.mjs', input, '--output'],
+      { cwd: process.cwd(), encoding: 'utf8' },
+    )
+    assert.notEqual(result.status, 0)
+    assert.equal(result.stdout, '')
+  })
+})
+
+test('M3 converter refuses duplicate --output destinations without writing either', async () => {
+  await inScratch('converter-duplicate-output', async (root) => {
+    const input = join(root, 'synthetic-sheet.json')
+    const first = join(root, 'first-study.json')
+    const second = join(root, 'second-study.json')
+    await writeFile(input, JSON.stringify(syntheticSheet()))
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--experimental-strip-types', 'scripts/m3-build-observed-study.mjs',
+        input, '--output', first, '--output', second,
+      ],
+      { cwd: process.cwd(), encoding: 'utf8' },
+    )
+    assert.notEqual(result.status, 0)
+    assert.equal(result.stdout, '')
+    for (const output of [first, second]) {
+      await assert.rejects(stat(output), { code: 'ENOENT' })
+    }
+  })
+})
+
+test('M3 converter makes only newly created nested output directories owner-private', {
+  skip: process.platform === 'win32',
+}, async () => {
+  await inScratch('converter-private-directories', async (root) => {
+    const input = join(root, 'synthetic-sheet.json')
+    const existing = join(root, 'existing-shared-parent')
+    const fresh = join(existing, 'private-observations')
+    const deeper = join(fresh, 'derived-study')
+    const output = join(deeper, 'study.json')
+    await writeFile(input, JSON.stringify(syntheticSheet()))
+    await mkdir(existing)
+    await chmod(existing, 0o755)
+
+    const result = runCli('scripts/m3-build-observed-study.mjs', input, output)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal((await stat(existing)).mode & 0o777, 0o755, 'never chmod old directories')
+    for (const directory of [fresh, deeper]) {
+      assert.equal((await stat(directory)).mode & 0o777, 0o700)
+    }
+    assert.equal((await stat(output)).mode & 0o777, 0o600)
+  })
+})
+
+test('M3 assessor creates missing nested private report directories without chmodding existing ancestors', {
+  skip: process.platform === 'win32',
+}, async () => {
+  await inScratch('assessor-private-directories', async (root) => {
+    const input = join(root, 'synthetic-study.json')
+    const existing = join(root, 'existing-report-parent')
+    const fresh = join(existing, 'private-observations')
+    const deeper = join(fresh, 'assessment-output')
+    const output = join(deeper, 'assessment.json')
+    await writeFile(input, JSON.stringify(
+      buildWeeklyBasketStudyFromObservationSheet(syntheticSheet()),
+    ))
+    await mkdir(existing)
+    await chmod(existing, 0o755)
+
+    const result = runCli('scripts/m3-assess-observed-week.mjs', input, output)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal((await stat(existing)).mode & 0o777, 0o755)
+    for (const directory of [fresh, deeper]) {
+      assert.equal((await stat(directory)).mode & 0o777, 0o700)
+    }
+    assert.equal((await stat(output)).mode & 0o777, 0o600)
+    assert.equal(JSON.parse(await readFile(output, 'utf8')).publicSavingsClaimEligible, false)
   })
 })
