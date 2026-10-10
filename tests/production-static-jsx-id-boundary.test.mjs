@@ -225,7 +225,7 @@ test('static id guard detects composed literal IDs but not dynamic interpolation
         "const b = <input id={`account-${'name'}`} />",
         "const c = <input id={dynamicPrefix + '-name'} />",
         "const d = <input id={`account-${dynamicName}`} />",
-      ].join('\\n'),
+      ].join('\n'),
     },
   ])
 
