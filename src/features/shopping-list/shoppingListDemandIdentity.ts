@@ -1,4 +1,5 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
+import { isPhysicallyTrustworthyShoppingBasket } from './shoppingListPhysicalValidity.ts'
 
 /**
  * Stable, price-independent identity for the physical shopping task.
@@ -36,6 +37,9 @@ function wholePacks(value: unknown): value is number {
  * restore checked items under a null identity.
  */
 export function shoppingListDemandIdentity(basket: OneStoreBasket): string | null {
+  // A price-independent key must still represent a possible physical task.
+  // Monetary integrity is enforced separately by trusted v2 storage entry points.
+  if (!isPhysicallyTrustworthyShoppingBasket(basket)) return null
   const input = record(basket)
   const store = record(input?.store)
   if (!store || !identifier(store.id) || !Array.isArray(input?.lines)) {
