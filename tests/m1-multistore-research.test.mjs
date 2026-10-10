@@ -131,3 +131,37 @@ test('mock HTTP403 stops capture instead of switching proxy or accepting evidenc
     }), /HTTP 403.*without retry/)
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
+
+test('single approved proxy route records mode only, and denied proxy request still fails', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-fixed-proxy-test-'))
+  try {
+    const proxyUrl = 'http://127.0.0.1:3128'
+    const approvedEnv = { SUPA_RESEARCH_APPROVED: '1', SUPA_RESEARCH_PROXY_URL: proxyUrl }
+    const okBin = await fakeCurl(dir, 200)
+    const accepted = await captureResearchSource('hoogvliet-magere-melk', {
+      env: { ...approvedEnv, PATH: okBin + ':/usr/bin:/bin' },
+      outputDir: join(dir, 'out'),
+    })
+    const meta = JSON.parse(await readFile(accepted.meta, 'utf8'))
+    assert.equal(meta.proxyMode, 'approved-fixed-egress')
+    assert.doesNotMatch(JSON.stringify(meta), /127\.0\.0\.1|3128|proxyUrl/)
+    // A refusal remains terminal even if a proxy was explicitly configured.
+    await rm(join(dir, 'bin', 'curl'))
+    const deniedBody = [
+      '#!/bin/sh', "header=''", "body=''",
+      'while [ "$#" -gt 0 ]; do',
+      ' case "$1" in --dump-header) header="$2"; shift 2 ;; --output) body="$2"; shift 2 ;; *) shift ;; esac',
+      'done',
+      "printf 'HTTP/1.1 403 Denied\\r\\nContent-Type: text/html\\r\\n\\r\\n' > \"$header\"",
+      "printf 'access denied' > \"$body\"",
+      '',
+    ].join('\n')
+    const deniedCurl = join(dir, 'bin', 'curl')
+    await writeFile(deniedCurl, deniedBody)
+    await chmod(deniedCurl, 0o700)
+    await assert.rejects(captureResearchSource('hoogvliet-magere-melk', {
+      env: { ...approvedEnv, PATH: okBin + ':/usr/bin:/bin' },
+      outputDir: join(dir, 'rejected'),
+    }), /HTTP 403.*without retry/)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
