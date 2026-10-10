@@ -9,8 +9,9 @@ import './recipe-reuse-preview-panel.css'
  * Optional, non-destructive recipe comparison.
  *
  * The user's real week remains owned by PlannerView's onRecipeChange handler.
- * This panel never calls that handler or writes preferences: it only compares
- * the current recipe identities, and no money/leftover claim is inferred.
+ * Preview controls never call that handler or write preferences. Only the
+ * separate explicit, validated "Kies" button invokes onChooseRecipe;
+ * no price, leftover, or savings claim is inferred.
  */
 export function RecipeReusePreviewPanel({
   plannedMeals,
@@ -26,7 +27,11 @@ export function RecipeReusePreviewPanel({
   const [expanded, setExpanded] = useState(false)
   const [requestedDay, setRequestedDay] = useState<string | null>(null)
   const [requestedRecipe, setRequestedRecipe] = useState<string | null>(null)
-  const [confirmedSource, setConfirmedSource] = useState<{ day: string; recipeId: string } | null>(null)
+  const [confirmedSource, setConfirmedSource] = useState<{
+    day: string
+    recipeId: string
+    weekKey: string
+  } | null>(null)
 
   if (!Array.isArray(plannedMeals) || !Array.isArray(activeDays) ||
       !Array.isArray(recipes) || activeDays.length === 0 || recipes.length < 2) {
@@ -53,6 +58,14 @@ export function RecipeReusePreviewPanel({
     requestedRecipe !== null && alternatives.some((recipe) => recipe.id === requestedRecipe)
       ? requestedRecipe : alternatives[0].id
 
+  // The proposed overlap depends on *all* active meals, not just the
+  // selected day's source recipe. A change on Tuesday can alter a Monday
+  // proposal too; require a fresh user confirmation before enabling Apply.
+  const weekKey = JSON.stringify(activeDays.map((activeDay) => [
+    activeDay,
+    plannedMeals.filter((meal) => meal?.day === activeDay).map((meal) => meal.recipeId),
+  ]))
+
   // A previously chosen day/recipe may disappear when the real plan changes.
   // Do not silently turn an old proposal into an actionable different one.
   // The user must explicitly refresh the suggestion before applying it.
@@ -62,7 +75,8 @@ export function RecipeReusePreviewPanel({
       !alternatives.some((recipe) => recipe.id === requestedRecipe)) ||
     (confirmedSource !== null &&
       (confirmedSource.day !== day ||
-        confirmedSource.recipeId !== currentMeal.recipeId))
+        confirmedSource.recipeId !== currentMeal.recipeId ||
+        confirmedSource.weekKey !== weekKey))
 
   const preview = expanded && !staleSelection
     ? previewRecipeReuseChange({
@@ -91,6 +105,7 @@ export function RecipeReusePreviewPanel({
             setConfirmedSource({
               day: openingDay,
               recipeId: openingMeal?.recipeId ?? '',
+              weekKey,
             })
           }
           setExpanded((value) => !value)
@@ -112,6 +127,7 @@ export function RecipeReusePreviewPanel({
                   setConfirmedSource({
                     day: event.target.value,
                     recipeId: plannedMeals.find((meal) => meal?.day === event.target.value)?.recipeId ?? '',
+                    weekKey,
                   })
                 }}
               >
@@ -148,6 +164,7 @@ export function RecipeReusePreviewPanel({
                   setConfirmedSource({
                     day: freshDay,
                     recipeId: plannedMeals.find((meal) => meal?.day === freshDay)?.recipeId ?? '',
+                    weekKey,
                   })
                 }}
               >
