@@ -1,0 +1,37 @@
+/* Standalone, passive comparison guidance. No layout or token overrides. */
+.comparison-next-action {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  padding: clamp(0.85rem, 2vw, 1.15rem);
+  border: 1px solid var(--border, #d7dfe2);
+  border-radius: 0.9rem;
+  background: var(--surface, #fff);
+  color: var(--text, #243038);
+  overflow-wrap: anywhere;
+}
+
+.comparison-next-action__title {
+  display: block;
+  max-width: 100%;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.comparison-next-action__explanation,
+.comparison-next-action__instruction {
+  max-width: 100%;
+  margin: 0.45rem 0 0;
+  line-height: 1.5;
+}
+
+.comparison-next-action__label {
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comparison-next-action {
+    transition: none;
+    animation: none;
+  }
+}
