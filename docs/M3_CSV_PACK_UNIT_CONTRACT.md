@@ -1,5 +1,13 @@
 # M3 veld-CSV: verpakkingseenheden (product-core, concept)
 
+**Opt-in:** de oorspronkelijke review blijft ongewijzigd. Gebruik de extra fysieke eenhedencontrole alleen met:
+
+```sh
+node --experimental-strip-types scripts/m3-review-field-csv.mjs --validate-units /private/m3-observations.csv
+```
+
+Het retourrapport heeft dezelfde veilige aggregaatvelden. De extra `incompatible-pack-unit` code telt een fysiek incompatibele, beschikbare regel niet mee; een positief `piece`-pack moet uit een heel aantal stuks bestaan. De default één-argument-review krijgt deze strengere regels bewust niet, zodat historische rapporten en originele tests consistent blijven.
+
 Deze opt-in controle is een uitbreiding op de bestaande, **niet-bewijskrachtige** ingevulde CSV-preflight uit product PR #1163 en gebruikt dezelfde hoeveelheidsfamilies als de M2 matching-engine.
 
 ## Wat de controle wel doet
