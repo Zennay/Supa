@@ -118,6 +118,14 @@ function makeHarness(initialBasket, localStorage) {
     },
     './shoppingListProgress': { shoppingListProgressStorageKey },
     './ShoppingListCompletionBanner.tsx': { ShoppingListCompletionBanner: bannerModule.exports.ShoppingListCompletionBanner },
+    // Integration-only child stub: this harness tests the live parent checkout
+    // state. The real export component and safe text are tested separately.
+    './ShoppingListCopyButton.tsx': {
+      ShoppingListCopyButton: ({ doneLineIds }) => createNode('div', {
+        'data-copy-done-ids': JSON.stringify(doneLineIds),
+        children: null,
+      }),
+    },
   }
   const module = { exports: {} }
   new Function('module', 'exports', 'require', compiled.outputText)(
@@ -167,8 +175,23 @@ function makeHarness(initialBasket, localStorage) {
     assert.equal(states[0]['aria-live'], 'polite')
     return states[0]['data-shopping-progress-state']
   }
+  function exportedCheckedIds(root) {
+    const captured = []
+    function visit(node) {
+      if (Array.isArray(node)) return node.forEach(visit)
+      if (!node || typeof node !== 'object') return
+      if (typeof node.type === 'function') return visit(node.type(node.props))
+      if (node.props?.['data-copy-done-ids'] !== undefined) {
+        captured.push(JSON.parse(node.props['data-copy-done-ids']))
+      }
+      visit(node.props?.children)
+    }
+    visit(root)
+    assert.equal(captured.length, 1, 'exactly one copy export receives live progress')
+    return captured[0]
+  }
   return {
-    render, buttons, completion,
+    render, buttons, completion, exportedCheckedIds,
     setBasket(next) { basketInput = next; return render() },
     dispose() {
       if (savedWindow === undefined) delete globalThis.window
