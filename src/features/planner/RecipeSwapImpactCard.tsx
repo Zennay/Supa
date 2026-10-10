@@ -5,8 +5,13 @@ import './recipeSwapImpactCard.css'
 function summarizeLine(
   line: NonNullable<Extract<PlanRecipeSwapPreview, { status: 'ready' | 'unknown' }>['changes'][number]['before']>,
 ): string {
-  if (line.status === 'unresolved') return 'Productkeuze nog niet bekend'
-  return `${line.packs} × ${line.productName}`
+  const amount = line.requirement.amount
+  const unit = line.requirement.unit === 'piece'
+    ? amount === 1 ? 'stuk' : 'stuks'
+    : line.requirement.unit
+  const demand = amount === null ? 'Hoeveelheid onbekend' : `${amount} ${unit}`
+  if (line.status === 'unresolved') return `${demand} · Productkeuze nog niet bekend`
+  return `${demand} · ${line.packs} × ${line.productName}`
 }
 
 /** Read-only preview: the customer explicitly applies the recipe change elsewhere. */
@@ -24,18 +29,16 @@ export function RecipeSwapImpactCard({ preview }: { preview: PlanRecipeSwapPrevi
     <section
       className="supa-swap-preview"
       aria-label="Voorvertoning receptwijziging"
-      aria-live="polite"
-      aria-atomic="true"
     >
       <h3>Als je dit recept kiest</h3>
       {preview.status === 'ready' ? (
-        <p className="supa-swap-preview__total" data-price-state="known">
+        <p className="supa-swap-preview__total" data-price-state="known" aria-live="polite" aria-atomic="true">
           {preview.deltaCents === 0
             ? 'Het berekende mandtotaal blijft gelijk.'
-            : `Het berekende mandtotaal wordt ${euro.formatCents(Math.abs(preview.deltaCents!))} ${preview.deltaCents! > 0 ? 'hoger' : 'lager'}.`}
+            : `Het berekende mandtotaal wordt ${euro.formatCents(Math.abs(preview.deltaCents))} ${preview.deltaCents! > 0 ? 'hoger' : 'lager'}.`}
         </p>
       ) : (
-        <p className="supa-swap-preview__total" data-price-state="unknown">
+        <p className="supa-swap-preview__total" data-price-state="unknown" aria-live="polite" aria-atomic="true">
           Het prijsverschil is nog niet betrouwbaar te berekenen. Controleer onbekende producten.
         </p>
       )}
