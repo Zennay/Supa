@@ -247,15 +247,31 @@ test('malformed cyclic active day identity does not render invalid controls', ()
   assert.equal(ui.render(), null)
 })
 
-test('null or malformed plan rows never crash the preview during actual render', () => {
-  for (const badRow of [null, undefined, { recipeId: 'tikka' }, 0]) {
+test('null plan entries fail closed, while inert inactive rows remain harmless', () => {
+  for (const badRow of [null, undefined]) {
     const ui = makeHarness({ plannedMeals: [...m2InitialPlan, badRow] })
     const initial = ui.render()
-    assert.ok(initial, 'malformed inactive row must not crash initial render')
+    assert.ok(initial, 'invalid row cannot crash the collapsed panel')
     ui.collect(initial, 'button')[0].props.onClick()
     const tree = ui.render()
     assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
-    assert.equal(ui.collect(tree, 'button').length, 1, 'unknown input never permits Apply')
+    assert.equal(ui.collect(tree, 'button').length, 1, 'untrusted plan cannot offer Apply')
+  }
+
+  // The existing basket domain deliberately ignores malformed *inactive*
+  // rows whose day is undefined; the trusted active week remains unchanged.
+  // Preserve that valid behavior without throwing or inventing new claims.
+  for (const inertRow of [{ recipeId: 'tikka' }, 0]) {
+    const ui = makeHarness({ plannedMeals: [...m2InitialPlan, inertRow] })
+    const initial = ui.render()
+    assert.ok(initial)
+    ui.collect(initial, 'button')[0].props.onClick()
+    const tree = ui.render()
+    const preview = ui.collect(tree, PreviewCard)[0].props.preview
+    assert.ok(preview, 'unchanged active-week proposal remains inspectable')
+    assert.equal(preview.day, 'Ma')
+    assert.equal(preview.previousRecipeId, 'tikka')
+    assert.equal(ui.collect(tree, 'button').length, 2)
   }
 })
 
