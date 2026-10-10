@@ -17,6 +17,12 @@
 
 Passing a structure/freshness gate does **not** establish that a store catalog covers all eleven actual meal demands, the product is purchasable, prices are licensed for reuse, a shop trip is geographically feasible, the source observation is authentically captured, or that a saving exists. The inputs used in regression tests are entirely **synthetic**. It is forbidden to treat this contract as meeting the genuine human-field proof in [issue #78](https://github.com/Zennay/Supa/issues/78). `captureWindowHours` is a property of the supplied **fixtures**, not a proof of M3 observation provenance.
 
+## Four-meal, eleven-demand controlled integration
+
+`tests/product-controlled-freshness-m2-basket-integration.test.mjs` connects the newly validated **two** source-shaped rice packs to the existing real four-meal M2 ingredient-demand plan and the actual one-store basket and full-basket comparator code. The DekaMarkt-shaped `6 × 500 g` pack satisfies the rice demand with **one** hypothetical 299-cent pack; the PLUS-shaped single 1 kg pack costs 249 hypothetical cents. All eleven demand lines are covered by **synthetic existing M2 catalog fixtures** plus the two projected rice products, so the comparator reports a 50-cent **worse** candidate. A timestamp one second older than 24 hours, or a future capture, blocks the entire comparison before pricing.
+
+This is *integration of arithmetic and readiness behaviour only*. Nine/other products come from fixtures, not real PLUS/DekaMarkt captures. Comparator output cannot be treated as genuine savings. The real human field gate [#78](https://github.com/Zennay/Supa/issues/78) is unchanged.
+
 ## Separate release gates
 
 1. The ingestion owner [#117](https://github.com/Zennay/Supa/pull/117) and retailer-adapter owner [#122](https://github.com/Zennay/Supa/pull/122) must preserve and verify source-derived pack count before any live path reuses this helper.
