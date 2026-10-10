@@ -8,6 +8,7 @@ import ts from 'typescript'
 
 import { m2DefaultActiveDays, m2InitialPlan, m2Recipes } from '../src/data/m2Fixture.ts'
 import { buildIngredientReuseInsight } from '../src/domain/ingredientReuse.ts'
+import { previewRecipeReuseChange } from '../src/domain/ingredientReusePreview.ts'
 import { assessPlannerBudgetCents } from '../src/lib/plannerBudgetCents.ts'
 import { euro } from '../src/lib/money.ts'
 import { RecipeEstimateDisclosure } from '../src/features/planner/RecipeEstimateDisclosure.ts'
@@ -49,6 +50,23 @@ const cardModule = fromCommonJs(
   compiledSource('../src/features/planner/IngredientReuseCard.tsx', 'IngredientReuseCard.tsx', 'ingredient-reuse.css'),
   {},
 )
+// Compile all three real production components. Previously this integration
+// stubbed the panel, so a broken planner->panel import went unnoticed.
+const previewCardModule = fromCommonJs(
+  compiledSource('../src/features/planner/IngredientReusePreviewCard.tsx', 'IngredientReusePreviewCard.tsx', 'ingredient-reuse-preview.css'),
+  {},
+)
+const previewPanelModule = fromCommonJs(
+  compiledSource('../src/features/planner/RecipeReusePreviewPanel.tsx', 'RecipeReusePreviewPanel.tsx', 'recipe-reuse-preview-panel.css'),
+  {
+    react: React,
+    '../../domain/ingredientReusePreview.ts': { previewRecipeReuseChange },
+    './IngredientReusePreviewCard.tsx': {
+      IngredientReusePreviewCard: previewCardModule.IngredientReusePreviewCard,
+    },
+  },
+)
+
 const plannerModule = fromCommonJs(
   compiledSource('../src/features/planner/PlannerView.tsx', 'PlannerView.tsx', 'planner.css'),
   {
@@ -57,7 +75,9 @@ const plannerModule = fromCommonJs(
     '../../domain/ingredientReuse.ts': { buildIngredientReuseInsight },
     './RecipeEstimateDisclosure.ts': { RecipeEstimateDisclosure },
     './IngredientReuseCard.tsx': { IngredientReuseCard: cardModule.IngredientReuseCard },
-    './RecipeReusePreviewPanel.tsx': { RecipeReusePreviewPanel: () => null },
+    './RecipeReusePreviewPanel.tsx': {
+      RecipeReusePreviewPanel: previewPanelModule.RecipeReusePreviewPanel,
+    },
   },
 )
 
@@ -121,4 +141,24 @@ test('real planner fails closed on invalid duplicated active-day identity', () =
   assert.match(html, /Maak eerst een geldige planning/)
   assert.doesNotMatch(html, /<ul class="ingredient-reuse-list"/)
   assert.match(html, /Plan eerst. Vergelijk daarna./)
+})
+
+test('real planner includes the actual collapsed recipe comparison panel, without implicit apply', () => {
+  const html = renderPlanner()
+  assert.match(html, /aria-label="Een ander recept bekijken"/)
+  assert.match(html, /aria-expanded="false"/)
+  assert.match(html, /Bekijk een ander recept zonder te wijzigen/)
+  assert.doesNotMatch(html, /Werk voorbeeld bij|recipe-reuse-preview-apply/)
+  assert.match(html, /Richtprijzen zijn indicatief/)
+})
+
+test('real planner does not render recipe preview without complete ingredient data', () => {
+  const recipes = m2Recipes.map(({ ingredients, ...recipe }) => recipe)
+  const html = renderPlanner({ recipes })
+  assert.doesNotMatch(html, /Een ander recept bekijken|Bekijk een ander recept zonder te wijzigen/)
+})
+
+test('real planner hides alternative preview if only one complete recipe is available', () => {
+  const html = renderPlanner({ recipes: [m2Recipes[0]] })
+  assert.doesNotMatch(html, /Een ander recept bekijken|Bekijk een ander recept zonder te wijzigen/)
 })
