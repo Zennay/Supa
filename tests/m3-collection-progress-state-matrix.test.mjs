@@ -155,3 +155,40 @@ test('all store/ingredient positions survive draft recovery without promoting mi
     assert.equal(JSON.stringify(sheet), serialized, 'restoring may not edit the input')
   }
 })
+
+test('simultaneously incomplete stores always route baseline first, then candidate', () => {
+  const template = buildObservationSheet()
+  const baselineCount = template.baseline.lines.length
+  const candidateCount = template.candidate.lines.length
+  const total = baselineCount + candidateCount
+
+  for (let baselineIndex = 0; baselineIndex < baselineCount; baselineIndex += 1) {
+    for (let candidateIndex = 0; candidateIndex < candidateCount; candidateIndex += 1) {
+      const sheet = buildObservationSheet()
+      markEveryLineComplete(sheet)
+      const baselineLine = sheet.baseline.lines[baselineIndex]
+      const candidateLine = sheet.candidate.lines[candidateIndex]
+      const expectedBaselineId = baselineLine.ingredientId
+      const expectedCandidateId = candidateLine.ingredientId
+
+      baselineLine.observedProduct.priceCents = null
+      candidateLine.observedProduct.priceCents = null
+      assert.equal(observationSheetProgress(sheet).completeLines, total - 2)
+      assert.deepEqual(nextIncompleteObservationLine(sheet), {
+        side: 'baseline',
+        ingredientId: expectedBaselineId,
+      })
+
+      fillSyntheticProduct(baselineLine, baselineIndex)
+      assert.equal(observationSheetProgress(sheet).completeLines, total - 1)
+      assert.deepEqual(nextIncompleteObservationLine(sheet), {
+        side: 'candidate',
+        ingredientId: expectedCandidateId,
+      })
+
+      fillSyntheticProduct(candidateLine, candidateIndex)
+      assert.equal(observationSheetProgress(sheet).completeLines, total)
+      assert.equal(nextIncompleteObservationLine(sheet), null)
+    }
+  }
+})
