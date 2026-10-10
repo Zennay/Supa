@@ -82,7 +82,8 @@ test('fractional quality matrix: every 0.30g two-meal decimal split fits one 0.3
 
 test('fractional quality matrix: real over-the-boundary demand never gets hidden by tolerance', () => {
   for (const cents of [1, 3, 7, 11, 13, 17, 23, 29]) {
-    const result = basketFor([cents / 100, (30 - cents) / 100 + 0.0001])
+    // Author the intended 4-place decimal, not an IEEE-754 addition artifact.
+    const result = basketFor([cents / 100, (3001 - cents * 100) / 10000])
     assert.equal(result.aggregate[0].amount, 0.3001)
     assertTrustedPacks(result, 2)
   }
@@ -94,7 +95,7 @@ test('fractional quality matrix: three meals maintain whole-pack and money parit
     assert.equal(result.aggregate[0].amount, 0.3)
     assertTrustedPacks(result, 1, 0)
     assert.equal(result.basket.selectedMealCount, 3)
-    const above = basketFor([amounts[0], amounts[1], amounts[2] + 0.0001])
+    const above = basketFor([amounts[0], amounts[1], (Math.round(amounts[2] * 10000) + 1) / 10000])
     assert.equal(above.aggregate[0].amount, 0.3001)
     assertTrustedPacks(above, 2)
   }
