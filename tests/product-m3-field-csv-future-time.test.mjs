@@ -69,7 +69,7 @@ test('whole-sheet future instants fail closed without inventing evidence', () =>
 })
 
 test('every individual row is reviewed against clock, not only the shared 24-hour window', () => {
-  for (const rowIndex of [1, 4, 11, 12, 17, 22]) {
+  for (let rowIndex = 1; rowIndex <= 22; rowIndex++) {
     const rows = syntheticRows()
     rows[rowIndex][7] = '2026-10-10T12:00:00.001Z'
     const result = reviewM3FieldCsv(serialize(rows), {
