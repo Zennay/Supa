@@ -71,6 +71,19 @@ const positiveDecimal = /^(?:(?:0|[1-9]\d*)(?:\.\d+)?|\.\d+)$/
 const safeText = value => !/^[\s]*[=+@-]/.test(value)
 const meaningfulText = value => typeof value === 'string' && value.trim().length > 0
 
+// The lexical prefix alone accepts malformed ports and hostnames. Parse the
+// authority without dereferencing the URL; never log or fetch the source.
+function validSourceUrl(value) {
+  if (!/^https:\/\/[^\s/@]+(?:\/|$)/i.test(value) || value.includes('\\')) return false
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'https:' && Boolean(parsed.hostname) &&
+      !parsed.username && !parsed.password
+  } catch {
+    return false
+  }
+}
+
 function validObservationTime(value) {
   if (!isoInstant.test(value)) return null
   // Date.parse can silently normalize 30 February into March. Calendar and
@@ -123,7 +136,7 @@ export function reviewM3FieldCsv(input) {
       warnings.add('unsafe-observation-cell')
     }
     if (context) contexts.add(context)
-    if (sourceUrl && !/^https:\/\/[^\s/@]+(?:\/|$)/i.test(sourceUrl)) {
+    if (sourceUrl && !validSourceUrl(sourceUrl)) {
       warnings.add('invalid-source-url')
     }
     const timestamp = observedAt ? validObservationTime(observedAt) : null
