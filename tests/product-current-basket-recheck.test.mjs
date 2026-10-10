@@ -168,3 +168,36 @@ test('current canonical result never leaks a cached report into an invalid next 
   assert.deepEqual(changed, before)
   assert.equal(oldComparison?.claimable, true, 'historical object was never re-used')
 })
+
+test('a JSON string pack amount may coerce upstream, but never unlocks current monetary guidance', () => {
+  const current = pair()
+  const index = current.candidate.lines.findIndex((line) => line.status === 'matched')
+  assert.ok(index >= 0)
+  const matched = current.candidate.lines[index]
+  const corrupted = structuredClone(current)
+  corrupted.candidate.lines[index] = {
+    ...matched,
+    pack: { ...matched.pack, amount: String(matched.pack.amount) },
+  }
+
+  // Existing canonical arithmetic multiplies pack.amount and can coerce the
+  // string without noticing its invalid runtime type. The new guard does not.
+  assert.equal(compareFullBaskets(corrupted).claimable, true)
+  assert.equal(compareCurrentBaskets(corrupted), null)
+  assert.equal(compareCurrentBaskets(current)?.claimable, true)
+  assert.equal(typeof corrupted.candidate.lines[index].pack.amount, 'string')
+})
+
+test('runtime-only number-wrapper pack amounts cannot be silently coerced', () => {
+  const current = pair()
+  const index = current.baseline.lines.findIndex((line) => line.status === 'matched')
+  assert.ok(index >= 0)
+  const matched = current.baseline.lines[index]
+  const numericWrapper = Object(matched.pack.amount)
+  current.baseline.lines[index] = {
+    ...matched,
+    pack: { ...matched.pack, amount: numericWrapper },
+  }
+
+  assert.equal(compareCurrentBaskets(current), null)
+})
