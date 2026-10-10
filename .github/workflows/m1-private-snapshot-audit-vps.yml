@@ -6,6 +6,7 @@ on:
       - product/m1-multistore-private-snapshot-audit-20261011
     paths:
       - 'scripts/m1-research-snapshot-audit.mjs'
+      - 'scripts/m1-research-snapshot-inventory.mjs'
       - 'tests/m1-multistore*.test.mjs'
       - '.github/workflows/m1-private-snapshot-audit-vps.yml'
   workflow_dispatch:
