@@ -35,7 +35,7 @@ test('synthetic unmodified snapshot is only ready for manual DOM review, never a
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.deepEqual(report.reasons, [])
   assert.equal(report.ageHours, 1 / 60)
-  assert.doesNotMatch(JSON.stringify(report), /synthetic fixture|halfvolle|halvarine|\\/boodschappen|€/)
+  assert.doesNotMatch(JSON.stringify(report), /synthetic fixture|private price payload|€/)
 })
 
 test('capture provenance rejects mutated HTML and forged digest, byte count or URL', () => {
