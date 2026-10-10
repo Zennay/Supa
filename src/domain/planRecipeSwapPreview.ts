@@ -11,6 +11,7 @@ type EvaluatedSwap = {
   activeDaysSnapshot: string[]
   changedDay: string
   replacementRecipeId: string
+  catalogSnapshotKey: string
   before: OneStoreBasket
   after: OneStoreBasket
   changes: Array<{
@@ -89,6 +90,39 @@ function safeCompleteBasket(basket: OneStoreBasket): boolean {
 }
 
 /**
+ * Snapshot only the catalog fields that affect this deterministic M2 matching
+ * decision. Sorting makes an equivalent catalog reorder harmless; all stores
+ * are included to prevent an unnoticed source-context change.
+ */
+function snapshotCatalogKey(store: Store, products: StoreProduct[]): string | null {
+  if (!store || !canonical(store.id) || !canonical(store.name) || !Array.isArray(products)) {
+    return null
+  }
+  try {
+    const entries = products.map((product) => {
+      if (!product || typeof product !== 'object') return null
+      return JSON.stringify({
+        id: product.id,
+        storeId: product.storeId,
+        name: product.name,
+        packAmount: product.packAmount,
+        packUnit: product.packUnit,
+        packCount: product.packCount ?? null,
+        available: product.available,
+        priceCents: product.priceCents,
+      })
+    })
+    if (entries.includes(null)) return null
+    return JSON.stringify({
+      store: { id: store.id, name: store.name },
+      products: entries.sort(),
+    })
+  } catch {
+    return null
+  }
+}
+
+/**
  * Evaluate one recipe replacement without mutating saved preferences or the
  * catalog. A change to the plan is NOT a change to the shopping list until the
  * user explicitly accepts it. The caller must label source freshness.
@@ -127,6 +161,9 @@ export function previewPlanRecipeSwap(input: PlanRecipeSwapInput): PlanRecipeSwa
   if (recipes.filter((recipe) => recipe && recipe.id === originalRecipeId).length !== 1) {
     return invalid('original recipe is absent or ambiguous')
   }
+
+  const catalogSnapshotKey = snapshotCatalogKey(store, products)
+  if (catalogSnapshotKey === null) return invalid('catalog snapshot cannot be trusted')
 
   const nextPlan = plan.map((meal) =>
     meal.day === day ? { day: meal.day, recipeId: replacementRecipeId } : { ...meal },
@@ -170,6 +207,7 @@ export function previewPlanRecipeSwap(input: PlanRecipeSwapInput): PlanRecipeSwa
     after,
     changes,
     priceEvidence: 'input-snapshot-only',
+    catalogSnapshotKey,
   }
   if (complete && Number.isSafeInteger(delta)) {
     return { ...snapshot, status: 'ready', reason: null, deltaCents: delta }
@@ -200,6 +238,8 @@ export function acceptPlanRecipeSwap(
   preview: PlanRecipeSwapPreview,
   currentPlan: PlannedMeal[],
   currentActiveDays: string[],
+  currentStore: Store,
+  currentProducts: StoreProduct[],
 ): AcceptedPlanRecipeSwap {
   if (!preview || preview.status === 'invalid') {
     return { status: 'invalid', plan: null, reason: 'no valid preview to accept' }
@@ -225,6 +265,10 @@ export function acceptPlanRecipeSwap(
 
   if (!samePlan || !sameDays) {
     return { status: 'stale', plan: null, reason: 'planning changed since preview' }
+  }
+  const currentCatalogKey = snapshotCatalogKey(currentStore, currentProducts)
+  if (currentCatalogKey === null || currentCatalogKey !== preview.catalogSnapshotKey) {
+    return { status: 'stale', plan: null, reason: 'catalog changed since preview' }
   }
 
   const expected = preview.previousPlan.map((meal) =>
