@@ -50,6 +50,7 @@ export function shoppingListCompletion(
     !Number.isSafeInteger(basket.unresolvedLineCount) ||
     basket.matchedLineCount < 0 ||
     basket.unresolvedLineCount < 0 ||
+    (basket.selectedMealCount === 0 && lines.length > 0) ||
     basket.matchedLineCount + basket.unresolvedLineCount !== lines.length
   ) {
     return { ...invalid }
