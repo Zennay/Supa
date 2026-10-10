@@ -110,3 +110,31 @@ test('calendar-impossible explicit UTC day must not be normalized into an observ
   assert.equal(observationSheetReadiness(sheet).ready, false)
   assert.notEqual(observationWindowSummary(sheet).state, 'within-window')
 })
+
+for (const [format, value] of [
+  ['timezone-less ISO', '2026-10-04T12:00:00'],
+  ['date-only', '2026-10-04'],
+  ['RFC-2822', 'Sun, 04 Oct 2026 12:00:00 GMT'],
+  ['calendar rollover', '2026-02-31T12:00:00Z'],
+]) {
+  test(`24-hour guidance cannot derive a deadline from invalid ${format}`, () => {
+    const sheet = syntheticUnavailableSheet()
+    sheet.baseline.observedAt = value
+
+    // Assert the window directly, independently of the readiness assertion;
+    // otherwise one failing gate can hide the other regression.
+    assert.deepEqual(observationWindowSummary(sheet), {
+      state: 'single-observation',
+      firstSide: 'candidate',
+      firstObservedAt: '2026-10-04T12:30:00.000Z',
+      deadlineAt: '2026-10-05T12:30:00.000Z',
+    })
+  })
+}
+
+test('two invalid formatted timestamps must not define a completed observation window', () => {
+  const sheet = syntheticUnavailableSheet()
+  sheet.baseline.observedAt = '2026-10-04T12:00:00'
+  sheet.candidate.observedAt = 'Sun, 04 Oct 2026 12:30:00 GMT'
+  assert.deepEqual(observationWindowSummary(sheet), { state: 'not-started' })
+})
