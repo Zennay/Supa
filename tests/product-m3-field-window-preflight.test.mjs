@@ -121,3 +121,40 @@ test('real Node entrypoint accepts observed historical timestamps but rejects ma
   assert.equal(malformed.status, 1)
   assert.match(malformed.stderr, /usage:/)
 })
+
+test('M3 clock uses elapsed hours rather than wall-clock labels through DST transitions', () => {
+  const later = Date.parse('2026-12-01T12:00:00Z')
+  const spring = assessFieldWindow({
+    baselineAt: '2026-03-28T12:00:00+01:00',
+    candidateAt: '2026-03-29T12:00:00+02:00',
+    nowMs: later,
+  })
+  assert.deepEqual(spring, { status: 'within-window', elapsedMinutes: 1380 })
+
+  const autumn = assessFieldWindow({
+    baselineAt: '2026-10-24T12:00:00+02:00',
+    candidateAt: '2026-10-25T12:00:00+01:00',
+    nowMs: later,
+  })
+  assert.equal(autumn.status, 'expired', 'same displayed hour on consecutive dates can be 25 elapsed hours')
+})
+
+test('M3 clock permits exact 24-hour cross-zone equality but refuses UTC-hidden futures', () => {
+  const later = Date.parse('2026-12-01T12:00:00Z')
+  assert.equal(assessFieldWindow({
+    baselineAt: '2026-10-23T22:00:00-05:00',
+    candidateAt: '2026-10-25T03:00:00Z',
+    nowMs: later,
+  }).status, 'within-window')
+
+  const hiddenFuture = '2026-10-10T20:30:00-05:00'
+  assert.equal(assessFieldWindow({
+    baselineAt: hiddenFuture, candidateAt: hiddenFuture, nowMs: NOW,
+  }).status, 'invalid')
+})
+
+test('M3 field clock handles century leap-year rules without coercion', () => {
+  assert.equal(parseFieldInstant('1900-02-29T00:00:00Z'), null)
+  assert.equal(parseFieldInstant('2000-02-29T00:00:00Z'),
+    Date.parse('2000-02-29T00:00:00Z'))
+})
