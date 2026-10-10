@@ -57,6 +57,7 @@ const plannerModule = fromCommonJs(
     '../../domain/ingredientReuse.ts': { buildIngredientReuseInsight },
     './RecipeEstimateDisclosure.ts': { RecipeEstimateDisclosure },
     './IngredientReuseCard.tsx': { IngredientReuseCard: cardModule.IngredientReuseCard },
+    './RecipeReusePreviewPanel.tsx': { RecipeReusePreviewPanel: () => null },
   },
 )
 
