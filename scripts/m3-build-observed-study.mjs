@@ -371,7 +371,16 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]
     if (value === '--output') {
-      output = argv[index + 1] ?? null
+      assert(output === null, '--output may be specified only once')
+      const destination = argv[index + 1]
+      assert(
+        typeof destination === 'string' &&
+          destination.length > 0 &&
+          destination === destination.trim() &&
+          !destination.startsWith('-'),
+        '--output requires exactly one non-option destination path',
+      )
+      output = destination
       index += 1
       continue
     }
@@ -382,7 +391,7 @@ function parseArgs(argv) {
     positional.length === 1,
     'usage: m3:build-observed-study <observation-sheet.json> [--output study.json]',
   )
-  assert(!output || output.trim().length > 0, '--output requires a file path')
+
 
   return { input: positional[0], output }
 }
