@@ -65,7 +65,8 @@ export function buildIngredientReuseInsight({
         !Number.isFinite(ingredient.amount) ||
         ingredient.amount <= 0 ||
         typeof ingredient.label !== 'string' ||
-        !ingredient.label.trim(),
+        !ingredient.label.trim() ||
+        !['g', 'kg', 'ml', 'l', 'piece'].includes(ingredient.unit),
     )
   ) {
     return null
