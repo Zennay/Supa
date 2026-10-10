@@ -164,7 +164,13 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
       {/* The exported checklist follows the same current trusted basket and
           checked IDs as the visible list; it never exports price claims. */}
-      <ShoppingListCopyButton basket={basket} doneLineIds={done} />
+      {basketKey === null ? (
+        <p role="status">
+          De boodschappenlijst kan nog niet veilig worden gekopieerd.
+        </p>
+      ) : (
+        <ShoppingListCopyButton basket={basket} doneLineIds={done} />
+      )}
     </section>
   )
 }
