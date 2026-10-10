@@ -533,7 +533,7 @@ function nonBlank(value: string) {
 // the canonical M3 JSON converter, not JavaScript Date.parse's loose fallback.
 // Both require a real calendar day and an explicit, valid ISO UTC offset.
 const M3_OBSERVED_AT_PATTERN =
-  /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})(?::(\\d{2})(?:\\.\\d{1,9})?)?(Z|[+-](\\d{2}):(\\d{2}))$/
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-](\d{2}):(\d{2}))$/
 
 function validObservedAt(value: string) {
   const match = M3_OBSERVED_AT_PATTERN.exec(value)
