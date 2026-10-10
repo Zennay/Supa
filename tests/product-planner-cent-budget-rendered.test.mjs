@@ -35,6 +35,7 @@ const localRequire = (moduleName) => {
   // these prior fixture-budget tests remain focused on money and estimate copy.
   if (moduleName === '../../domain/ingredientReuse.ts') return { buildIngredientReuseInsight: () => null }
   if (moduleName === './IngredientReuseCard.tsx') return { IngredientReuseCard: () => null }
+  if (moduleName === './RecipeReusePreviewPanel.tsx') return { RecipeReusePreviewPanel: () => null }
   if (moduleName === 'react/jsx-runtime') return require(moduleName)
   throw new Error(`Unexpected PlannerView dependency: ${moduleName}`)
 }
