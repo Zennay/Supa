@@ -1,4 +1,5 @@
 import type { OneStoreBasket } from '../../domain/basket'
+import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { BasketComparison } from '../../domain/basketComparison'
 
 export type ComparisonNextStepCode =
@@ -229,6 +230,30 @@ export function comparisonNextStep(input: {
     baseline.matchedLineCount !== baseline.lines.length ||
     candidate.matchedLineCount !== candidate.lines.length ||
     !consistentLineTrace(comparison, baseline, candidate)
+  ) {
+    return step('review-data')
+  }
+
+  // Price and ID traces alone cannot prove the CURRENT demand and physical packs.
+  // Re-check current input with the single canonical financial comparator before
+  // turning a cached result into consumer-facing comparison guidance (#1065).
+  // A malformed runtime pack must fail closed, never break the shopping screen.
+  let current: BasketComparison
+  try {
+    current = compareFullBaskets({ baseline, candidate })
+  } catch {
+    return step('review-data')
+  }
+  if (
+    current.claimable !== true ||
+    current.outcome !== comparison.outcome ||
+    current.deltaCents !== comparison.deltaCents ||
+    current.savingsCents !== comparison.savingsCents ||
+    current.baselineTotalCents !== comparison.baselineTotalCents ||
+    current.candidateTotalCents !== comparison.candidateTotalCents ||
+    !Array.isArray(current.reasons) ||
+    current.reasons.length !== 0 ||
+    !consistentLineTrace(current, baseline, candidate)
   ) {
     return step('review-data')
   }
