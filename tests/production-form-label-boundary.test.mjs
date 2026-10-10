@@ -85,13 +85,27 @@ function hasUsableNameAttribute(node, attributeName) {
   return staticValue === null || staticValue.trim().length > 0
 }
 
+// An entirely empty label, or one containing only controls, does not
+// supply an accessible name. Dynamic/unknown label content remains possible.
+function hasPotentialLabelContent(labelElement) {
+  return labelElement.children.some((child) => {
+    if (ts.isJsxText(child)) return child.getText().trim().length > 0
+    if (ts.isJsxSelfClosingElement(child) &&
+      labelledControlTags.has(intrinsicTagName(child))) return false
+    if (ts.isJsxElement(child) &&
+      labelledControlTags.has(intrinsicTagName(child.openingElement))) return false
+    return true
+  })
+}
+
 function isWrappedByLabel(node) {
   let current = node.parent
 
   while (current) {
     if (
       ts.isJsxElement(current) &&
-      intrinsicTagName(current.openingElement) === 'label'
+      intrinsicTagName(current.openingElement) === 'label' &&
+      hasPotentialLabelContent(current)
     ) {
       return true
     }
@@ -129,7 +143,10 @@ function findUnlabelledFormControl(source, filename = 'candidate.tsx') {
         attributeByName(node.attributes, 'htmlFor'),
         sourceFile,
       )
-      if (target !== null) labelTargets.add(target)
+      if (target !== null &&
+        ts.isJsxOpeningElement(node) &&
+        ts.isJsxElement(node.parent) &&
+        hasPotentialLabelContent(node.parent)) labelTargets.add(target)
     }
 
     ts.forEachChild(node, collectLabelTargets)
@@ -215,6 +232,10 @@ test('form-label guard rejects unlabelled controls and mismatched explicit label
     '<select><option>One</option></select>',
     '<textarea />',
     '<input aria-label="" />',
+    '<label><input /></label>',
+    '<label>   <input /></label>',
+    '<><label htmlFor="email" /><input id="email" /></>',
+    '<><label htmlFor="email">   </label><input id="email" /></>',
     '<input aria-label="   " />',
     '<input id="email" /><label htmlFor="other">Email</label>',
     '<input type={inputType} />',
@@ -230,6 +251,8 @@ test('form-label guard rejects unlabelled controls and mismatched explicit label
 test('form-label guard preserves wrapping, explicit, ARIA, and self-naming controls', () => {
   for (const source of [
     '<label>Name<input /></label>',
+    '<label>{dynamicLabel}<input /></label>',
+    '<label><span>Label</span><input /></label>',
     '<><label htmlFor="email">Email</label><input id="email" /></>',
     '<><label htmlFor={fieldId}>Field</label><select id={fieldId}><option>One</option></select></>',
     '<input aria-label="Search" />',
