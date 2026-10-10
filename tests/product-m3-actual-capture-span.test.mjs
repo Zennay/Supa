@@ -91,3 +91,16 @@ test('source-only basket preflight reports actual cross-retailer spread, never t
   assert.equal(result.releaseEligible, false)
   assert.equal(Object.hasOwn(result, 'savingsCents'), false)
 })
+
+test('empty source catalogs never manufacture a comparable captured-hour span', () => {
+  const plus = input('2026-10-10T12:00:00Z', '2026-10-10T12:00:00Z')
+  assert.equal(projectFreshControlledComparisonCatalogs({
+    ...plus, baselineObservations: [],
+  }), null)
+  assert.equal(projectFreshControlledComparisonCatalogs({
+    ...plus, candidateObservations: [],
+  }), null)
+  assert.equal(projectFreshControlledComparisonCatalogs({
+    ...plus, baselineObservations: [], candidateObservations: [],
+  }), null)
+})
