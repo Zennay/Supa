@@ -90,6 +90,9 @@ export function RecipeReusePreviewPanel({
     ]),
     recipes: recipes.map((recipe) => [
       typeof recipe?.id === 'string' ? recipe.id : null,
+      // The name the user is consenting to is part of proposal identity.
+      // A catalog rename must not silently reauthorize an old Apply action.
+      typeof recipe?.title === 'string' ? recipe.title : null,
       Array.isArray(recipe?.ingredients)
         ? recipe.ingredients.map((ingredient) => [
             typeof ingredient?.id === 'string' ? ingredient.id : null,
