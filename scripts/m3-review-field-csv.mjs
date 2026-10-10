@@ -1,6 +1,7 @@
 import { lstatSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { buildBlankM3FieldChecklistCsv } from './m3-export-blank-field-checklist.mjs'
+import { sameM3QuantityFamily } from './m3-field-unit-compatibility.mjs'
 
 const LIMIT_BYTES = 128 * 1024
 const IMMUTABLE = Object.freeze([0, 1, 2, 3, 4, 5, 6, 18])
@@ -150,9 +151,13 @@ export function reviewM3FieldCsv(input) {
     const yes = ['ja', 'yes', 'true'].includes(state)
     const no = ['nee', 'no', 'false'].includes(state)
     const required = Boolean(observedAt && meaningfulText(context) && meaningfulText(source) && (yes || no))
+    const unitCompatible = yes && sameM3QuantityFamily(row[6], packUnit)
+    if (yes && packUnit && !unitCompatible) {
+      warnings.add('incompatible-pack-unit')
+    }
     const coherent = no
       ? !product && !packAmount && !packUnit && !packCount && !priceCents
-      : yes && Boolean(meaningfulText(product) && packAmount && packUnit && packCount && priceCents) &&
+      : yes && unitCompatible && Boolean(meaningfulText(product) && packAmount && packUnit && packCount && priceCents) &&
         positiveDecimal.test(packAmount) && Number.isFinite(Number(packAmount)) &&
         Number(packAmount) > 0 && Number.isSafeInteger(Math.ceil(Number(packAmount))) &&
         ['g', 'kg', 'ml', 'l', 'piece'].includes(packUnit) &&
