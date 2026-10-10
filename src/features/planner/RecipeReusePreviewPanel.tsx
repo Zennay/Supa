@@ -34,7 +34,11 @@ export function RecipeReusePreviewPanel({
   } | null>(null)
 
   if (!Array.isArray(plannedMeals) || !Array.isArray(activeDays) ||
-      !Array.isArray(recipes) || activeDays.length === 0 || recipes.length < 2) {
+      !Array.isArray(recipes) || activeDays.length === 0 || recipes.length < 2 ||
+      activeDays.some((day) => typeof day !== 'string' || !day.trim()) ||
+      new Set(activeDays).size !== activeDays.length) {
+    // A duplicate/invalid active-day identity must not render duplicate
+    // select keys or permit a misleading alternative-recipe action.
     return null
   }
 
@@ -48,7 +52,7 @@ export function RecipeReusePreviewPanel({
   // Never reuse a stale day/recipe identity for an unrelated week.
   const day = requestedDay !== null && days.includes(requestedDay)
     ? requestedDay : days[0]
-  const currentMeal = plannedMeals.find((meal) => meal.day === day)
+  const currentMeal = plannedMeals.find((meal) => meal?.day === day)
   if (!currentMeal) return null
   const alternatives = recipes.filter((recipe) =>
     typeof recipe?.id === 'string' && recipe.id !== currentMeal.recipeId,
