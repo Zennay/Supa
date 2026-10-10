@@ -112,3 +112,10 @@ test('canonical M3 comparison fixture is immutable at exported boundaries', () =
     m3CandidateProducts.pop()
   }, TypeError)
 })
+
+test('candidate comparison label contains no internal milestone jargon (#592)', () => {
+  assert.equal(m3CandidateStore.id, 'm3-candidate-store')
+  assert.equal(m3CandidateStore.name, 'Voorbeeldwinkel B')
+  assert.doesNotMatch(m3CandidateStore.name, /\\bM[0-9]+\\b|testwinkel|testfixture/i)
+  assert.deepEqual(m3CandidateProducts.map((product) => product.storeId), Array(m3CandidateProducts.length).fill(m3CandidateStore.id))
+})
