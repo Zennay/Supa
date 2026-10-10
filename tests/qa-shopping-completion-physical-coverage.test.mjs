@@ -100,6 +100,32 @@ test('positive control: physically equivalent g/kg and ml/l packs are not reject
   assert.equal(shoppingListCompletion(transformed, allChecked(transformed)).state, 'complete')
 })
 
+test('positive control: exact boundary and a legitimate 2-pack remain accepted', () => {
+  const source = canonicalTuesday()
+  const adjusted = {
+    ...source,
+    lines: source.lines.map((line) => {
+      if (line.id === 'basmati-rice') {
+        // Exactly 150 g in a 0.15 kg bag, not two bags from a floating epsilon.
+        return { ...line, pack: { ...line.pack, amount: 0.15, unit: 'kg' } }
+      }
+      if (line.id === 'teriyaki-sauce') {
+        // Two physical 30 ml bottles inside one purchased 2-pack cover 60 ml.
+        return {
+          ...line,
+          pack: { ...line.pack, amount: 30, unit: 'ml', count: 2 },
+        }
+      }
+      return line
+    }),
+  }
+  const snapshot = structuredClone(adjusted)
+  const complete = shoppingListCompletion(adjusted, allChecked(adjusted))
+  assert.equal(complete.state, 'complete')
+  assert.equal(complete.remainingCount, 0)
+  assert.deepEqual(adjusted, snapshot)
+})
+
 test('negative control: marked-complete basket must reject requirements above available pack coverage', async (t) => {
   const source = canonicalTuesday()
   const scenarios = [
