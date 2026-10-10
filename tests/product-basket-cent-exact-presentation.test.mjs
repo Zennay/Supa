@@ -68,7 +68,8 @@ test('BasketView title and individual matched rows consume canonical cent format
   const source = await readFile(
     new URL('../src/features/basket/BasketView.tsx', import.meta.url), 'utf8',
   )
-  assert.match(source, /euro\.formatCents\(Math\.abs\(comparison\.savingsCents \?\? 0\)\)/)
+  assert.match(source, /basketComparisonHeadline\(comparison, comparisonCandidate\)/)
+  assert.doesNotMatch(source, /comparison\.savingsCents \?\? 0/)
   assert.match(source, /euro\.formatCents\(line\.lineTotalCents\)/)
   assert.doesNotMatch(source, /euro\.format\([^)]*\/ 100\)/)
   assert.match(source, /Geen actuele winkelprijzen of bewezen besparing\./)
