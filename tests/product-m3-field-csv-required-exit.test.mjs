@@ -71,3 +71,31 @@ test('M3 optional --require-complete rejects blank CSV with JSON counts but no s
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('M3 combined strict completeness and unit checks refuse false-ready packs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'supa-m3-combined-strict-'))
+  try {
+    const file = join(dir, 'private-field-record.csv')
+    const rows = parseM3FieldCsv(syntheticFilledCsv())
+    rows[1][11] = rows[1][6] === 'piece' ? 'ml' : 'piece'
+    const serialize = rs => rs.map(row => row.map(value =>
+      '"' + String(value).replaceAll('"', '""') + '"').join(',')).join('\n') + '\n'
+    writeFileSync(file, serialize(rows), { mode: 0o600 })
+    const proc = spawnSync(process.execPath, [
+      '--experimental-strip-types', 'scripts/m3-review-field-csv.mjs',
+      '--require-complete', '--validate-units', file,
+    ], { encoding: 'utf8' })
+    assert.equal(proc.status, 2, proc.stderr)
+    const report = JSON.parse(proc.stdout)
+    assert.ok(report.warnings.includes('incompatible-pack-unit'))
+    assert.equal(report.completeRows, 21)
+    assert.equal(report.evidenceVerified, false)
+    assert.equal(report.releaseEligible, false)
+    assert.equal(report.claimable, false)
+    assert.equal(report.savingsCents, null)
+    assert.equal(proc.stderr, '')
+    assert.doesNotMatch(proc.stdout, /private-field-record|synthetic fictional|199/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

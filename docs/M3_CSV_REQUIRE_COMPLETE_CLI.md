@@ -6,6 +6,8 @@ Wie de preflight in een shellscript gebruikt en wil dat *onvolledige* regels nie
 
 ```sh
 node --experimental-strip-types scripts/m3-review-field-csv.mjs --require-complete /private/m3-observations.csv
+# Optioneel met fysieke eenhedencontrole uit #1170:
+node --experimental-strip-types scripts/m3-review-field-csv.mjs --require-complete --validate-units /private/m3-observations.csv
 ```
 
 ## Exitcodecontract

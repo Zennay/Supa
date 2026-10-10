@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { sameM3QuantityFamily, validM3PackPieceAmount } from '../scripts/m3-field-unit-compatibility.mjs'
 import { buildBlankM3FieldChecklistCsv } from '../scripts/m3-export-blank-field-checklist.mjs'
 import { parseM3FieldCsv, reviewM3FieldCsv } from '../scripts/m3-review-field-csv.mjs'
@@ -41,7 +45,7 @@ test('M3 field reviewer rejects mismatched packaging dimension in either store',
     const rows = fictionalObservations()
     const required = rows[index][6]
     rows[index][11] = ['g','kg'].includes(required) ? 'ml' : 'g'
-    const report = reviewM3FieldCsv(csv(rows))
+    const report = reviewM3FieldCsv(csv(rows), { validateUnits: true })
     assert.equal(report.completeRows, 21)
     assert.ok(report.warnings.includes('incompatible-pack-unit'))
     assert.equal(report.status, 'incomplete-or-needs-review')
@@ -60,10 +64,10 @@ test('M3 preflight allows cross-unit packs and correctly leaves actual pack purc
     rows[i][11] = ({ g:'kg', kg:'g', ml:'l', l:'ml', piece:'piece' })[need]
     // A 100g single-SKU pack may be purchased more than once for a 1kg
     // requirement; pack_count is inner multipack count, not a purchase count.
-    rows[i][10] = '0.1'
+    rows[i][10] = need === 'piece' ? '1' : '0.1'
     rows[i][12] = '1'
   }
-  const report = reviewM3FieldCsv(csv(rows))
+  const report = reviewM3FieldCsv(csv(rows), { validateUnits: true })
   assert.equal(report.completeRows, 22)
   assert.deepEqual(report.warnings, [])
   assert.equal(report.status, 'requires-canonical-human-verification')
@@ -79,7 +83,7 @@ test('M3 explicitly unavailable lines have no pack-unit compatibility requiremen
     rows[index][14] = 'nee'
     for (const column of [9,10,11,12,13]) rows[index][column] = ''
   }
-  const report = reviewM3FieldCsv(csv(rows))
+  const report = reviewM3FieldCsv(csv(rows), { validateUnits: true })
   assert.equal(report.completeRows, 22)
   assert.deepEqual(report.warnings, [])
   assert.equal(report.status, 'requires-canonical-human-verification')
@@ -103,16 +107,47 @@ test('M3 piece packs reject fractional/unsafe inner item counts without rejectin
   assert.ok(pieceLine > 0, 'canonical 11-demand M3 plan should contain a piece requirement')
   rows[pieceLine][10] = '0.5'
   rows[pieceLine][11] = 'piece'
-  const rejected = reviewM3FieldCsv(csv(rows))
+  const rejected = reviewM3FieldCsv(csv(rows), { validateUnits: true })
   assert.equal(rejected.completeRows, 21)
   assert.ok(rejected.warnings.includes('inconsistent-product-fields'))
   assert.equal(rejected.releaseEligible, false)
   assert.equal(rejected.savingsCents, null)
 
   rows[pieceLine][10] = '2'
-  const valid = reviewM3FieldCsv(csv(rows))
+  const valid = reviewM3FieldCsv(csv(rows), { validateUnits: true })
   assert.equal(valid.completeRows, 22)
   assert.deepEqual(valid.warnings, [])
   assert.equal(valid.claimable, false)
   assert.equal(valid.evidenceVerified, false)
+})
+
+
+test('M3 unit validation is explicitly opt-in at the real CLI, preserving the legacy report', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'supa-m3-physical-units-'))
+  try {
+    const path = join(dir, 'private-fake-observations.csv')
+    const rows = fictionalObservations()
+    rows[1][11] = rows[1][6] === 'piece' ? 'ml' : 'piece'
+    writeFileSync(path, csv(rows), { mode: 0o600 })
+    const run = (...args) => spawnSync(process.execPath, [
+      '--experimental-strip-types', 'scripts/m3-review-field-csv.mjs', ...args,
+    ], { encoding: 'utf8' })
+    const defaultRun = run(path)
+    assert.equal(defaultRun.status, 0, defaultRun.stderr)
+    assert.equal(JSON.parse(defaultRun.stdout).completeRows, 22)
+    assert.deepEqual(JSON.parse(defaultRun.stdout).warnings, [])
+
+    const stricter = run('--validate-units', path)
+    assert.equal(stricter.status, 0, stricter.stderr)
+    assert.equal(JSON.parse(stricter.stdout).completeRows, 21)
+    assert.ok(JSON.parse(stricter.stdout).warnings.includes('incompatible-pack-unit'))
+    assert.equal(JSON.parse(stricter.stdout).releaseEligible, false)
+    assert.equal(JSON.parse(stricter.stdout).claimable, false)
+    assert.doesNotMatch(stricter.stdout, /private-fake|synthetic product|199/)
+    const malformed = run('--validate-units')
+    assert.equal(malformed.status, 1)
+    assert.equal(malformed.stdout, '')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
