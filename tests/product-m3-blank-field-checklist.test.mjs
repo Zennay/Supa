@@ -58,6 +58,20 @@ test('blank field CSV follows canonical 11 demands for BOTH retailer roles (22 s
   }
 })
 
+test('all eleven IDs are unique per retailer and both sides have identical demand fingerprints', () => {
+  const rows = buildBlankM3FieldChecklistCsv().trimEnd().split('\n').slice(1)
+  const signatures = rows.map(line => {
+    const row = Object.fromEntries(columns.map((name, i) => [name, parseRow(line)[i]]))
+    return [row.ingredient_id, row.ingredient_label, row.search_query,
+      row.required_amount, row.required_unit].join('|')
+  })
+  const plus = signatures.slice(0, 11)
+  const deka = signatures.slice(11)
+  assert.equal(new Set(plus).size, 11)
+  assert.deepEqual(deka, plus)
+  assert.ok(plus.every(signature => signature.split('|').every(Boolean)))
+})
+
 test('CSV export is deterministic and does not mark any price, participant or savings as collected', () => {
   const first = buildBlankM3FieldChecklistCsv()
   assert.equal(first, buildBlankM3FieldChecklistCsv())
