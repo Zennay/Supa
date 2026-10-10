@@ -85,6 +85,12 @@ export function BasketView({
               nog niet meegerekend. Dit is alleen het bekende minimum, geen
               volledig mandtotaal. Dit zijn voorbeeldprijzen, geen actuele winkelprijzen of bewezen besparing.
             </>
+          ) : basketCost.state === 'unknown' ? (
+            <>
+              Het mandbedrag is niet betrouwbaar genoeg voor een totaal of
+              minimum. Controleer de productprijzen. Geen actuele winkelprijzen
+              of bewezen besparing.
+            </>
           ) : (
             <>
               Dit is een volledig voorbeeldmandje met gecontroleerde voorbeeldprijzen.
