@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -290,5 +290,28 @@ test('M3 converter refuses duplicate --output destinations without writing eithe
     for (const output of [first, second]) {
       await assert.rejects(stat(output), { code: 'ENOENT' })
     }
+  })
+})
+
+test('M3 converter makes only newly created nested output directories owner-private', {
+  skip: process.platform === 'win32',
+}, async () => {
+  await inScratch('converter-private-directories', async (root) => {
+    const input = join(root, 'synthetic-sheet.json')
+    const existing = join(root, 'existing-shared-parent')
+    const fresh = join(existing, 'private-observations')
+    const deeper = join(fresh, 'derived-study')
+    const output = join(deeper, 'study.json')
+    await writeFile(input, JSON.stringify(syntheticSheet()))
+    await mkdir(existing)
+    await chmod(existing, 0o755)
+
+    const result = runCli('scripts/m3-build-observed-study.mjs', input, output)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal((await stat(existing)).mode & 0o777, 0o755, 'never chmod old directories')
+    for (const directory of [fresh, deeper]) {
+      assert.equal((await stat(directory)).mode & 0o777, 0o700)
+    }
+    assert.equal((await stat(output)).mode & 0o777, 0o600)
   })
 })
