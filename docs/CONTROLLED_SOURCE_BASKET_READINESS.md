@@ -8,14 +8,14 @@ The predecessor proof in #1147 exercises all eleven demands using **one real pro
 
 ## Contract
 
-1. The caller explicitly supplies two different source-bound stores, their display names, the meal plan, recipes, active days, a reference clock, and complete product-level observations for each retailer.
-2. The existing pack-count/provenance, strict freshness and non-promotional gates are applied to the **entire** catalog pair.
+1. The caller explicitly supplies two different source-bound stores, the meal plan, recipes, active days, a reference clock, and complete product-level observations for each retailer.
+2. Retailer names are derived from validated `supermarket` identities, not caller-supplied labels; duplicate/noncanonical active days fail closed. The existing pack-count/provenance, strict freshness and non-promotional gates are applied to the **entire** catalog pair.
 3. Both one-store baskets are built via the existing production domain algorithm from the **same demand**, but using only the corresponding controlled products.
 4. An empty selected week, missing recipe, an incomplete ingredient on **either** side, unmatched/ambiguous products, or a structurally unknown basket comparison returns a generic `structural-fail`. It never returns a misleading lower total for a partial basket.
 5. `structural-pass` exposes both basket traces, an internal comparison outcome and a cents-exact **candidate-minus-baseline** difference. It is still `releaseEligible: false` by design. It exposes no `savingsCents` or `claimable` field, to avoid mistaking simulation arithmetic for a consumer savings assertion.
 6. Unexpected runtime shapes/exceptions fail closed without echoing participant names, source URLs, or thrown exception messages. Inputs are not modified.
 
-The new tests use entirely **synthetic** retailer-shaped records, including `6 x 500 g`, missing ingredient coverage, malformed sources, 24h boundary/offset equivalence, empty weeks and hostile accessors.
+The new tests use entirely **synthetic** retailer-shaped records, including `6 x 500 g`, missing ingredient coverage, malformed sources, 24h boundary/offset equivalence, empty weeks, duplicate active days, hostile accessors and swapped caller-provided retailer labels. A second integration test uses the actual four-meal M2 **demand** with 11 synthetic source observations on **each** store side and exhaustively rejects removing any single source item; it never supplies M2 fixture prices to the bridge.
 
 ## Explicit non-goals / release gate
 
