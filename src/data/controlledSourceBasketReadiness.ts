@@ -120,3 +120,23 @@ export function assessControlledSourceBasketReadiness(
     return FAILURE
   }
 }
+
+/**
+ * M3-specific retailer order: PLUS is the baseline, DekaMarkt the candidate.
+ * A generic two-store structural pass must never certify swapped field roles.
+ * This remains synthetic/source-only preparation, NOT an observed-week gate.
+ */
+export function assessM3ControlledPlusDekaBasketReadiness(
+  input: ControlledSourceBasketInputs | null,
+): ControlledSourceBasketReadiness {
+  try {
+    if (
+      !input || typeof input !== 'object' || Array.isArray(input) ||
+      input.baselineStore?.supermarket !== 'plus' ||
+      input.candidateStore?.supermarket !== 'dekamarkt'
+    ) return FAILURE
+    return assessControlledSourceBasketReadiness(input)
+  } catch {
+    return FAILURE
+  }
+}
