@@ -214,6 +214,25 @@ test('external current-recipe change invalidates a still-selectable proposal', (
   assert.deepEqual(chosen, [['Ma', 'pasta']])
 })
 
+test('refresh after external edit on a non-default day cannot remain stale', () => {
+  const ui = makeHarness()
+  ui.collect(ui.render(), 'button')[0].props.onClick()
+  let tree = ui.render()
+  ui.collect(tree, 'select')[0].props.onChange({ target: { value: 'Di' } })
+  tree = ui.render()
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  const changed = m2InitialPlan.map((meal) =>
+    meal.day === 'Di' ? { ...meal, recipeId: 'tikka' } : meal)
+  tree = ui.update({ plannedMeals: changed })
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 2)
+  ui.collect(tree, 'button')[1].props.onClick()
+  tree = ui.render()
+  assert.equal(ui.collect(tree, 'select')[0].props.value, 'Ma')
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.day, 'Ma')
+  assert.equal(ui.collect(tree, 'button').length, 2, 'refreshed valid plan offers apply')
+})
+
 test('reopening a preview after selecting another day uses the fresh default day', () => {
   const ui = makeHarness()
   ui.collect(ui.render(), 'button')[0].props.onClick()
