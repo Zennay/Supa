@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
 
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
@@ -102,3 +106,48 @@ for (const [label, malformed] of malformedCounts) {
     assert.deepEqual(sheet, before)
   })
 }
+
+
+test('M3 JSON CLI cannot turn an absent pack count into a claimable observed-week report', async () => {
+  const sheet = completeSyntheticSheet()
+  delete sheet.baseline.lines[0].observedProduct.packCount
+  const directory = await mkdtemp(join(tmpdir(), 'supa-qa-m3-pack-count-'))
+  const inputPath = join(directory, 'raw-observation.json')
+  const studyPath = join(directory, 'converted-study.json')
+
+  try {
+    await writeFile(inputPath, JSON.stringify(sheet, null, 2), 'utf8')
+    const conversion = spawnSync(process.execPath, [
+      '--experimental-strip-types',
+      'scripts/m3-build-observed-study.mjs',
+      inputPath,
+      '--output',
+      studyPath,
+    ], { cwd: process.cwd(), encoding: 'utf8' })
+
+    // The converter may reject incomplete observations outright, or represent
+    // their missing pack count as unresolved. Both are safe.
+    if (conversion.status !== 0) {
+      assert.match(conversion.stderr, /pack|count|quantity|observed/i)
+      await assert.rejects(readFile(studyPath, 'utf8'), { code: 'ENOENT' })
+      return
+    }
+
+    const converted = JSON.parse(await readFile(studyPath, 'utf8'))
+    assert.equal(converted.baseline.basket.lines[0].status, 'unresolved')
+
+    const assessment = spawnSync(process.execPath, [
+      '--experimental-strip-types',
+      'scripts/m3-assess-observed-week.mjs',
+      studyPath,
+    ], { cwd: process.cwd(), encoding: 'utf8' })
+    assert.equal(assessment.status, 0, assessment.stderr)
+    const report = JSON.parse(assessment.stdout)
+    assert.equal(report.claimable, false)
+    assert.equal(report.outcome, 'unknown')
+    assert.equal(report.deltaCents, null)
+    assert.equal(report.savingsCents, null)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
