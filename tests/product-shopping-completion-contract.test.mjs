@@ -61,7 +61,7 @@ test('current matched item reports progress, ignores duplicates and unknown save
     totalCount: 1,
     remainingCount: 1,
     unresolvedCount: 0,
-    message: '0 van 1 boodschappen afgevinkt.',
+    message: '0 van 1 boodschap afgevinkt.',
     followUp: null,
   })
   assert.deepEqual(shoppingListCompletion(basket, [lineId, lineId, 'stale', 42]), {
