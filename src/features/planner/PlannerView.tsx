@@ -1,6 +1,7 @@
 import type { PlannedMeal, Recipe } from '../../domain/types'
-import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
+import { assessPlannerBudgetCents } from '../../lib/plannerBudgetCents.ts'
+import { RecipeEstimateDisclosure } from './RecipeEstimateDisclosure.ts'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -31,13 +32,25 @@ export function PlannerView({
   onReset,
 }: PlannerViewProps) {
   const plannedCost = basketTotalCents / 100
-  const budgetState = getBudgetState(plannedCost, budget)
-  const budgetAssessment = assessPlannerBudget(
-    plannedCost,
+  // The basket is already measured in cents. Do not subtract floating-point
+  // euro values and then ask the strict formatter to round the result (#1041).
+  const budgetAssessment = assessPlannerBudgetCents(
+    basketTotalCents,
     budget,
     basketUnresolvedLineCount,
   )
   const budgetKnown = budgetAssessment.status === 'known'
+  const validProgress =
+    Number.isSafeInteger(basketTotalCents) &&
+    basketTotalCents >= 0 &&
+    Number.isFinite(budget) &&
+    budget >= 0
+  const progressValue = validProgress ? Math.min(plannedCost, budget) : 0
+  const progressUsage = budgetKnown
+    ? budgetAssessment.usage
+    : validProgress && budget > 0
+      ? Math.min(plannedCost / budget, 1)
+      : 0
 
   return (
     <section className="screen">
@@ -57,7 +70,7 @@ export function PlannerView({
           </div>
           <span
             className={
-              budgetKnown && budgetAssessment.budgetState.overBudget
+              budgetKnown && budgetAssessment.overBudget
                 ? 'budget-status warning'
                 : budgetKnown
                   ? 'budget-status'
@@ -66,14 +79,16 @@ export function PlannerView({
             aria-live="polite"
           >
             {budgetKnown
-              ? budgetAssessment.budgetState.overBudget
-                ? `${euro.format(Math.abs(budgetAssessment.budgetState.remaining))} boven budget`
-                : `${euro.format(budgetAssessment.budgetState.remaining)} over`
-              : `${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`}
+              ? budgetAssessment.overBudget
+                ? `${euro.formatCents(-budgetAssessment.remainingCents)} boven budget`
+                : `${budgetAssessment.remainingLabel} over`
+              : budgetAssessment.reason === 'unresolved-products'
+                ? `${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`
+                : 'Budgetgegevens controleren'}
           </span>
         </div>
 
-        <div className="budget-options" aria-label="Kies je weekbudget">
+        <div className="budget-options" role="group" aria-label="Kies je weekbudget">
           {budgetOptions.map((option) => (
             <button
               type="button"
@@ -97,17 +112,20 @@ export function PlannerView({
           }
           aria-valuemin={0}
           aria-valuemax={budget}
-          aria-valuenow={Math.min(plannedCost, budget)}
+          aria-valuenow={progressValue}
         >
-          <span style={{ width: `${budgetState.usage * 100}%` }} />
+          <span style={{ width: `${progressUsage * 100}%` }} />
         </div>
 
         <div className="budget-summary">
           <span>{activeDays.length} maaltijden actief</span>
           <strong>
             {budgetKnown
-              ? euro.format(plannedCost)
-              : `min. ${euro.format(plannedCost)}`}
+              ? euro.formatCents(basketTotalCents)
+              : budgetAssessment.reason === 'unresolved-products' &&
+                  budgetAssessment.knownMinimumCents !== null
+                ? `min. ${euro.formatCents(budgetAssessment.knownMinimumCents)}`
+                : '—'}
           </strong>
         </div>
         <p className="disclaimer">
@@ -116,7 +134,7 @@ export function PlannerView({
               Dit bedrag komt uit exact dezelfde productmatching en
               verpakkingsberekening als de Mand-tab.
             </>
-          ) : (
+          ) : budgetAssessment.reason === 'unresolved-products' ? (
             <>
               Nog {budgetAssessment.unresolvedLineCount}{' '}
               {budgetAssessment.unresolvedLineCount === 1
@@ -125,11 +143,16 @@ export function PlannerView({
               onopgelost. Daarom is dit alleen het bekende minimum; SUPA claimt
               nog niet dat je binnen of boven budget zit.
             </>
+          ) : (
+            <>
+              Het budget of de mandgegevens zijn niet geldig. Controleer de
+              producten en bedragen voordat je een budgetvergelijking maakt.
+            </>
           )}
         </p>
       </section>
 
-      <div className="day-grid" aria-label="Geplande maaltijden">
+      <div className="day-grid" role="group" aria-label="Geplande maaltijden">
         {plannedMeals.map((item) => {
           const recipe = recipes.find((candidate) => candidate.id === item.recipeId)
           if (!recipe) return null
@@ -145,6 +168,7 @@ export function PlannerView({
                 <label htmlFor={`recipe-${item.day}`}>Recept</label>
                 <select
                   id={`recipe-${item.day}`}
+                  aria-label={`Recept voor ${item.day}`}
                   value={item.recipeId}
                   onChange={(event) => onRecipeChange(item.day, event.target.value)}
                 >
@@ -154,7 +178,8 @@ export function PlannerView({
                     </option>
                   ))}
                 </select>
-                <small>{recipe.minutes} min · {euro.format(recipe.estimatedCost)} / recept</small>
+                <small>{recipe.minutes} min</small>
+                <RecipeEstimateDisclosure estimatedCost={recipe.estimatedCost} />
               </span>
               <button
                 type="button"
@@ -170,8 +195,14 @@ export function PlannerView({
         })}
       </div>
 
+      <p className="disclaimer" data-recipe-estimate-explanation>
+        Richtprijzen zijn indicatief en komen uit voorbeeldrecepten.
+        De Mand-tab toont apart welke productkosten echt zijn berekend;
+        onbekende productkeuzes blijven daar zichtbaar.
+      </p>
+
       <div className="insight-card">
-        <span className="eyebrow">M2 verticale slice</span>
+        <span className="eyebrow">Van plan naar lijst</span>
         <strong>Je receptkeuzes sturen nu dezelfde mand en boodschappenlijst aan.</strong>
         <p>
           Onzekere productmatches worden niet ingevuld: ze blijven zichtbaar
