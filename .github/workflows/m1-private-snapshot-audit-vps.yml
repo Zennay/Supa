@@ -1,0 +1,42 @@
+name: M1 private snapshot audit (VPS, synthetic only)
+
+on:
+  push:
+    branches:
+      - product/m1-multistore-private-snapshot-audit-20261011
+    paths:
+      - 'scripts/m1-research-snapshot-audit.mjs'
+      - 'tests/m1-multistore*.test.mjs'
+      - '.github/workflows/m1-private-snapshot-audit-vps.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-capture-audit:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Verify permanent Supa runner
+        run: |
+          test "$(hostname -s)" = "vps-bb300bba"
+          echo "runner=$(hostname -s)"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run offline multistore tests only
+        run: node --test tests/m1-multistore*.test.mjs
+      - name: Confirm no research HTML artifact has been generated
+        run: |
+          if test -d artifacts/m1-multistore-research; then
+            echo "Unexpected raw research artifact in CI workspace"
+            exit 1
+          fi
+          echo "No private research HTML generated or uploaded"
