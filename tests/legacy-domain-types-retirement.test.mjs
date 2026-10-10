@@ -8,7 +8,7 @@ const typesSource = await readFile(
 )
 
 test('public domain exports no longer advertise unused prototype types', () => {
-  assert.doesNotMatch(typesSource, /export\\s+type\\s+(?:Product|PriceObservation)\\b/)
+  assert.doesNotMatch(typesSource, /export\s+type\s+(?:Product|PriceObservation)\b/)
 })
 
 test('retiring prototypes leaves consumed domain contracts available', () => {
