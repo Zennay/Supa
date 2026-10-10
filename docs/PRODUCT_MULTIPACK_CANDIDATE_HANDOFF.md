@@ -6,7 +6,9 @@ The current reviewed pack parser retains `count` for e.g. `6 x 1 l`, but `RawPac
 
 The opt-in pure `projectTrustedPackForMatching(pack)` derives pack count from the original text, then **requires exact agreement** with the adapter's parsed amount and unit. It returns `null` on absent/unparseable text, contradictory quantity/unit or count, malformed input, and effective amount above the safe numeric range. It never defaults an unknown multipack to count 1. A future explicit `count` field must agree with the original text.
 
-The additional `projectTrustedObservationPack(observation)` entry point first validates the complete raw observation and its supermarket/HTTPS source provenance; invalid, inconsistent or malformed observations cannot expose a trusted pack. This does not constitute a retailer-use permission check.\n\nNew executable test `tests/product-trusted-multipack-candidate.test.mjs` exercises the **real** one-store basket calculation with a synthetic 6 × 1 l candidate: a 4 l requirement needs one pack (199 cents), while 7 l requires two packs (398 cents). Also tests one-pack, comma decimal, unit mismatch, conflicting count, overflow and immutable input. The values are synthetic only.
+The additional `projectTrustedObservationPack(observation)` entry point first validates the complete raw observation and its supermarket/HTTPS source provenance; invalid, inconsistent or malformed observations cannot expose a trusted pack. This does not constitute a retailer-use permission check.
+
+New executable test `tests/product-trusted-multipack-candidate.test.mjs` exercises the **real** one-store basket calculation with a synthetic 6 × 1 l candidate: a 4 l requirement needs one pack (199 cents), while 7 l requires two packs (398 cents). Also tests one-pack, comma decimal, unit mismatch, conflicting count, overflow and immutable input. The values are synthetic only.
 
 ## Integration required before issue closure
 
