@@ -83,7 +83,7 @@ test('each of 22 single incomplete collection lines routes to its exact store an
       assert.equal(action.stage, 'line')
       assert.equal(action.side, side)
       assert.equal(action.ingredientId, line.ingredientId)
-      assert.match(action.detail, /geen.*gok/i)
+      assert.match(action.detail, /vul niets op basis van een gok in/i)
       assert.equal(observationSheetReadiness(sheet).ready, false)
       cases++
     }
