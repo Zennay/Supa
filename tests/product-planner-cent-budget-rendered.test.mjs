@@ -102,10 +102,10 @@ test('product #709: the real planner marks fixture recipe amounts as indicative,
   assert.match(html, /data-recipe-cost-kind="indicative"/)
   assert.match(html, /role="note"/)
   assert.match(html, /aria-label="Richtprijs:/)
-  assert.match(html, />Richtprijs:.*\\/ recept<\\/small>/)
+  assert.match(html, />Richtprijs:.*\/ recept<\/small>/)
   assert.match(html, /data-recipe-estimate-explanation/)
   assert.match(html, /Richtprijzen zijn indicatief/)
-  assert.doesNotMatch(html, /<small>[^<]*€[^<]*\\/ recept<\\/small>/)
+  assert.doesNotMatch(html, /<small>[^<]*€[^<]*\/ recept<\/small>/)
   assert.match(html, /aria-label="Recept voor Di"/)
 })
 
