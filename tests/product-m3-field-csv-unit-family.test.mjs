@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { sameM3QuantityFamily } from '../scripts/m3-field-unit-compatibility.mjs'
+import { sameM3QuantityFamily, validM3PackPieceAmount } from '../scripts/m3-field-unit-compatibility.mjs'
 import { buildBlankM3FieldChecklistCsv } from '../scripts/m3-export-blank-field-checklist.mjs'
 import { parseM3FieldCsv, reviewM3FieldCsv } from '../scripts/m3-review-field-csv.mjs'
 
@@ -85,4 +85,34 @@ test('M3 explicitly unavailable lines have no pack-unit compatibility requiremen
   assert.equal(report.status, 'requires-canonical-human-verification')
   assert.equal(report.evidenceVerified, false)
   assert.equal(report.claimable, false)
+})
+
+
+test('M3 piece packs reject fractional/unsafe inner item counts without rejecting fractional mass', () => {
+  for (const value of ['0.5', '1.5', '0', '-1', '99999999999999999', '01']) {
+    assert.equal(validM3PackPieceAmount(value, 'piece'), false, value)
+  }
+  for (const value of ['1', '2', '120']) {
+    assert.equal(validM3PackPieceAmount(value, 'piece'), true, value)
+  }
+  assert.equal(validM3PackPieceAmount('0.5', 'g'), true)
+  assert.equal(validM3PackPieceAmount('0.5', 'ml'), true)
+
+  const rows = fictionalObservations()
+  const pieceLine = rows.findIndex((row,index) => index > 0 && row[6] === 'piece')
+  assert.ok(pieceLine > 0, 'canonical 11-demand M3 plan should contain a piece requirement')
+  rows[pieceLine][10] = '0.5'
+  rows[pieceLine][11] = 'piece'
+  const rejected = reviewM3FieldCsv(csv(rows))
+  assert.equal(rejected.completeRows, 21)
+  assert.ok(rejected.warnings.includes('inconsistent-product-fields'))
+  assert.equal(rejected.releaseEligible, false)
+  assert.equal(rejected.savingsCents, null)
+
+  rows[pieceLine][10] = '2'
+  const valid = reviewM3FieldCsv(csv(rows))
+  assert.equal(valid.completeRows, 22)
+  assert.deepEqual(valid.warnings, [])
+  assert.equal(valid.claimable, false)
+  assert.equal(valid.evidenceVerified, false)
 })
