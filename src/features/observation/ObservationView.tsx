@@ -337,7 +337,7 @@ export function ObservationView() {
     <section className="screen observation-screen">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">M3 · echte winkelobservatie</span>
+          <span className="eyebrow">Echte winkelprijzen verzamelen</span>
           <h2>Meten zonder gokken.</h2>
         </div>
       </div>
@@ -355,8 +355,8 @@ export function ObservationView() {
           {progress.metadataCompleted}/{progress.metadataTotal} verplichte metadata ingevuld
         </span>
         <p>
-          Dit scherm verzamelt invoer. Pas de bestaande converter en assessment
-          bepalen of de observatie geldig en vergelijkbaar is.
+          Vul alleen gegevens in die je zelf hebt waargenomen. Een aparte controle
+          moet daarna bepalen of beide winkelmetingen echt vergelijkbaar zijn.
         </p>
         <p>
           Je concept wordt automatisch lokaal op dit apparaat bewaard, zodat een
@@ -388,7 +388,7 @@ export function ObservationView() {
           <p>
             <strong>24u-venster overschreden:</strong> de twee observaties liggen{' '}
             {windowSummary.deltaHours.toFixed(1)} uur uit elkaar. Deze combinatie
-            is niet geschikt voor M3-evidence.
+            is niet geschikt voor een eerlijke winkelvergelijking.
           </p>
         )}
       </div>
@@ -398,24 +398,22 @@ export function ObservationView() {
         aria-live="polite"
       >
         <div>
-          <span className="eyebrow">Preflight</span>
+          <span className="eyebrow">Controle voor bewaren</span>
           <strong>
             {readiness.ready
-              ? 'Klaar voor de M3-converter'
+              ? 'Invoer klaar om apart te controleren'
               : `Nog ${readiness.issues.length} controle${readiness.issues.length === 1 ? '' : 's'} open`}
           </strong>
         </div>
         {readiness.ready ? (
           <p>
-            De verzameling is lokaal compleet genoeg om door de bestaande
-            fail-closed converter te laten beoordelen. Dit maakt het nog geen
-            evidence.
+            Je hebt de verplichte velden ingevuld. Bewaar het concept en laat het
+            apart beoordelen. Dit bewijst nog geen prijsverschil of besparing.
           </p>
         ) : (
           <>
             <p>
-              Los deze punten op vóór je de observatie als kandidaat voor de
-              converter gebruikt:
+              Controleer de volgende gegevens voordat je het concept bewaart:
             </p>
             <ul>
               {readiness.issues.slice(0, 6).map((issue) => (
@@ -432,19 +430,19 @@ export function ObservationView() {
       <div className="observation-card">
         <div>
           <span className="eyebrow">Studie</span>
-          <h3>Privacy-safe context</h3>
+          <h3>Gegevens van deze meting</h3>
         </div>
         <div className="field-grid">
           <label>
-            Study ID
+            Metingcode
             <input
               value={sheet.study.studyId}
               onChange={(event) => updateStudy('studyId', event.target.value)}
-              placeholder="m3-week-001"
+              placeholder="weekmeting-001"
             />
           </label>
           <label>
-            Pseudonieme participant key
+            Anonieme deelnemerscode
             <input
               value={sheet.study.participantKey}
               onChange={(event) =>
