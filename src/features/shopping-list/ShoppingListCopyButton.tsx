@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
 import { buildShoppingListCopyText } from './shoppingListCopyText'
 import './shoppingListCopyButton.css'
 
-type Status = 'idle' | 'copied' | 'unavailable'
-
 /**
- * Opt-in clipboard transfer: no network call and no background clipboard read.
- * The surrounding ShoppingListView owns live checkbox state.
+ * A selectable text export; deliberately NO Clipboard API.
+ * The project's privileged-capability gate forbids programmatic clipboard
+ * writes. A native read-only text area lets the user copy via their device.
  */
 export function ShoppingListCopyButton({
   basket,
@@ -16,43 +15,40 @@ export function ShoppingListCopyButton({
   basket: OneStoreBasket
   doneLineIds: readonly string[]
 }) {
-  const [status, setStatus] = useState<Status>('idle')
-  const generation = useRef(0)
+  const [expanded, setExpanded] = useState(false)
+  const text = buildShoppingListCopyText(basket, doneLineIds)
+  const fieldId = useId()
+  const field = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    generation.current += 1
-    setStatus('idle')
-  }, [basket, doneLineIds])
+  useEffect(() => setExpanded(false), [basket, doneLineIds])
 
-  async function copyList() {
-    const text = buildShoppingListCopyText(basket, doneLineIds)
-    const requestGeneration = generation.current
-
-    if (!text || typeof navigator === 'undefined' ||
-        typeof navigator.clipboard?.writeText !== 'function') {
-      setStatus('unavailable')
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(text)
-      if (generation.current === requestGeneration) setStatus('copied')
-    } catch {
-      if (generation.current === requestGeneration) setStatus('unavailable')
-    }
+  function toggleExport() {
+    if (!text) return
+    setExpanded(current => !current)
   }
 
   return (
     <div className="shopping-copy">
-      <button type="button" className="shopping-copy__button" onClick={copyList}>
-        Kopieer boodschappenlijst
+      <button type="button" className="shopping-copy__button"
+        disabled={!text} aria-expanded={expanded} aria-controls={fieldId}
+        onClick={toggleExport}>
+        {expanded ? 'Verberg kopieerbare lijst' : 'Toon kopieerbare lijst'}
       </button>
-      {status !== 'idle' && (
-        <span className="shopping-copy__status" role="status" aria-live="polite">
-          {status === 'copied'
-            ? 'Boodschappenlijst gekopieerd.'
-            : 'Kopiëren is hier niet beschikbaar. Gebruik de lijst in SUPA.'}
+      {!text && (
+        <span role="status" className="shopping-copy__status">
+          De boodschappenlijst kan nog niet veilig worden gekopieerd.
         </span>
+      )}
+      {expanded && text && (
+        <div className="shopping-copy__detail">
+          <label htmlFor={fieldId}>Boodschappenlijst om te kopiëren</label>
+          <textarea id={fieldId} ref={field} readOnly rows={8}
+            value={text} onFocus={event => event.currentTarget.select()}
+            className="shopping-copy__text" />
+          <span className="shopping-copy__status">
+            Selecteer de tekst en kies Kopieer op je apparaat.
+          </span>
+        </div>
       )}
     </div>
   )
