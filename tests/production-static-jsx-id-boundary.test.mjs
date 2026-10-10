@@ -285,7 +285,7 @@ test('static id guard detects duplicate intrinsic IDs in constant JSX spreads', 
       source: [
         '<input {...{ id: "account-name" }} />',
         '<div {...({ ["id"]: "account" + "-name" } satisfies Record<string, string>)} />',
-      ].join('\\n'),
+      ].join('\n'),
     },
   ])
   assert.equal(duplicates.length, 2)
@@ -302,7 +302,7 @@ test('static id guard does not infer dynamic or custom-component spread props', 
         '<Field {...{ id: "same" }} />',
         '<Field {...{ id: "same" }} />',
         '<div {...{ [computedName]: "same" }} />',
-      ].join('\\n'),
+      ].join('\n'),
     },
   ])
   assert.deepEqual(duplicates, [])
