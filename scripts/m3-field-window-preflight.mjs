@@ -47,7 +47,37 @@ export function parseFieldInstant(value) {
   return Number.isFinite(instant) ? instant : null
 }
 
-export function assessFieldWindow({ baselineAt, candidateAt = null, nowMs = Date.now() }) {
+// Direct callers can supply malformed records even though CLI arguments are strict.
+// Read only own data descriptors: do not evaluate getters on untrusted input.
+function fieldWindowInput(value) {
+  if (value === null || typeof value !== 'object') return null
+  try {
+    // Array.isArray itself throws for revoked proxies: keep it inside the guard.
+    if (Array.isArray(value)) return null
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype && prototype !== null) return null
+    const own = Object.getOwnPropertyDescriptors(value)
+    for (const key of ['baselineAt', 'candidateAt', 'nowMs']) {
+      if (Object.hasOwn(own, key) && !Object.hasOwn(own[key], 'value')) return null
+    }
+    return {
+      baselineAt: Object.hasOwn(own, 'baselineAt') ? own.baselineAt.value : undefined,
+      candidateAt: Object.hasOwn(own, 'candidateAt') ? own.candidateAt.value : null,
+      nowMs: Object.hasOwn(own, 'nowMs') && own.nowMs.value !== undefined
+        ? own.nowMs.value : Date.now(),
+    }
+  } catch {
+    // Revoked proxies or hostile reflection traps cannot become valid evidence.
+    return null
+  }
+}
+
+export function assessFieldWindow(input) {
+  const fields = fieldWindowInput(input)
+  if (fields === null) {
+    return { status: 'invalid', reason: 'field-window inputs missing or malformed' }
+  }
+  const { baselineAt, candidateAt, nowMs } = fields
   const baseline = parseFieldInstant(baselineAt)
   if (baseline === null || !Number.isFinite(nowMs) || baseline > nowMs) {
     return { status: 'invalid', reason: 'baseline timestamp missing, malformed or future-dated' }
