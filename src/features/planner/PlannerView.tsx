@@ -1,4 +1,8 @@
 import type { PlannedMeal, Recipe } from '../../domain/types'
+import type { RecipeWithIngredients } from '../../domain/basket.ts'
+import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
+import { IngredientReuseCard } from './IngredientReuseCard.tsx'
+import { RecipeReusePreviewPanel } from './RecipeReusePreviewPanel.tsx'
 import { euro } from '../../lib/money'
 import { assessPlannerBudgetCents } from '../../lib/plannerBudgetCents.ts'
 import { RecipeEstimateDisclosure } from './RecipeEstimateDisclosure.ts'
@@ -40,6 +44,24 @@ export function PlannerView({
     basketUnresolvedLineCount,
   )
   const budgetKnown = budgetAssessment.status === 'known'
+  // The app already passes real RecipeWithIngredients[]; retain the public
+  // Recipe[] view contract and safely abstain for callers lacking ingredient
+  // metadata. Recompute from CURRENT meal/day choices, never cached estimates.
+  const ingredientRecipes = recipes.filter(
+    (recipe): recipe is RecipeWithIngredients =>
+      recipe !== null &&
+      typeof recipe === 'object' &&
+      Array.isArray((recipe as RecipeWithIngredients).ingredients),
+  )
+  const hasIngredientData =
+    ingredientRecipes.length > 0 && ingredientRecipes.length === recipes.length
+  const reuseInsight = hasIngredientData
+    ? buildIngredientReuseInsight({
+        plan: plannedMeals,
+        recipes: ingredientRecipes,
+        activeDays,
+      })
+    : null
   const validProgress =
     Number.isSafeInteger(basketTotalCents) &&
     basketTotalCents >= 0 &&
@@ -194,6 +216,16 @@ export function PlannerView({
           )
         })}
       </div>
+
+      {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
+      {hasIngredientData && (
+        <RecipeReusePreviewPanel
+          plannedMeals={plannedMeals}
+          activeDays={activeDays}
+          recipes={ingredientRecipes}
+          onChooseRecipe={onRecipeChange}
+        />
+      )}
 
       <p className="disclaimer" data-recipe-estimate-explanation>
         Richtprijzen zijn indicatief en komen uit voorbeeldrecepten.
