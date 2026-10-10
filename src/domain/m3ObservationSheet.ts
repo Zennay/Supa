@@ -763,6 +763,8 @@ export function observationSheetReadiness(
   }
 
   if (
+    isRecord(sheet.baseline.store) &&
+    isRecord(sheet.candidate.store) &&
     nonBlank(sheet.baseline.store.id) &&
     nonBlank(sheet.candidate.store.id) &&
     sheet.baseline.store.id.trim() === sheet.candidate.store.id.trim()
