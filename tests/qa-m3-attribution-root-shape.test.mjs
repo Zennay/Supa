@@ -132,3 +132,40 @@ test('valid explicitly unclaimable comparison remains unknown with its safe reas
   expectNoAttributedMoney(result)
   assert.ok(result.reasons.includes('fictional baseline is unavailable'))
 })
+
+for (const [label, malformedReasons] of [
+  ['missing comparison reasons', undefined],
+  ['null comparison reasons', null],
+  ['non-array comparison reasons', 'sensitive-untrusted-payload'],
+  ['non-string member in comparison reasons', [null]],
+  ['non-string object member in comparison reasons', [{ value: 'sensitive-untrusted-payload' }]],
+]) {
+  test(`otherwise claimable comparison refuses ${label}`, () => {
+    const result = attributeSavingsEffects({
+      comparison: trustedComparison({ reasons: malformedReasons }),
+      evidence: [],
+    })
+    expectNoAttributedMoney(result)
+    assert.ok(result.reasons.length <= 5)
+    assert.doesNotMatch(result.reasons.join(' '), /sensitive-untrusted-payload/)
+  })
+}
+
+for (const [label, malformedDelta] of [
+  ['missing basket delta', undefined],
+  ['string basket delta', '0'],
+  ['fractional basket delta', 0.5],
+  ['nonfinite basket delta', Number.POSITIVE_INFINITY],
+  ['NaN basket delta', Number.NaN],
+  ['unsafe basket delta', Number.MAX_SAFE_INTEGER + 1],
+  ['boolean basket delta', true],
+  ['object basket delta', { cents: 0 }],
+]) {
+  test(`attribution never returns untrusted ${label} as known comparison money`, () => {
+    const result = attributeSavingsEffects({
+      comparison: trustedComparison({ deltaCents: malformedDelta }),
+      evidence: [],
+    })
+    expectNoAttributedMoney(result)
+  })
+}
