@@ -30,7 +30,7 @@ test('preview reports actual same-store basket difference for a single active re
   assert.deepEqual(result.changes.map((line) => line.ingredientId), [
     'basmati-rice', 'broccoli', 'edamame', 'greek-yogurt', 'spaghetti',
     'teriyaki-sauce', 'tomato-cubes',
-  ].filter((id) => id !== 'basmati-rice'))
+  ])
   assert.ok(result.changes.some((line) => line.kind === 'added'))
   assert.ok(result.changes.some((line) => line.kind === 'removed'))
 })
