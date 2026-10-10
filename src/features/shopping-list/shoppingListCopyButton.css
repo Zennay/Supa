@@ -28,3 +28,30 @@
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
+
+.shopping-copy__detail {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shopping-copy__text {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 120px;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  padding: 10px;
+  background: transparent;
+  color: inherit;
+}
+
+.shopping-copy__text:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
