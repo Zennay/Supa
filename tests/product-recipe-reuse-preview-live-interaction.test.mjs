@@ -214,6 +214,44 @@ test('external current-recipe change invalidates a still-selectable proposal', (
   assert.deepEqual(chosen, [['Ma', 'pasta']])
 })
 
+test('a change to another active meal invalidates a proposal for the selected day', () => {
+  const applied = []
+  const ui = makeHarness({
+    onChooseRecipe(day, recipeId) { applied.push([day, recipeId]) },
+  })
+  ui.collect(ui.render(), 'button')[0].props.onClick()
+  let tree = ui.render()
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.day, 'Ma')
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'pasta')
+
+  // Tuesday changed elsewhere: Monday's proposed ingredient overlap has a
+  // new baseline even though Monday and the candidate ID remain identical.
+  const changed = m2InitialPlan.map((meal) =>
+    meal.day === 'Di' ? { ...meal, recipeId: 'tikka' } : meal)
+  tree = ui.update({ plannedMeals: changed })
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 2, 'only refresh, never apply')
+  assert.deepEqual(applied, [])
+  ui.collect(tree, 'button')[1].props.onClick()
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.day, 'Ma')
+  assert.equal(ui.collect(tree, 'button').length, 2)
+})
+
+test('malformed inactive day identity never crashes the preview boundary', () => {
+  const odd = {}
+  odd.self = odd
+  const ui = makeHarness({ activeDays: ['Ma', odd] })
+  const start = ui.render()
+  assert.ok(start)
+  ui.collect(start, 'button')[0].props.onClick()
+  const tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 1)
+})
+
 test('refresh after external edit on a non-default day cannot remain stale', () => {
   const ui = makeHarness()
   ui.collect(ui.render(), 'button')[0].props.onClick()
