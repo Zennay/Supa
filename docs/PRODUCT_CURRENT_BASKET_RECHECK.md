@@ -1,53 +1,99 @@
-# Current-basket comparison recheck (product-core #1065)
+# Current-plan / basket comparison recheck (product-core #1065)
 
-Status: integration-ready helper, **not connected to BasketView or the in-flight comparison card**.
+Status: **tested integration candidate**, not yet connected to the concurrently owned
+`BasketView` / `comparisonNextStep` surfaces. No live retailer evidence.
 
-## Why this exists
+## Why
 
-`BasketComparison` contains line IDs, labels and cent totals, but not a complete
-serialized identity of the demand/pack inputs. A comparator object calculated
-before a planner edit can therefore pass superficial line-total consistency
-checks even after ingredient requirements change.
+A stored `BasketComparison` has ingredient IDs, labels and integer-cent totals,
+but not a complete binding to its original recipe demand, active days, packs and
+product-price snapshot. Reusing it after changing the planner can make stale
+financial guidance appear valid even when its old totals still agree.
 
-`compareCurrentBaskets({ baseline, candidate })` deliberately has **no
-parameter for a previously cached report**. It calls the existing canonical
-`compareFullBaskets` on the two **current** snapshots and returns a newly
-calculated claimable report or `null` (no claim). There is no parallel money
-engine, new source of prices or inferred savings.
+This isolated lane adds two deterministic, fail-closed domain functions. Neither
+reads browser state, changes prices, implements savings independently or writes
+a plan.
 
-## Owner integration contract
+### Preferred: rebuild from a **single current planner snapshot**
 
-The active `comparisonNextStep.ts` product owner (PR #1063) and BasketView owner
-(PR #319/#118) can use this after coordinating ownership:
+`compareCurrentPlannedBaskets(input)` takes the same active days, plan and recipes
+for *both* stores, plus each store's independent catalog. It invokes the actual
+`buildOneStoreBasket` twice before recomputing with the canonical
+`compareFullBaskets`, all synchronously. It **never accepts cached baskets or
+a cached comparator report**.
 
-1. Rebuild baseline and candidate baskets from the same *current* planner demand
-   and chosen product catalogs. Do not pass a cached basket after a plan edit.
-2. Call `compareCurrentBaskets({ baseline, candidate })` at the point a
-   financial comparison is to be rendered, not once at app startup.
-3. If the result is `null`, **do not show a price delta or savings claim**.
-   Route to the existing incomplete/empty/plan-alignment/review action.
-4. If non-null, send that **fresh** result to `comparisonNextStep` and the
-   existing basket trace UI. Never continue displaying the old report.
-5. Recheck after a change in active days, recipe, ingredient demand, chosen
-   product, store identity, price, pack count/size or match status.
-6. Keep the current M3 evidence/price-source permission gate. Synthetic fixture
-   arithmetic is not a real PLUS/DekaMarkt saving.
+Example for the BasketView owner, after adapting props to the owning UI:
 
-The helper purposefully returns `null` rather than fabricating an "unknown"
-monetary summary when runtime basket structure is malformed. A malformed nested
-pack can still throw inside the existing comparator; this boundary catches that
-error and prevents a user-facing money claim.
+```ts
+const result = compareCurrentPlannedBaskets({
+  plan: currentPlan,
+  recipes: controlledRecipes,
+  activeDays: currentActiveDays,
+  baseline: { store: selectedBaselineStore, products: baselineProducts },
+  candidate: { store: selectedCandidateStore, products: candidateProducts },
+})
 
-## Proof and remaining limitations
+const moneyClaim = result?.comparison ?? null
+// Render the two basket traces from result?.baseline / result?.candidate.
+// Render a money difference only when moneyClaim !== null.
+// Re-run with the latest inputs after EVERY planner, pack, price or store edit.
+```
 
-`tests/product-current-basket-recheck.test.mjs` runs the real M2 basket builder,
-canonical comparator and recheck helper across better/same/worse outcomes, stale
-single-store demand, changed prices, malformed nested packs, empty weeks,
-incomplete catalogs, asymmetric plans, self-comparison and mutation invariants.
-Tests use **synthetic** products and prices.
+The result distinguishes:
+- **`null`**: malformed/unusable snapshot (including duplicate active days,
+  invalid restored plans or invalid catalogs); no financial output.
+- **`{ baseline, candidate, comparison: null }`**: valid-to-show empty or
+  incomplete baskets, but comparison is not claimable.
+- **`{ baseline, candidate, comparison }`** where comparison is non-null:
+  the canonical comparator validated a nonempty matched basket pair, with
+  exact signed cents and line trace. Display only as *controlled catalog
+  comparison*, not evidence of real retailer savings.
 
-This is an additive, owner-disjoint building block. Until the active UI owner
-uses it, it **does not fix existing rendered BasketView behavior**. The helper
-cannot know whether its own supplied *basket objects* are stale: callers must
-always rebuild both snapshots from the latest planner state. Genuine M3
-same-demand PLUS + DekaMarkt observation (issue #78) is still outstanding.
+The helper rejects duplicate active days before the current basket engine
+can inadvertently treat duplicates as a different selected week. Invalid plan
+metadata and thrown runtime errors fail closed.
+
+### Secondary: independently rebuilt basket snapshots
+
+`compareCurrentBaskets({ baseline, candidate })` accepts already built baskets
+and re-evaluates the existing canonical comparator instead of trusting a
+cached `BasketComparison` argument. This is appropriate only when an upstream
+owner already guarantees that **both baskets** came from the *same latest*
+planner inputs. It cannot detect a stale basket object by itself.
+
+## Required integration and ownership
+
+The owners of PR #1063 (comparison guidance), PR #319/#118 (BasketView), PR #342
+(planner domain), PR #273 (basket engine) and PR #1012 (canonical comparator)
+retain their files. The PR in this lane introduces only new domain/test files
+and this handoff document; **do not cherry-pick overlapping UI changes**.
+
+1. Supply one atomic latest-plan input for both store baskets.
+2. Recreate both baskets and compare after changing recipe, selected days,
+   ingredient demand, selected product, pack size/count, store or price.
+3. If result is null or `result.comparison` is null, suppress *all* displayed
+   financial differences (including a previously rendered old difference).
+   Keep empty/unresolved basket lines visible and guide the user.
+4. Do not cache or reuse an old `comparison` through a subsequent render or
+   persisted planner state. This contract relies on callers passing genuinely
+   current input objects.
+5. Do not treat a valid synthetic fixture comparison as permission to ingest
+   retailer data or as a real-world savings observation. Provenance/freshness
+   and retailer source permission remain separately gated.
+
+## Deterministic proof, not a release claim
+
+- `tests/product-current-basket-recheck.test.mjs` exercises stale demand,
+  repricing, empty weeks, partial stores, malformed pack metadata,
+  nonmutation and comparison direction on actual canonical M2 baskets.
+- `tests/product-current-planned-comparison.test.mjs` exercises one-snapshot
+  rebuilding across recipe/day edits, pack-price refresh, catalog completeness,
+  invalid restored plan JSON, input-order independence and unchanged inputs.
+- Hosted CI gates must validate the final exact commit: npm ci, dependency
+  audit, full Node tests, benchmark, source-permission gate and production
+  TypeScript/Vite build. VPS/mobile/Firefox remain separate gates.
+- Real PLUS+DekaMarkt same-demand within-24h observation in issue #78 remains
+  the M3 exit criterion; do not mark it complete based on these synthetic tests.
+
+Until the owning UI integrates the helper and passes rendered browser/mobile
+verification, **current on-main consumer behavior is not fixed by this PR**.
