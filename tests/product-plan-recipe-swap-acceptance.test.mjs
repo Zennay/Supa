@@ -7,7 +7,7 @@ const context = {
   store: m2Store,
   plan: m2InitialPlan,
   recipes: m2Recipes,
-  activeDays: ['Ma', 'Di'],
+  activeDays: ['Di', 'Wo'],
   products: m2Products,
   day: 'Di',
   replacementRecipeId: 'pasta',
@@ -65,7 +65,7 @@ test('stale recipe/active-day/reset/order changes block a previously approved sn
 
 test('changing a live day ordering only is not a stale active-day selection', () => {
   const preview = previewPlanRecipeSwap(context)
-  const result = acceptPlanRecipeSwap(preview, m2InitialPlan, ['Di', 'Ma'])
+  const result = acceptPlanRecipeSwap(preview, m2InitialPlan, ['Wo', 'Di'])
   assert.equal(result.status, 'applied')
   assert.equal(result.plan[1].recipeId, 'pasta')
 })
