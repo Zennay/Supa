@@ -297,3 +297,27 @@ test('reuse of the same ingredient ID across two planned days is still aggregate
   assert.equal(result.candidate.lines[0].pack.count, 6)
   assert.equal(result.candidate.lines[0].packs, 1)
 })
+
+test('every synthetic cheaper/equal/worse structural result stays non-release-eligible', () => {
+  const cases = [
+    { baselinePrice: 249, candidatePrice: 199, outcome: 'better', difference: -50 },
+    { baselinePrice: 249, candidatePrice: 249, outcome: 'same', difference: 0 },
+    { baselinePrice: 249, candidatePrice: 299, outcome: 'worse', difference: 50 },
+  ]
+  for (const scenario of cases) {
+    const result = assessControlledSourceBasketReadiness(input({
+      baselineObservations: [
+        observation('plus', { currentPriceCents: scenario.baselinePrice }),
+      ],
+      candidateObservations: [
+        observation('dekamarkt', { currentPriceCents: scenario.candidatePrice }),
+      ],
+    }))
+    assert.equal(result.status, 'structural-pass', scenario.outcome)
+    assert.equal(result.outcome, scenario.outcome)
+    assert.equal(result.candidateMinusBaselineCents, scenario.difference)
+    assert.equal(result.releaseEligible, false)
+    assert.equal(Object.hasOwn(result, 'savingsCents'), false)
+    assert.equal(Object.hasOwn(result, 'claimable'), false)
+  }
+})
