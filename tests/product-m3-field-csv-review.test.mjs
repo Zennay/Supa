@@ -21,7 +21,7 @@ function syntheticFilledRows() {
     rows[i][12] = '1'
     rows[i][13] = '199'
     rows[i][14] = 'ja'
-    rows[i][15] = 'synthetic-fixture-not-a-source'
+    rows[i][15] = 'manual-cart'
     rows[i][16] = 'https://example.invalid/non-retailer'
     rows[i][17] = 'fictional test-only observation'
   }
