@@ -9,10 +9,8 @@ const srcDir = new URL('../src/', import.meta.url)
 // Evaluate only literal-only expressions; never execute code or resolve
 // variables. Static IDs wrapped in parentheses or concatenated in source are
 // still static and must not bypass duplicate-id accessibility validation.
-function staticStringExpression(node, depth = 0) {
-  if (depth > 20) return null
+function unwrapStaticExpression(node) {
   let current = node
-
   while (
     ts.isParenthesizedExpression(current) ||
     ts.isAsExpression(current) ||
@@ -20,6 +18,12 @@ function staticStringExpression(node, depth = 0) {
     ts.isTypeAssertionExpression(current) ||
     ts.isSatisfiesExpression(current)
   ) current = current.expression
+  return current
+}
+
+function staticStringExpression(node, depth = 0) {
+  if (depth > 20) return null
+  const current = unwrapStaticExpression(node)
 
   if (ts.isStringLiteralLike(current)) return current.text
 
@@ -98,6 +102,34 @@ function collectStaticIntrinsicIds(source, filename = 'candidate.tsx') {
           line: line + 1,
           column: character + 1,
         })
+      }
+    }
+
+    // A literal JSX attributes spread may also declare an intrinsic element ID.
+    // Only parse direct object literals; variables and dynamic values remain unknown.
+    if (ts.isJsxSpreadAttribute(node)) {
+      const element = node.parent?.parent
+      const intrinsic = element &&
+        (ts.isJsxOpeningElement(element) || ts.isJsxSelfClosingElement(element)) &&
+        ts.isIdentifier(element.tagName) && /^[a-z]/.test(element.tagName.text)
+      const object = unwrapStaticExpression(node.expression)
+      if (intrinsic && ts.isObjectLiteralExpression(object)) {
+        for (const property of object.properties) {
+          if (!ts.isPropertyAssignment(property)) continue
+          const key = property.name
+          const keyName = ts.isIdentifier(key) || ts.isStringLiteralLike(key)
+            ? key.text
+            : ts.isComputedPropertyName(key)
+              ? staticStringExpression(key.expression)
+              : null
+          if (keyName !== 'id') continue
+          const id = staticStringExpression(property.initializer)
+          if (id === null || id.trim() === '') continue
+          const { line, character } = sourceFile.getLineAndCharacterOfPosition(
+            property.getStart(sourceFile),
+          )
+          ids.push({ id, line: line + 1, column: character + 1 })
+        }
       }
     }
 
@@ -243,6 +275,37 @@ test('static id guard resolves typed constant ids without evaluating variable re
   const duplicates = duplicateStaticIds(sources)
   assert.equal(duplicates.length, 1)
   assert.equal(duplicates[0].id, 'typed-duplicate')
+})
+
+test('static id guard detects duplicate intrinsic IDs in constant JSX spreads', () => {
+  const duplicates = duplicateStaticIds([
+    { filename: 'original.tsx', source: '<label id="account-name" />' },
+    {
+      filename: 'spread.tsx',
+      source: [
+        '<input {...{ id: "account-name" }} />',
+        '<div {...({ ["id"]: "account" + "-name" } satisfies Record<string, string>)} />',
+      ].join('\\n'),
+    },
+  ])
+  assert.equal(duplicates.length, 2)
+  assert.deepEqual(duplicates.map(({ id }) => id), ['account-name', 'account-name'])
+})
+
+test('static id guard does not infer dynamic or custom-component spread props', () => {
+  const duplicates = duplicateStaticIds([
+    {
+      filename: 'dynamic.tsx',
+      source: [
+        '<div {...{ id: runtimeId }} />',
+        '<div {...runtimeProps} />',
+        '<Field {...{ id: "same" }} />',
+        '<Field {...{ id: "same" }} />',
+        '<div {...{ [computedName]: "same" }} />',
+      ].join('\\n'),
+    },
+  ])
+  assert.deepEqual(duplicates, [])
 })
 
 test('static id guard handles no-substitution template ids', () => {
