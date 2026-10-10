@@ -109,3 +109,46 @@ test('M3 next-task navigation only targets a canonical ingredient/demand line', 
     })
   }
 })
+
+
+test('M3 empty-draft guard rejects altered fixed planner/template identity', async t => {
+  const corruptions = [
+    ['schema version', s => { s.schemaVersion = 2 }],
+    ['sheet type', s => { s.sheetType = 'other-template' }],
+    ['evidence status', s => { s.evidenceStatus = 'evidence' }],
+    ['planner fixture', s => { s.plannerFixture = 'other-week' }],
+    ['selected meal count', s => { s.selectedMealCount = 0 }],
+    ['fixed observation hours', s => { s.study.maxObservationWindowHours = 48 }],
+    ['requirements removed', s => { s.requirements.pop() }],
+    ['requirements changed', s => { s.requirements[0].amount += 100 }],
+    ['candidate observation removed', s => { s.candidate = undefined }],
+  ]
+  for (const [name, corrupt] of corruptions) {
+    await t.test(name, () => {
+      const sheet = buildObservationSheet()
+      corrupt(sheet)
+      const before = structuredClone(sheet)
+      assert.equal(observationSheetHasUserInput(sheet), true,
+        'a noncanonical template may contain lost data: force explicit destructive-action confirmation')
+      assert.deepEqual(sheet, before)
+    })
+  }
+})
+
+test('M3 task selection fails closed if a different store has damaged demand', () => {
+  const sheet = syntheticCompleteSheet()
+  sheet.baseline.lines[0].observedProduct.available = null
+  const before = structuredClone(sheet)
+  assert.deepEqual(nextIncompleteObservationLine(sheet), {
+    side: 'baseline',
+    ingredientId: sheet.baseline.lines[0].ingredientId,
+  })
+  assert.deepEqual(sheet, before)
+
+  sheet.candidate.lines[3].ingredientId = 'forged-different-ingredient'
+  const corrupted = structuredClone(sheet)
+  assert.equal(observationSheetReadiness(sheet).ready, false)
+  assert.equal(nextIncompleteObservationLine(sheet), null,
+    'even an earlier real missing task must not distract from a later corrupted fixed demand')
+  assert.deepEqual(sheet, corrupted)
+})
