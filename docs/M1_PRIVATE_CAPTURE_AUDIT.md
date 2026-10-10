@@ -27,3 +27,17 @@ A passing result is `status: "manual-review"` (exit 0), not a trusted retailer p
 Tests: `node --test tests/m1-multistore-snapshot-audit.test.mjs`. The fixtures are synthetic and cannot substitute for retailer source permissions, actual browser DOM inspection, correct price-context tracking, semantic selector reviews or human field observations.
 
 **Integration remains DRAFT / HOLD / NO MERGE / NO DEPLOY** until M1 source/terms review and exact-head hosted and applicable permanent tests and ownership reconciliation.
+
+## Offline inventory of all saved research sources
+
+After a few explicitly approved captures, run:
+
+```sh
+node scripts/m1-research-snapshot-inventory.mjs --inventory
+```
+
+The inventory never performs network requests or starts a scraper. It checks every complete private HTML + JSON pair against the same SHA-256/provenance/freshness audit, counts missing pairs, unexpected files and rejected captures, and reports **aggregate counts by registered source identifier only**. It never prints file stems, raw HTML, exact retailer pages, page content, prices or full timestamps. This gives the operator a way to discover which source captures still need manual DOM review without copying any private files to CI or an issue.
+
+Exit codes: **0** means at least one locally stored capture passed only the *synthetic-proof-free M1 integrity review* and there were no rejected/incomplete/unexpected files; **1** means a rejected, incomplete or unexpected capture; **2** means no saved captures. Neither 0 nor `manual-review` authorizes source use, proves DOM selector semantics or establishes live savings. Inventory will not silently ignore unregistered directories, missing JSON partners or stale captures.
+
+Tests: `node --test tests/m1-multistore-research-inventory.test.mjs`. All tests use synthetic private temp directories, not supermarket content.
