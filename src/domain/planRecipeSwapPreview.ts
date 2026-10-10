@@ -5,23 +5,23 @@ import type { PlannedMeal, Store } from './types.ts'
  * A same-store, same-catalog *planning* preview. Prices can be controlled
  * fixtures: deltaCents is never evidence of live prices or customer savings.
  */
+type EvaluatedSwap = {
+  nextPlan: PlannedMeal[]
+  before: OneStoreBasket
+  after: OneStoreBasket
+  changes: Array<{
+    ingredientId: string
+    kind: 'added' | 'removed' | 'changed'
+    before: BasketTraceLine | null
+    after: BasketTraceLine | null
+  }>
+  priceEvidence: 'input-snapshot-only'
+}
+
 export type PlanRecipeSwapPreview =
   | { status: 'invalid'; reason: string; deltaCents: null; changes: [] }
-  | {
-      status: 'ready' | 'unknown'
-      reason: string | null
-      deltaCents: number | null
-      nextPlan: PlannedMeal[]
-      before: OneStoreBasket
-      after: OneStoreBasket
-      changes: Array<{
-        ingredientId: string
-        kind: 'added' | 'removed' | 'changed'
-        before: BasketTraceLine | null
-        after: BasketTraceLine | null
-      }>
-      priceEvidence: 'input-snapshot-only'
-    }
+  | (EvaluatedSwap & { status: 'ready'; reason: null; deltaCents: number })
+  | (EvaluatedSwap & { status: 'unknown'; reason: string; deltaCents: null })
 
 export type PlanRecipeSwapInput = {
   store: Store
@@ -119,6 +119,10 @@ export function previewPlanRecipeSwap(input: PlanRecipeSwapInput): PlanRecipeSwa
   if (recipes.filter((recipe) => recipe && recipe.id === replacementRecipeId).length !== 1) {
     return invalid('replacement recipe is absent or ambiguous')
   }
+  const originalRecipeId = plan.find((meal) => meal.day === day)?.recipeId
+  if (recipes.filter((recipe) => recipe && recipe.id === originalRecipeId).length !== 1) {
+    return invalid('original recipe is absent or ambiguous')
+  }
 
   const nextPlan = plan.map((meal) =>
     meal.day === day ? { day: meal.day, recipeId: replacementRecipeId } : { ...meal },
@@ -152,19 +156,24 @@ export function previewPlanRecipeSwap(input: PlanRecipeSwapInput): PlanRecipeSwa
 
   const complete = safeCompleteBasket(before) && safeCompleteBasket(after)
   const delta = after.totalCents - before.totalCents
-  const known = complete && Number.isSafeInteger(delta)
-  return {
-    status: known ? 'ready' : 'unknown',
-    reason: known
-      ? null
-      : before.selectedMealCount === 0 || after.selectedMealCount === 0
-        ? 'no active meals to price'
-        : 'unresolved or unsafe basket prices',
-    deltaCents: known ? delta : null,
+  const snapshot: EvaluatedSwap = {
     nextPlan,
     before,
     after,
     changes,
     priceEvidence: 'input-snapshot-only',
+  }
+  if (complete && Number.isSafeInteger(delta)) {
+    return { ...snapshot, status: 'ready', reason: null, deltaCents: delta }
+  }
+
+  return {
+    ...snapshot,
+    status: 'unknown',
+    reason:
+      before.selectedMealCount === 0 || after.selectedMealCount === 0
+        ? 'no active meals to price'
+        : 'unresolved or unsafe basket prices',
+    deltaCents: null,
   }
 }
