@@ -29,7 +29,7 @@ The v2 identity sorts projected shopping lines by validated stable id, unlike v1
 ## Owner-controlled wiring plan
 
 - After [#356](https://github.com/Zennay/Supa/pull/356) lands its runtime validation, import the v2 identity and serialize/restore helpers into the current shopping persistence implementation or adopt the adapter as appropriate. Do not delete its existing fail-closed runtime checks.
-- Update the `ShoppingListView.tsx` owner ([#422](https://github.com/Zennay/Supa/pull/422)) to calculate component `basketKey` from `shoppingListDemandIdentity(basket)`; when null, expose unchecked state only and do not persist. Use `reconcileShoppingProgressV2(previousBasket,nextBasket,done)` for same-session state transitions if not using the identical v2 key as React state key.
+- Update the `ShoppingListView.tsx` owner ([#422](https://github.com/Zennay/Supa/pull/422)) to calculate component `basketKey` from `shoppingListDemandIdentity(basket)`; when null, expose unchecked state only and do not persist. Use `reconcileShoppingProgressV2(previousBasket,nextBasket,done)` for same-session state transitions if not using the identical v2 key as React state key. Use `toggleShoppingProgressV2(basket,done,lineId)` for click transitions; it refuses malformed baskets and phantom line ids while de-duplicating valid state.
 - Read/write only `shoppingListProgressV2StorageKey` for v2 snapshots. Existing v1 localStorage may remain untouched (separate namespace). Do **not** automatically transfer v1 checkmarks under the new schema because the old fingerprint is price-sensitive and carries no version-2 proof.
 - Refresh `tests/shopping-list-progress.test.mjs` (currently owned by #422) to assert price-only change preserves checked items while store/pack/status changes reset. Add rendered browser proof for both same-session repricing and a reload with the updated price; preserve screen-reader `aria-pressed` semantics.
 - Confirm exact-HEAD hosted CI, permanent VPS/mobile, and Firefox rendering before coordinated landing. Run with controlled fixtures; never claim real PLUS or DekaMarkt observations.
@@ -38,7 +38,7 @@ The v2 identity sorts projected shopping lines by validated stable id, unlike v1
 
 `tests/product-shopping-demand-identity.test.mjs` proves one-cent repricing, mutation boundaries, empty demand, malformed values, stability/immutability.
 
-`tests/product-shopping-progress-v2.test.mjs` proves v1→v2 rejection, persistent reload with repricing, same-session preservation, cross-store/product/pack/demand reset, malformed data filtering and empty week. Tests use only fixed M2 fixtures, not live retail price feeds.
+`tests/product-shopping-progress-v2.test.mjs` proves v1→v2 rejection, persistent reload with repricing, same-session preservation, order-insensitive progress, safe click toggles, cross-store/product/pack/demand reset, malformed data filtering and empty week. Tests use only fixed M2 fixtures, not live retail price feeds.
 
 ## Open proof gate
 
