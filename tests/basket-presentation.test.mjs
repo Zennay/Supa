@@ -253,10 +253,10 @@ test('unknown matcher diagnostics stay hidden behind a safe generic explanation'
 
 test('basket disclosure text is user-facing, source-honest, and free of milestone jargon (#580)', async () => {
   const source = await readFile(new URL('../src/features/basket/BasketView.tsx', import.meta.url), 'utf8')
-  assert.doesNotMatch(source, /\\bM[23]\\b|testfixture|controlled testdata|productie-liveprijs/i)
-  assert.equal((source.match(/Geen actuele winkelprijzen of bewezen besparing\\./g) || []).length, 2)
+  assert.doesNotMatch(source, /\bM[23]\b|testfixture|controlled testdata|productie-liveprijs/i)
+  assert.equal((source.match(/Geen actuele winkelprijzen of bewezen besparing\./g) || []).length, 2)
   assert.match(source, /geen actuele winkelprijzen of bewezen besparing/)
   assert.match(source, /bekende minimum, geen/)
-  assert.match(source, /comparison\\.claimable \\?/)
+  assert.match(source, /comparison\.claimable \?/)
   assert.match(source, /comparison-warning/)
 })
