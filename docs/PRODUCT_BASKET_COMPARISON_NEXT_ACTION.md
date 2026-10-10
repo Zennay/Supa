@@ -1,6 +1,6 @@
 # Product-core handoff: actionable, evidence-honest basket comparison
 
-Scope: new `src/features/basket/comparisonNextStep.ts` and isolated regression file. No overlapping basket comparator, Planner, retailer adapter, shopping persistence, or BasketView files were changed.
+Scope: new `src/features/basket/comparisonNextStep.ts`, `src/features/basket/ComparisonNextActionCard.tsx`, matching standalone CSS, and two isolated regression files. No overlapping basket comparator, Planner, retailer adapter, shopping persistence, or BasketView files were changed.
 
 ## User problem
 
@@ -23,7 +23,7 @@ Every state has a Dutch heading, explanation and next action. The only state wit
 Current `BasketView.tsx` is owned by active BasketView PRs [#319](https://github.com/Zennay/Supa/pull/319) and [#118](https://github.com/Zennay/Supa/pull/118). **Do not edit it from this branch.** After owner coordination:
 
 1. Import `comparisonNextStep` in BasketView and pass the existing `comparison`, `comparisonBaseline`, and `comparisonCandidate`.
-2. Render `title`, `explanation` and `action` as normal readable text, with accessible status semantics and no fake clickable affordance. Keep the controlled data disclaimer visible in all cases.
+2. Render the standalone `<ComparisonNextActionCard guidance={guidance} />` with `guidance = comparisonNextStep({comparison, baseline: comparisonBaseline, candidate: comparisonCandidate})`. It is a semantic passive `role=status`, with Dutch title/explanation/action and narrow-screen containment; it has **no** dead button. Keep the controlled data disclaimer visible in all cases.
 3. Only show any comparison money-difference headline when **both** `comparison.claimable` and `guidance.canShowDifference` are true; never present 0/0 empty baskets as "even duur". Keep independent per-store basket minimum disclosures honest.
 4. Avoid deriving or reconstructing savings from the guidance; the canonical comparator remains the financial authority. Do not display internal M2/M3 terminology, strings from `comparison.reasons`, or a live savings badge.
 5. Run exact-head hosted build/tests, permanent VPS and real Firefox/mobile keyboard rendering gates on the settled BasketView head. Check empty week, incomplete ingredient, different demands/stores and better/same/worse controlled outcomes.
@@ -36,3 +36,7 @@ Tests use only known, synthetic M2 product fixtures. No genuine PLUS/DekaMarkt p
 ## Validation
 
 `npm test`, `npm run build`, and permanent VPS/browser gates must be interpreted only for **exact commit SHA**. Until BasketView integration and rendered proof are completed, this is an isolated **DRAFT/HOLD** feature, not a released customer-facing fix.
+
+## Passive card contract
+
+New `tests/product-comparison-next-action-card-contract.test.mjs` AST-checks the actual standalone TSX markup, status semantics, no misleading interactive controls and the long-text responsive layout. This is a source/layout contract, not a claim of rendered Firefox proof. The new CSS is imported **only** by the standalone card; existing BasketView layout is unchanged until owner integration.
