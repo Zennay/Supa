@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assessControlledSourceBasketReadiness } from '../src/data/controlledSourceBasketReadiness.ts'
+import {\n  assessControlledSourceBasketReadiness,\n  assessM3ControlledPlusDekaBasketReadiness,\n} from '../src/data/controlledSourceBasketReadiness.ts'
 
 // ALL retailer names, prices, captures, provenance hashes and products here
 // are synthetic contract fixtures, NOT real PLUS/DekaMarkt observations.
@@ -204,4 +204,53 @@ test('malformed caller shapes and hostile getter never disclose diagnostic or th
   }))
   assert.equal(result.status, 'structural-fail')
   assert.doesNotMatch(JSON.stringify(result), /PRIVATE_PARTICIPANT_KEY/)
+})
+
+test('M3 preparation binds PLUS baseline and DekaMarkt candidate even if generic two-store arithmetic passes', () => {
+  const correct = assessM3ControlledPlusDekaBasketReadiness(input())
+  assert.equal(correct.status, 'structural-pass')
+  assert.equal(correct.releaseEligible, false)
+  assert.equal(correct.baseline.store.name, 'PLUS')
+  assert.equal(correct.candidate.store.name, 'DekaMarkt')
+
+  const switched = input({
+    baselineStore: candidateStore,
+    candidateStore: baselineStore,
+    baselineObservations: [observation('dekamarkt')],
+    candidateObservations: [observation('plus')],
+  })
+  assert.equal(assessControlledSourceBasketReadiness(switched).status, 'structural-pass')
+  assert.equal(assessM3ControlledPlusDekaBasketReadiness(switched).status, 'structural-fail')
+
+  const ah = observation('ah', {
+    provenance: {
+      supermarket: 'ah',
+      kind: 'product',
+      url: 'https://www.ah.nl/synthetic-rice',
+      capturedAt: referenceTime,
+      sha256: 'f'.repeat(64),
+    },
+  })
+  const otherRetailer = input({
+    baselineStore: { id: 'source-ah', supermarket: 'ah' },
+    baselineObservations: [ah],
+  })
+  assert.equal(assessControlledSourceBasketReadiness(otherRetailer).status, 'structural-pass')
+  assert.equal(assessM3ControlledPlusDekaBasketReadiness(otherRetailer).status, 'structural-fail')
+})
+
+test('M3 retailer-order preflight safely rejects malformed or getter-backed identities without leaking values', () => {
+  for (const candidate of [null, [], {}, { ...input(), baselineStore: null },
+    { ...input(), candidateStore: { ...candidateStore, supermarket: 'plus' } },
+  ]) {
+    assert.equal(assessM3ControlledPlusDekaBasketReadiness(candidate).status, 'structural-fail')
+  }
+
+  const store = { id: 'source-plus' }
+  Object.defineProperty(store, 'supermarket', {
+    get() { throw new Error('SECRET_SOURCE_CONTEXT') },
+  })
+  const result = assessM3ControlledPlusDekaBasketReadiness(input({ baselineStore: store }))
+  assert.equal(result.status, 'structural-fail')
+  assert.doesNotMatch(JSON.stringify(result), /SECRET_SOURCE_CONTEXT/)
 })
