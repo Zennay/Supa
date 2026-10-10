@@ -555,7 +555,8 @@ function validObservedAt(value: string) {
   }
   if (
     match[7] !== 'Z' &&
-    (Number(match[8]) > 14 || Number(match[9]) > 59 ||\n      (Number(match[8]) === 14 && Number(match[9]) !== 0))
+    (Number(match[8]) > 14 || Number(match[9]) > 59 ||
+      (Number(match[8]) === 14 && Number(match[9]) !== 0))
   ) {
     return null
   }
