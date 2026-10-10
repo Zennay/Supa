@@ -13,14 +13,17 @@ function emptyBasket(storeId) {
   }
 }
 
-test('canonical distinct store identifiers remain comparable', () => {
+test('canonical distinct store identities do not make an empty week financially comparable', () => {
   const result = compareFullBaskets({
     baseline: emptyBasket('plus'),
     candidate: emptyBasket('dekamarkt'),
   })
-  assert.equal(result.outcome, 'same')
-  assert.equal(result.claimable, true)
-  assert.equal(result.savingsCents, 0)
+  assert.equal(result.outcome, 'unknown')
+  assert.equal(result.claimable, false)
+  assert.equal(result.deltaCents, null)
+  assert.equal(result.savingsCents, null)
+  assert.deepEqual(result.lineDeltas, [])
+  assert.match(result.reasons.join(' '), /no planned meals or basket ingredients/)
 })
 
 test('padded store identity never establishes a claimable second store', () => {
