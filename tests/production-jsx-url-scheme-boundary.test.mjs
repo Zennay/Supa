@@ -6,7 +6,7 @@ import * as ts from 'typescript'
 
 const srcDir = new URL('../src/', import.meta.url)
 const jsxExtensions = new Set(['.jsx', '.tsx'])
-const urlAttributes = new Set(['href', 'src', 'action', 'formaction', 'xlinkhref'])
+const urlAttributes = new Set(['href', 'src', 'action', 'formaction', 'xlinkhref', 'xlink:href'])
 
 function unwrapExpression(node) {
   let current = node
@@ -15,7 +15,8 @@ function unwrapExpression(node) {
     (ts.isParenthesizedExpression(current) ||
       ts.isAsExpression(current) ||
       ts.isTypeAssertionExpression(current) ||
-      ts.isNonNullExpression(current))
+      ts.isNonNullExpression(current) ||
+      ts.isSatisfiesExpression(current))
   ) {
     current = current.expression
   }
@@ -166,6 +167,9 @@ test('JSX URL guard rejects static executable schemes', () => {
     '<form action={`javascript:alert(1)`} />',
     '<button formAction={"  javascript:submit()"} />',
     '<use xlinkHref="javascript:alert(1)" />',
+    '<use xlink:href="javascript:alert(1)" />',
+    '<a href={"javascript:alert(1)" satisfies string}>x</a>',
+    '<a href={(("java" + "script:alert(1)") satisfies string)}>x</a>',
     '<a href={"java\\nscript:alert(1)"}>x</a>',
     '<a href={"\\u0000javascript:alert(1)"}>x</a>',
     '<a href={\'java\' + \'script:alert(1)\'}>x</a>',
@@ -185,6 +189,7 @@ test('JSX URL guard preserves safe, dynamic and inert values', () => {
     '<a href={\'java\' + dynamicSuffix}>x</a>',
     '<a href={\`java\${dynamicSuffix}:alert(1)\`}>x</a>',
     '<form action={submitUrl}></form>',
+    '<a href={(safeLink satisfies string)}>safe</a>',
     '<div data-href="javascript:example">tekst</div>',
     "const example = '<a href=\"javascript:alert(1)\">x</a>'",
   ]) {
