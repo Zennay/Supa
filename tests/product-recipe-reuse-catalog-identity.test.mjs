@@ -131,3 +131,33 @@ test('valid exact identities still permit explicit consent without mutating inpu
   assert.deepEqual(chosen, [['Ma', 'teriyaki']])
   assert.deepEqual(m2InitialPlan, snapshot)
 })
+
+test('a catalog rename revokes previous recipe-change consent until explicit refresh', () => {
+  const chosen = []
+  const ui = makeHarness({
+    onChooseRecipe(day, recipeId) { chosen.push([day, recipeId]) },
+  })
+  ui.collect(ui.render(), 'button')[0].props.onClick()
+  let tree = ui.render()
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'pasta')
+  assert.equal(ui.collect(tree, 'button').length, 2)
+
+  const renamed = structuredClone(m2Recipes)
+  renamed.find((recipe) => recipe.id === 'pasta').title = 'Aangepaste tomatenpasta'
+  tree = ui.update({ recipes: renamed })
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 2, 'refresh replaces old Apply')
+  assert.match(JSON.stringify(tree), /receptgegevens zijn bijgewerkt/)
+  assert.deepEqual(chosen, [], 'a new label cannot inherit former confirmation')
+
+  ui.collect(tree, 'button')[1].props.onClick()
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'teriyaki')
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  tree = ui.render()
+  assert.equal(ui.collect(tree, 'button').length, 2)
+  ui.collect(tree, 'button')[1].props.onClick()
+  assert.deepEqual(chosen, [['Ma', 'pasta']])
+})
