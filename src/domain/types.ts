@@ -9,19 +9,6 @@ export type PriceSource =
   | 'scraper'
   | 'manual'
 
-export type Product = {
-  id: string
-  name: string
-}
-
-export type PriceObservation = {
-  productId: string
-  storeId: string
-  price: number
-  source: PriceSource
-  observedAt: string
-}
-
 export type Recipe = {
   id: string
   title: string
