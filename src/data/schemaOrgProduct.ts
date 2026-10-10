@@ -23,8 +23,13 @@ function schemaTypes(value: unknown): string[] {
   const object = isObject(value) ? value : null
   if (!object) return []
   const raw = object['@type']
-  if (Array.isArray(raw)) return raw.map(String)
-  return raw == null ? [] : [String(raw)]
+  if (typeof raw === 'string') return [raw]
+  // JSON-LD type identifiers must be strings. Coercion can execute caller
+  // methods or throw on otherwise JSON-parseable malformed objects.
+  if (Array.isArray(raw) && raw.every((type) => typeof type === 'string')) {
+    return raw
+  }
+  return []
 }
 
 function hasType(value: unknown, type: string): boolean {
@@ -33,15 +38,37 @@ function hasType(value: unknown, type: string): boolean {
   )
 }
 
-function productNodes(value: unknown): JsonObject[] {
-  if (Array.isArray(value)) return value.flatMap(productNodes)
-  if (!isObject(value)) return []
+function productNodes(value: unknown): JsonObject[] | null {
+  const nodes: JsonObject[] = []
+  const pending: unknown[] = [value]
+  const seen = new WeakSet<object>()
+  let visited = 0
 
-  const direct = hasType(value, 'Product') ? [value] : []
-  const graph = Array.isArray(value['@graph'])
-    ? value['@graph'].flatMap(productNodes)
-    : []
-  return [...direct, ...graph]
+  // Walk iteratively so deeply nested JSON-LD cannot exhaust the call stack.
+  // A repeated object/array reference is ambiguous, so do not accept even a
+  // partially discovered priced Product from a cyclic graph.
+  while (pending.length > 0) {
+    visited += 1
+    if (visited > 10000) return null
+    const current = pending.pop()
+    if (current === null || typeof current !== 'object') continue
+    if (seen.has(current)) return null
+    seen.add(current)
+
+    if (Array.isArray(current)) {
+      for (let index = current.length - 1; index >= 0; index -= 1) {
+        pending.push(current[index])
+      }
+      continue
+    }
+    if (!isObject(current)) continue
+    if (hasType(current, 'Product')) nodes.push(current)
+    if (Array.isArray(current['@graph'])) {
+      pending.push(current['@graph'])
+    }
+  }
+
+  return nodes
 }
 
 function cents(value: unknown): number | null {
@@ -187,8 +214,16 @@ export function parseSchemaOrgProduct(
   jsonLd: unknown,
   provenance: SourceSnapshotRef,
 ): SchemaOrgParseResult {
-  const products = productNodes(jsonLd)
+  let products: JsonObject[] | null
+  try {
+    products = productNodes(jsonLd)
+  } catch {
+    return { type: 'abstain', reason: 'Product JSON-LD graph is not safely readable' }
+  }
 
+  if (products === null) {
+    return { type: 'abstain', reason: 'Product JSON-LD graph is cyclic or exceeds safety limits' }
+  }
   if (products.length === 0) {
     return { type: 'abstain', reason: 'no Product JSON-LD node' }
   }
