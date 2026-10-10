@@ -24,7 +24,7 @@ function basket(store, delta) {
         priceCents: p.priceCents + delta,
       })),
       {
-        id: `${store.id}-garam`, storeId: store.id, name: 'Synthetic spice 50g',
+        id: `${store.id}-garam-50`, storeId: store.id, name: 'Garam masala 50 g',
         packAmount: 50, packUnit: 'g', available: true, priceCents: 139 + delta,
       },
     ],
