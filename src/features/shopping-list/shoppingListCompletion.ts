@@ -126,7 +126,7 @@ export function shoppingListCompletion(
       totalCount,
       remainingCount,
       unresolvedCount: unresolved,
-      message: `${checkedCount} van ${totalCount} boodschappen afgevinkt.`,
+      message: `${checkedCount} van ${totalCount} ${totalCount === 1 ? 'boodschap' : 'boodschappen'} afgevinkt.`,
       followUp: unresolved > 0 ? reviewMessage(unresolved) : null,
     }
   }
