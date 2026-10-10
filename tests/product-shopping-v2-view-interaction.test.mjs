@@ -118,6 +118,14 @@ function makeHarness(initialBasket, localStorage) {
     },
     './shoppingListProgress': { shoppingListProgressStorageKey },
     './ShoppingListCompletionBanner.tsx': { ShoppingListCompletionBanner: bannerModule.exports.ShoppingListCompletionBanner },
+    // Integration-only child stub: this harness tests the live parent checkout
+    // state. The real export component and safe text are tested separately.
+    './ShoppingListCopyButton.tsx': {
+      ShoppingListCopyButton: ({ doneLineIds }) => createNode('div', {
+        'data-copy-done-ids': JSON.stringify(doneLineIds),
+        children: null,
+      }),
+    },
   }
   const module = { exports: {} }
   new Function('module', 'exports', 'require', compiled.outputText)(
@@ -167,8 +175,24 @@ function makeHarness(initialBasket, localStorage) {
     assert.equal(states[0]['aria-live'], 'polite')
     return states[0]['data-shopping-progress-state']
   }
+  function exportedCheckedIds(root) {
+    const captured = []
+    function visit(node) {
+      if (Array.isArray(node)) return node.forEach(visit)
+      if (!node || typeof node !== 'object') return
+      if (typeof node.type === 'function') return visit(node.type(node.props))
+      if (node.props?.['data-copy-done-ids'] !== undefined) {
+        captured.push(JSON.parse(node.props['data-copy-done-ids']))
+      }
+      visit(node.props?.children)
+    }
+    visit(root)
+    assert.ok(captured.length <= 1, 'at most one copy export receives live progress')
+    if (captured.length === 0) return null
+    return captured[0]
+  }
   return {
-    render, buttons, completion,
+    render, buttons, completion, exportedCheckedIds,
     setBasket(next) { basketInput = next; return render() },
     dispose() {
       if (savedWindow === undefined) delete globalThis.window
@@ -314,4 +338,38 @@ test('real ShoppingListView: mutated quantity cannot show completed shopping', (
   matched.requirement.amount *= 1000
   assert.equal(ui.completion(ui.setBasket(changed)), 'invalid')
   assert.ok(ui.buttons(ui.render()).every((button) => button.props['aria-pressed'] === false))
+})
+
+test('real ShoppingListView: copy export follows live checked IDs through repricing and store changes', (t) => {
+  const initial = basket()
+  const chosen = initial.lines[0]
+  const ui = makeHarness(initial, storage())
+  t.after(() => ui.dispose())
+  assert.deepEqual(ui.exportedCheckedIds(ui.render()), [])
+  ui.buttons(ui.render())[0].props.onClick()
+  assert.deepEqual(ui.exportedCheckedIds(ui.render()), [chosen.id])
+  const repriced = basket({ products: m2Products.map(product =>
+    product.id === chosen.productId
+      ? { ...product, priceCents: product.priceCents + 1 }
+      : product,
+  ) })
+  assert.deepEqual(ui.exportedCheckedIds(ui.setBasket(repriced)), [chosen.id])
+  const otherStore = basket({ store: { ...m2Store, id: 'store-without-these-products' } })
+  assert.deepEqual(ui.exportedCheckedIds(ui.setBasket(otherStore)), [])
+})
+
+test('real ShoppingListView: copy export never receives stale checked IDs for a corrupted basket', (t) => {
+  const original = basket()
+  const ui = makeHarness(original, storage())
+  t.after(() => ui.dispose())
+  ui.buttons(ui.render())[0].props.onClick()
+  assert.deepEqual(ui.exportedCheckedIds(ui.render()), [original.lines[0].id])
+  const corrupted = structuredClone(original)
+  const firstMatched = corrupted.lines.find(line => line.status === 'matched')
+  firstMatched.pack.count = 0
+  assert.equal(isTrustworthyShoppingBasket(corrupted), false)
+  assert.equal(ui.exportedCheckedIds(ui.setBasket(corrupted)), null)
+  const invalidCents = { ...original, totalCents: original.totalCents + 1 }
+  assert.equal(isTrustworthyShoppingBasket(invalidCents), false)
+  assert.equal(ui.exportedCheckedIds(ui.setBasket(invalidCents)), null)
 })
