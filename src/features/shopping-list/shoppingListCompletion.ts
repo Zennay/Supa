@@ -20,6 +20,28 @@ const invalid: ShoppingListCompletion = {
   followUp: 'Controleer de actuele boodschappenlijst voordat je verdergaat.',
 }
 
+type QuantityFamily = 'mass' | 'volume' | 'piece'
+
+/** Same base-unit / whole-pack contract used by the one-store basket engine. */
+function physicalAmount(value: unknown, unit: unknown): { amount: number; family: QuantityFamily } | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null
+  let family: QuantityFamily
+  let factor = 1
+  if (unit === 'g' || unit === 'kg') {
+    family = 'mass'
+    if (unit === 'kg') factor = 1000
+  } else if (unit === 'ml' || unit === 'l') {
+    family = 'volume'
+    if (unit === 'l') factor = 1000
+  } else if (unit === 'piece') {
+    family = 'piece'
+  } else {
+    return null
+  }
+  const amount = value * factor
+  return Number.isFinite(amount) && amount > 0 ? { amount, family } : null
+}
+
 function reviewMessage(count: number): string {
   return count === 1
     ? '1 productkeuze vraagt nog jouw controle.'
@@ -50,6 +72,7 @@ export function shoppingListCompletion(
     !Number.isSafeInteger(basket.unresolvedLineCount) ||
     basket.matchedLineCount < 0 ||
     basket.unresolvedLineCount < 0 ||
+    !Number.isSafeInteger(basket.totalCents) || basket.totalCents < 0 ||
     (basket.selectedMealCount === 0 && lines.length > 0) ||
     basket.matchedLineCount + basket.unresolvedLineCount !== lines.length
   ) {
@@ -59,6 +82,7 @@ export function shoppingListCompletion(
   const ids = new Set<string>()
   let matched = 0
   let unresolved = 0
+  let summedCents = 0
 
   for (const line of lines) {
     if (
@@ -100,10 +124,27 @@ export function shoppingListCompletion(
     ) {
       return { ...invalid }
     }
+    // Checkbox completion is only trustworthy if this exact number of packs
+    // covers the demand with a compatible physical unit family.
+    const demanded = physicalAmount(line.requirement.amount, line.requirement.unit)
+    const packaged = physicalAmount(line.pack.amount, line.pack.unit)
+    if (!demanded || !packaged || demanded.family !== packaged.family) {
+      return { ...invalid }
+    }
+    const effectivePackAmount = packaged.amount * line.pack.count
+    const minimumWholePacks = Math.ceil(demanded.amount / effectivePackAmount)
+    if (!Number.isFinite(effectivePackAmount) || effectivePackAmount <= 0 ||
+        !Number.isSafeInteger(minimumWholePacks) || minimumWholePacks < 1 ||
+        minimumWholePacks !== line.packs) {
+      return { ...invalid }
+    }
+    summedCents += line.lineTotalCents
+    if (!Number.isSafeInteger(summedCents)) return { ...invalid }
     matched += 1
   }
 
-  if (matched !== basket.matchedLineCount || unresolved !== basket.unresolvedLineCount) {
+  if (summedCents !== basket.totalCents ||
+      matched !== basket.matchedLineCount || unresolved !== basket.unresolvedLineCount) {
     return { ...invalid }
   }
 
