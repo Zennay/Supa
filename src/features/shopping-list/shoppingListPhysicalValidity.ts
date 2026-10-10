@@ -92,9 +92,7 @@ function validateShoppingBasket(basket: unknown, checkMoney: boolean): basket is
     }
     if (value.status !== 'matched' || !identifier(value.productId) ||
         !identifier(value.productName) || !record(value.pack) ||
-        !safeCount(value.pack.count) || !safeCount(value.packs) ||
-        (checkMoney && (!safeNonnegativeCents(value.pricePerPackCents) ||
-                        !safeNonnegativeCents(value.lineTotalCents)))) return false
+        !safeCount(value.pack.count) || !safeCount(value.packs)) return false
 
     const required = quantity(value.requirement.amount, value.requirement.unit)
     const packageQuantity = quantity(value.pack.amount, value.pack.unit)
@@ -104,10 +102,14 @@ function validateShoppingBasket(basket: unknown, checkMoney: boolean): basket is
     if (!Number.isFinite(effective) || effective <= 0) return false
 
     const minimumPacks = Math.ceil(required.value / effective)
-    if (!safeCount(minimumPacks) || minimumPacks !== value.packs ||
-        (checkMoney && value.packs * value.pricePerPackCents !== value.lineTotalCents)) return false
+    if (!safeCount(minimumPacks) || minimumPacks !== value.packs) return false
 
     if (checkMoney) {
+      // Narrow monetary fields before arithmetic: price-free identity must not
+      // depend on these fields, while persisted checks need valid cents.
+      if (!safeNonnegativeCents(value.pricePerPackCents) ||
+          !safeNonnegativeCents(value.lineTotalCents) ||
+          value.packs * value.pricePerPackCents !== value.lineTotalCents) return false
       summedCents += value.lineTotalCents
       if (!Number.isSafeInteger(summedCents)) return false
     }
