@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { lstat, readFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { lstat, open } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { RESEARCH_SOURCES } from './m1-multistore-research.mjs'
@@ -80,10 +81,21 @@ export function auditResearchSnapshot({ sourceId, metadata, body, nowMs = Date.n
   return outcome(safeSourceId, reasons, ageHours)
 }
 
-async function regularFile(path, maxBytes) {
-  const details = await lstat(path)
-  if (!details.isFile() || details.isSymbolicLink() || details.size <= 0 ||
-      details.size > maxBytes) throw new Error('capture audit requires bounded regular files')
+async function readBoundedRegularFile(path, maxBytes) {
+  // Descriptor-level O_NOFOLLOW keeps a symlink swap between stat and read
+  // from turning this private verifier into an arbitrary-file reader.
+  let handle
+  try { handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK) }
+  catch { throw new Error('capture audit requires bounded regular files') }
+  try {
+    const details = await handle.stat()
+    if (!details.isFile() || details.size <= 0 || details.size > maxBytes) {
+      throw new Error('capture audit requires bounded regular files')
+    }
+    return await handle.readFile()
+  } finally {
+    await handle.close()
+  }
 }
 
 /**
@@ -102,11 +114,10 @@ export async function auditCaptureFiles({
   }
   const bodyPath = join(dir, stem + '.html')
   const metaPath = join(dir, stem + '.json')
-  await regularFile(bodyPath, MAX_BYTES)
-  await regularFile(metaPath, MAX_META_BYTES)
-  const body = await readFile(bodyPath)
+  const body = await readBoundedRegularFile(bodyPath, MAX_BYTES)
+  const metadataBytes = await readBoundedRegularFile(metaPath, MAX_META_BYTES)
   let metadata
-  try { metadata = JSON.parse(await readFile(metaPath, 'utf8')) }
+  try { metadata = JSON.parse(metadataBytes.toString('utf8')) }
   catch { return outcome(sourceId, ['invalid-metadata-json']) }
   return auditResearchSnapshot({ sourceId, metadata, body, nowMs })
 }
