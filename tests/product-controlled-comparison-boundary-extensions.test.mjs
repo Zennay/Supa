@@ -67,7 +67,7 @@ test('calendar input is strict for leap days and large valid timezone offsets', 
   ), null)
   assert.equal(result(
     '2024-02-29T10:00:00+14:00',
-    '2024-02-28T20:00:00Z',
+    '2024-02-28T19:59:59Z',
     '2024-02-29T20:00:00Z',
   ), null, 'candidate must be no older than 24 hours relative to explicit reference')
   assert.equal(result(
