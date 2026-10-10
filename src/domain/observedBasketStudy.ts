@@ -141,10 +141,70 @@ function unknownComparison(
   }
 }
 
+// TypeScript declarations cannot protect the exported assessment from
+// persisted JSON or other JavaScript callers. Reject the container shapes
+// before accessing evidence timestamps, baskets, stores or money fields.
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function malformedObservedStudyContainers(study: unknown): string[] {
+  if (!isRecord(study)) return ['study must be a non-array object']
+
+  const reasons: string[] = []
+  for (const side of ['baseline', 'candidate'] as const) {
+    const evidence = study[side]
+    if (!isRecord(evidence)) {
+      reasons.push(`${side} evidence must be a non-array object`)
+      continue
+    }
+
+    const basket = evidence.basket
+    if (!isRecord(basket)) {
+      reasons.push(`${side} basket must be a non-array object`)
+      continue
+    }
+
+    if (!isRecord(basket.store)) {
+      reasons.push(`${side} basket store must be a non-array object`)
+    }
+  }
+  return reasons
+}
+
+function malformedObservedStudyAssessment(
+  reasons: string[],
+): WeeklyBasketStudyAssessment {
+  // These zero-valued compatibility placeholders are NEVER trusted totals.
+  // This comparison is explicitly unknown and carries no financial claim.
+  const comparison: BasketComparison = {
+    outcome: 'unknown',
+    claimable: false,
+    baselineTotalCents: 0,
+    candidateTotalCents: 0,
+    deltaCents: null,
+    savingsCents: null,
+    lineDeltas: [],
+    reasons,
+  }
+  return {
+    claimable: false,
+    reasons,
+    comparison,
+    attribution: attributeSavingsEffects({ comparison, evidence: [] }),
+    observationWindowHours: null,
+  }
+}
+
 export function assessWeeklyBasketStudy(
   study: WeeklyBasketStudy,
   options: unknown = {},
 ): WeeklyBasketStudyAssessment {
+  const containerReasons = malformedObservedStudyContainers(study)
+  if (containerReasons.length > 0) {
+    return malformedObservedStudyAssessment(containerReasons)
+  }
+
   const validOptionsContainer =
     options !== null &&
     typeof options === 'object' &&
