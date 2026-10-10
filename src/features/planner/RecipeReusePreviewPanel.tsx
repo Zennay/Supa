@@ -171,7 +171,7 @@ export function RecipeReusePreviewPanel({
           </p>
           {staleSelection && (
             <div className="recipe-reuse-preview-refresh" role="status">
-              <p>Je planning is veranderd. Bekijk het voorstel opnieuw voordat je een recept kiest.</p>
+              <p>Je planning is veranderd of receptgegevens zijn bijgewerkt. Bekijk het voorstel opnieuw voordat je een recept kiest.</p>
               <button
                 type="button"
                 className="recipe-reuse-preview-apply"
