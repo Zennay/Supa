@@ -68,7 +68,8 @@ function validTimestamp(value) {
       .slice(1)
       .split(':')
       .map(Number)
-    if (offsetHour > 23 || offsetMinute > 59) return false
+    if (offsetHour > 14 || offsetMinute > 59 ||
+        (offsetHour === 14 && offsetMinute !== 0)) return false
   }
 
   // A future instant is not a completed human field observation. Treat the
