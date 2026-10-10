@@ -1,6 +1,6 @@
 # M3 task-first next action — owner integration note
 
-**Scope:** Supa product-core, [issue #594](https://github.com/Zennay/Supa/issues/594). The isolated helper `observationNextAction(sheet)` lives in `src/features/observation/observationNextStep.ts`; its isolated regression tests are in `tests/product-m3-observation-next-action.test.mjs`.
+**Scope:** Supa product-core, [issue #594](https://github.com/Zennay/Supa/issues/594). The isolated helper `observationNextAction(sheet)` lives in `src/features/observation/observationNextStep.ts`, and its accessible passive display is `ObservationNextActionCard` in the new TSX/CSS paths. Regression tests are in `tests/product-m3-observation-next-action.test.mjs` and `tests/product-m3-next-action-card-contract.test.mjs`.
 
 ## Contract
 
@@ -8,6 +8,7 @@
 - Study setup uses task-oriented Dutch copy and a pseudonymous participant code.
 - Collection walks through PLUS details and ingredients **before** DekaMarkt details and ingredients, while preserving the canonical ingredient IDs for navigation.
 - Missing product information is never invented. It remains a collection task.
+- Malformed observation dates receive a specific correction instruction; observations outside the genuine 24-hour window require new measurements rather than edited/guessed timestamps.
 - `observationSheetReadiness` stays authoritative; outside-window, malformed, incomplete, or otherwise invalid observations return a review action rather than an export-ready claim.
 - Even a complete form is **only a draft**. Its export requires downstream conversion and assessment and does not prove savings.
 - No live PLUS/DekaMarkt prices, observed basket pair, matching decision, financial claim, or M3 exit were generated.
@@ -17,7 +18,7 @@
 The active `ObservationView.tsx` owner should, after reconciling concurrent work:
 
 1. Import `observationNextAction` from `./observationNextStep.ts`; derive `const action = useMemo(() => observationNextAction(sheet), [sheet])`.
-2. Make `action.title` the primary task prompt and `action.detail` the supporting explanation. Keep all canonical readiness messages accessible in a subordinate review details section; do **not** replace readiness enforcement.
+2. Render exactly one `<ObservationNextActionCard action={action} />` as the primary task prompt, then keep all canonical readiness messages accessible in a subordinate review details section; do **not** replace readiness enforcement. The card is intentionally passive: no false-focus controls, buttons, or navigation. It uses neutral existing design tokens and mobile-safe word wrapping.
 3. For `action.stage === 'line'`, route the next-action control to the existing `jumpToNextIncomplete` only when its `side` and `ingredientId` match the current canonical `nextIncomplete` target. Otherwise show an informational hint, never navigate to guessed data.
 4. For `stage === 'study'` or `'store'`, focus the respective existing form field with real label semantics, or show informational copy until deterministic field mapping exists.
 5. For `stage === 'export'`, keep download *explicitly user-triggered*; do not automatically upload, validate, claim savings, or publish.
