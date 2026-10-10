@@ -35,6 +35,15 @@ function memberName(node) {
   return null
 }
 
+function isStaticKeyPropertyName(name) {
+  if (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) return name.text === 'key'
+  if (ts.isComputedPropertyName(name)) {
+    const expression = unwrapExpression(name.expression)
+    return ts.isStringLiteralLike(expression) && expression.text === 'key'
+  }
+  return false
+}
+
 function expressionReferencesIdentifier(expression, identifierName) {
   let found = false
 
@@ -115,6 +124,28 @@ function findMapIndexKey(source, filename = 'candidate.tsx') {
           text: node.getText(sourceFile),
         }
         return
+      }
+
+      // JSX spreads can also supply React's reserved key, e.g.
+      // <Row {...{ key: index }} />. Only inspect literal object spreads;
+      // never evaluate dynamic objects or guessed aliases.
+      if (ts.isJsxSpreadAttribute(node)) {
+        const value = unwrapExpression(node.expression)
+        if (ts.isObjectLiteralExpression(value)) {
+          for (const property of value.properties) {
+            if (
+              ts.isPropertyAssignment(property) &&
+              isStaticKeyPropertyName(property.name) &&
+              expressionReferencesIdentifier(property.initializer, indexName)
+            ) {
+              finding = {
+                indexName,
+                text: node.getText(sourceFile),
+              }
+              return
+            }
+          }
+        }
       }
 
       ts.forEachChild(node, visit)
@@ -205,6 +236,16 @@ test('list-key contract catches direct, wrapped and composite map-index keys', (
   }
 })
 
+test('list-key contract rejects map index supplied through literal JSX key spreads', () => {
+  for (const source of [
+    'items.map((item, index) => <Row {...{ key: index }} item={item} />)',
+    'items.map((item, index) => <Row {...{ ["key"]: item.id + ":" + index }} />)',
+    'items.map((item, index) => <Row {...({ key: String(index) })} />)',
+  ]) {
+    assert.ok(findMapIndexKey(source), source)
+  }
+})
+
 test('list-key contract preserves stable semantic keys and property names', () => {
   for (const source of [
     'items.map((item, index) => <Row key={item.id} item={item} />)',
@@ -213,6 +254,10 @@ test('list-key contract preserves stable semantic keys and property names', () =
     'const index = "stable"; const row = <Row key={index} />',
     'items.map((item) => <Row key={item.id} item={item} />)',
     'items["map"]((item, position) => <Row key={item.id} item={item} />)',
+    'items.map((item, index) => <Row {...{ key: item.id }} />)',
+    'items.map((item, index) => <Row {...{ unrelated: index, key: item.id }} />)',
+    'items.map((item, index) => <Row {...props} />)',
+    'items.map((item, index) => <Row {...{ ["keyName"]: index }} />)',
   ]) {
     assert.equal(findMapIndexKey(source), null, source)
   }
