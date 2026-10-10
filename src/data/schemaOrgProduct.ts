@@ -9,6 +9,11 @@ import { normalizeMoneyToCents, normalizePackText } from './normalize.ts'
 
 type JsonObject = Record<string, unknown>
 
+// Work budgets also cap *enqueued* values, not only nodes already visited.
+const MAX_GRAPH_WORK = 10_000
+const MAX_TYPE_DECLARATIONS = 64
+const MAX_OFFER_CANDIDATES = 10_000
+
 function isObject(value: unknown): value is JsonObject {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -28,6 +33,7 @@ function schemaTypes(value: unknown): string[] | null {
   if (raw == null) return []
   if (typeof raw === 'string') return raw.trim() ? [raw] : null
   if (Array.isArray(raw)) {
+    if (raw.length > MAX_TYPE_DECLARATIONS) return null
     return raw.every((candidate) => typeof candidate === 'string' && candidate.trim())
       ? raw
       : null
@@ -59,11 +65,14 @@ function productNodes(value: unknown): JsonObject[] | null {
       continue
     }
     // Bound direct-API input work even when a graph is acyclic.
-    if (++visited > 10_000 || active.has(node)) return null
+    if (++visited > MAX_GRAPH_WORK || active.has(node)) return null
     active.add(node)
     stack.push({ value: node, leaving: true })
 
     if (Array.isArray(node)) {
+      // Refuse pathological fanout before reading even the first array index.
+      // Include queued siblings/leave frames to avoid wide nested queue growth.
+      if (node.length > MAX_GRAPH_WORK || node.length + stack.length > MAX_GRAPH_WORK) return null
       for (let i = node.length - 1; i >= 0; i--) {
         stack.push({ value: node[i], leaving: false })
       }
@@ -90,6 +99,7 @@ function cents(value: unknown): number | null {
 
 function offerCandidates(raw: unknown): JsonObject[] | null {
   const values = Array.isArray(raw) ? raw : raw == null ? [] : [raw]
+  if (values.length > MAX_OFFER_CANDIDATES) return null
   const offers: JsonObject[] = []
   for (const value of values) {
     if (!isObject(value)) continue
