@@ -555,8 +555,8 @@ export type ObservationSheetReadiness = {
   issues: string[]
 }
 
-function nonBlank(value: string) {
-  return value.trim().length > 0
+function nonBlank(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
 }
 
 function validCalendarDate(value: string) {
@@ -602,6 +602,14 @@ export function observationSheetReadiness(
   sheet: ObservationSheet,
 ): ObservationSheetReadiness {
   const issues: string[] = []
+  if (
+    !isRecord(sheet) ||
+    !isRecord(sheet.study) ||
+    !isRecord(sheet.baseline) ||
+    !isRecord(sheet.candidate)
+  ) {
+    return { ready: false, issues: ['Meetblad: basis- of winkelgegevens zijn ongeldig.'] }
+  }
 
   const studyFields: Array<[string, string]> = [
     ['Study ID', sheet.study.studyId],
@@ -677,6 +685,10 @@ export function observationSheetReadiness(
   const observedTimes: number[] = []
 
   for (const [label, side, observation] of observations) {
+    if (!isRecord(observation.store) || !Array.isArray(observation.lines)) {
+      issues.push(`${label}: winkel- of ingrediëntenstructuur is ongeldig.`)
+      continue
+    }
     if (!nonBlank(observation.store.name)) {
       issues.push(`${label}: winkelnaam ontbreekt.`)
     } else if (!observationStoreMatchesExpectedRetailer(side, observation.store.name)) {
@@ -706,7 +718,11 @@ export function observationSheetReadiness(
       observedTimes.push(observedAt)
     }
 
-    observation.lines.forEach((line) => {
+    observation.lines.forEach((line, index) => {
+      if (!isRecord(line) || !isRecord(line.observedProduct)) {
+        issues.push(`${label}: ingrediëntregel ${index + 1} is ongeldig.`)
+        return
+      }
       const product = line.observedProduct
       const lineLabel = `${label} · ${line.ingredientLabel}`
 
