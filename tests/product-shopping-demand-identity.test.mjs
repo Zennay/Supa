@@ -119,6 +119,10 @@ test('invalid runtime baskets fail closed instead of colliding on JSON nulls', (
     changeLine(before, (line) => { line.packs = Number.MAX_SAFE_INTEGER + 1 }),
     changeLine(before, (line) => { line.productId = '' }),
     changeLine(before, (line) => { line.pack.unit = 'unknown' }),
+    changeLine(before, (line) => { line.requirement.unit = { toString: () => 'g' } }),
+    changeLine(before, (line) => { line.pack.unit = { toString: () => 'g' } }),
+    changeLine(before, (line) => { line.requirement.unit = 12 }),
+    changeLine(before, (line) => { line.pack.unit = 12 }),
     changeLine(before, (line) => { line.status = 'incomplete' }),
   ]
 
