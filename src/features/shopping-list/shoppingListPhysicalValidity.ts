@@ -20,6 +20,11 @@ function identifier(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.trim() === value
 }
 
+/** Display copy is not a stable identity: localized names can legitimately change. */
+function visibleLabel(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
 function quantity(value: unknown, unit: unknown): { value: number; family: Family } | null {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 ||
       typeof unit !== 'string') return null
@@ -61,7 +66,8 @@ function safeCount(value: unknown): value is number {
  */
 function validateShoppingBasket(basket: unknown, checkMoney: boolean): basket is OneStoreBasket {
   if (!record(basket) || !record(basket.store) ||
-      !identifier(basket.store.id) || !Array.isArray(basket.lines) ||
+      !identifier(basket.store.id) || !visibleLabel(basket.store.name) ||
+      !Array.isArray(basket.lines) ||
       basket.lines.length > 10000 ||
       (checkMoney && !safeNonnegativeCents(basket.totalCents)) ||
       !safeNonnegativeCents(basket.selectedMealCount) ||
@@ -78,7 +84,7 @@ function validateShoppingBasket(basket: unknown, checkMoney: boolean): basket is
 
   for (const value of basket.lines) {
     if (!record(value) || !identifier(value.id) || seen.has(value.id) ||
-        !record(value.requirement) ||
+        !visibleLabel(value.ingredientLabel) || !record(value.requirement) ||
         typeof value.requirement.unit !== 'string' ||
         !REQUIREMENT_UNITS.has(value.requirement.unit)) return false
 
