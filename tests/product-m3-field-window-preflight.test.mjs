@@ -169,7 +169,7 @@ test('pending operator guidance includes a safe, rounded-up countdown', () => {
   assert.equal(exitCode, 2)
   assert.equal(logs.length, 1)
   assert.match(logs[0], /PENDING: DekaMarkt/)
-  assert.match(logs[0], /23 uur en 1 minuten over/)
+  assert.match(logs[0], /23 uur en 1 minuut over/)
   assert.match(logs[0], /Nog geen besparingsbewijs/)
   assert.doesNotMatch(logs[0], /2026|22:00:00|PLUS|\u20ac/)
 })
@@ -187,18 +187,18 @@ test('less than one minute at deadline never incorrectly reports zero minutes le
   })
 
   const justInside = assessFieldWindow({
-    baselineAt: '2026-10-09T23:59:59.999Z',
+    baselineAt: '2026-10-10T00:00:00Z',
     nowMs: clock,
   })
   assert.equal(justInside.status, 'pending')
   assert.equal(justInside.remainingMinutes, 1)
   const exitCode = main(
-    ['--baseline', '2026-10-09T23:59:59.999Z'],
+    ['--baseline', '2026-10-10T00:00:00Z'],
     message => logs.push(message),
     clock,
   )
   assert.equal(exitCode, 2)
-  assert.match(logs[0], /0 uur en 1 minuten over/)
+  assert.match(logs[0], /0 uur en 1 minuut over/)
 })
 
 test('at exactly the first-store deadline pending stays nonclaimable', () => {
