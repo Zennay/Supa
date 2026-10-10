@@ -9,6 +9,7 @@ import ts from 'typescript'
 import { euro } from '../src/lib/money.ts'
 import { assessPlannerBudgetCents } from '../src/lib/plannerBudgetCents.ts'
 import { RecipeEstimateDisclosure } from '../src/features/planner/RecipeEstimateDisclosure.ts'
+import { m2Recipes } from '../src/data/m2Fixture.ts'
 
 // SSR the actual PlannerView, not a reimplementation of its budget label.
 const require = createRequire(import.meta.url)
@@ -38,12 +39,12 @@ new Function('module', 'exports', 'require', compiled.outputText)(
 )
 const { PlannerView } = pageModule.exports
 
-function renderBudget(basketTotalCents, basketUnresolvedLineCount, budget = 35) {
+function renderBudget(basketTotalCents, basketUnresolvedLineCount, budget = 35, plannedMeals = [], recipes = []) {
   const html = renderToStaticMarkup(React.createElement(PlannerView, {
     budget,
-    activeDays: [],
-    plannedMeals: [],
-    recipes: [],
+    activeDays: plannedMeals.map((meal) => meal.day),
+    plannedMeals,
+    recipes,
     basketTotalCents,
     basketUnresolvedLineCount,
     onBudgetChange() {},
@@ -91,4 +92,29 @@ test('product #1041: true sub-cent budget is not silently rounded for a claim', 
   assert.equal(status, 'Budgetgegevens controleren')
   assert.doesNotMatch(html, /15,31 over/)
   assert.equal(euro.format(35.001), '—')
+})
+
+test('product #709: the real planner marks fixture recipe amounts as indicative, never as a current quote', () => {
+  const recipe = m2Recipes[0]
+  const plannedMeals = [{ day: 'Di', recipeId: recipe.id }]
+  const { html } = renderBudget(1969, 0, 35, plannedMeals, m2Recipes)
+
+  assert.match(html, /data-recipe-cost-kind="indicative"/)
+  assert.match(html, /role="note"/)
+  assert.match(html, /aria-label="Richtprijs:/)
+  assert.match(html, />Richtprijs:.*\\/ recept<\\/small>/)
+  assert.match(html, /data-recipe-estimate-explanation/)
+  assert.match(html, /Richtprijzen zijn indicatief/)
+  assert.doesNotMatch(html, /<small>[^<]*€[^<]*\\/ recept<\\/small>/)
+  assert.match(html, /aria-label="Recept voor Di"/)
+})
+
+test('product #709: an invalid recipe fixture estimate remains unknown in actual rendered planner', () => {
+  const bad = { ...m2Recipes[0], estimatedCost: Number.NaN }
+  const { html } = renderBudget(1969, 0, 35, [{ day: 'Di', recipeId: bad.id }], [bad])
+
+  assert.match(html, /data-recipe-cost-kind="unknown"/)
+  assert.match(html, /Richtprijs onbekend/)
+  assert.doesNotMatch(html, /€NaN|€Infinity|Richtprijs: €/)
+  assert.match(html, /aria-label="Recept voor Di"/)
 })
