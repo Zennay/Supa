@@ -72,6 +72,18 @@ const safeText = value => !/^[\s]*[=+@-]/.test(value)
 
 function validObservationTime(value) {
   if (!isoInstant.test(value)) return null
+  // Date.parse can silently normalize 30 February into March. Calendar and
+  // explicit offset validation must precede any freshness arithmetic.
+  const datePart = value.slice(0, 10)
+  const midnight = Date.parse(datePart + 'T00:00:00Z')
+  if (!Number.isFinite(midnight) ||
+      new Date(midnight).toISOString().slice(0, 10) !== datePart) return null
+  const offset = value.match(/([+-])(\\d{2}):(\\d{2})$/)
+  if (offset) {
+    const hours = Number(offset[2])
+    const minutes = Number(offset[3])
+    if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) return null
+  }
   const millis = Date.parse(value)
   if (!Number.isFinite(millis)) return null
   // An over-precise timestamp is never silently truncated to milliseconds.
