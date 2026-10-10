@@ -190,15 +190,23 @@ export function reviewM3FieldCsv(input) {
 }
 
 export function main(argv = process.argv.slice(2)) {
-  if (argv.length !== 1 || !argv[0] || argv[0].startsWith('-')) {
+  // Only the explicitly requested automation gate returns exit 2 on a
+  // structurally incomplete CSV. Legacy read-only human review is unchanged.
+  const requireComplete = argv[0] === '--require-complete'
+  const filePath = requireComplete ? argv[1] : argv[0]
+  if ((requireComplete ? argv.length !== 2 : argv.length !== 1) ||
+      !filePath || filePath.startsWith('-')) {
     throw new Error('M3 field CSV review failed')
   }
-  const stat = lstatSync(argv[0])
+  const stat = lstatSync(filePath)
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > LIMIT_BYTES) {
     throw new Error('M3 field CSV review failed')
   }
-  const result = reviewM3FieldCsv(readFileSync(argv[0], 'utf8'))
+  const result = reviewM3FieldCsv(readFileSync(filePath, 'utf8'))
   process.stdout.write(JSON.stringify(result) + '\n')
+  if (requireComplete && result.status !== 'requires-canonical-human-verification') {
+    process.exitCode = 2
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
