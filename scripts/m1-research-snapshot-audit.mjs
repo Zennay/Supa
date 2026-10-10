@@ -31,6 +31,24 @@ function canonicalTimestamp(value) {
   return new Date(millis).toISOString() === value ? millis : null
 }
 
+function ownCaptureMetadata(metadata) {
+  try {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null
+    const proto = Object.getPrototypeOf(metadata)
+    if (proto !== Object.prototype && proto !== null) return null
+    const record = Object.create(null)
+    for (const field of ['version', 'type', 'sourceId', 'store', 'url',
+      'observedAt', 'httpStatus', 'mediaType', 'bytes', 'sha256', 'proxyMode']) {
+      const descriptor = Object.getOwnPropertyDescriptor(metadata, field)
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) return null
+      record[field] = descriptor.value
+    }
+    // Reflection can be trapped on a Proxy; a transparent get-only Proxy
+    // cannot safely be distinguished from a record, but no get trap runs.
+    return record
+  } catch { return null }
+}
+
 /**
  * Compare the private capture bytes to their own metadata, without returning
  * raw HTML, extracted prices, page titles, URLs or participant information.
@@ -40,35 +58,36 @@ export function auditResearchSnapshot({ sourceId, metadata, body, nowMs = Date.n
   const registered = RESEARCH_SOURCES.find(source => source.id === sourceId)
   const safeSourceId = registered ? registered.id : null
   const reasons = []
+  const capture = ownCaptureMetadata(metadata)
   if (!registered) reasons.push('unknown-source')
   if (!Number.isFinite(nowMs) || nowMs < 0) reasons.push('invalid-clock')
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+  if (!capture) {
     reasons.push('invalid-metadata')
   } else if (registered) {
-    if (metadata.version !== 1 || metadata.type !== 'research-only-not-price-proof' ||
-        metadata.sourceId !== registered.id || metadata.store !== registered.store ||
-        metadata.url !== registered.url) reasons.push('metadata-provenance-mismatch')
-    if (metadata.httpStatus !== 200 ||
-        !['text/html', 'application/xhtml+xml'].includes(metadata.mediaType) ||
-        !['direct', 'approved-fixed-egress'].includes(metadata.proxyMode)) {
+    if (capture.version !== 1 || capture.type !== 'research-only-not-price-proof' ||
+        capture.sourceId !== registered.id || capture.store !== registered.store ||
+        capture.url !== registered.url) reasons.push('metadata-provenance-mismatch')
+    if (capture.httpStatus !== 200 ||
+        !['text/html', 'application/xhtml+xml'].includes(capture.mediaType) ||
+        !['direct', 'approved-fixed-egress'].includes(capture.proxyMode)) {
       reasons.push('invalid-capture-transport')
     }
   }
 
   if (!Buffer.isBuffer(body) || body.length === 0 || body.length > MAX_BYTES) {
     reasons.push('invalid-capture-bytes')
-  } else if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+  } else if (capture) {
     const digest = createHash('sha256').update(body).digest('hex')
-    if (metadata.bytes !== body.length ||
-        typeof metadata.sha256 !== 'string' ||
-        !/^[a-f0-9]{64}$/.test(metadata.sha256) || metadata.sha256 !== digest) {
+    if (capture.bytes !== body.length ||
+        typeof capture.sha256 !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(capture.sha256) || capture.sha256 !== digest) {
       reasons.push('capture-integrity-mismatch')
     }
   }
 
   let ageHours = null
-  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
-    const captureTime = canonicalTimestamp(metadata.observedAt)
+  if (capture) {
+    const captureTime = canonicalTimestamp(capture.observedAt)
     if (captureTime === null || !Number.isFinite(nowMs)) {
       reasons.push('invalid-capture-time')
     } else {
