@@ -135,3 +135,17 @@ test('an empty week cannot resurrect stale progress', () => {
   assert.ok(emptyRaw)
   assert.deepEqual(restoreShoppingProgressV2(blank, emptyRaw), [])
 })
+
+test('display reordering retains completed items in memory and on reload', () => {
+  const before = basket()
+  assert.ok(before.lines.length > 1)
+  const completed = [before.lines[0].id, before.lines[1].id]
+  const raw = serializeShoppingProgressV2(before, completed)
+  assert.ok(raw)
+
+  const after = structuredClone(before)
+  after.lines.reverse()
+  assert.deepEqual(reconcileShoppingProgressV2(before, after, completed), completed)
+  assert.deepEqual(restoreShoppingProgressV2(after, raw), completed)
+  assert.deepEqual(restoreShoppingProgressV2(before, serializeShoppingProgressV2(after, completed)), completed)
+})
