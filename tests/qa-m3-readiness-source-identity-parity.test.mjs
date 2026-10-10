@@ -155,3 +155,30 @@ test('M3 draft recovery cannot silently invent a manual-cart source from unsuppo
     }
   }
 })
+
+
+test('M3 export readiness must never outrank the canonical fixed-demand sheet contract', async (t) => {
+  const scenarios = [
+    ['tampered evidence status', (sheet) => { sheet.evidenceStatus = 'reviewed-evidence' }],
+    ['different planned meal count', (sheet) => { sheet.selectedMealCount += 1 }],
+    ['changed canonical ingredient demand', (sheet) => { sheet.requirements[0].amount += 1 }],
+    ['changed baseline line demand', (sheet) => { sheet.baseline.lines[0].requirement.amount += 1 }],
+    ['swapped canonical ingredient order', (sheet) => { sheet.requirements.reverse() }],
+    ['unknown 48-hour collection allowance', (sheet) => {
+      sheet.study.maxObservationWindowHours = 48
+      sheet.candidate.observedAt = '2026-10-06T10:00:01Z'
+    }],
+  ]
+  for (const [label, corrupt] of scenarios) {
+    await t.test(label, () => {
+      const sheet = completeSyntheticSheet()
+      corrupt(sheet)
+      const original = structuredClone(sheet)
+      assert.throws(() => buildWeeklyBasketStudyFromObservationSheet(sheet))
+      const readiness = observationSheetReadiness(sheet)
+      assert.equal(readiness.ready, false, label + ': misleading M3 converter-ready claim')
+      assert.ok(readiness.issues.length > 0, label + ': must explain collection discrepancy')
+      assert.deepEqual(sheet, original)
+    })
+  }
+})
