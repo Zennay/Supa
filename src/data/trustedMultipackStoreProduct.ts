@@ -65,3 +65,31 @@ export function projectTrustedObservationForBasket(
     ...pack,
   }
 }
+
+
+/**
+ * Project a controlled set of product observations as one all-or-nothing
+ * basket catalog. Fail closed rather than dropping corrupt or duplicated
+ * rows and silently presenting incomplete source coverage as trustworthy.
+ * This does not grant permission to acquire or reuse retailer data.
+ */
+export function projectTrustedObservationCatalogForBasket(
+  observations: unknown,
+  store: ControlledSourceStore,
+): StoreProduct[] | null {
+  if (!Array.isArray(observations) || observations.length === 0) return null
+  if (observations.length > 5000) return null
+
+  const products: StoreProduct[] = []
+  const ids = new Set<string>()
+  for (const observation of observations) {
+    const product = projectTrustedObservationForBasket(
+      observation as RawProductObservation,
+      store,
+    )
+    if (product === null || ids.has(product.id)) return null
+    ids.add(product.id)
+    products.push(product)
+  }
+  return products.sort((a, b) => a.id.localeCompare(b.id))
+}
