@@ -403,7 +403,20 @@ export async function main(argv = process.argv.slice(2)) {
 
   if (output) {
     await mkdir(dirname(output), { recursive: true })
-    await writeFile(output, serialized, 'utf8')
+    // Exclusive creation protects original collection evidence and prior study files.
+    // The mode applies only to a newly created file; never chmod existing evidence.
+    try {
+      await writeFile(output, serialized, {
+        encoding: 'utf8',
+        flag: 'wx',
+        mode: 0o600,
+      })
+    } catch (error) {
+      if (error?.code === 'EEXIST') {
+        throw new Error('refusing to overwrite an existing derived study')
+      }
+      throw error
+    }
   } else {
     process.stdout.write(serialized)
   }
