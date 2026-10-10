@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { sameM3QuantityFamily, validM3PackPieceAmount } from '../scripts/m3-field-unit-compatibility.mjs'
 import { buildBlankM3FieldChecklistCsv } from '../scripts/m3-export-blank-field-checklist.mjs'
 import { parseM3FieldCsv, reviewM3FieldCsv } from '../scripts/m3-review-field-csv.mjs'
@@ -115,4 +119,35 @@ test('M3 piece packs reject fractional/unsafe inner item counts without rejectin
   assert.deepEqual(valid.warnings, [])
   assert.equal(valid.claimable, false)
   assert.equal(valid.evidenceVerified, false)
+})
+
+
+test('M3 unit validation is explicitly opt-in at the real CLI, preserving the legacy report', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'supa-m3-physical-units-'))
+  try {
+    const path = join(dir, 'private-fake-observations.csv')
+    const rows = fictionalObservations()
+    rows[1][11] = rows[1][6] === 'piece' ? 'ml' : 'piece'
+    writeFileSync(path, csv(rows), { mode: 0o600 })
+    const run = (...args) => spawnSync(process.execPath, [
+      '--experimental-strip-types', 'scripts/m3-review-field-csv.mjs', ...args,
+    ], { encoding: 'utf8' })
+    const defaultRun = run(path)
+    assert.equal(defaultRun.status, 0, defaultRun.stderr)
+    assert.equal(JSON.parse(defaultRun.stdout).completeRows, 22)
+    assert.deepEqual(JSON.parse(defaultRun.stdout).warnings, [])
+
+    const stricter = run('--validate-units', path)
+    assert.equal(stricter.status, 0, stricter.stderr)
+    assert.equal(JSON.parse(stricter.stdout).completeRows, 21)
+    assert.ok(JSON.parse(stricter.stdout).warnings.includes('incompatible-pack-unit'))
+    assert.equal(JSON.parse(stricter.stdout).releaseEligible, false)
+    assert.equal(JSON.parse(stricter.stdout).claimable, false)
+    assert.doesNotMatch(stricter.stdout, /private-fake|synthetic product|199/)
+    const malformed = run('--validate-units')
+    assert.equal(malformed.status, 1)
+    assert.equal(malformed.stdout, '')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
