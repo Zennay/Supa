@@ -137,6 +137,18 @@ test('rejects empty, incomplete, ambiguous, inconsistent and invalid quantity pl
         ? { ...recipe, ingredients: [{ ...recipe.ingredients[0], amount: null }] }
         : recipe),
     },
+    {
+      ...input(),
+      recipes: m2Recipes.map((recipe) => recipe.id === 'teriyaki'
+        ? { ...recipe, ingredients: [{ ...recipe.ingredients[0], unit: 'light-years' }] }
+        : recipe),
+    },
+    {
+      ...input(),
+      recipes: m2Recipes.map((recipe) => recipe.id === 'teriyaki'
+        ? { ...recipe, ingredients: [{ ...recipe.ingredients[0], unit: 'kg' }] }
+        : recipe),
+    },
     { ...input(), activeDays: null },
     { ...input(), recipes: null },
     { ...input(), plan: null },
