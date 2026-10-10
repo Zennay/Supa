@@ -67,7 +67,7 @@ test('M3 local draft recovery sanitizes malformed editable product values', () =
 })
 
 
-test('M3 local draft recovery sanitizes unsafe integer collection values', () => {
+test('M3 local draft recovery rejects unsafe available-item pack counts', () => {
   const sheet = buildObservationSheet()
   sheet.baseline.lines[0].observedProduct.available = true
   sheet.baseline.lines[0].observedProduct.productName = 'Observed chicken'
@@ -78,9 +78,9 @@ test('M3 local draft recovery sanitizes unsafe integer collection values', () =>
 
   const restored = restoreObservationSheetDraft(JSON.stringify(sheet))
 
-  assert.ok(restored)
-  assert.equal(restored.baseline.lines[0].observedProduct.packCount, 1)
-  assert.equal(restored.baseline.lines[0].observedProduct.priceCents, null)
+  // A forged pack count must not silently become a purchased, checked pack.
+  // A corrupted available-item draft is rejected rather than normalized.
+  assert.equal(restored, null)
 })
 
 test('M3 availability reset clears stale observed product details', () => {

@@ -44,11 +44,15 @@ export function observationStoreMatchesExpectedRetailer(
   side: M3ObservationSide,
   storeName: string,
 ) {
-  const normalized = normalizedRetailerName(storeName)
-  if (side === 'baseline') {
-    return normalized.split(/\s+/).includes('plus')
-  }
-  return normalized.replace(/\s+/g, '').includes('dekamarkt')
+  const words = normalizedRetailerName(storeName).split(/\s+/)
+  // Brand identity must be a whole token, never embedded in another brand.
+  // A contradictory two-retailer name cannot serve as either observation.
+  const hasPlus = words.includes('plus')
+  const hasDekaMarkt = words.includes('dekamarkt') || words.some(
+    (word, index) => word === 'deka' && words[index + 1] === 'markt',
+  )
+  if (hasPlus && hasDekaMarkt) return false
+  return side === 'baseline' ? hasPlus : hasDekaMarkt
 }
 
 export type ObservationRequirement = {
@@ -300,6 +304,18 @@ function restoreStoreObservation(
       product.available === true || product.available === false
         ? product.available
         : null
+    // A recorded available product must not gain a fabricated whole pack on
+    // restore. Rejecting a corrupted draft is safer than counting it complete.
+    if (
+      available === true &&
+      !(
+        typeof product.packCount === 'number' &&
+        Number.isSafeInteger(product.packCount) &&
+        product.packCount > 0
+      )
+    ) {
+      return null
+    }
     const packCount =
       typeof product.packCount === 'number' &&
       Number.isSafeInteger(product.packCount) &&
