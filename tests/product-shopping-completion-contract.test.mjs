@@ -28,6 +28,7 @@ function matchedBasket() {
   return {
     ...source,
     lines: [line],
+    totalCents: line.lineTotalCents,
     matchedLineCount: 1,
     unresolvedLineCount: 0,
   }
@@ -97,6 +98,7 @@ test('unresolved items still require review even if there are no matched items',
   const basket = {
     ...source,
     lines: source.lines.slice(1),
+    totalCents: 0,
     matchedLineCount: 0,
     unresolvedLineCount: 1,
   }
