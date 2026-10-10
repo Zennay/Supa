@@ -37,3 +37,9 @@ These fixture values are **never** genuine PLUS/DekaMarkt observed prices or sav
 `projectTrustedObservationCatalogForBasket(observations, store)` accepts a nonempty bounded array (at most 5000 explicitly selected observations) and returns a deterministic ID-sorted basket product set. **Any** invalid, unavailable, mismatched-store, unpriced, promotional, or duplicate source product row rejects the **whole** batch with `null` instead of silently shrinking the catalog and reporting false coverage or an artificially cheap basket. This is intentional: a partial source set must never be labeled complete by this preparation helper. The caller must still establish genuine completeness and source-use permission separately; this helper does neither.
 
 Standalone tests demonstrate duplicate IDs with contradictory cent prices, a corrupt element after a valid one, mixed source identities, input immutability and stable ordering. A synthetic rejection is not actual evidence about retailer catalogs.
+
+### Four-meal / 11-demand comparison integration (synthetic only)
+
+The additional `tests/product-m3-controlled-multipack-basket-integration.test.mjs` runs the real **four-meal M2 plan** and eleven ingredient demands through `buildOneStoreBasket` for two *synthetic* stores. The candidate replaces the baseline 1 kg rice candidate at 249 cents with a source-shaped `6 x 500 g` multipack at either 299 or 199 hypothetical cents. The real comparator yields **worse by 50 cents** and **better by 50 cents**, respectively; it preserves the six-unit pack count and refuses to calculate savings when the candidate rice is missing.
+
+The comparator's structural `claimable` flag is *not* field-run evidence. These controlled values are never human-observed prices and cannot satisfy issue #78, produce a public savings claim or bypass retailer data permissions.
