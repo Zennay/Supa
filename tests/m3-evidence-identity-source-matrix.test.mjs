@@ -444,3 +444,63 @@ test('M3 sheet-to-report evidence gaps remain non-claimable across source pairin
   }
   assert.equal(cases, 54)
 })
+
+test('M3 two-command field pipeline distinguishes complete from incomplete synthetic collections', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-pipeline-qa-'))
+  try {
+    for (const incomplete of [false, true]) {
+      const sheet = syntheticCollectedSheet({
+        priceContext: 'in-store',
+        baselineSource: 'receipt',
+        candidateSource: 'consented-export',
+      })
+      const privateMarker = 'QA-ONLY-PRIVATE-NOTE-MUST-NOT-BE-REPORTED'
+      sheet.baseline.provenanceNote = privateMarker
+      sheet.candidate.provenanceNote = privateMarker
+      if (incomplete) sheet.candidate.lines[0].observedProduct.priceCents = null
+
+      const suffix = incomplete ? 'incomplete' : 'complete'
+      const input = join(directory, `${suffix}-collection.json`)
+      const studyFile = join(directory, `${suffix}-study.json`)
+      const reportFile = join(directory, `${suffix}-report.json`)
+      const serializedSheet = JSON.stringify(sheet)
+      await writeFile(input, serializedSheet, { encoding: 'utf8', mode: 0o600 })
+
+      const convert = spawnSync(process.execPath, [
+        '--experimental-strip-types',
+        'scripts/m3-build-observed-study.mjs',
+        input,
+        '--output',
+        studyFile,
+      ], { cwd: process.cwd(), encoding: 'utf8' })
+      assert.equal(convert.status, 0, convert.stderr)
+      const converted = JSON.parse(await readFile(studyFile, 'utf8'))
+      assert.equal(converted.baseline.source, 'receipt')
+      assert.equal(converted.candidate.source, 'consented-export')
+      assert.equal(converted.candidate.basket.unresolvedLineCount, incomplete ? 1 : 0)
+
+      const assess = spawnSync(process.execPath, [
+        '--experimental-strip-types',
+        'scripts/m3-assess-observed-week.mjs',
+        studyFile,
+        '--output',
+        reportFile,
+      ], { cwd: process.cwd(), encoding: 'utf8' })
+      assert.equal(assess.status, 0, assess.stderr)
+      const serializedReport = await readFile(reportFile, 'utf8')
+      const report = JSON.parse(serializedReport)
+      assert.equal(report.claimable, !incomplete)
+      assert.equal(report.outcome, incomplete ? 'unknown' : 'better')
+      assert.equal(report.savingsCents === null, incomplete)
+      assert.equal(report.deltaCents === null, incomplete)
+      assert.equal(report.publicSavingsClaimEligible, false)
+      assert.equal(report.baseline.source, 'receipt')
+      assert.equal(report.candidate.source, 'consented-export')
+      assert.ok(!serializedReport.includes(sheet.study.participantKey))
+      assert.ok(!serializedReport.includes(privateMarker))
+      assert.equal(await readFile(input, 'utf8'), serializedSheet)
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
