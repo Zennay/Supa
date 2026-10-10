@@ -177,9 +177,11 @@ export function assessWeeklyBasketStudy(
     typeof requestedMaxObservationWindowHours === 'number' &&
     Number.isFinite(requestedMaxObservationWindowHours) &&
     requestedMaxObservationWindowHours > 0
-  const maxObservationWindowHours = validMaxObservationWindowHours
-    ? requestedMaxObservationWindowHours
-    : 24
+  const maxObservationWindowHours =
+    validMaxObservationWindowHours &&
+    typeof requestedMaxObservationWindowHours === 'number'
+      ? requestedMaxObservationWindowHours
+      : 24
   const reasons: string[] = []
 
   if (!validOptionsContainer) {
