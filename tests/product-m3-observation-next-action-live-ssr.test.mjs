@@ -111,6 +111,7 @@ test('the actual ObservationView renders one task-first accessible guide on a fr
   assert.match(html, /Geef deze meting een code/)
   assert.match(html, /Kies een herkenbare code/)
   assert.match(html, /Meten zonder gokken/)
+  assert.doesNotMatch(html, /class="ghost-button observation-next-button"/, 'no jump past study metadata')
   assert.match(html, /Nog .* controle/)
   assert.deepEqual(sheet, before, 'render never mutates input evidence')
 })
@@ -147,4 +148,23 @@ test('task-first integration does not auto-export or change the canonical readin
   assert.match(source, /const readiness = useMemo\(\(\) => observationSheetReadiness\(sheet\), \[sheet\]\)/)
   assert.match(source, /onClick=\{jumpToNextIncomplete\}/)
   assert.match(source, /const downloadDraft = \(\) =>/)
+})
+
+test('real M3 line-jump control appears only for current canonical ingredient task', () => {
+  const studyReady = populatedSheet()
+  studyReady.baseline.lines[0].observedProduct.available = null
+  assert.equal(observationNextAction(studyReady).stage, 'line')
+  const html = renderView(studyReady)
+  assert.match(html, /class="ghost-button observation-next-button"/)
+  assert.match(html, /Volgende stap/)
+  assert.match(html, /PLUS/)
+  assert.match(html, /Basmati rijst/)
+
+  const notReady = observationSheetDomain.buildObservationSheet()
+  assert.equal(observationNextAction(notReady).stage, 'study')
+  assert.doesNotMatch(renderView(notReady), /class="ghost-button observation-next-button"/)
+
+  const complete = populatedSheet()
+  assert.equal(observationNextAction(complete).stage, 'export')
+  assert.doesNotMatch(renderView(complete), /class="ghost-button observation-next-button"/)
 })
