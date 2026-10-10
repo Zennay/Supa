@@ -529,8 +529,37 @@ function nonBlank(value: string) {
   return value.trim().length > 0
 }
 
+// Keep the collector's export readiness and window guidance in lockstep with
+// the canonical M3 JSON converter, not JavaScript Date.parse's loose fallback.
+// Both require a real calendar day and an explicit, valid ISO UTC offset.
+const M3_OBSERVED_AT_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-](\d{2}):(\d{2}))$/
+
 function validObservedAt(value: string) {
-  if (!nonBlank(value)) return null
+  const match = M3_OBSERVED_AT_PATTERN.exec(value)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    Number(match[4]) > 23 ||
+    Number(match[5]) > 59 ||
+    Number(match[6] ?? '0') > 59
+  ) {
+    return null
+  }
+  if (
+    match[7] !== 'Z' &&
+    (Number(match[8]) > 23 || Number(match[9]) > 59)
+  ) {
+    return null
+  }
+
   const timestamp = Date.parse(value)
   // A future calendar instant cannot represent a completed collection.
   // Compare UTC instants (including parsed offsets) at the collection gate.
