@@ -159,11 +159,11 @@ function findMapIndexKey(source, filename = 'candidate.tsx') {
 
     if (ts.isCallExpression(node)) {
       const callee = unwrapExpression(node.expression)
-      const isMapCall =
+      const isListMapperCall =
         (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) &&
-        memberName(callee) === 'map'
+        (memberName(callee) === 'map' || memberName(callee) === 'flatMap')
 
-      if (isMapCall) {
+      if (isListMapperCall) {
         const callback = node.arguments[0]
         if (
           callback &&
@@ -236,6 +236,15 @@ test('list-key contract catches direct, wrapped and composite map-index keys', (
   }
 })
 
+test('list-key contract also rejects flatMap-position keys', () => {
+  for (const source of [
+    'items.flatMap((item, index) => <Row key={index} item={item} />)',
+    'items["flatMap"]((item, position) => [<Row {...{ key: position }} />])',
+  ]) {
+    assert.ok(findMapIndexKey(source), source)
+  }
+})
+
 test('list-key contract rejects map index supplied through literal JSX key spreads', () => {
   for (const source of [
     'items.map((item, index) => <Row {...{ key: index }} item={item} />)',
@@ -258,6 +267,7 @@ test('list-key contract preserves stable semantic keys and property names', () =
     'items.map((item, index) => <Row {...{ unrelated: index, key: item.id }} />)',
     'items.map((item, index) => <Row {...props} />)',
     'items.map((item, index) => <Row {...{ ["keyName"]: index }} />)',
+    'items.flatMap((item, index) => <Row key={item.id} />)',
   ]) {
     assert.equal(findMapIndexKey(source), null, source)
   }
