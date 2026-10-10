@@ -178,3 +178,42 @@ test('accessible touch controls and narrow text are enforced by original CSS', (
   assert.match(css, /font-size:\s*1rem/)
   assert.match(css, /overflow-wrap:\s*anywhere/)
 })
+
+test('the chosen recipe only changes after an explicit validated confirmation', () => {
+  const applied = []
+  const before = structuredClone(m2InitialPlan)
+  const ui = makeHarness({
+    onChooseRecipe(day, recipeId) { applied.push({ day, recipeId }) },
+  })
+  let tree = ui.render()
+  ui.collect(tree, 'button')[0].props.onClick()
+  tree = ui.render()
+  assert.equal(applied.length, 0)
+  const fields = ui.collect(tree, 'select')
+  fields[0].props.onChange({ target: { value: 'Di' } })
+  tree = ui.render()
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  tree = ui.render()
+  assert.equal(applied.length, 0, 'preview controls never commit')
+  const buttons = ui.collect(tree, 'button')
+  assert.equal(buttons.length, 2)
+  assert.equal(buttons[1].props.type, 'button')
+  assert.match(buttons[1].props.children, /Kies Romige tomatenpasta voor Di/)
+  buttons[1].props.onClick()
+  assert.deepEqual(applied, [{ day: 'Di', recipeId: 'pasta' }])
+  assert.equal(ui.collect(ui.render(), 'select').length, 0, 'confirmation closes the proposal')
+  assert.deepEqual(m2InitialPlan, before, 'parent callback alone owns the actual update')
+})
+
+test('invalid preview does not offer a confirm action', () => {
+  const chosen = []
+  const ui = makeHarness({
+    activeDays: ['Ma', 'Ma'],
+    onChooseRecipe(day, recipeId) { chosen.push([day, recipeId]) },
+  })
+  ui.collect(ui.render(), 'button')[0].props.onClick()
+  const tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 1)
+  assert.deepEqual(chosen, [])
+})
