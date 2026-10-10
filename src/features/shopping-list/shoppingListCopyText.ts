@@ -19,6 +19,15 @@ function safeUnit(value: unknown): value is 'g' | 'kg' | 'ml' | 'l' | 'piece' {
   return typeof value === 'string' && KNOWN_UNITS.has(value)
 }
 
+function baseQuantity(amount: number, unit: string) {
+  const factor = unit === 'kg' || unit === 'l' ? 1000 : 1
+  const converted = amount * factor
+  if (!safePositive(converted)) return null
+  const family = unit === 'kg' || unit === 'g' ? 'mass' :
+    unit === 'ml' || unit === 'l' ? 'volume' : 'piece'
+  return { family, amount: converted }
+}
+
 function dutchAmount(value: number): string {
   return String(value).replace('.', ',')
 }
@@ -81,6 +90,14 @@ export function buildShoppingListCopyText(
         line.pack.count <= 0 || !Number.isSafeInteger(line.pricePerPackCents) ||
         line.pricePerPackCents < 0 || !Number.isSafeInteger(line.lineTotalCents) ||
         line.lineTotalCents !== line.packs * line.pricePerPackCents) return null
+
+    // Reject stale demand with too few physical packs, without pricing anything.
+    const required = baseQuantity(requirement.amount, requirement.unit)
+    const perPack = baseQuantity(line.pack.amount, line.pack.unit)
+    const available = perPack === null ? 0 :
+      perPack.amount * line.pack.count * line.packs
+    if (!required || !perPack || required.family !== perPack.family ||
+        !safePositive(available) || required.amount > available) return null
 
     matchedCount += 1
     const packUnit = quantityUnitLabelNl(line.pack.unit, line.pack.amount)
