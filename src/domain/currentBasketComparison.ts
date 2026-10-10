@@ -2,6 +2,29 @@ import { compareFullBaskets, type BasketComparison } from './basketComparison.ts
 import type { OneStoreBasket } from './basket.ts'
 
 /**
+ * JSON and persisted snapshots can carry a string pack.amount that the
+ * canonical comparator currently coerces via multiplication. Its *value*
+ * may be mathematically equivalent, but it is not a valid typed basket pack.
+ * Do not present a monetary claim from type-coerced metadata.
+ */
+function strictMatchedPackMetadata(lines: unknown[]): boolean {
+  return lines.every((line) => {
+    if (!line || typeof line !== 'object' || Array.isArray(line)) return false
+    if (!('status' in line) || line.status !== 'matched') return true
+
+    const pack = line.pack
+    return (
+      pack !== null &&
+      typeof pack === 'object' &&
+      !Array.isArray(pack) &&
+      typeof pack.amount === 'number' &&
+      Number.isFinite(pack.amount) &&
+      pack.amount > 0
+    )
+  })
+}
+
+/**
  * Recompute a two-store comparison from the current baskets.
  *
  * Never accept a previously cached BasketComparison here: its line deltas do
@@ -31,7 +54,9 @@ export function compareCurrentBaskets(input: {
     !Array.isArray(baseline.lines) ||
     !Array.isArray(candidate.lines) ||
     baseline.lines.length === 0 ||
-    candidate.lines.length === 0
+    candidate.lines.length === 0 ||
+    !strictMatchedPackMetadata(baseline.lines) ||
+    !strictMatchedPackMetadata(candidate.lines)
   ) {
     return null
   }
