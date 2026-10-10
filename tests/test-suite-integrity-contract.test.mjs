@@ -10,13 +10,24 @@ const nodeTestExports = new Set(['describe', 'it', 'suite', 'test'])
 function propertyName(node) {
   if (!node) return null
   if (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) return node.text
+  if (ts.isComputedPropertyName(node)) return elementName(node.expression)
   return null
 }
 
+// Resolve only literal string expressions. A variable, function call or getter
+// must never be executed while statically auditing repository test sources.
 function elementName(node) {
   if (!node) return null
   const current = unwrapExpression(node)
-  return ts.isStringLiteralLike(current) ? current.text : null
+  if (ts.isStringLiteralLike(current)) return current.text
+  if (ts.isBinaryExpression(current) && current.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = elementName(current.left)
+    const right = elementName(current.right)
+    if (left !== null && right !== null && left.length + right.length <= 256) {
+      return left + right
+    }
+  }
+  return null
 }
 
 function unwrapExpression(node) {
@@ -61,7 +72,7 @@ function nodeTestBindings(sourceFile) {
 
     for (const element of namedBindings.elements) {
       const importedName = (element.propertyName ?? element.name).text
-      if (nodeTestExports.has(importedName)) {
+      if (nodeTestExports.has(importedName) || importedName === 'default') {
         bindings.add(element.name.text)
       }
     }
@@ -206,11 +217,27 @@ test('disabled-test detector rejects namespace-imported test methods and options
     nodeTest.describe('todo via options', { todo: 'later' }, () => {})
     nodeTest['test']('skipped via options', { skip: true }, () => {})
     nodeTest.default.todo('todo via default export', () => {})
+    nodeTest['te' + 'st']['sk' + 'ip']('composed method', () => {})
+    nodeTest.test('computed options', { ['to' + 'do']: true }, () => {})
   `
 
   assert.deepEqual(
     findDisabledNodeTests(source).map(({ mode }) => mode),
-    ['skip', 'only', 'todo', 'skip', 'todo'],
+    ['skip', 'only', 'todo', 'skip', 'todo', 'skip', 'todo'],
+  )
+})
+
+test('disabled-test detector handles named default imports and literal member concatenation', () => {
+  const source = `
+    import { default as check } from 'node:test'
+    check['sk' + 'ip']('disabled', () => {})
+    check('computed option', { ['on' + 'ly']: true }, () => {})
+    check['to' + 'do']('todo', () => {})
+  `
+
+  assert.deepEqual(
+    findDisabledNodeTests(source).map(({ mode }) => mode),
+    ['skip', 'only', 'todo'],
   )
 })
 
@@ -229,6 +256,9 @@ test('disabled-test detector ignores inert text and unrelated or dynamic APIs', 
     const name = 'test'
     nodeTest[name].skip('dynamic namespace key', () => {})
     nodeTest.test[mode]('dynamic mode', () => {})
+    nodeTest['te' + name].only('dynamic namespace', () => {})
+    test['sk' + mode]('dynamic composed mode', () => {})
+    test('dynamic computed option', { [mode]: true }, () => {})
     test('ordinary test', () => {})
     test('false literals stay enabled', { skip: false, todo: false, only: false }, () => {})
   `
