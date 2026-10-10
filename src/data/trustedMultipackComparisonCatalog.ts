@@ -99,7 +99,9 @@ export function projectFreshControlledComparisonCatalogs(
     )
     if (baseline === null || candidate === null) return null
 
-    let earliest = referenceMillis
+    // Reference time is only the freshness cutoff, not a retailer capture.
+    // The reported window must measure actual observations on BOTH sides.
+    let earliest = Number.POSITIVE_INFINITY
     let latest = Number.NEGATIVE_INFINITY
     const ONE_DAY_MS = 24 * 60 * 60 * 1000
     for (const observations of [baselineObservations, candidateObservations]) {
@@ -114,6 +116,8 @@ export function projectFreshControlledComparisonCatalogs(
         latest = Math.max(latest, capturedMillis)
       }
     }
+    // Empty catalogs have no observed pair and must not yield -Infinity hours.
+    if (!Number.isFinite(earliest) || !Number.isFinite(latest)) return null
     if (latest - earliest > ONE_DAY_MS) return null
 
     return { baseline, candidate, captureWindowHours: (latest - earliest) / 3600000 }
