@@ -152,3 +152,35 @@ test('CLI prints only aggregate safe status; bad inputs never leak filename or e
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('strict ISO calendar/offset rules do not normalize impossible field timestamps', () => {
+  for (const invalid of [
+    '2026-02-30T10:00:00Z',
+    '2026-02-29T10:00:00Z',
+    '2026-04-31T10:00:00Z',
+    '2026-10-10T10:00:00+14:01',
+    '2026-10-10T10:00:00+15:00',
+    '2026-10-10T10:00:00+01:99',
+    '2026-10-10T24:00:00Z',
+  ]) {
+    const rows = syntheticFilledRows()
+    rows[1][7] = invalid
+    const reviewed = reviewM3FieldCsv(serialize(rows))
+    assert.ok(reviewed.warnings.includes('invalid-timestamp'), invalid)
+    assert.equal(reviewed.evidenceVerified, false)
+  }
+
+  for (const valid of [
+    '2028-02-29T10:00:00Z',
+    '2026-10-10T10:00:00.123+14:00',
+    '2026-10-10T10:00:00-12:00',
+  ]) {
+    const rows = syntheticFilledRows()
+    for (let i = 1; i < rows.length; i++) rows[i][7] = valid
+    const reviewed = reviewM3FieldCsv(serialize(rows))
+    assert.equal(reviewed.completeRows, 22, valid)
+    assert.deepEqual(reviewed.warnings, [], valid)
+    assert.equal(reviewed.status, 'requires-canonical-human-verification')
+    assert.equal(reviewed.releaseEligible, false)
+  }
+})
