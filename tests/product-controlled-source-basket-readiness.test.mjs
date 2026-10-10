@@ -254,3 +254,45 @@ test('M3 retailer-order preflight safely rejects malformed or getter-backed iden
   assert.equal(result.status, 'structural-fail')
   assert.doesNotMatch(JSON.stringify(result), /SECRET_SOURCE_CONTEXT/)
 })
+
+test('two distinct ingredients selecting one source SKU cannot be double-charged as complete', () => {
+  const separateDemandNamesOneProduct = [{
+    ...recipes[0],
+    ingredients: [
+      ...recipes[0].ingredients,
+      {
+        id: 'rice-additional-usage',
+        label: 'Basmati rijst voor saus',
+        query: 'basmati rijst',
+        amount: 300, unit: 'g',
+      },
+    ],
+  }]
+  // Both distinct ingredient IDs would match the same single SKU at each
+  // retailer. 2 × one pack is NOT the validated shared purchase quantity.
+  const result = assessControlledSourceBasketReadiness(input({
+    recipes: separateDemandNamesOneProduct,
+  }))
+  assert.deepEqual(result, {
+    status: 'structural-fail',
+    releaseEligible: false,
+    reason: 'source-or-plan-not-comparable',
+    comparison: null,
+  })
+  assert.equal(assessM3ControlledPlusDekaBasketReadiness(input({
+    recipes: separateDemandNamesOneProduct,
+  })).status, 'structural-fail')
+})
+
+test('reuse of the same ingredient ID across two planned days is still aggregated once', () => {
+  const result = assessControlledSourceBasketReadiness(input({
+    plan: [{ day: 'Ma', recipeId: 'rice' }, { day: 'Di', recipeId: 'rice' }],
+    activeDays: ['Ma', 'Di'],
+  }))
+  assert.equal(result.status, 'structural-pass')
+  assert.equal(result.baseline.lines.length, 1)
+  assert.equal(result.baseline.lines[0].requirement.amount, 900)
+  assert.equal(result.baseline.lines[0].packs, 1)
+  assert.equal(result.candidate.lines[0].pack.count, 6)
+  assert.equal(result.candidate.lines[0].packs, 1)
+})
