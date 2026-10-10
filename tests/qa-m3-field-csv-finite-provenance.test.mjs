@@ -45,7 +45,7 @@ test('M3 filled CSV: whitespace-only context and source are missing provenance',
 
 test('M3 filled CSV: whitespace-only product is not a complete available observation', () => {
   const rows = fictionalRows()
-  rows[1][9] = ' \t '
+  rows[1][9] = '    '
   rejectIncomplete(rows)
 })
 
