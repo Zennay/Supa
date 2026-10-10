@@ -222,3 +222,61 @@ export function basketLineExplanation(
 
   return 'SUPA kan hier niet betrouwbaar automatisch kiezen; kies zelf.'
 }
+
+/**
+ * A price difference is user-facing only when the complete signed-cent
+ * comparison is internally consistent. Never coerce missing runtime money
+ * to zero or derive a comparison claim from a malformed snapshot.
+ *
+ * This is a presentation trust boundary, not evidence of live shop prices.
+ */
+export function basketComparisonHeadline(
+  comparison: BasketComparison,
+  candidate: { store: { name: string } },
+): string {
+  const abstain = 'Nog geen betrouwbare vergelijking'
+  const storeName = candidate?.store?.name
+  if (
+    !comparison || typeof comparison !== 'object' ||
+    comparison.claimable !== true ||
+    !Array.isArray(comparison.reasons) ||
+    comparison.reasons.length !== 0 ||
+    typeof storeName !== 'string' ||
+    storeName.trim().length === 0 ||
+    storeName !== storeName.trim() ||
+    !Number.isSafeInteger(comparison.baselineTotalCents) ||
+    comparison.baselineTotalCents < 0 ||
+    !Number.isSafeInteger(comparison.candidateTotalCents) ||
+    comparison.candidateTotalCents < 0 ||
+    !Number.isSafeInteger(comparison.deltaCents) ||
+    !Number.isSafeInteger(comparison.savingsCents)
+  ) {
+    return abstain
+  }
+
+  const expectedDelta =
+    comparison.candidateTotalCents - comparison.baselineTotalCents
+  if (
+    !Number.isSafeInteger(expectedDelta) ||
+    comparison.deltaCents !== expectedDelta ||
+    comparison.savingsCents !== -expectedDelta
+  ) {
+    return abstain
+  }
+
+  if (comparison.outcome === 'same') {
+    return expectedDelta === 0 ? 'Beide testmanden zijn even duur' : abstain
+  }
+  if (
+    (comparison.outcome !== 'better' || expectedDelta >= 0) &&
+    (comparison.outcome !== 'worse' || expectedDelta <= 0)
+  ) {
+    return abstain
+  }
+
+  const amount = euro.formatCents(Math.abs(expectedDelta))
+  if (amount === '—') return abstain
+  return comparison.outcome === 'better'
+    ? `${storeName} ligt ${amount} lager`
+    : `${storeName} ligt ${amount} hoger`
+}
