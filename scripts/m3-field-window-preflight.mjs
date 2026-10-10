@@ -53,7 +53,7 @@ export function assessFieldWindow({ baselineAt, candidateAt = null, nowMs = Date
     return { status: 'invalid', reason: 'baseline timestamp missing, malformed or future-dated' }
   }
 
-  if (candidateAt === null || candidateAt === undefined || candidateAt === '') {
+  if (candidateAt === null || candidateAt === undefined) {
     const remainingMs = baseline + MAX_FIELD_WINDOW_MS - nowMs
     return remainingMs < 0
       ? { status: 'expired', reason: '24-hour window has elapsed; recollect both stores' }
@@ -81,7 +81,7 @@ function parseArgs(args) {
     throw new Error('usage: node scripts/m3-field-window-preflight.mjs --baseline ISO [--candidate ISO]')
   }
   if (args[0] !== '--baseline' || typeof args[1] !== 'string' ||
-      (args.length === 4 && args[2] !== '--candidate')) {
+      (args.length === 4 && (args[2] !== '--candidate' || typeof args[3] !== 'string' || args[3].trim() === ''))) {
     throw new Error('usage: node scripts/m3-field-window-preflight.mjs --baseline ISO [--candidate ISO]')
   }
   return { baselineAt: args[1], candidateAt: args.length === 4 ? args[3] : null }
