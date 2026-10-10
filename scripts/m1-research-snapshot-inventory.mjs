@@ -7,6 +7,7 @@ import { auditCaptureFiles } from './m1-research-snapshot-audit.mjs'
 // Offline only. This lists counts of private capture pairs, never product data,
 // filenames, raw HTML, prices or full source URLs.
 const MAX_SOURCE_ENTRIES = 500
+const MAX_ROOT_ENTRIES = 100
 const CAPTURE_FILE = /^(capture-[0-9]{13}-[0-9]+)\.(html|json)$/
 
 function summary(status, sources, unexpectedRootEntries = 0) {
@@ -55,6 +56,7 @@ export async function inventoryResearchSnapshots({
   const root = await directoryEntries(outputDir)
   if (root === null) return summary('no-captures', sources)
   if (root === false) return summary('rejected', sources, 1)
+  if (root.length > MAX_ROOT_ENTRIES) return summary('rejected', sources, root.length)
   const known = new Set(RESEARCH_SOURCES.map(source => source.id))
   // Do not traverse or expose unexpected directories or files.
   const unexpectedRootEntries = root.filter(entry => !known.has(entry.name)).length
