@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { assessControlledSourceBasketReadiness } from '../src/data/controlledSourceBasketReadiness.ts'
+import {\n  assessControlledSourceBasketReadiness, assessM3ControlledPlusDekaBasketReadiness,\n} from '../src/data/controlledSourceBasketReadiness.ts'
 import {
   m2DefaultActiveDays, m2InitialPlan, m2Products, m2Recipes,
 } from '../src/data/m2Fixture.ts'
@@ -92,6 +92,11 @@ test('all 11 actual M2 demands require 11 controlled synthetic source records EA
   assert.equal(result.baseline.unresolvedLineCount, 0)
   assert.equal(result.candidate.unresolvedLineCount, 0)
   assert.equal(result.outcome, 'worse')
+  const m3Result = assessM3ControlledPlusDekaBasketReadiness(input)
+  assert.equal(m3Result.status, 'structural-pass')
+  assert.equal(m3Result.releaseEligible, false)
+  assert.equal(m3Result.baseline.store.name, 'PLUS')
+  assert.equal(m3Result.candidate.store.name, 'DekaMarkt')
   assert.equal(result.candidateMinusBaselineCents, 50)
 
   const candidateRice = result.candidate.lines.find(line => line.id === 'basmati-rice')
@@ -131,4 +136,50 @@ test('a single malformed or stale item makes a full source catalog ineligible', 
   const dekaCorrect = storeSource('dekamarkt')
   dekaCorrect[2].pack.amount = 999
   assert.equal(assessControlledSourceBasketReadiness(request(plus, dekaCorrect)).status, 'structural-fail')
+})
+
+test('M3 must match the real 11-line observation-sheet demand exactly even when arithmetic still works', () => {
+  const plus = storeSource('plus')
+  const deka = storeSource('dekamarkt')
+  const ordinary = request(plus, deka)
+
+  const plusOneGram = m2Recipes.map(recipe => recipe.id === 'tikka'
+    ? {
+      ...recipe,
+      ingredients: recipe.ingredients.map(item => item.id === 'basmati-rice'
+        ? { ...item, amount: item.amount + 1 }
+        : item),
+    }
+    : recipe)
+  const changedAmount = { ...ordinary, recipes: plusOneGram }
+  assert.equal(assessControlledSourceBasketReadiness(changedAmount).status, 'structural-pass')
+  assert.equal(assessM3ControlledPlusDekaBasketReadiness(changedAmount).status, 'structural-fail')
+
+  const changedLabelRecipes = m2Recipes.map(recipe => recipe.id === 'pasta'
+    ? {
+      ...recipe,
+      ingredients: recipe.ingredients.map(item => item.id === 'spaghetti'
+        ? { ...item, label: 'Andere pasta' }
+        : item),
+    }
+    : recipe)
+  assert.equal(assessM3ControlledPlusDekaBasketReadiness({
+    ...ordinary, recipes: changedLabelRecipes,
+  }).status, 'structural-fail')
+
+  const threeMeals = {
+    ...ordinary, activeDays: ['Ma', 'Di', 'Wo'],
+  }
+  assert.equal(assessControlledSourceBasketReadiness(threeMeals).status, 'structural-pass')
+  assert.equal(assessM3ControlledPlusDekaBasketReadiness(threeMeals).status, 'structural-fail')
+})
+
+test('M3 accepts a reordered equivalent four-meal plan without changing the canonical demand', () => {
+  const equivalent = request(storeSource('plus'), storeSource('dekamarkt'))
+  equivalent.plan = [...equivalent.plan].reverse()
+  equivalent.activeDays = [...equivalent.activeDays].reverse()
+  const result = assessM3ControlledPlusDekaBasketReadiness(equivalent)
+  assert.equal(result.status, 'structural-pass')
+  assert.equal(result.baseline.lines.length, 11)
+  assert.equal(result.releaseEligible, false)
 })
