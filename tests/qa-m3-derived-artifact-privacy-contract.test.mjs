@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -134,3 +134,32 @@ test('M3 assessment writes a new private report while retaining honest evidence 
     assert.equal(report.evidenceBoundary.includes('never sufficient'), true)
   })
 })
+
+for (const [label, script] of [
+  ['converter', 'scripts/m3-build-observed-study.mjs'],
+  ['assessment', 'scripts/m3-assess-observed-week.mjs'],
+]) {
+  test(`M3 ${label} does not follow an output symlink into previously reviewed data`, {
+    skip: process.platform === 'win32',
+  }, async () => {
+    await inScratch(`${label}-symlink`, async (root) => {
+      const input = join(root, 'input.json')
+      const target = join(root, 'reviewed-evidence.json')
+      const output = join(root, 'output-alias.json')
+      const sentinel = 'previously reviewed file behind an output symlink\\n'
+      const sheet = syntheticSheet()
+      const data = label === 'converter'
+        ? sheet
+        : buildWeeklyBasketStudyFromObservationSheet(sheet)
+      await writeFile(input, JSON.stringify(data))
+      await writeFile(target, sentinel)
+      await symlink(target, output)
+
+      const result = runCli(script, input, output)
+      assert.notEqual(result.status, 0, 'a pre-existing output symlink must be refused')
+      assert.equal(result.stdout, '', 'rejected symlink must not expose evidence')
+      assert.equal(await readFile(target, 'utf8'), sentinel)
+      assert.equal((await lstat(output)).isSymbolicLink(), true)
+    })
+  })
+}
