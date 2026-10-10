@@ -27,7 +27,7 @@ test('App buttons are explicitly non-submit controls', async () => {
 test('prototype app shell has no misleading interactive profile control', async () => {
   const source = await readFile('src/App.tsx', 'utf8')
   assert.match(source, /import \\{ IdentityAvatar \\} from/)
-  assert.match(source, /<IdentityAvatar \\/>/)
+  assert.match(source, /<IdentityAvatar \/>/)
   assert.doesNotMatch(source, /<button[^>]+aria-label="Profiel"/)
   assert.doesNotMatch(source, /<a[^>]+aria-label="Profiel"/)
   assert.match(source, /<nav className="bottom-nav" aria-label="Hoofdnavigatie">/)
