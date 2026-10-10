@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
@@ -318,6 +319,9 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(report, null, 2)}\n`
 
   if (output) {
+    // Missing output directories must not break a genuine M3 report run.
+    // Preserve existing directory permissions; private mode applies to new ones.
+    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
     // Never clobber a reviewed report or follow a pre-existing output symlink.
     // Newly created reports contain field metadata: restrict them to the owner.
     try {
