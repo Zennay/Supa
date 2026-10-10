@@ -20,7 +20,7 @@ function safeUnit(value: unknown): value is 'g' | 'kg' | 'ml' | 'l' | 'piece' {
 }
 
 function dutchAmount(value: number): string {
-  return value.toLocaleString('nl-NL', { maximumFractionDigits: 14, useGrouping: false })
+  return String(value).replace('.', ',')
 }
 
 /**
