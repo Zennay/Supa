@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
+import { buildObservationSheet, withObservedProductAvailability } from '../src/domain/m3ObservationSheet.ts'
 import { checkFieldSheet } from '../scripts/m3-check-field-readiness.mjs'
 
 function syntheticCompleteSheet() {
@@ -99,7 +99,9 @@ test('synthetically filled same-demand two-store sheet is only ready for human r
 
 test('partial two-store measurement stays incomplete and retains the absolute 24h guard', () => {
   const sheet = syntheticCompleteSheet()
-  sheet.candidate.lines[0].observedProduct.available = null
+  sheet.candidate.lines[0].observedProduct = withObservedProductAvailability(
+    sheet.candidate.lines[0].observedProduct, null,
+  )
   sheet.candidate.observedAt = '2026-10-05T14:00:00Z'
   const report = checkFieldSheet(sheet)
 
