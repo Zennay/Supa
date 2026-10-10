@@ -1,4 +1,6 @@
 import type { BasketTraceLine } from '../../domain/basket.ts'
+import type { BasketLineDelta } from '../../domain/basketComparison.ts'
+import type { BasketComparison } from '../../domain/basketComparison.ts'
 import { euro } from '../../lib/money.ts'
 
 export type BasketCostDisclosure = {
@@ -64,6 +66,87 @@ export function orderBasketLinesForReview(
   }
 
   return [...unresolved, ...matched]
+}
+
+export type ComparisonLineHighlight = {
+  id: string
+  ingredientLabel: string
+  direction: 'lower' | 'higher'
+  amountLabel: string
+}
+
+export function comparisonLineHighlights(
+  comparison: BasketComparison,
+  limit = 3,
+): ComparisonLineHighlight[] {
+  if (!comparison.claimable || comparison.outcome === 'unknown') return []
+
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 3
+
+  return comparison.lineDeltas
+    .map((line, index) => ({ line, index }))
+    .filter(
+      ({ line }) =>
+        Number.isSafeInteger(line.deltaCents) && line.deltaCents !== 0,
+    )
+    .sort(
+      (left, right) =>
+        Math.abs(right.line.deltaCents) - Math.abs(left.line.deltaCents) ||
+        left.index - right.index,
+    )
+    .slice(0, safeLimit)
+    .map(({ line }) => ({
+      id: line.id,
+      ingredientLabel: line.ingredientLabel,
+      direction: line.deltaCents < 0 ? 'lower' : 'higher',
+      amountLabel: euro.format(Math.abs(line.deltaCents) / 100),
+    }))
+}
+
+export function comparisonLineHighlightCopy(
+  highlight: ComparisonLineHighlight,
+  candidateStoreName: string,
+): string {
+  const storeName =
+    typeof candidateStoreName === 'string' && candidateStoreName.trim()
+      ? candidateStoreName.trim()
+      : 'De kandidaatwinkel'
+
+  return `${storeName} is op deze mandregel ${highlight.amountLabel} ${
+    highlight.direction === 'lower' ? 'lager' : 'hoger'
+  }.`
+}
+
+export type ComparisonLineBreakdown = {
+  id: string
+  ingredientLabel: string
+  direction: 'lower' | 'higher'
+  amountLabel: string
+}
+
+export function comparisonLineBreakdown(
+  lineDeltas: readonly BasketLineDelta[],
+  limit = 3,
+): ComparisonLineBreakdown[] {
+  const safeLimit =
+    Number.isInteger(limit) && limit > 0 ? limit : 3
+
+  return [...lineDeltas]
+    .filter(
+      (line) =>
+        Number.isSafeInteger(line.deltaCents) && line.deltaCents !== 0,
+    )
+    .sort(
+      (left, right) =>
+        Math.abs(right.deltaCents) - Math.abs(left.deltaCents),
+    )
+    .slice(0, safeLimit)
+    .map((line) => ({
+      id: line.id,
+      ingredientLabel: line.ingredientLabel,
+      direction: line.deltaCents < 0 ? 'lower' : 'higher',
+      amountLabel: euro.format(Math.abs(line.deltaCents) / 100),
+    }))
 }
 
 export function comparisonWarningCopy(

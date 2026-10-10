@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import {
   basketCostDisclosure,
   basketLineExplanation,
   basketReviewSummary,
+  comparisonLineHighlightCopy,
+  comparisonLineHighlights,
   comparisonWarningCopy,
   orderBasketLinesForReview,
 } from '../src/features/basket/basketPresentation.ts'
@@ -74,6 +77,119 @@ test('basket review ordering moves unresolved choices first without reordering e
   ])
 })
 
+test('comparison line highlights surface the largest trustworthy rule deltas without causal claims', () => {
+  const highlights = comparisonLineHighlights({
+    claimable: true,
+    outcome: 'better',
+    baselineTotalCents: 3000,
+    candidateTotalCents: 2600,
+    deltaCents: -400,
+    savingsCents: 400,
+    reasons: [],
+    lineDeltas: [
+      {
+        id: 'rice',
+        ingredientLabel: 'Basmati rijst',
+        baselineLineTotalCents: 500,
+        candidateLineTotalCents: 450,
+        deltaCents: -50,
+      },
+      {
+        id: 'chicken',
+        ingredientLabel: 'Kipdij',
+        baselineLineTotalCents: 900,
+        candidateLineTotalCents: 650,
+        deltaCents: -250,
+      },
+      {
+        id: 'tomato',
+        ingredientLabel: 'Tomaten',
+        baselineLineTotalCents: 300,
+        candidateLineTotalCents: 400,
+        deltaCents: 100,
+      },
+      {
+        id: 'salt',
+        ingredientLabel: 'Zout',
+        baselineLineTotalCents: 80,
+        candidateLineTotalCents: 80,
+        deltaCents: 0,
+      },
+    ],
+  }, 2)
+
+  assert.deepEqual(highlights.map((item) => item.id), ['chicken', 'tomato'])
+  assert.equal(highlights[0].direction, 'lower')
+  assert.equal(highlights[1].direction, 'higher')
+  assert.match(highlights[0].amountLabel, /2,50/)
+  assert.match(highlights[1].amountLabel, /1,00/)
+})
+
+test('comparison line copy states the observed rule delta without inventing a cause', () => {
+  const lower = {
+    id: 'rice',
+    ingredientLabel: 'Basmati rijst',
+    direction: 'lower',
+    amountLabel: '€ 0,50',
+  }
+  const higher = { ...lower, direction: 'higher', amountLabel: '€ 0,25' }
+
+  assert.equal(
+    comparisonLineHighlightCopy(lower, 'DekaMarkt'),
+    'DekaMarkt is op deze mandregel € 0,50 lager.',
+  )
+  assert.equal(
+    comparisonLineHighlightCopy(higher, 'DekaMarkt'),
+    'DekaMarkt is op deze mandregel € 0,25 hoger.',
+  )
+  assert.equal(
+    comparisonLineHighlightCopy(lower, '   '),
+    'De kandidaatwinkel is op deze mandregel € 0,50 lager.',
+  )
+  assert.doesNotMatch(
+    comparisonLineHighlightCopy(lower, 'DekaMarkt'),
+    /aanbieding|verpakking|planning|oorzaak/i,
+  )
+})
+
+test('comparison line highlights fail closed for non-claimable comparisons and unsafe deltas', () => {
+  const comparison = {
+    claimable: false,
+    outcome: 'unknown',
+    baselineTotalCents: 3000,
+    candidateTotalCents: 2600,
+    deltaCents: null,
+    savingsCents: null,
+    reasons: ['incomplete basket'],
+    lineDeltas: [
+      {
+        id: 'rice',
+        ingredientLabel: 'Basmati rijst',
+        baselineLineTotalCents: 500,
+        candidateLineTotalCents: 450,
+        deltaCents: -50,
+      },
+    ],
+  }
+
+  assert.deepEqual(comparisonLineHighlights(comparison), [])
+  assert.deepEqual(
+    comparisonLineHighlights({
+      ...comparison,
+      claimable: true,
+      outcome: 'better',
+      reasons: [],
+      lineDeltas: [
+        {
+          ...comparison.lineDeltas[0],
+          deltaCents: Number.MAX_SAFE_INTEGER + 1,
+        },
+      ],
+    }),
+    [],
+  )
+})
+
 test('comparison warning explains unresolved product choices without leaking domain diagnostics', () => {
   assert.equal(
     comparisonWarningCopy(1, 2, 4),
@@ -133,4 +249,14 @@ test('unknown matcher diagnostics stay hidden behind a safe generic explanation'
     basketLineExplanation('unresolved', ['future internal matcher reason']),
     'SUPA kan hier niet betrouwbaar automatisch kiezen; kies zelf.',
   )
+})
+
+test('basket disclosure text is user-facing, source-honest, and free of milestone jargon (#580)', async () => {
+  const source = await readFile(new URL('../src/features/basket/BasketView.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /\bM[23]\b|testfixture|controlled testdata|productie-liveprijs/i)
+  assert.equal((source.match(/Geen actuele winkelprijzen of bewezen besparing\./g) || []).length, 2)
+  assert.match(source, /geen actuele winkelprijzen of bewezen besparing/)
+  assert.match(source, /bekende minimum, geen/)
+  assert.match(source, /comparison\.claimable \?/)
+  assert.match(source, /comparison-warning/)
 })

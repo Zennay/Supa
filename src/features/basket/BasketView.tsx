@@ -5,6 +5,8 @@ import {
   basketCostDisclosure,
   basketLineExplanation,
   basketReviewSummary,
+  comparisonLineHighlightCopy,
+  comparisonLineHighlights,
   comparisonWarningCopy,
   orderBasketLinesForReview,
 } from './basketPresentation'
@@ -62,6 +64,7 @@ export function BasketView({
     comparisonCandidate.unresolvedLineCount,
     comparison.reasons.length,
   )
+  const comparisonHighlights = comparisonLineHighlights(comparison)
   const reviewSummary = basketReviewSummary(basket.unresolvedLineCount)
   const basketLines = orderBasketLinesForReview(basket.lines)
 
@@ -92,12 +95,12 @@ export function BasketView({
                 ? 'productkeuze is'
                 : 'productkeuzes zijn'}{' '}
               nog niet meegerekend. Dit is alleen het bekende minimum, geen
-              volledig mandtotaal. M2 testfixture — geen productie-liveprijs.
+              volledig mandtotaal. Dit zijn voorbeeldprijzen, geen actuele winkelprijzen of bewezen besparing.
             </>
           ) : (
             <>
-              Volledige deterministische M2 testfixture — geen besparingsclaim
-              en geen productie-liveprijs.
+              Dit is een volledig voorbeeldmandje met gecontroleerde voorbeeldprijzen.
+              Geen actuele winkelprijzen of bewezen besparing.
             </>
           )}
         </p>
@@ -120,10 +123,35 @@ export function BasketView({
             </strong>
           </div>
         </div>
+        {comparisonHighlights.length > 0 && (
+          <div data-comparison-line-breakdown="true">
+            <span className="eyebrow">Grootste regelverschillen</span>
+            <div className="list-card">
+              {comparisonHighlights.map((item) => (
+                <div className="list-row" key={item.id}>
+                  <div>
+                    <strong>{item.ingredientLabel}</strong>
+                    <span>
+                      {comparisonLineHighlightCopy(
+                        item,
+                        comparisonCandidate.store.name,
+                      )}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="disclaimer">
+              Dit laat zien welke mandregels het totaalverschil dragen, niet
+              waarom het prijsverschil ontstaat.
+            </p>
+          </div>
+        )}
+
         {comparison.claimable ? (
           <p className="disclaimer">
-            M3 controlled testdata · zelfde week en volledige mand · geen
-            live-besparingsclaim.
+            Vergelijking van voorbeeldprijzen voor dezelfde week en een volledige mand.
+            Geen actuele winkelprijzen of bewezen besparing.
           </p>
         ) : (
           <div className="comparison-warning">
