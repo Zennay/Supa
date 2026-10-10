@@ -26,6 +26,7 @@ export function RecipeReusePreviewPanel({
   const [expanded, setExpanded] = useState(false)
   const [requestedDay, setRequestedDay] = useState<string | null>(null)
   const [requestedRecipe, setRequestedRecipe] = useState<string | null>(null)
+  const [confirmedSource, setConfirmedSource] = useState<{ day: string; recipeId: string } | null>(null)
 
   if (!Array.isArray(plannedMeals) || !Array.isArray(activeDays) ||
       !Array.isArray(recipes) || activeDays.length === 0 || recipes.length < 2) {
@@ -58,7 +59,10 @@ export function RecipeReusePreviewPanel({
   const staleSelection =
     (requestedDay !== null && !days.includes(requestedDay)) ||
     (requestedRecipe !== null &&
-      !alternatives.some((recipe) => recipe.id === requestedRecipe))
+      !alternatives.some((recipe) => recipe.id === requestedRecipe)) ||
+    (confirmedSource !== null &&
+      (confirmedSource.day !== day ||
+        confirmedSource.recipeId !== currentMeal.recipeId))
 
   const preview = expanded && !staleSelection
     ? previewRecipeReuseChange({
@@ -77,7 +81,15 @@ export function RecipeReusePreviewPanel({
         className="recipe-reuse-preview-toggle"
         aria-expanded={expanded}
         aria-controls="recipe-reuse-preview-content"
-        onClick={() => setExpanded((value) => !value)}
+        onClick={() => {
+          if (!expanded) {
+            // Opening begins a fresh proposal against the current recipe.
+            setRequestedDay(null)
+            setRequestedRecipe(null)
+            setConfirmedSource({ day, recipeId: currentMeal.recipeId })
+          }
+          setExpanded((value) => !value)
+        }}
       >
         {expanded ? 'Verberg receptvoorbeeld' : 'Bekijk een ander recept zonder te wijzigen'}
       </button>
@@ -92,6 +104,10 @@ export function RecipeReusePreviewPanel({
                 onChange={(event) => {
                   setRequestedDay(event.target.value)
                   setRequestedRecipe(null)
+                  setConfirmedSource({
+                    day: event.target.value,
+                    recipeId: plannedMeals.find((meal) => meal?.day === event.target.value)?.recipeId ?? '',
+                  })
                 }}
               >
                 {days.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -123,6 +139,7 @@ export function RecipeReusePreviewPanel({
                 onClick={() => {
                   setRequestedDay(null)
                   setRequestedRecipe(null)
+                  setConfirmedSource({ day, recipeId: currentMeal.recipeId })
                 }}
               >
                 Werk voorbeeld bij
