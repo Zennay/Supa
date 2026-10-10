@@ -82,3 +82,23 @@ export function reconcileShoppingProgressV2(
   }
   return checkedIds(nextBasket, completedLineIds)
 }
+
+/**
+ * Safe toggle boundary for the future ShoppingListView integration.
+ * Unknown line ids, malformed baskets and invalid caller input fail closed:
+ * they can neither add phantom checks nor resurrect an old shopping task.
+ */
+export function toggleShoppingProgressV2(
+  basket: OneStoreBasket,
+  completedLineIds: unknown,
+  lineId: unknown,
+): string[] {
+  if (shoppingListDemandIdentity(basket) === null) return []
+  const validCompleted = checkedIds(basket, completedLineIds)
+  if (typeof lineId !== 'string' || !basket.lines.some((line) => line.id === lineId)) {
+    return validCompleted
+  }
+  return validCompleted.includes(lineId)
+    ? validCompleted.filter((id) => id !== lineId)
+    : [...validCompleted, lineId]
+}
