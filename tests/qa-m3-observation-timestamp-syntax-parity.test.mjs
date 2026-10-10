@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildObservationSheet, observationSheetReadiness, observationWindowSummary } from '../src/domain/m3ObservationSheet.ts'
+import { buildObservationSheet, observationSheetReadiness, observationWindowSummary, restoreObservationSheetDraft } from '../src/domain/m3ObservationSheet.ts'
 import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
 
 // Every observation and store here is invented; unavailable lines carry NO prices.
@@ -83,4 +83,30 @@ test('two noncanonical date-only values must not create a false two-store window
   assert.throws(() => buildWeeklyBasketStudyFromObservationSheet(sheet), /observedAt must be a valid timestamp/)
   assert.equal(observationSheetReadiness(sheet).ready, false)
   assert.deepEqual(observationWindowSummary(sheet), { state: 'not-started' })
+})
+
+for (const side of ['baseline', 'candidate']) {
+  test(`saved/restored M3 draft must not mark noncanonical ${side} timestamp export-ready`, () => {
+    const original = syntheticUnavailableSheet()
+    original[side].observedAt = '2026-10-04T12:00:00' // local-time ISO, no timezone
+    const restored = restoreObservationSheetDraft(JSON.stringify(original))
+    assert.ok(restored, 'the local draft must restore before readiness is evaluated')
+    assert.throws(
+      () => buildWeeklyBasketStudyFromObservationSheet(restored),
+      new RegExp(side + '\\.observedAt must be a valid timestamp'),
+    )
+    assert.equal(observationSheetReadiness(restored).ready, false)
+  })
+}
+
+test('calendar-impossible explicit UTC day must not be normalized into an observed day', () => {
+  const sheet = syntheticUnavailableSheet()
+  sheet.baseline.observedAt = '2026-02-31T12:00:00Z' // parser may normalize to 2026-03-03
+  sheet.candidate.observedAt = '2026-03-03T12:30:00Z'
+  assert.throws(
+    () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+    /baseline\\.observedAt must be a valid timestamp/,
+  )
+  assert.equal(observationSheetReadiness(sheet).ready, false)
+  assert.notEqual(observationWindowSummary(sheet).state, 'within-window')
 })
