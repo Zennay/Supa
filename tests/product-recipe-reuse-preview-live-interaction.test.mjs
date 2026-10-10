@@ -252,6 +252,63 @@ test('malformed inactive day identity never crashes the preview boundary', () =>
   assert.equal(ui.collect(tree, 'button').length, 1)
 })
 
+test('changing ingredients behind the same recipe identity revokes a visible proposal', () => {
+  const chosen = []
+  const ui = makeHarness({
+    onChooseRecipe(day, recipeId) { chosen.push([day, recipeId]) },
+  })
+  ui.collect(ui.render(), 'button')[0].props.onClick()
+  let tree = ui.render()
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'pasta')
+
+  const changed = structuredClone(m2Recipes)
+  const pasta = changed.find((recipe) => recipe.id === 'pasta')
+  pasta.ingredients[0].id = 'new-catalog-ingredient'
+  pasta.ingredients[0].label = 'Nieuw ingrediënt'
+  pasta.ingredients[0].query = 'nieuw ingredient'
+  tree = ui.update({ recipes: changed })
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 2, 'cannot apply before a refreshed explanation')
+  assert.deepEqual(chosen, [])
+
+  ui.collect(tree, 'button')[1].props.onClick()
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.day, 'Ma')
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'teriyaki')
+  ui.collect(tree, 'select')[1].props.onChange({ target: { value: 'pasta' } })
+  tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview.nextRecipeId, 'pasta')
+  ui.collect(tree, 'button')[1].props.onClick()
+  assert.deepEqual(chosen, [['Ma', 'pasta']])
+})
+
+test('changing an ingredient amount with unchanged recipe IDs also revokes preview', () => {
+  const ui = makeHarness()
+  ui.collect(ui.render(), 'button')[0].props.onClick()
+  const changed = structuredClone(m2Recipes)
+  const pasta = changed.find((recipe) => recipe.id === 'pasta')
+  pasta.ingredients[0].amount += 1
+  const tree = ui.update({ recipes: changed })
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 2)
+})
+
+test('circular invalid ingredient metadata never crashes the preview identity', () => {
+  const cyclic = {}
+  cyclic.parent = cyclic
+  const changed = structuredClone(m2Recipes)
+  changed[0].ingredients[0] = cyclic
+  const ui = makeHarness({ recipes: changed })
+  const initial = ui.render()
+  assert.ok(initial)
+  ui.collect(initial, 'button')[0].props.onClick()
+  const tree = ui.render()
+  assert.equal(ui.collect(tree, PreviewCard)[0].props.preview, null)
+  assert.equal(ui.collect(tree, 'button').length, 1)
+})
+
 test('refresh after external edit on a non-default day cannot remain stale', () => {
   const ui = makeHarness()
   ui.collect(ui.render(), 'button')[0].props.onClick()
