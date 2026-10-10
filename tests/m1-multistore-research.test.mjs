@@ -9,8 +9,8 @@ import test from 'node:test'
 import { RESEARCH_SOURCES, validateResearchSource, researchTransport,
   parseCaptureHeaders, main, captureResearchSource } from '../scripts/m1-multistore-research.mjs'
 
-test('four real-public-page research probes and strict registered host validation', () => {
-  assert.deepEqual(RESEARCH_SOURCES.map(x => x.store), ['ah', 'dirk', 'hoogvliet', 'jumbo'])
+test('four stores with five real-public-page research probes and strict host validation', () => {
+  assert.deepEqual(RESEARCH_SOURCES.map(x => x.store), ['ah', 'dirk', 'dirk', 'hoogvliet', 'jumbo'])
   for (const source of RESEARCH_SOURCES) assert.equal(validateResearchSource(source), true)
   for (const url of [
     'http://www.ah.nl/producten/product/wi1525/halfvolle-melk',
@@ -45,7 +45,7 @@ test('parse headers safely after CONNECT prelude and recognize refusal', () => {
 test('read-only --list does not fetch, CLI capture refuses without approval', async () => {
   const out = []
   assert.equal(await main(['--list'], {}, value => out.push(value)), 0)
-  assert.equal(JSON.parse(out[0]).length, 4)
+  assert.equal(JSON.parse(out[0]).length, 5)
   await assert.rejects(captureResearchSource('ah-halfvolle-melk', { env: {} }), /SUPA_RESEARCH_APPROVED/)
   await assert.rejects(captureResearchSource('missing', { env: { SUPA_RESEARCH_APPROVED: '1' } }), /unknown/)
   const cli = spawnSync(process.execPath, [resolve('scripts/m1-multistore-research.mjs'),
