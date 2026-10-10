@@ -114,6 +114,32 @@ function findExecutableStaticJsxUrl(source, filename = 'candidate.tsx') {
       }
     }
 
+    // Direct literal JSX spreads are just as statically knowable as attributes.
+    // Do not resolve variables or execute spreads with dynamic properties.
+    if (ts.isJsxSpreadAttribute(node)) {
+      const spread = unwrapExpression(node.expression)
+      if (ts.isObjectLiteralExpression(spread)) {
+        for (const property of spread.properties) {
+          if (!ts.isPropertyAssignment(property)) continue
+          const key = property.name
+          const name = ts.isIdentifier(key) || ts.isStringLiteralLike(key)
+            ? key.text.toLowerCase()
+            : ts.isComputedPropertyName(key)
+              ? staticStringExpression(key.expression)?.toLowerCase()
+              : null
+          const value = staticStringExpression(property.initializer)
+          if (name && urlAttributes.has(name) && value !== null && isExecutableUrl(value)) {
+            finding = {
+              attribute: key.getText(sourceFile),
+              value,
+              text: property.getText(sourceFile),
+            }
+            return
+          }
+        }
+      }
+    }
+
     ts.forEachChild(node, visit)
   }
 
@@ -176,6 +202,9 @@ test('JSX URL guard rejects static executable schemes', () => {
     '<a href={(\'ja\' + (\'va\' + \'script:alert(1)\'))}>x</a>',
     '<a href={\`java\${\'script\'}:alert(1)\`}>x</a>',
     '<img src={\`java\${\'scr\' + \'ipt\'}:alert(1)\`} />',
+    '<a {...{ href: "javascript:alert(1)" }}>x</a>',
+    '<button {...{ formAction: "java" + "script:submit()" }} />',
+    '<use {...({ ["xlinkHref"]: "javascript:alert(1)" } satisfies Record<string, string>)} />',
   ]) {
     assert.ok(findExecutableStaticJsxUrl(source), source)
   }
@@ -190,6 +219,10 @@ test('JSX URL guard preserves safe, dynamic and inert values', () => {
     '<a href={\`java\${dynamicSuffix}:alert(1)\`}>x</a>',
     '<form action={submitUrl}></form>',
     '<a href={(safeLink satisfies string)}>safe</a>',
+    '<a {...dynamicAttributes}>safe</a>',
+    '<a {...{ href: "/planner" }}>safe</a>',
+    '<a {...{ href: dynamicHref }}>safe</a>',
+    '<div {...{ "data-href": "javascript:alert(1)" }}>safe</div>',
     '<div data-href="javascript:example">tekst</div>',
     "const example = '<a href=\"javascript:alert(1)\">x</a>'",
   ]) {
