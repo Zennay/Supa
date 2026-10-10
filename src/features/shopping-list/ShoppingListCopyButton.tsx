@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
 import { buildShoppingListCopyText } from './shoppingListCopyText'
+import { isTrustworthyShoppingBasket } from './shoppingListPhysicalValidity.ts'
 import './shoppingListCopyButton.css'
 
 /**
@@ -16,7 +17,11 @@ export function ShoppingListCopyButton({
   doneLineIds: readonly string[]
 }) {
   const [expanded, setExpanded] = useState(false)
-  const text = buildShoppingListCopyText(basket, doneLineIds)
+  // The live v2 list only exports baskets permitted by the same strict
+  // financial and physical trust boundary that authorizes persisted ticks.
+  const text = isTrustworthyShoppingBasket(basket)
+    ? buildShoppingListCopyText(basket, doneLineIds)
+    : null
   const fieldId = useId()
 
   useEffect(() => setExpanded(false), [basket, doneLineIds])
