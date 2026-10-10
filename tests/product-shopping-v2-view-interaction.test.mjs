@@ -187,7 +187,8 @@ function makeHarness(initialBasket, localStorage) {
       visit(node.props?.children)
     }
     visit(root)
-    assert.equal(captured.length, 1, 'exactly one copy export receives live progress')
+    assert.ok(captured.length <= 1, 'at most one copy export receives live progress')
+    if (captured.length === 0) return null
     return captured[0]
   }
   return {
@@ -367,5 +368,8 @@ test('real ShoppingListView: copy export never receives stale checked IDs for a 
   const firstMatched = corrupted.lines.find(line => line.status === 'matched')
   firstMatched.pack.count = 0
   assert.equal(isTrustworthyShoppingBasket(corrupted), false)
-  assert.deepEqual(ui.exportedCheckedIds(ui.setBasket(corrupted)), [])
+  assert.equal(ui.exportedCheckedIds(ui.setBasket(corrupted)), null)
+  const invalidCents = { ...original, totalCents: original.totalCents + 1 }
+  assert.equal(isTrustworthyShoppingBasket(invalidCents), false)
+  assert.equal(ui.exportedCheckedIds(ui.setBasket(invalidCents)), null)
 })
