@@ -1,6 +1,7 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+
+import { writeNewPrivateM3Artifact } from './m3-private-derived-output.mjs'
 
 import { matchIngredient } from '../src/domain/matching.ts'
 import {
@@ -411,22 +412,7 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(study, null, 2)}\n`
 
   if (output) {
-    // Restrict only newly created ancestors; do not mutate pre-existing paths.
-    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
-    // Exclusive creation protects original collection evidence and prior study files.
-    // The mode applies only to a newly created file; never chmod existing evidence.
-    try {
-      await writeFile(output, serialized, {
-        encoding: 'utf8',
-        flag: 'wx',
-        mode: 0o600,
-      })
-    } catch (error) {
-      if (error?.code === 'EEXIST') {
-        throw new Error('refusing to overwrite an existing derived study')
-      }
-      throw error
-    }
+    await writeNewPrivateM3Artifact(output, serialized, 'refusing to overwrite an existing derived study')
   } else {
     process.stdout.write(serialized)
   }
