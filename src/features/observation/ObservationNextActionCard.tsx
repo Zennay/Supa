@@ -1,3 +1,4 @@
+import './ObservationNextActionCard.css'
 import type { ObservationNextAction } from './observationNextStep.ts'
 
 /**
