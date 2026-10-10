@@ -36,7 +36,8 @@ function basket(store, offsetCents) {
   ]
 
   return buildOneStoreBasket({
-    store,
+    // Never share the mutable fixture store with a returned basket under test.
+    store: { ...store },
     plan: m2InitialPlan,
     recipes: m2Recipes,
     activeDays: m2DefaultActiveDays,
