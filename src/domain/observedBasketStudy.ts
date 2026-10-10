@@ -92,7 +92,8 @@ function validTimestamp(value: unknown) {
       .slice(1)
       .split(':')
       .map(Number)
-    if (offsetHour > 14 || offsetMinute > 59 ||\n        (offsetHour === 14 && offsetMinute !== 0)) return null
+    if (offsetHour > 14 || offsetMinute > 59 ||
+        (offsetHour === 14 && offsetMinute !== 0)) return null
   }
 
   const timestamp = Date.parse(value)
