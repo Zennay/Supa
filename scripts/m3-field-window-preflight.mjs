@@ -50,8 +50,10 @@ export function parseFieldInstant(value) {
 // Direct callers can supply malformed records even though CLI arguments are strict.
 // Read only own data descriptors: do not evaluate getters on untrusted input.
 function fieldWindowInput(value) {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null
+  if (value === null || typeof value !== 'object') return null
   try {
+    // Array.isArray itself throws for revoked proxies: keep it inside the guard.
+    if (Array.isArray(value)) return null
     const prototype = Object.getPrototypeOf(value)
     if (prototype !== Object.prototype && prototype !== null) return null
     const own = Object.getOwnPropertyDescriptors(value)
