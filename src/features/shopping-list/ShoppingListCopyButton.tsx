@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
 import { buildShoppingListCopyText } from './shoppingListCopyText'
 import './shoppingListCopyButton.css'
@@ -18,7 +18,6 @@ export function ShoppingListCopyButton({
   const [expanded, setExpanded] = useState(false)
   const text = buildShoppingListCopyText(basket, doneLineIds)
   const fieldId = useId()
-  const field = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => setExpanded(false), [basket, doneLineIds])
 
@@ -42,7 +41,7 @@ export function ShoppingListCopyButton({
       {expanded && text && (
         <div className="shopping-copy__detail">
           <label htmlFor={fieldId}>Boodschappenlijst om te kopiëren</label>
-          <textarea id={fieldId} ref={field} readOnly rows={8}
+          <textarea id={fieldId} readOnly rows={8}
             value={text} onFocus={event => event.currentTarget.select()}
             className="shopping-copy__text" />
           <span className="shopping-copy__status">
