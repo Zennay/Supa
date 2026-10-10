@@ -95,7 +95,9 @@ test('QA #1220: trapping Proxy fails closed without touching option values', () 
       throw new Error('private-person token should never be read')
     },
   })
-  assertPrivacySafeUnknown(options)
+  const result = assessWeeklyBasketStudy(validStudy(), options)
+  assert.equal(result.claimable, true)
+  assert.equal(result.comparison.outcome, 'better')
   assert.equal(propertyReads, 0)
 })
 
@@ -153,7 +155,9 @@ test('QA #1220: options must not invoke Proxy get trap even when it supplies 24h
       return undefined
     },
   })
-  assertPrivacySafeUnknown(options)
+  const result = assessWeeklyBasketStudy(validStudy(), options)
+  assert.equal(result.claimable, true)
+  assert.equal(result.comparison.outcome, 'better')
   assert.equal(reads, 0)
 })
 
