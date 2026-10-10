@@ -190,10 +190,13 @@ export function reviewM3FieldCsv(input, { validateUnits = false } = {}) {
 }
 
 export function main(argv = process.argv.slice(2)) {
-  const validateUnits = argv[0] === '--validate-units'
-  const filePath = validateUnits ? argv[1] : argv[0]
-  if ((validateUnits ? argv.length !== 2 : argv.length !== 1) ||
-      !filePath || filePath.startsWith('-')) {
+  // Strict completeness is an explicit automation gate; unit checks are
+  // separately opt-in and may be combined in this documented order.
+  const requireComplete = argv[0] === '--require-complete'
+  const validateUnits = argv[requireComplete ? 1 : 0] === '--validate-units'
+  const optionCount = Number(requireComplete) + Number(validateUnits)
+  const filePath = argv[optionCount]
+  if (argv.length !== optionCount + 1 || !filePath || filePath.startsWith('-')) {
     throw new Error('M3 field CSV review failed')
   }
   const stat = lstatSync(filePath)
@@ -202,6 +205,9 @@ export function main(argv = process.argv.slice(2)) {
   }
   const result = reviewM3FieldCsv(readFileSync(filePath, 'utf8'), { validateUnits })
   process.stdout.write(JSON.stringify(result) + '\n')
+  if (requireComplete && result.status !== 'requires-canonical-human-verification') {
+    process.exitCode = 2
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
