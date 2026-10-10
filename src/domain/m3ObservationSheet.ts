@@ -292,8 +292,8 @@ function restoreStoreObservation(
     if (
       line.ingredientId !== expectedLine.ingredientId ||
       line.ingredientLabel !== expectedLine.ingredientLabel ||
-      line.requirement.amount !== expectedLine.requirement.amount ||
-      line.requirement.unit !== expectedLine.requirement.unit
+      // Do not erase forged demand metadata during draft recovery.
+      JSON.stringify(line.requirement) !== JSON.stringify(expectedLine.requirement)
     ) {
       return null
     }
@@ -377,6 +377,7 @@ export function restoreObservationSheetDraft(
       value.evidenceStatus !== canonical.evidenceStatus ||
       value.plannerFixture !== canonical.plannerFixture ||
       value.selectedMealCount !== canonical.selectedMealCount ||
+      value.study.maxObservationWindowHours !== 24 ||
       !hasCanonicalRequirements(value.requirements, canonical.requirements)
     ) {
       return null
