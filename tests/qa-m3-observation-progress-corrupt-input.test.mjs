@@ -107,3 +107,33 @@ test('M3 progress never treats a malformed measurement line as collected', async
     })
   }
 })
+
+test('M3 progress treats malformed observation containers as an incomplete review state', async (t) => {
+  const corruptions = [
+    ['missing baseline lines', sheet => { sheet.baseline.lines = null }],
+    ['candidate lines are an object', sheet => { sheet.candidate.lines = {} }],
+    ['missing baseline store', sheet => { sheet.baseline.store = null }],
+    ['missing candidate observation', sheet => { sheet.candidate = null }],
+    ['missing study details', sheet => { sheet.study = null }],
+  ]
+  for (const [label, corrupt] of corruptions) {
+    await t.test(label, () => {
+      const sheet = filledProgressSheet()
+      corrupt(sheet)
+      const snapshot = structuredClone(sheet)
+      const readiness = observationSheetReadiness(sheet)
+      assert.equal(readiness.ready, false)
+      assert.ok(readiness.issues.length > 0)
+      const progress = observationSheetProgress(sheet)
+      for (const key of ['totalLines', 'completeLines', 'availabilityRecorded',
+        'metadataTotal', 'metadataCompleted']) {
+        assert.ok(Number.isSafeInteger(progress[key]) && progress[key] >= 0,
+          key + ': show finite nonnegative counters, never crash the UI')
+      }
+      assert.equal(progress.metadataTotal, 16)
+      assert.ok(progress.metadataCompleted < 16 || progress.completeLines < 22,
+        'malformed store/study/line container cannot look fully complete')
+      assert.deepEqual(sheet, snapshot)
+    })
+  }
+})
