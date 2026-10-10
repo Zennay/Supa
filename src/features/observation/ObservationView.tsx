@@ -362,15 +362,14 @@ export function ObservationView() {
           Je concept wordt automatisch lokaal op dit apparaat bewaard, zodat een
           refresh of gesloten tab je winkelmeting niet wist.
         </p>
-        {canJumpToNextLine && (
-          <button
-            className="ghost-button observation-next-button"
-            type="button"
-            onClick={jumpToNextIncomplete}
-          >
-            {nextObservationActionLabel(sheet, nextIncomplete)}
-          </button>
-        )}
+        <button
+          className="ghost-button observation-next-button"
+          type="button"
+          onClick={jumpToNextIncomplete}
+          disabled={!canJumpToNextLine}
+        >
+          {nextObservationActionLabel(sheet, nextIncomplete)}
+        </button>
         {windowSummary.state === 'single-observation' && (
           <p>
             <strong>24u-venster:</strong> meet de andere winkel uiterlijk{' '}
