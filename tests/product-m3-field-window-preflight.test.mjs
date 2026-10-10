@@ -158,3 +158,52 @@ test('M3 field clock handles century leap-year rules without coercion', () => {
   assert.equal(parseFieldInstant('2000-02-29T00:00:00Z'),
     Date.parse('2000-02-29T00:00:00Z'))
 })
+
+test('pending operator guidance includes a safe, rounded-up countdown', () => {
+  const logs = []
+  const exitCode = main(
+    ['--baseline', '2026-10-10T22:00:00.001Z'],
+    (message) => logs.push(message),
+    NOW,
+  )
+  assert.equal(exitCode, 2)
+  assert.equal(logs.length, 1)
+  assert.match(logs[0], /PENDING: DekaMarkt/)
+  assert.match(logs[0], /23 uur en 1 minuten over/)
+  assert.match(logs[0], /Nog geen besparingsbewijs/)
+  assert.doesNotMatch(logs[0], /2026|22:00:00|PLUS|\u20ac/)
+})
+
+test('less than one minute at deadline never incorrectly reports zero minutes left', () => {
+  const logs = []
+  const clock = Date.parse('2026-10-10T23:59:59.999Z')
+  const result = assessFieldWindow({
+    baselineAt: '2026-10-09T00:00:00Z',
+    nowMs: clock,
+  })
+  assert.deepEqual(result, {
+    status: 'expired',
+    reason: '24-hour window has elapsed; recollect both stores',
+  })
+
+  const justInside = assessFieldWindow({
+    baselineAt: '2026-10-09T23:59:59.999Z',
+    nowMs: clock,
+  })
+  assert.equal(justInside.status, 'pending')
+  assert.equal(justInside.remainingMinutes, 1)
+  const exitCode = main(
+    ['--baseline', '2026-10-09T23:59:59.999Z'],
+    message => logs.push(message),
+    clock,
+  )
+  assert.equal(exitCode, 2)
+  assert.match(logs[0], /0 uur en 1 minuten over/)
+})
+
+test('at exactly the first-store deadline pending stays nonclaimable', () => {
+  const cutoff = Date.parse('2026-10-10T23:00:00Z')
+  const expected = assessFieldWindow({ baselineAt: '2026-10-09T23:00:00Z', nowMs: cutoff })
+  assert.deepEqual(expected, { status: 'pending', remainingMinutes: 0 })
+  assert.equal('claimable' in expected, false)
+})
