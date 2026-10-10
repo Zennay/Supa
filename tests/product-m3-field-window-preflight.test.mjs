@@ -207,3 +207,30 @@ test('at exactly the first-store deadline pending stays nonclaimable', () => {
   assert.deepEqual(expected, { status: 'pending', remainingMinutes: 0 })
   assert.equal('claimable' in expected, false)
 })
+
+test('explicit blank candidate is invalid, never a pending measurement', () => {
+  for (const rawCandidate of ['', ' ', '\t']) {
+    const assessment = assessFieldWindow({
+      baselineAt: BASELINE,
+      candidateAt: rawCandidate,
+      nowMs: NOW,
+    })
+    assert.equal(assessment.status, 'invalid')
+    assert.equal('remainingMinutes' in assessment, false)
+  }
+})
+
+test('CLI refuses explicitly blank candidate option rather than saying PENDING', () => {
+  const script = resolve('scripts/m3-field-window-preflight.mjs')
+  for (const value of ['', '  ']) {
+    const processResult = spawnSync(
+      process.execPath,
+      [script, '--baseline', BASELINE, '--candidate', value],
+      { encoding: 'utf8' },
+    )
+    assert.equal(processResult.status, 1)
+    assert.match(processResult.stderr, /usage:/)
+    assert.doesNotMatch(processResult.stdout, /PENDING/)
+    assert.doesNotMatch(processResult.stderr, /2026|\u20ac/)
+  }
+})
