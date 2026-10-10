@@ -1,5 +1,6 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation.ts'
+import { isTrustworthyShoppingBasket } from './shoppingListPhysicalValidity.ts'
 
 const KNOWN_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece'])
 const BIDI_AND_CONTROL = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g
@@ -43,6 +44,11 @@ export function buildShoppingListCopyText(
 ): string | null {
   if (!basket || typeof basket !== 'object' || !basket.store ||
       !Array.isArray(basket.lines) || !Array.isArray(doneLineIds)) return null
+
+  // Keep the reusable export as strict as the live shopping view: totals,
+  // selected meals, line counters and *minimal* pack counts must all agree.
+  // Price-independent copy is not permission to copy an untrusted basket.
+  if (!isTrustworthyShoppingBasket(basket)) return null
 
   const storeName = safeLabel(basket.store.name)
   if (!storeName || !safeLabel(basket.store.id)) return null
