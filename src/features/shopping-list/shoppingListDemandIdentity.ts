@@ -100,5 +100,13 @@ export function shoppingListDemandIdentity(basket: OneStoreBasket): string | nul
     })
   }
 
+  // Reordering the presentation does not change what must be purchased.
+  // Use code-point order rather than locale-sensitive ordering for stable keys.
+  lines.sort((left, right) => {
+    const a = String(left.id)
+    const b = String(right.id)
+    return a < b ? -1 : a > b ? 1 : 0
+  })
+
   return JSON.stringify({ schemaVersion: 2, storeId: store.id, lines })
 }
