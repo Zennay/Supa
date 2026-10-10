@@ -19,29 +19,67 @@ function asString(value: unknown): string | null {
   return null
 }
 
-function schemaTypes(value: unknown): string[] {
+// Treat Schema.org types as declared strings only; arbitrary coercion may throw
+// and can turn nested arrays into counterfeit Product or Offer declarations.
+function schemaTypes(value: unknown): string[] | null {
   const object = isObject(value) ? value : null
   if (!object) return []
   const raw = object['@type']
-  if (Array.isArray(raw)) return raw.map(String)
-  return raw == null ? [] : [String(raw)]
+  if (raw == null) return []
+  if (typeof raw === 'string') return raw.trim() ? [raw] : null
+  if (Array.isArray(raw)) {
+    return raw.every((candidate) => typeof candidate === 'string' && candidate.trim())
+      ? raw
+      : null
+  }
+  return null
 }
 
 function hasType(value: unknown, type: string): boolean {
-  return schemaTypes(value).some(
-    (candidate) => candidate.toLowerCase() === type.toLowerCase(),
-  )
+  const types = schemaTypes(value)
+  return types?.some((candidate) => candidate.toLowerCase() === type.toLowerCase()) ?? false
 }
 
-function productNodes(value: unknown): JsonObject[] {
-  if (Array.isArray(value)) return value.flatMap(productNodes)
-  if (!isObject(value)) return []
+// Iterative depth-first traversal avoids recursion overflow. The *active* set
+// rejects actual cycles but permits ordinary shared acyclic subtrees.
+function productNodes(value: unknown): JsonObject[] | null {
+  const active = new WeakSet<object>()
+  const stack: Array<{ value: unknown; leaving: boolean }> = [
+    { value, leaving: false },
+  ]
+  const products: JsonObject[] = []
+  let visited = 0
 
-  const direct = hasType(value, 'Product') ? [value] : []
-  const graph = Array.isArray(value['@graph'])
-    ? value['@graph'].flatMap(productNodes)
-    : []
-  return [...direct, ...graph]
+  while (stack.length > 0) {
+    const frame = stack.pop()!
+    const node = frame.value
+    if (!Array.isArray(node) && !isObject(node)) continue
+    if (frame.leaving) {
+      active.delete(node)
+      continue
+    }
+    // Bound direct-API input work even when a graph is acyclic.
+    if (++visited > 10_000 || active.has(node)) return null
+    active.add(node)
+    stack.push({ value: node, leaving: true })
+
+    if (Array.isArray(node)) {
+      for (let i = node.length - 1; i >= 0; i--) {
+        stack.push({ value: node[i], leaving: false })
+      }
+      continue
+    }
+
+    const types = schemaTypes(node)
+    if (types === null) return null
+    if (types.some((candidate) => candidate.toLowerCase() === 'product')) {
+      products.push(node)
+    }
+    if (Array.isArray(node['@graph'])) {
+      stack.push({ value: node['@graph'], leaving: false })
+    }
+  }
+  return products
 }
 
 function cents(value: unknown): number | null {
@@ -50,13 +88,19 @@ function cents(value: unknown): number | null {
   return normalizeMoneyToCents(raw)
 }
 
-function offerCandidates(raw: unknown): JsonObject[] {
+function offerCandidates(raw: unknown): JsonObject[] | null {
   const values = Array.isArray(raw) ? raw : raw == null ? [] : [raw]
-  return values.filter(
-    (value): value is JsonObject =>
-      isObject(value) &&
-      (hasType(value, 'Offer') || hasType(value, 'AggregateOffer')),
-  )
+  const offers: JsonObject[] = []
+  for (const value of values) {
+    if (!isObject(value)) continue
+    const types = schemaTypes(value)
+    if (types === null) return null
+    if (types.some((candidate) => {
+      const type = candidate.toLowerCase()
+      return type === 'offer' || type === 'aggregateoffer'
+    })) offers.push(value)
+  }
+  return offers
 }
 
 function uniqueKnown<T>(values: T[]): T | null {
@@ -194,7 +238,15 @@ export function parseSchemaOrgProduct(
     }
   }
 
-  const products = productNodes(jsonLd)
+  let products: JsonObject[] | null
+  try {
+    products = productNodes(jsonLd)
+  } catch {
+    products = null
+  }
+  if (products === null) {
+    return { type: 'abstain', reason: 'Product JSON-LD graph or types are malformed' }
+  }
 
   if (products.length === 0) {
     return { type: 'abstain', reason: 'no Product JSON-LD node' }
@@ -212,7 +264,15 @@ export function parseSchemaOrgProduct(
     return { type: 'abstain', reason: 'Product JSON-LD has no usable name' }
   }
 
-  const offers = offerCandidates(product.offers)
+  let offers: JsonObject[] | null
+  try {
+    offers = offerCandidates(product.offers)
+  } catch {
+    offers = null
+  }
+  if (offers === null) {
+    return { type: 'abstain', reason: 'Product JSON-LD offer types are malformed' }
+  }
   const currency = extractCurrency(offers)
   if (currency !== null && currency !== 'EUR') {
     return {
