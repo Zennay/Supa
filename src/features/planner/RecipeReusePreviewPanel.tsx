@@ -9,8 +9,9 @@ import './recipe-reuse-preview-panel.css'
  * Optional, non-destructive recipe comparison.
  *
  * The user's real week remains owned by PlannerView's onRecipeChange handler.
- * This panel never calls that handler or writes preferences: it only compares
- * the current recipe identities, and no money/leftover claim is inferred.
+ * Preview controls never call that handler or write preferences. Only the
+ * separate explicit, validated "Kies" button invokes onChooseRecipe;
+ * no price, leftover, or savings claim is inferred.
  */
 export function RecipeReusePreviewPanel({
   plannedMeals,
@@ -26,9 +27,18 @@ export function RecipeReusePreviewPanel({
   const [expanded, setExpanded] = useState(false)
   const [requestedDay, setRequestedDay] = useState<string | null>(null)
   const [requestedRecipe, setRequestedRecipe] = useState<string | null>(null)
+  const [confirmedSource, setConfirmedSource] = useState<{
+    day: string
+    recipeId: string
+    weekKey: string
+  } | null>(null)
 
   if (!Array.isArray(plannedMeals) || !Array.isArray(activeDays) ||
-      !Array.isArray(recipes) || activeDays.length === 0 || recipes.length < 2) {
+      !Array.isArray(recipes) || activeDays.length === 0 || recipes.length < 2 ||
+      activeDays.some((day) => typeof day !== 'string' || !day.trim()) ||
+      new Set(activeDays).size !== activeDays.length) {
+    // A duplicate/invalid active-day identity must not render duplicate
+    // select keys or permit a misleading alternative-recipe action.
     return null
   }
 
@@ -42,7 +52,7 @@ export function RecipeReusePreviewPanel({
   // Never reuse a stale day/recipe identity for an unrelated week.
   const day = requestedDay !== null && days.includes(requestedDay)
     ? requestedDay : days[0]
-  const currentMeal = plannedMeals.find((meal) => meal.day === day)
+  const currentMeal = plannedMeals.find((meal) => meal?.day === day)
   if (!currentMeal) return null
   const alternatives = recipes.filter((recipe) =>
     typeof recipe?.id === 'string' && recipe.id !== currentMeal.recipeId,
@@ -52,7 +62,45 @@ export function RecipeReusePreviewPanel({
     requestedRecipe !== null && alternatives.some((recipe) => recipe.id === requestedRecipe)
       ? requestedRecipe : alternatives[0].id
 
-  const preview = expanded
+  // Proposed ingredient overlap depends on the whole active week AND the
+  // ingredient definitions behind each candidate. Recipe IDs can remain
+  // unchanged while an imported/catalog recipe's ingredients are updated.
+  // Snapshot only primitive fields, so malformed nested runtime values cannot
+  // smuggle circular objects into JSON.stringify or reauthorize old previews.
+  const weekKey = JSON.stringify({
+    active: activeDays.map((activeDay) => [
+      typeof activeDay === 'string' ? activeDay : null,
+      plannedMeals.filter((meal) => meal?.day === activeDay)
+        .map((meal) => typeof meal?.recipeId === 'string' ? meal.recipeId : null),
+    ]),
+    recipes: recipes.map((recipe) => [
+      typeof recipe?.id === 'string' ? recipe.id : null,
+      Array.isArray(recipe?.ingredients)
+        ? recipe.ingredients.map((ingredient) => [
+            typeof ingredient?.id === 'string' ? ingredient.id : null,
+            typeof ingredient?.label === 'string' ? ingredient.label : null,
+            typeof ingredient?.query === 'string' ? ingredient.query : null,
+            typeof ingredient?.amount === 'number' && Number.isFinite(ingredient.amount)
+              ? ingredient.amount : null,
+            typeof ingredient?.unit === 'string' ? ingredient.unit : null,
+          ])
+        : null,
+    ]),
+  })
+
+  // A previously chosen day/recipe may disappear when the real plan changes.
+  // Do not silently turn an old proposal into an actionable different one.
+  // The user must explicitly refresh the suggestion before applying it.
+  const staleSelection =
+    (requestedDay !== null && !days.includes(requestedDay)) ||
+    (requestedRecipe !== null &&
+      !alternatives.some((recipe) => recipe.id === requestedRecipe)) ||
+    (confirmedSource !== null &&
+      (confirmedSource.day !== day ||
+        confirmedSource.recipeId !== currentMeal.recipeId ||
+        confirmedSource.weekKey !== weekKey))
+
+  const preview = expanded && !staleSelection
     ? previewRecipeReuseChange({
         plan: plannedMeals,
         recipes,
@@ -69,7 +117,21 @@ export function RecipeReusePreviewPanel({
         className="recipe-reuse-preview-toggle"
         aria-expanded={expanded}
         aria-controls="recipe-reuse-preview-content"
-        onClick={() => setExpanded((value) => !value)}
+        onClick={() => {
+          if (!expanded) {
+            // Opening begins a fresh proposal against the current recipe.
+            setRequestedDay(null)
+            setRequestedRecipe(null)
+            const openingDay = days[0]
+            const openingMeal = plannedMeals.find((meal) => meal?.day === openingDay)
+            setConfirmedSource({
+              day: openingDay,
+              recipeId: openingMeal?.recipeId ?? '',
+              weekKey,
+            })
+          }
+          setExpanded((value) => !value)
+        }}
       >
         {expanded ? 'Verberg receptvoorbeeld' : 'Bekijk een ander recept zonder te wijzigen'}
       </button>
@@ -84,6 +146,11 @@ export function RecipeReusePreviewPanel({
                 onChange={(event) => {
                   setRequestedDay(event.target.value)
                   setRequestedRecipe(null)
+                  setConfirmedSource({
+                    day: event.target.value,
+                    recipeId: plannedMeals.find((meal) => meal?.day === event.target.value)?.recipeId ?? '',
+                    weekKey,
+                  })
                 }}
               >
                 {days.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -106,6 +173,27 @@ export function RecipeReusePreviewPanel({
             Je planning blijft hetzelfde. Dit laat alleen gedeelde ingrediënten zien,
             geen boodschappenprijzen of bewezen besparing.
           </p>
+          {staleSelection && (
+            <div className="recipe-reuse-preview-refresh" role="status">
+              <p>Je planning is veranderd of receptgegevens zijn bijgewerkt. Bekijk het voorstel opnieuw voordat je een recept kiest.</p>
+              <button
+                type="button"
+                className="recipe-reuse-preview-apply"
+                onClick={() => {
+                  setRequestedDay(null)
+                  setRequestedRecipe(null)
+                  const freshDay = days[0]
+                  setConfirmedSource({
+                    day: freshDay,
+                    recipeId: plannedMeals.find((meal) => meal?.day === freshDay)?.recipeId ?? '',
+                    weekKey,
+                  })
+                }}
+              >
+                Werk voorbeeld bij
+              </button>
+            </div>
+          )}
           <IngredientReusePreviewCard preview={preview} />
           {preview !== null && (
             <button

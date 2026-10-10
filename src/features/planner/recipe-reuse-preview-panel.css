@@ -81,3 +81,15 @@
   outline: 3px solid currentColor;
   outline-offset: 3px;
 }
+
+/* A changed week requires an explicit new preview before recipe confirmation. */
+.recipe-reuse-preview-refresh {
+  display: grid;
+  gap: .55rem;
+  min-width: 0;
+}
+
+.recipe-reuse-preview-refresh p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
