@@ -5,6 +5,9 @@ import {
   buildObservationSheet,
   observationSheetProgress,
   observationSheetReadiness,
+  observationWindowSummary,
+  nextIncompleteObservationLine,
+  observationSheetHasUserInput,
 } from '../src/domain/m3ObservationSheet.ts'
 
 // Independent QA contract for an untrusted in-memory collector state.
@@ -133,6 +136,71 @@ test('M3 progress treats malformed observation containers as an incomplete revie
       assert.equal(progress.metadataTotal, 16)
       assert.ok(progress.metadataCompleted < 16 || progress.completeLines < 22,
         'malformed store/study/line container cannot look fully complete')
+      assert.deepEqual(sheet, snapshot)
+    })
+  }
+})
+
+test('M3 task navigation does not crash after preflight refuses malformed rows (#1112)', async (t) => {
+  const corruptions = [
+    ['null baseline line', s => { s.baseline.lines[0] = null }],
+    ['missing candidate product', s => { delete s.candidate.lines[0].observedProduct }],
+    ['missing candidate lines', s => { s.candidate.lines = null }],
+    ['missing baseline observation', s => { s.baseline = null }],
+  ]
+  for (const [label, corrupt] of corruptions) {
+    await t.test(label, () => {
+      const sheet = filledProgressSheet()
+      corrupt(sheet)
+      const snapshot = structuredClone(sheet)
+      assert.equal(observationSheetReadiness(sheet).ready, false)
+      const target = nextIncompleteObservationLine(sheet)
+      assert.ok(target === null ||
+        (['baseline', 'candidate'].includes(target.side) &&
+          typeof target.ingredientId === 'string'),
+      'malformed state may only produce a safe review target or no target')
+      assert.deepEqual(sheet, snapshot)
+    })
+  }
+})
+
+test('M3 observation-window display stays fail-closed on missing observations (#1112)', async (t) => {
+  const corruptions = [
+    ['missing baseline observation', s => { s.baseline = null }],
+    ['missing candidate observation', s => { s.candidate = null }],
+    ['nonnumeric baseline observedAt', s => { s.baseline.observedAt = {} }],
+    ['numeric candidate observedAt', s => { s.candidate.observedAt = 42 }],
+  ]
+  for (const [label, corrupt] of corruptions) {
+    await t.test(label, () => {
+      const sheet = filledProgressSheet()
+      corrupt(sheet)
+      const snapshot = structuredClone(sheet)
+      assert.equal(observationSheetReadiness(sheet).ready, false)
+      const summary = observationWindowSummary(sheet)
+      assert.ok(['single-observation', 'not-started', 'outside-window'].includes(summary.state),
+        'a missing or invalid timestamp cannot produce a valid two-store observation window')
+      assert.deepEqual(sheet, snapshot)
+    })
+  }
+})
+
+test('M3 reset warning must not crash or disregard remaining user input (#1112)', async (t) => {
+  const corruptions = [
+    ['missing study', s => { s.study = null }],
+    ['missing baseline', s => { s.baseline = null }],
+    ['missing candidate store', s => { s.candidate.store = null }],
+    ['null candidate line', s => { s.candidate.lines[0] = null }],
+    ['missing baseline product', s => { s.baseline.lines[0].observedProduct = null }],
+  ]
+  for (const [label, corrupt] of corruptions) {
+    await t.test(label, () => {
+      const sheet = filledProgressSheet()
+      corrupt(sheet)
+      const snapshot = structuredClone(sheet)
+      assert.equal(observationSheetReadiness(sheet).ready, false)
+      assert.equal(observationSheetHasUserInput(sheet), true,
+        'destructive-action confirmation cannot silently drop remaining user edits')
       assert.deepEqual(sheet, snapshot)
     })
   }
