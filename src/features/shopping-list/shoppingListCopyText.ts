@@ -72,16 +72,17 @@ export function buildShoppingListCopyText(
       ? '?'
       : dutchAmount(requirement.amount)
     const neededUnit = quantityUnitLabelNl(requirement.unit, requirement.amount)
-    const statusMark = done.has(id) ? '[x]' : '[ ]'
-
     if (line.status === 'unresolved') {
       unresolvedCount += 1
-      entries.push(statusMark + ' ' + ingredientLabel +
+      // An unresolved product can be marked handled locally, but it is not
+      // a verified purchase. Never export it as an already bought item.
+      entries.push('[ ] ' + ingredientLabel +
         ' — product zelf kiezen (nodig: ' + needed + ' ' + neededUnit + ')')
       continue
     }
 
     if (line.status !== 'matched' || requirement.amount === null) return null
+    const statusMark = done.has(id) ? '[x]' : '[ ]'
     const productName = safeLabel(line.productName)
     if (!productName || !safeLabel(line.productId) ||
         !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
