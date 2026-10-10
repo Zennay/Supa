@@ -1,10 +1,6 @@
 import type { PlanRecipeSwapPreview } from '../../domain/planRecipeSwapPreview'
+import { euro } from '../../lib/money'
 import './recipeSwapImpactCard.css'
-
-const euros = new Intl.NumberFormat('nl-NL', {
-  style: 'currency',
-  currency: 'EUR',
-})
 
 function summarizeLine(
   line: NonNullable<Extract<PlanRecipeSwapPreview, { status: 'ready' | 'unknown' }>['changes'][number]['before']>,
@@ -36,7 +32,7 @@ export function RecipeSwapImpactCard({ preview }: { preview: PlanRecipeSwapPrevi
         <p className="supa-swap-preview__total" data-price-state="known">
           {preview.deltaCents === 0
             ? 'Het berekende mandtotaal blijft gelijk.'
-            : `Het berekende mandtotaal wordt ${euros.format(Math.abs(preview.deltaCents!) / 100)} ${preview.deltaCents! > 0 ? 'hoger' : 'lager'}.`}
+            : `Het berekende mandtotaal wordt ${euro.formatCents(Math.abs(preview.deltaCents!))} ${preview.deltaCents! > 0 ? 'hoger' : 'lager'}.`}
         </p>
       ) : (
         <p className="supa-swap-preview__total" data-price-state="unknown">
