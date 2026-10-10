@@ -73,7 +73,8 @@ test('BasketView title and individual matched rows consume canonical cent format
   assert.match(source, /euro\.formatCents\(line\.lineTotalCents\)/)
   assert.doesNotMatch(source, /euro\.format\([^)]*\/ 100\)/)
   assert.match(source, /Geen actuele winkelprijzen of bewezen besparing\./)
-  assert.match(source, /comparison\.claimable \?/)
+  assert.match(source, /comparisonCanShowMoney \?/)
+  assert.match(source, /comparisonCanShowMoney\s*\?\s*comparisonLineHighlights\(comparison\)\s*:\s*\[\]/)
 })
 
 test('malformed basket cent values remain non-price, not rounded into apparent precision', () => {
