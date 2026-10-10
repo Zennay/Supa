@@ -198,7 +198,7 @@ test('the chosen recipe only changes after an explicit validated confirmation', 
   const buttons = ui.collect(tree, 'button')
   assert.equal(buttons.length, 2)
   assert.equal(buttons[1].props.type, 'button')
-  assert.match(buttons[1].props.children, /Kies Romige tomatenpasta voor Di/)
+  assert.match([buttons[1].props.children].flat().join(''), /Kies Romige tomatenpasta voor Di/)
   buttons[1].props.onClick()
   assert.deepEqual(applied, [{ day: 'Di', recipeId: 'pasta' }])
   assert.equal(ui.collect(ui.render(), 'select').length, 0, 'confirmation closes the proposal')
