@@ -203,3 +203,20 @@ test('claimable money must retain a complete ingredient-level trace, not merely 
   )
   assert.equal(JSON.stringify(value), initialSnapshot, 'presentation guidance cannot mutate inputs')
 })
+
+test('malformed nested basket rows are rejected without leaking a JavaScript TypeError', () => {
+  const value = scenario(basket(baselineStore), basket(candidateStore))
+  assert.equal(comparisonNextStep(value).canShowDifference, true)
+  for (const malformed of [null, undefined, 3, 'matched', []]) {
+    const changed = {
+      ...value,
+      baseline: {
+        ...value.baseline,
+        lines: [malformed, ...value.baseline.lines.slice(1)],
+      },
+    }
+    assert.doesNotThrow(() => comparisonNextStep(changed))
+    assert.equal(comparisonNextStep(changed).code, 'review-data')
+    assert.equal(comparisonNextStep(changed).canShowDifference, false)
+  }
+})
