@@ -104,12 +104,22 @@ function isNodeTestCallee(callee, bindings, namespaceBindings) {
 function disablingLiteral(name, initializer) {
   const value = unwrapExpression(initializer)
 
+  // node:test options are runtime truthy flags. A hard-coded nonempty string
+  // or nonzero number also disables/focuses cases, including `only: 'yes'`.
+  // Do not evaluate arbitrary expressions or variables.
   if (value.kind === ts.SyntaxKind.TrueKeyword) return true
-
-  return (
-    (name === 'skip' || name === 'todo') &&
-    ts.isStringLiteralLike(value)
-  )
+  if (value.kind === ts.SyntaxKind.FalseKeyword || value.kind === ts.SyntaxKind.NullKeyword) {
+    return false
+  }
+  if (ts.isStringLiteralLike(value)) return value.text.length > 0
+  if (ts.isNumericLiteral(value)) return Number(value.text) !== 0
+  if (ts.isPrefixUnaryExpression(value) && (
+    value.operator === ts.SyntaxKind.MinusToken ||
+    value.operator === ts.SyntaxKind.PlusToken
+  ) && ts.isNumericLiteral(value.operand)) {
+    return Number(value.operand.text) !== 0
+  }
+  return false
 }
 
 function literalDisabledOption(call, sourceFile) {
@@ -224,6 +234,21 @@ test('disabled-test detector rejects namespace-imported test methods and options
   assert.deepEqual(
     findDisabledNodeTests(source).map(({ mode }) => mode),
     ['skip', 'only', 'todo', 'skip', 'todo', 'skip', 'todo'],
+  )
+})
+
+test('disabled-test detector rejects truthy literal flags in node:test options', () => {
+  const source = `
+    import test from 'node:test'
+    test('numeric skip', { skip: 1 }, () => {})
+    test('negative todo', { todo: -1 }, () => {})
+    test('string only', { only: 'yes' }, () => {})
+    test('empty flags remain enabled', { skip: 0, todo: '', only: '' }, () => {})
+  `
+
+  assert.deepEqual(
+    findDisabledNodeTests(source).map(({ mode }) => mode),
+    ['skip', 'todo', 'only'],
   )
 })
 
