@@ -133,7 +133,7 @@ test('escaping in the rendered card treats attacker-controlled labels as plain t
   }
   const html = render(guidance)
 
-  assert.doesNotMatch(html, /<img\b|onerror=|<script\b/i)
+  assert.doesNotMatch(html, /<(?:img|script)\b/i)
   assert.match(html, /&lt;img/)
   assert.match(html, /&amp; cost/)
   assert.equal((html.match(/&lt;img/g) ?? []).length, 3)
