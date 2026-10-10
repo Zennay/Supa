@@ -23,6 +23,11 @@ const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const TIMESTAMP_PATTERN =
   /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
 const ALLOWED_PRICE_CONTEXTS = new Set<PriceContext>(['in-store', 'online-order'])
+const ALLOWED_OBSERVATION_SOURCES = new Set<ObservationSource>([
+  'manual-cart',
+  'receipt',
+  'consented-export',
+])
 
 export type M3ObservationSide = keyof typeof M3_EXPECTED_RETAILERS
 
@@ -267,6 +272,10 @@ function restoreStoreObservation(
   canonical: StoreObservation,
 ): StoreObservation | null {
   if (!isRecord(value) || !isRecord(value.store) || !Array.isArray(value.lines)) {
+    return null
+  }
+  // Never turn untrusted saved provenance into a made-up manual-cart observation.
+  if (!ALLOWED_OBSERVATION_SOURCES.has(value.source as ObservationSource)) {
     return null
   }
   const rawLines = value.lines
@@ -592,6 +601,41 @@ export function observationSheetReadiness(
     if (!nonBlank(value)) issues.push(`${label} ontbreekt.`)
   }
 
+  // Readiness must enforce the exact same fixed planner/demand contract that
+  // m3-build-observed-study checks, not just a complete-looking editable form.
+  const canonical = buildObservationSheet()
+  if (
+    sheet.schemaVersion !== canonical.schemaVersion ||
+    sheet.sheetType !== canonical.sheetType ||
+    sheet.evidenceStatus !== canonical.evidenceStatus ||
+    sheet.plannerFixture !== canonical.plannerFixture ||
+    sheet.selectedMealCount !== canonical.selectedMealCount ||
+    !hasCanonicalRequirements(sheet.requirements, canonical.requirements)
+  ) {
+    issues.push('Meetblad of ingrediëntenbehoefte wijkt af van de vaste weekplanning.')
+  }
+  if (sheet.study.maxObservationWindowHours !== 24) {
+    issues.push('Meetvenster moet precies 24 uur zijn; de limiet kan niet worden aangepast.')
+  }
+  for (const side of ['baseline', 'candidate'] as const) {
+    const lines = sheet[side].lines
+    const expected = canonical[side].lines
+    if (
+      !Array.isArray(lines) ||
+      lines.length !== expected.length ||
+      lines.some((line, index) =>
+        !line ||
+        line.ingredientId !== expected[index].ingredientId ||
+        line.ingredientLabel !== expected[index].ingredientLabel ||
+        !line.requirement ||
+        line.requirement.amount !== expected[index].requirement.amount ||
+        line.requirement.unit !== expected[index].requirement.unit,
+      )
+    ) {
+      issues.push(`${side === 'baseline' ? 'Winkel A' : 'Winkel B'}: ingrediëntenlijst wijkt af van de vaste weekplanning.`)
+    }
+  }
+
   if (nonBlank(sheet.study.studyId) && !KEY_PATTERN.test(sheet.study.studyId)) {
     issues.push('Study ID moet een padveilige sleutel zijn.')
   }
@@ -632,6 +676,9 @@ export function observationSheetReadiness(
       issues.push(`${label}: evidence ID ontbreekt.`)
     } else if (!KEY_PATTERN.test(observation.evidenceId)) {
       issues.push(`${label}: evidence ID moet een padveilige sleutel zijn.`)
+    }
+    if (!ALLOWED_OBSERVATION_SOURCES.has(observation.source)) {
+      issues.push(`${label}: bron/herkomst moet manual-cart, receipt of consented-export zijn.`)
     }
     if (!nonBlank(observation.provenanceNote)) {
       issues.push(`${label}: provenance-notitie ontbreekt.`)
@@ -692,12 +739,20 @@ export function observationSheetReadiness(
     issues.push('Winkel A en Winkel B moeten verschillende winkel-ID\'s hebben.')
   }
 
+  if (
+    nonBlank(sheet.baseline.evidenceId) &&
+    nonBlank(sheet.candidate.evidenceId) &&
+    sheet.baseline.evidenceId === sheet.candidate.evidenceId
+  ) {
+    issues.push('Winkel A en Winkel B moeten verschillende evidence ID\'s hebben.')
+  }
+
   if (observedTimes.length === 2) {
     const deltaHours =
       Math.abs(observedTimes[0] - observedTimes[1]) / (60 * 60 * 1000)
-    if (deltaHours > sheet.study.maxObservationWindowHours) {
+    if (deltaHours > 24) {
       issues.push(
-        `De twee observaties liggen ${deltaHours.toFixed(1)} uur uit elkaar; maximaal ${sheet.study.maxObservationWindowHours} uur is toegestaan.`,
+        `De twee observaties liggen ${deltaHours.toFixed(1)} uur uit elkaar; maximaal 24 uur is toegestaan.`,
       )
     }
   }
@@ -742,7 +797,7 @@ export function observationWindowSummary(
       firstSide,
       firstObservedAt: new Date(firstObservedAt).toISOString(),
       deadlineAt: new Date(
-        firstObservedAt + sheet.study.maxObservationWindowHours * 60 * 60 * 1000,
+        firstObservedAt + 24 * 60 * 60 * 1000,
       ).toISOString(),
     }
   }
@@ -752,7 +807,7 @@ export function observationWindowSummary(
 
   return {
     state:
-      deltaHours <= sheet.study.maxObservationWindowHours
+      deltaHours <= 24
         ? 'within-window'
         : 'outside-window',
     deltaHours,
