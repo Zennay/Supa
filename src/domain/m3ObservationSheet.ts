@@ -442,18 +442,29 @@ export function nextIncompleteObservationLine(
   sheet: ObservationSheet,
 ): ObservationLineTarget | null {
   if (!isRecord(sheet)) return null
-  const expected = buildObservationSheet()
+  const canonical = buildObservationSheet()
+
+  // Validate both entire row sets before returning even the first target:
+  // otherwise a damaged demand can be offered as a real collector task.
   for (const side of ['baseline', 'candidate'] as const) {
-    const store = sheet[side]
-    if (!isRecord(store) || !Array.isArray(store.lines) ||
-        store.lines.length !== expected[side].lines.length) {
-      return null
+    const observation = sheet[side]
+    const expected = canonical[side].lines
+    if (!isRecord(observation) || !Array.isArray(observation.lines) ||
+        observation.lines.length !== expected.length) return null
+
+    for (let index = 0; index < expected.length; index += 1) {
+      const line = observation.lines[index]
+      if (!isRecord(line) || !isRecord(line.requirement) ||
+          line.ingredientId !== expected[index].ingredientId ||
+          line.ingredientLabel !== expected[index].ingredientLabel ||
+          JSON.stringify(line.requirement) !==
+            JSON.stringify(expected[index].requirement)) return null
     }
-    for (const line of store.lines) {
-      // A broken row cannot supply a safe navigation target. The separate
-      // readiness gate prevents it from being exported or marked complete.
-      if (!isRecord(line) || !nonBlank(line.ingredientId)) return null
-      if (!observationLineCollectionComplete(line as StoreObservation['lines'][number])) {
+  }
+
+  for (const side of ['baseline', 'candidate'] as const) {
+    for (const line of sheet[side].lines) {
+      if (!observationLineCollectionComplete(line)) {
         return { side, ingredientId: line.ingredientId }
       }
     }
@@ -462,10 +473,21 @@ export function nextIncompleteObservationLine(
 }
 
 export function observationSheetHasUserInput(sheet: ObservationSheet): boolean {
-  // On malformed drafts, require a confirmation rather than silently assuming
-  // there is nothing to lose. The normal empty sheet still returns false.
+  // Treat malformed state as user data at risk, never as permission to skip
+  // confirmation before reset or a destructive imported-draft replacement.
   if (!isRecord(sheet) || !isRecord(sheet.study)) return true
-  const studyValues = [
+  const canonical = buildObservationSheet()
+  if (
+    sheet.schemaVersion !== canonical.schemaVersion ||
+    sheet.sheetType !== canonical.sheetType ||
+    sheet.evidenceStatus !== canonical.evidenceStatus ||
+    sheet.plannerFixture !== canonical.plannerFixture ||
+    sheet.selectedMealCount !== canonical.selectedMealCount ||
+    sheet.study.maxObservationWindowHours !== 24 ||
+    !hasCanonicalRequirements(sheet.requirements, canonical.requirements)
+  ) return true
+
+  const studyValues: unknown[] = [
     sheet.study.studyId,
     sheet.study.participantKey,
     sheet.study.population,
@@ -473,33 +495,51 @@ export function observationSheetHasUserInput(sheet: ObservationSheet): boolean {
     sheet.study.weekStart,
     sheet.study.priceContext,
   ]
-  if (studyValues.some(nonBlank)) return true
+  if (studyValues.some(value =>
+    typeof value !== 'string' || nonBlank(value))) return true
 
   for (const side of ['baseline', 'candidate'] as const) {
     const observation = sheet[side]
+    const expected = canonical[side].lines
     if (!isRecord(observation) || !isRecord(observation.store) ||
-        !Array.isArray(observation.lines)) return true
-    if (
-      nonBlank(observation.evidenceId) ||
-      nonBlank(observation.observedAt) ||
-      observation.source !== 'manual-cart' ||
-      nonBlank(observation.provenanceNote) ||
-      nonBlank(observation.store.id) ||
-      nonBlank(observation.store.name)
-    ) return true
-    for (const line of observation.lines) {
-      if (!isRecord(line) || !isRecord(line.observedProduct)) return true
+        !Array.isArray(observation.lines) ||
+        observation.lines.length !== expected.length) return true
+
+    const observedText: unknown[] = [
+      observation.evidenceId,
+      observation.observedAt,
+      observation.provenanceNote,
+      observation.store.id,
+      observation.store.name,
+    ]
+    if (observedText.some(value =>
+      typeof value !== 'string' || nonBlank(value))) return true
+    if (observation.source !== 'manual-cart') return true
+
+    for (let index = 0; index < expected.length; index += 1) {
+      const line = observation.lines[index]
+      if (!isRecord(line) || !isRecord(line.requirement) ||
+          !isRecord(line.observedProduct) ||
+          line.ingredientId !== expected[index].ingredientId ||
+          line.ingredientLabel !== expected[index].ingredientLabel ||
+          JSON.stringify(line.requirement) !==
+            JSON.stringify(expected[index].requirement)) return true
+
       const product = line.observedProduct
+      const productText: unknown[] = [
+        product.productId,
+        product.productName,
+        product.sourceUrl,
+        product.note,
+      ]
       if (
         product.available !== null ||
-        nonBlank(product.productId) ||
-        nonBlank(product.productName) ||
         product.packAmount !== null ||
         product.packUnit !== null ||
         product.packCount !== 1 ||
         product.priceCents !== null ||
-        nonBlank(product.sourceUrl) ||
-        nonBlank(product.note)
+        productText.some(value =>
+          typeof value !== 'string' || nonBlank(value))
       ) return true
     }
   }
