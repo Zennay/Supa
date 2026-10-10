@@ -106,17 +106,17 @@ test('product label line breaks and bidirectional controls cannot insert checkbo
   assert.equal(output.split('\n').filter(line => line.startsWith('[x]')).length, 0)
 })
 
-test('copy control only writes on explicit click and announces permission errors', async () => {
+test('copy interface exposes selectable readonly content without privileged clipboard calls', async () => {
   const component = await readFile(
     new URL('../src/features/shopping-list/ShoppingListCopyButton.tsx', import.meta.url), 'utf8',
   )
   assert.ok(component.includes('type="button"'))
-  assert.ok(component.includes('onClick={copyList}'))
-  assert.ok(component.includes('navigator.clipboard.writeText(text)'))
-  assert.ok(component.includes('role="status"'))
-  assert.ok(component.includes('aria-live="polite"'))
-  assert.ok(component.includes("setStatus('unavailable')"))
-  assert.ok(component.includes('generation.current === requestGeneration'))
-  assert.ok(!component.includes('navigator.clipboard.readText'))
+  assert.ok(component.includes('onClick={toggleExport}'))
+  assert.ok(component.includes('readOnly'))
+  assert.ok(component.includes('onFocus={event => event.currentTarget.select()}'))
+  assert.ok(component.includes('aria-expanded={expanded}'))
+  assert.ok(component.includes('Boodschappenlijst om te kopiëren'))
+  assert.ok(component.includes('Kopieer op je apparaat'))
+  assert.ok(!component.includes('navigator.clipboard'))
   assert.ok(!component.includes('fetch('))
 })
