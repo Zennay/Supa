@@ -86,7 +86,12 @@ export function RecipeReusePreviewPanel({
             // Opening begins a fresh proposal against the current recipe.
             setRequestedDay(null)
             setRequestedRecipe(null)
-            setConfirmedSource({ day, recipeId: currentMeal.recipeId })
+            const openingDay = days[0]
+            const openingMeal = plannedMeals.find((meal) => meal?.day === openingDay)
+            setConfirmedSource({
+              day: openingDay,
+              recipeId: openingMeal?.recipeId ?? '',
+            })
           }
           setExpanded((value) => !value)
         }}
