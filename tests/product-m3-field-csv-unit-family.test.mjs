@@ -22,7 +22,7 @@ function fictionalObservations() {
     rows[i][12] = '1'
     rows[i][13] = '199'
     rows[i][14] = 'ja'
-    rows[i][15] = 'synthetic test-only source'
+    rows[i][15] = 'manual-cart'
   }
   return rows
 }

@@ -18,7 +18,7 @@ function syntheticFilledCsv() {
     row[12] = '1'
     row[13] = '199'
     row[14] = 'ja'
-    row[15] = 'test-only source'
+    row[15] = 'manual-cart'
   }
   return rows.map(row => row.map(value =>
     '"' + String(value).replaceAll('"', '""') + '"').join(',')).join('\n') + '\n'

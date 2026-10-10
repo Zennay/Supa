@@ -21,7 +21,7 @@ function syntheticRows(context = 'in-store') {
     row[12] = '1'
     row[13] = '199'
     row[14] = 'ja'
-    row[15] = 'synthetic-only-not-a-source'
+    row[15] = 'manual-cart'
   }
   return rows
 }

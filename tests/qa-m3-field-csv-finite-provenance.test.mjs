@@ -15,7 +15,7 @@ function fictionalRows() {
     row[12] = '1'
     row[13] = '199'
     row[14] = 'ja'
-    row[15] = 'fictional field test'
+    row[15] = 'manual-cart'
   }
   return rows
 }
