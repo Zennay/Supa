@@ -52,7 +52,15 @@ export function RecipeReusePreviewPanel({
     requestedRecipe !== null && alternatives.some((recipe) => recipe.id === requestedRecipe)
       ? requestedRecipe : alternatives[0].id
 
-  const preview = expanded
+  // A previously chosen day/recipe may disappear when the real plan changes.
+  // Do not silently turn an old proposal into an actionable different one.
+  // The user must explicitly refresh the suggestion before applying it.
+  const staleSelection =
+    (requestedDay !== null && !days.includes(requestedDay)) ||
+    (requestedRecipe !== null &&
+      !alternatives.some((recipe) => recipe.id === requestedRecipe))
+
+  const preview = expanded && !staleSelection
     ? previewRecipeReuseChange({
         plan: plannedMeals,
         recipes,
@@ -106,6 +114,21 @@ export function RecipeReusePreviewPanel({
             Je planning blijft hetzelfde. Dit laat alleen gedeelde ingrediënten zien,
             geen boodschappenprijzen of bewezen besparing.
           </p>
+          {staleSelection && (
+            <div className="recipe-reuse-preview-refresh" role="status">
+              <p>Je planning is veranderd. Bekijk het voorstel opnieuw voordat je een recept kiest.</p>
+              <button
+                type="button"
+                className="recipe-reuse-preview-apply"
+                onClick={() => {
+                  setRequestedDay(null)
+                  setRequestedRecipe(null)
+                }}
+              >
+                Werk voorbeeld bij
+              </button>
+            </div>
+          )}
           <IngredientReusePreviewCard preview={preview} />
           {preview !== null && (
             <button
