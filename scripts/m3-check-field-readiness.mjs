@@ -112,6 +112,8 @@ export async function main(argv = process.argv.slice(2)) {
   const result = checkFieldSheet(raw)
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
   if (result.status === 'invalid') process.exitCode = 1
+  else if (result.status === 'needs-field-input') process.exitCode = 2
+  else process.exitCode = 0
   return result
 }
 
