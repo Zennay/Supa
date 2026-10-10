@@ -32,18 +32,30 @@ test('stat pill accessible labels fail safe when text is empty or visually invis
     'Statistiek: Niet beschikbaar',
   )
   assert.equal(
-    statPillAccessibleLabel('\u061C\u00AD', '\u180E\u061C'),
+    statPillAccessibleLabel('\u061C\u00AD', '\u061C\u00AD'),
+    'Statistiek: Niet beschikbaar',
+  )
+  assert.equal(
+    statPillAccessibleLabel('\u180E\u061C', '\u00AD\u180E'),
     'Statistiek: Niet beschikbaar',
   )
 })
 
 test('stat pill strips invisible formatting controls without changing visible text', () => {
   assert.deepEqual(
-    statPillPresentation('\u061C\u200EGematcht\u200F\u00AD', '\u180E\u206611\u2069'),
+    statPillPresentation('\u200EGematcht\u200F', '\u206611\u2069'),
     {
       label: 'Gematcht',
       value: '11',
       accessibleLabel: 'Gematcht: 11',
+    },
+  )
+  assert.deepEqual(
+    statPillPresentation('\u180E\u061CControle\u00AD', '\u00AD2\u180E\u061C'),
+    {
+      label: 'Controle',
+      value: '2',
+      accessibleLabel: 'Controle: 2',
     },
   )
 })

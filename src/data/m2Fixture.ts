@@ -6,13 +6,13 @@ import type {
 
 export const m2Store: Store = {
   id: 'm2-one-store',
-  name: 'M2 testwinkel',
+  name: 'Voorbeeldwinkel · demo',
 }
 
 export const m2Recipes: RecipeWithIngredients[] = [
   {
     id: 'tikka',
-    title: 'Tikka chicken bowl',
+    title: 'Tikka-bowl met kip',
     minutes: 25,
     servings: 2,
     estimatedCost: 6.4,
@@ -27,7 +27,7 @@ export const m2Recipes: RecipeWithIngredients[] = [
   },
   {
     id: 'teriyaki',
-    title: 'Teriyaki veggie bowl',
+    title: 'Teriyaki-bowl met groenten',
     minutes: 20,
     servings: 2,
     estimatedCost: 5.8,
@@ -41,7 +41,7 @@ export const m2Recipes: RecipeWithIngredients[] = [
   },
   {
     id: 'pasta',
-    title: 'Creamy tomato pasta',
+    title: 'Romige tomatenpasta',
     minutes: 18,
     servings: 2,
     estimatedCost: 4.9,

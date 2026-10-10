@@ -80,8 +80,50 @@ function safeSourceId(value: unknown): value is string {
   )
 }
 
-function validIso(value: unknown): value is string {
-  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+function safePositiveInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
+}
+
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIMESTAMP_PATTERN =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
+
+function validCalendarDate(value: string) {
+  const match = DATE_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
+function validCapturedAt(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+
+  const match = TIMESTAMP_PATTERN.exec(value)
+  if (!match || !validCalendarDate(match[1])) return false
+
+  const hour = Number(match[2])
+  const minute = Number(match[3])
+  const second = Number(match[4] ?? '0')
+  if (hour > 23 || minute > 59 || second > 59) return false
+
+  if (match[5] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[5]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return false
+  }
+
+  return Number.isFinite(Date.parse(value))
 }
 
 function selectorContractMatches(value: unknown): value is SelectorContract {
@@ -92,11 +134,29 @@ function selectorContractMatches(value: unknown): value is SelectorContract {
   )
 }
 
-function validHttpsPlusUrl(value: unknown): value is string {
+function validHttpsPlusUrl(
+  value: unknown,
+  expectedKind: SourcePageKind,
+): value is string {
   if (typeof value !== 'string') return false
   try {
     const url = new URL(value)
-    return url.protocol === 'https:' && url.hostname === 'www.plus.nl'
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname !== 'www.plus.nl' ||
+      url.port ||
+      url.username ||
+      url.password
+    ) {
+      return false
+    }
+
+    const expectedRoute =
+      expectedKind === 'catalog' ? '/producten' : '/aanbiedingen'
+    return (
+      url.pathname === expectedRoute ||
+      url.pathname.startsWith(`${expectedRoute}/`)
+    )
   } catch {
     return false
   }
@@ -119,8 +179,8 @@ function validateEvidenceBoundary(
     !safeSourceId(evidence.source?.id) ||
     evidence.source.supermarket !== 'plus' ||
     evidence.source.kind !== expectedKind ||
-    !validHttpsPlusUrl(evidence.source.url) ||
-    !validIso(evidence.source.capturedAt) ||
+    !validHttpsPlusUrl(evidence.source.url, expectedKind) ||
+    !validCapturedAt(evidence.source.capturedAt) ||
     !/^[a-f0-9]{64}$/.test(evidence.source.sha256)
   ) {
     return `PLUS rendered evidence must identify a valid ${expectedKind} source`
@@ -129,23 +189,18 @@ function validateEvidenceBoundary(
   const browserEvidence = evidence.browserEvidence
   const safety = browserEvidence?.safety
   if (
-    !Number.isInteger(browserEvidence?.runId) ||
-    browserEvidence.runId <= 0 ||
-    !Number.isInteger(browserEvidence?.artifactId) ||
-    browserEvidence.artifactId <= 0 ||
+    !safePositiveInteger(browserEvidence?.runId) ||
+    !safePositiveInteger(browserEvidence?.artifactId) ||
     !/^sha256:[a-f0-9]{64}$/.test(browserEvidence?.artifactDigest ?? '') ||
     !/^[a-f0-9]{40}$/.test(browserEvidence?.supaSha ?? '') ||
     browserEvidence?.renderedHtmlSha256 !== evidence.source.sha256 ||
-    !Number.isInteger(browserEvidence?.renderedHtmlBytes) ||
-    browserEvidence.renderedHtmlBytes <= 0 ||
-    !Number.isInteger(browserEvidence?.screenshotBytes) ||
-    browserEvidence.screenshotBytes <= 0 ||
+    !safePositiveInteger(browserEvidence?.renderedHtmlBytes) ||
+    !safePositiveInteger(browserEvidence?.screenshotBytes) ||
     typeof browserEvidence?.browser !== 'string' ||
     !browserEvidence.browser.trim() ||
     typeof browserEvidence?.driver !== 'string' ||
     !browserEvidence.driver.trim() ||
-    !Number.isInteger(browserEvidence?.observedProductLinkCount) ||
-    browserEvidence.observedProductLinkCount <= 0 ||
+    !safePositiveInteger(browserEvidence?.observedProductLinkCount) ||
     !selectorContractMatches(browserEvidence?.selectorContract) ||
     !safety ||
     safety.login !== false ||
@@ -172,9 +227,21 @@ function validateEvidenceBoundary(
 
 function productIdFromHref(href: string): string | null {
   if (typeof href !== 'string' || !href.startsWith('/product/')) return null
-  const path = href.split(/[?#]/, 1)[0]
-  const match = path.match(/-(\d+)$/)
-  return match ? match[1] : null
+
+  try {
+    const url = new URL(href, 'https://www.plus.nl')
+    if (
+      url.origin !== 'https://www.plus.nl' ||
+      !url.pathname.startsWith('/product/')
+    ) {
+      return null
+    }
+
+    const match = url.pathname.match(/-(\d+)$/)
+    return match ? match[1] : null
+  } catch {
+    return null
+  }
 }
 
 function currentPriceCents(card: PlusRenderedListingCard): number | null {

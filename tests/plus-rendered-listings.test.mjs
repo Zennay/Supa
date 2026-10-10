@@ -139,3 +139,122 @@ test('listing evidence rejects selector-contract or acquisition-safety drift', a
     'PromotionListFlow.OfferItem',
   )
 })
+
+
+test('PLUS listing evidence binds catalog and offers kinds to their public routes', async () => {
+  const catalogOnOffersRoute = await fixture(catalogUrl)
+  catalogOnOffersRoute.source.url = 'https://www.plus.nl/aanbiedingen'
+
+  assert.deepEqual(parsePlusRenderedCatalogEvidence(catalogOnOffersRoute), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid catalog source',
+  })
+
+  const offersOnCatalogRoute = await fixture(offersUrl)
+  offersOnCatalogRoute.source.url = 'https://www.plus.nl/producten/zuivel'
+
+  assert.deepEqual(parsePlusRenderedOffersEvidence(offersOnCatalogRoute), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid offers source',
+  })
+
+  const misleadingPrefix = await fixture(catalogUrl)
+  misleadingPrefix.source.url = 'https://www.plus.nl/producten-archive'
+
+  assert.deepEqual(parsePlusRenderedCatalogEvidence(misleadingPrefix), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid catalog source',
+  })
+})
+
+
+test('PLUS listing evidence rejects credential-bearing public source URLs', async () => {
+  for (const sourceUrl of [
+    'https://reporter@www.plus.nl/producten',
+    'https://:secret@www.plus.nl/aanbiedingen',
+  ]) {
+    const evidence = await fixture(
+      sourceUrl.endsWith('/aanbiedingen') ? offersUrl : catalogUrl,
+    )
+    evidence.source.url = sourceUrl
+
+    const result =
+      evidence.source.kind === 'offers'
+        ? parsePlusRenderedOffersEvidence(evidence)
+        : parsePlusRenderedCatalogEvidence(evidence)
+
+    assert.equal(result.type, 'abstain')
+    assert.match(result.reason, /must identify a valid (catalog|offers) source/)
+  }
+})
+
+
+test('PLUS listing evidence rejects non-default ports but accepts canonical HTTPS 443', async () => {
+  const nonDefault = await fixture(catalogUrl)
+  nonDefault.source.url = 'https://www.plus.nl:8443/producten'
+
+  assert.deepEqual(parsePlusRenderedCatalogEvidence(nonDefault), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence must identify a valid catalog source',
+  })
+
+  const explicitDefault = await fixture(catalogUrl)
+  explicitDefault.source.url = 'https://www.plus.nl:443/producten'
+
+  assert.equal(parsePlusRenderedCatalogEvidence(explicitDefault).type, 'observations')
+})
+
+test('PLUS listing evidence requires a timezone-bearing capture timestamp', async () => {
+  for (const capturedAt of [
+    '2026-10-04',
+    '2026-10-04T18:08:57.837',
+    '2026-02-30T18:08:57.837Z',
+    '2026-10-04T24:00:00Z',
+    '2026-10-04T18:08:57+24:00',
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    evidence.source.capturedAt = capturedAt
+
+    assert.deepEqual(parsePlusRenderedCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence must identify a valid catalog source',
+    })
+  }
+
+  const offset = await fixture(catalogUrl)
+  offset.source.capturedAt = '2026-10-04T20:08:57.837+02:00'
+  assert.equal(parsePlusRenderedCatalogEvidence(offset).type, 'observations')
+})
+
+test('PLUS listing cards reject product hrefs that escape the product route after normalization', async () => {
+  const evidence = await fixture(catalogUrl)
+  evidence.cards[0].href = '/product/../aanbiedingen-113651'
+
+  const result = parsePlusRenderedCatalogEvidence(evidence)
+
+  assert.equal(result.type, 'observations')
+  assert.equal(result.observations.length, 3)
+  assert.equal(result.abstained, 1)
+  assert.equal(
+    result.observations.some((observation) => observation.sourceProductId === '113651'),
+    false,
+  )
+})
+
+test('PLUS listing evidence rejects unsafe integer browser metadata', async () => {
+  for (const mutate of [
+    (evidence) => { evidence.browserEvidence.runId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.artifactId = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.renderedHtmlBytes = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.screenshotBytes = Number.MAX_SAFE_INTEGER + 1 },
+    (evidence) => { evidence.browserEvidence.observedProductLinkCount = Number.MAX_SAFE_INTEGER + 1 },
+  ]) {
+    const evidence = await fixture(catalogUrl)
+    mutate(evidence)
+
+    assert.deepEqual(parsePlusRenderedCatalogEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence violates the bounded browser trust contract',
+    })
+  }
+})

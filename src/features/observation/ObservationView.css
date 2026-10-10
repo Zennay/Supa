@@ -172,6 +172,11 @@
   text-align: center;
 }
 
+.observation-import-button:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .observation-import-button input {
   position: absolute;
   width: 1px;

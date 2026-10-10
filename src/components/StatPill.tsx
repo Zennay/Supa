@@ -1,8 +1,8 @@
 import { statPillPresentation } from './statPillPresentation'
 
 type Props = {
-  label: string
-  value: string
+  label: unknown
+  value: unknown
 }
 
 export function StatPill({ label, value }: Props) {
