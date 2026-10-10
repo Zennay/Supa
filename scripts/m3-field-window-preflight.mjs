@@ -97,7 +97,7 @@ export function main(args = process.argv.slice(2), write = console.log, nowMs = 
   if (result.status === 'pending') {
     const hours = Math.floor(result.remainingMinutes / 60)
     const minutes = result.remainingMinutes % 60
-    write(`PENDING: DekaMarkt nog niet gemeten; maximaal ${hours} uur en ${minutes} minuten over voor dezelfde prijscontext. Nog geen besparingsbewijs.`)
+    write(`PENDING: DekaMarkt nog niet gemeten; maximaal ${hours} uur en ${minutes} ${minutes === 1 ? 'minuut' : 'minuten'} over voor dezelfde prijscontext. Nog geen besparingsbewijs.`)
     return 2
   }
   write('NOT READY: invalid or expired observation window. Verify/recollect genuine observations; no savings claim.')
