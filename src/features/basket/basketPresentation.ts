@@ -4,8 +4,8 @@ import type { BasketComparison } from '../../domain/basketComparison.ts'
 import { euro } from '../../lib/money.ts'
 
 export type BasketCostDisclosure = {
-  state: 'complete' | 'minimum'
-  headline: 'Deterministisch mandtotaal' | 'Bekend mandminimum'
+  state: 'complete' | 'minimum' | 'unknown'
+  headline: 'Deterministisch mandtotaal' | 'Bekend mandminimum' | 'Mandtotaal niet beschikbaar'
   amountLabel: string
   unresolvedLineCount: number
 }
@@ -22,7 +22,16 @@ export function basketCostDisclosure(
       : complete
         ? 0
         : 1
-  const formattedAmount = euro.format(totalCents / 100)
+  if (!Number.isSafeInteger(totalCents) || totalCents < 0) {
+    return {
+      state: 'unknown',
+      headline: 'Mandtotaal niet beschikbaar',
+      amountLabel: '—',
+      unresolvedLineCount: safeUnresolvedLineCount,
+    }
+  }
+
+  const formattedAmount = euro.formatCents(totalCents)
 
   return complete
     ? {
@@ -99,7 +108,7 @@ export function comparisonLineHighlights(
       id: line.id,
       ingredientLabel: line.ingredientLabel,
       direction: line.deltaCents < 0 ? 'lower' : 'higher',
-      amountLabel: euro.format(Math.abs(line.deltaCents) / 100),
+      amountLabel: euro.formatCents(Math.abs(line.deltaCents)),
     }))
 }
 
@@ -145,7 +154,7 @@ export function comparisonLineBreakdown(
       id: line.id,
       ingredientLabel: line.ingredientLabel,
       direction: line.deltaCents < 0 ? 'lower' : 'higher',
-      amountLabel: euro.format(Math.abs(line.deltaCents) / 100),
+      amountLabel: euro.formatCents(Math.abs(line.deltaCents)),
     }))
 }
 
@@ -221,4 +230,72 @@ export function basketLineExplanation(
   }
 
   return 'SUPA kan hier niet betrouwbaar automatisch kiezen; kies zelf.'
+}
+
+/**
+ * A price difference is user-facing only when the complete signed-cent
+ * comparison is internally consistent. Never coerce missing runtime money
+ * to zero or derive a comparison claim from a malformed snapshot.
+ *
+ * This is a presentation trust boundary, not evidence of live shop prices.
+ */
+export function basketComparisonCanShowMoney(
+  comparison: BasketComparison,
+  candidate: { store: { name: string } },
+): boolean {
+  const storeName = candidate?.store?.name
+  if (
+    !comparison || typeof comparison !== 'object' ||
+    comparison.claimable !== true ||
+    !Array.isArray(comparison.reasons) ||
+    comparison.reasons.length !== 0 ||
+    typeof storeName !== 'string' ||
+    storeName.trim().length === 0 ||
+    storeName !== storeName.trim() ||
+    !Number.isSafeInteger(comparison.baselineTotalCents) ||
+    comparison.baselineTotalCents < 0 ||
+    !Number.isSafeInteger(comparison.candidateTotalCents) ||
+    comparison.candidateTotalCents < 0 ||
+    !Number.isSafeInteger(comparison.deltaCents) ||
+    !Number.isSafeInteger(comparison.savingsCents)
+  ) {
+    return false
+  }
+
+  const expectedDelta =
+    comparison.candidateTotalCents - comparison.baselineTotalCents
+  if (
+    !Number.isSafeInteger(expectedDelta) ||
+    comparison.deltaCents !== expectedDelta ||
+    comparison.savingsCents !== -expectedDelta
+  ) {
+    return false
+  }
+
+  if (comparison.outcome === 'same') return expectedDelta === 0
+  if (comparison.outcome === 'better') return expectedDelta < 0
+  if (comparison.outcome === 'worse') return expectedDelta > 0
+  return false
+}
+
+export function basketComparisonHeadline(
+  comparison: BasketComparison,
+  candidate: { store: { name: string } },
+): string {
+  if (!basketComparisonCanShowMoney(comparison, candidate)) {
+    return 'Nog geen betrouwbare vergelijking'
+  }
+
+  if (comparison.outcome === 'same') {
+    return 'Beide testmanden zijn even duur'
+  }
+
+  const difference = euro.formatCents(
+    Math.abs(comparison.candidateTotalCents - comparison.baselineTotalCents),
+  )
+  if (difference === '—') return 'Nog geen betrouwbare vergelijking'
+
+  return comparison.outcome === 'better'
+    ? `${candidate.store.name} ligt ${difference} lager`
+    : `${candidate.store.name} ligt ${difference} hoger`
 }

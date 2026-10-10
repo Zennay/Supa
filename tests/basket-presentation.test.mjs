@@ -257,6 +257,35 @@ test('basket disclosure text is user-facing, source-honest, and free of mileston
   assert.equal((source.match(/Geen actuele winkelprijzen of bewezen besparing\./g) || []).length, 2)
   assert.match(source, /geen actuele winkelprijzen of bewezen besparing/)
   assert.match(source, /bekende minimum, geen/)
-  assert.match(source, /comparison\.claimable \?/)
+  assert.match(source, /comparisonCanShowMoney \?/)
   assert.match(source, /comparison-warning/)
+})
+
+test('corrupt basket cent totals never advertise a deterministic amount or minimum', () => {
+  for (const cents of [null, undefined, '100', -1, 1.25, Number.NaN,
+    Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
+    for (const unresolved of [0, 2]) {
+      const shown = basketCostDisclosure(cents, unresolved)
+      assert.equal(shown.state, 'unknown')
+      assert.equal(shown.headline, 'Mandtotaal niet beschikbaar')
+      assert.equal(shown.amountLabel, '—')
+      assert.equal(shown.unresolvedLineCount, unresolved)
+    }
+  }
+
+  const known = basketCostDisclosure(0, 0)
+  assert.equal(known.state, 'complete')
+  assert.notEqual(known.amountLabel, '—')
+  const minimum = basketCostDisclosure(500, 2)
+  assert.equal(minimum.state, 'minimum')
+  assert.match(minimum.amountLabel, /^min\./)
+})
+
+test('BasketView states invalid basket amounts are unavailable rather than claiming a minimum', async () => {
+  const source = await readFile(new URL('../src/features/basket/BasketView.tsx', import.meta.url), 'utf8')
+  assert.match(source, /basketCost\.state === 'unknown'/)
+  assert.match(source, /Het mandbedrag is niet betrouwbaar genoeg voor een totaal of/)
+  assert.match(source, /Geen actuele winkelprijzen/)
+  assert.match(source, /data-basket-total-state=\{basketCost\.state\}/)
+  assert.match(source, /data-comparison-outcome=\{comparisonCanShowMoney/)
 })

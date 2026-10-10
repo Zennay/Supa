@@ -3,6 +3,8 @@ import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import {
   basketCostDisclosure,
+  basketComparisonHeadline,
+  basketComparisonCanShowMoney,
   basketLineExplanation,
   basketReviewSummary,
   comparisonLineHighlightCopy,
@@ -14,26 +16,6 @@ import { StatPill } from '../../components/StatPill'
 
 function quantity(amount: number | null, unit: string) {
   return amount === null ? `? ${unit}` : `${amount} ${unit}`
-}
-
-function comparisonTitle(
-  comparison: BasketComparison,
-  candidate: OneStoreBasket,
-) {
-  if (!comparison.claimable || comparison.outcome === 'unknown') {
-    return 'Nog geen betrouwbare vergelijking'
-  }
-
-  if (comparison.outcome === 'same') {
-    return 'Beide testmanden zijn even duur'
-  }
-
-  const difference = euro.format(
-    Math.abs(comparison.savingsCents ?? 0) / 100,
-  )
-  return comparison.outcome === 'better'
-    ? `${candidate.store.name} ligt ${difference} lager`
-    : `${candidate.store.name} ligt ${difference} hoger`
 }
 
 export function BasketView({
@@ -64,7 +46,13 @@ export function BasketView({
     comparisonCandidate.unresolvedLineCount,
     comparison.reasons.length,
   )
-  const comparisonHighlights = comparisonLineHighlights(comparison)
+  const comparisonCanShowMoney = basketComparisonCanShowMoney(
+    comparison,
+    comparisonCandidate,
+  )
+  const comparisonHighlights = comparisonCanShowMoney
+    ? comparisonLineHighlights(comparison)
+    : []
   const reviewSummary = basketReviewSummary(basket.unresolvedLineCount)
   const basketLines = orderBasketLinesForReview(basket.lines)
 
@@ -97,6 +85,12 @@ export function BasketView({
               nog niet meegerekend. Dit is alleen het bekende minimum, geen
               volledig mandtotaal. Dit zijn voorbeeldprijzen, geen actuele winkelprijzen of bewezen besparing.
             </>
+          ) : basketCost.state === 'unknown' ? (
+            <>
+              Het mandbedrag is niet betrouwbaar genoeg voor een totaal of
+              minimum. Controleer de productprijzen. Geen actuele winkelprijzen
+              of bewezen besparing.
+            </>
           ) : (
             <>
               Dit is een volledig voorbeeldmandje met gecontroleerde voorbeeldprijzen.
@@ -106,9 +100,9 @@ export function BasketView({
         </p>
       </div>
 
-      <div className="comparison-card" data-comparison-outcome={comparison.outcome}>
+      <div className="comparison-card" data-comparison-outcome={comparisonCanShowMoney ? comparison.outcome : 'unknown'}>
         <span className="eyebrow">Gecontroleerde winkelvergelijking</span>
-        <strong>{comparisonTitle(comparison, comparisonCandidate)}</strong>
+        <strong>{basketComparisonHeadline(comparison, comparisonCandidate)}</strong>
         <div className="comparison-totals">
           <div>
             <span>Baseline · {comparisonBaseline.store.name}</span>
@@ -148,7 +142,7 @@ export function BasketView({
           </div>
         )}
 
-        {comparison.claimable ? (
+        {comparisonCanShowMoney ? (
           <p className="disclaimer">
             Vergelijking van voorbeeldprijzen voor dezelfde week en een volledige mand.
             Geen actuele winkelprijzen of bewezen besparing.
@@ -194,7 +188,7 @@ export function BasketView({
             </div>
             <strong>
               {line.status === 'matched'
-                ? euro.format(line.lineTotalCents / 100)
+                ? euro.formatCents(line.lineTotalCents)
                 : '—'}
             </strong>
           </div>
