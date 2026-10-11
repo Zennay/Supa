@@ -65,6 +65,32 @@ test('the real shopping-v2 TSX offers a deliberate accessible clear action only 
 
     const differentStore = basket({ ...m2Store, id: 'synthetic-new-store' })
     assert.doesNotMatch(render(differentStore), /Vinkjes wissen/)
+
+    // The clear affordance itself must obey the exact physical-demand key,
+    // not merely be present because a previously saved record lists an ID.
+    const physicallyChanged = [
+      (() => { const changed = structuredClone(first)
+        changed.lines.find((line) => line.id === picked.id).productId = 'synthetic-different-product'
+        return changed })(),
+      (() => { const changed = structuredClone(first)
+        changed.lines.find((line) => line.id === picked.id).pack.count += 1
+        return changed })(),
+      (() => { const changed = structuredClone(first)
+        changed.lines.find((line) => line.id === picked.id).requirement.amount += 1
+        return changed })(),
+      (() => { const changed = structuredClone(first)
+        changed.lines.find((line) => line.id === picked.id).status = 'unresolved'
+        return changed })(),
+    ]
+    for (const changed of physicallyChanged) {
+      assert.doesNotMatch(render(changed), /Vinkjes wissen/,
+        'stale checked IDs cannot authorize a restart on changed physical demand')
+    }
+
+    const reordered = structuredClone(first)
+    reordered.lines.reverse()
+    assert.match(render(reordered), /Vinkjes wissen/,
+      'row presentation order must not change the shopping task')
     assert.doesNotMatch(render({ ...first, lines: [null] }), /Vinkjes wissen/)
     assert.doesNotMatch(render({ ...first, lines: [] }), /Vinkjes wissen/)
 
