@@ -349,6 +349,14 @@ export function openShoppingProgressStorageV2(
           failedPersistAttempt = true
           return false
         }
+        // The storage port is caller-supplied and can synchronously change a
+        // mutable basket during getItem. Recheck the physical task *after*
+        // that read, or a successful save could persist obsolete checkmarks.
+        // This is not an atomic cross-tab compare-and-swap.
+        if (shoppingListDemandIdentity(currentBasket) !== session.demandIdentity) {
+          failedPersistAttempt = true
+          return false
+        }
         storage.setItem(shoppingListProgressV2StorageKey, session.serialized)
         // Advance only after a confirmed successful write. Denied writes can
         // be explicitly retried while the durable value stays unchanged.
