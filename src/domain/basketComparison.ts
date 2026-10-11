@@ -26,6 +26,7 @@ type PinnedMonetaryFacts = WeakMap<object, {
 type PinnedStoreIdentity = { reference: unknown; id: unknown }
 type PinnedRootFacts = {
   lines: unknown
+  physicalSlots: unknown[]
   selectedMealCount: unknown
   totalCents: unknown
   matchedLineCount: unknown
@@ -247,6 +248,7 @@ function safeRuntimeBasket(
     const physical = ownData(lines, String(index))
     if (!physical) return false
     const line = physical.value
+    pinnedRoot.physicalSlots.push(line)
     const statusData = ownData(line, 'status')
     // A present accessor status must not be visited by supportedBasketLine.
     if (!statusData && line !== null && typeof line === 'object' &&
@@ -420,9 +422,13 @@ function snapshotRuntimeBasket(
       throw new Error('basket length changed outside the snapshot safety bound')
     }
     for (let index = 0; index < length; index += 1) {
-      lines.push(snapshotRuntimeLine(
-        ownData(originalLines, String(index))!.value, pinnedMonetaryFacts,
-      ))
+      const physical = ownData(originalLines, String(index))
+      // A stable array reference does not imply stable indexed descriptors.
+      // Previously validated row objects may be exchanged by an Array Proxy.
+      if (!physical || physical.value !== pinnedRoot.physicalSlots[index]) {
+        throw new Error('basket physical row slot changed after preflight')
+      }
+      lines.push(snapshotRuntimeLine(physical.value, pinnedMonetaryFacts))
     }
   }
   const originalStore = ownData(basket, 'store')?.value
@@ -738,11 +744,11 @@ export function compareFullBaskets(input: {
     const baselineStore: PinnedStoreIdentity = { reference: null, id: null }
     const candidateStore: PinnedStoreIdentity = { reference: null, id: null }
     const baselineRoot: PinnedRootFacts = {
-      lines: null, selectedMealCount: null, totalCents: null, matchedLineCount: null,
+      lines: null, physicalSlots: [], selectedMealCount: null, totalCents: null, matchedLineCount: null,
       unresolvedLineCount: null,
     }
     const candidateRoot: PinnedRootFacts = {
-      lines: null, selectedMealCount: null, totalCents: null, matchedLineCount: null,
+      lines: null, physicalSlots: [], selectedMealCount: null, totalCents: null, matchedLineCount: null,
       unresolvedLineCount: null,
     }
     if (!safeRuntimeBasket(baseline, baselineLength, baselinePinnedFacts, baselineStore, baselineRoot) ||
