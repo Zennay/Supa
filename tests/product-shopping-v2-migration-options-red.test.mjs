@@ -55,10 +55,10 @@ test('Product #1056 expected RED: existing v2 must not read throwing migration o
   const options = { get allowLegacyUpgrade() { accesses++; throw new Error('synthetic guarded getter') } }
   assert.doesNotThrow(() => {
     const controller = openShoppingProgressStorageV2(basket, storage, options)
-    assert.equal(controller.storageFormatStatus(), 'unavailable')
+    assert.equal(controller.storageFormatStatus(), 'ready')
   })
   assert.equal(storage.writes, 0)
-  assert.equal(accesses, 1)
+  assert.equal(accesses, 0, 'migration consent is irrelevant when v2 already exists')
 })
 
 test('Product #1056 expected RED: explicit null options must behave like no upgrade consent', () => {
