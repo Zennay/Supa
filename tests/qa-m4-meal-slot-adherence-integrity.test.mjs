@@ -145,6 +145,38 @@ test('QA M4: malformed non-JSON numeric and unsupported events fail before repor
     /not an allowed value/)
 })
 
+test('QA M4: a large aggregate payload is refused before any adherence report', () => {
+  const events = Array.from({ length: 160 }, (_, i) => [
+    `synthetic-slot-${i}`, i % 2 === 0 ? 'followed' : 'skipped',
+  ])
+  const input = session(events)
+  const longText = '🔒'.repeat(2048)
+  for (const event of input.events) {
+    if (event.type === 'meal_outcome_recorded') {
+      event.extraSyntheticMetadata = longText
+    }
+  }
+  const original = structuredClone(input)
+  assert.throws(
+    () => buildM4SummaryWithMealSlotIntegrity(input),
+    /aggregate UTF-8 byte budget/,
+  )
+  assert.deepEqual(input, original)
+})
+
+test('QA M4: abandoned/partial weeks preserve missing measures as unknown', () => {
+  const input = session([])
+  input.sessionOutcome = 'abandoned'
+  input.events = input.events.filter((event) =>
+    event.type !== 'plan_completed' && event.type !== 'beta_week_closed')
+  const report = buildM4SummaryWithMealSlotIntegrity(input)
+  assert.equal(report.sessionOutcome, 'abandoned')
+  assert.equal(report.supaPlanningDurationSeconds, null)
+  assert.equal(report.planAdherence, null)
+  assert.equal(report.returnIntentRating, null)
+  assert.equal(report.publicClaimEligible, false)
+})
+
 test('QA M4: M3 gate still denies actual beta execution without the signed prerequisite', () => {
   const input = session()
   input.m3Gate.status = 'open'
