@@ -36,6 +36,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
   // Set after mount to keep SSR markup stable when browser storage differs.
   const [unknownStoredRecord, setUnknownStoredRecord] = useState(false)
   const [unavailableStorage, setUnavailableStorage] = useState(false)
+  const [unavailableReadRetryFailed, setUnavailableReadRetryFailed] = useState(false)
 
   // Re-evaluate even for an in-place mutation of a reused basket reference.
   const liveIdentity = shoppingListDemandIdentity(basket)
@@ -96,14 +97,36 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
         // Protected bytes remain read-only; don't suggest a stale-tab save.
         setRecheckFailed(true)
         setSaveFailed(false)
+      } else if (controller.storageFormatStatus() === 'unavailable') {
+        // An initially denied read is not evidence that another tab saved.
+        setUnavailableReadRetryFailed(true)
+        setSaveFailed(false)
       } else {
         setSaveFailed(true)
       }
       return
     }
     setRecheckFailed(false)
+    setUnavailableReadRetryFailed(false)
     setSession(latest)
     setSaveFailed(false)
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
+    setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
+  }
+
+  function retryUnavailableStorage() {
+    // Keep the ordinary saved-list reload contract intact. Transiently denied
+    // storage has no trusted initial revision, so retry must be same-demand.
+    controller.rebase(basket)
+    const latest = controller.reloadSaved({ requireSameDemand: true })
+    if (latest === null) {
+      setUnavailableReadRetryFailed(true)
+      return
+    }
+    setUnavailableReadRetryFailed(false)
+    setSession(latest)
+    setSaveFailed(false)
+    setRecheckFailed(false)
     setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
     setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
   }
@@ -144,6 +167,17 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
           <strong>Opgeslagen voortgang niet beschikbaar</strong>
           <span>Opslaan werkt hier niet. Vinkjes blijven alleen tijdelijk zichtbaar
             en kunnen verdwijnen als je de pagina sluit of herlaadt.</span>
+          {controller.canRetryStorageRead() && (
+            <>
+              {unavailableReadRetryFailed && (
+                <span>Opgeslagen voortgang is nog niet leesbaar. Je tijdelijke vinkjes blijven staan.</span>
+              )}
+              <button type="button" className="ghost-button" onClick={retryUnavailableStorage}>
+                Opgeslagen voortgang opnieuw controleren
+              </button>
+              <small>Dit leest opnieuw zonder iets te bewaren. Niet-opgeslagen vinkjes verdwijnen alleen als laden lukt.</small>
+            </>
+          )}
         </div>
       )}
 

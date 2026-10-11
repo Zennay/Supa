@@ -105,6 +105,11 @@ export function openShoppingProgressStorageV2(
   return {
     snapshot,
 
+    /** A null browser port cannot be retried; a temporarily denied port can. */
+    canRetryStorageRead(): boolean {
+      return storage !== null
+    },
+
     /** Display-only diagnostic; never exposes or rewrites stored bytes. */
     storageFormatStatus(): 'ready' | 'unknown-record' | 'unavailable' {
       if (!storageReadable) return 'unavailable'
