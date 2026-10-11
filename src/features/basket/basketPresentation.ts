@@ -369,7 +369,7 @@ export function basketComparisonCanShowMoney(
     summedDeltaCents !== expectedDelta
   ) return false
 
-  if (displayedBaseline && !matchesCurrentDisplayedBaskets(comparison, candidate, displayedBaseline)) return false
+  if (displayedBaseline !== undefined && !matchesCurrentDisplayedBaskets(comparison, candidate, displayedBaseline)) return false
 
   if (comparison.outcome === 'same') return expectedDelta === 0
   if (comparison.outcome === 'better') return expectedDelta < 0
