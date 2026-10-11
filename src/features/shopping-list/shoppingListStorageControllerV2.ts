@@ -137,8 +137,10 @@ export function openShoppingProgressStorageV2(
      * user action. Discards unsaved local ticks on successful read, without
      * persisting, migrating v1, or adopting a foreign physical basket.
      * Failed/denied reads never modify the session or pinned storage revision.
+     * UI protected-record rechecks opt into a same-demand-only read even before
+     * any failed save; regular read-only recovery retains existing semantics.
      */
-    reloadSaved(): ShoppingProgressSessionV2 | null {
+    reloadSaved(options: Readonly<{ requireSameDemand?: boolean }> = {}): ShoppingProgressSessionV2 | null {
       if (storage === null) return null
       try {
         const liveIdentity = shoppingListDemandIdentity(currentBasket)
@@ -149,7 +151,7 @@ export function openShoppingProgressStorageV2(
         const observed = storage.getItem(shoppingListProgressV2StorageKey)
         // Even a manual reload must not adopt and pin an unknown schema.
         if (!recognizedStoredV2(observed)) return null
-        if (failedPersistAttempt && observed !== null) {
+        if ((failedPersistAttempt || options.requireSameDemand === true) && observed !== null) {
           // A previous stale write proved another tab changed the checklist.
           // Never convert its *different* physical task into an empty current
           // task and then pin its revision, which would enable rollback.
