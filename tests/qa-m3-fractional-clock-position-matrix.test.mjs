@@ -15,8 +15,8 @@ const build = (store, products) => buildOneStoreBasket({
   store, products, plan: m2InitialPlan, recipes: m2Recipes,
   activeDays: m2DefaultActiveDays,
 })
-const baselineBasket = build(m3BaselineStore, m3BaselineProducts)
-const candidateBasket = build(m3CandidateStore, m3CandidateProducts)
+const baselineBasket = build({ ...m3BaselineStore, name: 'PLUS synthetic test store' }, m3BaselineProducts)
+const candidateBasket = build({ ...m3CandidateStore, name: 'DekaMarkt synthetic test store' }, m3CandidateProducts)
 assert.equal(baselineBasket.unresolvedLineCount, 0)
 assert.equal(candidateBasket.unresolvedLineCount, 0)
 
