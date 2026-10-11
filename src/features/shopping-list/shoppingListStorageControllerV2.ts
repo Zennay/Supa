@@ -25,6 +25,33 @@ type StorageOptions = Readonly<{
  * In strict/private-browser contexts a throwing storage port safely degrades
  * to an in-memory checklist without an implicit fallback to legacy storage.
  */
+/**
+ * An old client must never convert an unknown future format (or corrupt
+ * existing data) into an empty v2 list and overwrite the original bytes.
+ * Only check the storage envelope here; physical-demand matching stays with
+ * the existing v2 restore/rebase path. The v2 key may legitimately belong to
+ * another *recognized* shopping task when a user switches stores.
+ */
+function recognizedStoredV2(raw: string | null): boolean {
+  if (raw === null) return true
+  if (typeof raw !== 'string') return false
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
+    const item = parsed as Record<string, unknown>
+    return (
+      Object.hasOwn(item, 'schemaVersion') && item.schemaVersion === 2 &&
+      Object.hasOwn(item, 'demandIdentity') &&
+      typeof item.demandIdentity === 'string' && item.demandIdentity.length > 0 &&
+      Object.hasOwn(item, 'doneLineIds') &&
+      Array.isArray(item.doneLineIds) &&
+      item.doneLineIds.every((lineId) => typeof lineId === 'string')
+    )
+  } catch {
+    return false
+  }
+}
+
 export function openShoppingProgressStorageV2(
   basket: OneStoreBasket,
   storage: ShoppingStoragePort | null,
@@ -52,6 +79,8 @@ export function openShoppingProgressStorageV2(
   // The last durable v2 value observed by this controller. A separate tab
   // may save a different checklist while this tab is open.
   let lastObservedV2 = initialV2
+  // Unsupported stored bytes are read-only until a deliberate valid recovery.
+  let storageFormatSupported = storageReadable && recognizedStoredV2(initialV2)
   // Any failed explicit save may predate a newer physical shopping task,
   // including an initially denied read or a quota-denied write. A later
   // recovery must not turn that foreign saved task into an empty local list.
@@ -112,6 +141,8 @@ export function openShoppingProgressStorageV2(
         // Always read the v2 key alone: a present/missing v2 revision never
         // authorizes a surprise legacy import during conflict recovery.
         const observed = storage.getItem(shoppingListProgressV2StorageKey)
+        // Even a manual reload must not adopt and pin an unknown schema.
+        if (!recognizedStoredV2(observed)) return null
         if (failedPersistAttempt && observed !== null) {
           // A previous stale write proved another tab changed the checklist.
           // Never convert its *different* physical task into an empty current
@@ -136,6 +167,7 @@ export function openShoppingProgressStorageV2(
         session = refreshed
         lastObservedV2 = observed
         storageReadable = true
+        storageFormatSupported = true
         failedPersistAttempt = false
         return snapshot()
       } catch {
@@ -148,7 +180,7 @@ export function openShoppingProgressStorageV2(
      * render. Invalid basket or blocked storage never writes stale state.
      */
     persist(): boolean {
-      if (!storageReadable || storage === null || session.serialized === null) {
+      if (!storageReadable || !storageFormatSupported || storage === null || session.serialized === null) {
         failedPersistAttempt = true
         return false
       }
