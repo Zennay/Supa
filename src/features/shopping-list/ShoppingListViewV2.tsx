@@ -32,6 +32,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
   )
   const [session, setSession] = useState(() => controller.snapshot())
   const [saveFailed, setSaveFailed] = useState(false)
+  const [recheckFailed, setRecheckFailed] = useState(false)
   // Set after mount to keep SSR markup stable when browser storage differs.
   const [unknownStoredRecord, setUnknownStoredRecord] = useState(false)
   const [unavailableStorage, setUnavailableStorage] = useState(false)
@@ -91,9 +92,16 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     controller.rebase(basket)
     const latest = controller.reloadSaved()
     if (latest === null) {
-      setSaveFailed(true)
+      if (controller.storageFormatStatus() === 'unknown-record') {
+        // Protected bytes remain read-only; don't suggest a stale-tab save.
+        setRecheckFailed(true)
+        setSaveFailed(false)
+      } else {
+        setSaveFailed(true)
+      }
       return
     }
+    setRecheckFailed(false)
     setSession(latest)
     setSaveFailed(false)
     setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
@@ -121,6 +129,13 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
           <strong>Opgeslagen boodschappenlijst beschermd</strong>
           <span>De opgeslagen versie is onbekend of ongeldig. Je kunt tijdelijk afvinken,
             maar nieuwe vinkjes worden niet bewaard. SUPA overschrijft de bestaande gegevens niet.</span>
+          {recheckFailed && (
+            <span>De opgeslagen versie is nog niet leesbaar. Bestaande gegevens zijn behouden.</span>
+          )}
+          <button type="button" className="ghost-button" onClick={reloadSaved}>
+            Opgeslagen versie opnieuw controleren
+          </button>
+          <small>Dit leest opnieuw zonder iets te bewaren. Niet-opgeslagen vinkjes verdwijnen als het laden lukt.</small>
         </div>
       )}
 
