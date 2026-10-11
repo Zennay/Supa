@@ -11,8 +11,33 @@ const baseline = {
   candidateTotalCents: 12250,
   deltaCents: -250,
   savingsCents: 250,
-  lineDeltas: [],
+  lineDeltas: [{
+    id: 'synthetic',
+    ingredientLabel: 'Synthetische mandregel',
+    baselineLineTotalCents: 12500,
+    candidateLineTotalCents: 12250,
+    deltaCents: -250,
+  }],
   reasons: [],
+}
+
+function comparisonForTotals(baselineTotalCents, candidateTotalCents, outcome) {
+  const deltaCents = candidateTotalCents - baselineTotalCents
+  return {
+    ...baseline,
+    outcome,
+    baselineTotalCents,
+    candidateTotalCents,
+    deltaCents,
+    savingsCents: -deltaCents,
+    lineDeltas: [{
+      id: 'synthetic',
+      ingredientLabel: 'Synthetische mandregel',
+      baselineLineTotalCents,
+      candidateLineTotalCents,
+      deltaCents,
+    }],
+  }
 }
 
 const candidate = { store: { id: 'store-b', name: 'DekaMarkt' } }
@@ -25,36 +50,22 @@ test('product comparison headline displays only validated exact signed cent diff
     `DekaMarkt ligt ${euro.formatCents(250)} lager`,
   )
   assert.equal(
-    basketComparisonHeadline({
-      ...baseline,
-      outcome: 'worse',
-      candidateTotalCents: 12875,
-      deltaCents: 375,
-      savingsCents: -375,
-    }, candidate),
+    basketComparisonHeadline(
+      comparisonForTotals(12500, 12875, 'worse'), candidate,
+    ),
     `DekaMarkt ligt ${euro.formatCents(375)} hoger`,
   )
   assert.equal(
-    basketComparisonHeadline({
-      ...baseline,
-      outcome: 'same',
-      baselineTotalCents: 12500,
-      candidateTotalCents: 12500,
-      deltaCents: 0,
-      savingsCents: 0,
-    }, candidate),
+    basketComparisonHeadline(
+      comparisonForTotals(12500, 12500, 'same'), candidate,
+    ),
     'Beide testmanden zijn even duur',
   )
   const large = 9_007_199_253_740_993
   assert.equal(
-    basketComparisonHeadline({
-      ...baseline,
-      baselineTotalCents: 0,
-      candidateTotalCents: large,
-      outcome: 'worse',
-      deltaCents: large,
-      savingsCents: -large,
-    }, candidate),
+    basketComparisonHeadline(
+      comparisonForTotals(0, large, 'worse'), candidate,
+    ),
     `DekaMarkt ligt ${euro.formatCents(large)} hoger`,
   )
 })
@@ -97,14 +108,7 @@ test('financial headline abstains on missing, coerced, unsafe or contradictory c
 })
 
 test('even a claimed same-price headline needs consistent, complete cent totals', () => {
-  const same = {
-    ...baseline,
-    outcome: 'same',
-    baselineTotalCents: 1000,
-    candidateTotalCents: 1000,
-    deltaCents: 0,
-    savingsCents: 0,
-  }
+  const same = comparisonForTotals(1000, 1000, 'same')
   for (const mutation of [
     { baselineTotalCents: Number.NaN },
     { candidateTotalCents: '1000' },
