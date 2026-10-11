@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { chmod, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -64,7 +64,7 @@ test('malformed source, host and timestamp cannot produce trusted candidates', (
     { originHost: 'www.dirk.nl.evil.test' },
     { originHost: 'www.ah.nl' },
     { capturedAt: '2099-01-01T00:00:00.000Z' },
-    { capturedAt: '2026-10-10T00:00:00.000Z' },
+    { capturedAt: '2026-10-09T23:59:59.999Z' },
     { capturedAt: '2026-10-11T00:00:00Z' },
   ]) {
     assert.throws(() => reviewDomProbe(probe(candidate), { sourceId: source.id, nowMs }), /rejected/)
@@ -182,7 +182,7 @@ test('no review survives tampered captures, stale evidence or symlinked probe', 
       sourceId: source.id, stem: f.stem, probePath: f.probePath,
       captureDir: f.captureDir, outputDir: f.outputDir, nowMs,
     }), /rejected/)
-    assert.rejects(() => saveDomCandidateReview({
+    await assert.rejects(saveDomCandidateReview({
       sourceId: source.id, stem: '../secret', probePath: f.probePath,
       captureDir: f.captureDir, outputDir: f.outputDir, nowMs,
     }), /rejected/)
