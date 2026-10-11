@@ -49,6 +49,7 @@ function invalidPortableSegment(segment) {
 function trackedFailures(entries) {
   const failures = []
   const seen = new Map()
+  const directories = new Set()
   for (const { path, mode, stage } of entries) {
     if (stage !== '0') failures.push('unmerged index entry')
     if (mode === '120000' || mode === '160000') failures.push('symlink/gitlink entry')
@@ -61,6 +62,16 @@ function trackedFailures(entries) {
       .replace(/ß/g, 'ss')
       .replace(/ς/g, 'σ')
     if (seen.has(key) && seen.get(key) !== path) failures.push('portable path collision')
+    // On case-insensitive/normalizing filesystems a tracked file must never
+    // also be a directory prefix of another tracked file. Check both index
+    // iteration orders without touching any paths outside Git metadata.
+    if (directories.has(key)) failures.push('portable path collision')
+    const components = key.split('/')
+    for (let i = 1; i < components.length; i += 1) {
+      const parent = components.slice(0, i).join('/')
+      if (seen.has(parent)) failures.push('portable path collision')
+      directories.add(parent)
+    }
     seen.set(key, path)
   }
   return failures
