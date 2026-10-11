@@ -52,13 +52,14 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   // NFKC folds width/compatibility variants before text-only privacy checks.
   // Deliberately leave file paths, evidence files and collection metadata untouched.
   // This is a backstop against obvious labelled IDs, not general PII detection.
-  // Remove invisible zero-width/word-joining format characters in scan text.
+  // Ignore selected invisible format controls only in scanner text, including
+  // soft hyphens, bidi marks/isolates and BOM. Keep actual evidence bytes intact.
   // This prevents visually unchanged ID labels and email addresses hiding
   // from the backstop without modifying any stored Markdown evidence.
   // Decode visible Markdown punctuation escapes before scanning explicit IDs.
   // This modifies only the in-memory scan text, never the evidence note itself.
   markdown = markdown.normalize('NFKC')
-    .replace(/[\u200b-\u200d\u2060]/g, '')
+    .replace(/[\u00ad\u200b-\u200f\u2060\u2066-\u2069\ufeff]/g, '')
     .replace(/\\([_.-])/g, '$1')
   assert.doesNotMatch(
     markdown,
