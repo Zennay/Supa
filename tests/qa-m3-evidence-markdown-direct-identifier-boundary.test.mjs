@@ -46,14 +46,17 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   // This is a backstop against obvious labelled IDs, not general PII detection.
   // Decode visible Markdown punctuation escapes before scanning explicit IDs.
   // This modifies only the in-memory scan text, never the evidence note itself.
-  // Decode ONLY ASCII identifier-separator numeric HTML references in the
+  // Decode ONLY ASCII identifier/assignment punctuation references in the
   // in-memory scan copy. Rendered Markdown/HTML treats these as punctuation;
   // do not turn this deliberately bounded backstop into an HTML parser.
   markdown = markdown.normalize('NFKC').replace(/\\([_.-])/g, '$1')
   markdown = markdown.replace(/&#(?:([0-9]{1,7})|[xX]([0-9a-fA-F]{1,6}));/g, (entity, decimal, hex) => {
     const codePoint = Number.parseInt(decimal ?? hex, hex === undefined ? 10 : 16)
-    return codePoint === 95 ? '_' : codePoint === 45 ? '-' : codePoint === 46 ? '.' : entity
+    return codePoint === 95 ? '_' : codePoint === 45 ? '-' : codePoint === 46 ? '.'
+      : codePoint === 58 ? ':' : codePoint === 61 ? '=' : entity
   })
+  // HTML named assignment entities have the same rendered punctuation.
+  markdown = markdown.replace(/&(colon|equals);/g, (_, entity) => entity === 'colon' ? ':' : '=')
   assert.doesNotMatch(
     markdown,
     emailLike,
