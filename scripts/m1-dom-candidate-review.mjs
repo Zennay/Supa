@@ -27,8 +27,9 @@ const STATIC_SELECTORS = new Map([
 const CLASS_SELECTOR = /^[a-z][a-z0-9-]{0,25}\.[a-z_][a-z0-9_-]{1,45}$/i
 
 function ownRecord(value, allowedKeys, requiredKeys) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   try {
+    // Array.isArray itself throws for revoked Proxies: keep all reflections inside guard.
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
     const proto = Object.getPrototypeOf(value)
     if (proto !== Object.prototype && proto !== null) return null
     const fields = Reflect.ownKeys(value)
