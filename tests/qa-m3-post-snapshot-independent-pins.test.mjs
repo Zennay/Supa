@@ -102,7 +102,7 @@ for (const rise of [0, 1, -1]) {
     assert.equal(actual.claimable, true)
     assert.equal(actual.outcome, rise === 0 ? 'same' : rise > 0 ? 'worse' : 'better')
     assert.equal(actual.deltaCents, packs * rise)
-    assert.equal(actual.savingsCents, -(packs * rise))
+    assert.equal(actual.savingsCents, rise === 0 ? 0 : -(packs * rise))
     assert.equal(actual.lineDeltas.length, 11)
     assert.deepEqual(data.baseline, baseline, 'source must not mutate caller basket')
     assert.equal(trap.visits, 2)

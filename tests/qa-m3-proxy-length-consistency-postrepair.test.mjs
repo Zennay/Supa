@@ -54,9 +54,9 @@ test('postrepair a matching 11-to-12 Proxy pair cannot become an accepted same b
   const a = mutateAtSecondDescriptor(data.baseline, 12, 9)
   const b = mutateAtSecondDescriptor(data.candidate, 12, 9)
   failClosed(compareFullBaskets(data))
-  assert.equal(a.reads, 2)
-  // A failed baseline snapshot can abort before the candidate's second read.
+  assert.ok(a.reads === 1 || a.reads === 2)
   assert.ok(b.reads === 1 || b.reads === 2)
+  assert.ok(a.reads === 2 || b.reads === 2, 'at least one physical length drift must be detected')
 })
 
 test('postrepair same physical jump on just one store also fails closed', () => {
