@@ -36,7 +36,7 @@ function interleavedPort(onPersistRead) {
 }
 
 for (const [label, mutate] of [
-  ['store identity changes', (basket) => { basket.store.id = 'fictional-other-store' }],
+  ['store identity changes', (basket) => { basket.store = { ...basket.store, id: 'fictional-other-store' } }],
   ['selected physical pack count changes', (basket) => {
     const row = basket.lines.find((line) => line.status === 'matched')
     assert.ok(row)
