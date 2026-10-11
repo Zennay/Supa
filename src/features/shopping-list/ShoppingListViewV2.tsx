@@ -59,7 +59,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
       (previous.demandIdentity !== next.demandIdentity ||
         previous.upgradedFromLegacy)
     ) {
-      setSaveFailed(!controller.persist())
+      setSaveFailed(!controller.persist() && controller.storageFormatStatus() === 'ready')
     } else if (previous.demandIdentity !== next.demandIdentity) {
       setSaveFailed(false)
     }
@@ -71,7 +71,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     controller.rebase(basket)
     const next = controller.toggle(lineId)
     setSession(next)
-    setSaveFailed(next.serialized !== null && !controller.persist())
+    setSaveFailed(next.serialized !== null && !controller.persist() && controller.storageFormatStatus() === 'ready')
     setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
     setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
   }
@@ -82,7 +82,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     controller.rebase(basket)
     const next = controller.clear()
     setSession(next)
-    setSaveFailed(next.serialized !== null && !controller.persist())
+    setSaveFailed(next.serialized !== null && !controller.persist() && controller.storageFormatStatus() === 'ready')
     setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
     setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
   }
