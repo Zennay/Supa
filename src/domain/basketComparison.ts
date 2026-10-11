@@ -421,14 +421,21 @@ function snapshotRuntimeBasket(
         length !== validatedLength) {
       throw new Error('basket length changed outside the snapshot safety bound')
     }
+    // Capture the bounded physical index descriptor vector exactly once before
+    // materializing any row, so later checks use one consistent snapshot.
+    const physicalRows: unknown[] = []
     for (let index = 0; index < length; index += 1) {
       const physical = ownData(originalLines, String(index))
-      // A stable array reference does not imply stable indexed descriptors.
-      // Previously validated row objects may be exchanged by an Array Proxy.
-      if (!physical || physical.value !== pinnedRoot.physicalSlots[index]) {
-        throw new Error('basket physical row slot changed after preflight')
+      if (!physical) {
+        throw new Error('basket physical row slot disappeared after preflight')
       }
-      lines.push(snapshotRuntimeLine(physical.value, pinnedMonetaryFacts))
+      physicalRows.push(physical.value)
+    }
+    if (physicalRows.some((row, index) => row !== pinnedRoot.physicalSlots[index])) {
+      throw new Error('basket physical row slot changed after preflight')
+    }
+    for (const row of physicalRows) {
+      lines.push(snapshotRuntimeLine(row, pinnedMonetaryFacts))
     }
   }
   const originalStore = ownData(basket, 'store')?.value
