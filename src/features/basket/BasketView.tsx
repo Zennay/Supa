@@ -49,6 +49,7 @@ export function BasketView({
   const comparisonCanShowMoney = basketComparisonCanShowMoney(
     comparison,
     comparisonCandidate,
+    comparisonBaseline,
   )
   const comparisonHighlights = comparisonCanShowMoney
     ? comparisonLineHighlights(comparison)
@@ -102,7 +103,7 @@ export function BasketView({
 
       <div className="comparison-card" data-comparison-outcome={comparisonCanShowMoney ? comparison.outcome : 'unknown'}>
         <span className="eyebrow">Gecontroleerde winkelvergelijking</span>
-        <strong>{basketComparisonHeadline(comparison, comparisonCandidate)}</strong>
+        <strong>{basketComparisonHeadline(comparison, comparisonCandidate, comparisonBaseline)}</strong>
         <div className="comparison-totals">
           <div>
             <span>Baseline · {comparisonBaseline.store.name}</span>
