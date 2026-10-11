@@ -34,11 +34,15 @@
   }
   const observed = new Map()
   const elements = document.querySelectorAll('h1, [itemprop="price"], [data-testid*="price" i], [class*="price" i], a[href*="/product"]')
-  for (const element of Array.from(elements).slice(0, 500)) {
+  // Do not copy the entire rendered NodeList before applying a work limit.
+  for (let index = 0; index < Math.min(elements.length, 500); index++) {
+    const element = elements[index]
     const tag = String(element.tagName || '').toLowerCase()
     if (!/^[a-z][a-z0-9-]{0,25}$/.test(tag)) continue
-    const classes = Array.from(element.classList || [])
-    for (const name of classes.slice(0, 5)) {
+    // DOMTokenList is indexable; sample just five tokens without Array.from.
+    const classes = element.classList
+    for (let classIndex = 0; classIndex < Math.min(classes?.length ?? 0, 5); classIndex++) {
+      const name = classes[classIndex]
       if (!/^[a-z_][a-z0-9_-]{1,45}$/i.test(name)) continue
       const selector = tag + '.' + name
       observed.set(selector, (observed.get(selector) || 0) + 1)
