@@ -65,6 +65,12 @@ function privacyScanText(markdown) {
       }
       return values[name]
     })
+    // CommonMark renders a backslash before punctuation as its literal
+    // symbol. Keep even runs escaped: \\@ displays as \@, not as an
+    // email address. Decode in scanner memory BEFORE the original raw
+    // link-target email check; never mutate the stored evidence bytes.
+    .replace(/(\\+)([_.:=@-])/g, (_, slashes, symbol) =>
+      '\\'.repeat(Math.floor(slashes.length / 2)) + symbol)
 }
 
 function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
@@ -89,7 +95,7 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
     // Unwrap simple linked field labels for the scanner only: rendered
     // Markdown/HTML links must not conceal an otherwise explicit ID field.
     // Retain the original evidence bytes; this is not an HTML parser.
-    .replace(/\\([_.-])/g, '$1')
+    // CommonMark punctuation escapes were decoded in privacyScanText above.
     .replace(/\[([^\]\r\n]{1,160})\]\([^()\r\n]{1,512}\)/g, '$1')
     // Resolve simple reference/collapsed linked field labels in scan text only.
     // Link definitions and raw M3 notes remain untouched.
