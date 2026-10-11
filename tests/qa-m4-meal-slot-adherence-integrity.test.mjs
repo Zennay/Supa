@@ -106,7 +106,7 @@ test('QA M4: NFC/NFKC display-equivalent meal slot labels cannot duplicate', () 
 test('QA M4: noncanonical or invisible meal slot labels fail before summary', () => {
   for (const slot of [' monday', 'monday ', '', '\u200b=SUM(1)', 'monday\nslot', 'monday\u202eslot', 'x'.repeat(257)]) {
     assert.throws(() => buildM4SummaryWithMealSlotIntegrity(session([[slot, 'followed']])),
-      /meal outcome slot/, JSON.stringify(slot))
+      /meal outcome slot|meal_slot must be a non-empty string/, JSON.stringify(slot))
   }
 })
 
