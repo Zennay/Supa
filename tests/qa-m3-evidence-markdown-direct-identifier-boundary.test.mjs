@@ -39,6 +39,14 @@ const htmlCommentValueLine = new RegExp(
   'im',
 )
 
+// Raw HTML definition lists render field labels and their paired values.
+// A closing </dd> tag is not a nonempty disclosed value.
+const htmlDefinitionValueLine = new RegExp(
+  '<dt\\b[^>\\r\\n]{0,512}>\\s*(?:<(?<defmark>strong|b|code)\\b[^>\\r\\n]{0,512}>\\s*)?' +
+    identifierField + '\\s*(?:<\\/\\k<defmark>>\\s*)?<\\/dt>\\s*<dd\\b[^>\\r\\n]{0,512}>\\s*[^\\s<]+',
+  'im',
+)
+
 function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   assert.equal(typeof markdown, 'string')
   // NFKC folds width/compatibility variants before text-only privacy checks.
@@ -67,6 +75,7 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
     quotedFieldValueLine,
     htmlTableValueLine,
     htmlCommentValueLine,
+    htmlDefinitionValueLine,
   ]) {
     assert.doesNotMatch(
       markdown,
