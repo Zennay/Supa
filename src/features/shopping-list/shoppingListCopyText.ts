@@ -37,7 +37,7 @@ function dutchAmount(value: number): string {
  * Never invent store prices, complete-basket claims or product matches.
  * An invalid runtime snapshot returns null rather than a misleading list.
  */
-export function buildShoppingListCopyText(
+function buildShoppingListCopyTextUnchecked(
   basket: OneStoreBasket,
   doneLineIds: readonly string[] = [],
 ): string | null {
@@ -134,4 +134,20 @@ export function buildShoppingListCopyText(
       ? ['Let op: ' + unresolvedCount + ' productkeuze(s) nog niet bepaald.']
       : []),
   ].join('\n')
+}
+
+/**
+ * Caller-owned basket/checkmark snapshots may contain hostile accessors or revoked
+ * proxies. Never let a malformed runtime snapshot crash shopping-list rendering.
+ */
+export function buildShoppingListCopyText(
+  basket: OneStoreBasket,
+  doneLineIds: readonly string[] = [],
+): string | null {
+  try {
+    return buildShoppingListCopyTextUnchecked(basket, doneLineIds)
+  } catch {
+    // A partial local checklist is discarded: invalid input is never copyable.
+    return null
+  }
 }
