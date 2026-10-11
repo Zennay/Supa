@@ -762,23 +762,19 @@ export function compareFullBaskets(input: {
         !safeRuntimeBasket(candidate, candidateLength, candidatePinnedFacts, candidateStore, candidateRoot)) {
       return runtimeUnknownComparison()
     }
-    const baselineSnapshot = snapshotRuntimeBasket(
-      baseline, baselineLength.value, baselinePinnedFacts, baselineStore, baselineRoot,
-    )
+    // Keep one bounded descriptor-only snapshot per side. Materialize the
+    // candidate before the baseline: candidate snapshot reflection can mutate
+    // baseline input after its preflight, so the final baseline snapshot must
+    // still verify the previously pinned facts instead of trusting an earlier
+    // baseline DTO. No extra pass is added for ordinary stable proxy inputs.
     const candidateSnapshot = snapshotRuntimeBasket(
       candidate, candidateLength.value, candidatePinnedFacts, candidateStore, candidateRoot,
     )
-    // Candidate descriptor reflection may execute caller code after the
-    // baseline snapshot has already been taken. Reconfirm baseline's pinned
-    // own-data provenance after candidate materialization; never quote the
-    // stale first snapshot if the other basket changed it in the meantime.
-    // This is a second validation of the same bounded physical slots, not
-    // a new preflight with relaxed descriptor or index requirements.
-    const verifiedBaseline = snapshotRuntimeBasket(
+    const baselineSnapshot = snapshotRuntimeBasket(
       baseline, baselineLength.value, baselinePinnedFacts, baselineStore, baselineRoot,
     )
     return compareInspectedBaskets({
-      baseline: verifiedBaseline,
+      baseline: baselineSnapshot,
       candidate: candidateSnapshot,
     })
   } catch {
