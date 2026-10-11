@@ -66,7 +66,12 @@ export function parseCaptureHeaders(raw) {
     if (/^[ \t]/.test(line)) throw new Error('ambiguous response header continuation')
     const colon = line.indexOf(':')
     if (colon < 1) throw new Error('malformed response header line')
-    const k = line.slice(0, colon).trim().toLowerCase()
+    // RFC HTTP field names are tokens; do not normalize invalid spaces or tabs.
+    const name = line.slice(0, colon)
+    if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name)) {
+      throw new Error('malformed response header name')
+    }
+    const k = name.toLowerCase()
     // Content-Type is singular. A first-wins map could label conflicting HTTP
     // intermediary headers as HTML and wrongly archive an ambiguous response.
     if (k === 'content-type' && headers.has(k)) throw new Error('ambiguous response content-type')
