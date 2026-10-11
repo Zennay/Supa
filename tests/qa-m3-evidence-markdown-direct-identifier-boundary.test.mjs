@@ -43,7 +43,7 @@ const htmlCommentValueLine = new RegExp(
 // A closing </dd> tag is not a nonempty disclosed value.
 const htmlDefinitionValueLine = new RegExp(
   '<dt\\b[^>\\r\\n]{0,512}>\\s*(?:<(?<defmark>strong|b|code)\\b[^>\\r\\n]{0,512}>\\s*)?' +
-    identifierField + '\\s*(?:<\\/\\k<defmark>>\\s*)?<\\/dt>\\s*<dd\\b[^>\\r\\n]{0,512}>\\s*(?:<(?:span|strong|b|em|code)\\b[^>\\r\\n]{0,512}>\\s*)?[^\\s<]+',
+    identifierField + '\\s*(?:<\\/\\k<defmark>>\\s*)?<\\/dt>\\s*<dd\\b[^>\\r\\n]{0,512}>\\s*(?:<(?:span|strong|b|em|code)\\b[^>\\r\\n]{0,512}>\\s*){0,2}[^\\s<]+',
   'im',
 )
 
