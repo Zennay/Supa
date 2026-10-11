@@ -77,6 +77,49 @@ test('real M3 observation TSX structure exposes the selectors used by narrow-car
     assert.deepEqual(reads, [OBSERVATION_DRAFT_STORAGE_KEY])
     assert.deepEqual(writes, [])
     assert.doesNotMatch(html, /publicSavingsClaimEligible|evidenceStatus="observed"/)
+
+    // A restored draft with drifted canonical demand MUST NOT inject a
+    // fabricated ingredient label into the UI or appear field-ready.
+    // This is a render-level check; the canonical restoration boundary owns
+    // the underlying validation.
+    const forged = structuredClone(sheet)
+    forged.baseline.lines[0].ingredientLabel = 'SYNTHETIC-UNTRUSTED-INGREDIENT'
+    forged.study.studyId = 'synthetic-altered-observation'
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { localStorage: {
+        getItem(key) {
+          reads.push(key)
+          return key === OBSERVATION_DRAFT_STORAGE_KEY ? JSON.stringify(forged) : null
+        },
+        setItem(key, value) { writes.push([key, value]) },
+      } },
+    })
+    const rejected = renderToStaticMarkup(createElement(ObservationView))
+    assert.doesNotMatch(rejected, /SYNTHETIC-UNTRUSTED-INGREDIENT|synthetic-altered-observation/)
+    assert.match(rejected, /Nog [0-9]+ controles? open/)
+    assert.equal(matches(rejected, /class="observation-line"/g), lineTotal)
+
+    // Conversely, an otherwise canonical *synthetic* draft with HTML-like
+    // display text should remain usable but may only render escaped TEXT.
+    const withMarkup = structuredClone(sheet)
+    withMarkup.baseline.store.name = '<img src=x onerror=alert(1)>'
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { localStorage: {
+        getItem(key) {
+          reads.push(key)
+          return key === OBSERVATION_DRAFT_STORAGE_KEY ? JSON.stringify(withMarkup) : null
+        },
+        setItem(key, value) { writes.push([key, value]) },
+      } },
+    })
+    const safe = renderToStaticMarkup(createElement(ObservationView))
+    assert.match(safe, /&lt;img/)
+    assert.doesNotMatch(safe, /<img\\s/i)
+    assert.equal(matches(safe, /class="observation-card-heading"/g), 2)
+    assert.deepEqual(writes, [], 'none of the render variants may persist data')
+    assert.ok(reads.every((key) => key === OBSERVATION_DRAFT_STORAGE_KEY))
   } finally {
     if (priorWindow) Object.defineProperty(globalThis, 'window', priorWindow)
     else delete globalThis.window
