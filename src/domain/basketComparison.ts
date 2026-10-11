@@ -171,7 +171,11 @@ function safeRuntimeBasket(basket: unknown): boolean {
     const physical = ownData(lines, String(index))
     if (!physical) return false
     const line = physical.value
-    const status = ownData(line, 'status')?.value
+    const statusData = ownData(line, 'status')
+    // A present accessor status must not be visited by supportedBasketLine.
+    if (!statusData && line !== null && typeof line === 'object' &&
+        Object.hasOwn(line, 'status')) return false
+    const status = statusData?.value
     if (status === 'matched') {
       const keys = [
         'id', 'ingredientLabel', 'productId', 'productName', 'requirement',
