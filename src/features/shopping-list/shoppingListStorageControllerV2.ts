@@ -52,6 +52,10 @@ export function openShoppingProgressStorageV2(
   // The last durable v2 value observed by this controller. A separate tab
   // may save a different checklist while this tab is open.
   let lastObservedV2 = initialV2
+  // Only a controller that has actually lost a persist race must refuse to
+  // treat a *foreign* saved physical basket as an empty local checklist.
+  // A fresh controller may still deliberately start a different task.
+  let observedWriteConflict = false
 
   let currentBasket = basket
   let session = startShoppingProgressSessionV2(
@@ -107,6 +111,20 @@ export function openShoppingProgressStorageV2(
         // Always read the v2 key alone: a present/missing v2 revision never
         // authorizes a surprise legacy import during conflict recovery.
         const observed = storage.getItem(shoppingListProgressV2StorageKey)
+        if (observedWriteConflict && observed !== null) {
+          // A previous stale write proved another tab changed the checklist.
+          // Never convert its *different* physical task into an empty current
+          // task and then pin its revision, which would enable rollback.
+          const parsed: unknown = JSON.parse(observed)
+          if (
+            parsed === null || typeof parsed !== 'object' || Array.isArray(parsed) ||
+            !('schemaVersion' in parsed) || parsed.schemaVersion !== 2 ||
+            !('demandIdentity' in parsed) || parsed.demandIdentity !== liveIdentity ||
+            !('doneLineIds' in parsed) || !Array.isArray(parsed.doneLineIds)
+          ) {
+            return null
+          }
+        }
         const refreshed = startShoppingProgressSessionV2(currentBasket, observed)
         if (refreshed.demandIdentity !== liveIdentity || refreshed.serialized === null) {
           return null
@@ -117,6 +135,7 @@ export function openShoppingProgressStorageV2(
         session = refreshed
         lastObservedV2 = observed
         storageReadable = true
+        observedWriteConflict = false
         return snapshot()
       } catch {
         return null
@@ -141,12 +160,14 @@ export function openShoppingProgressStorageV2(
         // newly observed value must never be silently overwritten by our
         // outdated in-memory checklist. Also fail closed on denied reads.
         if (storage.getItem(shoppingListProgressV2StorageKey) !== lastObservedV2) {
+          observedWriteConflict = true
           return false
         }
         storage.setItem(shoppingListProgressV2StorageKey, session.serialized)
         // Advance only after a confirmed successful write. Denied writes can
         // be explicitly retried while the durable value stays unchanged.
         lastObservedV2 = session.serialized
+        observedWriteConflict = false
         return true
       } catch {
         return false
