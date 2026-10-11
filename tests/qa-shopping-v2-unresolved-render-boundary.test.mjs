@@ -105,6 +105,32 @@ test('real shopping v2 SSR fails closed for unresolved tasks, forged progress an
     assert.match(escapedHtml, /&lt;img/)
     assert.equal(pressedCount(escapedHtml), 1, 'display-only rename must preserve the physical check')
 
+    // Reordering rows never changes what must be purchased; restored
+    // checkmarks remain attached to stable IDs rather than DOM positions.
+    const reordered = structuredClone(complete)
+    reordered.lines.reverse()
+    assert.equal(pressedCount(render(reordered)), 1)
+
+    // By contrast, a different physical pack, demand quantity or match
+    // outcome is a new shopping task. Old checked state must not leak.
+    const differentPack = structuredClone(complete)
+    differentPack.lines.find((line) => line.id === matched.id).pack.count += 1
+    assert.equal(pressedCount(render(differentPack)), 0)
+
+    const differentAmount = structuredClone(complete)
+    differentAmount.lines.find((line) => line.id === matched.id).requirement.amount += 1
+    assert.equal(pressedCount(render(differentAmount)), 0)
+
+    const noLongerMatched = structuredClone(complete)
+    const downgraded = noLongerMatched.lines.find((line) => line.id === matched.id)
+    downgraded.status = 'unresolved'
+    downgraded.reasons = ['synthetic unresolved match']
+    noLongerMatched.matchedLineCount -= 1
+    noLongerMatched.unresolvedLineCount += 1
+    const downgradedHtml = render(noLongerMatched)
+    assert.equal(pressedCount(downgradedHtml), 0)
+    assert.match(downgradedHtml, /handmatig kiezen/)
+
     assert.deepEqual(writes, [], 'no SSR/render path may persist storage')
     assert.ok(reads.every((key) => key === shoppingListProgressV2StorageKey))
   } finally {
