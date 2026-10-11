@@ -108,3 +108,45 @@ test('M3 complete converter route preserves a worse basket at sub-24h', () => {
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.equal('participantKey' in report, false)
 })
+
+test('M3 canonical converter rejects attempts to widen the 24-hour field contract', () => {
+  for (const bypass of [48, 24.0001, Number.POSITIVE_INFINITY, '24', null]) {
+    const sheet = completeSyntheticSheet(
+      '2026-10-24T16:00:00Z',
+      '2026-10-26T16:00:00Z',
+    )
+    sheet.study.maxObservationWindowHours = bypass
+    assert.throws(
+      () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+      /maxObservationWindowHours must remain 24/,
+    )
+  }
+})
+
+test('M3 observation template cannot be promoted to actual evidence by renaming its status', () => {
+  const sheet = completeSyntheticSheet(
+    '2026-10-24T16:00:00Z',
+    '2026-10-25T16:00:00Z',
+  )
+  sheet.evidenceStatus = 'real-observation'
+  assert.throws(
+    () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+    /evidenceStatus must remain/,
+  )
+})
+
+test('M3 identical evidence IDs across stores yield unknown, never a savings claim', () => {
+  const sheet = completeSyntheticSheet(
+    '2026-10-24T16:00:00Z',
+    '2026-10-25T15:00:00Z',
+  )
+  sheet.candidate.evidenceId = sheet.baseline.evidenceId
+  const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  const report = buildObservedWeekReport(study)
+  assert.equal(report.claimable, false)
+  assert.equal(report.outcome, 'unknown')
+  assert.equal(report.deltaCents, null)
+  assert.equal(report.savingsCents, null)
+  assert.equal(report.publicSavingsClaimEligible, false)
+  assert.match(report.reasons.join(' '), /evidence IDs must differ/)
+})
