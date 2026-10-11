@@ -33,11 +33,16 @@ export function serializeShoppingProgressV2(
   const demandIdentity = shoppingListDemandIdentity(basket)
   if (demandIdentity === null) return null
 
-  return JSON.stringify({
-    schemaVersion: 2,
-    demandIdentity,
-    doneLineIds: checkedIds(basket, doneLineIds),
-  } satisfies ShoppingProgressV2)
+  try {
+    return JSON.stringify({
+      schemaVersion: 2,
+      demandIdentity,
+      doneLineIds: checkedIds(basket, doneLineIds),
+    } satisfies ShoppingProgressV2)
+  } catch {
+    // Revoked completion arrays and late-read basket accessors cannot be saved.
+    return null
+  }
 }
 
 export function restoreShoppingProgressV2(
@@ -81,7 +86,11 @@ export function reconcileShoppingProgressV2(
   if (previous === null || previous !== shoppingListDemandIdentity(nextBasket)) {
     return []
   }
-  return checkedIds(nextBasket, completedLineIds)
+  try {
+    return checkedIds(nextBasket, completedLineIds)
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -95,13 +104,17 @@ export function toggleShoppingProgressV2(
   lineId: unknown,
 ): string[] {
   if (shoppingListDemandIdentity(basket) === null) return []
-  const validCompleted = checkedIds(basket, completedLineIds)
-  if (typeof lineId !== 'string' || !basket.lines.some((line) => line.id === lineId)) {
-    return validCompleted
+  try {
+    const validCompleted = checkedIds(basket, completedLineIds)
+    if (typeof lineId !== 'string' || !basket.lines.some((line) => line.id === lineId)) {
+      return validCompleted
+    }
+    return validCompleted.includes(lineId)
+      ? validCompleted.filter((id) => id !== lineId)
+      : [...validCompleted, lineId]
+  } catch {
+    return []
   }
-  return validCompleted.includes(lineId)
-    ? validCompleted.filter((id) => id !== lineId)
-    : [...validCompleted, lineId]
 }
 
 /**
