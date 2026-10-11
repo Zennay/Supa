@@ -39,7 +39,7 @@ function withArrayDescriptor(data, side, changeAt) {
   })
   const other = new Proxy(swapped, {
     getOwnPropertyDescriptor(target, key) {
-      if (typeof key === 'string' && /^\\d+$/.test(key)) indexProbes++
+      if (typeof key === 'string' && Number.isInteger(Number(key)) && String(Number(key)) === key) indexProbes++
       return Reflect.getOwnPropertyDescriptor(target, key)
     },
   })
