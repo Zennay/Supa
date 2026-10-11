@@ -107,3 +107,34 @@ test('second capture with identical stem fails without deleting valid first priv
     assert.deepEqual((await readFile(f.calls, 'utf8')).trim().split('\n'), ['x', 'x'])
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
+
+
+test('two concurrent fake captures sharing a stem preserve exactly one complete private pair', async () => {
+  const f = await fixture()
+  const original = Date.now
+  Date.now = () => CLOCK
+  try {
+    const results = await Promise.allSettled([
+      captureResearchSource(ID, { outputDir: f.outputDir, env: f.env }),
+      captureResearchSource(ID, { outputDir: f.outputDir, env: f.env }),
+    ])
+    assert.equal(results.filter(item => item.status === 'fulfilled').length, 1)
+    const failure = results.find(item => item.status === 'rejected')
+    assert.equal(failure?.reason?.code, 'EEXIST')
+    assert.doesNotMatch(failure.reason.message, /PRIVATE-FAKE-BODY/)
+    assert.deepEqual((await readdir(f.dir)).sort(), [
+      f.html.split('/').at(-1), f.meta.split('/').at(-1),
+    ].sort())
+    assert.equal((await stat(f.html)).mode & 0o777, 0o600)
+    assert.equal((await stat(f.meta)).mode & 0o777, 0o600)
+    const html = await readFile(f.html)
+    const metadata = JSON.parse(await readFile(f.meta, 'utf8'))
+    assert.equal(metadata.type, 'research-only-not-price-proof')
+    assert.equal(metadata.bytes, html.length)
+    assert.match(html.toString(), /PRIVATE-FAKE-BODY/)
+    assert.deepEqual((await readFile(f.calls, 'utf8')).trim().split('\n'), ['x', 'x'])
+  } finally {
+    Date.now = original
+    await rm(f.root, { recursive: true, force: true })
+  }
+})
