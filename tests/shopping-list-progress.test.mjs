@@ -117,3 +117,50 @@ test('shopping progress rejects malformed or mismatched persisted state', () => 
     [],
   )
 })
+
+
+test('shopping progress resets when the store identity changes', () => {
+  const basket = defaultBasket()
+  const raw = serializeShoppingListProgress(basket, [basket.lines[0].id])
+  const changedStoreBasket = {
+    ...basket,
+    store: { ...basket.store, id: 'different-store' },
+  }
+
+  assert.notEqual(
+    shoppingListBasketKey(changedStoreBasket),
+    shoppingListBasketKey(basket),
+  )
+  assert.deepEqual(restoreShoppingListProgress(changedStoreBasket, raw), [])
+})
+
+test('shopping progress resets when a line resolution state changes', () => {
+  const basket = defaultBasket()
+  const unresolved = basket.lines.find((line) => line.status === 'unresolved')
+  assert.ok(unresolved)
+  const raw = serializeShoppingListProgress(basket, [unresolved.id])
+
+  const resolvedBasket = {
+    ...basket,
+    lines: basket.lines.map((line) =>
+      line.id === unresolved.id
+        ? {
+            id: line.id,
+            requirement: line.requirement,
+            status: 'matched',
+            productId: 'manual-resolution',
+            productName: 'Handmatig gekozen product',
+            packs: 1,
+            pack: { amount: 1, unit: line.requirement.unit, count: 1 },
+            pricePerPackCents: 100,
+            lineTotalCents: 100,
+            matchScore: 1,
+            reasons: ['manual-test-resolution'],
+          }
+        : line,
+    ),
+  }
+
+  assert.notEqual(shoppingListBasketKey(resolvedBasket), shoppingListBasketKey(basket))
+  assert.deepEqual(restoreShoppingListProgress(resolvedBasket, raw), [])
+})
