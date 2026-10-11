@@ -36,6 +36,8 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
   // Re-evaluate even for an in-place mutation of a reused basket reference.
   const liveIdentity = shoppingListDemandIdentity(basket)
   const rows = shoppingListRowsV2(basket, session)
+  const completedCount = rows.filter((row) => row.checked).length
+  const unresolvedCount = rows.filter((row) => row.unresolved).length
 
   useEffect(() => {
     const previous = controller.snapshot()
@@ -74,9 +76,9 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
         </div>
       </div>
 
-      {basket.unresolvedLineCount > 0 && (
+      {unresolvedCount > 0 && (
         <div className="attention-card">
-          <strong>{basket.unresolvedLineCount} productkeuze vraagt controle</strong>
+          <strong>{unresolvedCount} productkeuze vraagt controle</strong>
           <span>SUPA vult een onzekere match niet automatisch in.</span>
         </div>
       )}
@@ -86,6 +88,12 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
           <strong>Voortgang niet opgeslagen</strong>
           <span>Je vinkjes blijven in deze sessie, maar kunnen na herladen verdwijnen.</span>
         </div>
+      )}
+
+      {rows.length > 0 && (
+        <p className="shopping-progress" role="status" aria-live="polite">
+          {completedCount} van {rows.length} afgevinkt
+        </p>
       )}
 
       <div className="list-card">
