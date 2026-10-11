@@ -171,7 +171,9 @@ export function openShoppingProgressStorageV2(
         const observed = storage.getItem(shoppingListProgressV2StorageKey)
         // Even a manual reload must not adopt and pin an unknown schema.
         if (!recognizedStoredV2(observed, currentBasket)) return null
-        if ((failedPersistAttempt || options.requireSameDemand === true) && observed !== null) {
+        // A previously protected record must never be rebound to a foreign
+        // physical task by an ordinary reload, even before a failed save.
+        if ((failedPersistAttempt || !storageFormatSupported || options.requireSameDemand === true) && observed !== null) {
           // A previous stale write proved another tab changed the checklist.
           // Never convert its *different* physical task into an empty current
           // task and then pin its revision, which would enable rollback.
