@@ -164,6 +164,12 @@ function safeRuntimeBasket(basket: unknown): boolean {
 
   const lines = ownData(basket, 'lines')?.value
   if (!Array.isArray(lines)) return true // Existing malformed-array reason.
+  // The comparator calls filter()/some() on the caller's array. Never execute
+  // shadowed instance methods or inherited overrides from an altered prototype.
+  if (
+    Object.getPrototypeOf(lines) !== Array.prototype ||
+    Object.hasOwn(lines, 'filter') || Object.hasOwn(lines, 'some')
+  ) return false
   const length = ownData(lines, 'length')?.value
   if (!Number.isSafeInteger(length) || (length as number) < 0) return false
 
