@@ -4,7 +4,7 @@ import {
   type MatchUnit,
   type ProductCandidate,
 } from './matching.ts'
-import { calculateDecimalPackCount, sumDecimalAmounts } from './decimalPackArithmetic.ts'
+import { calculateDecimalPackCount, sumDecimalAmounts, sumDecimalDemandUnits } from './decimalPackArithmetic.ts'
 import type { PlannedMeal, Recipe, Store } from './types.ts'
 
 export type RecipeIngredient = IngredientRequirement & {
@@ -70,6 +70,14 @@ function baseAmount(
   return null
 }
 
+function compatibleDemandUnits(left: MatchUnit, right: MatchUnit): boolean {
+  if (left === right) return true
+  return (
+    ((left === 'g' || left === 'kg') && (right === 'g' || right === 'kg')) ||
+    ((left === 'ml' || left === 'l') && (right === 'ml' || right === 'l'))
+  )
+}
+
 export function aggregatePlanIngredients(
   plan: PlannedMeal[],
   recipes: RecipeWithIngredients[],
@@ -127,7 +135,7 @@ export function aggregatePlanIngredients(
 
       if (
         current.query !== ingredient.query ||
-        current.unit !== ingredient.unit ||
+        !compatibleDemandUnits(current.unit, ingredient.unit) ||
         current.label !== ingredient.label
       ) {
         throw new Error(`Ingredient definition drift: ${ingredient.id}`)
@@ -136,7 +144,15 @@ export function aggregatePlanIngredients(
       current.amount =
         current.amount === null || ingredient.amount === null
           ? null
-          : sumDecimalAmounts([current.amount, ingredient.amount])
+          : current.unit === ingredient.unit
+            ? sumDecimalAmounts([current.amount, ingredient.amount])
+            : sumDecimalDemandUnits(
+                [
+                  { amount: current.amount, unit: current.unit },
+                  { amount: ingredient.amount, unit: ingredient.unit },
+                ],
+                current.unit,
+              )
     }
   }
 
