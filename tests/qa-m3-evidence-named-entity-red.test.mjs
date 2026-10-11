@@ -37,7 +37,7 @@ const disclosures = [
   '- participant&lowbar;name: invented-person',
   '| full&period;name | fictitious-person |',
   '> account&hyphen;id: imaginary-ref',
-  '**account&lowbar;email&colon;** fictional-contact',
+  '**account&lowbar;email**&colon; fictional-contact',
   'Contact: imaginary&commat;example&period;test',
 ]
 for (const [index, note] of disclosures.entries()) {
