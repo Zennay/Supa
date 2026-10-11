@@ -68,17 +68,15 @@ test('staged real view offers a user-invoked read-only recheck before any tick, 
   const source = readFileSync(
     new URL('../src/features/shopping-list/ShoppingListViewV2.tsx', import.meta.url), 'utf8',
   )
-  const protectedBlock = source.match(
-    /\{unknownStoredRecord && \([\s\S]*?data-storage-state="unknown-record"[\s\S]*?\n\s*\)\}/,
-  )?.[0]
+  const protectedBlock = source.split("{unknownStoredRecord && (")[1]
+    ?.split("{unavailableStorage && (")[0]
   assert.ok(protectedBlock, 'the actual view must preserve a distinct protected-record advisory')
   assert.match(protectedBlock, /onClick=\{reloadSaved\}/,
     'the recheck must be available before saveFailed becomes true')
   assert.match(protectedBlock, /Opgeslagen versie opnieuw controleren/)
   assert.match(protectedBlock, /SUPA overschrijft de bestaande gegevens niet/)
-  const unavailableBlock = source.match(
-    /\{unavailableStorage && \([\s\S]*?data-storage-state="unavailable"[\s\S]*?\n\s*\)\}/,
-  )?.[0]
+  const unavailableBlock = source.split("{unavailableStorage && (")[1]
+    ?.split("{saveFailed && (")[0]
   assert.ok(unavailableBlock)
   assert.doesNotMatch(unavailableBlock, /Opgeslagen versie opnieuw controleren/,
     'a null/unavailable port cannot be reopened by this controller')
