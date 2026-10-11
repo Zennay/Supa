@@ -17,12 +17,13 @@ const basket = () => buildOneStoreBasket({
   activeDays: ['Di'], recipes: m2Recipes,
 })
 
-test('review-only v2 UI offers explicit recovery only for a failed save, never on normal render', async () => {
+test('review-only v2 UI recovery stays explicit for failed saves and protected records, never on normal render', async () => {
   const source = readFileSync(
     new URL('../src/features/shopping-list/ShoppingListViewV2.tsx', import.meta.url), 'utf8',
   )
   assert.match(source, /function reloadSaved\(\)/)
-  assert.match(source, /controller\.reloadSaved\(\)/)
+  assert.match(source, /controller\.reloadSaved\(\{ requireSameDemand: unknownStoredRecord \}\)/)
+  assert.match(source, /\{unknownStoredRecord && \(/)
   assert.match(source, /onClick=\{reloadSaved\}/)
   assert.match(source, /type="button" className="ghost-button" onClick=\{reloadSaved\}/)
   assert.match(source, /Niet-opgeslagen vinkjes verdwijnen als het laden lukt\./)
