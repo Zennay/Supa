@@ -89,7 +89,7 @@ function hasDuplicateRootKeys(raw: string): boolean {
  * builder; comparing its exact serialization also detects duplicate/unknown
  * identity fields and non-canonical forms without inventing a second schema.
  */
-function isCanonicalPhysicalDemandIdentity(rawIdentity: string): boolean {
+function isCanonicalPhysicalDemandIdentity(rawIdentity: string, doneLineIds?: readonly string[]): boolean {
   try {
     const parsed: unknown = JSON.parse(rawIdentity)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
@@ -118,16 +118,22 @@ function isCanonicalPhysicalDemandIdentity(rawIdentity: string): boolean {
         : physical
     })
 
-    return shoppingListDemandIdentity({
+    if (shoppingListDemandIdentity({
       store: { id: input.storeId },
       lines,
-    } as unknown as OneStoreBasket) === rawIdentity
+    } as unknown as OneStoreBasket) !== rawIdentity) return false
+
+    // An older client may deliberately replace a recognized foreign round,
+    // but must never discard a completion ID absent from that physical task.
+    // The canonical serialized identity already contains every valid line ID.
+    const foreignIds = new Set(lines.map((line) => line?.id))
+    return doneLineIds === undefined || doneLineIds.every((lineId) => foreignIds.has(lineId))
   } catch {
     return false
   }
 }
 
-function recognizedStoredV2(raw: string | null, basket: OneStoreBasket): boolean {
+function recognizedStoredV2(raw: string | null, basket: OneStoreBasket, verifyForeignDoneIds = false): boolean {
   if (raw === null) return true
   if (typeof raw !== 'string') return false
   try {
@@ -155,7 +161,7 @@ function recognizedStoredV2(raw: string | null, basket: OneStoreBasket): boolean
     if (new Set(item.doneLineIds).size !== item.doneLineIds.length) return false
     // A nonempty opaque string is not proof of a supported *foreign* v2 task.
     // An older client must not turn it into its own physical basket on save.
-    if (!isCanonicalPhysicalDemandIdentity(item.demandIdentity)) return false
+    if (!isCanonicalPhysicalDemandIdentity(item.demandIdentity, verifyForeignDoneIds ? item.doneLineIds : undefined)) return false
     const liveIdentity = shoppingListDemandIdentity(basket)
     if (liveIdentity !== item.demandIdentity) return true
 
@@ -283,7 +289,10 @@ export function openShoppingProgressStorageV2(
         // authorizes a surprise legacy import during conflict recovery.
         const observed = storage.getItem(shoppingListProgressV2StorageKey)
         // Even a manual reload must not adopt and pin an unknown schema.
-        if (!recognizedStoredV2(observed, currentBasket)) return null
+        if (!recognizedStoredV2(observed, currentBasket, true)) {
+          storageFormatSupported = false
+          return null
+        }
         // An ordinary manual reload must also reject a newly observed foreign
         // physical task *before* any attempted save: otherwise a stale tab can
         // pin that other task as an empty local checklist and overwrite it.
@@ -350,6 +359,15 @@ export function openShoppingProgressStorageV2(
           if (!recognizedStoredV2(observed, currentBasket)) {
             storageFormatSupported = false
           }
+          failedPersistAttempt = true
+          return false
+        }
+        // On explicit writes, verify that a known foreign physical task has
+        // only completed line IDs belonging to its own canonical demand.
+        // Keep open() read-compatible for existing foreign progress previews,
+        // but never overwrite a corrupt/future record on a new-task save.
+        if (!recognizedStoredV2(observed, currentBasket, true)) {
+          storageFormatSupported = false
           failedPersistAttempt = true
           return false
         }
