@@ -3,6 +3,7 @@ import { lstat, open, readdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { RESEARCH_SOURCES } from './m1-multistore-research.mjs'
+import { reviewDomProbe } from './m1-dom-candidate-review.mjs'
 
 // Strictly offline, private-candidate progress only. Counts are never prices,
 // product coverage, DOM semantic verification or source-use permission.
@@ -43,6 +44,38 @@ function canonicalTimestamp(value) {
   return Number.isFinite(millis) && new Date(millis).toISOString() === value ? millis : null
 }
 
+
+const STATIC_ROW_KEYS = ['role', 'selector', 'count', 'semanticVerified']
+const CLASS_ROW_KEYS = ['selector', 'observedNodes', 'semanticVerified']
+
+function exactJsonRecord(value, fields) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const keys = Object.keys(value)
+  return keys.length === fields.length && keys.every(key => fields.includes(key))
+}
+
+// Private files can be modified after their initial sanitized write. Recheck
+// every stored row with the SAME reviewed selector vocabulary used at creation,
+// including count limits, roles, uniqueness and non-verification flags.
+// The inventory still returns counts only; this never reads an HTML body.
+function validStoredRows(data, source, observedAtMs) {
+  if (!data.selectors.every(row => exactJsonRecord(row, STATIC_ROW_KEYS)) ||
+      !data.actualClassCandidates.every(row => exactJsonRecord(row, CLASS_ROW_KEYS))) return false
+  try {
+    const reviewed = reviewDomProbe({
+      version: 1, kind: 'rendered-dom-candidate-only',
+      originHost: new URL(source.url).hostname,
+      capturedAt: data.observedAt,
+      selectors: data.selectors.map(row => ({ ...row, groundedInCurrentDom: true })),
+      actualClassCandidates: data.actualClassCandidates,
+    }, { sourceId: source.id, nowMs: observedAtMs })
+    return reviewed.selectors.length === data.selectors.length &&
+      reviewed.actualClassCandidates.length === data.actualClassCandidates.length
+  } catch {
+    return false
+  }
+}
+
 async function classify(path, source, nowMs) {
   let handle
   try {
@@ -73,7 +106,7 @@ async function classify(path, source, nowMs) {
         !Array.isArray(data.selectors) || data.selectors.length > 11 ||
         !Array.isArray(data.actualClassCandidates) || data.actualClassCandidates.length > 25) return 'rejected'
     const time = canonicalTimestamp(data.observedAt)
-    if (time === null || time > nowMs) return 'rejected'
+    if (time === null || time > nowMs || !validStoredRows(data, source, time)) return 'rejected'
     return nowMs - time > FRESHNESS_MS ? 'stale' : 'pendingHumanReview'
   } catch { return 'rejected' }
   finally { await handle?.close() }
