@@ -57,7 +57,7 @@ test('postrepair: Unicode letters with meaningful vowel marks remain fully visib
     ...original,
     store: { ...original.store, name: 'Cafe\u0301 🛒\uFE0F' },
     lines: original.lines.map((line, index) =>
-      index === 0 ? { ...line, ingredientLabel: 'بِسم' } : line),
+      index === 0 ? { ...line, productName: 'بِسم' } : line),
   }
   const copied = buildShoppingListCopyText(changed)
   assert.ok(copied)
