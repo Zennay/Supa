@@ -16,3 +16,8 @@ This independent QA branch is **add-only** from immutable `main=22edb59b7c96311b
 ## Release and ownership boundary
 
 **DRAFT / HOLD / NO MERGE / NO DEPLOY.** No synthetic fixture closes genuine two-store human observation [#78](https://github.com/Zennay/Supa/issues/78), cross-basket descriptor atomicity [#1508](https://github.com/Zennay/Supa/issues/1508), or submillisecond observation clocks [#1513](https://github.com/Zennay/Supa/issues/1513). Integration requires verified zCloud owner/lease, original owner review, exact final-head CI, applicable permanent runner/Firefox check and safe current-main comparison. Do not claim production permission or public savings from this suite.
+
+## Per-item completion navigation
+
+- `tests/qa-m3-draft-next-missing-22-slot-navigation.test.mjs`: for **every one of 22 possible last-unmeasured physical ingredient/store positions**, recover persisted JSON and require `availabilityRecorded=21`, `completeLines=21`, and an exact next-incomplete target pointing to that same store/ingredient. The draft must keep the reset-protection flag and remain unready/non-evidence.
+- Once all 22 synthetic lines are explicitly measured as unavailable, item navigation can complete, but missing real store/study metadata must still keep the observation sheet **not ready**, with no evidence promotion or financial inference. This is a collection-state boundary, never proof of real stock status.
