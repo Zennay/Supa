@@ -1,6 +1,12 @@
 import { aggregatePlanIngredients } from './basket.ts'
 import type { MatchUnit } from './matching.ts'
 import {
+  parseM3TimestampNanos,
+  evaluateM3ObservationInterval,
+  normalizeM3Timestamp,
+  m3TimestampWithElapsedHours,
+} from './m3ObservationClock.ts'
+import {
   m2DefaultActiveDays,
   m2InitialPlan,
   m2Recipes,
@@ -531,8 +537,7 @@ function nonBlank(value: string) {
 
 function validObservedAt(value: string) {
   if (!nonBlank(value)) return null
-  const timestamp = Date.parse(value)
-  return Number.isFinite(timestamp) ? timestamp : null
+  return parseM3TimestampNanos(value)
 }
 
 export function observationSheetReadiness(
@@ -557,7 +562,7 @@ export function observationSheetReadiness(
     ['Winkel A', 'baseline', sheet.baseline],
     ['Winkel B', 'candidate', sheet.candidate],
   ]
-  const observedTimes: number[] = []
+  const observedTimes: bigint[] = []
 
   for (const [label, side, observation] of observations) {
     if (!nonBlank(observation.store.name)) {
@@ -633,11 +638,16 @@ export function observationSheetReadiness(
   }
 
   if (observedTimes.length === 2) {
-    const deltaHours =
-      Math.abs(observedTimes[0] - observedTimes[1]) / (60 * 60 * 1000)
-    if (deltaHours > sheet.study.maxObservationWindowHours) {
+    const exact = evaluateM3ObservationInterval(
+      sheet.baseline.observedAt,
+      sheet.candidate.observedAt,
+      sheet.study.maxObservationWindowHours,
+    )
+    if (exact === null) {
+      issues.push('Het observatievenster is niet exact te controleren.')
+    } else if (!exact.withinWindow) {
       issues.push(
-        `De twee observaties liggen ${deltaHours.toFixed(1)} uur uit elkaar; maximaal ${sheet.study.maxObservationWindowHours} uur is toegestaan.`,
+        `De twee observaties liggen ${exact.hoursApprox.toFixed(1)} uur uit elkaar; maximaal ${sheet.study.maxObservationWindowHours} uur is toegestaan (nanosecondegrens overschreden).`,
       )
     }
   }
@@ -677,25 +687,34 @@ export function observationWindowSummary(
       return { state: 'not-started' }
     }
 
+    const originalTime = sheet[firstSide].observedAt
+    const exactFirst = normalizeM3Timestamp(originalTime)
+    const exactDeadline = m3TimestampWithElapsedHours(
+      originalTime,
+      sheet.study.maxObservationWindowHours,
+    )
+    if (exactFirst === null || exactDeadline === null) {
+      return { state: 'not-started' }
+    }
+
     return {
       state: 'single-observation',
       firstSide,
-      firstObservedAt: new Date(firstObservedAt).toISOString(),
-      deadlineAt: new Date(
-        firstObservedAt + sheet.study.maxObservationWindowHours * 60 * 60 * 1000,
-      ).toISOString(),
+      firstObservedAt: exactFirst,
+      deadlineAt: exactDeadline,
     }
   }
 
-  const deltaHours =
-    Math.abs(baselineAt - candidateAt) / (60 * 60 * 1000)
+  const exact = evaluateM3ObservationInterval(
+    sheet.baseline.observedAt,
+    sheet.candidate.observedAt,
+    sheet.study.maxObservationWindowHours,
+  )
+  if (exact === null) return { state: 'not-started' }
 
   return {
-    state:
-      deltaHours <= sheet.study.maxObservationWindowHours
-        ? 'within-window'
-        : 'outside-window',
-    deltaHours,
+    state: exact.withinWindow ? 'within-window' : 'outside-window',
+    deltaHours: exact.hoursApprox,
   }
 }
 
