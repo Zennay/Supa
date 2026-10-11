@@ -94,10 +94,17 @@ export function buildShoppingListCopyText(
     // Reject stale demand with too few physical packs, without pricing anything.
     const required = baseQuantity(requirement.amount, requirement.unit)
     const perPackQuantity = baseQuantity(line.pack.amount, line.pack.unit)
-    const available = perPackQuantity === null ? 0 :
-      perPackQuantity.amount * line.pack.count * line.packs
+    const perPurchasedPack = perPackQuantity === null ? 0 :
+      perPackQuantity.amount * line.pack.count
+    const available = perPurchasedPack * line.packs
+    const minimumPacks = safePositive(perPurchasedPack) && required
+      ? Math.ceil(required.amount / perPurchasedPack)
+      : null
+    // Sufficient coverage alone is unsafe: stale rows may buy needless extra packs.
     if (!required || !perPackQuantity || required.family !== perPackQuantity.family ||
-        !safePositive(available) || required.amount > available) return null
+        !safePositive(available) || required.amount > available ||
+        !Number.isSafeInteger(minimumPacks) || minimumPacks === 0 ||
+        line.packs !== minimumPacks) return null
 
     matchedCount += 1
     const packUnit = quantityUnitLabelNl(line.pack.unit, line.pack.amount)
