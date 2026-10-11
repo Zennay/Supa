@@ -56,6 +56,15 @@ function privacyScanText(markdown) {
       const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
       return code >= 32 && code <= 126 ? String.fromCharCode(code) : reference
     })
+    // CommonMark also renders HTML5 named references for these visible
+    // identifier delimiters. Keep this deliberately small and inspect-only.
+    .replace(/&(lowbar|period|hyphen|colon|commat|equals|nbsp|Tab);/g, (_, name) => {
+      const values = {
+        lowbar: '_', period: '.', hyphen: '-', colon: ':',
+        commat: '@', equals: '=', nbsp: ' ', Tab: '\\t',
+      }
+      return values[name]
+    })
 }
 
 function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
