@@ -39,7 +39,7 @@ test('pre-tick protected recheck may not pin a different physical basket', () =>
 
   // A different tab intentionally creates a new physical store checklist.
   disk.values.set(v2Key, foreignBytes)
-  assert.equal(current.reloadSaved(), null,
+  assert.equal(current.reloadSaved({ requireSameDemand: true }), null,
     'manual recheck must not mistake the foreign saved task for an empty local checklist')
   assert.equal(disk.values.get(v2Key), foreignBytes)
   current.toggle(first)
@@ -49,13 +49,13 @@ test('pre-tick protected recheck may not pin a different physical basket', () =>
   assert.equal(disk.values.get(v2Key), foreignBytes)
 })
 
-test('manual reload never adopts a foreign recognized v2 revision before a failed save', () => {
+test('strict manual reload never adopts a foreign recognized v2 revision before a failed save', () => {
   const localBytes = serializeShoppingProgressV2(localBasket, [first])
   assert.ok(localBytes)
   const disk = storage(localBytes)
   const current = openShoppingProgressStorageV2(localBasket, disk)
   disk.values.set(v2Key, foreignBytes)
-  assert.equal(current.reloadSaved(), null)
+  assert.equal(current.reloadSaved({ requireSameDemand: true }), null)
   assert.deepEqual(current.snapshot().completedLineIds, [first])
   current.toggle(first)
   assert.equal(current.persist(), false)
