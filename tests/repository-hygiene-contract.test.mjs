@@ -34,8 +34,10 @@ function invalidPortableSegment(segment) {
   if (/[<>:"\\|?*\x00-\x1f]/.test(segment)) return true
   if (/[. ]$/.test(segment)) return true
   // Windows treats a device name as reserved even when an extension follows.
-  const stem = segment.split('.')[0]
-  return /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(stem)
+  // Windows also reserves the superscript 1/2/3 device suffixes. Spaces
+  // before an extension cannot make a reserved device name portable.
+  const stem = segment.split('.')[0].replace(/ +$/u, '')
+  return /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])$/i.test(stem)
 }
 
 function trackedFailures(entries) {
@@ -47,7 +49,12 @@ function trackedFailures(entries) {
     if (mode !== '100644' && mode !== '100755') failures.push('unsupported git file mode')
     if (isForbiddenTrackedPath(path)) failures.push('forbidden tracked artifact')
     if (path.split('/').some(invalidPortableSegment)) failures.push('nonportable path segment')
-    const key = path.normalize('NFC').toLowerCase()
+    // JS lowercase is not Unicode case folding. Reject known multi-codepoint
+    // and special-casing collisions as well, without modifying Git paths.
+    // This is deliberately a conservative portability key, not evidence data.
+    const key = path.normalize('NFKC').toLowerCase()
+      .replace(/ß/g, 'ss')
+      .replace(/ς/g, 'σ')
     if (seen.has(key) && seen.get(key) !== path) failures.push('portable path collision')
     seen.set(key, path)
   }
