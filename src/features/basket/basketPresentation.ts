@@ -1,4 +1,5 @@
-import type { BasketTraceLine } from '../../domain/basket.ts'
+import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
+import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { BasketLineDelta } from '../../domain/basketComparison.ts'
 import type { BasketComparison } from '../../domain/basketComparison.ts'
 import { euro } from '../../lib/money.ts'
@@ -233,6 +234,52 @@ export function basketLineExplanation(
 }
 
 /**
+ * The displayed basket panels are separate props from the comparison report.
+ * Rebuild the canonical report from those *current* snapshots before trusting
+ * a stale-but-self-consistent report from an earlier planner selection.
+ */
+function matchesCurrentDisplayedBaskets(
+  comparison: BasketComparison,
+  candidate: { store: { name: string } },
+  baseline: OneStoreBasket,
+): boolean {
+  if (
+    !baseline || typeof baseline !== 'object' ||
+    !Array.isArray(baseline.lines) ||
+    !Array.isArray((candidate as OneStoreBasket).lines)
+  ) return false
+
+  try {
+    const actual = compareFullBaskets({
+      baseline,
+      candidate: candidate as OneStoreBasket,
+    })
+    if (
+      !actual.claimable || actual.reasons.length !== 0 ||
+      actual.outcome !== comparison.outcome ||
+      actual.baselineTotalCents !== comparison.baselineTotalCents ||
+      actual.candidateTotalCents !== comparison.candidateTotalCents ||
+      actual.deltaCents !== comparison.deltaCents ||
+      actual.savingsCents !== comparison.savingsCents ||
+      actual.lineDeltas.length !== comparison.lineDeltas.length
+    ) return false
+
+    const actualById = new Map(actual.lineDeltas.map((line) => [line.id, line]))
+    return comparison.lineDeltas.every((line) => {
+      const current = actualById.get(line.id)
+      return current !== undefined &&
+        current.ingredientLabel === line.ingredientLabel &&
+        current.baselineLineTotalCents === line.baselineLineTotalCents &&
+        current.candidateLineTotalCents === line.candidateLineTotalCents &&
+        current.deltaCents === line.deltaCents
+    })
+  } catch {
+    // Malformed transient UI snapshots may not become financial evidence.
+    return false
+  }
+}
+
+/**
  * A price difference is user-facing only when the complete signed-cent
  * comparison is internally consistent. Never coerce missing runtime money
  * to zero or derive a comparison claim from a malformed snapshot.
@@ -242,6 +289,7 @@ export function basketLineExplanation(
 export function basketComparisonCanShowMoney(
   comparison: BasketComparison,
   candidate: { store: { name: string } },
+  displayedBaseline?: OneStoreBasket,
 ): boolean {
   const storeName = candidate?.store?.name
   if (
@@ -321,6 +369,8 @@ export function basketComparisonCanShowMoney(
     summedDeltaCents !== expectedDelta
   ) return false
 
+  if (displayedBaseline && !matchesCurrentDisplayedBaskets(comparison, candidate, displayedBaseline)) return false
+
   if (comparison.outcome === 'same') return expectedDelta === 0
   if (comparison.outcome === 'better') return expectedDelta < 0
   if (comparison.outcome === 'worse') return expectedDelta > 0
@@ -330,8 +380,9 @@ export function basketComparisonCanShowMoney(
 export function basketComparisonHeadline(
   comparison: BasketComparison,
   candidate: { store: { name: string } },
+  displayedBaseline?: OneStoreBasket,
 ): string {
-  if (!basketComparisonCanShowMoney(comparison, candidate)) {
+  if (!basketComparisonCanShowMoney(comparison, candidate, displayedBaseline)) {
     return 'Nog geen betrouwbare vergelijking'
   }
 
