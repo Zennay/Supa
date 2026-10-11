@@ -50,7 +50,10 @@ const htmlDefinitionValueLine = new RegExp(
 // Decode only visible ASCII numeric HTML references for privacy scanning.
 // This stays in-memory: source evidence and permissions are unchanged.
 function privacyScanText(markdown) {
+  // Read visually hyphenated direct-ID labels as their ASCII-hyphen form.
+  // Limit this equivalence to the temporary privacy scan; never rewrite notes.
   return markdown.normalize('NFKC')
+    .replace(/[\u2010-\u2013\u2212]/g, '-')
     .replace(/[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufe00-\ufe0f\ufeff]/g, '')
     .replace(/&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/g, (reference, hex, decimal) => {
       const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
