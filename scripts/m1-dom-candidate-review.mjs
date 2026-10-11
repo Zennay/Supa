@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
 import { lstat, mkdir, open, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, parse, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { RESEARCH_SOURCES } from './m1-multistore-research.mjs'
 import { auditCaptureFiles } from './m1-research-snapshot-audit.mjs'
@@ -118,6 +118,7 @@ async function privateJsonFile(path) {
   try {
     // A no-follow final file descriptor alone cannot stop an aliased parent.
     // Probe inputs receive the same lexical-ancestor check as private outputs.
+    await rejectSymlinkedInputAncestors(path)
     await rejectSymlinkedAncestors(dirname(path))
     handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     const stat = await handle.stat()
@@ -125,6 +126,29 @@ async function privateJsonFile(path) {
     return JSON.parse((await handle.readFile()).toString('utf8'))
   } catch { malformed() }
   finally { await handle?.close() }
+}
+
+// path.resolve() discards "alias/.." before checking directories, while the
+// OS follows alias first when opening the original path. Walk supplied lexical
+// components in order; reject aliases before handling later '..' segments.
+async function rejectSymlinkedInputAncestors(path) {
+  const parentPath = dirname(path)
+  const absolute = isAbsolute(parentPath)
+  const root = absolute ? parse(parentPath).root : process.cwd()
+  const components = (absolute ? parentPath.slice(root.length) : parentPath).split(sep)
+  let current = root
+  for (const part of components) {
+    if (!part || part === '.') continue
+    if (part === '..') { current = dirname(current); continue }
+    current = join(current, part)
+    let details
+    try { details = await lstat(current) }
+    catch (error) {
+      if (error?.code !== 'ENOENT') malformed()
+      continue
+    }
+    if (!details.isDirectory() || details.isSymbolicLink()) malformed()
+  }
 }
 
 async function rejectSymlinkedAncestors(path) {
