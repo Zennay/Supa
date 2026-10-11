@@ -106,7 +106,7 @@ test('foreign saved task denial can later recover only after explicit same-deman
   assert.equal(controller.persist(), true)
   assert.deepEqual(
     JSON.parse(disk.values.get(v2Key)).doneLineIds.sort(),
-    [...lineIds].sort(),
+    [lineIds[0], lineIds[1]].sort(),
   )
   assert.equal(disk.writes, 1, 'only the subsequent explicit toggle is saved')
 
