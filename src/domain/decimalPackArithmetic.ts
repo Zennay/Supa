@@ -73,7 +73,10 @@ export function sumDecimalAmounts(amounts: readonly number[]): number | null {
     scale = commonScale
   }
 
-  const result = Number(coefficient) / Number(10n ** BigInt(scale))
+  // Convert the exact coefficient and scale together. An intermediate
+  // 10 ** scale can overflow even when the final positive JS value exists
+  // (e.g. 1e-310 + 1e-310 = 2e-310).
+  const result = Number(`${coefficient}e-${scale}`)
   const resultDecimal = decimal(result)
   if (!resultDecimal || !equalDecimal(resultDecimal, { coefficient, scale })) return null
   return result
