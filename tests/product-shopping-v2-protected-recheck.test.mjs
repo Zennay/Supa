@@ -69,7 +69,7 @@ test('staged real view offers a user-invoked read-only recheck before any tick, 
     new URL('../src/features/shopping-list/ShoppingListViewV2.tsx', import.meta.url), 'utf8',
   )
   const protectedBlock = source.match(
-    /\{storageStatus === 'unknown-record' && \([\s\S]*?data-storage-state="unknown-record"[\s\S]*?\n\s*\)\}/,
+    /\{unknownStoredRecord && \([\s\S]*?data-storage-state="unknown-record"[\s\S]*?\n\s*\)\}/,
   )?.[0]
   assert.ok(protectedBlock, 'the actual view must preserve a distinct protected-record advisory')
   assert.match(protectedBlock, /onClick=\{reloadSaved\}/,
@@ -77,7 +77,7 @@ test('staged real view offers a user-invoked read-only recheck before any tick, 
   assert.match(protectedBlock, /Opgeslagen versie opnieuw controleren/)
   assert.match(protectedBlock, /SUPA overschrijft de bestaande gegevens niet/)
   const unavailableBlock = source.match(
-    /\{storageStatus === 'unavailable' && \([\s\S]*?data-storage-state="unavailable"[\s\S]*?\n\s*\)\}/,
+    /\{unavailableStorage && \([\s\S]*?data-storage-state="unavailable"[\s\S]*?\n\s*\)\}/,
   )?.[0]
   assert.ok(unavailableBlock)
   assert.doesNotMatch(unavailableBlock, /Opgeslagen versie opnieuw controleren/,
