@@ -57,7 +57,8 @@ export function parseCaptureHeaders(raw) {
   const blocks = raw.replace(/\r\n/g, '\n').trim().split(/\n\n+/)
   const last = blocks.at(-1) || ''
   const lines = last.split('\n')
-  const response = /^HTTP\/(?:1\.[01]|2|3)\s+(\d{3})\b/.exec(lines.shift() || '')
+  // A word boundary also accepts "!"/NUL/non-ASCII after 200; require a real delimiter.
+  const response = /^HTTP\/(?:1\.[01]|2|3)\s+(\d{3})(?=[ \t]|$)/.exec(lines.shift() || '')
   if (!response) throw new Error('unrecognized HTTP response headers')
   const headers = new Map()
   for (const line of lines) {
