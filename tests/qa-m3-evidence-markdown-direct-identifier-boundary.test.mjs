@@ -61,7 +61,7 @@ function privacyScanText(markdown) {
     .replace(/&(lowbar|period|hyphen|colon|commat|equals|nbsp|Tab);/g, (_, name) => {
       const values = {
         lowbar: '_', period: '.', hyphen: '-', colon: ':',
-        commat: '@', equals: '=', nbsp: ' ', Tab: '\\t',
+        commat: '@', equals: '=', nbsp: ' ', Tab: ' ',
       }
       return values[name]
     })
