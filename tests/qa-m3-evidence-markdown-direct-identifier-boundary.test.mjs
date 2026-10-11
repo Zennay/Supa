@@ -120,7 +120,7 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   markdown = markdown.replace(/<\/?(?:strong|b|em|i|code|span|p|mark|u|small|sup|sub|kbd|abbr)\b[^>\r\n]{0,512}>/gi, '')
   // HTML <wbr> is a void, visually empty word-break hint (not paired).
   // Prevent invisible boundaries from splitting an explicit identity label.
-  markdown = markdown.replace(/<wbr\\b[^<>\\r\\n]{0,512}\\/?>/gi, '')
+  markdown = markdown.replace(/<wbr\b[^<>\r\n]{0,512}\/?>/gi, '')
   // Bounded visible single-line CommonMark phrasing spans can split an
   // explicit identifier label (e.g. participant_**email**). Inspect only.
   // The source evidence is never normalized or rewritten.
