@@ -48,7 +48,7 @@ test('81 same-priced weeks abstain when one ingredient amount changes without ch
     assert.equal(compareFullBaskets({ baseline, candidate: normal }).claimable, true)
     const recipeId = plan[0].recipeId
     const changedRecipes = modifyOneIngredient(m2Recipes, recipeId, (ingredient) => ({
-      ...ingredient, amount: ingredient.amount + 0.001,
+      ...ingredient, amount: ingredient.amount - 0.001,
     }))
     const modified = build(m3CandidateStore, m3CandidateProducts, plan, changedRecipes)
     assert.equal(modified.unresolvedLineCount, 0, `week ${index}`)
@@ -70,8 +70,12 @@ test('81 same-price weeks abstain when a trusted ingredient label changes across
     const plan = planFor(index)
     const baseline = build(m3BaselineStore, m3BaselineProducts, plan)
     const normal = build(m3CandidateStore, m3CandidateProducts, plan)
-    const changedRecipes = modifyOneIngredient(m2Recipes, plan[0].recipeId, (ingredient) => ({
-      ...ingredient, label: `${ingredient.label} (andere productbetekenis)`,
+    const changedIngredientId = m2Recipes.find((recipe) => recipe.id === plan[0].recipeId).ingredients[0].id
+    const changedRecipes = m2Recipes.map((recipe) => ({
+      ...recipe,
+      ingredients: recipe.ingredients.map((ingredient) => ingredient.id === changedIngredientId
+        ? { ...ingredient, label: `${ingredient.label} (andere productbetekenis)` }
+        : { ...ingredient }),
     }))
     const changed = build(m3CandidateStore, m3CandidateProducts, plan, changedRecipes)
     assert.equal(changed.unresolvedLineCount, 0)
