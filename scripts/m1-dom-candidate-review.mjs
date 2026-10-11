@@ -116,6 +116,9 @@ export function reviewDomProbe(report, { sourceId, nowMs = Date.now() } = {}) {
 async function privateJsonFile(path) {
   let handle
   try {
+    // A no-follow final file descriptor alone cannot stop an aliased parent.
+    // Probe inputs receive the same lexical-ancestor check as private outputs.
+    await rejectSymlinkedAncestors(dirname(path))
     handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     const stat = await handle.stat()
     if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_PROBE_BYTES) malformed()
