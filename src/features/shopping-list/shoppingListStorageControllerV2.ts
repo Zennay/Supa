@@ -28,25 +28,34 @@ type StorageOptions = Readonly<{
 /**
  * An old client must never convert an unknown future format (or corrupt
  * existing data) into an empty v2 list and overwrite the original bytes.
- * Only check the storage envelope here; physical-demand matching stays with
- * the existing v2 restore/rebase path. The v2 key may legitimately belong to
- * another *recognized* shopping task when a user switches stores.
+ * Check both the envelope and any same-demand line IDs before accepting a
+ * durable record. Foreign-task IDs cannot be verified against this basket,
+ * but a valid foreign envelope may be replaced on a deliberate fresh switch.
  */
-function recognizedStoredV2(raw: string | null): boolean {
+function recognizedStoredV2(raw: string | null, basket: OneStoreBasket): boolean {
   if (raw === null) return true
   if (typeof raw !== 'string') return false
   try {
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
     const item = parsed as Record<string, unknown>
-    return (
-      Object.hasOwn(item, 'schemaVersion') && item.schemaVersion === 2 &&
-      Object.hasOwn(item, 'demandIdentity') &&
-      typeof item.demandIdentity === 'string' && item.demandIdentity.length > 0 &&
-      Object.hasOwn(item, 'doneLineIds') &&
-      Array.isArray(item.doneLineIds) &&
-      item.doneLineIds.every((lineId) => typeof lineId === 'string')
-    )
+    if (
+      !Object.hasOwn(item, 'schemaVersion') || item.schemaVersion !== 2 ||
+      !Object.hasOwn(item, 'demandIdentity') ||
+      typeof item.demandIdentity !== 'string' || item.demandIdentity.length === 0 ||
+      !Object.hasOwn(item, 'doneLineIds') || !Array.isArray(item.doneLineIds) ||
+      !item.doneLineIds.every((lineId) => typeof lineId === 'string')
+    ) return false
+
+    // Silently deduplicating a durable checklist can destroy information.
+    if (new Set(item.doneLineIds).size !== item.doneLineIds.length) return false
+    const liveIdentity = shoppingListDemandIdentity(basket)
+    if (liveIdentity !== item.demandIdentity) return true
+
+    // A v2 record for this exact physical task must be restorable without
+    // dropping any line IDs. A future/foreign ID is not an empty checkmark.
+    const knownIds = new Set(basket.lines.map((line) => line.id))
+    return item.doneLineIds.every((lineId) => knownIds.has(lineId))
   } catch {
     return false
   }
@@ -80,7 +89,7 @@ export function openShoppingProgressStorageV2(
   // may save a different checklist while this tab is open.
   let lastObservedV2 = initialV2
   // Unsupported stored bytes are read-only until a deliberate valid recovery.
-  let storageFormatSupported = storageReadable && recognizedStoredV2(initialV2)
+  let storageFormatSupported = storageReadable && recognizedStoredV2(initialV2, basket)
   // Any failed explicit save may predate a newer physical shopping task,
   // including an initially denied read or a quota-denied write. A later
   // recovery must not turn that foreign saved task into an empty local list.
@@ -155,7 +164,7 @@ export function openShoppingProgressStorageV2(
         // authorizes a surprise legacy import during conflict recovery.
         const observed = storage.getItem(shoppingListProgressV2StorageKey)
         // Even a manual reload must not adopt and pin an unknown schema.
-        if (!recognizedStoredV2(observed)) return null
+        if (!recognizedStoredV2(observed, currentBasket)) return null
         if ((failedPersistAttempt || options.requireSameDemand === true) && observed !== null) {
           // A previous stale write proved another tab changed the checklist.
           // Never convert its *different* physical task into an empty current
