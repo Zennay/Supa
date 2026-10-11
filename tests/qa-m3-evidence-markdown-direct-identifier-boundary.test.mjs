@@ -13,7 +13,7 @@ const emailLike = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 const identifierField =
   '(?:participant[\\s_.-]*(?:name|email)|full[\\s_.-]*name|account[\\s_.-]*(?:id|email)|e[\\s_.-]*mail[\\s_.-]*(?:address|adres)|naam[\\s_.-]*deelnemer)'
 const fieldValueLine = new RegExp(
-  '^[ \\t]*(?:>\\s*)?(?:[-*+]\\s*)?(?:\\*\\*|__|\\x60)?' +
+  '^[ \\t]*(?:>\\s*)?(?:#{1,6}[ \\t]+)?(?:[-*+]\\s*)?(?:\\*\\*|__|\\x60)?' +
     identifierField + '(?:\\*\\*|__|\\x60)?\\s*(?::|=)\\s*\\S+',
   'im',
 )
@@ -25,7 +25,7 @@ const tableValueLine = new RegExp(
 
 
 const quotedFieldValueLine = new RegExp(
-  '^[ \\t]*(?:>\\s*)?(?:[-*+]\\s*)?(?:\\{\\s*)?(?:\\x22|\\x27)' +
+  '^[ \\t]*(?:>\\s*)?(?:#{1,6}[ \\t]+)?(?:[-*+]\\s*)?(?:\\{\\s*)?(?:\\x22|\\x27)' +
     identifierField + '(?:\\x22|\\x27)\\s*(?::|=)\\s*\\S+',
   'im',
 )
