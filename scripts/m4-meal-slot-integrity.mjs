@@ -69,7 +69,7 @@ function slotKey(value) {
     throw new Error('M4 meal outcome slot must be canonical bounded text')
   }
   for (const ch of value) {
-    if (/\\p{Cc}|\\p{Cf}|\\p{Cs}|\\p{Co}|\\p{Cn}|\\p{Zl}|\\p{Zp}/u.test(ch)) {
+    if (/\p{Cc}|\p{Cf}|\p{Cs}|\p{Co}|\p{Cn}|\p{Zl}|\p{Zp}/u.test(ch)) {
       throw new Error('M4 meal outcome slot contains unsafe characters')
     }
   }
