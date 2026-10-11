@@ -188,3 +188,35 @@ test('plain physical candidate row reordering cannot change a same-demand M3 mon
     assert.equal(JSON.stringify(shuffled.baseline), originalBaseline)
   }
 })
+
+test('M3 plain price recheck recalculates cents and does not retroactively alter a prior report', () => {
+  const input = study(0)
+  const unchangedBaseline = JSON.stringify(input.baseline)
+  const previous = buildObservedWeekReport(input)
+  const previousSerialized = JSON.stringify(previous)
+
+  assert.equal(previous.outcome, 'same')
+  assert.equal(previous.deltaCents, 0)
+  assert.equal(previous.savingsCents, 0)
+  assert.equal(previous.publicSavingsClaimEligible, false)
+
+  // This is a legal, sequentially updated *ordinary* input between calls,
+  // not a Proxy descriptor mutation while one comparison is in progress.
+  const line = input.candidate.basket.lines.find((item) => item.status === 'matched')
+  assert.ok(line)
+  const boughtPacks = line.packs
+  assert.ok(Number.isSafeInteger(boughtPacks) && boughtPacks > 0)
+  line.pricePerPackCents += 1
+  line.lineTotalCents += boughtPacks
+  input.candidate.basket.totalCents += boughtPacks
+
+  const next = buildObservedWeekReport(input)
+  assert.equal(next.claimable, true)
+  assert.equal(next.outcome, 'worse')
+  assert.equal(next.deltaCents, boughtPacks)
+  assert.equal(next.savingsCents, -boughtPacks)
+  assert.equal(next.publicSavingsClaimEligible, false)
+  assert.equal(JSON.stringify(previous), previousSerialized)
+  assert.equal(JSON.stringify(input.baseline), unchangedBaseline)
+  assert.equal('participantKey' in next, false)
+})
