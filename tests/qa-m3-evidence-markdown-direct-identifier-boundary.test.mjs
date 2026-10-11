@@ -35,7 +35,7 @@ const htmlTableValueLine = new RegExp(
   'im',
 )
 const htmlCommentValueLine = new RegExp(
-  '<!--\\s*' + identifierField + '\\s*(?::|=)\\s*\\S+[^\\n]*?-->',
+  '<!--\\s*' + identifierField + '\\s*(?::|=)\\s*\\S+[\\s\\S]*?-->',
   'im',
 )
 
