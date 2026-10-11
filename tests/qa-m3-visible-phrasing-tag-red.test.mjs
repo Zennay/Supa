@@ -55,7 +55,7 @@ test('QA #1528 allows harmless phrasing markup and policy references', () => {
     '- ingredient<sup>_name</sup>: courgette',
     '> store<sub>_id</sub> = plus-demo',
     'Recipe: press <kbd>Enter</kbd> for the ingredient.',
-    '| participant<abbr>_email</abbr> | forbidden example field, never store it |',
+    'Never store participant<abbr>_email</abbr> in evidence.',
     '- participantKey: pseudonymized-student-01',
   ]) {
     const actual = scan(note)
