@@ -23,7 +23,7 @@ function alterChicken(basket, change) {
   assert.equal(previous.status, 'matched')
   assert.equal(previous.requirement.amount, 600)
   assert.equal(previous.requirement.unit, 'g')
-  assert.equal(previous.pack.amount, 500)
+  assert.equal(previous.pack.amount, 400)
   assert.equal(previous.pack.unit, 'g')
   assert.equal(previous.packs, 2)
   const updated = change(previous)
@@ -60,7 +60,7 @@ test('valid exact pack minimum and true multipack keep portable shopping text', 
   const original = currentBasket()
   const initialText = buildShoppingListCopyText(original)
   assert.ok(initialText)
-  assert.match(initialText, /2 × 500 g \(nodig: 600 g\)/)
+  assert.match(initialText, /2 × 400 g \(nodig: 600 g\)/)
 
   const validMultipack = alterChicken(original, line => ({
     ...line,
@@ -70,7 +70,7 @@ test('valid exact pack minimum and true multipack keep portable shopping text', 
   }))
   const copied = buildShoppingListCopyText(validMultipack)
   assert.ok(copied)
-  assert.match(copied, /1 × 2 × 500 g \(nodig: 600 g\)/)
+  assert.match(copied, /1 × 2 × 400 g \(nodig: 600 g\)/)
 
   const trueThreePackDemand = alterChicken(original, line => ({
     ...line,
@@ -78,17 +78,17 @@ test('valid exact pack minimum and true multipack keep portable shopping text', 
     packs: 3,
     lineTotalCents: 3 * line.pricePerPackCents,
   }))
-  assert.match(buildShoppingListCopyText(trueThreePackDemand), /3 × 500 g \(nodig: 1100 g\)/)
+  assert.match(buildShoppingListCopyText(trueThreePackDemand), /3 × 400 g \(nodig: 1100 g\)/)
 })
 
 test('legitimate precise boundary still uses minimum packs and never infers prices', () => {
   const original = currentBasket()
   const exact = alterChicken(original, line => ({
     ...line,
-    requirement: { amount: 1000, unit: 'g' },
+    requirement: { amount: 800, unit: 'g' },
   }))
   const text = buildShoppingListCopyText(exact)
   assert.ok(text)
-  assert.match(text, /2 × 500 g \(nodig: 1000 g\)/)
+  assert.match(text, /2 × 400 g \(nodig: 800 g\)/)
   assert.doesNotMatch(text, /€|besparing|korting|prijsverschil/i)
 })
