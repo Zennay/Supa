@@ -41,6 +41,10 @@ const htmlCommentValueLine = new RegExp(
 
 function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   assert.equal(typeof markdown, 'string')
+  // NFKC folds width/compatibility variants before text-only privacy checks.
+  // Deliberately leave file paths, evidence files and collection metadata untouched.
+  // This is a backstop against obvious labelled IDs, not general PII detection.
+  markdown = markdown.normalize('NFKC')
   assert.doesNotMatch(
     markdown,
     emailLike,
