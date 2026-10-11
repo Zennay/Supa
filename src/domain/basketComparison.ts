@@ -8,6 +8,9 @@ const MAX_PHYSICAL_BASKET_LINES = 10_000
 type PinnedMonetaryFacts = WeakMap<object, {
   pricePerPackCents: unknown
   lineTotalCents: unknown
+  requirement: object
+  requirementAmount: unknown
+  requirementUnit: unknown
 }>
 
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
@@ -220,17 +223,24 @@ function safeRuntimeBasket(
       ]
       let pricePerPackCents: unknown
       let lineTotalCents: unknown
+      let requirement: unknown
       for (const key of keys) {
         const descriptor = ownData(line, key)
         if (!descriptor) return false
         if (key === 'pricePerPackCents') pricePerPackCents = descriptor.value
         if (key === 'lineTotalCents') lineTotalCents = descriptor.value
+        if (key === 'requirement') requirement = descriptor.value
       }
-      pinnedMonetaryFacts.set(line as object, { pricePerPackCents, lineTotalCents })
-      const requirement = ownData(line, 'requirement')?.value
       const pack = ownData(line, 'pack')?.value
-      if (['amount', 'unit'].some((key) => !ownData(requirement, key))) return false
+      const amountData = ownData(requirement, 'amount')
+      const unitData = ownData(requirement, 'unit')
+      if (!amountData || !unitData || requirement === null ||
+          typeof requirement !== 'object') return false
       if (['amount', 'unit', 'count'].some((key) => !ownData(pack, key))) return false
+      pinnedMonetaryFacts.set(line as object, {
+        pricePerPackCents, lineTotalCents, requirement,
+        requirementAmount: amountData.value, requirementUnit: unitData.value,
+      })
     } else if (status === 'unresolved' && !ownData(line, 'id')) {
       return false
     }
@@ -262,6 +272,13 @@ function snapshotRuntimeLine(
       throw new Error('basket monetary descriptors changed after preflight')
     }
     const requirement = ownData(line, 'requirement')?.value
+    const requirementAmount = ownData(requirement, 'amount')?.value
+    const requirementUnit = ownData(requirement, 'unit')?.value
+    if (requirement !== pinned.requirement ||
+        !Object.is(requirementAmount, pinned.requirementAmount) ||
+        !Object.is(requirementUnit, pinned.requirementUnit)) {
+      throw new Error('basket requirement descriptors changed after preflight')
+    }
     const pack = ownData(line, 'pack')?.value
     return {
       status: 'matched',
@@ -275,8 +292,8 @@ function snapshotRuntimeLine(
       matchScore: ownData(line, 'matchScore')?.value as number,
       reasons: ownData(line, 'reasons')?.value as string[] ?? [],
       requirement: {
-        amount: ownData(requirement, 'amount')?.value as number,
-        unit: ownData(requirement, 'unit')?.value as MatchedBasketLine['requirement']['unit'],
+        amount: requirementAmount as number,
+        unit: requirementUnit as MatchedBasketLine['requirement']['unit'],
       },
       pack: {
         amount: ownData(pack, 'amount')?.value as number,
