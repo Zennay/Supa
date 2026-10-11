@@ -135,6 +135,9 @@ function recognizedStoredV2(raw: string | null, basket: OneStoreBasket): boolean
     if (hasDuplicateRootKeys(raw)) return false
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
     const item = parsed as Record<string, unknown>
+    // Unknown root fields may be owned by a newer client, even at version 2.
+    // Rewriting the record as the known three-field shape would erase them.
+    if (Object.keys(item).length !== 3) return false
     if (
       !Object.hasOwn(item, 'schemaVersion') || item.schemaVersion !== 2 ||
       !Object.hasOwn(item, 'demandIdentity') ||
