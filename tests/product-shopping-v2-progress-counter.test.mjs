@@ -86,7 +86,12 @@ test('real v2 shopping screen counts only physically valid checked tasks', async
     assert.equal(pressed(deduplicated), 1, 'phantom/duplicate IDs must not inflate totals')
     assert.match(deduplicated, new RegExp(`1 van ${count(deduplicated)} afgevinkt`))
 
-    const unresolved = render(basket(m2Store, []))
+    const allUnresolved = basket(m2Store, [])
+    const unresolved = render(allUnresolved)
+    assert.match(unresolved, new RegExp(`${allUnresolved.lines.length} productkeuze vraagt controle`))
+    const forgedWarning = render({ ...initial, unresolvedLineCount: 999 })
+    assert.doesNotMatch(forgedWarning, /999 productkeuze vraagt controle/,
+      'warning must count actual validated unresolved rows, not a stale header')
     assert.match(unresolved, /handmatig kiezen/)
     assert.equal(pressed(unresolved), 0)
     assert.match(unresolved, new RegExp(`0 van ${count(unresolved)} afgevinkt`))
@@ -95,7 +100,9 @@ test('real v2 shopping screen counts only physically valid checked tasks', async
     assert.equal(pressed(newStore), 0)
     assert.match(newStore, new RegExp(`0 van ${count(newStore)} afgevinkt`))
 
-    const rejected = render({ ...initial, lines: [null] })
+    const rejected = render({ ...initial, lines: [null], unresolvedLineCount: 999 })
+    assert.doesNotMatch(rejected, /productkeuze vraagt controle/,
+      'invalid rows cannot produce an authoritative manual-choice warning')
     assert.equal(count(rejected), 0)
     assert.doesNotMatch(rejected, / van \d+ afgevinkt/)
 
