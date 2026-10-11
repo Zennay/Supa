@@ -128,6 +128,12 @@ export function openShoppingProgressStorageV2(
     rebase(nextBasket: OneStoreBasket): ShoppingProgressSessionV2 {
       session = rebaseShoppingProgressSessionV2(session, nextBasket)
       currentBasket = nextBasket
+      // A record that was foreign when opened can become same-demand after
+      // switching physical baskets. Recheck its raw pinned bytes before any
+      // write; once protected, a rebase must never implicitly unlock them.
+      if (storageFormatSupported && !recognizedStoredV2(lastObservedV2, nextBasket)) {
+        storageFormatSupported = false
+      }
       return snapshot()
     },
 
