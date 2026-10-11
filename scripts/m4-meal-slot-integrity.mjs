@@ -5,11 +5,19 @@ import {
 } from './m4-validate-beta-session.mjs'
 
 const MAX_INPUT_NODES = 20_000
+const MAX_TOTAL_JSON_UTF8_BYTES = 1_048_576
 const MAX_EVENTS = 2_000
 const MAX_SLOT_BYTES = 256
 
 function snapshotPlainJson(input) {
-  const state = { count: 0 }
+  const state = { count: 0, bytes: 0 }
+
+  function addBytes(value) {
+    state.bytes += Buffer.byteLength(value, 'utf8')
+    if (state.bytes > MAX_TOTAL_JSON_UTF8_BYTES) {
+      throw new Error('M4 JSON evidence exceeds aggregate UTF-8 byte budget')
+    }
+  }
 
   function visit(value, depth) {
     state.count += 1
@@ -21,6 +29,7 @@ function snapshotPlainJson(input) {
       if (Buffer.byteLength(value, 'utf8') > 16_384) {
         throw new Error('M4 evidence string exceeds the bounded JSON budget')
       }
+      addBytes(value)
       return value
     }
     if (typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER) {
@@ -49,6 +58,7 @@ function snapshotPlainJson(input) {
         if (typeof key !== 'string' || key === '__proto__' || key === 'constructor' || key === 'prototype') {
           throw new Error('M4 evidence object has an invalid key')
         }
+        addBytes(key)
         const descriptor = descriptors[key]
         if (!('value' in descriptor)) {
           throw new Error('M4 evidence accessors are not accepted')
