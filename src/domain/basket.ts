@@ -4,6 +4,7 @@ import {
   type MatchUnit,
   type ProductCandidate,
 } from './matching.ts'
+import { calculateDecimalPackCount, sumDecimalAmounts } from './decimalPackArithmetic.ts'
 import type { PlannedMeal, Recipe, Store } from './types.ts'
 
 export type RecipeIngredient = IngredientRequirement & {
@@ -74,6 +75,16 @@ export function aggregatePlanIngredients(
   recipes: RecipeWithIngredients[],
   activeDays: string[],
 ): AggregatedIngredient[] {
+  if (!Array.isArray(plan)) {
+    throw new Error('Basket plan must be an array')
+  }
+  if (!Array.isArray(recipes)) {
+    throw new Error('Basket recipes must be an array')
+  }
+  if (!Array.isArray(activeDays)) {
+    throw new Error('Basket active days must be an array')
+  }
+
   const active = new Set(activeDays)
   const aggregated = new Map<string, AggregatedIngredient>()
   const plannedActiveDays = new Set<string>()
@@ -125,7 +136,7 @@ export function aggregatePlanIngredients(
       current.amount =
         current.amount === null || ingredient.amount === null
           ? null
-          : current.amount + ingredient.amount
+          : sumDecimalAmounts([current.amount, ingredient.amount])
     }
   }
 
@@ -159,6 +170,10 @@ export function buildOneStoreBasket({
   }
 
   const ingredients = aggregatePlanIngredients(plan, recipes, activeDays)
+  if (!Array.isArray(products)) {
+    throw new Error('Basket products must be an array')
+  }
+
   const storeProducts = products.filter(
     (product) =>
       typeof product === 'object' &&
@@ -255,7 +270,22 @@ export function buildOneStoreBasket({
       }
     }
 
-    const packs = Math.ceil(required.amount / pack.amount)
+    // Decimal aggregation and whole-pack rounding share one exact arithmetic
+    // contract. Never floor/epsilon-adjust a genuine above-boundary demand.
+    const packs = calculateDecimalPackCount(
+      [{ amount: ingredient.amount, unit: ingredient.unit }],
+      { amount: product.packAmount!, unit: product.packUnit, count: packCount },
+    )
+    if (packs === null) {
+      return {
+        id: ingredient.id,
+        ingredientLabel: ingredient.label,
+        requirement: { amount: ingredient.amount, unit: ingredient.unit },
+        status: 'unresolved',
+        reasons: [...decision.reasons, 'basket quantity or pack count is not trusted'],
+        matchScore: decision.score,
+      }
+    }
     const lineTotalCents = packs * product.priceCents
     if (!Number.isSafeInteger(packs) || !Number.isSafeInteger(lineTotalCents)) {
       return {
