@@ -73,7 +73,7 @@ test('expired DOM observation is stale, not accepted as current or price verifie
   try {
     const oldStamp = new Date(nowMs - 24 * 60 * 60 * 1000 - 1).toISOString()
     const source = RESEARCH_SOURCES[0]
-    await saveReview(f.outputDir, source, candidate(source, oldStamp))
+    await saveReview(f.outputDir, source, { ...candidate(source), observedAt: oldStamp })
     const result = await inventoryDomCandidateReviews({ outputDir: f.outputDir, nowMs })
     assert.equal(result.status, 'stale')
     assert.equal(result.totals.stale, 1)
