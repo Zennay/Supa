@@ -171,7 +171,12 @@ function safeRuntimeBasket(basket: unknown): boolean {
     Object.hasOwn(lines, 'filter') || Object.hasOwn(lines, 'some')
   ) return false
   const length = ownData(lines, 'length')?.value
-  if (!Number.isSafeInteger(length) || (length as number) < 0) return false
+  // A small proxy-backed array can synthesize arbitrarily many indexed
+  // descriptors. Bound both preflight and subsequent trusted snapshots before
+  // consulting any physical slot (same ceiling as decimal demand arithmetic).
+  const MAX_PHYSICAL_BASKET_LINES = 10_000
+  if (!Number.isSafeInteger(length) || (length as number) < 0 ||
+      (length as number) > MAX_PHYSICAL_BASKET_LINES) return false
 
   for (let index = 0; index < (length as number); index += 1) {
     const physical = ownData(lines, String(index))
