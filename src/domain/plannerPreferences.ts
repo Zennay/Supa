@@ -16,6 +16,13 @@ function isCanonicalIdentity(value: unknown): value is string {
   )
 }
 
+/** Accept only budgets that resolve to positive safe integer cents. */
+function isExactPositiveCentBudget(value: unknown): value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return false
+  const cents = Math.round(value * 100)
+  return Number.isSafeInteger(cents) && cents > 0 && cents / 100 === value
+}
+
 function canonicalizeDefaultPlan(defaultPlan: unknown): PlannedMeal[] | null {
   if (!Array.isArray(defaultPlan)) return null
 
@@ -50,7 +57,7 @@ export function defaultPlannerPreferences(
   fallbackBudget = 35,
 ): PlannerPreferences {
   const safeFallbackBudget =
-    Number.isFinite(fallbackBudget) && fallbackBudget > 0 ? fallbackBudget : 35
+    isExactPositiveCentBudget(fallbackBudget) ? fallbackBudget : 35
 
   const canonicalPlan = canonicalizeDefaultPlan(defaultPlan) ?? []
 
@@ -76,7 +83,7 @@ export function parsePlannerPreferences(
   const supportedBudgets = Array.from(
     new Set(
       runtimeValidBudgets.filter(
-        (budget) => Number.isFinite(budget) && budget > 0,
+        (budget) => isExactPositiveCentBudget(budget),
       ),
     ),
   )
