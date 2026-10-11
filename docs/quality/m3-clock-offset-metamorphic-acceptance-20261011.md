@@ -1,6 +1,6 @@
 # Independent QA — M3 exact observation-clock invariants (2026-10-11)
 
-**Scope:** independent, synthetic acceptance of the isolated product precision repair [#1525](https://github.com/Zennay/Supa/pull/1525) and open safety issue [#1513](https://github.com/Zennay/Supa/issues/1513). This document and a NEW test file only; original source owner, field evidence, existing tests, workflows and canonical main remain untouched.
+**Scope:** independent, synthetic acceptance of the isolated product precision repair [#1525](https://github.com/Zennay/Supa/pull/1525) and open safety issue [#1513](https://github.com/Zennay/Supa/issues/1513). This document and two NEW test files only; original source owner, field evidence, existing tests, workflows and canonical main remain untouched.
 
 ## Machine-verifiable assertions
 - The same observed instant expressed under five UTC offsets, including +05:45 and -04:30, retains every fractional digit width 1–9. Expected epoch nanoseconds use an independent fixed UTC calendar anchor, not the implementation parser as oracle.
@@ -8,9 +8,10 @@
 - Across the +02:00 to +01:00 transition, an exact 24h and 24h−1ns interval remain inside; 24h+1ns stays outside, including reversed helper arguments.
 - Positive decimal window limits 0.1h, 0.25h and 1.5h reject the first nanosecond after their limits.
 - The resulting first-observation deadline preserves nine significant fractional digits; sub-nanosecond hour increments and invalid calendar/fraction/offset timestamps are rejected, never silently rounded into valid observations.
+- The real 11-demand basket study/assessment/report path is exercised with 25 combinations of time-zone-equivalent baseline/candidate instants. Private-only, cent-exact monetary output must remain invariant. Ten reversed and forward +1ns-outside cases must instead produce an unknown, no-money report and never expose participantKey.
 
 ## Reproduction
-`node --experimental-strip-types --test tests/qa-m3-clock-offset-metamorphic-acceptance.test.mjs`
+`node --experimental-strip-types --test tests/qa-m3-clock-offset-metamorphic-acceptance.test.mjs tests/qa-m3-report-cross-offset-money-equivalence.test.mjs`
 
 Use hosted `npm test`, audit, source-permission gate, matching benchmark and production build for exact-HEAD evidence. Permanent VPS/Firefox/M3 workflow proof is a separate owner/release check, not implied by this test.
 
