@@ -4,10 +4,13 @@ import { quantityUnitLabelNl } from '../../lib/quantityPresentation.ts'
 const KNOWN_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece'])
 const BIDI_AND_CONTROL = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g
 
+// A label needs a visible lexical or symbol base, not just invisible marks.
+const VISIBLE_LABEL_BASE = /[\p{L}\p{N}\p{S}]/u
+
 function safeLabel(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const label = value.replace(BIDI_AND_CONTROL, ' ').replace(/\s+/g, ' ').trim()
-  return label ? label : null
+  return label && VISIBLE_LABEL_BASE.test(label) ? label : null
 }
 
 function safePositive(value: unknown): value is number {
