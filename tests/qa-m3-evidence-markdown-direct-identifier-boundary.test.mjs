@@ -51,14 +51,14 @@ const htmlDefinitionValueLine = new RegExp(
 // This stays in-memory: source evidence and permissions are unchanged.
 function privacyScanText(markdown) {
   return markdown.normalize('NFKC')
-    .replace(/[\u00ad\u034f\u061c\u180e\u200b-\u200f\u2060-\u2064\u2066-\u2069\ufe00-\ufe0f\ufeff]/g, '')
+    .replace(/[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufe00-\ufe0f\ufeff]/g, '')
     .replace(/&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/g, (reference, hex, decimal) => {
       const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
       // HTML renders these particular numeric references invisibly.
       // Drop them only from the scan copy, just like raw format controls.
       const invisible = code === 0x00ad || code === 0x034f || code === 0x061c || code === 0x180e ||
         (code >= 0xfe00 && code <= 0xfe0f) || (code >= 0x200b && code <= 0x200f) ||
-        (code >= 0x2060 && code <= 0x2064) || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff
+        (code >= 0x202a && code <= 0x202e) || (code >= 0x2060 && code <= 0x2064) || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff
       // CommonMark renders these numeric HTML references as visible spaces.
       // Normalize only reviewed Unicode space separators in the scan copy.
       // Use ASCII space so the existing bounded field-label matcher sees them.
