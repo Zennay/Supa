@@ -51,13 +51,13 @@ const htmlDefinitionValueLine = new RegExp(
 // This stays in-memory: source evidence and permissions are unchanged.
 function privacyScanText(markdown) {
   return markdown.normalize('NFKC')
-    .replace(/[\u00ad\u200b-\u200f\u2060\u2066-\u2069\ufeff]/g, '')
+    .replace(/[\u00ad\u200b-\u200f\u2060-\u2063\u2066-\u2069\ufeff]/g, '')
     .replace(/&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/g, (reference, hex, decimal) => {
       const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
       // HTML renders these particular numeric references invisibly.
       // Drop them only from the scan copy, just like raw format controls.
       const invisible = code === 0x00ad || (code >= 0x200b && code <= 0x200f) ||
-        code === 0x2060 || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff
+        (code >= 0x2060 && code <= 0x2063) || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff
       // CommonMark renders these numeric HTML references as visible spaces.
       // Normalize only reviewed Unicode space separators in the scan copy.
       // Use ASCII space so the existing bounded field-label matcher sees them.
@@ -74,7 +74,7 @@ function privacyScanText(markdown) {
     // CommonMark HTML5 named references can encode visible separators or
     // invisible format controls inside explicit personal identifiers.
     // Decode only reviewed names in scanner memory; evidence stays unchanged.
-    .replace(/&(lowbar|period|hyphen|colon|commat|equals|nbsp|Tab|NewLine|ensp|emsp|thinsp|ThinSpace|numsp|MediumSpace|hairsp|puncsp|NonBreakingSpace|VeryThinSpace|ThickSpace|emsp13|emsp14|NegativeThinSpace|NegativeMediumSpace|NegativeThickSpace|NegativeVeryThinSpace|ZeroWidthSpace|zwnj|zwj|shy|NoBreak|lrm|rlm);/g, (_, name) => {
+    .replace(/&(lowbar|period|hyphen|colon|commat|equals|nbsp|Tab|NewLine|ensp|emsp|thinsp|ThinSpace|numsp|MediumSpace|hairsp|puncsp|NonBreakingSpace|VeryThinSpace|ThickSpace|emsp13|emsp14|NegativeThinSpace|NegativeMediumSpace|NegativeThickSpace|NegativeVeryThinSpace|ApplyFunction|InvisibleTimes|InvisibleComma|ZeroWidthSpace|zwnj|zwj|shy|NoBreak|lrm|rlm);/g, (_, name) => {
       const values = {
         lowbar: '_', period: '.', hyphen: '-', colon: ':',
         commat: '@', equals: '=', nbsp: ' ', Tab: ' ', NewLine: ' ',
@@ -84,6 +84,7 @@ function privacyScanText(markdown) {
         emsp13: ' ', emsp14: ' ',
         NegativeThinSpace: '', NegativeMediumSpace: '',
         NegativeThickSpace: '', NegativeVeryThinSpace: '',
+        ApplyFunction: '', InvisibleTimes: '', InvisibleComma: '',
         ZeroWidthSpace: '', zwnj: '', zwj: '', shy: '',
         NoBreak: '', lrm: '', rlm: '',
       }
