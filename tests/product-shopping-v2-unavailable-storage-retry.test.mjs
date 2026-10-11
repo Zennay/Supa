@@ -90,8 +90,10 @@ test('unavailable banner exposes retry only for a recoverable port and uses stri
     'do not offer an impossible retry when browser storage is null')
   assert.match(unavailableBanner, /onClick=\{retryUnavailableStorage\}/,
     'a temporarily denied read needs an explicit user recovery control')
-  assert.match(source, /requireSameDemand: unknownStoredRecord \|\| unavailableStorage/,
+  assert.match(source, /function retryUnavailableStorage\(\)[\s\S]*controller\.reloadSaved\(\{ requireSameDemand: true \}\)/,
     'recovery from an unavailable initial read must not take over another physical task')
+  assert.match(source, /controller\.reloadSaved\(\{ requireSameDemand: unknownStoredRecord \}\)/,
+    'the existing ordinary/protected reload contract must remain intact')
   assert.match(unavailableBanner, /zonder iets te bewaren|niets te bewaren/,
     'the control must explain that retry is read-only')
 })
