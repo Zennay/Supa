@@ -52,10 +52,11 @@ export function openShoppingProgressStorageV2(
   // The last durable v2 value observed by this controller. A separate tab
   // may save a different checklist while this tab is open.
   let lastObservedV2 = initialV2
-  // Only a controller that has actually lost a persist race must refuse to
-  // treat a *foreign* saved physical basket as an empty local checklist.
-  // A fresh controller may still deliberately start a different task.
-  let observedWriteConflict = false
+  // Any failed explicit save may predate a newer physical shopping task,
+  // including an initially denied read or a quota-denied write. A later
+  // recovery must not turn that foreign saved task into an empty local list.
+  // A fresh controller with no failed save can still start a different task.
+  let failedPersistAttempt = false
 
   let currentBasket = basket
   let session = startShoppingProgressSessionV2(
@@ -111,7 +112,7 @@ export function openShoppingProgressStorageV2(
         // Always read the v2 key alone: a present/missing v2 revision never
         // authorizes a surprise legacy import during conflict recovery.
         const observed = storage.getItem(shoppingListProgressV2StorageKey)
-        if (observedWriteConflict && observed !== null) {
+        if (failedPersistAttempt && observed !== null) {
           // A previous stale write proved another tab changed the checklist.
           // Never convert its *different* physical task into an empty current
           // task and then pin its revision, which would enable rollback.
@@ -135,7 +136,7 @@ export function openShoppingProgressStorageV2(
         session = refreshed
         lastObservedV2 = observed
         storageReadable = true
-        observedWriteConflict = false
+        failedPersistAttempt = false
         return snapshot()
       } catch {
         return null
@@ -148,28 +149,31 @@ export function openShoppingProgressStorageV2(
      */
     persist(): boolean {
       if (!storageReadable || storage === null || session.serialized === null) {
+        failedPersistAttempt = true
         return false
       }
       try {
         // Reject a stale snapshot if a caller mutated the basket after toggle
         // but before this explicit write. Financial-only updates retain identity.
         if (shoppingListDemandIdentity(currentBasket) !== session.demandIdentity) {
+          failedPersistAttempt = true
           return false
         }
         // Best-effort stale-tab guard: localStorage has no atomic CAS, but a
         // newly observed value must never be silently overwritten by our
         // outdated in-memory checklist. Also fail closed on denied reads.
         if (storage.getItem(shoppingListProgressV2StorageKey) !== lastObservedV2) {
-          observedWriteConflict = true
+          failedPersistAttempt = true
           return false
         }
         storage.setItem(shoppingListProgressV2StorageKey, session.serialized)
         // Advance only after a confirmed successful write. Denied writes can
         // be explicitly retried while the durable value stays unchanged.
         lastObservedV2 = session.serialized
-        observedWriteConflict = false
+        failedPersistAttempt = false
         return true
       } catch {
+        failedPersistAttempt = true
         return false
       }
     },
