@@ -1,0 +1,54 @@
+.custom-budget-form {
+  display: grid;
+  gap: 8px;
+}
+
+.custom-budget-form label {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.custom-budget-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.custom-budget-controls input {
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.custom-budget-controls button {
+  min-height: 44px;
+  min-width: 88px;
+}
+
+.custom-budget-controls input[aria-invalid="true"] {
+  border-color: #8b4b22;
+}
+
+.custom-budget-form small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.custom-budget-error {
+  margin: 0;
+  color: #8b4b22;
+  font-size: 13px;
+}
+
+@media (max-width: 320px) {
+  .custom-budget-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
