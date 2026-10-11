@@ -57,6 +57,10 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   })
   // HTML named assignment entities have the same rendered punctuation.
   markdown = markdown.replace(/&(colon|equals);/g, (_, entity) => entity === 'colon' ? ':' : '=')
+  // Named rendered field punctuation needs the same conservative treatment.
+  // &hyphen; renders U+2010 (hyphen), compared as a separator ONLY in scan text.
+  markdown = markdown.replace(/&(lowbar|period|hyphen);/g, (_, entity) =>
+    entity === 'lowbar' ? '_' : entity === 'period' ? '.' : '-')
   assert.doesNotMatch(
     markdown,
     emailLike,
