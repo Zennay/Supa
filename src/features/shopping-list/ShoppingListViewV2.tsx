@@ -95,7 +95,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
       {saveFailed && (
         <div className="attention-card" role="status">
           <strong>Voortgang niet opgeslagen</strong>
-          <span>Je vinkjes blijven in deze sessie, maar kunnen na herladen verdwijnen.</span>
+          <span>De wijziging is niet bewaard. Na herladen kunnen oude vinkjes terugkomen of nieuwe vinkjes verdwijnen.</span>
         </div>
       )}
 
