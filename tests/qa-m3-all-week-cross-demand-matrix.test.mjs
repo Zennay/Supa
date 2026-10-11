@@ -80,8 +80,8 @@ test('M3 full 81 x 81 comparison matrix refuses financially different recipe mul
   }
 
   assert.equal(sameDemandPairs + driftPairs, 81 * 81)
-  assert.ok(sameDemandPairs > 81, 'different weekdays with equal demand remain comparable')
-  assert.ok(driftPairs > 6000, 'most same-meal-count pairs represent a different basket')
+  assert.equal(sameDemandPairs, 639, 'same-demand weekday permutations remain comparable')
+  assert.equal(driftPairs, 5922, 'remaining equal-meal-count comparisons must abstain')
 })
 
 test('M3 week comparison never mutates source recipe, plan or physical basket inputs', () => {
