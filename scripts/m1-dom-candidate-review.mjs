@@ -44,6 +44,31 @@ function ownRecord(value, allowedKeys, requiredKeys) {
   } catch { return null }
 }
 
+// A direct API caller can supply an Array subclass, accessor indices, a custom
+// Symbol.iterator or an exotic Proxy, even though on-disk JSON cannot. Copy
+// exactly the canonical own dense data slots, without invoking index getters
+// or iteration hooks. Reflection faults fail closed and reveal no probe data.
+function ownDenseArray(value, maxLength) {
+  try {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return null
+    const length = Object.getOwnPropertyDescriptor(value, 'length')
+    if (!length || !Object.hasOwn(length, 'value') ||
+        !Number.isSafeInteger(length.value) || length.value > maxLength) return null
+    const keys = Reflect.ownKeys(value)
+    if (keys.length !== length.value + 1 ||
+        keys.some(key => key !== 'length' &&
+          (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) ||
+           Number(key) >= length.value))) return null
+    const items = []
+    for (let i = 0; i < length.value; i++) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(i))
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) return null
+      items.push(descriptor.value)
+    }
+    return items
+  } catch { return null }
+}
+
 function canonicalUtc(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return null
   const time = Date.parse(value)
@@ -73,12 +98,13 @@ export function reviewDomProbe(report, { sourceId, nowMs = Date.now() } = {}) {
   if (root.originHost !== new URL(source.url).hostname) malformed()
   const time = canonicalUtc(root.capturedAt)
   if (time === null || time > nowMs || nowMs - time > MAX_AGE_MS) malformed()
-  if (!Array.isArray(root.selectors) || root.selectors.length > STATIC_SELECTORS.size ||
-      !Array.isArray(root.actualClassCandidates) || root.actualClassCandidates.length > 25) malformed()
+  const selectorRows = ownDenseArray(root.selectors, STATIC_SELECTORS.size)
+  const classRows = ownDenseArray(root.actualClassCandidates, 25)
+  if (!selectorRows || !classRows) malformed()
 
   const seen = new Set()
   const selectors = []
-  for (const raw of root.selectors) {
+  for (const raw of selectorRows) {
     const item = ownRecord(raw, ['role', 'selector', 'count', 'groundedInCurrentDom', 'semanticVerified'],
       ['role', 'selector', 'count', 'groundedInCurrentDom', 'semanticVerified'])
     if (!item || STATIC_SELECTORS.get(item.selector) !== item.role ||
@@ -91,7 +117,7 @@ export function reviewDomProbe(report, { sourceId, nowMs = Date.now() } = {}) {
 
   const classSeen = new Set()
   const actualClassCandidates = []
-  for (const raw of root.actualClassCandidates) {
+  for (const raw of classRows) {
     const item = ownRecord(raw, ['selector', 'observedNodes', 'semanticVerified'],
       ['selector', 'observedNodes', 'semanticVerified'])
     if (!item || typeof item.selector !== 'string' || !CLASS_SELECTOR.test(item.selector) ||
