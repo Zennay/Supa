@@ -60,12 +60,15 @@ function privacyScanText(markdown) {
         code === 0x2060 || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff
       return invisible ? '' : code >= 32 && code <= 126 ? String.fromCharCode(code) : reference
     })
-    // CommonMark also renders HTML5 named references for these visible
-    // identifier delimiters. Keep this deliberately small and inspect-only.
-    .replace(/&(lowbar|period|hyphen|colon|commat|equals|nbsp|Tab);/g, (_, name) => {
+    // CommonMark HTML5 named references can encode visible separators or
+    // invisible format controls inside explicit personal identifiers.
+    // Decode only reviewed names in scanner memory; evidence stays unchanged.
+    .replace(/&(lowbar|period|hyphen|colon|commat|equals|nbsp|Tab|ZeroWidthSpace|zwnj|zwj|shy|NoBreak|lrm|rlm);/g, (_, name) => {
       const values = {
         lowbar: '_', period: '.', hyphen: '-', colon: ':',
         commat: '@', equals: '=', nbsp: ' ', Tab: ' ',
+        ZeroWidthSpace: '', zwnj: '', zwj: '', shy: '',
+        NoBreak: '', lrm: '', rlm: '',
       }
       return values[name]
     })
