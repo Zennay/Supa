@@ -115,7 +115,7 @@ function formatM3EpochNanoseconds(epochNanos: bigint): string | null {
     subsecond % NANOS_PER_MILLISECOND === 0n
       ? (subsecond / NANOS_PER_MILLISECOND).toString().padStart(3, '0')
       : subsecond.toString().padStart(9, '0')
-  return utc.toISOString().replace(/\\.000Z$/, '') + '.' + fraction + 'Z'
+  return utc.toISOString().slice(0, -5) + '.' + fraction + 'Z'
 }
 
 /** Canonical UTC rendering never silently drops meaningful nanoseconds. */
