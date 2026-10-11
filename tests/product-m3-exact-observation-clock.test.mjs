@@ -89,7 +89,7 @@ test('M3 collector deadlines preserve observed subseconds instead of fabricating
   )
   assert.equal(
     m3TimestampWithElapsedHours('2026-10-24T16:00:00Z', 0.25),
-    '2026-10-24T16:15:00.000000000Z',
+    '2026-10-24T16:15:00.000Z',
   )
   assert.equal(
     m3TimestampWithElapsedHours('2026-10-24T16:00:00.123456789Z', 0.0000000000001),
