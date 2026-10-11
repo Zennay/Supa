@@ -272,6 +272,55 @@ export function basketComparisonCanShowMoney(
     return false
   }
 
+  // A basket-level headline is financial evidence only when its individual
+  // rows also reconcile. In particular, a forged or stale lineDeltas array
+  // must never yield a convincing price headline or rule-level breakdown.
+  if (!Array.isArray(comparison.lineDeltas)) return false
+
+  const seenLineIds = new Set<string>()
+  let summedBaselineCents = 0
+  let summedCandidateCents = 0
+  let summedDeltaCents = 0
+
+  for (const line of comparison.lineDeltas) {
+    if (!line || typeof line !== 'object' || Array.isArray(line)) return false
+    if (
+      typeof line.id !== 'string' ||
+      line.id.length === 0 ||
+      line.id !== line.id.trim() ||
+      typeof line.ingredientLabel !== 'string' ||
+      line.ingredientLabel.trim().length === 0 ||
+      line.ingredientLabel !== line.ingredientLabel.trim() ||
+      seenLineIds.has(line.id) ||
+      !Number.isSafeInteger(line.baselineLineTotalCents) ||
+      line.baselineLineTotalCents < 0 ||
+      !Number.isSafeInteger(line.candidateLineTotalCents) ||
+      line.candidateLineTotalCents < 0 ||
+      !Number.isSafeInteger(line.deltaCents)
+    ) return false
+
+    seenLineIds.add(line.id)
+    const lineDelta = line.candidateLineTotalCents - line.baselineLineTotalCents
+    if (!Number.isSafeInteger(lineDelta) || lineDelta !== line.deltaCents) {
+      return false
+    }
+
+    summedBaselineCents += line.baselineLineTotalCents
+    summedCandidateCents += line.candidateLineTotalCents
+    summedDeltaCents += lineDelta
+    if (
+      !Number.isSafeInteger(summedBaselineCents) ||
+      !Number.isSafeInteger(summedCandidateCents) ||
+      !Number.isSafeInteger(summedDeltaCents)
+    ) return false
+  }
+
+  if (
+    summedBaselineCents !== comparison.baselineTotalCents ||
+    summedCandidateCents !== comparison.candidateTotalCents ||
+    summedDeltaCents !== expectedDelta
+  ) return false
+
   if (comparison.outcome === 'same') return expectedDelta === 0
   if (comparison.outcome === 'better') return expectedDelta < 0
   if (comparison.outcome === 'worse') return expectedDelta > 0
