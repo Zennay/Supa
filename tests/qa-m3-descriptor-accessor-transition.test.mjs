@@ -108,7 +108,9 @@ for (const side of ['baseline', 'candidate']) {
       const spy = guardOwnDescriptor(data[side].lines[5], field, 1)
       data[side].lines[5] = spy.wrapped
       abstains(compareFullBaskets(data))
-      assert.equal(spy.reads, 1)
+      // 'status' checks both ownData and Object.hasOwn on accessor
+      // preflight; neither probe invokes the supplied getter.
+      assert.equal(spy.reads, field === 'status' ? 2 : 1)
       assert.equal(spy.getterCalls, 0)
       assert.equal(spy.ordinaryGets, 0)
     })
