@@ -104,10 +104,10 @@ function textTokens(value: string): string[] {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
     .trim()
     .split(/\s+/)
-    .filter((token) => token && !STOP_TOKENS.has(token))
+    .filter((token) => token && /[\p{L}\p{N}]/u.test(token) && !STOP_TOKENS.has(token))
 }
 
 function normalizedPhrase(value: string): string {
