@@ -59,7 +59,8 @@ export function parseCaptureHeaders(raw) {
   const last = blocks.at(-1) || ''
   const lines = last.split('\n')
   // A word boundary also accepts "!"/NUL/non-ASCII after 200; require a real delimiter.
-  const response = /^HTTP\/(?:1\.[01]|2|3)\s+(\d{3})(?=[ \t]|$)/.exec(lines.shift() || '')
+  // HTTP version/status separators cannot contain Unicode or control whitespace.
+  const response = /^HTTP\/(?:1\.[01]|2|3)[ \t]+(\d{3})(?=[ \t]|$)/.exec(lines.shift() || '')
   if (!response) throw new Error('unrecognized HTTP response headers')
   const headers = new Map()
   for (const line of lines) {
