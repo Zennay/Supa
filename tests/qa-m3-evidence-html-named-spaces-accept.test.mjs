@@ -36,7 +36,7 @@ function verify(note) {
 
 for (const [label, note] of [
   ['different medium-space personal name', '> **full&MediumSpace;name** = invented-alpha'],
-  ['HTML list participant email', '<li>participant&emsp;email: dummy-bravo</li>'],
+  ['HTML definition participant email', '<dt>participant&emsp;email</dt><dd>dummy-bravo</dd>'],
   ['different ThinSpace HTML table', '<th>account&ThinSpace;id</th><td>fictional-charlie</td>'],
   ['en-space Dutch definition', '<dt>naam&ensp;deelnemer</dt><dd>imaginary-delta</dd>'],
   ['hair/figure-space Dutch email', '3. e&hairsp;mail&numsp;adres: fake-echo'],
