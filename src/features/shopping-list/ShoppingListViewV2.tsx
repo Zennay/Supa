@@ -33,7 +33,8 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
   const [session, setSession] = useState(() => controller.snapshot())
   const [saveFailed, setSaveFailed] = useState(false)
   // Set after mount to keep SSR markup stable when browser storage differs.
-  const [storageStatus, setStorageStatus] = useState<'ready' | 'unknown-record' | 'unavailable' | null>(null)
+  const [unknownStoredRecord, setUnknownStoredRecord] = useState(false)
+  const [unavailableStorage, setUnavailableStorage] = useState(false)
 
   // Re-evaluate even for an in-place mutation of a reused basket reference.
   const liveIdentity = shoppingListDemandIdentity(basket)
@@ -45,7 +46,8 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     const previous = controller.snapshot()
     const next = controller.rebase(basket)
     setSession(next)
-    setStorageStatus(controller.storageFormatStatus())
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
+    setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
 
     // Do not write when the view first renders or on price-only prop refresh.
     // Changing the *physical* basket invalidates old checks in durable storage.
@@ -68,7 +70,8 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     const next = controller.toggle(lineId)
     setSession(next)
     setSaveFailed(next.serialized !== null && !controller.persist())
-    setStorageStatus(controller.storageFormatStatus())
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
+    setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
   }
 
   function clearChecked() {
@@ -78,7 +81,8 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     const next = controller.clear()
     setSession(next)
     setSaveFailed(next.serialized !== null && !controller.persist())
-    setStorageStatus(controller.storageFormatStatus())
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
+    setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
   }
 
   function reloadSaved() {
@@ -92,7 +96,8 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     }
     setSession(latest)
     setSaveFailed(false)
-    setStorageStatus(controller.storageFormatStatus())
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
+    setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
   }
 
   return (
@@ -111,7 +116,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
         </div>
       )}
 
-      {storageStatus === 'unknown-record' && (
+      {unknownStoredRecord && (
         <div className="attention-card" role="status" aria-live="polite" data-storage-state="unknown-record">
           <strong>Opgeslagen boodschappenlijst beschermd</strong>
           <span>De opgeslagen versie is onbekend of ongeldig. Je kunt tijdelijk afvinken,
@@ -119,7 +124,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
         </div>
       )}
 
-      {storageStatus === 'unavailable' && (
+      {unavailableStorage && (
         <div className="attention-card" role="status" aria-live="polite" data-storage-state="unavailable">
           <strong>Opgeslagen voortgang niet beschikbaar</strong>
           <span>Opslaan werkt hier niet. Vinkjes blijven alleen tijdelijk zichtbaar
