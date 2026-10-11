@@ -51,6 +51,14 @@ The approved, single-source research path is intentionally bounded and fails clo
 
 These are pathname and file-mode checks, not a guarantee against arbitrary concurrent filesystem races. Keep captures inside owner-controlled directories, do not commit them, and stop on any safety error.
 
+### Interrupted or failed capture writes (staged #1272)
+
+The separate [partial-pair repair (#1272)](https://github.com/Zennay/Supa/issues/1272) reserves HTML and metadata with owner-only **exclusive** file handles. During an ordinary handled write/collision failure, it closes the handles and removes **only new files opened in that attempt**. A collision with a pre-existing capture remains an error: old HTML/JSON must never be deleted or overwritten, and no automatic retry is permitted.
+
+This is **not** a crash-atomic filesystem transaction. Forced termination, power loss, storage failure, or concurrent filesystem mutation can still leave incomplete pairs. If private research output contains HTML without matching metadata, a mismatched stem, or metadata without HTML: **stop**. Do not ingest, publish, or treat either file as permission/price/selector evidence. Inspect the owner-private directory offline, retain audit/provenance records where appropriate, and manually resolve the orphan only after identifying which local run created it. Never point a recovery script at an untrusted or shared path, and never use another retailer request or proxy to repair a local snapshot.
+
+A complete matching pair is still **research-only** and requires separate manual DOM/source-permission review. Nothing in this staged repair or its synthetic tests changes the genuine 11-demand PLUS + DekaMarkt M3 field-evidence requirement [#78](https://github.com/Zennay/Supa/issues/78).
+
 ## Derive selectors from an actual visible DOM
 
 Public HTML responses can differ from JavaScript-rendered product pages. On a retailer page that the user can normally view with permission, open **Firefox Developer Tools → Web Console**, enable the multiline editor, and run the complete contents of `scripts/m1-dom-candidate-probe.js`. This *local browser-only* probe inspects existing HTML elements and prints counts of CSS candidates actually seen for product links, names, prices, pack-size hints and offers, plus observed tag/class combinations. It sends no requests and does **not** copy text, prices, URLs, cookies, identifiers or account data.
