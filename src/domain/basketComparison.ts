@@ -3,6 +3,13 @@ import { calculateDecimalPackCount } from './decimalPackArithmetic.ts'
 
 const MAX_PHYSICAL_BASKET_LINES = 10_000
 
+// Keep preflight financial descriptor values scoped to one comparison call.
+// A caller-owned Proxy must not silently swap a row price during the snapshot.
+type PinnedMonetaryFacts = WeakMap<object, {
+  pricePerPackCents: unknown
+  lineTotalCents: unknown
+}>
+
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
 
 export type BasketComparisonOutcome =
@@ -169,6 +176,7 @@ function ownData(record: unknown, key: PropertyKey): { value: unknown } | null {
 function safeRuntimeBasket(
   basket: unknown,
   validatedLength: { value: number | null },
+  pinnedMonetaryFacts: PinnedMonetaryFacts,
 ): boolean {
   const keys = [
     'store', 'lines', 'selectedMealCount', 'totalCents',
@@ -210,7 +218,15 @@ function safeRuntimeBasket(
         'id', 'ingredientLabel', 'productId', 'productName', 'requirement',
         'pack', 'packs', 'pricePerPackCents', 'lineTotalCents', 'matchScore',
       ]
-      if (keys.some((key) => !ownData(line, key))) return false
+      let pricePerPackCents: unknown
+      let lineTotalCents: unknown
+      for (const key of keys) {
+        const descriptor = ownData(line, key)
+        if (!descriptor) return false
+        if (key === 'pricePerPackCents') pricePerPackCents = descriptor.value
+        if (key === 'lineTotalCents') lineTotalCents = descriptor.value
+      }
+      pinnedMonetaryFacts.set(line as object, { pricePerPackCents, lineTotalCents })
       const requirement = ownData(line, 'requirement')?.value
       const pack = ownData(line, 'pack')?.value
       if (['amount', 'unit'].some((key) => !ownData(requirement, key))) return false
@@ -230,9 +246,21 @@ function safeRuntimeBasket(
 // Copy all inspected financial and demand fields through own data descriptors:
 // a transparent Proxy may spoof ordinary `get` while exposing valid descriptors.
 // Unsupported/malformed lines keep the existing diagnostic, not financial facts.
-function snapshotRuntimeLine(line: unknown): BasketTraceLine {
+function snapshotRuntimeLine(
+  line: unknown,
+  pinnedMonetaryFacts: PinnedMonetaryFacts,
+): BasketTraceLine {
   const status = ownData(line, 'status')?.value
   if (status === 'matched') {
+    // Descriptor values must be the same facts that passed preflight. Merely
+    // repeating a shape check is insufficient for a changing Array/row Proxy.
+    const pinned = pinnedMonetaryFacts.get(line as object)
+    const pricePerPackCents = ownData(line, 'pricePerPackCents')?.value
+    const lineTotalCents = ownData(line, 'lineTotalCents')?.value
+    if (!pinned || !Object.is(pricePerPackCents, pinned.pricePerPackCents) ||
+        !Object.is(lineTotalCents, pinned.lineTotalCents)) {
+      throw new Error('basket monetary descriptors changed after preflight')
+    }
     const requirement = ownData(line, 'requirement')?.value
     const pack = ownData(line, 'pack')?.value
     return {
@@ -242,8 +270,8 @@ function snapshotRuntimeLine(line: unknown): BasketTraceLine {
       productId: ownData(line, 'productId')?.value as string,
       productName: ownData(line, 'productName')?.value as string,
       packs: ownData(line, 'packs')?.value as number,
-      pricePerPackCents: ownData(line, 'pricePerPackCents')?.value as number,
-      lineTotalCents: ownData(line, 'lineTotalCents')?.value as number,
+      pricePerPackCents: pricePerPackCents as number,
+      lineTotalCents: lineTotalCents as number,
       matchScore: ownData(line, 'matchScore')?.value as number,
       reasons: ownData(line, 'reasons')?.value as string[] ?? [],
       requirement: {
@@ -278,6 +306,7 @@ function snapshotRuntimeLine(line: unknown): BasketTraceLine {
 function snapshotRuntimeBasket(
   basket: unknown,
   validatedLength: number | null,
+  pinnedMonetaryFacts: PinnedMonetaryFacts,
 ): OneStoreBasket {
   const originalLines = ownData(basket, 'lines')?.value
   const lines: BasketTraceLine[] = []
@@ -292,7 +321,9 @@ function snapshotRuntimeBasket(
       throw new Error('basket length changed outside the snapshot safety bound')
     }
     for (let index = 0; index < length; index += 1) {
-      lines.push(snapshotRuntimeLine(ownData(originalLines, String(index))!.value))
+      lines.push(snapshotRuntimeLine(
+        ownData(originalLines, String(index))!.value, pinnedMonetaryFacts,
+      ))
     }
   }
   const originalStore = ownData(basket, 'store')?.value
@@ -589,13 +620,15 @@ export function compareFullBaskets(input: {
     const candidate = ownData(input, 'candidate')?.value
     const baselineLength = { value: null as number | null }
     const candidateLength = { value: null as number | null }
-    if (!safeRuntimeBasket(baseline, baselineLength) ||
-        !safeRuntimeBasket(candidate, candidateLength)) {
+    const baselinePinnedFacts: PinnedMonetaryFacts = new WeakMap()
+    const candidatePinnedFacts: PinnedMonetaryFacts = new WeakMap()
+    if (!safeRuntimeBasket(baseline, baselineLength, baselinePinnedFacts) ||
+        !safeRuntimeBasket(candidate, candidateLength, candidatePinnedFacts)) {
       return runtimeUnknownComparison()
     }
     return compareInspectedBaskets({
-      baseline: snapshotRuntimeBasket(baseline, baselineLength.value),
-      candidate: snapshotRuntimeBasket(candidate, candidateLength.value),
+      baseline: snapshotRuntimeBasket(baseline, baselineLength.value, baselinePinnedFacts),
+      candidate: snapshotRuntimeBasket(candidate, candidateLength.value, candidatePinnedFacts),
     })
   } catch {
     // Invalid proxies, descriptor traps or a changed runtime snapshot cannot
