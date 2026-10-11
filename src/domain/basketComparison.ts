@@ -199,6 +199,35 @@ function safeRuntimeBasket(basket: unknown): boolean {
   return true
 }
 
+// Consume only indexed own-data values from a preflighted array. A Proxy can
+// preserve Array.isArray/prototype/descriptors yet spoof .filter/.some/.map on
+// property GET; copying through descriptors avoids invoking those methods.
+// The resulting array and basket metadata are ordinary local values.
+function snapshotRuntimeBasket(basket: unknown): OneStoreBasket {
+  const originalLines = ownData(basket, 'lines')?.value
+  const lines: BasketTraceLine[] = []
+  if (Array.isArray(originalLines)) {
+    const length = ownData(originalLines, 'length')?.value as number
+    for (let index = 0; index < length; index += 1) {
+      lines.push(ownData(originalLines, String(index))!.value as BasketTraceLine)
+    }
+  }
+  const originalStore = ownData(basket, 'store')?.value
+  return {
+    store: {
+      id: ownData(originalStore, 'id')?.value as string,
+      name: (ownData(originalStore, 'name')?.value ?? '') as string,
+    },
+    lines: Array.isArray(originalLines)
+      ? lines
+      : originalLines as BasketTraceLine[],
+    selectedMealCount: ownData(basket, 'selectedMealCount')?.value as number,
+    totalCents: ownData(basket, 'totalCents')?.value as number,
+    matchedLineCount: ownData(basket, 'matchedLineCount')?.value as number,
+    unresolvedLineCount: ownData(basket, 'unresolvedLineCount')?.value as number,
+  }
+}
+
 function runtimeUnknownComparison(): BasketComparison {
   return {
     outcome: 'unknown',
@@ -445,8 +474,8 @@ export function compareFullBaskets(input: {
       return runtimeUnknownComparison()
     }
     return compareInspectedBaskets({
-      baseline: baseline as OneStoreBasket,
-      candidate: candidate as OneStoreBasket,
+      baseline: snapshotRuntimeBasket(baseline),
+      candidate: snapshotRuntimeBasket(candidate),
     })
   } catch {
     // Invalid proxies, descriptor traps or a changed runtime snapshot cannot
