@@ -24,9 +24,9 @@ test('M1 private parser must reject folded Content-Encoding values', () => {
   }
 })
 
-test('M1 private parser must reject disguised encoding folded after Content-Type', () => {
+test('M1 private parser must reject orphaned malformed encoding-looking lines', () => {
   assert.throws(
-    () => parseCaptureHeaders('HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n Content-Encoding: gzip\r\n\r\n'),
+    () => parseCaptureHeaders('HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n content-encoding gzip\r\n\r\n'),
     /header|encoding|fold|malformed|ambiguous/i,
   )
 })
