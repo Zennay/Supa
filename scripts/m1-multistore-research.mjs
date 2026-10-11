@@ -67,7 +67,14 @@ export function parseCaptureHeaders(raw) {
     // Content-Type is singular. A first-wins map could label conflicting HTTP
     // intermediary headers as HTML and wrongly archive an ambiguous response.
     if (k === 'content-type' && headers.has(k)) throw new Error('ambiguous response content-type')
+    // curl stores raw response bytes; without --compressed, encoded bytes
+    // cannot safely be labeled or reviewed as an HTML snapshot.
+    if (k === 'content-encoding' && headers.has(k)) throw new Error('ambiguous response content-encoding')
     if (!headers.has(k)) headers.set(k, line.slice(colon + 1).trim())
+  }
+  if (headers.has('content-encoding') &&
+      headers.get('content-encoding').toLowerCase() !== 'identity') {
+    throw new Error('unsupported response content-encoding')
   }
   return { status: Number(response[1]), contentType: (headers.get('content-type') || '').split(';')[0].trim().toLowerCase() }
 }
