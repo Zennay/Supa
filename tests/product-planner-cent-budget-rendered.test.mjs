@@ -12,6 +12,7 @@ import { customWeekBudgetLabel, parseCustomWeekBudget } from '../src/domain/cust
 import { RecipeEstimateDisclosure } from '../src/features/planner/RecipeEstimateDisclosure.ts'
 import { m2Recipes } from '../src/data/m2Fixture.ts'
 
+const require = createRequire(import.meta.url)
 // Render the actual custom form in the already existing PlannerView SSR suite.
 const customBudgetSource = readFileSync(
   new URL('../src/features/planner/CustomBudgetInput.tsx', import.meta.url),
@@ -42,7 +43,6 @@ new Function('module', 'exports', 'require', customCompiled.outputText)(
 const { CustomBudgetInput } = customModule.exports
 
 // SSR the actual PlannerView, not a reimplementation of its budget label.
-const require = createRequire(import.meta.url)
 const source = readFileSync(new URL('../src/features/planner/PlannerView.tsx', import.meta.url), 'utf8')
 const script = source.replace(/^import\s+['"]\.\/planner\.css['"]\s*;?\s*$/m, '')
 const compiled = ts.transpileModule(script, {
