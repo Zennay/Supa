@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -208,4 +208,20 @@ test('probe file symlinks and private output directory symlinks fail closed', as
 
 test('CLI rejects missing arguments without attempting a network operation', async () => {
   await assert.rejects(main([], () => {}), /usage/)
+})
+
+
+test('existing group-readable output directories cannot receive private selectors', async () => {
+  for (const variant of ['root', 'source']) {
+    const f = await fixture()
+    try {
+      const directory = variant === 'root' ? f.outputDir : join(f.outputDir, source.id)
+      await mkdir(directory, { recursive: true, mode: 0o700 })
+      await chmod(directory, 0o755)
+      await assert.rejects(saveDomCandidateReview({
+        sourceId: source.id, stem: f.stem, probePath: f.probePath,
+        captureDir: f.captureDir, outputDir: f.outputDir, nowMs,
+      }), /rejected/)
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }
 })
