@@ -32,11 +32,60 @@ type StorageOptions = Readonly<{
  * durable record. Foreign-task IDs cannot be verified against this basket,
  * but a valid foreign envelope may be replaced on a deliberate fresh switch.
  */
+/**
+ * JSON.parse silently accepts duplicate object keys using last-key-wins.
+ * Refuse an ambiguous persisted root before a v2 client can drop a hidden
+ * schema, demand identity, or set of checked line IDs during a later save.
+ * Quoted/escaped string contents and nested objects are not root keys.
+ */
+function hasDuplicateRootKeys(raw: string): boolean {
+  const keys = new Set<string>()
+  let objectDepth = 0
+  let arrayDepth = 0
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw[i]
+    if (char === '"') {
+      const start = i
+      let escaped = false
+      for (i++; i < raw.length; i++) {
+        const quoted = raw[i]
+        if (escaped) {
+          escaped = false
+        } else if (quoted === '\\') {
+          escaped = true
+        } else if (quoted === '"') {
+          break
+        }
+      }
+      if (i >= raw.length) return true
+      if (objectDepth === 1 && arrayDepth === 0) {
+        let next = i + 1
+        while (next < raw.length && /\s/.test(raw[next])) next++
+        if (raw[next] === ':') {
+          const key: string = JSON.parse(raw.slice(start, i + 1))
+          if (keys.has(key)) return true
+          keys.add(key)
+        }
+      }
+    } else if (char === '{') {
+      objectDepth++
+    } else if (char === '}') {
+      objectDepth--
+    } else if (char === '[') {
+      arrayDepth++
+    } else if (char === ']') {
+      arrayDepth--
+    }
+  }
+  return false
+}
+
 function recognizedStoredV2(raw: string | null, basket: OneStoreBasket): boolean {
   if (raw === null) return true
   if (typeof raw !== 'string') return false
   try {
     const parsed: unknown = JSON.parse(raw)
+    if (hasDuplicateRootKeys(raw)) return false
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
     const item = parsed as Record<string, unknown>
     if (
