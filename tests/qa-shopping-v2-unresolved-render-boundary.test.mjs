@@ -78,6 +78,20 @@ test('real shopping v2 SSR fails closed for unresolved tasks, forged progress an
     assert.equal(rowCount(restoredHtml), complete.lines.length)
     assert.equal(pressedCount(restoredHtml), 1)
 
+    // Well-formed JSON is not automatically a trustworthy progress record.
+    // Unknown schema versions, old demand identities and wrong done-ID
+    // shapes must not restore old ticks or fall back to legacy with opt-in.
+    for (const malformed of [
+      { ...canonical, schemaVersion: 3 },
+      { ...canonical, demandIdentity: 'synthetic-stale-demand' },
+      { ...canonical, doneLineIds: matched.id },
+      { ...canonical, doneLineIds: null },
+    ]) {
+      storage.set(shoppingListProgressV2StorageKey, JSON.stringify(malformed))
+      assert.equal(pressedCount(render(complete, { allowLegacyUpgrade: true })), 0)
+    }
+    storage.set(shoppingListProgressV2StorageKey, JSON.stringify(canonical))
+
     // A malformed basket with duplicate physical task IDs is untrusted, even
     // when storage contains an otherwise valid snapshot for the old basket.
     const duplicated = structuredClone(complete)
