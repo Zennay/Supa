@@ -93,6 +93,37 @@ export function openShoppingProgressStorageV2(
     },
 
     /**
+     * Recover from another tab's newer saved checklist only after a deliberate
+     * user action. Discards unsaved local ticks on successful read, without
+     * persisting, migrating v1, or adopting a foreign physical basket.
+     * Failed/denied reads never modify the session or pinned storage revision.
+     */
+    reloadSaved(): ShoppingProgressSessionV2 | null {
+      if (storage === null) return null
+      try {
+        const liveIdentity = shoppingListDemandIdentity(currentBasket)
+        if (liveIdentity === null) return null
+
+        // Always read the v2 key alone: a present/missing v2 revision never
+        // authorizes a surprise legacy import during conflict recovery.
+        const observed = storage.getItem(shoppingListProgressV2StorageKey)
+        const refreshed = startShoppingProgressSessionV2(currentBasket, observed)
+        if (refreshed.demandIdentity !== liveIdentity || refreshed.serialized === null) {
+          return null
+        }
+
+        // Pin the exact observed value before allowing subsequent explicit
+        // writes. A later external change still fails the persist guard.
+        session = refreshed
+        lastObservedV2 = observed
+        storageReadable = true
+        return snapshot()
+      } catch {
+        return null
+      }
+    },
+
+    /**
      * Explicitly call only after a user event / approved effect, never during
      * render. Invalid basket or blocked storage never writes stale state.
      */

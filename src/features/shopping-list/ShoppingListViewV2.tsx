@@ -76,6 +76,19 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     setSaveFailed(next.serialized !== null && !controller.persist())
   }
 
+  function reloadSaved() {
+    // Explicit recovery after a conflict: this drops unsaved local changes
+    // only when the durable v2 read succeeds. Never write during recovery.
+    controller.rebase(basket)
+    const latest = controller.reloadSaved()
+    if (latest === null) {
+      setSaveFailed(true)
+      return
+    }
+    setSession(latest)
+    setSaveFailed(false)
+  }
+
   return (
     <section className="screen">
       <div className="section-heading">
@@ -96,6 +109,11 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
         <div className="attention-card" role="status">
           <strong>Voortgang niet opgeslagen</strong>
           <span>De wijziging is niet bewaard. Na herladen kunnen oude vinkjes terugkomen of nieuwe vinkjes verdwijnen.</span>
+          <p>Een ander tabblad kan de lijst hebben aangepast. Je kunt de nieuwste opgeslagen lijst opnieuw laden.</p>
+          <button type="button" className="ghost-button" onClick={reloadSaved}>
+            Opgeslagen lijst laden
+          </button>
+          <small>Niet-opgeslagen vinkjes verdwijnen als het laden lukt.</small>
         </div>
       )}
 
