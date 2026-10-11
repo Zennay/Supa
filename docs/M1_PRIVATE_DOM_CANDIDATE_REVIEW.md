@@ -40,3 +40,17 @@ node --experimental-strip-types --test tests/m1-dom-candidate-review.test.mjs
 ```
 
 Permanent runner validation and original multistore research owner acceptance remain required before any merge/deploy.
+
+## Offline coverage inventory across all registered sources
+
+After one or more private DOM candidate reviews, run:
+
+```sh
+node scripts/m1-dom-candidate-coverage.mjs --coverage
+```
+
+This **never opens raw HTML or makes requests**. It counts private review files for all five registered source IDs (AH, two Dirk targets, Hoogvliet and Jumbo). It rejects unexpected folders/files/symlinks, oversized inventories, forged semantic/permission flags, invalid/future timestamps and tampered source IDs. It distinguishes pending human reviews, stale (>24h old) records and rejected/unknown artifacts. Its stdout reports **only aggregate counts per registered source**; no CSS selectors, URLs, product names, raw page content, prices or capture stems. Exit 0 = pending manual review(s) with no rejected/unexpected entries; 1 = rejected/unexpected; 2 = no current pending review (including no files or stale-only).
+
+**Important:** inventory status `pending-human-review` is *not* source permission, current live product data, a verified DOM selector or savings evidence. Old (>24h) source observations become stale even if their old review file is still present. No stored candidate is automatically promoted to a production scraper.
+
+Synthetic coverage tests: `node --test tests/m1-dom-candidate-coverage.test.mjs`.
