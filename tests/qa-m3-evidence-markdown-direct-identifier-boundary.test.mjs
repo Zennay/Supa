@@ -56,7 +56,8 @@ function privacyScanText(markdown) {
       const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
       // HTML renders these particular numeric references invisibly.
       // Drop them only from the scan copy, just like raw format controls.
-      const invisible = code === 0x00ad || code === 0x034f || code === 0x061c || code === 0x180e ||\n        (code >= 0xfe00 && code <= 0xfe0f) || (code >= 0x200b && code <= 0x200f) ||
+      const invisible = code === 0x00ad || code === 0x034f || code === 0x061c || code === 0x180e ||
+        (code >= 0xfe00 && code <= 0xfe0f) || (code >= 0x200b && code <= 0x200f) ||
         (code >= 0x2060 && code <= 0x2064) || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff
       // CommonMark renders these numeric HTML references as visible spaces.
       // Normalize only reviewed Unicode space separators in the scan copy.
