@@ -68,7 +68,13 @@ function trackedFailures(entries) {
 
 function trackedEntries() {
   const bytes = execFileSync('git', ['ls-files', '--stage', '-z'], { cwd: root })
-  // Git permits filenames containing arbitrary bytes on POSIX. A lossy UTF-8\n  // decode can hide an uncheckoutable path behind replacement characters.\n  // Round-trip the metadata before inspecting portable path components.\n  const paths = bytes.toString('utf8')\n  assert.ok(Buffer.from(paths, 'utf8').equals(bytes),\n    'tracked checkout violates reviewed hygiene contract: invalid UTF-8 Git index bytes')\n  return paths.split('\0').filter(Boolean).map((line) => {
+  // Git permits filenames containing arbitrary bytes on POSIX. A lossy UTF-8
+  // decode can hide an uncheckoutable path behind replacement characters.
+  // Round-trip the metadata before inspecting portable path components.
+  const paths = bytes.toString('utf8')
+  assert.ok(Buffer.from(paths, 'utf8').equals(bytes),
+    'tracked checkout violates reviewed hygiene contract: invalid UTF-8 Git index bytes')
+  return paths.split('\0').filter(Boolean).map((line) => {
     const match = /^(\d{6}) ([0-9a-f]{40,64}) ([0-3])\t([\s\S]+)$/.exec(line)
     assert.ok(match, 'git index metadata has a parseable stage record')
     return { mode: match[1], stage: match[3], path: match[4] }
