@@ -17,7 +17,7 @@ const require = createRequire(import.meta.url)
 const customBudgetSource = readFileSync(
   new URL('../src/features/planner/CustomBudgetInput.tsx', import.meta.url),
   'utf8',
-).replace(/^import\\s+['"]\\.\\/customBudget\\.css['"]\\s*;?\\s*$/m, '')
+).replace(/^import\s+['"]\.\/customBudget\.css['"]\s*;?\s*$/m, '')
 const customCompiled = ts.transpileModule(customBudgetSource, {
   compilerOptions: {
     jsx: ts.JsxEmit.ReactJSX,
