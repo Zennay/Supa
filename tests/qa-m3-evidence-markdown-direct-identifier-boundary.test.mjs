@@ -40,9 +40,10 @@ const htmlCommentValueLine = new RegExp(
 )
 
 // Raw HTML definition lists render field labels and their paired values.
+// A closing </dd> tag is not a nonempty disclosed value.
 const htmlDefinitionValueLine = new RegExp(
   '<dt\\b[^>\\r\\n]{0,512}>\\s*(?:<(?<defmark>strong|b|code)\\b[^>\\r\\n]{0,512}>\\s*)?' +
-    identifierField + '\\s*(?:<\\/\\k<defmark>>\\s*)?<\\/dt>\\s*<dd\\b[^>\\r\\n]{0,512}>\\s*\\S+',
+    identifierField + '\\s*(?:<\\/\\k<defmark>>\\s*)?<\\/dt>\\s*<dd\\b[^>\\r\\n]{0,512}>\\s*[^\\s<]+',
   'im',
 )
 
