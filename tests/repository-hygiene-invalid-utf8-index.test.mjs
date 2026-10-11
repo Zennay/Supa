@@ -43,6 +43,9 @@ test('QA #723: undecodable byte and truncated UTF-8 index names fail closed', ()
   for (const rawName of [
     Buffer.concat([Buffer.from('docs/bad-'), Buffer.from([0xff]), Buffer.from('.md')]),
     Buffer.concat([Buffer.from('docs/truncated-'), Buffer.from([0xc3]), Buffer.from('.md')]),
+    Buffer.concat([Buffer.from('docs/overlong-'), Buffer.from([0xc0, 0xaf]), Buffer.from('.md')]),
+    Buffer.concat([Buffer.from('docs/surrogate-'), Buffer.from([0xed, 0xa0, 0x80]), Buffer.from('.md')]),
+    Buffer.concat([Buffer.from('docs/out-of-range-'), Buffer.from([0xf4, 0x90, 0x80, 0x80]), Buffer.from('.md')]),
   ]) {
     const result = scanIndexPath(rawName)
     assert.equal(result.ok, false, 'undecodable path accepted by hygiene guard')
