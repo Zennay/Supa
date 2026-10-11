@@ -405,6 +405,15 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   return reasons
 }
 
+// Unknown results are public DTOs: an own-data value from a rejected runtime
+// basket must never escape as an object with toJSON/valueOf/get traps, nor as
+// noncanonical cents. Keep trusted nonnegative integer totals for diagnostics.
+function trustedUnknownTotalCents(value: unknown): number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : 0
+}
+
 function unknownComparison(
   baseline: OneStoreBasket,
   candidate: OneStoreBasket,
@@ -413,8 +422,8 @@ function unknownComparison(
   return {
     outcome: 'unknown',
     claimable: false,
-    baselineTotalCents: baseline.totalCents,
-    candidateTotalCents: candidate.totalCents,
+    baselineTotalCents: trustedUnknownTotalCents(baseline.totalCents),
+    candidateTotalCents: trustedUnknownTotalCents(candidate.totalCents),
     deltaCents: null,
     savingsCents: null,
     lineDeltas: [],
