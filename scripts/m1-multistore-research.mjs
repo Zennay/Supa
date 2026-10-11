@@ -149,10 +149,10 @@ export async function captureResearchSource(id, { env = process.env, outputDir =
     const headers = parseCaptureHeaders(await readFile(headerPath, 'utf8'))
     // The final curl HTTP code must agree with the last dumped response block.
     // Disagreement is not a trusted raw HTML snapshot, even if headers say 200.
+    if (headers.status !== 200) throw new Error('source returned HTTP ' + headers.status + '; capture stopped without retry')
     if (!/^\d{3}$/.test(response.status) || Number(response.status) !== headers.status) {
       throw new Error('curl final HTTP status disagrees with response headers')
     }
-    if (headers.status !== 200) throw new Error('source returned HTTP ' + headers.status + '; capture stopped without retry')
     if (!['text/html', 'application/xhtml+xml'].includes(headers.contentType)) throw new Error('source did not return HTML')
     const bodyStats = await stat(bodyPath)
     if (bodyStats.size === 0 || bodyStats.size > MAX_BYTES) throw new Error('source body is empty or exceeds byte cap')
