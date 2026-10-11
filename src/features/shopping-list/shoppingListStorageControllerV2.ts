@@ -49,6 +49,10 @@ export function openShoppingProgressStorageV2(
     }
   }
 
+  // The last durable v2 value observed by this controller. A separate tab
+  // may save a different checklist while this tab is open.
+  let lastObservedV2 = initialV2
+
   let currentBasket = basket
   let session = startShoppingProgressSessionV2(
     basket,
@@ -102,7 +106,16 @@ export function openShoppingProgressStorageV2(
         if (shoppingListDemandIdentity(currentBasket) !== session.demandIdentity) {
           return false
         }
+        // Best-effort stale-tab guard: localStorage has no atomic CAS, but a
+        // newly observed value must never be silently overwritten by our
+        // outdated in-memory checklist. Also fail closed on denied reads.
+        if (storage.getItem(shoppingListProgressV2StorageKey) !== lastObservedV2) {
+          return false
+        }
         storage.setItem(shoppingListProgressV2StorageKey, session.serialized)
+        // Advance only after a confirmed successful write. Denied writes can
+        // be explicitly retried while the durable value stays unchanged.
+        lastObservedV2 = session.serialized
         return true
       } catch {
         return false
