@@ -73,7 +73,10 @@ export function sumDecimalAmounts(amounts: readonly number[]): number | null {
     scale = commonScale
   }
 
-  const result = Number(coefficient) / Number(10n ** BigInt(scale))
+  // Convert the exact rational decimal in one step. Dividing by 10^scale
+  // first overflows to Infinity for subnormal inputs even when the sum itself
+  // is a finite, exactly representable JavaScript decimal number.
+  const result = Number(`${coefficient}e-${scale}`)
   const resultDecimal = decimal(result)
   if (!resultDecimal || !equalDecimal(resultDecimal, { coefficient, scale })) return null
   return result
