@@ -30,7 +30,7 @@ function fixtureBasket(storeId, discount) {
     },
   ]
   return buildOneStoreBasket({
-    store: { id: storeId, name: 'Controlled synthetic ' + storeId },
+    store: { id: storeId, name: storeId.includes('plus') ? 'Synthetic PLUS' : 'Synthetic DekaMarkt' },
     plan: m2InitialPlan,
     recipes: m2Recipes,
     activeDays: m2DefaultActiveDays,
