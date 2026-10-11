@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -137,4 +137,40 @@ test('oversized source enumeration fails without parsing attacker files', async 
 
 test('coverage CLI requires exact safe switch', async () => {
   await assert.rejects(main(['--prices']), /usage/)
+})
+
+
+test('private candidate report must match its immutable capture stem and contain no extra fields', async () => {
+  const source = RESEARCH_SOURCES[0]
+  for (const mode of ['stem', 'extra']) {
+    const f = await fixture()
+    try {
+      const payload = candidate(source)
+      if (mode === 'stem') payload.captureStem = 'capture-' + (nowMs - 59_000) + '-42'
+      else payload.privateHtml = 'NEVER EMIT THIS RAW HTML'
+      await saveReview(f.outputDir, source, payload)
+      const result = await inventoryDomCandidateReviews({ outputDir: f.outputDir, nowMs })
+      assert.equal(result.status, 'rejected', mode)
+      assert.equal(result.totals.rejected, 1, mode)
+      assert.doesNotMatch(JSON.stringify(result), /NEVER EMIT THIS RAW HTML/)
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }
+})
+
+test('existing group-readable review files and directories do not count as safe private reviews', async () => {
+  const source = RESEARCH_SOURCES[0]
+  for (const mode of ['file', 'source-directory', 'root-directory']) {
+    const f = await fixture()
+    try {
+      await saveReview(f.outputDir, source, candidate(source))
+      const path = join(f.outputDir, source.id, 'capture-' + (nowMs - 60_000) + '-42-candidate-review.json')
+      if (mode === 'file') await chmod(path, 0o644)
+      if (mode === 'source-directory') await chmod(join(f.outputDir, source.id), 0o755)
+      if (mode === 'root-directory') await chmod(f.outputDir, 0o755)
+      const result = await inventoryDomCandidateReviews({ outputDir: f.outputDir, nowMs })
+      assert.equal(result.status, 'rejected', mode)
+      assert.equal(result.totals.pendingHumanReview, 0, mode)
+      assert.ok(result.totals.rejected + result.totals.unexpected > 0, mode)
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }
 })
