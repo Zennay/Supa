@@ -81,11 +81,8 @@ export function openShoppingProgressStorageV2(
   let lastObservedV2 = initialV2
   // Unsupported stored bytes are read-only until a deliberate valid recovery.
   let storageFormatSupported = storageReadable && recognizedStoredV2(initialV2)
-  // Any failed explicit save may predate a newer physical shopping task,
-  // including an initially denied read or a quota-denied write. A later
-  // recovery must not turn that foreign saved task into an empty local list.
-  // A fresh controller with no failed save can still start a different task.
-  let failedPersistAttempt = false
+  // Recovery must not adopt or pin a foreign physical shopping task,
+  // even when no explicit persist was attempted in this tab.
 
   let currentBasket = basket
   let session = startShoppingProgressSessionV2(
@@ -149,10 +146,10 @@ export function openShoppingProgressStorageV2(
         const observed = storage.getItem(shoppingListProgressV2StorageKey)
         // Even a manual reload must not adopt and pin an unknown schema.
         if (!recognizedStoredV2(observed)) return null
-        if (failedPersistAttempt && observed !== null) {
-          // A previous stale write proved another tab changed the checklist.
-          // Never convert its *different* physical task into an empty current
-          // task and then pin its revision, which would enable rollback.
+        if (observed !== null) {
+          // A recognized record for a different physical task is NOT an
+          // empty checklist for this one. An explicit recovery may never pin
+          // that revision, regardless of earlier save attempts.
           const parsed: unknown = JSON.parse(observed)
           if (
             parsed === null || typeof parsed !== 'object' || Array.isArray(parsed) ||
@@ -174,7 +171,6 @@ export function openShoppingProgressStorageV2(
         lastObservedV2 = observed
         storageReadable = true
         storageFormatSupported = true
-        failedPersistAttempt = false
         return snapshot()
       } catch {
         return null
@@ -187,31 +183,26 @@ export function openShoppingProgressStorageV2(
      */
     persist(): boolean {
       if (!storageReadable || !storageFormatSupported || storage === null || session.serialized === null) {
-        failedPersistAttempt = true
         return false
       }
       try {
         // Reject a stale snapshot if a caller mutated the basket after toggle
         // but before this explicit write. Financial-only updates retain identity.
         if (shoppingListDemandIdentity(currentBasket) !== session.demandIdentity) {
-          failedPersistAttempt = true
           return false
         }
         // Best-effort stale-tab guard: localStorage has no atomic CAS, but a
         // newly observed value must never be silently overwritten by our
         // outdated in-memory checklist. Also fail closed on denied reads.
         if (storage.getItem(shoppingListProgressV2StorageKey) !== lastObservedV2) {
-          failedPersistAttempt = true
           return false
         }
         storage.setItem(shoppingListProgressV2StorageKey, session.serialized)
         // Advance only after a confirmed successful write. Denied writes can
         // be explicitly retried while the durable value stays unchanged.
         lastObservedV2 = session.serialized
-        failedPersistAttempt = false
         return true
       } catch {
-        failedPersistAttempt = true
         return false
       }
     },
