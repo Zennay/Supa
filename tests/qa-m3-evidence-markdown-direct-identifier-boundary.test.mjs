@@ -23,6 +23,22 @@ const tableValueLine = new RegExp(
   'im',
 )
 
+
+const quotedFieldValueLine = new RegExp(
+  '^\\s{0,3}(?:>\\s*)?(?:[-*+]\\s*)?(?:\\{\\s*)?(?:\\x22|\\x27)' +
+    identifierField + '(?:\\x22|\\x27)\\s*(?::|=)\\s*\\S+',
+  'im',
+)
+const htmlTableValueLine = new RegExp(
+  '<(?:td|th)\\b[^>]*>\\s*' + identifierField +
+    '\\s*<\\/(?:td|th)>\\s*<(?:td|th)\\b[^>]*>\\s*\\S+',
+  'im',
+)
+const htmlCommentValueLine = new RegExp(
+  '<!--\\s*' + identifierField + '\\s*(?::|=)\\s*\\S+[^\\n]*?-->',
+  'im',
+)
+
 function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   assert.equal(typeof markdown, 'string')
   assert.doesNotMatch(
@@ -40,6 +56,18 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
     tableValueLine,
     'obvious participant identifier table field is not allowed in M3 Markdown evidence: ' + displayPath,
   )
+
+  for (const pattern of [
+    quotedFieldValueLine,
+    htmlTableValueLine,
+    htmlCommentValueLine,
+  ]) {
+    assert.doesNotMatch(
+      markdown,
+      pattern,
+      'obvious participant identifier embedded field is not allowed in M3 Markdown evidence: ' + displayPath,
+    )
+  }
 }
 
 async function listMarkdownFiles(root = EVIDENCE_ROOT) {
