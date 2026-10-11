@@ -88,7 +88,7 @@ test('unavailable banner exposes retry only for a recoverable port and uses stri
   assert.ok(unavailableBanner, 'the actual staged view must show the unavailable status')
   assert.match(unavailableBanner, /controller\.canRetryStorageRead\(\)/,
     'do not offer an impossible retry when browser storage is null')
-  assert.match(unavailableBanner, /onClick=\{reloadSaved\}/,
+  assert.match(unavailableBanner, /onClick=\{retryUnavailableStorage\}/,
     'a temporarily denied read needs an explicit user recovery control')
   assert.match(source, /requireSameDemand: unknownStoredRecord \|\| unavailableStorage/,
     'recovery from an unavailable initial read must not take over another physical task')
