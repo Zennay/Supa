@@ -83,6 +83,47 @@ export type DecimalDemand = { amount: number; unit: MatchUnit }
 export type DecimalPack = { amount: number; unit: MatchUnit; count?: number }
 
 /**
+ * Aggregate physically compatible recipe requirements into the chosen
+ * display unit without multiplying IEEE-754 approximations (e.g. 0.00007 l).
+ * Return null instead of silently rounding a non-representable result.
+ */
+export function sumDecimalDemandUnits(
+  demands: readonly DecimalDemand[],
+  resultUnit: MatchUnit,
+): number | null {
+  if (!Array.isArray(demands) || demands.length === 0 || demands.length > MAX_DEMAND_LINES) {
+    return null
+  }
+  const target = baseFactor(resultUnit)
+  if (!target) return null
+
+  let coefficient = 0n
+  let scale = 0
+  for (const demand of demands) {
+    if (!demand || typeof demand !== 'object' || Array.isArray(demand)) return null
+    const part = decimal(demand.amount)
+    const unit = baseFactor(demand.unit)
+    if (!part || !unit || unit.family !== target.family) return null
+
+    const commonScale = Math.max(scale, part.scale)
+    coefficient =
+      coefficient * 10n ** BigInt(commonScale - scale) +
+      part.coefficient * unit.factor * 10n ** BigInt(commonScale - part.scale)
+    scale = commonScale
+  }
+
+  const result = Number(coefficient) / Number(10n ** BigInt(scale)) / Number(target.factor)
+  const parsed = decimal(result)
+  if (!parsed) return null
+  return (
+    parsed.coefficient * target.factor * 10n ** BigInt(scale) ===
+    coefficient * 10n ** BigInt(parsed.scale)
+  ) ? result : null
+}
+
+
+
+/**
  * Exact whole-pack ceiling of the *original* per-meal decimal requirements.
  * Never use an already-rounded floating sum as the input.
  *
