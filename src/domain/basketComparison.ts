@@ -390,12 +390,16 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   }
 
   if (unresolved.length > 0) {
-    reasons.push(
-      `${label} basket has unresolved ingredients: ${unresolved
-        .map((line) => line.id)
+    // A malformed runtime ID can be an object with toString/toPrimitive hooks.
+    // Never let diagnostic formatting execute those hooks after preflight.
+    const unresolvedIds: unknown[] = unresolved.map((line) => line.id)
+    if (unresolvedIds.every(validIdentity)) {
+      reasons.push(`${label} basket has unresolved ingredients: ${(unresolvedIds as string[])
         .sort()
-        .join(', ')}`,
-    )
+        .join(', ')}`)
+    } else {
+      reasons.push(`${label} basket has unresolved ingredients with invalid identifiers`)
+    }
   }
 
   return reasons
