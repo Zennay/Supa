@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { BasketView } from './features/basket/BasketView'
-import { ShoppingListView } from './features/shopping-list/ShoppingListView'
+import { ShoppingListViewV2 as ShoppingListView } from './features/shopping-list/ShoppingListViewV2'
 import { ObservationView } from './features/observation/ObservationView'
 import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
