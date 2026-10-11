@@ -2,6 +2,7 @@ import type { PlannedMeal, Recipe } from '../../domain/types'
 import { euro } from '../../lib/money'
 import { assessPlannerBudgetCents } from '../../lib/plannerBudgetCents.ts'
 import { RecipeEstimateDisclosure } from './RecipeEstimateDisclosure.ts'
+import { CustomBudgetInput } from './CustomBudgetInput.tsx'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -101,6 +102,8 @@ export function PlannerView({
             </button>
           ))}
         </div>
+
+        <CustomBudgetInput budget={budget} onBudgetChange={onBudgetChange} />
 
         <div
           className="budget-progress"
