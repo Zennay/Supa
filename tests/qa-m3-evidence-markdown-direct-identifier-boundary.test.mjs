@@ -47,6 +47,17 @@ const htmlDefinitionValueLine = new RegExp(
   'im',
 )
 
+// Decode only visible ASCII numeric HTML references for privacy scanning.
+// This stays in-memory: source evidence and permissions are unchanged.
+function privacyScanText(markdown) {
+  return markdown.normalize('NFKC')
+    .replace(/[\u00ad\u200b-\u200f\u2060\u2066-\u2069\ufeff]/g, '')
+    .replace(/&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/g, (reference, hex, decimal) => {
+      const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
+      return code >= 32 && code <= 126 ? String.fromCharCode(code) : reference
+    })
+}
+
 function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   assert.equal(typeof markdown, 'string')
   // NFKC folds width/compatibility variants before text-only privacy checks.
@@ -61,12 +72,11 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   // Inspect original link targets before unwrapping rendered field labels:
   // otherwise a mailto: URL could lose its email address during scanning.
   assert.doesNotMatch(
-    markdown.normalize('NFKC').replace(/[\u00ad\u200b-\u200f\u2060\u2066-\u2069\ufeff]/g, ''),
+    privacyScanText(markdown),
     emailLike,
     'obvious participant identifier email is not allowed in M3 Markdown evidence: ' + displayPath,
   )
-  markdown = markdown.normalize('NFKC')
-    .replace(/[\u00ad\u200b-\u200f\u2060\u2066-\u2069\ufeff]/g, '')
+  markdown = privacyScanText(markdown)
     // Unwrap simple linked field labels for the scanner only: rendered
     // Markdown/HTML links must not conceal an otherwise explicit ID field.
     // Retain the original evidence bytes; this is not an HTML parser.
