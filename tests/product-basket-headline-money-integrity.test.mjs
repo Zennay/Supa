@@ -33,8 +33,8 @@ function comparisonForTotals(baselineTotalCents, candidateTotalCents, outcome) {
     lineDeltas: [{
       id: 'synthetic',
       ingredientLabel: 'Synthetische mandregel',
-      baselineLineTotalCents,
-      candidateLineTotalCents,
+      baselineLineTotalCents: baselineTotalCents,
+      candidateLineTotalCents: candidateTotalCents,
       deltaCents,
     }],
   }
