@@ -68,7 +68,12 @@ function trackedFailures(entries) {
 
 function trackedEntries() {
   const bytes = execFileSync('git', ['ls-files', '--stage', '-z'], { cwd: root })
-  return bytes.toString('utf8').split('\0').filter(Boolean).map((line) => {
+  // Git index paths are raw bytes; lossy decoding can hide invalid names.
+  // Round-trip the full NUL-delimited index metadata before path validation.
+  const decoded = bytes.toString('utf8')
+  assert.ok(Buffer.from(decoded, 'utf8').equals(bytes),
+    'tracked checkout violates reviewed hygiene contract: invalid UTF-8 path bytes')
+  return decoded.split('\0').filter(Boolean).map((line) => {
     const match = /^(\d{6}) ([0-9a-f]{40,64}) ([0-3])\t([\s\S]+)$/.exec(line)
     assert.ok(match, 'git index metadata has a parseable stage record')
     return { mode: match[1], stage: match[3], path: match[4] }
