@@ -141,3 +141,35 @@ test('M3 one millisecond outside window abstains equally when retailer observati
   })
   expectPrivateReport(report)
 })
+
+test('M3 one millisecond inside window retains a worse result without hiding negative savings', () => {
+  const study = syntheticStudy(
+    '2026-10-24T16:00:00.000Z',
+    '2026-10-25T15:59:59.999Z',
+    1,
+  )
+  const report = buildObservedWeekReport(study)
+  assert.ok(report.observationWindowHours < 24)
+  assert.equal(report.claimable, true)
+  assert.equal(report.outcome, 'worse')
+  assert.equal(report.deltaCents, study.candidate.basket.totalCents - study.baseline.basket.totalCents)
+  assert.ok(report.deltaCents > 0)
+  assert.equal(report.savingsCents, -report.deltaCents)
+  expectPrivateReport(report)
+})
+
+test('M3 equivalent UTC and time-offset instants preserve elapsed-window economics', () => {
+  const utc = syntheticStudy('2026-10-24T16:00:00Z', '2026-10-25T15:00:00Z')
+  const offset = syntheticStudy('2026-10-24T18:00:00+02:00', '2026-10-25T16:00:00+01:00')
+  const a = buildObservedWeekReport(utc)
+  const b = buildObservedWeekReport(offset)
+  assert.equal(a.observationWindowHours, 23)
+  assert.equal(b.observationWindowHours, 23)
+  assert.equal(a.claimable, true)
+  assert.equal(b.claimable, true)
+  for (const field of ['outcome', 'baselineTotalCents', 'candidateTotalCents', 'deltaCents', 'savingsCents']) {
+    assert.equal(a[field], b[field], field)
+  }
+  expectPrivateReport(a)
+  expectPrivateReport(b)
+})
