@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
 import { lstat, open, readdir } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { RESEARCH_SOURCES } from './m1-multistore-research.mjs'
 import { reviewDomProbe } from './m1-dom-candidate-review.mjs'
@@ -27,7 +27,29 @@ function summary(sources, unexpectedRoot = 0) {
   return { status, totals, sources, semanticVerified: false, livePriceVerified: false,
     retailerPermissionVerified: false, publicSavingsClaimEligible: false }
 }
+// A symlink at an earlier path segment can redirect inventory to an entirely
+// different private review tree while lstat(outputDir) still looks ordinary.
+// Validate each existing lexical ancestor before any source enumeration.
+async function hasCanonicalDirectoryAncestors(path) {
+  if (typeof path !== 'string' || !path) return false
+  try {
+    let current = resolve(path)
+    while (true) {
+      try {
+        const meta = await lstat(current)
+        if (!meta.isDirectory() || meta.isSymbolicLink()) return false
+      } catch (error) {
+        if (error?.code !== 'ENOENT') return false
+      }
+      const parent = dirname(current)
+      if (parent === current) return true
+      current = parent
+    }
+  } catch { return false }
+}
+
 async function entries(path) {
+  if (!await hasCanonicalDirectoryAncestors(path)) return false
   try {
     const meta = await lstat(path)
     if (!meta.isDirectory() || meta.isSymbolicLink() || (meta.mode & 0o077) !== 0) return false
