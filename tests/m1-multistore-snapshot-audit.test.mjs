@@ -90,7 +90,7 @@ test('private fixture pair on disk can be audited without exposing HTML', async 
   try {
     const sourceDir = join(dir, source.id)
     const stem = 'capture-1791675600000-1234'
-    await mkdir(sourceDir)
+    await mkdir(sourceDir, { mode: 0o700 })
     await writeFile(join(sourceDir, stem + '.html'), html, { mode: 0o600 })
     await writeFile(join(sourceDir, stem + '.json'), JSON.stringify(metadata()), { mode: 0o600 })
     const ok = await auditCaptureFiles({ sourceId: source.id, stem, outputDir: dir, nowMs })
@@ -107,11 +107,11 @@ test('capture audit refuses traversal and private symlinked snapshots before rea
   try {
     const sourceDir = join(dir, source.id)
     const stem = 'capture-1791675600000-4321'
-    await mkdir(sourceDir)
+    await mkdir(sourceDir, { mode: 0o700 })
     const target = join(dir, 'elsewhere.txt')
     await writeFile(target, 'private-dont-read')
     await symlink(target, join(sourceDir, stem + '.html'))
-    await writeFile(join(sourceDir, stem + '.json'), JSON.stringify(metadata()))
+    await writeFile(join(sourceDir, stem + '.json'), JSON.stringify(metadata()), { mode: 0o600 })
     await assert.rejects(auditCaptureFiles({ sourceId: source.id, stem, outputDir: dir, nowMs }),
       /regular files/)
     await assert.rejects(auditCaptureFiles({ sourceId: source.id, stem: '../escape',
