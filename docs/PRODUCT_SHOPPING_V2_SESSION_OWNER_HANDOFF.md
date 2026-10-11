@@ -12,6 +12,22 @@ The existing v2 utilities support price-independent physical basket identity, bu
 - `toggleShoppingProgressSessionV2(session, currentBasket, lineId)`: first reconcile the current task, then toggle only an existing line ID; never resurrect old checks.
 - Each returned state has `demandIdentity`, `completedLineIds`, `serialized` and `upgradedFromLegacy`. A null identity/snapshot must never be persisted.
 
+## Optional storage adapter (production module)
+The additive `shoppingListStorageControllerV2.ts` can supply the UI with a bounded storage lifecycle without direct `localStorage` calls in rendering code.
+
+```ts
+// Inside a once-only effect/event owned by the ShoppingListView maintainer:
+const controller = openShoppingProgressStorageV2(currentBasket, window.localStorage, {
+  allowLegacyUpgrade: false, // only opt in after reviewing legacy migration
+})
+const first = controller.snapshot()
+const repriced = controller.rebase(nextBasket)
+const checked = controller.toggle(ingredientId)
+const persisted = controller.persist() // call after user action/effect, not render
+```
+
+The adapter reads only v2 when present, never falls back to v1 if v2 is malformed, and reads v1 only by explicit opt-in and absent v2. It stores only the v2 key, never silently overwrites v1. Blocked/private browser storage or quota errors are caught; session checkmarks still function in memory but `persist()` returns `false`. Invalid basket identities never persist. Snapshot arrays are copied to prevent external mutation from changing internal session state. Initialization performs **zero writes**. Rendering/React lifecycle wiring and accessibility acceptance remain with the original view owners.
+
 ## Owner integration (NOT done here)
 The current view owner [#422](https://github.com/Zennay/Supa/pull/422) and v1 progress owner [#356](https://github.com/Zennay/Supa/pull/356) must decide if/how to adopt this new module. On mount read the v2 namespace first, optionally opt into strict v1 migration only when the v2 key is absent, then write `session.serialized` to the **v2 key only** after valid transitions. On basket prop change, rebase with the last immutable session snapshot; on checkbox click, toggle against the current basket. A legacy v1 price-dependent key remains a separate incompatible schema. No persistent write should be done from a React render.
 
