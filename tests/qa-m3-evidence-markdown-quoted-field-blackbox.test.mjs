@@ -21,10 +21,14 @@ function runPrivacyGate(markdown) {
     copyFileSync(SCANNER, join(testDir, SCANNER_NAME))
     writeFileSync(join(evidenceDir, 'README.md'), '# Synthetic privacy test fixture\n')
     writeFileSync(join(evidenceDir, 'field-note.md'), markdown, 'utf8')
+    // Node's test runner marks child workers with NODE_TEST_CONTEXT.
+    // Explicit nested --test otherwise silently skips all tests with exit 0.
+    const childEnv = { ...process.env }
+    delete childEnv.NODE_TEST_CONTEXT
     const result = spawnSync(
       process.execPath,
       ['--test', join(testDir, SCANNER_NAME)],
-      { encoding: 'utf8', timeout: 20000 },
+      { encoding: 'utf8', timeout: 20000, env: childEnv },
     )
     assert.ifError(result.error)
     return result
