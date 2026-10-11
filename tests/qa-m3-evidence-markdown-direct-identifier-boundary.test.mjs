@@ -99,6 +99,10 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   // Strip only bounded presentational tags in scan text, never in evidence.
   // Original email/link targets were already checked before this step.
   markdown = markdown.replace(/<\/?(?:strong|b|em|i|code|span|p)\b[^>\r\n]{0,512}>/gi, '')
+  // Bounded visible single-line CommonMark phrasing spans can split an
+  // explicit identifier label (e.g. participant_**email**). Inspect only.
+  // The source evidence is never normalized or rewritten.
+  markdown = markdown.replace(/(\*\*|\*|`)([^\r\n*`]{1,80})\1/g, '$2')
   assert.doesNotMatch(
     markdown,
     emailLike,
