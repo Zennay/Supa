@@ -129,10 +129,21 @@ function validateShoppingBasket(basket: unknown, checkMoney: boolean): basket is
 
 /** A pure physical shopping-task identity never depends on price or cents. */
 export function isPhysicallyTrustworthyShoppingBasket(basket: unknown): basket is OneStoreBasket {
-  return validateShoppingBasket(basket, false)
+  // A corrupted runtime snapshot can include throwing accessors or revoked
+  // proxies. They are invalid shopping tasks, not a reason to crash the UI.
+  try {
+    return validateShoppingBasket(basket, false)
+  } catch {
+    return false
+  }
 }
 
 /** Persisted checkmarks require both physical coverage and coherent money. */
 export function isTrustworthyShoppingBasket(basket: unknown): basket is OneStoreBasket {
-  return validateShoppingBasket(basket, true)
+  // Refuse unreadable snapshots before checked IDs enter or leave storage.
+  try {
+    return validateShoppingBasket(basket, true)
+  } catch {
+    return false
+  }
 }
