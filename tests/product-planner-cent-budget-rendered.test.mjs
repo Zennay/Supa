@@ -149,3 +149,21 @@ test('product #709: an invalid recipe fixture estimate remains unknown in actual
   assert.doesNotMatch(html, /€NaN|€Infinity|Richtprijs: €/)
   assert.match(html, /aria-label="Recept voor Di"/)
 })
+
+test('product #1424: actual PlannerView SSR keeps a custom comma-budget and exact cent remainder', () => {
+  const { html, status } = renderBudget(1969, 0, 27.5)
+  assert.match(status, /7,81 over/)
+  assert.match(html, /Eigen weekbudget/)
+  assert.match(html, /value="27,50"/)
+  assert.match(html, />Instellen<\/button>/)
+  assert.doesNotMatch(status, /—|NaN|Infinity/)
+})
+
+test('product #1424: custom budget overspend and unknown product prices remain distinct', () => {
+  const over = renderBudget(3001, 0, 27.5)
+  assert.match(over.status, /2,51 boven budget/)
+  const partial = renderBudget(1969, 1, 27.5)
+  assert.match(partial.status, /1 mandregel open/)
+  assert.doesNotMatch(partial.status, /7,81 over|boven budget/)
+  assert.match(partial.html.replaceAll('\u00a0', ' '), /min\. [^<]*19,69/)
+})
