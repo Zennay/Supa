@@ -40,7 +40,7 @@ function runHygieneAgainstSyntheticIndex(paths) {
       cwd: root, env, encoding: 'utf8',
     })
     for (const path of paths) {
-      assert.ok(tracked.includes(`\\t${path}\\0`),
+      assert.ok(tracked.includes(`\t${path}\0`),
         `alternate index did not stage synthetic path: ${path}`)
     }
     const result = spawnSync(process.execPath,
