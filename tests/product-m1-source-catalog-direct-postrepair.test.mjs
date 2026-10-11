@@ -71,6 +71,38 @@ test('M1 fixed source catalog uses exact pinned URLs without proxy or retries', 
           'exactly one local no-proxy request to each registered path, no fallback')
       })
     }
+    // A pinned source URL is not permission to fetch it. Recheck the gate for
+    // every source, including explicit proxy configuration without opt-in.
+    const requestsBeforeDenial = (await readFile(seen, 'utf8')).trim().split('\\n')
+    for (const source of RESEARCH_SOURCES) {
+      const deniedOutput = join(root, 'denied-' + source.id)
+      await assert.rejects(
+        captureResearchSource(source.id, {
+          env: { PATH: bin + ':/usr/bin:/bin' },
+          outputDir: deniedOutput,
+        }),
+        /review retailer terms\/robots/,
+      )
+      await assert.rejects(
+        captureResearchSource(source.id, {
+          env: {
+            PATH: bin + ':/usr/bin:/bin',
+            SUPA_RESEARCH_PROXY_URL: 'http://127.0.0.1:8943',
+          },
+          outputDir: deniedOutput,
+        }),
+        /proxy configuration requires explicit approved research opt-in/,
+      )
+    }
+    await assert.rejects(
+      captureResearchSource('unregistered-source', {
+        env,
+        outputDir: join(root, 'unknown-source'),
+      }),
+      /unknown research source/,
+    )
+    assert.deepEqual((await readFile(seen, 'utf8')).trim().split('\\n'), requestsBeforeDenial,
+      'denied or unknown source must not invoke fake curl')
   } finally {
     await rm(root, { recursive: true, force: true })
   }
