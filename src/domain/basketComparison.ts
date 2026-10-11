@@ -56,13 +56,40 @@ function validIdentity(value: unknown): value is string {
   return typeof value === 'string' && /[\p{L}\p{N}\p{S}]/u.test(value)
 }
 
+// Financial facts must belong to the observed row; prototypes are not basket evidence.
+function hasOwnMatchedFacts(line: object): boolean {
+  const keys = [
+    'id', 'ingredientLabel', 'requirement', 'productId', 'productName',
+    'packs', 'pack', 'pricePerPackCents', 'lineTotalCents', 'matchScore',
+  ]
+  if (keys.some((key) => !Object.hasOwn(line, key))) return false
+
+  const matched = line as MatchedBasketLine
+  const requirement = matched.requirement
+  const pack = matched.pack
+  return (
+    requirement !== null && typeof requirement === 'object' &&
+    !Array.isArray(requirement) &&
+    Object.hasOwn(requirement, 'amount') &&
+    Object.hasOwn(requirement, 'unit') &&
+    pack !== null && typeof pack === 'object' &&
+    !Array.isArray(pack) &&
+    Object.hasOwn(pack, 'amount') &&
+    Object.hasOwn(pack, 'unit') &&
+    Object.hasOwn(pack, 'count')
+  )
+}
+
 function supportedBasketLine(line: unknown): line is BasketTraceLine {
-  if (line === null || typeof line !== 'object' || !('status' in line)) {
+  if (
+    line === null || typeof line !== 'object' ||
+    Array.isArray(line) || !Object.hasOwn(line, 'status')
+  ) {
     return false
   }
 
   const status = (line as { status?: unknown }).status
-  return status === 'matched' || status === 'unresolved'
+  return status === 'unresolved' || (status === 'matched' && hasOwnMatchedFacts(line))
 }
 
 function basketLines(basket: OneStoreBasket): BasketTraceLine[] {
