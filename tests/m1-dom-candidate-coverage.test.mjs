@@ -127,7 +127,9 @@ test('oversized source enumeration fails without parsing attacker files', async 
   const f = await fixture()
   try {
     const dir = join(f.outputDir, source.id)
-    await mkdir(dir)
+    // Keep the fixture directory private so this test reaches the separate
+    // >500-entry boundary rather than correctly stopping at unsafe modes.
+    await mkdir(dir, { mode: 0o700 })
     for (let i = 0; i < 501; i++) await writeFile(join(dir, 'junk-' + i), 'not private')
     const result = await inventoryDomCandidateReviews({ outputDir: f.outputDir, nowMs })
     assert.equal(result.status, 'rejected')
