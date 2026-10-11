@@ -39,9 +39,9 @@ function invalidPortableSegment(segment) {
   if (/[. ]$/.test(segment)) return true
   // Windows treats a device name as reserved even when an extension follows.
   // Windows also reserves superscript 1/2/3 device suffixes; trailing
-  // spaces before an extension cannot make a reserved device name portable.
+  // spaces before an extension cannot make a reserved device name portable.\n  // CONIN$ and CONOUT$ are also reserved Windows console device aliases,\n  // even when an extension follows.
   const stem = segment.split('.')[0].replace(/ +$/u, '')
-  return /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])$/i.test(stem)
+  return /^(?:con|prn|aux|nul|conin\\$|conout\\$|com[1-9¹²³]|lpt[1-9¹²³])$/i.test(stem)
 }
 
 function trackedFailures(entries) {
