@@ -65,6 +65,15 @@ function privacyScanText(markdown) {
       }
       return values[name]
     })
+    // Percent-encoded ASCII in mailto: recipient URLs still represents a
+    // visible destination email. Only decode short mailto fragments in the
+    // in-memory privacy scan, before Markdown links erase their destinations.
+    // Ordinary catalog URLs and original M3 evidence bytes remain untouched.
+    .replace(/mailto:[^\s<>"')]{1,512}/gi, (uri) =>
+      uri.replace(/%([0-9a-f]{2})/gi, (reference, hex) => {
+        const code = Number.parseInt(hex, 16)
+        return code >= 33 && code <= 126 ? String.fromCharCode(code) : reference
+      }))
     // CommonMark renders a backslash before punctuation as its literal
     // symbol. Keep even runs escaped: \\@ displays as \@, not as an
     // email address. Decode in scanner memory BEFORE the original raw
