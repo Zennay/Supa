@@ -74,10 +74,12 @@ function privacyScanText(markdown) {
     // CommonMark HTML5 named references can encode visible separators or
     // invisible format controls inside explicit personal identifiers.
     // Decode only reviewed names in scanner memory; evidence stays unchanged.
-    .replace(/&(lowbar|period|hyphen|colon|commat|equals|nbsp|Tab|NewLine|ZeroWidthSpace|zwnj|zwj|shy|NoBreak|lrm|rlm);/g, (_, name) => {
+    .replace(/&(lowbar|period|hyphen|colon|commat|equals|nbsp|Tab|NewLine|ensp|emsp|thinsp|ThinSpace|numsp|MediumSpace|hairsp|puncsp|ZeroWidthSpace|zwnj|zwj|shy|NoBreak|lrm|rlm);/g, (_, name) => {
       const values = {
         lowbar: '_', period: '.', hyphen: '-', colon: ':',
         commat: '@', equals: '=', nbsp: ' ', Tab: ' ', NewLine: ' ',
+        ensp: ' ', emsp: ' ', thinsp: ' ', ThinSpace: ' ',
+        numsp: ' ', MediumSpace: ' ', hairsp: ' ', puncsp: ' ',
         ZeroWidthSpace: '', zwnj: '', zwj: '', shy: '',
         NoBreak: '', lrm: '', rlm: '',
       }
