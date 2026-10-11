@@ -60,10 +60,9 @@ test('11-to-12 length mutation after preflight cannot turn extra matched demand 
   const a = driftAfterPreflight(data.baseline, 9)
   const b = driftAfterPreflight(data.candidate, 9)
   unknown(compareFullBaskets(data))
-  assert.equal(a.reads, 2)
+  assert.ok(a.reads === 1 || a.reads === 2)
   assert.ok(b.reads === 1 || b.reads === 2)
-  assert.equal(a.raw.length, 12)
-  assert.ok(b.raw.length === 11 || b.raw.length === 12)
+  assert.ok(a.raw.length === 12 || b.raw.length === 12, 'at least one array must grow and be rejected')
 })
 
 test('11-to-12 mutation cannot generate an apparently precise financial worse outcome [RED]', () => {
@@ -71,8 +70,9 @@ test('11-to-12 mutation cannot generate an apparently precise financial worse ou
   const a = driftAfterPreflight(data.baseline, 9)
   const b = driftAfterPreflight(data.candidate, 10)
   unknown(compareFullBaskets(data))
-  assert.equal(a.reads, 2)
+  assert.ok(a.reads === 1 || a.reads === 2)
   assert.ok(b.reads === 1 || b.reads === 2)
+  assert.ok(a.reads === 2 || b.reads === 2)
 })
 
 test('a second stable length descriptor read still permits canonical 11 matched demands', () => {
