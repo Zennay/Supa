@@ -166,7 +166,10 @@ function ownData(record: unknown, key: PropertyKey): { value: unknown } | null {
     : null
 }
 
-function safeRuntimeBasket(basket: unknown): boolean {
+function safeRuntimeBasket(
+  basket: unknown,
+  validatedLength: { value: number | null },
+): boolean {
   const keys = [
     'store', 'lines', 'selectedMealCount', 'totalCents',
     'matchedLineCount', 'unresolvedLineCount',
@@ -190,6 +193,8 @@ function safeRuntimeBasket(basket: unknown): boolean {
   // consulting any physical slot (same ceiling as decimal demand arithmetic).
   if (!Number.isSafeInteger(length) || (length as number) < 0 ||
       (length as number) > MAX_PHYSICAL_BASKET_LINES) return false
+  // Pin exactly the physical length that was inspected, not just its bound.
+  validatedLength.value = length as number
 
   for (let index = 0; index < (length as number); index += 1) {
     const physical = ownData(lines, String(index))
@@ -270,7 +275,10 @@ function snapshotRuntimeLine(line: unknown): BasketTraceLine {
     : line as BasketTraceLine
 }
 
-function snapshotRuntimeBasket(basket: unknown): OneStoreBasket {
+function snapshotRuntimeBasket(
+  basket: unknown,
+  validatedLength: number | null,
+): OneStoreBasket {
   const originalLines = ownData(basket, 'lines')?.value
   const lines: BasketTraceLine[] = []
   if (Array.isArray(originalLines)) {
@@ -279,7 +287,8 @@ function snapshotRuntimeBasket(basket: unknown): OneStoreBasket {
     // before *any* snapshot index; never trust a previous length check.
     const length = ownData(originalLines, 'length')?.value
     if (typeof length !== 'number' || !Number.isSafeInteger(length) ||
-        length < 0 || length > MAX_PHYSICAL_BASKET_LINES) {
+        length < 0 || length > MAX_PHYSICAL_BASKET_LINES ||
+        length !== validatedLength) {
       throw new Error('basket length changed outside the snapshot safety bound')
     }
     for (let index = 0; index < length; index += 1) {
@@ -578,12 +587,15 @@ export function compareFullBaskets(input: {
     // No unsafe getter is visited during this validation.
     const baseline = ownData(input, 'baseline')?.value
     const candidate = ownData(input, 'candidate')?.value
-    if (!safeRuntimeBasket(baseline) || !safeRuntimeBasket(candidate)) {
+    const baselineLength = { value: null as number | null }
+    const candidateLength = { value: null as number | null }
+    if (!safeRuntimeBasket(baseline, baselineLength) ||
+        !safeRuntimeBasket(candidate, candidateLength)) {
       return runtimeUnknownComparison()
     }
     return compareInspectedBaskets({
-      baseline: snapshotRuntimeBasket(baseline),
-      candidate: snapshotRuntimeBasket(candidate),
+      baseline: snapshotRuntimeBasket(baseline, baselineLength.value),
+      candidate: snapshotRuntimeBasket(candidate, candidateLength.value),
     })
   } catch {
     // Invalid proxies, descriptor traps or a changed runtime snapshot cannot
