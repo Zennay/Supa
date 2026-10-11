@@ -102,7 +102,15 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   // Bounded visible single-line CommonMark phrasing spans can split an
   // explicit identifier label (e.g. participant_**email**). Inspect only.
   // The source evidence is never normalized or rewritten.
-  markdown = markdown.replace(/(\*\*|\*|`)([^\r\n*`]{1,80})\1/g, '$2')
+  // Resolve a bounded number of nested CommonMark phrasing layers. A
+  // single pass leaves ***name*** or **`email`** partly marked up and can
+  // hide an explicit M3 identifier field. Nothing is rewritten on disk.
+  const visibleSpan = /(\*\*|\*|`)([^\r\n*`]{1,80})\1/g
+  for (let depth = 0; depth < 3; depth++) {
+    const next = markdown.replace(visibleSpan, '$2')
+    if (next === markdown) break
+    markdown = next
+  }
   assert.doesNotMatch(
     markdown,
     emailLike,
