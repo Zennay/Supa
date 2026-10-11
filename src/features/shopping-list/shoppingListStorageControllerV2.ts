@@ -176,19 +176,25 @@ export function openShoppingProgressStorageV2(
   let storageReadable = false
   let initialV2: string | null = null
   let initialV1: string | null = null
+  // Pin explicit migration consent once within the guarded storage preflight.
+  let allowLegacyUpgrade = false
 
   if (storage !== null) {
     try {
       initialV2 = storage.getItem(shoppingListProgressV2StorageKey)
       storageReadable = true
-      if (initialV2 === null && options.allowLegacyUpgrade === true) {
-        initialV1 = storage.getItem(shoppingListProgressStorageKey)
+      if (initialV2 === null) {
+        // A present v2 record never needs a legacy option read. Hostile or
+        // stateful runtime option getters may throw; handle them only here.
+        allowLegacyUpgrade = options?.allowLegacyUpgrade === true
+        if (allowLegacyUpgrade) initialV1 = storage.getItem(shoppingListProgressStorageKey)
       }
     } catch {
       // Do not trust partial storage reads or turn a failure into migration.
       storageReadable = false
       initialV2 = null
       initialV1 = null
+      allowLegacyUpgrade = false
     }
   }
 
@@ -208,7 +214,7 @@ export function openShoppingProgressStorageV2(
     basket,
     storageReadable ? initialV2 : null,
     {
-      allowLegacyUpgrade: storageReadable && options.allowLegacyUpgrade === true,
+      allowLegacyUpgrade: storageReadable && allowLegacyUpgrade,
       rawV1: initialV1,
     },
   )
