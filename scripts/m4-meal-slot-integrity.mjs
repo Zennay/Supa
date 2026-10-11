@@ -83,7 +83,13 @@ function slotKey(value) {
       throw new Error('M4 meal outcome slot contains unsafe characters')
     }
   }
-  return value.normalize('NFKC')
+  const canonical = value.normalize('NFKC')
+  // A standalone modifier/variation selector has no perceptible identity.
+  // Preserve marks when attached to an actual letter, numeral or symbol.
+  if (!/[\p{L}\p{N}\p{P}\p{S}]/u.test(canonical)) {
+    throw new Error('M4 meal outcome slot must include a visible base character')
+  }
+  return canonical
 }
 
 export function validateM4MealSlotIntegrity(input) {
