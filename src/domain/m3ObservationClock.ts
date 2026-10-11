@@ -100,7 +100,31 @@ export function evaluateM3ObservationInterval(
   }
 }
 
-/** Formats a validated timestamp's original nanoseconds without truncation. */
+function formatM3EpochNanoseconds(epochNanos: bigint): string | null {
+  // Floor division is required for a negative epoch with fractional seconds.
+  let seconds = epochNanos / 1_000_000_000n
+  let subsecond = epochNanos % 1_000_000_000n
+  if (subsecond < 0n) {
+    seconds -= 1n
+    subsecond += 1_000_000_000n
+  }
+
+  const utc = new Date(Number(seconds * 1000n))
+  if (!Number.isFinite(utc.getTime())) return null
+  const fraction =
+    subsecond % NANOS_PER_MILLISECOND === 0n
+      ? (subsecond / NANOS_PER_MILLISECOND).toString().padStart(3, '0')
+      : subsecond.toString().padStart(9, '0')
+  return utc.toISOString().replace(/\\.000Z$/, '') + '.' + fraction + 'Z'
+}
+
+/** Canonical UTC rendering never silently drops meaningful nanoseconds. */
+export function normalizeM3Timestamp(value: unknown): string | null {
+  const instant = parseM3TimestampNanos(value)
+  return instant === null ? null : formatM3EpochNanoseconds(instant)
+}
+
+/** Formats an exact UTC deadline without truncating the observation clock. */
 export function m3TimestampWithElapsedHours(
   firstObservedAt: unknown,
   hours: unknown,
@@ -110,17 +134,5 @@ export function m3TimestampWithElapsedHours(
   if (start === null || ratio === null) return null
   const increment = ratio.numerator * NANOS_PER_HOUR
   if (increment % ratio.denominator !== 0n) return null
-
-  const end = start + increment / ratio.denominator
-  const seconds = end / 1_000_000_000n
-  const subsecond = end % 1_000_000_000n
-  // Date deals only with the whole-second calendar rendering; the fraction
-  // is attached verbatim, and no precision information is dropped.
-  const date = new Date(Number(seconds * 1000n))
-  if (!Number.isFinite(date.getTime())) return null
-
-  return (
-    date.toISOString().replace(/\.000Z$/, '') +
-    '.' + subsecond.toString().padStart(9, '0') + 'Z'
-  )
+  return formatM3EpochNanoseconds(start + increment / ratio.denominator)
 }
