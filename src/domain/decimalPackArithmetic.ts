@@ -112,13 +112,14 @@ export function sumDecimalDemandUnits(
     scale = commonScale
   }
 
-  const result = Number(coefficient) / Number(10n ** BigInt(scale)) / Number(target.factor)
+  // Convert the exact decimal once. Number(coefficient) / 10^scale can
+  // overflow/underflow prematurely even when the final decimal is finite.
+  const resultScale = scale + (target.factor === 1000n ? 3 : 0)
+  const result = Number(`${coefficient}e-${resultScale}`)
   const parsed = decimal(result)
-  if (!parsed) return null
-  return (
-    parsed.coefficient * target.factor * 10n ** BigInt(scale) ===
-    coefficient * 10n ** BigInt(parsed.scale)
-  ) ? result : null
+  return parsed && equalDecimal(parsed, { coefficient, scale: resultScale })
+    ? result
+    : null
 }
 
 
