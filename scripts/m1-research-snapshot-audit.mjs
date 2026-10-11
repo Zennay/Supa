@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, open } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { RESEARCH_SOURCES } from './m1-multistore-research.mjs'
 
@@ -117,6 +117,24 @@ async function readBoundedRegularFile(path, maxBytes) {
   }
 }
 
+// A pathname can reach an otherwise ordinary source directory through a
+// symlinked parent. Check each lexical component, not only the final two
+// capture directories, before opening any private HTML/metadata files.
+async function requireCanonicalCaptureAncestors(path) {
+  let current = resolve(path)
+  while (true) {
+    let details
+    try { details = await lstat(current) }
+    catch { throw new Error('capture audit requires real directories') }
+    if (!details.isDirectory() || details.isSymbolicLink()) {
+      throw new Error('capture audit requires real directories')
+    }
+    const parent = dirname(current)
+    if (parent === current) return
+    current = parent
+  }
+}
+
 /**
  * Audit an already saved private research pair. Caller selects a registered
  * source and an exact capture stem; no crawling or outbound requests occur.
@@ -127,6 +145,7 @@ export async function auditCaptureFiles({
   if (!RESEARCH_SOURCES.some(source => source.id === sourceId)) throw new Error('unknown source')
   if (typeof stem !== 'string' || !STEM_RE.test(stem)) throw new Error('invalid capture stem')
   const dir = join(outputDir, sourceId)
+  await requireCanonicalCaptureAncestors(dir)
   for (const path of [outputDir, dir]) {
     const details = await lstat(path)
     if (!details.isDirectory() || details.isSymbolicLink()) throw new Error('capture audit requires real directories')
