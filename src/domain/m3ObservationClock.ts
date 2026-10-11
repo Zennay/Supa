@@ -111,6 +111,10 @@ function formatM3EpochNanoseconds(epochNanos: bigint): string | null {
 
   const utc = new Date(Number(seconds * 1000n))
   if (!Number.isFinite(utc.getTime())) return null
+  // The public M3 parser only accepts four-digit years 0100..9999.
+  // Reject UTC offset/deadline rollovers instead of emitting timestamps
+  // that cannot round-trip through that same fail-closed parser.
+  if (utc.getUTCFullYear() < 100 || utc.getUTCFullYear() > 9999) return null
   const fraction =
     subsecond % NANOS_PER_MILLISECOND === 0n
       ? (subsecond / NANOS_PER_MILLISECOND).toString().padStart(3, '0')
