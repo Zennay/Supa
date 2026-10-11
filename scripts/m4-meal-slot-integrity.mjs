@@ -86,7 +86,7 @@ function slotKey(value) {
   const canonical = value.normalize('NFKC')
   // A standalone modifier/variation selector has no perceptible identity.
   // Preserve marks when attached to an actual letter, numeral or symbol.
-  if (!/[\\p{L}\\p{N}\\p{P}\\p{S}]/u.test(canonical)) {
+  if (!/[\p{L}\p{N}\p{P}\p{S}]/u.test(canonical)) {
     throw new Error('M4 meal outcome slot must include a visible base character')
   }
   return canonical
