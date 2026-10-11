@@ -20,6 +20,8 @@ Before collection, check each retailer's terms and robots rules and obtain any n
 
 Run: `node scripts/m1-multistore-research.mjs --list`
 
+**Registered URL identity:** `--list` is the reviewed allowlist of exactly five source IDs and exact HTTPS URLs shown above, not a discovery endpoint. On the staged immutable-catalog repair [#1306](https://github.com/Zennay/Supa/issues/1306), both the exported list **and each entry's ID, store, kind and URL** are frozen so another import in the same process cannot retarget a permitted source to a different page—even on the same retailer host. This runtime guard is defense-in-depth, **not** retailer consent or an exception to the manual terms/robots review. Do not patch around it with dynamic URLs or substitute captures; any new registered source requires an explicit reviewed code change and new source-use approval before requesting it. Do not treat a passing synthetic catalog test as actual retailer HTML/DOM/price or M3 savings evidence.
+
 After confirming capture is allowed, opt in to **one registered source**:
 
 ```sh
