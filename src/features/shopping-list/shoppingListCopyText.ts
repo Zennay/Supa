@@ -28,6 +28,34 @@ function baseQuantity(amount: number, unit: string) {
   return { family, amount: converted }
 }
 
+/** Keep human-readable decimal quantities exact at physical pack boundaries.
+ * Number.toString() expresses the chosen input quantity as a canonical decimal;
+ * rational BigInt arithmetic avoids IEEE-754 ceil/multiplication overshoot.
+ */
+function decimalBaseQuantity(amount: number, unit: string) {
+  const match = /^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i.exec(String(amount))
+  if (!match) return null
+  const shift = Number(match[3] ?? 0) - (match[2]?.length ?? 0)
+  const digits = BigInt(match[1] + (match[2] ?? ''))
+  const numerator = digits * (unit === 'kg' || unit === 'l' ? 1000n : 1n)
+  if (numerator <= 0n) return null
+  return shift >= 0
+    ? { numerator: numerator * 10n ** BigInt(shift), denominator: 1n }
+    : { numerator, denominator: 10n ** BigInt(-shift) }
+}
+
+function exactMinimalPackCount(
+  demandAmount: number, demandUnit: string,
+  packAmount: number, packUnit: string, count: number,
+): bigint | null {
+  const demand = decimalBaseQuantity(demandAmount, demandUnit)
+  const pack = decimalBaseQuantity(packAmount, packUnit)
+  if (!demand || !pack) return null
+  const needed = demand.numerator * pack.denominator
+  const perPurchase = pack.numerator * BigInt(count) * demand.denominator
+  return perPurchase > 0n ? (needed + perPurchase - 1n) / perPurchase : null
+}
+
 function dutchAmount(value: number): string {
   return String(value).replace('.', ',')
 }
@@ -98,13 +126,16 @@ function buildShoppingListCopyTextUnchecked(
       perPackQuantity.amount * line.pack.count
     const available = perPurchasedPack * line.packs
     const minimumPacks = safePositive(perPurchasedPack) && required
-      ? Math.ceil(required.amount / perPurchasedPack)
+      ? exactMinimalPackCount(
+          requirement.amount, requirement.unit, line.pack.amount, line.pack.unit,
+          line.pack.count,
+        )
       : null
-    // Sufficient coverage alone is unsafe: stale rows may buy needless extra packs.
+    // Exact rational comparison neither invents extra packs nor tolerates shortfalls.
     if (!required || !perPackQuantity || required.family !== perPackQuantity.family ||
-        !safePositive(available) || required.amount > available ||
-        !Number.isSafeInteger(minimumPacks) || minimumPacks === 0 ||
-        line.packs !== minimumPacks) return null
+        !safePositive(available) || minimumPacks === null ||
+        minimumPacks === 0n || minimumPacks > BigInt(Number.MAX_SAFE_INTEGER) ||
+        BigInt(line.packs) !== minimumPacks) return null
 
     matchedCount += 1
     const packUnit = quantityUnitLabelNl(line.pack.unit, line.pack.amount)
