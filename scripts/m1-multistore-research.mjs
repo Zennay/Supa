@@ -15,6 +15,7 @@ export const RESEARCH_SOURCES = Object.freeze([
 ])
 const HOSTS = Object.freeze({ ah: 'www.ah.nl', dirk: 'www.dirk.nl', hoogvliet: 'www.hoogvliet.com', jumbo: 'www.jumbo.com' })
 const MAX_BYTES = 5 * 1024 * 1024
+const MAX_HEADER_BYTES = 64 * 1024
 const TIMEOUT_SECONDS = 20
 
 export function validateResearchSource(source) {
@@ -47,6 +48,12 @@ export function researchTransport(env = process.env) {
 }
 
 export function parseCaptureHeaders(raw) {
+  // Body max-filesize does not cap curl's separate --dump-header output.
+  // Reject unbounded header bytes before any parsing/allocation.
+  if (typeof raw !== 'string' || raw.length > MAX_HEADER_BYTES ||
+      Buffer.byteLength(raw, 'utf8') > MAX_HEADER_BYTES) {
+    throw new Error('response headers exceed byte budget')
+  }
   const blocks = raw.replace(/\r\n/g, '\n').trim().split(/\n\n+/)
   const last = blocks.at(-1) || ''
   const lines = last.split('\n')
@@ -125,6 +132,10 @@ export async function captureResearchSource(id, { env = process.env, outputDir =
     if (transport.proxy) restrictedEnv.HTTPS_PROXY = transport.proxy
     const response = await runCurl(args, restrictedEnv)
     if (response.code !== 0) throw new Error('capture failed safely (curl code ' + response.code + '; no retry/proxy fallback)')
+    const headerDetails = await stat(headerPath)
+    if (!headerDetails.isFile() || headerDetails.size > MAX_HEADER_BYTES) {
+      throw new Error('response headers exceed byte budget')
+    }
     const headers = parseCaptureHeaders(await readFile(headerPath, 'utf8'))
     if (headers.status !== 200) throw new Error('source returned HTTP ' + headers.status + '; capture stopped without retry')
     if (!['text/html', 'application/xhtml+xml'].includes(headers.contentType)) throw new Error('source did not return HTML')
