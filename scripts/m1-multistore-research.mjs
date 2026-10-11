@@ -57,6 +57,9 @@ export function parseCaptureHeaders(raw) {
     const colon = line.indexOf(':')
     if (colon < 1) continue
     const k = line.slice(0, colon).trim().toLowerCase()
+    // Content-Type is singular. A first-wins map could label conflicting HTTP
+    // intermediary headers as HTML and wrongly archive an ambiguous response.
+    if (k === 'content-type' && headers.has(k)) throw new Error('ambiguous response content-type')
     if (!headers.has(k)) headers.set(k, line.slice(colon + 1).trim())
   }
   return { status: Number(response[1]), contentType: (headers.get('content-type') || '').split(';')[0].trim().toLowerCase() }
