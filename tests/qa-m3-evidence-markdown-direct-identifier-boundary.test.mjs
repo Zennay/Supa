@@ -54,7 +54,11 @@ function privacyScanText(markdown) {
     .replace(/[\u00ad\u200b-\u200f\u2060\u2066-\u2069\ufeff]/g, '')
     .replace(/&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/g, (reference, hex, decimal) => {
       const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
-      return code >= 32 && code <= 126 ? String.fromCharCode(code) : reference
+      // HTML renders these particular numeric references invisibly.
+      // Drop them only from the scan copy, just like raw format controls.
+      const invisible = code === 0x00ad || (code >= 0x200b && code <= 0x200f) ||
+        code === 0x2060 || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff
+      return invisible ? '' : code >= 32 && code <= 126 ? String.fromCharCode(code) : reference
     })
     // CommonMark also renders HTML5 named references for these visible
     // identifier delimiters. Keep this deliberately small and inspect-only.
@@ -114,6 +118,9 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   // Strip only bounded presentational tags in scan text, never in evidence.
   // Original email/link targets were already checked before this step.
   markdown = markdown.replace(/<\/?(?:strong|b|em|i|code|span|p|mark|u|small|sup|sub|kbd|abbr)\b[^>\r\n]{0,512}>/gi, '')
+  // HTML <wbr> is a void, visually empty word-break hint (not paired).
+  // Prevent invisible boundaries from splitting an explicit identity label.
+  markdown = markdown.replace(/<wbr\\b[^<>\\r\\n]{0,512}\\/?>/gi, '')
   // Bounded visible single-line CommonMark phrasing spans can split an
   // explicit identifier label (e.g. participant_**email**). Inspect only.
   // The source evidence is never normalized or rewritten.
