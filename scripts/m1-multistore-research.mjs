@@ -61,8 +61,11 @@ export function parseCaptureHeaders(raw) {
   if (!response) throw new Error('unrecognized HTTP response headers')
   const headers = new Map()
   for (const line of lines) {
+    // Obsolete folded headers or malformed orphan lines can hide extra
+    // transfer codings; never archive ambiguous raw bytes as HTML.
+    if (/^[ \t]/.test(line)) throw new Error('ambiguous response header continuation')
     const colon = line.indexOf(':')
-    if (colon < 1) continue
+    if (colon < 1) throw new Error('malformed response header line')
     const k = line.slice(0, colon).trim().toLowerCase()
     // Content-Type is singular. A first-wins map could label conflicting HTTP
     // intermediary headers as HTML and wrongly archive an ambiguous response.
