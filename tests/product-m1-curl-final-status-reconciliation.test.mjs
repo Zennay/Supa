@@ -48,7 +48,6 @@ test('M1 private capture reconciles curl final status with the final response he
       { name: 'malformed-status', headerStatus: 200, curlStatus: '2xx' },
       { name: 'consistent-403', headerStatus: 403, curlStatus: '403', expectedNon200: true },
     ]
-    let count = 0
     for (const scenario of cases) {
       await t.test(scenario.name, async () => {
         await writeFile(headers, 'HTTP/1.1 ' + scenario.headerStatus + ' Synthetic\r\nContent-Type: text/html\r\n\r\n')
@@ -76,8 +75,7 @@ test('M1 private capture reconciles curl final status with the final response he
           }, scenario.name)
           await assert.rejects(readdir(outputDir), { code: 'ENOENT' })
         }
-        count += 1
-        assert.equal((await readFile(calls, 'utf8')).trim().split('\n').length, count,
+        assert.equal((await readFile(calls, 'utf8')).trim().split('\n').length, cases.indexOf(scenario) + 1,
           'a single bounded offline fake curl request, no retry')
       })
     }
