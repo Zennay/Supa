@@ -26,7 +26,7 @@ function isForbiddenTrackedPath(p) {
   const basename = rawBasename.toLowerCase()
   if (components.some((v) => v === 'node_modules' || v === 'dist' ||
       v === 'artifacts' || v === '.vscode' || v === '.idea')) return true
-  if (components.some((v) => v === '.DS_Store')) return true
+  if (components.some((v) => v === '.ds_store')) return true
   if (basename === '.env' || (basename.startsWith('.env.') && rawBasename !== '.env.example')) return true
   if (basename.endsWith('.log') || basename.endsWith('.tsbuildinfo')) return true
   if (p.toLowerCase() === 'vite.config.js' || p.toLowerCase() === 'vite.config.d.ts') return true
