@@ -11,6 +11,11 @@ type PinnedMonetaryFacts = WeakMap<object, {
   requirement: object
   requirementAmount: unknown
   requirementUnit: unknown
+  packs: unknown
+  pack: object
+  packAmount: unknown
+  packUnit: unknown
+  packCount: unknown
 }>
 
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
@@ -224,22 +229,31 @@ function safeRuntimeBasket(
       let pricePerPackCents: unknown
       let lineTotalCents: unknown
       let requirement: unknown
+      let pack: unknown
+      let packs: unknown
       for (const key of keys) {
         const descriptor = ownData(line, key)
         if (!descriptor) return false
         if (key === 'pricePerPackCents') pricePerPackCents = descriptor.value
         if (key === 'lineTotalCents') lineTotalCents = descriptor.value
         if (key === 'requirement') requirement = descriptor.value
+        if (key === 'pack') pack = descriptor.value
+        if (key === 'packs') packs = descriptor.value
       }
-      const pack = ownData(line, 'pack')?.value
       const amountData = ownData(requirement, 'amount')
       const unitData = ownData(requirement, 'unit')
       if (!amountData || !unitData || requirement === null ||
           typeof requirement !== 'object') return false
-      if (['amount', 'unit', 'count'].some((key) => !ownData(pack, key))) return false
+      const packAmount = ownData(pack, 'amount')
+      const packUnit = ownData(pack, 'unit')
+      const packCount = ownData(pack, 'count')
+      if (!packAmount || !packUnit || !packCount || pack === null ||
+          typeof pack !== 'object') return false
       pinnedMonetaryFacts.set(line as object, {
         pricePerPackCents, lineTotalCents, requirement,
         requirementAmount: amountData.value, requirementUnit: unitData.value,
+        packs, pack, packAmount: packAmount.value, packUnit: packUnit.value,
+        packCount: packCount.value,
       })
     } else if (status === 'unresolved' && !ownData(line, 'id')) {
       return false
@@ -280,13 +294,23 @@ function snapshotRuntimeLine(
       throw new Error('basket requirement descriptors changed after preflight')
     }
     const pack = ownData(line, 'pack')?.value
+    const packs = ownData(line, 'packs')?.value
+    const packAmount = ownData(pack, 'amount')?.value
+    const packUnit = ownData(pack, 'unit')?.value
+    const packCount = ownData(pack, 'count')?.value
+    if (pack !== pinned.pack || !Object.is(packs, pinned.packs) ||
+        !Object.is(packAmount, pinned.packAmount) ||
+        !Object.is(packUnit, pinned.packUnit) ||
+        !Object.is(packCount, pinned.packCount)) {
+      throw new Error('basket physical pack descriptors changed after preflight')
+    }
     return {
       status: 'matched',
       id: ownData(line, 'id')?.value as string,
       ingredientLabel: ownData(line, 'ingredientLabel')?.value as string,
       productId: ownData(line, 'productId')?.value as string,
       productName: ownData(line, 'productName')?.value as string,
-      packs: ownData(line, 'packs')?.value as number,
+      packs: packs as number,
       pricePerPackCents: pricePerPackCents as number,
       lineTotalCents: lineTotalCents as number,
       matchScore: ownData(line, 'matchScore')?.value as number,
@@ -296,9 +320,9 @@ function snapshotRuntimeLine(
         unit: requirementUnit as MatchedBasketLine['requirement']['unit'],
       },
       pack: {
-        amount: ownData(pack, 'amount')?.value as number,
-        unit: ownData(pack, 'unit')?.value as MatchedBasketLine['pack']['unit'],
-        count: ownData(pack, 'count')?.value as number,
+        amount: packAmount as number,
+        unit: packUnit as MatchedBasketLine['pack']['unit'],
+        count: packCount as number,
       },
     }
   }
