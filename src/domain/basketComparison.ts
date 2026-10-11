@@ -496,6 +496,16 @@ function compareInspectedBaskets({
       continue
     }
 
+    // Other invalid rows may have already added inspection reasons. Never
+    // subtract caller-controlled non-numeric data before abstaining.
+    if (
+      typeof baselineLine.lineTotalCents !== 'number' ||
+      typeof candidateLine.lineTotalCents !== 'number'
+    ) {
+      reasons.push(`ingredient line total is not numeric for ${id}`)
+      continue
+    }
+
     lineDeltas.push({
       id,
       ingredientLabel: baselineLine.ingredientLabel,
