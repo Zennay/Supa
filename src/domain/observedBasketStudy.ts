@@ -95,6 +95,12 @@ function validTimestamp(value: unknown) {
     if (offsetHour > 23 || offsetMinute > 59) return null
   }
 
+  // Date.parse truncates fractional seconds to milliseconds. Reject any
+  // nonzero submillisecond remainder rather than claim a ≤24h (or custom)
+  // observation window from rounded clocks. Extra trailing zeros are exact.
+  const fraction = /\\.(\\d{1,9})(?:Z|[+-]\\d{2}:\\d{2})$/.exec(value)?.[1]
+  if (fraction && /[1-9]/.test(fraction.slice(3))) return null
+
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) ? timestamp : null
 }
