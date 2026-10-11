@@ -80,6 +80,53 @@ function hasDuplicateRootKeys(raw: string): boolean {
   return false
 }
 
+/**
+ * A v2 client's "foreign basket" exception only applies to identities this
+ * client could itself produce. Any other opaque string may belong to a later
+ * schema or corrupted record and must remain byte-for-byte read-only.
+ *
+ * Reconstruct the physical shape and reuse the single canonical identity
+ * builder; comparing its exact serialization also detects duplicate/unknown
+ * identity fields and non-canonical forms without inventing a second schema.
+ */
+function isCanonicalPhysicalDemandIdentity(rawIdentity: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(rawIdentity)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
+    const input = parsed as Record<string, unknown>
+    if (input.schemaVersion !== 2 || !Array.isArray(input.lines)) return false
+
+    const lines = input.lines.map((value: unknown) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+      const line = value as Record<string, unknown>
+      const physical = {
+        id: line.id,
+        status: line.status,
+        requirement: { amount: line.amount, unit: line.unit },
+      }
+      return line.status === 'matched'
+        ? {
+            ...physical,
+            productId: line.productId,
+            packs: line.packs,
+            pack: {
+              amount: line.packAmount,
+              unit: line.packUnit,
+              count: line.packCount,
+            },
+          }
+        : physical
+    })
+
+    return shoppingListDemandIdentity({
+      store: { id: input.storeId },
+      lines,
+    } as unknown as OneStoreBasket) === rawIdentity
+  } catch {
+    return false
+  }
+}
+
 function recognizedStoredV2(raw: string | null, basket: OneStoreBasket): boolean {
   if (raw === null) return true
   if (typeof raw !== 'string') return false
@@ -98,6 +145,9 @@ function recognizedStoredV2(raw: string | null, basket: OneStoreBasket): boolean
 
     // Silently deduplicating a durable checklist can destroy information.
     if (new Set(item.doneLineIds).size !== item.doneLineIds.length) return false
+    // A nonempty opaque string is not proof of a supported *foreign* v2 task.
+    // An older client must not turn it into its own physical basket on save.
+    if (!isCanonicalPhysicalDemandIdentity(item.demandIdentity)) return false
     const liveIdentity = shoppingListDemandIdentity(basket)
     if (liveIdentity !== item.demandIdentity) return true
 
