@@ -113,6 +113,14 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
   )
 }
 
+// Array.some()/filter() skip holes: a missing physical line must never vanish.
+function hasMissingOwnLine(lines: unknown[]): boolean {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!Object.hasOwn(lines, index)) return true
+  }
+  return false
+}
+
 function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   const reasons: string[] = []
   const rawLines: unknown[] = Array.isArray(basket.lines) ? basket.lines : []
@@ -125,6 +133,8 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
 
   if (!Array.isArray(basket.lines)) {
     reasons.push(`${label} basket lines are not an array`)
+  } else if (hasMissingOwnLine(rawLines)) {
+    reasons.push(`${label} basket has an unobserved physical line slot`)
   } else if (rawLines.some((line) => !supportedBasketLine(line))) {
     reasons.push(`${label} basket contains an unsupported line shape or status`)
   }
