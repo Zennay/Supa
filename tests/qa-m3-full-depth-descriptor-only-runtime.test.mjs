@@ -84,7 +84,7 @@ for (const [label, rise, expected] of [
     assert.equal(result.claimable, true)
     assert.equal(result.outcome, expected)
     assert.equal(result.deltaCents, totalPacks * rise)
-    assert.equal(result.savingsCents, -(totalPacks * rise))
+    assert.equal(result.savingsCents, rise === 0 ? 0 : -(totalPacks * rise))
     assert.equal(result.lineDeltas.length, 11)
     assert.ok(result.lineDeltas.every(line => Number.isSafeInteger(line.deltaCents)))
     assert.equal(data.counts.ordinaryGets, 0)
