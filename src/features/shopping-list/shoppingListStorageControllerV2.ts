@@ -79,6 +79,16 @@ export function openShoppingProgressStorageV2(
     },
 
     /**
+     * Only a deliberate user action should call this. Restarting the current
+     * shopping round writes an empty v2 completion snapshot after the caller
+     * explicitly invokes persist(); the legacy v1 key remains untouched.
+     */
+    clear(): ShoppingProgressSessionV2 {
+      session = startShoppingProgressSessionV2(currentBasket, null)
+      return snapshot()
+    },
+
+    /**
      * Explicitly call only after a user event / approved effect, never during
      * render. Invalid basket or blocked storage never writes stale state.
      */

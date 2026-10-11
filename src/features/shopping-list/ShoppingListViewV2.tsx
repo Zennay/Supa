@@ -67,6 +67,15 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     setSaveFailed(next.serialized !== null && !controller.persist())
   }
 
+  function clearChecked() {
+    // Never touch legacy v1 or persist a stale basket: clear is an explicit
+    // user action against the latest physical shopping demand only.
+    controller.rebase(basket)
+    const next = controller.clear()
+    setSession(next)
+    setSaveFailed(next.serialized !== null && !controller.persist())
+  }
+
   return (
     <section className="screen">
       <div className="section-heading">
@@ -91,9 +100,16 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
       )}
 
       {rows.length > 0 && (
-        <p className="shopping-progress" role="status" aria-live="polite">
-          {completedCount} van {rows.length} afgevinkt
-        </p>
+        <div className="section-heading">
+          <p className="shopping-progress" role="status" aria-live="polite">
+            {completedCount} van {rows.length} afgevinkt
+          </p>
+          {completedCount > 0 && (
+            <button className="ghost-button" type="button" onClick={clearChecked}>
+              Vinkjes wissen
+            </button>
+          )}
+        </div>
       )}
 
       <div className="list-card">
