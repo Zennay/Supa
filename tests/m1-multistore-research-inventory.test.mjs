@@ -24,8 +24,8 @@ async function capture(root, source, stamp, overrides = {}, body = html) {
     mediaType: 'text/html', httpStatus: 200, proxyMode: 'direct',
     bytes: html.length, sha256: hash, ...overrides,
   }
-  await writeFile(join(dir, stem + '.html'), body)
-  await writeFile(join(dir, stem + '.json'), JSON.stringify(metadata))
+  await writeFile(join(dir, stem + '.html'), body, { mode: 0o600 })
+  await writeFile(join(dir, stem + '.json'), JSON.stringify(metadata), { mode: 0o600 })
   return { dir, stem }
 }
 
