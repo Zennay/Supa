@@ -147,6 +147,11 @@ export async function captureResearchSource(id, { env = process.env, outputDir =
       throw new Error('response headers exceed byte budget')
     }
     const headers = parseCaptureHeaders(await readFile(headerPath, 'utf8'))
+    // curl's final HTTP code and the last dumped response block must agree.
+    // Never archive a misleading 200 when transport status is missing or different.
+    if (!/^\d{3}$/.test(response.status) || Number(response.status) !== headers.status) {
+      throw new Error('curl final HTTP status disagrees with response headers')
+    }
     if (headers.status !== 200) throw new Error('source returned HTTP ' + headers.status + '; capture stopped without retry')
     if (!['text/html', 'application/xhtml+xml'].includes(headers.contentType)) throw new Error('source did not return HTML')
     const bodyStats = await stat(bodyPath)
