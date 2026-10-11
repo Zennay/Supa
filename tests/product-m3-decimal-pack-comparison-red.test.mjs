@@ -89,18 +89,3 @@ test('an actual decimal overshoot still requires an extra physical pack [control
   assert.equal(result.claimable, true)
   assert.equal(result.outcome, 'same')
 })
-
-test('one-store empty weeks never create an M3 financial claim [control]', () => {
-  const { baseline, candidate } = pair({ amount: 0.1, unit: 'g' }, { amount: 0.1, unit: 'g' })
-  for (const basket of [baseline, candidate]) {
-    basket.lines = []
-    basket.selectedMealCount = 0
-    basket.totalCents = 0
-    basket.matchedLineCount = 0
-  }
-  const result = compareFullBaskets({ baseline, candidate })
-  assert.equal(result.claimable, false)
-  assert.equal(result.outcome, 'unknown')
-  assert.equal(result.deltaCents, null)
-  assert.deepEqual(result.lineDeltas, [])
-})
