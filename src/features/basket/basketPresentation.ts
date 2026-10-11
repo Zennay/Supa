@@ -11,9 +11,106 @@ export type BasketCostDisclosure = {
   unresolvedLineCount: number
 }
 
+/**
+ * A displayed one-store price is evidence about the CURRENT matched lines,
+ * not just a previously cached basket total and an unresolved counter.
+ * Fail closed on mismatched line/pack economics before formatting money.
+ * This boundary consumes controlled/offline snapshots; it never asserts
+ * that prices came from a live supermarket.
+ */
+function reconcilesVisibleBasketCost(basket: OneStoreBasket): boolean {
+  try {
+    if (
+      !basket || typeof basket !== 'object' ||
+      !basket.store || typeof basket.store.id !== 'string' ||
+      basket.store.id.trim().length === 0 ||
+      !Number.isSafeInteger(basket.selectedMealCount) ||
+      basket.selectedMealCount < 0 ||
+      !Array.isArray(basket.lines) ||
+      !Number.isSafeInteger(basket.totalCents) ||
+      basket.totalCents < 0 ||
+      !Number.isSafeInteger(basket.matchedLineCount) ||
+      basket.matchedLineCount < 0 ||
+      !Number.isSafeInteger(basket.unresolvedLineCount) ||
+      basket.unresolvedLineCount < 0 ||
+      basket.matchedLineCount + basket.unresolvedLineCount !== basket.lines.length
+    ) return false
+
+    const quantity = (amount: number, unit: string) => {
+      if (!Number.isFinite(amount) || amount <= 0) return null
+      if (unit === 'g') return { family: 'mass', amount }
+      if (unit === 'kg') return { family: 'mass', amount: amount * 1000 }
+      if (unit === 'ml') return { family: 'volume', amount }
+      if (unit === 'l') return { family: 'volume', amount: amount * 1000 }
+      if (unit === 'piece') return { family: 'piece', amount }
+      return null
+    }
+
+    const seen = new Set<string>()
+    let matched = 0
+    let unresolved = 0
+    let totalCents = 0
+    for (const line of basket.lines) {
+      if (
+        !line || typeof line !== 'object' || Array.isArray(line) ||
+        typeof line.id !== 'string' || line.id.length === 0 ||
+        line.id !== line.id.trim() || seen.has(line.id) ||
+        typeof line.ingredientLabel !== 'string' ||
+        line.ingredientLabel.trim().length === 0 ||
+        line.ingredientLabel !== line.ingredientLabel.trim()
+      ) return false
+      seen.add(line.id)
+
+      if (line.status === 'unresolved') {
+        unresolved += 1
+        continue
+      }
+      if (line.status !== 'matched') return false
+      matched += 1
+
+      if (
+        !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
+        !Number.isSafeInteger(line.pricePerPackCents) ||
+        line.pricePerPackCents < 0 ||
+        !Number.isSafeInteger(line.lineTotalCents) ||
+        line.lineTotalCents < 0 ||
+        !line.pack || typeof line.pack !== 'object' ||
+        !Number.isSafeInteger(line.pack.count) || line.pack.count <= 0 ||
+        typeof line.productId !== 'string' || !line.productId.trim() ||
+        typeof line.productName !== 'string' || !line.productName.trim() ||
+        !line.requirement || typeof line.requirement !== 'object' ||
+        !Number.isSafeInteger(line.matchScore) ||
+        line.matchScore < 65 || line.matchScore > 110 ||
+        !Number.isSafeInteger(line.packs * line.pricePerPackCents) ||
+        line.lineTotalCents !== line.packs * line.pricePerPackCents
+      ) return false
+
+      const required = quantity(line.requirement.amount, line.requirement.unit)
+      const pack = quantity(line.pack.amount * line.pack.count, line.pack.unit)
+      if (
+        !required || !pack || !Number.isFinite(required.amount) ||
+        !Number.isFinite(pack.amount) || pack.amount <= 0 ||
+        required.family !== pack.family ||
+        !Number.isSafeInteger(Math.ceil(required.amount / pack.amount)) ||
+        Math.ceil(required.amount / pack.amount) !== line.packs
+      ) return false
+
+      totalCents += line.lineTotalCents
+      if (!Number.isSafeInteger(totalCents)) return false
+    }
+
+    return matched === basket.matchedLineCount &&
+      unresolved === basket.unresolvedLineCount &&
+      totalCents === basket.totalCents
+  } catch {
+    return false
+  }
+}
+
 export function basketCostDisclosure(
   totalCents: number,
   unresolvedLineCount: number,
+  currentBasket?: OneStoreBasket,
 ): BasketCostDisclosure {
   const complete =
     Number.isInteger(unresolvedLineCount) && unresolvedLineCount === 0
@@ -23,7 +120,12 @@ export function basketCostDisclosure(
       : complete
         ? 0
         : 1
-  if (!Number.isSafeInteger(totalCents) || totalCents < 0) {
+  if (!Number.isSafeInteger(totalCents) || totalCents < 0 ||
+      (currentBasket !== undefined && (
+        !reconcilesVisibleBasketCost(currentBasket) ||
+        currentBasket.totalCents !== totalCents ||
+        currentBasket.unresolvedLineCount !== unresolvedLineCount
+      ))) {
     return {
       state: 'unknown',
       headline: 'Mandtotaal niet beschikbaar',
