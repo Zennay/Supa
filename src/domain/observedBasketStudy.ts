@@ -1,4 +1,5 @@
 import type { OneStoreBasket } from './basket.ts'
+import { evaluateM3ObservationInterval } from './m3ObservationClock.ts'
 import {
   compareFullBaskets,
   type BasketComparison,
@@ -212,12 +213,23 @@ export function assessWeeklyBasketStudy(
   let observationWindowHours: number | null = null
 
   if (baselineObservedAt !== null && candidateObservedAt !== null) {
-    observationWindowHours =
-      Math.abs(candidateObservedAt - baselineObservedAt) / (1000 * 60 * 60)
-    if (observationWindowHours > maxObservationWindowHours) {
-      reasons.push(
-        `basket observations are ${observationWindowHours.toFixed(2)}h apart; max is ${maxObservationWindowHours}h`,
-      )
+    const exactInterval = evaluateM3ObservationInterval(
+      study.baseline.observedAt,
+      study.candidate.observedAt,
+      maxObservationWindowHours,
+    )
+
+    if (exactInterval === null) {
+      reasons.push('basket observation clock cannot be compared exactly')
+    } else {
+      // hoursApprox is for display only. The eligibility gate compares
+      // integer nanoseconds, so 24h + 1ns cannot look like exactly 24h.
+      observationWindowHours = exactInterval.hoursApprox
+      if (!exactInterval.withinWindow) {
+        reasons.push(
+          `basket observations are ${observationWindowHours.toFixed(2)}h apart; max is ${maxObservationWindowHours}h (exact nanosecond limit exceeded)`,
+        )
+      }
     }
   }
 
