@@ -762,9 +762,24 @@ export function compareFullBaskets(input: {
         !safeRuntimeBasket(candidate, candidateLength, candidatePinnedFacts, candidateStore, candidateRoot)) {
       return runtimeUnknownComparison()
     }
+    const baselineSnapshot = snapshotRuntimeBasket(
+      baseline, baselineLength.value, baselinePinnedFacts, baselineStore, baselineRoot,
+    )
+    const candidateSnapshot = snapshotRuntimeBasket(
+      candidate, candidateLength.value, candidatePinnedFacts, candidateStore, candidateRoot,
+    )
+    // Candidate descriptor reflection may execute caller code after the
+    // baseline snapshot has already been taken. Reconfirm baseline's pinned
+    // own-data provenance after candidate materialization; never quote the
+    // stale first snapshot if the other basket changed it in the meantime.
+    // This is a second validation of the same bounded physical slots, not
+    // a new preflight with relaxed descriptor or index requirements.
+    const verifiedBaseline = snapshotRuntimeBasket(
+      baseline, baselineLength.value, baselinePinnedFacts, baselineStore, baselineRoot,
+    )
     return compareInspectedBaskets({
-      baseline: snapshotRuntimeBasket(baseline, baselineLength.value, baselinePinnedFacts, baselineStore, baselineRoot),
-      candidate: snapshotRuntimeBasket(candidate, candidateLength.value, candidatePinnedFacts, candidateStore, candidateRoot),
+      baseline: verifiedBaseline,
+      candidate: candidateSnapshot,
     })
   } catch {
     // Invalid proxies, descriptor traps or a changed runtime snapshot cannot
