@@ -319,6 +319,26 @@ function unknownComparison(
   }
 }
 
+// Each exact decimal pack ceiling equals one in both directions only when
+// the two positive demands describe the *same* physical amount. Reuse the
+// basket's rational decimal/unit conversion instead of epsilon arithmetic.
+function sameDemand(
+  baseline: MatchedBasketLine['requirement'],
+  candidate: MatchedBasketLine['requirement'],
+): boolean {
+  if (baseline.amount === candidate.amount && baseline.unit === candidate.unit) {
+    return true
+  }
+  return (
+    calculateDecimalPackCount([baseline], {
+      amount: candidate.amount, unit: candidate.unit,
+    }) === 1 &&
+    calculateDecimalPackCount([candidate], {
+      amount: baseline.amount, unit: baseline.unit,
+    }) === 1
+  )
+}
+
 function compareInspectedBaskets({
   baseline,
   candidate,
@@ -371,8 +391,7 @@ function compareInspectedBaskets({
     }
 
     if (
-      baselineLine.requirement.amount !== candidateLine.requirement.amount ||
-      baselineLine.requirement.unit !== candidateLine.requirement.unit
+      !sameDemand(baselineLine.requirement, candidateLine.requirement)
     ) {
       reasons.push(`ingredient demand differs for ${id}`)
       continue
