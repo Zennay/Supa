@@ -58,7 +58,14 @@ function privacyScanText(markdown) {
       // Drop them only from the scan copy, just like raw format controls.
       const invisible = code === 0x00ad || (code >= 0x200b && code <= 0x200f) ||
         code === 0x2060 || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff
-      return invisible ? '' : code >= 32 && code <= 126 ? String.fromCharCode(code) : reference
+      // CommonMark renders these numeric HTML references as visible spaces.
+      // Normalize only reviewed Unicode space separators in the scan copy.
+      // Use ASCII space so the existing bounded field-label matcher sees them.
+      const renderedSpace = code === 0x00a0 || code === 0x1680 ||
+        (code >= 0x2000 && code <= 0x200a) || code === 0x202f ||
+        code === 0x205f || code === 0x3000
+      return invisible ? '' : renderedSpace ? ' ' :
+        code >= 32 && code <= 126 ? String.fromCharCode(code) : reference
     })
     // CommonMark HTML5 named references can encode visible separators or
     // invisible format controls inside explicit personal identifiers.
