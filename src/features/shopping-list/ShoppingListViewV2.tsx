@@ -32,6 +32,8 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
   )
   const [session, setSession] = useState(() => controller.snapshot())
   const [saveFailed, setSaveFailed] = useState(false)
+  // Set after mount to keep SSR markup stable when browser storage differs.
+  const [unknownStoredRecord, setUnknownStoredRecord] = useState(false)
 
   // Re-evaluate even for an in-place mutation of a reused basket reference.
   const liveIdentity = shoppingListDemandIdentity(basket)
@@ -43,6 +45,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     const previous = controller.snapshot()
     const next = controller.rebase(basket)
     setSession(next)
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
 
     // Do not write when the view first renders or on price-only prop refresh.
     // Changing the *physical* basket invalidates old checks in durable storage.
@@ -65,6 +68,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     const next = controller.toggle(lineId)
     setSession(next)
     setSaveFailed(next.serialized !== null && !controller.persist())
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
   }
 
   function clearChecked() {
@@ -74,6 +78,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     const next = controller.clear()
     setSession(next)
     setSaveFailed(next.serialized !== null && !controller.persist())
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
   }
 
   function reloadSaved() {
@@ -87,6 +92,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     }
     setSession(latest)
     setSaveFailed(false)
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
   }
 
   return (
@@ -102,6 +108,14 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
         <div className="attention-card">
           <strong>{unresolvedCount} productkeuze vraagt controle</strong>
           <span>SUPA vult een onzekere match niet automatisch in.</span>
+        </div>
+      )}
+
+      {unknownStoredRecord && (
+        <div className="attention-card" role="status" aria-live="polite" data-storage-state="unknown-record">
+          <strong>Opgeslagen boodschappenlijst beschermd</strong>
+          <span>De opgeslagen versie is onbekend of ongeldig. Je kunt tijdelijk afvinken,
+            maar nieuwe vinkjes worden niet bewaard. SUPA overschrijft de bestaande gegevens niet.</span>
         </div>
       )}
 
