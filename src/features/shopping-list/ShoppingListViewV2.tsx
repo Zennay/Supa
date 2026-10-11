@@ -90,7 +90,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     // Explicit recovery after a conflict: this drops unsaved local changes
     // only when the durable v2 read succeeds. Never write during recovery.
     controller.rebase(basket)
-    const latest = controller.reloadSaved()
+    const latest = controller.reloadSaved({ requireSameDemand: unknownStoredRecord })
     if (latest === null) {
       if (controller.storageFormatStatus() === 'unknown-record') {
         // Protected bytes remain read-only; don't suggest a stale-tab save.
