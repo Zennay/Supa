@@ -25,6 +25,7 @@ type PinnedMonetaryFacts = WeakMap<object, {
 
 type PinnedStoreIdentity = { reference: unknown; id: unknown }
 type PinnedRootFacts = {
+  lines: unknown
   selectedMealCount: unknown
   totalCents: unknown
   matchedLineCount: unknown
@@ -217,12 +218,15 @@ function safeRuntimeBasket(
   if (!storeId) return false
   pinnedStore.reference = store
   pinnedStore.id = storeId.value
+  pinnedRoot.lines = metadata.get('lines')
   pinnedRoot.selectedMealCount = metadata.get('selectedMealCount')
   pinnedRoot.totalCents = metadata.get('totalCents')
   pinnedRoot.matchedLineCount = metadata.get('matchedLineCount')
   pinnedRoot.unresolvedLineCount = metadata.get('unresolvedLineCount')
 
   const lines = ownData(basket, 'lines')?.value
+  // The same caller-owned array must be inspected across both preflight reads.
+  if (lines !== pinnedRoot.lines) return false
   if (!Array.isArray(lines)) return true // Existing malformed-array reason.
   // The comparator calls filter()/some() on the caller's array. Never execute
   // shadowed instance methods or inherited overrides from an altered prototype.
@@ -399,6 +403,11 @@ function snapshotRuntimeBasket(
   pinnedRoot: PinnedRootFacts,
 ): OneStoreBasket {
   const originalLines = ownData(basket, 'lines')?.value
+  // Row pins alone are insufficient: a replacement array can reuse the same
+  // validated row objects while bypassing the original array's method checks.
+  if (originalLines !== pinnedRoot.lines) {
+    throw new Error('basket physical lines array reference changed after preflight')
+  }
   const lines: BasketTraceLine[] = []
   if (Array.isArray(originalLines)) {
     // A caller-owned Array Proxy can change its actual length between
@@ -729,11 +738,11 @@ export function compareFullBaskets(input: {
     const baselineStore: PinnedStoreIdentity = { reference: null, id: null }
     const candidateStore: PinnedStoreIdentity = { reference: null, id: null }
     const baselineRoot: PinnedRootFacts = {
-      selectedMealCount: null, totalCents: null, matchedLineCount: null,
+      lines: null, selectedMealCount: null, totalCents: null, matchedLineCount: null,
       unresolvedLineCount: null,
     }
     const candidateRoot: PinnedRootFacts = {
-      selectedMealCount: null, totalCents: null, matchedLineCount: null,
+      lines: null, selectedMealCount: null, totalCents: null, matchedLineCount: null,
       unresolvedLineCount: null,
     }
     if (!safeRuntimeBasket(baseline, baselineLength, baselinePinnedFacts, baselineStore, baselineRoot) ||
