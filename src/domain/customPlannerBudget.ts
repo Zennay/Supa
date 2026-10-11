@@ -12,9 +12,15 @@ export const MAX_CUSTOM_WEEK_BUDGET_CENTS = 100_000
 export function parseCustomWeekBudget(input: unknown): number | null {
   if (typeof input !== 'string') return null
   const value = input.trim()
-  if (!/^(?:0|[1-9]\d{0,3})(?:[,.]\d{1,2})?$/.test(value)) return null
+  // Accept the grouped Dutch ceiling displayed as €1.000,00, but reject
+  // an ambiguous bare "1.000" rather than silently guessing its value.
+  const grouped = /^([1-9]\d{0,2})\.(\d{3}),(\d{1,2})$/.exec(value)
+  const normalized = grouped === null
+    ? value
+    : grouped[1] + grouped[2] + ',' + grouped[3]
+  if (!/^(?:0|[1-9]\d{0,3})(?:[,.]\d{1,2})?$/.test(normalized)) return null
 
-  const [euros, decimals = ''] = value.replace(',', '.').split('.')
+  const [euros, decimals = ''] = normalized.replace(',', '.').split('.')
   const cents = BigInt(euros) * 100n + BigInt(decimals.padEnd(2, '0') || '0')
   if (cents < 1n || cents > BigInt(MAX_CUSTOM_WEEK_BUDGET_CENTS)) {
     return null
