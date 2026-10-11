@@ -4,13 +4,14 @@ import test from 'node:test'
 
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import {
-  m2DefaultActiveDays, m2InitialPlan, m2Products, m2Recipes, m2Store,
+  m2DefaultActiveDays, m2InitialPlan, m2Recipes,
 } from '../src/data/m2Fixture.ts'
+import { m3BaselineProducts, m3BaselineStore } from '../src/data/m3ComparisonFixture.ts'
 import { basketCostDisclosure } from '../src/features/basket/basketPresentation.ts'
 
-function basket(products = m2Products, activeDays = m2DefaultActiveDays) {
+function basket(products = m3BaselineProducts, activeDays = m2DefaultActiveDays) {
   return buildOneStoreBasket({
-    store: m2Store, plan: m2InitialPlan, recipes: m2Recipes, activeDays, products,
+    store: m3BaselineStore, plan: m2InitialPlan, recipes: m2Recipes, activeDays, products,
   })
 }
 
@@ -28,7 +29,7 @@ test('controlled complete and incomplete M2 basket costs remain honestly disclos
   assert.equal(money(partial).state, 'minimum')
   assert.match(money(partial).amountLabel, /^min\./)
 
-  const empty = basket(m2Products, [])
+  const empty = basket(m3BaselineProducts, [])
   assert.equal(empty.lines.length, 0)
   assert.equal(money(empty).state, 'complete')
   assert.match(money(empty).amountLabel, /0,00/)
