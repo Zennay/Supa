@@ -1,6 +1,8 @@
 import type { BasketTraceLine, OneStoreBasket } from './basket.ts'
 import { calculateDecimalPackCount } from './decimalPackArithmetic.ts'
 
+const MAX_PHYSICAL_BASKET_LINES = 10_000
+
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
 
 export type BasketComparisonOutcome =
@@ -186,7 +188,6 @@ function safeRuntimeBasket(basket: unknown): boolean {
   // A small proxy-backed array can synthesize arbitrarily many indexed
   // descriptors. Bound both preflight and subsequent trusted snapshots before
   // consulting any physical slot (same ceiling as decimal demand arithmetic).
-  const MAX_PHYSICAL_BASKET_LINES = 10_000
   if (!Number.isSafeInteger(length) || (length as number) < 0 ||
       (length as number) > MAX_PHYSICAL_BASKET_LINES) return false
 
@@ -273,7 +274,14 @@ function snapshotRuntimeBasket(basket: unknown): OneStoreBasket {
   const originalLines = ownData(basket, 'lines')?.value
   const lines: BasketTraceLine[] = []
   if (Array.isArray(originalLines)) {
-    const length = ownData(originalLines, 'length')?.value as number
+    // A caller-owned Array Proxy can change its actual length between
+    // preflight and this second own-descriptor read. Recheck the same cap
+    // before *any* snapshot index; never trust a previous length check.
+    const length = ownData(originalLines, 'length')?.value
+    if (typeof length !== 'number' || !Number.isSafeInteger(length) ||
+        length < 0 || length > MAX_PHYSICAL_BASKET_LINES) {
+      throw new Error('basket length changed outside the snapshot safety bound')
+    }
     for (let index = 0; index < length; index += 1) {
       lines.push(snapshotRuntimeLine(ownData(originalLines, String(index))!.value))
     }
