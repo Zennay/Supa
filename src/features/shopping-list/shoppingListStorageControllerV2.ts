@@ -337,7 +337,15 @@ export function openShoppingProgressStorageV2(
         // Best-effort stale-tab guard: localStorage has no atomic CAS, but a
         // newly observed value must never be silently overwritten by our
         // outdated in-memory checklist. Also fail closed on denied reads.
-        if (storage.getItem(shoppingListProgressV2StorageKey) !== lastObservedV2) {
+        const observed = storage.getItem(shoppingListProgressV2StorageKey)
+        if (observed !== lastObservedV2) {
+          // A newer tab might have written an unsupported future version or
+          // corrupt record, not merely another valid set of checkmarks.
+          // Surface the existing protected-record warning on this explicit
+          // save failure, and keep writes blocked until deliberate recovery.
+          if (!recognizedStoredV2(observed, currentBasket)) {
+            storageFormatSupported = false
+          }
           failedPersistAttempt = true
           return false
         }
