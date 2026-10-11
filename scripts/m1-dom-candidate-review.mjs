@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
 import { lstat, mkdir, open, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { RESEARCH_SOURCES } from './m1-multistore-research.mjs'
 import { auditCaptureFiles } from './m1-research-snapshot-audit.mjs'
@@ -124,8 +124,31 @@ async function privateJsonFile(path) {
   finally { await handle?.close() }
 }
 
+async function rejectSymlinkedAncestors(path) {
+  // mkdir(recursive) and O_NOFOLLOW on the final report are not sufficient:
+  // a symlink at an *earlier* path segment can redirect private output.
+  // Walk lexical ancestors rather than following realpath aliases.
+  let current = resolve(path)
+  while (true) {
+    let details
+    try {
+      details = await lstat(current)
+    } catch (error) {
+      if (error?.code !== 'ENOENT') malformed()
+    }
+    if (details && (!details.isDirectory() || details.isSymbolicLink())) malformed()
+    const parent = dirname(current)
+    if (parent === current) return
+    current = parent
+  }
+}
+
 async function ensurePrivateDirectory(path) {
+  // Reject redirection before recursive mkdir can create folders elsewhere.
+  // Check again after creation to catch an alias substituted during setup.
+  await rejectSymlinkedAncestors(path)
   await mkdir(path, { recursive: true, mode: 0o700 })
+  await rejectSymlinkedAncestors(path)
   const details = await lstat(path)
   // Never create a private selector report inside an already group/world-readable
   // directory; changing its mode behind an operator's back is not safe either.
