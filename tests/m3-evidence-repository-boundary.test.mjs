@@ -5,14 +5,21 @@ import test from 'node:test'
 
 const evidenceDir = 'evidence/m3'
 const allowedExtensions = new Set(['.json', '.md'])
+// Canonicalize JSON key spellings before applying the privacy denylist.
+// Do not allow a snake_case, kebab-case, dotted, spaced, case-variant,
+// or Unicode-width alias to bypass the same direct-identifier restriction.
 const directIdentifierKeys = new Set([
-  'participantName',
-  'participantEmail',
-  'emailAddress',
-  'accountId',
-  'accountEmail',
-  'fullName',
+  'participantname',
+  'participantemail',
+  'emailaddress',
+  'accountid',
+  'accountemail',
+  'fullname',
 ])
+
+function canonicalIdentifierKey(key) {
+  return key.normalize('NFKC').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+}
 const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 
 function assertNoEvidenceSymlink(entry, path) {
@@ -52,7 +59,7 @@ function inspectForDirectIdentifiers(value, path = '$') {
   if (value && typeof value === 'object') {
     for (const [key, item] of Object.entries(value)) {
       assert.equal(
-        directIdentifierKeys.has(key),
+        directIdentifierKeys.has(canonicalIdentifierKey(key)),
         false,
         `direct participant identifier key is not allowed in M3 evidence: ${path}.${key}`,
       )
