@@ -12,6 +12,7 @@ import {
 const recipeIds = m2Recipes.map(({ id }) => id)
 const fixtureTargets = ['m3-b-basmati-1kg', 'm3-b-chicken-400', 'm3-candidate-store-garam-50']
 const syntheticMixCount = recipeIds.length ** m2DefaultActiveDays.length
+const negateCents = (value) => value === 0 ? 0 : -value
 
 function planAt(index) {
   let value = index
@@ -55,7 +56,7 @@ test('each synthetic 1-cent candidate SKU increase changes comparison only by ph
         `mix ${mix} / ${productId} purchased packs`,
       )
       assert.equal(pricier.deltaCents - original.deltaCents, expectedImpactCents)
-      assert.equal(pricier.savingsCents - original.savingsCents, -expectedImpactCents)
+      assert.equal(pricier.savingsCents - original.savingsCents, negateCents(expectedImpactCents))
       assert.equal(pricier.baselineTotalCents, baseline.totalCents)
       assert.deepEqual(
         pricier.lineDeltas.filter(({ id }) => id !== purchasedLine?.id),
@@ -74,13 +75,13 @@ test('flipping baseline and candidate in each recipe mix reverses the signed eco
     const reverse = compareFullBaskets({ baseline: candidate, candidate: baseline })
     assert.equal(forward.claimable, true)
     assert.equal(reverse.claimable, true)
-    assert.equal(forward.deltaCents, -reverse.deltaCents)
-    assert.equal(forward.savingsCents, -reverse.savingsCents)
+    assert.equal(forward.deltaCents, negateCents(reverse.deltaCents))
+    assert.equal(forward.savingsCents, negateCents(reverse.savingsCents))
     assert.equal(forward.baselineTotalCents, reverse.candidateTotalCents)
     assert.equal(forward.candidateTotalCents, reverse.baselineTotalCents)
     const reverseLineDeltas = new Map(reverse.lineDeltas.map((line) => [line.id, line.deltaCents]))
     for (const line of forward.lineDeltas) {
-      assert.equal(line.deltaCents, -reverseLineDeltas.get(line.id), `mix ${mix} / ${line.id}`)
+      assert.equal(line.deltaCents, negateCents(reverseLineDeltas.get(line.id)), `mix ${mix} / ${line.id}`)
     }
     assert.equal(
       reverse.outcome,
