@@ -1,0 +1,10 @@
+# QA: nested Markdown label indentation — expected RED (2026-10-11)
+
+- Scope: independent **test-only**, based on immutable [privacy repair #1531](https://github.com/Zennay/Supa/pull/1531) at `9df26fe88887953c88c8cabe5641798e95f67353`. The earlier privacy owner [#1529](https://github.com/Zennay/Supa/pull/1529) and independent RED [#1530](https://github.com/Zennay/Supa/pull/1530) remain unchanged.
+- Contract: the existing Markdown M3 repository backstop detects **obvious explicit personal-identifier field/value labels**, even in normally indented JSON/YAML or Markdown notes. A `^\\s{0,3}` anchor in both field-line guards appears to miss 4+-space nested values.
+- Five synthetically labelled negative fixtures: four-space JSON quoted participant name, six-space YAML participant email, eight-space YAML account ID, four-space Markdown bold full name, seven-space quoted nested account email. No actual names, contacts or retailer observations.
+- Three allowed controls: deep indented pseudonymous metadata, policy-only sentence and product/store descriptions.
+- Test invokes the **real** prior scanner as a child against disposable evidence trees, and clears `NODE_TEST_CONTEXT` so nested tests genuinely execute. A green result requires all five negatives to be rejected, no false positives and regular QA suites to pass.
+- Anticipated on original scanner: **exactly five intentional RED**. Do not treat a red CI run as successful repair validation.
+- Owner repair option: permit bounded indentation of ordinary nested fields without broad "name" keyword bans, and re-run this independent test plus previous quoted-field suite. The scanner is a bounded backstop; free-text identities and obfuscations are not exhaustively covered.
+- **DRAFT / HOLD / NO MERGE / NO DEPLOY** until verified zCloud write lease, owner approval, original privacy stack integrated safely, exact-head CI and permanent applicable VPS/M3 checks. Human genuine M3 issue [#78](https://github.com/Zennay/Supa/issues/78) remains independently open.
