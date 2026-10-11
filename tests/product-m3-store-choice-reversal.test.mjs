@@ -38,8 +38,8 @@ function assertReversible(baseline, candidate) {
   assert.equal(inverse.outcome === 'unknown', false)
   assert.equal(forward.baselineTotalCents, inverse.candidateTotalCents)
   assert.equal(forward.candidateTotalCents, inverse.baselineTotalCents)
-  assert.equal(forward.deltaCents, -inverse.deltaCents)
-  assert.equal(forward.savingsCents, -inverse.savingsCents)
+  assert.equal(forward.deltaCents + inverse.deltaCents, 0)
+  assert.equal(forward.savingsCents + inverse.savingsCents, 0)
 
   const expectedInverseOutcome = {
     better: 'worse',
@@ -56,7 +56,7 @@ function assertReversible(baseline, candidate) {
     assert.equal(line.ingredientLabel, swapped.ingredientLabel)
     assert.equal(line.baselineLineTotalCents, swapped.candidateLineTotalCents)
     assert.equal(line.candidateLineTotalCents, swapped.baselineLineTotalCents)
-    assert.equal(line.deltaCents, -swapped.deltaCents)
+    assert.equal(line.deltaCents + swapped.deltaCents, 0)
   }
   assert.equal(
     forward.lineDeltas.reduce((sum, line) => sum + line.deltaCents, 0),
