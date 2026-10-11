@@ -36,7 +36,7 @@ function wholePacks(value: unknown): value is number {
  * Return null for an invalid runtime basket; consumers must never store or
  * restore checked items under a null identity.
  */
-export function shoppingListDemandIdentity(basket: OneStoreBasket): string | null {
+function buildShoppingListDemandIdentity(basket: OneStoreBasket): string | null {
   // A price-independent key must still represent a possible physical task.
   // Monetary integrity is enforced separately by trusted v2 storage entry points.
   if (!isPhysicallyTrustworthyShoppingBasket(basket)) return null
@@ -115,4 +115,14 @@ export function shoppingListDemandIdentity(basket: OneStoreBasket): string | nul
   })
 
   return JSON.stringify({ schemaVersion: 2, storeId: store.id, lines })
+}
+
+/** Late-read failures remain untrusted even if the first validation succeeded. */
+export function shoppingListDemandIdentity(basket: OneStoreBasket): string | null {
+  try {
+    return buildShoppingListDemandIdentity(basket)
+  } catch {
+    // Accessors/proxies can become unreadable between admission and projection.
+    return null
+  }
 }
