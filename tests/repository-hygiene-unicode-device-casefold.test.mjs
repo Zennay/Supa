@@ -36,9 +36,20 @@ function runHygieneAgainstSyntheticIndex(paths) {
       gitResult(['update-index', '--add', '--cacheinfo',
         `100644,${existingBlob},${path}`], env)
     }
+    const tracked = execFileSync('git', ['ls-files', '--stage', '-z'], {
+      cwd: root, env, encoding: 'utf8',
+    })
+    for (const path of paths) {
+      assert.ok(tracked.includes(`\t${path}\0`),
+        `alternate index did not stage synthetic path: ${path}`)
+    }
+    // Node's outer --test runner sets NODE_TEST_CONTEXT. Passing that into
+    // a second node --test recursively skips its files instead of testing.
+    const childEnv = { ...env }
+    delete childEnv.NODE_TEST_CONTEXT
     const result = spawnSync(process.execPath,
       ['--test', hygieneTest], {
-        cwd: root, env, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024,
+        cwd: root, env: childEnv, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024,
       })
     assert.equal(result.error, undefined, 'Child QA guard must execute')
     return { status: result.status, output: result.stdout + result.stderr }
@@ -60,7 +71,7 @@ test('QA #723: reject Windows COM/LPT superscript-digit device names', () => {
   ]) {
     const result = runHygieneAgainstSyntheticIndex([path])
     assert.notEqual(result.status, 0,
-      `portable tracked-path gate accepted reserved Windows device: ${path}`)
+      `portable tracked-path gate accepted reserved Windows device: ${path}; child: ${result.output.slice(-1600)}`)
     assert.match(result.output, /tracked checkout violates reviewed hygiene contract/,
       `reserved-name failure must come from tracked-path hygiene: ${path}`)
   }
@@ -75,7 +86,7 @@ test('QA #723: reject Unicode full-casefold collisions after NFC', () => {
   for (const paths of collisions) {
     const result = runHygieneAgainstSyntheticIndex(paths)
     assert.notEqual(result.status, 0,
-      `casefold collision was accepted: ${paths.join(' versus ')}`)
+      `casefold collision was accepted: ${paths.join(' versus ')}; child: ${result.output.slice(-1600)}`)
     assert.match(result.output, /tracked checkout violates reviewed hygiene contract/,
       'collision failure must come from tracked-path hygiene')
   }
