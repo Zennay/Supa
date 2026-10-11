@@ -18,7 +18,7 @@ const fieldValueLine = new RegExp(
   'im',
 )
 const tableValueLine = new RegExp(
-  '^\\s*\\|\\s*(?:\\*\\*)?' + identifierField +
+  '^[ \\t]*(?:>[ \\t]*|#{1,6}[ \\t]+|[-*+][ \\t]+)*\\|[ \\t]*(?:\\*\\*)?' + identifierField +
     '(?:\\*\\*)?\\s*\\|\\s*[^|\\s][^|]*\\|?',
   'im',
 )
