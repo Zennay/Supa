@@ -28,6 +28,7 @@ test('real TSX server render restores checked v2 rows across repricing, not new 
   const vite = await createServer({
     server: { middlewareMode: true },
     appType: 'custom',
+    optimizeDeps: { noDiscovery: true, include: [] },
     logLevel: 'error',
   })
   const oldWindow = globalThis.window
