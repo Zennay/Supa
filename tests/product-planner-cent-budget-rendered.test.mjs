@@ -8,8 +8,38 @@ import ts from 'typescript'
 
 import { euro } from '../src/lib/money.ts'
 import { assessPlannerBudgetCents } from '../src/lib/plannerBudgetCents.ts'
+import { customWeekBudgetLabel, parseCustomWeekBudget } from '../src/domain/customPlannerBudget.ts'
 import { RecipeEstimateDisclosure } from '../src/features/planner/RecipeEstimateDisclosure.ts'
 import { m2Recipes } from '../src/data/m2Fixture.ts'
+
+// Render the actual custom form in the already existing PlannerView SSR suite.
+const customBudgetSource = readFileSync(
+  new URL('../src/features/planner/CustomBudgetInput.tsx', import.meta.url),
+  'utf8',
+).replace(/^import\\s+['"]\\.\\/customBudget\\.css['"]\\s*;?\\s*$/m, '')
+const customCompiled = ts.transpileModule(customBudgetSource, {
+  compilerOptions: {
+    jsx: ts.JsxEmit.ReactJSX,
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2022,
+  },
+  fileName: 'CustomBudgetInput.tsx',
+  reportDiagnostics: true,
+})
+assert.deepEqual(customCompiled.diagnostics, [])
+const customModule = { exports: {} }
+new Function('module', 'exports', 'require', customCompiled.outputText)(
+  customModule, customModule.exports, (dep) => {
+    if (dep === 'react') return React
+    if (dep === '../../domain/customPlannerBudget.ts') return {
+      customWeekBudgetLabel,
+      parseCustomWeekBudget,
+    }
+    if (dep === 'react/jsx-runtime') return require(dep)
+    throw Error('Unexpected custom budget import: ' + dep)
+  },
+)
+const { CustomBudgetInput } = customModule.exports
 
 // SSR the actual PlannerView, not a reimplementation of its budget label.
 const require = createRequire(import.meta.url)
@@ -31,6 +61,7 @@ const localRequire = (moduleName) => {
   if (moduleName === '../../lib/plannerBudgetCents.ts') return { assessPlannerBudgetCents }
   if (moduleName === '../../lib/money') return { euro }
   if (moduleName === './RecipeEstimateDisclosure.ts') return { RecipeEstimateDisclosure }
+  if (moduleName === './CustomBudgetInput.tsx') return { CustomBudgetInput }
   if (moduleName === 'react/jsx-runtime') return require(moduleName)
   throw new Error(`Unexpected PlannerView dependency: ${moduleName}`)
 }
