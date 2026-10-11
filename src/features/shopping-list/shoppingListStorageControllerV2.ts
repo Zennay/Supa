@@ -1,7 +1,7 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { shoppingListDemandIdentity } from './shoppingListDemandIdentity.ts'
 import { shoppingListProgressStorageKey } from './shoppingListProgress.ts'
-import { shoppingListProgressV2StorageKey } from './shoppingListProgressV2.ts'
+import { serializeShoppingProgressV2, shoppingListProgressV2StorageKey } from './shoppingListProgressV2.ts'
 import {
   rebaseShoppingProgressSessionV2,
   startShoppingProgressSessionV2,
@@ -59,6 +59,8 @@ export function openShoppingProgressStorageV2(
     },
   )
 
+  let clearedRound: { demandIdentity: string; completedLineIds: readonly string[] } | null = null
+
   const snapshot = (): ShoppingProgressSessionV2 => ({
     ...session,
     completedLineIds: [...session.completedLineIds],
@@ -70,10 +72,14 @@ export function openShoppingProgressStorageV2(
     rebase(nextBasket: OneStoreBasket): ShoppingProgressSessionV2 {
       session = rebaseShoppingProgressSessionV2(session, nextBasket)
       currentBasket = nextBasket
+      // Undo belongs to this exact physical shopping round only.
+      if (clearedRound?.demandIdentity !== session.demandIdentity) clearedRound = null
       return snapshot()
     },
 
     toggle(lineId: unknown): ShoppingProgressSessionV2 {
+      // Any subsequent manual edit ends the one-step undo window.
+      clearedRound = null
       session = toggleShoppingProgressSessionV2(session, currentBasket, lineId)
       return snapshot()
     },
@@ -84,7 +90,42 @@ export function openShoppingProgressStorageV2(
      * explicitly invokes persist(); the legacy v1 key remains untouched.
      */
     clear(): ShoppingProgressSessionV2 {
+      const before = snapshot()
       session = startShoppingProgressSessionV2(currentBasket, null)
+      clearedRound =
+        before.demandIdentity !== null &&
+        before.demandIdentity === session.demandIdentity &&
+        before.completedLineIds.length > 0
+          ? { demandIdentity: before.demandIdentity, completedLineIds: before.completedLineIds }
+          : null
+      return snapshot()
+    },
+
+    /** The undo offer must never survive any physical-demand change or new tick. */
+    canUndoClear(): boolean {
+      return (
+        clearedRound !== null &&
+        session.demandIdentity === clearedRound.demandIdentity &&
+        session.completedLineIds.length === 0 &&
+        shoppingListDemandIdentity(currentBasket) === clearedRound.demandIdentity
+      )
+    },
+
+    /**
+     * Restore a single deliberate clear in the same physical round only.
+     * Does not write: the user-event owner calls persist() explicitly.
+     */
+    undoClear(): ShoppingProgressSessionV2 {
+      if (!this.canUndoClear()) {
+        clearedRound = null
+        return snapshot()
+      }
+      const previous = clearedRound!
+      clearedRound = null
+      session = startShoppingProgressSessionV2(
+        currentBasket,
+        serializeShoppingProgressV2(currentBasket, previous.completedLineIds),
+      )
       return snapshot()
     },
 
