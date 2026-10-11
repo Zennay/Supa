@@ -18,6 +18,8 @@ type PinnedMonetaryFacts = WeakMap<object, {
   packCount: unknown
 }>
 
+type PinnedStoreIdentity = { reference: unknown; id: unknown }
+
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
 
 export type BasketComparisonOutcome =
@@ -185,15 +187,24 @@ function safeRuntimeBasket(
   basket: unknown,
   validatedLength: { value: number | null },
   pinnedMonetaryFacts: PinnedMonetaryFacts,
+  pinnedStore: PinnedStoreIdentity,
 ): boolean {
   const keys = [
     'store', 'lines', 'selectedMealCount', 'totalCents',
     'matchedLineCount', 'unresolvedLineCount',
   ]
-  if (keys.some((key) => !ownData(basket, key))) return false
+  const metadata = new Map<string, unknown>()
+  for (const key of keys) {
+    const descriptor = ownData(basket, key)
+    if (!descriptor) return false
+    metadata.set(key, descriptor.value)
+  }
 
-  const store = ownData(basket, 'store')?.value
-  if (!ownData(store, 'id')) return false
+  const store = metadata.get('store')
+  const storeId = ownData(store, 'id')
+  if (!storeId) return false
+  pinnedStore.reference = store
+  pinnedStore.id = storeId.value
 
   const lines = ownData(basket, 'lines')?.value
   if (!Array.isArray(lines)) return true // Existing malformed-array reason.
@@ -348,6 +359,7 @@ function snapshotRuntimeBasket(
   basket: unknown,
   validatedLength: number | null,
   pinnedMonetaryFacts: PinnedMonetaryFacts,
+  pinnedStore: PinnedStoreIdentity,
 ): OneStoreBasket {
   const originalLines = ownData(basket, 'lines')?.value
   const lines: BasketTraceLine[] = []
@@ -368,9 +380,13 @@ function snapshotRuntimeBasket(
     }
   }
   const originalStore = ownData(basket, 'store')?.value
+  const storeId = ownData(originalStore, 'id')?.value
+  if (originalStore !== pinnedStore.reference || !Object.is(storeId, pinnedStore.id)) {
+    throw new Error('basket store identity changed after preflight')
+  }
   return {
     store: {
-      id: ownData(originalStore, 'id')?.value as string,
+      id: storeId as string,
       name: (ownData(originalStore, 'name')?.value ?? '') as string,
     },
     lines: Array.isArray(originalLines)
@@ -663,13 +679,15 @@ export function compareFullBaskets(input: {
     const candidateLength = { value: null as number | null }
     const baselinePinnedFacts: PinnedMonetaryFacts = new WeakMap()
     const candidatePinnedFacts: PinnedMonetaryFacts = new WeakMap()
-    if (!safeRuntimeBasket(baseline, baselineLength, baselinePinnedFacts) ||
-        !safeRuntimeBasket(candidate, candidateLength, candidatePinnedFacts)) {
+    const baselineStore: PinnedStoreIdentity = { reference: null, id: null }
+    const candidateStore: PinnedStoreIdentity = { reference: null, id: null }
+    if (!safeRuntimeBasket(baseline, baselineLength, baselinePinnedFacts, baselineStore) ||
+        !safeRuntimeBasket(candidate, candidateLength, candidatePinnedFacts, candidateStore)) {
       return runtimeUnknownComparison()
     }
     return compareInspectedBaskets({
-      baseline: snapshotRuntimeBasket(baseline, baselineLength.value, baselinePinnedFacts),
-      candidate: snapshotRuntimeBasket(candidate, candidateLength.value, candidatePinnedFacts),
+      baseline: snapshotRuntimeBasket(baseline, baselineLength.value, baselinePinnedFacts, baselineStore),
+      candidate: snapshotRuntimeBasket(candidate, candidateLength.value, candidatePinnedFacts, candidateStore),
     })
   } catch {
     // Invalid proxies, descriptor traps or a changed runtime snapshot cannot
