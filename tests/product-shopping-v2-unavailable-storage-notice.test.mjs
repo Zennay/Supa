@@ -57,9 +57,9 @@ test('unavailable-storage notice is mount-only and separate from unknown-schema 
   const viewSource = await readFile(new URL('../src/features/shopping-list/ShoppingListViewV2.tsx', import.meta.url), 'utf8')
   // Lightweight wiring guard: the mount effect must take the controller's
   // actual diagnostic, not infer storage availability from checkbox state.
-  assert.match(viewSource, /setStorageStatus\(controller\.storageFormatStatus\(\)\)/)
-  assert.match(viewSource, /storageStatus === 'unavailable'/)
-  assert.match(viewSource, /storageStatus === 'unknown-record'/)
+  assert.match(viewSource, /setUnavailableStorage\(controller\.storageFormatStatus\(\) === 'unavailable'\)/)
+  assert.match(viewSource, /unavailableStorage &&/)
+  assert.match(viewSource, /unknownStoredRecord &&/)
   assert.match(viewSource, /Opgeslagen voortgang niet beschikbaar/)
   assert.match(viewSource, /Opgeslagen boodschappenlijst beschermd/)
 
