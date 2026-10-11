@@ -91,7 +91,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     // Explicit recovery after a conflict: this drops unsaved local changes
     // only when the durable v2 read succeeds. Never write during recovery.
     controller.rebase(basket)
-    const latest = controller.reloadSaved({ requireSameDemand: unknownStoredRecord || unavailableStorage })
+    const latest = controller.reloadSaved({ requireSameDemand: unknownStoredRecord })
     if (latest === null) {
       if (controller.storageFormatStatus() === 'unknown-record') {
         // Protected bytes remain read-only; don't suggest a stale-tab save.
@@ -110,6 +110,23 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     setUnavailableReadRetryFailed(false)
     setSession(latest)
     setSaveFailed(false)
+    setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
+    setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
+  }
+
+  function retryUnavailableStorage() {
+    // Keep the ordinary saved-list reload contract intact. Transiently denied
+    // storage has no trusted initial revision, so retry must be same-demand.
+    controller.rebase(basket)
+    const latest = controller.reloadSaved({ requireSameDemand: true })
+    if (latest === null) {
+      setUnavailableReadRetryFailed(true)
+      return
+    }
+    setUnavailableReadRetryFailed(false)
+    setSession(latest)
+    setSaveFailed(false)
+    setRecheckFailed(false)
     setUnknownStoredRecord(controller.storageFormatStatus() === 'unknown-record')
     setUnavailableStorage(controller.storageFormatStatus() === 'unavailable')
   }
@@ -155,7 +172,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
               {unavailableReadRetryFailed && (
                 <span>Opgeslagen voortgang is nog niet leesbaar. Je tijdelijke vinkjes blijven staan.</span>
               )}
-              <button type="button" className="ghost-button" onClick={reloadSaved}>
+              <button type="button" className="ghost-button" onClick={retryUnavailableStorage}>
                 Opgeslagen voortgang opnieuw controleren
               </button>
               <small>Dit leest opnieuw zonder iets te bewaren. Niet-opgeslagen vinkjes verdwijnen alleen als laden lukt.</small>
