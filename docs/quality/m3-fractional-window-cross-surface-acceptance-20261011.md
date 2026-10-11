@@ -27,6 +27,8 @@ Neither the numbers nor the shop identities in these tests represent a real PLUS
 | Persisted v1 collector | DST offset + JSON restore, +999999ns | Same |
 | M3 full-basket report | .777000000 → .777999999, +999999ns | `unknown`, `claimable=false`, null financial delta/savings, no public claim |
 | M3 direct assessment + report | DST offset +999999ns | Unknown/null/no line deltas/no public claim |
+| First-observation countdown | .123999999 nanosecond timestamp with only one observed store | Do not present an exact-looking millisecond-truncated `firstObservedAt` or `deadlineAt`: preserve exact nanoseconds under policy A, or abstain under policy B |
+| First-observation countdown | Same with +02:00 UTC offset, .456789123 | Offset-normalized exact instant and 24h deadline, or abstain |
 
 Positive controls deliberately preserve **valid trailing-zero whole-millisecond** `.123000000`, `.456000000` and `.777000000` exact 24h and existing +1 *full* millisecond rejection. This contract remains compatible with owner-approved exact-nanosecond implementation or a conservative policy disallowing unsupported *nonzero* submillisecond fractions; do not weaken negative assertions to get GREEN.
 
@@ -35,8 +37,11 @@ Independent QA files:
 - `tests/qa-m3-collector-submillisecond-matrix-red.test.mjs` (six tests).
 - `tests/qa-m3-collector-restored-millisecond-fractions-red.test.mjs` (three tests).
 - `tests/qa-m3-financial-submillisecond-overrun-red.test.mjs` (three tests).
+- `tests/qa-m3-single-observation-deadline-precision-red.test.mjs` (three tests, including supported millisecond positive).
 
 ## Evidence and release boundary
+
+The single-observation deadline requirement is deliberately policy-neutral: a source fix may represent the exact nanosecond instant in both displayed timestamps, or conservatively refuse a precision it cannot faithfully display. Silently formatting a truncated Date as an exact deadline is not acceptable.
 
 The first combined version of the child on commit `83a46792dd2d1e59929a949be7dc8ed37ba70498` ran [hosted CI #38129716628](https://github.com/Zennay/Supa/actions/runs/38129716628): **703 tests, 683 pass and exactly 20 purposeful expected-RED failures**. This included **12 parent-branch expected-RED collector failures** (the parent concurrently advanced) and **8 new child expected-RED failures**. Positive child controls pass. No unrelated failures appear in the named failing-test list. This is *not* a GREEN release; the CI job deliberately fails.
 
