@@ -37,6 +37,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
   const liveIdentity = shoppingListDemandIdentity(basket)
   const rows = shoppingListRowsV2(basket, session)
   const completedCount = rows.filter((row) => row.checked).length
+  const unresolvedCount = rows.filter((row) => row.unresolved).length
 
   useEffect(() => {
     const previous = controller.snapshot()
@@ -75,9 +76,9 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
         </div>
       </div>
 
-      {basket.unresolvedLineCount > 0 && (
+      {unresolvedCount > 0 && (
         <div className="attention-card">
-          <strong>{basket.unresolvedLineCount} productkeuze vraagt controle</strong>
+          <strong>{unresolvedCount} productkeuze vraagt controle</strong>
           <span>SUPA vult een onzekere match niet automatisch in.</span>
         </div>
       )}
