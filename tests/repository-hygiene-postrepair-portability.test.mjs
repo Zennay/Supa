@@ -61,7 +61,7 @@ test('QA #723: postrepair rejects compatibility-width and ligature collisions', 
 
 test('QA #723: postrepair rejects Windows device names padded before extensions', () => {
   for (const path of [
-    'docs/COM  .txt',
+    'docs/COM1  .txt',
     'docs/LPT³  .txt',
     'docs/NUL .md',
   ]) {
