@@ -203,13 +203,62 @@ function safeRuntimeBasket(basket: unknown): boolean {
 // preserve Array.isArray/prototype/descriptors yet spoof .filter/.some/.map on
 // property GET; copying through descriptors avoids invoking those methods.
 // The resulting array and basket metadata are ordinary local values.
+// The prior array snapshot alone retained caller-owned matched line objects.
+// Copy all inspected financial and demand fields through own data descriptors:
+// a transparent Proxy may spoof ordinary `get` while exposing valid descriptors.
+// Unsupported/malformed lines keep the existing diagnostic, not financial facts.
+function snapshotRuntimeLine(line: unknown): BasketTraceLine {
+  const status = ownData(line, 'status')?.value
+  if (status === 'matched') {
+    const requirement = ownData(line, 'requirement')?.value
+    const pack = ownData(line, 'pack')?.value
+    return {
+      status: 'matched',
+      id: ownData(line, 'id')?.value as string,
+      ingredientLabel: ownData(line, 'ingredientLabel')?.value as string,
+      productId: ownData(line, 'productId')?.value as string,
+      productName: ownData(line, 'productName')?.value as string,
+      packs: ownData(line, 'packs')?.value as number,
+      pricePerPackCents: ownData(line, 'pricePerPackCents')?.value as number,
+      lineTotalCents: ownData(line, 'lineTotalCents')?.value as number,
+      matchScore: ownData(line, 'matchScore')?.value as number,
+      reasons: ownData(line, 'reasons')?.value as string[] ?? [],
+      requirement: {
+        amount: ownData(requirement, 'amount')?.value as number,
+        unit: ownData(requirement, 'unit')?.value as MatchedBasketLine['requirement']['unit'],
+      },
+      pack: {
+        amount: ownData(pack, 'amount')?.value as number,
+        unit: ownData(pack, 'unit')?.value as MatchedBasketLine['pack']['unit'],
+        count: ownData(pack, 'count')?.value as number,
+      },
+    }
+  }
+  if (status === 'unresolved') {
+    return {
+      status: 'unresolved',
+      id: ownData(line, 'id')?.value as string,
+      ingredientLabel: ownData(line, 'ingredientLabel')?.value as string,
+      requirement: {
+        amount: ownData(ownData(line, 'requirement')?.value, 'amount')?.value as number | null,
+        unit: ownData(ownData(line, 'requirement')?.value, 'unit')?.value as MatchedBasketLine['requirement']['unit'],
+      },
+      matchScore: ownData(line, 'matchScore')?.value as number | null,
+      reasons: ownData(line, 'reasons')?.value as string[] ?? [],
+    }
+  }
+  return line !== null && typeof line === 'object'
+    ? { status, id: ownData(line, 'id')?.value } as BasketTraceLine
+    : line as BasketTraceLine
+}
+
 function snapshotRuntimeBasket(basket: unknown): OneStoreBasket {
   const originalLines = ownData(basket, 'lines')?.value
   const lines: BasketTraceLine[] = []
   if (Array.isArray(originalLines)) {
     const length = ownData(originalLines, 'length')?.value as number
     for (let index = 0; index < length; index += 1) {
-      lines.push(ownData(originalLines, String(index))!.value as BasketTraceLine)
+      lines.push(snapshotRuntimeLine(ownData(originalLines, String(index))!.value))
     }
   }
   const originalStore = ownData(basket, 'store')?.value
