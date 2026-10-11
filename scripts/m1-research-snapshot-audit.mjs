@@ -108,8 +108,11 @@ async function readBoundedRegularFile(path, maxBytes) {
   catch { throw new Error('capture audit requires bounded regular files') }
   try {
     const details = await handle.stat()
-    if (!details.isFile() || details.size <= 0 || details.size > maxBytes) {
-      throw new Error('capture audit requires bounded regular files')
+    // Private research remains owner-only even after the writer saved it.
+    // Validate the already-open descriptor, not a pathname followed by a read.
+    if (!details.isFile() || details.size <= 0 || details.size > maxBytes ||
+        (details.mode & 0o077) !== 0) {
+      throw new Error('capture audit requires private bounded regular files')
     }
     return await handle.readFile()
   } finally {
@@ -148,7 +151,8 @@ export async function auditCaptureFiles({
   await requireCanonicalCaptureAncestors(dir)
   for (const path of [outputDir, dir]) {
     const details = await lstat(path)
-    if (!details.isDirectory() || details.isSymbolicLink()) throw new Error('capture audit requires real directories')
+    if (!details.isDirectory() || details.isSymbolicLink() ||
+        (details.mode & 0o077) !== 0) throw new Error('capture audit requires private directories')
   }
   const bodyPath = join(dir, stem + '.html')
   const metaPath = join(dir, stem + '.json')
