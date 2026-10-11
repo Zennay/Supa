@@ -33,7 +33,7 @@ function baseQuantity(amount: number, unit: string) {
  * rational BigInt arithmetic avoids IEEE-754 ceil/multiplication overshoot.
  */
 function decimalBaseQuantity(amount: number, unit: string) {
-  const match = /^(\\d+)(?:\\.(\\d+))?(?:e([+-]?\\d+))?$/i.exec(String(amount))
+  const match = /^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i.exec(String(amount))
   if (!match) return null
   const shift = Number(match[3] ?? 0) - (match[2]?.length ?? 0)
   const digits = BigInt(match[1] + (match[2] ?? ''))
