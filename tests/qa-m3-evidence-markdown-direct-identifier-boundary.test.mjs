@@ -60,7 +60,12 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   // This modifies only the in-memory scan text, never the evidence note itself.
   markdown = markdown.normalize('NFKC')
     .replace(/[\u00ad\u200b-\u200f\u2060\u2066-\u2069\ufeff]/g, '')
+    // Unwrap simple linked field labels for the scanner only: rendered
+    // Markdown/HTML links must not conceal an otherwise explicit ID field.
+    // Retain the original evidence bytes; this is not an HTML parser.
     .replace(/\\([_.-])/g, '$1')
+    .replace(/\[([^\]\r\n]{1,160})\]\([^()\r\n]{1,512}\)/g, '$1')
+    .replace(/<a\b[^>\r\n]{0,512}>\s*([^<\r\n]{1,160}?)\s*<\/a>/gi, '$1')
   assert.doesNotMatch(
     markdown,
     emailLike,
