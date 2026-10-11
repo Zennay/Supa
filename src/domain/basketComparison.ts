@@ -422,6 +422,13 @@ function unknownComparison(
   }
 }
 
+// Reject user-owned runtime objects before interpolating identifier diagnostics.
+// A malformed matched line is already unclaimable; its label must not run
+// Symbol.toPrimitive/toString or hide a more specific validation reason.
+function diagnosticIngredientId(id: unknown): string {
+  return validIdentity(id) ? id : '[invalid ingredient id]'
+}
+
 // Each exact decimal pack ceiling equals one in both directions only when
 // the two positive demands describe the *same* physical amount. Reuse the
 // basket's rational decimal/unit conversion instead of epsilon arithmetic.
@@ -484,19 +491,19 @@ function compareInspectedBaskets({
   for (const [id, baselineLine] of baselineById) {
     const candidateLine = candidateById.get(id)
     if (!candidateLine) {
-      reasons.push(`candidate basket is missing ingredient ${id}`)
+      reasons.push(`candidate basket is missing ingredient ${diagnosticIngredientId(id)}`)
       continue
     }
 
     if (baselineLine.ingredientLabel !== candidateLine.ingredientLabel) {
-      reasons.push(`ingredient label differs for ${id}`)
+      reasons.push(`ingredient label differs for ${diagnosticIngredientId(id)}`)
       continue
     }
 
     if (
       !sameDemand(baselineLine.requirement, candidateLine.requirement)
     ) {
-      reasons.push(`ingredient demand differs for ${id}`)
+      reasons.push(`ingredient demand differs for ${diagnosticIngredientId(id)}`)
       continue
     }
 
@@ -506,7 +513,7 @@ function compareInspectedBaskets({
       typeof baselineLine.lineTotalCents !== 'number' ||
       typeof candidateLine.lineTotalCents !== 'number'
     ) {
-      reasons.push(`ingredient line total is not numeric for ${id}`)
+      reasons.push(`ingredient line total is not numeric for ${diagnosticIngredientId(id)}`)
       continue
     }
 
@@ -522,7 +529,7 @@ function compareInspectedBaskets({
 
   for (const id of candidateById.keys()) {
     if (!baselineById.has(id)) {
-      reasons.push(`candidate basket has extra ingredient ${id}`)
+      reasons.push(`candidate basket has extra ingredient ${diagnosticIngredientId(id)}`)
     }
   }
 
