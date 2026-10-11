@@ -105,6 +105,12 @@ export function openShoppingProgressStorageV2(
   return {
     snapshot,
 
+    /** Display-only diagnostic; never exposes or rewrites stored bytes. */
+    storageFormatStatus(): 'ready' | 'unknown-record' | 'unavailable' {
+      if (!storageReadable) return 'unavailable'
+      return storageFormatSupported ? 'ready' : 'unknown-record'
+    },
+
     rebase(nextBasket: OneStoreBasket): ShoppingProgressSessionV2 {
       session = rebaseShoppingProgressSessionV2(session, nextBasket)
       currentBasket = nextBasket
