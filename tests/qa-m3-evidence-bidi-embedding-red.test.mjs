@@ -40,7 +40,7 @@ for (const [label, note] of [
   ['numeric pop-directional-format U+202C', '> account&#x202C;email: sample-c'],
   ['numeric left-to-right override U+202D', '<dt>participant&#8237;email</dt><dd>synthetic-d</dd>'],
   ['raw right-to-left override U+202E', '<th>account\u202Eid</th><td>fake-e</td>'],
-  ['format mark inside a fictional email address', 'fictitious\u202Aname@example.test'],
+  ['format mark inside a fictional email address', 'contact: invented@example\u202A.test'],
 ]) {
   test('QA #1737 expected RED: bidirectional controls may not hide ' + label, () => {
     const result = runScanner(note)
