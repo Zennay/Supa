@@ -16,10 +16,22 @@ type ShoppingProgressV2 = {
 
 function checkedIds(basket: OneStoreBasket, values: unknown): string[] {
   if (!Array.isArray(values)) return []
+  // Never execute caller-supplied Array.filter overrides. A sparse array
+  // with an inherited numeric property also must not invent a completed task.
+  if (Object.getOwnPropertyDescriptor(values, 'filter') || values.length > 10000) {
+    throw new TypeError('untrusted shopping completion array')
+  }
   const valid = new Set(basket.lines.map((line) => line.id))
-  return Array.from(new Set(values.filter(
-    (value): value is string => typeof value === 'string' && valid.has(value),
-  )))
+  const unique = new Set<string>()
+  for (let index = 0; index < values.length; index++) {
+    const item = Object.getOwnPropertyDescriptor(values, String(index))
+    if (!item || !Object.hasOwn(item, 'value')) {
+      throw new TypeError('untrusted shopping completion slot')
+    }
+    const value: unknown = item.value
+    if (typeof value === 'string' && valid.has(value)) unique.add(value)
+  }
+  return Array.from(unique)
 }
 
 /**
