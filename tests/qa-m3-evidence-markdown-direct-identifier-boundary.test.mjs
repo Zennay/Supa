@@ -30,7 +30,7 @@ const quotedFieldValueLine = new RegExp(
   'im',
 )
 const htmlTableValueLine = new RegExp(
-  '<(?:td|th)\\b[^>]*>\\s*(?:<(?<mark>strong|b|code)>\\s*)?' + identifierField +
+  '<(?:td|th)\\b[^>]*>\\s*(?:<(?<mark>strong|b|code)\\b[^>\\r\\n]{0,512}>\\s*)?' + identifierField +
     '\\s*(?:<\\/\\k<mark>>\\s*)?<\\/(?:td|th)>\\s*<(?:td|th)\\b[^>]*>\\s*\\S+',
   'im',
 )
