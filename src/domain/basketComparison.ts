@@ -53,7 +53,12 @@ function baseQuantity(
 }
 
 function validIdentity(value: unknown): value is string {
-  return typeof value === 'string' && /[\p{L}\p{N}\p{S}]/u.test(value)
+  return (
+    typeof value === 'string' &&
+    /[\p{L}\p{N}\p{S}]/u.test(value) &&
+    // A visible letter does not make embedded direction or line controls safe.
+    !/[\p{Cc}\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u.test(value)
+  )
 }
 
 // Financial facts must belong to the observed row; prototypes are not basket evidence.
