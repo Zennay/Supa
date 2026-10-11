@@ -1,4 +1,5 @@
 import type { BasketTraceLine, OneStoreBasket } from './basket.ts'
+import { calculateDecimalPackCount } from './decimalPackArithmetic.ts'
 
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
 
@@ -84,7 +85,10 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
   const pack = baseQuantity(effectivePackAmount, line.pack.unit)
   const expectedPacks =
     required && pack && required.family === pack.family
-      ? Math.ceil(required.amount / pack.amount)
+      ? calculateDecimalPackCount(
+          [{ amount: line.requirement.amount, unit: line.requirement.unit }],
+          { amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count },
+        )
       : null
   const expectedLineTotalCents = line.packs * line.pricePerPackCents
 
