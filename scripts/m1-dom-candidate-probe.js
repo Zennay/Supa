@@ -25,7 +25,12 @@
   for (const [role, selector] of candidates) {
     let count = 0
     try { count = document.querySelectorAll(selector).length } catch { continue }
-    if (count > 0) results.push({ role, selector, count, groundedInCurrentDom: true, semanticVerified: false })
+    // The private reviewer accepts only actual counts within its 500-node budget.
+    // Omit a broad selector instead of inventing a capped count or rejecting
+    // unrelated, safely bounded candidates from the same rendered page.
+    if (Number.isSafeInteger(count) && count > 0 && count <= 500) {
+      results.push({ role, selector, count, groundedInCurrentDom: true, semanticVerified: false })
+    }
   }
   const observed = new Map()
   const elements = document.querySelectorAll('h1, [itemprop="price"], [data-testid*="price" i], [class*="price" i], a[href*="/product"]')
