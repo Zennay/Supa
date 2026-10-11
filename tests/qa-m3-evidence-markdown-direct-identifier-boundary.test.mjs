@@ -64,7 +64,11 @@ function privacyScanText(markdown) {
       const renderedSpace = code === 0x00a0 || code === 0x1680 ||
         (code >= 0x2000 && code <= 0x200a) || code === 0x202f ||
         code === 0x205f || code === 0x3000
-      return invisible ? '' : renderedSpace ? ' ' :
+      // CommonMark also renders ASCII TAB/LF/CR numeric character references
+      // as whitespace. Fold only these three valid whitespace controls in
+      // scanner memory; never rewrite the underlying evidence file.
+      const renderedAsciiWhitespace = code === 0x09 || code === 0x0a || code === 0x0d
+      return invisible ? '' : (renderedSpace || renderedAsciiWhitespace) ? ' ' :
         code >= 32 && code <= 126 ? String.fromCharCode(code) : reference
     })
     // CommonMark HTML5 named references can encode visible separators or
