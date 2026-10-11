@@ -125,3 +125,37 @@ test('committed M3 study JSON stays structurally identifiable and privacy-safe',
     inspectForDirectIdentifiers(study)
   }
 })
+
+
+test('M3 evidence privacy boundary rejects equivalent direct-identifier key spellings', () => {
+  const disallowedAliases = [
+    'participant_name',
+    'PARTICIPANT-NAME',
+    'participant.name',
+    'participant name',
+    'ParticipantEmail',
+    'account-id',
+    'ACCOUNT_EMAIL',
+    'Full Name',
+    'email-address',
+    'ｅｍａｉｌ＿ａｄｄｒｅｓｓ',
+  ]
+
+  for (const key of disallowedAliases) {
+    assert.throws(
+      () => inspectForDirectIdentifiers({ nested: [{ [key]: 'Synthetic Person' }] }),
+      /direct participant identifier key is not allowed in M3 evidence/,
+      `identifier alias ${JSON.stringify(key)} must fail closed`,
+    )
+  }
+
+  assert.doesNotThrow(() =>
+    inspectForDirectIdentifiers({
+      participantKey: 'student-001',
+      studyId: 'week-001',
+      storeId: 'plus-001',
+      ingredientLabel: 'Broccoli',
+      provenanceNote: 'Synthetic test only',
+    }),
+  )
+})
