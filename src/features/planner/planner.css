@@ -89,7 +89,6 @@
   grid-template-columns: 42px 1fr 44px;
   color: var(--ink);
   text-align: left;
-  cursor: pointer;
 }
 
 .meal-config.active {
@@ -114,12 +113,13 @@
 .meal-copy select {
   width: 100%;
   min-width: 0;
+  min-height: 44px;
   border: 0;
   background: transparent;
   color: var(--ink);
   padding: 0;
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
 }
 
