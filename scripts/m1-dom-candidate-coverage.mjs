@@ -1,6 +1,6 @@
 import { constants } from 'node:fs'
 import { lstat, open, readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { RESEARCH_SOURCES } from './m1-multistore-research.mjs'
 
@@ -29,7 +29,7 @@ function summary(sources, unexpectedRoot = 0) {
 async function entries(path) {
   try {
     const meta = await lstat(path)
-    if (!meta.isDirectory() || meta.isSymbolicLink()) return false
+    if (!meta.isDirectory() || meta.isSymbolicLink() || (meta.mode & 0o077) !== 0) return false
     return await readdir(path, { withFileTypes: true })
   } catch (error) {
     if (error?.code === 'ENOENT') return null
@@ -48,9 +48,20 @@ async function classify(path, source, nowMs) {
   try {
     handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     const meta = await handle.stat()
-    if (!meta.isFile() || meta.size < 1 || meta.size > MAX_BYTES) return 'rejected'
+    if (!meta.isFile() || meta.size < 1 || meta.size > MAX_BYTES || (meta.mode & 0o077) !== 0) return 'rejected'
     const data = JSON.parse((await handle.readFile()).toString('utf8'))
     if (!data || typeof data !== 'object' || Array.isArray(data)) return 'rejected'
+    // A copied/renamed report must never be treated as the original capture
+    // review, even when its store and public metadata are otherwise valid.
+    if (typeof data.captureStem !== 'string' ||
+        data.captureStem + '-candidate-review.json' !== basename(path)) return 'rejected'
+    const keys = new Set([
+      'version', 'kind', 'sourceId', 'store', 'observedAt', 'status',
+      'selectors', 'actualClassCandidates', 'domCaptureIdentityVerified',
+      'retailerPermissionVerified', 'semanticVerified', 'livePriceVerified',
+      'publicSavingsClaimEligible', 'captureStem', 'captureAuditStatus',
+    ])
+    if (Object.keys(data).some(key => !keys.has(key))) return 'rejected'
     if (data.version !== 1 || data.kind !== 'private-dom-candidate-review' ||
         data.sourceId !== source.id || data.store !== source.store ||
         data.status !== 'human-semantic-review-required' ||
