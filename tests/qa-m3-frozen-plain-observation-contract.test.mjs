@@ -138,3 +138,53 @@ test('M3 partial frozen plain basket abstains and cannot carry a savings delta',
   assert.equal(JSON.stringify(input), original)
   assert.deepEqual(buildObservedWeekReport(input), report)
 })
+
+test('M3 JSON transport preserves all synthetic financial and unknown outcomes', () => {
+  for (const [expected, offset, incomplete] of [
+    ['better', -10, false],
+    ['same', 0, false],
+    ['worse', 10, false],
+    ['unknown', -10, true],
+  ]) {
+    // Canonical JSON transport yields fresh ordinary data, not an
+    // attacker-supplied accessor/Proxy and not human field observations.
+    const input = JSON.parse(JSON.stringify(study(offset, incomplete)))
+    const original = JSON.stringify(input)
+    const report = buildObservedWeekReport(input)
+
+    assert.equal(report.outcome, expected)
+    assert.equal(report.claimable, !incomplete)
+    assert.equal(report.publicSavingsClaimEligible, false)
+    assert.equal('participantKey' in report, false)
+    assert.equal(JSON.stringify(input), original)
+    assert.equal(
+      report.deltaCents,
+      incomplete
+        ? null
+        : input.candidate.basket.totalCents - input.baseline.basket.totalCents,
+    )
+    assert.equal(
+      report.savingsCents,
+      incomplete ? null : -(report.deltaCents) || 0,
+    )
+  }
+})
+
+test('plain physical candidate row reordering cannot change a same-demand M3 money decision', () => {
+  for (const offset of [-10, 0, 10]) {
+    const input = study(offset)
+    const ordered = buildObservedWeekReport(input)
+    const originalBaseline = JSON.stringify(input.baseline)
+    input.candidate.basket.lines.reverse()
+    const shuffled = freezeOwnedPlain(input)
+    const reordered = buildObservedWeekReport(shuffled)
+
+    assert.equal(ordered.claimable, true)
+    assert.equal(reordered.claimable, true)
+    assert.equal(reordered.outcome, ordered.outcome)
+    assert.equal(reordered.deltaCents, ordered.deltaCents)
+    assert.equal(reordered.savingsCents, ordered.savingsCents)
+    assert.equal(reordered.publicSavingsClaimEligible, false)
+    assert.equal(JSON.stringify(shuffled.baseline), originalBaseline)
+  }
+})
