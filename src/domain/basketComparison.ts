@@ -107,6 +107,18 @@ function invalidMatchedLineIdentity(line: MatchedBasketLine): boolean {
 }
 
 function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
+  // Descriptor-safe snapshots may still carry caller-owned objects. Check the
+  // primitive types before multiplication can invoke valueOf/toPrimitive.
+  if (
+    typeof line.requirement.amount !== 'number' ||
+    typeof line.pack.amount !== 'number' ||
+    typeof line.pack.count !== 'number' ||
+    typeof line.packs !== 'number' ||
+    typeof line.pricePerPackCents !== 'number' ||
+    typeof line.lineTotalCents !== 'number' ||
+    typeof line.matchScore !== 'number'
+  ) return true
+
   const effectivePackAmount = line.pack.amount * line.pack.count
   const required = baseQuantity(line.requirement.amount, line.requirement.unit)
   const pack = baseQuantity(effectivePackAmount, line.pack.unit)
@@ -355,8 +367,12 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
     reasons.push(`${label} basket contains invalid matched-line economics`)
   }
 
+  // A malformed financial snapshot must not trigger numeric coercion even
+  // after invalidMatchedLineEconomics has rejected it.
   const calculatedTotal = matched.reduce(
-    (total, line) => total + line.lineTotalCents,
+    (total, line) => typeof line.lineTotalCents === 'number'
+      ? total + line.lineTotalCents
+      : Number.NaN,
     0,
   )
   if (!Number.isSafeInteger(calculatedTotal)) {
