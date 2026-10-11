@@ -4,7 +4,7 @@
 
 Independent quality-validation extension of [open #1513](https://github.com/Zennay/Supa/issues/1513). This is a **synthetic regression experiment**, not a PLUS or DekaMarkt field observation, price, retailer permission, or savings proof. M3's genuine two-store same-demand run remains [#78](https://github.com/Zennay/Supa/issues/78). Independent cross-basket atomicity [#1508](https://github.com/Zennay/Supa/issues/1508) remains separate.
 
-Canonical `main` pin at test creation: `22edb59b7c96311b686161b74a9fc2060e3c5d77`. One new QA file: `tests/qa-m3-configurable-window-nanosecond-red.test.mjs`. No change to preexisting source, workflow, test, fixture, field data, or owner branches.
+Canonical `main` pin at test creation: `22edb59b7c96311b686161b74a9fc2060e3c5d77`. Two new executable QA files: `tests/qa-m3-configurable-window-nanosecond-red.test.mjs` and `tests/qa-m3-fraction-length-4-to-9-red.test.mjs`. No change to preexisting source, workflow, test, fixture, field data, or owner branches.
 
 ## Why test this
 
@@ -23,6 +23,10 @@ The observed-week assessor exposes `maxObservationWindowHours` as a positive fin
 Safety requirement: an invalid or unsupported-precision pair must yield `claimable=false`, `comparison.claimable=false`, `outcome='unknown'`, `deltaCents=null`, `savingsCents=null`, `lineDeltas=[]`, and nonempty diagnostic reasons. Neither basket's prices should be publicly claimed. Merely rounding down elapsed time or formatting an approximate 0.00h is **not** a repair.
 
 Accept either exact fractional comparison through 9 digits or conservative rejection of timestamps requiring unsupported nonzero fractional precision beyond milliseconds. Preserve full UTC-offset semantics, explicit reversed ordering, and exact-boundary values with only trailing zero precision.
+
+## Cross-precision coverage
+
+The second executable file independently challenges all six loss-bearing ISO fraction lengths (4, 5, 6, 7, 8 and 9 decimal digits). The elapsed intervals exceed 24 hours by exactly 100,000ns, 10,000ns, 1,000ns, 100ns, 10ns, and 1ns respectively, while `Date.parse` rounds all pairs to the same 24-hour millisecond difference. Nine supported 1–9-digit trailing-zero precision controls and a +1ms rejection control verify that a future fix does not disable legitimate exact-boundary evidence.
 
 ## Validation and release posture
 
