@@ -101,7 +101,7 @@ for (const [label, mutation] of mutations) {
     const result = compareFullBaskets(data)
     assertUnknown(result)
     assert.equal(spy.mutations, 1)
-    assert.equal(spy.descriptorVisits, 2)
+    assert.equal(spy.descriptorVisits, 1, 'failed baseline snapshot must short-circuit before candidate snapshot')
     assert.equal(spy.ordinaryGets, 0)
     assert.equal(before.outcome, 'same')
     assert.equal(before.deltaCents, 0)
