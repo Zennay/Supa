@@ -127,7 +127,9 @@ async function privateJsonFile(path) {
 async function ensurePrivateDirectory(path) {
   await mkdir(path, { recursive: true, mode: 0o700 })
   const details = await lstat(path)
-  if (!details.isDirectory() || details.isSymbolicLink()) malformed()
+  // Never create a private selector report inside an already group/world-readable
+  // directory; changing its mode behind an operator's back is not safe either.
+  if (!details.isDirectory() || details.isSymbolicLink() || (details.mode & 0o077) !== 0) malformed()
 }
 
 /**
