@@ -58,6 +58,13 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   // from the backstop without modifying any stored Markdown evidence.
   // Decode visible Markdown punctuation escapes before scanning explicit IDs.
   // This modifies only the in-memory scan text, never the evidence note itself.
+  // Inspect original link targets before unwrapping rendered field labels:
+  // otherwise a mailto: URL could lose its email address during scanning.
+  assert.doesNotMatch(
+    markdown.normalize('NFKC').replace(/[\\u00ad\\u200b-\\u200f\\u2060\\u2066-\\u2069\\ufeff]/g, ''),
+    emailLike,
+    'obvious participant identifier email is not allowed in M3 Markdown evidence: ' + displayPath,
+  )
   markdown = markdown.normalize('NFKC')
     .replace(/[\u00ad\u200b-\u200f\u2060\u2066-\u2069\ufeff]/g, '')
     // Unwrap simple linked field labels for the scanner only: rendered
