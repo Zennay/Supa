@@ -40,6 +40,17 @@ node scripts/m1-multistore-research.mjs --capture hoogvliet-magere-melk
 
 This is **one fixed credential-free proxy**, not a rotating pool, IP-ban bypass, retry fallback, anonymity mechanism, or geo/CAPTCHA evasion. Do **not** reattempt denied pages through it. The full proxy address is never included in capture metadata. Ordinary environment `HTTP_PROXY`, `ALL_PROXY`, credentials, browser accounts and hidden curl config are not used automatically.
 
+### Capture safety boundaries (offline M1, not evidence)
+
+The approved, single-source research path is intentionally bounded and fails closed:
+
+- **Response headers:** at most **64 KiB of raw bytes**, including UTF-8 multibyte data. Larger `curl --dump-header` files are refused **before being loaded**. Multiple `Content-Type` headers, even if identical or capitalized differently, are rejected rather than selecting the first MIME value. Only unambiguous HTTP 200 HTML is accepted.
+- **Response body:** at most **5 MiB**, with a 20-second total request limit and no redirect following, retry, dynamic hostname selection or automatic egress fallback. A denied/oversized/non-HTML response creates **no approved snapshot**; do not retry from a rotated proxy or alternate address.
+- **Private output paths:** only the registered source can be written beneath the requested capture root. Existing path ancestors may not be symlinks. Already-existing output/source directories must be owner-private (no group/other bits); the writer creates new private directories as `0700`, and HTML/JSON snapshots with exclusive `0600` file creation. It refuses shared roots instead of quietly changing their permissions.
+- **Verification remains separate:** saving private HTML+metadata and matching SHA-256 does not establish retailer permission, browser-DOM identity, reliable prices or any M3 savings claim. Synthetic local-curl tests are not field evidence. The follow-up snapshot **reader** private-mode repair is separately staged in [issue #1258](https://github.com/Zennay/Supa/issues/1258) and must not be assumed deployed merely because the writer enforces private paths.
+
+These are pathname and file-mode checks, not a guarantee against arbitrary concurrent filesystem races. Keep captures inside owner-controlled directories, do not commit them, and stop on any safety error.
+
 ## Derive selectors from an actual visible DOM
 
 Public HTML responses can differ from JavaScript-rendered product pages. On a retailer page that the user can normally view with permission, open **Firefox Developer Tools → Web Console**, enable the multiline editor, and run the complete contents of `scripts/m1-dom-candidate-probe.js`. This *local browser-only* probe inspects existing HTML elements and prints counts of CSS candidates actually seen for product links, names, prices, pack-size hints and offers, plus observed tag/class combinations. It sends no requests and does **not** copy text, prices, URLs, cookies, identifiers or account data.
