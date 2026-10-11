@@ -13,7 +13,7 @@ const emailLike = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 const identifierField =
   '(?:participant[\\s_.-]*(?:name|email)|full[\\s_.-]*name|account[\\s_.-]*(?:id|email)|e[\\s_.-]*mail[\\s_.-]*(?:address|adres)|naam[\\s_.-]*deelnemer)'
 const fieldValueLine = new RegExp(
-  '^[ \\t]*(?:>\\s*)?(?:[-*+]\\s*)?(?:\\*\\*|__|\\x60)?' +
+  '^[ \\t]*(?:#{1,6}[ \\t]+)?(?:>\\s*)?(?:[-*+]\\s*)?(?:\\*\\*|__|\\x60)?' +
     identifierField + '(?:\\*\\*|__|\\x60)?\\s*(?::|=)\\s*\\S+',
   'im',
 )
@@ -34,6 +34,15 @@ const htmlTableValueLine = new RegExp(
     '\\s*<\\/(?:td|th)>\\s*<(?:td|th)\\b[^>]*>\\s*\\S+',
   'im',
 )
+// Raw HTML is allowed in Markdown notes; visible label/value pairs inside
+// common text tags must not bypass the direct-identifier backstop.
+const htmlElementValueLine = new RegExp(
+  '<(?:p|div|li|span|h[1-6])\\b[^>]*>\\s*(?:<(?:strong|b|code)>\\s*)?' +
+    identifierField +
+    '(?:\\s*<\\/(?:strong|b|code)>)?\\s*(?::|=)\\s*\\S+',
+  'im',
+)
+
 const htmlCommentValueLine = new RegExp(
   '<!--\\s*' + identifierField + '\\s*(?::|=)\\s*\\S+[^\\n]*?-->',
   'im',
@@ -65,6 +74,7 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
     quotedFieldValueLine,
     htmlTableValueLine,
     htmlCommentValueLine,
+    htmlElementValueLine,
   ]) {
     assert.doesNotMatch(
       markdown,
