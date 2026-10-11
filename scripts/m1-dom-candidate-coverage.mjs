@@ -91,7 +91,10 @@ export async function inventoryDomCandidateReviews({
     if (children.length > MAX_SOURCE_ENTRIES) { source.unexpected += children.length; continue }
     for (const child of children) {
       if (!child.isFile() || !STEM.test(child.name)) { source.unexpected++; continue }
-      const result = await classify(join(path, child.name), source, nowMs)
+      // Counters carry only a sourceId; validate private records against the
+      // immutable registered source instead of the public count-only summary.
+      const registered = RESEARCH_SOURCES.find(item => item.id === source.sourceId)
+      const result = await classify(join(path, child.name), registered, nowMs)
       source[result]++
     }
   }
