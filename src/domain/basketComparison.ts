@@ -16,6 +16,11 @@ type PinnedMonetaryFacts = WeakMap<object, {
   packAmount: unknown
   packUnit: unknown
   packCount: unknown
+  id: unknown
+  ingredientLabel: unknown
+  productId: unknown
+  productName: unknown
+  matchScore: unknown
 }>
 
 type PinnedStoreIdentity = { reference: unknown; id: unknown }
@@ -253,6 +258,7 @@ function safeRuntimeBasket(
       let requirement: unknown
       let pack: unknown
       let packs: unknown
+      const attribution: Record<string, unknown> = {}
       for (const key of keys) {
         const descriptor = ownData(line, key)
         if (!descriptor) return false
@@ -261,6 +267,10 @@ function safeRuntimeBasket(
         if (key === 'requirement') requirement = descriptor.value
         if (key === 'pack') pack = descriptor.value
         if (key === 'packs') packs = descriptor.value
+        if (key === 'id' || key === 'ingredientLabel' || key === 'productId' ||
+            key === 'productName' || key === 'matchScore') {
+          attribution[key] = descriptor.value
+        }
       }
       const amountData = ownData(requirement, 'amount')
       const unitData = ownData(requirement, 'unit')
@@ -276,6 +286,9 @@ function safeRuntimeBasket(
         requirementAmount: amountData.value, requirementUnit: unitData.value,
         packs, pack, packAmount: packAmount.value, packUnit: packUnit.value,
         packCount: packCount.value,
+        id: attribution.id, ingredientLabel: attribution.ingredientLabel,
+        productId: attribution.productId, productName: attribution.productName,
+        matchScore: attribution.matchScore,
       })
     } else if (status === 'unresolved' && !ownData(line, 'id')) {
       return false
@@ -326,16 +339,28 @@ function snapshotRuntimeLine(
         !Object.is(packCount, pinned.packCount)) {
       throw new Error('basket physical pack descriptors changed after preflight')
     }
+    const id = ownData(line, 'id')?.value
+    const ingredientLabel = ownData(line, 'ingredientLabel')?.value
+    const productId = ownData(line, 'productId')?.value
+    const productName = ownData(line, 'productName')?.value
+    const matchScore = ownData(line, 'matchScore')?.value
+    if (!Object.is(id, pinned.id) ||
+        !Object.is(ingredientLabel, pinned.ingredientLabel) ||
+        !Object.is(productId, pinned.productId) ||
+        !Object.is(productName, pinned.productName) ||
+        !Object.is(matchScore, pinned.matchScore)) {
+      throw new Error('basket matched attribution descriptors changed after preflight')
+    }
     return {
       status: 'matched',
-      id: ownData(line, 'id')?.value as string,
-      ingredientLabel: ownData(line, 'ingredientLabel')?.value as string,
-      productId: ownData(line, 'productId')?.value as string,
-      productName: ownData(line, 'productName')?.value as string,
+      id: id as string,
+      ingredientLabel: ingredientLabel as string,
+      productId: productId as string,
+      productName: productName as string,
       packs: packs as number,
       pricePerPackCents: pricePerPackCents as number,
       lineTotalCents: lineTotalCents as number,
-      matchScore: ownData(line, 'matchScore')?.value as number,
+      matchScore: matchScore as number,
       reasons: ownData(line, 'reasons')?.value as string[] ?? [],
       requirement: {
         amount: requirementAmount as number,
