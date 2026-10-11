@@ -1,4 +1,5 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
+import { shoppingListDemandIdentity } from './shoppingListDemandIdentity.ts'
 import { shoppingListProgressStorageKey } from './shoppingListProgress.ts'
 import { shoppingListProgressV2StorageKey } from './shoppingListProgressV2.ts'
 import {
@@ -86,6 +87,11 @@ export function openShoppingProgressStorageV2(
         return false
       }
       try {
+        // Reject a stale snapshot if a caller mutated the basket after toggle
+        // but before this explicit write. Financial-only updates retain identity.
+        if (shoppingListDemandIdentity(currentBasket) !== session.demandIdentity) {
+          return false
+        }
         storage.setItem(shoppingListProgressV2StorageKey, session.serialized)
         return true
       } catch {
