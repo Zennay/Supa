@@ -43,7 +43,7 @@ test('postrepair: NFKC must not turn apparent letter/symbol compatibility marks 
     '\u{1d185}', // musical combining stem
   ]
   for (const value of cases) {
-    assert.equal(/[\\p{L}\\p{N}\\p{P}\\p{S}]/u.test(value.normalize('NFKC')), false)
+    assert.equal(/[\p{L}\p{N}\p{P}\p{S}]/u.test(value.normalize('NFKC')), false)
     assert.throws(() => buildM4SummaryWithMealSlotIntegrity(session([[value, 'followed']])),
       /M4 meal outcome slot must include a visible base character/,
       JSON.stringify(value))
