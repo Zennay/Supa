@@ -38,6 +38,7 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
   const rows = shoppingListRowsV2(basket, session)
   const completedCount = rows.filter((row) => row.checked).length
   const unresolvedCount = rows.filter((row) => row.unresolved).length
+  const canUndoClear = session.demandIdentity === liveIdentity && controller.canUndoClear()
 
   useEffect(() => {
     const previous = controller.snapshot()
@@ -76,6 +77,18 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
     setSaveFailed(next.serialized !== null && !controller.persist())
   }
 
+  function undoClear() {
+    controller.rebase(basket)
+    // A changed product, store or quantity invalidates this undo immediately.
+    if (!controller.canUndoClear()) {
+      setSession(controller.snapshot())
+      return
+    }
+    const next = controller.undoClear()
+    setSession(next)
+    setSaveFailed(next.serialized !== null && !controller.persist())
+  }
+
   return (
     <section className="screen">
       <div className="section-heading">
@@ -104,11 +117,15 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
           <p className="shopping-progress" role="status" aria-live="polite">
             {completedCount} van {rows.length} afgevinkt
           </p>
-          {completedCount > 0 && (
+          {completedCount > 0 ? (
             <button className="ghost-button" type="button" onClick={clearChecked}>
               Vinkjes wissen
             </button>
-          )}
+          ) : canUndoClear ? (
+            <button className="ghost-button" type="button" onClick={undoClear}>
+              Wissen ongedaan maken
+            </button>
+          ) : null}
         </div>
       )}
 
