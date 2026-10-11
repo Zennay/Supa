@@ -28,7 +28,10 @@ function inspect(catalogCount, nameCount = 1) {
     document, Date, console: { log: (...args) => logs.push(args) },
   }
   sandbox.globalThis = sandbox
-  const report = vm.runInNewContext(snippet, sandbox)
+  const browserReport = vm.runInNewContext(snippet, sandbox)
+  // Operators transfer the DevTools report as JSON to the offline Node reviewer.
+  // Cross-realm VM arrays are not equivalent to parsed on-disk JSON arrays.
+  const report = JSON.parse(JSON.stringify(browserReport))
   return { report, logs }
 }
 
