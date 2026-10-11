@@ -95,6 +95,10 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
     // Link definitions and raw M3 notes remain untouched.
     .replace(/\[([^\]\r\n]{1,160})\]\[[^\]\r\n]{0,160}\]/g, '$1')
     .replace(/<a\b[^>\r\n]{0,512}>\s*([^<\r\n]{1,160}?)\s*<\/a>/gi, '$1')
+  // Inline phrasing tags render their contents in a visible field label.
+  // Strip only bounded presentational tags in scan text, never in evidence.
+  // Original email/link targets were already checked before this step.
+  markdown = markdown.replace(/<\/?(?:strong|b|em|i|code|span|p)\b[^>\r\n]{0,512}>/gi, '')
   assert.doesNotMatch(
     markdown,
     emailLike,
