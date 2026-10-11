@@ -12,10 +12,10 @@ import {
   shoppingListProgressV2StorageKey,
 } from '../src/features/shopping-list/shoppingListProgressV2.ts'
 
-function basket(store = m2Store) {
+function basket(store = m2Store, products = m2Products) {
   return buildOneStoreBasket({
     store,
-    products: m2Products,
+    products,
     activeDays: ['Di'],
     plan: m2InitialPlan,
     recipes: m2Recipes,
@@ -67,6 +67,29 @@ test('real v2 shopping screen counts only physically valid checked tasks', async
     const restored = render(initial)
     assert.equal(pressed(restored), 1)
     assert.match(restored, new RegExp(`1 van ${count(restored)} afgevinkt`))
+
+    const repricedBasket = basket(m2Store, m2Products.map((product) => ({
+      ...product,
+      priceCents: product.priceCents + 7,
+    })))
+    assert.notEqual(repricedBasket.totalCents, initial.totalCents)
+    const repriced = render(repricedBasket)
+    assert.equal(pressed(repriced), 1, 'price-only changes retain checked physical tasks')
+    assert.match(repriced, new RegExp(`1 van ${count(repriced)} afgevinkt`))
+
+    const storedWithPhantom = JSON.parse(
+      serializeShoppingProgressV2(initial, [picked.id]),
+    )
+    storedWithPhantom.doneLineIds = [picked.id, picked.id, 'synthetic-phantom-id']
+    values.set(shoppingListProgressV2StorageKey, JSON.stringify(storedWithPhantom))
+    const deduplicated = render(initial)
+    assert.equal(pressed(deduplicated), 1, 'phantom/duplicate IDs must not inflate totals')
+    assert.match(deduplicated, new RegExp(`1 van ${count(deduplicated)} afgevinkt`))
+
+    const unresolved = render(basket(m2Store, []))
+    assert.match(unresolved, /handmatig kiezen/)
+    assert.equal(pressed(unresolved), 0)
+    assert.match(unresolved, new RegExp(`0 van ${count(unresolved)} afgevinkt`))
 
     const newStore = render(basket({ ...m2Store, id: 'synthetic-second-store' }))
     assert.equal(pressed(newStore), 0)
