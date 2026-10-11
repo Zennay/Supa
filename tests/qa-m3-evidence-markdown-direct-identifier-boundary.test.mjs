@@ -53,7 +53,7 @@ function privacyScanText(markdown) {
   // Read visually hyphenated direct-ID labels as their ASCII-hyphen form.
   // Limit this equivalence to the temporary privacy scan; never rewrite notes.
   return markdown.normalize('NFKC')
-    .replace(/[\u2010-\u2013\u2212]/g, '-')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
     .replace(/[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufe00-\ufe0f\ufeff]/g, '')
     .replace(/&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/g, (reference, hex, decimal) => {
       const code = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
@@ -72,15 +72,16 @@ function privacyScanText(markdown) {
       // as whitespace. Fold only these three valid whitespace controls in
       // scanner memory; never rewrite the underlying evidence file.
       const renderedAsciiWhitespace = code === 0x09 || code === 0x0a || code === 0x0d
-      return invisible ? '' : (renderedSpace || renderedAsciiWhitespace) ? ' ' :
+      return invisible ? '' : (code === 0x2014 || code === 0x2015) ? '-' :
+        (renderedSpace || renderedAsciiWhitespace) ? ' ' :
         code >= 32 && code <= 126 ? String.fromCharCode(code) : reference
     })
     // CommonMark HTML5 named references can encode visible separators or
     // invisible format controls inside explicit personal identifiers.
     // Decode only reviewed names in scanner memory; evidence stays unchanged.
-    .replace(/&(lowbar|period|hyphen|colon|commat|equals|nbsp|Tab|NewLine|ensp|emsp|thinsp|ThinSpace|numsp|MediumSpace|hairsp|puncsp|NonBreakingSpace|VeryThinSpace|ThickSpace|emsp13|emsp14|NegativeThinSpace|NegativeMediumSpace|NegativeThickSpace|NegativeVeryThinSpace|ApplyFunction|InvisibleTimes|InvisibleComma|af|it|ic|ZeroWidthSpace|zwnj|zwj|shy|NoBreak|lrm|rlm);/g, (_, name) => {
+    .replace(/&(lowbar|period|hyphen|mdash|horbar|colon|commat|equals|nbsp|Tab|NewLine|ensp|emsp|thinsp|ThinSpace|numsp|MediumSpace|hairsp|puncsp|NonBreakingSpace|VeryThinSpace|ThickSpace|emsp13|emsp14|NegativeThinSpace|NegativeMediumSpace|NegativeThickSpace|NegativeVeryThinSpace|ApplyFunction|InvisibleTimes|InvisibleComma|af|it|ic|ZeroWidthSpace|zwnj|zwj|shy|NoBreak|lrm|rlm);/g, (_, name) => {
       const values = {
-        lowbar: '_', period: '.', hyphen: '-', colon: ':',
+        lowbar: '_', period: '.', hyphen: '-', mdash: '-', horbar: '-', colon: ':',
         commat: '@', equals: '=', nbsp: ' ', Tab: ' ', NewLine: ' ',
         ensp: ' ', emsp: ' ', thinsp: ' ', ThinSpace: ' ',
         numsp: ' ', MediumSpace: ' ', hairsp: ' ', puncsp: ' ',
