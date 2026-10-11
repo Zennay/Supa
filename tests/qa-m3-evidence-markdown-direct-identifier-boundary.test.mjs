@@ -46,7 +46,7 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
   // This is a backstop against obvious labelled IDs, not general PII detection.
   // Decode visible Markdown punctuation escapes before scanning explicit IDs.
   // This modifies only the in-memory scan text, never the evidence note itself.
-  markdown = markdown.normalize('NFKC').replace(/\\\\([_.-])/g, '$1')
+  markdown = markdown.normalize('NFKC').replace(/\\([_.-])/g, '$1')
   assert.doesNotMatch(
     markdown,
     emailLike,
