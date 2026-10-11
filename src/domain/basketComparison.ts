@@ -140,6 +140,72 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
   )
 }
 
+// Read property descriptors before dereferencing untrusted runtime snapshots.
+// An accessor can be an own property but is not observed price or demand data.
+// Transparent Proxy get traps cannot be identified by reflection: the catch
+// below still guarantees abstention if their reads throw.
+function ownData(record: unknown, key: PropertyKey): { value: unknown } | null {
+  if (record === null || typeof record !== 'object') return null
+  const descriptor = Object.getOwnPropertyDescriptor(record, key)
+  return descriptor && Object.hasOwn(descriptor, 'value')
+    ? { value: descriptor.value }
+    : null
+}
+
+function safeRuntimeBasket(basket: unknown): boolean {
+  const keys = [
+    'store', 'lines', 'selectedMealCount', 'totalCents',
+    'matchedLineCount', 'unresolvedLineCount',
+  ]
+  if (keys.some((key) => !ownData(basket, key))) return false
+
+  const store = ownData(basket, 'store')?.value
+  if (!ownData(store, 'id')) return false
+
+  const lines = ownData(basket, 'lines')?.value
+  if (!Array.isArray(lines)) return true // Existing malformed-array reason.
+  const length = ownData(lines, 'length')?.value
+  if (!Number.isSafeInteger(length) || (length as number) < 0) return false
+
+  for (let index = 0; index < (length as number); index += 1) {
+    const physical = ownData(lines, String(index))
+    if (!physical) return false
+    const line = physical.value
+    const statusData = ownData(line, 'status')
+    // A present accessor status must not be visited by supportedBasketLine.
+    if (!statusData && line !== null && typeof line === 'object' &&
+        Object.hasOwn(line, 'status')) return false
+    const status = statusData?.value
+    if (status === 'matched') {
+      const keys = [
+        'id', 'ingredientLabel', 'productId', 'productName', 'requirement',
+        'pack', 'packs', 'pricePerPackCents', 'lineTotalCents', 'matchScore',
+      ]
+      if (keys.some((key) => !ownData(line, key))) return false
+      const requirement = ownData(line, 'requirement')?.value
+      const pack = ownData(line, 'pack')?.value
+      if (['amount', 'unit'].some((key) => !ownData(requirement, key))) return false
+      if (['amount', 'unit', 'count'].some((key) => !ownData(pack, key))) return false
+    } else if (status === 'unresolved' && !ownData(line, 'id')) {
+      return false
+    }
+  }
+  return true
+}
+
+function runtimeUnknownComparison(): BasketComparison {
+  return {
+    outcome: 'unknown',
+    claimable: false,
+    baselineTotalCents: 0,
+    candidateTotalCents: 0,
+    deltaCents: null,
+    savingsCents: null,
+    lineDeltas: [],
+    reasons: ['basket runtime snapshot cannot be safely inspected'],
+  }
+}
+
 // Array.some()/filter() skip holes: a missing physical line must never vanish.
 function hasMissingOwnLine(lines: unknown[]): boolean {
   for (let index = 0; index < lines.length; index += 1) {
@@ -247,7 +313,7 @@ function unknownComparison(
   }
 }
 
-export function compareFullBaskets({
+function compareInspectedBaskets({
   baseline,
   candidate,
 }: {
@@ -339,5 +405,27 @@ export function compareFullBaskets({
     savingsCents: deltaCents === 0 ? 0 : -deltaCents,
     lineDeltas,
     reasons: [],
+  }
+}
+
+export function compareFullBaskets(input: {
+  baseline: OneStoreBasket
+  candidate: OneStoreBasket
+}): BasketComparison {
+  try {
+    // No unsafe getter is visited during this validation.
+    const baseline = ownData(input, 'baseline')?.value
+    const candidate = ownData(input, 'candidate')?.value
+    if (!safeRuntimeBasket(baseline) || !safeRuntimeBasket(candidate)) {
+      return runtimeUnknownComparison()
+    }
+    return compareInspectedBaskets({
+      baseline: baseline as OneStoreBasket,
+      candidate: candidate as OneStoreBasket,
+    })
+  } catch {
+    // Invalid proxies, descriptor traps or a changed runtime snapshot cannot
+    // become trusted financial claims, and no partial line deltas escape.
+    return runtimeUnknownComparison()
   }
 }
