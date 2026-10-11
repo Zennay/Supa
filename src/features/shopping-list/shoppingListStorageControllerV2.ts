@@ -135,6 +135,14 @@ function recognizedStoredV2(raw: string | null, basket: OneStoreBasket): boolean
     if (hasDuplicateRootKeys(raw)) return false
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
     const item = parsed as Record<string, unknown>
+    // Preserve compatibility with legacy optional note metadata already accepted
+    // by v2; treat any other extension as newer-client-owned and read-only.
+    // This is deliberately not a blanket rejection of all optional root data.
+    const compatibleRootKeys = new Set([
+      'schemaVersion', 'demandIdentity', 'doneLineIds',
+      'note', 'metadata', 'futureDescription',
+    ])
+    if (Object.keys(item).some((field) => !compatibleRootKeys.has(field))) return false
     if (
       !Object.hasOwn(item, 'schemaVersion') || item.schemaVersion !== 2 ||
       !Object.hasOwn(item, 'demandIdentity') ||
