@@ -1,4 +1,5 @@
 import type { BasketTraceLine, OneStoreBasket } from './basket.ts'
+import { calculateDecimalPackCount } from './decimalPackArithmetic.ts'
 
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
 
@@ -52,16 +53,43 @@ function baseQuantity(
 }
 
 function validIdentity(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0
+  return typeof value === 'string' && /[\p{L}\p{N}\p{S}]/u.test(value)
+}
+
+// Financial facts must belong to the observed row; prototypes are not basket evidence.
+function hasOwnMatchedFacts(line: object): boolean {
+  const keys = [
+    'id', 'ingredientLabel', 'requirement', 'productId', 'productName',
+    'packs', 'pack', 'pricePerPackCents', 'lineTotalCents', 'matchScore',
+  ]
+  if (keys.some((key) => !Object.hasOwn(line, key))) return false
+
+  const matched = line as MatchedBasketLine
+  const requirement = matched.requirement
+  const pack = matched.pack
+  return (
+    requirement !== null && typeof requirement === 'object' &&
+    !Array.isArray(requirement) &&
+    Object.hasOwn(requirement, 'amount') &&
+    Object.hasOwn(requirement, 'unit') &&
+    pack !== null && typeof pack === 'object' &&
+    !Array.isArray(pack) &&
+    Object.hasOwn(pack, 'amount') &&
+    Object.hasOwn(pack, 'unit') &&
+    Object.hasOwn(pack, 'count')
+  )
 }
 
 function supportedBasketLine(line: unknown): line is BasketTraceLine {
-  if (line === null || typeof line !== 'object' || !('status' in line)) {
+  if (
+    line === null || typeof line !== 'object' ||
+    Array.isArray(line) || !Object.hasOwn(line, 'status')
+  ) {
     return false
   }
 
   const status = (line as { status?: unknown }).status
-  return status === 'matched' || status === 'unresolved'
+  return status === 'unresolved' || (status === 'matched' && hasOwnMatchedFacts(line))
 }
 
 function basketLines(basket: OneStoreBasket): BasketTraceLine[] {
@@ -84,7 +112,10 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
   const pack = baseQuantity(effectivePackAmount, line.pack.unit)
   const expectedPacks =
     required && pack && required.family === pack.family
-      ? Math.ceil(required.amount / pack.amount)
+      ? calculateDecimalPackCount(
+          [{ amount: line.requirement.amount, unit: line.requirement.unit }],
+          { amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count },
+        )
       : null
   const expectedLineTotalCents = line.packs * line.pricePerPackCents
 
@@ -109,6 +140,86 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
   )
 }
 
+// Read property descriptors before dereferencing untrusted runtime snapshots.
+// An accessor can be an own property but is not observed price or demand data.
+// Transparent Proxy get traps cannot be identified by reflection: the catch
+// below still guarantees abstention if their reads throw.
+function ownData(record: unknown, key: PropertyKey): { value: unknown } | null {
+  if (record === null || typeof record !== 'object') return null
+  const descriptor = Object.getOwnPropertyDescriptor(record, key)
+  return descriptor && Object.hasOwn(descriptor, 'value')
+    ? { value: descriptor.value }
+    : null
+}
+
+function safeRuntimeBasket(basket: unknown): boolean {
+  const keys = [
+    'store', 'lines', 'selectedMealCount', 'totalCents',
+    'matchedLineCount', 'unresolvedLineCount',
+  ]
+  if (keys.some((key) => !ownData(basket, key))) return false
+
+  const store = ownData(basket, 'store')?.value
+  if (!ownData(store, 'id')) return false
+
+  const lines = ownData(basket, 'lines')?.value
+  if (!Array.isArray(lines)) return true // Existing malformed-array reason.
+  // The comparator calls filter()/some() on the caller's array. Never execute
+  // shadowed instance methods or inherited overrides from an altered prototype.
+  if (
+    Object.getPrototypeOf(lines) !== Array.prototype ||
+    Object.hasOwn(lines, 'filter') || Object.hasOwn(lines, 'some')
+  ) return false
+  const length = ownData(lines, 'length')?.value
+  if (!Number.isSafeInteger(length) || (length as number) < 0) return false
+
+  for (let index = 0; index < (length as number); index += 1) {
+    const physical = ownData(lines, String(index))
+    if (!physical) return false
+    const line = physical.value
+    const statusData = ownData(line, 'status')
+    // A present accessor status must not be visited by supportedBasketLine.
+    if (!statusData && line !== null && typeof line === 'object' &&
+        Object.hasOwn(line, 'status')) return false
+    const status = statusData?.value
+    if (status === 'matched') {
+      const keys = [
+        'id', 'ingredientLabel', 'productId', 'productName', 'requirement',
+        'pack', 'packs', 'pricePerPackCents', 'lineTotalCents', 'matchScore',
+      ]
+      if (keys.some((key) => !ownData(line, key))) return false
+      const requirement = ownData(line, 'requirement')?.value
+      const pack = ownData(line, 'pack')?.value
+      if (['amount', 'unit'].some((key) => !ownData(requirement, key))) return false
+      if (['amount', 'unit', 'count'].some((key) => !ownData(pack, key))) return false
+    } else if (status === 'unresolved' && !ownData(line, 'id')) {
+      return false
+    }
+  }
+  return true
+}
+
+function runtimeUnknownComparison(): BasketComparison {
+  return {
+    outcome: 'unknown',
+    claimable: false,
+    baselineTotalCents: 0,
+    candidateTotalCents: 0,
+    deltaCents: null,
+    savingsCents: null,
+    lineDeltas: [],
+    reasons: ['basket runtime snapshot cannot be safely inspected'],
+  }
+}
+
+// Array.some()/filter() skip holes: a missing physical line must never vanish.
+function hasMissingOwnLine(lines: unknown[]): boolean {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!Object.hasOwn(lines, index)) return true
+  }
+  return false
+}
+
 function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   const reasons: string[] = []
   const rawLines: unknown[] = Array.isArray(basket.lines) ? basket.lines : []
@@ -121,6 +232,8 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
 
   if (!Array.isArray(basket.lines)) {
     reasons.push(`${label} basket lines are not an array`)
+  } else if (hasMissingOwnLine(rawLines)) {
+    reasons.push(`${label} basket has an unobserved physical line slot`)
   } else if (rawLines.some((line) => !supportedBasketLine(line))) {
     reasons.push(`${label} basket contains an unsupported line shape or status`)
   }
@@ -206,7 +319,7 @@ function unknownComparison(
   }
 }
 
-export function compareFullBaskets({
+function compareInspectedBaskets({
   baseline,
   candidate,
 }: {
@@ -298,5 +411,27 @@ export function compareFullBaskets({
     savingsCents: deltaCents === 0 ? 0 : -deltaCents,
     lineDeltas,
     reasons: [],
+  }
+}
+
+export function compareFullBaskets(input: {
+  baseline: OneStoreBasket
+  candidate: OneStoreBasket
+}): BasketComparison {
+  try {
+    // No unsafe getter is visited during this validation.
+    const baseline = ownData(input, 'baseline')?.value
+    const candidate = ownData(input, 'candidate')?.value
+    if (!safeRuntimeBasket(baseline) || !safeRuntimeBasket(candidate)) {
+      return runtimeUnknownComparison()
+    }
+    return compareInspectedBaskets({
+      baseline: baseline as OneStoreBasket,
+      candidate: candidate as OneStoreBasket,
+    })
+  } catch {
+    // Invalid proxies, descriptor traps or a changed runtime snapshot cannot
+    // become trusted financial claims, and no partial line deltas escape.
+    return runtimeUnknownComparison()
   }
 }
