@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { spawn } from 'node:child_process'
-import { lstat, mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, open, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -150,11 +150,28 @@ export async function captureResearchSource(id, { env = process.env, outputDir =
     const basename = 'capture-' + Date.now() + '-' + process.pid
     const html = join(dir, basename + '.html')
     const meta = join(dir, basename + '.json')
-    await writeFile(html, body, { flag: 'wx', mode: 0o600 })
-    await writeFile(meta, JSON.stringify({ version: 1, type: 'research-only-not-price-proof', sourceId: id,
+    const metadata = JSON.stringify({ version: 1, type: 'research-only-not-price-proof', sourceId: id,
       store: source.store, url: source.url, observedAt: new Date().toISOString(),
       mediaType: headers.contentType, httpStatus: 200, bytes: bodyStats.size, sha256,
-      proxyMode: transport.proxy ? 'approved-fixed-egress' : 'direct' }, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
+      proxyMode: transport.proxy ? 'approved-fixed-egress' : 'direct' }, null, 2) + '\n'
+    // Reserve both unique private paths with exclusive handles. If either write
+    // fails, remove only the files opened by this invocation; never touch a
+    // pre-existing colliding capture or leave an unpaired private snapshot.
+    let htmlHandle
+    let metaHandle
+    try {
+      htmlHandle = await open(html, 'wx', 0o600)
+      metaHandle = await open(meta, 'wx', 0o600)
+      await htmlHandle.writeFile(body)
+      await metaHandle.writeFile(metadata)
+      await Promise.all([htmlHandle.close(), metaHandle.close()])
+    } catch (error) {
+      await Promise.allSettled([htmlHandle, metaHandle]
+        .filter(Boolean).map(handle => handle.close()))
+      if (htmlHandle) await rm(html, { force: true })
+      if (metaHandle) await rm(meta, { force: true })
+      throw error
+    }
     return { status: 'saved', sourceId: id, html, meta, bytes: bodyStats.size, sha256 }
   } finally {
     await rm(working, { recursive: true, force: true })
