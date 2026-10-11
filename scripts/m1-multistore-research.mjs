@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import { spawn } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { resolve, join } from 'node:path'
+import { dirname, resolve, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 // Independent feasibility probe, not a production price scraper.
@@ -74,6 +74,33 @@ function runCurl(args, env) {
   })
 }
 
+function refuseUnsafePrivateOutput() {
+  throw new Error('private research output path rejected')
+}
+
+// Inspect lexical ancestors rather than resolving symlinks with realpath.
+// Existing private root and per-source output directories must be owner-only;
+// normal /tmp or home ancestors need only be actual directories (no aliases).
+async function validatePrivateOutputAncestry(outputDir, sourceDir) {
+  const privateRoots = new Set([resolve(outputDir), resolve(sourceDir)])
+  let current = resolve(sourceDir)
+  while (true) {
+    let details
+    try {
+      details = await lstat(current)
+    } catch (error) {
+      if (error?.code !== 'ENOENT') refuseUnsafePrivateOutput()
+    }
+    if (details && (!details.isDirectory() || details.isSymbolicLink() ||
+        (privateRoots.has(current) && (details.mode & 0o077) !== 0))) {
+      refuseUnsafePrivateOutput()
+    }
+    const parent = dirname(current)
+    if (parent === current) return
+    current = parent
+  }
+}
+
 export async function captureResearchSource(id, { env = process.env, outputDir = join('artifacts', 'm1-multistore-research') } = {}) {
   const source = RESEARCH_SOURCES.find(entry => entry.id === id)
   if (!source) throw new Error('unknown research source (run --list)')
@@ -103,7 +130,9 @@ export async function captureResearchSource(id, { env = process.env, outputDir =
     const body = await readFile(bodyPath)
     const sha256 = createHash('sha256').update(body).digest('hex')
     const dir = resolve(outputDir, id)
+    await validatePrivateOutputAncestry(outputDir, dir)
     await mkdir(dir, { recursive: true, mode: 0o700 })
+    await validatePrivateOutputAncestry(outputDir, dir)
     const basename = 'capture-' + Date.now() + '-' + process.pid
     const html = join(dir, basename + '.html')
     const meta = join(dir, basename + '.json')
