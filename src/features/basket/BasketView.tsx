@@ -32,14 +32,17 @@ export function BasketView({
   const basketCost = basketCostDisclosure(
     basket.totalCents,
     basket.unresolvedLineCount,
+    basket,
   )
   const baselineCost = basketCostDisclosure(
     comparisonBaseline.totalCents,
     comparisonBaseline.unresolvedLineCount,
+    comparisonBaseline,
   )
   const candidateCost = basketCostDisclosure(
     comparisonCandidate.totalCents,
     comparisonCandidate.unresolvedLineCount,
+    comparisonCandidate,
   )
   const comparisonWarning = comparisonWarningCopy(
     comparisonBaseline.unresolvedLineCount,
