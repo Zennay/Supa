@@ -55,7 +55,7 @@ test('five registered supermarket source IDs count only pending human DOM review
   try {
     for (const source of RESEARCH_SOURCES) await saveReview(f.outputDir, source, candidate(source))
     const result = await inventoryDomCandidateReviews({ outputDir: f.outputDir, nowMs })
-    assert.equal(result.status, 'pending-human-review')
+    assert.equal(result.status, 'pending-human-review', JSON.stringify(result))
     assert.equal(result.totals.pendingHumanReview, 5)
     assert.equal(result.totals.rejected, 0)
     assert.equal(result.totals.unexpected, 0)
@@ -75,7 +75,7 @@ test('expired DOM observation is stale, not accepted as current or price verifie
     const source = RESEARCH_SOURCES[0]
     await saveReview(f.outputDir, source, { ...candidate(source), observedAt: oldStamp })
     const result = await inventoryDomCandidateReviews({ outputDir: f.outputDir, nowMs })
-    assert.equal(result.status, 'stale')
+    assert.equal(result.status, 'stale', JSON.stringify(result))
     assert.equal(result.totals.stale, 1)
     assert.equal(result.totals.pendingHumanReview, 0)
   } finally { await rm(f.root, { recursive: true, force: true }) }
