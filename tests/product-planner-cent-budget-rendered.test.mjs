@@ -121,3 +121,22 @@ test('product #709: an invalid recipe fixture estimate remains unknown in actual
   assert.doesNotMatch(html, /€NaN|€Infinity|Richtprijs: €/)
   assert.match(html, /aria-label="Recept voor Di"/)
 })
+
+test('product #1424: planner SSR exposes a separate opt-in custom amount without silently applying it', () => {
+  const fixed = renderBudget(1969, 0, 35)
+  assert.match(fixed.html, /Ander bedrag instellen/)
+  assert.match(fixed.html, /aria-expanded="false"/)
+  assert.doesNotMatch(fixed.html, /id="custom-weekbudget-value"/)
+  const custom = renderBudget(1969, 0, 27.5)
+  assert.match(custom.html, /Eigen budget/)
+  assert.match(custom.html, /aria-pressed="true"/)
+  assert.match(custom.status, /7,81 over/)
+  assert.doesNotMatch(custom.html, /NaN|Infinity|Budgetgegevens controleren/)
+})
+
+test('product #1424: the custom budget keeps strict known-minimum claims for unresolved products', () => {
+  const { html, status } = renderBudget(1969, 1, 27.5)
+  assert.match(status, /1 mandregel open/)
+  assert.doesNotMatch(status, /7,81 over|binnen budget/)
+  assert.match(html, /alleen het bekende minimum/)
+})
