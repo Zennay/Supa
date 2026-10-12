@@ -20,10 +20,15 @@ function scriptKindFor(filename) {
   }
 }
 
-function hasExplanatoryComment(source) {
-  const comments = source.match(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g) ?? []
+function hasExplanatoryComment(source, ignoredRanges = []) {
+  const comments = [...source.matchAll(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g)]
 
-  return comments.some((comment) => {
+  return comments.some((match) => {
+    // Explanations inside a function body that never ran cannot document the
+    // outer catch's decision to swallow its exception.
+    if (ignoredRanges.some(([start, end]) =>
+      match.index >= start && match.index < end)) return false
+    const comment = match[0]
     const text = comment.startsWith('//')
       ? comment.slice(2)
       : comment
@@ -105,6 +110,21 @@ function hasEffectiveCatchStatements(statements) {
   })
 }
 
+function ignoredDeferredCommentRanges(catchClause, sourceFile, contentStart) {
+  const ranges = []
+  function visit(node) {
+    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) ||
+        ts.isFunctionDeclaration(node)) {
+      ranges.push([node.getStart(sourceFile) - contentStart,
+        node.getEnd() - contentStart])
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  for (const statement of catchClause.block.statements) visit(statement)
+  return ranges
+}
+
 function findUndocumentedEmptyCatch(source, filename = 'candidate.tsx') {
   const sourceFile = ts.createSourceFile(
     filename,
@@ -120,12 +140,11 @@ function findUndocumentedEmptyCatch(source, filename = 'candidate.tsx') {
     if (finding) return
 
     if (ts.isCatchClause(node) && !hasEffectiveCatchStatements(node.block.statements)) {
-      const inner = source.slice(
-        node.block.getStart(sourceFile) + 1,
-        node.block.getEnd() - 1,
-      )
+      const contentStart = node.block.getStart(sourceFile) + 1
+      const inner = source.slice(contentStart, node.block.getEnd() - 1)
+      const ignored = ignoredDeferredCommentRanges(node, sourceFile, contentStart)
 
-      if (!hasExplanatoryComment(inner)) {
+      if (!hasExplanatoryComment(inner, ignored)) {
         const { line, character } = sourceFile.getLineAndCharacterOfPosition(
           node.getStart(sourceFile),
         )
