@@ -94,7 +94,12 @@ function canNormalizeCurrentPlannerRecord(raw: string | null): boolean {
   const knownDays = new Set(m2InitialPlan.map((meal) => meal.day))
   const knownRecipes = new Set(validRecipeIds)
   return (
-    parsed.activeDays.every((day) => knownDays.has(day)) &&
+    // Every active day needs an explicitly persisted recipe. Otherwise the
+    // restore fallback can silently fill a missing choice and overwrite the
+    // user's original incomplete record on first render.
+    parsed.activeDays.every(
+      (day) => knownDays.has(day) && Object.hasOwn(parsed.recipeByDay, day),
+    ) &&
     Object.entries(parsed.recipeByDay).every(
       ([day, recipe]) => knownDays.has(day) && knownRecipes.has(recipe),
     )
