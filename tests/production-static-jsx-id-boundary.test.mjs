@@ -27,6 +27,25 @@ function staticStringExpression(node, depth = 0) {
 
   if (ts.isStringLiteralLike(current)) return current.text
 
+  // JSX string concatenation and no-substitution template interpolation both
+  // convert compile-time numeric literals to strings (e.g. 'row-' + 2).
+  // This only decodes literal AST nodes: never execute code or read variables.
+  if (ts.isNumericLiteral(current)) {
+    const numeric = Number(current.text.replaceAll('_', ''))
+    return Number.isFinite(numeric) ? String(numeric) : null
+  }
+
+  if (ts.isPrefixUnaryExpression(current) &&
+      (current.operator === ts.SyntaxKind.MinusToken || current.operator === ts.SyntaxKind.PlusToken)) {
+    const literal = unwrapStaticExpression(current.operand)
+    if (ts.isNumericLiteral(literal)) {
+      const numeric = Number(literal.text.replaceAll('_', ''))
+      if (Number.isFinite(numeric)) {
+        return String(current.operator === ts.SyntaxKind.MinusToken ? -numeric : numeric)
+      }
+    }
+  }
+
   if (
     ts.isBinaryExpression(current) &&
     current.operatorToken.kind === ts.SyntaxKind.PlusToken
@@ -344,4 +363,24 @@ test('QA #1006: numeric static IDs remain distinct and dynamic numeric IDs are n
     ].join('\n') },
   ])
   assert.deepEqual(duplicates, [])
+})
+
+test('QA #1006: finite signed and radix numeric constants resolve exactly, dynamic IDs stay unknown', () => {
+  const duplicates = duplicateStaticIds([
+    { filename: 'orig.tsx', source: [
+      '<div id="slot--2" />',
+      '<div id="slot-16" />',
+      '<div id="slot-1000" />',
+    ].join('\n') },
+    { filename: 'derived.tsx', source: [
+      'const a = <input id={"slot-" + (-2)} />',
+      'const b = <output id={`slot-${-2}`} />',
+      'const c = <span {...{id: "slot-" + 0x10}} />',
+      'const d = <span id={"slot-" + 1_000} />',
+      'const e = <span id={"slot-" + variableNumber} />',
+      'const f = <CustomWidget id={"slot-" + (-2)} />',
+    ].join('\n') },
+  ])
+  assert.deepEqual(duplicates.map(row => row.id),
+    ['slot--2', 'slot--2', 'slot-16', 'slot-1000'])
 })
