@@ -140,3 +140,41 @@ test('product #1056: losing a trusted match invalidates stale product completion
   assert.equal(controller.persist(), true)
   assert.deepEqual(openShoppingProgressStorageV2(unresolved, port).snapshot().completedLineIds, [])
 })
+
+test('product #1056: requirement quantity change resets even if pack purchase count stays equal', () => {
+  const initial = baseBasket()
+  const { port, saved } = storagePort()
+  const { controller, id } = checkedController(initial, port)
+  const savedBefore = saved.get(shoppingListProgressV2StorageKey)
+  const changed = structuredClone(initial)
+  const line = changed.lines.find((item) => item.id === id)
+  const originalPacks = line.packs
+  line.requirement.amount += 1
+
+  assert.equal(line.packs, originalPacks, 'quantity differs while the purchased pack count is unchanged')
+  assert.notEqual(shoppingListDemandIdentity(changed), shoppingListDemandIdentity(initial))
+  assert.deepEqual(restoreShoppingProgressV2(changed, savedBefore), [])
+  assert.deepEqual(controller.rebase(changed).completedLineIds, [])
+  assert.equal(controller.persist(), true)
+  assert.deepEqual(openShoppingProgressStorageV2(changed, port).snapshot().completedLineIds, [])
+})
+
+test('product #1056: product display-name correction never discards the purchased check', () => {
+  const initial = baseBasket()
+  const { port, saved, writes } = storagePort()
+  const { controller, id } = checkedController(initial, port)
+  const savedBefore = saved.get(shoppingListProgressV2StorageKey)
+  const corrected = structuredClone(initial)
+  const line = corrected.lines.find((item) => item.id === id)
+  line.productName += ' (etiketcorrectie)'
+  line.ingredientLabel += ' (gecorrigeerd)'
+
+  assert.equal(shoppingListDemandIdentity(corrected), shoppingListDemandIdentity(initial))
+  const next = controller.rebase(corrected)
+  const row = shoppingListRowsV2(corrected, next).find((item) => item.id === id)
+  assert.equal(row.checked, true)
+  assert.match(row.label, /etiketcorrectie/)
+  assert.equal(saved.get(shoppingListProgressV2StorageKey), savedBefore)
+  assert.equal(writes.length, 1, 'nonphysical name change must not trigger a save')
+  assert.deepEqual(openShoppingProgressStorageV2(corrected, port).snapshot().completedLineIds, [id])
+})
