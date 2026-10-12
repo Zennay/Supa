@@ -58,7 +58,7 @@ function hasNonEmptyText(value: unknown) {
   // Required human context needs a visible base character. Unicode marks,
   // directional formats, controls and lone surrogates alone are not evidence.
   return typeof value === 'string' &&
-    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s]/u.test(value)
+    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
 }
 
 function validCalendarDate(value: unknown) {
