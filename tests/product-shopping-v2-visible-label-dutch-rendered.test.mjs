@@ -10,7 +10,7 @@ import { shoppingListProgressV2StorageKey } from '../src/features/shopping-list/
 
 function basket() {
   return buildOneStoreBasket({
-    store: m2Store, plan: m2InitialPlan, recipes: m2Recipes,
+    store: { ...m2Store }, plan: m2InitialPlan, recipes: m2Recipes,
     products: m2Products, activeDays: ['Di'],
   })
 }
