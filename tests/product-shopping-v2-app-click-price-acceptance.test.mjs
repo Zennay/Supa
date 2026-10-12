@@ -213,3 +213,39 @@ test('product #1056: routed v2 keeps clicked physical row after price-only refre
     assert.equal(browser.writes.length, 1, 'price refresh alone never writes storage')
   } finally { browser.close() }
 })
+
+test('product #1056: real Planner day toggle changes physical demand and clears old v2 checks', () => {
+  const browser = storageSession()
+  try {
+    let screen = goTo(appRender(), 'Lijst')
+    const original = activeBasket(screen)
+    const originalIdentity = demand.shoppingListDemandIdentity(original)
+    const first = view(original)
+    first.flush()
+    const riceIndex = original.lines.findIndex((line) => line.id === 'basmati-rice')
+    assert.ok(riceIndex >= 0)
+    first.rows[riceIndex].props.onClick()
+    assert.equal(view(original).rows[riceIndex].props['aria-pressed'], true)
+    const priorSaved = browser.saved.get(progress.shoppingListProgressV2StorageKey)
+    assert.ok(priorSaved)
+
+    screen = goTo(screen, 'Planner')
+    const planner = elements(screen, (n) => n.type === fakeViews.PlannerView)
+    assert.equal(planner.length, 1)
+    assert.ok(planner[0].props.activeDays.includes('Ma'))
+    planner[0].props.onToggleDay('Ma')
+    screen = goTo(appRender(), 'Lijst')
+    const changed = activeBasket(screen)
+    assert.ok(changed.lines.length > 0, 'other active days still need a basket')
+    assert.notEqual(
+      demand.shoppingListDemandIdentity(changed), originalIdentity,
+      'changing planned meals changes the physical shopping round',
+    )
+    const firstNew = view(changed)
+    firstNew.flush()
+    const after = view(changed)
+    assert.ok(after.rows.every((button) => button.props['aria-pressed'] === false))
+    assert.notEqual(browser.saved.get(progress.shoppingListProgressV2StorageKey), priorSaved)
+    assert.equal(browser.saved.get(legacy.shoppingListProgressStorageKey), undefined)
+  } finally { browser.close() }
+})
