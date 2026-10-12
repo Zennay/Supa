@@ -21,7 +21,7 @@ const foreign = {
   store: { ...local.store, id: 'fixture-foreign-store' },
   lines: [
     ...local.lines.filter(line => line.id !== matched.id),
-    { id: foreignUnresolvedId, status: 'unresolved', requirement: matched.requirement },
+    { id: foreignUnresolvedId, ingredientLabel: matched.ingredientLabel, status: 'unresolved', requirement: matched.requirement },
   ],
 }
 assert.equal(foreign.lines.length, 11)
