@@ -8,6 +8,7 @@ import { compareFullBaskets } from './domain/basketComparison'
 import {
   defaultPlannerPreferences,
   serializePlannerPreferences,
+  type PlannerPreferences,
 } from './domain/plannerPreferences'
 import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
 import {
@@ -35,25 +36,66 @@ const tabs: { id: Tab; label: string }[] = [
 const plannerStorageKey = 'supa:planner-preferences:v2'
 const validRecipeIds = m2Recipes.map((recipe) => recipe.id)
 
-function readPlannerPreferences() {
+type PersistenceWarning = 'unavailable' | 'protected' | null
+
+// Only the exact established v2 envelope may be normalized/rewritten.
+// Unknown future/corrupt data must survive untouched until reviewed.
+function canReplacePlannerRecord(raw: string | null): boolean {
+  if (raw === null) return true
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+    const object = value as Record<string, unknown>
+    const allowed = ['budget', 'activeDays', 'recipeByDay']
+    if (!allowed.every((key) => Object.hasOwn(object, key))) return false
+    if (!Object.keys(object).every((key) => allowed.includes(key))) return false
+    return (
+      typeof object.budget === 'number' &&
+      Number.isFinite(object.budget) &&
+      Array.isArray(object.activeDays) &&
+      object.activeDays.every((day: unknown) => typeof day === 'string') &&
+      object.recipeByDay !== null &&
+      typeof object.recipeByDay === 'object' &&
+      !Array.isArray(object.recipeByDay) &&
+      Object.values(object.recipeByDay).every((id) => typeof id === 'string')
+    )
+  } catch {
+    return false
+  }
+}
+
+function readPlannerPreferences(): {
+  preferences: PlannerPreferences
+  warning: PersistenceWarning
+  raw: string | null
+} {
+  const fallback = defaultPlannerPreferences(m2InitialPlan)
   if (typeof window === 'undefined') {
-    return defaultPlannerPreferences(m2InitialPlan)
+    return { preferences: fallback, warning: null, raw: null }
   }
 
   try {
-    return restorePlannerPreferencesWithCustomBudget(
-      window.localStorage.getItem(plannerStorageKey),
-      m2InitialPlan,
-      validRecipeIds,
-    )
+    const raw = window.localStorage.getItem(plannerStorageKey)
+    return {
+      preferences: restorePlannerPreferencesWithCustomBudget(
+        raw, m2InitialPlan, validRecipeIds,
+      ),
+      warning: canReplacePlannerRecord(raw) ? null : 'protected',
+      raw,
+    }
   } catch {
-    return defaultPlannerPreferences(m2InitialPlan)
+    return { preferences: fallback, warning: 'unavailable', raw: null }
   }
 }
 
 export function App() {
   const [tab, setTab] = useState<Tab>('planner')
-  const [preferences, setPreferences] = useState(readPlannerPreferences)
+  const [initialLoad] = useState(readPlannerPreferences)
+  const [preferences, setPreferences] = useState(() => initialLoad.preferences)
+  const [persistenceWarning, setPersistenceWarning] = useState<PersistenceWarning>(
+    initialLoad.warning,
+  )
+  const [lastStoredRaw, setLastStoredRaw] = useState(initialLoad.raw)
   const { budget, activeDays, recipeByDay } = preferences
 
   const plannedMeals = useMemo(
@@ -112,14 +154,25 @@ export function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    // Do not turn a failed initial read into an unrequested overwrite of
+    // existing preferences. Retry only after a deliberate planner edit.
+    if (initialLoad.warning && preferences === initialLoad.preferences) return
 
     try {
-      window.localStorage.setItem(
-        plannerStorageKey,
-        serializePlannerPreferences(preferences),
-      )
+      const stored = window.localStorage.getItem(plannerStorageKey)
+      // This is a pre-write check, not an atomic cross-tab CAS transaction.
+      if (!canReplacePlannerRecord(stored) ||
+          (stored !== null && stored !== lastStoredRaw)) {
+        setPersistenceWarning('protected')
+        return
+      }
+      const serialized = serializePlannerPreferences(preferences)
+      window.localStorage.setItem(plannerStorageKey, serialized)
+      setLastStoredRaw(serialized)
+      setPersistenceWarning(null)
     } catch {
-      // Strict privacy modes can deny storage; the active session remains usable.
+      // Keep changes usable in this session without pretending they are saved.
+      setPersistenceWarning('unavailable')
     }
   }, [preferences])
 
@@ -157,6 +210,13 @@ export function App() {
       </header>
 
       <div className="content">
+        {persistenceWarning && (
+          <p role="alert" className="disclaimer">
+            {persistenceWarning === 'protected'
+              ? 'Je weekbudget en maaltijdkeuzes zijn tijdelijk en niet opgeslagen. Eerdere opgeslagen gegevens blijven bewaard.'
+              : 'Je weekbudget en maaltijdkeuzes zijn tijdelijk en niet opgeslagen omdat browseropslag niet beschikbaar is.'}
+          </p>
+        )}
         {tab === 'planner' && (
           <PlannerView
             budget={budget}
