@@ -10,6 +10,7 @@ import { buildObservationSheet } from '../scripts/m3-create-observation-sheet.mj
 // Synthetic-only CLI contract. Neither source prices nor field observations are used.
 const ZONES = ['UTC', 'Europe/Amsterdam', 'America/New_York']
 const PARTICIPANT = 'synthetic-participant-privacy-marker-001'
+const PRIVATE_PROVENANCE_MARKER = 'fictional-private-provenance-marker-do-not-emit'
 
 function observedSheet({
   baselineAt,
@@ -41,7 +42,7 @@ function observedSheet({
     observation.evidenceId = `${side}-synthetic-evidence-001`
     observation.observedAt = timestamp
     observation.source = 'manual-cart'
-    observation.provenanceNote = 'Fictional data; no visit or receipt.'
+    observation.provenanceNote = `${side}-${PRIVATE_PROVENANCE_MARKER}`
     for (const [index, line] of observation.lines.entries()) {
       const requirement = sheet.requirements[index]
       line.observedProduct = {
@@ -87,11 +88,39 @@ async function runThroughBothClis(sheet, timezone, directory) {
   const study = JSON.parse(studyText)
   const report = JSON.parse(reportText)
 
+  assert.equal(study.participantKey, PARTICIPANT)
   assert.equal(study.baseline.basket.lines.length, 11)
   assert.equal(study.candidate.basket.lines.length, 11)
+  for (const side of ['baseline', 'candidate']) {
+    const inputSide = sheet[side]
+    const studySide = study[side]
+    const reportSide = report[side]
+    assert.equal(studySide.evidenceId, inputSide.evidenceId)
+    assert.equal(studySide.observedAt, inputSide.observedAt)
+    assert.equal(studySide.provenanceNote, inputSide.provenanceNote)
+    assert.equal(studySide.source, inputSide.source)
+    assert.deepEqual(studySide.basket.store, inputSide.store)
+    assert.equal(reportSide.evidenceId, inputSide.evidenceId)
+    assert.equal(reportSide.observedAt, inputSide.observedAt)
+    assert.equal(reportSide.source, inputSide.source)
+    assert.equal(reportSide.storeId, inputSide.store.id)
+    assert.equal(reportSide.storeName, inputSide.store.name)
+    assert.equal(reportSide.matchedLineCount + reportSide.unresolvedLineCount, 11)
+    assert.equal(Object.hasOwn(reportSide, 'provenanceNote'), false)
+    for (const [index, row] of studySide.basket.lines.entries()) {
+      const requirement = sheet.requirements[index]
+      assert.equal(row.id, requirement.id)
+      assert.equal(row.ingredientLabel, requirement.label)
+      assert.deepEqual(row.requirement, {
+        amount: requirement.amount,
+        unit: requirement.unit,
+      })
+    }
+  }
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.equal(Object.hasOwn(report, 'participantKey'), false)
   assert.equal(reportText.includes(PARTICIPANT), false)
+  assert.equal(reportText.includes(PRIVATE_PROVENANCE_MARKER), false)
   return { studyText, reportText, report }
 }
 
