@@ -142,9 +142,11 @@ function assertMarkdownHasNoObviousDirectIdentifiers(markdown, displayPath) {
     .replace(/\[([^\]\r\n]{1,160})\]\[[^\]\r\n]{0,160}\]/g, '$1')
     .replace(/<a\b[^>\r\n]{0,512}>\s*([^<\r\n]{1,160}?)\s*<\/a>/gi, '$1')
   // Inline phrasing tags render their contents in a visible field label.
+  // Includes HTML5 inserted/deleted, strike, defining, variable and cite text;
+  // these are visible even when they split an explicit participant ID label.
   // Strip only bounded presentational tags in scan text, never in evidence.
   // Original email/link targets were already checked before this step.
-  markdown = markdown.replace(/<\/?(?:strong|b|em|i|code|span|p|mark|u|small|sup|sub|kbd|abbr)\b[^>\r\n]{0,512}>/gi, '')
+  markdown = markdown.replace(/<\/?(?:strong|b|em|i|code|span|p|mark|u|small|sup|sub|kbd|abbr|ins|del|s|dfn|var|cite)\b[^>\r\n]{0,512}>/gi, '')
   // HTML <wbr> is a void, visually empty word-break hint (not paired).
   // Prevent invisible boundaries from splitting an explicit identity label.
   markdown = markdown.replace(/<wbr\b[^<>\r\n]{0,512}\/?>/gi, '')
