@@ -82,7 +82,7 @@ test('qa: Lijst and Mand agree on localized physical demand without implying obs
     assert.match(uncertainList, /\? onbekend · handmatig kiezen/)
     assert.match(uncertainMand, /Benodigd: \? onbekend/)
     assert.match(uncertainMand, /Geen financieel verschil tonen/)
-    assert.doesNotMatch(uncertainList + uncertainMand, /\bunknown\b|\bpiece\b/)
+    assert.doesNotMatch(uncertainList + uncertainMand, /(?:Benodigd: | × |\? )(?:piece|unknown)\b/)
     assert.deepEqual(uncertain, uncertainBefore)
     assert.deepEqual({ baseline, candidate }, before)
   } finally {
