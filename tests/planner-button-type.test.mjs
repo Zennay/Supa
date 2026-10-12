@@ -12,7 +12,10 @@ test('Planner buttons are non-submit except the intentional custom-budget form s
     ([tag]) => tag,
   )
 
-  assert.equal(buttonTags.length, 5)
+  // Presets, reset, custom toggle, and the explicit cancel all stay
+  // non-submitting; only the intentional save action submits.
+  assert.equal(buttonTags.length, 6)
+  assert.match(plannerViewSource, />Annuleren<\/button>/)
   const submits = buttonTags.filter((tag) => /\btype=["']submit["']/.test(tag))
   assert.equal(submits.length, 1, 'Only the opt-in custom budget may submit')
   assert.match(plannerViewSource, /<form\b[^>]*onSubmit=\{commitCustomBudget\}/)

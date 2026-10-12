@@ -163,7 +163,7 @@ export function PlannerView({
                 placeholder="Bijv. 27,50"
                 value={customDraft}
                 aria-invalid={customError !== '' ? true : undefined}
-                aria-describedby="custom-weekbudget-hint"
+                aria-describedby={customError ? 'custom-weekbudget-hint custom-weekbudget-error' : 'custom-weekbudget-hint'}
                 onChange={(event) => {
                   setCustomDraft(event.target.value)
                   setCustomError('')
@@ -171,7 +171,22 @@ export function PlannerView({
               />
               <p id="custom-weekbudget-hint" className="disclaimer">€0,01 – €1.000,00 · maximaal twee decimalen</p>
               <button type="submit" className="budget-chip">Budget opslaan</button>
-              {customError && <p role="alert" className="budget-custom-error">{customError}</p>}
+              <button
+                type="button"
+                className="budget-chip"
+                onClick={() => {
+                  // Cancelling only discards the uncommitted editor state.
+                  // The selected weekbudget and persisted plan stay unchanged.
+                  setCustomOpen(false)
+                  setCustomDraft('')
+                  setCustomError('')
+                }}
+              >Annuleren</button>
+              {customError && (
+                <p id="custom-weekbudget-error" role="alert" className="budget-custom-error">
+                  {customError}
+                </p>
+              )}
             </form>
           )}
         </div>
