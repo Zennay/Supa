@@ -85,6 +85,22 @@ function canReplacePlannerRecord(raw: string | null): boolean {
   }
 }
 
+// A structurally known record can still contain identifiers from a future
+// catalog that this App version cannot restore. Never rewrite those raw bytes.
+function canNormalizeCurrentPlannerRecord(raw: string | null): boolean {
+  if (!canReplacePlannerRecord(raw)) return false
+  if (raw === null) return true
+  const parsed = JSON.parse(raw) as PlannerPreferences
+  const knownDays = new Set(m2InitialPlan.map((meal) => meal.day))
+  const knownRecipes = new Set(validRecipeIds)
+  return (
+    parsed.activeDays.every((day) => knownDays.has(day)) &&
+    Object.entries(parsed.recipeByDay).every(
+      ([day, recipe]) => knownDays.has(day) && knownRecipes.has(recipe),
+    )
+  )
+}
+
 function readPlannerPreferences(): {
   preferences: PlannerPreferences
   warning: PersistenceWarning
@@ -101,7 +117,7 @@ function readPlannerPreferences(): {
       preferences: restorePlannerPreferencesWithCustomBudget(
         raw, m2InitialPlan, validRecipeIds,
       ),
-      warning: canReplacePlannerRecord(raw) ? null : 'protected',
+      warning: canNormalizeCurrentPlannerRecord(raw) ? null : 'protected',
       raw,
     }
   } catch {
@@ -182,7 +198,7 @@ export function App() {
     try {
       const stored = window.localStorage.getItem(plannerStorageKey)
       // This is a pre-write check, not an atomic cross-tab CAS transaction.
-      if (!canReplacePlannerRecord(stored) ||
+      if (!canNormalizeCurrentPlannerRecord(stored) ||
           (stored !== null && stored !== lastStoredRaw)) {
         setPersistenceWarning('protected')
         return
