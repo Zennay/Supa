@@ -47,10 +47,12 @@ export function renderM3FieldVisitCard(
     '',
     'Studie-ID: ____________________',
     'Pseudonieme deelnemercode (geen naam/e-mail): ____________________',
+    'Doelgroep: ____________________',
     'Regio: ____________________   Week start: ____________________',
     'Kies ÉÉN prijscontext voor beide winkels: [ ] winkel  [ ] online bestelling',
     'Vergelijk dezelfde vraagset; noteer beide metingen binnen maximaal 24 uur.',
     'Onbekend of niet verkrijgbaar blijft onbekend; geen vervangende prijs verzinnen.',
+    'Bij nee/onbekend: laat product, verpakking en prijs leeg; hergebruik geen oude waarden.',
   ]
 
   for (const side of sides) {
@@ -58,10 +60,13 @@ export function renderM3FieldVisitCard(
     text.push(
       '',
       `## ${store} — ${side === 'baseline' ? 'eerste winkel' : 'vergelijkwinkel'}`,
+      'Winkelnaam (zoals waargenomen): ____________________',
+      'Winkel-ID (zelfgekozen unieke code; geen klantnummer): ____________________',
       'Filiaal of bestelcontext: ____________________',
       'Waargenomen op (datum, tijd en tijdzone): ____________________',
       'Bron: [ ] handmatige mand  [ ] kassabon  [ ] export met toestemming',
-      'Bewijs-ID / herkomstnotitie (geen persoonsgegevens): ____________________',
+      'Bewijs-ID (uniek per meting, zonder persoonsgegevens): ____________________',
+      'Herkomstnotitie (wat, waar en hoe gecontroleerd): ____________________',
       `Benodigd: ${sheet.requirements.length} vaste ingrediënten uit de M2-weekplanning.`,
     )
 
@@ -71,7 +76,8 @@ export function renderM3FieldVisitCard(
         `${index + 1}. ${requirement.label} — nodig: ${quantityLabel(requirement.amount, requirement.unit)}`,
         '   Verkrijgbaar: [ ] ja  [ ] nee  [ ] onbekend',
         '   Gezien product + merk: __________________________________________',
-        '   Verpakkingshoeveelheid + eenheid / multipack: __________________',
+        '   Verpakkingsinhoud (hoeveelheid + g/kg/ml/l/stuk): ______________',
+        '   Aantal stuks in verkooppakket (multipack; 1 bij enkelpak): ____',
         '   Prijs per verpakking (EUR): ________   Aanbieding/bron: ________',
       )
     }
