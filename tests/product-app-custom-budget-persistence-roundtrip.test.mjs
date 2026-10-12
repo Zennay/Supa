@@ -170,15 +170,23 @@ test('product #1424: App reset clears saved custom selection and keeps chip defa
   })
 })
 
-test('product #1424: App never trusts an invalid stored sub-cent amount', () => {
-  const storage = memoryStorage(JSON.stringify({
+test('product #1424/#1925: invalid saved sub-cent budget is not trusted or silently overwritten', () => {
+  const original = JSON.stringify({
     ...defaultPlannerPreferences(m2InitialPlan),
     budget: 27.501,
-  }))
+  })
+  const storage = memoryStorage(original)
   inWindow(storage, () => {
     const page = appHarness(storage)
-    assert.equal(page.planner().budget, 35)
-    assert.equal(storage.saved().budget, 35)
+    assert.equal(page.planner().budget, 35, 'fallback must be the safe default')
+    // The old expectation wrote the default over an unreadable/corrupt record
+    // on mount. Preserve its original bytes under #1925's storage trust gate.
+    assert.equal(storage.contents.get(storage.key), original)
+    assert.equal(storage.writes, 0)
+    assert.ok(
+      page.render().some(node => node.type === 'p' && node.props.role === 'alert'),
+      'tell the user that in-session planner changes are not yet saved',
+    )
   })
 })
 
