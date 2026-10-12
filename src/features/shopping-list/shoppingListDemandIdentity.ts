@@ -31,9 +31,10 @@ function identifier(value: unknown): value is string {
 
 /** Check labels independently of the price-independent physical task key. */
 function visibleLabel(value: unknown): value is string {
+  // Like a physical ID, display text needs at least one visible code point.
+  // Whitespace, controls, marks and invisible format-only labels are invalid.
   return typeof value === 'string' &&
-    // A zero-width/control/combining-only label looks blank to a shopper.
-    /[^\\p{M}\\p{Cf}\\p{Cc}\\p{Cs}\\s]/u.test(value)
+    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s]/u.test(value)
 }
 
 function amount(value: unknown): value is number {
