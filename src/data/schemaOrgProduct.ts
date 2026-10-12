@@ -289,7 +289,12 @@ export function parseSchemaOrgProduct(
   }
 
   const product = products[0]
-  const name = asString(product.name)
+  let name: string | null
+  try {
+    name = asString(product.name)
+  } catch {
+    return { type: 'abstain', reason: 'Product JSON-LD name metadata is malformed' }
+  }
   if (!name) {
     return { type: 'abstain', reason: 'Product JSON-LD has no usable name' }
   }
@@ -328,19 +333,22 @@ export function parseSchemaOrgProduct(
     }
   }
 
-  const observation: RawProductObservation = {
-    supermarket: provenance.supermarket,
-    sourceProductId: extractSourceProductId(product),
-    name,
-    currentPriceCents: price,
-    currency: 'EUR',
-    pack: extractPack(product),
-    offer: buildOffer(offers, price),
-    availability: extractAvailability(offers),
-    provenance,
-  }
-
+  // Reading the remaining caller-owned metadata can invoke accessors or
+  // revoked Proxies even after the graph, offers and money checks succeed.
+  // Keep those reads inside the same fail-closed parser boundary as validation.
   try {
+    const observation: RawProductObservation = {
+      supermarket: provenance.supermarket,
+      sourceProductId: extractSourceProductId(product),
+      name,
+      currentPriceCents: price,
+      currency: 'EUR',
+      pack: extractPack(product),
+      offer: buildOffer(offers, price),
+      availability: extractAvailability(offers),
+      provenance,
+    }
+
     return {
       type: 'observation',
       observation: validateRawProductObservation(observation),
