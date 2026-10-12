@@ -63,8 +63,9 @@ test('review-only v2 UI recovery stays explicit for failed saves and protected r
     const first = current.lines.find((row) => row.status === 'matched')
     assert.ok(first)
     values.set(shoppingListProgressV2StorageKey, serializeShoppingProgressV2(current, [first.id]))
-    const restored = render()
-    assert.match(restored, /1 van \d+ afgevinkt/)
+    const firstPaint = render()
+    assert.match(firstPaint, /0 van \d+ afgevinkt/,
+      'saved progress can be restored by the mounted effect, not during SSR')
     assert.doesNotMatch(restored, /Opgeslagen lijst laden/)
     assert.deepEqual(writes, [], 'SSR opening existing progress never writes or reloads')
   } finally {
