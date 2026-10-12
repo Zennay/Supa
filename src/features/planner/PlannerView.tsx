@@ -114,7 +114,14 @@ export function PlannerView({
               key={option}
               className={budget === option ? 'budget-chip active' : 'budget-chip'}
               aria-pressed={budget === option}
-              onClick={() => onBudgetChange(option)}
+              onClick={() => {
+                onBudgetChange(option)
+                // A preset is a final selection: do not leave a stale custom
+                // editor or invalid unsaved draft able to override it later.
+                setCustomOpen(false)
+                setCustomDraft('')
+                setCustomError('')
+              }}
             >
               {euro.format(option)}
             </button>
