@@ -126,7 +126,13 @@ test('M3 preserves readable RTL, Hangul, emoji joins and decomposed accents', ()
   sheet.study.region = '서울, القاهرة en Leiden'
   sheet.baseline.provenanceNote = 'Caf' + 'e\u0301' + ' testnotitie'
   sheet.candidate.provenanceNote = '🧾 gecontroleerd (synthetisch)'
-  sheet.baseline.lines[0].observedProduct.productName = '쌀 🍚'
+  // A legible multilingual product label passes collector validation. Keep the
+  // canonical matched product identity for the separate end-to-end money test.
+  const firstProduct = sheet.baseline.lines[0].observedProduct
+  const originalProductName = firstProduct.productName
+  firstProduct.productName = '쌀 🍚'
+  assert.equal(observationLineCollectionComplete(sheet.baseline.lines[0]), true)
+  firstProduct.productName = originalProductName
   const before = JSON.stringify(sheet)
   const restored = restoreObservationSheetDraft(before)
   assert.ok(restored)
