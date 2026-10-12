@@ -83,7 +83,7 @@ test('same ID switched from matched to unresolved never becomes a same-demand re
   const changed = {
     ...local,
     lines: local.lines.map(line => line.id === priced.id
-      ? { id: line.id, status: 'unresolved', requirement: line.requirement }
+      ? { id: line.id, ingredientLabel: line.ingredientLabel, status: 'unresolved', requirement: line.requirement }
       : line),
   }
   const original = savedForeign(changed)
