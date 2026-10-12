@@ -219,6 +219,8 @@ export function App() {
   }, [preferences])
 
   const toggleDay = (day: string) => {
+    // Persist only days from the current controlled planner catalog.
+    if (!m2InitialPlan.some((meal) => meal.day === day)) return
     setPreferences((current) => ({
       ...current,
       activeDays: current.activeDays.includes(day)
@@ -228,6 +230,8 @@ export function App() {
   }
 
   const changeRecipe = (day: string, recipeId: string) => {
+    if (!m2InitialPlan.some((meal) => meal.day === day) ||
+        !validRecipeIds.includes(recipeId)) return
     setPreferences((current) => ({
       ...current,
       recipeByDay: {
@@ -267,12 +271,16 @@ export function App() {
             recipes={m2Recipes}
             basketTotalCents={basket.totalCents}
             basketUnresolvedLineCount={basket.unresolvedLineCount}
-            onBudgetChange={(nextBudget) =>
+            onBudgetChange={(nextBudget) => {
+              const cents = Number.isFinite(nextBudget) ? Math.round(nextBudget * 100) : NaN
+              // Reject invalid new choices before they reach durable storage.
+              if (!Number.isSafeInteger(cents) || cents < 1 || cents > 100_000 ||
+                  nextBudget !== cents / 100) return
               setPreferences((current) => ({
                 ...current,
                 budget: nextBudget,
               }))
-            }
+            }}
             onToggleDay={toggleDay}
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
