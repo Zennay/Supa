@@ -42,7 +42,11 @@ export function PlannerBudgetProgressCents({
   }
 
   const incomplete = assessment.status === 'unknown'
-  const percent = Math.min(100, Math.round((knownCents / budgetCents) * 100))
+  // Never show 100% while a whole cent of budget remains.
+  // Keep the exact-cent accessible text and known-minimum copy unchanged.
+  const percent = knownCents >= budgetCents
+    ? 100
+    : Math.floor((knownCents / budgetCents) * 100)
   const amount = euro.formatCents(knownCents)
   const budget = euro.formatCents(budgetCents)
   const status = incomplete
