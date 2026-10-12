@@ -112,6 +112,7 @@ test('product: routed Lijst receives the real M2 basket, not a detached v2 list'
 })
 
 test('product: navigating after a day edit routes updated physical demand to current shopping view', () => {
+  const fixtureBefore = structuredClone(m2InitialPlan)
   const app = mountApp()
   const initial = app.render()
   const planner = app.page(initial, PlannerView)
@@ -131,6 +132,5 @@ test('product: navigating after a day edit routes updated physical demand to cur
   })
   assert.deepEqual(list.props.basket, expected)
   assert.notDeepEqual(list.props.basket, original, 'list reflects edited planned demand')
-  assert.deepEqual(m2InitialPlan, m2InitialPlan.map(meal => ({ ...meal })),
-    'fixture source remains unchanged')
+  assert.deepEqual(m2InitialPlan, fixtureBefore, 'fixture source remains unchanged')
 })
