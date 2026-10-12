@@ -79,6 +79,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     basketKey,
     done: readStoredProgress(basket),
   }))
+  const [storageWarning, setStorageWarning] = useState<'protected' | 'unavailable' | null>(null)
   const done = progress.basketKey === basketKey ? progress.done : []
   // An actually empty plan is different from a malformed basket with no rows.
   // Never tell someone they have nothing to buy if the counters disagree.
@@ -110,13 +111,18 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       // Read immediately before writing: protect future/unknown/corrupt
       // records even if storage changed after mount. This is not atomic CAS.
       const stored = window.localStorage.getItem(shoppingListProgressStorageKey)
-      if (!canOverwriteStoredProgress(stored)) return
+      if (!canOverwriteStoredProgress(stored)) {
+        setStorageWarning('protected')
+        return
+      }
       window.localStorage.setItem(
         shoppingListProgressStorageKey,
         serializeShoppingListProgress(basket, progress.done),
       )
+      setStorageWarning(null)
     } catch {
       // Strict privacy modes can deny storage; the active session remains usable.
+      setStorageWarning('unavailable')
     }
   }, [basket, basketKey, genuinelyEmpty, progress])
 
@@ -134,6 +140,14 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
           <strong>{basket.unresolvedLineCount} productkeuze vraagt controle</strong>
           <span>SUPA vult een onzekere match niet automatisch in.</span>
         </div>
+      )}
+
+      {storageWarning && (
+        <p role="alert" className="disclaimer">
+          {storageWarning === 'protected'
+            ? 'Afvinken is tijdelijk en niet opgeslagen. Je eerdere opgeslagen gegevens blijven bewaard.'
+            : 'Afvinken is tijdelijk en niet opgeslagen omdat opslag niet beschikbaar is.'}
+        </p>
       )}
 
       <div className="list-card">
