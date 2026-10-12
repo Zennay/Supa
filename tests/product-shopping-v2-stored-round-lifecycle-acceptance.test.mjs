@@ -74,7 +74,7 @@ test('product shopping v2: saved M2 checks survive a price refresh with Dutch ro
   const rows = shoppingListRowsV2(later, session)
   assert.equal(rows.length, later.lines.length)
   assert.equal(rows.find(line => line.id === checkedId)?.checked, true)
-  assert.ok(rows.every(line => !/\\b(?:unknown|piece)\\b/.test(line.quantity)))
+  assert.ok(rows.every(line => !/\b(?:unknown|piece)\b/.test(line.quantity)))
   assert.deepEqual(storage.calls.writes.map(([key]) => key), [shoppingListProgressV2StorageKey])
   assert.equal(storage.records.get(shoppingListProgressV2StorageKey), written)
   assert.deepEqual(original, frozen)
