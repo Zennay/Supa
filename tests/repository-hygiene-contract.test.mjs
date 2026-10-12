@@ -44,6 +44,10 @@ function invalidPortableSegment(segment) {
   // Hidden formatting can make a tracked file masquerade as a protected name
   // (for example, .env). Keep Arabic ZWNJ and emoji ZWJ filenames valid.
   if (/[\u00ad\u034f\u200b\u2060\ufeff]/u.test(segment)) return true
+  // Blank Hangul fillers and Braille Pattern Blank look like empty spacing
+  // inside a filename but survive as ordinary graphic Unicode code points.
+  // Disallow only these reviewed blanks, not real Hangul/Braille text.
+  if (/[\u115f\u1160\u2800\u3164\uffa0]/u.test(segment)) return true
   // Unicode line/paragraph separators can split a single path in review output.
   // Keep ordinary NBSP, visible RTL letters, Arabic ZWNJ and emoji ZWJ valid.
   if (/[\u0085\u2028\u2029]/u.test(segment)) return true
