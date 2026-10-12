@@ -29,6 +29,11 @@ function identifier(value: unknown): value is string {
     /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s]/u.test(value)
 }
 
+/** Check labels independently of the price-independent physical task key. */
+function visibleLabel(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
 function amount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
@@ -44,7 +49,7 @@ function wholePacks(value: unknown): value is number {
 export function shoppingListDemandIdentity(basket: OneStoreBasket): string | null {
   const input = record(basket)
   const store = record(input?.store)
-  if (!store || !identifier(store.id) || !Array.isArray(input?.lines)) {
+  if (!store || !identifier(store.id) || !visibleLabel(store.name) || !Array.isArray(input?.lines)) {
     return null
   }
 
@@ -58,6 +63,7 @@ export function shoppingListDemandIdentity(basket: OneStoreBasket): string | nul
     if (
       !line ||
       !identifier(line.id) ||
+      !visibleLabel(line.ingredientLabel) ||
       seen.has(line.id) ||
       !requirement ||
       typeof requirement.unit !== 'string' ||
@@ -85,6 +91,7 @@ export function shoppingListDemandIdentity(basket: OneStoreBasket): string | nul
       !amount(requirement.amount) ||
       requirement.unit === 'unknown' ||
       !identifier(line.productId) ||
+      !visibleLabel(line.productName) ||
       !wholePacks(line.packs) ||
       !pack ||
       !amount(pack.amount) ||
