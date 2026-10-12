@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { shoppingListDemandIdentity } from './shoppingListDemandIdentity.ts'
 import { shoppingListRowsV2 } from './shoppingListRowsV2.ts'
+import { startShoppingProgressSessionV2 } from './shoppingListProgressSessionV2.ts'
 import { openShoppingProgressStorageV2 } from './shoppingListStorageControllerV2.ts'
 
 type Props = Readonly<{
@@ -30,7 +31,9 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
   const [controller] = useState(() =>
     openShoppingProgressStorageV2(basket, browserStorage(), { allowLegacyUpgrade }),
   )
-  const [session, setSession] = useState(() => controller.snapshot())
+  // Hydration-safe first paint: server HTML cannot inspect browser storage.
+  // A mounted effect restores the already-read v2 session without writing.
+  const [session, setSession] = useState(() => startShoppingProgressSessionV2(basket, null))
   const [saveFailed, setSaveFailed] = useState(false)
   const [recheckFailed, setRecheckFailed] = useState(false)
   // Set after mount to keep SSR markup stable when browser storage differs.
