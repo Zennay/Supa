@@ -38,6 +38,9 @@ function isForbiddenTrackedPath(p) {
 function invalidPortableSegment(segment) {
   if (!segment || segment === '.' || segment === '..') return true
   if (/[<>:"\\|?*\x00-\x1f]/.test(segment)) return true
+  // Explicit bidi control characters can spoof the visual order of a Git path.
+  // Preserve normal RTL letters; disallow only directional controls in names.
+  if (/[\u061c\u200e-\u200f\u202a-\u202e\u2066-\u2069]/u.test(segment)) return true
   if (/[. ]$/.test(segment)) return true
   // Windows treats a device name as reserved even when an extension follows.
   // Windows also reserves superscript 1/2/3 device suffixes; trailing
