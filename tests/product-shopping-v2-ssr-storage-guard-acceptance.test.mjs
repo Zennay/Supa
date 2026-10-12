@@ -100,6 +100,25 @@ test('shopping-v2 SSR remains neutral for denied storage and explicit v1 upgrade
     )
     assert.equal(bytes.has(shoppingListProgressV2StorageKey), false)
     assert.equal(bytes.get(shoppingListProgressStorageKey), v1)
+
+    // The inverse consent boundary: with v2 absent, default/no-consent render
+    // is storage-read-only and must not even inspect the legacy v1 value.
+    reads.length = 0
+    assert.equal(
+      renderToString(createElement(ShoppingListViewV2, {
+        basket, allowLegacyUpgrade: false,
+      })),
+      server,
+    )
+    assert.deepEqual(reads, [shoppingListProgressV2StorageKey])
+    assert.equal(writes, 0)
+    assert.deepEqual(
+      openShoppingProgressStorageV2(basket, storage).snapshot().completedLineIds,
+      [],
+      'legacy progress must never be imported without explicit consent',
+    )
+    assert.equal(bytes.has(shoppingListProgressV2StorageKey), false)
+    assert.equal(bytes.get(shoppingListProgressStorageKey), v1)
   } finally {
     if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow)
     else delete globalThis.window
