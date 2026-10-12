@@ -118,35 +118,55 @@ function uniqueKnown<T>(values: T[]): T | null {
   return unique.length === 1 ? unique[0] : null
 }
 
-function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
+// Bound the *total* nested work across all accepted offers, not merely each
+// array or the outer offers count. Return null before reading any element of an
+// oversized specification list. Callers catch hostile property/index getters.
+function priceSpecificationCandidates(
+  offer: JsonObject,
+  budget: { remaining: number },
+): JsonObject[] | null {
   const raw = offer.priceSpecification
   const values = Array.isArray(raw) ? raw : raw == null ? [] : [raw]
-  return values.filter((value): value is JsonObject => isObject(value))
+  if (values.length > budget.remaining) return null
+  budget.remaining -= values.length
+
+  const specifications: JsonObject[] = []
+  for (let index = 0; index < values.length; index++) {
+    const value = values[index]
+    if (isObject(value)) specifications.push(value)
+  }
+  return specifications
 }
 
-function extractPrice(offers: JsonObject[]): number | null {
-  const prices = offers
-    .flatMap((offer) => [
-      cents(offer.price ?? offer.lowPrice),
-      ...priceSpecificationCandidates(offer).map((specification) =>
-        cents(specification.price ?? specification.lowPrice),
-      ),
-    ])
-    .filter((value): value is number => value !== null)
-  return uniqueKnown(prices)
-}
+function extractOfferMoney(offers: JsonObject[]): {
+  price: number | null
+  currency: string | null
+} | null {
+  const budget = { remaining: MAX_OFFER_CANDIDATES }
+  const prices: number[] = []
+  const currencies: string[] = []
 
-function extractCurrency(offers: JsonObject[]): string | null {
-  const currencies = offers
-    .flatMap((offer) => [
-      asString(offer.priceCurrency),
-      ...priceSpecificationCandidates(offer).map((specification) =>
-        asString(specification.priceCurrency),
-      ),
-    ])
-    .filter((value): value is string => Boolean(value))
-    .map((value) => value.toUpperCase())
-  return uniqueKnown(currencies)
+  for (const offer of offers) {
+    const specifications = priceSpecificationCandidates(offer, budget)
+    if (specifications === null) return null
+
+    const offerPrice = cents(offer.price ?? offer.lowPrice)
+    if (offerPrice !== null) prices.push(offerPrice)
+    const offerCurrency = asString(offer.priceCurrency)
+    if (offerCurrency) currencies.push(offerCurrency.toUpperCase())
+
+    for (const specification of specifications) {
+      const specificationPrice = cents(specification.price ?? specification.lowPrice)
+      if (specificationPrice !== null) prices.push(specificationPrice)
+      const specificationCurrency = asString(specification.priceCurrency)
+      if (specificationCurrency) currencies.push(specificationCurrency.toUpperCase())
+    }
+  }
+
+  return {
+    price: uniqueKnown(prices),
+    currency: uniqueKnown(currencies),
+  }
 }
 
 const SCHEMA_ORG_AVAILABILITY = new Map<
@@ -283,7 +303,17 @@ export function parseSchemaOrgProduct(
   if (offers === null) {
     return { type: 'abstain', reason: 'Product JSON-LD offer types are malformed' }
   }
-  const currency = extractCurrency(offers)
+  let money: ReturnType<typeof extractOfferMoney>
+  try {
+    money = extractOfferMoney(offers)
+  } catch {
+    money = null
+  }
+  if (money === null) {
+    return { type: 'abstain', reason: 'Product JSON-LD price specifications are malformed' }
+  }
+
+  const { price, currency } = money
   if (currency !== null && currency !== 'EUR') {
     return {
       type: 'abstain',
@@ -291,7 +321,6 @@ export function parseSchemaOrgProduct(
     }
   }
 
-  const price = extractPrice(offers)
   if (price !== null && currency === null) {
     return {
       type: 'abstain',
