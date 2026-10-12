@@ -60,6 +60,7 @@ function scheduler() {
       useEffect: (fn) => effects.push(fn),
     },
     begin() { cursor = 0; effects = [] },
+    reset() { slots.length = 0; cursor = 0; effects = [] },
     flush() { for (const fn of [...effects]) fn() },
   }
 }
@@ -132,6 +133,9 @@ function activeBasket(tree) {
   return routed[0].props.basket
 }
 function storageSession() {
+  // Each synthetic mount uses fresh component hook slots and browser storage.
+  appHooks.reset()
+  shoppingHooks.reset()
   const old = Object.getOwnPropertyDescriptor(globalThis, 'window')
   const saved = new Map()
   const writes = []
