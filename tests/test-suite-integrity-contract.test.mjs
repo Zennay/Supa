@@ -113,6 +113,24 @@ function disablingLiteral(name, initializer) {
   }
   if (ts.isStringLiteralLike(value)) return value.text.length > 0
   if (ts.isNumericLiteral(value)) return Number(value.text) !== 0
+  if (ts.isBigIntLiteral(value)) {
+    try {
+      return BigInt(value.text.replaceAll('_', '').replace(/n$/, '')) !== 0n
+    } catch {
+      return false
+    }
+  }
+  if (
+    ts.isPrefixUnaryExpression(value) &&
+    value.operator === ts.SyntaxKind.MinusToken &&
+    ts.isBigIntLiteral(value.operand)
+  ) {
+    try {
+      return BigInt(value.operand.text.replaceAll('_', '').replace(/n$/, '')) !== 0n
+    } catch {
+      return false
+    }
+  }
   if (ts.isPrefixUnaryExpression(value) && (
     value.operator === ts.SyntaxKind.MinusToken ||
     value.operator === ts.SyntaxKind.PlusToken
