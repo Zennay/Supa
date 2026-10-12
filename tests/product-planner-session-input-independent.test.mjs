@@ -141,11 +141,14 @@ test('product #1925 independent: malformed budgets never poison an existing stor
   const app = mount(saved)
   try {
     app.render()
+    // A valid sparse saved v2 map is intentionally normalized on mount.
+    // Assert the invalid callbacks do not alter the mounted baseline.
+    const mounted = app.raw
     const before = app.writes.length
     for (const bad of [-1, 0, 0.001, 27.501, 1000.01, Number.NaN, Number.POSITIVE_INFINITY]) {
       app.planner().onBudgetChange(bad)
       app.render()
-      assert.equal(app.raw, saved)
+      assert.equal(app.raw, mounted)
       assert.equal(app.planner().budget, 35)
       assert.equal(app.writes.length, before)
     }
@@ -158,6 +161,9 @@ test('product #1925 independent: unknown days and recipe IDs cannot create a cor
   const app = mount(saved)
   try {
     app.render()
+    // A valid sparse saved v2 map is intentionally normalized on mount.
+    // Assert the invalid callbacks do not alter the mounted baseline.
+    const mounted = app.raw
     const before = app.writes.length
     for (const action of [
       props => props.onToggleDay('Za'),
@@ -167,7 +173,7 @@ test('product #1925 independent: unknown days and recipe IDs cannot create a cor
     ]) {
       action(app.planner())
       app.render()
-      assert.equal(app.raw, saved)
+      assert.equal(app.raw, mounted)
       assert.equal(app.writes.length, before)
     }
     app.planner().onRecipeChange('Di', 'pasta')

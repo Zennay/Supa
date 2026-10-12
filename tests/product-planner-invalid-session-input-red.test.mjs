@@ -164,11 +164,14 @@ test('product #1925 RED: unknown day and recipe handlers cannot poison durable p
     const app = mount(saved)
     try {
       app.render()
+      // App legitimately fills current-catalog defaults during its first
+      // restore. Invalid callbacks must not change that normalized baseline.
+      const priorRaw = app.raw
       const priorWrites = app.writes.length
       mutate(app.planner())
       app.render()
+      assert.equal(app.raw, priorRaw)
       assert.deepEqual(JSON.parse(app.raw).activeDays, ['Di'])
-      assert.deepEqual(JSON.parse(app.raw).recipeByDay, { Di: 'teriyaki' })
       assert.equal(app.writes.length, priorWrites)
     } finally { app.close() }
   }
