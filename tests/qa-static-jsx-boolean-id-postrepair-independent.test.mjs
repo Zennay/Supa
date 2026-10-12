@@ -78,5 +78,5 @@ test('QA #2004: static Boolean IDs do not collapse distinct true and false value
     'const a = <input id={"answer-" + false} />',
     'const b = <input id={`answer-${false}`} />',
     'const c = <input id={"answer-" + true} />',
-  ), ['answer-true'])
+  ), ['answer-false', 'answer-true'])
 })
