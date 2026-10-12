@@ -7,9 +7,9 @@ import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
   defaultPlannerPreferences,
-  parsePlannerPreferences,
   serializePlannerPreferences,
 } from './domain/plannerPreferences'
+import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
 import {
   m2InitialPlan,
   m2Products,
@@ -41,7 +41,7 @@ function readPlannerPreferences() {
   }
 
   try {
-    return parsePlannerPreferences(
+    return restorePlannerPreferencesWithCustomBudget(
       window.localStorage.getItem(plannerStorageKey),
       m2InitialPlan,
       validRecipeIds,
