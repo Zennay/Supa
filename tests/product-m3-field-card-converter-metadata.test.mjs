@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import test from 'node:test'
 
 import { buildObservationSheet, observationLineCollectionComplete } from '../src/domain/m3ObservationSheet.ts'
+import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
 import { renderM3FieldVisitCard } from '../src/domain/m3FieldVisitCard.ts'
 
 const root = resolve('scripts/m3-field-visit-card.mjs')
@@ -147,4 +148,43 @@ test('unmeasured availability is never silently treated as confirmed unavailable
   line.observedProduct.available = false
   assert.equal(observationLineCollectionComplete(line), true)
   assert.equal(line.observedProduct.priceCents, null)
+})
+
+test('actual M3 converter requires a measured Boolean for each ingredient', () => {
+  // Entirely synthetic all-unavailable controls: this establishes only
+  // converter behavior, never a real store visit, price or study proof.
+  const sheet = buildObservationSheet()
+  Object.assign(sheet.study, {
+    studyId: 'synthetic-m3-card-parity',
+    participantKey: 'synthetic-pseudonym',
+    population: 'uitwonende studenten',
+    region: 'Leiden',
+    weekStart: '2026-10-12',
+    priceContext: 'in-store',
+  })
+  for (const [side, name, id, evidenceId, time] of [
+    ['baseline', 'PLUS', 'synthetic-plus-store', 'synthetic-plus-evidence', '2026-10-12T10:00:00Z'],
+    ['candidate', 'DekaMarkt', 'synthetic-deka-store', 'synthetic-deka-evidence', '2026-10-12T11:00:00Z'],
+  ]) {
+    const entry = sheet[side]
+    entry.store.name = name
+    entry.store.id = id
+    entry.evidenceId = evidenceId
+    entry.observedAt = time
+    entry.provenanceNote = 'FICTIEF: alleen converterstructuur verifiëren'
+    entry.lines.forEach((line) => { line.observedProduct.available = false })
+  }
+  const complete = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  assert.equal(complete.baseline.basket.unresolvedLineCount, 11)
+  assert.equal(complete.candidate.basket.unresolvedLineCount, 11)
+  assert.equal(complete.baseline.basket.totalCents, 0)
+  assert.equal(complete.candidate.basket.totalCents, 0)
+
+  // A collector must not silently coerce "unknown" to observed unavailable.
+  sheet.baseline.lines[0].observedProduct.available = null
+  assert.equal(observationLineCollectionComplete(sheet.baseline.lines[0]), false)
+  assert.throws(
+    () => buildWeeklyBasketStudyFromObservationSheet(sheet),
+    /baseline\.lines\[0\]\.observedProduct\.available must be true or false/,
+  )
 })
