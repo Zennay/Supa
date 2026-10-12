@@ -29,6 +29,10 @@ function staticPrimitiveExpression(node, depth = 0) {
   const current = unwrapStaticExpression(node)
 
   if (ts.isStringLiteralLike(current)) return current.text
+  // JavaScript coerces literal Booleans in string addition and interpolation.
+  // Keep their primitive type until final ID coercion; never infer variables.
+  if (current.kind === ts.SyntaxKind.TrueKeyword) return true
+  if (current.kind === ts.SyntaxKind.FalseKeyword) return false
   if (ts.isNumericLiteral(current)) {
     const value = Number(current.text.replaceAll('_', ''))
     return Number.isFinite(value) ? value : null
