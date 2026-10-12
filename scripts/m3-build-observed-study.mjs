@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { writeDerivedM3Output } from './m3-source-output-preservation.mjs'
 import { pathToFileURL } from 'node:url'
 
 import { matchIngredient } from '../src/domain/matching.ts'
@@ -403,7 +404,7 @@ export async function main(argv = process.argv.slice(2)) {
 
   if (output) {
     await mkdir(dirname(output), { recursive: true })
-    await writeFile(output, serialized, 'utf8')
+    await writeDerivedM3Output(input, output, serialized)
   } else {
     process.stdout.write(serialized)
   }
