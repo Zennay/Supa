@@ -205,3 +205,37 @@ test('QA v1: denied storage never prevents rapid toggles from updating visible s
     session.close()
   }
 })
+
+test('QA v1: historical duplicate and unknown stored IDs cannot amplify rapid toggles', () => {
+  const basket = makeBasket(['Di'])
+  const valid = basket.lines[0].id
+  const second = basket.lines[1].id
+  const previous = JSON.stringify({
+    schemaVersion: 1,
+    basketKey: saved.shoppingListBasketKey(basket),
+    doneLineIds: [valid, valid, 'retired-line-id', valid],
+  })
+  const session = makeHarness(previous)
+  try {
+    const start = session.render(basket)
+    assert.equal(checked(start.rows[0]), true)
+    assert.equal(checked(start.rows[1]), false)
+    start.flush()
+    assert.deepEqual(JSON.parse(session.raw).doneLineIds, [valid],
+      'restoring old bytes must discard retired and duplicate IDs')
+
+    // Two quick operations on an already checked row retain it. The second
+    // row is added exactly once; neither legacy duplicate may come back.
+    start.rows[0].props.onClick()
+    start.rows[0].props.onClick()
+    start.rows[1].props.onClick()
+    const settled = session.render(basket)
+    assert.equal(checked(settled.rows[0]), true)
+    assert.equal(checked(settled.rows[1]), true)
+    settled.flush()
+    assert.deepEqual(JSON.parse(session.raw).doneLineIds, [valid, second])
+    assert.equal(new Set(JSON.parse(session.raw).doneLineIds).size, 2)
+  } finally {
+    session.close()
+  }
+})
