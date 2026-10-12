@@ -34,13 +34,20 @@ function syntheticBasket(store = m2Store, products = m2Products) {
   })
 }
 
-function memoryStorage() {
+function memoryStorage({ denyRead = false, denyWrite = false } = {}) {
   const data = new Map()
   const writes = []
   return {
     data, writes,
-    getItem(key) { return data.get(key) ?? null },
-    setItem(key, value) { data.set(key, value); writes.push({ key, value }) },
+    getItem(key) {
+      if (denyRead) throw Error('synthetic private mode: storage reads denied')
+      return data.get(key) ?? null
+    },
+    setItem(key, value) {
+      if (denyWrite) throw Error('synthetic private mode: storage writes denied')
+      data.set(key, value)
+      writes.push({ key, value })
+    },
   }
 }
 
@@ -94,8 +101,8 @@ function checked(button) {
   return button.props.className.split(' ').includes('checked')
 }
 
-function withStorage(run) {
-  const storage = memoryStorage()
+function withStorage(run, policy = {}) {
+  const storage = memoryStorage(policy)
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'window')
   Object.defineProperty(globalThis, 'window', {
     configurable: true, writable: true, value: { localStorage: storage },
@@ -151,4 +158,46 @@ test('QA #248: unresolved-to-matched and matched-to-unresolved physical changes 
     assert.deepEqual(JSON.parse(storage.data.get(shoppingProgress.shoppingListProgressStorageKey)).doneLineIds, [])
     assert.deepEqual({ unresolved, matched }, before)
   })
+})
+
+test('QA #248: corrupt saved progress fails closed before a new store transition', () => {
+  withStorage(storage => {
+    const key = shoppingProgress.shoppingListProgressStorageKey
+    storage.data.set(key, '{malformed saved data')
+    const view = mountView(storage)
+    const current = syntheticBasket()
+    assert.equal(checked(riceButton(view.render(current))), false)
+    riceButton(view.render(current)).props.onClick()
+    assert.equal(checked(riceButton(view.render(current))), true)
+
+    const otherStore = { ...m2Store, id: 'qa-corrupt-storage-other-store' }
+    const switched = syntheticBasket(otherStore, m2Products.map(product => ({
+      ...product, storeId: otherStore.id,
+    })))
+    assert.equal(checked(riceButton(view.render(switched))), false)
+    assert.equal(checked(riceButton(view.render(switched))), false)
+    assert.deepEqual(JSON.parse(storage.data.get(key)).doneLineIds, [])
+  })
+})
+
+test('QA #248: denied private-mode storage keeps session usable without leaking a tick across stores', () => {
+  withStorage(storage => {
+    const view = mountView(storage)
+    const current = syntheticBasket()
+    const otherStore = { ...m2Store, id: 'qa-privacy-other-store' }
+    const switched = syntheticBasket(otherStore, m2Products.map(product => ({
+      ...product, storeId: otherStore.id,
+    })))
+
+    assert.equal(checked(riceButton(view.render(current))), false)
+    riceButton(view.render(current)).props.onClick()
+    assert.equal(checked(riceButton(view.render(current))), true,
+      'local session remains usable when storage denies writes')
+    assert.equal(checked(riceButton(view.render(switched))), false)
+    assert.equal(checked(riceButton(view.render(switched))), false)
+    assert.equal(checked(riceButton(view.render(current))), false)
+    assert.equal(checked(riceButton(view.render(current))), false)
+    assert.deepEqual(storage.writes, [],
+      'denied storage must not claim successful persistence')
+  }, { denyRead: true, denyWrite: true })
 })
