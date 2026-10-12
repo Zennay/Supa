@@ -42,7 +42,14 @@ export function PlannerBudgetProgressCents({
   }
 
   const incomplete = assessment.status === 'unknown'
-  const percent = Math.min(100, Math.round((knownCents / budgetCents) * 100))
+  // Compute whole percentages in integer cents. Float ratios can turn 29/100
+  // into 28.999999..., and multiplying large safe cents by 100 as a Number
+  // can lose integer precision. Clamp BEFORE conversion to Number: with a
+  // positive denominator the result is guaranteed to be in [0, 99].
+  const percent =
+    knownCents >= budgetCents
+      ? 100
+      : Number((BigInt(knownCents) * 100n) / BigInt(budgetCents))
   const amount = euro.formatCents(knownCents)
   const budget = euro.formatCents(budgetCents)
   const status = incomplete
