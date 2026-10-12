@@ -1,7 +1,9 @@
+import { useState, type FormEvent } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
 import { euro } from '../../lib/money'
 import { assessPlannerBudgetCents } from '../../lib/plannerBudgetCents.ts'
 import { RecipeEstimateDisclosure } from './RecipeEstimateDisclosure.ts'
+import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -31,6 +33,23 @@ export function PlannerView({
   onRecipeChange,
   onReset,
 }: PlannerViewProps) {
+  const [customOpen, setCustomOpen] = useState(false)
+  const [customDraft, setCustomDraft] = useState('')
+  const [customError, setCustomError] = useState('')
+  const customActive = validCustomWeekBudgetEuros(budget) !== null && !budgetOptions.includes(budget)
+
+  const commitCustomBudget = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const cents = parseCustomWeekBudgetCents(customDraft)
+    if (cents === null) {
+      setCustomError('Vul een bedrag van €0,01 t/m €1.000,00 in, met maximaal twee decimalen.')
+      return
+    }
+    onBudgetChange(cents / 100)
+    setCustomError('')
+    setCustomOpen(false)
+  }
+
   const plannedCost = basketTotalCents / 100
   // The basket is already measured in cents. Do not subtract floating-point
   // euro values and then ask the strict formatter to round the result (#1041).
@@ -100,6 +119,45 @@ export function PlannerView({
               {euro.format(option)}
             </button>
           ))}
+        </div>
+
+        <div className="budget-custom">
+          <button
+            type="button"
+            className={customActive ? 'budget-chip budget-custom-toggle active' : 'budget-chip budget-custom-toggle'}
+            aria-pressed={customActive}
+            aria-expanded={customOpen}
+            aria-controls="custom-weekbudget-form"
+            onClick={() => {
+              setCustomOpen((open) => !open)
+              setCustomError('')
+              setCustomDraft(customActive ? budget.toFixed(2).replace('.', ',') : '')
+            }}
+          >
+            {customActive ? `Eigen budget · ${euro.format(budget)}` : 'Ander bedrag instellen'}
+          </button>
+          {customOpen && (
+            <form id="custom-weekbudget-form" className="budget-custom-form" onSubmit={commitCustomBudget} noValidate>
+              <label htmlFor="custom-weekbudget-value">Eigen weekbudget (€)</label>
+              <input
+                id="custom-weekbudget-value"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="Bijv. 27,50"
+                value={customDraft}
+                aria-invalid={customError !== '' ? true : undefined}
+                aria-describedby="custom-weekbudget-hint"
+                onChange={(event) => {
+                  setCustomDraft(event.target.value)
+                  setCustomError('')
+                }}
+              />
+              <p id="custom-weekbudget-hint" className="disclaimer">€0,01 – €1.000,00 · maximaal twee decimalen</p>
+              <button type="submit" className="budget-chip">Budget opslaan</button>
+              {customError && <p role="alert" className="budget-custom-error">{customError}</p>}
+            </form>
+          )}
         </div>
 
         <div
