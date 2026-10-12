@@ -506,9 +506,7 @@ export function observationSheetProgress(sheet: ObservationSheet) {
     sheet.candidate.store.id,
     sheet.candidate.store.name,
   ]
-  const metadataCompleted = metadataValues.filter(
-    (value) => value.trim().length > 0,
-  ).length
+  const metadataCompleted = metadataValues.filter(nonBlank).length
 
   return {
     totalLines,
@@ -526,7 +524,9 @@ export type ObservationSheetReadiness = {
 }
 
 function nonBlank(value: string) {
-  return value.trim().length > 0
+  // Required collector fields need a visible Unicode base character.
+  return typeof value === 'string' &&
+    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
 }
 
 function validObservedAt(value: string) {
