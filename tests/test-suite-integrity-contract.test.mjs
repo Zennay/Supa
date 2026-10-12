@@ -116,6 +116,9 @@ function disablingLiteral(name, initializer) {
   if (ts.isArrayLiteralExpression(value) || ts.isObjectLiteralExpression(value)) {
     return true
   }
+  // /pattern/ is also a truthy object at runtime. Test the AST node kind;
+  // never construct or execute a RegExp while inspecting source files.
+  if (value.kind === ts.SyntaxKind.RegularExpressionLiteral) return true
   if (ts.isStringLiteralLike(value)) return value.text.length > 0
   if (ts.isNumericLiteral(value)) return Number(value.text) !== 0
   if (ts.isBigIntLiteral(value)) {
