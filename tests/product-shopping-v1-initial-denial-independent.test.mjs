@@ -115,7 +115,9 @@ test('product #1891 independent: unknown checked bytes survive read failure, edi
     s.render(basket).flush()
     assert.equal(s.raw, initial)
     assert.equal(s.writes.length, 0, 'explicit edit cannot clobber unread bytes')
-    assert.match(String(s.render(basket).alerts[0]?.props.children), /eerdere opgeslagen gegevens/i)
+    // The last attempted read was denied; without a later explicit edit the
+    // original unavailable alert must remain, not imply a successful retry.
+    assert.match(String(s.render(basket).alerts[0]?.props.children), /opslag niet beschikbaar/i)
     assert.match(s.render(basket).rows[1].props.className, /checked/, 'local session stays interactive')
   } finally { s.close() }
 })
