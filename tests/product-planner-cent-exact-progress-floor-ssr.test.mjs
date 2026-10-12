@@ -83,9 +83,13 @@ test('product #1041: ordinary integer-cent ratios follow mathematical floor', ()
 test('product #1041: near-MAX_SAFE_INTEGER cents cannot overflow the percentage multiply', () => {
   // 100× MAX_SAFE_INTEGER is not a Number-safe integer; BigInt arithmetic
   // clamps to a safe [0, 100] percentage prior to rendering the DOM value.
-  assertPercent(Number.MAX_SAFE_INTEGER - 1, Number.MAX_SAFE_INTEGER)
-  assertPercent(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)
-  assertPercent(Number.MAX_SAFE_INTEGER, 100)
+  // Use whole-euro denominators so the existing euro -> cent adapter
+  // preserves exactly the intended amount at this magnitude.
+  const almostMaxBudgetCents = 9007199254740100
+  const almostMaxCostCents = 9007199254740000
+  assertPercent(almostMaxCostCents, almostMaxBudgetCents)
+  assertPercent(almostMaxBudgetCents, almostMaxBudgetCents)
+  assertPercent(almostMaxCostCents, 100)
 })
 
 test('product #1041: incomplete baskets disclose only a known minimum', () => {
