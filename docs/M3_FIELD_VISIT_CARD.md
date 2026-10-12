@@ -21,6 +21,16 @@ node --experimental-strip-types scripts/m3-field-visit-card.mjs > artifacts/m3/b
 
 Printing/saving this text does **not** produce observation evidence. Only human-confirmed observations should populate the JSON sheet. Do not commit a hand-filled card, receipt, name, email or account ID; these may reveal participant/store-visit details.
 
+## Invulvelden en echte M3-gegevens
+
+De veldkaart is bewust leeg. De officiële converter verwacht **afzonderlijke velden**; schrijf geen twee waarden samen in één notitie:
+
+- **Studie:** `studyId`, pseudonieme `participantKey`, `population` (doelgroep), `region`, `weekStart` en één gedeelde `priceContext`.
+- **Per winkel:** werkelijke `store.name`, een **unieke, zelfgekozen** `store.id` (geen klantnummer), `observedAt` met datum/tijd/tijdzone, `source`, een eigen `evidenceId` en afzonderlijke `provenanceNote` (wat/waar/hoe waargenomen). Gebruik niet dezelfde winkel- of bewijs-ID voor beide winkels.
+- **Per productregel:** kies beschikbaarheid expliciet. Bij **ja** noteer een herkenbare productnaam, inhoud met eenheid, het aantal artikelen **in één verkooppakket** (`packCount`; 1 bij enkelpak) en de geobserveerde prijs **per verkooppakket** in EUR. Dit aantal is **niet** het aantal aan te schaffen verpakkingen: de converter leidt dat af uit de plannerbehoefte. Bij **nee/onbekend** blijven product- en prijsvelden leeg; hergebruik geen oude informatie.
+
+Het veld **Filiaal of bestelcontext** is alleen extra context voor de herkomstnotitie; het vervangt de afzonderlijke winkelnaam en winkel-ID niet. De veldkaart kan niet vaststellen of een waarneming werkelijk plaatsvond of of de aanbieder toestemming voor hergebruik gaf.
+
 ## During the visit
 
 1. Use baseline = **PLUS**, candidate = **DekaMarkt**, and the **same 11 requirements** for both. Do not swap retailer sides or improvise replacement demand.
