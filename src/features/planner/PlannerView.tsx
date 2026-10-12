@@ -78,7 +78,16 @@ export function PlannerView({
           <span className="eyebrow">Deze week</span>
           <h2>Plan eerst. Vergelijk daarna.</h2>
         </div>
-        <button type="button" className="ghost-button" onClick={onReset}>Reset</button>
+        <button
+          type="button"
+          className="ghost-button"
+          onClick={() => {
+            onReset()
+            setCustomOpen(false)
+            setCustomDraft('')
+            setCustomError('')
+          }}
+        >Reset</button>
       </div>
 
       <section className="budget-card" aria-labelledby="weekbudget-title">
@@ -114,7 +123,14 @@ export function PlannerView({
               key={option}
               className={budget === option ? 'budget-chip active' : 'budget-chip'}
               aria-pressed={budget === option}
-              onClick={() => onBudgetChange(option)}
+              onClick={() => {
+                onBudgetChange(option)
+                // A preset is a final selection: do not leave a stale custom
+                // editor or invalid unsaved draft able to override it later.
+                setCustomOpen(false)
+                setCustomDraft('')
+                setCustomError('')
+              }}
             >
               {euro.format(option)}
             </button>
