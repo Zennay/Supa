@@ -66,7 +66,7 @@ test('review-only v2 UI recovery stays explicit for failed saves and protected r
     const firstPaint = render()
     assert.match(firstPaint, /0 van \d+ afgevinkt/,
       'saved progress can be restored by the mounted effect, not during SSR')
-    assert.doesNotMatch(restored, /Opgeslagen lijst laden/)
+    assert.doesNotMatch(firstPaint, /Opgeslagen lijst laden/)
     assert.deepEqual(writes, [], 'SSR opening existing progress never writes or reloads')
   } finally {
     if (previous) Object.defineProperty(globalThis, 'window', previous)
