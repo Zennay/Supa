@@ -27,6 +27,14 @@ function staticStringExpression(node, depth = 0) {
 
   if (ts.isStringLiteralLike(current)) return current.text
 
+  // JSX string concatenation and no-substitution template interpolation both
+  // convert compile-time numeric literals to strings (e.g. 'row-' + 2).
+  // This only decodes literal AST nodes: never execute code or read variables.
+  if (ts.isNumericLiteral(current)) {
+    const numeric = Number(current.text.replaceAll('_', ''))
+    return Number.isFinite(numeric) ? String(numeric) : null
+  }
+
   if (
     ts.isBinaryExpression(current) &&
     current.operatorToken.kind === ts.SyntaxKind.PlusToken
