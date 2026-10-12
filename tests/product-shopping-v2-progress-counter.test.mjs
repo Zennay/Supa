@@ -7,6 +7,7 @@ import { createServer } from 'vite'
 
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import { m2InitialPlan, m2Products, m2Recipes, m2Store } from '../src/data/m2Fixture.ts'
+import { openShoppingProgressStorageV2 } from '../src/features/shopping-list/shoppingListStorageControllerV2.ts'
 import {
   serializeShoppingProgressV2,
   shoppingListProgressV2StorageKey,
@@ -65,8 +66,10 @@ test('real v2 shopping screen counts only physically valid checked tasks', async
       serializeShoppingProgressV2(initial, [picked.id]),
     )
     const restored = render(initial)
-    assert.equal(pressed(restored), 1)
-    assert.match(restored, new RegExp(`1 van ${count(restored)} afgevinkt`))
+    assert.equal(pressed(restored), 0, 'SSR cannot hydrate browser-only checks early')
+    assert.match(restored, new RegExp(`0 van ${count(restored)} afgevinkt`))
+    assert.deepEqual(openShoppingProgressStorageV2(initial, storage).snapshot().completedLineIds,
+      [picked.id], 'the mounted controller can still restore the real saved check')
 
     const repricedBasket = basket(m2Store, m2Products.map((product) => ({
       ...product,
@@ -74,8 +77,10 @@ test('real v2 shopping screen counts only physically valid checked tasks', async
     })))
     assert.notEqual(repricedBasket.totalCents, initial.totalCents)
     const repriced = render(repricedBasket)
-    assert.equal(pressed(repriced), 1, 'price-only changes retain checked physical tasks')
-    assert.match(repriced, new RegExp(`1 van ${count(repriced)} afgevinkt`))
+    assert.equal(pressed(repriced), 0, 'pre-hydration display remains neutral')
+    assert.match(repriced, new RegExp(`0 van ${count(repriced)} afgevinkt`))
+    assert.deepEqual(openShoppingProgressStorageV2(repricedBasket, storage).snapshot().completedLineIds,
+      [picked.id], 'saved check survives price-only changes for post-mount restore')
 
     const storedWithPhantom = JSON.parse(
       serializeShoppingProgressV2(initial, [picked.id]),
@@ -83,8 +88,10 @@ test('real v2 shopping screen counts only physically valid checked tasks', async
     storedWithPhantom.doneLineIds = [picked.id, picked.id, 'synthetic-phantom-id']
     values.set(shoppingListProgressV2StorageKey, JSON.stringify(storedWithPhantom))
     const deduplicated = render(initial)
-    assert.equal(pressed(deduplicated), 1, 'phantom/duplicate IDs must not inflate totals')
-    assert.match(deduplicated, new RegExp(`1 van ${count(deduplicated)} afgevinkt`))
+    assert.equal(pressed(deduplicated), 0, 'untrusted record cannot claim checked progress on first render')
+    assert.match(deduplicated, new RegExp(`0 van ${count(deduplicated)} afgevinkt`))
+    assert.equal(openShoppingProgressStorageV2(initial, storage).storageFormatStatus(),
+      'unknown-record', 'a malformed duplicate/phantom checklist stays protected')
 
     const allUnresolved = basket(m2Store, [])
     const unresolved = render(allUnresolved)
