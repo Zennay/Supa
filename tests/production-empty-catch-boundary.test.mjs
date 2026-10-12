@@ -149,3 +149,25 @@ test('empty-catch guard preserves deliberate recovery and documented best-effort
     assert.equal(findUndocumentedEmptyCatch(source), null, source)
   }
 })
+
+test('QA #1000: decorator-prefixed TODO and directive-only catches are still undocumented [expected RED]', () => {
+  for (const text of [
+    '@TODO: decide later',
+    '@FIXME: implement',
+    '@ts-nocheck',
+    'tslint:disable:no-empty',
+    'eslint-enable no-empty',
+  ]) {
+    const source = `try { risky() } catch { /* ${text} */ }`
+    assert.ok(findUndocumentedEmptyCatch(source), text)
+  }
+})
+
+test('QA #1000: genuine explained best-effort catches stay valid with commented tooling prose elsewhere', () => {
+  for (const source of [
+    'try { risky() } catch { /* Ignore denied browser storage; continue in memory. */ }',
+    'try { risky() } catch { // Fallback to empty checklist because privacy mode blocks storage.\\n }',
+  ]) {
+    assert.equal(findUndocumentedEmptyCatch(source), null, source)
+  }
+})
