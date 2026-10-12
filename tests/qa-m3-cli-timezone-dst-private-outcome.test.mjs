@@ -16,6 +16,7 @@ function observedSheet({
   candidateAt,
   weekStart,
   unavailable = false,
+  baselineUnavailable = false,
   priceContext = 'in-store',
   candidatePremium = 0,
 }) {
@@ -50,7 +51,8 @@ function observedSheet({
         packUnit: requirement.unit,
         packCount: 1,
         priceCents: 100 + index + premium,
-        available: !(unavailable && side === 'candidate' && index === 0),
+        available: !((unavailable && side === 'candidate' && index === 0) ||
+          (baselineUnavailable && side === 'baseline' && index === 0)),
         sourceUrl: '',
         note: 'Synthetic-only regression value.',
       }
@@ -141,6 +143,46 @@ for (const scenario of [
     window: 24,
   },
   {
+    name: 'DST fall-back, candidate observed before baseline exactly 24h',
+    baselineAt: '2026-10-25T11:00:00+01:00',
+    candidateAt: '2026-10-24T12:00:00+02:00',
+    claimable: true,
+    outcome: 'better',
+    window: 24,
+  },
+  {
+    name: 'DST fall-back, equal baskets retain same outcome',
+    candidateAt: '2026-10-25T11:00:00+01:00',
+    candidatePremium: 10,
+    claimable: true,
+    outcome: 'same',
+    window: 24,
+  },
+  {
+    name: 'two UTC offset representations of one instant have a zero-hour window',
+    candidateAt: '2026-10-24T11:00:00+01:00',
+    claimable: true,
+    outcome: 'better',
+    window: 0,
+  },
+  {
+    name: 'DST spring-forward 1ms inside the inclusive 24-hour bound',
+    baselineAt: '2026-03-28T12:00:00+01:00',
+    candidateAt: '2026-03-29T12:59:59.999+02:00',
+    weekStart: '2026-03-23',
+    claimable: true,
+    outcome: 'better',
+    window: 24 - 1 / 3600000,
+  },
+  {
+    name: 'DST fall-back, baseline item unavailable prevents financial claim',
+    candidateAt: '2026-10-25T11:00:00+01:00',
+    baselineUnavailable: true,
+    claimable: false,
+    outcome: 'unknown',
+    window: 24,
+  },
+  {
     name: 'DST fall-back, unresolved candidate item',
     candidateAt: '2026-10-25T11:00:00+01:00',
     unavailable: true,
@@ -169,6 +211,10 @@ for (const scenario of [
         assert.equal(report.candidate.matchedLineCount, 11)
         if (scenario.outcome === 'better') assert.ok(report.savingsCents > 0)
         if (scenario.outcome === 'worse') assert.ok(report.savingsCents < 0)
+        if (scenario.outcome === 'same') {
+          assert.equal(report.savingsCents, 0)
+          assert.equal(report.deltaCents, 0)
+        }
       } else {
         assert.equal(report.savingsCents, null)
         assert.equal(report.deltaCents, null)
