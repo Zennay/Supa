@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -66,12 +66,13 @@ async function aliasFor({ dir }, original, variant, prefix) {
     await mkdir(middle)
     return `${middle}/../${original.split('/').at(-1)}`
   }
-  const alias = join(dir, prefix + '-symlink.json')
-  await symlink(original, alias)
+  const alias = join(dir, prefix + (variant === 'hardlink' ? '-hardlink.json' : '-symlink.json'))
+  if (variant === 'hardlink') await link(original, alias)
+  else await symlink(original, alias)
   return alias
 }
 
-for (const variant of ['identical', 'normalized', 'symlink']) {
+for (const variant of ['identical', 'normalized', 'symlink', 'hardlink']) {
   test(`converter cannot replace its source observation sheet via ${variant} --output alias (#2035 expected RED)`, async () => {
     await withSyntheticFixture(async (ctx) => {
       const output = await aliasFor(ctx, ctx.sheetPath, variant, 'converter')
@@ -84,7 +85,7 @@ for (const variant of ['identical', 'normalized', 'symlink']) {
       assert.notEqual(result.status, 0, 'converter must refuse an output alias')
       assert.equal(result.stdout.trim(), '', 'no private study may escape to stdout')
       assert.equal(result.stderr.includes('synthetic-private-key'), false)
-      if (variant === 'symlink') assert.equal(existsSync(output), true)
+      if (variant === 'symlink' || variant === 'hardlink') assert.equal(existsSync(output), true)
     })
   })
 
@@ -103,7 +104,7 @@ for (const variant of ['identical', 'normalized', 'symlink']) {
       assert.notEqual(result.status, 0, 'assessor must refuse an output alias')
       assert.equal(result.stdout.trim(), '', 'no private report may escape to stdout')
       assert.equal(result.stderr.includes('synthetic-private-key'), false)
-      if (variant === 'symlink') assert.equal(existsSync(output), true)
+      if (variant === 'symlink' || variant === 'hardlink') assert.equal(existsSync(output), true)
     })
   })
 }
