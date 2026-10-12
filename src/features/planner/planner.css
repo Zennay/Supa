@@ -151,3 +151,16 @@
     flex-direction: column;
   }
 }
+
+/* Opt-in custom amount: accessible at narrow mobile widths without crowding chips. */
+.budget-custom-toggle { width: 100%; min-height: 44px; }
+.budget-custom-form { display: grid; gap: 8px; margin-top: 10px; }
+.budget-custom-form label { font-weight: 800; font-size: 13px; }
+.budget-custom-form input {
+  width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; color: var(--ink); background: var(--surface);
+  font: inherit; font-size: 16px;
+}
+.budget-custom-form input[aria-invalid="true"] { border-color: #a83621; }
+.budget-custom-error { margin: 0; color: #8b2b20; font-size: 13px; }
