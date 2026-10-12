@@ -166,7 +166,11 @@ test('product #1056: App Lijst routes real v2 click with no implicit legacy read
     assert.ok(first.rows.length >= 2)
     assert.ok(first.rows.every((b) => b.props['aria-pressed'] === false))
     assert.deepEqual(browser.writes, [])
-    assert.deepEqual(\n      browser.reads.filter((key) => key.startsWith('supa:shopping-list-progress:')),\n      [progress.shoppingListProgressV2StorageKey],\n      'App may read its own planner key, but the v2 list must not read v1',\n    )
+    assert.deepEqual(
+      browser.reads.filter((key) => key.startsWith('supa:shopping-list-progress:')),
+      [progress.shoppingListProgressV2StorageKey],
+      'App may read its own planner key, but the v2 list must not read v1',
+    )
     first.flush()
     assert.deepEqual(browser.writes, [], 'mount must be read only')
     const checkedId = basket.lines[0].id
