@@ -6,7 +6,7 @@ import ts from 'typescript'
 // #938 expected RED: compile-time negation of literal node:test options is
 // still a literal truthy skip/todo/only flag. Parsed source only, never run.
 const script = readFileSync(new URL('./test-suite-integrity-contract.test.mjs', import.meta.url), 'utf8')
-const start = script.indexOf('function propertyName(')
+const start = script.indexOf('const disabledModes =')
 const end = script.indexOf("\ntest('disabled-test detector catches", start)
 assert.ok(start >= 0 && end > start)
 const scan = new Function('ts', script.slice(start, end) +
