@@ -44,14 +44,37 @@ function hasExplanatoryComment(source) {
   })
 }
 
-// Semicolons and nested empty braces do not handle an exception, even though
-// the TypeScript AST represents them as nonempty statement nodes.
+// Semicolons, debugger pauses and stand-alone literal evaluations do not
+// handle an exception. These are syntactic checks only: a call, property
+// access, identifier or dynamic template could have effects, so do not guess.
 function hasEffectiveCatchStatements(statements) {
-  return statements.some((statement) =>
-    ts.isBlock(statement)
-      ? hasEffectiveCatchStatements(statement.statements)
-      : !ts.isEmptyStatement(statement)
-  )
+  return statements.some((statement) => {
+    if (ts.isBlock(statement)) {
+      return hasEffectiveCatchStatements(statement.statements)
+    }
+    if (ts.isEmptyStatement(statement) || ts.isDebuggerStatement(statement)) {
+      return false
+    }
+    if (ts.isExpressionStatement(statement)) {
+      let expression = statement.expression
+      while (ts.isParenthesizedExpression(expression)) {
+        expression = expression.expression
+      }
+      if (
+        ts.isStringLiteral(expression) ||
+        ts.isNumericLiteral(expression) ||
+        ts.isBigIntLiteral(expression) ||
+        ts.isNoSubstitutionTemplateLiteral(expression) ||
+        ts.isRegularExpressionLiteral(expression) ||
+        expression.kind === ts.SyntaxKind.TrueKeyword ||
+        expression.kind === ts.SyntaxKind.FalseKeyword ||
+        expression.kind === ts.SyntaxKind.NullKeyword
+      ) {
+        return false
+      }
+    }
+    return true
+  })
 }
 
 function findUndocumentedEmptyCatch(source, filename = 'candidate.tsx') {
