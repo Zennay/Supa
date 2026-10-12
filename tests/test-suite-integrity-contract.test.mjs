@@ -124,7 +124,24 @@ function disablingLiteral(name, initializer) {
              inner.kind === ts.SyntaxKind.NullKeyword) truthy = false
     else if (ts.isStringLiteralLike(inner)) truthy = inner.text.length > 0
     else if (ts.isNumericLiteral(inner)) truthy = Number(inner.text) !== 0
-    else if (ts.isBigIntLiteral(inner)) {
+    else if (ts.isPrefixUnaryExpression(inner) &&
+             (inner.operator === ts.SyntaxKind.PlusToken ||
+              inner.operator === ts.SyntaxKind.MinusToken) &&
+             ts.isNumericLiteral(unwrapExpression(inner.operand))) {
+      // Signed numeric literal evaluation is statically safe; its sign does
+      // not change zero/nonzero truthiness, including negative zero.
+      truthy = Number(unwrapExpression(inner.operand).text) !== 0
+    } else if (ts.isPrefixUnaryExpression(inner) &&
+               inner.operator === ts.SyntaxKind.MinusToken &&
+               ts.isBigIntLiteral(unwrapExpression(inner.operand))) {
+      // Unary minus is valid on BigInt; unary plus throws and stays unknown.
+      try {
+        const magnitude = unwrapExpression(inner.operand).text
+        truthy = BigInt(magnitude.replaceAll('_', '').replace(/n$/, '')) !== 0n
+      } catch {
+        return false
+      }
+    } else if (ts.isBigIntLiteral(inner)) {
       try {
         truthy = BigInt(inner.text.replaceAll('_', '').replace(/n$/, '')) !== 0n
       } catch {
