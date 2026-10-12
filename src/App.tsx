@@ -52,6 +52,8 @@ function canReplacePlannerRecord(raw: string | null): boolean {
     // Numeric JSON is not necessarily a valid persisted weekbudget.
     // Check a cent-exact positive value in the advertised €0,01–€1.000,00
     // range without rounding an invalid stored value into user consent.
+    const isCanonicalIdentifier = (value: unknown): value is string =>
+      typeof value === 'string' && value.length > 0 && value === value.trim()
     const budget = object.budget
     const budgetCents = typeof budget === 'number' && Number.isFinite(budget)
       ? Math.round(budget * 100)
@@ -62,11 +64,13 @@ function canReplacePlannerRecord(raw: string | null): boolean {
       budgetCents <= 100_000 &&
       budget === budgetCents / 100 &&
       Array.isArray(object.activeDays) &&
-      object.activeDays.every((day: unknown) => typeof day === 'string') &&
+      object.activeDays.every(isCanonicalIdentifier) &&
+      new Set(object.activeDays).size === object.activeDays.length &&
       object.recipeByDay !== null &&
       typeof object.recipeByDay === 'object' &&
       !Array.isArray(object.recipeByDay) &&
-      Object.values(object.recipeByDay).every((id) => typeof id === 'string')
+      Object.keys(object.recipeByDay).every(isCanonicalIdentifier) &&
+      Object.values(object.recipeByDay).every(isCanonicalIdentifier)
     )
   } catch {
     return false
