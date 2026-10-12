@@ -9,7 +9,7 @@ function selectionFromArgs(args) {
     if (args[1] === 'plus') return 'baseline'
     if (args[1] === 'dekamarkt') return 'candidate'
   }
-  throw new Error('gebruik: npm run m3:field-visit-card -- [--store both|plus|dekamarkt]')
+  throw new Error('gebruik: node --experimental-strip-types scripts/m3-field-visit-card.mjs [--store both|plus|dekamarkt]')
 }
 
 export function main(args = process.argv.slice(2)) {
