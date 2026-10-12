@@ -31,7 +31,9 @@ function identifier(value: unknown): value is string {
 
 /** Check labels independently of the price-independent physical task key. */
 function visibleLabel(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0
+  return typeof value === 'string' &&
+    // A zero-width/control/combining-only label looks blank to a shopper.
+    /[^\\p{M}\\p{Cf}\\p{Cc}\\p{Cs}\\s]/u.test(value)
 }
 
 function amount(value: unknown): value is number {
