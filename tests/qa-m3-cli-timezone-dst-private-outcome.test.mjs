@@ -11,7 +11,7 @@ import { buildObservationSheet } from '../scripts/m3-create-observation-sheet.mj
 const ZONES = ['UTC', 'Europe/Amsterdam', 'America/New_York']
 const PARTICIPANT = 'synthetic-participant-privacy-marker-001'
 
-function observedSheet({ candidateAt, unavailable = false }) {
+function observedSheet({ baselineAt, candidateAt, weekStart, unavailable = false }) {
   const sheet = buildObservationSheet()
   assert.equal(sheet.requirements.length, 11)
   sheet.study = {
@@ -20,12 +20,12 @@ function observedSheet({ candidateAt, unavailable = false }) {
     participantKey: PARTICIPANT,
     population: 'synthetic independent students',
     region: 'synthetic-region',
-    weekStart: '2026-10-19',
+    weekStart: weekStart ?? '2026-10-19',
     priceContext: 'in-store',
   }
 
   for (const [side, name, timestamp, premium] of [
-    ['baseline', 'PLUS synthetic store', '2026-10-24T12:00:00+02:00', 10],
+    ['baseline', 'PLUS synthetic store', baselineAt ?? '2026-10-24T12:00:00+02:00', 10],
     ['candidate', 'DekaMarkt synthetic store', candidateAt, 0],
   ]) {
     const observation = sheet[side]
@@ -98,6 +98,26 @@ for (const scenario of [
   {
     name: 'DST fall-back, over 24 hours by one second',
     candidateAt: '2026-10-25T11:00:01+01:00',
+    unavailable: false,
+    claimable: false,
+    outcome: 'unknown',
+    window: 24 + 1 / 3600,
+  },
+  {
+    name: 'DST spring-forward, exactly 24 absolute hours',
+    baselineAt: '2026-03-28T12:00:00+01:00',
+    candidateAt: '2026-03-29T13:00:00+02:00',
+    weekStart: '2026-03-23',
+    unavailable: false,
+    claimable: true,
+    outcome: 'better',
+    window: 24,
+  },
+  {
+    name: 'DST spring-forward, over 24 absolute hours by one second',
+    baselineAt: '2026-03-28T12:00:00+01:00',
+    candidateAt: '2026-03-29T13:00:01+02:00',
+    weekStart: '2026-03-23',
     unavailable: false,
     claimable: false,
     outcome: 'unknown',
