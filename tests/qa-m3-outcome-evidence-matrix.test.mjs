@@ -92,3 +92,32 @@ for (const priceContext of ['in-store', 'online-order']) {
     assert.equal('participantKey' in report, false)
   })
 }
+
+for (const side of ['baseline', 'candidate']) {
+  for (const condition of ['explicitly unavailable with stale price', 'available but price missing']) {
+    test(`M3 ${side}: ${condition} never becomes an inferred zero-price saving`, () => {
+      const sheet = syntheticSheet('in-store', -1)
+      const product = sheet[side].lines[0].observedProduct
+
+      if (condition === 'explicitly unavailable with stale price') {
+        product.available = false
+        // A saved value must never override explicit unavailability.
+        assert.equal(typeof product.priceCents, 'number')
+      } else {
+        product.priceCents = null
+        assert.equal(product.available, true)
+      }
+
+      const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+      const report = buildObservedWeekReport(study)
+
+      assert.equal(study[side].basket.unresolvedLineCount, 1)
+      assert.equal(report.claimable, false)
+      assert.equal(report.outcome, 'unknown')
+      assert.equal(report.deltaCents, null)
+      assert.equal(report.savingsCents, null)
+      assert.equal(report.publicSavingsClaimEligible, false)
+      assert.match(report.reasons.join(' '), /unresolved ingredients/i)
+    })
+  }
+}
