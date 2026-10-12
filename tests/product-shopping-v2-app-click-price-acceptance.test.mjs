@@ -253,3 +253,38 @@ test('product #1056: real Planner day toggle changes physical demand and clears 
     assert.equal(browser.saved.get(legacy.shoppingListProgressStorageKey), undefined)
   } finally { browser.close() }
 })
+
+test('product #1056: returning to Lijst remounts saved checkmarks without rewriting v1 or v2', () => {
+  const browser = storageSession()
+  try {
+    let screen = goTo(appRender(), 'Lijst')
+    const basket = activeBasket(screen)
+    const riceIndex = basket.lines.findIndex((line) => line.id === 'basmati-rice')
+    assert.ok(riceIndex >= 0)
+    const first = view(basket)
+    first.flush()
+    first.rows[riceIndex].props.onClick()
+    const saved = browser.saved.get(progress.shoppingListProgressV2StorageKey)
+    assert.ok(saved, 'intentional check has a durable v2 representation')
+    assert.equal(view(basket).rows[riceIndex].props['aria-pressed'], true)
+    assert.equal(browser.writes.length, 1)
+
+    // Real navigation changes destination. React unmounts the old v2 view;
+    // clear only that view's hook slots to emulate a new mounting instance.
+    screen = goTo(screen, 'Mand')
+    assert.equal(elements(screen, (n) => n.type === ShoppingListViewV2).length, 0)
+    shoppingHooks.reset()
+    screen = goTo(screen, 'Lijst')
+    const restored = view(activeBasket(screen))
+    assert.equal(restored.rows[riceIndex].props['aria-pressed'], true)
+    restored.flush()
+    assert.equal(view(activeBasket(screen)).rows[riceIndex].props['aria-pressed'], true)
+    assert.equal(browser.writes.length, 1, 'returning is read-only until a new click')
+    assert.equal(browser.saved.get(progress.shoppingListProgressV2StorageKey), saved)
+    assert.equal(browser.saved.get(legacy.shoppingListProgressStorageKey), undefined)
+    assert.equal(
+      browser.reads.filter((key) => key === legacy.shoppingListProgressStorageKey).length,
+      0, 'legacy v1 is never implicitly consulted',
+    )
+  } finally { browser.close() }
+})
