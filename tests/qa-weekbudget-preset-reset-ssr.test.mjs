@@ -76,8 +76,11 @@ test('QA #1424: saved custom amount €1.000,00 is shown without a fabricated cl
   assert.match(html, /2 mandregels open/)
   assert.match(html, /min\./, 'only a known basket minimum may be shown')
   assert.match(html, /aria-label="Bekend minimum van het weekbudget"/)
-  assert.doesNotMatch(html, /(?:boven budget|over budget|bespaard)/i)
-  assert.doesNotMatch(html, /\d[,\.]\d\d over/, 'not a false budget headroom claim')
+  const status = html.match(/<span class="budget-status warning" aria-live="polite">([^<]*)<\/span>/)?.[1]
+  assert.equal(status, '2 mandregels open', 'status does not invent a budget outcome')
+  assert.match(html, /SUPA claimt nog niet dat je binnen of boven budget zit\./,
+    'explanatory copy may mention the forbidden claim only while denying it')
+  assert.doesNotMatch(status, /(?:boven budget|over budget|bespaard|\d[,\.]\d\d over)/i)
 })
 
 test('QA #1424: ordinary preset €40 keeps pressed selection and does not render an obsolete custom editor', () => {
