@@ -32,8 +32,10 @@ function hasExplanatoryComment(source) {
 
     const explanation = text.trim()
     // A placeholder or a lint suppression is not an error-handling rationale.
-    if (/^(?:todo|fixme|tbd|xxx)(?:\b|\s*[:!-])/i.test(explanation)) return false
-    if (/^(?:eslint-disable|tslint-disable|@ts-ignore|@ts-expect-error)\b/i.test(explanation)) {
+    if (/^@?(?:todo|fixme|tbd|xxx)(?:\b|\s*[:!-])/i.test(explanation)) return false
+    // Suppression/enable directives alone are not explanations for discarding
+    // an error, even when introduced with legacy tslint or TypeScript markers.
+    if (/^(?:eslint-(?:disable|enable)(?:-next-line|-line)?|tslint(?:-disable|:disable)|@ts-(?:ignore|expect-error|nocheck|check))\b/i.test(explanation)) {
       return false
     }
     return /[\p{L}\p{N}]/u.test(explanation)
