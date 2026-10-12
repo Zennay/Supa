@@ -53,6 +53,7 @@ export function renderM3FieldVisitCard(
     'Vergelijk dezelfde vraagset; noteer beide metingen binnen maximaal 24 uur.',
     'Onbekend of niet verkrijgbaar blijft onbekend; geen vervangende prijs verzinnen.',
     'Bij nee/onbekend: laat product, verpakking en prijs leeg; hergebruik geen oude waarden.',
+    'Onbekend is niet hetzelfde als nee: een ongemeten regel is nog niet klaar voor conversie.',
   ]
 
   for (const side of sides) {
