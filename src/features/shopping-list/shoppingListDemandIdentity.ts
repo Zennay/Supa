@@ -20,13 +20,13 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 function identifier(value: unknown): value is string {
-  // Marks, formatting, controls and unpaired surrogates alone are not a
-  // visible physical task identity. Preserve readable scripts, punctuation,
+  // Marks, formatting, controls, unpaired surrogates and visually empty
+  // Hangul fillers/Braille Pattern Blank alone are not a visible identity. Preserve readable scripts, punctuation,
   // decomposed accents and legitimate internal format joiners.
   return typeof value === 'string' &&
     value.length > 0 &&
     value.trim() === value &&
-    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s]/u.test(value)
+    /[^\u115F\u1160\u3164\uFFA0\u2800\p{M}\p{Cf}\p{Cc}\p{Cs}\s]/u.test(value)
 }
 
 function amount(value: unknown): value is number {
