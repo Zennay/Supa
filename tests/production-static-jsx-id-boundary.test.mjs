@@ -35,6 +35,15 @@ function staticStringExpression(node, depth = 0) {
     return Number.isFinite(numeric) ? String(numeric) : null
   }
 
+  if (ts.isBigIntLiteral(current)) {
+    // BigInt must never pass through Number (precision would be lost).
+    try {
+      return String(BigInt(current.text.replaceAll('_', '').replace(/n$/, '')))
+    } catch {
+      return null
+    }
+  }
+
   if (ts.isPrefixUnaryExpression(current) &&
       (current.operator === ts.SyntaxKind.MinusToken || current.operator === ts.SyntaxKind.PlusToken)) {
     const literal = unwrapStaticExpression(current.operand)
@@ -42,6 +51,14 @@ function staticStringExpression(node, depth = 0) {
       const numeric = Number(literal.text.replaceAll('_', ''))
       if (Number.isFinite(numeric)) {
         return String(current.operator === ts.SyntaxKind.MinusToken ? -numeric : numeric)
+      }
+    }
+    if (ts.isBigIntLiteral(literal)) {
+      try {
+        const numeric = BigInt(literal.text.replaceAll('_', '').replace(/n$/, ''))
+        return String(current.operator === ts.SyntaxKind.MinusToken ? -numeric : numeric)
+      } catch {
+        return null
       }
     }
   }
