@@ -56,6 +56,11 @@ function isInertCatchExpression(expression) {
     current = current.expression
   }
 
+  // Defining an uncalled callback/body is not executing recovery code.
+  // Function creation must not make an otherwise empty catch appear handled.
+  if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
+    return true
+  }
   if (ts.isVoidExpression(current)) {
     return isInertCatchExpression(current.expression)
   }
@@ -87,7 +92,9 @@ function hasEffectiveCatchStatements(statements) {
     if (ts.isBlock(statement)) {
       return hasEffectiveCatchStatements(statement.statements)
     }
-    if (ts.isEmptyStatement(statement) || ts.isDebuggerStatement(statement)) {
+    if (ts.isEmptyStatement(statement) || ts.isDebuggerStatement(statement) ||
+        ts.isFunctionDeclaration(statement)) {
+      // The function body is inert until a call actually executes it.
       return false
     }
     if (ts.isExpressionStatement(statement) &&
