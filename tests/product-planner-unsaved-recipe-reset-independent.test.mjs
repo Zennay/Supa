@@ -153,7 +153,7 @@ test('product #1925: recipe/day/budget edits compose in session after denied sav
     p.onBudgetChange(27.5)
     app.render()
     assert.equal(app.raw, defaultRaw, 'no failed save may claim durability')
-    assert.equal(app.planner().recipeByDay[first], changedRecipe.id)
+    assert.equal(app.planner().plannedMeals.find(meal => meal.day === first)?.recipeId, changedRecipe.id)
     assert.equal(app.planner().budget, 27.5)
     assert.equal(app.planner().activeDays.includes(second), !defaults.activeDays.includes(second))
     app.refuseWrites = false
