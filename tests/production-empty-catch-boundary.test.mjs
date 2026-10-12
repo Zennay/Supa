@@ -135,11 +135,14 @@ function hasEffectiveCatchStatements(statements) {
   })
 }
 
-function ignoredDeferredCommentRanges(catchClause, sourceFile, contentStart) {
+function ignoredNonRuntimeCommentRanges(catchClause, sourceFile, contentStart) {
   const ranges = []
   function visit(node) {
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) ||
-        ts.isFunctionDeclaration(node)) {
+        ts.isFunctionDeclaration(node) || ts.isTypeAliasDeclaration(node) ||
+        ts.isInterfaceDeclaration(node)) {
+      // Comments inside deferred functions or erased TypeScript types cannot
+      // explain why the surrounding catch chose to swallow an exception.
       ranges.push([node.getStart(sourceFile) - contentStart,
         node.getEnd() - contentStart])
       return
@@ -167,7 +170,7 @@ function findUndocumentedEmptyCatch(source, filename = 'candidate.tsx') {
     if (ts.isCatchClause(node) && !hasEffectiveCatchStatements(node.block.statements)) {
       const contentStart = node.block.getStart(sourceFile) + 1
       const inner = source.slice(contentStart, node.block.getEnd() - 1)
-      const ignored = ignoredDeferredCommentRanges(node, sourceFile, contentStart)
+      const ignored = ignoredNonRuntimeCommentRanges(node, sourceFile, contentStart)
 
       if (!hasExplanatoryComment(inner, ignored)) {
         const { line, character } = sourceFile.getLineAndCharacterOfPosition(
