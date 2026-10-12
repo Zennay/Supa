@@ -41,6 +41,9 @@ function invalidPortableSegment(segment) {
   // Explicit bidi control characters can spoof the visual order of a Git path.
   // Preserve normal RTL letters; disallow only directional controls in names.
   if (/[\u061c\u200e-\u200f\u202a-\u202e\u2066-\u2069]/u.test(segment)) return true
+  // Hidden formatting can make a tracked file masquerade as a protected name
+  // (for example, .env). Keep Arabic ZWNJ and emoji ZWJ filenames valid.
+  if (/[\u00ad\u034f\u200b\u2060\ufeff]/u.test(segment)) return true
   if (/[. ]$/.test(segment)) return true
   // Windows treats a device name as reserved even when an extension follows.
   // Windows also reserves superscript 1/2/3 device suffixes; trailing
