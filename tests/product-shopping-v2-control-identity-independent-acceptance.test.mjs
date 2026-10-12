@@ -84,3 +84,35 @@ test('product #1805: price-only change retains visible physical identity; produc
   row.productId += '-alternative'
   assert.notEqual(shoppingListDemandIdentity(changedPrice), shoppingListDemandIdentity(original))
 })
+
+test('product #1805: mixtures of invisible categories cannot synthesize a physical identity', () => {
+  const composites = [
+    '\\u0000\\u0301',
+    '\\u0085\\u200d',
+    '\\ud800\\u2060',
+    '\\u034f\\u009f',
+    '\\udc00\\ufe0f',
+    '\\u0007\\u200b\\u0300',
+  ].map((sequence) => JSON.parse('"' + sequence + '"'))
+  for (const id of composites) {
+    for (const target of ['store', 'ingredient', 'product']) {
+      const basket = altered(target, id)
+      assert.equal(shoppingListDemandIdentity(basket), null,
+        'mixed non-display control/format/mark is not a visible identity')
+      assert.equal(serializeShoppingProgressV2(basket, []), null)
+    }
+  }
+})
+
+test('product #1805: an unresolved manual-pick line with control-only ID is not checkable', () => {
+  const basket = fixture()
+  const line = basket.lines.find((item) => item.status === 'matched')
+  assert.ok(line)
+  line.status = 'unresolved'
+  line.id = '\\u001b'.replace('\\u001b', String.fromCharCode(0x1b))
+  assert.equal(shoppingListDemandIdentity(basket), null)
+  assert.equal(serializeShoppingProgressV2(basket, [line.id]), null)
+  const session = openShoppingProgressStorageV2(basket, null)
+  assert.equal(session.snapshot().serialized, null)
+  assert.deepEqual(shoppingListRowsV2(basket, session.snapshot()), [])
+})
