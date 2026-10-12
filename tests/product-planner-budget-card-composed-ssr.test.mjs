@@ -47,7 +47,7 @@ function loadComponent(name) {
         return { plannerBudgetStatusCopyNl }
       }
       if (specifier === '../../lib/money.ts') return { euro }
-      const componentName = /^\\.\\/(Planner[A-Za-z]+)\\.tsx$/.exec(specifier)?.[1]
+      const componentName = /^\.\/(Planner[A-Za-z]+)\.tsx$/.exec(specifier)?.[1]
       if (componentName && sources.includes(componentName)) {
         return { [componentName]: loadComponent(componentName) }
       }
