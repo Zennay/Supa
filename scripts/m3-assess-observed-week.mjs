@@ -1,5 +1,6 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { writeDerivedM3Output } from './m3-source-output-preservation.mjs'
 
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
 import {
@@ -309,7 +310,7 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(report, null, 2)}\n`
 
   if (output) {
-    await writeFile(output, serialized, 'utf8')
+    await writeDerivedM3Output(input, output, serialized)
   } else {
     process.stdout.write(serialized)
   }
