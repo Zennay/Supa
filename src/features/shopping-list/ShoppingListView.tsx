@@ -78,6 +78,9 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
 
   useEffect(() => {
     if (typeof window === 'undefined' || progress.basketKey !== basketKey) return
+    // A malformed rowless store is not a valid empty shopping task. Never
+    // overwrite the existing v1 record while showing an untrusted warning.
+    if (basket.lines.length === 0 && !genuinelyEmpty) return
 
     try {
       window.localStorage.setItem(
@@ -87,7 +90,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     } catch {
       // Strict privacy modes can deny storage; the active session remains usable.
     }
-  }, [basket, basketKey, progress])
+  }, [basket, basketKey, genuinelyEmpty, progress])
 
   return (
     <section className="screen">
