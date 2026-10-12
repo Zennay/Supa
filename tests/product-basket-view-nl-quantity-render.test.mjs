@@ -61,7 +61,7 @@ test('product: visible Mand requirement units are Dutch and canonical source dat
         basket, comparison, comparisonBaseline: baseline, comparisonCandidate: candidate,
       }))
       assert.ok(html.includes(expected), `${name}: quantity absent from rendered HTML`)
-      assert.doesNotMatch(html, /Benodigd: (?:\\d+(?:\\.\\d+)?|\\?) (?:piece|unknown)/)
+      assert.doesNotMatch(html, /Benodigd: (?:\d+(?:\.\d+)?|\?) (?:piece|unknown)/)
       assert.equal(line.requirement.unit, unit, `${name}: canonical quantity must remain intact`)
       assert.deepEqual(basket, before, `${name}: rendering may not mutate basket`)
     }
