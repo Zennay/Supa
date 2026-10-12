@@ -209,7 +209,12 @@ export function App() {
         return
       }
       const serialized = serializePlannerPreferences(preferences)
-      window.localStorage.setItem(plannerStorageKey, serialized)
+      // A valid already-saved snapshot needs no write. In read-only browser
+      // storage, an unnecessary setItem failure would falsely tell the user
+      // that their unchanged, durable preferences were not saved.
+      if (stored !== serialized) {
+        window.localStorage.setItem(plannerStorageKey, serialized)
+      }
       setLastStoredRaw(serialized)
       setPersistenceWarning(null)
     } catch {
