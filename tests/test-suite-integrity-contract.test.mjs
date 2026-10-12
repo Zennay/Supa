@@ -111,6 +111,11 @@ function disablingLiteral(name, initializer) {
   if (value.kind === ts.SyntaxKind.FalseKeyword || value.kind === ts.SyntaxKind.NullKeyword) {
     return false
   }
+  // Empty arrays and objects are truthy in JavaScript, including as
+  // node:test skip/todo/only option values. Inspect literal AST only.
+  if (ts.isArrayLiteralExpression(value) || ts.isObjectLiteralExpression(value)) {
+    return true
+  }
   if (ts.isStringLiteralLike(value)) return value.text.length > 0
   if (ts.isNumericLiteral(value)) return Number(value.text) !== 0
   if (ts.isBigIntLiteral(value)) {
