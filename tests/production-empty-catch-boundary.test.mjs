@@ -44,6 +44,16 @@ function hasExplanatoryComment(source) {
   })
 }
 
+// Semicolons and nested empty braces do not handle an exception, even though
+// the TypeScript AST represents them as nonempty statement nodes.
+function hasEffectiveCatchStatements(statements) {
+  return statements.some((statement) =>
+    ts.isBlock(statement)
+      ? hasEffectiveCatchStatements(statement.statements)
+      : !ts.isEmptyStatement(statement)
+  )
+}
+
 function findUndocumentedEmptyCatch(source, filename = 'candidate.tsx') {
   const sourceFile = ts.createSourceFile(
     filename,
@@ -58,7 +68,7 @@ function findUndocumentedEmptyCatch(source, filename = 'candidate.tsx') {
   function visit(node) {
     if (finding) return
 
-    if (ts.isCatchClause(node) && node.block.statements.length === 0) {
+    if (ts.isCatchClause(node) && !hasEffectiveCatchStatements(node.block.statements)) {
       const inner = source.slice(
         node.block.getStart(sourceFile) + 1,
         node.block.getEnd() - 1,
