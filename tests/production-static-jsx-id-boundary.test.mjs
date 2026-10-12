@@ -21,6 +21,11 @@ function unwrapStaticExpression(node) {
   return current
 }
 
+// A real static JavaScript null is distinct from "cannot evaluate this AST".
+// React omits a direct null id, but string addition/template interpolation
+// converts the literal null to the visible text "null".
+const STATIC_NULL = Symbol('static JSX null literal')
+
 // Literal-only primitive evaluator: preserve JS operand types until final
 // coercion. Treating every numeric subexpression as a string makes
 // "id-" + (1 + 2) incorrectly look like "id-12" rather than "id-3".
@@ -33,6 +38,7 @@ function staticPrimitiveExpression(node, depth = 0) {
   // Keep their primitive type until final ID coercion; never infer variables.
   if (current.kind === ts.SyntaxKind.TrueKeyword) return true
   if (current.kind === ts.SyntaxKind.FalseKeyword) return false
+  if (current.kind === ts.SyntaxKind.NullKeyword) return STATIC_NULL
   if (ts.isNumericLiteral(current)) {
     const value = Number(current.text.replaceAll('_', ''))
     return Number.isFinite(value) ? value : null
@@ -68,8 +74,13 @@ function staticPrimitiveExpression(node, depth = 0) {
     if (left === null || right === null) return null
     // Once either operand is a string, JS performs concatenation.
     if (typeof left === 'string' || typeof right === 'string') {
-      return String(left) + String(right)
+      return String(left === STATIC_NULL ? null : left) +
+        String(right === STATIC_NULL ? null : right)
     }
+    // JavaScript ToNumber(null) is exactly zero in numeric addition.
+    if (left === STATIC_NULL && right === STATIC_NULL) return 0
+    if (left === STATIC_NULL && typeof right === 'number') return right
+    if (right === STATIC_NULL && typeof left === 'number') return left
     if (typeof left === 'number' && typeof right === 'number') {
       const sum = left + right
       return Number.isFinite(sum) ? sum : null
@@ -86,7 +97,7 @@ function staticPrimitiveExpression(node, depth = 0) {
     for (const span of current.templateSpans) {
       const part = staticPrimitiveExpression(span.expression, depth + 1)
       if (part === null) return null
-      value += String(part) + span.literal.text
+      value += String(part === STATIC_NULL ? null : part) + span.literal.text
     }
     return value
   }
@@ -99,7 +110,8 @@ function staticStringExpression(node, depth = 0) {
   // React omits direct Boolean values for a non-Boolean HTML id attribute.
   // Only infer Boolean ID text when JS explicitly coerces it inside a
   // string concatenation or template interpolation.
-  return value === null || typeof value === 'boolean' ? null : String(value)
+  return value === null || value === STATIC_NULL || typeof value === 'boolean'
+    ? null : String(value)
 }
 
 function staticAttributeValue(initializer) {
