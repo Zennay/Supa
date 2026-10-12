@@ -20,16 +20,18 @@ const ignoredExamples = [
 function isForbiddenTrackedPath(p) {
   // Git ignore matching on Linux is case-sensitive; a Windows checkout is
   // not. Inspect aliases without reading the contents of any tracked file.
-  const rawComponents = p.split('/')
-  const components = rawComponents.map((part) => part.toLowerCase())
-  const rawBasename = rawComponents.at(-1) || ''
-  const basename = rawBasename.toLowerCase()
+  // Apply the existing portability NFKC contract before comparing names.
+  // Keep the original basename for the exact .env.example allow-list.
+  const components = p.normalize('NFKC').split('/').map((part) => part.toLowerCase())
+  const rawBasename = p.split('/').at(-1) || ''
+  const basename = components.at(-1) || ''
   if (components.some((v) => v === 'node_modules' || v === 'dist' ||
       v === 'artifacts' || v === '.vscode' || v === '.idea')) return true
   if (components.some((v) => v === '.ds_store')) return true
   if (basename === '.env' || (basename.startsWith('.env.') && rawBasename !== '.env.example')) return true
   if (basename.endsWith('.log') || basename.endsWith('.tsbuildinfo')) return true
-  if (p.toLowerCase() === 'vite.config.js' || p.toLowerCase() === 'vite.config.d.ts') return true
+  const canonicalPath = components.join('/')
+  if (canonicalPath === 'vite.config.js' || canonicalPath === 'vite.config.d.ts') return true
   return false
 }
 
