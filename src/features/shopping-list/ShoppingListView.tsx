@@ -138,7 +138,9 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
                     current.basketKey === basketKey ? current.done : []
                   return {
                     basketKey,
-                    done: checked
+                    // The rendered `checked` flag may be stale if two taps
+                    // queue before React paints. Toggle from latest state.
+                    done: currentDone.includes(line.id)
                       ? currentDone.filter((id) => id !== line.id)
                       : [...currentDone, line.id],
                   }
