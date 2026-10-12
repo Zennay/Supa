@@ -49,6 +49,30 @@ function readStoredProgress(basket: OneStoreBasket) {
   }
 }
 
+// A v1 client must not destroy a newer/unknown or corrupt persisted record.
+// Keep session-local checkmarks usable; decline writes until the key is absent
+// or contains precisely this client's supported v1 envelope.
+function canOverwriteStoredProgress(raw: string | null): boolean {
+  if (raw === null) return true
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
+    const record = parsed as Record<string, unknown>
+    return (
+      record.schemaVersion === 1 &&
+      typeof record.basketKey === 'string' &&
+      record.basketKey.length > 0 &&
+      Array.isArray(record.doneLineIds) &&
+      record.doneLineIds.every((id: unknown) => typeof id === 'string') &&
+      Object.keys(record).every((key) =>
+        key === 'schemaVersion' || key === 'basketKey' || key === 'doneLineIds'
+      )
+    )
+  } catch {
+    return false
+  }
+}
+
 export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   const basketKey = useMemo(() => shoppingListBasketKey(basket), [basket])
   const [progress, setProgress] = useState(() => ({
@@ -83,6 +107,10 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     if (basket.lines.length === 0 && !genuinelyEmpty) return
 
     try {
+      // Read immediately before writing: protect future/unknown/corrupt
+      // records even if storage changed after mount. This is not atomic CAS.
+      const stored = window.localStorage.getItem(shoppingListProgressStorageKey)
+      if (!canOverwriteStoredProgress(stored)) return
       window.localStorage.setItem(
         shoppingListProgressStorageKey,
         serializeShoppingListProgress(basket, progress.done),
