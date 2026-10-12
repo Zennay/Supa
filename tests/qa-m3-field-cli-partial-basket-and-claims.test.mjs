@@ -100,5 +100,6 @@ test('fully matched synthetic more expensive basket preserves worse outcome and 
   assert.equal(report.outcome, 'worse')
   assert.equal(report.claimable, true)
   assert.equal(report.publicSavingsClaimEligible, false)
-  assert.equal(report.savingsCents, 0)
+  assert.ok(report.savingsCents < 0)
+  assert.ok(report.deltaCents > 0)
 })
