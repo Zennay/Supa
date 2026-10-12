@@ -35,7 +35,7 @@ function hasExplanatoryComment(source) {
     if (/^@?(?:todo|fixme|tbd|xxx)(?:\b|\s*[:!-])/i.test(explanation)) return false
     // Suppression/enable directives alone are not explanations for discarding
     // an error, even when introduced with legacy tslint or TypeScript markers.
-    if (/^(?:eslint-(?:disable|enable)(?:-next-line|-line)?|tslint(?:-disable|:disable)|@ts-(?:ignore|expect-error|nocheck|check))\b/i.test(explanation)) {
+    if (/^(?:eslint-(?:disable|enable)(?:-next-line|-line)?|tslint(?:-disable|:disable)|@ts-(?:ignore|expect-error|nocheck|check)|biome-ignore|deno-lint-ignore|oxlint-(?:disable|enable)(?:-next-line|-line)?|prettier-ignore)\b/i.test(explanation)) {
       return false
     }
     // A numeric code by itself is not a rationale for discarding a failure.
