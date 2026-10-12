@@ -33,7 +33,7 @@ test('shopping-v2 server markup and pre-hydration client markup agree for saved 
     const render = () => renderToString(createElement(ShoppingListViewV2, { basket }))
     delete globalThis.window
     const serverHtml = render()
-    assert.match(serverHtml, /0 van \d+ afgevinkt/)
+    assert.match(serverHtml.replaceAll('<!-- -->', ''), /0 van \d+ afgevinkt/)
 
     const stored = serializeShoppingProgressV2(basket, [checked])
     assert.ok(stored)
@@ -74,7 +74,7 @@ test('shopping-v2 SSR and first render agree with no browser storage', async () 
     Object.defineProperty(globalThis, 'window', { configurable: true, value: { localStorage: null } })
     const client = renderToString(createElement(ShoppingListViewV2, { basket }))
     assert.equal(client, ssr)
-    assert.match(client, /0 van \d+ afgevinkt/)
+    assert.match(client.replaceAll('<!-- -->', ''), /0 van \d+ afgevinkt/)
   } finally {
     if (priorWindow) Object.defineProperty(globalThis, 'window', priorWindow)
     else delete globalThis.window
