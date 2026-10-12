@@ -13,7 +13,7 @@ import { openShoppingProgressStorageV2 } from '../src/features/shopping-list/sho
 // #1809 Dutch row units. All prices, stores and products are controlled M2 data.
 function basket() {
   return buildOneStoreBasket({
-    store: m2Store, plan: m2InitialPlan, recipes: m2Recipes,
+    store: { ...m2Store }, plan: m2InitialPlan, recipes: m2Recipes,
     products: m2Products, activeDays: ['Di'],
   })
 }
