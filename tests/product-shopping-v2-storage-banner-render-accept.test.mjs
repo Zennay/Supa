@@ -55,7 +55,8 @@ test('independent real TSX acceptance: unknown stored versions are never overwri
     // A separately rendered recognized v2 record restores only its own ticks.
     records.set(v2Key, serializeShoppingProgressV2(basket, [picked]))
     const recognized = renderToStaticMarkup(createElement(ShoppingListViewV2, { basket }))
-    assert.match(recognized, /1 van \d+ afgevinkt/)
+    assert.match(recognized, /0 van \d+ afgevinkt/,
+      'saved checks are applied after mount, not during initial hydration')
     assert.deepEqual(writes, [])
   } finally {
     if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow)
