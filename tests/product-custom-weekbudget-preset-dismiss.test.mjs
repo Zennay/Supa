@@ -28,6 +28,7 @@ assert.deepEqual(compiled.diagnostics, [])
 function setup() {
   const slots = []
   const budgets = []
+  const resets = []
   let cursor = 0
   const useState = initial => {
     const index = cursor++
@@ -52,7 +53,7 @@ function setup() {
     activeDays: [], plannedMeals: [], recipes: [],
     basketTotalCents: 1969, basketUnresolvedLineCount: 0,
     onBudgetChange(value) { budgets.push(value); props.budget = value },
-    onToggleDay() {}, onRecipeChange() {}, onReset() {},
+    onToggleDay() {}, onRecipeChange() {}, onReset() { resets.push('reset') },
   }
   const nodes = element => {
     if (Array.isArray(element)) return element.flatMap(nodes)
@@ -73,7 +74,7 @@ function setup() {
   const input = () => find('input', p => p.id === 'custom-weekbudget-value')
   const preset = amount => find('button', p =>
     p.type === 'button' && p.children === euro.format(amount))
-  return { budgets, render, maybe, find, custom, input, preset }
+  return { budgets, resets, render, maybe, find, custom, input, preset }
 }
 
 test('product #1424: selecting a preset dismisses an unsaved custom budget draft and its error', () => {
@@ -99,4 +100,21 @@ test('product #1424: an ordinary preset remains a direct selection without openi
   assert.deepEqual(app.budgets, [30])
   assert.equal(app.custom().props['aria-expanded'], false)
   assert.equal(app.maybe('form', p => p.id === 'custom-weekbudget-form'), undefined)
+})
+
+
+test('product #1424: Reset discards a pending custom editor instead of leaving an obsolete form', () => {
+  const app = setup()
+  app.custom().props.onClick()
+  app.input().props.onChange({ target: { value: '9999,99' } })
+  app.find('form', p => p.id === 'custom-weekbudget-form').props.onSubmit({ preventDefault() {} })
+  assert.ok(app.maybe('p', p => p.role === 'alert'))
+  app.find('button', p => p.children === 'Reset').props.onClick()
+  assert.deepEqual(app.resets, ['reset'], 'Existing planner reset callback still fires exactly once')
+  assert.equal(app.custom().props['aria-expanded'], false, 'Reset closes pending custom editor')
+  assert.equal(app.maybe('form', p => p.id === 'custom-weekbudget-form'), undefined)
+  app.custom().props.onClick()
+  assert.equal(app.input().props.value, '', 'Reset clears stale unsaved custom budget')
+  assert.equal(app.maybe('p', p => p.role === 'alert'), undefined, 'Reset clears old validation error')
+  assert.deepEqual(app.budgets, [], 'Reset does not synthesize extra budget change')
 })
