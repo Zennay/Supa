@@ -118,6 +118,16 @@ function hasEffectiveCatchStatements(statements) {
         isInertCatchExpression(statement.expression)) {
       return false
     }
+    if (ts.isVariableStatement(statement)) {
+      // A local binding of a pure literal or a deferred callback does not
+      // recover from an exception. Treat destructuring as potentially active:
+      // its iterators or property getters can execute even for literal RHS.
+      return statement.declarationList.declarations.some((declaration) =>
+        !ts.isIdentifier(declaration.name) ||
+        (declaration.initializer !== undefined &&
+          !isInertCatchExpression(declaration.initializer))
+      )
+    }
     return true
   })
 }
