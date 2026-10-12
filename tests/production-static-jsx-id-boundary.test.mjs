@@ -315,3 +315,33 @@ test('static id guard handles no-substitution template ids', () => {
 
   assert.deepEqual(ids.map(({ id }) => id), ['static-id'])
 })
+
+test('QA #1006: compile-time numeric JSX ID interpolation must not evade duplicates [expected RED]', () => {
+  const duplicates = duplicateStaticIds([
+    { filename: 'known.tsx', source: '<label id="row-2" />' },
+    {
+      filename: 'numeric.tsx',
+      source: [
+        'const a = <input id={"row-" + 2} />',
+        'const b = <div id={`row-${2}`} />',
+        'const c = <span {...{ id: "row-" + 2 }} />',
+        'const d = <output id={"row-" + runtimeIndex} />',
+        'const e = <Field id={"row-" + 2} />',
+      ].join('\\n'),
+    },
+  ])
+  assert.equal(duplicates.length, 3, 'all three literal-only intrinsic duplicates should be detected')
+  assert.deepEqual(duplicates.map(({ id }) => id), ['row-2', 'row-2', 'row-2'])
+})
+
+test('QA #1006: numeric static IDs remain distinct and dynamic numeric IDs are not guessed', () => {
+  const duplicates = duplicateStaticIds([
+    { filename: 'a.tsx', source: '<div id="week-3" />' },
+    { filename: 'b.tsx', source: [
+      'const a = <div id={"week-" + 4} />',
+      'const b = <div id={`week-${runtimeWeek}`} />',
+      'const c = <div {...{ id: "week-" + externalWeek }} />',
+    ].join('\\n') },
+  ])
+  assert.deepEqual(duplicates, [])
+})
