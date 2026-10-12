@@ -104,6 +104,40 @@ function isNodeTestCallee(callee, bindings, namespaceBindings) {
 function disablingLiteral(name, initializer) {
   const value = unwrapExpression(initializer)
 
+  // Negating a literal is itself a statically known boolean. Preserve an
+  // unknown operand as unknown: never execute calls, getters or variables.
+  let inner = value
+  let negations = 0
+  while (ts.isPrefixUnaryExpression(inner) &&
+         inner.operator === ts.SyntaxKind.ExclamationToken &&
+         negations < 16) {
+    negations++
+    inner = unwrapExpression(inner.operand)
+  }
+  if (negations > 0) {
+    // Limit nesting; a partially unwrapped expression is not trusted.
+    if (negations === 16 && ts.isPrefixUnaryExpression(inner) &&
+        inner.operator === ts.SyntaxKind.ExclamationToken) return false
+    let truthy
+    if (inner.kind === ts.SyntaxKind.TrueKeyword) truthy = true
+    else if (inner.kind === ts.SyntaxKind.FalseKeyword ||
+             inner.kind === ts.SyntaxKind.NullKeyword) truthy = false
+    else if (ts.isStringLiteralLike(inner)) truthy = inner.text.length > 0
+    else if (ts.isNumericLiteral(inner)) truthy = Number(inner.text) !== 0
+    else if (ts.isBigIntLiteral(inner)) {
+      try {
+        truthy = BigInt(inner.text.replaceAll('_', '').replace(/n$/, '')) !== 0n
+      } catch {
+        return false
+      }
+    } else if (ts.isArrayLiteralExpression(inner) ||
+               ts.isObjectLiteralExpression(inner) ||
+               inner.kind === ts.SyntaxKind.RegularExpressionLiteral) {
+      truthy = true
+    } else return false
+    return negations % 2 === 0 ? truthy : !truthy
+  }
+
   // node:test options are runtime truthy flags. A hard-coded nonempty string
   // or nonzero number also disables/focuses cases, including `only: 'yes'`.
   // Do not evaluate arbitrary expressions or variables.
