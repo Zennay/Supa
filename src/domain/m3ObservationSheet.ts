@@ -526,7 +526,7 @@ export type ObservationSheetReadiness = {
 function nonBlank(value: string) {
   // Required collector fields need a visible Unicode base character.
   return typeof value === 'string' &&
-    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s]/u.test(value)
+    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
 }
 
 function validObservedAt(value: string) {
