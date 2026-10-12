@@ -98,6 +98,12 @@ function validTimestamp(value: unknown) {
     if (offsetHour > 23 || offsetMinute > 59) return null
   }
 
+  // Date.parse keeps milliseconds; higher nonzero fractional precision cannot
+  // safely substantiate an inclusive M3 24h (or custom) comparison window.
+  // Extra zero digits are exact and may remain valid.
+  const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1]
+  if (fraction && /[1-9]/.test(fraction.slice(3))) return null
+
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) ? timestamp : null
 }
