@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 
-import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
+import { buildObservationSheet, observationLineCollectionComplete } from '../src/domain/m3ObservationSheet.ts'
 import { renderM3FieldVisitCard } from '../src/domain/m3FieldVisitCard.ts'
 
 const root = resolve('scripts/m3-field-visit-card.mjs')
@@ -130,4 +130,21 @@ test('stdout-only blank M3 visit CLI never creates fake retailer evidence files'
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+test('unmeasured availability is never silently treated as confirmed unavailable', () => {
+  const sheet = buildObservationSheet()
+  const line = sheet.baseline.lines[0]
+  assert.equal(line.observedProduct.available, null)
+  assert.equal(observationLineCollectionComplete(line), false)
+
+  const card = renderM3FieldVisitCard()
+  assert.match(card, /Onbekend is niet hetzelfde als nee:/)
+  assert.match(card, /ongemeten regel is nog niet klaar voor conversie/)
+
+  // Explicit observed unavailability is collection-complete even without
+  // a product or price, while a blank observation is not.
+  line.observedProduct.available = false
+  assert.equal(observationLineCollectionComplete(line), true)
+  assert.equal(line.observedProduct.priceCents, null)
 })
