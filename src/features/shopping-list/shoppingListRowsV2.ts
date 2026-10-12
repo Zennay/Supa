@@ -1,5 +1,6 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { shoppingListDemandIdentity } from './shoppingListDemandIdentity.ts'
+import { quantityUnitLabelNl } from '../../lib/quantityPresentation.ts'
 import type { ShoppingProgressSessionV2 } from './shoppingListProgressSessionV2.ts'
 
 export type ShoppingRowV2 = Readonly<{
@@ -33,7 +34,7 @@ export function shoppingListRowsV2(
       return {
         id: line.id,
         label: line.ingredientLabel,
-        quantity: `${line.requirement.amount ?? '?'} ${line.requirement.unit} · handmatig kiezen`,
+        quantity: `${line.requirement.amount ?? '?'} ${quantityUnitLabelNl(line.requirement.unit, line.requirement.amount)} · handmatig kiezen`,
         checked: checked.has(line.id),
         unresolved: true,
       }
@@ -43,7 +44,7 @@ export function shoppingListRowsV2(
     return {
       id: line.id,
       label: line.productName,
-      quantity: `${line.packs} × ${packPrefix}${line.pack.amount} ${line.pack.unit}`,
+      quantity: `${line.packs} × ${packPrefix}${line.pack.amount} ${quantityUnitLabelNl(line.pack.unit, line.pack.amount)}`,
       checked: checked.has(line.id),
       unresolved: false,
     }
