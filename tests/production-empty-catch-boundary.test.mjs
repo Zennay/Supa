@@ -47,6 +47,41 @@ function hasExplanatoryComment(source) {
 // Semicolons, debugger pauses and stand-alone literal evaluations do not
 // handle an exception. These are syntactic checks only: a call, property
 // access, identifier or dynamic template could have effects, so do not guess.
+// Pure literal evaluation does not recover from a caught exception. Only
+// peel unary syntax when its operand is itself statically inert: 'void fn()',
+// '!recover()' and other calls/reads must remain potentially effective.
+function isInertCatchExpression(expression) {
+  let current = expression
+  while (ts.isParenthesizedExpression(current)) {
+    current = current.expression
+  }
+
+  if (ts.isVoidExpression(current)) {
+    return isInertCatchExpression(current.expression)
+  }
+  if (ts.isPrefixUnaryExpression(current)) {
+    if (![
+      ts.SyntaxKind.ExclamationToken,
+      ts.SyntaxKind.TildeToken,
+      ts.SyntaxKind.PlusToken,
+      ts.SyntaxKind.MinusToken,
+    ].includes(current.operator)) return false
+    // Unary + on a BigInt throws: conservatively treat it as non-inert.
+    if (current.operator === ts.SyntaxKind.PlusToken &&
+        ts.isBigIntLiteral(current.operand)) return false
+    return isInertCatchExpression(current.operand)
+  }
+
+  return ts.isStringLiteral(current) ||
+    ts.isNumericLiteral(current) ||
+    ts.isBigIntLiteral(current) ||
+    ts.isNoSubstitutionTemplateLiteral(current) ||
+    ts.isRegularExpressionLiteral(current) ||
+    current.kind === ts.SyntaxKind.TrueKeyword ||
+    current.kind === ts.SyntaxKind.FalseKeyword ||
+    current.kind === ts.SyntaxKind.NullKeyword
+}
+
 function hasEffectiveCatchStatements(statements) {
   return statements.some((statement) => {
     if (ts.isBlock(statement)) {
@@ -55,23 +90,9 @@ function hasEffectiveCatchStatements(statements) {
     if (ts.isEmptyStatement(statement) || ts.isDebuggerStatement(statement)) {
       return false
     }
-    if (ts.isExpressionStatement(statement)) {
-      let expression = statement.expression
-      while (ts.isParenthesizedExpression(expression)) {
-        expression = expression.expression
-      }
-      if (
-        ts.isStringLiteral(expression) ||
-        ts.isNumericLiteral(expression) ||
-        ts.isBigIntLiteral(expression) ||
-        ts.isNoSubstitutionTemplateLiteral(expression) ||
-        ts.isRegularExpressionLiteral(expression) ||
-        expression.kind === ts.SyntaxKind.TrueKeyword ||
-        expression.kind === ts.SyntaxKind.FalseKeyword ||
-        expression.kind === ts.SyntaxKind.NullKeyword
-      ) {
-        return false
-      }
+    if (ts.isExpressionStatement(statement) &&
+        isInertCatchExpression(statement.expression)) {
+      return false
     }
     return true
   })
