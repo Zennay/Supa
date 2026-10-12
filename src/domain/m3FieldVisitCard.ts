@@ -11,10 +11,9 @@ function quantityLabel(amount: number, unit: string): string {
     throw new Error('invalid canonical ingredient quantity')
   }
 
-  const number = new Intl.NumberFormat('nl-NL', {
-    maximumFractionDigits: 12,
-    useGrouping: false,
-  }).format(amount)
+  // Keep the source-of-truth decimal intact: a display helper must not round
+  // a future fractional shopping requirement into a different demand.
+  const number = String(amount).replace('.', ',')
   if (unit === 'piece') return `${number} ${amount === 1 ? 'stuk' : 'stuks'}`
   if (['g', 'kg', 'ml', 'l'].includes(unit)) return `${number} ${unit}`
   throw new Error('invalid canonical ingredient unit')
