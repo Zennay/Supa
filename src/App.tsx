@@ -49,9 +49,18 @@ function canReplacePlannerRecord(raw: string | null): boolean {
     const allowed = ['budget', 'activeDays', 'recipeByDay']
     if (!allowed.every((key) => Object.hasOwn(object, key))) return false
     if (!Object.keys(object).every((key) => allowed.includes(key))) return false
+    // Numeric JSON is not necessarily a valid persisted weekbudget.
+    // Check a cent-exact positive value in the advertised €0,01–€1.000,00
+    // range without rounding an invalid stored value into user consent.
+    const budget = object.budget
+    const budgetCents = typeof budget === 'number' && Number.isFinite(budget)
+      ? Math.round(budget * 100)
+      : NaN
     return (
-      typeof object.budget === 'number' &&
-      Number.isFinite(object.budget) &&
+      Number.isSafeInteger(budgetCents) &&
+      budgetCents >= 1 &&
+      budgetCents <= 100_000 &&
+      budget === budgetCents / 100 &&
       Array.isArray(object.activeDays) &&
       object.activeDays.every((day: unknown) => typeof day === 'string') &&
       object.recipeByDay !== null &&
