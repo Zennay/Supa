@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { chmod, link, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { link, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -17,9 +17,15 @@ async function withSyntheticPaths(callback) {
   await writeFile(source, sourceBytes, { mode: 0o600 })
   try {
     await callback({ dir, source, output })
-    assert.equal(await readFile(source, 'utf8'), sourceBytes)
   } finally {
-    await rm(dir, { recursive: true, force: true })
+    // Also validate the evidence source when the case intentionally fails
+    // (expected-RED tests otherwise bypass assertions after the callback).
+    try {
+      assert.equal(await readFile(source, 'utf8'), sourceBytes,
+        'synthetic source bytes must be preserved, including on publication failure')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   }
 }
 
@@ -115,7 +121,6 @@ test('M3 complete single-writer publication keeps source and 0600 private output
     await writeDerivedM3Output(source, output, report)
     assert.equal(await readFile(output, 'utf8'), report)
     assert.equal((await stat(output)).mode & 0o777, 0o600)
-    await chmod(output, 0o600) // All test I/O remains inside the disposable directory.
   })
 })
 
