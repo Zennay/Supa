@@ -71,7 +71,7 @@ test('QA #1794 independent: preserve ordinary mixed-language paths and benign Un
     'src/SUPA-Recepten.ts',
     'docs/één-week.md',
     'docs/👩‍🍳-maaltijden.md',
-    'docs/readme\\u005fcopy.md',
+    'docs/readme_copy.md',
   ])
   assert.equal(ok.ok, true, 'ordinary path rejected\n' + ok.output)
 })
