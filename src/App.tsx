@@ -52,8 +52,13 @@ function canReplacePlannerRecord(raw: string | null): boolean {
     // Numeric JSON is not necessarily a valid persisted weekbudget.
     // Check a cent-exact positive value in the advertised €0,01–€1.000,00
     // range without rounding an invalid stored value into user consent.
+    // Identifiers that act as object prototype/metaprogramming keys are
+    // never legitimate planner day or recipe-map identities. Preserve the
+    // original saved envelope instead of normalizing these keys away.
+    const reservedIdentities = new Set(['__proto__', 'prototype', 'constructor'])
     const isCanonicalIdentifier = (value: unknown): value is string =>
-      typeof value === 'string' && value.length > 0 && value === value.trim()
+      typeof value === 'string' && value.length > 0 &&
+      value === value.trim() && !reservedIdentities.has(value)
     const budget = object.budget
     const budgetCents = typeof budget === 'number' && Number.isFinite(budget)
       ? Math.round(budget * 100)
