@@ -26,7 +26,7 @@ function identifier(value: unknown): value is string {
   return typeof value === 'string' &&
     value.length > 0 &&
     value.trim() === value &&
-    /[^\\p{M}\\p{Cf}\\s]/u.test(value)
+    /[^\p{M}\p{Cf}\s]/u.test(value)
 }
 
 function amount(value: unknown): value is number {
