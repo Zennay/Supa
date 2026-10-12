@@ -3,7 +3,7 @@
 // This suite tests CLI error-channel privacy; it does not modify CLI owners.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CONVERTER = join(ROOT, 'scripts/m3-build-observed-study.mjs')
 const ASSESSOR = join(ROOT, 'scripts/m3-assess-observed-week.mjs')
+const GENERATOR = join(ROOT, 'scripts/m3-create-observation-sheet.mjs')
 const PRIVATE_CANARY = 'SYNTHETIC_PARTICIPANT_DO_NOT_PRINT_13579'
 
 function withScratch(callback) {
@@ -63,3 +64,44 @@ for (const [label, script] of [
     })
   })
 }
+
+test('M3 sheet generator: existing private output path must not be echoed on no-clobber rejection [expected RED]', () => {
+  withScratch((directory) => {
+    const output = join(directory, `${PRIVATE_CANARY}-sheet.json`)
+    const original = Buffer.from('FICTIONAL-PRESERVED-BYTES-2468')
+    writeFileSync(output, original, { mode: 0o600 })
+    const result = spawnSync(
+      process.execPath,
+      ['--experimental-strip-types', GENERATOR, '--output', output],
+      { cwd: ROOT, encoding: 'utf8', timeout: 15000 },
+    )
+    assert.equal(result.error, undefined, result.error?.message)
+    assert.notEqual(result.status, 0)
+    assert.equal(result.stdout, '')
+    assert.deepEqual(readFileSync(output), original, 'no-clobber must preserve exact original output')
+    assert.doesNotMatch(
+      result.stderr,
+      new RegExp(PRIVATE_CANARY),
+      'EEXIST diagnostics must not reveal sensitive field-run sheet path components',
+    )
+  })
+})
+
+test('M3 sheet generator: ordinary existing output is rejected with unchanged bytes [control]', () => {
+  withScratch((directory) => {
+    const output = join(directory, 'existing-sheet.json')
+    const original = Buffer.from('FICTIONAL-PRESERVED-BYTES-2468')
+    writeFileSync(output, original, { mode: 0o600 })
+    const result = spawnSync(
+      process.execPath,
+      ['--experimental-strip-types', GENERATOR, '--output', output],
+      { cwd: ROOT, encoding: 'utf8', timeout: 15000 },
+    )
+    assert.equal(result.error, undefined, result.error?.message)
+    assert.notEqual(result.status, 0)
+    assert.equal(result.stdout, '')
+    assert.match(result.stderr, /refusing to overwrite existing observation sheet/)
+    assert.deepEqual(readFileSync(output), original)
+    assert.doesNotMatch(result.stderr, /SYNTHETIC_PARTICIPANT_DO_NOT_PRINT/)
+  })
+})
