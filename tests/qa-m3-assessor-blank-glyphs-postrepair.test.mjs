@@ -20,7 +20,7 @@ function basket(storeId, adjustment) {
     priceCents: 139 + adjustment,
   })
   return buildOneStoreBasket({
-    store: { id: storeId, name: storeId },
+    store: { id: storeId, name: storeId === 'qa-glyph-store-a' ? 'PLUS fictief' : 'DekaMarkt fictief' },
     products, plan: m2InitialPlan, recipes: m2Recipes,
     activeDays: m2DefaultActiveDays,
   })
