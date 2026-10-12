@@ -29,6 +29,10 @@ function staticPrimitiveExpression(node, depth = 0) {
   const current = unwrapStaticExpression(node)
 
   if (ts.isStringLiteralLike(current)) return current.text
+  // JavaScript coerces literal Booleans in string addition and interpolation.
+  // Keep their primitive type until final ID coercion; never infer variables.
+  if (current.kind === ts.SyntaxKind.TrueKeyword) return true
+  if (current.kind === ts.SyntaxKind.FalseKeyword) return false
   if (ts.isNumericLiteral(current)) {
     const value = Number(current.text.replaceAll('_', ''))
     return Number.isFinite(value) ? value : null
@@ -92,7 +96,10 @@ function staticPrimitiveExpression(node, depth = 0) {
 
 function staticStringExpression(node, depth = 0) {
   const value = staticPrimitiveExpression(node, depth)
-  return value === null ? null : String(value)
+  // React omits direct Boolean values for a non-Boolean HTML id attribute.
+  // Only infer Boolean ID text when JS explicitly coerces it inside a
+  // string concatenation or template interpolation.
+  return value === null || typeof value === 'boolean' ? null : String(value)
 }
 
 function staticAttributeValue(initializer) {
