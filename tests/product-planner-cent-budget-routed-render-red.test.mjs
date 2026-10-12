@@ -95,7 +95,7 @@ test('product #1041: unresolved basket keeps unknown, not a fake exact remainder
   assert.equal(expected.status, 'unknown')
   const markup = render(1969, 1)
   assert.equal(renderedBudgetStatus(markup), '1 mandregel open')
-  assert.ok(markup.includes('bekende minimum') || markup.includes('bekende minimum'))
+  assert.ok(markup.includes('bekende minimum'), 'Incomplete prices are a known minimum only')
   assert.ok(!renderedBudgetStatus(markup).includes(euro.formatCents(1531)))
 })
 
