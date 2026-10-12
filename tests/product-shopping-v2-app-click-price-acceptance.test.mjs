@@ -132,7 +132,7 @@ function activeBasket(tree) {
   assert.equal(routed[0].props.allowLegacyUpgrade, undefined)
   return routed[0].props.basket
 }
-function storageSession() {
+function storageSession({ denyWrite = false } = {}) {
   // Each synthetic mount uses fresh component hook slots and browser storage.
   appHooks.reset()
   shoppingHooks.reset()
@@ -140,14 +140,19 @@ function storageSession() {
   const saved = new Map()
   const writes = []
   const reads = []
+  let writeDenied = denyWrite
   Object.defineProperty(globalThis, 'window', { configurable: true, value: {
     localStorage: {
       getItem(key) { reads.push(key); return saved.get(key) ?? null },
-      setItem(key, value) { writes.push({ key, value }); saved.set(key, value) },
+      setItem(key, value) {
+        if (writeDenied) throw Error('synthetic storage write denial')
+        writes.push({ key, value }); saved.set(key, value)
+      },
     },
   } })
   return {
     saved, writes, reads,
+    set denyWrites(next) { writeDenied = next },
     close() {
       if (old) Object.defineProperty(globalThis, 'window', old)
       else delete globalThis.window
@@ -286,5 +291,43 @@ test('product #1056: returning to Lijst remounts saved checkmarks without rewrit
       browser.reads.filter((key) => key === legacy.shoppingListProgressStorageKey).length,
       0, 'legacy v1 is never implicitly consulted',
     )
+  } finally { browser.close() }
+})
+
+test('product #1056: App v2 warns on failed storage then saves only after deliberate recovery click', () => {
+  const browser = storageSession({ denyWrite: true })
+  try {
+    const screen = goTo(appRender(), 'Lijst')
+    const basket = activeBasket(screen)
+    const initial = view(basket)
+    initial.flush()
+    assert.equal(initial.rows.length, basket.lines.length)
+    assert.ok(initial.rows.length >= 2)
+
+    initial.rows[0].props.onClick()
+    const denied = view(basket)
+    assert.equal(denied.rows[0].props['aria-pressed'], true)
+    assert.equal(browser.saved.has(progress.shoppingListProgressV2StorageKey), false)
+    assert.equal(browser.writes.length, 0, 'failed write cannot claim durable saved bytes')
+    const warning = elements(denied.tree, (node) => node.props.role === 'status')
+    assert.equal(warning.length, 1, 'failed persistence must be programmatically announced')
+    assert.match(JSON.stringify(warning[0].props.children), /Voortgang niet opgeslagen/)
+    assert.match(JSON.stringify(warning[0].props.children), /na herladen verdwijnen/)
+
+    // A passive re-render is not a user opt-in for replaying a failed write.
+    browser.denyWrites = false
+    view(basket).flush()
+    assert.equal(browser.writes.length, 0)
+    view(basket).rows[1].props.onClick()
+    const recovered = view(basket)
+    assert.ok(recovered.rows[0].props['aria-pressed'])
+    assert.ok(recovered.rows[1].props['aria-pressed'])
+    assert.equal(
+      elements(recovered.tree, (node) => node.props.role === 'status').length,
+      0, 'after the new deliberate successful write the warning clears',
+    )
+    assert.equal(browser.writes.length, 1)
+    assert.equal(browser.writes[0].key, progress.shoppingListProgressV2StorageKey)
+    assert.equal(browser.saved.has(legacy.shoppingListProgressStorageKey), false)
   } finally { browser.close() }
 })
