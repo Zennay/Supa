@@ -58,7 +58,10 @@ function canReplacePlannerRecord(raw: string | null): boolean {
     const reservedIdentities = new Set(['__proto__', 'prototype', 'constructor'])
     const isCanonicalIdentifier = (value: unknown): value is string =>
       typeof value === 'string' && value.length > 0 &&
-      value === value.trim() && !reservedIdentities.has(value)
+      value === value.trim() && !reservedIdentities.has(value) &&
+      // Zero-width and default-ignorable-only identifiers are not a real day
+      // or recipe identity. Keep unknown durable JSON untouched.
+      value.replace(/[\p{Default_Ignorable_Code_Point}\s]/gu, '').length > 0
     const budget = object.budget
     const budgetCents = typeof budget === 'number' && Number.isFinite(budget)
       ? Math.round(budget * 100)
