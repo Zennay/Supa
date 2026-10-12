@@ -165,7 +165,7 @@ test('QA #1925: unsupported fractional-cent record survives mount and explicit c
     assert.equal(app.planner().budget, 27.5, 'valid session edits remain usable')
     assert.equal(disk.raw, original, 'invalid stored record must not be clobbered')
     assert.equal(disk.writes.length, 0)
-    assert.match(app.warning(), /eerdere opgeslagen gegevens/)
+    assert.match(app.warning(), /eerdere opgeslagen gegevens/i)
   } finally { app.close() }
 })
 
