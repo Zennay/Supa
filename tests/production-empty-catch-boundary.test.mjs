@@ -166,7 +166,7 @@ test('QA #1000: decorator-prefixed TODO and directive-only catches are still und
 test('QA #1000: genuine explained best-effort catches stay valid with commented tooling prose elsewhere', () => {
   for (const source of [
     'try { risky() } catch { /* Ignore denied browser storage; continue in memory. */ }',
-    'try { risky() } catch { // Fallback to empty checklist because privacy mode blocks storage.\\n }',
+    'try { risky() } catch { // Fallback to empty checklist because privacy mode blocks storage.\n }',
   ]) {
     assert.equal(findUndocumentedEmptyCatch(source), null, source)
   }
