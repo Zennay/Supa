@@ -21,68 +21,78 @@ function unwrapStaticExpression(node) {
   return current
 }
 
-function staticStringExpression(node, depth = 0) {
+// Literal-only primitive evaluator: preserve JS operand types until final
+// coercion. Treating every numeric subexpression as a string makes
+// "id-" + (1 + 2) incorrectly look like "id-12" rather than "id-3".
+function staticPrimitiveExpression(node, depth = 0) {
   if (depth > 20) return null
   const current = unwrapStaticExpression(node)
 
   if (ts.isStringLiteralLike(current)) return current.text
-
-  // JSX string concatenation and no-substitution template interpolation both
-  // convert compile-time numeric literals to strings (e.g. 'row-' + 2).
-  // This only decodes literal AST nodes: never execute code or read variables.
   if (ts.isNumericLiteral(current)) {
-    const numeric = Number(current.text.replaceAll('_', ''))
-    return Number.isFinite(numeric) ? String(numeric) : null
+    const value = Number(current.text.replaceAll('_', ''))
+    return Number.isFinite(value) ? value : null
   }
-
   if (ts.isBigIntLiteral(current)) {
-    // BigInt must never pass through Number (precision would be lost).
     try {
-      return String(BigInt(current.text.replaceAll('_', '').replace(/n$/, '')))
+      // Do not round large literal IDs through IEEE-754 Number.
+      return BigInt(current.text.replaceAll('_', '').replace(/n$/, ''))
     } catch {
       return null
     }
   }
 
   if (ts.isPrefixUnaryExpression(current) &&
-      (current.operator === ts.SyntaxKind.MinusToken || current.operator === ts.SyntaxKind.PlusToken)) {
-    const literal = unwrapStaticExpression(current.operand)
-    if (ts.isNumericLiteral(literal)) {
-      const numeric = Number(literal.text.replaceAll('_', ''))
-      if (Number.isFinite(numeric)) {
-        return String(current.operator === ts.SyntaxKind.MinusToken ? -numeric : numeric)
-      }
+      (current.operator === ts.SyntaxKind.MinusToken ||
+       current.operator === ts.SyntaxKind.PlusToken)) {
+    const value = staticPrimitiveExpression(current.operand, depth + 1)
+    if (typeof value === 'number') {
+      const signed = current.operator === ts.SyntaxKind.MinusToken ? -value : value
+      return Number.isFinite(signed) ? signed : null
     }
-    if (ts.isBigIntLiteral(literal)) {
-      try {
-        const numeric = BigInt(literal.text.replaceAll('_', '').replace(/n$/, ''))
-        return String(current.operator === ts.SyntaxKind.MinusToken ? -numeric : numeric)
-      } catch {
-        return null
-      }
+    // Unary + on a BigInt throws in JavaScript; do not invent an ID.
+    if (typeof value === 'bigint' && current.operator === ts.SyntaxKind.MinusToken) {
+      return -value
     }
+    return null
   }
 
-  if (
-    ts.isBinaryExpression(current) &&
-    current.operatorToken.kind === ts.SyntaxKind.PlusToken
-  ) {
-    const left = staticStringExpression(current.left, depth + 1)
-    const right = staticStringExpression(current.right, depth + 1)
-    return left === null || right === null ? null : left + right
+  if (ts.isBinaryExpression(current) &&
+      current.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = staticPrimitiveExpression(current.left, depth + 1)
+    const right = staticPrimitiveExpression(current.right, depth + 1)
+    if (left === null || right === null) return null
+    // Once either operand is a string, JS performs concatenation.
+    if (typeof left === 'string' || typeof right === 'string') {
+      return String(left) + String(right)
+    }
+    if (typeof left === 'number' && typeof right === 'number') {
+      const sum = left + right
+      return Number.isFinite(sum) ? sum : null
+    }
+    if (typeof left === 'bigint' && typeof right === 'bigint') {
+      return left + right
+    }
+    // Number + BigInt throws; dynamic or invalid expressions stay unknown.
+    return null
   }
 
   if (ts.isTemplateExpression(current)) {
     let value = current.head.text
     for (const span of current.templateSpans) {
-      const part = staticStringExpression(span.expression, depth + 1)
+      const part = staticPrimitiveExpression(span.expression, depth + 1)
       if (part === null) return null
-      value += part + span.literal.text
+      value += String(part) + span.literal.text
     }
     return value
   }
 
   return null
+}
+
+function staticStringExpression(node, depth = 0) {
+  const value = staticPrimitiveExpression(node, depth)
+  return value === null ? null : String(value)
 }
 
 function staticAttributeValue(initializer) {
