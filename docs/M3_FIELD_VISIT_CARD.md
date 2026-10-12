@@ -8,15 +8,15 @@ From a fresh `main` checkout, record the exact Git commit/workflow ID that will 
 
 ```bash
 # Print/display the identical demand for both retailers.
-npm run m3:field-visit-card
+node --experimental-strip-types scripts/m3-field-visit-card.mjs
 
 # Or prepare individual store cards without changing the canonical demand.
-npm run m3:field-visit-card -- --store plus
-npm run m3:field-visit-card -- --store dekamarkt
+node --experimental-strip-types scripts/m3-field-visit-card.mjs --store plus
+node --experimental-strip-types scripts/m3-field-visit-card.mjs --store dekamarkt
 
 # Optional: save a blank PRINT COPY to the git-ignored local artifacts directory.
 mkdir -p artifacts/m3
-npm run --silent m3:field-visit-card > artifacts/m3/blank-field-card.txt
+node --experimental-strip-types scripts/m3-field-visit-card.mjs > artifacts/m3/blank-field-card.txt
 ```
 
 Printing/saving this text does **not** produce observation evidence. Only human-confirmed observations should populate the JSON sheet. Do not commit a hand-filled card, receipt, name, email or account ID; these may reveal participant/store-visit details.
