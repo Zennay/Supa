@@ -29,6 +29,15 @@ function identifier(value: unknown): value is string {
     /[^\u115F\u1160\u3164\uFFA0\u2800\p{M}\p{Cf}\p{Cc}\p{Cs}\s]/u.test(value)
 }
 
+/** A visible label is required for a checkable row, but labels stay outside
+ * the price-independent physical identity so legitimate renames keep ticks.
+ * In particular, visually blank Hangul fillers and Braille Blank aren't text.
+ */
+function visibleLabel(value: unknown): value is string {
+  return typeof value === 'string' &&
+    /[^\u115F\u1160\u3164\uFFA0\u2800\p{M}\p{Cf}\p{Cc}\p{Cs}\s]/u.test(value)
+}
+
 function amount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
@@ -44,7 +53,7 @@ function wholePacks(value: unknown): value is number {
 export function shoppingListDemandIdentity(basket: OneStoreBasket): string | null {
   const input = record(basket)
   const store = record(input?.store)
-  if (!store || !identifier(store.id) || !Array.isArray(input?.lines)) {
+  if (!store || !identifier(store.id) || !visibleLabel(store.name) || !Array.isArray(input?.lines)) {
     return null
   }
 
@@ -58,6 +67,7 @@ export function shoppingListDemandIdentity(basket: OneStoreBasket): string | nul
     if (
       !line ||
       !identifier(line.id) ||
+      !visibleLabel(line.ingredientLabel) ||
       seen.has(line.id) ||
       !requirement ||
       typeof requirement.unit !== 'string' ||
@@ -85,6 +95,7 @@ export function shoppingListDemandIdentity(basket: OneStoreBasket): string | nul
       !amount(requirement.amount) ||
       requirement.unit === 'unknown' ||
       !identifier(line.productId) ||
+      !visibleLabel(line.productName) ||
       !wholePacks(line.packs) ||
       !pack ||
       !amount(pack.amount) ||
