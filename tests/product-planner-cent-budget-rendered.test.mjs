@@ -9,6 +9,7 @@ import ts from 'typescript'
 import { euro } from '../src/lib/money.ts'
 import { assessPlannerBudgetCents } from '../src/lib/plannerBudgetCents.ts'
 import { RecipeEstimateDisclosure } from '../src/features/planner/RecipeEstimateDisclosure.ts'
+import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from '../src/features/planner/customWeekBudget.ts'
 import { m2Recipes } from '../src/data/m2Fixture.ts'
 
 // SSR the actual PlannerView, not a reimplementation of its budget label.
@@ -31,6 +32,8 @@ const localRequire = (moduleName) => {
   if (moduleName === '../../lib/plannerBudgetCents.ts') return { assessPlannerBudgetCents }
   if (moduleName === '../../lib/money') return { euro }
   if (moduleName === './RecipeEstimateDisclosure.ts') return { RecipeEstimateDisclosure }
+  if (moduleName === './customWeekBudget.ts') return { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros }
+  if (moduleName === 'react') return require(moduleName)
   if (moduleName === 'react/jsx-runtime') return require(moduleName)
   throw new Error(`Unexpected PlannerView dependency: ${moduleName}`)
 }
