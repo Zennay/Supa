@@ -78,7 +78,16 @@ export function PlannerView({
           <span className="eyebrow">Deze week</span>
           <h2>Plan eerst. Vergelijk daarna.</h2>
         </div>
-        <button type="button" className="ghost-button" onClick={onReset}>Reset</button>
+        <button
+          type="button"
+          className="ghost-button"
+          onClick={() => {
+            onReset()
+            setCustomOpen(false)
+            setCustomDraft('')
+            setCustomError('')
+          }}
+        >Reset</button>
       </div>
 
       <section className="budget-card" aria-labelledby="weekbudget-title">
