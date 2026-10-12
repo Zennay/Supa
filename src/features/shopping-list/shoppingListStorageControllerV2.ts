@@ -102,12 +102,17 @@ function isCanonicalPhysicalDemandIdentity(rawIdentity: string, doneLineIds?: re
       const physical = {
         id: line.id,
         status: line.status,
+        // The persisted identity deliberately omits *display* labels.
+        // Reconstruct valid neutral names for the canonical identity check;
+        // never pretend that these are observed retailer names.
+        ingredientLabel: 'Ingrediënt',
         requirement: { amount: line.amount, unit: line.unit },
       }
       return line.status === 'matched'
         ? {
             ...physical,
             productId: line.productId,
+            productName: 'Product',
             packs: line.packs,
             pack: {
               amount: line.packAmount,
@@ -119,7 +124,7 @@ function isCanonicalPhysicalDemandIdentity(rawIdentity: string, doneLineIds?: re
     })
 
     if (shoppingListDemandIdentity({
-      store: { id: input.storeId },
+      store: { id: input.storeId, name: 'Winkel' },
       lines,
     } as unknown as OneStoreBasket) !== rawIdentity) return false
 
