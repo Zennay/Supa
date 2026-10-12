@@ -96,7 +96,10 @@ function staticPrimitiveExpression(node, depth = 0) {
 
 function staticStringExpression(node, depth = 0) {
   const value = staticPrimitiveExpression(node, depth)
-  return value === null ? null : String(value)
+  // React omits direct Boolean values for a non-Boolean HTML id attribute.
+  // Only infer Boolean ID text when JS explicitly coerces it inside a
+  // string concatenation or template interpolation.
+  return value === null || typeof value === 'boolean' ? null : String(value)
 }
 
 function staticAttributeValue(initializer) {
