@@ -69,7 +69,7 @@ for (const priceContext of ['in-store', 'online-order']) {
       assert.equal(report.claimable, true)
       assert.equal(report.outcome, expectedOutcome)
       assert.equal(report.deltaCents, expectedDelta)
-      assert.equal(report.savingsCents, -expectedDelta)
+      assert.equal(report.savingsCents, expectedDelta === 0 ? 0 : -expectedDelta)
       assert.equal(report.publicSavingsClaimEligible, false)
       assert.match(report.evidenceBoundary, /never sufficient/i)
       assert.equal(report.observationWindowHours, 0.5)
