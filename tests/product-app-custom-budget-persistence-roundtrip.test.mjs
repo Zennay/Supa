@@ -197,3 +197,31 @@ test('product #1424: denied browser storage leaves App budget editable in sessio
     assert.equal(page.planner().budget, 27.5)
   })
 })
+
+
+test('product #1424: changing recipes and active days cannot silently reset a committed custom budget', () => {
+  const initial = defaultPlannerPreferences(m2InitialPlan)
+  const selected = m2InitialPlan[0]
+  const alternative = m2Recipes.find(recipe => recipe.id !== selected.recipeId)
+  assert.ok(selected && alternative)
+  const storage = memoryStorage(serializePlannerPreferences({ ...initial, budget: 27.5 }))
+  inWindow(storage, () => {
+    const page = appHarness(storage)
+    page.planner().onRecipeChange(selected.day, alternative.id)
+    assert.equal(page.planner().budget, 27.5)
+    assert.equal(page.planner().plannedMeals.find(meal => meal.day === selected.day)?.recipeId, alternative.id)
+    assert.equal(storage.saved().recipeByDay[selected.day], alternative.id)
+    assert.equal(storage.saved().budget, 27.5)
+    page.planner().onToggleDay(selected.day)
+    assert.equal(page.planner().budget, 27.5)
+    assert.ok(!page.planner().activeDays.includes(selected.day))
+    assert.equal(storage.saved().budget, 27.5)
+    const restarted = appHarness(storage)
+    assert.equal(restarted.planner().budget, 27.5)
+    assert.ok(!restarted.planner().activeDays.includes(selected.day))
+    assert.equal(restarted.planner().plannedMeals.find(meal => meal.day === selected.day)?.recipeId, alternative.id)
+    restarted.planner().onToggleDay(selected.day)
+    assert.equal(restarted.planner().budget, 27.5)
+    assert.ok(restarted.planner().activeDays.includes(selected.day))
+  })
+})
