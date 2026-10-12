@@ -147,6 +147,10 @@ test('product #1925: passive navigation cannot retry failed planner write or cle
   try {
     app.render()
     assert.equal(app.raw, defaultRaw)
+    assert.equal(app.alert, '', 'unchanged durable choices must not trigger a failed write')
+    app.planner().onBudgetChange(27.49)
+    app.render()
+    assert.equal(app.raw, defaultRaw, 'the deliberate change was denied')
     assert.match(app.alert, /tijdelijk en niet opgeslagen/)
     app.denyWrite = false
     app.nav('Mand')
@@ -184,7 +188,7 @@ test('product #1925: batched day toggles and budget edit compose without losing 
     }
     assert.equal(JSON.parse(app.raw).budget, 42.75)
     assert.deepEqual(new Set(JSON.parse(app.raw).activeDays), expected)
-    assert.equal(app.writes.length, 2, 'mount and one combined edit snapshot')
+    assert.equal(app.writes.length, 1, 'only the actual combined edit writes')
     assert.equal(app.alert, '')
   } finally { app.close() }
 })
@@ -192,6 +196,9 @@ test('product #1925: batched day toggles and budget edit compose without losing 
 test('product #1925: external future-schema replacement stays byte-exact after a new edit', () => {
   const app = mount({ denyWrite: true })
   try {
+    app.render()
+    assert.equal(app.alert, '', 'valid saved mount stays quiet')
+    app.planner().onBudgetChange(27.49)
     app.render()
     assert.match(app.alert, /niet opgeslagen/)
     app.denyWrite = false
