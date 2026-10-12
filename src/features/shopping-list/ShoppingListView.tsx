@@ -83,6 +83,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     basketKey,
     ...readStoredProgress(basket),
     dirty: false,
+    retryAfterFailure: false,
   }))
   const [storageWarning, setStorageWarning] = useState<'protected' | 'unavailable' | null>(null)
   const done = progress.basketKey === basketKey ? progress.done : []
@@ -104,6 +105,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       basketKey,
       ...readStoredProgress(basket),
       dirty: false,
+      retryAfterFailure: false,
     })
   }, [basket, basketKey, progress.basketKey])
 
@@ -114,8 +116,10 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     if (basket.lines.length === 0 && !genuinelyEmpty) return
     // A missing initial read is not proof that previously checked items were
     // empty. Never write a fallback snapshot until an explicit user edit.
-    if (progress.readDenied && !progress.dirty) {
-      setStorageWarning('unavailable')
+    if ((progress.readDenied || progress.retryAfterFailure) && !progress.dirty) {
+      // An earlier denied/protected write may only be retried after another
+      // deliberate checkbox change, not after an unrelated render or recovery.
+      if (!progress.retryAfterFailure) setStorageWarning('unavailable')
       return
     }
 
@@ -125,11 +129,11 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       const stored = window.localStorage.getItem(shoppingListProgressStorageKey)
       // After a denied read, even a currently valid v1 record is foreign:
       // rewriting it from an empty fallback would erase unseen checkmarks.
-      if (progress.readDenied && stored !== null) {
-        setStorageWarning('protected')
-        return
-      }
-      if (!canOverwriteStoredProgress(stored)) {
+      if ((progress.readDenied && stored !== null) ||
+          !canOverwriteStoredProgress(stored)) {
+        setProgress((current) => current === progress
+          ? { ...current, dirty: false, retryAfterFailure: true }
+          : current)
         setStorageWarning('protected')
         return
       }
@@ -138,14 +142,23 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       if (stored !== serialized) {
         window.localStorage.setItem(shoppingListProgressStorageKey, serialized)
       }
-      if (progress.readDenied) {
+      if (progress.readDenied || progress.retryAfterFailure) {
         setProgress((current) => current === progress
-          ? { ...current, readDenied: false, dirty: false }
+          ? {
+              ...current,
+              readDenied: false,
+              dirty: false,
+              retryAfterFailure: false,
+            }
           : current)
       }
       setStorageWarning(null)
     } catch {
-      // Strict privacy modes can deny storage; the active session remains usable.
+      // Mark a failed action as spent. A future automatic effect is not a
+      // new request to retry or silently claim persistent storage is healthy.
+      setProgress((current) => current === progress
+        ? { ...current, dirty: false, retryAfterFailure: true }
+        : current)
       setStorageWarning('unavailable')
     }
   }, [basket, basketKey, genuinelyEmpty, progress])
