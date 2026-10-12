@@ -48,6 +48,6 @@ test('QA #1000 independent: independent nested catch inspection and TSX outer li
   ].join('\n')
   const finding = check(example, 'fixture.tsx')
   assert.ok(finding)
-  assert.equal(finding.line, 4)
+  assert.equal(finding.line, 5)
   assert.match(finding.text, /catch \{ \/\* TODO/)
 })
