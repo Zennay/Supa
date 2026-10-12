@@ -22,7 +22,7 @@ function weeklyBasket(activeDays = ['Di']) {
 
 async function withShoppingView(run) {
   const vite = await createServer({
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, hmr: false },
     appType: 'custom',
     optimizeDeps: { noDiscovery: true, include: [] },
     logLevel: 'error',
