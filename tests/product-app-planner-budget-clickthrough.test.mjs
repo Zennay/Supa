@@ -207,9 +207,12 @@ test('product #1424 integrated: formatted maximum is accepted, explicit reset re
     page.typeAmount('1.000,00')
     assert.equal(disk.saved().budget, 35)
     page.submit()
+    // React effects flush after the state update has been rendered.
+    page.render()
     assert.equal(disk.saved().budget, 1000)
     assert.equal(page.find('strong', p => p.id === 'weekbudget-title').props.children, euro.format(1000))
     page.find('button', p => p.children === 'Reset').props.onClick()
+    page.render()
     assert.equal(disk.saved().budget, 35)
     assert.equal(mount(disk).find('strong', p => p.id === 'weekbudget-title').props.children, euro.format(35))
   })
