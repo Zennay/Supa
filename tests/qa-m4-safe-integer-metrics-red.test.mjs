@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
   buildBetaSessionSummary,
@@ -114,4 +119,40 @@ test('M4 expected RED: reject aggregate repair edit counts exceeding safe intege
     () => buildBetaSessionSummary(input),
     /safe integer|repairManualEdits|out of range/i,
   )
+})
+
+test('M4 CLI control: safe JSON integer yields private-abstaining summary', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'supa-m4-integer-'))
+  try {
+    const path = join(dir, 'fictional-session.json')
+    writeFileSync(path, JSON.stringify(fakeSession([baseline(29)])))
+    const cli = fileURLToPath(new URL('../scripts/m4-validate-beta-session.mjs', import.meta.url))
+    const result = spawnSync(process.execPath, [cli, path], { encoding: 'utf8', timeout: 15_000 })
+    assert.equal(result.status, 0, result.stderr)
+    const report = JSON.parse(result.stdout)
+    assert.equal(report.baselinePlanningDurationSeconds, 29)
+    assert.equal(report.publicClaimEligible, false)
+    assert.equal('participantKey' in report, false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('M4 CLI expected RED: reject an unsafe raw JSON integer before it rounds', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'supa-m4-integer-'))
+  try {
+    const path = join(dir, 'fictional-unsafe-session.json')
+    let json = JSON.stringify(fakeSession([baseline(29)]))
+    // This token cannot be faithfully represented as a JavaScript Number.
+    // Insert the raw JSON integer without first rounding it in JS.
+    assert.ok(json.includes('"duration_seconds":29'))
+    json = json.replace('"duration_seconds":29', '"duration_seconds":9007199254740993')
+    writeFileSync(path, json)
+    const cli = fileURLToPath(new URL('../scripts/m4-validate-beta-session.mjs', import.meta.url))
+    const result = spawnSync(process.execPath, [cli, path], { encoding: 'utf8', timeout: 15_000 })
+    assert.notEqual(result.status, 0, 'unsafe raw JSON integer must fail closed')
+    assert.equal(result.stdout, '', 'rejected input must not publish summary JSON')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
