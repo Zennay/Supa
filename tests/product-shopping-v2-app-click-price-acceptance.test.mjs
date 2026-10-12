@@ -331,3 +331,31 @@ test('product #1056: App v2 warns on failed storage then saves only after delibe
     assert.equal(browser.saved.has(legacy.shoppingListProgressStorageKey), false)
   } finally { browser.close() }
 })
+
+test('product #1056: blocked localStorage getter keeps the routed v2 checklist interactive', () => {
+  const browser = storageSession()
+  try {
+    const unavailable = {}
+    Object.defineProperty(unavailable, 'localStorage', {
+      get() { throw Error('synthetic private-mode storage getter denial') },
+    })
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true, value: unavailable,
+    })
+    const screen = goTo(appRender(), 'Lijst')
+    const basket = activeBasket(screen)
+    const initial = view(basket)
+    assert.ok(initial.rows.length > 0)
+    initial.flush()
+    initial.rows[0].props.onClick()
+    const after = view(basket)
+    assert.equal(after.rows[0].props['aria-pressed'], true)
+    assert.equal(
+      elements(after.tree, (node) => node.props.role === 'status').length,
+      1, 'in-memory checks must not masquerade as saved progress',
+    )
+    assert.equal(browser.writes.length, 0)
+    assert.equal(browser.reads.length, 0)
+    assert.equal(browser.saved.size, 0)
+  } finally { browser.close() }
+})
