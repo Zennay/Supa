@@ -42,6 +42,26 @@ test('M3 interrupted existing-report write must preserve exact prior bytes [expe
   })
 })
 
+test('M3 interrupted creation must leave no partial output at a brand-new path [expected RED]', async () => {
+  await fixture(async ({ source, output, sourceBytes }) => {
+    async function* interruptedCreation() {
+      yield '{"outcome":"PARTIAL_NOT_PUBLISHED"'
+      throw new Error('SYNTHETIC_NEW_REPORT_INTERRUPTED')
+    }
+
+    await assert.rejects(
+      () => writeDerivedM3Output(source, output, interruptedCreation()),
+      /SYNTHETIC_NEW_REPORT_INTERRUPTED/,
+    )
+    assert.equal(await readFile(source, 'utf8'), sourceBytes)
+    await assert.rejects(
+      () => stat(output),
+      { code: 'ENOENT' },
+      'an interrupted new report cannot be visible even as a truncated or partial file',
+    )
+  })
+})
+
 test('M3 competing writers must publish one complete report, never mixed or partial bytes [expected RED]', async () => {
   await fixture(async ({ source, output, sourceBytes }) => {
     await writeFile(output, 'INITIAL_SYNTHETIC_REPORT\n')
