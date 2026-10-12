@@ -87,6 +87,6 @@ test('M3 CLI handles one-store selection and rejects incorrect arguments', () =>
     const child = spawnSync(process.execPath, ['--experimental-strip-types', script, ...args], { encoding: 'utf8' })
     assert.equal(child.status, 1)
     assert.equal(child.stdout, '')
-    assert.match(child.stderr, /gebruik: npm run m3:field-visit-card/)
+    assert.match(child.stderr, /gebruik: node --experimental-strip-types scripts/m3-field-visit-card.mjs/)
   }
 })
