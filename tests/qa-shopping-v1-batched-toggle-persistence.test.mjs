@@ -239,3 +239,38 @@ test('QA v1: historical duplicate and unknown stored IDs cannot amplify rapid to
     session.close()
   }
 })
+
+test('QA v1: deterministic many-tap parity model matches rendered and persisted checklist', () => {
+  const basket = makeBasket(['Ma', 'Di', 'Wo'])
+  const sourceBefore = structuredClone(basket)
+  const session = makeHarness()
+  try {
+    const frame = session.render(basket)
+    frame.flush()
+    assert.ok(frame.rows.length >= 5)
+    const expected = new Set()
+    // All 137 operations intentionally hit closures from the same render:
+    // a model independent of the component tracks each ID's parity.
+    let seed = 0x51ab
+    for (let n = 0; n < 137; n++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+      const index = seed % frame.rows.length
+      const id = basket.lines[index].id
+      if (expected.has(id)) expected.delete(id)
+      else expected.add(id)
+      frame.rows[index].props.onClick()
+    }
+    const rendered = session.render(basket)
+    assert.deepEqual(
+      rendered.rows.map((row, index) => [basket.lines[index].id, checked(row)]),
+      basket.lines.map(line => [line.id, expected.has(line.id)]),
+    )
+    rendered.flush()
+    const savedIds = JSON.parse(session.raw).doneLineIds
+    assert.equal(savedIds.length, expected.size)
+    assert.deepEqual(new Set(savedIds), expected)
+    assert.deepEqual(basket, sourceBefore)
+  } finally {
+    session.close()
+  }
+})
