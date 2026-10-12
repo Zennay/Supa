@@ -110,8 +110,11 @@ function hasEffectiveCatchStatements(statements) {
       return hasEffectiveCatchStatements(statement.statements)
     }
     if (ts.isEmptyStatement(statement) || ts.isDebuggerStatement(statement) ||
-        ts.isFunctionDeclaration(statement)) {
-      // The function body is inert until a call actually executes it.
+        ts.isFunctionDeclaration(statement) ||
+        ts.isTypeAliasDeclaration(statement) ||
+        ts.isInterfaceDeclaration(statement)) {
+      // Function bodies are deferred. Type/interface declarations are
+      // erased by TypeScript, so none of these handle a caught exception.
       return false
     }
     if (ts.isExpressionStatement(statement) &&
