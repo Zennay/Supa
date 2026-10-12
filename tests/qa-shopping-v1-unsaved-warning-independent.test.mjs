@@ -139,8 +139,9 @@ test('QA #1891: external corrupt replacement after valid mount is protected acro
     s.render(week).flush()
     assert.equal(s.raw, corrupt)
     assertAlert(s, week, /eerdere opgeslagen gegevens/)
-    // The protected record can never be replaced by a stale progress snapshot.
-    assert.equal(s.writes.length, 1)
+    // Identical valid progress now avoids an unnecessary mount write.
+    // The corrupt external replacement must never receive a write either.
+    assert.equal(s.writes.length, 0)
   } finally { s.close() }
 })
 
