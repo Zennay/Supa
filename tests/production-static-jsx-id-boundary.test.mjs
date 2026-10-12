@@ -327,7 +327,7 @@ test('QA #1006: compile-time numeric JSX ID interpolation must not evade duplica
         'const c = <span {...{ id: "row-" + 2 }} />',
         'const d = <output id={"row-" + runtimeIndex} />',
         'const e = <Field id={"row-" + 2} />',
-      ].join('\\n'),
+      ].join('\n'),
     },
   ])
   assert.equal(duplicates.length, 3, 'all three literal-only intrinsic duplicates should be detected')
@@ -341,7 +341,7 @@ test('QA #1006: numeric static IDs remain distinct and dynamic numeric IDs are n
       'const a = <div id={"week-" + 4} />',
       'const b = <div id={`week-${runtimeWeek}`} />',
       'const c = <div {...{ id: "week-" + externalWeek }} />',
-    ].join('\\n') },
+    ].join('\n') },
   ])
   assert.deepEqual(duplicates, [])
 })
