@@ -55,7 +55,7 @@ function validIdentity(value: unknown): value is string {
   // Unicode mark/format-only values can survive trim() while conveying no
   // visible identity. Require a readable base, number, punctuation or symbol.
   // This keeps legitimate multilingual, emoji and decomposed-accent labels.
-  return typeof value === 'string' && /[\\p{L}\\p{N}\\p{P}\\p{S}]/u.test(value)
+  return typeof value === 'string' && /[\p{L}\p{N}\p{P}\p{S}]/u.test(value)
 }
 
 function supportedBasketLine(line: unknown): line is BasketTraceLine {
