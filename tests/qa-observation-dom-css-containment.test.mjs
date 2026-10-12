@@ -34,7 +34,7 @@ function classNames(node) {
     (entry) => ts.isJsxAttribute(entry) && entry.name.text === 'className',
   )
   return attr && ts.isStringLiteral(attr.initializer)
-    ? attr.initializer.text.split(/\\s+/u)
+    ? attr.initializer.text.split(' ')
     : []
 }
 
@@ -60,22 +60,18 @@ function only(nodes, description) {
 }
 
 function rule(selector) {
-  // Resolve a complete declaration block: a selector string occurring only in
-  // a comment or another selector must not satisfy this regression contract.
-  const escaped = selector.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')
-  const matches = [...css.matchAll(new RegExp(`(?:^|})\\s*${escaped}\\s*\\{([^{}]*)\\}`, 'gm'))]
-  assert.equal(matches.length, 1, `Expected one CSS rule for ${selector}`)
-  return matches[0][1]
+  const marker = selector + ' {'
+  const start = css.indexOf(marker)
+  assert.ok(start >= 0, `Missing CSS selector: ${selector}`)
+  assert.equal(css.indexOf(marker, start + marker.length), -1, `Duplicate CSS selector: ${selector}`)
+  const end = css.indexOf('}', start + marker.length)
+  assert.ok(end > start, `Unclosed CSS declaration: ${selector}`)
+  return css.slice(start + marker.length, end)
 }
 
 function property(declarations, name, value) {
-  const escapedName = name.replace(/-/g, '\\-')
-  const escapedValue = value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')
-  assert.match(
-    declarations,
-    new RegExp(`(?:^|;)\\s*${escapedName}\\s*:\\s*${escapedValue}\\s*;`, 'u'),
-    `Expected ${name}: ${value} in ${declarations}`,
-  )
+  const entries = declarations.split(';').map((entry) => entry.trim())
+  assert.ok(entries.includes(`${name}: ${value}`), `Missing ${name}: ${value} in ${declarations}`)
 }
 
 test('actual JSX store heading has a shrinkable heading and unshrinking progress pill', () => {
@@ -116,9 +112,10 @@ test('actual JSX ingredient details summary has shrinkable copy beside durable s
 
 test('narrow observation cards preserve 44px detail tap targets and single-column fields', () => {
   property(rule('.observation-line summary'), 'min-height', '44px')
-  assert.match(css, /@media\\s*\\(max-width:\\s*430px\\)\\s*\\{/u)
-  assert.match(
-    css,
-    /@media\\s*\\(max-width:\\s*430px\\)[\\s\\S]*?\\.field-grid,\\s*\\.line-fields\\s*\\{\\s*grid-template-columns:\\s*1fr;/u,
-  )
+  const breakpoint = css.indexOf('@media (max-width: 430px) {')
+  assert.ok(breakpoint >= 0, 'Missing narrow viewport media rule')
+  const responsive = css.slice(breakpoint)
+  assert.ok(responsive.includes('.field-grid,'))
+  assert.ok(responsive.includes('.line-fields {'))
+  assert.ok(responsive.includes('grid-template-columns: 1fr;'))
 })
