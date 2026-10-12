@@ -8,12 +8,19 @@ export const MAX_CUSTOM_WEEK_BUDGET_CENTS = 100_000
 
 /**
  * Dutch-friendly custom week budgets: parse decimal digits into integer cents,
- * never parseFloat/Math.round user text. No signs, thousands separators,
+ * never parseFloat/Math.round user text. No signs, general thousands separators,
  * exponents, or fractional cents. A value is committed only on form submit.
  */
 export function parseCustomWeekBudgetCents(value: unknown): number | null {
   if (typeof value !== 'string') return null
-  const match = /^(0|[1-9][0-9]{0,3})(?:[,.]([0-9]{1,2}))?$/.exec(value.trim())
+  const input = value.trim()
+  // The visible Dutch ceiling uses a thousands dot. Accept only that exact,
+  // unambiguous grouped spelling with a comma and one/two zero cents.
+  // A bare "1.000" could also mean a decimal value: do not guess its intent.
+  const normalized = /^1\.000,0{1,2}$/.test(input)
+    ? input.replace(/^1\.000,/, '1000,')
+    : input
+  const match = /^(0|[1-9][0-9]{0,3})(?:[,.]([0-9]{1,2}))?$/.exec(normalized)
   if (!match) return null
   const cents = Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0') || '0')
   return Number.isSafeInteger(cents) && cents >= 1 && cents <= MAX_CUSTOM_WEEK_BUDGET_CENTS
