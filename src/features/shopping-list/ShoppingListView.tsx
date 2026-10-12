@@ -37,15 +37,19 @@ function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
 }
 
 function readStoredProgress(basket: OneStoreBasket) {
-  if (typeof window === 'undefined') return []
+  if (typeof window === 'undefined') return { done: [], readDenied: false }
 
   try {
-    return restoreShoppingListProgress(
-      basket,
-      window.localStorage.getItem(shoppingListProgressStorageKey),
-    )
+    return {
+      done: restoreShoppingListProgress(
+        basket,
+        window.localStorage.getItem(shoppingListProgressStorageKey),
+      ),
+      readDenied: false,
+    }
   } catch {
-    return []
+    // A failed read must not be treated as confirmed empty saved progress.
+    return { done: [], readDenied: true }
   }
 }
 
@@ -77,7 +81,8 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   const basketKey = useMemo(() => shoppingListBasketKey(basket), [basket])
   const [progress, setProgress] = useState(() => ({
     basketKey,
-    done: readStoredProgress(basket),
+    ...readStoredProgress(basket),
+    dirty: false,
   }))
   const [storageWarning, setStorageWarning] = useState<'protected' | 'unavailable' | null>(null)
   const done = progress.basketKey === basketKey ? progress.done : []
@@ -97,7 +102,8 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
 
     setProgress({
       basketKey,
-      done: readStoredProgress(basket),
+      ...readStoredProgress(basket),
+      dirty: false,
     })
   }, [basket, basketKey, progress.basketKey])
 
@@ -106,19 +112,37 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     // A malformed rowless store is not a valid empty shopping task. Never
     // overwrite the existing v1 record while showing an untrusted warning.
     if (basket.lines.length === 0 && !genuinelyEmpty) return
+    // A missing initial read is not proof that previously checked items were
+    // empty. Never write a fallback snapshot until an explicit user edit.
+    if (progress.readDenied && !progress.dirty) {
+      setStorageWarning('unavailable')
+      return
+    }
 
     try {
       // Read immediately before writing: protect future/unknown/corrupt
       // records even if storage changed after mount. This is not atomic CAS.
       const stored = window.localStorage.getItem(shoppingListProgressStorageKey)
+      // After a denied read, even a currently valid v1 record is foreign:
+      // rewriting it from an empty fallback would erase unseen checkmarks.
+      if (progress.readDenied && stored !== null) {
+        setStorageWarning('protected')
+        return
+      }
       if (!canOverwriteStoredProgress(stored)) {
         setStorageWarning('protected')
         return
       }
-      window.localStorage.setItem(
-        shoppingListProgressStorageKey,
-        serializeShoppingListProgress(basket, progress.done),
-      )
+      const serialized = serializeShoppingListProgress(basket, progress.done)
+      // Avoid a second write when the safe-recovery state update rerenders.
+      if (stored !== serialized) {
+        window.localStorage.setItem(shoppingListProgressStorageKey, serialized)
+      }
+      if (progress.readDenied) {
+        setProgress((current) => current === progress
+          ? { ...current, readDenied: false, dirty: false }
+          : current)
+      }
       setStorageWarning(null)
     } catch {
       // Strict privacy modes can deny storage; the active session remains usable.
@@ -179,7 +203,9 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
                   const currentDone =
                     current.basketKey === basketKey ? current.done : []
                   return {
+                    ...current,
                     basketKey,
+                    dirty: true,
                     // The rendered `checked` flag may be stale if two taps
                     // queue before React paints. Toggle from latest state.
                     done: currentDone.includes(line.id)
