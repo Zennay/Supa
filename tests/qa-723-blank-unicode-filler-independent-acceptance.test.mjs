@@ -69,7 +69,7 @@ test('QA #723 independent keeps real Hangul, Braille, readable and joined Unicod
     'docs/⠠⠞⠑⠎⠞.md',
     'docs/⡏⡍⡅.md',
     'docs/café.md',
-    'docs/cafe\u0301.md',
+    'docs/cafe\u0301-extra.md',
     'docs/پیش\u200cغذا.md',
     'docs/👩‍🍳-week.md',
     'src/features/shopping-list/README.md',
