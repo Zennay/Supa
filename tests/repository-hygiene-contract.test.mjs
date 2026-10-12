@@ -44,6 +44,9 @@ function invalidPortableSegment(segment) {
   // Hidden formatting can make a tracked file masquerade as a protected name
   // (for example, .env). Keep Arabic ZWNJ and emoji ZWJ filenames valid.
   if (/[\u00ad\u034f\u200b\u2060\ufeff]/u.test(segment)) return true
+  // Unicode line/paragraph separators can split a single path in review output.
+  // Keep ordinary NBSP, visible RTL letters, Arabic ZWNJ and emoji ZWJ valid.
+  if (/[\u0085\u2028\u2029]/u.test(segment)) return true
   if (/[. ]$/.test(segment)) return true
   // Windows treats a device name as reserved even when an extension follows.
   // Windows also reserves superscript 1/2/3 device suffixes; trailing
