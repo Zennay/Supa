@@ -61,7 +61,7 @@ function session({ denyWrite = false } = {}) {
       useState(value) {
         const index = cursor++
         if (!(index in slots)) {
-          slots[index] = typeof value === 'function' ? value() : value
+          slots[index] = { value: typeof value === 'function' ? value() : value }
         }
         return [slots[index].value, next => {
           slots[index].value = typeof next === 'function'
