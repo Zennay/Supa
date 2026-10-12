@@ -11,7 +11,14 @@ import { buildObservationSheet } from '../scripts/m3-create-observation-sheet.mj
 const ZONES = ['UTC', 'Europe/Amsterdam', 'America/New_York']
 const PARTICIPANT = 'synthetic-participant-privacy-marker-001'
 
-function observedSheet({ baselineAt, candidateAt, weekStart, unavailable = false }) {
+function observedSheet({
+  baselineAt,
+  candidateAt,
+  weekStart,
+  unavailable = false,
+  priceContext = 'in-store',
+  candidatePremium = 0,
+}) {
   const sheet = buildObservationSheet()
   assert.equal(sheet.requirements.length, 11)
   sheet.study = {
@@ -21,12 +28,12 @@ function observedSheet({ baselineAt, candidateAt, weekStart, unavailable = false
     population: 'synthetic independent students',
     region: 'synthetic-region',
     weekStart: weekStart ?? '2026-10-19',
-    priceContext: 'in-store',
+    priceContext,
   }
 
   for (const [side, name, timestamp, premium] of [
     ['baseline', 'PLUS synthetic store', baselineAt ?? '2026-10-24T12:00:00+02:00', 10],
-    ['candidate', 'DekaMarkt synthetic store', candidateAt, 0],
+    ['candidate', 'DekaMarkt synthetic store', candidateAt, candidatePremium],
   ]) {
     const observation = sheet[side]
     observation.store = { id: `${side}-synthetic-store`, name }
@@ -124,6 +131,16 @@ for (const scenario of [
     window: 24 + 1 / 3600,
   },
   {
+    name: 'DST fall-back, online-order candidate is more expensive',
+    candidateAt: '2026-10-25T11:00:00+01:00',
+    priceContext: 'online-order',
+    candidatePremium: 25,
+    unavailable: false,
+    claimable: true,
+    outcome: 'worse',
+    window: 24,
+  },
+  {
     name: 'DST fall-back, unresolved candidate item',
     candidateAt: '2026-10-25T11:00:00+01:00',
     unavailable: true,
@@ -143,13 +160,15 @@ for (const scenario of [
       assert.equal(new Set(results.map((result) => result.studyText)).size, 1)
       assert.equal(new Set(results.map((result) => result.reportText)).size, 1)
       const { report } = results[0]
+      assert.equal(report.priceContext, scenario.priceContext ?? 'in-store')
       assert.equal(report.claimable, scenario.claimable)
       assert.equal(report.outcome, scenario.outcome)
       assert.ok(Math.abs(report.observationWindowHours - scenario.window) < 1e-9)
       if (scenario.claimable) {
         assert.equal(report.baseline.matchedLineCount, 11)
         assert.equal(report.candidate.matchedLineCount, 11)
-        assert.ok(report.savingsCents > 0)
+        if (scenario.outcome === 'better') assert.ok(report.savingsCents > 0)
+        if (scenario.outcome === 'worse') assert.ok(report.savingsCents < 0)
       } else {
         assert.equal(report.savingsCents, null)
         assert.equal(report.deltaCents, null)
