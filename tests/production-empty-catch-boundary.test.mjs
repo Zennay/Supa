@@ -21,14 +21,26 @@ function scriptKindFor(filename) {
 }
 
 function hasExplanatoryComment(source, ignoredRanges = []) {
-  const comments = [...source.matchAll(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g)]
+  // Use lexical comment trivia: character sequences that resemble comments
+  // inside a string or static template literal are not comments at all.
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source,
+  )
+  const comments = []
+  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken;
+    token = scanner.scan()) {
+    if (token === ts.SyntaxKind.SingleLineCommentTrivia ||
+        token === ts.SyntaxKind.MultiLineCommentTrivia) {
+      comments.push({ index: scanner.getTokenPos(), comment: scanner.getTokenText() })
+    }
+  }
 
   return comments.some((match) => {
     // Explanations inside a function body that never ran cannot document the
     // outer catch's decision to swallow its exception.
     if (ignoredRanges.some(([start, end]) =>
       match.index >= start && match.index < end)) return false
-    const comment = match[0]
+    const comment = match.comment
     const text = comment.startsWith('//')
       ? comment.slice(2)
       : comment
