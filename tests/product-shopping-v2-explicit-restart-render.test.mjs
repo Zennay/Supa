@@ -7,6 +7,7 @@ import { createServer } from 'vite'
 
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import { m2InitialPlan, m2Products, m2Recipes, m2Store } from '../src/data/m2Fixture.ts'
+import { openShoppingProgressStorageV2 } from '../src/features/shopping-list/shoppingListStorageControllerV2.ts'
 import {
   serializeShoppingProgressV2,
   shoppingListProgressV2StorageKey,
@@ -55,13 +56,18 @@ test('the real shopping-v2 TSX offers a deliberate accessible clear action only 
     assert.match(fresh, /0 van \d+ afgevinkt/)
 
     items.set(shoppingListProgressV2StorageKey, serializeShoppingProgressV2(first, [picked.id]))
-    const restored = render(first)
-    assert.match(restored, /<button[^>]*class="ghost-button"[^>]*type="button"[^>]*>Vinkjes wissen<\/button>/)
-    assert.match(restored, /1 van \d+ afgevinkt/)
+    const firstPaint = render(first)
+    assert.doesNotMatch(firstPaint, /Vinkjes wissen/,
+      'the first render cannot inspect saved progress without risking hydration drift')
+    assert.match(firstPaint, /0 van \d+ afgevinkt/)
+    assert.deepEqual(openShoppingProgressStorageV2(first, storage).snapshot().completedLineIds,
+      [picked.id], 'saved progress remains recoverable by the mounted effect')
     const repriced = basket(m2Store, m2Products.map((product) => ({
       ...product, priceCents: product.priceCents + 4,
     })))
-    assert.match(render(repriced), /Vinkjes wissen/, 'price-only changes retain the affordance')
+    assert.doesNotMatch(render(repriced), /Vinkjes wissen/)
+    assert.deepEqual(openShoppingProgressStorageV2(repriced, storage).snapshot().completedLineIds,
+      [picked.id], 'price-only changes retain saved physical progress after mount')
 
     const differentStore = basket({ ...m2Store, id: 'synthetic-new-store' })
     assert.doesNotMatch(render(differentStore), /Vinkjes wissen/)
@@ -89,8 +95,9 @@ test('the real shopping-v2 TSX offers a deliberate accessible clear action only 
 
     const reordered = structuredClone(first)
     reordered.lines.reverse()
-    assert.match(render(reordered), /Vinkjes wissen/,
-      'row presentation order must not change the shopping task')
+    assert.doesNotMatch(render(reordered), /Vinkjes wissen/)
+    assert.deepEqual(openShoppingProgressStorageV2(reordered, storage).snapshot().completedLineIds,
+      [picked.id], 'row order must not change saved physical task')
     assert.doesNotMatch(render({ ...first, lines: [null] }), /Vinkjes wissen/)
     assert.doesNotMatch(render({ ...first, lines: [] }), /Vinkjes wissen/)
 
