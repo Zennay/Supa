@@ -55,7 +55,10 @@ function isPathSafeKey(value: unknown) {
 }
 
 function hasNonEmptyText(value: unknown) {
-  return typeof value === 'string' && value.trim().length > 0
+  // Required human context needs a visible base character. Unicode marks,
+  // directional formats, controls and lone surrogates alone are not evidence.
+  return typeof value === 'string' &&
+    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
 }
 
 function validCalendarDate(value: unknown) {
@@ -94,6 +97,12 @@ function validTimestamp(value: unknown) {
       .map(Number)
     if (offsetHour > 23 || offsetMinute > 59) return null
   }
+
+  // Date.parse keeps milliseconds; higher nonzero fractional precision cannot
+  // safely substantiate an inclusive M3 24h (or custom) comparison window.
+  // Extra zero digits are exact and may remain valid.
+  const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1]
+  if (fraction && /[1-9]/.test(fraction.slice(3))) return null
 
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) ? timestamp : null
