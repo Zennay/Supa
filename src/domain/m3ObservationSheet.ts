@@ -531,6 +531,10 @@ function nonBlank(value: string) {
 
 function validObservedAt(value: string) {
   if (!nonBlank(value)) return null
+  // Date.parse drops submillisecond precision. The collector must not claim a
+  // ≤24h window or display an actionable deadline from an ambiguous instant.
+  const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1]
+  if (fraction && /[1-9]/.test(fraction.slice(3))) return null
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) ? timestamp : null
 }
