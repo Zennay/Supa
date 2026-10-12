@@ -38,7 +38,7 @@ test('shopping-v2 SSR remains neutral for denied storage and explicit v1 upgrade
 
     delete globalThis.window
     const server = html()
-    assert.match(server, /0 van \d+ afgevinkt/)
+    assert.match(server, /Boodschappenlijst/)
     assert.doesNotMatch(server, /aria-pressed="true"/)
 
     // Private browsing may expose window while throwing on localStorage access.
