@@ -38,7 +38,9 @@ function hasExplanatoryComment(source) {
     if (/^(?:eslint-(?:disable|enable)(?:-next-line|-line)?|tslint(?:-disable|:disable)|@ts-(?:ignore|expect-error|nocheck|check))\b/i.test(explanation)) {
       return false
     }
-    return /[\p{L}\p{N}]/u.test(explanation)
+    // A numeric code by itself is not a rationale for discarding a failure.
+    // Require at least one word character that is a Unicode letter.
+    return /[\p{L}]/u.test(explanation)
   })
 }
 
