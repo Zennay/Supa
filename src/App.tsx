@@ -61,7 +61,7 @@ function canReplacePlannerRecord(raw: string | null): boolean {
       value === value.trim() && !reservedIdentities.has(value) &&
       // Zero-width and default-ignorable-only identifiers are not a real day
       // or recipe identity. Keep unknown durable JSON untouched.
-      value.replace(/[\\p{Default_Ignorable_Code_Point}\\s]/gu, '').length > 0
+      value.replace(/[\p{Default_Ignorable_Code_Point}\s]/gu, '').length > 0
     const budget = object.budget
     const budgetCents = typeof budget === 'number' && Number.isFinite(budget)
       ? Math.round(budget * 100)
