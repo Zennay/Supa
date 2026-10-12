@@ -210,7 +210,13 @@ export function ShoppingListViewV2({ basket, allowLegacyUpgrade = false }: Props
       )}
 
       <div className="list-card">
-        {rows.length === 0 && <p>Geen boodschappen voor deze planning.</p>}
+        {rows.length === 0 && liveIdentity === null && (
+          <div className="attention-card" role="status">
+            <strong>Boodschappenlijst niet beschikbaar</strong>
+            <span>Controleer je planning. De boodschappen kunnen niet betrouwbaar worden weergegeven.</span>
+          </div>
+        )}
+        {rows.length === 0 && liveIdentity !== null && <p>Geen boodschappen voor deze planning.</p>}
         {rows.map((row) => (
           <button
             type="button"
