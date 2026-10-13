@@ -52,8 +52,8 @@ createRoot(document.getElementById('print-preview-root')!).render(
         </div>
         <div className="attention-card">Schermhulp (mag niet op papier verschijnen)</div>
         <div className="list-card">Schermkaart (mag niet op papier verschijnen)</div>
-        <aside className="screen-only-canary">SCHERMALLEEN_WILLEKEURIGE_SECTIE_GEEN_PAPIER</aside>
-        <div className="diagnostic-canary">SCHERMALLEEN_GEVOELIGE_DIAGNOSTIEK_GEEN_PAPIER</div>
+        <aside className="screen-only-canary" style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}>SCHERMALLEEN_WILLEKEURIGE_SECTIE_GEEN_PAPIER</aside>
+        <div className="diagnostic-canary" style={{ maxWidth: '100%', overflowWrap: 'anywhere' }}>SCHERMALLEEN_GEVOELIGE_DIAGNOSTIEK_GEEN_PAPIER</div>
         {isMultiPage && (
           <section className="screen-only-scroll-stress" style={{ height: 16000 }}>
             SCHERMALLEEN_ZESTIENDUIZEND_PX_GEEN_EXTRA_PAGINAS
