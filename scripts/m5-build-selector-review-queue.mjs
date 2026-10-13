@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url'
 
 const STATUS_ACTION = Object.freeze({
   unavailable: ['P1', 'recapture_or_investigate_failure'],
+  origin_changed: ['P1', 'investigate_source_origin_change'],
   removed: ['P1', 'investigate_missing_source'],
   shape_changed: ['P1', 'review_parser_and_selector_drift'],
   added: ['P2', 'review_new_source_and_rights'],
@@ -80,6 +81,11 @@ export function buildOfflineSelectorReviewQueue(report) {
       }
     }
     if (current === null && baseline === null) invalid()
+    // Do not trust a reported 'unchanged' state when its immutable source
+    // origin differs, nor a forged P1 origin state for identical provenance.
+    const originChanged = current !== null && baseline !== null &&
+      (current.supermarket !== baseline.supermarket || current.kind !== baseline.kind)
+    if ((status === 'origin_changed') !== originChanged) invalid()
     if (current !== null) foundCurrent += 1
     if (status === 'removed' && !(current === null && baseline !== null)) invalid()
     if (status === 'added' && !(current !== null && baseline === null)) invalid()
@@ -104,7 +110,7 @@ export function buildOfflineSelectorReviewQueue(report) {
     if (status === 'shape_changed' &&
         current.shapeSha256 === baseline.shapeSha256 &&
         current.schemaOrgStatus === baseline.schemaOrgStatus) invalid()
-    if (['removed', 'added', 'unavailable', 'shape_changed'].includes(status)) driftCount += 1
+    if (['removed', 'added', 'unavailable', 'shape_changed', 'origin_changed'].includes(status)) driftCount += 1
     const [priority, action] = STATUS_ACTION[status]
     return { sourceToken: sourceToken(change.id), status, priority, action,
       selectorVerified: false, rightsVerified: false, productionEnabled: false }

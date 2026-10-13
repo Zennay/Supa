@@ -100,6 +100,12 @@ export function compareInspections(current, baseline = null) {
     if (!baseline) status = 'baseline_missing'
     else if (!latest) status = 'removed'
     else if (!previous) status = 'added'
+    // A reused source ID can conceal a different supermarket or capture type.
+    // Treat provenance re-assignment as high-priority drift even when both HTML
+    // and shape fingerprints are identical or one capture is unavailable.
+    else if (latest.supermarket !== previous.supermarket || latest.kind !== previous.kind) {
+      status = 'origin_changed'
+    }
     else if (latest.captureStatus !== 'verified' || previous.captureStatus !== 'verified') {
       status = 'unavailable'
     } else if (latest.shapeSha256 !== previous.shapeSha256 ||
@@ -122,7 +128,7 @@ export function compareInspections(current, baseline = null) {
     captureCount: now.size,
     changes,
     driftCount: changes.filter((value) =>
-      ['removed', 'added', 'unavailable', 'shape_changed'].includes(value.status)).length,
+      ['removed', 'added', 'unavailable', 'shape_changed', 'origin_changed'].includes(value.status)).length,
     // Only same approved-origin, human-reviewed snapshots can justify selectors.
     reviewerActionRequired: true,
   }
