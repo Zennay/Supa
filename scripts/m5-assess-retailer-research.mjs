@@ -22,6 +22,20 @@ const KEYS = new Set(['retailerId', 'reviewedAt', 'sourceKind', 'sourceUrl',
   'regionScope', 'assortmentScope', 'termsReview', 'robotsReview',
   'ownerContactStatus', 'freshnessPlan', 'priority'])
 const ISO_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/
+const LEDGER_KEYS = new Set(['version', 'purpose', 'reviews'])
+
+function requireResearchShape(value, expected, label) {
+  const prototype = Object.getPrototypeOf(value)
+  check(prototype === Object.prototype || prototype === null,
+    'Invalid private research ' + label + ' object')
+  const ownKeys = Reflect.ownKeys(value)
+  const descriptors = Object.getOwnPropertyDescriptors(value)
+  check(ownKeys.length === expected.size &&
+    ownKeys.every((key) => typeof key === 'string' && expected.has(key) &&
+      Object.hasOwn(descriptors[key], 'value')),
+    'Invalid private research ' + label + ' schema')
+}
+
 
 function check(ok, message) {
   if (!ok) throw new Error(message)
@@ -55,19 +69,16 @@ export function assessRetailerResearch(discovery, ledger) {
   const candidates = assessRetailerDiscovery(discovery)
   check(ledger && typeof ledger === 'object' && !Array.isArray(ledger),
     'Invalid research ledger')
+  requireResearchShape(ledger, LEDGER_KEYS, 'root')
   check(ledger.version === 1 && ledger.purpose === 'manual-research-only',
     'Invalid research ledger version/purpose')
   check(Array.isArray(ledger.reviews) && ledger.reviews.length <= candidates.sourceCount,
     'Invalid research ledger length')
-  check(Object.keys(ledger).every((key) => ['version', 'purpose', 'reviews'].includes(key)),
-    'Unknown ledger fields')
   const known = new Set(candidates.sources.map((source) => source.id))
   const reviews = new Map()
   for (const review of ledger.reviews) {
     check(review && typeof review === 'object' && !Array.isArray(review), 'Invalid review record')
-    check(Object.keys(review).length === KEYS.size &&
-      Object.keys(review).every((key) => KEYS.has(key)),
-    'Unexpected, missing or private review field')
+    requireResearchShape(review, KEYS, 'retailer')
     check(typeof review.retailerId === 'string' && known.has(review.retailerId) &&
       !reviews.has(review.retailerId), 'Unknown or repeated retailer review')
     check(validDate(review.reviewedAt), 'Invalid review date')
