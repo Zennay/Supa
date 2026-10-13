@@ -57,7 +57,9 @@ function safePhysicalPacks(
   pack: { amount: number; unit: unknown; count: number },
   packs: number,
 ): boolean {
-  if (!Number.isSafeInteger(packs) || packs < 1 ||
+  if (!requirement || typeof requirement !== 'object' ||
+      !pack || typeof pack !== 'object' ||
+      !Number.isSafeInteger(packs) || packs < 1 ||
       !Number.isSafeInteger(pack.count) || pack.count < 1) return false
 
   const required = exactBaseQuantity(requirement.amount, requirement.unit)
@@ -82,8 +84,16 @@ function safePhysicalPacks(
 export function preparePrintableShoppingChecklist(
   basket: OneStoreBasket,
 ): PrintableShoppingChecklistData {
-  if (!basket || !Array.isArray(basket.lines)) {
+  if (!basket || !Array.isArray(basket.lines) || basket.lines.length > 500) {
     throw new Error('Ongeldige boodschappenmand')
+  }
+
+  // Array.map silently drops sparse slots. Never show an incomplete paper
+  // shopping list as if every planned ingredient had been copied.
+  for (let index = 0; index < basket.lines.length; index += 1) {
+    if (!Object.prototype.hasOwnProperty.call(basket.lines, index)) {
+      throw new Error('Onvolledige boodschappenmand')
+    }
   }
 
   const seen = new Set<string>()
