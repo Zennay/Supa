@@ -62,9 +62,16 @@ function repair(durationSeconds, manualEdits) {
   }
 }
 
+function repairStartAt(timestamp) {
+  return { type: 'repair_started', timestamp, repair_kind: 'fictional-swap' }
+}
+
 test('M4 control: ordinary integer counts are exact and summary stays privacy-safe', () => {
   const summary = buildBetaSessionSummary(fakeSession([
     baseline(1200),
+    // Valid repair provenance is a separate, already-enforced M4 precondition.
+    repairStartAt('2026-01-01T10:10:00.000Z'),
+    repairStartAt('2026-01-01T10:20:00.000Z'),
     repair(9, 2),
     repair(11, 3),
   ]))
@@ -114,7 +121,12 @@ test('M4 expected RED: reject unsafe budget_cents rather than preserve rounded m
 test('M4 expected RED: reject aggregate repair edit counts exceeding safe integer range', () => {
   // Both constituent events are individually exact and legitimate integers.
   // Their sum is not safe to represent as an integer metric in a JSON report.
-  const input = fakeSession([repair(10, Number.MAX_SAFE_INTEGER), repair(12, 1)])
+  const input = fakeSession([
+    repairStartAt('2026-01-01T10:10:00.000Z'),
+    repairStartAt('2026-01-01T10:20:00.000Z'),
+    repair(10, Number.MAX_SAFE_INTEGER),
+    repair(12, 1),
+  ])
   assert.throws(
     () => buildBetaSessionSummary(input),
     /safe integer|repairManualEdits|out of range/i,
