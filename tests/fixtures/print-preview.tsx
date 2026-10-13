@@ -32,7 +32,8 @@ const fixtureBasket = isMultiPage
       ...basket,
       lines: Array.from({ length: 88 }, (_, index) => {
         const original = basket.lines[index % basket.lines.length]
-        const label = `Proefregel${String(index + 1).padStart(3, '0')}`
+        const label = `Proefregel${String(index + 1).padStart(3, '0')}` +
+          (index === 41 ? 'L'.repeat(165) + 'EINDEPRODUCT' : '')
         if (!original) throw new Error('Synthetische printbron ontbreekt')
         return original.status === 'matched'
           ? { ...original, id: label, productName: label }
