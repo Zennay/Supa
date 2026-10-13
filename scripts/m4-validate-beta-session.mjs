@@ -1,10 +1,14 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, open, link, unlink } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
+import { basename, dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const SESSION_OUTCOMES = new Set(['completed', 'abandoned', 'unknown'])
 const MEAL_OUTCOMES = new Set(['followed', 'skipped', 'swapped', 'unknown'])
 const LEFTOVER_OUTCOMES = new Set(['reused', 'wasted', 'remaining', 'unknown'])
 const BASKET_OUTCOMES = new Set(['better', 'same', 'worse', 'unknown'])
+const SAFE_SESSION_KEY = /^[a-z0-9][a-z0-9_-]{2,63}$/
+const DIRECT_EMAIL_PATTERN = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/iu
 
 const EVENT_TYPES = new Set([
   'beta_session_started',
@@ -43,16 +47,21 @@ function requireString(value, path) {
   assert(typeof value === 'string' && value.trim().length > 0, `${path} must be a non-empty string`)
 }
 
+function requirePrivateSummaryMetadata(value, path) {
+  requireString(value, path)
+  assert(!DIRECT_EMAIL_PATTERN.test(value), `${path} must not contain a direct email identifier`)
+}
+
 function requireBoolean(value, path) {
   assert(typeof value === 'boolean', `${path} must be a boolean`)
 }
 
 function requireNonNegativeInteger(value, path) {
-  assert(Number.isInteger(value) && value >= 0, `${path} must be a non-negative integer`)
+  assert(Number.isSafeInteger(value) && value >= 0, `${path} must be a non-negative safe integer`)
 }
 
 function requirePositiveInteger(value, path) {
-  assert(Number.isInteger(value) && value > 0, `${path} must be a positive integer`)
+  assert(Number.isSafeInteger(value) && value > 0, `${path} must be a positive safe integer`)
 }
 
 function requireRating(value, path) {
@@ -126,6 +135,10 @@ function validateEventPayload(event, path) {
     case 'basket_assessment_viewed':
       requireEnum(event.outcome, BASKET_OUTCOMES, `${path}.outcome`)
       requireNonNegativeInteger(event.unresolved_line_count, `${path}.unresolved_line_count`)
+      assert(
+        event.unresolved_line_count === 0 || event.outcome === 'unknown',
+        `${path}.outcome must be unknown when basket lines are unresolved`,
+      )
       break
     case 'basket_recommendation_decided':
       requireBoolean(event.followed, `${path}.followed`)
@@ -160,11 +173,101 @@ function eventsOfType(events, type) {
   return events.filter((event) => event.type === type)
 }
 
+const MAX_MEAL_SLOT_UTF8_BYTES = 256
+const UNSAFE_MEAL_SLOT_CHAR = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}]/u
+const VISIBLE_MEAL_SLOT_BASE = /[\p{L}\p{N}\p{P}\p{S}]/u
+
+// Measure adherence per *meal*, never per number of outcome events. Two
+// distinct input spellings that NFKC-normalize to the same meal identity
+// cannot create extra "followed" evidence. Keep the original values intact.
+function validateMealOutcomeSlots(events) {
+  const seen = new Set()
+  for (const event of events) {
+    if (event.type !== 'meal_outcome_recorded') continue
+    const slot = event.meal_slot
+    assert(
+      typeof slot === 'string' &&
+      slot.trim().length > 0 &&
+      slot === slot.trim() &&
+      Buffer.byteLength(slot, 'utf8') <= MAX_MEAL_SLOT_UTF8_BYTES,
+      'M4 meal outcome slot must be canonical bounded text',
+    )
+    assert(
+      !UNSAFE_MEAL_SLOT_CHAR.test(slot),
+      'M4 meal outcome slot contains unsafe characters',
+    )
+    const identity = slot.normalize('NFKC')
+    assert(
+      VISIBLE_MEAL_SLOT_BASE.test(identity),
+      'M4 meal outcome slot must include a visible base character',
+    )
+    assert(
+      !seen.has(identity),
+      'M4 meal outcome slot must have exactly one final outcome',
+    )
+    seen.add(identity)
+  }
+}
+
+
 function latestEvent(events, type) {
   return eventsOfType(events, type)
     .slice()
     .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
     .at(-1) ?? null
+}
+
+// A completed repair counts as evidence only if it consumes one earlier
+// still-open start of the same kind. Sort a *copy* by timestamp; incoming
+// event order is not required to match collection order.
+function validateRepairPairs(events) {
+  const byTime = events
+    .filter((event) => event.type === 'repair_started' || event.type === 'repair_completed')
+    .map((event, index) => ({ event, index, at: Date.parse(event.timestamp) }))
+    .sort((a, b) => a.at - b.at || a.index - b.index)
+  const unmatchedStarts = new Map()
+
+  for (const { event, at } of byTime) {
+    const starts = unmatchedStarts.get(event.repair_kind) ?? []
+    if (event.type === 'repair_started') {
+      starts.push(at)
+      unmatchedStarts.set(event.repair_kind, starts)
+      continue
+    }
+    assert(
+      starts.length > 0 && starts[0] < at,
+      'repair_completed requires a preceding unmatched repair_started of the same kind',
+    )
+    starts.shift()
+  }
+}
+
+function validateCompletedWeekCausality(events) {
+  const starts = eventsOfType(events, 'plan_started')
+  const completed = eventsOfType(events, 'plan_completed')
+  const closed = eventsOfType(events, 'beta_week_closed')
+  assert(starts.length > 0, 'completed sessions require a plan_started event')
+  assert(completed.length > 0, 'completed sessions require a plan_completed event')
+  assert(closed.length > 0, 'completed sessions require a beta_week_closed event')
+  assert(closed.length === 1, 'completed sessions require exactly one beta_week_closed event')
+
+  const firstStart = Math.min(...starts.map((event) => Date.parse(event.timestamp)))
+  const firstCompletion = Math.min(...completed.map((event) => Date.parse(event.timestamp)))
+  const latestCompletion = Math.max(...completed.map((event) => Date.parse(event.timestamp)))
+  const closeAt = Date.parse(closed[0].timestamp)
+  assert(
+    firstStart <= firstCompletion && latestCompletion <= closeAt,
+    'completed session events require plan_started <= plan_completed <= beta_week_closed',
+  )
+  assert(
+    completed.every((event) => Date.parse(event.timestamp) >= firstStart),
+    'plan_completed must not precede plan_started',
+  )
+  assert(
+    events.every((event) => event.type === 'beta_week_closed' ||
+      Date.parse(event.timestamp) < closeAt),
+    'completed session must not contain activity at or after beta_week_closed',
+  )
 }
 
 function median(values) {
@@ -180,9 +283,10 @@ export function validateBetaSession(input) {
   requireRecord(input, 'session')
   assert(input.schemaVersion === 1, 'schemaVersion must equal 1')
   assert(input.sessionType === 'm4-private-beta-session', 'sessionType must equal m4-private-beta-session')
-  requireString(input.sessionId, 'sessionId')
+  requirePrivateSummaryMetadata(input.sessionId, 'sessionId')
+  assert(SAFE_SESSION_KEY.test(input.sessionId), 'sessionId must be a pseudonymous path-safe key')
   requireString(input.participantKey, 'participantKey')
-  requireString(input.population, 'population')
+  requirePrivateSummaryMetadata(input.population, 'population')
   requireEnum(input.sessionOutcome, SESSION_OUTCOMES, 'sessionOutcome')
 
   requireRecord(input.consent, 'consent')
@@ -199,16 +303,31 @@ export function validateBetaSession(input) {
 
   assert(Array.isArray(input.events), 'events must be an array')
   input.events.forEach((event, index) => validateEvent(event, index, startedAt, endedAt))
+  validateMealOutcomeSlots(input.events)
   const startEvents = eventsOfType(input.events, 'beta_session_started')
   assert(startEvents.length === 1, 'sessions require exactly one beta_session_started event')
   assert(
     startEvents[0].participant_id === input.participantKey,
     'beta_session_started.participant_id must match participantKey',
   )
+  // The outer session window is a broad recording boundary, not proof
+  // that research activity began. Evidence before its actual start event
+  // would otherwise contaminate effort, meal and trust measurements.
+  const actualSessionStart = Date.parse(startEvents[0].timestamp)
+  assert(
+    input.events.every(
+      (event) => event === startEvents[0] ||
+        Date.parse(event.timestamp) >= actualSessionStart,
+    ),
+    'M4 events must not precede beta_session_started',
+  )
+
+  // Protect effort metrics for all outcomes (including abandoned/unknown):
+  // unmatched starts may remain partial evidence, orphan completions never count.
+  validateRepairPairs(input.events)
 
   if (input.sessionOutcome === 'completed') {
-    assert(eventsOfType(input.events, 'plan_completed').length > 0, 'completed sessions require a plan_completed event')
-    assert(eventsOfType(input.events, 'beta_week_closed').length > 0, 'completed sessions require a beta_week_closed event')
+    validateCompletedWeekCausality(input.events)
   }
 
   return input
@@ -228,6 +347,11 @@ export function buildBetaSessionSummary(input) {
   const followedMeals = knownMealOutcomes.filter((event) => event.outcome === 'followed').length
   const leftoverEvents = eventsOfType(session.events, 'leftover_event_recorded')
   const repairCompletions = eventsOfType(session.events, 'repair_completed')
+  const repairManualEdits = repairCompletions.reduce((sum, event) => {
+    const next = sum + event.manual_edits
+    assert(Number.isSafeInteger(next), 'repairManualEdits total exceeds safe integer range')
+    return next
+  }, 0)
 
   return {
     schemaVersion: 1,
@@ -247,7 +371,7 @@ export function buildBetaSessionSummary(input) {
     supaListEditCount: eventsOfType(session.events, 'list_edit_recorded').length,
     repairCount: repairCompletions.length,
     medianRepairDurationSeconds: median(repairCompletions.map((event) => event.duration_seconds)),
-    repairManualEdits: repairCompletions.reduce((sum, event) => sum + event.manual_edits, 0),
+    repairManualEdits,
     planAdherence:
       knownMealOutcomes.length > 0 ? followedMeals / knownMealOutcomes.length : null,
     reusedLeftoverEvents: leftoverEvents.filter((event) => event.outcome === 'reused').length,
@@ -282,16 +406,49 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]
     if (value === '--output') {
-      output = argv[index + 1] ?? null
+      assert(output === null, '--output may only be provided once')
+      const destination = argv[index + 1]
+      assert(
+        typeof destination === 'string' &&
+          destination.trim().length > 0 &&
+          !destination.startsWith('--'),
+        '--output requires a non-flag file path',
+      )
+      output = destination
       index += 1
       continue
     }
+    assert(!value.startsWith('--'), 'unrecognized option')
     positional.push(value)
   }
 
   assert(positional.length === 1, 'usage: m4-validate-beta-session <session.json> [--output summary.json]')
-  assert(!output || output.trim().length > 0, '--output requires a file path')
   return { input: positional[0], output }
+}
+
+// Private M4 summaries are immutable new artifacts. A fully written 0600
+// temporary inode is hard-linked into place only when the destination is absent.
+// link() fails with EEXIST for a source pathname, symlink, hardlink, or previously
+// published report. It does not follow/overwrite the preexisting destination.
+async function publishPrivateReport(output, serialized) {
+  const temporary = join(
+    dirname(output),
+    `.${basename(output)}.${randomBytes(16).toString('hex')}.tmp`,
+  )
+  let handle = null
+  let created = false
+  try {
+    handle = await open(temporary, 'wx', 0o600)
+    created = true
+    await handle.writeFile(serialized, 'utf8')
+    await handle.sync()
+    await handle.close()
+    handle = null
+    await link(temporary, output)
+  } finally {
+    if (handle) await handle.close()
+    if (created) await unlink(temporary)
+  }
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -309,7 +466,7 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(report, null, 2)}\n`
 
   if (output) {
-    await writeFile(output, serialized, 'utf8')
+    await publishPrivateReport(output, serialized)
   } else {
     process.stdout.write(serialized)
   }
