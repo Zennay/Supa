@@ -12,10 +12,12 @@ Run `node --test tests/qa-m3-private-summary-metadata-identity-red.test.mjs` (No
 | `region` | `synthetic region` | `synthetic region assigned to fictional.person@example.invalid` |
 | `baseline.basket.store.name` | `PLUS fictional branch` | `PLUS synthetic fictional.person@example.invalid` |
 | `candidate.basket.store.name` | `DekaMarkt fictional branch` | `DekaMarkt synthetic fictional.person@example.invalid` |
+| `baseline.basket.store.id` | `qa-plus` | `fictional.person@example.invalid` |
+| `candidate.basket.store.id` | `qa-deka` | `fictional.person@example.invalid` |
 
-Two distinct execution pathways: exported actual `buildObservedWeekReport()` and real M3 report CLI `--output` subprocess, each with one positive and four negative tests (**10 total**). Existing preflight validates nonempty strings and expected retailer substring, but copies unsafe fields verbatim into private summaries. Acceptance is **either explicit input rejection before any report** or safe deterministic redaction with preserved retailer semantics; never let an address enter serialized reports, even when `publicSavingsClaimEligible` remains false or `participantKey` is absent.
+Two distinct execution pathways: exported actual `buildObservedWeekReport()` and real M3 report CLI `--output` subprocess, each with one positive and six negative tests (**14 total**). Existing preflight validates nonempty strings and expected retailer substring, but copies unsafe fields verbatim into private summaries. Acceptance is **either explicit input rejection before any report** or safe deterministic redaction with preserved retailer semantics; never let an address enter serialized reports, even when `publicSavingsClaimEligible` remains false or `participantKey` is absent.
 
-The real CLI tests use disposable per-case temp directories, explicit output paths, confirm byte-identical raw input and prohibit stdout for private reports. No network, retailer requests, account identifiers, contacts, permissions, consent claims or production data.
+The real CLI tests use disposable per-case temp directories, explicit output paths, confirm byte-identical raw input and prohibit stdout for private reports **and direct identifying values in error diagnostics**. No network, retailer requests, account identifiers, contacts, permissions, consent claims or production data.
 
 ## Release boundaries
 
