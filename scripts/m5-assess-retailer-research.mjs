@@ -1,6 +1,6 @@
-import { open, readFile } from 'node:fs/promises'
+import { lstat, open, readFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, parse, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pathToFileURL } from 'node:url'
 import { assessRetailerDiscovery } from './m5-audit-retailer-discovery.mjs'
@@ -133,10 +133,59 @@ export function parseResearchArgs(args) {
   return args[0]
 }
 
-// Single-descriptor read closes the lstat→readFile symlink replacement window.
+// Linux: walk the absolute directory chain under *already opened directory
+// descriptors*. O_NOFOLLOW applies to each segment, not just the final file.
+// Via /proc/self/fd/<parent> we anchor every next lookup to the trusted inode,
+// even when another process renames a directory between lookups. This requires
+// the ordinary Linux procfs fd view (VPS and hosted CI are both Linux).
+async function openNoSymlinkResearchFile(filename) {
+  const canonical = resolve(filename)
+  const flags = constants.O_RDONLY | (constants.O_NOFOLLOW || 0)
+  if (process.platform === 'linux') {
+    check(typeof constants.O_NOFOLLOW === 'number' &&
+      typeof constants.O_DIRECTORY === 'number',
+    'No-follow directory handling is unavailable')
+    const directoryFlags = flags | constants.O_DIRECTORY
+    let parent = await open(parse(canonical).root, directoryFlags)
+    try {
+      const components = canonical.slice(parse(canonical).root.length).split(sep)
+      check(components.length > 0 && components.every(Boolean),
+        'Private reviewer path must name a regular file')
+      for (const name of components.slice(0, -1)) {
+        const child = await open('/proc/self/fd/' + parent.fd + '/' + name,
+          directoryFlags)
+        await parent.close()
+        parent = child
+      }
+      return await open('/proc/self/fd/' + parent.fd + '/' + components.at(-1),
+        flags)
+    } finally {
+      await parent.close()
+    }
+  }
+
+  // Portable fallback: verify that no directory is a symlink before opening
+  // the final inode with O_NOFOLLOW. Linux's descriptor-based traversal above
+  // is stronger against directory-swap races; no such guarantee is implied here.
+  let ancestor = dirname(canonical)
+  const folders = []
+  while (ancestor !== dirname(ancestor)) {
+    folders.push(ancestor)
+    ancestor = dirname(ancestor)
+  }
+  folders.push(ancestor)
+  for (const folder of folders.reverse()) {
+    const stat = await lstat(folder)
+    check(stat.isDirectory() && !stat.isSymbolicLink(),
+      'Private reviewer directory must not be symlinked')
+  }
+  return open(canonical, flags)
+}
+
+// Same verified descriptor for file-mode/size checks AND the single read.
 export async function loadPrivateRetailerResearch(input) {
   const filename = input instanceof URL ? fileURLToPath(input) : input
-  const handle = await open(filename, constants.O_RDONLY | (constants.O_NOFOLLOW || 0))
+  const handle = await openNoSymlinkResearchFile(filename)
   try {
     const fileStats = await handle.stat()
     check(fileStats.isFile() && fileStats.size > 0 && fileStats.size <= 65536,
