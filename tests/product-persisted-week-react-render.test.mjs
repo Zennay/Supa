@@ -230,6 +230,6 @@ test('corrupt browser planner storage renders the safe deterministic default rat
     () => renderToStaticMarkup(createElement(App)),
   )
   assert.match(html, /4 maaltijden actief/)
-  assert.match(html, /€\\s*35,00/)
+  assert.match(html, /€\s*35,00/)
   assert.doesNotMatch(html, /2 maaltijden actief/)
 })
