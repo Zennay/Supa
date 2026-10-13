@@ -22,7 +22,7 @@ These are synthetic research-integrity problems: a summary saying `completed` sh
 node --test tests/m4-causal-lifecycle-independent-qa.test.mjs
 ```
 
-- One **expected GREEN**: fictional event sequence start → plan start → plan complete → week close; private/no-public-claim report.
+- Three **expected GREEN**: fictional ordered completed-week validation; abandoned/unknown sessions retain honest partial evidence without completion; real CLI accepts canonical fictional finished week, emitting a private/no-public-claim summary.
 - Five **expected RED** direct validator assertions (one for each invalid chronology above).
 - One **expected RED** subprocess acceptance: real CLI must refuse omitted-plan-start `completed` evidence, leave the private destination absent, and not print a report/pseudonym.
 - Clock times differ by whole minutes. Unlike [#2073](https://github.com/Zennay/Supa/issues/2073), this does **not** address timestamp fractional precision.
