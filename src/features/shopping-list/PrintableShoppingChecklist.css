@@ -25,6 +25,18 @@
 @media print {
   @page { margin: 14mm; }
 
+  /* Fail closed: the original shopping view may contain arbitrary screen
+     content, not only the known card/navigation class names. The paper
+     subtree is the ONLY content which may become visible when printing. */
+  body:has(.supa-printable-shopping) * {
+    visibility: hidden !important;
+  }
+
+  body:has(.supa-printable-shopping) .supa-printable-shopping__paper,
+  body:has(.supa-printable-shopping) .supa-printable-shopping__paper * {
+    visibility: visible !important;
+  }
+
   body:has(.supa-printable-shopping) {
     background: #fff !important;
     color: #111 !important;
@@ -56,6 +68,12 @@
   }
 
   .supa-printable-shopping__paper {
+    /* Position independently of hidden layout so the printout starts at
+       the first A4 page rather than below screen-only scroll content. */
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    width: 100%;
     display: block !important;
     color: #111;
     background: #fff;
