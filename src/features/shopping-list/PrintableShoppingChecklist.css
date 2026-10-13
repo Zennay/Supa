@@ -25,6 +25,27 @@
 @media print {
   @page { margin: 14mm; }
 
+  body:has(.supa-printable-shopping) {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body:has(.supa-printable-shopping) .app-shell,
+  body:has(.supa-printable-shopping) .content,
+  body:has(.supa-printable-shopping) .screen {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
   body:has(.supa-printable-shopping) .topbar,
   body:has(.supa-printable-shopping) .bottom-nav,
   body:has(.supa-printable-shopping) .section-heading,
