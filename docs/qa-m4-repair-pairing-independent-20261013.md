@@ -6,7 +6,7 @@
 
 The original `scripts/m4-validate-beta-session.mjs` accepts `repair_started` and `repair_completed` as separately valid event records. Its privacy-safe M4 summary uses every completed repair as one instance in `repairCount`, median duration and total manual edits, but currently has no causal pairing check. Tests use only self-contained, fictional events with whole-minute ISO timestamps and a *synthetically* marked closed M3 gate. **No real participant, retailer, baseline, permission, savings measurement or permission to conduct M4 beta exists in this branch.**
 
-The new `tests/m4-repair-pairing-independent-qa.test.mjs` is add-only and exercises the unchanged original source and actual CLI (**10 cases: 5 positive controls, 5 intentional expected RED**):
+The new `tests/m4-repair-pairing-independent-qa.test.mjs` is add-only and exercises the unchanged original source and actual CLI (**12 cases: 7 positive controls, 5 intentional expected RED**):
 
 | Check | Expected on frozen source | Required acceptance after source-owner fix |
 | --- | --- | --- |
@@ -15,6 +15,8 @@ The new `tests/m4-repair-pairing-independent-qa.test.mjs` is add-only and exerci
 | Interleaved different repair kinds, both started first | GREEN | Match per kind; count 2, median 135 sec, edits 3 |
 | No repair events | GREEN | Count 0, median null, edits 0 |
 | Abandoned session with unmatched start | GREEN | Preserve partial record, no invented completion |
+| Unknown session with unmatched start | GREEN | Preserve partial record, no fabricated duration or return intent |
+| Real CLI with valid paired repair | GREEN | Reports count/median/edits without stdout or participant key; input unchanged |
 | Completion without any start | RED | Reject rather than inventing observed repair effort |
 | Completion one minute before its start | RED | Reject regardless of array ordering |
 | Completion kind differs from preceding start | RED | Reject mismatched causal pair |
