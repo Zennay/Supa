@@ -295,6 +295,7 @@ try {
     )
   }
   assert.doesNotMatch(longText, /SCHERMALLEEN_WILLEKEURIGE_SECTIE_GEEN_PAPIER|SCHERMALLEEN_GEVOELIGE_DIAGNOSTIEK_GEEN_PAPIER/)
+  assert.doesNotMatch(longText, /SCHERMALLEEN_ZESTIENDUIZEND_PX_GEEN_EXTRA_PAGINAS/)
   assert.doesNotMatch(longText, /Schermhulp \(mag niet op papier verschijnen\)|Testnavigatie \(mag niet op papier verschijnen\)|€|Besparing:|bespaard/)
   const pdfInfo = execFileSync('pdfinfo', [longPath], {
     encoding: 'utf8',
