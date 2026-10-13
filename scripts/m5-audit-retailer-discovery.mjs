@@ -6,6 +6,31 @@ const DEFAULT_FILE = new URL('../docs/m5-retailer-discovery.v1.json', import.met
 // Request/denial/approval outcomes belong in a separate reviewed evidence record.
 const VALID_STATUSES = new Set(['unreviewed'])
 const MAX_SOURCES = 100
+const DISCOVERY_FIELDS = new Set(['version', 'purpose', 'screenedAt', 'milestone', 'sources'])
+const SOURCE_FIELDS = new Set([
+  'id', 'name', 'researchUrl', 'permissionStatus', 'sourceMechanism',
+  'productionEnabled', 'regionScope', 'assortmentScope', 'termsStatus',
+  'robotsStatus', 'dataOwner', 'contactStatus', 'expectedRefresh',
+  'riskStatus', 'priority', 'permissionEvidence',
+])
+const REQUIRED_PURPOSE =
+  'M5 exploratory retailer discovery only; not an ingest allowlist or grant of data rights'
+
+function assertExactFields(record, allowed, context) {
+  // Reject both unknown authority metadata and missing documented fields.
+  // Reflect.ownKeys also rejects hidden/non-enumerable or symbol-based bypasses.
+  const prototype = Object.getPrototypeOf(record)
+  assert(prototype === Object.prototype || prototype === null,
+    `M5 ${context} requires a plain research object`)
+  const descriptors = Object.getOwnPropertyDescriptors(record)
+  const actualKeys = Reflect.ownKeys(record)
+  assert(actualKeys.length === allowed.size &&
+    actualKeys.every((key) =>
+      typeof key === 'string' && allowed.has(key) &&
+      Object.hasOwn(descriptors[key], 'value')),
+    `M5 ${context} contains missing, unexpected, or accessor schema fields`)
+}
+
 const MARKET_LIST_EVIDENCE = new Set([
   'https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid',
   'https://www.consumentenbond.nl/voedingstests/prijspeiling-supermarkten',
@@ -40,6 +65,9 @@ function safeResearchUrl(value) {
 export function assessRetailerDiscovery(document) {
   assert(document && typeof document === 'object' && !Array.isArray(document),
     'M5 discovery must be an object')
+  assertExactFields(document, DISCOVERY_FIELDS, 'root')
+  assert(document.purpose === REQUIRED_PURPOSE,
+    'M5 discovery purpose must be research-only; production permission is never implied')
   assert(document.version === 1, 'M5 discovery requires version 1')
   assert(document.milestone === 'M5 Expansion (future; current M3 gate OPEN)',
     'M5 discovery cannot assert a later milestone')
@@ -53,6 +81,7 @@ export function assessRetailerDiscovery(document) {
   const sources = document.sources.map((record) => {
     assert(record && typeof record === 'object' && !Array.isArray(record),
       'M5 source must be an object')
+    assertExactFields(record, SOURCE_FIELDS, 'retailer record')
     assert(typeof record.id === 'string' &&
       /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(record.id) &&
       !seen.has(record.id), 'M5 source ID must be unique and canonical')
