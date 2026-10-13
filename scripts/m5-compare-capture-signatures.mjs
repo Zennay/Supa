@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto'
+import { readFile, stat } from 'node:fs/promises'
+import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { inspectCaptureDirectory } from './m1-inspect-captures.mjs'
 
 const MAX_SOURCES = 100
+const MAX_CAPTURE_MANIFEST_BYTES = 8 * 1024 * 1024
 const MAX_JSON_LD_BLOCKS = 128
 const MAX_APPLICATION_JSON_SCRIPTS = 128
 const MAX_JSON_LD_ENTRIES = 256
@@ -207,7 +210,32 @@ export function compareInspections(current, baseline = null) {
   }
 }
 
+// M1's inspector reads every declared source before compareInspections() sees
+// its MAX_SOURCES limit. Gate both manifests first, before any source HTML I/O.
+// This is a bounded offline preflight, not an atomic filesystem snapshot.
+async function preflightBoundedManifest(directory) {
+  const manifestPath = path.join(directory, 'manifest.json')
+  const fail = () => { throw new Error('Invalid or oversized M1 capture manifest') }
+  let parsed
+  try {
+    const info = await stat(manifestPath)
+    if (!info.isFile() || !Number.isSafeInteger(info.size) ||
+        info.size > MAX_CAPTURE_MANIFEST_BYTES) fail()
+    const raw = await readFile(manifestPath, 'utf8')
+    if (Buffer.byteLength(raw, 'utf8') > MAX_CAPTURE_MANIFEST_BYTES) fail()
+    parsed = JSON.parse(raw)
+  } catch {
+    fail()
+  }
+  if (!parsed || parsed.milestone !== 'M1 Data Feasibility' ||
+      parsed.bounded !== true || !Array.isArray(parsed.results) ||
+      parsed.results.length > MAX_SOURCES ||
+      parsed.sourceCount !== parsed.results.length) fail()
+}
+
 export async function compareCaptureDirectories(currentDir, baselineDir = null) {
+  await preflightBoundedManifest(currentDir)
+  if (baselineDir) await preflightBoundedManifest(baselineDir)
   const current = await inspectCaptureDirectory(currentDir)
   const baseline = baselineDir ? await inspectCaptureDirectory(baselineDir) : null
   return compareInspections(current, baseline)
