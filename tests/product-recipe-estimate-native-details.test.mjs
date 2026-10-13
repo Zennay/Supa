@@ -19,13 +19,15 @@ test('fixture recipe estimate has visible indicative money and native expandable
     const expected = recipeEstimatePresentation(recipe.estimatedCost)
     assert.match(html, /data-recipe-estimate-kind="indicative"/)
     assert.match(html, /<small[^>]*>Richtprijs:/)
-    assert.match(html, /<details[^>]*><summary>Waarom een richtprijs\?<\/summary>/)
+    assert.match(html, /<details[^>]*><summary[^>]*>Waarom een richtprijs\?<\/summary>/)
     assert.ok(html.includes('niet de actuele prijs'), recipe.id)
     assert.ok(html.includes('voorbeeldrecept'), recipe.id)
     assert.ok(html.includes('Richtprijs:'), recipe.id)
     assert.ok(html.includes(expected.label.split(' / recept')[0].replace(/&/g, '&amp;')), recipe.id)
     assert.doesNotMatch(html, /<button\b[^>]*>|on(?:click|keydown)=/i)
     assert.doesNotMatch(html, /<summary[^>]+tabindex="-1"/)
+    assert.match(html, /<summary[^>]*style="[^"]*min-height:44px/)
+    assert.match(html, /<summary[^>]*style="[^"]*overflow-wrap:anywhere/)
   }
 })
 
@@ -34,7 +36,7 @@ test('unknown and unsafe fixture costs remain unpriced with an actionable disclo
     const html = renderEstimate(bad)
     assert.match(html, /data-recipe-estimate-kind="unknown"/)
     assert.match(html, /<small[^>]*>Richtprijs onbekend<\/small>/)
-    assert.match(html, /<details[^>]*><summary>Waarom geen richtprijs\?<\/summary>/)
+    assert.match(html, /<details[^>]*><summary[^>]*>Waarom geen richtprijs\?<\/summary>/)
     assert.match(html, /geen betrouwbare richtprijs/)
     assert.doesNotMatch(html, /€|Besparing|bespaard/)
   }
@@ -44,7 +46,7 @@ test('zero and cent-exact examples retain their indicative label, never claim re
   for (const value of [0, 0.01, 3.5, 19.69]) {
     const html = renderEstimate(value)
     assert.match(html, /Richtprijs:/)
-    assert.match(html, /<summary>Waarom een richtprijs\?<\/summary>/)
+    assert.match(html, /<summary[^>]*>Waarom een richtprijs\?<\/summary>/)
     assert.match(html, /niet de actuele prijs/)
     assert.doesNotMatch(html, /<output|data-public-savings-claim|<strong>Besparing/)
   }
@@ -54,9 +56,10 @@ test('native disclosure is a semantic sibling of price text, not a hover-only ti
   const html = renderEstimate(19.69)
   assert.match(
     html,
-    /^<div class="recipe-estimate-explanation" data-recipe-estimate-kind="indicative"><small[^>]*>[^<]+<\/small><details[^>]*><summary>[^<]+<\/summary><p>[^<]+<\/p><\/details><\/div>$/,
+    /^<div class="recipe-estimate-explanation" data-recipe-estimate-kind="indicative"><small[^>]*>[^<]+<\/small><details[^>]*><summary[^>]*>[^<]+<\/summary><p>[^<]+<\/p><\/details><\/div>$/,
   )
   assert.doesNotMatch(html, /title=|aria-hidden="true"|style="display:none"/)
+  assert.match(html, /<summary[^>]*style="[^"]*cursor:pointer/)
   assert.equal((html.match(/<details/g) ?? []).length, 1)
   assert.equal((html.match(/<summary/g) ?? []).length, 1)
 })
