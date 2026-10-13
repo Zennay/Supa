@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { buildObservationSheet } from '../scripts/m3-create-observation-sheet.mjs'
-import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
-import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
-import { validateBetaSession } from '../scripts/m4-validate-beta-session.mjs'
+import {
+  buildWeeklyBasketStudyFromObservationSheet,
+  main as convertObservationSheet,
+} from '../scripts/m3-build-observed-study.mjs'
+import {
+  buildObservedWeekReport,
+  main as assessObservedWeek,
+} from '../scripts/m3-assess-observed-week.mjs'
+import {
+  buildBetaSessionSummary,
+  validateBetaSession,
+} from '../scripts/m4-validate-beta-session.mjs'
 
 // Entirely invented protocol fixtures: this test does not represent a retailer visit.
 // Never change these to real prices, field observations, or participant data.
@@ -157,4 +169,59 @@ test('M4 gate: synthetic session cannot pass while genuine M3 evidence is open',
     () => validateBetaSession(session),
     /m3Gate.status must be closed before M4 beta data is accepted/,
   )
+})
+
+test('M3 gate: separate source, derived study and report preserve input bytes', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-qa-evidence-gate-'))
+  const source = join(directory, 'synthetic-sheet.json')
+  const studyFile = join(directory, 'derived-study.json')
+  const reportFile = join(directory, 'derived-report.json')
+  const original = JSON.stringify(syntheticSheet(), null, 2) + '\n'
+  try {
+    await writeFile(source, original, { encoding: 'utf8', mode: 0o600 })
+    await convertObservationSheet([source, '--output', studyFile])
+    const studyBytes = await readFile(studyFile, 'utf8')
+    await assessObservedWeek([studyFile, '--output', reportFile])
+    const report = JSON.parse(await readFile(reportFile, 'utf8'))
+    assert.equal(await readFile(source, 'utf8'), original)
+    assert.equal(await readFile(studyFile, 'utf8'), studyBytes)
+    assert.notEqual(source, studyFile)
+    assert.notEqual(studyFile, reportFile)
+    assertNoPublicMoneyClaim(report)
+    assert.equal(JSON.stringify(report).includes('synthetic-participant-001'), false)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('M4 gate: fictional closed-gate parser summary still suppresses private identities', () => {
+  // Purely synthetic parser test. A manually supplied "closed" string is NOT
+  // evidence of M3 human completion and must never authorize a real beta.
+  const key = 'synthetic-private-key-009'
+  const session = {
+    schemaVersion: 1,
+    sessionType: 'm4-private-beta-session',
+    sessionId: 'synthetic-summary-session',
+    participantKey: key,
+    population: 'fictional validation cohort',
+    sessionOutcome: 'unknown',
+    consent: { researchConsent: true, allowsAnonymizedQuotes: false },
+    m3Gate: { status: 'closed', evidenceRef: 'synthetic-parser-contract-only' },
+    startedAt: '2026-10-06T10:00:00Z',
+    endedAt: '2026-10-06T10:01:00Z',
+    events: [{
+      type: 'beta_session_started',
+      timestamp: '2026-10-06T10:00:00Z',
+      participant_id: key,
+      study_week_id: 'synthetic-week',
+    }],
+  }
+  const summary = buildBetaSessionSummary(session)
+  assert.equal(summary.sessionOutcome, 'unknown')
+  assert.equal(summary.publicClaimEligible, false)
+  assert.equal(summary.participantKeyIncluded, false)
+  assert.equal('participantKey' in summary, false)
+  assert.equal(JSON.stringify(summary).includes(key), false)
+  assert.equal(summary.supaPlanningDurationSeconds, null)
+  assert.equal(summary.basketOutcome, 'unknown')
 })
