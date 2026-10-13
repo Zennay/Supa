@@ -1,10 +1,14 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, open, link, unlink } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
+import { basename, dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const SESSION_OUTCOMES = new Set(['completed', 'abandoned', 'unknown'])
 const MEAL_OUTCOMES = new Set(['followed', 'skipped', 'swapped', 'unknown'])
 const LEFTOVER_OUTCOMES = new Set(['reused', 'wasted', 'remaining', 'unknown'])
 const BASKET_OUTCOMES = new Set(['better', 'same', 'worse', 'unknown'])
+const SAFE_SESSION_KEY = /^[a-z0-9][a-z0-9_-]{2,63}$/
+const DIRECT_EMAIL_PATTERN = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/iu
 
 const EVENT_TYPES = new Set([
   'beta_session_started',
@@ -43,16 +47,21 @@ function requireString(value, path) {
   assert(typeof value === 'string' && value.trim().length > 0, `${path} must be a non-empty string`)
 }
 
+function requirePrivateSummaryMetadata(value, path) {
+  requireString(value, path)
+  assert(!DIRECT_EMAIL_PATTERN.test(value), `${path} must not contain a direct email identifier`)
+}
+
 function requireBoolean(value, path) {
   assert(typeof value === 'boolean', `${path} must be a boolean`)
 }
 
 function requireNonNegativeInteger(value, path) {
-  assert(Number.isInteger(value) && value >= 0, `${path} must be a non-negative integer`)
+  assert(Number.isSafeInteger(value) && value >= 0, `${path} must be a non-negative safe integer`)
 }
 
 function requirePositiveInteger(value, path) {
-  assert(Number.isInteger(value) && value > 0, `${path} must be a positive integer`)
+  assert(Number.isSafeInteger(value) && value > 0, `${path} must be a positive safe integer`)
 }
 
 function requireRating(value, path) {
@@ -126,6 +135,10 @@ function validateEventPayload(event, path) {
     case 'basket_assessment_viewed':
       requireEnum(event.outcome, BASKET_OUTCOMES, `${path}.outcome`)
       requireNonNegativeInteger(event.unresolved_line_count, `${path}.unresolved_line_count`)
+      assert(
+        event.unresolved_line_count === 0 || event.outcome === 'unknown',
+        `${path}.outcome must be unknown when basket lines are unresolved`,
+      )
       break
     case 'basket_recommendation_decided':
       requireBoolean(event.followed, `${path}.followed`)
@@ -233,9 +246,10 @@ export function validateBetaSession(input) {
   requireRecord(input, 'session')
   assert(input.schemaVersion === 1, 'schemaVersion must equal 1')
   assert(input.sessionType === 'm4-private-beta-session', 'sessionType must equal m4-private-beta-session')
-  requireString(input.sessionId, 'sessionId')
+  requirePrivateSummaryMetadata(input.sessionId, 'sessionId')
+  assert(SAFE_SESSION_KEY.test(input.sessionId), 'sessionId must be a pseudonymous path-safe key')
   requireString(input.participantKey, 'participantKey')
-  requireString(input.population, 'population')
+  requirePrivateSummaryMetadata(input.population, 'population')
   requireEnum(input.sessionOutcome, SESSION_OUTCOMES, 'sessionOutcome')
 
   requireRecord(input.consent, 'consent')
@@ -284,6 +298,11 @@ export function buildBetaSessionSummary(input) {
   const followedMeals = knownMealOutcomes.filter((event) => event.outcome === 'followed').length
   const leftoverEvents = eventsOfType(session.events, 'leftover_event_recorded')
   const repairCompletions = eventsOfType(session.events, 'repair_completed')
+  const repairManualEdits = repairCompletions.reduce((sum, event) => {
+    const next = sum + event.manual_edits
+    assert(Number.isSafeInteger(next), 'repairManualEdits total exceeds safe integer range')
+    return next
+  }, 0)
 
   return {
     schemaVersion: 1,
@@ -303,7 +322,7 @@ export function buildBetaSessionSummary(input) {
     supaListEditCount: eventsOfType(session.events, 'list_edit_recorded').length,
     repairCount: repairCompletions.length,
     medianRepairDurationSeconds: median(repairCompletions.map((event) => event.duration_seconds)),
-    repairManualEdits: repairCompletions.reduce((sum, event) => sum + event.manual_edits, 0),
+    repairManualEdits,
     planAdherence:
       knownMealOutcomes.length > 0 ? followedMeals / knownMealOutcomes.length : null,
     reusedLeftoverEvents: leftoverEvents.filter((event) => event.outcome === 'reused').length,
@@ -338,16 +357,49 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]
     if (value === '--output') {
-      output = argv[index + 1] ?? null
+      assert(output === null, '--output may only be provided once')
+      const destination = argv[index + 1]
+      assert(
+        typeof destination === 'string' &&
+          destination.trim().length > 0 &&
+          !destination.startsWith('--'),
+        '--output requires a non-flag file path',
+      )
+      output = destination
       index += 1
       continue
     }
+    assert(!value.startsWith('--'), 'unrecognized option')
     positional.push(value)
   }
 
   assert(positional.length === 1, 'usage: m4-validate-beta-session <session.json> [--output summary.json]')
-  assert(!output || output.trim().length > 0, '--output requires a file path')
   return { input: positional[0], output }
+}
+
+// Private M4 summaries are immutable new artifacts. A fully written 0600
+// temporary inode is hard-linked into place only when the destination is absent.
+// link() fails with EEXIST for a source pathname, symlink, hardlink, or previously
+// published report. It does not follow/overwrite the preexisting destination.
+async function publishPrivateReport(output, serialized) {
+  const temporary = join(
+    dirname(output),
+    `.${basename(output)}.${randomBytes(16).toString('hex')}.tmp`,
+  )
+  let handle = null
+  let created = false
+  try {
+    handle = await open(temporary, 'wx', 0o600)
+    created = true
+    await handle.writeFile(serialized, 'utf8')
+    await handle.sync()
+    await handle.close()
+    handle = null
+    await link(temporary, output)
+  } finally {
+    if (handle) await handle.close()
+    if (created) await unlink(temporary)
+  }
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -365,7 +417,7 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(report, null, 2)}\n`
 
   if (output) {
-    await writeFile(output, serialized, 'utf8')
+    await publishPrivateReport(output, serialized)
   } else {
     process.stdout.write(serialized)
   }
