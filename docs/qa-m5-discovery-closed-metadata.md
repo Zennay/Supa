@@ -13,7 +13,7 @@ The source `assessRetailerDiscovery()` enforces `productionReady=false` in its d
 | Group | Synthetic mutation | Expected |
 |---|---|---|
 | GREEN | Original 17-candidate JSON unchanged | Stable 17 stores, deterministic report, all disabled |
-| GREEN | `permissionStatus=denied` and `permission-requested` | Denial remains no-ingest; productionReady false |
+| GREEN | Reverse ordering of the 17 unchanged `unreviewed` candidates | Deterministic sorted report; input array unchanged; 17 blockers and productionReady false |
 | RED x4 | Root `productionEnabled=true`, `permissionGranted=true`, `ingestReady=true`, `licenseVerified=true` | **Reject** unexpected rights flags |
 | RED x3 | Extra per-retailer `ingestAuthorized=true`, `licenseApproved=true`, `proxyOverridePermitted=true` | **Reject** unexpected rights flags |
 | RED x1 | Replace top-level `purpose` with production allowlist assertion | **Reject** misleading purpose |
@@ -21,6 +21,6 @@ The source `assessRetailerDiscovery()` enforces `productionReady=false` in its d
 
 **11 total executable tests** (2 GREEN + 9 expected RED). All mutations run fully in memory; the CLI case uses an auto-deleted directory and synthetic JSON, not real retailer credentials or endpoint requests.
 
-The product owner may implement a closed/versioned allowlist of allowed top-level and record keys and exact research-only purpose, avoiding accidental backward incompatibility with future explicitly reviewed schemas. Keep `permissionStatus` restricted to the existing non-authorizing statuses. Production permission remains governed separately by the existing M1 source-permission gate.
+The second positive control is deliberately independent of interim `denied`/`permission-requested` discovery-status semantics on the moving product branch. The product owner may implement a closed/versioned allowlist of allowed top-level and record keys and exact research-only purpose, avoiding accidental backward incompatibility with future explicitly reviewed schemas. Keep `permissionStatus` restricted to the existing non-authorizing statuses. Production permission remains governed separately by the existing M1 source-permission gate.
 
 Independent zCloud preflight/write lease, original owner review, all-GREEN corrected-head hosted and applicable permanent VPS proof, integration on latest main, M3/M4 prerequisite completion and explicit human release authorization are required before merge or deploy. Until then **DRAFT/HOLD/NO MERGE/NO DEPLOY**; M3 authentic PLUS + DekaMarkt [#78](https://github.com/Zennay/Supa/issues/78) remains OPEN.
