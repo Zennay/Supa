@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { readFile, writeFile, mkdtemp, rm, symlink } from 'node:fs/promises'
+import { readFile, writeFile, mkdtemp, rm, symlink, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { assessRetailerResearch, parseResearchArgs } from '../scripts/m5-assess-retailer-research.mjs'
+import { assessRetailerResearch, loadPrivateRetailerResearch, parseResearchArgs } from '../scripts/m5-assess-retailer-research.mjs'
 
 const durl = new URL('../docs/m5-retailer-discovery.v1.json', import.meta.url)
 const original = JSON.parse(await readFile(durl, 'utf8'))
@@ -176,6 +176,75 @@ test('CLI requires explicit local file, emits privacy-redacted report and preser
     assert.equal(huge.status, 2)
     assert.equal(huge.stdout, '')
     assert.ok(!huge.stderr.includes(oversize))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('QA #2102: real private ledger rejects symlinked ancestor and nested alias', {
+  skip: process.platform === 'win32',
+}, async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'supa-private-ancestor-'))
+  try {
+    const real = path.join(dir, 'private')
+    const nested = path.join(dir, 'nested')
+    await mkdir(real, { mode: 0o700 })
+    await mkdir(nested, { mode: 0o700 })
+    const source = path.join(real, 'research.json')
+    const original = JSON.stringify(empty())
+    await writeFile(source, original, { mode: 0o600 })
+    const immediateAlias = path.join(dir, 'alias')
+    const nestedAlias = path.join(nested, 'alias')
+    await symlink(real, immediateAlias, 'dir')
+    await symlink(real, nestedAlias, 'dir')
+    const script = new URL('../scripts/m5-assess-retailer-research.mjs', import.meta.url)
+
+    assert.deepEqual(await loadPrivateRetailerResearch(source), empty(),
+      'regular private file still works')
+    const good = spawnSync(process.execPath, [script.pathname, source], {
+      encoding: 'utf8', timeout: 15000,
+    })
+    assert.equal(good.status, 0, good.stderr)
+    assert.equal(JSON.parse(good.stdout).productionReady, false)
+
+    for (const bad of [path.join(immediateAlias, 'research.json'),
+      path.join(nestedAlias, 'research.json')]) {
+      await assert.rejects(loadPrivateRetailerResearch(bad),
+        undefined, 'all directory symlink components must fail closed')
+      const command = spawnSync(process.execPath, [script.pathname, bad], {
+        encoding: 'utf8', timeout: 15000,
+      })
+      assert.equal(command.status, 2, command.stderr)
+      assert.equal(command.stdout, '', 'no private report on refused source')
+      assert.match(command.stderr, /Offline M5 research assessment rejected/)
+      assert.ok(!command.stderr.includes(dir), 'private folder path leaked')
+    }
+    assert.equal(await readFile(source, 'utf8'), original)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('QA #2102: priorities CLI inherits private symlink-ancestor refusal', {
+  skip: process.platform === 'win32',
+}, async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'supa-m5-priority-alias-'))
+  try {
+    const actual = path.join(dir, 'actual')
+    await mkdir(actual, { mode: 0o700 })
+    const name = path.join(actual, 'research.json')
+    const original = JSON.stringify(empty())
+    await writeFile(name, original, { mode: 0o600 })
+    const alias = path.join(dir, 'alias')
+    await symlink(actual, alias, 'dir')
+    const script = new URL('../scripts/m5-build-retailer-priorities.mjs', import.meta.url)
+    const rejected = spawnSync(process.execPath,
+      [script.pathname, path.join(alias, 'research.json')],
+      { encoding: 'utf8', timeout: 15000 })
+    assert.equal(rejected.status, 2)
+    assert.equal(rejected.stdout, '')
+    assert.doesNotMatch(rejected.stderr, /supa-m5-priority-alias|research\.json/)
+    assert.equal(await readFile(name, 'utf8'), original)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
