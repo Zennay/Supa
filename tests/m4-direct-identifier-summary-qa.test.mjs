@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, readFile, rm, writeFile, access } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import {
   buildBetaSessionSummary,
+  main,
   validateBetaSession,
 } from '../scripts/m4-validate-beta-session.mjs'
 
@@ -72,5 +76,45 @@ for (const [field, raw] of [
       /privacy|identifier|email|unsafe|pseudonym|population|sessionId/i,
       'M4 summary creation must not echo direct participant identifiers into reported session metadata',
     )
+  })
+}
+
+async function withSyntheticCliFiles(session, check) {
+  const folder = await mkdtemp(join(tmpdir(), 'supa-m4-private-qa-'))
+  const source = join(folder, 'fictional-session.json')
+  const reportPath = join(folder, 'fictional-summary.json')
+  try {
+    await writeFile(source, JSON.stringify(session), 'utf8')
+    await check(source, reportPath)
+  } finally {
+    await rm(folder, { recursive: true, force: true })
+  }
+}
+
+test('positive: real M4 --output CLI serializes safe opaque data, not participant pseudonym', async () => {
+  await withSyntheticCliFiles(fictionalSession(), async (source, reportPath) => {
+    await main([source, '--output', reportPath])
+    const report = JSON.parse(await readFile(reportPath, 'utf8'))
+    assert.equal(report.sessionId, 'opaque-qa-session-001')
+    assertNoDirectIdentifier(report, 'CLI positive')
+    assert.doesNotMatch(JSON.stringify(report), /synthetic-pseudonym-001/)
+  })
+})
+
+for (const field of ['sessionId', 'population']) {
+  test(`EXPECTED RED: actual M4 --output must refuse direct-email ${field} before writing report`, async () => {
+    const input = fictionalSession({
+      [field]: field === 'sessionId'
+        ? DIRECT_IDENTIFIER : 'fictional students: ' + DIRECT_IDENTIFIER,
+    })
+    await withSyntheticCliFiles(input, async (source, reportPath) => {
+      await assert.rejects(
+        () => main([source, '--output', reportPath]),
+        /privacy|identifier|email|unsafe|pseudonym|population|sessionId/i,
+        'output writer must reject private direct identifiers before file creation',
+      )
+      await assert.rejects(() => access(reportPath),
+        /ENOENT/, 'rejected session must not leave private report on disk')
+    })
   })
 }
