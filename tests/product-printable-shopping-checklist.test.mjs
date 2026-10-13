@@ -74,6 +74,7 @@ test('multipacks show both outer packages and real inner physical units', () => 
   assert.ok(line)
   line.requirement.amount = 1200
   line.pack.amount = 200
+  line.pack.unit = 'g'
   line.pack.count = 2
   line.packs = 3
   const result = preparePrintableShoppingChecklist(source)
