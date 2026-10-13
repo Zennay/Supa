@@ -82,7 +82,7 @@ export function preparePrintableShoppingChecklist(
         label: line.productName.trim(),
         quantity: count === 1
           ? `${line.packs} × ${pack}`
-          : `${line.packs} verpakkingen van ${count} × ${pack}`,
+          : `${line.packs} ${line.packs === 1 ? 'verpakking' : 'verpakkingen'} van ${count} × ${pack}`,
         needsReview: false,
       }
     }
