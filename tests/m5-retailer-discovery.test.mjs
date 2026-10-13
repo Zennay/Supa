@@ -44,6 +44,11 @@ test('source discovery is not a backdoor around M1 data rights', () => {
     ['permissionEvidence', 'https://example.invalid/approval'],
     ['researchUrl', 'http://invalid.example/path'],
     ['researchUrl', 'https://user:pass@invalid.example/'],
+    ['researchUrl', 'https://www.wur.nl.evil.example/nl/onderzoek'],
+    ['researchUrl', 'https://example.invalid/fictional-market-list'],
+    ['researchUrl', 'https://www.wur.nl/'],
+    ['researchUrl', 'https://www.consumentenbond.nl@evil.example/'],
+    ['researchUrl', 'https://www.consumentenbond.nl/voedingstests/prijspeiling-supermarkten?tracking=1'],
     ['name', 'ALDI' + String.fromCodePoint(0x202e)]
   ]) {
     const doc = clone()
