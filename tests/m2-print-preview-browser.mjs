@@ -119,7 +119,8 @@ try {
       }
     `)
     assert.ok(observed, 'React print fixture did not render')
-    assert.ok(observed.viewport <= width + 2 && observed.viewport >= width - 2, `Firefox did not honor ${width}px viewport: ${observed.viewport}`)\n    assert.equal(observed.horizontalOverflow, false, `overflow at ${width}px`)
+    assert.ok(observed.viewport <= width + 2 && observed.viewport >= width - 2, `Firefox did not honor ${width}px viewport: ${observed.viewport}`)
+    assert.equal(observed.horizontalOverflow, false, `overflow at ${width}px`)
     assert.equal(observed.minHeight, '44px')
     assert.equal(observed.buttonType, 'button')
     assert.equal(observed.rows, 11)
