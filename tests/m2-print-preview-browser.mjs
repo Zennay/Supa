@@ -248,6 +248,61 @@ try {
     containsPdfHeader: true,
     printTextVerifiedWithPoppler: evidence.pdfTextVerified,
   })
+  // Physical shopping lists can exceed one A4 page. Use Firefox's actual
+  // native print layout to prove every row survives page boundaries exactly
+  // once; passing SSR or first-page text alone would miss truncation.
+  await request(`/session/${sessionId}/url`, {
+    method: 'POST',
+    body: JSON.stringify({ url: pageUrl + '?long=1' }),
+  })
+  await waitFor(sessionId, '.supa-printable-shopping__action')
+  const longRows = await execute(
+    sessionId,
+    `return document.querySelectorAll('.supa-printable-shopping__paper li').length`,
+  )
+  assert.equal(longRows, 88, 'multi-page fixture did not mount 88 physical rows')
+  const longBase64 = await request(`/session/${sessionId}/print`, {
+    method: 'POST',
+    body: JSON.stringify({
+      background: false,
+      page: { width: 21, height: 29.7 },
+      scale: 1,
+      shrinkToFit: true,
+    }),
+  })
+  const longPdf = Buffer.from(longBase64, 'base64')
+  assert.equal(longPdf.subarray(0, 5).toString('ascii'), '%PDF-')
+  assert.ok(longPdf.length > 2000 && longPdf.length < 3_000_000)
+  const longPath = path.join(artifactDir, 'synthetic-multipage-shopping-list.pdf')
+  await writeFile(longPath, longPdf)
+  const longText = extractPdfText(longPath)
+  assert.notEqual(longText, null, 'Poppler could not inspect the multi-page PDF')
+  const labels = longText.match(/Proefregel\\d{3}/g) ?? []
+  assert.equal(labels.length, 88, 'Firefox PDF dropped or duplicated one or more physical rows')
+  assert.equal(new Set(labels).size, 88, 'Firefox PDF repeated a physical row')
+  for (let index = 1; index <= 88; index += 1) {
+    assert.ok(
+      labels.includes(`Proefregel${String(index).padStart(3, '0')}`),
+      `PDF missing physical shopping line ${index}`,
+    )
+  }
+  assert.doesNotMatch(longText, /Schermhulp \\(mag niet op papier verschijnen\\)|Testnavigatie \\(mag niet op papier verschijnen\\)|€|Besparing:|bespaard/)
+  const pdfInfo = execFileSync('pdfinfo', [longPath], {
+    encoding: 'utf8',
+    timeout: 10_000,
+  })
+  const pages = Number(/^Pages:\\s*(\\d+)/m.exec(pdfInfo)?.[1])
+  assert.ok(Number.isInteger(pages) && pages >= 2 && pages < 15,
+    `expected real multi-page PDF, observed ${pages} pages`)
+  evidence.checks.push({
+    kind: 'native-firefox-multi-page-pdf',
+    passed: true,
+    syntheticRows: 88,
+    uniquePrintedRows: labels.length,
+    pages,
+    bytes: longPdf.length,
+  })
+
 } finally {
   await request(`/session/${sessionId}`, { method: 'DELETE' }).catch(() => {})
   await writeFile(
