@@ -169,7 +169,8 @@ export function rehearseM3FieldPipeline() {
   return {
     kind: 'm3-field-pipeline-rehearsal',
     syntheticOnly: true,
-    requirementPairsChecked: 11,\n    fictionalOutcomesVerified: ['better', 'same', 'worse', 'unknown'],
+    requirementPairsChecked: 11,
+    fictionalOutcomesVerified: ['better', 'same', 'worse', 'unknown'],
     negativeControlsPassed: 7,
     converterAndAssessorOperational: true,
     realRetailerEvidenceVerified: false,
