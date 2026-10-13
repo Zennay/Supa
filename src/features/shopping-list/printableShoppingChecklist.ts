@@ -17,7 +17,7 @@ export type PrintableShoppingChecklistData = {
 
 function visibleText(value: unknown): value is string {
   return typeof value === 'string' &&
-    /[\\p{L}\\p{N}\\p{S}]/u.test(value.replace(/[\\p{Cf}\\p{M}]/gu, ''))
+    /[\p{L}\p{N}\p{S}]/u.test(value.replace(/[\p{Cf}\p{M}]/gu, ''))
 }
 
 function quantityLabel(amount: number | null, unit: unknown): string {
