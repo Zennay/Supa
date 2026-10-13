@@ -72,8 +72,10 @@ test('multipacks show both outer packages and real inner physical units', () => 
   const source = structuredClone(basket())
   const line = source.lines.find((line) => line.status === 'matched')
   assert.ok(line)
-  line.packs = 3
+  line.requirement.amount = 1200
+  line.pack.amount = 200
   line.pack.count = 2
+  line.packs = 3
   const result = preparePrintableShoppingChecklist(source)
   assert.match(result.lines.find((item) => item.id === line.id).quantity, /^3 verpakkingen van 2 × /)
 })
@@ -84,6 +86,25 @@ test('invalid matched physical quantities fail closed to a manual check', () => 
     const line = source.lines.find((item) => item.status === 'matched')
     assert.ok(line)
     line.packs = value
+    const result = preparePrintableShoppingChecklist(source)
+    const printed = result.lines.find((item) => item.id === line.id)
+    assert.equal(printed.needsReview, true)
+    assert.match(printed.quantity, /handmatig kiezen/)
+  }
+})
+
+
+test('stale excessive packs or incompatible units never become a purchase instruction', () => {
+  const original = basket()
+  for (const mutate of [
+    (line) => { line.packs += 1 },
+    (line) => { line.pack.unit = 'ml' },
+    (line) => { line.pack.count = 0 },
+  ]) {
+    const source = structuredClone(original)
+    const line = source.lines.find((item) => item.status === 'matched')
+    assert.ok(line)
+    mutate(line)
     const result = preparePrintableShoppingChecklist(source)
     const printed = result.lines.find((item) => item.id === line.id)
     assert.equal(printed.needsReview, true)
