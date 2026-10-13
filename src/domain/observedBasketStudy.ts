@@ -99,6 +99,30 @@ function validTimestamp(value: unknown) {
   return Number.isFinite(timestamp) ? timestamp : null
 }
 
+// A week is a local calendar interval, not a rolling 24h freshness window.
+// Allow practical shopping on the preceding weekend (Sat/Sun), then during
+// the planned Monday-Sunday week. Compare civil dates from each observation's
+// explicit ISO offset, so crossing DST or UTC midnight does not relabel it.
+const PRE_WEEK_SHOPPING_DAYS = 2
+const PLANNED_WEEK_DAYS = 7
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+function localCalendarDayIndex(date: string) {
+  const [year, month, day] = date.split('-').map(Number)
+  return Math.floor(Date.UTC(year, month - 1, day) / MS_PER_DAY)
+}
+
+function matchesDeclaredPlanningWeek(weekStart: string, observedAt: string) {
+  const localDate = observedAt.slice(0, 10)
+  const daysFromWeekStart =
+    localCalendarDayIndex(localDate) - localCalendarDayIndex(weekStart)
+
+  return (
+    daysFromWeekStart >= -PRE_WEEK_SHOPPING_DAYS &&
+    daysFromWeekStart < PLANNED_WEEK_DAYS
+  )
+}
+
 function validateEvidence(
   label: 'baseline' | 'candidate',
   evidence: ObservedBasketEvidence,
@@ -220,6 +244,23 @@ export function assessWeeklyBasketStudy(
       )
     }
   }
+  // Date-validation precedes this check; never calculate misleading week
+  // coherence from invalid calendar values or timestamp strings.
+  if (validCalendarDate(study.weekStart)) {
+    if (
+      baselineObservedAt !== null &&
+      !matchesDeclaredPlanningWeek(study.weekStart, study.baseline.observedAt)
+    ) {
+      reasons.push('baseline observation is outside the declared planning week shopping window')
+    }
+    if (
+      candidateObservedAt !== null &&
+      !matchesDeclaredPlanningWeek(study.weekStart, study.candidate.observedAt)
+    ) {
+      reasons.push('candidate observation is outside the declared planning week shopping window')
+    }
+  }
+
 
   const comparison = compareFullBaskets({
     baseline: study.baseline.basket,
