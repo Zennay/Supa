@@ -134,6 +134,17 @@ try {
     await screenshot(sessionId, `preview-${width}.png`)
   }
 
+  const clickInvokesNativePrint = await execute(sessionId, `
+    const button = document.querySelector('.supa-printable-shopping__action')
+    if (!button) return false
+    let invoked = 0
+    window.print = () => { invoked += 1 }
+    button.click()
+    return invoked === 1
+  `)
+  assert.equal(clickInvokesNativePrint, true, 'the actual React button did not invoke window.print')
+  evidence.checks.push({ kind: 'react-print-button', passed: true })
+
   // W3C /print exercises the *real* Firefox print medium, not an SSR stub.
   const printBase64 = await request(`/session/${sessionId}/print`, {
     method: 'POST',
