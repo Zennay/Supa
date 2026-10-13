@@ -28,9 +28,9 @@ function quantityLabel(amount: number | null, unit: unknown): string {
 }
 
 
-type PhysicalUnit = 'g' | 'kg' | 'ml' | 'l' | 'piece'
-function baseQuantity(amount: number, unit: PhysicalUnit) {
-  if (!Number.isFinite(amount) || amount <= 0) return null
+function baseQuantity(amount: number, unit: unknown) {
+  if (!Number.isFinite(amount) || amount <= 0 ||
+      !['g', 'kg', 'ml', 'l', 'piece'].includes(unit as string)) return null
   const factor = unit === 'kg' || unit === 'l' ? 1000 : 1
   const normalized = amount * factor
   if (!Number.isFinite(normalized) || normalized <= 0) return null
@@ -40,8 +40,8 @@ function baseQuantity(amount: number, unit: PhysicalUnit) {
 }
 
 function safePhysicalPacks(
-  requirement: { amount: number; unit: PhysicalUnit },
-  pack: { amount: number; unit: PhysicalUnit; count: number },
+  requirement: { amount: number; unit: unknown },
+  pack: { amount: number; unit: unknown; count: number },
   packs: number,
 ): boolean {
   if (!Number.isSafeInteger(packs) || packs < 1 ||
