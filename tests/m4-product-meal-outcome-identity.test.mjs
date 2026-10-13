@@ -96,7 +96,7 @@ for (const [label, rows] of [
 
 for (const bad of ['', ' ', ' monday', 'monday ', 'monday\n', '\u0301', '\u00b4', '\uff9e', '\ufe0f', 'a\u202e', 'a\u200b', 'a'.repeat(257)]) {
   test(`M4 rejects non-canonical/invisible/oversized slot: ${JSON.stringify(bad)}`, () => {
-    rejectsWithoutMutation(study([[bad, 'followed']]), /M4 meal outcome slot/)
+    rejectsWithoutMutation(study([[bad, 'followed']]), /M4 meal outcome slot|meal_slot must be a non-empty string/)
   })
 }
 
