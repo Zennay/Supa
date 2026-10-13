@@ -6,6 +6,11 @@ const DEFAULT_FILE = new URL('../docs/m5-retailer-discovery.v1.json', import.met
 // Request/denial/approval outcomes belong in a separate reviewed evidence record.
 const VALID_STATUSES = new Set(['unreviewed'])
 const MAX_SOURCES = 100
+const MARKET_LIST_EVIDENCE = new Set([
+  'https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid',
+  'https://www.consumentenbond.nl/voedingstests/prijspeiling-supermarkten',
+  'https://www.consumentenbond.nl/acties-claims/nieuws/2025/laagsteprijsclaims-van-supermarkten-update',
+])
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -24,7 +29,7 @@ function safeResearchUrl(value) {
     return url.protocol === 'https:' &&
       url.username === '' && url.password === '' &&
       url.port === '' && Boolean(url.hostname) &&
-      !url.hash
+      !url.hash && MARKET_LIST_EVIDENCE.has(url.href)
   } catch {
     return false
   }
