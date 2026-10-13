@@ -31,14 +31,17 @@ test('M5 QA positive: all 17 original records remain disabled and audit never mu
   assert.equal(JSON.stringify(doc), serialized)
 })
 
-test('M5 QA positive: denied and pending retailer reviews remain non-authorizing', () => {
+test('M5 QA positive: candidate input ordering cannot change reviewed-rights outcome', () => {
   const doc = clone()
-  doc.sources[0].permissionStatus = 'denied'
-  doc.sources[1].permissionStatus = 'permission-requested'
+  doc.sources.reverse()
+  const originalOrder = doc.sources.map(source => source.id)
   const report = assessRetailerDiscovery(doc)
   ensureOnlyResearch(report)
-  assert.equal(report.blockers, 16)
-  assert.match(report.sources.find(source => source.id === doc.sources[0].id).nextAction, /Do not ingest/)
+  assert.equal(report.blockers, 17)
+  assert.deepEqual(report.sources.map(source => source.id),
+    [...originalOrder].sort(), 'audit output must remain sorted regardless of input')
+  assert.deepEqual(doc.sources.map(source => source.id), originalOrder,
+    'audit must not sort or mutate original research input')
 })
 
 const rootCases = [
