@@ -112,7 +112,8 @@ export function preparePrintableShoppingChecklist(
     }
     seen.add(line.id)
 
-    const productLabel = safePrintableLabel(line.productName)
+    const productLabel = line.status === 'matched'
+      ? safePrintableLabel(line.productName) : null
     if (line.status === 'matched' && productLabel !== null &&
         safePhysicalPacks(line.requirement, line.pack, line.packs)) {
       const count = line.pack.count
