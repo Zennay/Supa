@@ -1,0 +1,55 @@
+name: SUPA proxy pool independent VPS QA
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/retailer-proxy-pool.mjs'
+      - 'tests/qa-proxy-health-state-matrix.test.mjs'
+      - '.github/workflows/supa-qa-proxy-health-vps.yml'
+
+concurrency:
+  group: supa-proxy-qa-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  offline-proxy-qa:
+    # Never check out or run external fork PR code on a permanent VPS runner.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Verify fixed runner and immutable exact source SHA
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "vps-bb300bba"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies and replay offline proxy QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          node --test tests/qa-proxy-health-state-matrix.test.mjs
+
+      - name: Run full existing regression suite and compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm test
+          npm run build
