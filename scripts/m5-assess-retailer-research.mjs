@@ -1,4 +1,6 @@
-import { readFile } from 'node:fs/promises'
+import { lstat, readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { pathToFileURL } from 'node:url'
 import { assessRetailerDiscovery } from './m5-audit-retailer-discovery.mjs'
 
@@ -118,6 +120,16 @@ export function parseResearchArgs(args) {
 
 export async function main(args = process.argv.slice(2)) {
   const input = parseResearchArgs(args)
+  const fileStats = await lstat(input)
+  check(fileStats.isFile() && !fileStats.isSymbolicLink() &&
+    fileStats.size > 0 && fileStats.size <= 65536,
+  'Private reviewer input must be a bounded regular file, not a symlink')
+  const publicEmptyTemplate = fileURLToPath(
+    new URL('../docs/m5-retailer-research-template.v1.json', import.meta.url))
+  if (resolve(input) !== publicEmptyTemplate && process.platform !== 'win32') {
+    check((fileStats.mode & 0o077) === 0,
+      'Private reviewer files must not be readable by group or other users')
+  }
   const [discovery, ledger] = await Promise.all([
     readFile(DISCOVERY, 'utf8'), readFile(input, 'utf8'),
   ])
