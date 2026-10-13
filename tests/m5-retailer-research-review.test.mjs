@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises'
+import { readFile, writeFile, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -134,6 +134,31 @@ test('CLI requires explicit local file, emits privacy-redacted report and preser
     assert.ok(!malformed.stderr.includes(secret))
     assert.ok(!malformed.stderr.includes('fictional.person@example.invalid'))
     assert.equal(await readFile(bad, 'utf8'), JSON.stringify({ secret }))
+
+    // A caller's real research file must not be accidentally world-readable,
+    // symlink-followed or unlimited in size before private data is parsed.
+    const publicCopy = path.join(dir, 'public-review.json')
+    await writeFile(publicCopy, content, { mode: 0o644 })
+    const world = spawnSync(process.execPath, [script.pathname, publicCopy],
+      { encoding: 'utf8' })
+    if (process.platform !== 'win32') {
+      assert.equal(world.status, 2)
+      assert.equal(world.stdout, '')
+      assert.ok(!world.stderr.includes(publicCopy))
+    }
+    const alias = path.join(dir, 'linked-review.json')
+    await symlink(input, alias)
+    const linked = spawnSync(process.execPath, [script.pathname, alias],
+      { encoding: 'utf8' })
+    assert.equal(linked.status, 2)
+    assert.equal(linked.stdout, '')
+    const oversize = path.join(dir, 'oversize-review.json')
+    await writeFile(oversize, ' '.repeat(65537), { mode: 0o600 })
+    const huge = spawnSync(process.execPath, [script.pathname, oversize],
+      { encoding: 'utf8' })
+    assert.equal(huge.status, 2)
+    assert.equal(huge.stdout, '')
+    assert.ok(!huge.stderr.includes(oversize))
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
