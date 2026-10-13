@@ -10,14 +10,16 @@ const clone = () => structuredClone(original)
 
 test('M5 inventory covers publicly listed NL retailers without production permission', () => {
   const report = assessRetailerDiscovery(clone())
-  assert.equal(report.sourceCount, 16)
+  assert.equal(report.sourceCount, 17)
   assert.equal(report.productionReady, false)
   assert.deepEqual(report.sources.map((s) => s.id),
     [...report.sources.map((s) => s.id)].sort())
   assert.ok(report.sources.some((s) => s.id === 'plus'))
+  assert.ok(report.sources.some((s) => s.id === 'boni'))
   assert.ok(report.sources.some((s) => s.id === 'dekamarkt'))
   assert.ok(report.sources.every((s) => s.productionEnabled === false))
   assert.ok(report.sources.every((s) => s.sourceMechanism === 'unassessed'))
+  assert.ok(report.sources.every((s) => s.termsStatus === 'unreviewed' && s.robotsStatus === 'unreviewed'))
   assert.equal(JSON.stringify(original), JSON.stringify(clone()), 'audit must not mutate input')
 })
 
@@ -29,6 +31,15 @@ test('source discovery is not a backdoor around M1 data rights', () => {
     ['permissionStatus', 'approved'],
     ['sourceMechanism', 'html-scraper'],
     ['sourceMechanism', 'licensed-feed'],
+    ['regionScope', 'nationwide'],
+    ['termsStatus', 'accepted'],
+    ['robotsStatus', 'permitted'],
+    ['dataOwner', 'some-retailer'],
+    ['contactStatus', 'contacted'],
+    ['expectedRefresh', 'hourly'],
+    ['riskStatus', 'low'],
+    ['priority', 'P1'],
+    ['permissionEvidence', 'https://example.invalid/approval'],
     ['researchUrl', 'http://invalid.example/path'],
     ['researchUrl', 'https://user:pass@invalid.example/'],
     ['name', 'ALDI' + String.fromCodePoint(0x202e)]
@@ -63,7 +74,7 @@ test('CLI produces a non-authorizing report and --require-production-ready exits
   assert.equal(ordinary.status, 0, ordinary.stderr)
   const report = JSON.parse(ordinary.stdout)
   assert.equal(report.productionReady, false)
-  assert.equal(report.sourceCount, 16)
+  assert.equal(report.sourceCount, 17)
   const gated = spawnSync(process.execPath, [cli.pathname, '--require-production-ready'], { encoding: 'utf8' })
   assert.equal(gated.status, 2)
   assert.equal(JSON.parse(gated.stdout).productionReady, false)
