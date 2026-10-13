@@ -145,6 +145,7 @@ try {
       const rows = [...paper.querySelectorAll('li')]
       return {
         viewport: doc.documentElement.clientWidth,
+        requestedCssWidth: frame ? Math.round(frame.getBoundingClientRect().width) : window.innerWidth,
         horizontalOverflow: doc.documentElement.scrollWidth > doc.documentElement.clientWidth + 2,
         minHeight: doc.defaultView.getComputedStyle(action).minHeight,
         buttonType: action.type,
@@ -159,7 +160,17 @@ try {
       }
     `)
     assert.ok(observed, 'React print fixture did not render')
-    assert.ok(observed.viewport <= width + 2 && observed.viewport >= width - 2, `Firefox did not honor ${width}px viewport: ${observed.viewport}`)
+    assert.ok(
+      observed.requestedCssWidth <= width + 2 && observed.requestedCssWidth >= width - 2,
+      `Firefox iframe did not honor ${width}px CSS width: ${observed.requestedCssWidth}`,
+    )
+    // Gecko subtracts a non-overlay scrollbar from documentElement.clientWidth.
+    // It still has to keep the available CSS viewport within the true device
+    // width and prevent all horizontal spill.
+    assert.ok(
+      observed.viewport <= width + 2 && observed.viewport >= width - 20,
+      `Firefox effective ${width}px viewport outside scrollbar bound: ${observed.viewport}`,
+    )
     assert.equal(observed.horizontalOverflow, false, `overflow at ${width}px`)
     assert.equal(observed.minHeight, '44px')
     assert.equal(observed.buttonType, 'button')
