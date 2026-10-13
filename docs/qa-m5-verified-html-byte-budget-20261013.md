@@ -1,0 +1,17 @@
+# Independent QA #2165 — M5 local HTML byte budget (13 Oct 2026)
+
+## Identity and scope
+- Project phase: **Supa M3 ACTIVE**, human PLUS + DekaMarkt 11+11 same-demand 24h [issue #78](https://github.com/Zennay/Supa/issues/78) OPEN.
+- Future M5 helper: frozen corrected product [DRAFT #2162](https://github.com/Zennay/Supa/pull/2162), exact `dd6e98b9b097ed21947fc4a4cdfaf8fc10d1aaab`.
+- New issue: [#2165](https://github.com/Zennay/Supa/issues/2165); isolated QA **ADD-ONLY**, original product/QA/main/workflows untouched.
+- Files: `tests/qa-m5-verified-html-byte-budget-20261013.test.mjs` (original four cases, unchanged since first RED) and `tests/qa-m5-aggregate-html-byte-budget-20261013.test.mjs` (separate positive + expected RED for aggregate budget).
+
+## Repro and distinct acceptance
+`preflightBoundedManifest()` caps the raw JSON **manifest** at 8 MiB and 100 records, but then canonical M1 `inspectCaptureDirectory()` reads each declared successful source HTML with `readFile(htmlPath, 'utf8')`, with no pre-read HTML byte check. A matching SHA proves bytes have not changed; it does not bound bytes or parse work. M5 shape field/array limits run **after** the full HTML read and inspection. This is distinct from raw success normalization #2159, malformed M1 HTML scalar shapes #2152, and the **manifest** size limit added in product #2160.
+
+The test suites create only fictional local HTML and SHA-valid small manifests. The original suite has exactly two positives that should remain GREEN: small successful source -> P2 baseline preparation, genuine false capture -> P1 unavailable, with production/M5/rights/selector all false. Exactly two original *intended* source RED tests demand refusal for current-side or baseline-side **>8 MiB source HTML** with tiny <2 KiB valid manifest, matching SHA, bounded runtime and no output queue. Each case verifies input manifest and HTML contents are unchanged. A separate add-only two-case aggregate suite checks two small sources pass and two individually below-8MiB SHA-correct fictional HTML files totaling above 8MiB fail closed. This explicitly prevents a per-file-only source fix from masking unbounded aggregate memory/CPU use. Original four-case QA test blob remains byte-identical to the first hosted expected-RED run. Errors must be generic, never repeat identifiers, paths or URL labels.
+
+The proposed 8 MiB HTML threshold is QA's conservative *hypothesis*, not an agreed product contract; product owner must own the final defensible per-file and **total inspected bytes** limit, check limits **before** unbounded reads, preserve exact SHA verification, and consider symlinks/races separately. The tests intentionally fail on the unfixed frozen source; **an expected RED is evidence of an open boundary, not a successful full CI gate**. Do not silently change assertions or delete red tests to green the workflow. Follow-up independently replays exactly the original QA bytes on fixed source.
+
+## Release posture
+Entirely synthetic local offline data; no real retailers, no external requests, real prices, customer data, production source rights, selector approval or savings. No participant beta, M4/M5 eligibility, merge or deploy. **DRAFT/HOLD/NO MERGE/NO DEPLOY** until separately verified zCloud SQLite preflight/claim+write lease, independent owners, exact-head hosted+applicable permanent VPS, latest-main integration, genuine M3 human proof and explicit releasego.
