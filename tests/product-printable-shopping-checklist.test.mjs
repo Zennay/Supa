@@ -68,6 +68,20 @@ test('unknown quantity never turns into a bogus purchase count', () => {
   assert.equal(result.lines[0].quantity, 'hoeveelheid onbekend · handmatig kiezen')
 })
 
+test('one outer multipack says verpakking, never 1 verpakkingen (independent QA #2071)', () => {
+  const source = structuredClone(basket())
+  const line = source.lines.find((item) => item.status === 'matched')
+  assert.ok(line)
+  line.requirement = { amount: 600, unit: 'g' }
+  line.pack = { amount: 300, unit: 'g', count: 2 }
+  line.packs = 1
+  const printed = preparePrintableShoppingChecklist(source).lines.find((item) => item.id === line.id)
+  assert.ok(printed)
+  assert.equal(printed.needsReview, false)
+  assert.equal(printed.quantity, '1 verpakking van 2 × 300 g')
+  assert.doesNotMatch(printed.quantity, /1 verpakkingen/)
+})
+
 test('multipacks show both outer packages and real inner physical units', () => {
   const source = structuredClone(basket())
   const line = source.lines.find((line) => line.status === 'matched')
