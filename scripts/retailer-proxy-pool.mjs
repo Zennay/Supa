@@ -98,7 +98,11 @@ export class ProxyHealthPool {
     for (const candidate of candidates) {
       if (typeof candidate !== 'string' || !candidate.startsWith('http://')) continue
       const original = candidate.slice('http://'.length)
-      if (parseProxyCandidates(original).length !== 1) continue
+      // A feed parser intentionally skips malformed lines. Refresh receives
+      // individual endpoint identities, so accept only a byte-for-byte
+      // canonical one-line URL. Never retain extra lines as a Map key.
+      const parsed = parseProxyCandidates(original)
+      if (parsed.length !== 1 || parsed[0] !== candidate) continue
       if (next.has(candidate)) continue
       next.set(candidate, this.entries.get(candidate) || {
         failures: 0,
