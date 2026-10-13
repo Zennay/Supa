@@ -1,5 +1,6 @@
 import { lstat, open, readFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
+import { isIP } from 'node:net'
 import { dirname, parse, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pathToFileURL } from 'node:url'
@@ -52,9 +53,18 @@ function validHttps(s) {
   if (typeof s !== 'string' || s.length > 2048) return false
   try {
     const url = new URL(s)
+    const hostname = url.hostname.toLowerCase()
+    // URLs here are research *citations*, never valid local/private endpoints.
+    // URL canonicalizes numeric IPv4 forms; isIP covers literal v4/v6 after
+    // bracket removal, without DNS/network lookup. Public IPs are rejected too.
+    const unbracketedHost = hostname.startsWith('[') && hostname.endsWith(']')
+      ? hostname.slice(1, -1) : hostname
+    const canonicalHost = unbracketedHost.endsWith('.')
+      ? unbracketedHost.slice(0, -1) : unbracketedHost
     return url.protocol === 'https:' && url.username === '' && url.password === '' &&
-      url.port === '' && url.hostname.includes('.') &&
-      url.hostname !== 'localhost' && !url.hash &&
+      url.port === '' && hostname.includes('.') &&
+      isIP(canonicalHost) === 0 && canonicalHost !== 'localhost' &&
+      !canonicalHost.endsWith('.localhost') && !url.hash &&
       url.toString() === s
   } catch {
     return false
