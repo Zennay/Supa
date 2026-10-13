@@ -198,7 +198,7 @@ try {
   await nav(sessionId, 'Planner')
   for (const day of ['Di', 'Do']) {
     const removed = await script(sessionId, `
-      const button = document.querySelector('[aria-label="${arguments[0]} uit planning halen"]')
+      const button = document.querySelector('[aria-label="' + arguments[0] + ' uit planning halen"]')
       if (!button) return false
       button.click()
       return true
