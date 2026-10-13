@@ -6,6 +6,9 @@ import { assessRetailerResearch, loadPrivateRetailerResearch } from './m5-assess
 const DISCOVERY = new URL('../docs/m5-retailer-discovery.v1.json', import.meta.url)
 const M1_GATE = new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url)
 const EMPTY_REVIEW = new URL('../docs/m5-retailer-research-template.v1.json', import.meta.url)
+// Reviewer preference only breaks ties inside a human-action/rights tier.
+// It can never outrank a verified M1 blocker, denial or legal review.
+const RESEARCH_PRIORITY_RANK = Object.freeze({ P1: 0, P2: 1, P3: 2, unprioritized: 3 })
 
 const ACTIONS = Object.freeze({
   'independent-license-review': 'Have a human validate actual license scope; do not enable ingest',
@@ -59,6 +62,8 @@ export function buildM5ResearchPriorities(discovery, canonicalM1, privateLedger)
       rightsVerified: false,
     }
   }).sort((a, b) => a.urgencyRank - b.urgencyRank ||
+    RESEARCH_PRIORITY_RANK[a.reviewPriority] -
+      RESEARCH_PRIORITY_RANK[b.reviewPriority] ||
     a.retailerId.localeCompare(b.retailerId))
   return {
     version: 1,
