@@ -29,6 +29,8 @@ test('source discovery is not a backdoor around M1 data rights', () => {
     ['productionEnabled', 'false'],
     ['permissionStatus', 'permitted'],
     ['permissionStatus', 'approved'],
+    ['permissionStatus', 'permission-requested'],
+    ['permissionStatus', 'denied'],
     ['sourceMechanism', 'html-scraper'],
     ['sourceMechanism', 'licensed-feed'],
     ['regionScope', 'nationwide'],
