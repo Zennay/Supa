@@ -66,13 +66,24 @@ test('positive: no unresolved products does not force an unknown result to becom
   assert.equal(report.publicClaimEligible, false)
 })
 
+test('positive: missing basket assessment cannot silently turn into certainty', () => {
+  const session = fakeSession()
+  session.events = session.events.filter((event) => event.type !== 'basket_assessment_viewed')
+  const report = buildBetaSessionSummary(session)
+  assert.equal(report.basketOutcome, 'unknown')
+  assert.equal(report.basketUnresolvedLineCount, null)
+  assert.equal(report.publicClaimEligible, false)
+})
+
 for (const definiteOutcome of ['better', 'same', 'worse']) {
-  test(`EXPECTED RED: ${definiteOutcome} cannot be claimed with 11 unresolved products`, () => {
-    const session = fakeSession({ outcome: definiteOutcome, unresolvedCount: 11 })
-    assert.throws(
-      () => validateBetaSession(session),
-      /basket|unresolved|outcome|contradict|unknown/i,
-      'M4 should reject a definitive M3 basket outcome when any required line is still unresolved',
-    )
-  })
+  for (const unresolvedCount of [1, 11]) {
+    test(`EXPECTED RED: ${definiteOutcome} cannot be claimed with ${unresolvedCount} unresolved product(s)`, () => {
+      const session = fakeSession({ outcome: definiteOutcome, unresolvedCount })
+      assert.throws(
+        () => validateBetaSession(session),
+        /basket|unresolved|outcome|contradict|unknown/i,
+        'M4 should reject a definitive M3 basket outcome when any required line is still unresolved',
+      )
+    })
+  }
 }
