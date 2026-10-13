@@ -62,10 +62,30 @@ export function assessRetailerDiscovery(document) {
       `Source mechanism cannot be assumed for ${record.id}`)
     assert(record.productionEnabled === false,
       `Future discovery cannot enable production for ${record.id}`)
+    // Every unknown expansion dimension must be explicit; placeholders are
+    // not permission, source availability, freshness or approved access.
+    for (const [field, expected] of Object.entries({
+      regionScope: 'unassessed',
+      assortmentScope: 'unassessed',
+      termsStatus: 'unreviewed',
+      robotsStatus: 'unreviewed',
+      dataOwner: 'unassessed',
+      contactStatus: 'unreviewed',
+      expectedRefresh: 'unassessed',
+      riskStatus: 'unknown',
+      priority: 'unprioritized',
+      permissionEvidence: null,
+    })) {
+      assert(Object.hasOwn(record, field) && record[field] === expected,
+        `M5 discovery cannot claim reviewed ${field} for ${record.id}`)
+    }
     return Object.freeze({
       id: record.id, name: record.name,
       permissionStatus: record.permissionStatus,
       sourceMechanism: 'unassessed',
+      regionScope: 'unassessed',
+      termsStatus: 'unreviewed',
+      robotsStatus: 'unreviewed',
       productionEnabled: false,
       nextAction: record.permissionStatus === 'denied'
         ? 'Do not ingest; review only if legal/source authorization changes'
