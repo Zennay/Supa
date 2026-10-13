@@ -187,6 +187,41 @@ test('empty planned week prints an honest empty list', () => {
   assert.equal(result.reviewCount, 0)
 })
 
+test('a sparse or excessively large basket must never produce a deceptively complete paper list', () => {
+  const original = basket()
+  const sparse = structuredClone(original)
+  delete sparse.lines[2]
+  assert.throws(
+    () => preparePrintableShoppingChecklist(sparse),
+    /Onvolledige boodschappenmand/,
+  )
+
+  const tooLarge = {
+    ...original,
+    lines: Array.from({ length: 501 }, (_, i) => ({
+      ...original.lines[0], id: `extra-${i}`,
+    })),
+  }
+  assert.throws(() => preparePrintableShoppingChecklist(tooLarge), /Ongeldige boodschappenmand/)
+  assert.deepEqual(original, basket())
+})
+
+test('missing matched pack metadata is explicitly manual, never a guessed purchase', () => {
+  for (const edit of [
+    (line) => { line.pack = null },
+    (line) => { line.pack = undefined },
+    (line) => { line.requirement = null },
+  ]) {
+    const source = structuredClone(basket())
+    const line = source.lines.find((item) => item.status === 'matched')
+    assert.ok(line)
+    edit(line)
+    const printed = preparePrintableShoppingChecklist(source).lines.find((item) => item.id === line.id)
+    assert.equal(printed.needsReview, true)
+    assert.match(printed.quantity, /handmatig kiezen/)
+  }
+})
+
 test('duplicate and invisible-only identifiers fail closed rather than printing ambiguous tasks', () => {
   const original = basket()
   for (const source of [
