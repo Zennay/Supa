@@ -95,6 +95,60 @@ test('multipacks show both outer packages and real inner physical units', () => 
   assert.match(result.lines.find((item) => item.id === line.id).quantity, /^3 verpakkingen van 2 × /)
 })
 
+test('exact decimal physical-pack boundaries do not overbuy across g/kg, ml/l and multipacks', () => {
+  const cases = [
+    [0.3, 'g', 0.1, 'g', 1, 3, '3 × 0.1 g'],
+    [0.6, 'g', 0.2, 'g', 1, 3, '3 × 0.2 g'],
+    [0.3, 'kg', 100, 'g', 1, 3, '3 × 100 g'],
+    [0.35, 'l', 175, 'ml', 1, 2, '2 × 175 ml'],
+    [0.00007, 'l', 0.07, 'ml', 1, 1, '1 × 0.07 ml'],
+    [0.6, 'l', 0.2, 'l', 2, 2, '2 verpakkingen van 2 × 0.2 l'],
+    [3, 'piece', 2, 'piece', 2, 1, '1 verpakking van 2 × 2 stuks'],
+    [5e-324, 'g', 5e-324, 'g', 1, 1, '1 × 5e-324 g'],
+  ]
+  for (const [amount, unit, packAmount, packUnit, packCount, packs, label] of cases) {
+    const source = structuredClone(basket())
+    const line = source.lines.find((item) => item.status === 'matched')
+    assert.ok(line)
+    line.requirement = { amount, unit }
+    line.pack = { amount: packAmount, unit: packUnit, count: packCount }
+    line.packs = packs
+    const result = preparePrintableShoppingChecklist(source).lines.find((item) => item.id === line.id)
+    assert.equal(result.needsReview, false, label)
+    assert.equal(result.quantity, label)
+  }
+})
+
+test('exact decimal pack boundaries refuse one extra pack and one insufficient pack', () => {
+  for (const packs of [2, 4]) {
+    const source = structuredClone(basket())
+    const line = source.lines.find((item) => item.status === 'matched')
+    assert.ok(line)
+    line.requirement = { amount: 0.3, unit: 'kg' }
+    line.pack = { amount: 0.1, unit: 'kg', count: 1 }
+    line.packs = packs
+    const result = preparePrintableShoppingChecklist(source).lines.find((item) => item.id === line.id)
+    assert.equal(result.needsReview, true)
+    assert.match(result.quantity, /handmatig kiezen/)
+  }
+})
+
+test('printable physical task text remains stable under price-only catalog changes', () => {
+  const original = basket()
+  const changed = structuredClone(original)
+  for (const line of changed.lines) {
+    if (line.status === 'matched') {
+      line.pricePerPackCents += 10
+      line.lineTotalCents += 1000
+    }
+  }
+  changed.totalCents += 9000
+  assert.deepEqual(
+    preparePrintableShoppingChecklist(changed),
+    preparePrintableShoppingChecklist(original),
+  )
+})
+
 test('invalid matched physical quantities fail closed to a manual check', () => {
   for (const value of [0, -1, 2.5, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
     const source = structuredClone(basket())
