@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { spawnSync } from 'node:child_process'
 import { assessRetailerDiscovery } from '../scripts/m5-audit-retailer-discovery.mjs'
@@ -114,6 +116,26 @@ test('invisible/accessor-based rights flags are never silently ignored', () => {
   })
   assert.throws(() => assessRetailerDiscovery(doc3), /schema fields/i)
   assert.equal(invoked, false, 'audit must not invoke suspicious accessor')
+})
+
+test('real M5 CLI refuses deceptive rights metadata without generating a ready report', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m5-forged-rights-'))
+  try {
+    const input = join(dir, 'fictional-discovery.json')
+    const document = clone()
+    document.productionEnabled = true
+    const originalBytes = JSON.stringify(document)
+    await writeFile(input, originalBytes, { mode: 0o600 })
+    const cli = new URL('../scripts/m5-audit-retailer-discovery.mjs', import.meta.url)
+    const run = spawnSync(process.execPath, [cli.pathname, input], {
+      encoding: 'utf8', timeout: 20000,
+    })
+    assert.notEqual(run.status, 0)
+    assert.equal(run.stdout, '', 'failed audit must not emit ready JSON')
+    assert.equal(await readFile(input, 'utf8'), originalBytes, 'input must not change')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('CLI produces a non-authorizing report and --require-production-ready exits 2', () => {
