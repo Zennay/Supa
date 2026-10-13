@@ -54,6 +54,11 @@ createRoot(document.getElementById('print-preview-root')!).render(
         <div className="list-card">Schermkaart (mag niet op papier verschijnen)</div>
         <aside className="screen-only-canary">SCHERMALLEEN_WILLEKEURIGE_SECTIE_GEEN_PAPIER</aside>
         <div className="diagnostic-canary">SCHERMALLEEN_GEVOELIGE_DIAGNOSTIEK_GEEN_PAPIER</div>
+        {isMultiPage && (
+          <section className="screen-only-scroll-stress" style={{ height: 16000 }}>
+            SCHERMALLEEN_ZESTIENDUIZEND_PX_GEEN_EXTRA_PAGINAS
+          </section>
+        )}
         <PrintableShoppingChecklist basket={fixtureBasket} />
       </section>
     </div>
