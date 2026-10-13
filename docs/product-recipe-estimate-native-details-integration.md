@@ -6,6 +6,7 @@ This child follows **frozen product owner [PR #1049](https://github.com/Zennay/S
 
 `src/features/planner/RecipeEstimateDetails.ts` composes the **existing owner adapter** into:
 - Visible `Richtprijs: … / recept` or `Richtprijs onbekend`.
+- Native **44px minimum-height** summary tap target with wrapping and pointer affordance, preserving the browser's original disclosure marker and focus/keyboard behavior.
 - Native, unfocused-by-default `<details><summary>Waarom (geen) richtprijs?</summary>…</details>` so keyboard Enter/Space and taps open the explanation without custom JS state, tooltips or direct DOM access.
 - Plain, visible copy explicitly disavowing live/current supermarket pricing. No new offers, retailer source, economics, public saving, participant info or persistence.
 
@@ -20,7 +21,7 @@ The **original [PlannerView owner #423](https://github.com/Zennay/Supa/pull/423)
 <RecipeEstimateDetails estimatedCost={recipe.estimatedCost} />
 ```
 
-On integration, check 320–430px screens for summary wrapping/tap target, Enter/Space keyboard and mobile tap expansion, screen-reader announcement of summary and details, and that resolved/unresolved week-budget cards still source **only** the trusted basket. Tests require rendered Firefox/mobile on the **exact integrated head**, original owner acceptance and zCloud claim/lease/preflight before any merge or deploy.
+On integration, check 320–430px screens for the real 44px summary tap target and text wrapping, Enter/Space keyboard and mobile tap expansion, screen-reader announcement of summary and details, and that resolved/unresolved week-budget cards still source **only** the trusted basket. Tests require rendered Firefox/mobile on the **exact integrated head**, original owner acceptance and zCloud claim/lease/preflight before any merge or deploy.
 
 ## Proof boundary
 
