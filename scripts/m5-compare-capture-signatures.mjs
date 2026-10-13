@@ -45,7 +45,8 @@ function canonicalShapeTerms(values) {
 }
 
 function requireBoundedHtmlShape(html) {
-  if (!html || !Array.isArray(html.jsonLd) ||
+  if (!html || typeof html.hasNextData !== 'boolean' ||
+      !Array.isArray(html.jsonLd) ||
       !Array.isArray(html.applicationJsonScripts) ||
       html.jsonLd.length > MAX_JSON_LD_BLOCKS ||
       html.applicationJsonScripts.length > MAX_APPLICATION_JSON_SCRIPTS) {
@@ -58,14 +59,22 @@ function requireBoundedHtmlShape(html) {
     const record = html.jsonLd[i]
     if (!record || typeof record !== 'object' || Array.isArray(record) ||
         !canonicalShapeTerms(record.type) ||
-        !canonicalShapeTerms(record.keys)) {
+        !canonicalShapeTerms(record.keys) ||
+        (Object.hasOwn(record, 'parseError') && record.parseError !== true)) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
   }
   for (let i = 0; i < html.applicationJsonScripts.length; i += 1) {
     if (!Object.hasOwn(html.applicationJsonScripts, i) ||
         !html.applicationJsonScripts[i] ||
-        typeof html.applicationJsonScripts[i] !== 'object') {
+        typeof html.applicationJsonScripts[i] !== 'object' ||
+        Array.isArray(html.applicationJsonScripts[i]) ||
+        !Object.hasOwn(html.applicationJsonScripts[i], 'id') ||
+        !Object.hasOwn(html.applicationJsonScripts[i], 'bytes') ||
+        (html.applicationJsonScripts[i].id !== null &&
+          typeof html.applicationJsonScripts[i].id !== 'string') ||
+        !Number.isSafeInteger(html.applicationJsonScripts[i].bytes) ||
+        html.applicationJsonScripts[i].bytes < 0) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
   }
