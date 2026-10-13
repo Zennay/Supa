@@ -167,6 +167,58 @@ function latestEvent(events, type) {
     .at(-1) ?? null
 }
 
+// A completed repair counts as evidence only if it consumes one earlier
+// still-open start of the same kind. Sort a *copy* by timestamp; incoming
+// event order is not required to match collection order.
+function validateRepairPairs(events) {
+  const byTime = events
+    .filter((event) => event.type === 'repair_started' || event.type === 'repair_completed')
+    .map((event, index) => ({ event, index, at: Date.parse(event.timestamp) }))
+    .sort((a, b) => a.at - b.at || a.index - b.index)
+  const unmatchedStarts = new Map()
+
+  for (const { event, at } of byTime) {
+    const starts = unmatchedStarts.get(event.repair_kind) ?? []
+    if (event.type === 'repair_started') {
+      starts.push(at)
+      unmatchedStarts.set(event.repair_kind, starts)
+      continue
+    }
+    assert(
+      starts.length > 0 && starts[0] < at,
+      'repair_completed requires a preceding unmatched repair_started of the same kind',
+    )
+    starts.shift()
+  }
+}
+
+function validateCompletedWeekCausality(events) {
+  const starts = eventsOfType(events, 'plan_started')
+  const completed = eventsOfType(events, 'plan_completed')
+  const closed = eventsOfType(events, 'beta_week_closed')
+  assert(starts.length > 0, 'completed sessions require a plan_started event')
+  assert(completed.length > 0, 'completed sessions require a plan_completed event')
+  assert(closed.length === 1, 'completed sessions require exactly one beta_week_closed event')
+
+  const firstStart = Math.min(...starts.map((event) => Date.parse(event.timestamp)))
+  const firstCompletion = Math.min(...completed.map((event) => Date.parse(event.timestamp)))
+  const latestCompletion = Math.max(...completed.map((event) => Date.parse(event.timestamp)))
+  const closeAt = Date.parse(closed[0].timestamp)
+  assert(
+    firstStart <= firstCompletion && latestCompletion <= closeAt,
+    'completed session events require plan_started <= plan_completed <= beta_week_closed',
+  )
+  assert(
+    completed.every((event) => Date.parse(event.timestamp) >= firstStart),
+    'plan_completed must not precede plan_started',
+  )
+  assert(
+    events.every((event) => event.type === 'beta_week_closed' ||
+      Date.parse(event.timestamp) < closeAt),
+    'completed session must not contain activity at or after beta_week_closed',
+  )
+}
+
 function median(values) {
   if (values.length === 0) return null
   const sorted = values.slice().sort((a, b) => a - b)
@@ -206,9 +258,12 @@ export function validateBetaSession(input) {
     'beta_session_started.participant_id must match participantKey',
   )
 
+  // Protect effort metrics for all outcomes (including abandoned/unknown):
+  // unmatched starts may remain partial evidence, orphan completions never count.
+  validateRepairPairs(input.events)
+
   if (input.sessionOutcome === 'completed') {
-    assert(eventsOfType(input.events, 'plan_completed').length > 0, 'completed sessions require a plan_completed event')
-    assert(eventsOfType(input.events, 'beta_week_closed').length > 0, 'completed sessions require a beta_week_closed event')
+    validateCompletedWeekCausality(input.events)
   }
 
   return input
