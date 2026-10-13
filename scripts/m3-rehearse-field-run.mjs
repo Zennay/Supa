@@ -45,6 +45,29 @@ export function buildFictionalRehearsalSheet() {
   return sheet
 }
 
+// Fully priced fiction exercises the *positive* money path. Never print these
+// values and never mislabel them as observed retailer prices.
+export function buildFictionalPricedSheet(candidatePriceCents = 90) {
+  assert.ok(Number.isSafeInteger(candidatePriceCents) && candidatePriceCents >= 0)
+  const sheet = buildFictionalRehearsalSheet()
+  for (const side of ['baseline', 'candidate']) {
+    sheet[side].lines = sheet[side].lines.map((line, index) => ({
+      ...line,
+      observedProduct: {
+        ...line.observedProduct,
+        available: true,
+        productId: `fictional-${side}-product-${index}`,
+        productName: sheet.requirements[index].query,
+        packAmount: line.requirement.amount,
+        packUnit: line.requirement.unit,
+        packCount: 1,
+        priceCents: side === 'baseline' ? 100 : candidatePriceCents,
+      },
+    }))
+  }
+  return sheet
+}
+
 function evaluate(sheet) {
   const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
   return buildObservedWeekReport(study)
@@ -106,13 +129,48 @@ export function rehearseM3FieldPipeline() {
   assert.equal(expiredReport.savingsCents, null)
   assert.equal(expiredReport.publicSavingsClaimEligible, false)
 
+  // Full fictional matched baskets must exercise better/same/worse using the
+  // real matcher, pack arithmetic, comparator and report, not mock totals.
+  for (const [priceCents, outcome, privateSavingsCents] of [
+    [90, 'better', 110],
+    [100, 'same', 0],
+    [110, 'worse', -110],
+  ]) {
+    const priced = buildFictionalPricedSheet(priceCents)
+    const pricedReport = evaluate(priced)
+    assert.equal(pricedReport.baseline.matchedLineCount, 11)
+    assert.equal(pricedReport.candidate.matchedLineCount, 11)
+    assert.equal(pricedReport.baselineTotalCents, 1100)
+    assert.equal(pricedReport.candidateTotalCents, priceCents * 11)
+    assert.equal(pricedReport.outcome, outcome)
+    assert.equal(pricedReport.savingsCents, privateSavingsCents)
+    assert.equal(pricedReport.publicSavingsClaimEligible, false)
+  }
+
+  // A complete fictional basket one second outside the window must lose the
+  // otherwise calculable money outcome rather than retaining any savings.
+  const expiredPriced = buildFictionalPricedSheet()
+  expiredPriced.candidate.observedAt = '2026-10-02T10:00:01Z'
+  const expiredPricedReport = evaluate(expiredPriced)
+  assert.equal(expiredPricedReport.outcome, 'unknown')
+  assert.equal(expiredPricedReport.savingsCents, null)
+  assert.ok(expiredPricedReport.reasons.some((reason) => reason.includes('max is 24h')))
+
+  // An incomplete but otherwise priced fictional basket must remain unknown.
+  const partialPriced = buildFictionalPricedSheet()
+  partialPriced.candidate.lines[0].observedProduct.available = false
+  const partialReport = evaluate(partialPriced)
+  assert.equal(partialReport.outcome, 'unknown')
+  assert.equal(partialReport.savingsCents, null)
+  assert.equal(partialReport.publicSavingsClaimEligible, false)
+
   // The sole public output is a fixed, non-sensitive summary. In particular,
   // do not emit sheet/report JSON, timestamps, retailer values or participant keys.
   return {
     kind: 'm3-field-pipeline-rehearsal',
     syntheticOnly: true,
-    requirementPairsChecked: 11,
-    negativeControlsPassed: 5,
+    requirementPairsChecked: 11,\n    fictionalOutcomesVerified: ['better', 'same', 'worse', 'unknown'],
+    negativeControlsPassed: 7,
     converterAndAssessorOperational: true,
     realRetailerEvidenceVerified: false,
     m3ExitProven: false,
