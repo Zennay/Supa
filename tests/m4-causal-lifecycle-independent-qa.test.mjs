@@ -71,6 +71,44 @@ test('M4 causal-lifecycle positive: fictional complete week has one ordered star
   assert.equal(JSON.stringify(report).includes(fixture.participantKey), false)
 })
 
+test('M4 causal-lifecycle positive: abandoned and unknown weeks preserve partial evidence', () => {
+  for (const sessionOutcome of ['abandoned', 'unknown']) {
+    const fixture = fictionalCompletedSession()
+    fixture.sessionOutcome = sessionOutcome
+    fixture.events = fixture.events.filter((entry) => entry.type === 'beta_session_started')
+
+    const report = buildBetaSessionSummary(fixture)
+    assert.equal(report.sessionOutcome, sessionOutcome)
+    assert.equal(report.supaPlanningDurationSeconds, null)
+    assert.equal(report.returnIntentRating, null)
+    assert.equal(report.publicClaimEligible, false)
+    assert.equal(report.participantKeyIncluded, false)
+  }
+})
+
+test('M4 causal-lifecycle positive: real CLI can still emit a private fictional closed-week summary', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m4-causal-green-'))
+  const source = join(directory, 'fictional-valid-session.json')
+  const output = join(directory, 'private-report.json')
+  try {
+    const fixture = fictionalCompletedSession()
+    await writeFile(source, JSON.stringify(fixture), { mode: 0o600 })
+    const run = spawnSync(
+      process.execPath,
+      ['scripts/m4-validate-beta-session.mjs', source, '--output', output],
+      { cwd: process.cwd(), encoding: 'utf8' },
+    )
+    assert.equal(run.status, 0, run.stderr)
+    assert.equal(run.stdout, '')
+    const report = JSON.parse(await readFile(output, 'utf8'))
+    assert.equal(report.sessionOutcome, 'completed')
+    assert.equal(report.publicClaimEligible, false)
+    assert.equal('participantKey' in report, false)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('M4 causal-lifecycle negative: completed plan cannot lack a start event', () => {
   const fixture = fictionalCompletedSession()
   fixture.events = fixture.events.filter((entry) => entry.type !== 'plan_started')
