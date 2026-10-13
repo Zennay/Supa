@@ -186,6 +186,35 @@ try {
   assert.equal(clickInvokesNativePrint, true, 'the actual React button did not invoke window.print')
   evidence.checks.push({ kind: 'react-print-button', passed: true })
 
+  const keyboardFocusReady = await execute(sessionId, `
+    const button = document.querySelector('.supa-printable-shopping__action')
+    if (!button) return false
+    window.__supaKeyboardPrintCalls = 0
+    window.print = () => { window.__supaKeyboardPrintCalls += 1 }
+    button.focus()
+    return document.activeElement === button
+  `)
+  assert.equal(keyboardFocusReady, true, 'print action could not receive keyboard focus')
+  await request(`/session/${sessionId}/actions`, {
+    method: 'POST',
+    body: JSON.stringify({
+      actions: [{
+        type: 'key',
+        id: 'keyboard',
+        actions: [
+          { type: 'keyDown', value: String.fromCodePoint(0xE007) },
+          { type: 'keyUp', value: String.fromCodePoint(0xE007) },
+        ],
+      }],
+    }),
+  })
+  const keyboardPrintCalls = await execute(
+    sessionId,
+    'return window.__supaKeyboardPrintCalls || 0',
+  )
+  assert.equal(keyboardPrintCalls, 1, 'Enter did not activate the focused print button')
+  evidence.checks.push({ kind: 'real-firefox-keyboard-enter', passed: true })
+
   // W3C /print exercises the *real* Firefox print medium, not an SSR stub.
   const printBase64 = await request(`/session/${sessionId}/print`, {
     method: 'POST',
