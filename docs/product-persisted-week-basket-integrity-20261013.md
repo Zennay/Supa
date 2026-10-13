@@ -2,7 +2,7 @@
 
 Scope: add-only integration regression on frozen `main` `c36f5c8f71d77cae94663978b51a194e9b183af6`. This is not a new M3 collector, real-world observation, new retailer integration, production claim, or beta release.
 
-The existing App restores `plannerPreferences` and passes one selected set of days/recipes into the one-store shopping basket and the two M3 controlled comparison baskets. The regression in `tests/product-persisted-week-basket-consistency.test.mjs` exercises that real domain composition without changing any feature owner source file:
+The existing App restores `plannerPreferences` and passes one selected set of days/recipes into the one-store shopping basket and the two M3 controlled comparison baskets. A separate React SSR acceptance (`tests/product-persisted-week-react-render.test.mjs`) now loads the real TSX components through Vite and renders the restored App planner and the derived Basket/ShoppingList presentations, detecting divergence beyond pure domain math. The regression in `tests/product-persisted-week-basket-consistency.test.mjs` exercises that real domain composition without changing any feature owner source file:
 
 1. Persist and restore an intentionally reordered two-day week with custom recipes; all three derived baskets must use exactly the same ingredient IDs and physical requirements. Choosing another supported budget must change the preference only, never the physical basket.
 2. Persist an intentionally empty week; all baskets must have zero meals, lines and cost, while previous saved shopping checkmarks must not attach to the empty basket. The controlled comparator must return `same` at zero, not a fictional saving.
