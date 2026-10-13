@@ -225,3 +225,48 @@ test('M4 repair positive: interleaved kinds preserve two independently started r
   assert.equal(summary.repairManualEdits, 3)
   assert.equal(summary.publicClaimEligible, false)
 })
+
+
+test('M4 repair positive: unknown session retains incomplete repair without completion metrics', () => {
+  const input = removeType(removeType(removeType(session(), 'plan_completed'), 'beta_week_closed'), 'repair_completed')
+  input.sessionOutcome = 'unknown'
+  const summary = buildBetaSessionSummary(input)
+  assert.equal(summary.sessionOutcome, 'unknown')
+  assert.equal(summary.supaPlanningDurationSeconds, null)
+  assert.equal(summary.repairCount, 0)
+  assert.equal(summary.medianRepairDurationSeconds, null)
+  assert.equal(summary.repairManualEdits, 0)
+  assert.equal(summary.returnIntentRating, null)
+  assert.equal(summary.publicClaimEligible, false)
+})
+
+test('M4 repair positive: real CLI writes a valid repair summary without exposing participant key', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'supa-m4-repair-positive-qa-'))
+  const source = join(dir, 'private-session.json')
+  const target = join(dir, 'private-report.json')
+  const bytes = Buffer.from(JSON.stringify(session()) + '\n', 'utf8')
+  try {
+    writeFileSync(source, bytes, { mode: 0o600 })
+    chmodSync(source, 0o600)
+    const result = spawnSync(process.execPath, [CLI, source, '--output', target], {
+      encoding: 'utf8',
+      timeout: 15000,
+    })
+    assert.equal(result.error, undefined)
+    assert.equal(result.status, 0, 'valid causal repair session should still pass')
+    assert.equal(result.stdout, '', 'file output mode must not duplicate the report to stdout')
+    assert.equal(existsSync(target), true, 'valid session must produce a summary')
+    const reportText = readFileSync(target, 'utf8')
+    const report = JSON.parse(reportText)
+    assert.equal(report.repairCount, 1)
+    assert.equal(report.medianRepairDurationSeconds, 180)
+    assert.equal(report.repairManualEdits, 2)
+    assert.equal(report.publicClaimEligible, false)
+    assert.equal(report.participantKeyIncluded, false)
+    assert.equal(Object.hasOwn(report, 'participantKey'), false)
+    assert.doesNotMatch(reportText, /synthetic-pseudonym/)
+    assert.deepEqual(readFileSync(source), bytes, 'real CLI may not mutate private source bytes')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
