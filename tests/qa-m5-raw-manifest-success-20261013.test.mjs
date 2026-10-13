@@ -10,7 +10,7 @@ import test from 'node:test'
 // Never accesses a retailer, proxies, real prices, or external resources.
 const SOURCE = 'fictional-source'
 const STORE = 'fictional-store'
-const URL = 'https://example.invalid/fake'
+const SOURCE_URL = 'https://example.invalid/fake'
 
 async function withManifest(value, callback) {
   const root = await mkdtemp(join(tmpdir(), 'supa-m5-raw-success-'))
@@ -23,7 +23,7 @@ async function withManifest(value, callback) {
     await writeFile(join(storeDir, SOURCE + '.html'), html)
     const row = {
       id: SOURCE, supermarket: STORE, kind: 'product',
-      requestedUrl: URL, capturedAt: '2026-10-13T00:00:00.000Z',
+      requestedUrl: SOURCE_URL, capturedAt: '2026-10-13T00:00:00.000Z',
       sha256,
     }
     if (value !== 'OMIT_SUCCESS') row.success = value
