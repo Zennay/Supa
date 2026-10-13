@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { spawnSync } from 'node:child_process'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
@@ -95,5 +99,54 @@ for (const distantWeek of ['2025-09-29', '2027-09-27']) {
     assert.equal(result.attribution.fullyAttributed, false)
     assert.match(result.reasons.join(' '), /weekStart|week|observation|observed/i)
     assert.equal(JSON.stringify(study), original, 'original evidence must remain byte-identical')
+  })
+}
+
+for (const [weekStart, shouldBeClaimable] of [
+  ['2026-09-28', true],
+  ['2025-09-29', false],
+  ['2027-09-27', false],
+]) {
+  test(`QA M3 CLI ${shouldBeClaimable ? 'GREEN' : 'EXPECTED RED'}: report preserves week/evidence coherence for ${weekStart}`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'supa-m3-qa-week-'))
+    const input = join(directory, 'fictional-study.json')
+    const output = join(directory, 'private-summary.json')
+
+    try {
+      const original = JSON.stringify(fictionalObservedWeek(weekStart), null, 2)
+      await writeFile(input, original, 'utf8')
+      const result = spawnSync(process.execPath, [
+        '--experimental-strip-types',
+        'scripts/m3-assess-observed-week.mjs',
+        input,
+        '--output', output,
+      ], { cwd: process.cwd(), encoding: 'utf8' })
+
+      assert.equal(result.stdout, '', 'private summary must not appear on stdout')
+      assert.equal(await readFile(input, 'utf8'), original, 'raw fictional evidence must remain unchanged')
+      if (shouldBeClaimable) {
+        assert.equal(result.status, 0, result.stderr)
+        const report = JSON.parse(await readFile(output, 'utf8'))
+        assert.equal(report.claimable, true)
+        assert.equal(report.outcome, 'better')
+        assert.equal(report.publicSavingsClaimEligible, false)
+        assert.equal('participantKey' in report, false)
+      } else if (result.status === 0) {
+        // A private unknown report is acceptable; publishing savings is not.
+        const report = JSON.parse(await readFile(output, 'utf8'))
+        assert.equal(report.claimable, false)
+        assert.equal(report.outcome, 'unknown')
+        assert.equal(report.deltaCents, null)
+        assert.equal(report.savingsCents, null)
+        assert.equal(report.publicSavingsClaimEligible, false)
+        assert.equal('participantKey' in report, false)
+      } else {
+        // Early CLI refusal, without creating a report, is also safe.
+        assert.equal(result.status, 1)
+        await assert.rejects(readFile(output, 'utf8'), /ENOENT/)
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 }
