@@ -11,9 +11,15 @@ const KINDS = new Set(['unassessed', 'official-api', 'official-feed', 'public-ht
 const RIGHTS = new Set(['unknown', 'request-pending', 'denied', 'claimed-written-permission'])
 const REGIONS = new Set(['unknown', 'store-specific', 'regional', 'national'])
 const ASSORTMENT = new Set(['unknown', 'products', 'offers', 'products-and-offers'])
+const TERMS = new Set(['unreviewed', 'restrictive', 'unclear', 'allowance-claimed'])
+const ROBOTS = new Set(['unreviewed', 'restrictive', 'conditional', 'allowance-claimed'])
+const CONTACT = new Set(['unassessed', 'owner-identified', 'contact-pending', 'reply-recorded'])
+const FRESHNESS = new Set(['unassessed', 'manual-only', 'daily-claimed', 'weekly-claimed'])
+const PRIORITY = new Set(['unprioritized', 'P1', 'P2', 'P3'])
 const KEYS = new Set(['retailerId', 'reviewedAt', 'sourceKind', 'sourceUrl',
   'termsUrl', 'robotsUrl', 'rightsState', 'rightsEvidenceUrl',
-  'regionScope', 'assortmentScope'])
+  'regionScope', 'assortmentScope', 'termsReview', 'robotsReview',
+  'ownerContactStatus', 'freshnessPlan', 'priority'])
 const ISO_DATE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/
 
 function check(ok, message) {
@@ -65,7 +71,10 @@ export function assessRetailerResearch(discovery, ledger) {
       !reviews.has(review.retailerId), 'Unknown or repeated retailer review')
     check(validDate(review.reviewedAt), 'Invalid review date')
     check(KINDS.has(review.sourceKind) && RIGHTS.has(review.rightsState) &&
-      REGIONS.has(review.regionScope) && ASSORTMENT.has(review.assortmentScope),
+      REGIONS.has(review.regionScope) && ASSORTMENT.has(review.assortmentScope) &&
+      TERMS.has(review.termsReview) && ROBOTS.has(review.robotsReview) &&
+      CONTACT.has(review.ownerContactStatus) && FRESHNESS.has(review.freshnessPlan) &&
+      PRIORITY.has(review.priority),
     'Invalid research claim')
     check(validOptionalUrl(review.sourceUrl) && validOptionalUrl(review.termsUrl) &&
       validOptionalUrl(review.robotsUrl) && validOptionalUrl(review.rightsEvidenceUrl),
@@ -93,6 +102,11 @@ export function assessRetailerResearch(discovery, ledger) {
       claimedRightsEvidenceProvided: Boolean(review?.rightsEvidenceUrl),
       regionScope: review?.regionScope ?? 'unknown',
       assortmentScope: review?.assortmentScope ?? 'unknown',
+      termsReview: review?.termsReview ?? 'unreviewed',
+      robotsReview: review?.robotsReview ?? 'unreviewed',
+      ownerContactStatus: review?.ownerContactStatus ?? 'unassessed',
+      freshnessPlan: review?.freshnessPlan ?? 'unassessed',
+      priority: review?.priority ?? 'unprioritized',
       productionEnabled: false,
       rightsVerified: false,
       nextAction: !review
