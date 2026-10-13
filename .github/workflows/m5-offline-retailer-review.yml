@@ -40,9 +40,11 @@ jobs:
 
       - name: Verify checked-out commit and run all M5 offline tests
         shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
           node --test tests/m5-retailer-discovery.test.mjs tests/m5-retailer-review-pack.test.mjs tests/m5-retailer-rights-reconciliation.test.mjs
 
       - name: Export offline public candidate research pack and assert fail-closed gates
