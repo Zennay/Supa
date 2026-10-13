@@ -152,3 +152,35 @@ test('an untrusted product in one comparison store yields unknown, never a saved
   assert.equal(comparison.deltaCents, null)
   assert.deepEqual(comparison.lineDeltas, [])
 })
+
+test('budget-only edits preserve checkmarks, recipe edits invalidate a different physical basket', () => {
+  const originalPreferences = defaultPlannerPreferences(m2InitialPlan)
+  const original = basketsFor(originalPreferences)
+  const checkedId = original.shopping.lines.find((line) => line.status === 'matched')?.id
+  assert.ok(checkedId)
+
+  const stored = serializeShoppingListProgress(original.shopping, [checkedId])
+  const budgetOnly = basketsFor({ ...originalPreferences, budget: 40 })
+  assert.equal(
+    shoppingListBasketKey(original.shopping),
+    shoppingListBasketKey(budgetOnly.shopping),
+  )
+  assert.deepEqual(
+    restoreShoppingListProgress(budgetOnly.shopping, stored),
+    [checkedId],
+  )
+
+  const edited = basketsFor({
+    ...originalPreferences,
+    recipeByDay: { ...originalPreferences.recipeByDay, Di: 'pasta' },
+  })
+  assert.notEqual(
+    shoppingListBasketKey(original.shopping),
+    shoppingListBasketKey(edited.shopping),
+  )
+  assert.deepEqual(restoreShoppingListProgress(edited.shopping, stored), [])
+  assert.deepEqual(
+    edited.baseline.lines.map((line) => [line.id, line.requirement.amount, line.requirement.unit]),
+    edited.candidate.lines.map((line) => [line.id, line.requirement.amount, line.requirement.unit]),
+  )
+})
