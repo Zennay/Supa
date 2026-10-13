@@ -87,6 +87,10 @@ Even if `claimed-written-permission` has an HTTPS evidence URL, it remains **unv
 
 The GitHub-hosted workflow runs this assessment **only on the empty template**, producing `unreviewed-research-completeness.json` (17 pending, zero reviewed) in the research-only artifact. No human-provided private record is uploaded or accessed.
 
+## Permanent VPS read-only proof
+
+The additional [VPS M5 workflow](../.github/workflows/m5-retailer-review-vps.yml) is restricted to same-repository PRs (or explicit dispatch), checks out the exact PR SHA without stored GitHub credentials, validates permanent host `vps-bb300bba`, configures Node 22, runs only the offline M5 domain/CLI tests and verifies the empty public template. It performs **no live supermarket/API/network/proxy access, no participant intake, no production deployment**. A queued run is not a green validation; retain exact run ID, conclusion and commit SHA once executed. The GitHub-hosted and VPS checks are separate and must not be conflated.
+
 ## Acceptance for each future adapter (NOT completed)
 
 1. Human confirms active retailer identity, correct official source/feed URL, data owner, store/region, and source-specific technical access rules.
