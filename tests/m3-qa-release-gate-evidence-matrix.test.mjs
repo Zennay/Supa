@@ -225,3 +225,53 @@ test('M4 gate: fictional closed-gate parser summary still suppresses private ide
   assert.equal(summary.supaPlanningDurationSeconds, null)
   assert.equal(summary.basketOutcome, 'unknown')
 })
+
+
+function fullyPricedSyntheticSheet(candidateOffsetCents) {
+  const sheet = syntheticSheet()
+  for (const side of ['baseline', 'candidate']) {
+    const offset = side === 'candidate' ? candidateOffsetCents : 0
+    sheet[side].lines.forEach((line, index) => {
+      const requirement = sheet.requirements[index]
+      line.observedProduct = {
+        available: true,
+        productId: `${side}-synthetic-product-${index}`,
+        productName: requirement.query,
+        packAmount: requirement.amount,
+        packUnit: requirement.unit,
+        packCount: 1,
+        priceCents: 100 + index + offset,
+        sourceUrl: '',
+        note: 'Fictional QA value; never a measured retail price.',
+      }
+    })
+  }
+  return sheet
+}
+
+test('M3 gate: better, same and worse synthetic full baskets never authorize public savings', () => {
+  const expected = [
+    [-5, 'better'],
+    [0, 'same'],
+    [5, 'worse'],
+  ]
+  for (const [difference, expectedOutcome] of expected) {
+    const sheet = fullyPricedSyntheticSheet(difference)
+    const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+    assert.equal(study.baseline.basket.matchedLineCount, 11)
+    assert.equal(study.candidate.basket.matchedLineCount, 11)
+    assert.equal(study.baseline.basket.unresolvedLineCount, 0)
+    assert.equal(study.candidate.basket.unresolvedLineCount, 0)
+    const report = buildObservedWeekReport(study)
+    assert.equal(report.outcome, expectedOutcome)
+    assert.equal(report.claimable, true) // Study-comparable only; not public claim approval.
+    assert.equal(report.deltaCents, difference * 11)
+    assert.equal(report.publicSavingsClaimEligible, false)
+    assert.equal('participantKey' in report, false)
+    assert.equal(JSON.stringify(report).includes(study.participantKey), false)
+    assert.notEqual(study.baseline.evidenceId, study.candidate.evidenceId)
+    if (difference > 0) assert.ok(report.savingsCents < 0)
+    if (difference === 0) assert.equal(report.savingsCents, 0)
+    if (difference < 0) assert.ok(report.savingsCents > 0)
+  }
+})
