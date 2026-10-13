@@ -111,3 +111,38 @@ test('EXPECTED RED: a decision preceding explanation within a millisecond is not
     assert.match(String(error), /timestamp|precision|fraction|millisecond/i)
   }
 })
+
+
+test('EXPECTED RED: latest real basket observation must not regress to older optimistic result', () => {
+  const session = syntheticAbandonedSession()
+  // A later unknown observation appears before the earlier "better" one in the
+  // input array. Actual ordering (900 microseconds > 100 microseconds) matters.
+  session.events = [
+    session.events[0],
+    {
+      type: 'basket_assessment_viewed',
+      timestamp: '2026-10-12T10:00:00.0009Z',
+      outcome: 'unknown',
+      unresolved_line_count: 11,
+    },
+    {
+      type: 'basket_assessment_viewed',
+      timestamp: '2026-10-12T10:00:00.0001Z',
+      outcome: 'better',
+      unresolved_line_count: 0,
+    },
+  ]
+  // Rejecting unrepresentable precision is also a valid source repair.
+  try {
+    const summary = buildBetaSessionSummary(session)
+    assert.equal(
+      summary.basketOutcome,
+      'unknown',
+      'The latest real observation is unresolved; an older optimistic event must not win',
+    )
+    assert.equal(summary.publicClaimEligible, false)
+  } catch (error) {
+    if (error instanceof assert.AssertionError) throw error
+    assert.match(String(error), /timestamp|precision|fraction|millisecond/i)
+  }
+})
