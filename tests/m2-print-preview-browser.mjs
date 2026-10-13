@@ -277,7 +277,7 @@ try {
   await writeFile(longPath, longPdf)
   const longText = extractPdfText(longPath)
   assert.notEqual(longText, null, 'Poppler could not inspect the multi-page PDF')
-  const labels = longText.match(/Proefregel\\d{3}/g) ?? []
+  const labels = longText.match(/Proefregel\d{3}/g) ?? []
   assert.equal(labels.length, 88, 'Firefox PDF dropped or duplicated one or more physical rows')
   assert.equal(new Set(labels).size, 88, 'Firefox PDF repeated a physical row')
   for (let index = 1; index <= 88; index += 1) {
@@ -286,12 +286,12 @@ try {
       `PDF missing physical shopping line ${index}`,
     )
   }
-  assert.doesNotMatch(longText, /Schermhulp \\(mag niet op papier verschijnen\\)|Testnavigatie \\(mag niet op papier verschijnen\\)|€|Besparing:|bespaard/)
+  assert.doesNotMatch(longText, /Schermhulp \(mag niet op papier verschijnen\)|Testnavigatie \(mag niet op papier verschijnen\)|€|Besparing:|bespaard/)
   const pdfInfo = execFileSync('pdfinfo', [longPath], {
     encoding: 'utf8',
     timeout: 10_000,
   })
-  const pages = Number(/^Pages:\\s*(\\d+)/m.exec(pdfInfo)?.[1])
+  const pages = Number(/^Pages:\s*(\d+)/m.exec(pdfInfo)?.[1])
   assert.ok(Number.isInteger(pages) && pages >= 2 && pages < 15,
     `expected real multi-page PDF, observed ${pages} pages`)
   evidence.checks.push({
