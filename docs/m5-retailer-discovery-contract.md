@@ -22,6 +22,24 @@ node --test tests/m5-retailer-discovery.test.mjs
 
 The strict production-ready mode **always exits 2**. All individual records explicitly keep region/assortment, terms, robots, data ownership, contact, refresh, risk, priority and permission evidence **unassessed/unreviewed/null** until a separately reviewed follow-up. This registry has no "permitted" switch and deliberately cannot grant production rights. The M1 permission gate still covers only its original two chains; never append unapproved retailers to it.
 
+## New offline retailer review pack (read-only)
+
+The previously separate discovery register now has a **human review worksheet exporter**. This is real executable code, but it does not fetch any retailer website, contact data owner, grant rights, or update permission statuses.
+
+```bash
+node scripts/m5-build-retailer-review-pack.mjs --format=csv
+node scripts/m5-build-retailer-review-pack.mjs --format=markdown
+node scripts/m5-build-retailer-review-pack.mjs --format=json
+node --test tests/m5-retailer-review-pack.test.mjs
+```
+
+- CSV: fixed 14-column/17-row sheet (chain identity, market-source evidence, initial M1 proof pair, explicit unknown region/assortment/technical/terms/robots/owner/permission evidence, and concrete next-action checklist), ready to copy to a researcher-controlled document.
+- CSV cells are quoted, spreadsheet-formula-prefixed safely, and control characters filtered; rendered Markdown escapes tables, markup and pipe characters. The register itself is never overwritten.
+- JSON: deterministic offline work pack usable by a **separately approved** queue importer. It always reports `productionReady=false` and `productionEnabled=false`.
+- `existingM1ProofPair=true` solely distinguishes the historical PLUS/DekaMarkt technical research pair; this never indicates that actual source reuse, field observation or production access is authorized.
+- No implied rights or review acceptance: *market-listed* is not *licensed*, *robots-permitted* is not *data licensed*, and a working selector is not *permission*.
+- Reviewer must retain explicit source owner confirmation, permission proof, current terms/robots, store/region rights, allowed refresh cadence, and scope separately. This automated exporter records none of those as reviewed.
+
 ## Acceptance for each future adapter (NOT completed)
 
 1. Human confirms active retailer identity, correct official source/feed URL, data owner, store/region, and source-specific technical access rules.
