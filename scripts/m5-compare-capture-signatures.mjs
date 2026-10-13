@@ -86,6 +86,12 @@ export function captureShape(source) {
   if (!source || typeof source !== 'object' || typeof source.id !== 'string') {
     throw new Error('Invalid inspected source')
   }
+  // The M1 inspector always produces an explicit boolean. Do not interpret
+  // an untrusted "true"/"false", 0/1 or missing success flag as a verified
+  // or unavailable capture in the exported pure comparison API.
+  if (typeof source.success !== 'boolean') {
+    throw new Error('Invalid inspected capture success')
+  }
   if (!source.success) {
     requireCanonicalOrigin(source)
     return {
