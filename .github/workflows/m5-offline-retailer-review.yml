@@ -9,6 +9,9 @@ on:
       - "scripts/m5-audit-retailer-discovery.mjs"
       - "scripts/m5-build-retailer-review-pack.mjs"
       - "scripts/m5-reconcile-retailer-rights.mjs"
+      - "scripts/m5-assess-retailer-research.mjs"
+      - "docs/m5-retailer-research-template.v1.json"
+      - "tests/m5-retailer-research-review.test.mjs"
       - "tests/m5-retailer-discovery.test.mjs"
       - "tests/m5-retailer-review-pack.test.mjs"
       - "tests/m5-retailer-rights-reconciliation.test.mjs"
@@ -45,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
-          node --test tests/m5-retailer-discovery.test.mjs tests/m5-retailer-review-pack.test.mjs tests/m5-retailer-rights-reconciliation.test.mjs
+          node --test tests/m5-retailer-discovery.test.mjs tests/m5-retailer-review-pack.test.mjs tests/m5-retailer-rights-reconciliation.test.mjs tests/m5-retailer-research-review.test.mjs
 
       - name: Export offline public candidate research pack and assert fail-closed gates
         shell: bash
@@ -56,6 +59,7 @@ jobs:
           node scripts/m5-build-retailer-review-pack.mjs --format=markdown > artifacts/m5-offline-review/retailer-review.md
           node scripts/m5-build-retailer-review-pack.mjs --format=json > artifacts/m5-offline-review/retailer-review.json
           node scripts/m5-reconcile-retailer-rights.mjs > artifacts/m5-offline-review/m1-m5-rights-reconciliation.json
+          node scripts/m5-assess-retailer-research.mjs docs/m5-retailer-research-template.v1.json > artifacts/m5-offline-review/unreviewed-research-completeness.json
 
           set +e
           node scripts/m5-audit-retailer-discovery.mjs --require-production-ready > artifacts/m5-offline-review/m5-blocked-production.json
