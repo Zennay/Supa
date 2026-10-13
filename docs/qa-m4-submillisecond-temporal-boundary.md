@@ -12,9 +12,10 @@
 
 1. `endedAt >= startedAt` acceptance when the session is actually inverted;
 2. `event.timestamp <= endedAt` acceptance when the event is later than session closure;
-3. `explanationViewedBeforeDecision` when decision occurs before the explanation.
+3. `explanationViewedBeforeDecision` when decision occurs before the explanation;
+4. `latestEvent()` choosing an older optimistic `better` basket event instead of a later `unknown` one when both occupy the same millisecond.
 
-The regression calls **real exported source functions**, uses only fictional abandoned/unknown beta session data, and asserts no public claim or participant identifier in valid summary output. The two valid millisecond controls should remain green. Three hostile precision cases must fail on current main; that failing CI is **intentional evidence of an unaddressed finding**.
+The regression calls **real exported source functions**, uses only fictional abandoned/unknown beta session data, and asserts no public claim or participant identifier in valid summary output. The two valid millisecond controls should remain green. Four hostile precision cases must fail on current main; that failing CI is **intentional evidence of an unaddressed finding**.
 
 ## Narrow remediation contract (separate owner-reviewed source branch)
 
