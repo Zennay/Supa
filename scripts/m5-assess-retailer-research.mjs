@@ -1,4 +1,5 @@
-import { lstat, readFile } from 'node:fs/promises'
+import { open, readFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pathToFileURL } from 'node:url'
@@ -132,22 +133,31 @@ export function parseResearchArgs(args) {
   return args[0]
 }
 
+// Single-descriptor read closes the lstat→readFile symlink replacement window.
+export async function loadPrivateRetailerResearch(input) {
+  const handle = await open(input, constants.O_RDONLY | (constants.O_NOFOLLOW || 0))
+  try {
+    const fileStats = await handle.stat()
+    check(fileStats.isFile() && fileStats.size > 0 && fileStats.size <= 65536,
+      'Private reviewer input must be a bounded regular file')
+    const publicEmptyTemplate = fileURLToPath(
+      new URL('../docs/m5-retailer-research-template.v1.json', import.meta.url))
+    if (resolve(input) !== publicEmptyTemplate && process.platform !== 'win32') {
+      check((fileStats.mode & 0o077) === 0,
+        'Private reviewer files must not be readable by group or other users')
+    }
+    return JSON.parse(await handle.readFile('utf8'))
+  } finally {
+    await handle.close()
+  }
+}
+
 export async function main(args = process.argv.slice(2)) {
   const input = parseResearchArgs(args)
-  const fileStats = await lstat(input)
-  check(fileStats.isFile() && !fileStats.isSymbolicLink() &&
-    fileStats.size > 0 && fileStats.size <= 65536,
-  'Private reviewer input must be a bounded regular file, not a symlink')
-  const publicEmptyTemplate = fileURLToPath(
-    new URL('../docs/m5-retailer-research-template.v1.json', import.meta.url))
-  if (resolve(input) !== publicEmptyTemplate && process.platform !== 'win32') {
-    check((fileStats.mode & 0o077) === 0,
-      'Private reviewer files must not be readable by group or other users')
-  }
   const [discovery, ledger] = await Promise.all([
-    readFile(DISCOVERY, 'utf8'), readFile(input, 'utf8'),
+    readFile(DISCOVERY, 'utf8'), loadPrivateRetailerResearch(input),
   ])
-  const report = assessRetailerResearch(JSON.parse(discovery), JSON.parse(ledger))
+  const report = assessRetailerResearch(JSON.parse(discovery), ledger)
   process.stdout.write(JSON.stringify(report, null, 2) + '\n')
   return report
 }
