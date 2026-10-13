@@ -36,7 +36,15 @@ export function RecipeEstimateDetails({
     createElement(
       'details',
       { className: 'recipe-estimate-explanation__details' },
-      createElement('summary', null, question),
+      createElement(
+        'summary',
+        {
+          // Keep native list-item marker and keyboard behavior, while offering
+          // a comfortable tap target on small screens without global CSS.
+          style: { minHeight: 44, padding: '10px 0', overflowWrap: 'anywhere', cursor: 'pointer' },
+        },
+        question,
+      ),
       createElement('p', null, estimate.explanation),
     ),
   )
