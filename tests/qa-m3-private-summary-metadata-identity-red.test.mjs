@@ -32,6 +32,14 @@ const PATHS = [
     label: 'candidate store label',
     edit(study) { study.candidate.basket.store.name = `DekaMarkt synthetic ${EMAIL}` },
   },
+  {
+    label: 'baseline store ID',
+    edit(study) { study.baseline.basket.store.id = EMAIL },
+  },
+  {
+    label: 'candidate store ID',
+    edit(study) { study.candidate.basket.store.id = EMAIL },
+  },
 ]
 
 function oneBasket(store, priceOffset) {
@@ -123,6 +131,7 @@ for (const path of PATHS) {
     }
     if (rejection) {
       assert.match(String(rejection), /identity|privacy|identifier|personal|email|PII/i)
+      assert.doesNotMatch(String(rejection), /fictional\.person@example\.invalid/, 'error must not echo direct ID')
     } else {
       assertNoDirectIdentifier(report)
     }
@@ -167,6 +176,7 @@ for (const path of PATHS) {
         input, '--output', output,
       ], { cwd: process.cwd(), encoding: 'utf8' })
       assert.equal(result.stdout, '', 'never print private data on stdout')
+      assert.doesNotMatch(result.stderr, /fictional\.person@example\.invalid/, 'validation diagnostics must not echo the identity')
       if (result.status === 0) {
         assertNoDirectIdentifier(JSON.parse(await readFile(output, 'utf8')))
       } else {
