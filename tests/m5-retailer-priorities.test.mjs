@@ -69,6 +69,31 @@ test('research priority follows evidence completeness, not automation permission
   assert.deepEqual(ledger,baseline)
 })
 
+test('research preference sorts only within human-action tier, never bypasses rights blockers', () => {
+  const ledger = empty()
+  // All three candidate records share "check-terms-and-robots" urgency,
+  // but the manually chosen P1/P2/P3 order must override retailer alphabetics.
+  ledger.reviews.push(claim('aldi', {
+    sourceKind: 'official-feed', sourceUrl: 'https://example.invalid/a',
+    priority: 'P3',
+  }))
+  ledger.reviews.push(claim('boni', {
+    sourceKind: 'official-feed', sourceUrl: 'https://example.invalid/b',
+    priority: 'P1',
+  }))
+  ledger.reviews.push(claim('boon', {
+    sourceKind: 'official-feed', sourceUrl: 'https://example.invalid/c',
+    priority: 'P2',
+  }))
+  const report = buildM5ResearchPriorities(discovery, m1, ledger)
+  assert.deepEqual(report.queue.slice(0, 2).map(row => row.retailerId),
+    ['plus', 'dekamarkt'], 'M1 rights must outrank all P1 research')
+  const sameTier = report.queue.filter(row => row.nextActionCode === 'check-terms-and-robots')
+  assert.deepEqual(sameTier.map(row => row.retailerId), ['boni', 'boon', 'aldi'])
+  assert.deepEqual(sameTier.map(row => row.reviewPriority), ['P1', 'P2', 'P3'])
+  assert.ok(report.queue.every(row => !row.rightsVerified && !row.productionEnabled))
+})
+
 test('unknown and internally contradictory review metadata cannot enter priority queue',()=>{
   const rogue=empty()
   rogue.reviews.push(claim('plus',{rightsState:'permitted'}))
