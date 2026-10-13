@@ -1,0 +1,136 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { assessRetailerResearch, parseResearchArgs } from '../scripts/m5-assess-retailer-research.mjs'
+
+const durl = new URL('../docs/m5-retailer-discovery.v1.json', import.meta.url)
+const original = JSON.parse(await readFile(durl, 'utf8'))
+const discovery = () => structuredClone(original)
+const empty = () => ({ version: 1, purpose: 'manual-research-only', reviews: [] })
+const record = (overrides = {}) => ({
+  retailerId: 'plus',
+  reviewedAt: '2026-10-13',
+  sourceKind: 'unassessed',
+  sourceUrl: null,
+  termsUrl: null,
+  robotsUrl: null,
+  rightsState: 'unknown',
+  rightsEvidenceUrl: null,
+  regionScope: 'unknown',
+  assortmentScope: 'unknown',
+  ...overrides,
+})
+
+test('Empty private ledger never implies any approvals for 17 candidates', () => {
+  const report = assessRetailerResearch(discovery(), empty())
+  assert.equal(report.reviewedCount, 0)
+  assert.equal(report.missingCount, 17)
+  assert.equal(report.productionReady, false)
+  assert.equal(report.m5Eligible, false)
+  assert.ok(report.retailers.every((r) =>
+    !r.productionEnabled && !r.rightsVerified && r.rightsState === 'unknown'))
+})
+
+test('Human-researched source metadata is not a legal permission or production enablement', () => {
+  const ledger = empty()
+  ledger.reviews.push(record({
+    sourceKind: 'official-feed', sourceUrl: 'https://example.invalid/public/feed',
+    termsUrl: 'https://example.invalid/terms',
+    robotsUrl: 'https://example.invalid/robots.txt',
+    rightsState: 'claimed-written-permission',
+    rightsEvidenceUrl: 'https://example.invalid/permission-evidence',
+    regionScope: 'regional', assortmentScope: 'products-and-offers',
+  }))
+  const frozen = structuredClone(ledger)
+  const report = assessRetailerResearch(discovery(), ledger)
+  const plus = report.retailers.find((item) => item.id === 'plus')
+  assert.equal(report.reviewedCount, 1)
+  assert.equal(report.missingCount, 16)
+  assert.equal(plus.rightsState, 'claimed-written-permission')
+  assert.equal(plus.claimedRightsEvidenceProvided, true)
+  assert.equal(plus.rightsVerified, false)
+  assert.equal(plus.productionEnabled, false)
+  assert.equal(report.productionReady, false)
+  assert.deepEqual(ledger, frozen, 'review data mutated')
+  assert.ok(!JSON.stringify(report).includes('example.invalid'), 'private URLs leaked')
+})
+
+test('Duplicate, phantom and inconsistent claims fail closed', () => {
+  const changes = [
+    (r) => { r.reviews.push(record()); r.reviews.push(record()) },
+    (r) => { r.reviews.push(record({ retailerId: 'phantom' })) },
+    (r) => { r.reviews.push(record({ reviewedAt: '2999-01-01' })) },
+    (r) => { r.reviews.push(record({ reviewedAt: '2026-02-30' })) },
+    (r) => { r.reviews.push(record({ sourceKind: 'official-api' })) },
+    (r) => { r.reviews.push(record({ rightsState: 'claimed-written-permission' })) },
+    (r) => { r.reviews.push(record({ rightsState: 'unknown', rightsEvidenceUrl: 'https://example.invalid/secret' })) },
+    (r) => { r.reviews.push(record({ sourceKind: 'unassessed', sourceUrl: 'https://example.invalid/feed' })) },
+    (r) => { r.reviews.push(record({ sourceKind: 'public-html', sourceUrl: 'http://example.invalid/' })) },
+    (r) => { r.reviews.push(record({ sourceKind: 'public-html', sourceUrl: 'https://example.invalid/@user#hash' })) },
+    (r) => { r.reviews.push(record({ sourceKind: 'public-html', sourceUrl: 'https://user:pass@example.invalid/a' })) },
+    (r) => { r.reviews.push(record({ sourceKind: 'unverified-feed' })) },
+    (r) => { r.reviews.push(record({ rightsState: 'permitted' })) },
+    (r) => { r.reviews.push(record({ rightsState: 'denied', rightsEvidenceUrl: 'https://example.invalid/' })) },
+    (r) => { r.reviews.push(record({ regionScope: 'everywhere' })) },
+    (r) => { r.reviews.push(record({ assortmentScope: 'entire-catalog' })) },
+    (r) => { r.reviews.push(record({ reviewerName: 'person@example.invalid' })) },
+    (r) => { r.reviews.push(record({ sourceUrl: null, comments: 'contact@example.invalid' })) },
+    (r) => { r.productionReady = true; r.reviews.push(record()) },
+  ]
+  for (const mutate of changes) {
+    const sample = empty()
+    mutate(sample)
+    assert.throws(() => assessRetailerResearch(discovery(), sample), undefined, JSON.stringify(sample).slice(0, 120))
+  }
+})
+
+test('Malformed ledger containers, oversize entries and missing required keys fail closed', () => {
+  for (const doc of [null, [], {}, { version: 1, purpose: 'manual-research-only', reviews: null },
+    { version: 2, purpose: 'manual-research-only', reviews: [] },
+    { version: 1, purpose: 'permission-granted', reviews: [] }]) {
+    assert.throws(() => assessRetailerResearch(discovery(), doc))
+  }
+  const missing = empty()
+  const item = record()
+  delete item.robotsUrl
+  missing.reviews.push(item)
+  assert.throws(() => assessRetailerResearch(discovery(), missing))
+  const tooLong = empty()
+  tooLong.reviews = Array.from({ length: 18 }, (_, i) => record({ retailerId: 'retailer-' + i }))
+  assert.throws(() => assessRetailerResearch(discovery(), tooLong))
+})
+
+test('CLI requires explicit local file, emits privacy-redacted report and preserves bytes', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'supa-m5-review-'))
+  try {
+    const input = path.join(dir, 'private-review.json')
+    const secret = 'https://example.invalid/secret-evidence-keep-private'
+    const ledger = empty()
+    ledger.reviews = [record({ rightsState: 'claimed-written-permission',
+      rightsEvidenceUrl: secret })]
+    const content = JSON.stringify(ledger)
+    await writeFile(input, content, { mode: 0o600 })
+    const script = new URL('../scripts/m5-assess-retailer-research.mjs', import.meta.url)
+    const run = spawnSync(process.execPath, [script.pathname, input], { encoding: 'utf8' })
+    assert.equal(run.status, 0, run.stderr)
+    assert.equal(run.stderr, '')
+    assert.ok(!run.stdout.includes(secret))
+    assert.equal(JSON.parse(run.stdout).reviewedCount, 1)
+    assert.equal(await readFile(input, 'utf8'), content)
+    const invalid = spawnSync(process.execPath, [script.pathname], { encoding: 'utf8' })
+    assert.notEqual(invalid.status, 0)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('No implicit default reviewer input or unsafe CLI switch', () => {
+  assert.equal(parseResearchArgs(['reviews.json']), 'reviews.json')
+  for (const args of [[], ['--output=public.json'], ['--format=csv'],
+    ['file.json', 'second.json'], ['-'], ['--require-production-ready']]) {
+    assert.throws(() => parseResearchArgs(args))
+  }
+})
