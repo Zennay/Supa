@@ -129,7 +129,7 @@ export async function main(args = process.argv.slice(2)) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await main().catch(() => {
     // Never disclose an input path, URL or private record value in shared logs.
-    process.stderr.write('Offline M5 research assessment rejected the supplied file.\\n')
+    process.stderr.write('Offline M5 research assessment rejected the supplied file.' + String.fromCharCode(10))
     process.exitCode = 2
   })
 }
