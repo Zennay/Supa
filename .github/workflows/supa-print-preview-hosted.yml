@@ -1,0 +1,95 @@
+name: M2 hosted printable-list Firefox acceptance
+
+on:
+  pull_request:
+    paths:
+      - "src/features/shopping-list/PrintableShoppingChecklist.*"
+      - "src/features/shopping-list/printableShoppingChecklist.ts"
+      - "tests/fixtures/print-preview.*"
+      - "tests/m2-print-preview-browser.mjs"
+      - ".github/workflows/supa-print-preview-hosted.yml"
+
+concurrency:
+  group: supa-print-hosted-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hosted-print-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Verify independent hosted Firefox tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v firefox
+          command -v geckodriver
+          if ! command -v pdftotext; then
+            sudo apt-get update
+            sudo apt-get install -y poppler-utils
+          fi
+          command -v pdftotext
+          firefox --version
+          geckodriver --version
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and compile isolated React print fixture
+        run: |
+          npm ci
+          npm run build
+
+      - name: Generate and inspect native Firefox print PDF
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/print-browser-e2e
+          npm run dev -- --host 127.0.0.1 --port 4189 --strictPort \
+            >artifacts/print-browser-e2e/vite.log 2>&1 &
+          vite_pid=$!
+          geckodriver --port 4455 \
+            >artifacts/print-browser-e2e/geckodriver.log 2>&1 &
+          driver_pid=$!
+          cleanup() { kill "$vite_pid" "$driver_pid" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4189/tests/fixtures/print-preview.html >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:4189/tests/fixtures/print-preview.html >/dev/null
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4455/status >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:4455/status \
+            >artifacts/print-browser-e2e/webdriver-status.json
+
+          PRINT_BASE_URL=http://127.0.0.1:4189/tests/fixtures/print-preview.html \
+          PRINT_WEBDRIVER_URL=http://127.0.0.1:4455 \
+          PRINT_ARTIFACT_DIR=artifacts/print-browser-e2e \
+            node tests/m2-print-preview-browser.mjs
+
+      - name: Upload hosted synthetic browser PDF and JSON evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: supa-hosted-print-browser
+          path: artifacts/print-browser-e2e/
+          if-no-files-found: warn
+          retention-days: 14
