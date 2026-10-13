@@ -8,6 +8,7 @@ import test from 'node:test'
 
 import {
   buildFictionalRehearsalSheet,
+  buildFictionalPricedSheet,
   rehearseM3FieldPipeline,
 } from '../scripts/m3-rehearse-field-run.mjs'
 import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
@@ -24,7 +25,8 @@ test('M3 rehearsal runs real converter + assessor with strict fail-closed negati
     kind: 'm3-field-pipeline-rehearsal',
     syntheticOnly: true,
     requirementPairsChecked: 11,
-    negativeControlsPassed: 5,
+    fictionalOutcomesVerified: ['better', 'same', 'worse', 'unknown'],
+    negativeControlsPassed: 7,
     converterAndAssessorOperational: true,
     realRetailerEvidenceVerified: false,
     m3ExitProven: false,
@@ -49,6 +51,40 @@ test('fictional 11+11 unavailable requirements retain unknown/null savings, neve
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.equal(report.baseline.matchedLineCount, 0)
   assert.equal(report.candidate.unresolvedLineCount, 11)
+})
+
+test('fully priced fictional same-demand baskets exercise genuine converter better/same/worse branches', () => {
+  for (const [priceCents, expectedOutcome, expectedSavings] of [
+    [90, 'better', 110],
+    [100, 'same', 0],
+    [110, 'worse', -110],
+  ]) {
+    const sheet = buildFictionalPricedSheet(priceCents)
+    const report = reportFor(sheet)
+    assert.equal(report.outcome, expectedOutcome)
+    assert.equal(report.baseline.matchedLineCount, 11)
+    assert.equal(report.candidate.matchedLineCount, 11)
+    assert.equal(report.baselineTotalCents, 1100)
+    assert.equal(report.candidateTotalCents, 11 * priceCents)
+    assert.equal(report.savingsCents, expectedSavings)
+    assert.equal(report.publicSavingsClaimEligible, false)
+  }
+})
+
+test('fictional complete+expired and partial price studies never leak savings claims', () => {
+  const expired = buildFictionalPricedSheet()
+  expired.candidate.observedAt = '2026-10-02T10:00:01Z'
+  const expiredReport = reportFor(expired)
+  assert.equal(expiredReport.outcome, 'unknown')
+  assert.equal(expiredReport.savingsCents, null)
+  assert.equal(expiredReport.publicSavingsClaimEligible, false)
+
+  const partial = buildFictionalPricedSheet()
+  partial.candidate.lines[0].observedProduct.available = false
+  const partialReport = reportFor(partial)
+  assert.equal(partialReport.outcome, 'unknown')
+  assert.equal(partialReport.savingsCents, null)
+  assert.equal(partialReport.publicSavingsClaimEligible, false)
 })
 
 test('unfinished availability remains invalid, not invented unavailability', () => {
