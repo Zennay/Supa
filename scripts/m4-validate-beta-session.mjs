@@ -198,6 +198,7 @@ function validateCompletedWeekCausality(events) {
   const closed = eventsOfType(events, 'beta_week_closed')
   assert(starts.length > 0, 'completed sessions require a plan_started event')
   assert(completed.length > 0, 'completed sessions require a plan_completed event')
+  assert(closed.length > 0, 'completed sessions require a beta_week_closed event')
   assert(closed.length === 1, 'completed sessions require exactly one beta_week_closed event')
 
   const firstStart = Math.min(...starts.map((event) => Date.parse(event.timestamp)))
