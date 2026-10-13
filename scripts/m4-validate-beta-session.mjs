@@ -174,8 +174,8 @@ function eventsOfType(events, type) {
 }
 
 const MAX_MEAL_SLOT_UTF8_BYTES = 256
-const UNSAFE_MEAL_SLOT_CHAR = /[\\p{Cc}\\p{Cf}\\p{Cs}\\p{Co}\\p{Cn}\\p{Zl}\\p{Zp}]/u
-const VISIBLE_MEAL_SLOT_BASE = /[\\p{L}\\p{N}\\p{P}\\p{S}]/u
+const UNSAFE_MEAL_SLOT_CHAR = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}]/u
+const VISIBLE_MEAL_SLOT_BASE = /[\p{L}\p{N}\p{P}\p{S}]/u
 
 // Measure adherence per *meal*, never per number of outcome events. Two
 // distinct input spellings that NFKC-normalize to the same meal identity
