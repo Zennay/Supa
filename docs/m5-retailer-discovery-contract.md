@@ -9,6 +9,8 @@ The May 2026 Consumentenbond price survey lists thirteen chains. Wageningen Univ
 - Consumentenbond Boni reference: https://www.consumentenbond.nl/acties-claims/nieuws/2025/laagsteprijsclaims-van-supermarkten-update
 - WUR market research: https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid
 - Consumentenbond, 6 May 2026 survey: https://www.consumentenbond.nl/voedingstests/prijspeiling-supermarkten
+**Market-list provenance control:** these v1 candidate links are now exact-URL pinned to the two cited research organisations and their three confirmed public articles. Replacing evidence with an unrelated/lookalike HTTPS URL is rejected by the offline audit. Extending the set requires independent manual source verification; none of these articles grants product-data reuse rights.
+
 - Existing M1 source-permission gate: `scripts/m1-check-source-permission-gate.mjs` (PLUS/DekaMarkt only).
 - Open permission work: Notion PWQ-316; expansion epic https://github.com/Zennay/Supa/issues/2069.
 
