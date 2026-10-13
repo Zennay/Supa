@@ -63,7 +63,7 @@ node --test tests/m5-retailer-rights-reconciliation.test.mjs
 
 The new [M5 offline retailer review pack workflow](../.github/workflows/m5-offline-retailer-review.yml) checks out the exact PR head with `persist-credentials: false`, runs the isolated M5 regression files and builds a 14-day GitHub Actions artifact named `supa-m5-offline-retailer-review`. Only same-repository pull requests or explicitly dispatched runs are eligible. The workflow uses the GitHub-hosted runner; it performs no live retailer request, proxy probe, source ingestion, M3 observation, queue claim, production deploy or merge.
 
-The downloadable archive contains `retailer-review.csv`, `retailer-review.md`, `retailer-review.json`, `m1-m5-rights-reconciliation.json`, `unreviewed-research-completeness.json`, `m5-blocked-production.json`, and `m5-blocked-readiness.json`. Both final reports must exit code 2 as a safety proof. These are *review-preparation artifacts*, not proof of access rights or savings.
+The downloadable archive contains `retailer-review.csv`, `retailer-review.md`, `retailer-review.json`, `m1-m5-rights-reconciliation.json`, `unreviewed-research-completeness.json`, `retailer-human-priorities.json`, `retailer-human-priorities.md`, `m5-blocked-production.json`, and `m5-blocked-readiness.json`. Both final reports must exit code 2 as a safety proof. These are *review-preparation artifacts*, not proof of access rights or savings.
 
 ## Offline human source-research intake — separate from production permission
 
@@ -88,6 +88,23 @@ The private file must be an ordinary **non-symlink**, at most **64 KiB**, and mo
 Even if `claimed-written-permission` has an HTTPS evidence URL, it remains **unverified**, `rightsVerified=false`, `m5Eligible=false`, `productionReady=false`, and `productionEnabled=false`. Independent verification of the actual written license, current M1 policy, M3 #78 evidence, M4 beta eligibility, original source-owner authorization and an explicit M5-go remain separate human gates.
 
 The GitHub-hosted workflow runs this assessment **only on the empty template**, producing `unreviewed-research-completeness.json` (17 pending, zero reviewed) in the research-only artifact. No human-provided private record is uploaded or accessed.
+
+## Human-first retailer research priorities
+
+The new `scripts/m5-build-retailer-priorities.mjs` combines the reviewed candidate registry, **canonical actual M1 rights statuses** and an optional local-only private research ledger to generate a stable next-action queue. The default command reads only the EMPTY public template, so no retailer data is requested.
+
+```bash
+node scripts/m5-build-retailer-priorities.mjs
+node scripts/m5-build-retailer-priorities.mjs --format=markdown
+node scripts/m5-build-retailer-priorities.mjs /private/path/review.json --format=json
+node --test tests/m5-retailer-priorities.test.mjs
+```
+
+- Open written source-rights questions for **PLUS and DekaMarkt** appear ahead of unreviewed later-market brands. A claimed written permission is *only a claim* and is sorted into **independent human legal review**, never a source enablement.
+- Missing research yields the next offline identity/source review task. A denied source is marked `do-not-ingest`, while a pending human request is marked `await-human-reply`, without scraping, invented contact details or automatic retries.
+- These are **research priority ranks only**, not release priority, data freshness assertions or permission. All output records keep `rightsVerified=false`, `productionEnabled=false` and `m5Eligible=false`.
+- The JSON and Markdown summaries never echo local reviewer URLs, filenames, names, emails, terms links or written-license documents. Private inputs reuse the same one-file-descriptor, no-symlink, ≤64KiB and Unix restrictive-mode reader.
+- The GitHub-hosted workflow only exports the public-empty-template `retailer-human-priorities.json` and `retailer-human-priorities.md`. It never reads a real private reviewer ledger from the build workspace.
 
 ## Permanent VPS read-only proof
 
