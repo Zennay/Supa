@@ -1,16 +1,17 @@
-# QA handoff — M5 rights and review-pack cross-format replay (frozen product)
+# QA handoff — M5 unknown rights-metadata reproduction (frozen product)
 
-**Original product:** [PR #2090](https://github.com/Zennay/Supa/pull/2090), frozen exact revision `2704fbec375c13b34c4c54570b0713f26a427f27`. **Existing QA finding:** [#2097](https://github.com/Zennay/Supa/issues/2097), earlier red test [#2098](https://github.com/Zennay/Supa/pull/2098) against a now-outdated source. This branch is an isolated **follow-up**; it does not touch any original product, M3/M4, workflow or other QA files.
+**Original product:** [PR #2090](https://github.com/Zennay/Supa/pull/2090), immutable source `2704fbec375c13b34c4c54570b0713f26a427f27`. **Existing issue:** [#2097](https://github.com/Zennay/Supa/issues/2097). This new QA replay is independent of earlier [#2098](https://github.com/Zennay/Supa/pull/2098), which targeted older owner source.
 
-Run `node --test tests/qa-m5-owner-head-rights-metadata-replay.test.mjs tests/qa-m5-owner-head-independent-output-oracle.test.mjs`.
+## Expected-RED reproduction only
 
-## Evidence boundaries
+Run `node --test tests/qa-m5-owner-head-rights-metadata-replay.test.mjs`.
 
-- **Four new expected GREEN tests** independently reconcile the canonical 17 market candidates across `assessRetailerDiscovery`, JSON review pack, RFC4180-style CSV, Markdown, and the real M1 two-retailer permission source. They require sorted one-to-one identities, two historical M1 technical sources (not rights), all 17 disabled, preserved raw input and explicit unknown rights.
-- CSV oracle parses escaped quoted cells independently; checks each output row maps back to identical source ID, name, market-list URL, unknown rights and no production mode. Markdown oracle verifies exactly 17 disabled entries and no license assertion.
-- Status oracle uses **current owner contract**: discovery lists may contain only `unreviewed`; `denied` and `permission-requested` belong to separately reviewed evidence and must be refused by the source inventory. This supersedes obsolete expectations from the older frozen #2098 QA.
-- **Eleven issue #2097 replay tests:** two positive and nine intentional expected RED demonstrating that unrelated production/permission-like root or per-retailer properties or a forged `purpose` are ignored by the frozen source. This is a governance/schemas ambiguity, not any real permission or live ingest. The real CLI rejection case uses only a disposable temp file and no endpoint access.
-- Review only; the suite deliberately cannot be merged while it has expected RED. A source-owner patch must explicitly define safe top-level and record metadata and exact research-only `purpose`, rerun correct HEAD with **all tests green**, then complete independently authorized zCloud preflight/write lease, compatible VPS validation and explicit release approval.
-- Genuine M3 field [#78](https://github.com/Zennay/Supa/issues/78) is still OPEN. No genuine retailer observations, scraper, proxies, source requests, rights approval, real people or public savings.
+**Eleven offline tests:** two positive controlled-market-list checks, nine deliberate expected RED cases. The nine negative cases exercise unrecognized rights flags (top-level `productionEnabled`, `permissionGranted`, `ingestReady`, `licenseVerified`; per-retailer `ingestAuthorized`, `licenseApproved`, `proxyOverridePermitted`), forged top-level production `purpose`, and the real audit CLI with a misleading local synthetic input file. The owner validator currently checks a fixed set of fields but silently accepts contradictory unrelated metadata. The derived `productionReady` remains false: this is **governance/schema ambiguity**, not active source access.
+
+Four **independent green** cross-format and M1-rights tests now live in separate [DRAFT #2100](https://github.com/Zennay/Supa/pull/2100) and are intentionally absent from this RED branch so the two PRs can be reviewed independently. Its current-owner `unreviewed`-only discovery status acceptance is not overwritten.
+
+A source-owner patch must validate an explicit, versioned allowed schema and exact research-only `purpose`. Do not touch or fast-forward the owner's active branch from this test-only PR. No retailer network, scraping, proxy, human data, real permission, genuine prices or public savings claims.
+
+After owner remediation require independent zCloud preflight/lease, all-GREEN corrected source HEAD hosted & applicable permanent VPS, latest-main composition, source-owner review and explicit human release approval. M3 real PLUS + DekaMarkt [field #78](https://github.com/Zennay/Supa/issues/78) OPEN; M4/M5 ineligible.
 
 **DRAFT / HOLD / NO MERGE / NO DEPLOY.**
