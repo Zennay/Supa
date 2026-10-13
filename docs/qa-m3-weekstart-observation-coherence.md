@@ -2,7 +2,7 @@
 
 - Scope: `src/domain/observedBasketStudy.ts` **unchanged**, separate quality-validation branch based on immutable `main=c36f5c8f71d77cae94663978b51a194e9b183af6`.
 - Tracker: [#2093](https://github.com/Zennay/Supa/issues/2093). Human real-world field proof [#78](https://github.com/Zennay/Supa/issues/78) is still OPEN.
-- CLI/test: `node --test tests/qa-m3-weekstart-observation-coherence-red.test.mjs`. Uses only the canonical synthetic M2 planner/product fixture with 11/11 matched lines in each basket. There is no retailer request, scraping, personal data or actual savings claim.
+- CLI/test: `node --test tests/qa-m3-weekstart-observation-coherence-red.test.mjs`. **Six tests** replay both the direct domain assessment and the real `m3-assess-observed-week.mjs --output` subprocess. All subprocess I/O is restricted to auto-cleaned unique temporary directories. Uses only the canonical synthetic M2 planner/product fixture with 11/11 matched lines in each basket. There is no retailer request, scraping, personal data or actual savings claim.
 
 ## Acceptance matrix
 
@@ -12,7 +12,7 @@
 | Historical mislabel (EXPECTED RED) | 2025-09-29 | **same** 2026-10-02 timestamps | `claimable=false`, `outcome=unknown`, `deltaCents=null`, `savingsCents=null` |
 | Future mislabel (EXPECTED RED) | 2027-09-27 | **same** 2026-10-02 timestamps | Same fail-closed outcomes |
 
-Both RED cases keep demand, prices, stores, sources, field identity and 24h gap *identical* to the positive control. Thus they isolate only the missing `weekStart` relationship; do not mistake the 24-hour inter-store bound for a study-week coherence check.
+For each of the 3 cases, **two independent execution paths** are covered: direct `assessWeeklyBasketStudy()` and actual CLI with an explicit private report target. The CLI must either reject with no output file, or return a private unknown report with `publicSavingsClaimEligible=false`, `participantKey` absent, and null money; never leak the report to stdout or mutate raw input. Both RED cases keep demand, prices, stores, sources, field identity and 24h gap *identical* to the positive control. Thus they isolate only the missing `weekStart` relationship; do not mistake the 24-hour inter-store bound for a study-week coherence check.
 
 ## Design handoff to source owner
 
