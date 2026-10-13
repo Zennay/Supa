@@ -88,13 +88,19 @@ export function buildOfflineSelectorReviewQueue(report) {
     if ((status === 'origin_changed') !== originChanged) invalid()
     if (current !== null) foundCurrent += 1
     if (status === 'removed' && !(current === null && baseline !== null)) invalid()
-    if (status === 'added' && !(current !== null && baseline === null)) invalid()
-    if (status === 'baseline_missing' && !(current !== null && baseline === null && !report.baselineProvided)) invalid()
-    if (!report.baselineProvided && status !== 'baseline_missing') invalid()
+    if (status === 'added' && !(current !== null && baseline === null &&
+        current.captureStatus === 'verified')) invalid()
+    if (status === 'baseline_missing' && !(current !== null && baseline === null &&
+        !report.baselineProvided && current.captureStatus === 'verified')) invalid()
+    if (!report.baselineProvided && !['baseline_missing', 'unavailable'].includes(status)) invalid()
     if (report.baselineProvided && status === 'baseline_missing') invalid()
     if (!report.baselineProvided && status === 'added') invalid()
-    if (['unavailable', 'shape_changed', 'content_changed_shape_stable', 'unchanged'].includes(status) &&
+    if (['shape_changed', 'content_changed_shape_stable', 'unchanged'].includes(status) &&
         (current === null || baseline === null)) invalid()
+    // A first/new unavailable capture has no comparable same-ID baseline,
+    // and is P1 even without that baseline. This must not be forged into P2.
+    if (status === 'unavailable' && (current === null ||
+        (baseline === null && current.captureStatus !== 'unavailable'))) invalid()
     if (['unchanged', 'content_changed_shape_stable', 'shape_changed'].includes(status) &&
         (current.captureStatus !== 'verified' || baseline.captureStatus !== 'verified')) invalid()
     if (status === 'unavailable' && current?.captureStatus === 'verified' &&
