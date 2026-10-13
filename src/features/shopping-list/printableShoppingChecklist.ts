@@ -27,6 +27,32 @@ function quantityLabel(amount: number | null, unit: unknown): string {
   return `${amount} ${quantityUnitLabelNl(unit, amount)}`
 }
 
+
+type PhysicalUnit = 'g' | 'kg' | 'ml' | 'l' | 'piece'
+function baseQuantity(amount: number, unit: PhysicalUnit) {
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  const factor = unit === 'kg' || unit === 'l' ? 1000 : 1
+  const normalized = amount * factor
+  if (!Number.isFinite(normalized) || normalized <= 0) return null
+  const family = unit === 'g' || unit === 'kg' ? 'mass'
+    : unit === 'ml' || unit === 'l' ? 'volume' : 'piece'
+  return { normalized, family }
+}
+
+function safePhysicalPacks(
+  requirement: { amount: number; unit: PhysicalUnit },
+  pack: { amount: number; unit: PhysicalUnit; count: number },
+  packs: number,
+): boolean {
+  if (!Number.isSafeInteger(packs) || packs < 1 ||
+      !Number.isSafeInteger(pack.count) || pack.count < 1) return false
+  const required = baseQuantity(requirement.amount, requirement.unit)
+  const available = baseQuantity(pack.amount * pack.count, pack.unit)
+  if (!required || !available || required.family !== available.family) return false
+  const minimal = Math.ceil(required.normalized / available.normalized)
+  return Number.isSafeInteger(minimal) && minimal > 0 && minimal === packs
+}
+
 /**
  * Build a physical, price-free checklist from the current basket.
  * This is a convenience view, NOT a retailer observation or M3 savings proof.
@@ -48,9 +74,7 @@ export function preparePrintableShoppingChecklist(
 
     if (line.status === 'matched' &&
         visibleText(line.productName) &&
-        Number.isSafeInteger(line.packs) && line.packs > 0 &&
-        Number.isSafeInteger(line.pack.count) && line.pack.count > 0 &&
-        Number.isFinite(line.pack.amount) && line.pack.amount > 0) {
+        safePhysicalPacks(line.requirement, line.pack, line.packs)) {
       const count = line.pack.count
       const pack = `${line.pack.amount} ${quantityUnitLabelNl(line.pack.unit, line.pack.amount)}`
       return {
