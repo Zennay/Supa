@@ -31,7 +31,7 @@ test('source discovery is not a backdoor around M1 data rights', () => {
     ['sourceMechanism', 'licensed-feed'],
     ['researchUrl', 'http://invalid.example/path'],
     ['researchUrl', 'https://user:pass@invalid.example/'],
-    ['name', 'ALDI\\u202e']
+    ['name', 'ALDI' + String.fromCodePoint(0x202e)]
   ]) {
     const doc = clone()
     doc.sources[0][field] = value
