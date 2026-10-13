@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
-          node --test tests/m5-retailer-discovery.test.mjs tests/m5-retailer-review-pack.test.mjs tests/m5-retailer-rights-reconciliation.test.mjs tests/m5-retailer-research-review.test.mjs
+          node --test tests/m5-retailer-discovery.test.mjs tests/m5-retailer-review-pack.test.mjs tests/m5-retailer-rights-reconciliation.test.mjs tests/m5-retailer-research-review.test.mjs tests/m5-retailer-priorities.test.mjs
 
       - name: Export offline public candidate research pack and assert fail-closed gates
         shell: bash
