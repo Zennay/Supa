@@ -12,3 +12,15 @@ The existing App restores `plannerPreferences` and passes one selected set of da
 The tests deliberately import the canonical M2/M3 fixtures; no manual retailer requests, HTML captures, product source approvals, participant metadata or live/savings claims are introduced. The check guards a future composition regression, **not** the M3 milestone. The genuine same-demand 11+11 PLUS/DekaMarkt observation remains [#78](https://github.com/Zennay/Supa/issues/78) and must be collected by a human in a shared 24-hour price context.
 
 Review/merge gate: exact-head hosted CI, applicable permanent browser/VPS proof, independent write-lease/preflight and approval from the active product/QA owners. This branch is **DRAFT/HOLD/NO MERGE/NO DEPLOY**, independent from other open product-core feature branches.
+
+## Permanent rendered-browser verification (separate new workflow)
+
+The add-only `tests/product-persisted-week-browser-e2e.mjs` performs a genuine Firefox/geckodriver exercise against the locally built Vite app on the permanent `vps-bb300bba` runner:
+
+- edit two recipes, disable two days, choose the 40-euro budget and verify actual localStorage persisted preferences;
+- visit the real basket and require the **controlled-demo / no-live-savings** disclosure;
+- check an item, reload and confirm the stored checklist survives;
+- change only the budget and preserve that checkmark;
+- change a recipe and reject the old checkmark for the now-different physical basket.
+
+The new `.github/workflows/product-persisted-week-vps.yml` has read-only GitHub permissions, bound localhost Vite + WebDriver ports, explicit browser process cleanup, 15-minute timeout, and a retention-limited **synthetic-only** evidence artifact. It does not change existing shared test/workflow files or contact any retailer. An unrun or queued VPS job does not count as a Firefox PASS. Release remains gated by zCloud independent lease/claim, owner review and actual M3 human field evidence.
