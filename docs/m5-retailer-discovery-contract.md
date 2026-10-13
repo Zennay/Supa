@@ -105,6 +105,7 @@ node --test tests/m5-retailer-priorities.test.mjs
 
 - Open written source-rights questions for **PLUS and DekaMarkt** appear ahead of unreviewed later-market brands. A claimed written permission is *only a claim* and is sorted into **independent human legal review**, never a source enablement.
 - Missing research yields the next offline identity/source review task. A denied source is marked `do-not-ingest`, while a pending human request is marked `await-human-reply`, without scraping, invented contact details or automatic retries.
+- Inside the **same required human-action tier**, a manual `P1` research preference ranks before `P2`, then `P3`, then `unprioritized`; retailer ID breaks any remaining tie. **This can never outrank unresolved M1 rights or source-denial/legal-review gates.**
 - These are **research priority ranks only**, not release priority, data freshness assertions or permission. All output records keep `rightsVerified=false`, `productionEnabled=false` and `m5Eligible=false`.
 - The JSON and Markdown summaries never echo local reviewer URLs, filenames, names, emails, terms links or written-license documents. Private inputs reuse the same one-file-descriptor, no-symlink, ≤64KiB and Unix restrictive-mode reader.
 - The GitHub-hosted workflow only exports the public-empty-template `retailer-human-priorities.json` and `retailer-human-priorities.md`. It never reads a real private reviewer ledger from the build workspace.
