@@ -67,8 +67,8 @@ export function rehearseM3FieldPipeline() {
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.equal(report.deltaCents, null)
   assert.equal(report.savingsCents, null)
-  assert.equal(report.baselineTotalCents, null)
-  assert.equal(report.candidateTotalCents, null)
+  assert.equal(report.baselineTotalCents, 0)
+  assert.equal(report.candidateTotalCents, 0)
   assert.equal(report.observationWindowHours, 0.25)
 
   // A fabricated stale price behind "unavailable" must never become money.
@@ -76,7 +76,7 @@ export function rehearseM3FieldPipeline() {
   stalePriceSheet.baseline.lines[0].observedProduct.priceCents = 999999
   const stalePriceReport = evaluate(stalePriceSheet)
   assert.equal(stalePriceReport.savingsCents, null)
-  assert.equal(stalePriceReport.baselineTotalCents, null)
+  assert.equal(stalePriceReport.baselineTotalCents, 0)
   assert.equal(stalePriceReport.publicSavingsClaimEligible, false)
 
   // "Not measured" must never pass for "observed unavailable".
