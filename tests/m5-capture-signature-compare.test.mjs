@@ -66,8 +66,8 @@ test('M5 offline tool compares hash-verified synthetic snapshots without recordi
 test('adding a recognized JSON-LD field changes shape and flags independent review', async () => {
   const baseline = await capture(product('1.29'))
   const latest = await capture(product('1.29').replace(
-    '"priceCurrency":"EUR"',
-    '"priceCurrency":"EUR","availability":"https://schema.org/InStock"',
+    '"offers":{',
+    '"weight":{"value":"1 kg"},"offers":{',
   ))
   const report = await compareCaptureDirectories(latest, baseline)
   assert.equal(report.changes[0].status, 'shape_changed')
