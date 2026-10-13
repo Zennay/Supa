@@ -69,7 +69,7 @@ for (const [field, raw] of [
   ['population', 'Target students — contact: ' + DIRECT_IDENTIFIER],
   ['population', 'Young students\nname=fictional.person@example.invalid'],
 ]) {
-  test(`EXPECTED RED: M4 summary must reject direct identity in ${field} (${raw.includes('\\n') ? 'embedded' : 'plain'})`, () => {
+  test(`EXPECTED RED: M4 summary must reject direct identity in ${field} (${raw.includes('\n') ? 'embedded' : 'plain'})`, () => {
     const session = fictionalSession({ [field]: raw })
     assert.throws(
       () => buildBetaSessionSummary(session),
