@@ -86,7 +86,7 @@ test('positive: empty --output value is rejected before any report is published'
   const result = f.run(['--output', '  '])
   assert.notEqual(result.status, 0)
   assert.equal(result.stdout, '')
-  assert.match(result.stderr, /--output requires a file path/)
+  assert.match(result.stderr, /--output requires a non-flag file path/)
   assert.deepEqual(readdirSync(f.dir), ['source-session.json'])
   f.assertSourceUntouched()
 })
