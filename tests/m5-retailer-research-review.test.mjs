@@ -120,6 +120,40 @@ test('Malformed ledger containers, oversize entries and missing required keys fa
   assert.throws(() => assessRetailerResearch(discovery(), tooLong))
 })
 
+test('private M5 research object schema rejects hidden rights fields and accessors', () => {
+  for (const [where, key] of [
+    ['root', 'ingestAuthorized'],
+    ['root', 'productionReady'],
+    ['record', 'licenseApproved'],
+    ['record', 'proxyOverridePermitted'],
+  ]) {
+    const ledger = empty()
+    ledger.reviews.push(record())
+    const obj = where === 'root' ? ledger : ledger.reviews[0]
+    Object.defineProperty(obj, key, { value: true, enumerable: false })
+    assert.throws(() => assessRetailerResearch(discovery(), ledger),
+      /schema/, where + ' hidden ' + key + ' must fail')
+  }
+  for (const where of ['root', 'record']) {
+    const ledger = empty()
+    ledger.reviews.push(record())
+    let called = false
+    const obj = where === 'root' ? ledger : ledger.reviews[0]
+    const key = where === 'root' ? 'purpose' : 'rightsState'
+    Object.defineProperty(obj, key, {
+      enumerable: true,
+      get() { called = true; return 'claimed-written-permission' },
+    })
+    assert.throws(() => assessRetailerResearch(discovery(), ledger), /schema/)
+    assert.equal(called, false, 'untrusted property accessor must not be invoked')
+  }
+  const tooFew = empty()
+  tooFew.reviews.push(record())
+  delete tooFew.reviews[0].priority
+  assert.throws(() => assessRetailerResearch(discovery(), tooFew), /schema/)
+  assert.equal(assessRetailerResearch(discovery(), empty()).productionReady, false)
+})
+
 test('CLI requires explicit local file, emits privacy-redacted report and preserves bytes', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'supa-m5-review-'))
   try {
