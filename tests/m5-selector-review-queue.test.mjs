@@ -4,8 +4,8 @@ import { buildOfflineSelectorReviewQueue } from '../scripts/m5-build-selector-re
 
 const H = 'a'.repeat(64)
 const B = 'b'.repeat(64)
-const verified = (id, sha = H, shape = B) => ({ id, captureStatus: 'verified', snapshotSha256: sha, shapeSha256: shape })
-const absent = (id) => ({ id, captureStatus: 'unavailable', snapshotSha256: null, shapeSha256: null })
+const verified = (id, sha = H, shape = B) => ({ id, captureStatus: 'verified', snapshotSha256: sha, shapeSha256: shape, schemaOrgStatus: 'abstain' })
+const absent = (id) => ({ id, captureStatus: 'unavailable', snapshotSha256: null, shapeSha256: null, schemaOrgStatus: 'unknown' })
 const change = (id, status, current, baseline) => ({ id, status, current, baseline })
 const comparison = (changes, baselineProvided = true) => ({
   contractVersion: 1,
