@@ -14,3 +14,7 @@ Four runnable offline test groups use the actual `ProxyHealthPool` implementatio
 The suite deliberately uses example public IPv4 literals as **inert test data**, not operational proxies. The simulated `ownedEndpoint` flag is a controlled contract input, not proof that any real endpoint is authorized. It neither scrapes retailers nor rotates proxies to evade blocks or price/terms restrictions.
 
 Before accepting the source in the final product, require original owner's source-integrity repair #2081, independent zCloud writer lease/preflight, latest-main compatibility, exact-head hosted/VPS tests, per-retailer source permissions and explicit go. Current Supa M3 human [#78](https://github.com/Zennay/Supa/issues/78) remains open; M4/M5 not authorized.
+
+## Permanent-runner acceptance
+
+The additive read-only `.github/workflows/supa-qa-proxy-health-vps.yml` runs only for same-repository pull requests on the permanent `vps-bb300bba` runner, checks out the **explicit PR head SHA** without persistent credentials, verifies hostname and exact checked-out commit, executes the standalone offline suite, full npm test suite and production build. No action writes into the live portfolio queue, production inventory, retail network or applications. This is a release evidence check, not deployment or source permission. A queued/self-hosted run is **NOT** proof of success until the exact-job logs confirm completion.
