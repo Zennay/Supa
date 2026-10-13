@@ -38,7 +38,7 @@ function exactBaseQuantity(amount: number, unit: unknown) {
   if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 ||
       !['g', 'kg', 'ml', 'l', 'piece'].includes(unit as string)) return null
 
-  const parts = /^(\\d+)(?:\\.(\\d+))?(?:e([+-]?\\d+))?$/i.exec(amount.toString())
+  const parts = /^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i.exec(amount.toString())
   if (!parts) return null
   const exponent = Number(parts[3] ?? 0)
   if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 325) return null
