@@ -10,11 +10,12 @@ On canonical frozen `main=c36f5c8f71d77cae94663978b51a194e9b183af6`, `scripts/m4
 
 New `tests/m4-direct-identifier-summary-qa.test.mjs` calls the real M4 exports with a **fictional abandoned session** and an artificial `m3Gate.status='closed'` fixture solely to exercise the code path. The test does NOT evidence a completed M3 and must not authorize beta recruitment.
 
-Two positive cases should remain GREEN:
+Three positive cases should remain GREEN:
 - Opaque session key plus benign cohort label yields private, not public-claimable output and excludes the participant pseudonym.
 - An OPEN M3 gate still prevents any M4 input from being accepted.
+- The real `main([session.json, '--output', report.json])` file workflow writes safe opaque metadata while excluding pseudonyms and never suggesting public claims.
 
-Four intentionally **expected-RED** cases require rejecting a synthetic direct email-like identifier carried inside `sessionId` or `population`, including obvious newline/assignment formats. Do not mask or substitute personal data while silently claiming it came from the original source. Reject invalid metadata before report creation.
+Four direct-summary and two actual-file-output **expected-RED** cases require rejecting a synthetic direct email-like identifier carried inside `sessionId` or `population`, including obvious newline/assignment formats. Both exported summary and actual CLI output must reject invalid metadata **before writing**; rejected reports must not exist on disk. Do not mask or substitute personal data while silently claiming it came from the original source. Reject invalid metadata before report creation.
 
 ## Original source-owner contract
 
