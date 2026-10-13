@@ -64,7 +64,7 @@ test('actual TSX prints one checkbox per item with honest unresolved manual choi
   assert.equal((html.match(/aria-hidden="true"/g) ?? []).length, value.lines.length)
   assert.match(html, /handmatig kiezen/)
   assert.match(html, /Product nog te kiezen/)
-  assert.match(html, /productkeuze nog handmatig controleren/)
+  assert.match(html, /productkeuzes? nog handmatig controleren/)
   assert.doesNotMatch(html, /€|Besparing|bespaard/)
 })
 
