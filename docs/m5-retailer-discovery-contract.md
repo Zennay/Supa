@@ -4,8 +4,9 @@
 
 ## Why this exists
 
-The May 2026 Consumentenbond price survey lists thirteen chains. Wageningen University & Research's supermarket dashboard also identifies Boon, Ekoplaza and Odin. Together these give the initial **16 candidate brands**, not a promise that every supermarket/banner or franchise in the Netherlands is included. Re-evaluate coverage prior to any M5 expansion.
+The May 2026 Consumentenbond price survey lists thirteen chains. Wageningen University & Research's supermarket dashboard also identifies Boon, Ekoplaza and Odin. Along with Boni (covered by a July 2026 Consumentenbond update), these give the initial **17 candidate brands**, not a promise that every supermarket/banner or franchise in the Netherlands is included. Re-evaluate coverage prior to any M5 expansion.
 
+- Consumentenbond Boni reference: https://www.consumentenbond.nl/acties-claims/nieuws/2025/laagsteprijsclaims-van-supermarkten-update
 - WUR market research: https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid
 - Consumentenbond, 6 May 2026 survey: https://www.consumentenbond.nl/voedingstests/prijspeiling-supermarkten
 - Existing M1 source-permission gate: `scripts/m1-check-source-permission-gate.mjs` (PLUS/DekaMarkt only).
@@ -19,7 +20,7 @@ node scripts/m5-audit-retailer-discovery.mjs --require-production-ready
 node --test tests/m5-retailer-discovery.test.mjs
 ```
 
-The strict production-ready mode **always exits 2**. This registry has no "permitted" switch and deliberately cannot grant production rights. The M1 permission gate still covers only its original two chains; never append unapproved retailers to it.
+The strict production-ready mode **always exits 2**. All individual records explicitly keep region/assortment, terms, robots, data ownership, contact, refresh, risk, priority and permission evidence **unassessed/unreviewed/null** until a separately reviewed follow-up. This registry has no "permitted" switch and deliberately cannot grant production rights. The M1 permission gate still covers only its original two chains; never append unapproved retailers to it.
 
 ## Acceptance for each future adapter (NOT completed)
 
