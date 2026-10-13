@@ -10,7 +10,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "aldi",
@@ -18,7 +28,35 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
+    },
+    {
+      "id": "boni",
+      "name": "Boni",
+      "researchUrl": "https://www.consumentenbond.nl/acties-claims/nieuws/2025/laagsteprijsclaims-van-supermarkten-update",
+      "permissionStatus": "unreviewed",
+      "sourceMechanism": "unassessed",
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "boon",
@@ -26,7 +64,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "dekamarkt",
@@ -34,7 +82,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "dirk",
@@ -42,7 +100,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "ekoplaza",
@@ -50,7 +118,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "hoogvliet",
@@ -58,7 +136,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "jumbo",
@@ -66,7 +154,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "lidl",
@@ -74,7 +172,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "nettorama",
@@ -82,7 +190,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "odin",
@@ -90,7 +208,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "picnic",
@@ -98,7 +226,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "plus",
@@ -106,7 +244,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "poiesz",
@@ -114,7 +262,17 @@
       "researchUrl": "https://www.consumentenbond.nl/voedingstests/prijspeiling-supermarkten",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "spar",
@@ -122,7 +280,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     },
     {
       "id": "vomar",
@@ -130,7 +298,17 @@
       "researchUrl": "https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid",
       "permissionStatus": "unreviewed",
       "sourceMechanism": "unassessed",
-      "productionEnabled": false
+      "productionEnabled": false,
+      "regionScope": "unassessed",
+      "assortmentScope": "unassessed",
+      "termsStatus": "unreviewed",
+      "robotsStatus": "unreviewed",
+      "dataOwner": "unassessed",
+      "contactStatus": "unreviewed",
+      "expectedRefresh": "unassessed",
+      "riskStatus": "unknown",
+      "priority": "unprioritized",
+      "permissionEvidence": null
     }
   ]
 }
