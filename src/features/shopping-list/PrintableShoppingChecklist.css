@@ -76,14 +76,14 @@
     display: none !important;
   }
 
+  /* Position independently of hidden layout so the printout starts at
+     the first A4 page rather than below screen-only scroll content. */
   .supa-printable-shopping__paper {
-    /* Position independently of hidden layout so the printout starts at
-       the first A4 page rather than below screen-only scroll content. */
+    display: block !important;
     position: absolute !important;
     top: 0;
     left: 0;
     width: 100%;
-    display: block !important;
     color: #111;
     background: #fff;
     font: 12pt/1.4 system-ui, sans-serif;
