@@ -1,0 +1,63 @@
+/* Scoped: activated only if the original shopping owner composes this opt-in view. */
+.supa-printable-shopping__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.7rem 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.supa-printable-shopping__action:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+.supa-printable-shopping__paper {
+  display: none;
+}
+
+@media print {
+  @page { margin: 14mm; }
+
+  body:has(.supa-printable-shopping) .topbar,
+  body:has(.supa-printable-shopping) .bottom-nav,
+  body:has(.supa-printable-shopping) .section-heading,
+  body:has(.supa-printable-shopping) .list-card,
+  body:has(.supa-printable-shopping) .attention-card,
+  .supa-printable-shopping__action {
+    display: none !important;
+  }
+
+  .supa-printable-shopping__paper {
+    display: block !important;
+    color: #111;
+    background: #fff;
+    font: 12pt/1.4 system-ui, sans-serif;
+  }
+
+  .supa-printable-shopping__paper h2 {
+    margin: 0 0 0.6rem;
+    color: #111;
+  }
+
+  .supa-printable-shopping__paper p { margin: 0.4rem 0 0.8rem; }
+  .supa-printable-shopping__rows { padding-left: 1.8rem; }
+  .supa-printable-shopping__rows li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    margin-bottom: 0.6rem;
+    break-inside: avoid;
+  }
+  .supa-printable-shopping__rows li > span { font-size: 18pt; line-height: 1; }
+  .supa-printable-shopping__rows strong,
+  .supa-printable-shopping__rows small,
+  .supa-printable-shopping__rows em { display: block; }
+  .supa-printable-shopping__rows small { color: #333; }
+}
