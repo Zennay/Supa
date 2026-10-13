@@ -21,6 +21,11 @@ const record = (overrides = {}) => ({
   rightsEvidenceUrl: null,
   regionScope: 'unknown',
   assortmentScope: 'unknown',
+  termsReview: 'unreviewed',
+  robotsReview: 'unreviewed',
+  ownerContactStatus: 'unassessed',
+  freshnessPlan: 'unassessed',
+  priority: 'unprioritized',
   ...overrides,
 })
 
@@ -43,6 +48,9 @@ test('Human-researched source metadata is not a legal permission or production e
     rightsState: 'claimed-written-permission',
     rightsEvidenceUrl: 'https://example.invalid/permission-evidence',
     regionScope: 'regional', assortmentScope: 'products-and-offers',
+    termsReview: 'allowance-claimed', robotsReview: 'allowance-claimed',
+    ownerContactStatus: 'reply-recorded', freshnessPlan: 'daily-claimed',
+    priority: 'P1',
   }))
   const frozen = structuredClone(ledger)
   const report = assessRetailerResearch(discovery(), ledger)
@@ -52,6 +60,10 @@ test('Human-researched source metadata is not a legal permission or production e
   assert.equal(plus.rightsState, 'claimed-written-permission')
   assert.equal(plus.claimedRightsEvidenceProvided, true)
   assert.equal(plus.rightsVerified, false)
+  assert.equal(plus.termsReview, 'allowance-claimed')
+  assert.equal(plus.robotsReview, 'allowance-claimed')
+  assert.equal(plus.freshnessPlan, 'daily-claimed')
+  assert.equal(plus.priority, 'P1')
   assert.equal(plus.productionEnabled, false)
   assert.equal(report.productionReady, false)
   assert.deepEqual(ledger, frozen, 'review data mutated')
@@ -76,6 +88,11 @@ test('Duplicate, phantom and inconsistent claims fail closed', () => {
     (r) => { r.reviews.push(record({ rightsState: 'denied', rightsEvidenceUrl: 'https://example.invalid/' })) },
     (r) => { r.reviews.push(record({ regionScope: 'everywhere' })) },
     (r) => { r.reviews.push(record({ assortmentScope: 'entire-catalog' })) },
+    (r) => { r.reviews.push(record({ termsReview: 'licensed' })) },
+    (r) => { r.reviews.push(record({ robotsReview: 'scrape-permitted' })) },
+    (r) => { r.reviews.push(record({ ownerContactStatus: 'contact@example.invalid' })) },
+    (r) => { r.reviews.push(record({ freshnessPlan: 'continuous' })) },
+    (r) => { r.reviews.push(record({ priority: 'P0' })) },
     (r) => { r.reviews.push(record({ reviewerName: 'person@example.invalid' })) },
     (r) => { r.reviews.push(record({ sourceUrl: null, comments: 'contact@example.invalid' })) },
     (r) => { r.productionReady = true; r.reviews.push(record()) },
