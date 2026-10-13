@@ -12,6 +12,23 @@ const STATUS_ACTION = Object.freeze({
 })
 const HEX_HASH = /^[a-f\d]{64}$/
 const MAX_CHANGES = 200
+const VERIFIED_SCHEMA_ORG_STATUSES = new Set(['candidate_observation', 'abstain'])
+
+// Reject malformed UTF-16 before UTF-8 hashing: unpaired surrogates are
+// replaced by the encoder and would alias two distinct source identities.
+function validUnicodeSourceId(id) {
+  for (let index = 0; index < id.length; index += 1) {
+    const unit = id.charCodeAt(index)
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      if (++index >= id.length) return false
+      const trailing = id.charCodeAt(index)
+      if (trailing < 0xdc00 || trailing > 0xdfff) return false
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      return false
+    }
+  }
+  return true
+}
 
 function invalid() {
   throw new Error('Invalid offline capture comparison report')
@@ -39,17 +56,28 @@ export function buildOfflineSelectorReviewQueue(report) {
   const actions = report.changes.map((change) => {
     if (!change || typeof change !== 'object' ||
         typeof change.id !== 'string' || !change.id || change.id.length > 512 ||
+        !validUnicodeSourceId(change.id) ||
         typeof change.status !== 'string' || !Object.hasOwn(STATUS_ACTION, change.status) ||
         seen.has(change.id)) invalid()
     seen.add(change.id)
     const { current, baseline, status } = change
     for (const snapshot of [current, baseline]) {
       if (snapshot === null) continue
-      if (!snapshot || typeof snapshot !== 'object' ||
-          snapshot.id !== change.id ||
-          !['verified', 'unavailable'].includes(snapshot.captureStatus) ||
-          (snapshot.captureStatus === 'verified' &&
-             (!HEX_HASH.test(snapshot.snapshotSha256) || !HEX_HASH.test(snapshot.shapeSha256)))) invalid()
+      if (!snapshot || typeof snapshot !== 'object' || snapshot.id !== change.id) invalid()
+      // Only metadata produced by the canonical M1 captureShape() contract is
+      // eligible for a human-only queue. Inconsistent or invented provenance
+      // cannot be upgraded to a nominal review action.
+      if (snapshot.captureStatus === 'verified') {
+        if (!HEX_HASH.test(snapshot.snapshotSha256) ||
+            !HEX_HASH.test(snapshot.shapeSha256) ||
+            !VERIFIED_SCHEMA_ORG_STATUSES.has(snapshot.schemaOrgStatus)) invalid()
+      } else if (snapshot.captureStatus === 'unavailable') {
+        if (snapshot.snapshotSha256 !== null ||
+            snapshot.shapeSha256 !== null ||
+            snapshot.schemaOrgStatus !== 'unknown') invalid()
+      } else {
+        invalid()
+      }
     }
     if (current === null && baseline === null) invalid()
     if (current !== null) foundCurrent += 1
