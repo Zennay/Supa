@@ -1,4 +1,6 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, open, link, unlink } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
+import { basename, dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const SESSION_OUTCOMES = new Set(['completed', 'abandoned', 'unknown'])
@@ -338,16 +340,49 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]
     if (value === '--output') {
-      output = argv[index + 1] ?? null
+      assert(output === null, '--output may only be provided once')
+      const destination = argv[index + 1]
+      assert(
+        typeof destination === 'string' &&
+          destination.trim().length > 0 &&
+          !destination.startsWith('--'),
+        '--output requires a non-flag file path',
+      )
+      output = destination
       index += 1
       continue
     }
+    assert(!value.startsWith('--'), 'unrecognized option')
     positional.push(value)
   }
 
   assert(positional.length === 1, 'usage: m4-validate-beta-session <session.json> [--output summary.json]')
-  assert(!output || output.trim().length > 0, '--output requires a file path')
   return { input: positional[0], output }
+}
+
+// Private M4 summaries are immutable new artifacts. A fully written 0600
+// temporary inode is hard-linked into place only when the destination is absent.
+// link() fails with EEXIST for a source pathname, symlink, hardlink, or previously
+// published report. It does not follow/overwrite the preexisting destination.
+async function publishPrivateReport(output, serialized) {
+  const temporary = join(
+    dirname(output),
+    `.${basename(output)}.${randomBytes(16).toString('hex')}.tmp`,
+  )
+  let handle = null
+  let created = false
+  try {
+    handle = await open(temporary, 'wx', 0o600)
+    created = true
+    await handle.writeFile(serialized, 'utf8')
+    await handle.sync()
+    await handle.close()
+    handle = null
+    await link(temporary, output)
+  } finally {
+    if (handle) await handle.close()
+    if (created) await unlink(temporary)
+  }
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -365,7 +400,7 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(report, null, 2)}\n`
 
   if (output) {
-    await writeFile(output, serialized, 'utf8')
+    await publishPrivateReport(output, serialized)
   } else {
     process.stdout.write(serialized)
   }
