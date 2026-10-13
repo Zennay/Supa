@@ -173,6 +173,43 @@ function eventsOfType(events, type) {
   return events.filter((event) => event.type === type)
 }
 
+const MAX_MEAL_SLOT_UTF8_BYTES = 256
+const UNSAFE_MEAL_SLOT_CHAR = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}]/u
+const VISIBLE_MEAL_SLOT_BASE = /[\p{L}\p{N}\p{P}\p{S}]/u
+
+// Measure adherence per *meal*, never per number of outcome events. Two
+// distinct input spellings that NFKC-normalize to the same meal identity
+// cannot create extra "followed" evidence. Keep the original values intact.
+function validateMealOutcomeSlots(events) {
+  const seen = new Set()
+  for (const event of events) {
+    if (event.type !== 'meal_outcome_recorded') continue
+    const slot = event.meal_slot
+    assert(
+      typeof slot === 'string' &&
+      slot.trim().length > 0 &&
+      slot === slot.trim() &&
+      Buffer.byteLength(slot, 'utf8') <= MAX_MEAL_SLOT_UTF8_BYTES,
+      'M4 meal outcome slot must be canonical bounded text',
+    )
+    assert(
+      !UNSAFE_MEAL_SLOT_CHAR.test(slot),
+      'M4 meal outcome slot contains unsafe characters',
+    )
+    const identity = slot.normalize('NFKC')
+    assert(
+      VISIBLE_MEAL_SLOT_BASE.test(identity),
+      'M4 meal outcome slot must include a visible base character',
+    )
+    assert(
+      !seen.has(identity),
+      'M4 meal outcome slot must have exactly one final outcome',
+    )
+    seen.add(identity)
+  }
+}
+
+
 function latestEvent(events, type) {
   return eventsOfType(events, type)
     .slice()
@@ -266,6 +303,7 @@ export function validateBetaSession(input) {
 
   assert(Array.isArray(input.events), 'events must be an array')
   input.events.forEach((event, index) => validateEvent(event, index, startedAt, endedAt))
+  validateMealOutcomeSlots(input.events)
   const startEvents = eventsOfType(input.events, 'beta_session_started')
   assert(startEvents.length === 1, 'sessions require exactly one beta_session_started event')
   assert(
