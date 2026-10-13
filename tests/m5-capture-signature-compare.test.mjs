@@ -58,7 +58,7 @@ test('M5 offline tool compares hash-verified synthetic snapshots without recordi
   assert.equal(report.driftCount, 0)
   assert.equal(report.changes[0].status, 'content_changed_shape_stable')
   assert.equal(report.changes[0].current.captureStatus, 'verified')
-  assert.equal(report.changes[0].current.schemaOrgStatus, 'candidate_observation')
+  assert.equal(report.changes[0].current.schemaOrgStatus, 'abstain')
   assert.match(report.changes[0].current.shapeSha256, /^[a-f0-9]{64}$/)
   assert.doesNotMatch(JSON.stringify(report), /2\.89|1\.29|Fictional milk|example\.invalid/)
 })
