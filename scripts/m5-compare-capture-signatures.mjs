@@ -230,7 +230,10 @@ async function preflightBoundedManifest(directory) {
   if (!parsed || parsed.milestone !== 'M1 Data Feasibility' ||
       parsed.bounded !== true || !Array.isArray(parsed.results) ||
       parsed.results.length > MAX_SOURCES ||
-      parsed.sourceCount !== parsed.results.length) fail()
+      parsed.sourceCount !== parsed.results.length ||
+      parsed.results.some((record) => !record ||
+        typeof record !== 'object' ||
+        typeof record.success !== 'boolean')) fail()
 }
 
 export async function compareCaptureDirectories(currentDir, baselineDir = null) {
