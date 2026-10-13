@@ -121,7 +121,19 @@ test('CLI requires explicit local file, emits privacy-redacted report and preser
     assert.equal(JSON.parse(run.stdout).reviewedCount, 1)
     assert.equal(await readFile(input, 'utf8'), content)
     const invalid = spawnSync(process.execPath, [script.pathname], { encoding: 'utf8' })
-    assert.notEqual(invalid.status, 0)
+    assert.equal(invalid.status, 2)
+    assert.equal(invalid.stdout, '')
+    assert.match(invalid.stderr, /Offline M5 research assessment rejected/)
+    assert.ok(!invalid.stderr.includes(input), 'private path disclosed in diagnostics')
+    const bad = path.join(dir, 'fictional.person@example.invalid')
+    await writeFile(bad, JSON.stringify({ secret }), { mode: 0o600 })
+    const malformed = spawnSync(process.execPath, [script.pathname, bad],
+      { encoding: 'utf8' })
+    assert.equal(malformed.status, 2)
+    assert.equal(malformed.stdout, '')
+    assert.ok(!malformed.stderr.includes(secret))
+    assert.ok(!malformed.stderr.includes('fictional.person@example.invalid'))
+    assert.equal(await readFile(bad, 'utf8'), JSON.stringify({ secret }))
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
