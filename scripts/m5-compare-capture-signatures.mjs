@@ -97,9 +97,13 @@ export function compareInspections(current, baseline = null) {
     const latest = now.get(id)
     const previous = before.get(id)
     let status
-    if (!baseline) status = 'baseline_missing'
+    // A failed first/new capture is a P1 failure to investigate, not P2
+    // healthy-source onboarding, regardless of whether a baseline exists.
+    if (!baseline) status = latest?.captureStatus === 'unavailable'
+      ? 'unavailable' : 'baseline_missing'
     else if (!latest) status = 'removed'
-    else if (!previous) status = 'added'
+    else if (!previous) status = latest.captureStatus === 'unavailable'
+      ? 'unavailable' : 'added'
     // A reused source ID can conceal a different supermarket or capture type.
     // Treat provenance re-assignment as high-priority drift even when both HTML
     // and shape fingerprints are identical or one capture is unavailable.
