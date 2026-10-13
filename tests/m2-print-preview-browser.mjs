@@ -93,7 +93,7 @@ try {
   })
   await waitFor(sessionId, '.supa-printable-shopping__action')
 
-  for (const width of [430, 800]) {
+  for (const width of [320, 430, 800]) {
     await request(`/session/${sessionId}/window/rect`, {
       method: 'POST', body: JSON.stringify({ width, height: 932 }),
     })
@@ -119,7 +119,7 @@ try {
       }
     `)
     assert.ok(observed, 'React print fixture did not render')
-    assert.equal(observed.horizontalOverflow, false, `overflow at ${width}px`)
+    assert.ok(observed.viewport <= width + 2 && observed.viewport >= width - 2, `Firefox did not honor ${width}px viewport: ${observed.viewport}`)\n    assert.equal(observed.horizontalOverflow, false, `overflow at ${width}px`)
     assert.equal(observed.minHeight, '44px')
     assert.equal(observed.buttonType, 'button')
     assert.equal(observed.rows, 11)
@@ -161,6 +161,7 @@ try {
   const pdfPath = path.join(artifactDir, 'synthetic-shopping-list.pdf')
   await writeFile(pdfPath, pdf)
   const printText = extractPdfText(pdfPath)
+  assert.notEqual(printText, null, 'Poppler must verify the native PDF content')
   if (printText !== null) {
     assert.match(printText, /Boodschappenlijst/)
     assert.match(printText, /handmatig kiezen/)
