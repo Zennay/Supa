@@ -135,14 +135,15 @@ export function parseResearchArgs(args) {
 
 // Single-descriptor read closes the lstat→readFile symlink replacement window.
 export async function loadPrivateRetailerResearch(input) {
-  const handle = await open(input, constants.O_RDONLY | (constants.O_NOFOLLOW || 0))
+  const filename = input instanceof URL ? fileURLToPath(input) : input
+  const handle = await open(filename, constants.O_RDONLY | (constants.O_NOFOLLOW || 0))
   try {
     const fileStats = await handle.stat()
     check(fileStats.isFile() && fileStats.size > 0 && fileStats.size <= 65536,
       'Private reviewer input must be a bounded regular file')
     const publicEmptyTemplate = fileURLToPath(
       new URL('../docs/m5-retailer-research-template.v1.json', import.meta.url))
-    if (resolve(input) !== publicEmptyTemplate && process.platform !== 'win32') {
+    if (resolve(filename) !== publicEmptyTemplate && process.platform !== 'win32') {
       check((fileStats.mode & 0o077) === 0,
         'Private reviewer files must not be readable by group or other users')
     }
