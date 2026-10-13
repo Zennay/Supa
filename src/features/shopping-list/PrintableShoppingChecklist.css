@@ -37,6 +37,15 @@
     visibility: visible !important;
   }
 
+  /* Remove non-paper siblings from layout as well as hiding their pixels:
+     otherwise a long interactive list can create extra blank PDF pages.
+     Keep every ancestor of the paper section irrespective of future
+     integration nesting, but prune all unrelated subtrees. */
+  body:has(.supa-printable-shopping)
+    *:not(:has(.supa-printable-shopping)):not(.supa-printable-shopping):not(.supa-printable-shopping *) {
+    display: none !important;
+  }
+
   body:has(.supa-printable-shopping) {
     background: #fff !important;
     color: #111 !important;
