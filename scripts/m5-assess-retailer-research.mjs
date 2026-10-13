@@ -207,7 +207,24 @@ export async function loadPrivateRetailerResearch(input) {
       check((fileStats.mode & 0o077) === 0,
         'Private reviewer files must not be readable by group or other users')
     }
-    return JSON.parse(await handle.readFile('utf8'))
+    // Bound the actual read as well as the initial fstat size: another process
+    // may append to the same inode after the stat. Never allocate above 64KiB.
+    const maxBytes = 65536
+    const chunks = []
+    let received = 0
+    for (;;) {
+      const length = Math.min(8192, maxBytes + 1 - received)
+      const chunk = Buffer.allocUnsafe(length)
+      const { bytesRead } = await handle.read(chunk, 0, length, null)
+      if (bytesRead === 0) break
+      received += bytesRead
+      check(received <= maxBytes, 'Private reviewer file exceeds 64 KiB')
+      chunks.push(chunk.subarray(0, bytesRead))
+    }
+    check(received > 0, 'Private reviewer file is empty')
+    const utf8 = new TextDecoder('utf-8', { fatal: true }).decode(
+      Buffer.concat(chunks, received))
+    return JSON.parse(utf8)
   } finally {
     await handle.close()
   }
