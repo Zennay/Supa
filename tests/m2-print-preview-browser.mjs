@@ -94,19 +94,59 @@ try {
   await waitFor(sessionId, '.supa-printable-shopping__action')
 
   for (const width of [320, 430, 800]) {
+    // Linux Firefox enforces a 500px top-level minimum window width.
+    // Same-origin iframe viewports exercise *actual* 320px and 430px CSS.
     await request(`/session/${sessionId}/window/rect`, {
-      method: 'POST', body: JSON.stringify({ width, height: 932 }),
+      method: 'POST', body: JSON.stringify({ width: 800, height: 932 }),
     })
+    if (width !== 800) {
+      await execute(sessionId, `
+        let frame = document.getElementById('supa-mobile-viewport')
+        if (!frame) {
+          frame = document.createElement('iframe')
+          frame.id = 'supa-mobile-viewport'
+          frame.title = 'Synthetische mobiele printproef'
+          frame.src = arguments[0]
+          frame.style.border = '0'
+          frame.style.display = 'block'
+          frame.style.height = '1000px'
+          document.body.append(frame)
+        }
+        frame.style.width = arguments[1] + 'px'
+        frame.scrollIntoView()
+        return true
+      `, [pageUrl, width])
+      const start = Date.now()
+      let ready = false
+      while (Date.now() - start < 12_000) {
+        ready = await execute(sessionId, `
+          return !!document.getElementById('supa-mobile-viewport')
+            ?.contentDocument?.querySelector('.supa-printable-shopping__action')
+        `)
+        if (ready) break
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      assert.equal(ready, true, 'mobile iframe React fixture did not render')
+    } else {
+      await execute(sessionId, `
+        document.getElementById('supa-mobile-viewport')?.remove()
+        window.scrollTo(0, 0)
+        return true
+      `)
+    }
     const observed = await execute(sessionId, `
-      const root = document.querySelector('[data-synthetic-print-fixture]')
-      const action = document.querySelector('.supa-printable-shopping__action')
-      const paper = document.querySelector('.supa-printable-shopping__paper')
+      const frame = document.getElementById('supa-mobile-viewport')
+      const doc = frame ? frame.contentDocument : document
+      if (!doc) return null
+      const root = doc.querySelector('[data-synthetic-print-fixture]')
+      const action = doc.querySelector('.supa-printable-shopping__action')
+      const paper = doc.querySelector('.supa-printable-shopping__paper')
       if (!root || !action || !paper) return null
       const rows = [...paper.querySelectorAll('li')]
       return {
-        viewport: document.documentElement.clientWidth,
-        horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
-        minHeight: getComputedStyle(action).minHeight,
+        viewport: doc.documentElement.clientWidth,
+        horizontalOverflow: doc.documentElement.scrollWidth > doc.documentElement.clientWidth + 2,
+        minHeight: doc.defaultView.getComputedStyle(action).minHeight,
         buttonType: action.type,
         rows: rows.length,
         checkedBoxRows: paper.querySelectorAll('li span[aria-hidden="true"]').length,
@@ -115,7 +155,7 @@ try {
         demo: paper.textContent.includes('voorbeeldgegevens'),
         noClaims: paper.textContent.includes('Geen liveprijzen of besparingsbewijs.'),
         containsMoney: /[€]/.test(paper.textContent),
-        paperHiddenUntilPrint: getComputedStyle(paper).display === 'none',
+        paperHiddenUntilPrint: doc.defaultView.getComputedStyle(paper).display === 'none',
       }
     `)
     assert.ok(observed, 'React print fixture did not render')
