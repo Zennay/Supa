@@ -112,5 +112,10 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await main()
+  // M1 integrity errors may contain capture IDs; the operator CLI must not
+  // repeat these source labels or private local paths in stderr.
+  await main().catch(() => {
+    process.stderr.write('Offline review failed: invalid capture or report\n')
+    process.exitCode = 1
+  })
 }
