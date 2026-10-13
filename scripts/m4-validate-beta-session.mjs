@@ -310,6 +310,17 @@ export function validateBetaSession(input) {
     startEvents[0].participant_id === input.participantKey,
     'beta_session_started.participant_id must match participantKey',
   )
+  // The outer session window is a broad recording boundary, not proof
+  // that research activity began. Evidence before its actual start event
+  // would otherwise contaminate effort, meal and trust measurements.
+  const actualSessionStart = Date.parse(startEvents[0].timestamp)
+  assert(
+    input.events.every(
+      (event) => event === startEvents[0] ||
+        Date.parse(event.timestamp) >= actualSessionStart,
+    ),
+    'M4 events must not precede beta_session_started',
+  )
 
   // Protect effort metrics for all outcomes (including abandoned/unknown):
   // unmatched starts may remain partial evidence, orphan completions never count.
