@@ -4,6 +4,10 @@ import { pathToFileURL } from 'node:url'
 import { inspectCaptureDirectory } from './m1-inspect-captures.mjs'
 
 const MAX_SOURCES = 100
+const MAX_JSON_LD_BLOCKS = 128
+const MAX_APPLICATION_JSON_SCRIPTS = 128
+const MAX_JSON_LD_ENTRIES = 256
+const MAX_JSON_LD_TERM_LENGTH = 256
 const RELEVANT_KEYS = new Set([
   '@context', '@type', '@graph', 'name', 'sku', 'gtin', 'gtin12',
   'gtin13', 'gtin14', 'offers', 'price', 'lowPrice', 'highPrice',
@@ -25,6 +29,45 @@ function requireCanonicalOrigin(source) {
     /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
   if (!canonical(source.supermarket) || !canonical(source.kind)) {
     throw new Error('Invalid inspected source origin')
+  }
+}
+
+// M1's HTML inspector outputs short arrays of JSON-LD type/key strings.
+// A forged or degenerate capture must not be silently normalized to an
+// empty/small shape; reject it before potentially expensive map/filter/hash.
+function canonicalShapeTerms(values) {
+  if (!Array.isArray(values) || values.length > MAX_JSON_LD_ENTRIES) return false
+  for (let i = 0; i < values.length; i += 1) {
+    if (!Object.hasOwn(values, i) || typeof values[i] !== 'string' ||
+        values[i].length > MAX_JSON_LD_TERM_LENGTH) return false
+  }
+  return true
+}
+
+function requireBoundedHtmlShape(html) {
+  if (!html || !Array.isArray(html.jsonLd) ||
+      !Array.isArray(html.applicationJsonScripts) ||
+      html.jsonLd.length > MAX_JSON_LD_BLOCKS ||
+      html.applicationJsonScripts.length > MAX_APPLICATION_JSON_SCRIPTS) {
+    throw new Error('Invalid or unbounded inspected HTML shape')
+  }
+  for (let i = 0; i < html.jsonLd.length; i += 1) {
+    if (!Object.hasOwn(html.jsonLd, i)) {
+      throw new Error('Invalid or unbounded inspected HTML shape')
+    }
+    const record = html.jsonLd[i]
+    if (!record || typeof record !== 'object' || Array.isArray(record) ||
+        !canonicalShapeTerms(record.type) ||
+        !canonicalShapeTerms(record.keys)) {
+      throw new Error('Invalid or unbounded inspected HTML shape')
+    }
+  }
+  for (let i = 0; i < html.applicationJsonScripts.length; i += 1) {
+    if (!Object.hasOwn(html.applicationJsonScripts, i) ||
+        !html.applicationJsonScripts[i] ||
+        typeof html.applicationJsonScripts[i] !== 'object') {
+      throw new Error('Invalid or unbounded inspected HTML shape')
+    }
   }
 }
 
@@ -50,10 +93,7 @@ export function captureShape(source) {
     throw new Error('Snapshot integrity verification required')
   }
   requireCanonicalOrigin(source)
-  if (!source.html || !Array.isArray(source.html.jsonLd) ||
-      !Array.isArray(source.html.applicationJsonScripts)) {
-    throw new Error('Inspected HTML shape missing')
-  }
+  requireBoundedHtmlShape(source.html)
   const shape = {
     hasNextData: source.html.hasNextData === true,
     applicationJsonScriptCount: source.html.applicationJsonScripts.length,
