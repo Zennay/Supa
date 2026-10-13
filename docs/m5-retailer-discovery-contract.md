@@ -57,6 +57,12 @@ node --test tests/m5-retailer-rights-reconciliation.test.mjs
 - If the M1 gate itself changes, the report reflects the validated canonical gate state without pretending that technical M1 evidence grants broader M5 rights. Tests include a **fictional** M1 permission-granted fixture to lock this separation.
 - This is a **reporting/preparation feature**, not an M1/M3 migration, live capture, queue claim, signed approval, or M5 release switch.
 
+## Hosted review artifacts (offline, no M5 go)
+
+The new [M5 offline retailer review pack workflow](../.github/workflows/m5-offline-retailer-review.yml) checks out the exact PR head with `persist-credentials: false`, runs the isolated M5 regression files and builds a 14-day GitHub Actions artifact named `supa-m5-offline-retailer-review`. Only same-repository pull requests or explicitly dispatched runs are eligible. The workflow uses the GitHub-hosted runner; it performs no live retailer request, proxy probe, source ingestion, M3 observation, queue claim, production deploy or merge.
+
+The downloadable archive contains `retailer-review.csv`, `retailer-review.md`, `retailer-review.json`, `m1-m5-rights-reconciliation.json`, `m5-blocked-production.json`, and `m5-blocked-readiness.json`. Both final reports must exit code 2 as a safety proof. These are *review-preparation artifacts*, not proof of access rights or savings.
+
 ## Acceptance for each future adapter (NOT completed)
 
 1. Human confirms active retailer identity, correct official source/feed URL, data owner, store/region, and source-specific technical access rules.
