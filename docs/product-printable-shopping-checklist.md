@@ -27,3 +27,35 @@ Do not replace the existing interactive checkbox/persistence implementation with
 - Hosted full workflow: `npm test && npm run build`; compare exact final PR head with current main.
 - Obtain independent zCloud preflight/write claim/lease, component owner sign-off and applicable permanent VPS/Firefox product gates before integration.
 - **DRAFT / HOLD / NO MERGE / NO DEPLOY** without explicit release authorization. Genuine M3 #78 remains OPEN. All data in tests are controlled, not observed retailer evidence.
+
+## Dedicated rendered Firefox proof (isolated from App owner)
+A fixture-only page `tests/fixtures/print-preview.html` renders the real React
+component with the deterministic M2 basket, including deliberately unresolved
+lines. It is served only when explicitly running Vite for local testing; it
+does **not** wire the component into the product's routed shopping list.
+
+The separate, read-only `M2 print-preview Firefox proof` workflow at
+`.github/workflows/supa-print-preview.yml` starts headless Firefox and
+geckodriver on the permanent VPS, exercises a genuine React button click,
+measures 430px/800px viewport overflow and 44px touch sizing, and requests a
+native W3C WebDriver PDF print. Poppler's `pdftotext` confirms the paper
+contains real physical rows and excludes navigation, screen-only cards,
+money claims and fabricated savings. The workflow uploads a PDF, screenshots
+and a provenance/acceptance JSON under `artifacts/print-browser-e2e`.
+The workflow is **synthetic-only** and accepts no retailer or participant input.
+
+To reproduce on a local workstation with Firefox, geckodriver and Poppler:
+
+```bash
+npm ci
+npm run dev -- --host 127.0.0.1 --port 4189 --strictPort
+# In another terminal: geckodriver --port 4455
+PRINT_BASE_URL=http://127.0.0.1:4189/tests/fixtures/print-preview.html \
+PRINT_WEBDRIVER_URL=http://127.0.0.1:4455 \
+  node tests/m2-print-preview-browser.mjs
+```
+
+Passing this independent proof is a **browser validation of the standalone
+fixture**, not evidence that the production user-facing route is integrated.
+Owner composition, latest-main review, private-beta and real retailer proof
+remain separately gated.
