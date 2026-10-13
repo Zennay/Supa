@@ -52,6 +52,8 @@ createRoot(document.getElementById('print-preview-root')!).render(
         </div>
         <div className="attention-card">Schermhulp (mag niet op papier verschijnen)</div>
         <div className="list-card">Schermkaart (mag niet op papier verschijnen)</div>
+        <aside className="screen-only-canary">SCHERMALLEEN_WILLEKEURIGE_SECTIE_GEEN_PAPIER</aside>
+        <div className="diagnostic-canary">SCHERMALLEEN_GEVOELIGE_DIAGNOSTIEK_GEEN_PAPIER</div>
         <PrintableShoppingChecklist basket={fixtureBasket} />
       </section>
     </div>
