@@ -28,15 +28,28 @@ function quantityLabel(amount: number | null, unit: unknown): string {
 }
 
 
-function baseQuantity(amount: number, unit: unknown) {
-  if (!Number.isFinite(amount) || amount <= 0 ||
+/**
+ * Compare physical pack demand using exact decimal ratios. IEEE-754
+ * division/ceil can overcount a whole pack at decimal unit boundaries;
+ * a paper checklist must not convert that rounding artifact into a
+ * trusted purchase instruction. Canonical units remain unchanged.
+ */
+function exactBaseQuantity(amount: number, unit: unknown) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 ||
       !['g', 'kg', 'ml', 'l', 'piece'].includes(unit as string)) return null
-  const factor = unit === 'kg' || unit === 'l' ? 1000 : 1
-  const normalized = amount * factor
-  if (!Number.isFinite(normalized) || normalized <= 0) return null
+
+  const parts = /^(\\d+)(?:\\.(\\d+))?(?:e([+-]?\\d+))?$/i.exec(amount.toString())
+  if (!parts) return null
+  const exponent = Number(parts[3] ?? 0)
+  if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 325) return null
+  const digits = BigInt((parts[1] + (parts[2] ?? '')).replace(/^0+/, '') || '0')
+  const power = exponent - (parts[2]?.length ?? 0) +
+    (unit === 'kg' || unit === 'l' ? 3 : 0)
+  const numerator = power >= 0 ? digits * 10n ** BigInt(power) : digits
+  const denominator = power < 0 ? 10n ** BigInt(-power) : 1n
   const family = unit === 'g' || unit === 'kg' ? 'mass'
     : unit === 'ml' || unit === 'l' ? 'volume' : 'piece'
-  return { normalized, family }
+  return { numerator, denominator, family }
 }
 
 function safePhysicalPacks(
@@ -46,11 +59,19 @@ function safePhysicalPacks(
 ): boolean {
   if (!Number.isSafeInteger(packs) || packs < 1 ||
       !Number.isSafeInteger(pack.count) || pack.count < 1) return false
-  const required = baseQuantity(requirement.amount, requirement.unit)
-  const available = baseQuantity(pack.amount * pack.count, pack.unit)
-  if (!required || !available || required.family !== available.family) return false
-  const minimal = Math.ceil(required.normalized / available.normalized)
-  return Number.isSafeInteger(minimal) && minimal > 0 && minimal === packs
+
+  const required = exactBaseQuantity(requirement.amount, requirement.unit)
+  const perItem = exactBaseQuantity(pack.amount, pack.unit)
+  if (!required || !perItem || required.family !== perItem.family) return false
+
+  // required / perItem, cross-multiplied without a lossy floating quotient.
+  const demand = required.numerator * perItem.denominator
+  const outerPackCapacity = perItem.numerator *
+    BigInt(pack.count) * required.denominator
+  if (outerPackCapacity <= 0n) return false
+  const purchased = BigInt(packs)
+  return demand <= outerPackCapacity * purchased &&
+    demand > outerPackCapacity * (purchased - 1n)
 }
 
 /**
