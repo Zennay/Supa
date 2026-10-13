@@ -20,6 +20,15 @@ function visibleText(value: unknown): value is string {
     /[\p{L}\p{N}\p{S}]/u.test(value.replace(/[\p{Cf}\p{M}]/gu, ''))
 }
 
+// Printed words must never carry hidden direction overrides, zero-width format
+// characters, line separators or interior C0/C1 controls. Preserve legitimate
+// letters, accents, emoji, dashes and spaces; never mutate the basket source.
+function safePrintableLabel(value: unknown): string | null {
+  if (!visibleText(value)) return null
+  const cleaned = value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, '').trim()
+  return visibleText(cleaned) ? cleaned : null
+}
+
 function quantityLabel(amount: number | null, unit: unknown): string {
   if (amount === null || !Number.isFinite(amount) || amount <= 0) {
     return 'hoeveelheid onbekend'
@@ -103,14 +112,14 @@ export function preparePrintableShoppingChecklist(
     }
     seen.add(line.id)
 
-    if (line.status === 'matched' &&
-        visibleText(line.productName) &&
+    const productLabel = safePrintableLabel(line.productName)
+    if (line.status === 'matched' && productLabel !== null &&
         safePhysicalPacks(line.requirement, line.pack, line.packs)) {
       const count = line.pack.count
       const pack = `${line.pack.amount} ${quantityUnitLabelNl(line.pack.unit, line.pack.amount)}`
       return {
         id: line.id,
-        label: line.productName.trim(),
+        label: productLabel,
         quantity: count === 1
           ? `${line.packs} × ${pack}`
           : `${line.packs} ${line.packs === 1 ? 'verpakking' : 'verpakkingen'} van ${count} × ${pack}`,
@@ -124,16 +133,14 @@ export function preparePrintableShoppingChecklist(
 
     return {
       id: line.id,
-      label: visibleText(line.ingredientLabel)
-        ? line.ingredientLabel.trim() : 'Onbekend ingrediënt',
+      label: safePrintableLabel(line.ingredientLabel) ?? 'Onbekend ingrediënt',
       quantity: `${quantityLabel(line.requirement?.amount ?? null, line.requirement?.unit)} · handmatig kiezen`,
       needsReview: true,
     }
   })
 
   return {
-    storeLabel: visibleText(basket.store?.name)
-      ? basket.store.name.trim() : 'Winkel nog te kiezen',
+    storeLabel: safePrintableLabel(basket.store?.name) ?? 'Winkel nog te kiezen',
     lines,
     reviewCount: lines.filter((line) => line.needsReview).length,
     isDemo: basket.store?.id === 'm2-one-store',
