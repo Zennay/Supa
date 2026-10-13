@@ -210,6 +210,16 @@ test('CLI requires explicit local file, emits privacy-redacted report and preser
     assert.equal(huge.status, 2)
     assert.equal(huge.stdout, '')
     assert.ok(!huge.stderr.includes(oversize))
+    const malformedUtf8 = path.join(dir, 'malformed-utf8.json')
+    await writeFile(malformedUtf8, Buffer.from([0x7b, 0x22, 0xff, 0x22, 0x7d]),
+      { mode: 0o600 })
+    const malformedUtf8Result = spawnSync(process.execPath,
+      [script.pathname, malformedUtf8], { encoding: 'utf8' })
+    assert.equal(malformedUtf8Result.status, 2)
+    assert.equal(malformedUtf8Result.stdout, '')
+    assert.ok(!malformedUtf8Result.stderr.includes(malformedUtf8))
+    assert.equal(await readFile(malformedUtf8).then(buf => buf.length), 5)
+
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
