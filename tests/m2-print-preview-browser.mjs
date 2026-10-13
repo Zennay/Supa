@@ -127,6 +127,20 @@ try {
         await new Promise((resolve) => setTimeout(resolve, 100))
       }
       assert.equal(ready, true, 'mobile iframe React fixture did not render')
+      // On headless desktop Firefox the vertical scrollbar consumes
+      // 12px of an iframe's CSS box. Adjust the host iframe until its
+      // *inner document's usable layout viewport* is truly 320/430px.
+      await execute(sessionId, `
+        const frame = document.getElementById('supa-mobile-viewport')
+        const target = arguments[0]
+        for (let tries = 0; tries < 4; tries += 1) {
+          const effective = frame.contentDocument.documentElement.clientWidth
+          if (Math.abs(effective - target) <= 1) break
+          frame.style.width =
+            Math.round(frame.getBoundingClientRect().width + target - effective) + 'px'
+        }
+        return frame.contentDocument.documentElement.clientWidth
+      `, [width])
     } else {
       await execute(sessionId, `
         document.getElementById('supa-mobile-viewport')?.remove()
@@ -161,15 +175,15 @@ try {
     `)
     assert.ok(observed, 'React print fixture did not render')
     assert.ok(
-      observed.requestedCssWidth <= width + 2 && observed.requestedCssWidth >= width - 2,
-      `Firefox iframe did not honor ${width}px CSS width: ${observed.requestedCssWidth}`,
+      observed.requestedCssWidth <= width + 20 && observed.requestedCssWidth >= width - 2,
+      `Firefox iframe width or scrollbar gutter unexpectedly changed for ${width}px: ${observed.requestedCssWidth}`,
     )
     // Gecko subtracts a non-overlay scrollbar from documentElement.clientWidth.
     // It still has to keep the available CSS viewport within the true device
     // width and prevent all horizontal spill.
     assert.ok(
-      observed.viewport <= width + 2 && observed.viewport >= width - 20,
-      `Firefox effective ${width}px viewport outside scrollbar bound: ${observed.viewport}`,
+      observed.viewport <= width + 2 && observed.viewport >= width - 2,
+      `Firefox did not expose a real ${width}px content viewport: ${observed.viewport}`,
     )
     assert.equal(observed.horizontalOverflow, false, `overflow at ${width}px`)
     assert.equal(observed.minHeight, '44px')
