@@ -61,7 +61,24 @@ node --test tests/m5-retailer-rights-reconciliation.test.mjs
 
 The new [M5 offline retailer review pack workflow](../.github/workflows/m5-offline-retailer-review.yml) checks out the exact PR head with `persist-credentials: false`, runs the isolated M5 regression files and builds a 14-day GitHub Actions artifact named `supa-m5-offline-retailer-review`. Only same-repository pull requests or explicitly dispatched runs are eligible. The workflow uses the GitHub-hosted runner; it performs no live retailer request, proxy probe, source ingestion, M3 observation, queue claim, production deploy or merge.
 
-The downloadable archive contains `retailer-review.csv`, `retailer-review.md`, `retailer-review.json`, `m1-m5-rights-reconciliation.json`, `m5-blocked-production.json`, and `m5-blocked-readiness.json`. Both final reports must exit code 2 as a safety proof. These are *review-preparation artifacts*, not proof of access rights or savings.
+The downloadable archive contains `retailer-review.csv`, `retailer-review.md`, `retailer-review.json`, `m1-m5-rights-reconciliation.json`, `unreviewed-research-completeness.json`, `m5-blocked-production.json`, and `m5-blocked-readiness.json`. Both final reports must exit code 2 as a safety proof. These are *review-preparation artifacts*, not proof of access rights or savings.
+
+## Offline human source-research intake — separate from production permission
+
+A new **optional local-only human research file** is supported. Copy `docs/m5-retailer-research-template.v1.json` to a private, untracked location. Add only the ten documented fields per reviewed chain: `retailerId`, `reviewedAt`, `sourceKind`, `sourceUrl`, `termsUrl`, `robotsUrl`, `rightsState`, `rightsEvidenceUrl`, `regionScope` and `assortmentScope`. Each URL may be `null`. `sourceKind` is one of `unassessed`, `official-api`, `official-feed`, `public-html` or `no-public-source`. `rightsState` is one of `unknown`, `request-pending`, `denied` or `claimed-written-permission`. A non-null URL must use canonical HTTPS without credentials/fragments.
+
+```bash
+cp docs/m5-retailer-research-template.v1.json /private/path/review.json
+# Edit the private copy only, then inspect safely:
+node scripts/m5-assess-retailer-research.mjs /private/path/review.json
+node --test tests/m5-retailer-research-review.test.mjs
+```
+
+This reader **does not write or upload the private file**. Reports return only retailer ID, completeness flags, source category, rights *claim* (not permission), and evidence-presence booleans. They never echo reviewer-supplied source, terms, robots or permission-evidence URLs. Extra unstructured contact, note, name or email fields are rejected. The optional human file must never be committed, uploaded to public CI, attached to a review PR or treated as a source ingest allowlist.
+
+Even if `claimed-written-permission` has an HTTPS evidence URL, it remains **unverified**, `rightsVerified=false`, `m5Eligible=false`, `productionReady=false`, and `productionEnabled=false`. Independent verification of the actual written license, current M1 policy, M3 #78 evidence, M4 beta eligibility, original source-owner authorization and an explicit M5-go remain separate human gates.
+
+The GitHub-hosted workflow runs this assessment **only on the empty template**, producing `unreviewed-research-completeness.json` (17 pending, zero reviewed) in the research-only artifact. No human-provided private record is uploaded or accessed.
 
 ## Acceptance for each future adapter (NOT completed)
 
