@@ -2,7 +2,9 @@ import { readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 
 const DEFAULT_FILE = new URL('../docs/m5-retailer-discovery.v1.json', import.meta.url)
-const VALID_STATUSES = new Set(['unreviewed', 'permission-requested', 'denied'])
+// No human decision or authenticated evidence is stored in this discovery list.
+// Request/denial/approval outcomes belong in a separate reviewed evidence record.
+const VALID_STATUSES = new Set(['unreviewed'])
 const MAX_SOURCES = 100
 
 function assert(condition, message) {
@@ -87,9 +89,7 @@ export function assessRetailerDiscovery(document) {
       termsStatus: 'unreviewed',
       robotsStatus: 'unreviewed',
       productionEnabled: false,
-      nextAction: record.permissionStatus === 'denied'
-        ? 'Do not ingest; review only if legal/source authorization changes'
-        : 'Review official access path, terms and written/licensed permission',
+      nextAction: 'Review official access path, terms and written/licensed permission',
     })
   })
   return {
