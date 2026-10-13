@@ -9,6 +9,8 @@ The May 2026 Consumentenbond price survey lists thirteen chains. Wageningen Univ
 - Consumentenbond Boni reference: https://www.consumentenbond.nl/acties-claims/nieuws/2025/laagsteprijsclaims-van-supermarkten-update
 - WUR market research: https://www.wur.nl/nl/onderzoek/producten-diensten/dashboard-supermarkten-duurzaamheid-en-gezondheid
 - Consumentenbond, 6 May 2026 survey: https://www.consumentenbond.nl/voedingstests/prijspeiling-supermarkten
+**Strict schema integrity (#2097):** Both the top-level discovery document and every retailer record have a complete, exact version-1 field allowlist. The top-level `purpose` must match the canonical *research-only* declaration byte-for-byte. Unknown permissions such as `ingestAuthorized`, hidden/non-enumerable metadata, missing fields and accessor properties are rejected before data is interpreted; future legitimate fields require an explicitly reviewed schema version rather than silent extensions. Independent QA reproduction: [#2097](https://github.com/Zennay/Supa/issues/2097) and [#2099](https://github.com/Zennay/Supa/pull/2099). The original nonauthorizing `productionReady=false` invariant remains.
+
 **Market-list provenance control:** these v1 candidate links are now exact-URL pinned to the two cited research organisations and their three confirmed public articles. Replacing evidence with an unrelated/lookalike HTTPS URL is rejected by the offline audit. Extending the set requires independent manual source verification; none of these articles grants product-data reuse rights.
 
 - Existing M1 source-permission gate: `scripts/m1-check-source-permission-gate.mjs` (PLUS/DekaMarkt only).
