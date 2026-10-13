@@ -17,7 +17,9 @@ The original five tests create only temporary synthetic HTML and a correct manif
 4. **Expected RED** SHA-valid **supermarket directory** symlink points outside the capture root -> must reject.
 5. **Expected RED** normal current + synthetic **symlinked baseline supermarket** -> must reject before review publication.
 
-The second separately added suite verifies one positive ordinary manifest/root and two additional expected-RED cases: a symlinked manifest file in an ordinary directory, and the entire named capture-root directory itself being a symlink to a complete external fixture. Together the two suites require **3 positive GREEN and 5 intentional RED** until the source correction.\n\nAll negative cases demand normal nonzero exit, empty stdout (no JSON review queue), generic stderr without source ID, URI, HTML marker or temporary path. Test checks local fixture manifests, external original source bytes and symlink identity remain unchanged. No source HTTP requests or credentials.
+The second separately added suite verifies one positive ordinary manifest/root and two additional expected-RED cases: a symlinked manifest file in an ordinary directory, and the entire named capture-root directory itself being a symlink to a complete external fixture. Together the two suites require **3 positive GREEN and 5 intentional RED** until the source correction.
+
+All negative cases demand normal nonzero exit, empty stdout (no JSON review queue), generic stderr without source ID, URI, HTML marker or temporary path. Test checks local fixture manifests, external original source bytes and symlink identity remain unchanged. No source HTTP requests or credentials.
 
 Do **not** weaken cryptographic capture integrity or reclassify a noncanonical source as P2/P3 to satisfy tests. The source owner should choose an appropriate path-containment and no-symlink policy with race-aware directory handling and current+baseline coverage. After correction rerun the **unaltered original QA test blob** and full exact-head CI. An initial test runner with exactly three *intended* RED tests is evidence for a distinct unfixed source invariant, **not a green pipeline**.
 
