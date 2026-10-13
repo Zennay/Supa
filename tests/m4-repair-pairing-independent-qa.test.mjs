@@ -180,3 +180,48 @@ test('M4 repair expected RED: real CLI refuses orphan completion before writing 
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+
+test('M4 repair positive: consecutive same-kind repairs represent two real starts', () => {
+  const input = session()
+  input.events.splice(-1, 0,
+    {
+      type: 'repair_started',
+      timestamp: '2026-10-10T12:15:00.000Z',
+      repair_kind: 'skip-meal',
+    },
+    {
+      type: 'repair_completed',
+      timestamp: '2026-10-10T12:18:00.000Z',
+      repair_kind: 'skip-meal',
+      duration_seconds: 60,
+      manual_edits: 1,
+    },
+  )
+  const summary = buildBetaSessionSummary(input)
+  assert.equal(summary.repairCount, 2)
+  assert.equal(summary.medianRepairDurationSeconds, 120)
+  assert.equal(summary.repairManualEdits, 3)
+  assert.equal(summary.publicClaimEligible, false)
+})
+
+test('M4 repair positive: interleaved kinds preserve two independently started repairs', () => {
+  const input = session()
+  input.events.splice(4, 0, {
+    type: 'repair_started',
+    timestamp: '2026-10-10T12:11:00.000Z',
+    repair_kind: 'swap-meal',
+  })
+  input.events.splice(-1, 0, {
+    type: 'repair_completed',
+    timestamp: '2026-10-10T12:17:00.000Z',
+    repair_kind: 'swap-meal',
+    duration_seconds: 90,
+    manual_edits: 1,
+  })
+  const summary = buildBetaSessionSummary(input)
+  assert.equal(summary.repairCount, 2)
+  assert.equal(summary.medianRepairDurationSeconds, 135)
+  assert.equal(summary.repairManualEdits, 3)
+  assert.equal(summary.publicClaimEligible, false)
+})
