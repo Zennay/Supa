@@ -76,7 +76,18 @@
     margin-bottom: 0.6rem;
     break-inside: avoid;
   }
-  .supa-printable-shopping__rows li > span { font-size: 18pt; line-height: 1; }
+  /* Long product SKUs must wrap inside the A4 printable width, not bleed
+     off the paper edge or force the checkbox onto a different page. */
+  .supa-printable-shopping__rows li > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+  .supa-printable-shopping__rows li > span {
+    flex: 0 0 auto;
+    font-size: 18pt;
+    line-height: 1;
+  }
   .supa-printable-shopping__rows strong,
   .supa-printable-shopping__rows small,
   .supa-printable-shopping__rows em { display: block; }
