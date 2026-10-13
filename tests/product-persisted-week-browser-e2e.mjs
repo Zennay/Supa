@@ -193,6 +193,45 @@ try {
   assert.equal(anyChecked, false, 'stale checked state leaked into a different physical basket')
   checks.push('recipe-change-invalidates-old-checks')
 
+
+  // Explicitly empty planning is a valid user choice; never resurrect old groceries.
+  await nav(sessionId, 'Planner')
+  for (const day of ['Di', 'Do']) {
+    const removed = await script(sessionId, `
+      const button = document.querySelector('[aria-label="${arguments[0]} uit planning halen"]')
+      if (!button) return false
+      button.click()
+      return true
+    `, [day])
+    assert.equal(removed, true, `could not deactivate ${day}`)
+  }
+  await until(sessionId,
+    'return document.querySelector(".screen")?.textContent.includes("0 maaltijden actief")',
+    'all meals disabled',
+  )
+  await until(sessionId, `
+    const raw = localStorage.getItem('supa:planner-preferences:v2')
+    return raw && JSON.parse(raw).activeDays.length === 0
+  `, 'empty week persisted')
+  await nav(sessionId, 'Mand')
+  await until(sessionId,
+    'return document.querySelector(".comparison-card")?.textContent.includes("Beide testmanden zijn even duur")',
+    'zero-cost comparison with no savings',
+  )
+  await nav(sessionId, 'Lijst')
+  const emptyList = await script(sessionId,
+    'return document.querySelectorAll("button.shopping-row").length')
+  assert.equal(emptyList, 0, 'empty week must not show stale groceries')
+  await request(`/session/${sessionId}/refresh`, { method: 'POST', body: '{}' })
+  await until(sessionId,
+    'return document.querySelector(".screen")?.textContent.includes("0 maaltijden actief")',
+    'empty week restored after refresh',
+  )
+  await nav(sessionId, 'Lijst')
+  assert.equal(await script(sessionId,
+    'return document.querySelectorAll("button.shopping-row").length'), 0)
+  checks.push('intentionally-empty-week-persists-without-phantom-groceries')
+
   await writeFile(`${artifactDirectory}/result.json`,
     JSON.stringify({
       schemaVersion: 1,
