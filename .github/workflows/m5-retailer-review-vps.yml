@@ -7,12 +7,14 @@ on:
       - "docs/m5-retailer-discovery.v1.json"
       - "docs/m5-retailer-research-template.v1.json"
       - "scripts/m5-assess-retailer-research.mjs"
+      - "scripts/m5-build-retailer-priorities.mjs"
       - "scripts/m5-audit-retailer-discovery.mjs"
       - "scripts/m5-build-retailer-review-pack.mjs"
       - "scripts/m5-reconcile-retailer-rights.mjs"
       - "tests/m5-retailer-discovery.test.mjs"
       - "tests/m5-retailer-review-pack.test.mjs"
       - "tests/m5-retailer-research-review.test.mjs"
+      - "tests/m5-retailer-priorities.test.mjs"
       - "tests/m5-retailer-rights-reconciliation.test.mjs"
   workflow_dispatch:
 
@@ -53,6 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test tests/m5-retailer-discovery.test.mjs tests/m5-retailer-review-pack.test.mjs tests/m5-retailer-rights-reconciliation.test.mjs tests/m5-retailer-research-review.test.mjs
+          node --test tests/m5-retailer-discovery.test.mjs tests/m5-retailer-review-pack.test.mjs tests/m5-retailer-rights-reconciliation.test.mjs tests/m5-retailer-research-review.test.mjs tests/m5-retailer-priorities.test.mjs
           node scripts/m5-assess-retailer-research.mjs docs/m5-retailer-research-template.v1.json > /dev/null
+          node scripts/m5-build-retailer-priorities.mjs > /dev/null
           printf 'Offline M5 reviewer checks passed on permanent VPS; no retailer requests or M5 release.\n' >> "$GITHUB_STEP_SUMMARY"
