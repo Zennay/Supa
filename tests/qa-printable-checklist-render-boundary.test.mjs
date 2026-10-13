@@ -74,7 +74,7 @@ test('Unicode and HTML-special product/store labels are rendered as inert text, 
   const html = render(value)
   assert.match(html, /Winkel &lt;b&gt;&amp; Veilig&lt;\/b&gt;/)
   assert.match(html, /Havermout &lt;img src=x onerror=alert\(1\)&gt; &amp; cafés ☕/)
-  assert.doesNotMatch(html, /<img\b|<b>|<script|onerror=/i) // escaped markup contains textual onerror; check actual tags below
+  assert.doesNotMatch(html, /<img\b|<b>|<script/i) // escaped attribute text is safe; only actual tags are prohibited
 })
 
 test('print-only stylesheet, native print trigger and real visible action are gated to the opt-in subtree', () => {
