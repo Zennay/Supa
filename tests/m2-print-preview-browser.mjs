@@ -280,6 +280,13 @@ try {
   const labels = longText.match(/Proefregel\d{3}/g) ?? []
   assert.equal(labels.length, 88, 'Firefox PDF dropped or duplicated one or more physical rows')
   assert.equal(new Set(labels).size, 88, 'Firefox PDF repeated a physical row')
+  // A real supermarket title can contain one very long SKU with no spaces.
+  // Check that the tail survives Firefox's A4 print layout rather than being
+  // clipped outside the page bounds; PDF extraction ignores line wrapping.
+  assert.ok(
+    longText.replace(/\s+/g, '').includes('L'.repeat(165) + 'EINDEPRODUCT'),
+    'A4 PDF clipped the tail of a long unbroken product label',
+  )
   for (let index = 1; index <= 88; index += 1) {
     assert.ok(
       labels.includes(`Proefregel${String(index).padStart(3, '0')}`),
