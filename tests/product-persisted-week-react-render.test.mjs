@@ -124,3 +124,112 @@ test('real App restored empty week renders no phantom meals or budgeted savings'
   assert.equal(comparison.outcome, 'same')
   assert.equal(comparison.savingsCents, 0)
 })
+
+test('real Basket view with an unresolved candidate shows no financial difference', async (t) => {
+  const vite = await createServer({
+    configFile: false,
+    root: new URL('../', import.meta.url).pathname,
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  })
+  t.after(async () => { await vite.close() })
+
+  const { BasketView } = await vite.ssrLoadModule('/src/features/basket/BasketView.tsx')
+  const { shopping, baseline } = basketsFor(mockBudgetAndWeek)
+  const plan = m2InitialPlan.map((meal) => ({
+    ...meal,
+    recipeId: mockBudgetAndWeek.recipeByDay[meal.day],
+  }))
+  const candidate = buildOneStoreBasket({
+    plan,
+    activeDays: mockBudgetAndWeek.activeDays,
+    recipes: m2Recipes,
+    store: m3CandidateStore,
+    products: m3CandidateProducts.map((product) =>
+      product.name.includes('Spaghetti')
+        ? { ...product, available: false }
+        : product,
+    ),
+  })
+  const comparison = compareFullBaskets({ baseline, candidate })
+  assert.equal(comparison.claimable, false)
+  assert.equal(comparison.outcome, 'unknown')
+
+  const html = renderToStaticMarkup(createElement(BasketView, {
+    basket: shopping,
+    comparison,
+    comparisonBaseline: baseline,
+    comparisonCandidate: candidate,
+  }))
+  assert.match(html, /data-comparison-outcome="unknown"/)
+  assert.match(html, /Nog geen betrouwbare vergelijking/)
+  assert.match(html, /Geen financieel verschil tonen/)
+  assert.match(html, /productkeuze moet nog worden opgelost/)
+  assert.match(html, /data-basket-cost-state="minimum"/)
+  assert.doesNotMatch(html, /ligt[^<]*(?:lager|hoger)/)
+  assert.doesNotMatch(html, /M3 controlled testdata/)
+})
+
+test('real Basket view describes a more expensive synthetic candidate as worse, not saved', async (t) => {
+  const vite = await createServer({
+    configFile: false,
+    root: new URL('../', import.meta.url).pathname,
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  })
+  t.after(async () => { await vite.close() })
+
+  const { BasketView } = await vite.ssrLoadModule('/src/features/basket/BasketView.tsx')
+  const { shopping, baseline } = basketsFor(mockBudgetAndWeek)
+  const plan = m2InitialPlan.map((meal) => ({
+    ...meal,
+    recipeId: mockBudgetAndWeek.recipeByDay[meal.day],
+  }))
+  const candidate = buildOneStoreBasket({
+    plan,
+    activeDays: mockBudgetAndWeek.activeDays,
+    recipes: m2Recipes,
+    store: m3CandidateStore,
+    products: m3CandidateProducts.map((product) => ({
+      ...product,
+      priceCents: product.priceCents + 300,
+    })),
+  })
+  const comparison = compareFullBaskets({ baseline, candidate })
+  assert.equal(comparison.claimable, true)
+  assert.equal(comparison.outcome, 'worse')
+  assert.ok(comparison.savingsCents < 0)
+
+  const html = renderToStaticMarkup(createElement(BasketView, {
+    basket: shopping,
+    comparison,
+    comparisonBaseline: baseline,
+    comparisonCandidate: candidate,
+  }))
+  assert.match(html, /data-comparison-outcome="worse"/)
+  assert.match(html, /ligt[^<]*hoger/)
+  assert.doesNotMatch(html, /ligt[^<]*lager/)
+  assert.match(html, /geen live-besparingsclaim/)
+})
+
+test('corrupt browser planner storage renders the safe deterministic default rather than a fake week', async (t) => {
+  const vite = await createServer({
+    configFile: false,
+    root: new URL('../', import.meta.url).pathname,
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  })
+  t.after(async () => { await vite.close() })
+
+  const { App } = await vite.ssrLoadModule('/src/App.tsx')
+  const html = withBrowserStorage(
+    '{broken-json',
+    () => renderToStaticMarkup(createElement(App)),
+  )
+  assert.match(html, /4 maaltijden actief/)
+  assert.match(html, /€\\s*35,00/)
+  assert.doesNotMatch(html, /2 maaltijden actief/)
+})
