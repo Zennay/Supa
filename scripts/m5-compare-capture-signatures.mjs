@@ -16,6 +16,18 @@ function digest(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
+// Only canonical, bounded M1 origin metadata may be compared. An absent,
+// object-valued, control-bearing or non-canonical origin must not silently
+// produce an 'unchanged' (P3) source-review result. No source label is echoed.
+function requireCanonicalOrigin(source) {
+  const canonical = (value) => typeof value === 'string' &&
+    value.length > 0 && value.length <= 128 &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  if (!canonical(source.supermarket) || !canonical(source.kind)) {
+    throw new Error('Invalid inspected source origin')
+  }
+}
+
 // This fingerprint deliberately excludes names, prices, URLs, DOM text,
 // embedded-state payloads, and unknown keys (which may include private data).
 export function captureShape(source) {
@@ -23,6 +35,7 @@ export function captureShape(source) {
     throw new Error('Invalid inspected source')
   }
   if (!source.success) {
+    requireCanonicalOrigin(source)
     return {
       id: source.id,
       supermarket: source.supermarket,
@@ -36,6 +49,7 @@ export function captureShape(source) {
   if (source.integrity !== 'verified' || !/^[a-f0-9]{64}$/.test(source.manifestSha256 ?? '')) {
     throw new Error('Snapshot integrity verification required')
   }
+  requireCanonicalOrigin(source)
   if (!source.html || !Array.isArray(source.html.jsonLd) ||
       !Array.isArray(source.html.applicationJsonScripts)) {
     throw new Error('Inspected HTML shape missing')
