@@ -65,7 +65,14 @@ The downloadable archive contains `retailer-review.csv`, `retailer-review.md`, `
 
 ## Offline human source-research intake — separate from production permission
 
-A new **optional local-only human research file** is supported. Copy `docs/m5-retailer-research-template.v1.json` to a private, untracked location. Add only the ten documented fields per reviewed chain: `retailerId`, `reviewedAt`, `sourceKind`, `sourceUrl`, `termsUrl`, `robotsUrl`, `rightsState`, `rightsEvidenceUrl`, `regionScope` and `assortmentScope`. Each URL may be `null`. `sourceKind` is one of `unassessed`, `official-api`, `official-feed`, `public-html` or `no-public-source`. `rightsState` is one of `unknown`, `request-pending`, `denied` or `claimed-written-permission`. A non-null URL must use canonical HTTPS without credentials/fragments.
+A new **optional local-only human research file** is supported. Copy `docs/m5-retailer-research-template.v1.json` to a private, untracked location. Add only the fifteen documented fields per reviewed chain: `retailerId`, `reviewedAt`, `sourceKind`, `sourceUrl`, `termsUrl`, `robotsUrl`, `rightsState`, `rightsEvidenceUrl`, `regionScope` , `assortmentScope`, `termsReview`, `robotsReview`, `ownerContactStatus`, `freshnessPlan`, and `priority`. Each URL may be `null`. `sourceKind` is one of `unassessed`, `official-api`, `official-feed`, `public-html` or `no-public-source`. `rightsState` is one of `unknown`, `request-pending`, `denied` or `claimed-written-permission`. The extra human-research statuses use deliberately **non-authorizing** categories:
+- `termsReview`: `unreviewed`, `restrictive`, `unclear`, `allowance-claimed`.
+- `robotsReview`: `unreviewed`, `restrictive`, `conditional`, `allowance-claimed`.
+- `ownerContactStatus`: `unassessed`, `owner-identified`, `contact-pending`, `reply-recorded`. No contact names or addresses in the ledger.
+- `freshnessPlan`: `unassessed`, `manual-only`, `daily-claimed`, `weekly-claimed`.
+- `priority`: `unprioritized`, `P1`, `P2`, `P3` (research priority only).
+
+All researched categories describe reviewer claims, **never verified source permissions**. A non-null URL must use canonical HTTPS without credentials/fragments.
 
 ```bash
 cp docs/m5-retailer-research-template.v1.json /private/path/review.json
