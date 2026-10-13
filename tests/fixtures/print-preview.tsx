@@ -21,6 +21,26 @@ const basket = buildOneStoreBasket({
   products: m2Products.filter((product) => product.id !== 'chicken-400'),
 })
 
+
+/**
+ * Multi-page print stress fixture. No network or retailer observations:
+ * deterministic M2 example lines get new synthetic identities only.
+ */
+const isMultiPage = new URLSearchParams(window.location.search).get('long') === '1'
+const fixtureBasket = isMultiPage
+  ? {
+      ...basket,
+      lines: Array.from({ length: 88 }, (_, index) => {
+        const original = basket.lines[index % basket.lines.length]
+        const label = `Proefregel${String(index + 1).padStart(3, '0')}`
+        if (!original) throw new Error('Synthetische printbron ontbreekt')
+        return original.status === 'matched'
+          ? { ...original, id: label, productName: label }
+          : { ...original, id: label, ingredientLabel: label }
+      }),
+    }
+  : basket
+
 createRoot(document.getElementById('print-preview-root')!).render(
   <main className="app-shell" data-synthetic-print-fixture="true">
     <header className="topbar">SUPA · testomgeving</header>
@@ -31,7 +51,7 @@ createRoot(document.getElementById('print-preview-root')!).render(
         </div>
         <div className="attention-card">Schermhulp (mag niet op papier verschijnen)</div>
         <div className="list-card">Schermkaart (mag niet op papier verschijnen)</div>
-        <PrintableShoppingChecklist basket={basket} />
+        <PrintableShoppingChecklist basket={fixtureBasket} />
       </section>
     </div>
     <nav className="bottom-nav">Testnavigatie (mag niet op papier verschijnen)</nav>
