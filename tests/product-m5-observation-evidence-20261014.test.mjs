@@ -101,7 +101,9 @@ test('M5 candidate evidence: real M1 inspectHtml parses fictional Product and al
   source.manifestSha256=createHash('sha256').update(html).digest('hex')
   const proof=captureShape(source)
   assert.equal(proof.schemaOrgStatus,'candidate_observation')
-  assert.doesNotMatch(JSON.stringify(proof),/Fictional|fictional-product/)
+  // The internal pure shape still includes the source ID for matching; only
+  // the public human review queue must redact it. Never echo Product payload.
+  assert.doesNotMatch(JSON.stringify(proof),/\\"name\\":\\"Fictional\\"|\\"observation\\":/)
   const comparison=compareInspections({sourceCount:1,sources:[source]},
     {sourceCount:1,sources:[structuredClone(source)]})
   const queue=buildOfflineSelectorReviewQueue(comparison)
