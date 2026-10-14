@@ -82,15 +82,18 @@ test('independent valid dense P3 unchanged remains reviewer-only',()=>{
   assert.equal(out.actions.length,1);assert.equal(out.actions[0].priority,'P3')
   privateFlags(out)
 })
-test('independent valid 200 dense rows preserve private actions and 100 current limit',()=>{
+test('independent valid 200 dense rows preserve private actions with separately capped history',()=>{
+  // New #2241 physical-cohort rule: 100 unchanged + 100 removed would contain
+  // 200 historical snapshots. Use disjoint current/baseline cohorts instead.
   const changes=[]
-  for(let n=0;n<100;n++)changes.push(unchanged('current'+n))
+  for(let n=0;n<100;n++)changes.push(row('current'+n,'added',verified('current'+n),null))
   for(let n=0;n<100;n++)changes.push(row('removed'+n,'removed',null,verified('removed'+n)))
   const before=JSON.stringify(changes)
-  const out=buildOfflineSelectorReviewQueue(report(changes,{current:100,drift:100}))
+  const out=buildOfflineSelectorReviewQueue(report(changes,{current:100,drift:200}))
   assert.equal(out.actions.length,200)
-  assert.equal(out.sourceCount,100);assert.equal(out.driftCount,100)
+  assert.equal(out.sourceCount,100);assert.equal(out.driftCount,200)
   assert.equal(out.actions.filter(x=>x.priority==='P1').length,100)
+  assert.equal(out.actions.filter(x=>x.priority==='P2').length,100)
   assert.equal(JSON.stringify(changes),before)
   privateFlags(out)
 })
