@@ -179,7 +179,10 @@ test('real M3 line-jump control appears only for current canonical ingredient ta
 
   const notReady = observationSheetDomain.buildObservationSheet()
   assert.equal(observationNextAction(notReady).stage, 'study')
-  assert.match(renderView(notReady), /class="ghost-button observation-next-button"[^>]*disabled=""/)
+  const setupHtml = renderView(notReady)
+  assert.doesNotMatch(setupHtml, /class="ghost-button observation-next-button"[^>]*disabled/)
+  assert.match(setupHtml, /Ga naar: Geef deze meting een code/)
+  assert.match(setupHtml, /data-observation-study-field="studyId"/)
 
   const complete = populatedSheet()
   assert.equal(observationNextAction(complete).stage, 'export')
