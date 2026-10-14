@@ -45,7 +45,7 @@ export function observationRetailerCopy(
     storeIdPlaceholder: `${storeIdPrefix}-leiden-...`,
     guidance:
       side === 'baseline'
-        ? `Meet deze mand eerst bij ${expectedRetailer}. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`
-        : `Meet daarna dezelfde mand bij ${expectedRetailer}. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`,
+        ? `Meet deze mand eerst bij ${expectedRetailer}. Gebruik de officiële lijst met dezelfde ingrediënten en hoeveelheden voor beide winkels, in één regio en één prijscontext. Noteer het echte meetmoment met tijdzone, de bron en de feitelijke beschikbaarheid per product. Onbekend is niet hetzelfde als niet beschikbaar: gok geen product of prijs. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`
+        : `Meet daarna precies dezelfde ingrediënten en hoeveelheden bij ${expectedRetailer}, binnen 24 uur van de eerste meting en in dezelfde regio en prijscontext. Noteer het echte meetmoment met tijdzone, de bron en feitelijke beschikbaarheid per product. Onbekend is niet hetzelfde als niet beschikbaar: gok geen product of prijs. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`,
   }
 }
