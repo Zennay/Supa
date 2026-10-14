@@ -139,6 +139,21 @@ function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
     }
   }
 
+  // Both shops require distinct *real* location IDs for a meaningful pair.
+  // Keep this as navigable form guidance, not a synthesized correction to evidence.
+  if (
+    sheet.baseline.store.id.trim() === sheet.candidate.store.id.trim()
+  ) {
+    return {
+      stage: 'store',
+      side: 'candidate',
+      field: 'id',
+      title: 'Controleer de vestigingscode van DekaMarkt',
+      detail:
+        'PLUS en DekaMarkt hebben dezelfde vestigingscode. Controleer de echte codes van beide winkels; verzin geen code om de controle te omzeilen.',
+    }
+  }
+
   // Surface a concrete, safe remedy rather than a raw evidence error count.
   if (observationWindowSummary(sheet).state === 'outside-window') {
     return {
