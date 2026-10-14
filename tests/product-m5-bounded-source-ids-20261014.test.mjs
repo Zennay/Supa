@@ -57,7 +57,7 @@ function privateCli(now, older = null) {
   assert.equal(result.error, undefined)
   assert.equal(result.signal, null)
   assert.doesNotMatch(result.stdout + result.stderr,
-    /fictional-store|example\\.invalid|fictional captured markup|supa-m5-canonical-ids-/)
+    /fictional-store|example\.invalid|fictional captured markup|supa-m5-canonical-ids-/)
   return result
 }
 
@@ -69,7 +69,7 @@ async function invalidEarly(now, older = null) {
   const response = privateCli(now, older)
   assert.notEqual(response.status, 0)
   assert.equal(response.stdout, '')
-  assert.equal(response.stderr, 'Offline review failed: invalid capture or report\\n')
+  assert.equal(response.stderr, 'Offline review failed: invalid capture or report\n')
   assert.equal(await readFile(now.manifest, 'utf8'), now.raw)
   if (older) assert.equal(await readFile(older.manifest, 'utf8'), older.raw)
 }
@@ -88,7 +88,7 @@ test('product identity: pure P1 accepts exactly 128 ASCII source-id chars', () =
 })
 
 test('product identity: pure API rejects Unicode, control, path and overlong IDs', () => {
-  for (const id of ['', null, id129, 'é', 'a\\nb', 'a/b', 'a\\u202eb']) {
+  for (const id of ['', null, id129, 'é', 'a\nb', 'a/b', 'a\u202eb']) {
     assert.throws(() => captureShape({
       id, supermarket: 'fictional-store', kind: 'product', success: false,
     }), /^Error: Invalid inspected source$/)
@@ -170,7 +170,7 @@ test('product identity: historical too-long P1 rejects before current HTML read'
 test('product identity: non-ASCII P1 in late manifest row cannot enter reviewer', async () => {
   await isolated(async (root) => {
     const now = await capture(root, 'now', [
-      row('earlier-good'), row('a\\u202eb', { success: false }),
+      row('earlier-good'), row('a\u202eb', { success: false }),
     ])
     await invalidEarly(now)
   })
