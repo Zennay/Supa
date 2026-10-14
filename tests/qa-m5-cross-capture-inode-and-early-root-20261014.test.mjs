@@ -176,3 +176,33 @@ test('independent: aliased historical root is rejected BEFORE malformed current 
     await verify(now, old)
   })
 })
+
+
+test('independent: symlinked ANCESTOR of current root is refused before malformed manifest read', async () => {
+  await fixtureRun(async root => {
+    const ownedParent = join(root, 'owned-parent')
+    await mkdir(ownedParent)
+    const now = await capture(ownedParent, 'now', { malformed: true })
+    await symlink(ownedParent, join(root, 'aliased-parent'), 'dir')
+    const borrowed = join(root, 'aliased-parent', 'now')
+    await assert.rejects(compareCaptureDirectories(borrowed), (err) =>
+      err instanceof Error && err.message === 'Invalid offline capture tree origin')
+    rejects(run(borrowed))
+    await verify(now)
+  })
+})
+
+test('independent: symlinked ANCESTOR of baseline is rejected before malformed current manifest read', async () => {
+  await fixtureRun(async root => {
+    const now = await capture(root, 'now', { malformed: true })
+    const ownedParent = join(root, 'owned-parent')
+    await mkdir(ownedParent)
+    const old = await capture(ownedParent, 'old')
+    await symlink(ownedParent, join(root, 'aliased-parent'), 'dir')
+    const borrowed = join(root, 'aliased-parent', 'old')
+    await assert.rejects(compareCaptureDirectories(now.dir, borrowed), (err) =>
+      err instanceof Error && err.message === 'Invalid offline capture tree origin')
+    rejects(run(now.dir, borrowed))
+    await verify(now, old)
+  })
+})
