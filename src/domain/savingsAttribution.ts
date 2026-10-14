@@ -104,6 +104,31 @@ export function attributeSavingsEffects({
     }
   }
 
+  // A claimable same-demand result must agree on direction AND signed savings
+  // with the physical cent ledger. Imported/direct callers can otherwise supply
+  // correct rows but falsely label a worse basket as a saving.
+  // Read only own data descriptors: accessors and inherited claims are not
+  // trustworthy observation metadata and must never execute here.
+  const outcome = Object.getOwnPropertyDescriptor(comparison, 'outcome')
+  const savings = Object.getOwnPropertyDescriptor(comparison, 'savingsCents')
+  const expectedOutcome = comparison.deltaCents < 0
+    ? 'better'
+    : comparison.deltaCents > 0 ? 'worse' : 'same'
+  if (
+    !outcome || !('value' in outcome) || outcome.value !== expectedOutcome ||
+    !savings || !('value' in savings) ||
+    !Number.isSafeInteger(savings.value) ||
+    savings.value !== -comparison.deltaCents
+  ) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: comparison.deltaCents,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison outcome or savings disagrees with physical cents'],
+    }
+  }
+
   const comparisonLineIds = new Set<string>()
   let baselineLineSum = 0
   let candidateLineSum = 0
