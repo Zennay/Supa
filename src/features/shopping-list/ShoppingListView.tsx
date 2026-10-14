@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
-import { shoppingVisibleLines } from './shoppingVisibleLines'
 import { ShoppingListCopyButton } from './ShoppingListCopyButton'
 import { PrintableShoppingChecklist } from './PrintableShoppingChecklist'
 import {
@@ -25,6 +24,22 @@ function visibleStoreIdentity(value: unknown): boolean {
 function visibleStoreName(value: unknown): boolean {
   return typeof value === 'string' &&
     /[\p{L}\p{N}\p{S}]/u.test(value.replace(invisibleStoreFillers, ''))
+}
+
+/**
+ * Presentation-only view projection: leave the user's basket order, amounts,
+ * copied/printed full list and persisted v1 checked IDs untouched.
+ * Kept with this component to preserve the original v1 runtime import contract.
+ */
+export function shoppingVisibleLines(
+  lines: readonly OneStoreBasket['lines'][number][],
+  doneLineIds: readonly string[],
+  openOnly: boolean,
+): OneStoreBasket['lines'][number][] {
+  if (!Array.isArray(lines) || !Array.isArray(doneLineIds)) return []
+  if (!openOnly) return [...lines]
+  const checkedIds = new Set(doneLineIds.filter((id) => typeof id === 'string'))
+  return lines.filter((line) => !checkedIds.has(line.id))
 }
 
 function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
