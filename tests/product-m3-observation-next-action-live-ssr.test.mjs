@@ -254,3 +254,34 @@ test('real Meten input labels explain M3 store provenance and privacy without ch
   assert.doesNotMatch(html, />Evidence ID<|>Provenance-notitie<|>Week start<|>Winkel-ID</)
   assert.deepEqual(sheet, before)
 })
+
+test('actual M3 React UI focuses invalid normalized-looking observation times', () => {
+  const sheet = populatedSheet()
+  // Date.parse may roll 30 February into March; canonical readiness rejects it.
+  sheet.baseline.observedAt = '2026-02-30T09:00:00Z'
+  const before = structuredClone(sheet)
+  assert.equal(observationSheetDomain.observationSheetReadiness(sheet).ready, false)
+  assert.equal(observationNextAction(sheet).field, 'observedAt')
+  const html = renderView(sheet)
+  assert.match(html, /Ga naar: Controleer de datum en tijd van PLUS/)
+  assert.match(html, /data-observation-store-field="observedAt"/)
+  assert.doesNotMatch(html, /Ga naar: JSON-concept bewaren/)
+  assert.deepEqual(sheet, before, 'rendering cannot rewrite the human observation')
+})
+
+test('actual M3 React UI redirects duplicate shop codes instead of suggesting export', () => {
+  const sheet = populatedSheet()
+  sheet.candidate.store.id = sheet.baseline.store.id
+  const before = structuredClone(sheet)
+  assert.equal(observationSheetDomain.observationSheetReadiness(sheet).ready, false)
+  const action = observationNextAction(sheet)
+  assert.equal(action.stage, 'store')
+  assert.equal(action.side, 'candidate')
+  assert.equal(action.field, 'id')
+  const html = renderView(sheet)
+  assert.match(html, /Ga naar: Controleer de vestigingscode van DekaMarkt/)
+  assert.match(html, /verzin geen code/)
+  assert.match(html, /data-observation-store-field="id"/)
+  assert.doesNotMatch(html, /Ga naar: JSON-concept bewaren/)
+  assert.deepEqual(sheet, before, 'UI may guide but must not fix the identity by guesswork')
+})

@@ -4,6 +4,7 @@ import {
   observationSheetReadiness,
   observationWindowSummary,
   observationStoreMatchesExpectedRetailer,
+  validObservedAt,
   type M3ObservationSide,
   type ObservationSheet,
 } from '../../domain/m3ObservationSheet.ts'
@@ -87,8 +88,9 @@ function chooseStoreAction(
       }
     }
 
-    // A non-empty but unparsable date is an actionable field error.
-    if (key === 'observedAt' && !Number.isFinite(Date.parse(value))) {
+    // Use the *same* strict timestamp gate as canonical readiness: Date.parse
+    // alone accepts date-only, local-time and rolled-over calendar values.
+    if (key === 'observedAt' && validObservedAt(value) === null) {
       return {
         stage: 'store',
         side,
@@ -134,6 +136,21 @@ function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
         detail:
           'Controleer beschikbaarheid, product, verpakking en prijs. Laat onbekende gegevens open; vul niets op basis van een gok in.',
       }
+    }
+  }
+
+  // Both shops require distinct *real* location IDs for a meaningful pair.
+  // Keep this as navigable form guidance, not a synthesized correction to evidence.
+  if (
+    sheet.baseline.store.id.trim() === sheet.candidate.store.id.trim()
+  ) {
+    return {
+      stage: 'store',
+      side: 'candidate',
+      field: 'id',
+      title: 'Controleer de vestigingscode van DekaMarkt',
+      detail:
+        'PLUS en DekaMarkt hebben dezelfde vestigingscode. Controleer de echte codes van beide winkels; verzin geen code om de controle te omzeilen.',
     }
   }
 
