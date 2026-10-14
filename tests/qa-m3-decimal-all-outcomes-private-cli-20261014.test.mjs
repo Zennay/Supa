@@ -28,9 +28,11 @@ for (const [price, outcome, privateSavings] of [
       assert.notEqual(riceIndex, -1)
       for (const side of ['baseline', 'candidate']) {
         const product = sheet[side].lines[riceIndex].observedProduct
-        product.packAmount = 0.144
-        product.packUnit = 'g'
-        product.packCount = 1
+        // Same physical 0.144 g pack, different unit/multipack spelling
+        // across retailers must never manufacture a better/worse result.
+        product.packAmount = side === 'baseline' ? 0.144 : 0.000072
+        product.packUnit = side === 'baseline' ? 'g' : 'kg'
+        product.packCount = side === 'baseline' ? 1 : 2
       }
       const source = join(directory, 'sheet.json')
       const study = join(directory, 'study.json')
