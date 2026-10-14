@@ -27,7 +27,7 @@ const product = (price = '1.29', extraField = '') => [
   '</script></head><body></body></html>',
 ].join('')
 
-async function capture(html, { hashOverride, success = true } = {}) {
+async function capture(html, { hashOverride, success = true, capturedAt = '2026-10-13T00:00:00.000Z' } = {}) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'supa-m5-shapes-'))
   await mkdir(path.join(dir, 'fictional'), { recursive: true })
   await writeFile(path.join(dir, 'fictional', 'fictional-product.html'), html)
@@ -40,7 +40,7 @@ async function capture(html, { hashOverride, success = true } = {}) {
       supermarket: 'fictional',
       kind: 'product',
       requestedUrl: 'https://example.invalid/fictional-product',
-      capturedAt: '2026-10-13T00:00:00.000Z',
+      capturedAt,
       sha256: hashOverride ?? createHash('sha256').update(html).digest('hex'),
       success,
     }],
@@ -49,7 +49,7 @@ async function capture(html, { hashOverride, success = true } = {}) {
 }
 
 test('M5 offline tool compares hash-verified synthetic snapshots without recording price', async () => {
-  const baseline = await capture(product('1.29'))
+  const baseline = await capture(product('1.29'), { capturedAt: '2026-10-12T00:00:00.000Z' })
   const latest = await capture(product('2.89'))
   const report = await compareCaptureDirectories(latest, baseline)
   assert.equal(report.contractVersion, 1)
@@ -64,7 +64,7 @@ test('M5 offline tool compares hash-verified synthetic snapshots without recordi
 })
 
 test('adding a recognized JSON-LD field changes shape and flags independent review', async () => {
-  const baseline = await capture(product('1.29'))
+  const baseline = await capture(product('1.29'), { capturedAt: '2026-10-12T00:00:00.000Z' })
   const latest = await capture(product('1.29').replace(
     '"offers":{',
     '"weight":{"value":"1 kg"},"offers":{',
@@ -133,8 +133,9 @@ test('shape hash never contains unknown JSON-LD free text and ignores it for dri
 })
 
 test('M5 signature review does not create HTML, capture, ingestion, or permissions', async () => {
+  const previous = await capture(product(), { capturedAt: '2026-10-12T00:00:00.000Z' })
   const dir = await capture(product())
-  const report = await compareCaptureDirectories(dir, dir)
+  const report = await compareCaptureDirectories(dir, previous)
   assert.equal(report.changes[0].status, 'unchanged')
   assert.equal(report.mode, 'offline_capture_signature_review_only')
   assert.equal(report.productionReady, false)
