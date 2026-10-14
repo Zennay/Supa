@@ -70,6 +70,9 @@ function mount(initialRaw, { denyGetter = false } = {}) {
     if (name === 'react/jsx-runtime') return nativeRequire(name)
     if (name === '../../lib/quantityPresentation') return { quantityUnitLabelNl }
     if (name === './shoppingListProgress') return progressStorage
+    // This legacy test harness exercises storage and checkbox state only;
+    // a separate routed Vite/React SSR test exercises the real banner.
+    if (name === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
     throw Error('unexpected import: ' + name)
   }
   const module = { exports: {} }
