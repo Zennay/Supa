@@ -154,7 +154,7 @@ test('M3 stale-tab correction is wired to both save and delete and retains recov
   assert.ok(wrapper.indexOf('observationDraftStorageStatus(') >= 0)
   if (wrapper !== clear) {
     assert.ok(wrapper.indexOf('observationDraftStorageStatus(') < wrapper.indexOf('clearDraft()'))
-    assert.match(source, /onClick={clearDraftWithConflictGuard}/u)
+    assert.ok(source.includes('onClick={clearDraftWithConflictGuard}'))
   } else {
     assert.ok(clear.indexOf('observationDraftStorageStatus(') < clear.indexOf('removeObservationDraft('))
   }
