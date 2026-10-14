@@ -24,8 +24,8 @@ if (process.env.GITHUB_ACTIONS === 'true') {
   ]) {
     assert.match(value ?? '', /^[a-f0-9]{40}$/i, `${label} must identify an exact git commit`)
   }
-  assert.match(process.env.GITHUB_RUN_ID ?? '', /^\\d+$/, 'GitHub run id required')
-  assert.match(process.env.GITHUB_RUN_ATTEMPT ?? '', /^\\d+$/, 'GitHub attempt required')
+  assert.match(process.env.GITHUB_RUN_ID ?? '', /^\d+$/, 'GitHub run id required')
+  assert.match(process.env.GITHUB_RUN_ATTEMPT ?? '', /^\d+$/, 'GitHub attempt required')
 }
 
 async function request(endpoint, init = {}) {
