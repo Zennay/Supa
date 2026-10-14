@@ -1,34 +1,24 @@
 import { createElement } from 'react'
-import { euro } from '../../lib/money.ts'
+import { recipeEstimatePresentation } from './recipeEstimatePresentation.ts'
 
 type RecipePriceExplanationProps = {
   estimatedCost: unknown
 }
 
 /**
- * The controlled recipe catalog contains indicative fixture costs, not observed
- * retailer prices. Never round malformed fractional cents into apparent facts.
- * Native details/summary is keyboard- and touch-operable without custom state.
+ * The routed Planner and optional recipe disclosure use one strict cent-valid
+ * presentation contract. Preserve the existing native details/summary for
+ * keyboard and touch users, including its established explanation copy.
+ * A controlled recipe estimate is never an observed retailer/basket price.
  */
 export function RecipePriceExplanation({ estimatedCost }: RecipePriceExplanationProps) {
-  const cents =
-    typeof estimatedCost === 'number' &&
-    Number.isFinite(estimatedCost) &&
-    estimatedCost >= 0 &&
-    Number.isSafeInteger(Math.round(estimatedCost * 100)) &&
-    estimatedCost === Math.round(estimatedCost * 100) / 100
-      ? Math.round(estimatedCost * 100)
-      : null
+  const presentation = recipeEstimatePresentation(estimatedCost)
+  const known = presentation.kind === 'indicative'
 
-  const known = cents !== null
   return createElement(
     'div',
-    { className: 'recipe-estimate-note', 'data-estimate-status': known ? 'indicative' : 'unknown' },
-    createElement(
-      'small',
-      null,
-      known ? `Richtprijs: ${euro.formatCents(cents)} / recept` : 'Richtprijs onbekend',
-    ),
+    { className: 'recipe-estimate-note', 'data-estimate-status': presentation.kind },
+    createElement('small', null, presentation.label),
     createElement(
       'details',
       null,
