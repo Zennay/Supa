@@ -249,6 +249,29 @@ function captureObservationInstant(value) {
   return local.getTime() - offset
 }
 
+// Never allocate an entire growing manifest via FileHandle.readFile().
+// Read at most 8 MiB + 1 byte from the already validated *same* descriptor,
+// allowing an exact-limit file while catching concurrent growth before
+// allocating or parsing further. This bounds this preflight's input bytes;
+// it does not protect separate M1-inspector rereads of the manifest.
+async function readBoundedManifest(handle) {
+  const chunks = []
+  let total = 0
+  while (true) {
+    const buffer = Buffer.allocUnsafe(Math.min(
+      64 * 1024, MAX_CAPTURE_MANIFEST_BYTES + 1 - total,
+    ))
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, null)
+    if (bytesRead === 0) break
+    total += bytesRead
+    if (total > MAX_CAPTURE_MANIFEST_BYTES) {
+      throw new Error('Invalid or oversized M1 capture manifest')
+    }
+    chunks.push(buffer.subarray(0, bytesRead))
+  }
+  return Buffer.concat(chunks, total).toString('utf8')
+}
+
 // M1's inspector reads every declared source before compareInspections() sees
 // its MAX_SOURCES limit. Gate both manifests first, before any source HTML I/O.
 // This is a bounded offline preflight, not an atomic filesystem snapshot.
@@ -266,10 +289,9 @@ async function preflightBoundedManifest(directory) {
       if (!info.isFile() || info.nlink !== 1 ||
           !Number.isSafeInteger(info.size) ||
           info.size > MAX_CAPTURE_MANIFEST_BYTES) fail()
-      const raw = await handle.readFile('utf8')
-      // A concurrent writer can still grow an already-open inode. Treat
-      // the actual bytes read as untrusted regardless of the prior stat.
-      if (Buffer.byteLength(raw, 'utf8') > MAX_CAPTURE_MANIFEST_BYTES) fail()
+      // The byte ceiling is enforced *during* reads, not only after
+      // readFile() could have allocated a concurrently grown manifest.
+      const raw = await readBoundedManifest(handle)
       parsed = JSON.parse(raw)
     } finally {
       await handle.close()
