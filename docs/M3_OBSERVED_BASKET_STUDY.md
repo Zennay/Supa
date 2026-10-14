@@ -60,6 +60,7 @@ This revision pin is provenance only: it does not make the generated sheet evide
 De echte [M3-meting met dezelfde 11 boodschappen bij PLUS en DekaMarkt](https://github.com/Zennay/Supa/issues/78) is nog niet voltooid. Gebruik naast dit canonieke contract de volgende **lege werkdocumenten**; zij zijn geen bewijs van een supermarktprijs of besparing:
 
 - [Veldchecklist voor beide winkels](product/m3-field-operator-checklist.md) — wat je vooraf kiest en ter plekke feitelijk vastlegt.
+- [Eenvoudige tekstveldkaart voor telefoon of terminal](M3_FIELD_VISIT_CARD.md) — toon de exact elf regels per winkel met `node --experimental-strip-types scripts/m3-field-visit-card.mjs`; geen ingevulde prijzen of observaties.
 - [Leeg beslisformulier voor de reviewer](product/m3-field-decision-record-template.md) — bewijsverwijzingen, gedeelde prijscontext, ontbrekende regels en de werkelijke uitslag.
 - [Beslisregels bij verschillen](M3_FIELD_DISCREPANCY_TRIAGE.md) — D01–D12 voor bijvoorbeeld verpakkingsverschillen, ontbrekende producten, prijzen, voorwaarden en twijfel.
 
