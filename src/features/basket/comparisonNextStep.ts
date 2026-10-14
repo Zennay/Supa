@@ -101,14 +101,12 @@ function snapshotOwnGuidanceData(value: unknown): unknown {
       const keys = Reflect.ownKeys(descriptors)
       if (keys.length > 8192) throw new Error('guidance record too large')
       for (const key of keys) {
-        const descriptor = Object.getOwnPropertyDescriptor(descriptors, key)
-        if (!descriptor || !('value' in descriptor)) {
+        // The descriptor map is a fresh ordinary object returned by the
+        // language runtime. Never read a property from the source itself.
+        if (typeof key === 'symbol') throw new Error('symbol guidance field')
+        const property = descriptors[key]
+        if (!property || !('value' in property)) {
           throw new Error('guidance accessor not allowed')
-        }
-        // This is a descriptor of a newly created ordinary object; reading
-        // its own primitive `value` property cannot invoke source accessors.
-        if (typeof key === 'symbol' || !('value' in descriptors[key])) {
-          throw new Error('guidance accessors are not allowed')
         }
       }
       if (isArray) {
