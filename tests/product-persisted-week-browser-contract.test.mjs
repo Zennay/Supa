@@ -42,3 +42,43 @@ test('dedicated browser job never promotes permission, release or external retai
   assert.match(source, /kill "\$preview_pid" "\$driver_pid"/)
   assert.doesNotMatch(source, /\bdeploy\b|\brelease\b|curl\s+https?:\/\//i)
 })
+
+
+test('real browser evidence only records localhost URLs, exact GitHub SHAs and fixture screenshots', async () => {
+  const source = await readFile(browserScript, 'utf8')
+  assert.match(source, /assert\.equal\(url\.hostname, '127\.0\.0\.1'/)
+  assert.match(source, /assert\.equal\(url\.protocol, 'http:'/)
+  assert.match(source, /assert\.match\(value \?\? '', \/\^\[a-f0-9\]\{40\}\$\/i/)
+  assert.match(source, /githubRunId: process\.env\.GITHUB_RUN_ID/)
+  assert.match(source, /githubRunAttempt: process\.env\.GITHUB_RUN_ATTEMPT/)
+  assert.match(source, /checks\.push\('rendered-basket-list-line-count-agrees'\)/)
+
+  for (const name of [
+    'planner-changed.png',
+    'basket-controlled-demo.png',
+    'shopping-item-checked.png',
+    'shopping-reloaded.png',
+    'shopping-empty-week.png',
+  ]) {
+    assert.ok(source.includes(`await screenshot(sessionId, '${name}')`), name)
+    assert.ok(source.includes(`'${name}'`), name)
+  }
+  assert.match(source, /retailerDataObserved: false/)
+  assert.match(source, /realSavingsClaimEligible: false/)
+})
+
+test('independent hosted browser job uses only localhost and no deployment privilege', async () => {
+  const source = await readFile(
+    new URL('../.github/workflows/product-persisted-week-hosted-browser.yml', import.meta.url),
+    'utf8',
+  )
+  assert.match(source, /runs-on: ubuntu-latest/)
+  assert.match(source, /permissions:\s*\n\s*contents:\s*read/)
+  assert.match(source, /command -v firefox/)
+  assert.match(source, /command -v geckodriver/)
+  assert.match(source, /PRODUCT_WEEK_HEAD_SHA:/)
+  assert.match(source, /PRODUCT_WEEK_BASE_URL="http:\/\/127\.0\.0\.1:/)
+  assert.match(source, /PRODUCT_WEEK_WEBDRIVER_URL="http:\/\/127\.0\.0\.1:/)
+  assert.match(source, /node tests\/product-persisted-week-browser-e2e\.mjs/)
+  assert.doesNotMatch(source, /\bdeploy\b|\brelease\b|curl\s+https?:\/\//i)
+})
