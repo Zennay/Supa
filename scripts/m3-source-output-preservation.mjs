@@ -1,16 +1,24 @@
 import { lstat, open, stat, writeFile } from 'node:fs/promises'
-import { dirname, parse, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, parse, sep } from 'node:path'
 
 // Reject untrusted directory aliases before creating a private derived artifact.
 // This is a static preflight, not a defense against adversarial concurrent swaps
 // (those require descriptor-relative atomic publication; tracked separately).
 export async function assertNoSymlinkedM3OutputParents(output) {
-  const parent = dirname(resolve(output))
-  const root = parse(parent).root
-  const segments = parent.slice(root.length).split(sep).filter(Boolean)
+  // Do not lexically resolve ".." before walking: doing so can hide a
+  // symlink that the kernel would follow before processing the parent segment.
+  const parent = dirname(output)
+  const absolute = isAbsolute(parent)
+  const root = absolute ? parse(parent).root : process.cwd()
+  const segments = (absolute ? parent.slice(root.length) : parent).split(sep).filter(Boolean)
   let current = root
   for (const segment of segments) {
-    current = resolve(current, segment)
+    if (segment === '.') continue
+    if (segment === '..') {
+      current = dirname(current)
+      continue
+    }
+    current = join(current, segment)
     let info
     try {
       info = await lstat(current)

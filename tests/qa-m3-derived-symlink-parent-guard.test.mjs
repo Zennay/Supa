@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -57,5 +57,41 @@ for (const kind of ['converter', 'assessment']) {
         await assert.rejects(stat(join(target, 'nested-private', 'derived.json')), { code: 'ENOENT' })
         await assert.rejects(stat(join(target, 'nested-private')), { code: 'ENOENT' })
       } finally { await rm(dir, { recursive: true, force: true }) }
+    })
+}
+
+// The kernel follows the symlink BEFORE resolving ".."; a lexical resolve
+// done by preflight would erase this unsafe ancestor and miss the alias.
+for (const kind of ['converter', 'assessment']) {
+  test(`M3 ${kind} refuses symlink before a parent traversal in raw output`,
+    { skip: process.platform === 'win32' }, async () => {
+      const root = await mkdtemp(join(tmpdir(), `supa-m3-dotdot-${kind}-`))
+      try {
+        const physical = join(root, 'redirected')
+        const inside = join(physical, 'inside')
+        const alias = join(root, 'alias')
+        const input = join(root, 'private-input.json')
+        await mkdir(inside, { recursive: true })
+        await symlink(inside, alias, 'dir')
+        // Deliberately do not use path.join(), which erases /alias/../ first.
+        const output = alias + '/..' + '/new-private/derived.json'
+        const payload = kind === 'converter' ? inputSheet() : buildWeeklyBasketStudyFromObservationSheet(inputSheet())
+        await writeFile(input, JSON.stringify(payload))
+        const original = await readFile(input, 'utf8')
+        const command = kind === 'converter'
+          ? 'scripts/m3-build-observed-study.mjs'
+          : 'scripts/m3-assess-observed-week.mjs'
+        const run = spawnSync(process.execPath,
+          ['--experimental-strip-types', command, input, '--output', output],
+          { cwd: process.cwd(), encoding: 'utf8', timeout: 15000 })
+        assert.ifError(run.error)
+        assert.notEqual(run.status, 0)
+        assert.equal(run.stdout, '')
+        assert.match(run.stderr, /refusing symlinked M3 output parent directory/u)
+        assert.equal(await readFile(input, 'utf8'), original)
+        assert.doesNotMatch(run.stderr, /fictional-only|synthetic-symlink-parent/u)
+        await assert.rejects(stat(join(physical, 'new-private', 'derived.json')), { code: 'ENOENT' })
+        await assert.rejects(stat(join(root, 'new-private', 'derived.json')), { code: 'ENOENT' })
+      } finally { await rm(root, { recursive: true, force: true }) }
     })
 }
