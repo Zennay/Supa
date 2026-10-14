@@ -320,3 +320,13 @@
   cursor: default;
   opacity: 0.6;
 }
+
+/* Collector privacy guidance stays readable at native phone text sizes. */
+.observation-field-hint {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}

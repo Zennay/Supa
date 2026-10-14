@@ -479,9 +479,10 @@ export function ObservationView() {
               placeholder="student-001"
               autoComplete="off"
             />
+            <small className="observation-field-hint">Gebruik geen naam of e-mailadres. Kies een anonieme code.</small>
           </label>
           <label>
-            Populatie
+            Doelgroep
             <input
               data-observation-study-field="population"
               value={sheet.study.population}
@@ -490,7 +491,7 @@ export function ObservationView() {
             />
           </label>
           <label>
-            Regio
+            Gebied
             <input
               data-observation-study-field="region"
               value={sheet.study.region}
@@ -499,7 +500,7 @@ export function ObservationView() {
             />
           </label>
           <label>
-            Prijscontext
+            Hoe zijn de prijzen gemeten?
             <select
               data-observation-study-field="priceContext"
               value={sheet.study.priceContext}
@@ -515,7 +516,7 @@ export function ObservationView() {
             </select>
           </label>
           <label>
-            Week start
+            Startdatum van je planweek
             <input
               type="date"
               data-observation-study-field="weekStart"
@@ -564,7 +565,7 @@ export function ObservationView() {
                 />
               </label>
               <label>
-                Winkel-ID
+                Vestigingscode
                 <input
                   data-observation-store-field="id"
                   value={observation.store.id}
@@ -575,7 +576,7 @@ export function ObservationView() {
                 />
               </label>
               <label>
-                Evidence ID
+                Code van deze winkelmeting
                 <input
                   data-observation-store-field="evidenceId"
                   value={observation.evidenceId}
@@ -630,7 +631,7 @@ export function ObservationView() {
                 </select>
               </label>
               <label className="field-wide">
-                Provenance-notitie
+                Hoe heb je de prijzen vastgelegd?
                 <input
                   data-observation-store-field="provenanceNote"
                   value={observation.provenanceNote}
@@ -639,8 +640,9 @@ export function ObservationView() {
                       provenanceNote: event.target.value,
                     })
                   }
-                  placeholder="Hoe en waar deze prijzen echt zijn waargenomen"
+                  placeholder="Bijv. prijzen op het schap gecontroleerd"
                 />
+                <small className="observation-field-hint">Beschrijf de bron en het meetmoment; noteer geen persoonsgegevens.</small>
               </label>
             </div>
 

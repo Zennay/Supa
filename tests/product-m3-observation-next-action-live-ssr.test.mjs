@@ -202,3 +202,30 @@ test('real M3 line-jump control appears only for current canonical ingredient ta
   assert.match(reviewHtml, /data-observation-review-target/)
   assert.match(reviewHtml, /24u-venster overschreden/)
 })
+
+test('real Meten input labels explain M3 store provenance and privacy without changing field keys', () => {
+  const sheet = observationSheetDomain.buildObservationSheet()
+  const before = structuredClone(sheet)
+  const html = renderView(sheet)
+  for (const [label, field] of [
+    ['Doelgroep', 'population'],
+    ['Gebied', 'region'],
+    ['Hoe zijn de prijzen gemeten?', 'priceContext'],
+    ['Startdatum van je planweek', 'weekStart'],
+  ]) {
+    assert.match(html, new RegExp(label.replace(/[?]/g, '\\?') +
+      '[\\s\\S]*?data-observation-study-field="' + field + '"'))
+  }
+  for (const [label, field] of [
+    ['Vestigingscode', 'id'],
+    ['Code van deze winkelmeting', 'evidenceId'],
+    ['Hoe heb je de prijzen vastgelegd?', 'provenanceNote'],
+  ]) {
+    assert.match(html, new RegExp(label.replace(/[?]/g, '\\?') +
+      '[\\s\\S]*?data-observation-store-field="' + field + '"'))
+  }
+  assert.match(html, /Gebruik geen naam of e-mailadres/)
+  assert.match(html, /Beschrijf de bron en het meetmoment/)
+  assert.doesNotMatch(html, />Evidence ID<|>Provenance-notitie<|>Week start<|>Winkel-ID</)
+  assert.deepEqual(sheet, before)
+})
