@@ -358,13 +358,23 @@ function runtimeRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+function ownObservedFact(record: object, field: string): unknown {
+  // Getter-backed or prototype-supplied evidence is not a persisted fact.
+  const descriptor = Object.getOwnPropertyDescriptor(record, field)
+  return descriptor && Object.hasOwn(descriptor, 'value')
+    ? descriptor.value
+    : undefined
+}
+
 function hasObservedStudyContainers(value: unknown): value is WeeklyBasketStudy {
   if (!runtimeRecord(value)) return false
   for (const side of ['baseline', 'candidate'] as const) {
-    const evidence = value[side]
-    if (!runtimeRecord(evidence) || !runtimeRecord(evidence.basket)) return false
-    const basket = evidence.basket
-    if (!runtimeRecord(basket.store) || !Array.isArray(basket.lines)) return false
+    const evidence = ownObservedFact(value, side)
+    if (!runtimeRecord(evidence)) return false
+    const basket = ownObservedFact(evidence, 'basket')
+    if (!runtimeRecord(basket) ||
+        !runtimeRecord(ownObservedFact(basket, 'store')) ||
+        !Array.isArray(ownObservedFact(basket, 'lines'))) return false
   }
   return true
 }
