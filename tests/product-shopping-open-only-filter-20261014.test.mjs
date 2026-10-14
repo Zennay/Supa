@@ -8,7 +8,6 @@ import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import {
   m2DefaultActiveDays, m2InitialPlan, m2Products, m2Recipes, m2Store,
 } from '../src/data/m2Fixture.ts'
-import { shoppingVisibleLines } from '../src/features/shopping-list/shoppingVisibleLines.ts'
 import { shoppingListCompletion } from '../src/features/shopping-list/shoppingListCompletion.ts'
 import {
   serializeShoppingListProgress, restoreShoppingListProgress, shoppingListBasketKey,
@@ -22,7 +21,19 @@ function basket() {
   })
 }
 
-test('open-only projection keeps original order, references, and persisted checks unchanged', () => {
+test('the actual routed shopping-v1 filter and its safety invariants', async (t) => {
+  const vite = await createServer({
+    server: { middlewareMode: true }, appType: 'custom',
+    optimizeDeps: { noDiscovery: true, include: [] }, logLevel: 'error',
+  })
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  try {
+    delete globalThis.window
+    const { ShoppingListView, shoppingVisibleLines } = await vite.ssrLoadModule(
+      '/src/features/shopping-list/ShoppingListView.tsx',
+    )
+
+  await t.test('open-only projection keeps original order, references, and persisted checks unchanged', () => {
   const value = basket()
   const ids = value.lines.map((line) => line.id)
   assert.ok(ids.length >= 2, 'controlled basket needs multiple shopping rows')
@@ -43,7 +54,7 @@ test('open-only projection keeps original order, references, and persisted check
   assert.deepEqual(value, before)
 })
 
-test('a hidden checked unresolved decision cannot become evidence of a completed product match', () => {
+  await t.test('a hidden checked unresolved decision cannot become evidence of a completed product match', () => {
   const value = basket()
   const unresolved = {
     id: 'synthetic-manual-choice', ingredientLabel: 'Nog zelf uitzoeken',
@@ -66,7 +77,7 @@ test('a hidden checked unresolved decision cannot become evidence of a completed
   assert.deepEqual(withUnknown, before)
 })
 
-test('a fully checked basket has zero open rows, but the original basket and print text remain intact', () => {
+  await t.test('a fully checked basket has zero open rows, but the original basket and print text remain intact', () => {
   const value = basket()
   const allIds = value.lines.map((line) => line.id)
   const before = structuredClone(value)
@@ -81,17 +92,7 @@ test('a fully checked basket has zero open rows, but the original basket and pri
   assert.deepEqual(value, before)
 })
 
-test('the actual routed v1 ShoppingListView exposes a non-destructive open-only toggle', async () => {
-  const vite = await createServer({
-    server: { middlewareMode: true }, appType: 'custom',
-    optimizeDeps: { noDiscovery: true, include: [] }, logLevel: 'error',
-  })
-  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
-  try {
-    delete globalThis.window
-    const { ShoppingListView } = await vite.ssrLoadModule(
-      '/src/features/shopping-list/ShoppingListView.tsx',
-    )
+  await t.test('routed SSR shows non-destructive list filter and physical print control', () => {
     const value = basket()
     const original = structuredClone(value)
     const html = renderToStaticMarkup(createElement(ShoppingListView, { basket: value }))
@@ -100,8 +101,9 @@ test('the actual routed v1 ShoppingListView exposes a non-destructive open-only 
     assert.match(html, /Alleen open/u)
     assert.match(html, /\d+ van \d+ open/u)
     assert.match(html, /Boodschappenlijst/u)
-    assert.match(html, /Afdrukken/u)
+    assert.match(html, /Print boodschappenlijst/u)
     assert.deepEqual(value, original)
+  })
   } finally {
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
     else delete globalThis.window
