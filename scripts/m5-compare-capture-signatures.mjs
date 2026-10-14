@@ -3,6 +3,7 @@ import { constants } from 'node:fs'
 import { lstat, open, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { types as utilTypes } from 'node:util'
 
 import { inspectFrozenCaptureDirectory } from './m5-inspect-frozen-captures.mjs'
 
@@ -55,7 +56,7 @@ function requireCanonicalOrigin(source) {
 // strings. Inspect descriptors rather than evaluating attacker-supplied getter
 // metadata; return bounded copies so a later fingerprint cannot re-read it.
 function canonicalShapeTerms(values) {
-  if (!Array.isArray(values) || values.length > MAX_JSON_LD_ENTRIES) return null
+  if (utilTypes.isProxy(values) || !Array.isArray(values) || values.length > MAX_JSON_LD_ENTRIES) return null
   const terms = []
   for (let i = 0; i < values.length; i += 1) {
     const slot = Object.getOwnPropertyDescriptor(values, i)
@@ -71,6 +72,7 @@ function canonicalShapeTerms(values) {
 // metadata. Reading descriptors first prevents getters from running in the
 // exported in-memory comparison API and pins a bounded logical snapshot.
 function ownHtmlField(record, field) {
+  if (utilTypes.isProxy(record)) throw new Error('Invalid or unbounded inspected HTML shape')
   const descriptor = Object.getOwnPropertyDescriptor(record, field)
   if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
     throw new Error('Invalid or unbounded inspected HTML shape')
@@ -79,15 +81,15 @@ function ownHtmlField(record, field) {
 }
 
 function requireBoundedHtmlShape(html) {
-  if (!html || typeof html !== 'object' || Array.isArray(html)) {
+  if (!html || typeof html !== 'object' || utilTypes.isProxy(html) || Array.isArray(html)) {
     throw new Error('Invalid or unbounded inspected HTML shape')
   }
   const hasNextData = ownHtmlField(html, 'hasNextData')
   const htmlJsonLd = ownHtmlField(html, 'jsonLd')
   const applicationJsonScripts = ownHtmlField(html, 'applicationJsonScripts')
   if (typeof hasNextData !== 'boolean' ||
-      !Array.isArray(htmlJsonLd) ||
-      !Array.isArray(applicationJsonScripts) ||
+      utilTypes.isProxy(htmlJsonLd) || !Array.isArray(htmlJsonLd) ||
+      utilTypes.isProxy(applicationJsonScripts) || !Array.isArray(applicationJsonScripts) ||
       htmlJsonLd.length > MAX_JSON_LD_BLOCKS ||
       applicationJsonScripts.length > MAX_APPLICATION_JSON_SCRIPTS) {
     throw new Error('Invalid or unbounded inspected HTML shape')
@@ -97,7 +99,7 @@ function requireBoundedHtmlShape(html) {
     const row = Object.getOwnPropertyDescriptor(htmlJsonLd, i)
     const record = row?.value
     if (!row || !Object.hasOwn(row, 'value') ||
-        !record || typeof record !== 'object' || Array.isArray(record)) {
+        !record || typeof record !== 'object' || utilTypes.isProxy(record) || Array.isArray(record)) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
     const typeDescriptor = Object.getOwnPropertyDescriptor(record, 'type')
@@ -129,7 +131,7 @@ function requireBoundedHtmlShape(html) {
     const row = Object.getOwnPropertyDescriptor(applicationJsonScripts, i)
     const record = row?.value
     if (!row || !Object.hasOwn(row, 'value') ||
-        !record || typeof record !== 'object' || Array.isArray(record)) {
+        !record || typeof record !== 'object' || utilTypes.isProxy(record) || Array.isArray(record)) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
     const id = ownHtmlField(record, 'id')
@@ -163,7 +165,7 @@ function ownSourceField(raw, key, errorMessage) {
 }
 
 export function captureShape(rawSource) {
-  if (!rawSource || typeof rawSource !== 'object' || Array.isArray(rawSource)) {
+  if (!rawSource || typeof rawSource !== 'object' || utilTypes.isProxy(rawSource) || Array.isArray(rawSource)) {
     throw new Error('Invalid inspected source')
   }
   const source = Object.create(null)
@@ -228,7 +230,7 @@ export function captureShape(rawSource) {
   const schemaResult = schemaDescriptor?.value
   if (!schemaDescriptor || !Object.hasOwn(schemaDescriptor, 'value') ||
       !schemaResult || typeof schemaResult !== 'object' ||
-      Array.isArray(schemaResult)) {
+      utilTypes.isProxy(schemaResult) || Array.isArray(schemaResult)) {
     throw new Error('Invalid inspected Schema.org parse result')
   }
   const decisionDescriptor = Object.getOwnPropertyDescriptor(schemaResult, 'type')
@@ -249,7 +251,7 @@ export function captureShape(rawSource) {
     if (!observationDescriptor ||
         !Object.hasOwn(observationDescriptor, 'value') ||
         !observation || typeof observation !== 'object' ||
-        Array.isArray(observation) ||
+        utilTypes.isProxy(observation) || Array.isArray(observation) ||
         // M1's Schema.org parser can observe a Product only from an
         // explicit Product type (case-insensitive) or a JSON-LD @graph
         // containing a nested Product. Another successfully parsed page
@@ -296,14 +298,14 @@ export function captureShape(rawSource) {
 // captureShape after we have checked the cohort size. Pin bounded slots first.
 function pinnedInspectionCohort(raw, label) {
   const fail = () => { throw new Error('Invalid or unbounded ' + label + ' inspection') }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail()
+  if (!raw || typeof raw !== 'object' || utilTypes.isProxy(raw) || Array.isArray(raw)) fail()
   const sourcesDescriptor = Object.getOwnPropertyDescriptor(raw, 'sources')
   const countDescriptor = Object.getOwnPropertyDescriptor(raw, 'sourceCount')
   if (!sourcesDescriptor || !Object.hasOwn(sourcesDescriptor, 'value') ||
       !countDescriptor || !Object.hasOwn(countDescriptor, 'value')) fail()
   const sources = sourcesDescriptor.value
   const count = countDescriptor.value
-  if (!Array.isArray(sources) || sources.length > MAX_SOURCES ||
+  if (utilTypes.isProxy(sources) || !Array.isArray(sources) || sources.length > MAX_SOURCES ||
       !Number.isSafeInteger(count) || count < 0 || count !== sources.length) fail()
   const pinned = []
   for (let index = 0; index < sources.length; index += 1) {
