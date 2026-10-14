@@ -146,3 +146,59 @@ test('independent QA: canonical two-store basket result renders honest ready vs 
     }
   }
 })
+
+test('independent QA: actual incomplete, mismatched and same-store baskets render abstaining next actions', () => {
+  const shopA = { id: 'qa-fictive-shop-a', name: 'Fictieve A' }
+  const shopB = { id: 'qa-fictive-shop-b', name: 'Fictieve B' }
+  const physicalBasket = (store, { days = m2DefaultActiveDays, missing = false } = {}) => {
+    const products = [
+      ...m2Products.map((product) => ({
+        ...product, id: `${store.id}-${product.id}`, storeId: store.id,
+      })),
+      {
+        id: `${store.id}-garam`, storeId: store.id, name: 'Garam masala 50 g',
+        packAmount: 50, packUnit: 'g', priceCents: 139, available: true,
+      },
+    ]
+    return buildOneStoreBasket({
+      store,
+      plan: m2InitialPlan,
+      recipes: m2Recipes,
+      activeDays: days,
+      products: missing ? products.filter((item) => !item.id.endsWith('-garam')) : products,
+    })
+  }
+  const baseline = physicalBasket(shopA)
+  const candidate = physicalBasket(shopB)
+  const cases = [
+    ['missing-product', baseline, physicalBasket(shopB, { missing: true }), 'complete-products'],
+    ['different-days', baseline, physicalBasket(shopB, { days: m2DefaultActiveDays.slice(0, 1) }), 'align-plans'],
+    ['same-store', baseline, physicalBasket(shopA), 'choose-different-stores'],
+  ]
+  for (const [label, base, other, expected] of cases) {
+    const comparison = compareFullBaskets({ baseline: base, candidate: other })
+    assert.equal(comparison.claimable, false, label)
+    const nextStep = comparisonNextStep({ comparison, baseline: base, candidate: other })
+    assert.equal(nextStep.code, expected, label)
+    assert.equal(nextStep.canShowDifference, false, label)
+    const html = render(nextStep)
+    assert.ok(html.includes(`data-comparison-next-step="${expected}"`), label)
+    assert.match(html, /data-can-show-difference="false"/)
+    assert.match(html, /Volgende stap:/)
+    assert.doesNotMatch(html, /€\s*\d|EUR\s*\d/)
+  }
+
+  // Deliberate, fictional stale claim: never echo the internal diagnostic.
+  const comparison = compareFullBaskets({ baseline, candidate })
+  assert.equal(comparison.claimable, true)
+  const privateMarker = 'FICTIONAL_QA_INTERNAL_DIAGNOSTIC_3bf19'
+  const altered = { ...comparison, savingsCents: comparison.savingsCents + 1, reasons: [privateMarker] }
+  const nextStep = comparisonNextStep({ baseline, candidate, comparison: altered })
+  assert.equal(nextStep.code, 'review-data')
+  assert.equal(nextStep.canShowDifference, false)
+  const html = render(nextStep)
+  assert.match(html, /data-comparison-next-step="review-data"/)
+  assert.match(html, /data-can-show-difference="false"/)
+  assert.doesNotMatch(html, /FICTIONAL_QA_INTERNAL_DIAGNOSTIC_3bf19/)
+  assert.doesNotMatch(html, /€\s*\d|EUR\s*\d/)
+})
