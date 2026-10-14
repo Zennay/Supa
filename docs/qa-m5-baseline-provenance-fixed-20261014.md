@@ -1,0 +1,15 @@
+# Supa independent QA: historical capture limits on corrected owner (HOLD)
+
+- Scope: quality-validation 2/2, GitHub issue #2241 and frozen corrected product DRAFT #2243 `2ad763d96c4f276a138efcece08b96a872026004`.
+- Independent QA only; same byte-identical `tests/qa-m5-historical-cohort-provenance-20261014.test.mjs` as separate original-source RED witness; 15 fully synthetic pure in-memory cases, no production code changed.
+- Assert physical M1 historical maximum **100** independently of `captureCount` and action union maximum 200; refuse historical verified **and** unavailable metadata under `baselineProvided=false`, even for P1 unavailable; keep valid 100+100 disjoint union, genuine P1/P2/P3, deterministic anonymized tokens, immutability and every production/release flag false.
+- Run hosted GitHub CI at **this exact QA head**; do not infer GREEN from corrected product tests or prior QA suites. If it is GREEN, it only proves synthetic future offline private M5 inputs, not live retailer rights or actual savings.
+- Supa remains M3 ACTIVE with genuine human same-demand PLUS 11 + DekaMarkt 11 within 24h issue #78 OPEN; M4/M5 NOT eligible.
+- **DRAFT/HOLD/NO MERGE/NO DEPLOY** until independently verified zCloud SQLite task-write claim/lease, owner review, latest-main/integration/trusted VPS where needed, human field proof and explicit human release approval. No changed original product/other QA/worker/main/workflows/permanent VPS paths.
+
+## Comprehensive independent QA composition, 2026-10-14
+- Copied 24 separate independently authored QA test files from frozen QA DRAFT #2244 by immutable Git blob hashes. Those 24 files contain **191 independent cases** (count measured from the initial composed CI total).
+- Initial combined test [CI 38503514100](https://github.com/Zennay/Supa/actions/runs/38503514100) had 1,140 total, 1,139 PASS and **one historical source-policy conflict** (not a source regression): the older standalone `independent valid 200 dense rows` synthetic positive included 100 unchanged (thus 100 historical) plus 100 removed (another 100 historical), violating the newer M1 physical 100-historical cap.
+- Exactly **one** of 15 cases in `tests/qa-m5-sparse-review-independent-20261014.test.mjs` has been adapted on *this own QA-only branch* to disjoint 100 current `added` + 100 historical `removed`; statuses P1 100 + P2 100, drift 200. Other 14 tests in that file and all other 23 imported QA suite files remain identical to original QA blobs. The imported original source blob `893d8cbc321d7a9aa034fef60aab8bebc3a0a812` remains untouched on #2244; the corrected standalone test blob is `43034b44dc2b11d7ca0a67ecbab01aca964cb0e7`.
+- Exact composite now represents **206 independent QA cases** = 191 imported + 15 new historical tests, with one historical-positive fixture revised for stricter #2241 rules. This does not supersede or edit old QA #2244.
+- Follow-up exact hosted CI [38503655686](https://github.com/Zennay/Supa/actions/runs/38503655686) checks composed test+benchmark+permission+build. Keep HOLD for M3 human #78, SQLite lease, original reviews and releasego.
