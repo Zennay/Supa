@@ -26,6 +26,22 @@ function visibleStoreName(value: unknown): boolean {
     /[\p{L}\p{N}\p{S}]/u.test(value.replace(invisibleStoreFillers, ''))
 }
 
+/**
+ * Presentation-only view projection: leave the user's basket order, amounts,
+ * copied/printed full list and persisted v1 checked IDs untouched.
+ * Kept with this component to preserve the original v1 runtime import contract.
+ */
+export function shoppingVisibleLines(
+  lines: readonly OneStoreBasket['lines'][number][],
+  doneLineIds: readonly string[],
+  openOnly: boolean,
+): OneStoreBasket['lines'][number][] {
+  if (!Array.isArray(lines) || !Array.isArray(doneLineIds)) return []
+  if (!openOnly) return [...lines]
+  const checkedIds = new Set(doneLineIds.filter((id) => typeof id === 'string'))
+  return lines.filter((line) => !checkedIds.has(line.id))
+}
+
 function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
   if (line.status === 'unresolved') {
     return `${line.requirement.amount ?? '?'} ${quantityUnitLabelNl(line.requirement.unit, line.requirement.amount)} · handmatig kiezen`
@@ -95,6 +111,11 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   }))
   const [storageWarning, setStorageWarning] = useState<'protected' | 'unavailable' | null>(null)
   const done = progress.basketKey === basketKey ? progress.done : []
+  // Presentation filter only. Keep the full physical basket and stored ticks intact.
+  const [openOnly, setOpenOnly] = useState(false)
+  const visibleLines = basketKey === null
+    ? []
+    : shoppingVisibleLines(basket.lines, done, openOnly)
 
   // A genuinely empty plan has no shopping tasks. An empty row array with
   // inconsistent counters is not proof that the customer needs nothing.
@@ -220,6 +241,22 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       <ShoppingListCopyButton basket={basket} doneLineIds={done} />
       <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
 
+      {basket.lines.length > 0 && (
+        <div className="section-heading" data-shopping-filter={openOnly ? 'open' : 'all'}>
+          <button
+            type="button"
+            className="ghost-button"
+            aria-pressed={openOnly}
+            onClick={() => setOpenOnly((current) => !current)}
+          >
+            {openOnly ? 'Toon alles' : 'Alleen open'}
+          </button>
+          <span className="disclaimer">
+            {basket.lines.length - done.length} van {basket.lines.length} open
+          </span>
+        </div>
+      )}
+
       <div className="list-card">
         {basket.lines.length === 0 ? (
           <p className="disclaimer" role="status">
@@ -227,7 +264,11 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
               ? 'Geen boodschappen voor deze planning. Voeg een maaltijd toe in Planner.'
               : 'Boodschappenlijst niet beschikbaar. Controleer je planning.'}
           </p>
-        ) : basket.lines.map((line) => {
+        ) : visibleLines.length === 0 ? (
+          <p className="disclaimer" role="status">
+            Alle regels zijn afgevinkt. Onzekere productkeuzes blijven een handmatige controle.
+          </p>
+        ) : visibleLines.map((line) => {
           const checked = done.includes(line.id)
           const label =
             line.status === 'matched' ? line.productName : line.ingredientLabel
