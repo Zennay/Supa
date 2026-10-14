@@ -184,3 +184,30 @@ test('budget-only edits preserve checkmarks, recipe edits invalidate a different
     edited.candidate.lines.map((line) => [line.id, line.requirement.amount, line.requirement.unit]),
   )
 })
+
+
+test('a restored empty week is never financially comparable to an unrelated populated week', () => {
+  const defaultWeek = defaultPlannerPreferences(m2InitialPlan)
+  const normal = basketsFor(defaultWeek)
+  const empty = basketsFor({ ...defaultWeek, activeDays: [] })
+
+  assert.equal(empty.shopping.selectedMealCount, 0)
+  assert.ok(normal.shopping.selectedMealCount > 0)
+  assert.equal(empty.baseline.totalCents, 0)
+  assert.equal(empty.candidate.lines.length, 0)
+
+  // Distinct physical demand must fail closed in either store direction, even
+  // while the independent zero-vs-zero bug #1051 is owned by comparator #1012.
+  for (const [baseline, candidate] of [
+    [empty.baseline, normal.candidate],
+    [normal.baseline, empty.candidate],
+  ]) {
+    const comparison = compareFullBaskets({ baseline, candidate })
+    assert.equal(comparison.claimable, false)
+    assert.equal(comparison.outcome, 'unknown')
+    assert.equal(comparison.deltaCents, null)
+    assert.equal(comparison.savingsCents, null)
+    assert.deepEqual(comparison.lineDeltas, [])
+    assert.ok(comparison.reasons.length > 0)
+  }
+})
