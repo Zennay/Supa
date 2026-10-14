@@ -9,6 +9,7 @@ const C = 'c'.repeat(64)
 const verified = (id, html = A, shape = B, schema = 'abstain', supermarket = 'fictional') => ({
   id, supermarket, kind: 'product', captureStatus: 'verified',
   snapshotSha256: html, shapeSha256: shape, schemaOrgStatus: schema,
+  hasNextData: false, jsonLdCount: 0, jsonLdParseErrors: 0,
 })
 const unavailable = (id) => ({
   id, supermarket: 'fictional', kind: 'product', captureStatus: 'unavailable',
