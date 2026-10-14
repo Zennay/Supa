@@ -40,7 +40,7 @@ test('M3 visible line proof orders exact differences without causal or retailer 
   }), [])
   assert.deepEqual(comparisonLineHighlights({ ...comparison,
     lineDeltas: comparison.lineDeltas.map((line, index) =>
-      index === 0 ? { ...line, ingredientLabel: 'Rijst\\u202emalicious' } : line),
+      index === 0 ? { ...line, ingredientLabel: 'Rijst\u202emalicious' } : line),
   }), [])
 })
 
