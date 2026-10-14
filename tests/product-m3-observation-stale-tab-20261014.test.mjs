@@ -116,18 +116,19 @@ test('M3 form quarantines stale tabs before both writes and destructive deletes'
   assert.match(source, /expectedDraftRawRef\.current = raw/u)
   assert.match(source, /observationDraftStorageStatus\(/u)
   assert.match(source, /if \(status !== 'unchanged'\)/u)
-  assert.match(source, /if \(draftRecoveryNeeded \|\| draftConflict\)/u)
+  assert.match(source, /if \(draftRecoveryNeeded\) \{[\s\S]*?if \(draftConflict\)/u)
   assert.match(source, /window\.addEventListener\('storage', onStorage\)/u)
   assert.match(source, /window\.removeEventListener\('storage', onStorage\)/u)
   assert.match(source, /data-observation-save-status="conflict"/u)
   assert.match(source, /if \(status === 'changed'\) setDraftConflict\(true\)/u)
   assert.match(source, /expectedDraftRawRef\.current = null/u)
   assert.ok(source.indexOf('const status = observationDraftStorageStatus(') <
-    source.indexOf('const saved = persistObservationDraft('))
-  const beforeRemove = source.slice(source.indexOf('const clearDraft ='), source.indexOf('const jumpToNextIncomplete ='))
-  assert.ok(beforeRemove.indexOf('observationDraftStorageStatus(') <
-    beforeRemove.indexOf('const removed = removeObservationDraft('))
-  assert.ok(beforeRemove.includes('setDraftConflict(true)'))
+    source.indexOf('!persistObservationDraft('))
+  const guardedReset = source.slice(source.indexOf('const clearDraftWithConflictGuard ='), source.indexOf('const jumpToNextIncomplete ='))
+  assert.ok(guardedReset.indexOf('observationDraftStorageStatus(') <
+    guardedReset.indexOf('if (clearDraft() === true)'))
+  assert.ok(guardedReset.includes('setDraftConflict(true)'))
+  assert.match(source, /onClick=\{clearDraftWithConflictGuard\}/u)
   // Canonical validation and 22 field slots remain unmodified by this check.
   assert.match(source, /observationSheetReadiness\(sheet, referenceNowMs\)/u)
   assert.match(source, /JSON-concept bewaren/u)
