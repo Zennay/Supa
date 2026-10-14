@@ -77,6 +77,8 @@ function session({ denyWrite = false } = {}) {
     if (id === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
     // This interaction/storage harness does not exercise selectable export UI.
     if (id === './ShoppingListCopyButton') return { ShoppingListCopyButton: () => null }
+    // Only the dedicated SSR/print suites render this paper-only component.
+    if (id === './PrintableShoppingChecklist') return { PrintableShoppingChecklist: () => null }
     throw Error('unexpected ShoppingListView import: ' + id)
   }
   const mod = { exports: {} }
