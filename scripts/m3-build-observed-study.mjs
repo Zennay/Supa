@@ -72,6 +72,12 @@ function validTimestamp(value) {
     if (offsetHour > 23 || offsetMinute > 59) return false
   }
 
+  // Date.parse drops all fractional precision beyond milliseconds. Refuse
+  // nonzero hidden nanoseconds/microseconds rather than mint a 24h claim
+  // from two instants that are physically more than 24 hours apart.
+  const fractionalSeconds = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1]
+  if (fractionalSeconds && /[1-9]/.test(fractionalSeconds.slice(3))) return false
+
   // A future instant is never an already observed manual retailer capture.
   const observedAtMs = Date.parse(value)
   return Number.isFinite(observedAtMs) && observedAtMs <= Date.now()
