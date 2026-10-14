@@ -219,13 +219,40 @@ export function buildOfflineSelectorReviewQueue(report) {
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  if (argv.length < 1 || argv.length > 2 || argv.some((arg) => !arg || arg.startsWith('--'))) {
-    throw new Error('Usage: node scripts/m5-build-selector-review-queue.mjs <M1-capture-dir> [baseline-M1-capture-dir]')
+  // The optional flag is permitted ONLY in first position, before paths.
+  // Reject all other flags before touching a private capture directory.
+  const summaryOnly = argv[0] === '--summary-only'
+  const captureDirectories = summaryOnly ? argv.slice(1) : argv
+  if (captureDirectories.length < 1 || captureDirectories.length > 2 ||
+      captureDirectories.some((arg) =>
+        typeof arg !== 'string' || !arg || arg.startsWith('--'))) {
+    throw new Error('Usage: node scripts/m5-build-selector-review-queue.mjs [--summary-only] <M1-capture-dir> [baseline-M1-capture-dir]')
   }
   // Delayed import keeps the pure queue logic independently testable.
   const { compareCaptureDirectories } = await import('./m5-compare-capture-signatures.mjs')
-  const comparison = await compareCaptureDirectories(argv[0], argv[1] ?? null)
-  process.stdout.write(JSON.stringify(buildOfflineSelectorReviewQueue(comparison), null, 2) + '\n')
+  const comparison = await compareCaptureDirectories(
+    captureDirectories[0], captureDirectories[1] ?? null,
+  )
+  // Always validate every action, including in aggregate-only mode. A forged
+  // or invalid comparison cannot be promoted to a seemingly valid summary.
+  const queue = buildOfflineSelectorReviewQueue(comparison)
+  const output = summaryOnly
+    ? {
+        contractVersion: queue.contractVersion,
+        mode: 'offline_selector_review_summary_only',
+        inputContract: queue.inputContract,
+        baselineProvided: queue.baselineProvided,
+        sourceCount: queue.sourceCount,
+        driftCount: queue.driftCount,
+        summary: queue.summary,
+        reviewerActionRequired: queue.reviewerActionRequired,
+        selectorVerified: queue.selectorVerified,
+        rightsVerified: queue.rightsVerified,
+        productionReady: queue.productionReady,
+        m5Eligible: queue.m5Eligible,
+      }
+    : queue
+  process.stdout.write(JSON.stringify(output, null, 2) + '\n')
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
