@@ -106,6 +106,19 @@ export function ObservationView() {
   const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
   const [draftResetRemovalFailed, setDraftResetRemovalFailed] = useState(false)
   const [showOnlyOpenLines, setShowOnlyOpenLines] = useState(false)
+  // Never overwrite stored observations that this version cannot safely read.
+  // The normal sheet is still usable in memory, but auto-save is quarantined.
+  const [draftRecoveryNeeded, setDraftRecoveryNeeded] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      const saved = window.localStorage.getItem(OBSERVATION_DRAFT_STORAGE_KEY)
+      return saved !== null && saved !== '' && restoreObservationSheetDraft(saved) === null
+    } catch {
+      // A denied storage getter may be hiding a real previous observation.
+      return true
+    }
+  })
+  const [recoveryResetArmed, setRecoveryResetArmed] = useState(false)
   // The user's next field task is derived from the current draft; readiness remains authoritative.
   const nextAction = useMemo(() => observationNextAction(sheet), [sheet])
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
@@ -124,6 +137,10 @@ export function ObservationView() {
     nextIncomplete.ingredientId === nextAction.ingredientId
 
   useEffect(() => {
+    if (draftRecoveryNeeded) {
+      setDraftPersistenceFailed(true)
+      return
+    }
     setDraftPersistenceFailed(
       !persistObservationDraft(
         () => window.localStorage,
@@ -132,11 +149,55 @@ export function ObservationView() {
         () => setDraftResetRemovalFailed(false),
       ),
     )
-  }, [sheet])
+  }, [sheet, draftRecoveryNeeded])
 
   useEffect(() => {
     setResetArmed(false)
   }, [sheet])
+
+  const downloadUnrecognizedDraft = () => {
+    try {
+      const saved = window.localStorage.getItem(OBSERVATION_DRAFT_STORAGE_KEY)
+      if (!saved) throw new Error('no saved bytes')
+      // Download only on this user's device. Never put original observations
+      // into page text, analytics, URL parameters, or a remote service.
+      const href = URL.createObjectURL(new Blob([saved], {
+        type: 'application/octet-stream',
+      }))
+      const anchor = document.createElement('a')
+      anchor.href = href
+      anchor.download = 'supa-m3-lokaal-herstelorigineel.txt'
+      document.body.append(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(href)
+      setImportStatus({ kind: 'success', message: 'Het oorspronkelijke lokale bestand is op dit apparaat opgeslagen. Controleer het bestand voordat je het oude concept verwijdert.' })
+    } catch {
+      setImportStatus({ kind: 'error', message: 'Het lokale concept kon niet worden gelezen voor een reservekopie. Wis niets zolang je dit bestand nog wilt herstellen.' })
+    }
+  }
+
+  const clearUnrecognizedDraft = () => {
+    if (!recoveryResetArmed) {
+      setRecoveryResetArmed(true)
+      setImportStatus({ kind: 'warning', message: 'Bevestig nogmaals: het oude, onleesbare lokale concept wordt definitief verwijderd. Bewaar eerst een reservekopie als je dit wilt herstellen.' })
+      return
+    }
+    const removed = removeObservationDraft(
+      () => window.localStorage,
+      OBSERVATION_DRAFT_STORAGE_KEY,
+    )
+    setRecoveryResetArmed(false)
+    if (!removed) {
+      setImportStatus({ kind: 'error', message: 'Verwijderen is geweigerd. Het bestaande lokale concept is behouden en wordt niet overschreven.' })
+      return
+    }
+    setSheet(buildObservationSheet())
+    setPendingImport(null)
+    setDraftRecoveryNeeded(false)
+    setDraftResetRemovalFailed(false)
+    setImportStatus({ kind: 'success', message: 'Oude lokale concept verwijderd. Je kunt een nieuwe meting beginnen; dit is geen besparingsbewijs.' })
+  }
 
   const clearDraft = () => {
     if (observationSheetHasUserInput(sheet) && !resetArmed) {
@@ -331,6 +392,13 @@ export function ObservationView() {
   }
 
   const applyImportedDraft = (restored: ObservationSheet) => {
+    if (draftRecoveryNeeded) {
+      setImportStatus({
+        kind: 'error',
+        message: 'Import is gepauzeerd: bewaar of verwijder eerst het onleesbare lokale concept om overschrijven te voorkomen.',
+      })
+      return
+    }
     setSheet(restored)
     setPendingImport(null)
     setImportStatus({
@@ -893,6 +961,24 @@ export function ObservationView() {
         )
       })}
 
+      {draftRecoveryNeeded && (
+        <div className="observation-import-status is-warning" role="alert" data-observation-recovery-warning>
+          <strong>Ouder lokaal meetconcept niet veilig te lezen</strong>
+          <p>
+            Automatisch bewaren is uitgeschakeld om eerder ingevulde winkelprijzen
+            niet te overschrijven. Nieuwe invoer is tijdelijk totdat je een
+            reservekopie maakt en expliciet opnieuw begint.
+          </p>
+          <button className="ghost-button" type="button" onClick={downloadUnrecognizedDraft}>
+            Bewaar oorspronkelijk lokaal bestand
+          </button>
+          <button className={`ghost-button ${recoveryResetArmed ? 'is-danger' : ''}`}
+            type="button" onClick={clearUnrecognizedDraft}>
+            {recoveryResetArmed ? 'Bevestig definitief verwijderen' : 'Oud concept verwijderen en opnieuw beginnen'}
+          </button>
+        </div>
+      )}
+
       <div className="observation-actions">
         <button className="primary-button" type="button" data-observation-export-target onClick={downloadDraft}>
           JSON-concept bewaren
@@ -902,6 +988,7 @@ export function ObservationView() {
           <input
             aria-label="JSON-concept openen"
             type="file"
+            disabled={draftRecoveryNeeded}
             accept=".json,application/json"
             onChange={async (event) => {
               await importDraft(event.target.files?.[0])
@@ -913,6 +1000,7 @@ export function ObservationView() {
           className={`ghost-button ${resetArmed ? 'is-danger' : ''}`}
           type="button"
           onClick={clearDraft}
+          disabled={draftRecoveryNeeded}
         >
           {resetArmed ? 'Bevestig wissen' : 'Alles wissen'}
         </button>
@@ -927,7 +1015,7 @@ export function ObservationView() {
 
       {draftResetRemovalFailed && (
         <p className="observation-import-status is-warning" role="status">
-          Het scherm is leeggemaakt, maar het eerder opgeslagen lokale concept
+          Het scherm is niet leeggemaakt; het eerder opgeslagen lokale concept
           kon niet worden verwijderd. Bewaar zo nodig handmatig een JSON-kopie
           en probeer opnieuw; een volgende succesvolle lokale opslag herstelt
           deze waarschuwing automatisch.
