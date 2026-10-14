@@ -54,9 +54,11 @@ function isBrowserGlobalMember(node, expectedName) {
   )
 }
 
-function isNavigatorObject(node) {
+function isNavigatorObject(node, navigatorAliases = new Set()) {
   const current = unwrapExpression(node)
-  if (ts.isIdentifier(current)) return current.text === 'navigator'
+  if (ts.isIdentifier(current)) {
+    return current.text === 'navigator' || navigatorAliases.has(current.text)
+  }
 
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return false
@@ -70,16 +72,105 @@ function isNavigatorObject(node) {
   )
 }
 
-function isServiceWorkerObject(node) {
+function isServiceWorkerObject(
+  node,
+  navigatorAliases = new Set(),
+  serviceWorkerAliases = new Set(),
+) {
   const current = unwrapExpression(node)
+  if (ts.isIdentifier(current)) {
+    return serviceWorkerAliases.has(current.text)
+  }
+
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return false
   }
 
   return (
-    isNavigatorObject(current.expression) &&
+    isNavigatorObject(current.expression, navigatorAliases) &&
     memberName(current) === 'serviceWorker'
   )
+}
+
+function workerConstructorName(node, workerAliases = new Map()) {
+  const current = unwrapExpression(node)
+  if (ts.isIdentifier(current) && workerAliases.has(current.text)) {
+    return workerAliases.get(current.text)
+  }
+
+  for (const constructorName of workerConstructors) {
+    if (isBrowserGlobalMember(current, constructorName)) return constructorName
+  }
+  return null
+}
+
+function isImportScriptsReference(node, importScriptsAliases = new Set()) {
+  const current = unwrapExpression(node)
+  if (ts.isIdentifier(current) && importScriptsAliases.has(current.text)) {
+    return true
+  }
+  return isBrowserGlobalMember(current, 'importScripts')
+}
+
+function collectExecutionAliases(sourceFile) {
+  const navigatorAliases = new Set()
+  const serviceWorkerAliases = new Set()
+  const workerAliases = new Map()
+  const importScriptsAliases = new Set()
+  let changed = true
+
+  while (changed) {
+    changed = false
+
+    function visit(node) {
+      if (
+        ts.isVariableDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        node.initializer
+      ) {
+        const alias = node.name.text
+        const initializer = unwrapExpression(node.initializer)
+
+        if (!navigatorAliases.has(alias) && isNavigatorObject(initializer, navigatorAliases)) {
+          navigatorAliases.add(alias)
+          changed = true
+        }
+
+        if (
+          !serviceWorkerAliases.has(alias) &&
+          isServiceWorkerObject(initializer, navigatorAliases, serviceWorkerAliases)
+        ) {
+          serviceWorkerAliases.add(alias)
+          changed = true
+        }
+
+        const constructorName = workerConstructorName(initializer, workerAliases)
+        if (constructorName && workerAliases.get(alias) !== constructorName) {
+          workerAliases.set(alias, constructorName)
+          changed = true
+        }
+
+        if (
+          !importScriptsAliases.has(alias) &&
+          isImportScriptsReference(initializer, importScriptsAliases)
+        ) {
+          importScriptsAliases.add(alias)
+          changed = true
+        }
+      }
+
+      ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+  }
+
+  return {
+    navigatorAliases,
+    serviceWorkerAliases,
+    workerAliases,
+    importScriptsAliases,
+  }
 }
 
 function scriptKindFor(filename) {
@@ -103,6 +194,12 @@ function findSecondaryBrowserExecution(source, filename = 'candidate.tsx') {
     true,
     scriptKindFor(filename),
   )
+  const {
+    navigatorAliases,
+    serviceWorkerAliases,
+    workerAliases,
+    importScriptsAliases,
+  } = collectExecutionAliases(sourceFile)
 
   let finding = null
 
@@ -129,7 +226,11 @@ function findSecondaryBrowserExecution(source, filename = 'candidate.tsx') {
       }
 
       if (
-        isServiceWorkerObject(node.expression) &&
+        isServiceWorkerObject(
+          node.expression,
+          navigatorAliases,
+          serviceWorkerAliases,
+        ) &&
         memberName(node) === 'register'
       ) {
         finding = {
@@ -141,21 +242,20 @@ function findSecondaryBrowserExecution(source, filename = 'candidate.tsx') {
     }
 
     if (ts.isNewExpression(node)) {
-      for (const constructorName of workerConstructors) {
-        if (isBrowserGlobalMember(node.expression, constructorName)) {
-          finding = {
-            kind: constructorName + ' construction',
-            text: node.expression.getText(sourceFile),
-          }
-          return
+      const constructorName = workerConstructorName(node.expression, workerAliases)
+      if (constructorName) {
+        finding = {
+          kind: constructorName + ' construction',
+          text: node.expression.getText(sourceFile),
         }
+        return
       }
     }
 
     if (ts.isCallExpression(node)) {
       const callee = unwrapExpression(node.expression)
 
-      if (isBrowserGlobalMember(callee, 'importScripts')) {
+      if (isImportScriptsReference(callee, importScriptsAliases)) {
         finding = {
           kind: 'worker importScripts call',
           text: callee.getText(sourceFile),
@@ -165,7 +265,11 @@ function findSecondaryBrowserExecution(source, filename = 'candidate.tsx') {
 
       if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
         if (
-          isServiceWorkerObject(callee.expression) &&
+          isServiceWorkerObject(
+            callee.expression,
+            navigatorAliases,
+            serviceWorkerAliases,
+          ) &&
           memberName(callee) === 'register'
         ) {
           finding = {
@@ -241,6 +345,20 @@ test('worker execution boundary catches direct browser execution primitives', ()
   }
 })
 
+test('worker execution boundary follows execution-context aliases', () => {
+  for (const source of [
+    "const W = Worker; new W('/worker.js')",
+    "const W = window.Worker; const Next = W; new Next('/worker.js')",
+    "let Shared = SharedWorker; new Shared('/shared.js')",
+    "const loader = importScripts; loader('/runtime.js')",
+    "const loader = self.importScripts; const nextLoader = loader; nextLoader('/runtime.js')",
+    "const nav = navigator; nav.serviceWorker.register('/sw.js')",
+    "const nav = window.navigator; const sw = nav.serviceWorker; sw.register('/sw.js')",
+  ]) {
+    assert.ok(findSecondaryBrowserExecution(source), source)
+  }
+})
+
 test('worker execution boundary ignores inert text and unrelated local APIs', () => {
   for (const source of [
     "// new Worker('/example.js')",
@@ -250,6 +368,10 @@ test('worker execution boundary ignores inert text and unrelated local APIs', ()
     "serviceWorker.register('/local')",
     "registry.serviceWorker.register('/local')",
     "loader.importScripts('/local')",
+    "const W = runtime.Worker; new W('/local')",
+    "const loader = runtime.importScripts; loader('/local')",
+    "const nav = app.navigator; nav.serviceWorker.register('/local')",
+    "const sw = registry.serviceWorker; sw.register('/local')",
   ]) {
     assert.equal(findSecondaryBrowserExecution(source), null, source)
   }
