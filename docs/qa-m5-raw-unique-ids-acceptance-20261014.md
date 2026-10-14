@@ -19,3 +19,7 @@ Separate [open issue #2201](https://github.com/Zennay/Supa/issues/2201) concerns
 Require exact-head hosted npm ci, high audit, full Node tests, M1 matching/source-permission gate and TS/Vite build. Green synthetic results are not a race-free filesystem snapshot, current-main/VPS deploy approval, M3 exit or M4/M5 eligibility.
 
 **DRAFT/HOLD/NO MERGE/NO DEPLOY** pending independently verified zCloud SQLite task/write preflight and claim lease, original product/QA owner reviews, safe latest-main/applicable trusted permanent VPS integration, real human field evidence and explicit releasego.
+
+## Same-head unchanged regression composition
+
+Following the initial eight-case independently hosted run, this **same QA-owned branch** now also contains **13 copied, byte-identical existing independent test files** from frozen [QA #2196](https://github.com/Zennay/Supa/pull/2196) SHA `7b13625de2707ea1749fb1664ab852cd06f34559`: 12 original suites (**61 cases** from #2164/#2174/#2171/#2169/#2166) and one original 11-case QA cross-capture inode/root-first suite. The 13 Git content blobs are unchanged; no previous independent QA assertion weakened. This brings the independent compositional matrix to **80 scenarios** (61 + 11 + 8), all on new frozen #2200 source. Prior 8-case hosted full CI 815/815 GREEN covers only earlier QA head and **cannot** be used as complete 80-case proof. Require a NEW exact-head all-gates CI before claiming that composition GREEN.
