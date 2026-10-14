@@ -8,6 +8,7 @@ const canonical = await readFile(new URL('M3_OBSERVED_BASKET_STUDY.md', base), '
 test('canonical M3 source contract links actual field guidance without claiming savings proof', async () => {
   const paths = [
     'product/m3-field-operator-checklist.md',
+    'M3_FIELD_VISIT_CARD.md',
     'product/m3-field-decision-record-template.md',
     'M3_FIELD_DISCREPANCY_TRIAGE.md',
   ]
