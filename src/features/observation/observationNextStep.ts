@@ -81,6 +81,7 @@ function missing(value: unknown): boolean {
 function chooseStoreAction(
   sheet: ObservationSheet,
   side: M3ObservationSide,
+  referenceNowMs: number,
 ): ObservationNextAction | null {
   const observation = sheet[side]
   const retailer = M3_EXPECTED_RETAILERS[side]
@@ -114,7 +115,7 @@ function chooseStoreAction(
 
     // Use the *same* strict timestamp gate as canonical readiness: Date.parse
     // alone accepts date-only, local-time and rolled-over calendar values.
-    if (key === 'observedAt' && validObservedAt(value) === null) {
+    if (key === 'observedAt' && validObservedAt(value, referenceNowMs) === null) {
       return {
         stage: 'store',
         side,
@@ -129,7 +130,7 @@ function chooseStoreAction(
   return null
 }
 
-function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
+function nextForValidSheet(sheet: ObservationSheet, referenceNowMs: number): ObservationNextAction {
   for (const [key, title, detail] of studySteps) {
     if (missing(sheet.study[key])) {
       return { stage: 'study', field: key, title, detail }
@@ -147,7 +148,7 @@ function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
   }
 
   for (const side of ['baseline', 'candidate'] as const) {
-    const storeAction = chooseStoreAction(sheet, side)
+    const storeAction = chooseStoreAction(sheet, side, referenceNowMs)
     if (storeAction) return storeAction
 
     const line = nextIncompleteObservationLine(sheet)
@@ -188,7 +189,7 @@ function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
   }
 
   // Surface a concrete, safe remedy rather than a raw evidence error count.
-  if (observationWindowSummary(sheet).state === 'outside-window') {
+  if (observationWindowSummary(sheet, referenceNowMs).state === 'outside-window') {
     return {
       stage: 'review',
       title: 'Meet beide winkels binnen 24 uur',
@@ -197,7 +198,7 @@ function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
     }
   }
 
-  const readiness = observationSheetReadiness(sheet)
+  const readiness = observationSheetReadiness(sheet, referenceNowMs)
   const hasMeasuredLines = sheet.baseline.lines.length > 0 && sheet.candidate.lines.length > 0
   if (!readiness.ready || !hasMeasuredLines) return reviewAction
 
@@ -210,12 +211,17 @@ function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
 }
 
 /** Fail closed on malformed persisted input: never announce that evidence is ready. */
-export function observationNextAction(sheet: ObservationSheet): ObservationNextAction {
+export function observationNextAction(
+  sheet: ObservationSheet,
+  referenceNowMs = Date.now(),
+): ObservationNextAction {
   try {
+    // Presentation-only reference clock; the shared domain remains deterministic.
+    if (!Number.isFinite(referenceNowMs)) return reviewAction
     if (!sheet || typeof sheet !== 'object' || Array.isArray(sheet)) {
       return reviewAction
     }
-    return nextForValidSheet(sheet)
+    return nextForValidSheet(sheet, referenceNowMs)
   } catch {
     return reviewAction
   }
