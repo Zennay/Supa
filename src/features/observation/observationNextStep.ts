@@ -21,6 +21,8 @@ export type ObservationNextAction = {
   detail: string
   side?: M3ObservationSide
   ingredientId?: string
+  /** Whitelisted field key for deliberate local focus; not a persisted schema field. */
+  field?: string
 }
 
 const reviewAction: ObservationNextAction = {
@@ -64,6 +66,7 @@ function chooseStoreAction(
     return {
       stage: 'store',
       side,
+      field: 'name',
       title: 'Controleer de winkelnaam van ' + retailer,
       detail:
         'Vul de echte ' + retailer + '-vestiging in. Een andere supermarkt hoort niet bij deze vergelijking.',
@@ -78,6 +81,7 @@ function chooseStoreAction(
       return {
         stage: 'store',
         side,
+        field: key,
         title: title + ' voor ' + retailer,
         detail,
       }
@@ -88,6 +92,7 @@ function chooseStoreAction(
       return {
         stage: 'store',
         side,
+        field: 'observedAt',
         title: 'Controleer de datum en tijd van ' + retailer,
         detail:
           'Gebruik het echte meetmoment. Vul geen geschatte tijd in; beide winkels moeten binnen 24 uur worden gemeten.',
@@ -101,7 +106,7 @@ function chooseStoreAction(
 function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
   for (const [key, title, detail] of studySteps) {
     if (missing(sheet.study[key])) {
-      return { stage: 'study', title, detail }
+      return { stage: 'study', field: key, title, detail }
     }
   }
 
@@ -109,6 +114,7 @@ function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
   if (sheet.study.priceContext !== 'in-store' && sheet.study.priceContext !== 'online-order') {
     return {
       stage: 'study',
+      field: 'priceContext',
       title: 'Kies een geldige prijscontext',
       detail: 'Kies voor beide winkels dezelfde context: in de winkel of online.',
     }
@@ -163,4 +169,23 @@ export function observationNextAction(sheet: ObservationSheet): ObservationNextA
   } catch {
     return reviewAction
   }
+}
+
+/**
+ * Navigation targets are constructed only from closed, literal field whitelists.
+ * Never interpolate arbitrary input or target another store's records.
+ * Review/export and ingredient tasks intentionally have no field selector.
+ */
+export function observationNextTaskSelector(action: ObservationNextAction): string | null {
+  if (!action || typeof action !== 'object') return null
+  if (action.stage === 'study' &&
+      studySteps.some(([key]) => key === action.field)) {
+    return `[data-observation-study-field="${action.field}"]`
+  }
+  if (action.stage === 'store' &&
+      (action.side === 'baseline' || action.side === 'candidate') &&
+      storeSteps.some(([key]) => key === action.field)) {
+    return `[data-observation-side="${action.side}"] [data-observation-store-field="${action.field}"]`
+  }
+  return null
 }
