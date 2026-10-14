@@ -88,7 +88,14 @@ export function compareReviewedCatalogs({
       continue
     }
     const time = Date.parse(raw.provenance.capturedAt)
-    if (!Number.isFinite(time) || time > nowMs ||
+    // Date.parse truncates >3 fractional-second digits. A timestamp with a
+    // positive nanosecond remainder at nowMs is strictly in the future.
+    const subMs = /\\.\\d{3}(\\d+)(?:Z|[+-]\\d{2}:\\d{2})$/i.exec(
+      raw.provenance.capturedAt,
+    )
+    const strictlyFuture = time > nowMs ||
+      (time === nowMs && subMs !== null && /[1-9]/.test(subMs[1]))
+    if (!Number.isFinite(time) || strictlyFuture ||
         nowMs - time > DAY) {
       sourceTrusted = false
       continue
