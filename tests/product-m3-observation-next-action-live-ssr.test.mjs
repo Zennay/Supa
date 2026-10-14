@@ -188,5 +188,17 @@ test('real M3 line-jump control appears only for current canonical ingredient ta
 
   const complete = populatedSheet()
   assert.equal(observationNextAction(complete).stage, 'export')
-  assert.match(renderView(complete), /class="ghost-button observation-next-button"[^>]*disabled=""/)
+  const exportHtml = renderView(complete)
+  assert.doesNotMatch(exportHtml, /class="ghost-button observation-next-button"[^>]*disabled/)
+  assert.match(exportHtml, /Ga naar: JSON-concept bewaren/)
+  assert.match(exportHtml, /data-observation-export-target/)
+
+  const review = populatedSheet()
+  review.baseline.observedAt = '2026-10-08T09:00:00Z'
+  assert.equal(observationNextAction(review).stage, 'review')
+  const reviewHtml = renderView(review)
+  assert.doesNotMatch(reviewHtml, /class="ghost-button observation-next-button"[^>]*disabled/)
+  assert.match(reviewHtml, /Ga naar: controlepunten/)
+  assert.match(reviewHtml, /data-observation-review-target/)
+  assert.match(reviewHtml, /24u-venster overschreden/)
 })
