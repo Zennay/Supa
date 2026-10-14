@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFile, stat } from 'node:fs/promises'
+import { lstat, readFile, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -252,7 +252,8 @@ async function preflightBoundedManifest(directory) {
   const fail = () => { throw new Error('Invalid or oversized M1 capture manifest') }
   let parsed
   try {
-    const info = await stat(manifestPath)
+    // Manifest may not be borrowed through an alias outside this capture tree.
+    const info = await lstat(manifestPath)
     if (!info.isFile() || !Number.isSafeInteger(info.size) ||
         info.size > MAX_CAPTURE_MANIFEST_BYTES) fail()
     const raw = await readFile(manifestPath, 'utf8')
@@ -281,6 +282,34 @@ function observationInstants(results) {
   return times
 }
 
+// M5 is an offline human-only reviewer. Do not let a SHA-correct HTML file
+// borrowed via a symbolic path pretend to belong to the nominated capture.
+// Check *both* input trees before the M1 inspector reads any source HTML.
+// This is a conservative local path preflight, not descriptor-locked I/O.
+async function requireRegularCaptureTree(directory, rows) {
+  const root = await lstat(directory)
+  if (!root.isDirectory() || root.isSymbolicLink() ||
+      await realpath(directory) !== path.resolve(directory)) {
+    throw new Error('Invalid offline capture tree origin')
+  }
+  for (const row of rows) {
+    if (!row.success) continue
+    const segment = (value) => typeof value === 'string' &&
+      /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+    if (!segment(row.supermarket) || !segment(row.id)) {
+      throw new Error('Invalid offline capture tree origin')
+    }
+    const storePath = path.join(directory, row.supermarket)
+    const sourcePath = path.join(storePath, row.id + '.html')
+    const folder = await lstat(storePath)
+    const file = await lstat(sourcePath)
+    if (!folder.isDirectory() || folder.isSymbolicLink() ||
+        !file.isFile() || file.isSymbolicLink()) {
+      throw new Error('Invalid offline capture tree origin')
+    }
+  }
+}
+
 // Lexically different paths can resolve to the very same M1 capture tree.
 // Compare the underlying directory identity rather than argv strings or
 // path.normalize(), including symlink/relative aliases. This conservative
@@ -296,6 +325,8 @@ async function requireIndependentCaptureRoots(currentDir, baselineDir) {
 export async function compareCaptureDirectories(currentDir, baselineDir = null) {
   const currentRows = await preflightBoundedManifest(currentDir)
   const baselineRows = baselineDir ? await preflightBoundedManifest(baselineDir) : null
+  await requireRegularCaptureTree(currentDir, currentRows)
+  if (baselineRows) await requireRegularCaptureTree(baselineDir, baselineRows)
   // Keep the existing whole-manifest structural checks first, but do not
   // read HTML or assign P3 to one directory masquerading as its own baseline.
   if (baselineDir) await requireIndependentCaptureRoots(currentDir, baselineDir)
