@@ -9,6 +9,7 @@ const snapshot = (id, origin = 'fictional-market', kind = 'product', state = 've
   snapshotSha256: state === 'verified' ? HASH : null,
   shapeSha256: state === 'verified' ? SHAPE : null,
   schemaOrgStatus: state === 'verified' ? 'abstain' : 'unknown',
+  ...(state === 'verified' ? { hasNextData: false, jsonLdCount: 0, jsonLdParseErrors: 0 } : {}),
 })
 const row = (id, status, current, baseline = null) => ({
   id, status, current, baseline,
