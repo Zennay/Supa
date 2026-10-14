@@ -109,3 +109,50 @@ test('M3 independent attribution test paths cannot silently lose VPS trigger cov
     assert.equal(hasQuotedPathTrigger(mutant, path), false)
   }
 })
+
+function validateDispatchOnlyFieldPackUpload(workflow) {
+  const lines = workflow.split(/\r?\n/u)
+  const title = '      - name: Upload M3 field-run pack'
+  const indices = lines.flatMap((line, index) => line === title ? [index] : [])
+  assert.equal(indices.length, 1, 'exactly one M3 field-pack upload step')
+  const index = indices[0]
+  const step = []
+  for (let next = index + 1; next < lines.length; next += 1) {
+    if (lines[next].startsWith('      - ')) break
+    step.push(lines[next])
+  }
+  assert.ok(step.includes("        if: github.event_name == 'workflow_dispatch'"),
+    'upload step itself must require an explicit human workflow dispatch')
+  assert.ok(step.some((line) => /^        uses: actions\/upload-artifact@[a-f0-9]{40}(?:\s+#.*)?$/u.test(line)),
+    'field-pack upload must be bound to its intended pinned upload action')
+  const uploads = lines.filter((line) => /^\s+uses: actions\/upload-artifact@/u.test(line))
+  assert.equal(uploads.length, 1, 'no extra unguarded artifact upload action')
+}
+
+test('M3 field-pack upload is dispatch-only on the actual step, not a nearby step', async () => {
+  const workflow = await readFile(workflowPath, 'utf8')
+  validateDispatchOnlyFieldPackUpload(workflow)
+
+  // A global search for a dispatch-only condition can be fooled if it is
+  // moved to another step: the upload itself must own the guard.
+  const removed = workflow.replace(
+    "      - name: Upload M3 field-run pack\n        if: github.event_name == 'workflow_dispatch'\n",
+    '      - name: Upload M3 field-run pack\n',
+  )
+  assert.notEqual(removed, workflow)
+  assert.throws(() => validateDispatchOnlyFieldPackUpload(removed))
+
+  const loosened = workflow.replace(
+    "        if: github.event_name == 'workflow_dispatch'\n",
+    '        if: always()\n',
+  )
+  assert.notEqual(loosened, workflow)
+  assert.throws(() => validateDispatchOnlyFieldPackUpload(loosened))
+
+  const duplicate = workflow.replace(
+    '      - name: Upload M3 field-run pack',
+    '      - name: Upload M3 field-run pack\n        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+  )
+  assert.notEqual(duplicate, workflow)
+  assert.throws(() => validateDispatchOnlyFieldPackUpload(duplicate))
+})
