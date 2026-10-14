@@ -48,6 +48,50 @@ export function attributeSavingsEffects({
   comparison: BasketComparison
   evidence: unknown
 }): SavingsAttribution {
+  // Direct JS/persisted JSON callers can bypass BasketComparison's TS type.
+  // Never read properties or spread untrusted reason containers before
+  // establishing a structurally valid comparison root.
+  if (!comparison || typeof comparison !== 'object' || Array.isArray(comparison)) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: null,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison must be an object'],
+    }
+  }
+
+  if (
+    typeof comparison.claimable !== 'boolean' ||
+    !Array.isArray(comparison.reasons) ||
+    !comparison.reasons.every((reason) =>
+      typeof reason === 'string' &&
+      reason.trim().length > 0 &&
+      reason.length <= 200
+    )
+  ) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: null,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison has malformed claimability or reasons'],
+    }
+  }
+
+  // If the comparison is labeled claimable, its published monetary delta
+  // must be an exactly representable integer-cent value before any effect
+  // arithmetic or unknown-status response may expose it downstream.
+  if (comparison.claimable && !Number.isSafeInteger(comparison.deltaCents)) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: null,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison requires safe integer delta cents'],
+    }
+  }
+
   if (!comparison.claimable || comparison.deltaCents === null) {
     return {
       status: 'unknown',
