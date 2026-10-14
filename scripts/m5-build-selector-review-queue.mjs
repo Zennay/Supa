@@ -51,11 +51,18 @@ export function buildOfflineSelectorReviewQueue(report) {
       !Number.isSafeInteger(report.driftCount) || report.driftCount < 0 ||
       !Array.isArray(report.changes) || report.changes.length > MAX_CHANGES) invalid()
 
+  // Array#map skips holes. A sparse input previously survived all checks and
+  // produced a seemingly legitimate queue containing undefined action slots
+  // (serialized as null by JSON.stringify). Every declared slot must be real.
+  for (let index = 0; index < report.changes.length; index += 1) {
+    if (!Object.hasOwn(report.changes, index)) invalid()
+  }
+
   const seen = new Set()
   let foundCurrent = 0
   let driftCount = 0
   const actions = report.changes.map((change) => {
-    if (!change || typeof change !== 'object' ||
+    if (!change || typeof change !== 'object' || Array.isArray(change) ||
         typeof change.id !== 'string' || !change.id || change.id.length > 512 ||
         !validUnicodeSourceId(change.id) ||
         typeof change.status !== 'string' || !Object.hasOwn(STATUS_ACTION, change.status) ||
@@ -64,7 +71,8 @@ export function buildOfflineSelectorReviewQueue(report) {
     const { current, baseline, status } = change
     for (const snapshot of [current, baseline]) {
       if (snapshot === null) continue
-      if (!snapshot || typeof snapshot !== 'object' || snapshot.id !== change.id) invalid()
+      if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot) ||
+          snapshot.id !== change.id) invalid()
       // Only metadata produced by the canonical M1 captureShape() contract is
       // eligible for a human-only queue. Inconsistent or invented provenance
       // cannot be upgraded to a nominal review action.
