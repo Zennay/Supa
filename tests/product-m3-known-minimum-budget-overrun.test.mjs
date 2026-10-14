@@ -65,6 +65,11 @@ test('actual Planner says minimaal when the known basket alone exceeds a weekly 
     const exact = render(4001, 0)
     assert.match(exact, /5,01[^<]*boven budget/)
     assert.doesNotMatch(exact, /Minimaal[^<]*boven budget/)
+
+    assert.match(render(3501, 0), /0,01[^<]*boven budget/,
+      'known complete basket must never round away one cent of overspend')
+    assert.match(render(3499, 0), /0,01[^<]*over/,
+      'known complete basket must show one cent remaining without FP drift')
   } finally {
     await vite.close()
   }
