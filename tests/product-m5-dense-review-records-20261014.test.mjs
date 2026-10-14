@@ -8,6 +8,7 @@ const verified = (id, origin = 'fictional-market') => ({
   id, supermarket: origin, kind: 'product',
   captureStatus: 'verified', snapshotSha256: A, shapeSha256: B,
   schemaOrgStatus: 'abstain',
+  hasNextData: false, jsonLdCount: 0, jsonLdParseErrors: 0,
 })
 const unavailable = (id) => ({
   id, supermarket: 'fictional-market', kind: 'product',
