@@ -481,6 +481,13 @@ export async function main(argv = process.argv.slice(2)) {
   process.stdout.write(JSON.stringify(report, null, 2) + '\n')
 }
 
+// The direct offline comparator is not a diagnostic path-inspection CLI:
+// fs errors and M1 integrity errors can contain private source identifiers
+// or absolute local filenames. Keep the exported APIs' detailed exceptions
+// for trusted callers, but never put them on the terminal by default.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await main()
+  await main().catch(() => {
+    process.stderr.write('Offline comparison failed: invalid capture or report\n')
+    process.exitCode = 1
+  })
 }
