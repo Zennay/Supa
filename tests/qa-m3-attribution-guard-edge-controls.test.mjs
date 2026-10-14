@@ -107,9 +107,27 @@ for (const [label, delta] of [
   ['minimum safe cent magnitude', Number.MIN_SAFE_INTEGER],
 ]) {
   test(`valid ${label} remains a partial, exactly accounted unknown effect`, () => {
-    const lineDeltas = [{ ...comparison().lineDeltas[0], deltaCents: delta }]
+    // Current M3 attribution now independently reconciles every physical
+    // line price to both whole-store cent totals and the signed claim.
+    // These max-range cases must describe a physically possible two-store
+    // basket rather than the old 100→100 fixture with an impossible delta.
+    const baselineTotalCents = delta < 0 ? Number.MAX_SAFE_INTEGER : 0
+    const candidateTotalCents = delta < 0 ? 0 : Number.MAX_SAFE_INTEGER
+    const lineDeltas = [{
+      ...comparison().lineDeltas[0],
+      baselineLineTotalCents,
+      candidateLineTotalCents,
+      deltaCents: delta,
+    }]
     const result = attributeSavingsEffects({
-      comparison: comparison({ deltaCents: delta, lineDeltas }),
+      comparison: comparison({
+        baselineTotalCents,
+        candidateTotalCents,
+        deltaCents: delta,
+        savingsCents: -delta,
+        outcome: delta < 0 ? 'better' : 'worse',
+        lineDeltas,
+      }),
       evidence: [],
     })
     assert.equal(result.status, 'partial')
