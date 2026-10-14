@@ -122,6 +122,13 @@ export function captureShape(source) {
     throw new Error('Invalid inspected capture success')
   }
   if (!source.success) {
+    // The M1 inspector never parses Schema.org after a failed capture. A
+    // fabricated successful parser result must not appear on a failed source.
+    const failedSchema = Object.getOwnPropertyDescriptor(source, 'schemaOrgProduct')
+    if (failedSchema && (!Object.hasOwn(failedSchema, 'value') ||
+        failedSchema.value !== undefined)) {
+      throw new Error('Invalid inspected Schema.org parse result')
+    }
     requireCanonicalOrigin(source)
     return {
       id: source.id,
@@ -138,6 +145,26 @@ export function captureShape(source) {
   }
   requireCanonicalOrigin(source)
   requireBoundedHtmlShape(source.html)
+  // A successful M1 inspection always records a real parser decision.
+  // Optional chaining previously converted absent/invented outcomes into
+  // 'abstain', laundering untrusted source metadata into review evidence.
+  // Read own data descriptors only: inherited or getter-computed decisions
+  // must never be upgraded into canonical M1 parser results.
+  const schemaDescriptor = Object.getOwnPropertyDescriptor(
+    source, 'schemaOrgProduct',
+  )
+  const schemaResult = schemaDescriptor?.value
+  if (!schemaDescriptor || !Object.hasOwn(schemaDescriptor, 'value') ||
+      !schemaResult || typeof schemaResult !== 'object' ||
+      Array.isArray(schemaResult)) {
+    throw new Error('Invalid inspected Schema.org parse result')
+  }
+  const decisionDescriptor = Object.getOwnPropertyDescriptor(schemaResult, 'type')
+  const schemaDecision = decisionDescriptor?.value
+  if (!decisionDescriptor || !Object.hasOwn(decisionDescriptor, 'value') ||
+      !['observation', 'abstain'].includes(schemaDecision)) {
+    throw new Error('Invalid inspected Schema.org parse result')
+  }
   const shape = {
     hasNextData: source.html.hasNextData === true,
     applicationJsonScriptCount: source.html.applicationJsonScripts.length,
@@ -159,7 +186,7 @@ export function captureShape(source) {
     captureStatus: 'verified',
     snapshotSha256: source.manifestSha256,
     shapeSha256: digest(shape),
-    schemaOrgStatus: source.schemaOrgProduct?.type === 'observation'
+    schemaOrgStatus: schemaDecision === 'observation'
       ? 'candidate_observation'
       : 'abstain',
     hasNextData: shape.hasNextData,
