@@ -50,7 +50,7 @@ function labelControls(source) {
           }
           if (child.tagName.getText(file) === 'small' &&
               attribute(child, 'className', file) === 'observation-field-hint') {
-            hints.push(child.getText(file))
+            hints.push(child.parent.getText(file))
           }
         }
         ts.forEachChild(child, inside)
