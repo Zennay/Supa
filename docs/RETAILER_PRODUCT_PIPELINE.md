@@ -19,3 +19,29 @@ This is implemented code, **not** a live-price claim or approval to scrape. The 
 ## Validation
 
 `npm test` includes synthetic tests in `tests/retailer-catalog-pipeline.test.mjs`. It covers two whole packs for 1.5 liters, line/basket cent parity, 0-euro/equal cases, missing/stale/duplicated products, bounded HTML parsing, blocked rights, no unexpected network calls and truncated-stream rejection.
+
+
+## Local executable comparison (no retailer network)
+
+The input is one local JSON manifest and two or more existing HTML snapshots; run:
+
+```sh
+node --experimental-strip-types scripts/retailer-compare-local-snapshots.mjs manifest.json --out comparison-private.json
+```
+
+Example manifest structure (fictional; use locally captured or licensed source HTML files):
+
+```json
+{
+  "version": 1,
+  "requirements": [
+    { "id": "milk", "query": "halfvolle melk", "amount": 1500, "unit": "ml" }
+  ],
+  "snapshots": [
+    { "sourceId": "plus-product-halfvolle-melk", "htmlFile": "plus.html", "capturedAt": "2026-10-15T09:00:00Z" },
+    { "sourceId": "dekamarkt-product-halfvolle-melk", "htmlFile": "deka.html", "capturedAt": "2026-10-15T09:30:00Z" }
+  ]
+}
+```
+
+Requires two product-page JSON-LD snapshots with a recognizable Product name/SKU, EUR Offer, availability and pack size. Missing/malformed/stale prices result in unknown, not invented winnings. The local CLI refuses unsafe file names, outside-directory paths, symlinks, oversized files and duplicate pinned source IDs; `--out` exclusively creates a new `0600` report. Neither CLI nor tests access any supermarket. All prices remain provisional offline previews.
