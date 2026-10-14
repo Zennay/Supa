@@ -131,6 +131,26 @@ export function compareReviewedCatalogs({
       continue
     }
     const parsed = normalizePackText(raw.pack.rawText)
+    if (raw.pack.amount !== null && raw.pack.unit !== 'unknown' &&
+        parsed.amount !== null && parsed.unit !== 'unknown') {
+      // Numeric source quantities and recognizable label quantities must
+      // describe the same physical unit, not contradictory package sizes.
+      const physical = (amount: number, unit: string): [string, number] => {
+        if (unit === 'kg' || unit === 'g') {
+          return ['mass', amount * (unit === 'kg' ? 1000 : 1)]
+        }
+        if (unit === 'l' || unit === 'ml') {
+          return ['volume', amount * (unit === 'l' ? 1000 : 1)]
+        }
+        return [unit, amount]
+      }
+      const declared = physical(raw.pack.amount, raw.pack.unit)
+      const label = physical(parsed.amount, parsed.unit)
+      if (declared[0] !== label[0] || declared[1] !== label[1]) {
+        sourceTrusted = false
+        continue
+      }
+    }
     const packAmount = raw.pack.amount ?? parsed.amount
     const packUnit = raw.pack.unit === 'unknown' ? parsed.unit : raw.pack.unit
     const packCount = parsed.count
