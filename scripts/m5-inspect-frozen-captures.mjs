@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { inspectCaptureDirectory } from './m1-inspect-captures.mjs'
-import { withPinnedCaptureStore } from './m5-pin-capture-store.mjs'
+import { withPinnedCaptureTree } from './m5-pin-capture-store.mjs'
 
 const HTML_BYTE_LIMIT = 8 * 1024 * 1024
 const HTML_COHORT_BYTE_LIMIT = 8 * 1024 * 1024
@@ -98,23 +98,27 @@ export async function inspectFrozenCaptureDirectory(
       JSON.stringify(manifest), { mode: 0o600, flag: 'wx' })
     let total = 0
     const madeFolders = new Set()
-    for (const row of sources) {
-      if (!row.success) continue
-      // Pin original root + supermarket directory inodes during the HTML
-      // read. An attacker replacing an original parent pathname later cannot
-      // redirect the O_NOFOLLOW HTML open to a borrowed external file.
-      const bytes = await withPinnedCaptureStore(directory, row.supermarket,
-        (pinnedFilePath) => readVerifiedHtml(
-          pinnedFilePath(row.id), row.sha256, HTML_COHORT_BYTE_LIMIT - total,
-        ),
-      )
-      total += bytes.length
-      if (!madeFolders.has(row.supermarket)) {
-        await mkdir(path.join(privateRoot, row.supermarket), { mode: 0o700 })
-        madeFolders.add(row.supermarket)
-      }
-      await writeFile(path.join(privateRoot, row.supermarket, row.id + '.html'),
-        bytes, { mode: 0o600, flag: 'wx' })
+    // One original root handle, with one cached store descriptor per name,
+    // survives the complete successful-source cohort. It is not safe to
+    // reopen a changed supermarket path for the next source in that cohort.
+    // P1-only cohorts require no HTML or original-store access.
+    if (sources.some((row) => row.success)) {
+      await withPinnedCaptureTree(directory, async (getStorePath) => {
+        for (const row of sources) {
+          if (!row.success) continue
+          const pinnedFilePath = await getStorePath(row.supermarket)
+          const bytes = await readVerifiedHtml(
+            pinnedFilePath(row.id), row.sha256, HTML_COHORT_BYTE_LIMIT - total,
+          )
+          total += bytes.length
+          if (!madeFolders.has(row.supermarket)) {
+            await mkdir(path.join(privateRoot, row.supermarket), { mode: 0o700 })
+            madeFolders.add(row.supermarket)
+          }
+          await writeFile(path.join(privateRoot, row.supermarket, row.id + '.html'),
+            bytes, { mode: 0o600, flag: 'wx' })
+        }
+      })
     }
     return await inspector(privateRoot)
   } finally {
