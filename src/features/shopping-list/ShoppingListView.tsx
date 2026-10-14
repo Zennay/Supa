@@ -18,15 +18,19 @@ function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
 }
 
 function readStoredProgress(basket: OneStoreBasket) {
-  if (typeof window === 'undefined') return []
+  if (typeof window === 'undefined') return { done: [], readDenied: false }
 
   try {
-    return restoreShoppingListProgress(
-      basket,
-      window.localStorage.getItem(shoppingListProgressStorageKey),
-    )
+    return {
+      done: restoreShoppingListProgress(
+        basket,
+        window.localStorage.getItem(shoppingListProgressStorageKey),
+      ),
+      readDenied: false,
+    }
   } catch {
-    return []
+    // A denied initial read must not be mistaken for proof of an empty key.
+    return { done: [], readDenied: true }
   }
 }
 
@@ -57,8 +61,11 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   const basketKey = useMemo(() => shoppingListBasketKey(basket), [basket])
   const [progress, setProgress] = useState(() => ({
     basketKey,
-    done: readStoredProgress(basket),
+    ...readStoredProgress(basket),
+    dirty: false,
+    retryAfterFailure: false,
   }))
+  const [storageWarning, setStorageWarning] = useState<'protected' | 'unavailable' | null>(null)
   const done = progress.basketKey === basketKey ? progress.done : []
 
   // A genuinely empty plan has no shopping tasks. An empty row array with
@@ -75,26 +82,55 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
 
     setProgress({
       basketKey,
-      done: readStoredProgress(basket),
+      ...readStoredProgress(basket),
+      dirty: false,
+      retryAfterFailure: false,
     })
   }, [basket, basketKey, progress.basketKey])
 
   useEffect(() => {
     if (typeof window === 'undefined' || progress.basketKey !== basketKey) return
+    // Never persist a malformed zero-row basket just because it is visible.
+    if (basket.lines.length === 0 && !genuinelyEmpty) return
+
+    // A failed read or write is not an authorization to retry automatically.
+    if ((progress.readDenied || progress.retryAfterFailure) && !progress.dirty) {
+      if (!progress.retryAfterFailure) setStorageWarning('unavailable')
+      return
+    }
 
     try {
-      // Re-read immediately before write. This is protective, not atomic
-      // cross-tab compare-and-swap; any access denial must also prevent writes.
       const stored = window.localStorage.getItem(shoppingListProgressStorageKey)
-      if (!canOverwriteStoredProgress(stored)) return
-      window.localStorage.setItem(
-        shoppingListProgressStorageKey,
-        serializeShoppingListProgress(basket, progress.done),
-      )
+      // If the initial read was denied, later-readable existing bytes might
+      // contain previously checked rows. Refuse to replace them with [].
+      if ((progress.readDenied && stored !== null) ||
+          !canOverwriteStoredProgress(stored)) {
+        setProgress((current) => current === progress
+          ? { ...current, dirty: false, retryAfterFailure: true }
+          : current)
+        setStorageWarning('protected')
+        return
+      }
+
+      const serialized = serializeShoppingListProgress(basket, progress.done)
+      if (stored !== serialized) {
+        window.localStorage.setItem(shoppingListProgressStorageKey, serialized)
+      }
+      if (progress.readDenied || progress.retryAfterFailure) {
+        setProgress((current) => current === progress
+          ? { ...current, readDenied: false, dirty: false, retryAfterFailure: false }
+          : current)
+      }
+      setStorageWarning(null)
     } catch {
-      // Strict privacy modes can deny storage; the active session remains usable.
+      // A future passive rerender or permission recovery must not silently
+      // retry an already-failed save and falsely suggest persistent progress.
+      setProgress((current) => current === progress
+        ? { ...current, dirty: false, retryAfterFailure: true }
+        : current)
+      setStorageWarning('unavailable')
     }
-  }, [basket, basketKey, progress])
+  }, [basket, basketKey, genuinelyEmpty, progress])
 
   return (
     <section className="screen">
@@ -110,6 +146,14 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
           <strong>{basket.unresolvedLineCount} productkeuze vraagt controle</strong>
           <span>SUPA vult een onzekere match niet automatisch in.</span>
         </div>
+      )}
+
+      {storageWarning && (
+        <p role="alert" className="disclaimer">
+          {storageWarning === 'protected'
+            ? 'Afvinken is tijdelijk en niet opgeslagen. Je eerdere opgeslagen gegevens blijven bewaard.'
+            : 'Afvinken is tijdelijk en niet opgeslagen omdat opslag niet beschikbaar is. Eventuele eerdere opgeslagen gegevens blijven bewaard.'}
+        </p>
       )}
 
       <div className="list-card">
@@ -141,7 +185,9 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
                   const currentDone =
                     current.basketKey === basketKey ? current.done : []
                   return {
+                    ...current,
                     basketKey,
+                    dirty: true,
                     done: currentDone.includes(line.id)
                       ? currentDone.filter((id) => id !== line.id)
                       : [...currentDone, line.id],
