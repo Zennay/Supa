@@ -181,7 +181,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       )}
 
       <ShoppingListCopyButton basket={basket} doneLineIds={done} />
-      <PrintableShoppingChecklist basket={basket} />
+      <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
 
       <div className="list-card">
         {basket.lines.length === 0 ? (
