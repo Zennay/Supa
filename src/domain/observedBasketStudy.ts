@@ -173,7 +173,7 @@ function unknownComparison(
   }
 }
 
-export function assessWeeklyBasketStudy(
+function assessWeeklyBasketStudyCore(
   study: WeeklyBasketStudy,
   options: unknown = {},
 ): WeeklyBasketStudyAssessment {
@@ -345,5 +345,64 @@ export function assessWeeklyBasketStudy(
       evidence: study.attributionEvidence ?? [],
     }),
     observationWindowHours,
+  }
+}
+
+
+/**
+ * Imported observation JSON does not honor the WeeklyBasketStudy TypeScript
+ * type. A malformed root, evidence or nested basket must not throw at the
+ * financial claim boundary or publish invented basket totals.
+ */
+function runtimeRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function hasObservedStudyContainers(value: unknown): value is WeeklyBasketStudy {
+  if (!runtimeRecord(value)) return false
+  for (const side of ['baseline', 'candidate'] as const) {
+    const evidence = value[side]
+    if (!runtimeRecord(evidence) || !runtimeRecord(evidence.basket)) return false
+    const basket = evidence.basket
+    if (!runtimeRecord(basket.store) || !Array.isArray(basket.lines)) return false
+  }
+  return true
+}
+
+function invalidObservedStudyAssessment(): WeeklyBasketStudyAssessment {
+  const reasons = ['observed study contains malformed evidence or basket containers']
+  // Null totals are deliberate for malformed runtime JSON. The static
+  // BasketComparison contract applies only to validated, physical baskets.
+  const missingTotal = null as unknown as number
+  const comparison: BasketComparison = {
+    outcome: 'unknown',
+    claimable: false,
+    baselineTotalCents: missingTotal,
+    candidateTotalCents: missingTotal,
+    deltaCents: null,
+    savingsCents: null,
+    lineDeltas: [],
+    reasons,
+  }
+  return {
+    claimable: false,
+    reasons,
+    comparison,
+    attribution: attributeSavingsEffects({ comparison, evidence: [] }),
+    observationWindowHours: null,
+  }
+}
+
+export function assessWeeklyBasketStudy(
+  study: WeeklyBasketStudy,
+  options: unknown = {},
+): WeeklyBasketStudyAssessment {
+  try {
+    if (!hasObservedStudyContainers(study)) return invalidObservedStudyAssessment()
+    return assessWeeklyBasketStudyCore(study, options)
+  } catch {
+    // Read-only assessment must never promote malformed runtime records to
+    // a savings claim or allow a thrown nested accessor to crash the caller.
+    return invalidObservedStudyAssessment()
   }
 }
