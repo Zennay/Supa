@@ -53,6 +53,7 @@ test('real browser evidence only records localhost URLs, exact GitHub SHAs and f
   assert.match(source, /githubRunAttempt: process\.env\.GITHUB_RUN_ATTEMPT/)
   assert.match(source, /checks\.push\('corrupt-planner-and-checklist-recover-safely'\)/)
   assert.match(source, /checks\.push\('explicit-reset-restores-week-budget-and-clears-stale-checks'\)/)
+  assert.match(source, /assert\.deepEqual\(afterResetRows, canonicalDefaultShoppingRows/)
   assert.match(source, /checks\.push\('rendered-basket-list-line-count-agrees'\)/)
 
   for (const name of [
