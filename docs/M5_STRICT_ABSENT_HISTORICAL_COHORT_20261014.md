@@ -1,0 +1,11 @@
+# Future M5 — explicit historical absence versus malformed baseline
+
+Independent product-core issue [#2339](https://github.com/Zennay/Supa/issues/2339), child of immutable hosted-GREEN source [#2337](https://github.com/Zennay/Supa/pull/2337) commit `2403c8e95a221f4d497906fc264675d03cd331a6`.
+
+The pure `compareInspections(current, baseline = null)` previously used `baseline ? pinnedInspectionCohort(...) : null`. This allowed explicitly supplied invalid false, numeric zero, empty string, NaN and zero bigint historical data to be silently relabeled as **no baseline**. A newly added source would then receive human P2 `baseline_missing` instead of a generic invalid-history refusal. Such inference must not stand in for historical field or parser evidence.
+
+The updated rule permits only omitted/undefined/null as *absence* of baseline. Every other value must be a real bounded inspected cohort with own primitive count and own array-slot values (enforced by #2337), including a truly empty valid cohort: `{sourceCount:0,sources:[]}` means **baseline provided**, not omitted. Invalid history is checked before mapping any current source, preventing current user getters from running in that branch. Genuine Product current/new P2, unchanged historical P3, unavailable or removed P1 remain human-only, fully pseudonymous with all source rights, selector, production and M5 approval flags false.
+
+Twenty entirely synthetic product tests cover all falsy invalid baselines, boxed values, null/undefined/omitted controls, empty valid baseline as separate provenance, P1/P2/P3, absent source and no getter invocation. No supermarket HTTP, real user observations, prices or source-rights claim; all tests use fabricated local M1-like objects.
+
+**Release hold:** Supa **M3 ACTIVE**, the authentic human [#78](https://github.com/Zennay/Supa/issues/78) same-demand 11 PLUS and 11 DekaMarkt shopping observations in the same ≤24h context remain missing, so M4/M5 INELIGIBLE. **DRAFT/HOLD/NO MERGE/NO DEPLOY** pending independent zCloud SQLite task/scope lease, original product owner and separate QA reviews, exact-head hosted tests/current-main/trusted runner where applicable, authentic field verification, data-source rights and explicit human release authorization.
