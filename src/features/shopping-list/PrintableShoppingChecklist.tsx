@@ -6,7 +6,13 @@ import './PrintableShoppingChecklist.css'
  * Opt-in paper checklist for integration by the shopping-list owner.
  * Never persists, uploads, guesses unavailable products or prints prices.
  */
-export function PrintableShoppingChecklist({ basket }: { basket: OneStoreBasket }) {
+export function PrintableShoppingChecklist({
+  basket,
+  doneLineIds = [],
+}: {
+  basket: OneStoreBasket
+  doneLineIds?: readonly string[]
+}) {
   // A corrupted or sparse basket must never crash the shopping tab or produce
   // a plausible-looking paper checklist. Keep the interactive list available.
   let printable: ReturnType<typeof preparePrintableShoppingChecklist>
@@ -19,6 +25,14 @@ export function PrintableShoppingChecklist({ basket }: { basket: OneStoreBasket 
       </p>
     )
   }
+
+  // Print the current checklist truth without persisting or deriving any price.
+  // Ignore invalid/foreign IDs; only projected basket lines can be checked.
+  const completedIds = new Set(
+    Array.isArray(doneLineIds)
+      ? doneLineIds.filter((id): id is string => typeof id === 'string')
+      : [],
+  )
 
   return (
     <section className="supa-printable-shopping" aria-label="Papieren boodschappenlijst">
@@ -49,7 +63,7 @@ export function PrintableShoppingChecklist({ basket }: { basket: OneStoreBasket 
           <ol className="supa-printable-shopping__rows">
             {printable.lines.map((line) => (
               <li key={line.id}>
-                <span aria-hidden="true">☐</span>
+                <span aria-hidden="true">{completedIds.has(line.id) ? '☑' : '☐'}</span>
                 <div>
                   <strong>{line.label}</strong>
                   <small>{line.quantity}</small>
