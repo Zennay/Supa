@@ -58,6 +58,27 @@ test('DekaMarkt evidence fails closed on Nuxt/JSON-LD price disagreement', async
   })
 })
 
+test('DekaMarkt offer field admits only zero sentinel or finite positive prices', async () => {
+  const zeroOffer = await fixture()
+  assert.equal(parseDekaMarktSsrProductEvidence(zeroOffer).type, 'observation')
+
+  const activeOffer = await fixture()
+  activeOffer.nuxtPayload[12] = 0.65
+  activeOffer.jsonLdProduct.offers.Price = 0.65
+  const valid = parseDekaMarktSsrProductEvidence(activeOffer)
+  assert.equal(valid.type, 'observation')
+  assert.equal(valid.observation.currentPriceCents, 65)
+
+  for (const invalid of [-1, -0.01, '0', true, null, NaN, Infinity, -Infinity]) {
+    const evidence = await fixture()
+    evidence.nuxtPayload[12] = invalid
+    assert.deepEqual(parseDekaMarktSsrProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'DekaMarkt Nuxt offer price is malformed',
+    })
+  }
+})
+
 test('DekaMarkt evidence rejects unsafe acquisition metadata', async () => {
   const evidence = await fixture()
   evidence.captureEvidence.safety.antiBotBypass = true
