@@ -109,9 +109,9 @@ async function main(argv = process.argv.slice(2)) {
     ? compareCoreRetailerInventories(document, JSON.parse(await readFile(argv[2], 'utf8')))
     : assessCoreRetailerCoverage(document)
   process.stdout.write(JSON.stringify(report, null, 2) + '\n')
-  if (!report.coreCovered ||
-      (comparison && (report.removedCandidateIds.length > 0 ||
-        report.changedCandidateIds.length > 0 || report.screeningDateChanged))) {
+  // Every inventory difference (including a newly listed candidate) is a
+  // human review decision, never an implicit green automated source approval.
+  if (!report.coreCovered || (comparison && report.humanReviewRequired)) {
     process.exitCode = 2
   }
   return report
