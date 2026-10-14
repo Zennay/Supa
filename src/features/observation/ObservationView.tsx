@@ -30,6 +30,7 @@ import {
   removeObservationDraft,
 } from './observationDraftPersistence.ts'
 import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
+import { observationDraftStorageStatus } from './observationDraftStorageGuard.ts'
 import { observationNextAction, observationNextTaskSelector } from './observationNextStep.ts'
 import { readableObservationIssue } from './observationReadinessCopy.ts'
 import { ObservationNextActionCard } from './ObservationNextActionCard.tsx'
@@ -83,17 +84,20 @@ function formatLocalDateTime(value: string) {
 }
 
 export function ObservationView() {
+  // The exact raw bytes restored at mount are the only authorized write basis.
+  // An older open tab must not replace an updated 11+11 local field draft.
+  const expectedDraftRawRef = useRef<string | null | undefined>(undefined)
   const [sheet, setSheet] = useState<ObservationSheet>(() => {
     const fresh = buildObservationSheet()
     if (typeof window === 'undefined') return fresh
 
     try {
-      return (
-        restoreObservationSheetDraft(
-          window.localStorage.getItem(OBSERVATION_DRAFT_STORAGE_KEY),
-        ) ?? fresh
-      )
+      const raw = window.localStorage.getItem(OBSERVATION_DRAFT_STORAGE_KEY)
+      expectedDraftRawRef.current = raw
+      return restoreObservationSheetDraft(raw) ?? fresh
     } catch {
+      // No readable baseline means no consent to overwrite any existing data.
+      expectedDraftRawRef.current = undefined
       return fresh
     }
   })
@@ -104,6 +108,7 @@ export function ObservationView() {
   const [resetArmed, setResetArmed] = useState(false)
   const [pendingImport, setPendingImport] = useState<ObservationSheet | null>(null)
   const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
+  const [draftConflict, setDraftConflict] = useState(false)
   const [draftResetRemovalFailed, setDraftResetRemovalFailed] = useState(false)
   const [showOnlyOpenLines, setShowOnlyOpenLines] = useState(false)
   // Never overwrite stored observations that this version cannot safely read.
@@ -168,19 +173,49 @@ export function ObservationView() {
     nextIncomplete.ingredientId === nextAction.ingredientId
 
   useEffect(() => {
-    if (draftRecoveryNeeded) {
+    if (draftRecoveryNeeded || draftConflict) {
       setDraftPersistenceFailed(true)
       return
     }
-    setDraftPersistenceFailed(
-      !persistObservationDraft(
-        () => window.localStorage,
-        OBSERVATION_DRAFT_STORAGE_KEY,
-        sheet,
-        () => setDraftResetRemovalFailed(false),
-      ),
+    const status = observationDraftStorageStatus(
+      () => window.localStorage,
+      OBSERVATION_DRAFT_STORAGE_KEY,
+      expectedDraftRawRef.current,
     )
-  }, [sheet, draftRecoveryNeeded])
+    if (status !== 'unchanged') {
+      if (status === 'changed') setDraftConflict(true)
+      setDraftPersistenceFailed(true)
+      return
+    }
+    const saved = persistObservationDraft(
+      () => window.localStorage,
+      OBSERVATION_DRAFT_STORAGE_KEY,
+      sheet,
+      () => {
+        // Advance only after setItem succeeded. Denied storage can never
+        // replace our last known byte-for-byte authorized snapshot.
+        expectedDraftRawRef.current = JSON.stringify(sheet)
+        setDraftResetRemovalFailed(false)
+      },
+    )
+    setDraftPersistenceFailed(!saved)
+  }, [sheet, draftRecoveryNeeded, draftConflict])
+
+  useEffect(() => {
+    // Storage events fire in *other* tabs, not this tab. Show a warning
+    // immediately even if the operator has not yet edited this page.
+    const onStorage = (event: StorageEvent) => {
+      if (
+        (event.key === OBSERVATION_DRAFT_STORAGE_KEY || event.key === null) &&
+        event.newValue !== expectedDraftRawRef.current
+      ) {
+        setDraftConflict(true)
+        setDraftPersistenceFailed(true)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   useEffect(() => {
     setResetArmed(false)
@@ -223,6 +258,19 @@ export function ObservationView() {
       setImportStatus({ kind: 'warning', message: 'Bevestig nogmaals: het oude, onleesbare lokale concept wordt definitief verwijderd. Bewaar eerst een reservekopie als je dit wilt herstellen.' })
       return
     }
+    const status = observationDraftStorageStatus(
+      () => window.localStorage, OBSERVATION_DRAFT_STORAGE_KEY,
+      expectedDraftRawRef.current,
+    )
+    if (status !== 'unchanged') {
+      setRecoveryResetArmed(false)
+      setDraftConflict(status === 'changed')
+      setImportStatus({
+        kind: 'error',
+        message: 'Lokaal concept is tussentijds gewijzigd of niet leesbaar. Vernieuw de pagina voordat je gegevens wist.',
+      })
+      return
+    }
     const removed = removeObservationDraft(
       () => window.localStorage,
       OBSERVATION_DRAFT_STORAGE_KEY,
@@ -232,6 +280,7 @@ export function ObservationView() {
       setImportStatus({ kind: 'error', message: 'Verwijderen is geweigerd. Het bestaande lokale concept is behouden en wordt niet overschreven.' })
       return
     }
+    expectedDraftRawRef.current = null
     setSheet(buildObservationSheet())
     setPendingImport(null)
     setDraftRecoveryNeeded(false)
@@ -250,6 +299,20 @@ export function ObservationView() {
       return
     }
 
+    const status = observationDraftStorageStatus(
+      () => window.localStorage, OBSERVATION_DRAFT_STORAGE_KEY,
+      expectedDraftRawRef.current,
+    )
+    if (status !== 'unchanged') {
+      if (status === 'changed') setDraftConflict(true)
+      setDraftResetRemovalFailed(true)
+      setResetArmed(false)
+      setImportStatus({
+        kind: 'error',
+        message: 'Wissen geweigerd: een andere tab wijzigde het concept of opslag is niet leesbaar. Bewaar je werk als JSON en vernieuw de pagina.',
+      })
+      return
+    }
     const removed = removeObservationDraft(
       () => window.localStorage,
       OBSERVATION_DRAFT_STORAGE_KEY,
@@ -267,6 +330,7 @@ export function ObservationView() {
       })
       return
     }
+    expectedDraftRawRef.current = null
     setSheet(buildObservationSheet())
     setResetArmed(false)
     setPendingImport(null)
@@ -557,6 +621,13 @@ export function ObservationView() {
             concept dat niet veilig kan worden gelezen. Nieuwe invoer blijft
             tijdelijk totdat je het oorspronkelijke bestand hebt veiliggesteld
             en expliciet opnieuw begint.
+          </p>
+        ) : draftConflict ? (
+          <p role="alert" data-observation-save-status="conflict">
+            Een andere tab heeft dit winkelmeetconcept gewijzigd. Automatisch bewaren
+            is gestopt zodat nieuwere metingen niet worden overschreven.
+            Bewaar je huidige invoer apart als JSON en vernieuw de pagina om de
+            nieuwste lokaal opgeslagen versie te openen.
           </p>
         ) : draftPersistenceFailed ? (
           <p role="status" data-observation-save-status="failed">
