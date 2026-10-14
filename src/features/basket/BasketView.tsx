@@ -12,7 +12,7 @@ import {
   orderBasketLinesForReview,
 } from './basketPresentation'
 import { StatPill } from '../../components/StatPill'
-import { comparisonLineHighlights, comparisonLineHighlightCopy } from './comparisonLineHighlights.ts'
+import { comparisonLineHighlights, comparisonLineHighlightCopy, comparisonMatchesVisibleBaskets } from './comparisonLineHighlights.ts'
 
 function quantity(amount: number | null, unit: string) {
   const label = quantityUnitLabelNl(unit, amount)
@@ -53,7 +53,8 @@ export function BasketView({
     comparisonBaseline.lines.length > 0 &&
     comparisonCandidate.lines.length > 0
   const comparisonCanShowMoney = hasComparableDemand &&
-    basketComparisonCanShowMoney(comparison, comparisonCandidate)
+    basketComparisonCanShowMoney(comparison, comparisonCandidate) &&
+    comparisonMatchesVisibleBaskets(comparison, comparisonBaseline, comparisonCandidate)
   const displayComparison = comparisonCanShowMoney
     ? comparison
     : { ...comparison, outcome: 'unknown' as const, claimable: false }
