@@ -151,20 +151,36 @@ function requireBoundedHtmlShape(html) {
 
 // This fingerprint deliberately excludes names, prices, URLs, DOM text,
 // embedded-state payloads, and unknown keys (which may include private data).
-export function captureShape(source) {
-  if (!source || typeof source !== 'object' || !canonicalSourceId(source.id)) {
+// The M1 capture adapter yields own plain data fields. The exported pure
+// comparer must not execute source-origin/success getters, or re-read a
+// different source identity after provenance admission.
+function ownSourceField(raw, key, errorMessage) {
+  const descriptor = Object.getOwnPropertyDescriptor(raw, key)
+  if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error(errorMessage)
+  }
+  return descriptor.value
+}
+
+export function captureShape(rawSource) {
+  if (!rawSource || typeof rawSource !== 'object' || Array.isArray(rawSource)) {
     throw new Error('Invalid inspected source')
   }
-  // The M1 inspector always produces an explicit boolean. Do not interpret
-  // an untrusted "true"/"false", 0/1 or missing success flag as a verified
-  // or unavailable capture in the exported pure comparison API.
+  const source = Object.create(null)
+  source.id = ownSourceField(rawSource, 'id', 'Invalid inspected source')
+  if (!canonicalSourceId(source.id)) throw new Error('Invalid inspected source')
+  source.supermarket = ownSourceField(rawSource, 'supermarket', 'Invalid inspected source origin')
+  source.kind = ownSourceField(rawSource, 'kind', 'Invalid inspected source origin')
+  source.success = ownSourceField(rawSource, 'success', 'Invalid inspected capture success')
+  // The M1 inspector always produces an explicit boolean, never a getter
+  // supplied "true"/"false", 0/1, or missing success flag.
   if (typeof source.success !== 'boolean') {
     throw new Error('Invalid inspected capture success')
   }
   if (!source.success) {
     // The M1 inspector never parses Schema.org after a failed capture. A
     // fabricated successful parser result must not appear on a failed source.
-    const failedSchema = Object.getOwnPropertyDescriptor(source, 'schemaOrgProduct')
+    const failedSchema = Object.getOwnPropertyDescriptor(rawSource, 'schemaOrgProduct')
     if (failedSchema && (!Object.hasOwn(failedSchema, 'value') ||
         failedSchema.value !== undefined)) {
       throw new Error('Invalid inspected Schema.org parse result')
@@ -180,11 +196,19 @@ export function captureShape(source) {
       schemaOrgStatus: 'unknown',
     }
   }
-  if (source.integrity !== 'verified' || !/^[a-f0-9]{64}$/.test(source.manifestSha256 ?? '')) {
+  source.integrity = ownSourceField(
+    rawSource, 'integrity', 'Snapshot integrity verification required',
+  )
+  source.manifestSha256 = ownSourceField(
+    rawSource, 'manifestSha256', 'Snapshot integrity verification required',
+  )
+  if (source.integrity !== 'verified' ||
+      typeof source.manifestSha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(source.manifestSha256)) {
     throw new Error('Snapshot integrity verification required')
   }
   requireCanonicalOrigin(source)
-  const html = ownHtmlField(source, 'html')
+  const html = ownHtmlField(rawSource, 'html')
   const inspectedHtml = requireBoundedHtmlShape(html)
   const inspectedJsonLd = inspectedHtml.jsonLd
   // A successful M1 inspection always records a real parser decision.
@@ -193,7 +217,7 @@ export function captureShape(source) {
   // Read own data descriptors only: inherited or getter-computed decisions
   // must never be upgraded into canonical M1 parser results.
   const schemaDescriptor = Object.getOwnPropertyDescriptor(
-    source, 'schemaOrgProduct',
+    rawSource, 'schemaOrgProduct',
   )
   const schemaResult = schemaDescriptor?.value
   if (!schemaDescriptor || !Object.hasOwn(schemaDescriptor, 'value') ||
