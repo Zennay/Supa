@@ -43,7 +43,7 @@ test('portable list refuses blank-looking Unicode Letters and Symbols in store a
 })
 
 test('visible grocery text with combining marks, emoji selectors and fillers stays readable', () => {
-  const value = basket()
+  const value = structuredClone(basket())
   const index = value.lines.findIndex(line => line.status === 'matched')
   assert.ok(index >= 0)
   const id = value.lines[index].id
@@ -67,11 +67,11 @@ test('visible grocery text with combining marks, emoji selectors and fillers sta
 
 test('old mark-only and selector-only labels remain rejected without altering prices', () => {
   for (const invisible of ['\u0301', '\u0650', '\ufe0f']) {
-    const value = basket()
+    const value = structuredClone(basket())
     value.store.name = invisible
     assert.equal(buildShoppingListCopyText(value), null)
   }
-  const value = basket()
+  const value = structuredClone(basket())
   const original = buildShoppingListCopyText(value)
   assert.equal(typeof original, 'string')
   const index = value.lines.findIndex(line => line.status === 'matched')
