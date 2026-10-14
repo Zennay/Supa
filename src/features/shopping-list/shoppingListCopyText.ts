@@ -6,10 +6,14 @@ const BIDI_AND_CONTROL = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\
 
 // A label needs a visible lexical or symbol base, not just invisible marks.
 const VISIBLE_LABEL_BASE = /[\p{L}\p{N}\p{S}]/u
+// These blank-looking code points count as Unicode Letters/Symbols, so the
+// visible-base regex alone incorrectly treats an invisible name as readable.
+const VISUALLY_BLANK_FILLERS = /[\u115f\u1160\u2800\u3164\uffa0]/g
 
 function safeLabel(value: unknown): string | null {
   if (typeof value !== 'string') return null
-  const label = value.replace(BIDI_AND_CONTROL, ' ').replace(/\s+/g, ' ').trim()
+  const label = value.replace(BIDI_AND_CONTROL, ' ')
+    .replace(VISUALLY_BLANK_FILLERS, ' ').replace(/\s+/g, ' ').trim()
   return label && VISIBLE_LABEL_BASE.test(label) ? label : null
 }
 
