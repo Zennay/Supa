@@ -616,6 +616,11 @@ export function observationSheetReadiness(
     if (!nonBlank(observation.evidenceId)) {
       issues.push(`${label}: evidence ID ontbreekt.`)
     }
+    // An unsupported source is not a human observation, even when all 11
+    // product lines happen to contain numbers.
+    if (!['manual-cart', 'receipt', 'consented-export'].includes(observation.source)) {
+      issues.push(`${label}: kies een geldige herkomst (winkelmand, bon of toegestane export).`)
+    }
     if (!nonBlank(observation.provenanceNote)) {
       issues.push(`${label}: provenance-notitie ontbreekt.`)
     }
@@ -673,6 +678,14 @@ export function observationSheetReadiness(
     sheet.baseline.store.id.trim() === sheet.candidate.store.id.trim()
   ) {
     issues.push('Winkel A en Winkel B moeten verschillende winkel-ID\'s hebben.')
+  }
+
+  if (
+    nonBlank(sheet.baseline.evidenceId) &&
+    nonBlank(sheet.candidate.evidenceId) &&
+    sheet.baseline.evidenceId.trim() === sheet.candidate.evidenceId.trim()
+  ) {
+    issues.push('Winkel A en Winkel B moeten verschillende evidence-ID\'s hebben.')
   }
 
   if (observedTimes.length === 2) {
