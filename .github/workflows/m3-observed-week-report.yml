@@ -8,13 +8,18 @@ on:
       - "scripts/m3-build-observed-study.mjs"
       - "scripts/m3-assess-observed-week.mjs"
       - "src/domain/observedBasketStudy.ts"
+      - "src/domain/basket.ts"
+      - "src/domain/m3ObservationSheet.ts"
+      - "src/domain/matching.ts"
       - "src/domain/basketComparison.ts"
       - "src/domain/savingsAttribution.ts"
       - "tests/m3-observation-sheet.test.mjs"
       - "tests/m3-build-observed-study.test.mjs"
       - "tests/m3-observed-study-report.test.mjs"
       - "tests/m3-savings-attribution.test.mjs"
+      - "tests/m3-workflow-contract.test.mjs"
       - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 concurrency:
@@ -26,10 +31,13 @@ permissions:
 
 jobs:
   report-gate:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: self-hosted
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Verify permanent VPS runner
         run: test "$(hostname -s)" = "vps-bb300bba"
       - uses: actions/setup-node@v4
@@ -47,6 +55,6 @@ jobs:
           path: artifacts/m3/observation-sheet.json
           if-no-files-found: error
           retention-days: 7
-      - run: node --experimental-strip-types --test tests/m3-observation-sheet.test.mjs tests/m3-build-observed-study.test.mjs tests/m3-observed-study-report.test.mjs tests/m3-savings-attribution.test.mjs
+      - run: node --experimental-strip-types --test tests/m3-observation-sheet.test.mjs tests/m3-build-observed-study.test.mjs tests/m3-observed-study-report.test.mjs tests/m3-savings-attribution.test.mjs tests/m3-workflow-contract.test.mjs
       - run: npm test
       - run: npm run build
