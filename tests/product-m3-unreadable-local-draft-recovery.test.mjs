@@ -60,6 +60,17 @@ test('actual Meten screen quarantines unreadable stored observations without tre
       const html = renderToStaticMarkup(createElement(ObservationView))
       assert.equal(html.includes('data-observation-recovery-warning'), warning, name)
       assert.equal(html.includes('Ouder lokaal meetconcept niet veilig te lezen'), warning, name)
+      assert.equal(html.includes('data-observation-save-status="protected"'), warning, name)
+      assert.equal(html.includes('data-observation-save-status="normal"'), !warning, name)
+      assert.equal(html.includes('data-observation-save-status="failed"'), false, name)
+      if (warning) {
+        assert.match(html, /Automatisch bewaren staat uit/)
+        assert.doesNotMatch(html, /Je concept wordt automatisch lokaal/)
+        assert.match(html, /Nieuwe invoer blijft tijdelijk/)
+      } else {
+        assert.match(html, /Je concept wordt automatisch lokaal/)
+        assert.doesNotMatch(html, /Automatisch bewaren staat uit/)
+      }
       assert.equal(html.includes('Bewaar oorspronkelijk lokaal bestand'), warning, name)
       assert.equal(html.includes('Bevestig definitief verwijderen'), false, name)
       assert.equal((html.match(/data-observation-line="/g) ?? []).length, 22)
