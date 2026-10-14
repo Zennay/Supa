@@ -24,6 +24,15 @@ import {
   observationPriceCents,
   observationTimestampFromDate,
 } from './observationCollectionUi.ts'
+import {
+  observationPackAmount,
+  observationPackCount,
+} from './observationNumericInput.ts'
+import {
+  persistObservationDraft,
+  removeObservationDraft,
+} from './observationDraftPersistence.ts'
+import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -90,6 +99,8 @@ export function ObservationView() {
   } | null>(null)
   const [resetArmed, setResetArmed] = useState(false)
   const [pendingImport, setPendingImport] = useState<ObservationSheet | null>(null)
+  const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
+  const [draftResetRemovalFailed, setDraftResetRemovalFailed] = useState(false)
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
   const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
   const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
@@ -99,14 +110,14 @@ export function ObservationView() {
   )
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(
+    setDraftPersistenceFailed(
+      !persistObservationDraft(
+        () => window.localStorage,
         OBSERVATION_DRAFT_STORAGE_KEY,
-        JSON.stringify(sheet),
-      )
-    } catch {
-      // Local draft persistence is best-effort; manual JSON export stays available.
-    }
+        sheet,
+        () => setDraftResetRemovalFailed(false),
+      ),
+    )
   }, [sheet])
 
   useEffect(() => {
@@ -124,18 +135,22 @@ export function ObservationView() {
       return
     }
 
-    try {
-      window.localStorage.removeItem(OBSERVATION_DRAFT_STORAGE_KEY)
-    } catch {
-      // Keep reset usable even when storage is unavailable.
-    }
+    const removed = removeObservationDraft(
+      () => window.localStorage,
+      OBSERVATION_DRAFT_STORAGE_KEY,
+    )
+    setDraftResetRemovalFailed(!removed)
     setSheet(buildObservationSheet())
     setResetArmed(false)
     setPendingImport(null)
-    setImportStatus({
-      kind: 'success',
-      message: 'Lokaal concept gewist. Er is een nieuwe lege M3-meting gestart.',
-    })
+    setImportStatus(
+      removed
+        ? {
+            kind: 'success',
+            message: 'Lokaal concept gewist. Er is een nieuwe lege M3-meting gestart.',
+          }
+        : null,
+    )
   }
 
   const jumpToNextIncomplete = () => {
@@ -263,6 +278,15 @@ export function ObservationView() {
 
   const importDraft = async (file: File | undefined) => {
     if (!file) return
+
+    if (!observationDraftFileSizeAllowed(file.size)) {
+      setPendingImport(null)
+      setImportStatus({
+        kind: 'error',
+        message: 'Import geweigerd: het JSON-concept is groter dan 1 MB.',
+      })
+      return
+    }
 
     try {
       const restored = restoreObservationSheetDraft(await file.text())
@@ -669,9 +693,9 @@ export function ObservationView() {
                               value={product.packAmount ?? ''}
                               onChange={(event) =>
                                 updateProduct(side, lineIndex, {
-                                  packAmount: event.target.value
-                                    ? Number(event.target.value)
-                                    : null,
+                                  packAmount: observationPackAmount(
+                                    event.target.value,
+                                  ),
                                 })
                               }
                             />
@@ -701,9 +725,8 @@ export function ObservationView() {
                               value={product.packCount}
                               onChange={(event) =>
                                 updateProduct(side, lineIndex, {
-                                  packCount: Math.max(
-                                    1,
-                                    Math.trunc(Number(event.target.value) || 1),
+                                  packCount: observationPackCount(
+                                    event.target.value,
                                   ),
                                 })
                               }
@@ -797,6 +820,22 @@ export function ObservationView() {
           {resetArmed ? 'Bevestig wissen' : 'Alles wissen'}
         </button>
       </div>
+
+      {draftPersistenceFailed && (
+        <p className="observation-import-status is-warning" role="status">
+          Automatisch bewaren is mislukt. Bewaar dit concept handmatig als JSON
+          voordat je deze pagina sluit.
+        </p>
+      )}
+
+      {draftResetRemovalFailed && (
+        <p className="observation-import-status is-warning" role="status">
+          Het scherm is leeggemaakt, maar het eerder opgeslagen lokale concept
+          kon niet worden verwijderd. Bewaar zo nodig handmatig een JSON-kopie
+          en probeer opnieuw; een volgende succesvolle lokale opslag herstelt
+          deze waarschuwing automatisch.
+        </p>
+      )}
 
       {importStatus && (
         <p
