@@ -96,6 +96,6 @@ test('live collector registers all focusable fields and never opens data automat
   assert.match(source, /observationNextTaskSelector\(nextAction\)/)
   assert.match(source, /document\.querySelector<HTMLInputElement \| HTMLSelectElement>\(nextTaskSelector\)/)
   assert.match(source, /onClick=\{jumpToNextIncomplete\}/)
-  assert.match(source, /disabled=\{nextTaskSelector === null && !canJumpToNextLine\}/)
+  assert.match(source, /disabled=\{nextTaskSelector === null && !canJumpToNextLine && !canNavigateReview && !canNavigateExport\}/)
   assert.doesNotMatch(source, /autoFocus=|navigator\.clipboard|document\.execCommand/)
 })
