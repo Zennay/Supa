@@ -274,6 +274,17 @@ async function preflightBoundedManifest(directory) {
       parsed.results.some((record) => !record ||
         typeof record !== 'object' ||
         typeof record.success !== 'boolean')) fail()
+  // An M1 capture is a set of distinct sources, not a bag of observations.
+  // The downstream comparison rejects duplicate IDs only *after* the M1
+  // inspector would already have read HTML. Reject ambiguous source identity
+  // here, on both manifests, before any successful-source filesystem I/O.
+  const seenIds = new Set()
+  for (const record of parsed.results) {
+    if (typeof record.id !== 'string' ||
+        !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(record.id) ||
+        seenIds.has(record.id)) fail()
+    seenIds.add(record.id)
+  }
   return parsed.results
 }
 
