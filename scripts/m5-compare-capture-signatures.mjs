@@ -268,18 +268,25 @@ async function preflightBoundedManifest(directory) {
       parsed.results.some((record) => !record ||
         typeof record !== 'object' ||
         typeof record.success !== 'boolean')) fail()
-  // Verify every successfully collected source before reading any HTML. A
-  // single missing/invalid observation time invalidates the whole review.
+  return parsed.results
+}
+
+// Check *both* structural manifests before timestamp or HTML inspection.
+// Existing invalid-cohort refusal must win over missing source file/time.
+function observationInstants(results) {
   const times = new Map()
-  for (const result of parsed.results) {
+  for (const result of results) {
     if (result.success) times.set(result.id, captureObservationInstant(result.capturedAt))
   }
   return times
 }
 
 export async function compareCaptureDirectories(currentDir, baselineDir = null) {
-  const currentTimes = await preflightBoundedManifest(currentDir)
-  const baselineTimes = baselineDir ? await preflightBoundedManifest(baselineDir) : null
+  const currentRows = await preflightBoundedManifest(currentDir)
+  const baselineRows = baselineDir ? await preflightBoundedManifest(baselineDir) : null
+  // Every successful source needs a valid time before *any* HTML is read.
+  const currentTimes = observationInstants(currentRows)
+  const baselineTimes = baselineRows ? observationInstants(baselineRows) : null
   if (baselineTimes) {
     // Historical means strictly earlier for each shared successful source ID,
     // not just for the first row or based on wall-clock string ordering.
