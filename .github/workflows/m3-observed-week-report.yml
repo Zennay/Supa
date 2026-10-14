@@ -31,10 +31,13 @@ permissions:
 
 jobs:
   report-gate:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: self-hosted
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Verify permanent VPS runner
         run: test "$(hostname -s)" = "vps-bb300bba"
       - uses: actions/setup-node@v4
