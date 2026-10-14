@@ -41,7 +41,7 @@ for (const [name, change, expectedOutcome] of [
     const comparison = compareFullBaskets({ baseline, candidate })
     assert.equal(comparison.claimable, true)
     assert.equal(comparison.outcome, expectedOutcome)
-    assert.equal(comparison.savingsCents, -comparison.deltaCents)
+    assert.equal(comparison.savingsCents, comparison.deltaCents === 0 ? 0 : -comparison.deltaCents)
     assert.equal(comparison.lineDeltas.length, baseline.matchedLineCount)
     const evidence = comparison.lineDeltas.map((line) => ({
       lineId: line.id, effect: 'offer', deltaCents: line.deltaCents,
