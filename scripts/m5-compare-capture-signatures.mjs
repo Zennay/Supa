@@ -368,12 +368,19 @@ async function requireRegularCaptureRoot(directory) {
       await realpath(directory) !== path.resolve(directory)) {
     throw new Error('Invalid offline capture tree origin')
   }
+  return root
 }
 
 // M5 is an offline human-only reviewer. Do not let SHA-correct HTML borrowed
 // via filesystem aliases pretend to belong to a nominated capture tree.
 async function requireRegularCaptureTree(directory, rows) {
-  await requireRegularCaptureRoot(directory)
+  const root = await requireRegularCaptureRoot(directory)
+  // Preserve the original preflight inode identities. A later SHA-identical
+  // replacement is still a different physical capture origin.
+  const attest = {
+    root: { dev: root.dev, ino: root.ino },
+    stores: new Map(), files: new Map(),
+  }
   let totalHtmlBytes = 0
   for (const row of rows) {
     if (!row.success) continue
@@ -402,7 +409,16 @@ async function requireRegularCaptureTree(directory, rows) {
       throw new Error('Offline HTML input exceeds resource budget')
     }
     totalHtmlBytes += file.size
+    const previousStore = attest.stores.get(row.supermarket)
+    if (previousStore &&
+        (previousStore.dev !== folder.dev || previousStore.ino !== folder.ino)) {
+      throw new Error('Invalid offline capture tree origin')
+    }
+    attest.stores.set(row.supermarket, { dev: folder.dev, ino: folder.ino })
+    attest.files.set(row.supermarket + '\0' + row.id,
+      { dev: file.dev, ino: file.ino })
   }
+  return attest
 }
 
 // Lexically different paths can resolve to the very same M1 capture tree.
@@ -426,8 +442,9 @@ export async function compareCaptureDirectories(currentDir, baselineDir = null) 
   const baselineManifest = baselineDir ? await preflightBoundedManifest(baselineDir) : null
   const currentRows = currentManifest.results
   const baselineRows = baselineManifest?.results ?? null
-  await requireRegularCaptureTree(currentDir, currentRows)
-  if (baselineRows) await requireRegularCaptureTree(baselineDir, baselineRows)
+  const currentIdentity = await requireRegularCaptureTree(currentDir, currentRows)
+  const baselineIdentity = baselineRows
+    ? await requireRegularCaptureTree(baselineDir, baselineRows) : null
   // Keep the existing whole-manifest structural checks first, but do not
   // read HTML or assign P3 to one directory masquerading as its own baseline.
   if (baselineDir) await requireIndependentCaptureRoots(currentDir, baselineDir)
@@ -446,10 +463,13 @@ export async function compareCaptureDirectories(currentDir, baselineDir = null) 
   }
   // M1 remains canonical, but it now inspects a verified bounded private
   // snapshot rather than re-opening the mutable original source filenames.
-  const current = await inspectFrozenCaptureDirectory(currentDir, currentManifest)
+  const current = await inspectFrozenCaptureDirectory(
+    currentDir, currentManifest, undefined, currentIdentity,
+  )
   const baseline = baselineManifest
-    ? await inspectFrozenCaptureDirectory(baselineDir, baselineManifest)
-    : null
+    ? await inspectFrozenCaptureDirectory(
+      baselineDir, baselineManifest, undefined, baselineIdentity,
+    ) : null
   return compareInspections(current, baseline)
 }
 
