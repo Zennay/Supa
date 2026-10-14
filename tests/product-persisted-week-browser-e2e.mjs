@@ -5,6 +5,29 @@ const baseUrl = process.env.PRODUCT_WEEK_BASE_URL ?? 'http://127.0.0.1:4179'
 const driverUrl = process.env.PRODUCT_WEEK_WEBDRIVER_URL ?? 'http://127.0.0.1:4457'
 const artifactDirectory = process.env.PRODUCT_WEEK_ARTIFACT_DIR ?? 'artifacts/product-week-browser'
 
+for (const [label, raw] of [['app', baseUrl], ['webdriver', driverUrl]]) {
+  const url = new URL(raw)
+  assert.equal(url.protocol, 'http:', `${label} must use isolated HTTP`)
+  assert.equal(url.hostname, '127.0.0.1', `${label} must be localhost-only`)
+  assert.ok(url.port, `${label} must use an explicit isolated local port`)
+  assert.equal(url.username, '', `${label} must not contain credentials`)
+  assert.equal(url.password, '', `${label} must not contain credentials`)
+  assert.equal(url.search, '', `${label} must not contain query parameters`)
+  assert.equal(url.hash, '', `${label} must not contain fragments`)
+  assert.equal(url.pathname, '/', `${label} must target only the local origin`)
+}
+
+if (process.env.GITHUB_ACTIONS === 'true') {
+  for (const [label, value] of [
+    ['checkout SHA', process.env.GITHUB_SHA],
+    ['PR/source SHA', process.env.PRODUCT_WEEK_HEAD_SHA],
+  ]) {
+    assert.match(value ?? '', /^[a-f0-9]{40}$/i, `${label} must identify an exact git commit`)
+  }
+  assert.match(process.env.GITHUB_RUN_ID ?? '', /^\\d+$/, 'GitHub run id required')
+  assert.match(process.env.GITHUB_RUN_ATTEMPT ?? '', /^\\d+$/, 'GitHub attempt required')
+}
+
 async function request(endpoint, init = {}) {
   const response = await fetch(driverUrl + endpoint, {
     ...init,
@@ -21,6 +44,15 @@ async function script(sessionId, code, args = []) {
   return request(`/session/${sessionId}/execute/sync`, {
     method: 'POST',
     body: JSON.stringify({ script: code, args }),
+  })
+}
+
+async function screenshot(sessionId, name) {
+  const encoded = await request(`/session/${sessionId}/screenshot`)
+  assert.equal(typeof encoded, 'string', 'Firefox screenshot must be base64')
+  assert.match(encoded, /^[a-zA-Z0-9+/]+={0,2}$/, 'Firefox screenshot encoding is malformed')
+  await writeFile(`${artifactDirectory}/${name}`, Buffer.from(encoded, 'base64'), {
+    mode: 0o600,
   })
 }
 
@@ -120,19 +152,29 @@ try {
   `, 'saved 2-day/40 euro preferences')
   assert.equal(stored, true)
   checks.push('edited-planner-saved')
+  await screenshot(sessionId, 'planner-changed.png')
 
   await nav(sessionId, 'Mand')
   await until(sessionId,
     'return document.querySelector(".comparison-card")?.textContent.includes("geen live-besparingsclaim")',
     'controlled fixture comparison disclaimer',
   )
+  const basketLineCount = await script(sessionId,
+    'return document.querySelectorAll(".list-card .trace-row").length')
+  assert.ok(basketLineCount > 0)
   checks.push('basket-price-claim-boundary')
+  await screenshot(sessionId, 'basket-controlled-demo.png')
 
   await nav(sessionId, 'Lijst')
   await until(sessionId,
     'return document.querySelectorAll("button.shopping-row").length > 0',
     'populated checklist',
   )
+  const shoppingLineCount = await script(sessionId,
+    'return document.querySelectorAll("button.shopping-row").length')
+  assert.equal(shoppingLineCount, basketLineCount,
+    'real basket and shopping list must have the same physical ingredient rows')
+  checks.push('rendered-basket-list-line-count-agrees')
   const row = await script(sessionId, `
     const line = document.querySelector('button.shopping-row')
     line.click()
@@ -146,6 +188,7 @@ try {
     return line.classList.contains('checked') && JSON.parse(raw).doneLineIds.length === 1
   `, 'saved checked item')
   checks.push('checklist-saved')
+  await screenshot(sessionId, 'shopping-item-checked.png')
 
   await request(`/session/${sessionId}/refresh`, { method: 'POST', body: '{}' })
   await until(sessionId,
@@ -158,6 +201,7 @@ try {
     'restored checked item',
   )
   checks.push('persisted-reload-restores-checklist')
+  await screenshot(sessionId, 'shopping-reloaded.png')
 
   await nav(sessionId, 'Planner')
   assert.equal(await script(sessionId, `
@@ -234,6 +278,7 @@ try {
   assert.equal(await script(sessionId,
     'return document.querySelectorAll("button.shopping-row").length'), 0)
   checks.push('intentionally-empty-week-persists-without-phantom-groceries')
+  await screenshot(sessionId, 'shopping-empty-week.png')
 
   await writeFile(`${artifactDirectory}/result.json`,
     JSON.stringify({
@@ -241,6 +286,15 @@ try {
       category: 'synthetic-M2-M3-product-flow',
       checkoutSha: process.env.GITHUB_SHA ?? null,
       pullRequestHeadSha: process.env.PRODUCT_WEEK_HEAD_SHA ?? null,
+      githubRunId: process.env.GITHUB_RUN_ID ?? null,
+      githubRunAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null,
+      screenshots: [
+        'planner-changed.png',
+        'basket-controlled-demo.png',
+        'shopping-item-checked.png',
+        'shopping-reloaded.png',
+        'shopping-empty-week.png',
+      ],
       checks,
       retailerDataObserved: false,
       realSavingsClaimEligible: false,
