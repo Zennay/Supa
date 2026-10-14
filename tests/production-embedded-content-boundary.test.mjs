@@ -44,9 +44,11 @@ function staticString(node) {
   return null
 }
 
-function isDocumentObject(node) {
+function isDocumentObject(node, documentAliases = new Set()) {
   const current = unwrapExpression(node)
-  if (ts.isIdentifier(current)) return current.text === 'document'
+  if (ts.isIdentifier(current)) {
+    return current.text === 'document' || documentAliases.has(current.text)
+  }
 
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return false
@@ -60,9 +62,126 @@ function isDocumentObject(node) {
   )
 }
 
-function isReactObject(node) {
+function isReactObject(node, reactAliases = new Set()) {
   const current = unwrapExpression(node)
-  return ts.isIdentifier(current) && current.text === 'React'
+  return (
+    ts.isIdentifier(current) &&
+    (current.text === 'React' || reactAliases.has(current.text))
+  )
+}
+
+function collectEmbeddedContentAliases(sourceFile) {
+  const documentAliases = new Set()
+  const reactAliases = new Set()
+  const documentFactoryAliases = new Map()
+  const reactCreateElementAliases = new Set()
+  let changed = true
+
+  function bindObjectPattern(pattern, initializer) {
+    const documentObject = isDocumentObject(initializer, documentAliases)
+    const reactObject = isReactObject(initializer, reactAliases)
+
+    for (const element of pattern.elements) {
+      if (!ts.isIdentifier(element.name)) continue
+      const sourceName = staticName(element.propertyName) ?? element.name.text
+      const alias = element.name.text
+
+      if (
+        documentObject &&
+        (sourceName === 'createElement' || sourceName === 'createElementNS') &&
+        documentFactoryAliases.get(alias) !== sourceName
+      ) {
+        documentFactoryAliases.set(alias, sourceName)
+        changed = true
+      }
+
+      if (
+        reactObject &&
+        sourceName === 'createElement' &&
+        !reactCreateElementAliases.has(alias)
+      ) {
+        reactCreateElementAliases.add(alias)
+        changed = true
+      }
+    }
+  }
+
+  while (changed) {
+    changed = false
+
+    function visit(node) {
+      if (ts.isVariableDeclaration(node) && node.initializer) {
+        const initializer = unwrapExpression(node.initializer)
+
+        if (ts.isIdentifier(node.name)) {
+          const alias = node.name.text
+
+          if (!documentAliases.has(alias) && isDocumentObject(initializer, documentAliases)) {
+            documentAliases.add(alias)
+            changed = true
+          }
+
+          if (!reactAliases.has(alias) && isReactObject(initializer, reactAliases)) {
+            reactAliases.add(alias)
+            changed = true
+          }
+
+          if (ts.isIdentifier(initializer)) {
+            const documentFactory = documentFactoryAliases.get(initializer.text)
+            if (documentFactory && documentFactoryAliases.get(alias) !== documentFactory) {
+              documentFactoryAliases.set(alias, documentFactory)
+              changed = true
+            }
+            if (
+              reactCreateElementAliases.has(initializer.text) &&
+              !reactCreateElementAliases.has(alias)
+            ) {
+              reactCreateElementAliases.add(alias)
+              changed = true
+            }
+          }
+
+          if (
+            ts.isPropertyAccessExpression(initializer) ||
+            ts.isElementAccessExpression(initializer)
+          ) {
+            const method = memberName(initializer)
+
+            if (
+              isDocumentObject(initializer.expression, documentAliases) &&
+              (method === 'createElement' || method === 'createElementNS') &&
+              documentFactoryAliases.get(alias) !== method
+            ) {
+              documentFactoryAliases.set(alias, method)
+              changed = true
+            }
+
+            if (
+              isReactObject(initializer.expression, reactAliases) &&
+              method === 'createElement' &&
+              !reactCreateElementAliases.has(alias)
+            ) {
+              reactCreateElementAliases.add(alias)
+              changed = true
+            }
+          }
+        } else if (ts.isObjectBindingPattern(node.name)) {
+          bindObjectPattern(node.name, initializer)
+        }
+      }
+
+      ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+  }
+
+  return {
+    documentAliases,
+    reactAliases,
+    documentFactoryAliases,
+    reactCreateElementAliases,
+  }
 }
 
 function scriptKindFor(filename) {
@@ -92,6 +211,12 @@ function findExecutableEmbeddedContent(source, filename = 'candidate.tsx') {
     true,
     scriptKindFor(filename),
   )
+  const {
+    documentAliases,
+    reactAliases,
+    documentFactoryAliases,
+    reactCreateElementAliases,
+  } = collectEmbeddedContentAliases(sourceFile)
 
   let finding = null
 
@@ -100,55 +225,77 @@ function findExecutableEmbeddedContent(source, filename = 'candidate.tsx') {
 
     if (ts.isCallExpression(node)) {
       const callee = unwrapExpression(node.expression)
+      let documentFactory = null
+      let reactCreateElement = false
 
-      if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
+      if (ts.isIdentifier(callee)) {
+        documentFactory = documentFactoryAliases.get(callee.text) ?? null
+        reactCreateElement = reactCreateElementAliases.has(callee.text)
+      } else if (
+        ts.isPropertyAccessExpression(callee) ||
+        ts.isElementAccessExpression(callee)
+      ) {
         const method = memberName(callee)
 
-        if (isDocumentObject(callee.expression) && method === 'createElement') {
-          const tag = executableTagName(node.arguments[0])
-          if (tag === null) {
-            finding = {
-              kind: 'dynamic document.createElement tag',
-              text: node.getText(sourceFile),
-            }
-            return
-          }
-          if (executableTags.has(tag)) {
-            finding = {
-              kind: 'executable document element',
-              text: node.getText(sourceFile),
-            }
-            return
-          }
+        if (
+          isDocumentObject(callee.expression, documentAliases) &&
+          (method === 'createElement' || method === 'createElementNS')
+        ) {
+          documentFactory = method
         }
 
-        if (isDocumentObject(callee.expression) && method === 'createElementNS') {
-          const tag = executableTagName(node.arguments[1])
-          if (tag === null) {
-            finding = {
-              kind: 'dynamic document.createElementNS tag',
-              text: node.getText(sourceFile),
-            }
-            return
-          }
-          if (executableTags.has(tag)) {
-            finding = {
-              kind: 'executable namespaced document element',
-              text: node.getText(sourceFile),
-            }
-            return
-          }
+        if (
+          isReactObject(callee.expression, reactAliases) &&
+          method === 'createElement'
+        ) {
+          reactCreateElement = true
         }
+      }
 
-        if (isReactObject(callee.expression) && method === 'createElement') {
-          const tag = executableTagName(node.arguments[0])
-          if (tag !== null && executableTags.has(tag)) {
-            finding = {
-              kind: 'executable React element',
-              text: node.getText(sourceFile),
-            }
-            return
+      if (documentFactory === 'createElement') {
+        const tag = executableTagName(node.arguments[0])
+        if (tag === null) {
+          finding = {
+            kind: 'dynamic document.createElement tag',
+            text: node.getText(sourceFile),
           }
+          return
+        }
+        if (executableTags.has(tag)) {
+          finding = {
+            kind: 'executable document element',
+            text: node.getText(sourceFile),
+          }
+          return
+        }
+      }
+
+      if (documentFactory === 'createElementNS') {
+        const tag = executableTagName(node.arguments[1])
+        if (tag === null) {
+          finding = {
+            kind: 'dynamic document.createElementNS tag',
+            text: node.getText(sourceFile),
+          }
+          return
+        }
+        if (executableTags.has(tag)) {
+          finding = {
+            kind: 'executable namespaced document element',
+            text: node.getText(sourceFile),
+          }
+          return
+        }
+      }
+
+      if (reactCreateElement) {
+        const tag = executableTagName(node.arguments[0])
+        if (tag !== null && executableTags.has(tag)) {
+          finding = {
+            kind: 'executable React element',
+            text: node.getText(sourceFile),
+          }
+          return
         }
       }
     }
@@ -227,6 +374,20 @@ test('embedded-content boundary catches executable DOM and JSX creation', () => 
   }
 })
 
+test('embedded-content boundary follows document and React aliases', () => {
+  for (const source of [
+    "const doc = document; doc.createElement('iframe')",
+    "const doc = window.document; const next = doc; next.createElement('script')",
+    "const { createElement } = document; createElement('object')",
+    "const { createElementNS: makeNs } = window.document; makeNs('http://www.w3.org/2000/svg', 'script')",
+    "const make = document.createElement; const nextMake = make; nextMake('embed')",
+    "const R = React; R.createElement('iframe', { src: url })",
+    "const { createElement: makeReact } = React; makeReact('script', { src: url })",
+  ]) {
+    assert.ok(findExecutableEmbeddedContent(source), source)
+  }
+})
+
 test('embedded-content boundary preserves reviewed non-executable creation paths', () => {
   for (const source of [
     "document.createElement('a')",
@@ -238,6 +399,10 @@ test('embedded-content boundary preserves reviewed non-executable creation paths
     "const Script = () => null; const view = <Script />",
     "// document.createElement('script')",
     "const example = \"<iframe src='/example'></iframe>\"",
+    "const doc = editor.document; doc.createElement('iframe')",
+    "const { createElement } = factory; createElement('script')",
+    "const R = ui.React; R.createElement('iframe', { src: url })",
+    "const { createElement: make } = ui; make('script')",
   ]) {
     assert.equal(findExecutableEmbeddedContent(source), null, source)
   }
