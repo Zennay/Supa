@@ -35,8 +35,8 @@ test('actual routed Meten collector presents Dutch amounts but preserves canonic
     assert.doesNotMatch(html, /nodig: \d+ piece/)
     // Empty observation templates never show pack inputs until a product
     // is explicitly marked available by the human collector.
-    assert.equal((html.match(/<option value="piece">stuk<\\/option>/g) ?? []).length, 0)
-    assert.doesNotMatch(html, />piece<\\/option>/)
+    assert.equal(html.split('<option value="piece">stuk</option>').length - 1, 0)
+    assert.ok(!html.includes('>piece</option>'))
 
     const withOneProductEach = {
       ...sheet,
@@ -63,9 +63,9 @@ test('actual routed Meten collector presents Dutch amounts but preserves canonic
       } } },
     })
     const availableHtml = renderToStaticMarkup(createElement(ObservationView))
-    assert.equal((availableHtml.match(/<option value="piece">stuk<\\/option>/g) ?? []).length, 2,
+    assert.equal(availableHtml.split('<option value="piece">stuk</option>').length - 1, 2,
       'both store forms render Dutch labels after a real availability selection')
-    assert.doesNotMatch(availableHtml, />piece<\\/option>/)
+    assert.ok(!availableHtml.includes('>piece</option>'))
     assert.match(availableHtml, /nodig: 1 stuk|nodig: [2-9] stuks/)
     assert.match(html, /collection-template-not-evidence/)
     assert.deepEqual(sheet, snapshot)
