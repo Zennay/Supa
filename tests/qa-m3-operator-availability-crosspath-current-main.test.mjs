@@ -63,7 +63,7 @@ test('independent QA: routed operator instructions and paper card agree on retai
   const fullCard = renderM3FieldVisitCard()
   assert.match(fullCard, /GEEN bewijs/)
   assert.match(fullCard, /binnen maximaal 24 uur/)
-  assert.match(fullCard, /één prijscontext/)
+  assert.match(fullCard, /Kies ÉÉN prijscontext/)
   assert.match(fullCard, /onbekend = nog niet gemeten/)
   assert.match(fullCard, /niet verkrijgbaar = werkelijk als afwezig gezien/i)
   assert.doesNotMatch(fullCard, /€\s*\d+|\bEUR\s*\d+/)
