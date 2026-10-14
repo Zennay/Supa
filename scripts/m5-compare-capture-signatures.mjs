@@ -291,17 +291,32 @@ export function captureShape(rawSource) {
   }
 }
 
+// Canonical M1 outputs own plain cohort fields and own numeric array slots.
+// A synthetic direct caller must not smuggle getters/custom iterators into
+// captureShape after we have checked the cohort size. Pin bounded slots first.
+function pinnedInspectionCohort(raw, label) {
+  const fail = () => { throw new Error('Invalid or unbounded ' + label + ' inspection') }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail()
+  const sourcesDescriptor = Object.getOwnPropertyDescriptor(raw, 'sources')
+  const countDescriptor = Object.getOwnPropertyDescriptor(raw, 'sourceCount')
+  if (!sourcesDescriptor || !Object.hasOwn(sourcesDescriptor, 'value') ||
+      !countDescriptor || !Object.hasOwn(countDescriptor, 'value')) fail()
+  const sources = sourcesDescriptor.value
+  const count = countDescriptor.value
+  if (!Array.isArray(sources) || sources.length > MAX_SOURCES ||
+      !Number.isSafeInteger(count) || count < 0 || count !== sources.length) fail()
+  const pinned = []
+  for (let index = 0; index < sources.length; index += 1) {
+    const slot = Object.getOwnPropertyDescriptor(sources, index)
+    if (!slot || !Object.hasOwn(slot, 'value')) fail()
+    pinned.push(slot.value)
+  }
+  return pinned
+}
+
 export function compareInspections(current, baseline = null) {
-  if (!current || !Array.isArray(current.sources) ||
-      current.sources.length > MAX_SOURCES ||
-      current.sourceCount !== current.sources.length) {
-    throw new Error('Invalid or unbounded current inspection')
-  }
-  if (baseline && (!Array.isArray(baseline.sources) ||
-      baseline.sources.length > MAX_SOURCES ||
-      baseline.sourceCount !== baseline.sources.length)) {
-    throw new Error('Invalid or unbounded baseline inspection')
-  }
+  const nowSources = pinnedInspectionCohort(current, 'current')
+  const baselineSources = baseline ? pinnedInspectionCohort(baseline, 'baseline') : null
   const map = (sources) => {
     const result = new Map()
     for (const source of sources) {
@@ -311,8 +326,8 @@ export function compareInspections(current, baseline = null) {
     }
     return result
   }
-  const now = map(current.sources)
-  const before = baseline ? map(baseline.sources) : new Map()
+  const now = map(nowSources)
+  const before = baselineSources ? map(baselineSources) : new Map()
   const ids = [...new Set([...now.keys(), ...before.keys()])].sort()
   const changes = ids.map((id) => {
     const latest = now.get(id)
