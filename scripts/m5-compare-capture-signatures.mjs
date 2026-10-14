@@ -76,7 +76,12 @@ function requireBoundedHtmlShape(html) {
     if (!record || typeof record !== 'object' || Array.isArray(record) ||
         !canonicalShapeTerms(record.type) ||
         !canonicalShapeTerms(record.keys) ||
-        (Object.hasOwn(record, 'parseError') && record.parseError !== true)) {
+        (Object.hasOwn(record, 'parseError') && record.parseError !== true) ||
+        // The canonical M1 parser emits {type:[], keys:[], parseError:true}
+        // when JSON-LD is malformed. A failed parse cannot also have parsed
+        // product/offer types or keys to influence a trustworthy fingerprint.
+        (record.parseError === true &&
+          (record.type.length !== 0 || record.keys.length !== 0))) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
   }
