@@ -192,6 +192,8 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
 
           return (
             <button
+              type="button"
+              aria-pressed={checked}
               className={
                 line.status === 'unresolved'
                   ? checked
@@ -217,7 +219,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
                 })
               }
             >
-              <span className="check">{checked ? '✓' : ''}</span>
+              <span className="check" aria-hidden="true">{checked ? '✓' : ''}</span>
               <span>
                 <strong>{label}</strong>
                 <small>{shoppingQuantity(line)}</small>
