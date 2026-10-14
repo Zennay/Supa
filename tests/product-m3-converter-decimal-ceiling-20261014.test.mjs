@@ -109,5 +109,5 @@ test('synthetic exact-pack conversion reaches the canonical private M3 assessmen
   assert.equal(report.savingsCents, 313500 - 990)
   assert.equal(report.publicSavingsClaimEligible, false,
     'fictional prices never authorize public consumer savings')
-  assert.equal(report.m4BetaEligible, false)
+  assert.match(report.evidenceBoundary, /one observed week is study evidence only/i)
 })
