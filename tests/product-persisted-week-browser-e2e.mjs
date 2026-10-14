@@ -487,6 +487,7 @@ try {
     const navRect = nav.getBoundingClientRect()
     return {
       width: innerWidth,
+      viewportClientWidth: document.documentElement.clientWidth,
       desktopQuery: matchMedia('(min-width: 700px)').matches,
       shellWidth: shellRect.width,
       shellLeft: shellRect.left,
@@ -505,15 +506,15 @@ try {
   assert.ok(desktop.width >= 700, 'Firefox must honor a real desktop viewport')
   assert.ok(desktop.shellWidth <= 561 && desktop.shellWidth > 400,
     'centered desktop shopping app must retain a readable bounded width')
-  assert.ok(Math.abs(desktop.shellLeft - (desktop.width - desktop.shellWidth) / 2) <= 2,
+  assert.ok(Math.abs(desktop.shellLeft - (desktop.viewportClientWidth - desktop.shellWidth) / 2) <= 2,
     'desktop app shell must be horizontally centered')
   assert.ok(desktop.navWidth <= 533)
-  assert.ok(Math.abs(desktop.navLeft - (desktop.width - desktop.navWidth) / 2) <= 2,
+  assert.ok(Math.abs(desktop.navLeft - (desktop.viewportClientWidth - desktop.navWidth) / 2) <= 2,
     'desktop navigation must remain centered')
   assert.equal(desktop.topbar, 'sticky')
   assert.equal(desktop.overflow, 'clip')
   assert.equal(desktop.activeNav, 'Lijst')
-  assert.ok(desktop.scrollWidth <= desktop.width + 2,
+  assert.ok(desktop.scrollWidth <= desktop.viewportClientWidth + 2,
     'desktop must not horizontally overflow')
   assert.equal(desktop.rowCount, canonicalDefaultShoppingRows.length)
   assert.equal(desktop.checkedRows, 0)
@@ -532,6 +533,7 @@ try {
       width: innerWidth,
       desktopQuery: matchMedia('(min-width: 700px)').matches,
       scrollWidth: document.documentElement.scrollWidth,
+      viewportClientWidth: document.documentElement.clientWidth,
       navLeft: rect.left,
       navWidth: rect.width,
       activeNav: document.querySelector('.bottom-nav button[aria-current="page"]')?.textContent.trim(),
@@ -543,9 +545,9 @@ try {
   assert.ok(mobile, 'mobile shopping geometry missing')
   assert.equal(mobile.desktopQuery, false)
   assert.ok(mobile.width < 700, 'Firefox must restore the mobile breakpoint')
-  assert.ok(mobile.scrollWidth <= mobile.width + 2,
+  assert.ok(mobile.scrollWidth <= mobile.viewportClientWidth + 2,
     'mobile shopping rows must never cause horizontal overflow')
-  assert.ok(Math.abs(mobile.navLeft - (mobile.width - mobile.navWidth) / 2) <= 2,
+  assert.ok(Math.abs(mobile.navLeft - (mobile.viewportClientWidth - mobile.navWidth) / 2) <= 2,
     'mobile navigation must remain centered')
   assert.equal(mobile.activeNav, 'Lijst')
   assert.deepEqual(mobile.rows, canonicalDefaultShoppingRows,
