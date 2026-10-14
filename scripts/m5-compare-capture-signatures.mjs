@@ -329,6 +329,20 @@ export function compareInspections(current, baseline = null) {
       Object.getOwnPropertyDescriptor(baseline, 'sources').value)) {
     throw new Error('Invalid or unbounded baseline inspection')
   }
+  // Separate arrays alone do not establish independent source captures.
+  // Compare pinned slot values by identity before evaluating untrusted source
+  // fields. Even failed sources may not stand in for their own past snapshots.
+  if (baselineSources) {
+    const nowReferences = new Set(nowSources.filter(
+      (source) => source !== null && (typeof source === 'object' || typeof source === 'function'),
+    ))
+    for (const source of baselineSources) {
+      if (source !== null && (typeof source === 'object' || typeof source === 'function') &&
+          nowReferences.has(source)) {
+        throw new Error('Invalid or unbounded baseline inspection')
+      }
+    }
+  }
   const map = (sources) => {
     const result = new Map()
     for (const source of sources) {
