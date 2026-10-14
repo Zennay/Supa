@@ -1,0 +1,9 @@
+# Independent M5 direct report-root own-data: immutable original→fixed acceptance
+
+**Issue:** [#2325](https://github.com/Zennay/Supa/issues/2325). The product-owned corrected [DRAFT #2327](https://github.com/Zennay/Supa/pull/2327) is frozen at `fb27e9bff4e372579bdab05ff7978a51d51bd50d`, descendant of frozen [DRAFT #2323](https://github.com/Zennay/Supa/pull/2323) `0b089507faa27932fba75b2bb28dd7a517a27284`. Product source was not modified by QA.
+
+Independent original-source [QA DRAFT #2330](https://github.com/Zennay/Supa/pull/2330), head `bfb6dbe3afac0a365d0ee6e5f6613fdd7c2ddbae`, added **18 local synthetic acceptance tests: four true M1→M5 controls and 14 intended original RED** across all nine root report-envelope metadata fields. This fixed-source child imports the **exact same immutable Git test blob `459f266cad8cbb99e8c1caf35cf4a888ef3fd550`**, byte-identical with no weakened expectations. It must refuse accessor/inherited root fields without executing getters or echoing private labels, preserve legitimate P1/P2/P3 manual review, pseudonymous source tokens, rights/selector/production/M5 false.
+
+Exactly two own QA-only test/doc ADD files, no product source/other worker branch, main, M1/M3/UI, CI/workflows, permanent VPS, live retailer HTTP, personal data or actual prices touched. **Require this QA exact-head** full hosted Node, high npm audit, M1 matching/source-permission and TypeScript/Vite build GREEN; green product CI alone cannot prove independent acceptance.
+
+Supa **M3 ACTIVE**; genuine human [#78](https://github.com/Zennay/Supa/issues/78) same-demand 11 PLUS+11 DekaMarkt within 24h and source rights missing. M4/M5 ineligible, **DRAFT/HOLD/NO MERGE/NO DEPLOY** pending independently verified zCloud SQLite task/scope write lease, original product/QA owners, current-main/trusted runner where necessary, authentic human field and explicit releasego.
