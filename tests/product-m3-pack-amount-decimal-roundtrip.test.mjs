@@ -25,7 +25,7 @@ test('M3 pack quantity never saves an IEEE-754-rounded user decimal', async () =
       '2.9999999999999999',
       '1.234567890123456789',
       '9007199254740990,5',
-      '0.0000000000000000000000001234',
+      '0.000000000000000000000000123456789012345678',
     ]) {
       assert.equal(parse(typed), null, `refuse rounded physical quantity ${typed}`)
       assert.deepEqual(decide(typed), { kind: 'reject' },
