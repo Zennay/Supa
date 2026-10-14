@@ -46,13 +46,18 @@ async function readVerifiedHtml(sourcePath, declaredSha, remainingBytes) {
       chunks.push(chunk.subarray(0, bytesRead))
     }
     const bytes = Buffer.concat(chunks, size)
-    if (createHash('sha256').update(bytes).digest('hex') !== declaredSha) invalid()
+    // Preserve the established direct comparator integrity-mismatch contract,
+    // but never echo capture IDs, HTML, URLs or local filesystem paths.
+    if (createHash('sha256').update(bytes).digest('hex') !== declaredSha) {
+      throw new Error('Capture integrity mismatch')
+    }
     // M1's canonical inspector hashes the UTF-8 decoded HTML text. Refuse a
     // lossy decode here, otherwise raw-byte SHA and later inspector SHA could
     // silently refer to different representations of the same source file.
     new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
     return bytes
-  } catch {
+  } catch (error) {
+    if (error?.message === 'Capture integrity mismatch') throw error
     invalid()
   } finally {
     if (handle) await handle.close()
