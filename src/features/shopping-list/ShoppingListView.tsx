@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
+import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
 import {
   restoreShoppingListProgress,
   serializeShoppingListProgress,
@@ -171,6 +172,10 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
             ? 'Afvinken is tijdelijk en niet opgeslagen. Je eerdere opgeslagen gegevens blijven bewaard.'
             : 'Afvinken is tijdelijk en niet opgeslagen omdat opslag niet beschikbaar is. Eventuele eerdere opgeslagen gegevens blijven bewaard.'}
         </p>
+      )}
+
+      {basket.lines.length > 0 && (
+        <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
       )}
 
       <div className="list-card">
