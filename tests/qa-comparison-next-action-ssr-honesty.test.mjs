@@ -115,7 +115,7 @@ test('independent QA: canonical two-store basket result renders honest ready vs 
         ...product, id: `${store.id}-${product.id}`, storeId: store.id,
       })),
       {
-        id: `${store.id}-garam`, storeId: store.id, name: 'Garam 50 g',
+        id: `${store.id}-garam`, storeId: store.id, name: 'Garam masala 50 g',
         packAmount: 50, packUnit: 'g', priceCents: 139, available: true,
       },
     ]
