@@ -7,8 +7,8 @@ const hashA = 'a'.repeat(64)
 const hashB = 'b'.repeat(64)
 function snapshot(id, captureStatus = 'verified', schemaOrgStatus = 'abstain') {
   return captureStatus === 'verified'
-    ? { id, captureStatus, snapshotSha256: hashA, shapeSha256: hashB, schemaOrgStatus }
-    : { id, captureStatus: 'unavailable', snapshotSha256: null, shapeSha256: null, schemaOrgStatus: 'unknown' }
+    ? { id, supermarket: 'fictional-market', kind: 'product', captureStatus, snapshotSha256: hashA, shapeSha256: hashB, schemaOrgStatus }
+    : { id, supermarket: 'fictional-market', kind: 'product', captureStatus: 'unavailable', snapshotSha256: null, shapeSha256: null, schemaOrgStatus: 'unknown' }
 }
 function comparison(changes) {
   return {
