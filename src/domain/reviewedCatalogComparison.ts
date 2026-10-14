@@ -113,18 +113,23 @@ export function compareReviewedCatalogs({
     }
     observedTimes.push(time)
 
+    // Inventory contradictions matter even when one copy says "unavailable".
+    // Deduplicate identities before the price/stock usability filter.
+    if (typeof raw.sourceProductId === 'string' && raw.sourceProductId.trim()) {
+      const productKey = raw.supermarket + ':' + raw.sourceProductId
+      if (seenProducts.has(productKey)) {
+        sourceTrusted = false
+        continue
+      }
+      seenProducts.add(productKey)
+    }
+
     if (raw.availability === 'unavailable' ||
         !Number.isSafeInteger(raw.currentPriceCents) ||
         raw.currentPriceCents === null || raw.currentPriceCents < 0 ||
         typeof raw.sourceProductId !== 'string' || !raw.sourceProductId.trim()) {
       continue
     }
-    const productKey = raw.supermarket + ':' + raw.sourceProductId
-    if (seenProducts.has(productKey)) {
-      sourceTrusted = false
-      continue
-    }
-    seenProducts.add(productKey)
     const parsed = normalizePackText(raw.pack.rawText)
     const packAmount = raw.pack.amount ?? parsed.amount
     const packUnit = raw.pack.unit === 'unknown' ? parsed.unit : raw.pack.unit
