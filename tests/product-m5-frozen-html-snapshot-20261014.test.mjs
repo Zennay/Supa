@@ -152,7 +152,7 @@ test('product frozen capture: mismatched original HTML bytes refused before M1 i
         inspected = true
         return null
       }),
-      /^Error: Invalid frozen offline capture source$/,
+      /^Error: Capture integrity mismatch$/,
     )
     assert.equal(inspected, false)
   })
