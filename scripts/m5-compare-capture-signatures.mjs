@@ -217,7 +217,8 @@ export function captureShape(source) {
       parseError: record.parseError,
       types: record.type.filter((value) => KNOWN_TYPES.has(value)).sort(),
       keys: record.keys.filter((value) => RELEVANT_KEYS.has(value)).sort(),
-    })),  }
+    })),
+  }
 
   return {
     id: source.id,
