@@ -81,9 +81,9 @@ test('M3 0.45 g demand fits exactly one three-times-0.15 g multipack', () => {
   compared({ baseline, candidate }, -1, 'better')
 })
 
-test('M3 genuine 0.00000000000000001 g overage still requires an eighth pack', () => {
-  const baseline = basket({ storeId: 'mock-a', demand: 0.07000000000000001, packAmount: 0.01 })
-  const candidate = basket({ storeId: 'mock-b', demand: 0.07000000000000001,
+test('M3 genuine 0.00000000000000002 g overage still requires an eighth pack', () => {
+  const baseline = basket({ storeId: 'mock-a', demand: 0.07000000000000002, packAmount: 0.01 })
+  const candidate = basket({ storeId: 'mock-b', demand: 0.07000000000000002,
     packAmount: 0.01, priceCents: 11 })
   matched(baseline, 8, 72)
   matched(candidate, 8, 88)
