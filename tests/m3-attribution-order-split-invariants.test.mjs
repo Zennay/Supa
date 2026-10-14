@@ -7,8 +7,8 @@ import { attributeSavingsEffects } from '../src/domain/savingsAttribution.ts'
 const comparison = {
   outcome: 'better',
   claimable: true,
-  baselineTotalCents: 3000,
-  candidateTotalCents: 2910,
+  baselineTotalCents: 1150,
+  candidateTotalCents: 1060,
   deltaCents: -90,
   savingsCents: 90,
   reasons: [],
