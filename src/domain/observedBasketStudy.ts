@@ -383,7 +383,7 @@ function invalidObservedStudyAssessment(): WeeklyBasketStudyAssessment {
   const reasons = ['observed study contains malformed evidence or basket containers']
   // Null totals are deliberate for malformed runtime JSON. The static
   // BasketComparison contract applies only to validated, physical baskets.
-  const missingTotal = null as unknown as number
+  const missingTotal = null as number
   const comparison: BasketComparison = {
     outcome: 'unknown',
     claimable: false,
