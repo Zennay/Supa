@@ -108,6 +108,17 @@ export function buildOfflineSelectorReviewQueue(report) {
       }
     }
     if (current === null && baseline === null) invalid()
+    // Both sides are parsed by the same deterministic M1 HTML inspector.
+    // Identical SHA-verified HTML from the same origin cannot produce two
+    // different structural/schema fingerprints. A forged P1 shape change
+    // must not be laundered into manual reviewer work.
+    if (current?.captureStatus === 'verified' &&
+        baseline?.captureStatus === 'verified' &&
+        current.supermarket === baseline.supermarket &&
+        current.kind === baseline.kind &&
+        current.snapshotSha256 === baseline.snapshotSha256 &&
+        (current.shapeSha256 !== baseline.shapeSha256 ||
+         current.schemaOrgStatus !== baseline.schemaOrgStatus)) invalid()
     // Do not trust a reported 'unchanged' state when its immutable source
     // origin differs, nor a forged P1 origin state for identical provenance.
     const originChanged = current !== null && baseline !== null &&
