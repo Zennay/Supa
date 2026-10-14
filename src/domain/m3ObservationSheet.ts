@@ -529,8 +529,33 @@ function nonBlank(value: string) {
   return value.trim().length > 0
 }
 
+// The collection screen, its 24-hour deadline and the M3 converter must
+// agree about which observedAt values identify a real, timezone-qualified day.
+// Date.parse alone accepts locale strings, date-only values and rolled-over dates.
+const M3_CANONICAL_OBSERVED_AT =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-](\d{2}):(\d{2}))$/
+
 function validObservedAt(value: string) {
-  if (!nonBlank(value)) return null
+  if (typeof value !== 'string') return null
+  const match = M3_CANONICAL_OBSERVED_AT.exec(value)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const actualDay = new Date(Date.UTC(year, month - 1, day))
+  if (
+    actualDay.getUTCFullYear() !== year ||
+    actualDay.getUTCMonth() !== month - 1 ||
+    actualDay.getUTCDate() !== day ||
+    Number(match[4]) > 23 ||
+    Number(match[5]) > 59 ||
+    Number(match[6] ?? '0') > 59 ||
+    (match[7] !== 'Z' && (Number(match[8]) > 23 || Number(match[9]) > 59))
+  ) {
+    return null
+  }
+
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) ? timestamp : null
 }
