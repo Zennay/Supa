@@ -17,16 +17,36 @@ export function ShoppingListCopyButton({
   doneLineIds: readonly string[]
 }) {
   const text = buildShoppingListCopyText(basket, doneLineIds)
-  // Opening belongs to an exact user-visible snapshot, not future planner states.
-  const [expandedText, setExpandedText] = useState<string | null>(null)
-  const expanded = Boolean(text && expandedText === text)
+  // Track every *rendered* basket-text change, including A -> B -> A.
+  // Comparing text alone would reopen an earlier export without a fresh click.
+  // A ref-based revision closes it synchronously during render, not after an
+  // effect (which could briefly expose old text on a new planning snapshot).
+  const displayedText = useRef({ value: text, revision: 0 })
+  if (displayedText.current.value !== text) {
+    displayedText.current = {
+      value: text,
+      revision: displayedText.current.revision + 1,
+    }
+  }
+  const [expandedSnapshot, setExpandedSnapshot] = useState<{
+    text: string
+    revision: number
+  } | null>(null)
+  const expanded = Boolean(
+    text && expandedSnapshot?.text === text &&
+    expandedSnapshot.revision === displayedText.current.revision,
+  )
   const fieldId = useId()
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
 
-
   function toggleExport() {
     if (!text) return
-    setExpandedText(current => current === text ? null : text)
+    const revision = displayedText.current.revision
+    setExpandedSnapshot(current =>
+      current?.text === text && current.revision === revision
+        ? null
+        : { text, revision },
+    )
   }
 
   return (
