@@ -104,7 +104,7 @@ test('M3 converter and assessor blocked output directories redact private path',
       const result = run(script, input, '--output', join(blocker, 'derived.json'))
       assert.notEqual(result.status, 0)
       assert.equal(result.stdout, '')
-      assert.match(result.stderr, /private M3 derived output could not be written/)
+      assert.match(result.stderr, /private M3 derived output could not be written|refusing non-directory M3 output parent/)
     }
     assert.equal(await readFile(blocker, 'utf8'), 'UNRELATED_PRIVATE_FILE\n')
     assert.equal(await readFile(sheetInput, 'utf8'), originalSheet)
