@@ -3,6 +3,7 @@ import type { OneStoreBasket } from '../../domain/basket'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
 import { ShoppingListCopyButton } from './ShoppingListCopyButton'
+import { PrintableShoppingChecklist } from './PrintableShoppingChecklist'
 import {
   restoreShoppingListProgress,
   serializeShoppingListProgress,
@@ -180,6 +181,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       )}
 
       <ShoppingListCopyButton basket={basket} doneLineIds={done} />
+      <PrintableShoppingChecklist basket={basket} />
 
       <div className="list-card">
         {basket.lines.length === 0 ? (
