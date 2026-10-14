@@ -1,0 +1,9 @@
+# QA 2/2 — unchanged direct M5 queue parser evidence controls, newest Product source (expected RED)
+
+- Independent finding: [GitHub issue #2295](https://github.com/Zennay/Supa/issues/2295).
+- Original frozen [QA #2297](https://github.com/Zennay/Supa/pull/2297): `5a22f823555ad14805db2feb304a83116ce1e938`. The test Git blob is **exactly** `9f0a9b2ff1fd3f66d509f364248778af4bc5b165`.
+- Newer frozen product source: [#2296](https://github.com/Zennay/Supa/pull/2296), exact head `57ce76010cdc47046457cb6633932226d0f8e866` (separate Product-capable JSON-LD fix for #2293, GitHub-hosted green).
+- This QA-only replay includes that **same exact 13-test Git blob**, unchanged. It does not edit product, previous QA branches, main, M1/M3/Planner/UI, workflows, VPS or any actual user/retailer information.
+- The direct API `buildOfflineSelectorReviewQueue(report)` can still accept a forged `schemaOrgStatus:'candidate_observation'` from a verified snapshot with `jsonLdCount === jsonLdParseErrors`, meaning no successful JSON-LD parse. The upstream pure capture parser is stricter; direct queue callers remain an independent trust boundary.
+- Expected: five valid synthetic controls PASS; eight missing-rejection tests RED until product-core addresses direct queue validation in its own separate issue-scoped branch. This intentionally RED branch is **never mergeable**. Re-run original exact bytes against a corrected owner for proof of resolution; do not relax tests.
+- Supa **M3 ACTIVE**. Missing real human [#78 PLUS 11 / DekaMarkt 11](https://github.com/Zennay/Supa/issues/78) same-demand pair in <=24h. M4/M5 ineligible, rights/selector/production approval false, all data fictional. **DRAFT/HOLD/NO MERGE/NO DEPLOY** pending independently verified zCloud SQLite task/scope write lease, source and QA reviews, exact hosted current-main/trusted runner where applicable, human field data and explicit releasego.
