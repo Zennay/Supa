@@ -204,6 +204,13 @@ h3, p { margin: 0; }
 
 .stat-pill span { font-size: 12px; opacity: .7; }
 
+.hero-total > strong,
+.stat-pill strong,
+.comparison-totals strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .list-card {
   border: 1px solid var(--line);
   background: var(--surface-strong);

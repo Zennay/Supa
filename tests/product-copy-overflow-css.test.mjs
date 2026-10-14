@@ -19,4 +19,8 @@ test('shared product surfaces contain long store and grocery copy on narrow layo
     css,
     /\.section-heading h2,[\s\S]*?\.shopping-row strong,[\s\S]*?\.comparison-card > strong,[\s\S]*?\.comparison-totals span\s*{\s*overflow-wrap:\s*anywhere;/,
   )
+  assert.match(
+    css,
+    /\.hero-total > strong,\s*\.stat-pill strong,\s*\.comparison-totals strong\s*{\s*min-width:\s*0;\s*overflow-wrap:\s*anywhere;/,
+  )
 })
