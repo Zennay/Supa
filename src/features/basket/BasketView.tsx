@@ -10,6 +10,7 @@ import {
   orderBasketLinesForReview,
 } from './basketPresentation'
 import { StatPill } from '../../components/StatPill'
+import { comparisonLineHighlights, comparisonLineHighlightCopy } from './comparisonLineHighlights.ts'
 
 function quantity(amount: number | null, unit: string) {
   const label = quantityUnitLabelNl(unit, amount)
@@ -79,6 +80,9 @@ export function BasketView({
       comparison.reasons.length,
     )
     : 'Plan eerst een maaltijd; zonder boodschappen is er geen financieel verschil te vergelijken.'
+  const comparisonHighlights = displayComparison.claimable
+    ? comparisonLineHighlights(displayComparison)
+    : []
   const reviewSummary = basketReviewSummary(basket.unresolvedLineCount)
   const basketLines = orderBasketLinesForReview(basket.lines)
 
@@ -139,6 +143,26 @@ export function BasketView({
             </strong>
           </div>
         </div>
+        {comparisonHighlights.length > 0 && (
+          <section className="comparison-line-breakdown" aria-label="Grootste mandregelverschillen" data-comparison-line-breakdown="true">
+            <h3>Grootste verschillen per ingrediënt</h3>
+            <div className="list-card">
+              {comparisonHighlights.map((item) => (
+                <div className="list-row" key={item.id}>
+                  <div>
+                    <strong>{item.ingredientLabel}</strong>
+                    <span>{comparisonLineHighlightCopy(item, comparisonCandidate.store.name)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="disclaimer">
+              Dit laat alleen zien waar deze voorbeeldmanden verschillen, niet
+              waarom. Het bewijst geen aanbiedingen, besparingen of live prijzen.
+            </p>
+          </section>
+        )}
+
         {displayComparison.claimable ? (
           <p className="disclaimer">
             M3 controlled testdata · zelfde week en volledige mand · geen
