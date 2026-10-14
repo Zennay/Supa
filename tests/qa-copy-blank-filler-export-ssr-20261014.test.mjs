@@ -13,10 +13,12 @@ import { preparePrintableShoppingChecklist } from '../src/features/shopping-list
 const BLANK = ['\u115f', '\u1160', '\u3164', '\uffa0', '\u2800']
 const BLANK_PATTERN = /[\u115f\u1160\u3164\uffa0\u2800]/u
 function demo() {
-  return buildOneStoreBasket({
+  // The canonical fixture's store may be frozen. Clone only controlled QA data
+  // before changing synthetic names; never mutate the shared catalogue.
+  return structuredClone(buildOneStoreBasket({
     store: m2Store, plan: m2InitialPlan, recipes: m2Recipes,
     activeDays: m2DefaultActiveDays, products: m2Products,
-  })
+  }))
 }
 const initial = demo()
 const selected = initial.lines.findIndex(line => line.status === 'matched')
