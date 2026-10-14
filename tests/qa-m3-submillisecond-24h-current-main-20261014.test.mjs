@@ -1,73 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
 import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
-import {
-  m2DefaultActiveDays,
-  m2InitialPlan,
-  m2Products,
-  m2Recipes,
-} from '../src/data/m2Fixture.ts'
+import { buildFictionalPricedSheet } from '../scripts/m3-rehearse-field-run.mjs'
+import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
 
 // Independent, intentionally synthetic quality-validation for #1513.
-// None of these prices, evidence IDs or retailers constitute field observations.
-function fictionalBasket(side, discountCents = 0) {
-  const store = side === 'baseline'
-    ? { id: 'qa-plus-subms', name: 'PLUS fictional fixture' }
-    : { id: 'qa-dekamarkt-subms', name: 'DekaMarkt fictional fixture' }
-  const products = [
-    ...m2Products.map((product) => ({
-      ...product,
-      id: `${store.id}-${product.id}`,
-      storeId: store.id,
-      priceCents: product.priceCents - discountCents,
-    })),
-    {
-      id: `${store.id}-spice`,
-      storeId: store.id,
-      name: 'Fictional masala 50 g',
-      packAmount: 50,
-      packUnit: 'g',
-      available: true,
-      priceCents: 139 - discountCents,
-    },
-  ]
-  return buildOneStoreBasket({
-    store,
-    plan: m2InitialPlan,
-    recipes: m2Recipes,
-    activeDays: m2DefaultActiveDays,
-    products,
-  })
-}
-
+// Canonical full 11+11 fictional cohort avoids unrelated missing-pack matches.
 function fictionalStudy(baselineAt, candidateAt) {
-  // October 26–27 2025 belong to the legal Oct 27 shopping/week window.
-  return {
-    schemaVersion: 1,
-    studyId: 'qa-submillisecond-boundary',
-    participantKey: 'qa-pseudonym-only',
-    population: 'fictional independent students',
-    region: 'fictional Leiden',
-    weekStart: '2025-10-27',
-    priceContext: 'in-store',
-    baseline: {
-      evidenceId: 'qa-plus-subms-evidence',
-      observedAt: baselineAt,
-      source: 'manual-cart',
-      provenanceNote: 'Synthetic precision fixture; not a receipt.',
-      basket: fictionalBasket('baseline'),
-    },
-    candidate: {
-      evidenceId: 'qa-deka-subms-evidence',
-      observedAt: candidateAt,
-      source: 'manual-cart',
-      provenanceNote: 'Synthetic precision fixture; not a receipt.',
-      basket: fictionalBasket('candidate', 10),
-    },
-  }
+  const sheet = buildFictionalPricedSheet(90)
+  sheet.study.weekStart = '2025-10-27'
+  sheet.baseline.observedAt = baselineAt
+  sheet.candidate.observedAt = candidateAt
+  return buildWeeklyBasketStudyFromObservationSheet(sheet)
 }
 
 const exactly24h = [
