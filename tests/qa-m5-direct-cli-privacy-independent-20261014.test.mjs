@@ -82,7 +82,7 @@ test('independent direct CLI: malformed current JSON emits only one fixed stderr
 test('independent direct CLI: malformed baseline does not leak prior/current private roots',async()=>{
   await isolated(async home=>{
     const now=await capture(home,'current',[record(false)])
-    const past=await capture(home,'prior',[record(false)],{raw:'{"secret":"\ud800" INVALID'})
+    const past=await capture(home,'prior',[record(false)],{raw:'{"secret":"private-invalid" INVALID'})
     privateFailure(exec(now.dir,past.dir))
     assert.equal(await readFile(past.manifest,'utf8'),past.raw)
   })
