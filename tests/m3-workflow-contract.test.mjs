@@ -54,6 +54,8 @@ test('M3 observed-week workflow keeps every evidence-boundary dependency in its 
     'tests/m3-build-observed-study.test.mjs',
     'tests/m3-observed-study-report.test.mjs',
     'tests/m3-savings-attribution.test.mjs',
+    'tests/qa-m3-attribution-root-shape.test.mjs',
+    'tests/qa-m3-attribution-guard-edge-controls.test.mjs',
     'tests/m3-workflow-contract.test.mjs',
     'tests/m3-workflow-transitive-trigger-closure.test.mjs',
     'package.json',
@@ -93,4 +95,64 @@ test('M3 permanent VPS gate excludes untrusted fork pull-request heads', async (
   assert.match(workflow, /github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository/)
   assert.match(workflow, /if:\s*github\.event_name\s*==\s*'workflow_dispatch'\s*\|\|\s*\(github\.event_name\s*==\s*'pull_request'[^\n]*github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository\)/)
   assert.match(workflow, /uses:\s*actions\/checkout@[0-9a-f]{40}\s+# v\d+\.\d+\.\d+\s*\n\s*with:\s*\n\s*persist-credentials:\s*false/)
+})
+
+test('M3 independent attribution test paths cannot silently lose VPS trigger coverage', async () => {
+  const workflow = await readFile(workflowPath, 'utf8')
+  for (const path of [
+    'tests/qa-m3-attribution-root-shape.test.mjs',
+    'tests/qa-m3-attribution-guard-edge-controls.test.mjs',
+  ]) {
+    assert.equal(hasQuotedPathTrigger(workflow, path), true)
+    const mutant = workflow.replace('      - "' + path + '"', '')
+    assert.notEqual(mutant, workflow, 'missing QA path fixture: ' + path)
+    assert.equal(hasQuotedPathTrigger(mutant, path), false)
+  }
+})
+
+function validateDispatchOnlyFieldPackUpload(workflow) {
+  const lines = workflow.split(/\r?\n/u)
+  const title = '      - name: Upload M3 field-run pack'
+  const indices = lines.flatMap((line, index) => line === title ? [index] : [])
+  assert.equal(indices.length, 1, 'exactly one M3 field-pack upload step')
+  const index = indices[0]
+  const step = []
+  for (let next = index + 1; next < lines.length; next += 1) {
+    if (lines[next].startsWith('      - ')) break
+    step.push(lines[next])
+  }
+  assert.ok(step.includes("        if: github.event_name == 'workflow_dispatch'"),
+    'upload step itself must require an explicit human workflow dispatch')
+  assert.ok(step.some((line) => /^        uses: actions\/upload-artifact@[a-f0-9]{40}(?:\s+#.*)?$/u.test(line)),
+    'field-pack upload must be bound to its intended pinned upload action')
+  const uploads = lines.filter((line) => /^\s+uses: actions\/upload-artifact@/u.test(line))
+  assert.equal(uploads.length, 1, 'no extra unguarded artifact upload action')
+}
+
+test('M3 field-pack upload is dispatch-only on the actual step, not a nearby step', async () => {
+  const workflow = await readFile(workflowPath, 'utf8')
+  validateDispatchOnlyFieldPackUpload(workflow)
+
+  // A global search for a dispatch-only condition can be fooled if it is
+  // moved to another step: the upload itself must own the guard.
+  const removed = workflow.replace(
+    "      - name: Upload M3 field-run pack\n        if: github.event_name == 'workflow_dispatch'\n",
+    '      - name: Upload M3 field-run pack\n',
+  )
+  assert.notEqual(removed, workflow)
+  assert.throws(() => validateDispatchOnlyFieldPackUpload(removed))
+
+  const loosened = workflow.replace(
+    "        if: github.event_name == 'workflow_dispatch'\n",
+    '        if: always()\n',
+  )
+  assert.notEqual(loosened, workflow)
+  assert.throws(() => validateDispatchOnlyFieldPackUpload(loosened))
+
+  const duplicate = workflow.replace(
+    '      - name: Upload M3 field-run pack',
+    '      - name: Upload M3 field-run pack\n        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+  )
+  assert.notEqual(duplicate, workflow)
+  assert.throws(() => validateDispatchOnlyFieldPackUpload(duplicate))
 })
