@@ -244,3 +244,27 @@ test('malformed external JSON-LD abstains instead of throwing through the parser
   assert.match(result.reason, /failed trust validation/)
   assert.match(result.reason, /validFrom/)
 })
+
+
+test('malformed provenance containers abstain instead of throwing through the parser contract', () => {
+  const product = {
+    '@type': 'Product',
+    name: 'Milk',
+    offers: {
+      '@type': 'Offer',
+      price: '1.29',
+      priceCurrency: 'EUR',
+    },
+  }
+
+  for (const malformedProvenance of [null, undefined, [], 'source', 42, true]) {
+    assert.doesNotThrow(() =>
+      parseSchemaOrgProduct(product, malformedProvenance),
+    )
+
+    assert.deepEqual(parseSchemaOrgProduct(product, malformedProvenance), {
+      type: 'abstain',
+      reason: 'Product JSON-LD provenance is not a usable object',
+    })
+  }
+})
