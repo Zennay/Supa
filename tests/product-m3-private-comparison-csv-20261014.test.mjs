@@ -103,7 +103,7 @@ test('M3 CSV exact better/equal/worse signed financial rows stay provisional', (
     const csv = renderPrivateM3ComparisonCsv(
       buildPrivateM3ProductComparison(buildFictionalPricedSheet(price)),
     )
-    const footer = csv.trimEnd().split('\\r\\n').at(-1).slice(1, -1).split('";"')
+    const footer = csv.trimEnd().split('\r\n').at(-1).slice(1, -1).split('";"')
     assert.equal(footer[9], '11,00')
     assert.equal(footer[17], delta)
     assert.match(csv, /Geen actuele prijsfeed en geen publieke besparingsclaim/)
@@ -128,7 +128,7 @@ test('M3 CSV CLI from canonical private 22-line sheet writes mode 0600 and prese
     assert.equal(await readFile(input, 'utf8'), source)
     assert.equal((await stat(output)).mode & 0o777, 0o600)
     const csv = await readFile(output, 'utf8')
-    const footer = csv.trimEnd().split('\\r\\n').at(-1).slice(1, -1).split('";"')
+    const footer = csv.trimEnd().split('\r\n').at(-1).slice(1, -1).split('";"')
     assert.equal(footer[9], '11,00')
     assert.equal(footer[16], '9,90')
     assert.equal(footer[17], '-1,10')
