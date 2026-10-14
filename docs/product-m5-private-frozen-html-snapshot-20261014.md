@@ -1,0 +1,16 @@
+# Future M5 offline reviewer: private SHA-verified capture snapshots (14 October 2026)
+
+**Owner:** product-core 1/2. **Issue:** #2217. **Parent:** frozen hosted-green DRAFT #2216 commit aaa28d1b6ee89f661ab76e16b45b062d78b862d9. No modifications to original M1 inspector, independent QA files/branches, other product owners, UI/Planner/M3, main, workflows or permanent VPS.
+
+## Why
+Prior M5 accepted verified lstat/manifests/source bytes before invoking canonical M1 inspector, but M1 subsequently re-opened the original manifest and HTML paths. A replaceable source file could change between checks and M1 read. Additionally an HTML file growing after preflight might exceed the checked 8MiB cohort budget.
+
+## Product change
+Keep current/baseline root, raw manifest, SHA grammar, source IDs/origin, strict timestamps, no-follow/hardlink checks and 8MiB lstat preflight unchanged. After both sides pass, for each successful local HTML source: open O_RDONLY|O_NOFOLLOW and pin that descriptor, require regular file/nlink=1, stream at most 64KiB per read up to 8MiB+1, enforce total 8MiB per root, check actual raw-byte SHA-256 matches preflight manifest and reject malformed source UTF-8. Write validated bytes only to new mode 0700 unpredictable temporary root and mode 0600 files; write the already-preflighted manifest object into that same private snapshot. Then call **unchanged canonical M1 inspectCaptureDirectory** on the stable private copy, deleting the entire temp root in finally on both success and exception. Normal CLI report never exposes original source labels or temporary paths.
+
+## Synthetic acceptance
+tests/product-m5-frozen-html-snapshot-20261014.test.mjs includes 14 product-only cases: valid P2, historic P3 and absent P1, post-copy mutation of original HTML without altering verified inspected private snapshot, temporary permissions and cleanup on success and injected failure, mismatched SHA, symlinked and hardlinked source files, symlink store path, oversized 8MiB+1 bytes, malformed raw UTF-8 HTML, unsafe direct helper source IDs, and successful private CLI queue with no temp/real paths. No store HTTP, customer record, price, permission grant, active deployment, or savings estimate.
+
+## Boundaries and release hold
+This makes M1's later inspection reflect the frozen bytes verified and copied by M5, rather than re-reading original source paths. It is **not** complete atomic original filesystem attestation: original root and store traversal can still face privileged concurrent substitutions before descriptor open; no defense against attackers with same-UID write access to the private temp root is claimed. It does not establish source licensing, real observed prices or live M5 eligibility.
+**Supa M3 ACTIVE**: issue #78 genuine PLUS 11 + DekaMarkt 11 same-demand human observation within 24 hours OPEN. M4/M5 ineligible. **DRAFT/HOLD/NO MERGE/NO DEPLOY** until independently verified zCloud SQLite scope/task-write preflight + claim lease, original product/QA owner review, exact hosted CI, independent latest-main/QA/trusted permanent VPS or browser integration where applicable, actual #78 human field evidence and explicit human release approval.
