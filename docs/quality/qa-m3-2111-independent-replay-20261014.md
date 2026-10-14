@@ -1,0 +1,9 @@
+# SUPA M3 current-flow independent quality-validation — #2111
+
+Original, previously failing independent QA [#2096](https://github.com/Zennay/Supa/pull/2096) exact original test Git blob `800a4e48e3a1ce777906bfb9fcd842bbde600d6d`, from QA branch SHA `9b294c76cd4b1f891549e6b6c8992042ebcb3d56`, is copied **byte-for-byte with unchanged assertions** into a new isolated QA-only branch rooted at the frozen, repaired product-core [#2111](https://github.com/Zennay/Supa/pull/2111) SHA `05fc035e640b7769fa72dde3f209a08e4ae2e683`.
+
+Original expected-red hosted [run #38464170331](https://github.com/Zennay/Supa/actions/runs/38464170331) detected earlier privacy/week-integrity defects on main. Independent repaired replay must pass **all 14 original tests** together with full hosted Node suite, zero high npm audit vulnerabilities, M1 matching / source rights gate and TS/Vite build. Do not use moving-owner-base run as original RED evidence; original tests, previous expected-RED owner branch, product source and canonical main remain unchanged.
+
+These are fully synthetic 11+11 demand facts, not real field prices or savings. M3 ACTIVE: real human [issue #78](https://github.com/Zennay/Supa/issues/78) still requires same-demand PLUS 11 + DekaMarkt 11 within 24h in one pricing context, and retailers' source permission remains unresolved. This validates a narrow M3 proof boundary only, not product readiness.
+
+**DRAFT/HOLD/NO MERGE/NO DEPLOY** until independent zCloud SQLite task/scope lease, explicit original owner + QA reviews, current-main integration and trusted VPS/browser gates as applicable, genuinely authorized retailer use and human releasego. New task PWQ-325 emphasizes landing user-facing M3 fixes *after* gates instead of creating future M5 test loops. No peer-owned branches/main/workflows/VPS altered by QA.
