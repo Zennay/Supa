@@ -37,6 +37,15 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   }))
   const done = progress.basketKey === basketKey ? progress.done : []
 
+  // A genuinely empty plan has no shopping tasks. An empty row array with
+  // inconsistent counters is not proof that the customer needs nothing.
+  const genuinelyEmpty =
+    basket.lines.length === 0 &&
+    basket.selectedMealCount === 0 &&
+    basket.matchedLineCount === 0 &&
+    basket.unresolvedLineCount === 0 &&
+    basket.totalCents === 0
+
   useEffect(() => {
     if (progress.basketKey === basketKey) return
 
@@ -76,7 +85,13 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       )}
 
       <div className="list-card">
-        {basket.lines.map((line) => {
+        {basket.lines.length === 0 ? (
+          <p className="disclaimer" role="status">
+            {genuinelyEmpty
+              ? 'Geen boodschappen voor deze planning. Voeg een maaltijd toe in Planner.'
+              : 'Boodschappenlijst niet beschikbaar. Controleer je planning.'}
+          </p>
+        ) : basket.lines.map((line) => {
           const checked = done.includes(line.id)
           const label =
             line.status === 'matched' ? line.productName : line.ingredientLabel
