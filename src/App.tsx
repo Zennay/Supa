@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
+import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
+import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
+import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
@@ -54,6 +57,10 @@ function readPlannerPreferences() {
 export function App() {
   const [tab, setTab] = useState<Tab>('planner')
   const [preferences, setPreferences] = useState(readPlannerPreferences)
+  const [manualWeekCopy, setManualWeekCopy] = useState<WeekSharePreview | null>(null)
+  const [includeWeekBudget, setIncludeWeekBudget] = useState(false)
+  const [includeWeekDetails, setIncludeWeekDetails] = useState(false)
+  const [weekCopyMessage, setWeekCopyMessage] = useState('')
   const { budget, activeDays, recipeByDay } = preferences
 
   const plannedMeals = useMemo(
@@ -64,6 +71,17 @@ export function App() {
       })),
     [recipeByDay],
   )
+
+  // Bind prepared copy to the exact user-visible plan state. Clearing it in
+  // an effect alone happens after render and briefly exposes stale personal text.
+  const shareSourceKey = JSON.stringify([
+    plannedMeals,
+    activeDays,
+    budget,
+    includeWeekBudget,
+    includeWeekDetails,
+  ])
+  const currentManualCopy = currentWeekSharePreview(manualWeekCopy, shareSourceKey)
 
   const basket = useMemo(
     () =>
@@ -123,6 +141,33 @@ export function App() {
     }
   }, [preferences])
 
+  useEffect(() => {
+    // The export belongs to one exact plan snapshot; don't keep a stale draft
+    // visible after the user changes the plan or budget.
+    setManualWeekCopy(null)
+    setWeekCopyMessage('')
+  }, [preferences])
+
+  const prepareWeekPlanCopy = () => {
+    try {
+      setManualWeekCopy({
+        sourceKey: shareSourceKey,
+        text: formatShareableWeek({
+          plannedMeals,
+          activeDays,
+          recipes: m2Recipes,
+          budget,
+          includeBudget: includeWeekBudget,
+          includeDetails: includeWeekDetails,
+        }),
+      })
+      setWeekCopyMessage('Selecteer en kopieer de tekst hieronder')
+    } catch {
+      setManualWeekCopy(null)
+      setWeekCopyMessage('Weekmenu niet beschikbaar')
+    }
+  }
+
   const toggleDay = (day: string) => {
     setPreferences((current) => ({
       ...current,
@@ -175,6 +220,47 @@ export function App() {
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
           />
+        )}
+        {tab === 'planner' && (
+          <section className="week-share-panel" aria-label="Weekmenu delen">
+            <div className="week-share-actions">
+              <span>Deel je geplande maaltijden, zonder winkelprijzen.</span>
+              <button type="button" className="ghost-button" onClick={prepareWeekPlanCopy}>
+                Toon kopieertekst
+              </button>
+            </div>
+            <label className="week-share-privacy">
+              <input
+                type="checkbox"
+                checked={includeWeekBudget}
+                onChange={(event) => {
+                  setIncludeWeekBudget(event.target.checked)
+                  setManualWeekCopy(null)
+                  setWeekCopyMessage('')
+                }}
+              />
+              Mijn weekbudget ook opnemen (optioneel)
+            </label>
+            <label className="week-share-privacy">
+              <input
+                type="checkbox"
+                checked={includeWeekDetails}
+                onChange={(event) => {
+                  setIncludeWeekDetails(event.target.checked)
+                  setManualWeekCopy(null)
+                  setWeekCopyMessage('')
+                }}
+              />
+              Bereidingstijd en porties opnemen
+            </label>
+            <p role="status" aria-live="polite">{weekCopyMessage}</p>
+            {currentManualCopy !== null && (
+              <WeekShareManualCopy
+                text={currentManualCopy}
+                rows={Math.min(activeDays.length + 6, 14)}
+              />
+            )}
+          </section>
         )}
         {tab === 'basket' && (
           <BasketView
