@@ -79,7 +79,8 @@ test('M1 inspector produces actual boolean success fields from synthetic local c
     const inspected = await inspectCaptureDirectory(root)
     assert.equal(typeof inspected.sources[0].success, 'boolean')
     assert.equal(inspected.sources[0].success, true)
-    const result = compareInspections(inspected, inspected)
+    // A historical inspection must be a distinct cohort, even in tests.
+    const result = compareInspections(inspected, structuredClone(inspected))
     assert.equal(result.changes[0].status, 'unchanged')
     assert.equal(result.productionReady, false)
   } finally {
