@@ -15,7 +15,8 @@ const observed = (overrides = {}) => ({
   id: 'fictional-id', supermarket: 'fictional-market', kind: 'product',
   success: true, integrity: 'verified', manifestSha256: SHA,
   html: { hasNextData: false, jsonLd: [], applicationJsonScripts: [] },
-  schemaOrgProduct: { type: 'abstain' }, ...overrides,
+  ...(overrides.success === false ? {} : { schemaOrgProduct: { type: 'abstain' } }),
+  ...overrides,
 })
 const inspection = source => ({ sourceCount: 1, sources: [source] })
 const compare = (now, before) => compareInspections(inspection(now), inspection(before))
