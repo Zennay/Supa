@@ -95,3 +95,37 @@ for (const kind of ['converter', 'assessment']) {
       } finally { await rm(root, { recursive: true, force: true }) }
     })
 }
+
+// A symlink at the final output component must not redirect an otherwise
+// legitimate distinct-output regeneration into another existing file.
+for (const kind of ['converter', 'assessment']) {
+  test(`M3 ${kind} refuses symlinked final output without clobbering its unrelated target`,
+    { skip: process.platform === 'win32' }, async () => {
+      const root = await mkdtemp(join(tmpdir(), `supa-m3-final-link-${kind}-`))
+      try {
+        const input = join(root, 'synthetic-input.json')
+        const unrelated = join(root, 'unrelated-preserve.json')
+        const linkedOutput = join(root, 'derived-output-alias.json')
+        const sentinel = 'PREEXISTING_UNRELATED_SYNTHETIC_OUTPUT\n'
+        const payload = kind === 'converter' ? inputSheet() : buildWeeklyBasketStudyFromObservationSheet(inputSheet())
+        await writeFile(input, JSON.stringify(payload))
+        await writeFile(unrelated, sentinel)
+        await symlink(unrelated, linkedOutput, 'file')
+        const original = await readFile(input, 'utf8')
+        const command = kind === 'converter'
+          ? 'scripts/m3-build-observed-study.mjs'
+          : 'scripts/m3-assess-observed-week.mjs'
+        const run = spawnSync(process.execPath,
+          ['--experimental-strip-types', command, input, '--output', linkedOutput],
+          { cwd: process.cwd(), encoding: 'utf8', timeout: 15000 })
+        assert.ifError(run.error)
+        assert.notEqual(run.status, 0)
+        assert.equal(run.stdout, '')
+        assert.match(run.stderr, /refusing symlinked M3 derived output file/u)
+        assert.doesNotMatch(run.stderr, /fictional-only|synthetic-symlink-parent/u)
+        assert.equal(await readFile(input, 'utf8'), original)
+        assert.equal(await readFile(unrelated, 'utf8'), sentinel)
+        assert.equal(await readFile(linkedOutput, 'utf8'), sentinel)
+      } finally { await rm(root, { recursive: true, force: true }) }
+    })
+}
