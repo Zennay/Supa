@@ -1,0 +1,23 @@
+.observation-next-action {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  overflow-wrap: anywhere;
+}
+
+.observation-next-action strong {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.observation-next-action p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
