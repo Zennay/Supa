@@ -2,6 +2,7 @@ import { readFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { buildPrivateM3ProductComparison } from './m3-private-product-comparison.mjs'
+import { privateM3PackUnitPrice } from './m3-private-pack-unit-price.mjs'
 import {
   assertNoSymlinkedM3OutputParents,
   writeDerivedM3Output,
@@ -137,7 +138,15 @@ export function renderPrivateM3ProductComparisonHtml(report) {
       ? '<strong>' + html(row.productName) + '</strong><small>' +
           html(String(row.packages)) + ' × ' + html(String(row.packAmount)) +
           ' ' + html(row.packUnit) + ' · ' + euros(row.pricePerPackageCents) +
-          ' per pak</small><span>' + euros(total) + '</span>'
+          ' per pak</small>' +
+          (privateM3PackUnitPrice(row) === null
+            ? ''
+            : '<small>Indicatie: ' +
+                (privateM3PackUnitPrice(row).approximate ? 'ca. ' : '') +
+                euros(privateM3PackUnitPrice(row).cents) + ' / ' +
+                html(privateM3PackUnitPrice(row).basis) +
+                '</small>') +
+          '<span>' + euros(total) + '</span>'
       : '<span class="missing">Niet betrouwbaar geprijsd</span>'
     return '<tr><th scope="row">' + html(line.ingredientLabel) +
       '<small>' + html(String(line.requiredAmount)) + ' ' +
