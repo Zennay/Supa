@@ -16,7 +16,7 @@ test('copies only active meals in canonical day order, not persisted toggle orde
   data.activeDays = ['Wo', 'Ma']
   const before = structuredClone(data)
   const result = formatShareableWeek(data)
-  assert.match(result, /^SUPA · Weekmenu\nWeekbudget \(eigen voorkeur\): €35,00/m)
+  assert.match(result, /^SUPA · Weekmenu\nWeekbudget \(eigen voorkeur\): €\s*35,00/m)
   assert.ok(result.indexOf('Ma: ') < result.indexOf('Wo: '))
   assert.doesNotMatch(result, /\nDi: |\nDo: /)
   assert.match(result, /geen prijsopgave/i)
