@@ -52,6 +52,7 @@ test('real browser evidence only records localhost URLs, exact GitHub SHAs and f
   assert.match(source, /githubRunId: process\.env\.GITHUB_RUN_ID/)
   assert.match(source, /githubRunAttempt: process\.env\.GITHUB_RUN_ATTEMPT/)
   assert.match(source, /checks\.push\('corrupt-planner-and-checklist-recover-safely'\)/)
+  assert.match(source, /checks\.push\('explicit-reset-restores-week-budget-and-clears-stale-checks'\)/)
   assert.match(source, /checks\.push\('rendered-basket-list-line-count-agrees'\)/)
 
   for (const name of [
@@ -61,6 +62,7 @@ test('real browser evidence only records localhost URLs, exact GitHub SHAs and f
     'shopping-reloaded.png',
     'shopping-empty-week.png',
     'shopping-recovered-default.png',
+    'shopping-explicit-reset.png',
   ]) {
     assert.ok(source.includes(`await screenshot(sessionId, '${name}')`), name)
     assert.ok(source.includes(`'${name}'`), name)
@@ -127,7 +129,7 @@ test('archived Firefox image evidence binds every PNG to byte length, dimensions
   assert.match(source, /png\.readUInt32BE\(16\)/)
   assert.match(source, /png\.readUInt32BE\(20\)/)
   assert.match(source, /screenshotIntegrity\.push\(/)
-  assert.match(source, /assert\.equal\(screenshotIntegrity\.length, 6/)
+  assert.match(source, /assert\.equal\(screenshotIntegrity\.length, 7/)
   assert.match(source, /screenshotIntegrity,\n/)
   assert.match(source, /retailerDataObserved: false/)
   assert.match(source, /realSavingsClaimEligible: false/)
