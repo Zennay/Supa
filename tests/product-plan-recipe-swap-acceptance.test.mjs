@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { acceptPlanRecipeSwap, previewPlanRecipeSwap } from '../src/domain/planRecipeSwapPreview.ts'
+import { acceptPlanRecipeSwap as acceptWithStore, previewPlanRecipeSwap } from '../src/domain/planRecipeSwapPreview.ts'
 import { m2InitialPlan, m2Products, m2Recipes, m2Store } from '../src/data/m2Fixture.ts'
 
 const context = {
@@ -12,6 +12,24 @@ const context = {
   day: 'Di',
   replacementRecipeId: 'pasta',
 }
+
+// The acceptance API now pins the live store/catalog too; passing only plan and
+// selected days correctly fails closed as stale rather than authorizing a swap.
+function acceptPlanRecipeSwap(preview, plan, activeDays, products = m2Products, store = m2Store) {
+  return acceptWithStore(preview, plan, activeDays, store, products)
+}
+
+test('confirmation is stale when its live catalog or store differs', () => {
+  const preview = previewPlanRecipeSwap(context)
+  assert.equal(preview.status, 'ready')
+  const changedProducts = m2Products.map(product =>
+    product.id === 'spaghetti-500'
+      ? { ...product, priceCents: product.priceCents + 1 }
+      : { ...product },
+  )
+  assert.equal(acceptPlanRecipeSwap(preview, m2InitialPlan, context.activeDays, changedProducts).status, 'stale')
+  assert.equal(acceptPlanRecipeSwap(preview, m2InitialPlan, context.activeDays, m2Products, { ...m2Store, id: 'other' }).status, 'stale')
+})
 
 test('explicit confirmation applies one recipe change without mutating caller or preview snapshots', () => {
   const preview = previewPlanRecipeSwap(context)
@@ -35,7 +53,10 @@ test('user may still choose a recipe if preview honestly reports unknown prices'
   })
   assert.equal(preview.status, 'unknown')
   assert.equal(preview.deltaCents, null)
-  const result = acceptPlanRecipeSwap(preview, m2InitialPlan, context.activeDays)
+  const result = acceptPlanRecipeSwap(
+    preview, m2InitialPlan, context.activeDays,
+    m2Products.filter(product => product.id !== 'spaghetti-500'),
+  )
   assert.equal(result.status, 'applied')
   assert.equal(result.plan[1].recipeId, 'pasta')
 })
