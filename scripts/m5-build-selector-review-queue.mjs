@@ -100,13 +100,22 @@ export function buildOfflineSelectorReviewQueue(report) {
         // Canonical M1->M5 captureShape() always emits these own, bounded
         // inspection signals on successful captures. Forged counts or a
         // fabricated parse-error majority must not become reviewable P1/P3.
-        // RegExp#test coerces objects to strings (possibly executing custom
-        // toString/Symbol.toPrimitive). Canonical M1 SHA-256 fingerprints
-        // are primitive text; reject forged wrappers before any regex call.
-        if (typeof snapshot.snapshotSha256 !== 'string' ||
-            typeof snapshot.shapeSha256 !== 'string' ||
-            !HEX_HASH.test(snapshot.snapshotSha256) ||
-            !HEX_HASH.test(snapshot.shapeSha256) ||
+        // Canonical M1 digests are own primitive data, never accessors or
+        // inherited properties. Inspect descriptors first: direct typeof or
+        // RegExp#test on the snapshot field would evaluate caller getters or
+        // custom coercion and could expose private exception messages.
+        const snapshotDigest = Object.getOwnPropertyDescriptor(
+          snapshot, 'snapshotSha256',
+        )
+        const shapeDigest = Object.getOwnPropertyDescriptor(
+          snapshot, 'shapeSha256',
+        )
+        if (!snapshotDigest || !Object.hasOwn(snapshotDigest, 'value') ||
+            !shapeDigest || !Object.hasOwn(shapeDigest, 'value') ||
+            typeof snapshotDigest.value !== 'string' ||
+            typeof shapeDigest.value !== 'string' ||
+            !HEX_HASH.test(snapshotDigest.value) ||
+            !HEX_HASH.test(shapeDigest.value) ||
             !VERIFIED_SCHEMA_ORG_STATUSES.has(snapshot.schemaOrgStatus) ||
             !Object.hasOwn(snapshot, 'hasNextData') ||
             typeof snapshot.hasNextData !== 'boolean' ||
