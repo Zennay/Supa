@@ -1,6 +1,21 @@
 import { useId, useState } from 'react'
 
 /**
+ * Compare decimal spellings, not binary floating-point equality: Number() can
+ * silently round a typed 1,0000000000000001 to 1. The field must never save a
+ * different observed physical amount than the user actually entered.
+ *
+ * This runs only after strict decimal grammar validation below; display uses
+ * the same exponent-expansion path as the existing focus/blur control.
+ */
+function canonicalObservedDecimal(text: string): string {
+  const [integerPart = '', fractionPart = ''] = text.replace(',', '.').split('.')
+  const whole = (integerPart || '0').replace(/^0+(?=\d)/, '')
+  const fraction = fractionPart.replace(/0+$/, '')
+  return fraction ? `${whole}.${fraction}` : whole
+}
+
+/**
  * Human-observed package quantities are optional until collected.
  * Never round, truncate or interpret exponential syntax as a physical pack.
  */
@@ -10,7 +25,16 @@ export function observationFinalPackAmount(text: unknown): number | null {
   if (!/^(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(input)) return null
 
   const amount = Number(input.replace(',', '.'))
-  return Number.isFinite(amount) && amount > 0 && amount <= Number.MAX_SAFE_INTEGER
+  if (!Number.isFinite(amount) || amount <= 0 || amount > Number.MAX_SAFE_INTEGER) {
+    return null
+  }
+
+  // Reject decimal precision silently changed by IEEE-754 parsing. Trailing
+  // zeroes, leading zeroes and Dutch comma notation remain fully supported.
+  // An invalid edit is rejected by observationPackAmountEditDecision, which
+  // preserves the previously saved field instead of guessing a pack size.
+  return canonicalObservedDecimal(input) ===
+    canonicalObservedDecimal(observationEditablePackAmount(amount))
     ? amount
     : null
 }
