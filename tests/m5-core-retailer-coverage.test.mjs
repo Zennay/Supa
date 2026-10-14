@@ -351,3 +351,54 @@ test('screening-date-only change exits 2 from CLI without creating source grant'
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('candidate addition requires explicit human review with nonzero CLI exit', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m5-add-review-'))
+  try {
+    const previous = join(dir, 'previous.json')
+    const current = join(dir, 'current.json')
+    const old = copy()
+    old.sources = old.sources.filter((row) => row.id !== 'odin')
+    await writeFile(previous, JSON.stringify(old), { mode: 0o600 })
+    await writeFile(current, JSON.stringify(copy()), { mode: 0o600 })
+    const run = call([current, '--baseline', previous])
+    assert.equal(run.status, 2, run.stderr)
+    const result = JSON.parse(run.stdout)
+    assert.deepEqual(result.addedCandidateIds, ['odin'])
+    assert.deepEqual(result.removedCandidateIds, [])
+    assert.equal(result.changed, true)
+    assert.equal(result.humanReviewRequired, true)
+    assert.equal(result.rightsVerified, false)
+    assert.equal(result.productionReady, false)
+    assert.equal(result.m5Eligible, false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('core candidate replacement cannot pass review by preserving total count', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m5-replace-review-'))
+  try {
+    const previous = join(dir, 'previous.json')
+    const current = join(dir, 'current.json')
+    const changed = copy()
+    changed.sources = changed.sources.filter((row) => row.id !== 'boni')
+    changed.sources.push({
+      ...changed.sources[0],
+      id: 'fictional-market-banner',
+      name: 'Fictional market banner',
+    })
+    await writeFile(previous, JSON.stringify(copy()), { mode: 0o600 })
+    await writeFile(current, JSON.stringify(changed), { mode: 0o600 })
+    const run = call([current, '--baseline', previous])
+    assert.equal(run.status, 2, run.stderr)
+    const result = JSON.parse(run.stdout)
+    assert.deepEqual(result.addedCandidateIds, ['fictional-market-banner'])
+    assert.deepEqual(result.removedCandidateIds, ['boni'])
+    assert.equal(result.coreCovered, false)
+    assert.equal(result.candidateCount, undefined)
+    assert.equal(result.m5Eligible, false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
