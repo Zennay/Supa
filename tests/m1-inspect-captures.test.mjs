@@ -36,13 +36,13 @@ test('inspects generic structured data without source selectors', () => {
 
 test('verifies captured HTML against manifest SHA-256', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-inspect-'))
-  const supermarketDir = path.join(root, 'ah')
+  const supermarketDir = path.join(root, 'plus')
   await mkdir(supermarketDir, { recursive: true })
 
   const html = '<html><head><title>Milk</title></head><body></body></html>'
   const digest = createHash('sha256').update(html).digest('hex')
   await writeFile(
-    path.join(supermarketDir, 'ah-product.html'),
+    path.join(supermarketDir, 'plus-product.html'),
     html,
     'utf8',
   )
@@ -59,11 +59,11 @@ test('verifies captured HTML against manifest SHA-256', async () => {
       failureCount: 0,
       results: [
         {
-          id: 'ah-product',
-          supermarket: 'ah',
+          id: 'plus-product',
+          supermarket: 'plus',
           kind: 'product',
-          requestedUrl: 'https://www.ah.nl/producten/product/example',
-          finalUrl: 'https://www.ah.nl/producten/product/example',
+          requestedUrl: 'https://www.plus.nl/product/example',
+          finalUrl: 'https://www.plus.nl/product/example',
           capturedAt: '2026-10-04T00:00:30.000Z',
           sha256: digest,
           success: true,
@@ -172,4 +172,101 @@ test('rejects unsafe supermarket path segments before reading HTML', async () =>
     () => inspectCaptureDirectory(root),
     /Unsafe capture supermarket path segment/,
   )
+})
+
+
+test('rejects non-boolean capture success flags before inspecting artifacts', async () => {
+  for (const success of ['false', 1, {}, []]) {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-inspect-success-'))
+
+    await writeFile(
+      path.join(root, 'manifest.json'),
+      JSON.stringify({
+        milestone: 'M1 Data Feasibility',
+        bounded: true,
+        sourceCount: 1,
+        results: [
+          {
+            id: 'plus-product',
+            supermarket: 'plus',
+            kind: 'product',
+            success,
+          },
+        ],
+      }),
+      'utf8',
+    )
+
+    await assert.rejects(
+      () => inspectCaptureDirectory(root),
+      /boolean success flag/,
+    )
+  }
+})
+
+
+test('rejects duplicate capture source ids before building inspection evidence', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-inspect-duplicate-'))
+
+  await writeFile(
+    path.join(root, 'manifest.json'),
+    JSON.stringify({
+      milestone: 'M1 Data Feasibility',
+      bounded: true,
+      sourceCount: 2,
+      results: [
+        {
+          id: 'plus-product',
+          supermarket: 'plus',
+          kind: 'product',
+          success: false,
+        },
+        {
+          id: 'plus-product',
+          supermarket: 'plus',
+          kind: 'product',
+          success: false,
+        },
+      ],
+    }),
+    'utf8',
+  )
+
+  await assert.rejects(
+    () => inspectCaptureDirectory(root),
+    /Duplicate capture source id/,
+  )
+})
+
+test('rejects capture retailers and source kinds outside the bounded M1 contract', async () => {
+  for (const overrides of [
+    { supermarket: 'other-store' },
+    { kind: 'search' },
+  ]) {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-inspect-contract-'))
+
+    await writeFile(
+      path.join(root, 'manifest.json'),
+      JSON.stringify({
+        milestone: 'M1 Data Feasibility',
+        bounded: true,
+        sourceCount: 1,
+        results: [
+          {
+            id: 'bounded-source',
+            supermarket: 'plus',
+            kind: 'product',
+            success: false,
+            ...overrides,
+          },
+        ],
+      }),
+      'utf8',
+    )
+
+    await assert.rejects(
+      () => inspectCaptureDirectory(root),
+      /Unsupported capture (supermarket|source kind)/,
+    )
+  }
 })
