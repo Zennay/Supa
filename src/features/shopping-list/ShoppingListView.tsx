@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
+import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import {
   restoreShoppingListProgress,
   serializeShoppingListProgress,
@@ -9,11 +10,11 @@ import {
 
 function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
   if (line.status === 'unresolved') {
-    return `${line.requirement.amount ?? '?'} ${line.requirement.unit} · handmatig kiezen`
+    return `${line.requirement.amount ?? '?'} ${quantityUnitLabelNl(line.requirement.unit, line.requirement.amount)} · handmatig kiezen`
   }
 
   const packPrefix = line.pack.count > 1 ? `${line.pack.count} × ` : ''
-  return `${line.packs} × ${packPrefix}${line.pack.amount} ${line.pack.unit}`
+  return `${line.packs} × ${packPrefix}${line.pack.amount} ${quantityUnitLabelNl(line.pack.unit, line.pack.amount)}`
 }
 
 function readStoredProgress(basket: OneStoreBasket) {
