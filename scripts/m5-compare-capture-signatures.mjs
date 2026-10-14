@@ -277,7 +277,14 @@ export async function readBoundedManifest(handle) {
     }
     chunks.push(buffer.subarray(0, bytesRead))
   }
-  return Buffer.concat(chunks, total).toString('utf8')
+  // Buffer.toString('utf8') silently replaces malformed byte sequences with
+  // U+FFFD, allowing invalid capture-manifest bytes inside JSON strings to
+  // enter the M1 inspector. Decode the bounded complete byte stream strictly:
+  // valid multibyte characters may straddle descriptor read boundaries, but
+  // no lossily repaired capture source can become reviewable provenance.
+  // Keep an initial UTF-8 BOM visible so JSON.parse rejects it as before.
+  return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
+    .decode(Buffer.concat(chunks, total))
 }
 
 // M1's inspector reads every declared source before compareInspections() sees
