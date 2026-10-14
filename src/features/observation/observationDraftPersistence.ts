@@ -35,3 +35,6 @@ export function removeObservationDraft(
     return false
   }
 }
+
+/** Re-export through the existing form persistence dependency for direct M3 consumers. */
+export { observationDraftStorageStatus } from './observationDraftStorageGuard.ts'
