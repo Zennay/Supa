@@ -64,6 +64,13 @@ function renderView(sheet) {
       buildObservationSheet: () => structuredClone(sheet),
     },
     './observationPresentation.ts': observationPresentation,
+    // Existing main already routes Dutch quantity components; this guide SSR harness
+    // does not own or replace the separate quantity presentation contract.
+    './ObservationQuantityFields': {
+      ObservationRequirementText: ({ amount, unit }) =>
+        React.createElement('span', null, `${amount ?? '?'} ${unit}`),
+      ObservationPackUnitOptions: () => null,
+    },
     './observationCollectionUi.ts': collectionUi,
     './observationNumericInput.ts': numericInput,
     './observationDraftPersistence.ts': draftPersistence,
