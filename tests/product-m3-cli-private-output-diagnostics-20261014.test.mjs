@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 
 import { buildObservationSheet } from '../scripts/m3-create-observation-sheet.mjs'
 import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
-import { privateM3OutputFailure } from '../scripts/m3-private-file-errors.mjs'
+import { privateM3OutputFailure } from '../scripts/m3-source-output-preservation.mjs'
 
 // Fully fictional local fixtures. No human/store observations are included.
 const SECRET = 'SYNTHETIC_PRIVATE_FIELD_PATH_DO_NOT_PRINT_7642'
@@ -70,7 +70,7 @@ test('M3 private output error helper never relays arbitrary OS exception content
 test('M3 converter and assessor missing input paths remain redacted', () =>
   sandbox(async root => {
     for (const script of [converter, assessor]) {
-      const result = run(script, join(root, SECRET, 'missing.json'), join(root, 'out.json'))
+      const result = run(script, join(root, SECRET, 'missing.json'), '--output', join(root, 'out.json'))
       assert.notEqual(result.status, 0)
       assert.equal(result.stdout, '')
       assert.match(result.stderr, /could not be read\/parsed/)
@@ -101,7 +101,7 @@ test('M3 converter and assessor blocked output directories redact private path',
     const blocker = join(root, SECRET)
     await writeFile(blocker, 'UNRELATED_PRIVATE_FILE\n', { mode: 0o600 })
     for (const [script, input] of [[converter, sheetInput], [assessor, studyInput]]) {
-      const result = run(script, input, join(blocker, 'derived.json'))
+      const result = run(script, input, '--output', join(blocker, 'derived.json'))
       assert.notEqual(result.status, 0)
       assert.equal(result.stdout, '')
       assert.match(result.stderr, /private M3 derived output could not be written/)
