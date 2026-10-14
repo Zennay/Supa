@@ -94,8 +94,8 @@ test('unsupported M3 local drafts cannot be autosaved, imported over, or reset w
   assert.match(src, /\}, \[sheet, draftRecoveryNeeded\]\)/)
   assert.match(src, /if \(draftRecoveryNeeded\) \{[\s\S]*?Import is gepauzeerd/)
   assert.match(src, /type="file"\s*disabled=\{draftRecoveryNeeded\}/)
-  assert.match(src, /onClick=\{clearDraftWithConflictGuard\}\s*disabled=\{draftRecoveryNeeded\}/
-  assert.match(src, /const clearDraftWithConflictGuard = \(\) => \{[\s\S]*?observationDraftStorageStatus\([\s\S]*?if \(draftConflict \|\| status !== 'unchanged'\)[\s\S]*?return[\s\S]*?clearDraft\(\)/))
+  assert.match(src, /onClick=\{clearDraftWithConflictGuard\}\s*disabled=\{draftRecoveryNeeded\}/)
+  assert.match(src, /const clearDraftWithConflictGuard = \(\) => \{[\s\S]*?observationDraftStorageStatus\([\s\S]*?if \(draftConflict \|\| status !== 'unchanged'\)[\s\S]*?return[\s\S]*?clearDraft\(\)/)
   assert.match(src, /data-observation-recovery-warning/)
   assert.match(src, /role="alert"/)
   assert.match(src, /const downloadUnrecognizedDraft = \(\) => \{/)
