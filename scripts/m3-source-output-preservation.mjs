@@ -45,6 +45,21 @@ export async function assertNoSymlinkedM3OutputParents(output) {
 // This guards accidental aliasing, not adversarial concurrent filesystem races.
 export async function writeDerivedM3Output(input, output, serialized) {
   await assertNoSymlinkedM3OutputParents(output)
+  // Refuse an existing final-component symlink before opening with r+.
+  // A different existing report may still be intentionally regenerated;
+  // a symlink could otherwise redirect that update to an unrelated file.
+  let outputMetadata
+  try {
+    outputMetadata = await lstat(output)
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+  if (outputMetadata?.isSymbolicLink()) {
+    throw new Error('refusing symlinked M3 derived output file')
+  }
+  if (outputMetadata && !outputMetadata.isFile()) {
+    throw new Error('refusing nonregular M3 derived output file')
+  }
   const source = await stat(input)
   let target
   try {
