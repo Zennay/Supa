@@ -37,7 +37,10 @@ test('real App-routed v1 shopping list exposes basket-scoped status without fina
     assert.match(html, /role="status"/)
     assert.match(html, /van .* boodschappen? afgevinkt/)
     assert.match(html, /class="shopping-row/)
-    assert.doesNotMatch(html, /claimable|besparing|live prijs|€/)
+    // The paper view may explicitly DENY a savings claim, but must not print
+    // concrete money, retailer comparisons or machine-readable savings data.
+    assert.match(html, /Geen liveprijzen of besparingsbewijs/)
+    assert.doesNotMatch(html, /claimable|priceCents|savingsCents|prijsverschil|€/)
     assert.deepEqual(basket, input)
     const emptyBasket = buildOneStoreBasket({
       store: m2Store,

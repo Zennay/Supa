@@ -75,6 +75,8 @@ function mount(initialRaw, { denyGetter = false } = {}) {
     if (name === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
     // This interaction/storage harness does not exercise selectable export UI.
     if (name === './ShoppingListCopyButton') return { ShoppingListCopyButton: () => null }
+    // Only the dedicated SSR/print suites render this paper-only component.
+    if (name === './PrintableShoppingChecklist') return { PrintableShoppingChecklist: () => null }
     throw Error('unexpected import: ' + name)
   }
   const module = { exports: {} }
