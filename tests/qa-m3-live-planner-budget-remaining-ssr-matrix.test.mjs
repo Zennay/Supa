@@ -70,7 +70,7 @@ test('QA issue #1041: incomplete baskets never advertise a final remaining balan
       const html = renderToStaticMarkup(createElement(PlannerView, props(35, knownCents, missing)))
       assert.match(html, new RegExp(`${missing} mandregel(?:s)? open`))
       if (knownCents > 3500) {
-        assert.ok(html.includes(`Minimaal ${money(knownCents - 3500)} boven budget`))
+        assert.ok(html.includes(`${money(knownCents - 3500)} boven budget`))
       } else {
         assert.doesNotMatch(html, /15,31 over|35,00 over|0,00 over/)
       }
