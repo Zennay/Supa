@@ -25,15 +25,21 @@ function visibleText(value: unknown): value is string {
 // letters, accents, emoji, dashes and spaces; never mutate the basket source.
 function safePrintableLabel(value: unknown): string | null {
   if (!visibleText(value)) return null
-  const cleaned = value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, '').trim()
+  const cleaned = value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/\s+/gu, ' ').trim()
   return visibleText(cleaned) ? cleaned : null
+}
+
+// Physical quantities use the same Dutch decimal notation as the live Lijst.
+function dutchAmount(amount: number): string {
+  return String(amount).replace('.', ',')
 }
 
 function quantityLabel(amount: number | null, unit: unknown): string {
   if (amount === null || !Number.isFinite(amount) || amount <= 0) {
     return 'hoeveelheid onbekend'
   }
-  return `${amount} ${quantityUnitLabelNl(unit, amount)}`
+  return `${dutchAmount(amount)} ${quantityUnitLabelNl(unit, amount)}`
 }
 
 
@@ -117,7 +123,7 @@ export function preparePrintableShoppingChecklist(
     if (line.status === 'matched' && productLabel !== null &&
         safePhysicalPacks(line.requirement, line.pack, line.packs)) {
       const count = line.pack.count
-      const pack = `${line.pack.amount} ${quantityUnitLabelNl(line.pack.unit, line.pack.amount)}`
+      const pack = `${dutchAmount(line.pack.amount)} ${quantityUnitLabelNl(line.pack.unit, line.pack.amount)}`
       return {
         id: line.id,
         label: productLabel,
