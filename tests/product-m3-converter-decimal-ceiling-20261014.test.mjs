@@ -45,3 +45,48 @@ test('canonical M3 conversion retains normal matched packs and explicit unavaila
   assert.equal(partial.baseline.basket.totalCents, 1000)
   assert.equal(partial.baseline.basket.unresolvedLineCount, 1)
 })
+
+test('canonical M3 converter handles decimal multipacks and compatible kg-to-g units exactly', () => {
+  const riceIndex = buildFictionalPricedSheet().requirements.findIndex(
+    (entry) => entry.amount === 450 && entry.unit === 'g',
+  )
+  assert.notEqual(riceIndex, -1)
+
+  for (const [packAmount, packUnit, packCount, expectedPacks] of [
+    [0.072, 'g', 2, 3125],
+    [0.000144, 'kg', 1, 3125],
+    [0.3, 'g', 1, 1500],
+    [0.144, 'g', 3, 1042],
+  ]) {
+    const sheet = buildFictionalPricedSheet()
+    const product = sheet.baseline.lines[riceIndex].observedProduct
+    product.packAmount = packAmount
+    product.packUnit = packUnit
+    product.packCount = packCount
+    const before = JSON.stringify(sheet)
+    const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+    const rice = study.baseline.basket.lines[riceIndex]
+    assert.equal(rice.status, 'matched', 'trusted fictional rice stays matched')
+    assert.equal(rice.packs, expectedPacks)
+    assert.equal(rice.lineTotalCents, expectedPacks * 100)
+    assert.equal(study.baseline.basket.totalCents, expectedPacks * 100 + 1000)
+    assert.equal(JSON.stringify(sheet), before, 'converter must not change the human sheet')
+  }
+})
+
+test('unsafe observed pack arithmetic fails closed without inventing a price', () => {
+  const sheet = buildFictionalPricedSheet()
+  const riceIndex = sheet.requirements.findIndex(
+    (entry) => entry.amount === 450 && entry.unit === 'g',
+  )
+  const product = sheet.baseline.lines[riceIndex].observedProduct
+  // Required packs exceed the safe-integer range. No half-trusted money may
+  // survive as a matched line, even when the product text is a perfect match.
+  product.packAmount = 1e-20
+  product.packUnit = 'g'
+  const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  const rice = study.baseline.basket.lines[riceIndex]
+  assert.equal(rice.status, 'unresolved')
+  assert.equal(study.baseline.basket.unresolvedLineCount, 1)
+  assert.equal(study.baseline.basket.totalCents, 1000)
+})
