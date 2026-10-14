@@ -79,9 +79,22 @@ function sourceToken(id) {
   return createHash('sha256').update('supa-m5-source-v1\0' + id).digest('hex')
 }
 
-export function buildOfflineSelectorReviewQueue(report) {
-  if (!report || typeof report !== 'object' || Array.isArray(report) ||
-      report.contractVersion !== 1 ||
+// The canonical comparer returns a plain own-data report envelope. The
+// exported direct queue must not execute arbitrary getters (or see changed
+// values) while checking the same gates and later emitting its public result.
+const REQUIRED_REPORT_FIELDS = Object.freeze([
+  'contractVersion', 'mode', 'productionReady', 'm5Eligible',
+  'reviewerActionRequired', 'baselineProvided', 'captureCount',
+  'driftCount', 'changes',
+])
+
+export function buildOfflineSelectorReviewQueue(rawReport) {
+  if (!rawReport || typeof rawReport !== 'object' || Array.isArray(rawReport)) invalid()
+  const report = Object.create(null)
+  for (const field of REQUIRED_REPORT_FIELDS) {
+    report[field] = ownDataField(rawReport, field)
+  }
+  if (report.contractVersion !== 1 ||
       report.mode !== 'offline_capture_signature_review_only' ||
       report.productionReady !== false || report.m5Eligible !== false ||
       report.reviewerActionRequired !== true ||
