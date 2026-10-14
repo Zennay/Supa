@@ -166,6 +166,27 @@ try {
       p.recipeByDay.Di === 'pasta' && p.recipeByDay.Do === 'teriyaki'
   `, 'saved 2-day/40 euro preferences')
   assert.equal(stored, true)
+  const originalPlannerCost = await script(sessionId, `
+    const summary = document.querySelector('.budget-summary strong')
+    const status = document.querySelector('.budget-heading .budget-status')
+    const progress = document.querySelector('.budget-progress')
+    return summary && status && progress ? {
+      knownCost: summary.textContent.trim(),
+      budgetStatus: status.textContent.trim(),
+      amount: progress.getAttribute('aria-valuenow'),
+      max: progress.getAttribute('aria-valuemax'),
+      label: progress.getAttribute('aria-label'),
+    } : null
+  `)
+  assert.ok(originalPlannerCost, 'planner budget disclosure missing after saved week')
+  assert.equal(originalPlannerCost.max, '40')
+  assert.match(originalPlannerCost.knownCost, /€\\s*[0-9]/)
+  if (originalPlannerCost.knownCost.startsWith('min.')) {
+    assert.match(originalPlannerCost.budgetStatus, /mandregels? open/)
+    assert.equal(originalPlannerCost.label, 'Bekend minimum van het weekbudget')
+  } else {
+    assert.equal(originalPlannerCost.label, 'Gepland deel van het weekbudget')
+  }
   checks.push('edited-planner-saved')
   await screenshot(sessionId, 'planner-changed.png')
 
@@ -177,6 +198,21 @@ try {
   const basketLineCount = await script(sessionId,
     'return document.querySelectorAll(".list-card .trace-row").length')
   assert.ok(basketLineCount > 0)
+  const basketFinancial = await script(sessionId, `
+    const total = document.querySelector('.hero-total > strong')
+    const container = document.querySelector('.hero-total')
+    return total && container ? {
+      cost: total.textContent.trim(),
+      disclosure: container.dataset.basketTotalState,
+    } : null
+  `)
+  assert.ok(basketFinancial, 'full basket financial disclosure missing')
+  assert.equal(basketFinancial.cost, originalPlannerCost.knownCost,
+    'planner and basket must display the identical euro amount, not different estimates')
+  assert.equal(basketFinancial.disclosure,
+    originalPlannerCost.knownCost.startsWith('min.') ? 'minimum' : 'complete',
+    'planner and basket must describe any partial cost with the same honesty')
+  checks.push('planner-basket-same-euro-and-uncertainty')
   checks.push('basket-price-claim-boundary')
   await screenshot(sessionId, 'basket-controlled-demo.png')
 
@@ -229,12 +265,28 @@ try {
     const raw = localStorage.getItem('supa:planner-preferences:v2')
     return raw && JSON.parse(raw).budget === 30
   `, 'budget-only edit saved')
+  const afterBudgetOnlyCost = await script(sessionId, `
+    return {
+      value: document.querySelector('.budget-summary strong')?.textContent.trim(),
+      budgetMax: document.querySelector('.budget-progress')?.getAttribute('aria-valuemax'),
+      budgetStatus: document.querySelector('.budget-heading .budget-status')?.textContent.trim(),
+    }
+  `)
+  assert.equal(afterBudgetOnlyCost.value, originalPlannerCost.knownCost,
+    'budget-only preference must not change the physical grocery cost')
+  assert.equal(afterBudgetOnlyCost.budgetMax, '30')
+  await nav(sessionId, 'Mand')
+  const sameBasketCost = await script(sessionId,
+    'return document.querySelector(".hero-total > strong")?.textContent.trim()')
+  assert.equal(sameBasketCost, basketFinancial.cost,
+    'budget-only edit must not change the real rendered basket calculation')
   await nav(sessionId, 'Lijst')
   await until(sessionId,
     'return document.querySelector("button.shopping-row")?.classList.contains("checked")',
     'budget-only change kept checked item',
   )
   checks.push('budget-only-preserves-checklist')
+  checks.push('budget-only-keeps-basket-euros-unchanged')
 
   await nav(sessionId, 'Planner')
   await changeRecipe(sessionId, 'Di', 'tikka')
