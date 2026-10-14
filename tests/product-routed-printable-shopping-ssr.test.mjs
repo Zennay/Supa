@@ -12,7 +12,8 @@ test('live shopping tab includes user-triggered privacy-safe paper checklist and
   const view = await readFile(new URL('../src/features/shopping-list/ShoppingListView.tsx', import.meta.url), 'utf8')
   const css = await readFile(new URL('../src/features/shopping-list/PrintableShoppingChecklist.css', import.meta.url), 'utf8')
   assert.match(app, /ShoppingListView basket=\{basket\}/)
-  assert.match(view, /<PrintableShoppingChecklist basket=\{basket\} \/>/)
+  assert.match(view, /<PrintableShoppingChecklist basket=\{basket\} doneLineIds=\{done\} \/>/)
+  assert.match(view, /const done = progress\.basketKey === basketKey \? progress\.done : \[\]/)
   assert.match(css, /@media print/)
   assert.match(css, /body:has\(\.supa-printable-shopping\)/)
   const vite = await createServer({
