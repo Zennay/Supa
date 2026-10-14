@@ -5,7 +5,8 @@ import { buildOfflineSelectorReviewQueue } from '../scripts/m5-build-selector-re
 // Independently invented in-memory offline review records. No real retailer/user data.
 const H='a'.repeat(64)
 const verified=id=>({id,captureStatus:'verified',snapshotSha256:H,
-  shapeSha256:H,schemaOrgStatus:'abstain',supermarket:'fictional',kind:'product'})
+  shapeSha256:H,schemaOrgStatus:'abstain',supermarket:'fictional',kind:'product',
+  hasNextData:false,jsonLdCount:0,jsonLdParseErrors:0})
 const unavailable=id=>({id,captureStatus:'unavailable',snapshotSha256:null,
   shapeSha256:null,schemaOrgStatus:'unknown',supermarket:'fictional',kind:'product'})
 const row=(id,status,current,baseline)=>({id,status,current,baseline})
