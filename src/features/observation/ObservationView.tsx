@@ -479,7 +479,7 @@ export function ObservationView() {
               placeholder="student-001"
               autoComplete="off"
             />
-            <small>Gebruik geen naam of e-mailadres. Kies een anonieme code.</small>
+            <small className="observation-field-hint">Gebruik geen naam of e-mailadres. Kies een anonieme code.</small>
           </label>
           <label>
             Doelgroep
@@ -642,7 +642,7 @@ export function ObservationView() {
                   }
                   placeholder="Bijv. prijzen op het schap gecontroleerd"
                 />
-                <small>Beschrijf de bron en het meetmoment; noteer geen persoonsgegevens.</small>
+                <small className="observation-field-hint">Beschrijf de bron en het meetmoment; noteer geen persoonsgegevens.</small>
               </label>
             </div>
 
