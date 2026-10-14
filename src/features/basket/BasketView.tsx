@@ -3,6 +3,8 @@ import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import {
+  basketComparisonCanShowMoney,
+  basketComparisonHeadline,
   basketCostDisclosure,
   basketLineExplanation,
   basketReviewSummary,
@@ -10,30 +12,11 @@ import {
   orderBasketLinesForReview,
 } from './basketPresentation'
 import { StatPill } from '../../components/StatPill'
+import { comparisonLineHighlights, comparisonLineHighlightCopy, comparisonMatchesVisibleBaskets } from './comparisonLineHighlights.ts'
 
 function quantity(amount: number | null, unit: string) {
   const label = quantityUnitLabelNl(unit, amount)
   return amount === null ? `? ${label}` : `${amount} ${label}`
-}
-
-function comparisonTitle(
-  comparison: BasketComparison,
-  candidate: OneStoreBasket,
-) {
-  if (!comparison.claimable || comparison.outcome === 'unknown') {
-    return 'Nog geen betrouwbare vergelijking'
-  }
-
-  if (comparison.outcome === 'same') {
-    return 'Beide testmanden zijn even duur'
-  }
-
-  const difference = euro.format(
-    Math.abs(comparison.savingsCents ?? 0) / 100,
-  )
-  return comparison.outcome === 'better'
-    ? `${candidate.store.name} ligt ${difference} lager`
-    : `${candidate.store.name} ligt ${difference} hoger`
 }
 
 export function BasketView({
@@ -69,16 +52,22 @@ export function BasketView({
     basket.lines.length > 0 &&
     comparisonBaseline.lines.length > 0 &&
     comparisonCandidate.lines.length > 0
-  const displayComparison = hasComparableDemand
+  const comparisonCanShowMoney = hasComparableDemand &&
+    basketComparisonCanShowMoney(comparison, comparisonCandidate) &&
+    comparisonMatchesVisibleBaskets(comparison, comparisonBaseline, comparisonCandidate)
+  const displayComparison = comparisonCanShowMoney
     ? comparison
     : { ...comparison, outcome: 'unknown' as const, claimable: false }
   const comparisonWarning = hasComparableDemand
     ? comparisonWarningCopy(
       comparisonBaseline.unresolvedLineCount,
       comparisonCandidate.unresolvedLineCount,
-      comparison.reasons.length,
+      Array.isArray(comparison?.reasons) ? comparison.reasons.length : 1,
     )
     : 'Plan eerst een maaltijd; zonder boodschappen is er geen financieel verschil te vergelijken.'
+  const comparisonHighlights = comparisonCanShowMoney
+    ? comparisonLineHighlights(comparison)
+    : []
   const reviewSummary = basketReviewSummary(basket.unresolvedLineCount)
   const basketLines = orderBasketLinesForReview(basket.lines)
 
@@ -109,12 +98,12 @@ export function BasketView({
                 ? 'productkeuze is'
                 : 'productkeuzes zijn'}{' '}
               nog niet meegerekend. Dit is alleen het bekende minimum, geen
-              volledig mandtotaal. M2 testfixture — geen productie-liveprijs.
+              volledig mandtotaal. Dit zijn voorbeeldprijzen, geen actuele winkelprijzen of bewezen besparing.
             </>
           ) : (
             <>
-              Volledige deterministische M2 testfixture — geen besparingsclaim
-              en geen productie-liveprijs.
+              Dit is een volledig voorbeeldmandje met gecontroleerde voorbeeldprijzen.
+              Geen actuele winkelprijzen of bewezen besparing.
             </>
           )}
         </p>
@@ -123,7 +112,7 @@ export function BasketView({
       <div className="comparison-card" data-comparison-outcome={displayComparison.outcome}>
         <span className="eyebrow">Gecontroleerde winkelvergelijking</span>
         <strong>{hasComparableDemand
-          ? comparisonTitle(displayComparison, comparisonCandidate)
+          ? basketComparisonHeadline(displayComparison, comparisonCandidate)
           : 'Plan eerst maaltijden om winkels te vergelijken'}</strong>
         <div className="comparison-totals">
           <div>
@@ -139,10 +128,30 @@ export function BasketView({
             </strong>
           </div>
         </div>
+        {comparisonHighlights.length > 0 && (
+          <section className="comparison-line-breakdown" aria-label="Grootste mandregelverschillen" data-comparison-line-breakdown="true">
+            <h3>Grootste verschillen per ingrediënt</h3>
+            <div className="list-card">
+              {comparisonHighlights.map((item) => (
+                <div className="list-row" key={item.id}>
+                  <div>
+                    <strong>{item.ingredientLabel}</strong>
+                    <span>{comparisonLineHighlightCopy(item, comparisonCandidate.store.name)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="disclaimer">
+              Dit laat alleen zien waar deze voorbeeldmanden verschillen, niet
+              waarom. Het bewijst geen aanbiedingen, besparingen of live prijzen.
+            </p>
+          </section>
+        )}
+
         {displayComparison.claimable ? (
           <p className="disclaimer">
-            M3 controlled testdata · zelfde week en volledige mand · geen
-            live-besparingsclaim.
+            Vergelijking van voorbeeldprijzen voor dezelfde week en een volledige mand.
+            Geen actuele winkelprijzen of bewezen besparing.
           </p>
         ) : (
           <div className="comparison-warning">
@@ -185,7 +194,7 @@ export function BasketView({
             </div>
             <strong>
               {line.status === 'matched'
-                ? euro.format(line.lineTotalCents / 100)
+                ? euro.formatCents(line.lineTotalCents)
                 : '—'}
             </strong>
           </div>
