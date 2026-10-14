@@ -7,6 +7,7 @@ export type ShareableWeek = {
   recipes: readonly Recipe[]
   budget: number
   includeBudget?: boolean
+  includeDetails?: boolean
 }
 
 const MAX_DAYS = 14
@@ -38,6 +39,7 @@ export function formatShareableWeek(input: ShareableWeek): string {
       input.activeDays.length > MAX_DAYS ||
       input.recipes.length > MAX_RECIPES ||
       (input.includeBudget !== undefined && typeof input.includeBudget !== 'boolean') ||
+      (input.includeDetails !== undefined && typeof input.includeDetails !== 'boolean') ||
       !Number.isFinite(input.budget) || input.budget < 0 ||
       !Number.isSafeInteger(Math.round(input.budget * 100)) ||
       input.budget !== Math.round(input.budget * 100) / 100) {
@@ -66,7 +68,17 @@ export function formatShareableWeek(input: ShareableWeek): string {
     if (!active.has(meal.day)) continue
     const recipe = recipeById.get(meal.recipeId)
     if (!recipe) throw new Error('Weekmenu niet beschikbaar')
-    chosen.push(`${meal.day}: ${recipe.title}`)
+    if (input.includeDetails && (
+      !Number.isSafeInteger(recipe.minutes) || recipe.minutes <= 0 ||
+      recipe.minutes > 1440 ||
+      !Number.isSafeInteger(recipe.servings) || recipe.servings <= 0 ||
+      recipe.servings > 100
+    )) throw new Error('Weekmenu niet beschikbaar')
+
+    chosen.push(
+      `${meal.day}: ${recipe.title}` +
+      (input.includeDetails ? ` · ${recipe.minutes} min · ${recipe.servings} porties` : ''),
+    )
   }
   if (chosen.length !== active.size) throw new Error('Weekmenu niet beschikbaar')
 

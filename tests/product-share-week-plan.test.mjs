@@ -139,3 +139,22 @@ test('M3 copied menu preserves readable Dutch names, accents and honest optional
   assert.match(result, /Dit is een planning, geen prijsopgave/)
   assert.doesNotMatch(result, /bespaard|echte prijzen:/)
 })
+
+test('opt-in sharing includes practical preparation times and serving counts, never fixture price', () => {
+  const base = input()
+  const text = formatShareableWeek({ ...base, includeDetails: true })
+  assert.match(text, /Ma: Tikka-bowl met kip · 25 min · 2 porties/)
+  assert.match(text, /Wo: Romige tomatenpasta · 18 min · 2 porties/)
+  assert.doesNotMatch(text, /€|Weekbudget|6,40|4,90/)
+  assert.doesNotMatch(formatShareableWeek(base), /min · \d+ porties/)
+
+  const bad = { ...base, recipes: base.recipes.map(recipe =>
+    recipe.id === 'tikka' ? { ...recipe, minutes: Number.NaN } : recipe) }
+  assert.throws(() => formatShareableWeek({ ...bad, includeDetails: true }), {
+    message: 'Weekmenu niet beschikbaar',
+  })
+  assert.match(formatShareableWeek(bad), /Ma: Tikka-bowl met kip/)
+  assert.throws(() => formatShareableWeek({ ...base, includeDetails: 'yes' }), {
+    message: 'Weekmenu niet beschikbaar',
+  })
+})

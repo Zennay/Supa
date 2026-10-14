@@ -57,6 +57,7 @@ export function App() {
   const [preferences, setPreferences] = useState(readPlannerPreferences)
   const [manualWeekCopy, setManualWeekCopy] = useState<string | null>(null)
   const [includeWeekBudget, setIncludeWeekBudget] = useState(false)
+  const [includeWeekDetails, setIncludeWeekDetails] = useState(false)
   const [weekCopyMessage, setWeekCopyMessage] = useState('')
   const { budget, activeDays, recipeByDay } = preferences
 
@@ -142,6 +143,7 @@ export function App() {
         recipes: m2Recipes,
         budget,
         includeBudget: includeWeekBudget,
+        includeDetails: includeWeekDetails,
       }))
       setWeekCopyMessage('Selecteer en kopieer de tekst hieronder')
     } catch {
@@ -203,6 +205,18 @@ export function App() {
                 }}
               />
               Mijn weekbudget ook opnemen (optioneel)
+            </label>
+            <label className="week-share-privacy">
+              <input
+                type="checkbox"
+                checked={includeWeekDetails}
+                onChange={(event) => {
+                  setIncludeWeekDetails(event.target.checked)
+                  setManualWeekCopy(null)
+                  setWeekCopyMessage('')
+                }}
+              />
+              Bereidingstijd en porties opnemen
             </label>
             <p role="status" aria-live="polite">{weekCopyMessage}</p>
             {manualWeekCopy !== null && (
