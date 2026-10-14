@@ -1,0 +1,83 @@
+name: QA shopping-v1 empty state real Firefox
+
+on:
+  pull_request:
+    paths:
+      - "tests/qa-shopping-v1-empty-real-firefox-20261014.mjs"
+      - ".github/workflows/qa-shopping-v1-empty-firefox-20261014.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-supa-shopping-v1-empty-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa-rendered-empty-shopping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify hosted Firefox tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v firefox
+          command -v geckodriver
+          firefox --version
+          geckodriver --version
+          node --check tests/qa-shopping-v1-empty-real-firefox-20261014.mjs
+      - run: npm ci
+      - run: npm run build
+      - name: Run rendered empty-week trust flow on localhost only
+        shell: bash
+        env:
+          SUPA_QA_OWNER_HEAD_SHA: dea7d2fc3a3afeb31cb1860c3dde7cc2dfb89fad
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/qa-shopping-empty
+          choose_port() {
+            node -e "const s=require('node:net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"
+          }
+          preview_port="$(choose_port)"
+          driver_port="$(choose_port)"
+          test "$preview_port" != "$driver_port"
+
+          npm run preview -- --host 127.0.0.1 --port "$preview_port" --strictPort >artifacts/qa-shopping-empty/vite.log 2>&1 &
+          preview_pid="$!"
+          geckodriver --host 127.0.0.1 --port "$driver_port" >artifacts/qa-shopping-empty/geckodriver.log 2>&1 &
+          driver_pid="$!"
+          cleanup() { kill "$preview_pid" "$driver_pid" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 80); do
+            curl -fsS "http://127.0.0.1:$preview_port" >/dev/null 2>&1 && break
+            sleep 0.25
+          done
+          curl -fsS "http://127.0.0.1:$preview_port" >/dev/null
+          for _ in $(seq 1 80); do
+            curl -fsS "http://127.0.0.1:$driver_port/status" >/dev/null 2>&1 && break
+            sleep 0.25
+          done
+          curl -fsS "http://127.0.0.1:$driver_port/status" >/dev/null
+
+          SUPA_QA_BROWSER_URL="http://127.0.0.1:$preview_port" \
+          SUPA_QA_WEBDRIVER_URL="http://127.0.0.1:$driver_port" \
+          SUPA_QA_ARTIFACT_DIR="artifacts/qa-shopping-empty" \
+          node tests/qa-shopping-v1-empty-real-firefox-20261014.mjs
+      - name: Save fictional screenshots and technical evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: qa-supa-shopping-empty-firefox
+          path: artifacts/qa-shopping-empty/
+          if-no-files-found: warn
+          retention-days: 7
