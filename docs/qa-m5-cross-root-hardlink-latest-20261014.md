@@ -8,7 +8,7 @@
 - Prior [QA DRAFT #2194](https://github.com/Zennay/Supa/pull/2194) exact HEAD `5ffac8e0c12eb4f8b95c2b6ce57b40264093db8f`, [hosted CI #38494449187](https://github.com/Zennay/Supa/actions/runs/38494449187) **844/844 PASS**: original **61** independent QA cases from #2164 (34), #2174 (9), #2171 (4), #2169 (8), #2166 (6), all byte-identical.
 - Replayed 12 original files in this branch are exact same original Git blobs, verify by comparing `git ls-tree` or `fetch_file.sha` to previous #2194; no original assertion altered.
 
-## Ten additional independent new acceptance cases
+## Eleven additional independent new acceptance cases
 
 These focus on **cross-capture physical alias relationships and precedence** not just the isolated synthetic product fixture:
 1. Two SHA-matching, independent regular captures with strictly older true baseline are private P3 and never grant rights, selectors, production, or M5.
@@ -21,11 +21,14 @@ These focus on **cross-capture physical alias relationships and precedence** not
 8. A symlink alias **baseline** must be refused before parsing a deliberately malformed **current** manifest (both roots admitted before either manifest read).
 9. A current root underneath a **symlinked ancestor directory** must likewise be rejected before its malformed JSON is read.
 10. A historical root underneath a **symlinked ancestor directory** must be rejected before reading deliberately malformed **current** JSON.
+11. A standalone **valid successful P2** capture with externally hardlinked manifest must be rejected as manifest provenance failure even though no historical chronology comparison exists.
+
+**Strict error provenance:** Case 5 (shared manifest across two roots) now additionally requires the direct comparator's explicit `Invalid or oversized M1 capture manifest` error. Merely rejecting identical timestamps later would be an invalid false positive for manifest-ownership QA.
 
 All inputs are fictional short SHA-verified HTML or manifest strings under fresh local temporary directories; direct API error assertions distinguish unsafe precedence from incidental JSON rejection. CLI checks normal process exit, exact generic private stderr, no JSON for rejection, preservation of input bytes and verified inodes. No adversarial network scanning or live retailer access.
 
 ## Gates and limitations
 
-Require exact QA head GitHub-hosted `npm ci`, high audit, **all original 61 plus new 10** original independent cases, M1 matching, source-permission gate and TS/Vite build before technical GREEN. A green synthetic hosted run is **not** current-main merge proof, race-free descriptor-bound filesystem security, permanent trusted runner proof, actual M3 retailer observation or authorization for M4/M5.
+Require exact QA head GitHub-hosted `npm ci`, high audit, **all original 61 plus new 11** original independent cases, M1 matching, source-permission gate and TS/Vite build before technical GREEN. A green synthetic hosted run is **not** current-main merge proof, race-free descriptor-bound filesystem security, permanent trusted runner proof, actual M3 retailer observation or authorization for M4/M5.
 
 **DRAFT/HOLD/NO MERGE/NO DEPLOY** pending independent zCloud SQLite task/write scope preflight+claim lease, owner reviews, latest-main controlled integration, relevant trusted permanent VPS, true #78 human field observations and explicit human releasego.
