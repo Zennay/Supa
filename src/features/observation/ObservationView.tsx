@@ -154,6 +154,18 @@ export function ObservationView() {
       OBSERVATION_DRAFT_STORAGE_KEY,
     )
     setDraftResetRemovalFailed(!removed)
+    if (!removed) {
+      // Browser storage may reject removeItem while a later setItem still
+      // succeeds. Never clear the screen: the autosave effect would otherwise
+      // overwrite a real human observation with an empty 11+11 template.
+      setResetArmed(false)
+      setImportStatus({
+        kind: 'error',
+        message:
+          'Wissen is niet gelukt: je ingevulde meting is behouden. Exporteer eerst een JSON-concept of probeer opnieuw.',
+      })
+      return
+    }
     setSheet(buildObservationSheet())
     setResetArmed(false)
     setPendingImport(null)
