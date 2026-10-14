@@ -5,6 +5,15 @@ import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ts from 'typescript'
+import { buildOneStoreBasket } from '../src/domain/basket.ts'
+import { compareFullBaskets } from '../src/domain/basketComparison.ts'
+import { comparisonNextStep } from '../src/features/basket/comparisonNextStep.ts'
+import {
+  m2DefaultActiveDays,
+  m2InitialPlan,
+  m2Products,
+  m2Recipes,
+} from '../src/data/m2Fixture.ts'
 
 // Compile the actual production TSX card rather than copying its markup into a
 // synthetic test component. The stylesheet has no runtime effect in Node SSR.
@@ -95,4 +104,45 @@ test('independent QA: unknown money flag stays false and long multilingual conte
   assert.match(html, /Vergelijking onbekend/)
   assert.match(html, /Controleer gegevens/)
   assert.doesNotMatch(html, /<button|<a\b/i)
+})
+
+test('independent QA: canonical two-store basket result renders honest ready vs empty-week advice', () => {
+  const baseStore = { id: 'fictional-base', name: 'Fictieve winkel A' }
+  const candidateStore = { id: 'fictional-other', name: 'Fictieve winkel B' }
+  const build = (store, activeDays) => {
+    const products = [
+      ...m2Products.map((product) => ({
+        ...product, id: `${store.id}-${product.id}`, storeId: store.id,
+      })),
+      {
+        id: `${store.id}-garam`, storeId: store.id, name: 'Garam 50 g',
+        packAmount: 50, packUnit: 'g', priceCents: 139, available: true,
+      },
+    ]
+    return buildOneStoreBasket({
+      store, plan: m2InitialPlan, recipes: m2Recipes, activeDays, products,
+    })
+  }
+  for (const [days, expectedCode, eligible] of [
+    [m2DefaultActiveDays, 'comparison-ready', true],
+    [[], 'choose-meals', false],
+  ]) {
+    const baseline = build(baseStore, days)
+    const candidate = build(candidateStore, days)
+    const comparison = compareFullBaskets({ baseline, candidate })
+    const nextStep = comparisonNextStep({ comparison, baseline, candidate })
+    assert.equal(nextStep.code, expectedCode)
+    assert.equal(nextStep.canShowDifference, eligible)
+    const html = render(nextStep)
+    assert.ok(html.includes(`data-comparison-next-step="${expectedCode}"`))
+    assert.ok(html.includes(`data-can-show-difference="${eligible}"`))
+    assert.match(html, /Volgende stap:/)
+    if (eligible) {
+      assert.match(html, /geen actuele winkelprijzen/i)
+      assert.match(html, /geen.*bewezen besparingen/i)
+    } else {
+      assert.doesNotMatch(html, /data-can-show-difference="true"/)
+      assert.match(html, /Plan eerst een maaltijd/)
+    }
+  }
 })
