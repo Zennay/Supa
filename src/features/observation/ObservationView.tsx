@@ -511,10 +511,24 @@ export function ObservationView() {
           Vul alleen gegevens in die je zelf hebt waargenomen. Een aparte controle
           moet daarna bepalen of beide winkelmetingen echt vergelijkbaar zijn.
         </p>
-        <p>
-          Je concept wordt automatisch lokaal op dit apparaat bewaard, zodat een
-          refresh of gesloten tab je winkelmeting niet wist.
-        </p>
+        {draftRecoveryNeeded ? (
+          <p role="status" data-observation-save-status="protected">
+            Automatisch bewaren staat uit: dit apparaat bevat een eerder
+            concept dat niet veilig kan worden gelezen. Nieuwe invoer blijft
+            tijdelijk totdat je het oorspronkelijke bestand hebt veiliggesteld
+            en expliciet opnieuw begint.
+          </p>
+        ) : draftPersistenceFailed ? (
+          <p role="status" data-observation-save-status="failed">
+            Je nieuwste invoer is niet lokaal opgeslagen. Bewaar het
+            JSON-concept handmatig voordat je deze pagina sluit of vernieuwt.
+          </p>
+        ) : (
+          <p data-observation-save-status="normal">
+            Je concept wordt automatisch lokaal op dit apparaat bewaard, zodat een
+            refresh of gesloten tab je winkelmeting niet wist.
+          </p>
+        )}
         <button
           className="ghost-button observation-next-button"
           type="button"
