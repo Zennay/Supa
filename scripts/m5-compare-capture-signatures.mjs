@@ -316,7 +316,10 @@ function pinnedInspectionCohort(raw, label) {
 
 export function compareInspections(current, baseline = null) {
   const nowSources = pinnedInspectionCohort(current, 'current')
-  const baselineSources = baseline ? pinnedInspectionCohort(baseline, 'baseline') : null
+  // Only an omitted/null history means "no baseline". Falsy alternatives
+  // such as false/0/NaN/'' are supplied invalid cohorts, not P2 evidence.
+  const baselineSources = baseline === null || baseline === undefined
+    ? null : pinnedInspectionCohort(baseline, 'baseline')
   const map = (sources) => {
     const result = new Map()
     for (const source of sources) {
