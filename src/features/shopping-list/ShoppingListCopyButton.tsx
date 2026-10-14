@@ -1,6 +1,7 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
 import { buildShoppingListCopyText } from './shoppingListCopyText'
+import { selectShoppingCopyText } from './selectShoppingCopyText'
 import './shoppingListCopyButton.css'
 
 /**
@@ -18,6 +19,7 @@ export function ShoppingListCopyButton({
   const [expanded, setExpanded] = useState(false)
   const text = buildShoppingListCopyText(basket, doneLineIds)
   const fieldId = useId()
+  const textAreaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => setExpanded(false), [basket, doneLineIds])
 
@@ -41,11 +43,16 @@ export function ShoppingListCopyButton({
       {expanded && text && (
         <div className="shopping-copy__detail">
           <label htmlFor={fieldId}>Boodschappenlijst om te kopiëren</label>
-          <textarea id={fieldId} readOnly rows={8}
+          <textarea id={fieldId} ref={textAreaRef} readOnly rows={8}
             value={text} onFocus={event => event.currentTarget.select()}
             className="shopping-copy__text" />
+          <button type="button" className="shopping-copy__button"
+            aria-controls={fieldId}
+            onClick={() => selectShoppingCopyText(textAreaRef.current, text)}>
+            Selecteer alle tekst
+          </button>
           <span className="shopping-copy__status">
-            Selecteer de tekst en kies Kopieer op je apparaat.
+            Kies daarna Kopieer op je apparaat.
           </span>
         </div>
       )}
