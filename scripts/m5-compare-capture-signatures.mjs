@@ -210,6 +210,40 @@ export function compareInspections(current, baseline = null) {
   }
 }
 
+// Offline selector triage may only compare measurements with a real, explicitly
+// offset observation time. Date.parse alone normalizes impossible calendar days
+// and excessive fractional precision, so validate the components first.
+// Timestamps are private control data: never put a source value in an error.
+function captureObservationInstant(value) {
+  const match = typeof value === 'string' && /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/.exec(value)
+  if (!match) throw new Error('Invalid capture observation time')
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number)
+  const millis = Number((match[7] ?? '').padEnd(3, '0') || 0)
+  if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31 ||
+      hour > 23 || minute > 59 || second > 59) {
+    throw new Error('Invalid capture observation time')
+  }
+  const local = new Date(0)
+  local.setUTCFullYear(year, month - 1, day)
+  local.setUTCHours(hour, minute, second, millis)
+  if (local.getUTCFullYear() !== year || local.getUTCMonth() !== month - 1 ||
+      local.getUTCDate() !== day) {
+    throw new Error('Invalid capture observation time')
+  }
+  let offset = 0
+  if (match[8] !== 'Z') {
+    const offsetHours = Number(match[8].slice(1, 3))
+    const offsetMinutes = Number(match[8].slice(4, 6))
+    if (offsetHours > 14 || offsetMinutes > 59 ||
+        (offsetHours === 14 && offsetMinutes !== 0)) {
+      throw new Error('Invalid capture observation time')
+    }
+    offset = (match[8][0] === '+' ? 1 : -1) *
+      (offsetHours * 60 + offsetMinutes) * 60_000
+  }
+  return local.getTime() - offset
+}
+
 // M1's inspector reads every declared source before compareInspections() sees
 // its MAX_SOURCES limit. Gate both manifests first, before any source HTML I/O.
 // This is a bounded offline preflight, not an atomic filesystem snapshot.
@@ -234,11 +268,35 @@ async function preflightBoundedManifest(directory) {
       parsed.results.some((record) => !record ||
         typeof record !== 'object' ||
         typeof record.success !== 'boolean')) fail()
+  return parsed.results
+}
+
+// Check *both* structural manifests before timestamp or HTML inspection.
+// Existing invalid-cohort refusal must win over missing source file/time.
+function observationInstants(results) {
+  const times = new Map()
+  for (const result of results) {
+    if (result.success) times.set(result.id, captureObservationInstant(result.capturedAt))
+  }
+  return times
 }
 
 export async function compareCaptureDirectories(currentDir, baselineDir = null) {
-  await preflightBoundedManifest(currentDir)
-  if (baselineDir) await preflightBoundedManifest(baselineDir)
+  const currentRows = await preflightBoundedManifest(currentDir)
+  const baselineRows = baselineDir ? await preflightBoundedManifest(baselineDir) : null
+  // Every successful source needs a valid time before *any* HTML is read.
+  const currentTimes = observationInstants(currentRows)
+  const baselineTimes = baselineRows ? observationInstants(baselineRows) : null
+  if (baselineTimes) {
+    // Historical means strictly earlier for each shared successful source ID,
+    // not just for the first row or based on wall-clock string ordering.
+    for (const [id, previousInstant] of baselineTimes) {
+      const currentInstant = currentTimes.get(id)
+      if (currentInstant !== undefined && previousInstant >= currentInstant) {
+        throw new Error('Nonhistorical capture observation')
+      }
+    }
+  }
   const current = await inspectCaptureDirectory(currentDir)
   const baseline = baselineDir ? await inspectCaptureDirectory(baselineDir) : null
   return compareInspections(current, baseline)

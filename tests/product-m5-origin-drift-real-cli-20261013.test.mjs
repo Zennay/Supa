@@ -21,7 +21,7 @@ async function capture(root, name, { supermarket = 'fictional-a', kind = 'produc
     results: [{
       id: 'stable-id', supermarket, kind, success: true,
       requestedUrl: 'https://example.invalid/offline',
-      capturedAt: '2026-10-13T00:00:00.000Z',
+      capturedAt: name === 'before' ? '2026-10-12T00:00:00.000Z' : '2026-10-13T00:00:00.000Z',
       sha256: sha,
     }],
   }))

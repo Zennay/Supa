@@ -28,7 +28,7 @@ async function createCapture(root, name, price, shaOverride = null) {
     results: [{
       id: 'fictional-product', supermarket: 'fictional', kind: 'product',
       requestedUrl: 'https://example.invalid/fictional-product',
-      capturedAt: '2026-10-13T00:00:00.000Z',
+      capturedAt: name === 'before' ? '2026-10-12T00:00:00.000Z' : '2026-10-13T00:00:00.000Z',
       sha256: shaOverride ?? createHash('sha256').update(document).digest('hex'),
       success: true,
     }],
