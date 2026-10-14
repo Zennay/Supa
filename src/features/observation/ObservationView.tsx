@@ -21,7 +21,6 @@ import { observationRetailerCopy } from './observationPresentation.ts'
 import { ObservationPackUnitOptions, ObservationRequirementText } from './ObservationQuantityFields'
 import {
   nextObservationActionLabel,
-  observationPriceCents,
   observationTimestampFromDate,
 } from './observationCollectionUi.ts'
 import {
@@ -36,6 +35,7 @@ import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
 import { observationNextAction, observationNextTaskSelector } from './observationNextStep.ts'
 import { readableObservationIssue } from './observationReadinessCopy.ts'
 import { ObservationNextActionCard } from './ObservationNextActionCard.tsx'
+import { ObservationPriceInput } from './ObservationPriceInput.tsx'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -61,10 +61,6 @@ function toIsoDateTime(value: string) {
   if (!value) return ''
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toISOString()
-}
-
-function euroValue(priceCents: number | null) {
-  return priceCents === null ? '' : (priceCents / 100).toFixed(2)
 }
 
 function safeFilePart(value: string) {
@@ -789,15 +785,11 @@ export function ObservationView() {
                           </label>
                           <label>
                             Prijs per verpakking (€)
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={euroValue(product.priceCents)}
-                              onChange={(event) =>
-                                updateProduct(side, lineIndex, {
-                                  priceCents: observationPriceCents(event.target.value),
-                                })
+                            <ObservationPriceInput
+                              key={`${side}:${line.ingredientId}`}
+                              priceCents={product.priceCents}
+                              onPriceChange={(priceCents) =>
+                                updateProduct(side, lineIndex, { priceCents })
                               }
                             />
                           </label>
