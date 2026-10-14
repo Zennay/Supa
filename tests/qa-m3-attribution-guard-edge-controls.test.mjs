@@ -115,8 +115,8 @@ for (const [label, delta] of [
     const candidateTotalCents = delta < 0 ? 0 : Number.MAX_SAFE_INTEGER
     const lineDeltas = [{
       ...comparison().lineDeltas[0],
-      baselineLineTotalCents,
-      candidateLineTotalCents,
+      baselineLineTotalCents: baselineTotalCents,
+      candidateLineTotalCents: candidateTotalCents,
       deltaCents: delta,
     }]
     const result = attributeSavingsEffects({
