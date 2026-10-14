@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const workflowUrl = new URL('../.github/workflows/m3-observed-week-report.yml', import.meta.url)
 const required = [
+  'tests/qa-m3-private-input-error-redaction.test.mjs',
   'tests/qa-m3-output-arg-failclosed.test.mjs',
   'tests/qa-m3-derived-output-private-directories.test.mjs',
   'tests/qa-m3-derived-symlink-parent-guard.test.mjs',
