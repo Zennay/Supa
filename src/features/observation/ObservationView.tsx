@@ -786,6 +786,7 @@ export function ObservationView() {
                           <label>
                             Prijs per verpakking (€)
                             <ObservationPriceInput
+                              label={`${side === 'baseline' ? 'PLUS' : 'DekaMarkt'} · ${line.ingredientLabel} · prijs per verpakking`}
                               key={`${side}:${line.ingredientId}`}
                               priceCents={product.priceCents}
                               onPriceChange={(priceCents) =>
