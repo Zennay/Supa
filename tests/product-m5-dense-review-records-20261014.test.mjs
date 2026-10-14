@@ -128,19 +128,24 @@ test('product dense queue: valid origin shift remains P1, never P3', () => {
   assert.equal(value.driftCount, 1)
 })
 
-test('product dense queue: fully dense 200-row removed baseline boundary stays valid', () => {
-  const changes = Array.from({ length: 200 }, (_, index) => {
+test('product dense queue: fully dense 200-row union of exactly 100+100 captures stays valid', () => {
+  const removed = Array.from({ length: 100 }, (_, index) => {
     const id = 'removed-' + index
     return entry(id, 'removed', null, verified(id))
   })
-  const input = report(changes, true)
-  const value = buildOfflineSelectorReviewQueue(input)
+  const added = Array.from({ length: 100 }, (_, index) => {
+    const id = 'added-' + index
+    return entry(id, 'added', verified(id))
+  })
+  const changes = [...removed, ...added]
+  const value = buildOfflineSelectorReviewQueue(report(changes, true))
   assert.equal(value.actions.length, 200)
-  assert.equal(value.sourceCount, 0)
+  assert.equal(value.sourceCount, 100)
   assert.equal(value.driftCount, 200)
   assert.equal(value.productionReady, false)
   assert.equal(value.m5Eligible, false)
-  assert.ok(value.actions.every((action) => action.priority === 'P1'))
+  assert.deepEqual(value.actions.map((action) => action.priority),
+    [...Array(100).fill('P1'), ...Array(100).fill('P2')])
 })
 
 test('product dense queue: more than 200 dense records still fail closed', () => {
