@@ -43,7 +43,7 @@ test('legacy repository and prototype fixture stay absent from the product', asy
     )
     assert.doesNotMatch(
       source,
-      /(?:from|import)\s*['"][^'"]*(?:\/data\/mock|\./mock)(?:\.ts)?['"]/,
+      /(?:from|import)\s*['"][^'"]*(?:\/data\/mock|\.\/mock)(?:\.ts)?['"]/,
       `${file} must not import the retired prototype fixture`,
     )
   }
