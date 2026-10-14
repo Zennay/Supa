@@ -558,7 +558,10 @@ export function validObservedAt(value: string, referenceNowMs = Number.POSITIVE_
     Number(match[4]) > 23 ||
     Number(match[5]) > 59 ||
     Number(match[6] ?? '0') > 59 ||
-    (match[7] !== 'Z' && (Number(match[8]) > 23 || Number(match[9]) > 59))
+    (match[7] !== 'Z' && (
+      Number(match[8]) > 14 || Number(match[9]) > 59 ||
+      (Number(match[8]) === 14 && Number(match[9]) !== 0)
+    ))
   ) {
     return null
   }
