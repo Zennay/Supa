@@ -12,8 +12,10 @@ import { compareFullBaskets } from './domain/basketComparison'
 import {
   defaultPlannerPreferences,
   serializePlannerPreferences,
+  type PlannerPreferences,
 } from './domain/plannerPreferences'
 import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
+import { canReplacePlannerRecord, persistPlannerRecord } from './features/planner/plannerStorageGuard.ts'
 import {
   m2InitialPlan,
   m2Products,
@@ -39,25 +41,36 @@ const tabs: { id: Tab; label: string }[] = [
 const plannerStorageKey = 'supa:planner-preferences:v2'
 const validRecipeIds = m2Recipes.map((recipe) => recipe.id)
 
-function readPlannerPreferences() {
-  if (typeof window === 'undefined') {
-    return defaultPlannerPreferences(m2InitialPlan)
-  }
+type PersistenceWarning = 'unavailable' | 'protected' | null
 
+function readPlannerPreferences(): {
+  preferences: PlannerPreferences
+  warning: PersistenceWarning
+  raw: string | null
+} {
+  const fallback = defaultPlannerPreferences(m2InitialPlan)
+  if (typeof window === 'undefined') {
+    return { preferences: fallback, warning: null, raw: null }
+  }
   try {
-    return restorePlannerPreferencesWithCustomBudget(
-      window.localStorage.getItem(plannerStorageKey),
-      m2InitialPlan,
-      validRecipeIds,
-    )
+    const raw = window.localStorage.getItem(plannerStorageKey)
+    return {
+      preferences: restorePlannerPreferencesWithCustomBudget(raw, m2InitialPlan, validRecipeIds),
+      warning: canReplacePlannerRecord(raw, m2InitialPlan.map((meal) => meal.day), validRecipeIds)
+        ? null : 'protected',
+      raw,
+    }
   } catch {
-    return defaultPlannerPreferences(m2InitialPlan)
+    return { preferences: fallback, warning: 'unavailable', raw: null }
   }
 }
 
 export function App() {
   const [tab, setTab] = useState<Tab>('planner')
-  const [preferences, setPreferences] = useState(readPlannerPreferences)
+  const [initialLoad] = useState(readPlannerPreferences)
+  const [preferences, setPreferences] = useState(() => initialLoad.preferences)
+  const [persistenceWarning, setPersistenceWarning] = useState<PersistenceWarning>(initialLoad.warning)
+  const [lastStoredRaw, setLastStoredRaw] = useState(initialLoad.raw)
   const [manualWeekCopy, setManualWeekCopy] = useState<WeekSharePreview | null>(null)
   const [includeWeekBudget, setIncludeWeekBudget] = useState(false)
   const [includeWeekDetails, setIncludeWeekDetails] = useState(false)
@@ -132,13 +145,23 @@ export function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    try {
-      window.localStorage.setItem(
-        plannerStorageKey,
-        serializePlannerPreferences(preferences),
-      )
-    } catch {
-      // Strict privacy modes can deny storage; the active session remains usable.
+    // Never overwrite unknown/future or unreadable preference bytes on initial
+    // mount. An explicit planner edit can retry when storage becomes available.
+    if (initialLoad.warning && preferences === initialLoad.preferences) return
+
+    const result = persistPlannerRecord({
+      read: () => window.localStorage.getItem(plannerStorageKey),
+      write: (raw) => window.localStorage.setItem(plannerStorageKey, raw),
+      expectedRaw: lastStoredRaw,
+      nextRaw: serializePlannerPreferences(preferences),
+      validDays: m2InitialPlan.map((meal) => meal.day),
+      validRecipeIds,
+    })
+    if (result.status === 'saved') {
+      setLastStoredRaw(result.raw)
+      setPersistenceWarning(null)
+    } else {
+      setPersistenceWarning(result.status)
     }
   }, [preferences])
 
@@ -203,6 +226,13 @@ export function App() {
       </header>
 
       <div className="content">
+        {persistenceWarning && (
+          <p role="alert" className="disclaimer" aria-live="assertive">
+            {persistenceWarning === 'protected'
+              ? 'Je weekbudget en maaltijdkeuzes zijn tijdelijk en niet opgeslagen. Eerdere opgeslagen gegevens blijven bewaard.'
+              : 'Je weekbudget en maaltijdkeuzes zijn tijdelijk en niet opgeslagen omdat browseropslag niet beschikbaar is.'}
+          </p>
+        )}
         {tab === 'planner' && (
           <PlannerView
             budget={budget}
