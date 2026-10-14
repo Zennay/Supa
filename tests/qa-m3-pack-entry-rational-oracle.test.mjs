@@ -69,7 +69,7 @@ test('980+ independent synthetic Dutch-decimal candidates preserve their exact r
       }
     }
     for (const value of ['1e3', '-1', '1,', '1.', '1.000,20', 'NaN',
-      'Infinity', '1\n2', '0', '00', '1/2', '١,٥', '\u20281.5', '0x10']) {
+      'Infinity', '1\n2', '0', '00', '1/2', '١,٥', '1\u20282', '0x10']) {
       assert.equal(parse(value), null)
       assert.deepEqual(decide(value), { kind: 'reject' })
     }
@@ -77,6 +77,14 @@ test('980+ independent synthetic Dutch-decimal candidates preserve their exact r
       assert.equal(parse(value), null)
       assert.deepEqual(decide(value), { kind: 'reject' })
     }
+    // Leading Unicode whitespace is deliberately trimmed by the text-input
+    // parser, but the canonical saved value must contain no hidden glyph.
+    assert.equal(parse('\u20281.5'), 1.5)
+    assert.deepEqual(decide('\u20281.5'), { kind: 'accept', value: 1.5 })
+    assert.equal(show(parse('\u20281.5')), '1,5')
+    // An embedded separator is not removable at the field boundary.
+    assert.equal(parse('1\u20282'), null)
+    assert.deepEqual(decide('1\u20282'), { kind: 'reject' })
     assert.deepEqual(decide(''), { kind: 'accept', value: null },
       'user-initiated clearing is distinct from invalid input')
   } finally {
