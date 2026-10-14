@@ -9,7 +9,7 @@ const SHAPE_B = 'd'.repeat(64)
 const verified = (id, snapshotSha256 = HTML_A, shapeSha256 = SHAPE_A, schemaOrgStatus = 'abstain', supermarket = 'fictional-store') => ({
   id, supermarket, kind: 'product', captureStatus: 'verified',
   snapshotSha256, shapeSha256, schemaOrgStatus,
-  hasNextData: false, jsonLdCount: 0, jsonLdParseErrors: 0,
+  hasNextData: false, jsonLdCount: schemaOrgStatus === 'candidate_observation' ? 1 : 0, jsonLdParseErrors: 0,
 })
 const unavailable = (id) => ({
   id, supermarket: 'fictional-store', kind: 'product',
