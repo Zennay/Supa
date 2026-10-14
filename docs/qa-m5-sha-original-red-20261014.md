@@ -1,0 +1,5 @@
+# QA SHA admission: original frozen source RED control — 14 October 2026
+
+This is an **expected-source-RED** test of product DRAFT #2205 SHA `28a8f1a7f6ac4961a3010da80bbeaa09c48dca54`, before product #2207's raw SHA grammar preflight. QA suite is the **exact same Git blob `e719dfd80e84c8014a8dc94ff7327719f2fbdd9c`** as corrected composed QA PR #2211. The predicted failures are negative SHA cases whose early raw-manifest error cannot occur on original source, since it inspects successful HTML before checking malformed SHA. The P1/P2/P3 and content-integrity controls must still pass. This is not a failing production incident or evidence of unauthorized retailer access. It uses invented local test data and no network.
+
+**DRAFT/HOLD / DO NOT MERGE / DO NOT DEPLOY.** Supa stays M3 ACTIVE, genuine human field #78 is absent, M4/M5 ineligible. Independently retain exact-head CI result, failures and original branch untouched. zCloud SQLite scope/lease, owner approvals and explicit human releasego remain required for any main/deploy action.
