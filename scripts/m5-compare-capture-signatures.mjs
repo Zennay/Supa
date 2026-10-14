@@ -92,6 +92,9 @@ function requireBoundedHtmlShape(html) {
       ? canonicalShapeTerms(keysDescriptor.value) : null
     const parseError = parseErrorDescriptor?.value === true
     if (!type || !keys ||
+        // M1 never supplies inherited parser errors. Do not evaluate an
+        // inherited getter or normalize it into a trusted success.
+        (!parseErrorDescriptor && 'parseError' in record) ||
         (parseErrorDescriptor &&
          (!Object.hasOwn(parseErrorDescriptor, 'value') ||
           parseErrorDescriptor.value !== true)) ||
