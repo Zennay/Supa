@@ -82,7 +82,7 @@ test('M3 reset never claims success when local draft removal fails', () => {
 test('a later successful persistence recovers the reset-removal warning', () => {
   assert.match(
     source,
-    /persistObservationDraft\([\s\S]*?\(\) => setDraftResetRemovalFailed\(false\)/,
+    /persistObservationDraft\([\s\S]*?\(\) => \{[\s\S]*?expectedDraftRawRef\.current = JSON\.stringify\(sheet\)[\s\S]*?setDraftResetRemovalFailed\(false\)/,
   )
   assert.match(
     source,
