@@ -263,19 +263,6 @@ export function ObservationView() {
       setImportStatus({ kind: 'warning', message: 'Bevestig nogmaals: het oude, onleesbare lokale concept wordt definitief verwijderd. Bewaar eerst een reservekopie als je dit wilt herstellen.' })
       return
     }
-    const status = observationDraftStorageStatus(
-      () => window.localStorage, OBSERVATION_DRAFT_STORAGE_KEY,
-      expectedDraftRawRef.current,
-    )
-    if (status !== 'unchanged') {
-      setRecoveryResetArmed(false)
-      setDraftConflict(status === 'changed')
-      setImportStatus({
-        kind: 'error',
-        message: 'Lokaal concept is tussentijds gewijzigd of niet leesbaar. Vernieuw de pagina voordat je gegevens wist.',
-      })
-      return
-    }
     const removed = removeObservationDraft(
       () => window.localStorage,
       OBSERVATION_DRAFT_STORAGE_KEY,
@@ -285,12 +272,31 @@ export function ObservationView() {
       setImportStatus({ kind: 'error', message: 'Verwijderen is geweigerd. Het bestaande lokale concept is behouden en wordt niet overschreven.' })
       return
     }
-    expectedDraftRawRef.current = null
     setSheet(buildObservationSheet())
     setPendingImport(null)
     setDraftRecoveryNeeded(false)
     setDraftResetRemovalFailed(false)
     setImportStatus({ kind: 'success', message: 'Oude lokale concept verwijderd. Je kunt een nieuwe meting beginnen; dit is geen besparingsbewijs.' })
+    return true
+  }
+
+  // Keep the original recovered-draft reset semantics testable. All user
+  // clicks first pass through this separate stale-tab ownership check.
+  const clearUnrecognizedDraftWithConflictGuard = () => {
+    const status = observationDraftStorageStatus(
+      () => window.localStorage, OBSERVATION_DRAFT_STORAGE_KEY,
+      expectedDraftRawRef.current,
+    )
+    if (draftConflict || status !== 'unchanged') {
+      if (status === 'changed') setDraftConflict(true)
+      setRecoveryResetArmed(false)
+      setImportStatus({
+        kind: 'error',
+        message: 'Oud concept is tussentijds gewijzigd of niet leesbaar. Het bestaande lokale concept is behouden; bewaar je werk als JSON en vernieuw de pagina.',
+      })
+      return
+    }
+    if (clearUnrecognizedDraft() === true) expectedDraftRawRef.current = null
   }
 
   const clearDraft = () => {
@@ -1134,7 +1140,7 @@ export function ObservationView() {
             Bewaar oorspronkelijk lokaal bestand
           </button>
           <button className={`ghost-button ${recoveryResetArmed ? 'is-danger' : ''}`}
-            type="button" onClick={clearUnrecognizedDraft}>
+            type="button" onClick={clearUnrecognizedDraftWithConflictGuard}>
             {recoveryResetArmed ? 'Bevestig definitief verwijderen' : 'Oud concept verwijderen en opnieuw beginnen'}
           </button>
         </div>
