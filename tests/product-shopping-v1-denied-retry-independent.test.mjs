@@ -72,6 +72,9 @@ function session(initialRaw, denial = {}) {
     if (id === 'react/jsx-runtime') return requireNative(id)
     if (id === '../../lib/quantityPresentation') return { quantityUnitLabelNl }
     if (id === './shoppingListProgress') return storage
+    // This legacy test harness exercises storage and checkbox state only;
+    // a separate routed Vite/React SSR test exercises the real banner.
+    if (id === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
     throw Error('unexpected component dependency: ' + id)
   }
   const loaded = { exports: {} }

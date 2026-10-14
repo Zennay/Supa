@@ -72,6 +72,9 @@ function session({ denyWrite = false } = {}) {
     if (id === 'react/jsx-runtime') return nodeRequire(id)
     if (id === '../../lib/quantityPresentation') return { quantityUnitLabelNl }
     if (id === './shoppingListProgress') return progressStorage
+    // This legacy test harness exercises storage and checkbox state only;
+    // a separate routed Vite/React SSR test exercises the real banner.
+    if (id === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
     throw Error('unexpected ShoppingListView import: ' + id)
   }
   const mod = { exports: {} }
