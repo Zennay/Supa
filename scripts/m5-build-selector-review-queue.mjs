@@ -45,6 +45,36 @@ function canonicalOrigin(value) {
     value.length <= 128 && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
 }
 
+// Only copy the canonical M1 own data fields. Reading an untrusted direct
+// report with ordinary property access can execute accessors or observe a
+// different value between admission and the later P1/P2/P3 comparisons.
+function ownDataField(record, key) {
+  const descriptor = Object.getOwnPropertyDescriptor(record, key)
+  if (!descriptor || !Object.hasOwn(descriptor, 'value')) invalid()
+  return descriptor.value
+}
+
+const REQUIRED_SNAPSHOT_FIELDS = Object.freeze([
+  'id', 'supermarket', 'kind', 'captureStatus', 'snapshotSha256',
+  'shapeSha256', 'schemaOrgStatus',
+])
+const OPTIONAL_INSPECTION_FIELDS = Object.freeze([
+  'hasNextData', 'jsonLdCount', 'jsonLdParseErrors',
+])
+
+function pinnedSnapshot(raw) {
+  if (raw === null) return null
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) invalid()
+  const snapshot = Object.create(null)
+  for (const field of REQUIRED_SNAPSHOT_FIELDS) {
+    snapshot[field] = ownDataField(raw, field)
+  }
+  for (const field of OPTIONAL_INSPECTION_FIELDS) {
+    if (Object.hasOwn(raw, field)) snapshot[field] = ownDataField(raw, field)
+  }
+  return snapshot
+}
+
 function sourceToken(id) {
   return createHash('sha256').update('supa-m5-source-v1\0' + id).digest('hex')
 }
@@ -64,22 +94,28 @@ export function buildOfflineSelectorReviewQueue(report) {
   // Array#map skips holes. A sparse input previously survived all checks and
   // produced a seemingly legitimate queue containing undefined action slots
   // (serialized as null by JSON.stringify). Every declared slot must be real.
+  const changes = []
   for (let index = 0; index < report.changes.length; index += 1) {
-    if (!Object.hasOwn(report.changes, index)) invalid()
+    const slot = Object.getOwnPropertyDescriptor(report.changes, index)
+    if (!slot || !Object.hasOwn(slot, 'value')) invalid()
+    changes.push(slot.value)
   }
 
   const seen = new Set()
   let foundCurrent = 0
   let foundBaseline = 0
   let driftCount = 0
-  const actions = report.changes.map((change) => {
-    if (!change || typeof change !== 'object' || Array.isArray(change) ||
-        typeof change.id !== 'string' || !change.id || change.id.length > MAX_SOURCE_ID_UNITS ||
-        !validUnicodeSourceId(change.id) ||
-        typeof change.status !== 'string' || !Object.hasOwn(STATUS_ACTION, change.status) ||
-        seen.has(change.id)) invalid()
-    seen.add(change.id)
-    const { current, baseline, status } = change
+  const actions = changes.map((change) => {
+    if (!change || typeof change !== 'object' || Array.isArray(change)) invalid()
+    const id = ownDataField(change, 'id')
+    const status = ownDataField(change, 'status')
+    const current = pinnedSnapshot(ownDataField(change, 'current'))
+    const baseline = pinnedSnapshot(ownDataField(change, 'baseline'))
+    if (typeof id !== 'string' || !id || id.length > MAX_SOURCE_ID_UNITS ||
+        !validUnicodeSourceId(id) ||
+        typeof status !== 'string' || !Object.hasOwn(STATUS_ACTION, status) ||
+        seen.has(id)) invalid()
+    seen.add(id)
     // A physical M1 historical cohort is independently capped at 100, even
     // when the union with current sources contains up to 200 distinct IDs.
     // No-baseline reports must NEVER smuggle historical records inside a
@@ -90,7 +126,7 @@ export function buildOfflineSelectorReviewQueue(report) {
     for (const snapshot of [current, baseline]) {
       if (snapshot === null) continue
       if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot) ||
-          snapshot.id !== change.id ||
+          snapshot.id !== id ||
           !canonicalOrigin(snapshot.supermarket) ||
           !canonicalOrigin(snapshot.kind)) invalid()
       // Only metadata produced by the canonical M1 captureShape() contract is
@@ -197,7 +233,7 @@ export function buildOfflineSelectorReviewQueue(report) {
         current.schemaOrgStatus === baseline.schemaOrgStatus) invalid()
     if (['removed', 'added', 'unavailable', 'shape_changed', 'origin_changed'].includes(status)) driftCount += 1
     const [priority, action] = STATUS_ACTION[status]
-    return { sourceToken: sourceToken(change.id), status, priority, action,
+    return { sourceToken: sourceToken(id), status, priority, action,
       selectorVerified: false, rightsVerified: false, productionEnabled: false }
   })
 
