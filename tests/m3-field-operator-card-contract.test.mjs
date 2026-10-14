@@ -20,7 +20,7 @@ const demand = [
 test('operator card preserves exactly the canonical 11 M3 demand rows for both stores', () => {
   const table = card.split('## Same demand at BOTH stores')[1]?.split('For **each store')[0]
   assert.ok(table, 'canonical M3 field-run table is missing')
-  const rows = table.split('\n').filter((line) => /^\| [^|-]+ \|/.test(line))
+  const rows = table.split('\n').filter((line) => /^\| [^|-]+ \|/.test(line) && !line.startsWith('| Requirement |'))
   assert.equal(rows.length, 11, 'collector must observe each of 11 requirements exactly once')
   const entries = rows.map((line) => line.split('|').slice(1, 3).map((item) => item.trim()))
   assert.deepEqual(entries, demand, 'M3 demand changed; update issue #78 and canonical protocol intentionally')
