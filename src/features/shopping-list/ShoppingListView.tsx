@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
+import { ShoppingListCopyButton } from './ShoppingListCopyButton'
 import {
   restoreShoppingListProgress,
   serializeShoppingListProgress,
@@ -177,6 +178,8 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       {basket.lines.length > 0 && (
         <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
       )}
+
+      <ShoppingListCopyButton basket={basket} doneLineIds={done} />
 
       <div className="list-card">
         {basket.lines.length === 0 ? (

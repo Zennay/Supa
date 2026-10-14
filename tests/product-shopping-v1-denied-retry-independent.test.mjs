@@ -75,6 +75,8 @@ function session(initialRaw, denial = {}) {
     // This legacy test harness exercises storage and checkbox state only;
     // a separate routed Vite/React SSR test exercises the real banner.
     if (id === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
+    // This interaction/storage harness does not exercise selectable export UI.
+    if (id === './ShoppingListCopyButton') return { ShoppingListCopyButton: () => null }
     throw Error('unexpected component dependency: ' + id)
   }
   const loaded = { exports: {} }
