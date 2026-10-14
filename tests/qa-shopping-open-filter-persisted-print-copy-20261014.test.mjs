@@ -131,6 +131,21 @@ test('independent persisted-check filter keeps full paper/copy truth in the actu
       assert.deepEqual(value, snapshot)
     })
 
+    await t.test('switching physical stores cannot reuse the previous store checkmarks', () => {
+      const raw = serializeShoppingListProgress(value, ids)
+      const elsewhere = structuredClone(value)
+      elsewhere.store.id += '-independent-store'
+      assert.notEqual(shoppingListBasketKey(elsewhere), shoppingListBasketKey(value))
+      assert.deepEqual(restoreShoppingListProgress(elsewhere, raw), [])
+      const { html, calls } = usingStoredProgress(raw, () =>
+        renderToStaticMarkup(createElement(ShoppingListView, { basket: elsewhere })),
+      )
+      assert.deepEqual(calls, ['get'])
+      assert.ok(html.includes(String(ids.length) + ' van ' + String(ids.length) + ' open'))
+      assert.equal(countPhysicalPaperRows(html), ids.length)
+      assert.deepEqual(value, snapshot)
+    })
+
     await t.test('denied saved-state read cannot remove rows, claim saved progress or leak diagnostics', () => {
       const denied = new Error('fictional-private-store-identifier')
       const { html, calls } = usingStoredProgress(denied, () =>
