@@ -1,0 +1,11 @@
+# Independent M5 capture-source own data provenance — original RED
+
+**Frozen original product:** [DRAFT #2327](https://github.com/Zennay/Supa/pull/2327), exact `fb27e9bff4e372579bdab05ff7978a51d51bd50d`, already hosted-green. New product-owned [issue #2329](https://github.com/Zennay/Supa/issues/2329) is fixed only on separate [DRAFT #2331](https://github.com/Zennay/Supa/pull/2331), which QA does not edit.
+
+The pure exported `captureShape(source)` previously dereferenced `id`, `supermarket`, `kind`, `success`, `integrity`, `manifestSha256` as arbitrary properties; a caller-supplied getter or inherited value might execute, change source origin or masquerade as a canonical M1 observation. SHA regex also coerced object/array/boxed values, potentially executing arbitrary `toString`/`Symbol.toPrimitive`. Genuine M1 produces only own plain data and primitive SHA-256 text.
+
+**22 independent fake offline tests:** four valid M1→M5 controls: genuine fake Product P2, same-source historical P3, malformed JSON-LD abstain P2 and unavailable P1. **18 expected original-source RED** challenge own/returned getter values, inherited origin/success/integrity/hash, nonprimitive hash wrappers and coercion functions. Refusals must use the appropriate fixed generic error with **zero private getter/coercion calls**. Source IDs and fake prices never emitted; every selector, source-rights, production and M5 eligibility flag remains false. No retailer HTTP or actual participants/prices.
+
+Only two own QA add-only files on pinned original source; no product code, parallel QA branches, main, M1/M3/UI, CI/workflows, permanent VPS or retailer data altered. **Do not merge intentionally RED original proof**. Independent fixed-source replay must use same Git test blob exactly and require a separate complete GitHub-hosted Node/high npm audit/M1 matching/source-permission/TS-Vite build GREEN. Do not weaken acceptance to make tests pass.
+
+**Supa M3 ACTIVE**; real same-demand human [#78](https://github.com/Zennay/Supa/issues/78) 11 PLUS + 11 DekaMarkt <=24h and legal source rights absent, M4/M5 ineligible. **DRAFT/HOLD/NO MERGE/NO DEPLOY** until independently verified zCloud SQLite scope/task write lease, original source/QA reviews, current-main/trusted runner if applicable, field observations and human releasego.
