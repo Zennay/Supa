@@ -130,11 +130,31 @@ export function ObservationView() {
       sheetRevisionRef.current += 1
     }
   }, [sheet])
+  // A draft can remain open across midnight or a future observation timestamp.
+  // Keep guidance/readiness synchronized to one clock even without an input edit.
+  const [referenceNowMs, setReferenceNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => setReferenceNowMs(Date.now())
+    const interval = window.setInterval(refresh, 60_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
   // The user's next field task is derived from the current draft; readiness remains authoritative.
-  const nextAction = useMemo(() => observationNextAction(sheet), [sheet])
+  const nextAction = useMemo(
+    () => observationNextAction(sheet, referenceNowMs), [sheet, referenceNowMs],
+  )
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
-  const readiness = useMemo(() => observationSheetReadiness(sheet, Date.now()), [sheet])
-  const windowSummary = useMemo(() => observationWindowSummary(sheet, Date.now()), [sheet])
+  const readiness = useMemo(
+    () => observationSheetReadiness(sheet, referenceNowMs), [sheet, referenceNowMs],
+  )
+  const windowSummary = useMemo(
+    () => observationWindowSummary(sheet, referenceNowMs), [sheet, referenceNowMs],
+  )
   const nextIncomplete = useMemo(
     () => nextIncompleteObservationLine(sheet),
     [sheet],

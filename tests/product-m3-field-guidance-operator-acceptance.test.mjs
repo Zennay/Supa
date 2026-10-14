@@ -46,5 +46,6 @@ test('real Meten view routes field guidance under the correct store, without mod
   assert.match(source, /\['baseline', 'candidate'\]/)
   // Guidance is presentation only: all actual gates still call real readiness,
   // and each observation remains local and unverified until human assessment.
-  assert.match(source, /observationSheetReadiness\(sheet, Date\.now\(\)\)/)
+  assert.match(source, /observationSheetReadiness\(sheet, referenceNowMs\)/)
+  assert.match(source, /window\.setInterval\(refresh, 60_000\)/)
 })
