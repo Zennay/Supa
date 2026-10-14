@@ -162,5 +162,15 @@ test('M3 QA next-action hint cannot advertise export for a future capture', () =
       'export',
       side + ' future observedAt must not be described as export-ready',
     )
+  // Both stores are future-dated but just one hour apart. The 24-hour
+  // difference alone must not authorize a misleading export-next-action.
+  const futurePair = fictionalReadySheet()
+  futurePair.baseline.observedAt = '2099-10-10T12:00:00Z'
+  futurePair.candidate.observedAt = '2099-10-10T13:00:00Z'
+  assert.notEqual(
+    observationNextAction(futurePair).stage,
+    'export',
+    'two future observations within one hour cannot be export-ready',
+  )
   }
 })
