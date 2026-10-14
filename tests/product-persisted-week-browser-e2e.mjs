@@ -218,8 +218,8 @@ try {
   // while comparator owner PR #1012 is still unmerged.
   await nav(sessionId, 'Mand')
   await until(sessionId,
-    'return document.querySelector(".hero-total")?.textContent.includes("€ 0,00") || document.querySelector(".hero-total")?.textContent.includes("€ 0,00")',
-    'zero-cost physical basket',
+    'return document.querySelector(".hero-total")?.textContent.includes("0,00") && document.querySelectorAll(".list-card .trace-row").length === 0',
+    'zero-cost physical basket without phantom lines',
   )
   await nav(sessionId, 'Lijst')
   const emptyList = await script(sessionId,
