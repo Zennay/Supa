@@ -11,14 +11,13 @@ function segment(value) {
     value.length <= 128 && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
 }
 
-// Linux's /proc/self/fd child lookup is anchored to a *previously opened*
-// directory inode. The original pathname can be renamed or replaced with a
-// symlink after these handles are opened without redirecting any HTML read.
-// O_NOFOLLOW alone on HTML is not sufficient: it doesn't protect parent names.
-// Never fall back to unpinned original source paths on unsupported platforms.
-export async function withPinnedCaptureStore(directory, store, useFilePath) {
-  if (process.platform !== 'linux' || !segment(store) ||
-      typeof useFilePath !== 'function') invalid()
+// Pin ONE original root directory for the entire cohort. Each supermarket
+// directory is opened once and cached by canonical name, not re-opened for
+// later rows. Linux /proc/self/fd child lookups then remain anchored to the
+// original inodes after a root/store pathname is renamed or replaced.
+// Unsupported platforms fail closed; no fallback to mutable original paths.
+export async function withPinnedCaptureTree(directory, inspectCohort) {
+  if (process.platform !== 'linux' || typeof inspectCohort !== 'function') invalid()
 
   let rootHandle
   try {
@@ -36,35 +35,49 @@ export async function withPinnedCaptureStore(directory, store, useFilePath) {
     invalid()
   }
 
+  const stores = new Map()
   try {
-    // The original-root path is no longer consulted for source child lookup.
-    // In particular, /proc/self/fd/<fd>/<store> is safe against subsequent
-    // root-path replacement while this descriptor is held open.
-    const storePath = '/proc/self/fd/' + rootHandle.fd + '/' + store
-    let storeHandle
-    try {
-      const originalStore = await lstat(storePath)
-      if (!originalStore.isDirectory() || originalStore.isSymbolicLink()) invalid()
-      storeHandle = await open(storePath,
-        constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
-      const openedStore = await storeHandle.stat()
-      if (!openedStore.isDirectory() ||
-          openedStore.dev !== originalStore.dev ||
-          openedStore.ino !== originalStore.ino) invalid()
-    } catch {
-      if (storeHandle) await storeHandle.close()
-      invalid()
-    }
-
-    try {
-      return await useFilePath((sourceId) => {
+    return await inspectCohort(async (storeName) => {
+      if (!segment(storeName)) invalid()
+      if (!stores.has(storeName)) {
+        // Do not allow a direct helper user to exhaust descriptors beyond
+        // M5's maximum of 100 manifest sources.
+        if (stores.size >= 100) invalid()
+        const storePath = '/proc/self/fd/' + rootHandle.fd + '/' + storeName
+        let handle
+        try {
+          const before = await lstat(storePath)
+          if (!before.isDirectory() || before.isSymbolicLink()) invalid()
+          handle = await open(storePath,
+            constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
+          const pinned = await handle.stat()
+          if (!pinned.isDirectory() ||
+              pinned.dev !== before.dev || pinned.ino !== before.ino) invalid()
+        } catch {
+          if (handle) await handle.close()
+          invalid()
+        }
+        stores.set(storeName, handle)
+      }
+      const pinnedStore = stores.get(storeName)
+      return (sourceId) => {
         if (!segment(sourceId)) invalid()
-        return '/proc/self/fd/' + storeHandle.fd + '/' + sourceId + '.html'
-      })
-    } finally {
-      await storeHandle.close()
-    }
+        return '/proc/self/fd/' + pinnedStore.fd + '/' + sourceId + '.html'
+      }
+    })
   } finally {
-    await rootHandle.close()
+    try {
+      for (const storeHandle of stores.values()) await storeHandle.close()
+    } finally {
+      await rootHandle.close()
+    }
   }
+}
+
+// Compatibility convenience for exactly one store; preserve the published
+// test seam while the product uses withPinnedCaptureTree across all stores.
+export async function withPinnedCaptureStore(directory, storeName, useFilePath) {
+  if (typeof useFilePath !== 'function') invalid()
+  return withPinnedCaptureTree(directory, async (storeLookup) =>
+    useFilePath(await storeLookup(storeName)))
 }
