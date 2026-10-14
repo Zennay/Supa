@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
+import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
@@ -235,17 +236,10 @@ export function App() {
             </label>
             <p role="status" aria-live="polite">{weekCopyMessage}</p>
             {currentManualCopy !== null && (
-              <div className="week-share-manual">
-                <label htmlFor="week-share-text">Weekmenu om handmatig te kopiëren</label>
-                <textarea
-                  id="week-share-text"
-                  readOnly
-                  autoFocus
-                  rows={Math.min(activeDays.length + 6, 14)}
-                  value={currentManualCopy}
-                  onFocus={(event) => event.currentTarget.select()}
-                />
-              </div>
+              <WeekShareManualCopy
+                text={currentManualCopy}
+                rows={Math.min(activeDays.length + 6, 14)}
+              />
             )}
           </section>
         )}

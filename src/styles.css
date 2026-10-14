@@ -489,3 +489,18 @@ h3, p { margin: 0; }
   cursor: pointer;
 }
 .week-share-privacy input { width: 20px; height: 20px; flex: 0 0 auto; }
+
+.week-share-copy-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.week-share-copy-tools > label { min-width: 0; }
+.week-share-copy-tools > button { flex: 0 0 auto; }
+
+@media (max-width: 390px) {
+  .week-share-copy-tools { align-items: stretch; flex-direction: column; }
+  .week-share-copy-tools > button { width: 100%; }
+}

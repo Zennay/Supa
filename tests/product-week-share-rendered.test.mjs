@@ -32,6 +32,23 @@ test('actual routed Planner renders the private M3 sharing controls and no prepa
     assert.match(shareBlock, /role="status"/)
     assert.match(shareBlock, /aria-live="polite"/)
     assert.match(html, /Geplande maaltijden/)
+
+    // Render the actual conditional export component (not mounted until
+    // consentfully requested by the user) and prove copy selection affordance.
+    const { WeekShareManualCopy } = await vite.ssrLoadModule(
+      '/src/features/planner/WeekShareManualCopy.tsx',
+    )
+    const selected = 'Ma: Tikka met kip\\nWo: Romige pasta'
+    const preview = renderToStaticMarkup(
+      createElement(WeekShareManualCopy, { text: selected, rows: 8 }),
+    )
+    assert.match(preview, /Weekmenu om handmatig te kopiëren/)
+    assert.match(preview, /Selecteer alle tekst/)
+    assert.match(preview, /type="button"/)
+    assert.match(preview, /<textarea/)
+    assert.match(preview, /readOnly(?:=""|\\s|>)/i)
+    assert.match(preview, /Ma: Tikka met kip/)
+    assert.match(preview, /Wo: Romige pasta/)
   } finally {
     await vite.close()
   }
