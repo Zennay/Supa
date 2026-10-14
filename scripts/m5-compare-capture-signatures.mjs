@@ -258,7 +258,8 @@ async function preflightBoundedManifest(directory) {
   try {
     // Manifest may not be borrowed through an alias outside this capture tree.
     const info = await lstat(manifestPath)
-    if (!info.isFile() || !Number.isSafeInteger(info.size) ||
+    if (!info.isFile() || info.nlink !== 1 ||
+        !Number.isSafeInteger(info.size) ||
         info.size > MAX_CAPTURE_MANIFEST_BYTES) fail()
     const raw = await readFile(manifestPath, 'utf8')
     if (Buffer.byteLength(raw, 'utf8') > MAX_CAPTURE_MANIFEST_BYTES) fail()
@@ -309,7 +310,10 @@ async function requireRegularCaptureTree(directory, rows) {
     const folder = await lstat(storePath)
     const file = await lstat(sourcePath)
     if (!folder.isDirectory() || folder.isSymbolicLink() ||
-        !file.isFile() || file.isSymbolicLink()) {
+        !file.isFile() || file.isSymbolicLink() || file.nlink !== 1) {
+      // A regular hard-linked HTML inode can point outside the nominal
+      // capture tree while retaining a matching content SHA. Offline M5
+      // review requires files independently owned by their capture root.
       throw new Error('Invalid offline capture tree origin')
     }
     // A matching SHA proves bytes *match* their manifest, not that reading
