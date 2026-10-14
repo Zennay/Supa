@@ -22,7 +22,10 @@ test('independent: week text includes only selected meals and preference, not fa
   const source = meal()
   const before = structuredClone(source)
   const text = formatShareableWeek(source)
-  assert.match(text, /^SUPA · Weekmenu\nWeekbudget \(eigen voorkeur\): €\\s*34,25\n/)
+  assert.match(text, /^SUPA · Weekmenu\n\nMa: Tikka met kip\nWo: Romige pasta\n/)
+  assert.doesNotMatch(text, /Weekbudget|€/, 'personal budget must be private by default')
+  const optedIn = formatShareableWeek({ ...source, includeBudget: true })
+  assert.match(optedIn, /^SUPA · Weekmenu\nWeekbudget \(eigen voorkeur\): €\s*34,25\n/)
   assert.match(text, /\nMa: Tikka met kip\nWo: Romige pasta\n/)
   assert.match(text, /Dit is een planning, geen prijsopgave\./)
   assert.match(text, /echte winkelprijzen zijn niet inbegrepen/i)
@@ -37,8 +40,9 @@ test('independent: empty active week stays explicit and never leaks inactive mea
 })
 
 test('independent: cent-exact budgets accepted but invented extra decimal precision refused', () => {
-  const zero = formatShareableWeek({ ...meal(), budget: 0 })
-  assert.match(zero, /Weekbudget \(eigen voorkeur\): €\\s*0,00/)
+  const zero = formatShareableWeek({ ...meal(), budget: 0, includeBudget: true })
+  assert.match(zero, /Weekbudget \(eigen voorkeur\): €\s*0,00/)
+  assert.throws(() => formatShareableWeek({ ...meal(), includeBudget: 'yes' }), { message: 'Weekmenu niet beschikbaar' })
   for (const budget of [-0.01, 1.001, Number.NaN, Infinity, 1e25]) {
     assert.throws(
       () => formatShareableWeek({ ...meal(), budget }),
