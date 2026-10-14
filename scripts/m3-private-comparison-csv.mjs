@@ -106,6 +106,27 @@ export function renderPrivateM3ComparisonCsv(report) {
 }
 
 export async function main(argv = process.argv.slice(2)) {
+  if (argv.length === 1 && argv[0] === '--help') {
+    const usage = [
+      'Supa · priv\u00e9 PLUS/DekaMarkt producten vergelijken als CSV (M3)',
+      '',
+      'Vul dezelfde 11 boodschappenbehoeften in bij beide winkels.',
+      'Noteer echt gemeten prijzen, beschikbaarheid en verpakking binnen 24 uur.',
+      'Gebruik \u00e9\u00e9n prijscontext en bewaar brongegevens lokaal en priv\u00e9.',
+      '',
+      'Van lokaal M3-veldformulier rechtstreeks naar CSV (Excel):',
+      '  node --experimental-strip-types scripts/m3-private-comparison-csv.mjs --sheet <veldformulier.json> --output <priv\u00e9-prijzen.csv>',
+      '',
+      'Of exporteer een al gemaakte lokale priv\u00e9-vergelijking:',
+      '  node --experimental-strip-types scripts/m3-private-comparison-csv.mjs <vergelijking.json> --output <priv\u00e9-prijzen.csv>',
+      '',
+      'De CSV gebruikt puntkomma-kolommen, bedragen in EUR en priv\u00e9bestandsrechten (0600).',
+      'Onbekende prijzen blijven onbekend; een voorlopige winnaar is GEEN publieke besparingsclaim.',
+      'Geen scraping, automatische retailerprijzen, upload of onafhankelijke verificatie.',
+    ].join('\n')
+    process.stdout.write(usage + '\n')
+    return usage
+  }
   const fromSheet = argv.length === 4 && argv[0] === '--sheet' && argv[2] === '--output'
   const fromComparison = argv.length === 3 && argv[1] === '--output'
   const input = fromSheet ? argv[1] : argv[0]
