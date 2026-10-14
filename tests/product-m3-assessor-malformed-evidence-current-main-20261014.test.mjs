@@ -73,6 +73,28 @@ test('M3 refuses a throwing nested runtime accessor rather than propagating its 
   assert.doesNotMatch(result.reasons.join(' '), /private field content/)
 })
 
+test('M3 evidence preflight never executes an accessor masquerading as a store or evidence', () => {
+  for (const location of ['root', 'basket']) {
+    const study = completeStudy()
+    let getterCalls = 0
+    if (location === 'root') {
+      const evidence = study.baseline
+      Object.defineProperty(study, 'baseline', {
+        enumerable: true,
+        get() { getterCalls += 1; return evidence },
+      })
+    } else {
+      const store = study.baseline.basket.store
+      Object.defineProperty(study.baseline.basket, 'store', {
+        enumerable: true,
+        get() { getterCalls += 1; return store },
+      })
+    }
+    isSafelyUnknown(assessWeeklyBasketStudy(study), location + ' accessor')
+    assert.equal(getterCalls, 0, 'no invocation of untrusted evidence getters')
+  }
+})
+
 test('normal full 11+11 synthetic M3 basket keeps claimability with stable inputs', () => {
   const study = completeStudy()
   const original = JSON.stringify(study)
