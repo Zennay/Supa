@@ -29,12 +29,12 @@ function observedSheet({
     participantKey: PARTICIPANT,
     population: 'synthetic independent students',
     region: 'synthetic-region',
-    weekStart: weekStart ?? '2026-10-19',
+    weekStart: weekStart ?? '2025-10-20',
     priceContext,
   }
 
   for (const [side, name, timestamp, premium] of [
-    ['baseline', 'PLUS synthetic store', baselineAt ?? '2026-10-24T12:00:00+02:00', 10],
+    ['baseline', 'PLUS synthetic store', baselineAt ?? '2025-10-25T12:00:00+02:00', 10],
     ['candidate', 'DekaMarkt synthetic store', candidateAt, candidatePremium],
   ]) {
     const observation = sheet[side]
@@ -127,7 +127,7 @@ async function runThroughBothClis(sheet, timezone, directory) {
 for (const scenario of [
   {
     name: 'DST fall-back, exactly 24 hours',
-    candidateAt: '2026-10-25T11:00:00+01:00',
+    candidateAt: '2025-10-26T11:00:00+01:00',
     unavailable: false,
     claimable: true,
     outcome: 'better',
@@ -135,7 +135,7 @@ for (const scenario of [
   },
   {
     name: 'DST fall-back, over 24 hours by one second',
-    candidateAt: '2026-10-25T11:00:01+01:00',
+    candidateAt: '2025-10-26T11:00:01+01:00',
     unavailable: false,
     claimable: false,
     outcome: 'unknown',
@@ -163,7 +163,7 @@ for (const scenario of [
   },
   {
     name: 'DST fall-back, online-order candidate is more expensive',
-    candidateAt: '2026-10-25T11:00:00+01:00',
+    candidateAt: '2025-10-26T11:00:00+01:00',
     priceContext: 'online-order',
     candidatePremium: 25,
     unavailable: false,
@@ -173,15 +173,15 @@ for (const scenario of [
   },
   {
     name: 'DST fall-back, candidate observed before baseline exactly 24h',
-    baselineAt: '2026-10-25T11:00:00+01:00',
-    candidateAt: '2026-10-24T12:00:00+02:00',
+    baselineAt: '2025-10-26T11:00:00+01:00',
+    candidateAt: '2025-10-25T12:00:00+02:00',
     claimable: true,
     outcome: 'better',
     window: 24,
   },
   {
     name: 'DST fall-back, equal baskets retain same outcome',
-    candidateAt: '2026-10-25T11:00:00+01:00',
+    candidateAt: '2025-10-26T11:00:00+01:00',
     candidatePremium: 10,
     claimable: true,
     outcome: 'same',
@@ -189,7 +189,7 @@ for (const scenario of [
   },
   {
     name: 'two UTC offset representations of one instant have a zero-hour window',
-    candidateAt: '2026-10-24T11:00:00+01:00',
+    candidateAt: '2025-10-25T11:00:00+01:00',
     claimable: true,
     outcome: 'better',
     window: 0,
@@ -205,7 +205,7 @@ for (const scenario of [
   },
   {
     name: 'DST fall-back, baseline item unavailable prevents financial claim',
-    candidateAt: '2026-10-25T11:00:00+01:00',
+    candidateAt: '2025-10-26T11:00:00+01:00',
     baselineUnavailable: true,
     claimable: false,
     outcome: 'unknown',
@@ -213,7 +213,7 @@ for (const scenario of [
   },
   {
     name: 'DST fall-back, unresolved candidate item',
-    candidateAt: '2026-10-25T11:00:00+01:00',
+    candidateAt: '2025-10-26T11:00:00+01:00',
     unavailable: true,
     claimable: false,
     outcome: 'unknown',
