@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import {
-  mkdir, mkdtemp, readFile, renameSync, rm, symlinkSync, writeFile,
+  mkdir, mkdtemp, readFile, rm, writeFile,
 } from 'node:fs/promises'
 import { renameSync as renameNow, symlinkSync as symlinkNow } from 'node:fs'
 import { tmpdir } from 'node:os'
