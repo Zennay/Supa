@@ -331,8 +331,85 @@ try {
   checks.push('corrupt-planner-and-checklist-recover-safely')
   await screenshot(sessionId, 'shopping-recovered-default.png')
 
-  assert.equal(screenshotIntegrity.length, 6,
-    'All six fixture-only UI screenshots must be present before success')
+
+  // User-requested Reset is different from corrupt-data fallback: it must
+  // explicitly restore defaults after changing both physical demand and budget.
+  await nav(sessionId, 'Planner')
+  await changeRecipe(sessionId, 'Di', 'pasta')
+  for (const day of ['Ma', 'Wo']) {
+    const removed = await script(sessionId, `
+      const button = document.querySelector('[aria-label="' + arguments[0] + ' uit planning halen"]')
+      if (!button) return false
+      button.click()
+      return true
+    `, [day])
+    assert.equal(removed, true, `could not remove ${day} before reset`)
+  }
+  await script(sessionId, `
+    const budget = document.querySelectorAll('.budget-options button')[2]
+    if (!budget) return false
+    budget.click()
+    return true
+  `)
+  await until(sessionId, `
+    const raw = localStorage.getItem('supa:planner-preferences:v2')
+    if (!raw) return false
+    const saved = JSON.parse(raw)
+    return saved.budget === 40 && saved.activeDays.length === 2 &&
+      saved.recipeByDay.Di === 'pasta'
+  `, 'modified saved preferences before explicit reset')
+  await nav(sessionId, 'Lijst')
+  await until(sessionId,
+    'return document.querySelectorAll("button.shopping-row").length > 0',
+    'modified basket checklist before explicit reset')
+  await script(sessionId, `
+    const first = document.querySelector('button.shopping-row')
+    first.click()
+    return true
+  `)
+  await until(sessionId, `
+    const raw = localStorage.getItem('supa:shopping-list-progress:v1')
+    return raw && JSON.parse(raw).doneLineIds.length === 1
+  `, 'checked modified basket stored before reset')
+
+  await nav(sessionId, 'Planner')
+  await clickButton(sessionId, '.section-heading button', 'Reset')
+  await until(sessionId, `
+    const raw = localStorage.getItem('supa:planner-preferences:v2')
+    if (!raw) return false
+    const saved = JSON.parse(raw)
+    return saved.budget === 35 &&
+      saved.activeDays.join(',') === 'Ma,Di,Wo,Do' &&
+      saved.recipeByDay.Di === 'teriyaki' &&
+      saved.recipeByDay.Do === 'tikka'
+  `, 'explicit reset persisted canonical default week')
+  await nav(sessionId, 'Lijst')
+  await until(sessionId,
+    'return document.querySelectorAll("button.shopping-row").length > 0',
+    'reset canonical basket checklist')
+  assert.equal(await script(sessionId,
+    'return document.querySelectorAll("button.shopping-row.checked").length'), 0,
+    'reset to a physically different basket must not retain stale checks')
+
+  await request(`/session/${sessionId}/refresh`, { method: 'POST', body: '{}' })
+  await until(sessionId, `
+    const heading = document.querySelector(".screen")
+    const raw = localStorage.getItem('supa:planner-preferences:v2')
+    return heading?.textContent.includes('4 maaltijden actief') &&
+      raw && JSON.parse(raw).budget === 35
+  `, 'reset week survives actual Firefox page reload')
+  await nav(sessionId, 'Lijst')
+  await until(sessionId,
+    'return document.querySelectorAll("button.shopping-row").length > 0',
+    'default checklist after reset page reload')
+  assert.equal(await script(sessionId,
+    'return document.querySelectorAll("button.shopping-row.checked").length'), 0,
+    'old checked row must not resurrect after reset page reload')
+  checks.push('explicit-reset-restores-week-budget-and-clears-stale-checks')
+  await screenshot(sessionId, 'shopping-explicit-reset.png')
+
+  assert.equal(screenshotIntegrity.length, 7,
+    'All seven fixture-only UI screenshots must be present before success')
   await writeFile(`${artifactDirectory}/result.json`,
     JSON.stringify({
       schemaVersion: 1,
@@ -349,6 +426,7 @@ try {
         'shopping-reloaded.png',
         'shopping-empty-week.png',
         'shopping-recovered-default.png',
+        'shopping-explicit-reset.png',
       ],
       checks,
       retailerDataObserved: false,
