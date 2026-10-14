@@ -5,7 +5,7 @@ Scope: add-only integration regression on frozen `main` `c36f5c8f71d77cae9466397
 The existing App restores `plannerPreferences` and passes one selected set of days/recipes into the one-store shopping basket and the two M3 controlled comparison baskets. A separate React SSR acceptance (`tests/product-persisted-week-react-render.test.mjs`) now loads the real TSX components through Vite and renders the restored App planner and the derived Basket/ShoppingList presentations, detecting divergence beyond pure domain math. The regression in `tests/product-persisted-week-basket-consistency.test.mjs` exercises that real domain composition without changing any feature owner source file:
 
 1. Persist and restore an intentionally reordered two-day week with custom recipes; all three derived baskets must use exactly the same ingredient IDs and physical requirements. Choosing another supported budget must change the preference only, never the physical basket.
-2. Persist an intentionally empty week; all baskets must have zero meals, lines and cost, while previous saved shopping checkmarks must not attach to the empty basket. The controlled comparator must return `same` at zero, not a fictional saving.
+2. Persist an intentionally empty week; all baskets must have zero meals, lines and cost, while previous saved shopping checkmarks must not attach to the empty basket. Current-main comparator incorrectly returns a claimable `same` at zero (**existing [issue #1051](https://github.com/Zennay/Supa/issues/1051)**). These tests deliberately **do not** assert that financially misleading result. Independent comparator owner [PR #1012](https://github.com/Zennay/Supa/pull/1012) owns the fail-closed financial fix; integration against its reviewed outcome is required before release.
 3. Mark a required product unavailable in one *fictional* comparison store; the calculator must leave that line unresolved and the comparator must produce `unknown`, without a monetary saving or line delta.
 4. Change only the supported week budget: checkbox progress for the physically identical basket must still restore. Change a recipe: the physically different basket must not inherit an old checked item, and both comparison stores must still agree on its required demand.
 
@@ -23,6 +23,7 @@ The add-only `tests/product-persisted-week-browser-e2e.mjs` performs a genuine F
 - visit the real basket and require the **controlled-demo / no-live-savings** disclosure;
 - check an item, reload and confirm the stored checklist survives;
 - change only the budget and preserve that checkmark;
-- change a recipe and reject the old checkmark for the now-different physical basket.
+- change a recipe and reject the old checkmark for the now-different physical basket;
+- turn off the final active meals, persist an intentionally empty week, refresh, and verify zero shopping rows with no resurrected tasks. The empty-week financial comparison is **not validated** on current main due to #1051; it remains an independent owner gate.
 
 The new `.github/workflows/product-persisted-week-vps.yml` has read-only GitHub permissions, bound localhost Vite + WebDriver ports, explicit browser process cleanup, 15-minute timeout, and a retention-limited **synthetic-only** evidence artifact. It does not change existing shared test/workflow files or contact any retailer. An unrun or queued VPS job does not count as a Firefox PASS. Release remains gated by zCloud independent lease/claim, owner review and actual M3 human field evidence.
