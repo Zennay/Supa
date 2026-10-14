@@ -47,6 +47,7 @@ function harness() {
     if (name === './plannerKnownMinimumOverrun.ts') return { plannerKnownMinimumOverrunCents }
     if (name === '../../domain/ingredientReuse.ts') return { buildIngredientReuseInsight: () => null }
     if (name === './IngredientReuseCard.tsx') return { IngredientReuseCard: () => null }
+    if (name === './RecipeReusePreviewPanel.tsx') return { RecipeReusePreviewPanel: () => null }
     if (name === './customWeekBudget.ts') return { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros }
     throw new Error('Unexpected PlannerView dependency: ' + name)
   }

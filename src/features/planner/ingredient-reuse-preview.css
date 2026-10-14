@@ -1,0 +1,48 @@
+.ingredient-reuse-preview {
+  min-width: 0;
+  border: 1px solid var(--border, #d9dfd7);
+  border-radius: 1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.ingredient-reuse-preview h3,
+.ingredient-reuse-preview h4 {
+  margin: 0 0 .5rem;
+  overflow-wrap: anywhere;
+}
+
+.ingredient-reuse-preview h3 { font-size: 1.1rem; }
+.ingredient-reuse-preview h4 { font-size: .95rem; }
+
+.ingredient-reuse-preview p { overflow-wrap: anywhere; }
+
+.ingredient-reuse-preview-group + .ingredient-reuse-preview-group {
+  margin-top: .9rem;
+}
+
+.ingredient-reuse-preview-group ul {
+  list-style: none;
+  padding: 0;
+  margin: .3rem 0 .8rem;
+  display: grid;
+  gap: .5rem;
+}
+
+.ingredient-reuse-preview-group li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .3rem 1rem;
+  min-width: 0;
+}
+
+.ingredient-reuse-preview-group li strong,
+.ingredient-reuse-preview-group li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ingredient-reuse-preview-note {
+  color: var(--muted, #515f51);
+  font-size: .875rem;
+}
