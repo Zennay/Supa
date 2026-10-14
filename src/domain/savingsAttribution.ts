@@ -84,7 +84,29 @@ export function attributeSavingsEffects({
     }
   }
 
+  // Attribution must validate the physical monetary ledger independently of
+  // a caller's claimable flag. Never infer missing cents as zero.
+  if (
+    !Number.isSafeInteger(comparison.baselineTotalCents) ||
+    comparison.baselineTotalCents < 0 ||
+    !Number.isSafeInteger(comparison.candidateTotalCents) ||
+    comparison.candidateTotalCents < 0 ||
+    !Number.isSafeInteger(comparison.deltaCents) ||
+    !Number.isSafeInteger(comparison.candidateTotalCents - comparison.baselineTotalCents) ||
+    comparison.candidateTotalCents - comparison.baselineTotalCents !== comparison.deltaCents
+  ) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: comparison.deltaCents,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison contains an inconsistent monetary baseline'],
+    }
+  }
+
   const comparisonLineIds = new Set<string>()
+  let baselineLineSum = 0
+  let candidateLineSum = 0
   for (const line of comparison.lineDeltas) {
     // Loaded comparisons may bypass TypeScript and contain malformed entries.
     // Null entries throw on property access, while coercible cent strings can
@@ -125,7 +147,51 @@ export function attributeSavingsEffects({
         reasons: [`basket comparison contains duplicate line identity ${line.id}`],
       }
     }
+    // Own data descriptors avoid mistaking inherited or accessor values for
+    // independently captured cents. Reject forged row deltas and overflow.
+    const baseline = Object.getOwnPropertyDescriptor(line, 'baselineLineTotalCents')
+    const candidate = Object.getOwnPropertyDescriptor(line, 'candidateLineTotalCents')
+    if (
+      !baseline || !('value' in baseline) ||
+      !candidate || !('value' in candidate) ||
+      !Number.isSafeInteger(baseline.value) || baseline.value < 0 ||
+      !Number.isSafeInteger(candidate.value) || candidate.value < 0 ||
+      !Number.isSafeInteger(candidate.value - baseline.value) ||
+      candidate.value - baseline.value !== line.deltaCents
+    ) {
+      return {
+        status: 'unknown',
+        fullyAttributed: false,
+        comparisonDeltaCents: comparison.deltaCents,
+        effectTotals: emptyTotals(),
+        reasons: ['basket comparison contains inconsistent physical line cents'],
+      }
+    }
+    baselineLineSum += baseline.value
+    candidateLineSum += candidate.value
+    if (!Number.isSafeInteger(baselineLineSum) || !Number.isSafeInteger(candidateLineSum)) {
+      return {
+        status: 'unknown',
+        fullyAttributed: false,
+        comparisonDeltaCents: comparison.deltaCents,
+        effectTotals: emptyTotals(),
+        reasons: ['basket comparison physical line totals exceed safe integer cents'],
+      }
+    }
     comparisonLineIds.add(line.id)
+  }
+
+  if (
+    baselineLineSum !== comparison.baselineTotalCents ||
+    candidateLineSum !== comparison.candidateTotalCents
+  ) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: comparison.deltaCents,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison physical line totals differ from whole basket'],
+    }
   }
 
   const lineById = new Map(comparison.lineDeltas.map((line) => [line.id, line] as const))
