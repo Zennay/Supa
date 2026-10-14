@@ -73,7 +73,7 @@ test('QA M3: forged total, line ledger and textual identities cannot reach visib
     { ...good, lineDeltas: good.lineDeltas.map((line, i) =>
       i === 0 ? { ...line, id: good.lineDeltas[1].id } : line) },
     { ...good, lineDeltas: good.lineDeltas.map((line, i) =>
-      i === 0 ? { ...line, ingredientLabel: 'Fictief\\u202Everkeerd' } : line) },
+      i === 0 ? { ...line, ingredientLabel: 'Fictief' + String.fromCodePoint(0x202e) + 'verkeerd' } : line) },
     { ...good, lineDeltas: good.lineDeltas.map((line, i) =>
       i === 0 ? { ...line, ingredientLabel: ' '.repeat(181) } : line) },
   ]
