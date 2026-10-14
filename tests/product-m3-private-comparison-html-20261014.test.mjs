@@ -87,6 +87,42 @@ test('M3 HTML refuses invalid incomplete basket summary and overflow-like money'
   }
 })
 
+test('M3 complete offline flow converts fictional 22-line field sheet into private product JSON and HTML', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'supa-m3-html-fullflow-'))
+  try {
+    const sheetFile = join(root, 'fictional-sheet.json')
+    const comparisonFile = join(root, 'private-comparison.json')
+    const htmlFile = join(root, 'private-comparison.html')
+    const sheet = buildFictionalPricedSheet(90)
+    sheet.study.population = secret
+    const before = JSON.stringify(sheet)
+    await writeFile(sheetFile, before, { mode: 0o600 })
+    const converterScript = fileURLToPath(new URL('../scripts/m3-private-product-comparison.mjs', import.meta.url))
+    for (const [script, from, to] of [
+      [converterScript, sheetFile, comparisonFile],
+      [cli, comparisonFile, htmlFile],
+    ]) {
+      const result = spawnSync(process.execPath,
+        ['--experimental-strip-types', script, from, '--output', to],
+        { encoding: 'utf8' })
+      assert.equal(result.status, 0, result.stderr)
+      assert.equal(result.stdout, '')
+      assert.equal(result.stderr, '')
+      assert.equal((await stat(to)).mode & 0o777, 0o600)
+    }
+    assert.equal(await readFile(sheetFile, 'utf8'), before)
+    const rendered = await readFile(htmlFile, 'utf8')
+    assert.match(rendered, /€ 11,00/)
+    assert.match(rendered, /€ 9,90/)
+    assert.doesNotMatch(rendered, new RegExp(secret))
+    const raw = JSON.parse(await readFile(comparisonFile, 'utf8'))
+    assert.equal(raw.publicSavingsClaimEligible, false)
+    assert.equal(raw.fullBasket.provisionalSavingsCents, 110)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('M3 HTML real CLI writes a private 0600 report, no source clobber or private path log', async () => {
   const root = await mkdtemp(join(tmpdir(), 'supa-m3-html-test-'))
   try {
