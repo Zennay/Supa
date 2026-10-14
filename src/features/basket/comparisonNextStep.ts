@@ -84,6 +84,7 @@ function record(value: unknown): value is Record<string, unknown> {
 function snapshotOwnGuidanceData(value: unknown): unknown {
   const active = new WeakSet<object>()
   let visited = 0
+  let inspectedKeys = 0
   const copy = (item: unknown, depth: number): unknown => {
     if (item === null || typeof item !== 'object') {
       if (typeof item === 'function' || typeof item === 'symbol') {
@@ -97,17 +98,25 @@ function snapshotOwnGuidanceData(value: unknown): unknown {
     active.add(item)
     try {
       const isArray = Array.isArray(item)
-      const descriptors = Object.getOwnPropertyDescriptors(item)
-      const keys = Reflect.ownKeys(descriptors)
-      if (keys.length > 8192) throw new Error('guidance record too large')
+      // Check the physical key budget BEFORE reading every descriptor. The
+      // prior getOwnPropertyDescriptors call executed thousands of Proxy traps
+      // before the existing 8192-key limit could reject a hostile record.
+      // Reflect.ownKeys may itself trap, but the public boundary catches it.
+      const keys = Reflect.ownKeys(item)
+      // Per-object bounds alone allow many individually permitted objects to
+      // cause millions of descriptor traps; bound the entire input graph too.
+      inspectedKeys += keys.length
+      if (keys.length > 8192 || inspectedKeys > 8192) {
+        throw new Error('guidance record too large')
+      }
+      const descriptors: Record<string, PropertyDescriptor> = Object.create(null)
       for (const key of keys) {
-        // The descriptor map is a fresh ordinary object returned by the
-        // language runtime. Never read a property from the source itself.
-        if (typeof key === 'symbol') throw new Error('symbol guidance field')
-        const property = descriptors[key]
+        if (typeof key !== 'string') throw new Error('symbol guidance field')
+        const property = Reflect.getOwnPropertyDescriptor(item, key)
         if (!property || !('value' in property)) {
           throw new Error('guidance accessor not allowed')
         }
+        descriptors[key] = property
       }
       if (isArray) {
         const lengthDescriptor = descriptors.length
