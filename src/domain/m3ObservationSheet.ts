@@ -556,6 +556,12 @@ export function validObservedAt(value: string, referenceNowMs = Number.POSITIVE_
     return null
   }
 
+  // An otherwise valid 24h+1ns interval looks exactly 24h to Date.parse.
+  // Refuse hidden nonzero precision before offering a field-draft export.
+  // Trailing all-zero digits remain valid exact millisecond timestamps.
+  const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1]
+  if (fraction && /[1-9]/.test(fraction.slice(3))) return null
+
   const timestamp = Date.parse(value)
   // Deterministic: external operator must explicitly supply the real clock.
   return Number.isFinite(timestamp) && timestamp <= referenceNowMs ? timestamp : null
