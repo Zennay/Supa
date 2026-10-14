@@ -67,17 +67,34 @@ function canonicalShapeTerms(values) {
   return terms
 }
 
+// M1's inspection envelope is plain own data, not computed or inherited
+// metadata. Reading descriptors first prevents getters from running in the
+// exported in-memory comparison API and pins a bounded logical snapshot.
+function ownHtmlField(record, field) {
+  const descriptor = Object.getOwnPropertyDescriptor(record, field)
+  if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error('Invalid or unbounded inspected HTML shape')
+  }
+  return descriptor.value
+}
+
 function requireBoundedHtmlShape(html) {
-  if (!html || typeof html.hasNextData !== 'boolean' ||
-      !Array.isArray(html.jsonLd) ||
-      !Array.isArray(html.applicationJsonScripts) ||
-      html.jsonLd.length > MAX_JSON_LD_BLOCKS ||
-      html.applicationJsonScripts.length > MAX_APPLICATION_JSON_SCRIPTS) {
+  if (!html || typeof html !== 'object' || Array.isArray(html)) {
+    throw new Error('Invalid or unbounded inspected HTML shape')
+  }
+  const hasNextData = ownHtmlField(html, 'hasNextData')
+  const htmlJsonLd = ownHtmlField(html, 'jsonLd')
+  const applicationJsonScripts = ownHtmlField(html, 'applicationJsonScripts')
+  if (typeof hasNextData !== 'boolean' ||
+      !Array.isArray(htmlJsonLd) ||
+      !Array.isArray(applicationJsonScripts) ||
+      htmlJsonLd.length > MAX_JSON_LD_BLOCKS ||
+      applicationJsonScripts.length > MAX_APPLICATION_JSON_SCRIPTS) {
     throw new Error('Invalid or unbounded inspected HTML shape')
   }
   const jsonLd = []
-  for (let i = 0; i < html.jsonLd.length; i += 1) {
-    const row = Object.getOwnPropertyDescriptor(html.jsonLd, i)
+  for (let i = 0; i < htmlJsonLd.length; i += 1) {
+    const row = Object.getOwnPropertyDescriptor(htmlJsonLd, i)
     const record = row?.value
     if (!row || !Object.hasOwn(row, 'value') ||
         !record || typeof record !== 'object' || Array.isArray(record)) {
@@ -108,25 +125,28 @@ function requireBoundedHtmlShape(html) {
   // HTML document. Pure inspections must not invent impossible 8MiB+ scripts
   // or sum multiple individually-valid descriptors past the physical cap.
   let applicationJsonBytes = 0
-  for (let i = 0; i < html.applicationJsonScripts.length; i += 1) {
-    if (!Object.hasOwn(html.applicationJsonScripts, i) ||
-        !html.applicationJsonScripts[i] ||
-        typeof html.applicationJsonScripts[i] !== 'object' ||
-        Array.isArray(html.applicationJsonScripts[i]) ||
-        !Object.hasOwn(html.applicationJsonScripts[i], 'id') ||
-        !Object.hasOwn(html.applicationJsonScripts[i], 'bytes') ||
-        (html.applicationJsonScripts[i].id !== null &&
-          (typeof html.applicationJsonScripts[i].id !== 'string' ||
-           html.applicationJsonScripts[i].id.length > MAX_CAPTURE_HTML_BYTES)) ||
-        !Number.isSafeInteger(html.applicationJsonScripts[i].bytes) ||
-        html.applicationJsonScripts[i].bytes < 0 ||
-        html.applicationJsonScripts[i].bytes > MAX_CAPTURE_HTML_BYTES ||
-        (applicationJsonBytes += html.applicationJsonScripts[i].bytes) >
-          MAX_CAPTURE_HTML_BYTES) {
+  for (let i = 0; i < applicationJsonScripts.length; i += 1) {
+    const row = Object.getOwnPropertyDescriptor(applicationJsonScripts, i)
+    const record = row?.value
+    if (!row || !Object.hasOwn(row, 'value') ||
+        !record || typeof record !== 'object' || Array.isArray(record)) {
+      throw new Error('Invalid or unbounded inspected HTML shape')
+    }
+    const id = ownHtmlField(record, 'id')
+    const bytes = ownHtmlField(record, 'bytes')
+    if ((id !== null &&
+         (typeof id !== 'string' || id.length > MAX_CAPTURE_HTML_BYTES)) ||
+        !Number.isSafeInteger(bytes) ||
+        bytes < 0 || bytes > MAX_CAPTURE_HTML_BYTES ||
+        (applicationJsonBytes += bytes) > MAX_CAPTURE_HTML_BYTES) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
   }
-  return jsonLd
+  return {
+    hasNextData,
+    applicationJsonScriptCount: applicationJsonScripts.length,
+    jsonLd,
+  }
 }
 
 // This fingerprint deliberately excludes names, prices, URLs, DOM text,
@@ -164,7 +184,9 @@ export function captureShape(source) {
     throw new Error('Snapshot integrity verification required')
   }
   requireCanonicalOrigin(source)
-  const inspectedJsonLd = requireBoundedHtmlShape(source.html)
+  const html = ownHtmlField(source, 'html')
+  const inspectedHtml = requireBoundedHtmlShape(html)
+  const inspectedJsonLd = inspectedHtml.jsonLd
   // A successful M1 inspection always records a real parser decision.
   // Optional chaining previously converted absent/invented outcomes into
   // 'abstain', laundering untrusted source metadata into review evidence.
@@ -214,8 +236,8 @@ export function captureShape(source) {
     throw new Error('Invalid inspected Schema.org parse result')
   }
   const shape = {
-    hasNextData: source.html.hasNextData === true,
-    applicationJsonScriptCount: source.html.applicationJsonScripts.length,
+    hasNextData: inspectedHtml.hasNextData,
+    applicationJsonScriptCount: inspectedHtml.applicationJsonScriptCount,
     jsonLd: inspectedJsonLd.map((record) => ({
       parseError: record.parseError,
       types: record.type.filter((value) => KNOWN_TYPES.has(value)).sort(),
