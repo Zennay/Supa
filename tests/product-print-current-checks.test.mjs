@@ -140,3 +140,20 @@ test('real routed React SSR prints saved checkmarks only for the exact current b
     await vite.close()
   }
 })
+
+test('completed unknown line remains manual review rather than becoming a trusted product', () => {
+  const value = structuredClone(basket())
+  const row = value.lines[0]
+  row.status = 'unresolved'
+  row.requirement = { amount: null, unit: 'unknown' }
+  const before = structuredClone(value)
+  const expected = preparePrintableShoppingChecklist(value)
+  assert.ok(expected.lines[0].needsReview)
+  const html = render(value, [row.id])
+  assert.equal((html.match(/☑/g) ?? []).length, 1)
+  assert.match(html, /Product nog te kiezen/)
+  assert.match(html, /handmatig controleren/)
+  assert.match(html, /hoeveelheid onbekend/)
+  assert.doesNotMatch(html, /€|bespaard/)
+  assert.deepEqual(value, before)
+})
