@@ -285,3 +285,23 @@ test('actual M3 React UI redirects duplicate shop codes instead of suggesting ex
   assert.doesNotMatch(html, /Ga naar: JSON-concept bewaren/)
   assert.deepEqual(sheet, before, 'UI may guide but must not fix the identity by guesswork')
 })
+
+test('real React M3 next-action card names the exact field rather than a generic checklist', () => {
+  const sheet = populatedSheet()
+  const product = sheet.baseline.lines[0].observedProduct
+  product.available = true
+  product.productName = 'Fictief gezien product'
+  product.packAmount = 500
+  product.packUnit = 'g'
+  product.packCount = 1
+  product.priceCents = null
+  const before = structuredClone(sheet)
+  const html = renderView(sheet)
+  const cardHtml = html.match(/class="observation-next-action"[\\s\\S]*?<\\/div>/)?.[0] ?? ''
+  assert.match(cardHtml, /Volgende: PLUS/)
+  assert.match(cardHtml, /werkelijk geobserveerde prijs per verpakking/)
+  assert.doesNotMatch(cardHtml, /Controleer beschikbaarheid, product, verpakking en prijs/)
+  assert.doesNotMatch(cardHtml, /besparing bewezen|klaar voor publicatie/i)
+  assert.match(html, /data-observation-product-field="priceCents"/)
+  assert.deepEqual(sheet, before, 'task-first UI never writes a fictional price')
+})
