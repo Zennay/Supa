@@ -1,6 +1,7 @@
 import type { PlannedMeal, Recipe } from '../../domain/types'
 import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
+import { RecipePriceExplanation } from './RecipePriceExplanation'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -154,7 +155,8 @@ export function PlannerView({
                     </option>
                   ))}
                 </select>
-                <small>{recipe.minutes} min · {euro.format(recipe.estimatedCost)} / recept</small>
+                <small>{recipe.minutes} min</small>
+                <RecipePriceExplanation estimatedCost={recipe.estimatedCost} />
               </span>
               <button
                 type="button"
