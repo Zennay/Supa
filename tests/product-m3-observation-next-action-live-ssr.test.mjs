@@ -186,9 +186,11 @@ test('task-first integration does not auto-export or change the canonical readin
   const source = readFileSync(
     new URL('../src/features/observation/ObservationView.tsx', import.meta.url), 'utf8',
   )
-  assert.match(source, /const nextAction = useMemo\(\(\) => observationNextAction\(sheet\), \[sheet\]\)/)
+  assert.match(source, /observationNextAction\(sheet, referenceNowMs\)/)
+  assert.match(source, /\[sheet, referenceNowMs\]/)
   assert.match(source, /<ObservationNextActionCard action=\{nextAction\} \/>/)
-  assert.match(source, /const readiness = useMemo\(\(\) => observationSheetReadiness\(sheet, Date\.now\(\)\), \[sheet\]\)/)
+  assert.match(source, /observationSheetReadiness\(sheet, referenceNowMs\)/)
+  assert.match(source, /window\.setInterval\(refresh, 60_000\)/)
   assert.match(source, /onClick=\{jumpToNextIncomplete\}/)
   assert.match(source, /const downloadDraft = \(\) =>/)
 })
