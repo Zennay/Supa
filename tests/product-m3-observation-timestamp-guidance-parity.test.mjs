@@ -88,3 +88,36 @@ test('malformed direct calls never trigger an optimistic export or a new savings
     assert.notEqual(action.stage, 'export')
   }
 })
+
+test('M3 guides duplicate store identities to DekaMarkt instead of generic review', () => {
+  const sheet = preparedSheet('baseline')
+  const other = preparedSheet('candidate')
+  Object.assign(sheet.candidate, other.candidate)
+  sheet.baseline.observedAt = '2026-10-14T09:00:00Z'
+  sheet.candidate.observedAt = '2026-10-14T10:00:00Z'
+  // Actual observations cannot share one store identity: do not silently
+  // correct evidence, and never advise inventing a different source ID.
+  sheet.candidate.store.id = sheet.baseline.store.id
+  for (const side of ['baseline', 'candidate']) {
+    for (const line of sheet[side].lines) {
+      line.observedProduct.available = false
+    }
+  }
+  const before = structuredClone(sheet)
+  assert.equal(observationSheetReadiness(sheet).ready, false)
+  const action = observationNextAction(sheet)
+  assert.equal(action.stage, 'store')
+  assert.equal(action.side, 'candidate')
+  assert.equal(action.field, 'id')
+  assert.match(action.detail, /echte codes/)
+  assert.match(action.detail, /verzin geen code/)
+  assert.equal(
+    observationNextTaskSelector(action),
+    '[data-observation-side="candidate"] [data-observation-store-field="id"]',
+  )
+  assert.deepEqual(sheet, before)
+
+  sheet.candidate.store.id = 'dekamarkt-leiden'
+  assert.equal(observationSheetReadiness(sheet).ready, true)
+  assert.equal(observationNextAction(sheet).stage, 'export')
+})
