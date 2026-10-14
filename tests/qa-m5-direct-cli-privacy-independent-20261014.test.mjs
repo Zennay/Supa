@@ -13,14 +13,14 @@ const HTML='<!doctype html><html><body>fictional offline only</body></html>'
 const SHA=createHash('sha256').update(HTML).digest('hex')
 const MARKET='private-fictional-market'
 const SOURCE='private-fictional-source'
-const URL='https://example.invalid/secret-origin'
+const SOURCE_URL='https://example.invalid/secret-origin'
 async function isolated(fn){
   const root=await mkdtemp(join(tmpdir(),'supa-private-direct-cli-'))
   try{await fn(root)}finally{await rm(root,{recursive:true,force:true})}
 }
 function record(success=true,extra={}){
   return {id:SOURCE,supermarket:MARKET,kind:'product',success,
-    requestedUrl:URL,capturedAt:'2026-10-14T00:00:00.000Z',
+    requestedUrl:SOURCE_URL,capturedAt:'2026-10-14T00:00:00.000Z',
     ...(success?{sha256:SHA}:{}),...extra}
 }
 async function capture(root,name,rows,opts={}){
