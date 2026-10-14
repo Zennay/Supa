@@ -42,7 +42,10 @@ test('independent: actual M3 planner share UI defaults to private, accessible ma
     assert.equal((sharePanel.match(/class="week-share-privacy"/g) ?? []).length, 2,
       'each opt-in must have a clickable accessible label')
     assert.doesNotMatch(sharePanel, /<textarea\b/, 'share text must not exist before explicit user action')
-    assert.doesNotMatch(html, /€\s*\d+[,.]\d{2}.*weekmenu/i, 'initial UI must not disclose a user budget')
+    // Planner's own weekbudget is intentionally visible in its budget card.
+    // Only the *sharing panel* must withhold the private value until opt-in.
+    assert.doesNotMatch(sharePanel, /€\s*\d+[,.]\d{2}/i,
+      'share panel must not disclose the user budget before explicit opt-in')
   } finally {
     await server.close()
   }
