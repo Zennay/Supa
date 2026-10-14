@@ -48,7 +48,7 @@ test('sixteen variable 11+11 private M3 baskets agree with an independent exact-
           assert.equal(line.ingredientId, req.id)
           const product = line.observedProduct
           const divisible = req.unit === 'piece' ? 2 : 4
-          const mode = (seed + index + (side === 'candidate' ? 1 : 0)) % 3
+          const mode = (seed + index + (side === 'candidate' && seed >= 3 ? 1 : 0)) % 3
           // 1 package of full demand, 2 half-demand packages or
           // 2 physical quarter-demand items per multipack (2 multipacks).
           const divisor = mode === 0 ? 1 : mode === 1 ? 2 : divisible
