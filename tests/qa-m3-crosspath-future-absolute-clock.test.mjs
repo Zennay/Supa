@@ -111,3 +111,38 @@ test('M3 QA a wholly future one-hour pair is not a valid observed 24-hour window
   assert.ok(assessment.reasons.some(reason => reason.includes('baseline observedAt is not a valid timestamp')))
   assert.ok(assessment.reasons.some(reason => reason.includes('candidate observedAt is not a valid timestamp')))
 })
+
+
+test('M3 QA historical DST fallback exactly 24h is accepted on both observation paths', () => {
+  const sheet = fictionalReadySheet()
+  sheet.study.weekStart = '2025-10-27'
+  // 12:00 +02 and 11:00 +01 across the real Amsterdam autumn DST shift:
+  // exact elapsed UTC time is 24h, despite the local wall clock differing.
+  sheet.baseline.observedAt = '2025-10-25T12:00:00+02:00'
+  sheet.candidate.observedAt = '2025-10-26T11:00:00+01:00'
+  const status = observationSheetReadiness(sheet)
+  assert.equal(status.ready, true, status.issues.join('; '))
+  const window = observationWindowSummary(sheet)
+  assert.equal(window.state, 'within-window')
+  assert.equal(window.deltaHours, 24)
+  const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  const result = assessWeeklyBasketStudy(study)
+  assert.equal(result.claimable, true)
+  assert.equal(result.observationWindowHours, 24)
+  assert.equal(result.comparison.outcome, 'better')
+})
+
+test('M3 QA historical DST fallback 24h plus one millisecond never becomes savings', () => {
+  const sheet = fictionalReadySheet()
+  sheet.study.weekStart = '2025-10-27'
+  sheet.baseline.observedAt = '2025-10-25T12:00:00+02:00'
+  sheet.candidate.observedAt = '2025-10-26T11:00:00.001+01:00'
+  assert.equal(observationSheetReadiness(sheet).ready, false)
+  assert.equal(observationWindowSummary(sheet).state, 'outside-window')
+  const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  const result = assessWeeklyBasketStudy(study)
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.equal(result.comparison.savingsCents, null)
+  assert.ok(result.observationWindowHours > 24)
+})
