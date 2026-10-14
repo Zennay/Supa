@@ -58,17 +58,35 @@ export function compareCoreRetailerInventories(currentDocument, previousDocument
   const previousIds = new Set(previousDocument.sources.map((source) => source.id))
   const addedCandidateIds = [...currentIds].filter((id) => !previousIds.has(id)).sort()
   const removedCandidateIds = [...previousIds].filter((id) => !currentIds.has(id)).sort()
+  // A brand can keep its ID while its consumer-facing identity or pinned
+  // public market-list reference changes. Such edits need explicit human
+  // review even though the owner's legal status remains "unreviewed".
+  const previousById = new Map(previousDocument.sources.map((row) => [row.id, row]))
+  const changedCandidateIds = currentDocument.sources
+    .filter((row) => {
+      const older = previousById.get(row.id)
+      return older && (older.name !== row.name || older.researchUrl !== row.researchUrl)
+    })
+    .map((row) => row.id)
+    .sort()
+  // Date changes do not establish two independent field observations.
+  const screeningDateChanged = currentDocument.screenedAt !== previousDocument.screenedAt
+  const changed = addedCandidateIds.length > 0 ||
+    removedCandidateIds.length > 0 || changedCandidateIds.length > 0 ||
+    screeningDateChanged
   return {
     contractVersion: 1,
     purpose: 'offline_market_inventory_change_review_only',
     addedCandidateIds,
     removedCandidateIds,
+    changedCandidateIds,
+    screeningDateChanged,
     coreCovered: current.coreCovered,
     missingRequiredIds: current.missingRequiredIds,
     previousCandidateCount: previous.candidateCount,
     currentCandidateCount: current.candidateCount,
-    changed: addedCandidateIds.length > 0 || removedCandidateIds.length > 0,
-    humanReviewRequired: addedCandidateIds.length > 0 || removedCandidateIds.length > 0,
+    changed,
+    humanReviewRequired: changed,
     historicalEvidenceVerified: false,
     rightsVerified: false,
     productionReady: false,
@@ -91,7 +109,9 @@ async function main(argv = process.argv.slice(2)) {
     ? compareCoreRetailerInventories(document, JSON.parse(await readFile(argv[2], 'utf8')))
     : assessCoreRetailerCoverage(document)
   process.stdout.write(JSON.stringify(report, null, 2) + '\n')
-  if (!report.coreCovered || (comparison && report.removedCandidateIds.length > 0)) {
+  if (!report.coreCovered ||
+      (comparison && (report.removedCandidateIds.length > 0 ||
+        report.changedCandidateIds.length > 0 || report.screeningDateChanged))) {
     process.exitCode = 2
   }
   return report
