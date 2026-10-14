@@ -15,9 +15,15 @@ export type PrintableShoppingChecklistData = {
   isDemo: boolean
 }
 
+// Some Unicode symbols/letters render as *blank* glyphs. A product name or
+// location made only of these glyphs is not a visible shopping instruction.
+const INVISIBLE_FILLERS = /[\u115F\u1160\u3164\uFFA0\u2800]/gu
+
 function visibleText(value: unknown): value is string {
   return typeof value === 'string' &&
-    /[\p{L}\p{N}\p{S}]/u.test(value.replace(/[\p{Cf}\p{M}]/gu, ''))
+    /[\p{L}\p{N}\p{S}]/u.test(
+      value.replace(/[\p{Cf}\p{M}\u115F\u1160\u3164\uFFA0\u2800]/gu, ''),
+    )
 }
 
 // Printed words must never carry hidden direction overrides, zero-width format
@@ -25,7 +31,7 @@ function visibleText(value: unknown): value is string {
 // letters, accents, emoji, dashes and spaces; never mutate the basket source.
 function safePrintableLabel(value: unknown): string | null {
   if (!visibleText(value)) return null
-  const cleaned = value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
+  const cleaned = value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\u115F\u1160\u3164\uFFA0\u2800]/gu, ' ')
     .replace(/\s+/gu, ' ').trim()
   return visibleText(cleaned) ? cleaned : null
 }
@@ -113,7 +119,11 @@ export function preparePrintableShoppingChecklist(
 
   const seen = new Set<string>()
   const lines: PrintableShoppingLine[] = basket.lines.map((line) => {
-    if (!line || !visibleText(line.id) || seen.has(line.id)) {
+    if (!line || !visibleText(line.id) ||
+        line.id !== line.id.trim() ||
+        line.id !== line.id.replace(INVISIBLE_FILLERS, '') ||
+        /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(line.id) ||
+        seen.has(line.id)) {
       throw new Error('Dubbele of ongeldige boodschappenregel')
     }
     seen.add(line.id)
