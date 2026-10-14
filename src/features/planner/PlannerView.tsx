@@ -1,4 +1,7 @@
 import type { PlannedMeal, Recipe } from '../../domain/types'
+import type { RecipeWithIngredients } from '../../domain/basket.ts'
+import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
+import { IngredientReuseCard } from './IngredientReuseCard.tsx'
 import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
 import { RecipePriceExplanation } from './RecipePriceExplanation'
@@ -39,6 +42,18 @@ export function PlannerView({
     basketUnresolvedLineCount,
   )
   const budgetKnown = budgetAssessment.status === 'known'
+  // Derive reuse from current active recipe choices. No packet, leftover or
+  // monetary savings conclusion can be inferred from ingredient overlap.
+  const ingredientRecipes = recipes.filter(
+    (recipe): recipe is RecipeWithIngredients =>
+      recipe !== null && typeof recipe === 'object' &&
+      Array.isArray((recipe as RecipeWithIngredients).ingredients),
+  )
+  const hasIngredientData = ingredientRecipes.length > 0 &&
+    ingredientRecipes.length === recipes.length
+  const reuseInsight = hasIngredientData
+    ? buildIngredientReuseInsight({ plan: plannedMeals, recipes: ingredientRecipes, activeDays })
+    : null
 
   return (
     <section className="screen">
@@ -171,6 +186,8 @@ export function PlannerView({
           )
         })}
       </div>
+
+      {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
 
       <div className="insight-card">
         <span className="eyebrow">M2 verticale slice</span>
