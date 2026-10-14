@@ -70,14 +70,30 @@ function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
   return values.filter((value): value is JsonObject => isObject(value))
 }
 
+/**
+ * Only a concrete, purchase-ready price can be used as the cost of one pack.
+ * AggregateOffer.lowPrice is a range minimum (not an individual offer) and a
+ * UnitPriceSpecification is normally a reference price (e.g. EUR/kg), which
+ * cannot be multiplied by the number of packs at checkout.
+ *
+ * Keep unknown prices null rather than creating a fictitious basket winner.
+ */
 function extractPrice(offers: JsonObject[]): number | null {
   const prices = offers
-    .flatMap((offer) => [
-      cents(offer.price ?? offer.lowPrice),
-      ...priceSpecificationCandidates(offer).map((specification) =>
-        cents(specification.price ?? specification.lowPrice),
-      ),
-    ])
+    .flatMap((offer) => {
+      // A marketplace/retailer price range never proves a purchasable SKU.
+      if (hasType(offer, 'AggregateOffer')) return []
+
+      return [
+        cents(offer.price),
+        ...priceSpecificationCandidates(offer).map((specification) => {
+          if (hasType(specification, 'UnitPriceSpecification') ||
+              specification.referenceQuantity !== undefined) return null
+          // LowPrice is a bound, not an exact checkout price.
+          return cents(specification.price)
+        }),
+      ]
+    })
     .filter((value): value is number => value !== null)
   return uniqueKnown(prices)
 }
