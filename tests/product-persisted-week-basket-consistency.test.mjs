@@ -100,7 +100,7 @@ test('restored recipe/day choices feed the same demand to shopping and both comp
   assert.equal(differentBudget.preferences.budget, 30)
 })
 
-test('a genuinely saved empty week cannot leave stale shopping checkmarks or financial differences', () => {
+test('a genuinely saved empty week cannot leave stale shopping checkmarks or phantom basket totals', () => {
   const normal = basketsFor(defaultPlannerPreferences(m2InitialPlan))
   const empty = basketsFor({
     ...defaultPlannerPreferences(m2InitialPlan),
@@ -113,9 +113,9 @@ test('a genuinely saved empty week cannot leave stale shopping checkmarks or fin
     assert.equal(basket.totalCents, 0)
     assert.equal(basket.lines.length, 0)
   }
-  assert.equal(empty.comparison.claimable, true)
-  assert.equal(empty.comparison.outcome, 'same')
-  assert.equal(empty.comparison.savingsCents, 0)
+  // IMPORTANT: Do not lock in the current-main empty-week financial-claim bug (#1051).
+  // Comparator owner PR #1012 covers returning unknown/non-claimable here.
+  // This independent test asserts only the physical basket and checklist contract.
   assert.notEqual(shoppingListBasketKey(normal.shopping), shoppingListBasketKey(empty.shopping))
 
   const checkedId = normal.shopping.lines[0]?.id
