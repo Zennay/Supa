@@ -43,12 +43,17 @@ export function assessCoreRetailerCoverage(document) {
 // Capture-set change detection is a reviewer aid, not proof that snapshots
 // represent distinct dates, licensed data, or a usable ingestion source.
 export function compareCoreRetailerInventories(currentDocument, previousDocument) {
-  if (currentDocument === previousDocument ||
-      currentDocument?.sources === previousDocument?.sources) {
+  if (currentDocument === previousDocument) {
     throw new Error('Distinct inventory inputs required for offline comparison')
   }
+  // Validate the owner's complete own-data schema before reading nested
+  // source arrays; an accessor must not execute merely to check identity.
   const current = assessCoreRetailerCoverage(currentDocument)
   const previous = assessCoreRetailerCoverage(previousDocument)
+  if (Object.getOwnPropertyDescriptor(currentDocument, 'sources').value ===
+      Object.getOwnPropertyDescriptor(previousDocument, 'sources').value) {
+    throw new Error('Distinct inventory inputs required for offline comparison')
+  }
   const currentIds = new Set(currentDocument.sources.map((source) => source.id))
   const previousIds = new Set(previousDocument.sources.map((source) => source.id))
   const addedCandidateIds = [...currentIds].filter((id) => !previousIds.has(id)).sort()
