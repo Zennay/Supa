@@ -52,13 +52,15 @@ function paperPage(side, items) {
     '<p>Noteer uitsluitend echt geobserveerde waarden; laat onbekende gegevens leeg.</p>' +
     '<div class="metadata"><p>Filiaal: __________________________</p>' +
     '<p>Datum, tijd en tijdzone: __________________________</p>' +
+    '<p>Week vanaf (maandag): __________________________</p>' +
     '<p>Pseudonieme bewijsreferentie (geen naam/e-mail): __________________________</p>' +
+    '<p>Prijscontext: ☐ in-store ☐ online-order (dezelfde bij beide winkels)</p>' +
     '<p>Bron: ☐ winkelmand ☐ bon ☐ toegestane export</p></div>' +
     '<table><thead><tr><th>Ingrediënt/behoefte</th><th>Gevonden product</th>' +
     '<th>Verpakking (hoeveelheid + eenheid)</th><th>Aantal pakken</th>' +
     '<th>Prijs per pak (€)</th><th>Beschikbaar?</th></tr></thead><tbody>' +
     cells + '</tbody></table>' +
-    '<p>Herkomst, aanbieding, twijfel: _________________________________________________________</p>' +
+    '<p>Herkomst / productlink / aanbieding / twijfel: __________________________________________________</p>' +
     '<p>___________________________________________________________________________________________</p>' +
     '<footer>Leeg invulblad; geen bewijs of besparingsclaim. Neem echte bevindingen over in SUPA Meten.</footer>' +
     '</section>'

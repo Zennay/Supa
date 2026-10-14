@@ -17,6 +17,9 @@ test('22 empty printed rows match the exact canonical 11 demands in both superma
   assert.match(html, /PLUS — dezelfde 11 boodschappen/)
   assert.match(html, /DekaMarkt — dezelfde 11 boodschappen/)
   assert.match(html, /@page\{size:A4 landscape/)
+  assert.equal(html.split('Week vanaf (maandag)').length - 1, 2)
+  assert.equal(html.split('in-store ☐ online-order').length - 1, 2)
+  assert.equal(html.split('Herkomst \/ productlink').length - 1, 2)
   assert.match(html, /<html lang="nl">/)
   assert.equal(buildObservationSheet().requirements.length, 11)
   for (const required of buildObservationSheet().requirements) {
