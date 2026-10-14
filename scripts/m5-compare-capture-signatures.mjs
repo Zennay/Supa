@@ -169,8 +169,6 @@ export function captureShape(rawSource) {
   const source = Object.create(null)
   source.id = ownSourceField(rawSource, 'id', 'Invalid inspected source')
   if (!canonicalSourceId(source.id)) throw new Error('Invalid inspected source')
-  source.supermarket = ownSourceField(rawSource, 'supermarket', 'Invalid inspected source origin')
-  source.kind = ownSourceField(rawSource, 'kind', 'Invalid inspected source origin')
   source.success = ownSourceField(rawSource, 'success', 'Invalid inspected capture success')
   // The M1 inspector always produces an explicit boolean, never a getter
   // supplied "true"/"false", 0/1, or missing success flag.
@@ -185,6 +183,10 @@ export function captureShape(rawSource) {
         failedSchema.value !== undefined)) {
       throw new Error('Invalid inspected Schema.org parse result')
     }
+    // Failed captures have no integrity or parser proof. Pin their origin
+    // only after the success/failed Schema.org contract is checked.
+    source.supermarket = ownSourceField(rawSource, 'supermarket', 'Invalid inspected source origin')
+    source.kind = ownSourceField(rawSource, 'kind', 'Invalid inspected source origin')
     requireCanonicalOrigin(source)
     return {
       id: source.id,
@@ -207,6 +209,10 @@ export function captureShape(rawSource) {
       !/^[a-f0-9]{64}$/.test(source.manifestSha256)) {
     throw new Error('Snapshot integrity verification required')
   }
+  // Preserve canonical error precedence: malformed integrity is rejected
+  // before unrelated missing origin fields on otherwise successful captures.
+  source.supermarket = ownSourceField(rawSource, 'supermarket', 'Invalid inspected source origin')
+  source.kind = ownSourceField(rawSource, 'kind', 'Invalid inspected source origin')
   requireCanonicalOrigin(source)
   const html = ownHtmlField(rawSource, 'html')
   const inspectedHtml = requireBoundedHtmlShape(html)
