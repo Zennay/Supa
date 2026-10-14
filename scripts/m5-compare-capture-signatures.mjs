@@ -51,13 +51,20 @@ function requireCanonicalOrigin(source) {
 // M1's HTML inspector outputs short arrays of JSON-LD type/key strings.
 // A forged or degenerate capture must not be silently normalized to an
 // empty/small shape; reject it before potentially expensive map/filter/hash.
+// Canonical M1 inspection produces own *data* entries and own arrays of
+// strings. Inspect descriptors rather than evaluating attacker-supplied getter
+// metadata; return bounded copies so a later fingerprint cannot re-read it.
 function canonicalShapeTerms(values) {
-  if (!Array.isArray(values) || values.length > MAX_JSON_LD_ENTRIES) return false
+  if (!Array.isArray(values) || values.length > MAX_JSON_LD_ENTRIES) return null
+  const terms = []
   for (let i = 0; i < values.length; i += 1) {
-    if (!Object.hasOwn(values, i) || typeof values[i] !== 'string' ||
-        values[i].length > MAX_JSON_LD_TERM_LENGTH) return false
+    const slot = Object.getOwnPropertyDescriptor(values, i)
+    if (!slot || !Object.hasOwn(slot, 'value') ||
+        typeof slot.value !== 'string' ||
+        slot.value.length > MAX_JSON_LD_TERM_LENGTH) return null
+    terms.push(slot.value)
   }
-  return true
+  return terms
 }
 
 function requireBoundedHtmlShape(html) {
@@ -68,22 +75,34 @@ function requireBoundedHtmlShape(html) {
       html.applicationJsonScripts.length > MAX_APPLICATION_JSON_SCRIPTS) {
     throw new Error('Invalid or unbounded inspected HTML shape')
   }
+  const jsonLd = []
   for (let i = 0; i < html.jsonLd.length; i += 1) {
-    if (!Object.hasOwn(html.jsonLd, i)) {
+    const row = Object.getOwnPropertyDescriptor(html.jsonLd, i)
+    const record = row?.value
+    if (!row || !Object.hasOwn(row, 'value') ||
+        !record || typeof record !== 'object' || Array.isArray(record)) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
-    const record = html.jsonLd[i]
-    if (!record || typeof record !== 'object' || Array.isArray(record) ||
-        !canonicalShapeTerms(record.type) ||
-        !canonicalShapeTerms(record.keys) ||
-        (Object.hasOwn(record, 'parseError') && record.parseError !== true) ||
-        // The canonical M1 parser emits {type:[], keys:[], parseError:true}
-        // when JSON-LD is malformed. A failed parse cannot also have parsed
-        // product/offer types or keys to influence a trustworthy fingerprint.
-        (record.parseError === true &&
-          (record.type.length !== 0 || record.keys.length !== 0))) {
+    const typeDescriptor = Object.getOwnPropertyDescriptor(record, 'type')
+    const keysDescriptor = Object.getOwnPropertyDescriptor(record, 'keys')
+    const parseErrorDescriptor = Object.getOwnPropertyDescriptor(record, 'parseError')
+    const type = typeDescriptor && Object.hasOwn(typeDescriptor, 'value')
+      ? canonicalShapeTerms(typeDescriptor.value) : null
+    const keys = keysDescriptor && Object.hasOwn(keysDescriptor, 'value')
+      ? canonicalShapeTerms(keysDescriptor.value) : null
+    const parseError = parseErrorDescriptor?.value === true
+    if (!type || !keys ||
+        // M1 never supplies inherited parser errors. Do not evaluate an
+        // inherited getter or normalize it into a trusted success.
+        (!parseErrorDescriptor && 'parseError' in record) ||
+        (parseErrorDescriptor &&
+         (!Object.hasOwn(parseErrorDescriptor, 'value') ||
+          parseErrorDescriptor.value !== true)) ||
+        // A genuine M1 parse failure has no parsed Product types or keys.
+        (parseError && (type.length !== 0 || keys.length !== 0))) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
+    jsonLd.push({ type, keys, parseError })
   }
   // Every application/json body is part of the SAME SHA-verified bounded
   // HTML document. Pure inspections must not invent impossible 8MiB+ scripts
@@ -107,6 +126,7 @@ function requireBoundedHtmlShape(html) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
   }
+  return jsonLd
 }
 
 // This fingerprint deliberately excludes names, prices, URLs, DOM text,
@@ -144,7 +164,7 @@ export function captureShape(source) {
     throw new Error('Snapshot integrity verification required')
   }
   requireCanonicalOrigin(source)
-  requireBoundedHtmlShape(source.html)
+  const inspectedJsonLd = requireBoundedHtmlShape(source.html)
   // A successful M1 inspection always records a real parser decision.
   // Optional chaining previously converted absent/invented outcomes into
   // 'abstain', laundering untrusted source metadata into review evidence.
@@ -182,7 +202,7 @@ export function captureShape(source) {
         // explicit Product type (case-insensitive) or a JSON-LD @graph
         // containing a nested Product. Another successfully parsed page
         // type alone cannot justify a positive observation decision.
-        !source.html.jsonLd.some((record) => record.parseError !== true &&
+        !inspectedJsonLd.some((record) => record.parseError !== true &&
           (record.type.some((type) => type.toLowerCase() === 'product') ||
            record.keys.includes('@graph')))) {
       throw new Error('Invalid inspected Schema.org parse result')
@@ -196,14 +216,10 @@ export function captureShape(source) {
   const shape = {
     hasNextData: source.html.hasNextData === true,
     applicationJsonScriptCount: source.html.applicationJsonScripts.length,
-    jsonLd: source.html.jsonLd.map((record) => ({
-      parseError: record.parseError === true,
-      types: Array.isArray(record.type)
-        ? record.type.filter((value) => KNOWN_TYPES.has(value)).sort()
-        : [],
-      keys: Array.isArray(record.keys)
-        ? record.keys.filter((value) => RELEVANT_KEYS.has(value)).sort()
-        : [],
+    jsonLd: inspectedJsonLd.map((record) => ({
+      parseError: record.parseError,
+      types: record.type.filter((value) => KNOWN_TYPES.has(value)).sort(),
+      keys: record.keys.filter((value) => RELEVANT_KEYS.has(value)).sort(),
     })),
   }
 
