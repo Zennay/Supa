@@ -135,6 +135,10 @@ test('independent: hardlinked manifest shared by distinct capture roots fails re
     // Both manifests now contain the same current-time data. File provenance
     // must be rejected even though raw JSON is syntactically valid.
     old.body = now.body
+    // Without nlink ownership checks the two identical manifests would
+    // eventually fail chronology instead. Prove manifest rejection itself.
+    await assert.rejects(compareCaptureDirectories(now.dir, old.dir), (err) =>
+      err instanceof Error && err.message === 'Invalid or oversized M1 capture manifest')
     rejects(run(now.dir, old.dir))
     await verify(now, old)
   })
@@ -204,5 +208,20 @@ test('independent: symlinked ANCESTOR of baseline is rejected before malformed c
       err instanceof Error && err.message === 'Invalid offline capture tree origin')
     rejects(run(now.dir, borrowed))
     await verify(now, old)
+  })
+})
+
+
+test('independent: successful standalone P2 cannot borrow SHA-valid manifest through a hardlink', async () => {
+  await fixtureRun(async root => {
+    const now = await capture(root, 'now')
+    const borrowed = join(root, 'borrowed-valid-manifest.json')
+    await link(now.manifest, borrowed)
+    assert.equal((await lstat(now.manifest)).nlink, 2)
+    await assert.rejects(compareCaptureDirectories(now.dir), (err) =>
+      err instanceof Error && err.message === 'Invalid or oversized M1 capture manifest')
+    rejects(run(now.dir))
+    await verify(now)
+    assert.equal(await readFile(borrowed, 'utf8'), now.body)
   })
 })
