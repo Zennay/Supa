@@ -87,16 +87,18 @@ test('direct queue rejects own accessor on change id before any queue action',()
 test('direct queue rejects own accessor on change status before any queue action',()=>{
   const entry=row('baseline_missing',verified('change-status'))
   let called=0
+  const input=report([entry])
   Object.defineProperty(entry,'status',{get(){called++;return 'baseline_missing'}})
-  deny(report([entry]))
+  deny(input)
   assert.equal(called,0)
 })
 test('direct queue rejects own accessor on current or baseline cohort',()=>{
   for(const key of ['current','baseline']){
     const entry=row('unchanged',verified('value'),verified('value'))
     let called=0
+    const input=report([entry],true)
     Object.defineProperty(entry,key,{get(){called++;throw Error('PRIVATE')}})
-    deny(report([entry],true))
+    deny(input)
     assert.equal(called,0)
   }
 })
