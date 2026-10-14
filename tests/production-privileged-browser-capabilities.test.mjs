@@ -64,20 +64,115 @@ function isBrowserGlobalMember(node, expectedName) {
   )
 }
 
-function isNavigatorObject(node) {
-  return isBrowserGlobalMember(node, 'navigator')
+function isNavigatorObject(node, navigatorAliases = new Set()) {
+  const current = unwrapExpression(node)
+
+  if (ts.isIdentifier(current)) {
+    return current.text === 'navigator' || navigatorAliases.has(current.text)
+  }
+
+  return isBrowserGlobalMember(current, 'navigator')
 }
 
-function navigatorCapabilityName(node) {
+function navigatorCapabilityName(
+  node,
+  navigatorAliases = new Set(),
+  capabilityAliases = new Map(),
+) {
   const current = unwrapExpression(node)
+
+  if (ts.isIdentifier(current)) {
+    return capabilityAliases.get(current.text) ?? null
+  }
+
   if (!ts.isPropertyAccessExpression(current) && !ts.isElementAccessExpression(current)) {
     return null
   }
 
-  if (!isNavigatorObject(current.expression)) return null
+  if (!isNavigatorObject(current.expression, navigatorAliases)) return null
 
   const name = memberName(current)
   return privilegedNavigatorMethods.has(name) ? name : null
+}
+
+function collectNavigatorAliases(sourceFile) {
+  const navigatorAliases = new Set()
+  const capabilityAliases = new Map()
+  const methodAliases = new Set()
+  let changed = true
+
+  function bindObjectPattern(pattern, initializer) {
+    const navigatorObject = isNavigatorObject(initializer, navigatorAliases)
+    const capability = navigatorCapabilityName(
+      initializer,
+      navigatorAliases,
+      capabilityAliases,
+    )
+
+    for (const element of pattern.elements) {
+      if (!ts.isIdentifier(element.name)) continue
+      const sourceName = staticName(element.propertyName) ?? element.name.text
+      const alias = element.name.text
+
+      if (navigatorObject && directPrivilegedNavigatorMethods.has(sourceName)) {
+        if (!methodAliases.has(alias)) {
+          methodAliases.add(alias)
+          changed = true
+        }
+      }
+
+      if (navigatorObject && privilegedNavigatorMethods.has(sourceName)) {
+        if (capabilityAliases.get(alias) !== sourceName) {
+          capabilityAliases.set(alias, sourceName)
+          changed = true
+        }
+      }
+
+      if (capability && privilegedNavigatorMethods.get(capability)?.has(sourceName)) {
+        if (!methodAliases.has(alias)) {
+          methodAliases.add(alias)
+          changed = true
+        }
+      }
+    }
+  }
+
+  while (changed) {
+    changed = false
+
+    function visit(node) {
+      if (ts.isVariableDeclaration(node) && node.initializer) {
+        const initializer = unwrapExpression(node.initializer)
+
+        if (ts.isIdentifier(node.name)) {
+          const alias = node.name.text
+
+          if (!navigatorAliases.has(alias) && isNavigatorObject(initializer, navigatorAliases)) {
+            navigatorAliases.add(alias)
+            changed = true
+          }
+
+          const capability = navigatorCapabilityName(
+            initializer,
+            navigatorAliases,
+            capabilityAliases,
+          )
+          if (capability && capabilityAliases.get(alias) !== capability) {
+            capabilityAliases.set(alias, capability)
+            changed = true
+          }
+        } else if (ts.isObjectBindingPattern(node.name)) {
+          bindObjectPattern(node.name, initializer)
+        }
+      }
+
+      ts.forEachChild(node, visit)
+    }
+
+    visit(sourceFile)
+  }
+
+  return { navigatorAliases, capabilityAliases, methodAliases }
 }
 
 function scriptKindFor(filename) {
@@ -101,11 +196,25 @@ function findPrivilegedBrowserCapability(source, filename = 'candidate.tsx') {
     true,
     scriptKindFor(filename),
   )
+  const { navigatorAliases, capabilityAliases, methodAliases } =
+    collectNavigatorAliases(sourceFile)
 
   let finding = null
 
   function visit(node) {
     if (finding) return
+
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(unwrapExpression(node.expression)) &&
+      methodAliases.has(unwrapExpression(node.expression).text)
+    ) {
+      finding = {
+        kind: 'aliased privileged navigator method call',
+        text: node.expression.getText(sourceFile),
+      }
+      return
+    }
 
     if (ts.isNewExpression(node) && isBrowserGlobalMember(node.expression, 'Notification')) {
       finding = {
@@ -116,10 +225,17 @@ function findPrivilegedBrowserCapability(source, filename = 'candidate.tsx') {
     }
 
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-      const capability = navigatorCapabilityName(node.expression)
+      const capability = navigatorCapabilityName(
+        node.expression,
+        navigatorAliases,
+        capabilityAliases,
+      )
       const method = memberName(node)
 
-      if (isNavigatorObject(node.expression) && directPrivilegedNavigatorMethods.has(method)) {
+      if (
+        isNavigatorObject(node.expression, navigatorAliases) &&
+        directPrivilegedNavigatorMethods.has(method)
+      ) {
         finding = {
           kind: 'navigator.' + method + ' reference',
           text: node.getText(sourceFile),
@@ -220,6 +336,23 @@ test('privileged-capability boundary catches direct calls and detached browser a
   }
 })
 
+test('privileged-capability boundary follows navigator and capability aliases', () => {
+  for (const source of [
+    'const nav = navigator; nav.share({ title: "SUPA" })',
+    'const nav = window.navigator; const next = nav; next.bluetooth.requestDevice({ filters: [] })',
+    'const clipboard = navigator.clipboard; clipboard.readText()',
+    'const nav = self.navigator; const media = nav.mediaDevices; media.getUserMedia({ audio: true })',
+    'let hardware = navigator.usb; hardware.requestDevice({ filters: [] })',
+    'const { share } = navigator; share({ title: "SUPA" })',
+    'const { clipboard } = navigator; clipboard.readText()',
+    'const nav = window.navigator; const { usb } = nav; usb.requestDevice({ filters: [] })',
+    'const { mediaDevices: media } = self.navigator; media.getUserMedia({ audio: true })',
+    'const clipboard = navigator.clipboard; const { readText } = clipboard; readText()',
+  ]) {
+    assert.ok(findPrivilegedBrowserCapability(source), source)
+  }
+})
+
 test('privileged-capability boundary preserves unrelated local APIs and inert text', () => {
   for (const source of [
     'locationClient.geolocation.getCurrentPosition(onPosition)',
@@ -233,10 +366,15 @@ test('privileged-capability boundary preserves unrelated local APIs and inert te
     'input.hid.requestDevice(options)',
     'directory.contacts.select(fields)',
     'screen.wakeLock.request("screen")',
+    'const nav = app.navigator; nav.share(payload)',
+    'const clipboard = editor.clipboard; clipboard.readText()',
+    'const { share } = sharing; share(payload)',
+    'const { clipboard } = editor; clipboard.readText()',
+    'const { readText } = editor.clipboard; readText()',
     "notifications.requestPermission('local')",
     "new notifier.Notification('local')",
-    "const example = \"navigator.share({ title: 'SUPA' })\"",
-    "// navigator.bluetooth.requestDevice({ filters: [] })",
+    "const example = \"const nav = navigator; nav.share({ title: 'SUPA' })\"",
+    "// const usb = navigator.usb; usb.requestDevice({ filters: [] })",
     'const NotificationLike = class {}; new NotificationLike()',
     'navigator.language',
   ]) {
