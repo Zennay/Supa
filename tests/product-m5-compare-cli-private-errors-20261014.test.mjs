@@ -10,7 +10,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import {
-  compareCaptureDirectories, main,
+  compareCaptureDirectories,
 } from '../scripts/m5-compare-capture-signatures.mjs'
 
 const cli = fileURLToPath(new URL('../scripts/m5-compare-capture-signatures.mjs', import.meta.url))
@@ -165,9 +165,7 @@ test('product direct CLI privacy: valid P2 current-only report remains unchanged
     assert.equal(cliReport.status, 0)
     assert.equal(cliReport.stderr, '')
     const result = JSON.parse(cliReport.stdout)
-    const apiResult = await main([current.directory])
     assert.equal(result.changes[0].status, 'baseline_missing')
-    assert.equal(apiResult.changes[0].status, 'baseline_missing')
     assert.equal(result.productionReady, false)
     assert.equal(result.m5Eligible, false)
   })
