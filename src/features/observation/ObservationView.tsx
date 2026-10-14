@@ -28,6 +28,7 @@ import {
 import {
   persistObservationDraft,
   removeObservationDraft,
+  observationDraftStorageStatus,
 } from './observationDraftPersistence.ts'
 import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
 import { observationNextAction, observationNextTaskSelector } from './observationNextStep.ts'
