@@ -15,6 +15,7 @@ const HEX_HASH = /^[a-f\d]{64}$/
 const MAX_CHANGES = 200
 const MAX_CAPTURE_SOURCES = 100
 const MAX_SOURCE_ID_UNITS = 128
+const MAX_JSON_LD_RECORDS = 128
 const VERIFIED_SCHEMA_ORG_STATUSES = new Set(['candidate_observation', 'abstain'])
 
 // Reject malformed UTF-16 before UTF-8 hashing: unpaired surrogates are
@@ -96,13 +97,30 @@ export function buildOfflineSelectorReviewQueue(report) {
       // eligible for a human-only queue. Inconsistent or invented provenance
       // cannot be upgraded to a nominal review action.
       if (snapshot.captureStatus === 'verified') {
+        // Canonical M1->M5 captureShape() always emits these own, bounded
+        // inspection signals on successful captures. Forged counts or a
+        // fabricated parse-error majority must not become reviewable P1/P3.
         if (!HEX_HASH.test(snapshot.snapshotSha256) ||
             !HEX_HASH.test(snapshot.shapeSha256) ||
-            !VERIFIED_SCHEMA_ORG_STATUSES.has(snapshot.schemaOrgStatus)) invalid()
+            !VERIFIED_SCHEMA_ORG_STATUSES.has(snapshot.schemaOrgStatus) ||
+            !Object.hasOwn(snapshot, 'hasNextData') ||
+            typeof snapshot.hasNextData !== 'boolean' ||
+            !Object.hasOwn(snapshot, 'jsonLdCount') ||
+            !Number.isSafeInteger(snapshot.jsonLdCount) ||
+            snapshot.jsonLdCount < 0 ||
+            snapshot.jsonLdCount > MAX_JSON_LD_RECORDS ||
+            !Object.hasOwn(snapshot, 'jsonLdParseErrors') ||
+            !Number.isSafeInteger(snapshot.jsonLdParseErrors) ||
+            snapshot.jsonLdParseErrors < 0 ||
+            snapshot.jsonLdParseErrors > snapshot.jsonLdCount) invalid()
       } else if (snapshot.captureStatus === 'unavailable') {
+        // Failed captures have no inspected HTML or successful M1 signals.
         if (snapshot.snapshotSha256 !== null ||
             snapshot.shapeSha256 !== null ||
-            snapshot.schemaOrgStatus !== 'unknown') invalid()
+            snapshot.schemaOrgStatus !== 'unknown' ||
+            Object.hasOwn(snapshot, 'hasNextData') ||
+            Object.hasOwn(snapshot, 'jsonLdCount') ||
+            Object.hasOwn(snapshot, 'jsonLdParseErrors')) invalid()
       } else {
         invalid()
       }
@@ -118,7 +136,10 @@ export function buildOfflineSelectorReviewQueue(report) {
         current.kind === baseline.kind &&
         current.snapshotSha256 === baseline.snapshotSha256 &&
         (current.shapeSha256 !== baseline.shapeSha256 ||
-         current.schemaOrgStatus !== baseline.schemaOrgStatus)) invalid()
+         current.schemaOrgStatus !== baseline.schemaOrgStatus ||
+         current.hasNextData !== baseline.hasNextData ||
+         current.jsonLdCount !== baseline.jsonLdCount ||
+         current.jsonLdParseErrors !== baseline.jsonLdParseErrors)) invalid()
     // Do not trust a reported 'unchanged' state when its immutable source
     // origin differs, nor a forged P1 origin state for identical provenance.
     const originChanged = current !== null && baseline !== null &&
