@@ -117,3 +117,18 @@ test('permanent Firefox fork boundary preserves trusted manual dispatch and no f
   assert.match(source, /runs-on: self-hosted/)
   assert.doesNotMatch(source, /pull_request_target/)
 })
+
+
+test('archived Firefox image evidence binds every PNG to byte length, dimensions and SHA-256', async () => {
+  const source = await readFile(browserScript, 'utf8')
+  assert.match(source, /createHash\('sha256'\)\.update\(png\)\.digest\('hex'\)/)
+  assert.match(source, /png\.subarray\(0, 8\)\.toString\('hex'\)/)
+  assert.match(source, /89504e470d0a1a0a/)
+  assert.match(source, /png\.readUInt32BE\(16\)/)
+  assert.match(source, /png\.readUInt32BE\(20\)/)
+  assert.match(source, /screenshotIntegrity\.push\(/)
+  assert.match(source, /assert\.equal\(screenshotIntegrity\.length, 6/)
+  assert.match(source, /screenshotIntegrity,\n/)
+  assert.match(source, /retailerDataObserved: false/)
+  assert.match(source, /realSavingsClaimEligible: false/)
+})
