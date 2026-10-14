@@ -31,7 +31,11 @@ test('M3 private CSV uses UTF-8 Dutch headers and exactly 11 complete product ro
   assert.match(lines[2], /"0,90"/)
   assert.match(lines[2], /"-0,10"/)
   assert.match(lines[13], /"VOORLOPIGE VOLLEDIGE MAND"/)
-  assert.match(lines[13], /"11,00";"9,90";"-1,10"/)
+  const footer = lines[13].slice(1, -1).split('";"')
+  assert.equal(footer.length, 19)
+  assert.equal(footer[9], '11,00')
+  assert.equal(footer[16], '9,90')
+  assert.equal(footer[17], '-1,10')
   assert.equal(JSON.stringify(original), before)
   assert.doesNotMatch(csv, /participantKey|studyId|sourceUrl|evidenceId|provenanceNote/)
   assert.match(csv, /Geen actuele prijsfeed en geen publieke besparingsclaim/)
@@ -99,7 +103,9 @@ test('M3 CSV exact better/equal/worse signed financial rows stay provisional', (
     const csv = renderPrivateM3ComparisonCsv(
       buildPrivateM3ProductComparison(buildFictionalPricedSheet(price)),
     )
-    assert.match(csv, new RegExp('"VOORLOPIGE VOLLEDIGE MAND".*"' + delta.replace('.', '\\.') + '"'))
+    const footer = csv.trimEnd().split('\\r\\n').at(-1).slice(1, -1).split('";"')
+    assert.equal(footer[9], '11,00')
+    assert.equal(footer[17], delta)
     assert.match(csv, /Geen actuele prijsfeed en geen publieke besparingsclaim/)
   }
 })
@@ -122,7 +128,10 @@ test('M3 CSV CLI from canonical private 22-line sheet writes mode 0600 and prese
     assert.equal(await readFile(input, 'utf8'), source)
     assert.equal((await stat(output)).mode & 0o777, 0o600)
     const csv = await readFile(output, 'utf8')
-    assert.match(csv, /"11,00";"9,90";"-1,10"/)
+    const footer = csv.trimEnd().split('\\r\\n').at(-1).slice(1, -1).split('";"')
+    assert.equal(footer[9], '11,00')
+    assert.equal(footer[16], '9,90')
+    assert.equal(footer[17], '-1,10')
     assert.doesNotMatch(csv, new RegExp(secret))
     const overwrite = spawnSync(process.execPath,
       ['--experimental-strip-types', cli, '--sheet', input, '--output', input],
