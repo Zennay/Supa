@@ -322,8 +322,8 @@ export async function main(argv = process.argv.slice(2)) {
   try {
     study = JSON.parse(await readFile(input, 'utf8'))
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`study JSON could not be read/parsed: ${message}`)
+    // Never echo source paths or malformed private JSON fragments to logs.
+    throw new Error('study JSON could not be read/parsed')
   }
 
   const report = buildObservedWeekReport(study)

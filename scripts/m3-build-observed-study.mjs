@@ -404,8 +404,8 @@ export async function main(argv = process.argv.slice(2)) {
   try {
     sheet = JSON.parse(await readFile(input, 'utf8'))
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`observation sheet JSON could not be read/parsed: ${message}`)
+    // Filesystem errors and JSON parse errors may include private path/data snippets.
+    throw new Error('observation sheet JSON could not be read/parsed')
   }
 
   const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
