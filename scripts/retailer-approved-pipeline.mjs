@@ -24,6 +24,16 @@ export async function runApprovedRetailerComparison({
   if (!Number.isSafeInteger(nowMs) || nowMs < 0) {
     throw new Error('Invalid ingestion clock')
   }
+  // Reject an impossible basket before any permission-gated third-party I/O.
+  // Use the same canonical identity/duplicate/shape validator as the final
+  // comparison instead of paying network cost before discovering bad demand.
+  compareReviewedCatalogs({ requirements, observations: [], nowMs })
+  for (const required of requirements) {
+    if (!Number.isFinite(required.amount) || required.amount <= 0 ||
+        !['g', 'kg', 'ml', 'l', 'piece'].includes(required.unit)) {
+      throw new Error('Invalid comparison demand quantity or unit')
+    }
+  }
   const observations = []
   const captureSummary = []
 
