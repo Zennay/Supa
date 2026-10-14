@@ -7,8 +7,8 @@ function comparison(overrides = {}) {
   return {
     outcome: 'better',
     claimable: true,
-    baselineTotalCents: 3000,
-    candidateTotalCents: 2910,
+    baselineTotalCents: 900,
+    candidateTotalCents: 810,
     deltaCents: -90,
     savingsCents: 90,
     lineDeltas: [
@@ -92,8 +92,8 @@ test('M3 attribution preserves an explicit unknown remainder instead of inventin
 test('M3 attribution rejects a non-zero planning effect inside a same-demand store comparison', () => {
   const result = attributeSavingsEffects({
     comparison: comparison({
-      baselineTotalCents: 1000,
-      candidateTotalCents: 950,
+      baselineTotalCents: 250,
+      candidateTotalCents: 200,
       deltaCents: -50,
       savingsCents: 50,
       lineDeltas: [
