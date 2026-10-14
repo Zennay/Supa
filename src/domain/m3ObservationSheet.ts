@@ -535,7 +535,7 @@ function nonBlank(value: string) {
 const M3_CANONICAL_OBSERVED_AT =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-](\d{2}):(\d{2}))$/
 
-function validObservedAt(value: string) {
+export function validObservedAt(value: string) {
   if (typeof value !== 'string') return null
   const match = M3_CANONICAL_OBSERVED_AT.exec(value)
   if (!match) return null
