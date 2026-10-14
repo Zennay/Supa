@@ -25,7 +25,7 @@ test('six comparable offline statuses generate deterministic review work without
     change('added', 'added', verified('added'), null),
     change('removed', 'removed', null, verified('removed')),
     change('missing', 'unavailable', absent('missing'), verified('missing')),
-    change('shape', 'shape_changed', verified('shape', H, H), verified('shape')),
+    change('shape', 'shape_changed', verified('shape', B, H), verified('shape')),
     change('content', 'content_changed_shape_stable', verified('content', B), verified('content')),
   ]
   const before = comparison(changes)
@@ -55,7 +55,7 @@ test('new capture without a baseline cannot be interpreted as unchanged', () => 
 })
 
 test('fails closed on impossible status, report flags, missing capture and forged drift count', () => {
-  const valid = comparison([change('one', 'shape_changed', verified('one'), verified('one', H, H))])
+  const valid = comparison([change('one', 'shape_changed', verified('one', B), verified('one', H, H))])
   const bad = [
     { ...valid, productionReady: true },
     { ...valid, m5Eligible: true },

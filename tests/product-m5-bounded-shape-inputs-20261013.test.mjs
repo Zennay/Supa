@@ -22,6 +22,8 @@ test('valid bounded fingerprint remains deterministic and manual-only', () => {
   input.html.jsonLd = Array.from({ length: 128 }, (_, i) =>
     ({ type: i === 0 ? ['Product'] : [], keys: i === 0 ? ['offers', '@type'] : [] }))
   input.html.applicationJsonScripts = Array.from({ length: 128 }, () => ({ id: null, bytes: 0 }))
+  // This changed synthetic HTML must also have a different verified source SHA.
+  input.manifestSha256 = 'b'.repeat(64)
   const frozen = structuredClone(input)
   const report = compare(input, source())
   assert.equal(report.changes[0].status, 'shape_changed')

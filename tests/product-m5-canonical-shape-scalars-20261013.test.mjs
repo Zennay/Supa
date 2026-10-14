@@ -51,6 +51,8 @@ test('no synthetic coercion: missing or malformed next-data scalar is never fals
   const before = fake()
   const after = fake()
   after.html.hasNextData = true
+  // Distinct synthetic content cannot share the prior SHA-256 attestation.
+  after.manifestSha256 = 'b'.repeat(64)
   const result = compare(after, before)
   assert.equal(result.changes[0].status, 'shape_changed')
   assert.equal(buildOfflineSelectorReviewQueue(result).actions[0].priority, 'P1')
@@ -64,6 +66,7 @@ test('JSON-LD parseError is canonical true-or-absent, never string/false', () =>
   }
   const good = fake()
   good.html.jsonLd = [{ type: [], keys: [], parseError: true }]
+  good.manifestSha256 = 'b'.repeat(64)
   assert.equal(captureShape(good).jsonLdParseErrors, 1)
   const absent = fake()
   absent.html.jsonLd = [{ type: [], keys: [] }]
