@@ -1,0 +1,11 @@
+# Supa original raw M5 duplicate-ID preflight RED evidence — 14 October 2026
+
+- Current milestone **M3 ACTIVE**, M1/M2 technically closed. Real human [field issue #78](https://github.com/Zennay/Supa/issues/78) same-demand 11 PLUS and 11 DekaMarkt observations in 24h is OPEN; M4/M5 ineligible.
+- **Frozen original pre-fix product source:** [#2195](https://github.com/Zennay/Supa/pull/2195), exact `f44a77d67c906e72b80fd132044bc599735a3333`. Before [#2198](https://github.com/Zennay/Supa/pull/2198) moved duplicate/canonical source-ID rejection into raw manifest preflight and [#2200](https://github.com/Zennay/Supa/pull/2200) pinned manifest read to an O_NOFOLLOW descriptor.
+- **Unmodified independent QA file:** [fixed-source QA #2203](https://github.com/Zennay/Supa/pull/2203), one original eight-case test file Git blob `58423b85347341e019c81d86c0663164a0f5e19e`; copied byte-for-byte unchanged here, plus this provenance note. No edits to any original product/QA/other worker, main, workflow, VPS or retailer data.
+- Positive scenarios: canonical distinct P2, legitimately same ID across physically independent historical/current P3 should remain green and private-only.
+- Negative scenarios: duplicate available/unavailable, duplicate across stores, duplicate entirely unsuccessful P1, duplicate historical while current successful HTML is deliberately absent, unsafe raw current or historical path IDs must refuse **as structural manifest error before any HTML I/O**. On original source, a late duplicate rejection or incidental ENOENT is insufficient. Test asserts exact comparator error, CLI generic stderr/no partial reviewer JSON, unchanged manifest.
+- This is expected to demonstrate a targeted pre-fix **RED**, and must not be merged or deployed. Cite actual exact-hosted RED count only after CI completion; no invented result. [Issue #2201](https://github.com/Zennay/Supa/issues/2201) concerns a separate raw supermarket/kind origin check owned by product-core.
+- Fictional local SHA-valid HTML only, no real store traffic, prices, human private data, retailer permissions, claimed savings or production.
+
+**DRAFT/HOLD/NO MERGE/NO DEPLOY** until independently verified zCloud SQLite scope/task-write lease, original owner reviews, latest-main/applicable permanent VPS, true human M3 #78 field proof and explicit releasego.
