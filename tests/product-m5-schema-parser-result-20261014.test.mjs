@@ -88,6 +88,8 @@ test('M5 Schema.org provenance: explicit abstain remains valid and manual-only',
 
 test('M5 Schema.org provenance: explicit observation remains a candidate, never approved', () => {
   const input=makeSource({
+    html: { hasNextData:false, jsonLd:[{type:['Product'],keys:['@type','name']}],
+      applicationJsonScripts:[] },
     schemaOrgProduct:{type:'observation',observation:{name:'Fictional'}}
   })
   const out=captureShape(input)

@@ -126,7 +126,7 @@ test('shape hash never contains unknown JSON-LD free text and ignores it for dri
       applicationJsonScripts: [],
       jsonLd: [{ type: ['Product'], keys: ['name', 'offers', unknown] }],
     },
-    schemaOrgProduct: { type: 'observation' },
+    schemaOrgProduct: { type: 'observation', observation: { name: 'Fictional' } },
   })
   assert.equal(captureShape(source('some-private-field')).shapeSha256,
     captureShape(source('another-private-field')).shapeSha256)

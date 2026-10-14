@@ -165,6 +165,28 @@ export function captureShape(source) {
       !['observation', 'abstain'].includes(schemaDecision)) {
     throw new Error('Invalid inspected Schema.org parse result')
   }
+  // Canonical M1 can produce an observation only after actually parsing
+  // JSON-LD and validating an observation record. Pure review must not claim
+  // a candidate when all JSON-LD scripts failed or no record was returned.
+  // Verify provenance of the record, but NEVER inspect/echo prices or names.
+  const observationDescriptor = Object.getOwnPropertyDescriptor(
+    schemaResult, 'observation',
+  )
+  if (schemaDecision === 'observation') {
+    const observation = observationDescriptor?.value
+    if (!observationDescriptor ||
+        !Object.hasOwn(observationDescriptor, 'value') ||
+        !observation || typeof observation !== 'object' ||
+        Array.isArray(observation) ||
+        !source.html.jsonLd.some((record) => record.parseError !== true)) {
+      throw new Error('Invalid inspected Schema.org parse result')
+    }
+  } else if (observationDescriptor &&
+             (!Object.hasOwn(observationDescriptor, 'value') ||
+              observationDescriptor.value !== undefined)) {
+    // M1 abstentions never carry a successful Product observation payload.
+    throw new Error('Invalid inspected Schema.org parse result')
+  }
   const shape = {
     hasNextData: source.html.hasNextData === true,
     applicationJsonScriptCount: source.html.applicationJsonScripts.length,
