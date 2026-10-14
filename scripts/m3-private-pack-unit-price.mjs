@@ -28,13 +28,15 @@ export function privateM3PackUnitPrice(product) {
   const quantity = exactDecimal(product.packAmount)
   if (!quantity) return null
 
-  const conversion = {
+  const unitPrices = {
     g: { baseFactor: 1n, displaySize: 100n, label: '100 g' },
     kg: { baseFactor: 1000n, displaySize: 100n, label: '100 g' },
     ml: { baseFactor: 1n, displaySize: 100n, label: '100 ml' },
     l: { baseFactor: 1000n, displaySize: 100n, label: '100 ml' },
     piece: { baseFactor: 1n, displaySize: 1n, label: 'stuk' },
-  }[product.packUnit]
+  }
+  const conversion = Object.hasOwn(unitPrices, product.packUnit)
+    ? unitPrices[product.packUnit] : null
   if (!conversion) return null
 
   const denominator = quantity.numerator * conversion.baseFactor *
