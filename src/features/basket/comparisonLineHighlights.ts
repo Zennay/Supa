@@ -10,10 +10,9 @@ export type ComparisonLineHighlight = {
 
 // The controlled fixture's breakdown describes WHERE a total differs.
 // It cannot infer pack-size effects, offers, planning effects, or real prices.
-export function comparisonLineHighlights(
-  comparison: BasketComparison,
-  limit = 3,
-): ComparisonLineHighlight[] {
+
+/** A financial headline and its ingredient breakdown share this exact proof. */
+export function hasTrustedComparisonLineEvidence(comparison: BasketComparison): boolean {
   if (!comparison || comparison.claimable !== true ||
       !['better', 'same', 'worse'].includes(comparison.outcome) ||
       !Array.isArray(comparison.reasons) || comparison.reasons.length !== 0 ||
@@ -21,12 +20,12 @@ export function comparisonLineHighlights(
       !Number.isSafeInteger(comparison.baselineTotalCents) || comparison.baselineTotalCents < 0 ||
       !Number.isSafeInteger(comparison.candidateTotalCents) || comparison.candidateTotalCents < 0 ||
       !Number.isSafeInteger(comparison.deltaCents) ||
-      !Number.isSafeInteger(comparison.savingsCents)) return []
+      !Number.isSafeInteger(comparison.savingsCents)) return false
 
   const expected = comparison.candidateTotalCents - comparison.baselineTotalCents
   if (!Number.isSafeInteger(expected) ||
       comparison.deltaCents !== expected || comparison.savingsCents !== -expected ||
-      comparison.outcome !== (expected < 0 ? 'better' : expected > 0 ? 'worse' : 'same')) return []
+      comparison.outcome !== (expected < 0 ? 'better' : expected > 0 ? 'worse' : 'same')) return false
 
   const seen = new Set<string>()
   let sum = 0
@@ -43,17 +42,24 @@ export function comparisonLineHighlights(
         !Number.isSafeInteger(line.baselineLineTotalCents) || line.baselineLineTotalCents < 0 ||
         !Number.isSafeInteger(line.candidateLineTotalCents) || line.candidateLineTotalCents < 0 ||
         !Number.isSafeInteger(line.deltaCents) ||
-        line.deltaCents !== line.candidateLineTotalCents - line.baselineLineTotalCents) return []
+        line.deltaCents !== line.candidateLineTotalCents - line.baselineLineTotalCents) return false
     seen.add(line.id)
     sum += line.deltaCents
     baselineSum += line.baselineLineTotalCents
     candidateSum += line.candidateLineTotalCents
     if (!Number.isSafeInteger(sum) || !Number.isSafeInteger(baselineSum) ||
-        !Number.isSafeInteger(candidateSum)) return []
+        !Number.isSafeInteger(candidateSum)) return false
   }
   if (sum !== comparison.deltaCents || baselineSum !== comparison.baselineTotalCents ||
-      candidateSum !== comparison.candidateTotalCents) return []
+      candidateSum !== comparison.candidateTotalCents) return false
+  return true
+}
 
+export function comparisonLineHighlights(
+  comparison: BasketComparison,
+  limit = 3,
+): ComparisonLineHighlight[] {
+  if (!hasTrustedComparisonLineEvidence(comparison)) return []
   const max = Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 3) : 3
   return comparison.lineDeltas
     .map((line, index) => ({ line, index }))
