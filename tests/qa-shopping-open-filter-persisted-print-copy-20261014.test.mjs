@@ -13,6 +13,7 @@ import {
   shoppingListBasketKey, shoppingListProgressStorageKey,
 } from '../src/features/shopping-list/shoppingListProgress.ts'
 import { buildShoppingListCopyText } from '../src/features/shopping-list/shoppingListCopyText.ts'
+import { shoppingListCompletion } from '../src/features/shopping-list/shoppingListCompletion.ts'
 import { preparePrintableShoppingChecklist } from '../src/features/shopping-list/printableShoppingChecklist.ts'
 
 // Independent quality-validation of the real routed view after product #2592.
@@ -143,6 +144,38 @@ test('independent persisted-check filter keeps full paper/copy truth in the actu
       assert.deepEqual(calls, ['get'])
       assert.ok(html.includes(String(ids.length) + ' van ' + String(ids.length) + ' open'))
       assert.equal(countPhysicalPaperRows(html), ids.length)
+      assert.deepEqual(value, snapshot)
+    })
+
+    await t.test('an explicitly unavailable item stays in the paper review even if every row is checked', () => {
+      const unknown = {
+        id: 'fictional-unavailable-ingredient',
+        ingredientLabel: 'Fictional product not selected',
+        requirement: { amount: null, unit: 'unknown' },
+        status: 'unresolved',
+        reasons: ['manual review needed'],
+        matchScore: null,
+      }
+      const withUnknown = {
+        ...value,
+        lines: [...value.lines, unknown],
+        unresolvedLineCount: value.unresolvedLineCount + 1,
+      }
+      const allIds = withUnknown.lines.map((line) => line.id)
+      const saved = serializeShoppingListProgress(withUnknown, allIds)
+      assert.equal(shoppingListCompletion(withUnknown, allIds).state, 'review-needed')
+      assert.deepEqual(shoppingVisibleLines(withUnknown.lines, allIds, true), [])
+      const paper = preparePrintableShoppingChecklist(withUnknown)
+      assert.equal(paper.lines.length, allIds.length)
+      assert.equal(paper.lines.at(-1).needsReview, true)
+      assert.ok(paper.reviewCount > 0)
+      const { html } = usingStoredProgress(saved, () =>
+        renderToStaticMarkup(createElement(ShoppingListView, { basket: withUnknown })),
+      )
+      assert.equal(countPhysicalPaperRows(html), allIds.length)
+      assert.match(html, /Product nog te kiezen/u)
+      assert.match(html, /productkeuze vraagt controle|productkeuzes vragen controle/u)
+      assert.match(html, /0 van \d+ open/u)
       assert.deepEqual(value, snapshot)
     })
 
