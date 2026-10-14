@@ -156,24 +156,33 @@ export function ObservationView() {
   }, [sheet])
 
   const downloadUnrecognizedDraft = () => {
+    let href: string | null = null
+    let anchor: HTMLAnchorElement | null = null
     try {
       const saved = window.localStorage.getItem(OBSERVATION_DRAFT_STORAGE_KEY)
       if (!saved) throw new Error('no saved bytes')
       // Download only on this user's device. Never put original observations
       // into page text, analytics, URL parameters, or a remote service.
-      const href = URL.createObjectURL(new Blob([saved], {
+      href = URL.createObjectURL(new Blob([saved], {
         type: 'application/octet-stream',
       }))
-      const anchor = document.createElement('a')
+      anchor = document.createElement('a')
       anchor.href = href
       anchor.download = 'supa-m3-lokaal-herstelorigineel.txt'
       document.body.append(anchor)
       anchor.click()
-      anchor.remove()
-      URL.revokeObjectURL(href)
-      setImportStatus({ kind: 'success', message: 'Het oorspronkelijke lokale bestand is op dit apparaat opgeslagen. Controleer het bestand voordat je het oude concept verwijdert.' })
+      setImportStatus({
+        kind: 'success',
+        message: 'Download van het oorspronkelijke lokale bestand gestart. Controleer of het bestand echt is opgeslagen voordat je het oude concept verwijdert.',
+      })
     } catch {
-      setImportStatus({ kind: 'error', message: 'Het lokale concept kon niet worden gelezen voor een reservekopie. Wis niets zolang je dit bestand nog wilt herstellen.' })
+      setImportStatus({
+        kind: 'error',
+        message: 'De reservekopie kon niet worden gedownload. Het bestaande lokale concept is niet verwijderd; probeer opnieuw voordat je dit wist.',
+      })
+    } finally {
+      anchor?.remove()
+      if (href !== null) URL.revokeObjectURL(href)
     }
   }
 
