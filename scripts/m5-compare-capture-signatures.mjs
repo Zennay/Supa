@@ -320,6 +320,15 @@ export function compareInspections(current, baseline = null) {
   // such as false/0/NaN/'' are supplied invalid cohorts, not P2 evidence.
   const baselineSources = baseline === null || baseline === undefined
     ? null : pinnedInspectionCohort(baseline, 'baseline')
+  // A source cohort cannot act as its own historical observation. Pin both
+  // first to reject fake getters generically, then check physical in-memory
+  // identity of the already validated own data arrays without reading them.
+  // Cloned contents still require genuine independent human field evidence.
+  if (baselineSources && (current === baseline ||
+      Object.getOwnPropertyDescriptor(current, 'sources').value ===
+      Object.getOwnPropertyDescriptor(baseline, 'sources').value)) {
+    throw new Error('Invalid or unbounded baseline inspection')
+  }
   const map = (sources) => {
     const result = new Map()
     for (const source of sources) {

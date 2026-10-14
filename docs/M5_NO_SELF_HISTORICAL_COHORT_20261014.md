@@ -1,0 +1,11 @@
+# Future offline M5: no self-alias as historical source cohort
+
+Independent product-core [issue #2341](https://github.com/Zennay/Supa/issues/2341), child of hosted-green [#2340](https://github.com/Zennay/Supa/pull/2340) exact `b5704bc427579c262272c8fceb347164627103de` (1,230/1,230 Node, npm high audit 0, M1 gates/build GREEN).
+
+Pure `compareInspections(current, baseline)` is meant to form a human-only review of distinct current and historical source cohorts. Prior to this change a caller could pass the **identical object** as both arguments, or two separate objects wrapping the **same in-memory sources array**, and obtain a seemingly independent unchanged P3 historical snapshot. The ordinary filesystem review already refuses identical capture directory identities; a separate pure API guard is needed against obvious aliases.
+
+After current/baseline inspection-cohort own-data checks (so no accessor gets invoked), the comparer rejects the same object or same declared own sources array on both sides via the existing generic `Invalid or unbounded baseline inspection` error. Two independently allocated source arrays are accepted even when copied fictional Product content is identical; no P3 is promoted to selector authorization. The rule is a **necessary not sufficient** source-identity check: independent array identities do not prove historic collection, different timestamps, store rights or actual field observations.
+
+New 17 synthetic tests cover identical root or aliased nonempty/empty arrays, malicious getters not executed before alias refusal, normal independent Product P3, P1 failed/removed/drift, P2 absent/null history, malformed falsy baseline, privacy-safe tokens, input immutability and all manual-only false production/rights/M5 flags. No real retailer URLs or HTTP, real prices, participants or live deployment.
+
+Supa **M3 ACTIVE**; genuine human [#78](https://github.com/Zennay/Supa/issues/78) 11 PLUS +11 DekaMarkt same-demand observed items ≤24h in one price context still missing, and M3 collector is already ready for a real field run. M4/M5 INELIGIBLE. This PR remains **DRAFT/HOLD/NO MERGE/NO DEPLOY** pending verified zCloud SQLite task/scope write lease, original product and independent QA reviews, exact hosted/full current-main trusted runner as applicable, genuine field/source rights evidence and explicit human releasego.
