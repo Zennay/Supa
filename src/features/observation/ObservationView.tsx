@@ -1,5 +1,5 @@
 import './ObservationView.css'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   buildObservationSheet,
   nextIncompleteObservationLine,
@@ -119,6 +119,17 @@ export function ObservationView() {
     }
   })
   const [recoveryResetArmed, setRecoveryResetArmed] = useState(false)
+  // The awaited file read must check the latest *committed* observations,
+  // never the sheet captured when the user originally chose the file.
+  const latestSheetRef = useRef(sheet)
+  const sheetRevisionRef = useRef(0)
+  const importRequestRef = useRef(0)
+  useLayoutEffect(() => {
+    if (latestSheetRef.current !== sheet) {
+      latestSheetRef.current = sheet
+      sheetRevisionRef.current += 1
+    }
+  }, [sheet])
   // The user's next field task is derived from the current draft; readiness remains authoritative.
   const nextAction = useMemo(() => observationNextAction(sheet), [sheet])
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
@@ -434,6 +445,8 @@ export function ObservationView() {
 
   const importDraft = async (file: File | undefined) => {
     if (!file) return
+    const requestId = ++importRequestRef.current
+    const revisionAtStart = sheetRevisionRef.current
 
     if (!observationDraftFileSizeAllowed(file.size)) {
       setPendingImport(null)
@@ -446,6 +459,9 @@ export function ObservationView() {
 
     try {
       const restored = restoreObservationSheetDraft(await file.text())
+      // When two local reads finish out of order, only the newest selection
+      // may request replacement. An older file cannot undo newer field work.
+      if (requestId !== importRequestRef.current) return
       if (!restored) {
         setPendingImport(null)
         setImportStatus({
@@ -456,7 +472,10 @@ export function ObservationView() {
         return
       }
 
-      if (observationSheetHasUserInput(sheet)) {
+      if (
+        sheetRevisionRef.current !== revisionAtStart ||
+        observationSheetHasUserInput(latestSheetRef.current)
+      ) {
         setPendingImport(restored)
         setImportStatus({
           kind: 'warning',
@@ -468,6 +487,7 @@ export function ObservationView() {
 
       applyImportedDraft(restored)
     } catch {
+      if (requestId !== importRequestRef.current) return
       setPendingImport(null)
       setImportStatus({
         kind: 'error',
