@@ -76,3 +76,13 @@ test('M3 observed-week workflow retains focused evidence tests before the full s
   assert.ok(fullSuiteIndex > focusedIndex)
   assert.ok(buildIndex > fullSuiteIndex)
 })
+
+// This workflow runs on a persistent self-hosted VPS. A PR from a fork
+// must not be able to execute its checkout-controlled code on that host.
+test('M3 permanent VPS gate excludes untrusted fork pull-request heads', async () => {
+  const workflow = await readFile(workflowPath, 'utf8')
+  assert.match(workflow, /^\s*runs-on:\s*self-hosted\s*$/m)
+  assert.match(workflow, /github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository/)
+  assert.match(workflow, /if:\s*github\.event_name\s*==\s*'workflow_dispatch'\s*\|\|\s*\(github\.event_name\s*==\s*'pull_request'[^\n]*github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository\)/)
+  assert.match(workflow, /uses:\s*actions\/checkout@v4\s*\n\s*with:\s*\n\s*persist-credentials:\s*false/)
+})
