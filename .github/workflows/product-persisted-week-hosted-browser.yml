@@ -1,0 +1,92 @@
+name: Product saved-week hosted Firefox
+
+on:
+  pull_request:
+    paths:
+      - "tests/product-persisted-week-browser-e2e.mjs"
+      - "tests/product-persisted-week-react-render.test.mjs"
+      - "tests/product-persisted-week-basket-consistency.test.mjs"
+      - ".github/workflows/product-persisted-week-hosted-browser.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: supa-week-hosted-firefox-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hosted-firefox-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify GitHub-hosted browser dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v firefox
+          command -v geckodriver
+          firefox --version
+          geckodriver --version
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Run actual saved-week UI lifecycle on isolated localhost
+        shell: bash
+        env:
+          PRODUCT_WEEK_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/product-week-hosted
+          choose_port() {
+            node -e "const s=require('node:net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"
+          }
+          preview_port="$(choose_port)"
+          driver_port="$(choose_port)"
+          test "$preview_port" != "$driver_port"
+
+          npm run preview -- --host 127.0.0.1 --port "$preview_port" --strictPort >artifacts/product-week-hosted/vite.log 2>&1 &
+          preview_pid="$!"
+          geckodriver --host 127.0.0.1 --port "$driver_port" >artifacts/product-week-hosted/geckodriver.log 2>&1 &
+          driver_pid="$!"
+
+          cleanup() {
+            kill "$preview_pid" "$driver_pid" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 80); do
+            curl -fsS "http://127.0.0.1:$preview_port" >/dev/null 2>&1 && break
+            sleep 0.25
+          done
+          curl -fsS "http://127.0.0.1:$preview_port" >/dev/null
+
+          for _ in $(seq 1 80); do
+            curl -fsS "http://127.0.0.1:$driver_port/status" >/dev/null 2>&1 && break
+            sleep 0.25
+          done
+          curl -fsS "http://127.0.0.1:$driver_port/status" >/dev/null
+
+          PRODUCT_WEEK_BASE_URL="http://127.0.0.1:$preview_port" \
+          PRODUCT_WEEK_WEBDRIVER_URL="http://127.0.0.1:$driver_port" \
+          PRODUCT_WEEK_ARTIFACT_DIR="artifacts/product-week-hosted" \
+          node tests/product-persisted-week-browser-e2e.mjs
+
+      - name: Save synthetic-only Firefox outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: supa-saved-week-hosted-firefox
+          path: artifacts/product-week-hosted/
+          if-no-files-found: warn
+          retention-days: 7

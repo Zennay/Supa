@@ -1,0 +1,97 @@
+name: Product persisted-week Firefox proof
+
+on:
+  pull_request:
+    paths:
+      - "tests/product-persisted-week-browser-e2e.mjs"
+      - "tests/product-persisted-week-react-render.test.mjs"
+      - "tests/product-persisted-week-basket-consistency.test.mjs"
+      - ".github/workflows/product-persisted-week-vps.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supa-persisted-week-vps-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rendered-persisted-week:
+    # Do not schedule untrusted fork code on a permanent self-hosted runner.
+    # Same-repository pull requests and trusted manual dispatch remain eligible.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Verify permanent isolated browser runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "vps-bb300bba"
+          test -x /usr/bin/firefox
+          command -v geckodriver
+          firefox --version
+          geckodriver --version
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Test persisted planner -> basket -> checked list in real Firefox
+        shell: bash
+        env:
+          PRODUCT_WEEK_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/product-week-browser
+          choose_port() {
+            node -e "const s=require('node:net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"
+          }
+          preview_port="$(choose_port)"
+          driver_port="$(choose_port)"
+          test "$preview_port" != "$driver_port"
+
+          npm run preview -- --host 127.0.0.1 --port "$preview_port" --strictPort >artifacts/product-week-browser/preview.log 2>&1 &
+          preview_pid="$!"
+          geckodriver --host 127.0.0.1 --port "$driver_port" >artifacts/product-week-browser/webdriver.log 2>&1 &
+          driver_pid="$!"
+
+          cleanup() {
+            kill "$preview_pid" "$driver_pid" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 80); do
+            if curl -fsS "http://127.0.0.1:$preview_port" >/dev/null 2>&1; then break; fi
+            sleep 0.25
+          done
+          curl -fsS "http://127.0.0.1:$preview_port" >/dev/null
+
+          for _ in $(seq 1 80); do
+            if curl -fsS "http://127.0.0.1:$driver_port/status" >/dev/null 2>&1; then break; fi
+            sleep 0.25
+          done
+          curl -fsS "http://127.0.0.1:$driver_port/status" >/dev/null
+
+          PRODUCT_WEEK_BASE_URL="http://127.0.0.1:$preview_port" \
+          PRODUCT_WEEK_WEBDRIVER_URL="http://127.0.0.1:$driver_port" \
+          PRODUCT_WEEK_ARTIFACT_DIR="artifacts/product-week-browser" \
+          node tests/product-persisted-week-browser-e2e.mjs
+
+      - name: Preserve isolated synthetic browser results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: supa-product-persisted-week-browser
+          path: artifacts/product-week-browser/
+          if-no-files-found: warn
+          retention-days: 14
