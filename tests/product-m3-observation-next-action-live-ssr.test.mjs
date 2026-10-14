@@ -12,7 +12,7 @@ import * as observationPresentation from '../src/features/observation/observatio
 import * as numericInput from '../src/features/observation/observationNumericInput.ts'
 import * as draftPersistence from '../src/features/observation/observationDraftPersistence.ts'
 import * as draftImport from '../src/features/observation/observationDraftImport.ts'
-import { observationNextAction } from '../src/features/observation/observationNextStep.ts'
+import { observationNextAction, observationNextTaskSelector } from '../src/features/observation/observationNextStep.ts'
 import * as observationReadinessCopy from '../src/features/observation/observationReadinessCopy.ts'
 
 const require = createRequire(import.meta.url)
@@ -76,7 +76,7 @@ function renderView(sheet) {
     './observationNumericInput.ts': numericInput,
     './observationDraftPersistence.ts': draftPersistence,
     './observationDraftImport.ts': draftImport,
-    './observationNextStep.ts': { observationNextAction },
+    './observationNextStep.ts': { observationNextAction, observationNextTaskSelector },
     './observationReadinessCopy.ts': observationReadinessCopy,
     './ObservationNextActionCard.tsx': { ObservationNextActionCard: card },
   }
@@ -127,7 +127,9 @@ test('the actual ObservationView renders one task-first accessible guide on a fr
   assert.doesNotMatch(html, />Preflight<|>Study ID<|>Pseudonieme participant key</)
   assert.doesNotMatch(html, />Klaar voor de M3-converter</)
 
-  assert.match(html, /class="ghost-button observation-next-button"[^>]*disabled=""/, 'study setup cannot jump past metadata')
+  assert.doesNotMatch(html, /class="ghost-button observation-next-button"[^>]*disabled/)
+  assert.match(html, /Ga naar: Geef deze meting een code/)
+  assert.match(html, /data-observation-study-field="studyId"/)
   assert.match(html, /Nog .* controle/)
   assert.deepEqual(sheet, before, 'render never mutates input evidence')
 })
@@ -179,7 +181,10 @@ test('real M3 line-jump control appears only for current canonical ingredient ta
 
   const notReady = observationSheetDomain.buildObservationSheet()
   assert.equal(observationNextAction(notReady).stage, 'study')
-  assert.match(renderView(notReady), /class="ghost-button observation-next-button"[^>]*disabled=""/)
+  const setupHtml = renderView(notReady)
+  assert.doesNotMatch(setupHtml, /class="ghost-button observation-next-button"[^>]*disabled/)
+  assert.match(setupHtml, /Ga naar: Geef deze meting een code/)
+  assert.match(setupHtml, /data-observation-study-field="studyId"/)
 
   const complete = populatedSheet()
   assert.equal(observationNextAction(complete).stage, 'export')

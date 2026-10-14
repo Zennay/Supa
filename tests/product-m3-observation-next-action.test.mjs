@@ -44,6 +44,7 @@ test('M3 task guidance starts with personal-data-safe study setup, not raw valid
   const first = observationNextAction(sheet)
   assert.deepEqual(first, {
     stage: 'study',
+    field: 'studyId',
     title: 'Geef deze meting een code',
     detail: 'Kies een herkenbare code voor deze winkelvergelijking.',
   })
@@ -62,6 +63,7 @@ test('M3 guidance walks through exact PLUS then DekaMarkt collection tasks', () 
   assert.deepEqual(observationNextAction(sheet), {
     stage: 'store',
     side: 'baseline',
+    field: 'name',
     title: 'Controleer de winkelnaam van PLUS',
     detail:
       'Vul de echte PLUS-vestiging in. Een andere supermarkt hoort niet bij deze vergelijking.',
@@ -122,6 +124,7 @@ test('M3 invalid recorded time points to the actual field instead of encouraging
   assert.deepEqual(observationNextAction(sheet), {
     stage: 'store',
     side: 'baseline',
+    field: 'observedAt',
     title: 'Controleer de datum en tijd van PLUS',
     detail:
       'Gebruik het echte meetmoment. Vul geen geschatte tijd in; beide winkels moeten binnen 24 uur worden gemeten.',

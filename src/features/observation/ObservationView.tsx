@@ -33,7 +33,7 @@ import {
   removeObservationDraft,
 } from './observationDraftPersistence.ts'
 import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
-import { observationNextAction } from './observationNextStep.ts'
+import { observationNextAction, observationNextTaskSelector } from './observationNextStep.ts'
 import { readableObservationIssue } from './observationReadinessCopy.ts'
 import { ObservationNextActionCard } from './ObservationNextActionCard.tsx'
 
@@ -113,6 +113,7 @@ export function ObservationView() {
     () => nextIncompleteObservationLine(sheet),
     [sheet],
   )
+  const nextTaskSelector = observationNextTaskSelector(nextAction)
   const canJumpToNextLine =
     nextAction.stage === 'line' && nextIncomplete !== null &&
     nextIncomplete.side === nextAction.side &&
@@ -163,6 +164,14 @@ export function ObservationView() {
   }
 
   const jumpToNextIncomplete = () => {
+    // The selector is generated from literal whitelists, never a user-supplied ID.
+    if (nextTaskSelector !== null) {
+      const input = document.querySelector<HTMLInputElement | HTMLSelectElement>(nextTaskSelector)
+      if (!input) return
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      input.focus({ preventScroll: true })
+      return
+    }
     // A line jump never skips required study/store metadata or guesses the task.
     if (!canJumpToNextLine || !nextIncomplete) return
 
@@ -361,9 +370,11 @@ export function ObservationView() {
           className="ghost-button observation-next-button"
           type="button"
           onClick={jumpToNextIncomplete}
-          disabled={!canJumpToNextLine}
+          disabled={nextTaskSelector === null && !canJumpToNextLine}
         >
-          {nextObservationActionLabel(sheet, nextIncomplete)}
+          {nextAction.stage === 'line'
+            ? nextObservationActionLabel(sheet, nextIncomplete)
+            : nextTaskSelector !== null ? `Ga naar: ${nextAction.title}` : 'Geen volgende invoerstap'}
         </button>
         {windowSummary.state === 'single-observation' && (
           <p>
@@ -430,6 +441,7 @@ export function ObservationView() {
           <label>
             Metingcode
             <input
+              data-observation-study-field="studyId"
               value={sheet.study.studyId}
               onChange={(event) => updateStudy('studyId', event.target.value)}
               placeholder="weekmeting-001"
@@ -438,6 +450,7 @@ export function ObservationView() {
           <label>
             Anonieme deelnemerscode
             <input
+              data-observation-study-field="participantKey"
               value={sheet.study.participantKey}
               onChange={(event) =>
                 updateStudy('participantKey', event.target.value)
@@ -449,6 +462,7 @@ export function ObservationView() {
           <label>
             Populatie
             <input
+              data-observation-study-field="population"
               value={sheet.study.population}
               onChange={(event) => updateStudy('population', event.target.value)}
               placeholder="uitwonende student"
@@ -457,6 +471,7 @@ export function ObservationView() {
           <label>
             Regio
             <input
+              data-observation-study-field="region"
               value={sheet.study.region}
               onChange={(event) => updateStudy('region', event.target.value)}
               placeholder="Leiden"
@@ -465,6 +480,7 @@ export function ObservationView() {
           <label>
             Prijscontext
             <select
+              data-observation-study-field="priceContext"
               value={sheet.study.priceContext}
               onChange={(event) =>
                 updatePriceContext(
@@ -481,6 +497,7 @@ export function ObservationView() {
             Week start
             <input
               type="date"
+              data-observation-study-field="weekStart"
               value={sheet.study.weekStart}
               onChange={(event) => updateStudy('weekStart', event.target.value)}
             />
@@ -517,6 +534,7 @@ export function ObservationView() {
               <label>
                 Winkelnaam
                 <input
+                  data-observation-store-field="name"
                   value={observation.store.name}
                   onChange={(event) =>
                     updateStore(side, 'name', event.target.value)
@@ -527,6 +545,7 @@ export function ObservationView() {
               <label>
                 Winkel-ID
                 <input
+                  data-observation-store-field="id"
                   value={observation.store.id}
                   onChange={(event) =>
                     updateStore(side, 'id', event.target.value)
@@ -537,6 +556,7 @@ export function ObservationView() {
               <label>
                 Evidence ID
                 <input
+                  data-observation-store-field="evidenceId"
                   value={observation.evidenceId}
                   onChange={(event) =>
                     updateObservation(side, { evidenceId: event.target.value })
@@ -549,6 +569,7 @@ export function ObservationView() {
                   Geobserveerd op
                   <input
                     type="datetime-local"
+                    data-observation-store-field="observedAt"
                     value={toLocalDateTimeValue(observation.observedAt)}
                     onChange={(event) =>
                       updateObservation(side, {
@@ -590,6 +611,7 @@ export function ObservationView() {
               <label className="field-wide">
                 Provenance-notitie
                 <input
+                  data-observation-store-field="provenanceNote"
                   value={observation.provenanceNote}
                   onChange={(event) =>
                     updateObservation(side, {
