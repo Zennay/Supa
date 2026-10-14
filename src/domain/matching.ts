@@ -44,8 +44,12 @@ const STOP_TOKENS = new Set([
 ])
 
 // Dietary qualifiers change the actual product, not merely its brand.
-const VEGAN_QUALIFIERS = new Set(['vegan', 'veganistisch', 'plantaardig'])
-const VEGETARIAN_QUALIFIERS = new Set(['vegetarisch', 'vegetarische', 'veggie'])
+const VEGAN_QUALIFIERS = new Set([
+  'vegan', 'veganistisch', 'veganistische', 'plantaardig', 'plantaardige',
+])
+const VEGETARIAN_QUALIFIERS = new Set([
+  'vegetarisch', 'vegetarische', 'vegetarian', 'veggie',
+])
 function dietaryQualifier(value: string): 'vegan' | 'vegetarian' | 'unmarked' {
   const tokens = textTokens(value)
   if (tokens.some((token) => VEGAN_QUALIFIERS.has(token))) return 'vegan'
