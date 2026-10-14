@@ -98,7 +98,8 @@ test('sixteen variable 11+11 private M3 baskets agree with an independent exact-
       assert.equal(report.baselineTotalCents, totals.baseline)
       assert.equal(report.candidateTotalCents, totals.candidate)
       assert.equal(report.savingsCents, signedDifference)
-      assert.equal(report.deltaCents, -signedDifference)
+      assert.equal(report.deltaCents, signedDifference === 0 ? 0 : -signedDifference,
+        'equal baskets have canonical +0 delta, not -0')
       assert.equal(report.outcome, outcome)
       assert.equal(report.claimable, true)
       assert.equal(report.publicSavingsClaimEligible, false)
