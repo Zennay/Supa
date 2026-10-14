@@ -15,8 +15,10 @@ export function observationEditablePriceText(priceCents: number | null): string 
 export function ObservationPriceInput({
   priceCents,
   onPriceChange,
+  label,
 }: {
   priceCents: number | null
+  label: string
   onPriceChange: (value: number | null) => void
 }) {
   // Keep an in-progress entry visible while its canonical cent value changes.
@@ -34,6 +36,7 @@ export function ObservationPriceInput({
     <>
       <input
         type="text"
+        aria-label={label}
         inputMode="decimal"
         autoComplete="off"
         value={currentText}
