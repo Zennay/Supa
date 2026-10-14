@@ -18,6 +18,16 @@ export function observationFinalPriceCents(text: unknown): number | null {
   return observationPriceCents(text)
 }
 
+/** Invalid edits must not erase a previously observed price; blank is an explicit clear. */
+export function observationPriceEditDecision(
+  text: unknown,
+): { kind: 'accept'; value: number | null } | { kind: 'reject' } {
+  if (typeof text !== 'string') return { kind: 'reject' }
+  if (!text.trim()) return { kind: 'accept', value: null }
+  const parsed = observationFinalPriceCents(text)
+  return parsed === null ? { kind: 'reject' } : { kind: 'accept', value: parsed }
+}
+
 export function ObservationPriceInput({
   priceCents,
   onPriceChange,
@@ -32,11 +42,13 @@ export function ObservationPriceInput({
   // observed store price through localStorage autosave.
   const hintId = useId()
   const [editingText, setEditingText] = useState<string | null>(null)
+  const [rejected, setRejected] = useState(false)
   const currentText = editingText ?? observationEditablePriceText(priceCents)
-  const invalidEntry =
+  const invalidEntry = rejected || (
     editingText !== null &&
     editingText.trim() !== '' &&
     observationFinalPriceCents(editingText) === null
+  )
 
   return (
     <>
@@ -48,18 +60,28 @@ export function ObservationPriceInput({
         value={currentText}
         aria-invalid={invalidEntry}
         aria-describedby={invalidEntry ? hintId : undefined}
-        onFocus={() => setEditingText(observationEditablePriceText(priceCents))}
+        onFocus={() => {
+          setEditingText(observationEditablePriceText(priceCents))
+          setRejected(false)
+        }}
         onChange={(event) => {
           setEditingText(event.target.value)
+          setRejected(false)
         }}
         onBlur={(event) => {
-          onPriceChange(observationFinalPriceCents(event.currentTarget.value))
+          const decision = observationPriceEditDecision(event.currentTarget.value)
+          if (decision.kind === 'accept') {
+            if (decision.value !== priceCents) onPriceChange(decision.value)
+            setRejected(false)
+          } else {
+            setRejected(true)
+          }
           setEditingText(null)
         }}
       />
       {invalidEntry && (
         <small id={hintId} role="status">
-          Gebruik een bedrag in euro's met maximaal twee decimalen, bijvoorbeeld 2,49.
+          Gebruik een bedrag in euro's met maximaal twee decimalen, bijvoorbeeld 2,49. Ongeldige invoer is niet opgeslagen; een eerder gemeten prijs blijft behouden.
         </small>
       )}
     </>
