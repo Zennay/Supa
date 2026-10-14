@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { writeDerivedM3Output } from './m3-source-output-preservation.mjs'
 
@@ -329,6 +330,7 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(report, null, 2)}\n`
 
   if (output) {
+    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
     await writeDerivedM3Output(input, output, serialized)
   } else {
     process.stdout.write(serialized)
