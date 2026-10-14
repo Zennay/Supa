@@ -23,7 +23,7 @@ export function observationEditablePackAmount(amount: number | null): string {
   // JavaScript stringifies tiny finite decimals using exponents. Expand them
   // without rounding, otherwise focusing and blurring an existing observation
   // would inadvertently turn its value into null.
-  const tiny = /^(\\d)(?:\\.(\\d+))?e-(\\d+)$/.exec(text)
+  const tiny = /^(\d)(?:\.(\d+))?e-(\d+)$/.exec(text)
   if (tiny) {
     const digits = tiny[1] + (tiny[2] ?? '')
     return `0,${'0'.repeat(Number(tiny[3]) - 1)}${digits}`
