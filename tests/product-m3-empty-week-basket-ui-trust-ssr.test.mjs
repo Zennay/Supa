@@ -55,6 +55,13 @@ test('routed M3 Mand refuses optimistic same-price claim when no groceries are p
       ...optimistic,
       baselineTotalCents: matched.totalCents,
       candidateTotalCents: matched.totalCents,
+      lineDeltas: matched.lines.map((line) => ({
+        id: line.id,
+        ingredientLabel: line.ingredientLabel,
+        baselineLineTotalCents: line.lineTotalCents,
+        candidateLineTotalCents: line.lineTotalCents,
+        deltaCents: 0,
+      })),
     }
     const complete = render(matched, matched, matched, reconciled)
     assert.match(complete, /data-comparison-outcome="same"/)
