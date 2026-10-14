@@ -47,7 +47,7 @@ test('synthetic past M3 study remains convertible and comparable', () => {
   const study = buildWeeklyBasketStudyFromObservationSheet(syntheticSheet())
   assert.equal(study.baseline.basket.matchedLineCount, 11)
   assert.equal(study.candidate.basket.matchedLineCount, 11)
-  assert.equal(assessWeeklyBasketStudy(study).comparison.outcome, 'better')
+  assert.equal(assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() }).comparison.outcome, 'better')
 })
 
 test('canonical JSON converter rejects future captures for each retailer independently', () => {
@@ -76,7 +76,7 @@ test('direct financial assessment refuses a single future capture even with vali
   for (const side of ['baseline', 'candidate']) {
     const study = buildWeeklyBasketStudyFromObservationSheet(syntheticSheet())
     study[side].observedAt = '2099-10-10T12:00:00Z'
-    const result = assessWeeklyBasketStudy(study)
+    const result = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
     assert.equal(result.claimable, false, side)
     assert.equal(result.comparison.claimable, false, side)
     assert.equal(result.comparison.outcome, 'unknown', side)
@@ -88,7 +88,7 @@ test('direct financial assessment refuses a wholly future but 1-hour-apart pair'
   const study = buildWeeklyBasketStudyFromObservationSheet(syntheticSheet())
   study.baseline.observedAt = '2099-10-10T12:00:00Z'
   study.candidate.observedAt = '2099-10-10T08:00:00-05:00'
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
