@@ -36,6 +36,10 @@ import { ObservationNextActionCard } from './ObservationNextActionCard.tsx'
 import { ObservationPriceInput } from './ObservationPriceInput.tsx'
 import { ObservationPackAmountInput } from './ObservationPackAmountInput.tsx'
 import { ObservationPackCountInput } from './ObservationPackCountInput.tsx'
+import {
+  observationNextRequiredProductField,
+  observationRequiredFieldLabels,
+} from './observationRequiredLineField.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -201,7 +205,22 @@ export function ObservationView() {
 
     line.open = true
     line.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    line.querySelector<HTMLSelectElement>('select')?.focus({ preventScroll: true })
+    const currentLine = sheet[nextIncomplete.side].lines.find(
+      (candidate) => candidate.ingredientId === nextIncomplete.ingredientId,
+    )
+    const missingField = currentLine
+      ? observationNextRequiredProductField(currentLine)
+      : null
+    // A missing target remains fail-closed and only focuses availability.
+    // These selector values come from a closed product-field union, never IDs.
+    const target = missingField
+      ? line.querySelector<HTMLInputElement | HTMLSelectElement>(
+          `[data-observation-product-field="${missingField}"] input, [data-observation-product-field="${missingField}"] select`,
+        )
+      : null
+    ;(target ?? line.querySelector<HTMLSelectElement>('select'))?.focus({
+      preventScroll: true,
+    })
   }
 
   const updateStudy = (
@@ -674,7 +693,16 @@ export function ObservationView() {
                     </summary>
 
                     <div className="line-fields">
-                      <label>
+                      {product.available === true &&
+                        !observationLineCollectionComplete(line) &&
+                        observationNextRequiredProductField(line) !== null && (
+                          <p className="observation-field-hint field-wide" role="status">
+                            Nog invullen: {observationRequiredFieldLabels[
+                              observationNextRequiredProductField(line)!
+                            ]}.
+                          </p>
+                        )}
+                      <label data-observation-product-field="available">
                         Beschikbaar?
                         <select
                           aria-label={`${side} ${line.ingredientLabel} beschikbaar`}
@@ -712,7 +740,7 @@ export function ObservationView() {
 
                       {product.available === true && (
                         <>
-                          <label className="field-wide">
+                          <label className="field-wide" data-observation-product-field="productName">
                             Productnaam
                             <input
                               value={product.productName}
@@ -735,7 +763,7 @@ export function ObservationView() {
                               }
                             />
                           </label>
-                          <label>
+                          <label data-observation-product-field="packAmount">
                             Verpakkingshoeveelheid
                             <ObservationPackAmountInput
                               key={`${side}:${line.ingredientId}`}
@@ -746,7 +774,7 @@ export function ObservationView() {
                               }
                             />
                           </label>
-                          <label>
+                          <label data-observation-product-field="packUnit">
                             Eenheid
                             <select
                               value={product.packUnit ?? ''}
@@ -762,7 +790,7 @@ export function ObservationView() {
                               <ObservationPackUnitOptions />
                             </select>
                           </label>
-                          <label>
+                          <label data-observation-product-field="packCount">
                             Aantal per verpakking
                             <ObservationPackCountInput
                               key={`${side}:${line.ingredientId}`}
@@ -773,7 +801,7 @@ export function ObservationView() {
                               }
                             />
                           </label>
-                          <label>
+                          <label data-observation-product-field="priceCents">
                             Prijs per verpakking (€)
                             <ObservationPriceInput
                               label={`${side === 'baseline' ? 'PLUS' : 'DekaMarkt'} · ${line.ingredientLabel} · prijs per verpakking`}
