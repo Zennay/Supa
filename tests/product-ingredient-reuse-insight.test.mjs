@@ -146,7 +146,7 @@ test('rejects empty, incomplete, ambiguous, inconsistent and invalid quantity pl
     {
       ...input(),
       recipes: m2Recipes.map((recipe) => recipe.id === 'teriyaki'
-        ? { ...recipe, ingredients: [{ ...recipe.ingredients[0], unit: 'kg' }] }
+        ? { ...recipe, ingredients: [{ ...recipe.ingredients[0], unit: 'ml' }] }
         : recipe),
     },
     { ...input(), activeDays: null },
@@ -156,4 +156,22 @@ test('rejects empty, incomplete, ambiguous, inconsistent and invalid quantity pl
   for (const scenario of scenarios) {
     assert.equal(buildIngredientReuseInsight(scenario), null)
   }
+})
+
+
+test('physically compatible g/kg recipe reuse stays visible without inventing monetary savings', () => {
+  const recipes = m2Recipes.map((recipe) =>
+    recipe.id === 'teriyaki'
+      ? { ...recipe, ingredients: recipe.ingredients.map((ingredient) =>
+          ingredient.id === 'basmati-rice'
+            ? { ...ingredient, unit: 'kg', amount: ingredient.amount / 1000 }
+            : ingredient,
+        ) }
+      : recipe,
+  )
+  const result = buildIngredientReuseInsight({ ...input(), recipes })
+  assert.ok(result)
+  assert.equal(result.reusedIngredients[0].ingredientId, 'basmati-rice')
+  assert.deepEqual(result.reusedIngredients[0].days, ['Ma', 'Di', 'Do'])
+  assert.equal(Object.hasOwn(result.reusedIngredients[0], 'savingsCents'), false)
 })
