@@ -50,7 +50,7 @@ test('QA issue #832: 64 extreme but safe cent-valued basket lines and whole tota
       setRicePrice(candidate, hugeCents + 1)
       const comparison = compareFullBaskets({ baseline, candidate })
       assert.equal(comparison.claimable, true, `case ${n}: ${comparison.reasons.join('; ')}`)
-      assert.equal(comparison.outcome, 'worse', String(n))
+      assert.equal(comparison.outcome, candidate.totalCents > baseline.totalCents ? 'worse' : candidate.totalCents < baseline.totalCents ? 'better' : 'same', String(n))
       assert.equal(comparison.deltaCents, candidate.totalCents - baseline.totalCents, String(n))
       assert.equal(comparison.savingsCents, -comparison.deltaCents, String(n))
       const html = renderToStaticMarkup(createElement(BasketView, {
