@@ -249,3 +249,105 @@ test('comparison CLI accepts independent identical valid copies without release 
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('renamed retained banner is separately flagged for human market-identity review', () => {
+  const current = copy()
+  const previous = copy()
+  const row = current.sources.find((entry) => entry.id === 'plus')
+  row.name = 'PLUS market listing revision'
+  const comparison = compareCoreRetailerInventories(current, previous)
+  assert.deepEqual(comparison.addedCandidateIds, [])
+  assert.deepEqual(comparison.removedCandidateIds, [])
+  assert.deepEqual(comparison.changedCandidateIds, ['plus'])
+  assert.equal(comparison.changed, true)
+  assert.equal(comparison.humanReviewRequired, true)
+  assert.equal(comparison.rightsVerified, false)
+  assert.doesNotMatch(JSON.stringify(comparison), /market listing revision/)
+})
+
+test('an altered approved market-list citation does not pass as unchanged evidence', () => {
+  const current = copy()
+  const previous = copy()
+  current.sources.find((row) => row.id === 'boni').researchUrl =
+    'https://www.consumentenbond.nl/voedingstests/prijspeiling-supermarkten'
+  const comparison = compareCoreRetailerInventories(current, previous)
+  assert.deepEqual(comparison.changedCandidateIds, ['boni'])
+  assert.equal(comparison.screeningDateChanged, false)
+  assert.equal(comparison.historicalEvidenceVerified, false)
+})
+
+test('global screening-date edits require human review without proving an observation', () => {
+  const current = copy()
+  const previous = copy()
+  current.screenedAt = '2026-10-12'
+  const comparison = compareCoreRetailerInventories(current, previous)
+  assert.deepEqual(comparison.changedCandidateIds, [])
+  assert.equal(comparison.screeningDateChanged, true)
+  assert.equal(comparison.changed, true)
+  assert.equal(comparison.humanReviewRequired, true)
+  assert.equal(comparison.historicalEvidenceVerified, false)
+  assert.equal(comparison.m5Eligible, false)
+})
+
+test('unchanged source content but reordered canonical candidates is not false drift', () => {
+  const current = copy()
+  current.sources.reverse()
+  const comparison = compareCoreRetailerInventories(current, copy())
+  assert.deepEqual(comparison.changedCandidateIds, [])
+  assert.equal(comparison.screeningDateChanged, false)
+  assert.equal(comparison.changed, false)
+})
+
+test('source name accessor is rejected by existing owner schema before diff', () => {
+  const current = copy()
+  const previous = copy()
+  let calls = 0
+  Object.defineProperty(current.sources[0], 'name', {
+    enumerable: true,
+    get() { calls++; throw Error('PRIVATE-IDENTITY-LEAK') },
+  })
+  assert.throws(() => compareCoreRetailerInventories(current, previous),
+    /schema fields/)
+  assert.equal(calls, 0)
+})
+
+test('name-only change exits 2 from actual CLI with opaque private identity', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m5-name-change-'))
+  try {
+    const previous = join(dir, 'past.json')
+    const current = join(dir, 'now.json')
+    const changed = copy()
+    changed.sources.find((row) => row.id === 'plus').name = 'PRIVATE-CHANGED-IDENTITY'
+    await writeFile(previous, JSON.stringify(copy()), { mode: 0o600 })
+    await writeFile(current, JSON.stringify(changed), { mode: 0o600 })
+    const run = call([current, '--baseline', previous])
+    assert.equal(run.status, 2, run.stderr)
+    const result = JSON.parse(run.stdout)
+    assert.deepEqual(result.changedCandidateIds, ['plus'])
+    assert.equal(result.coreCovered, true)
+    assert.equal(result.rightsVerified, false)
+    assert.doesNotMatch(run.stdout, /PRIVATE-CHANGED-IDENTITY/)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('screening-date-only change exits 2 from CLI without creating source grant', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m5-date-change-'))
+  try {
+    const previous = join(dir, 'previous.json')
+    const current = join(dir, 'current.json')
+    const changed = copy()
+    changed.screenedAt = '2026-10-12'
+    await writeFile(previous, JSON.stringify(copy()), { mode: 0o600 })
+    await writeFile(current, JSON.stringify(changed), { mode: 0o600 })
+    const run = call([current, '--baseline', previous])
+    assert.equal(run.status, 2, run.stderr)
+    const result = JSON.parse(run.stdout)
+    assert.equal(result.screeningDateChanged, true)
+    assert.equal(result.m5Eligible, false)
+    assert.equal(result.productionReady, false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
