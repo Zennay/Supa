@@ -1,6 +1,7 @@
 import type { OneStoreBasket } from '../../domain/basket'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
+import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import {
   basketCostDisclosure,
   basketLineExplanation,
@@ -11,7 +12,7 @@ import {
 import { StatPill } from '../../components/StatPill'
 
 function quantity(amount: number | null, unit: string) {
-  return amount === null ? `? ${unit}` : `${amount} ${unit}`
+  return `${amount ?? '?'} ${quantityUnitLabelNl(unit, amount)}`
 }
 
 function comparisonTitle(
