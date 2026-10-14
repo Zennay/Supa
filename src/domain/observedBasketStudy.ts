@@ -55,7 +55,9 @@ function isPathSafeKey(value: unknown) {
 }
 
 function hasNonEmptyText(value: unknown) {
-  return typeof value === 'string' && value.trim().length > 0
+  // Required context must contain a visible Unicode base character; invisible
+  // formats/marks/fillers alone cannot authorize an observed savings outcome.
+  return typeof value === 'string' && /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
 }
 
 function validCalendarDate(value: unknown) {
