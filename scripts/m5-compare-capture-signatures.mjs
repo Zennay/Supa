@@ -7,6 +7,8 @@ import { inspectCaptureDirectory } from './m1-inspect-captures.mjs'
 
 const MAX_SOURCES = 100
 const MAX_CAPTURE_MANIFEST_BYTES = 8 * 1024 * 1024
+const MAX_CAPTURE_HTML_BYTES = 8 * 1024 * 1024
+const MAX_AGGREGATE_HTML_BYTES = 32 * 1024 * 1024
 const MAX_JSON_LD_BLOCKS = 128
 const MAX_APPLICATION_JSON_SCRIPTS = 128
 const MAX_JSON_LD_ENTRIES = 256
@@ -292,6 +294,7 @@ async function requireRegularCaptureTree(directory, rows) {
       await realpath(directory) !== path.resolve(directory)) {
     throw new Error('Invalid offline capture tree origin')
   }
+  let totalHtmlBytes = 0
   for (const row of rows) {
     if (!row.success) continue
     const segment = (value) => typeof value === 'string' &&
@@ -307,6 +310,15 @@ async function requireRegularCaptureTree(directory, rows) {
         !file.isFile() || file.isSymbolicLink()) {
       throw new Error('Invalid offline capture tree origin')
     }
+    // A matching SHA proves bytes *match* their manifest, not that reading
+    // arbitrary-size HTML is safe. Reject huge sources before readFile and
+    // bound the full capture cohort, not only each individual source.
+    if (!Number.isSafeInteger(file.size) || file.size < 0 ||
+        file.size > MAX_CAPTURE_HTML_BYTES ||
+        totalHtmlBytes + file.size > MAX_AGGREGATE_HTML_BYTES) {
+      throw new Error('Offline HTML input exceeds resource budget')
+    }
+    totalHtmlBytes += file.size
   }
 }
 
