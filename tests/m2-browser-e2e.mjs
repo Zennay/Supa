@@ -273,7 +273,7 @@ try {
   assert.equal(prioritizedReview.priorityVisible, true)
   assert.match(prioritizedReview.firstRow, /Garam masala/)
   assert.match(basketText, /Gecontroleerde winkelvergelijking/i)
-  assert.match(basketText, /M3 testwinkel B ligt/)
+  assert.match(basketText, /Voorbeeldwinkel B ligt/)
   assert.match(basketText, /geen live-besparingsclaim/)
   const comparisonOutcome = await execute(
     sessionId,
