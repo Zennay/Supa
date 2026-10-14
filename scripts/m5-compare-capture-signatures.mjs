@@ -287,16 +287,22 @@ function observationInstants(results) {
   return times
 }
 
-// M5 is an offline human-only reviewer. Do not let a SHA-correct HTML file
-// borrowed via a symbolic path pretend to belong to the nominated capture.
-// Check *both* input trees before the M1 inspector reads any source HTML.
-// This is a conservative local path preflight, not descriptor-locked I/O.
-async function requireRegularCaptureTree(directory, rows) {
+// A symlinked capture root (including an ancestor alias) must not make us
+// read a borrowed manifest before the later HTML provenance preflight.
+// Run on *both* roots before opening either manifest. This is a conservative
+// local check, not descriptor-bound atomic filesystem ownership.
+async function requireRegularCaptureRoot(directory) {
   const root = await lstat(directory)
   if (!root.isDirectory() || root.isSymbolicLink() ||
       await realpath(directory) !== path.resolve(directory)) {
     throw new Error('Invalid offline capture tree origin')
   }
+}
+
+// M5 is an offline human-only reviewer. Do not let SHA-correct HTML borrowed
+// via filesystem aliases pretend to belong to a nominated capture tree.
+async function requireRegularCaptureTree(directory, rows) {
+  await requireRegularCaptureRoot(directory)
   let totalHtmlBytes = 0
   for (const row of rows) {
     if (!row.success) continue
@@ -341,6 +347,10 @@ async function requireIndependentCaptureRoots(currentDir, baselineDir) {
 }
 
 export async function compareCaptureDirectories(currentDir, baselineDir = null) {
+  // Refuse directory aliases before even reading the manifest JSON. Still
+  // validate both raw manifests before inspecting any successful HTML.
+  await requireRegularCaptureRoot(currentDir)
+  if (baselineDir) await requireRegularCaptureRoot(baselineDir)
   const currentRows = await preflightBoundedManifest(currentDir)
   const baselineRows = baselineDir ? await preflightBoundedManifest(baselineDir) : null
   await requireRegularCaptureTree(currentDir, currentRows)
