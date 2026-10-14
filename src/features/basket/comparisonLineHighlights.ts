@@ -69,6 +69,13 @@ export function comparisonMatchesVisibleBaskets(
 ): boolean {
   if (!hasTrustedComparisonLineEvidence(comparison)) return false
   if (!baseline || !candidate ||
+      typeof baseline.store?.id !== 'string' || !baseline.store.id.trim() ||
+      typeof candidate.store?.id !== 'string' || !candidate.store.id.trim() ||
+      baseline.store.id === candidate.store.id ||
+      !Number.isSafeInteger(baseline.selectedMealCount) ||
+      !Number.isSafeInteger(candidate.selectedMealCount) ||
+      baseline.selectedMealCount <= 0 ||
+      baseline.selectedMealCount !== candidate.selectedMealCount ||
       !Array.isArray(baseline.lines) || !Array.isArray(candidate.lines) ||
       baseline.unresolvedLineCount !== 0 || candidate.unresolvedLineCount !== 0 ||
       baseline.matchedLineCount !== baseline.lines.length ||
