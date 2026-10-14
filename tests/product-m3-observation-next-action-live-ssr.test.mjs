@@ -12,7 +12,7 @@ import * as observationPresentation from '../src/features/observation/observatio
 import * as numericInput from '../src/features/observation/observationNumericInput.ts'
 import * as draftPersistence from '../src/features/observation/observationDraftPersistence.ts'
 import * as draftImport from '../src/features/observation/observationDraftImport.ts'
-import { observationNextAction } from '../src/features/observation/observationNextStep.ts'
+import { observationNextAction, observationNextTaskSelector } from '../src/features/observation/observationNextStep.ts'
 import * as observationReadinessCopy from '../src/features/observation/observationReadinessCopy.ts'
 
 const require = createRequire(import.meta.url)
@@ -76,7 +76,7 @@ function renderView(sheet) {
     './observationNumericInput.ts': numericInput,
     './observationDraftPersistence.ts': draftPersistence,
     './observationDraftImport.ts': draftImport,
-    './observationNextStep.ts': { observationNextAction },
+    './observationNextStep.ts': { observationNextAction, observationNextTaskSelector },
     './observationReadinessCopy.ts': observationReadinessCopy,
     './ObservationNextActionCard.tsx': { ObservationNextActionCard: card },
   }
