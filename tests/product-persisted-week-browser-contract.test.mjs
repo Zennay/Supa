@@ -82,3 +82,36 @@ test('independent hosted browser job uses only localhost and no deployment privi
   assert.match(source, /node tests\/product-persisted-week-browser-e2e\.mjs/)
   assert.doesNotMatch(source, /\bdeploy\b|\brelease\b|curl\s+https?:\/\//i)
 })
+
+
+test('permanent Firefox runner denies fork PR jobs before self-hosted runner assignment (#365)', async () => {
+  const source = await readFile(workflow, 'utf8')
+  assert.match(source, /on:\s*\n\s*pull_request:/)
+  assert.match(source, /\n\s*workflow_dispatch:/)
+  assert.match(source, /permissions:\s*\n\s*contents:\s*read/)
+  assert.match(source, /persist-credentials:\s*false/)
+
+  const jobStart = source.indexOf('  rendered-persisted-week:')
+  const runnerStart = source.indexOf('    runs-on: self-hosted', jobStart)
+  const stepsStart = source.indexOf('    steps:', jobStart)
+  assert.ok(jobStart >= 0 && runnerStart > jobStart && stepsStart > runnerStart)
+
+  const jobAdmission = source.slice(jobStart, runnerStart)
+  const expected =
+    "if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository"
+  assert.ok(jobAdmission.includes(expected), 'same-repo/fork guard must be at JOB level before runs-on')
+  assert.equal(jobAdmission.match(/\n\s*if:/g)?.length, 1)
+  assert.doesNotMatch(jobAdmission, /pull_request_target/)
+  assert.match(source, /timeout-minutes:\s*15/)
+  assert.match(source, /test "\$\(hostname -s\)" = "vps-bb300bba"/)
+})
+
+test('permanent Firefox fork boundary preserves trusted manual dispatch and no fork checkout loophole', async () => {
+  const source = await readFile(workflow, 'utf8')
+  const jobs = source.slice(source.indexOf('jobs:'))
+  const head = jobs.slice(0, jobs.indexOf('    steps:'))
+  assert.match(head, /github.event_name != 'pull_request' \|\| github.event.pull_request.head.repo.full_name == github.repository/)
+  assert.match(source, /workflow_dispatch:/)
+  assert.match(source, /runs-on: self-hosted/)
+  assert.doesNotMatch(source, /pull_request_target/)
+})
