@@ -40,6 +40,7 @@ import {
   observationNextRequiredProductField,
   observationRequiredFieldLabels,
 } from './observationRequiredLineField.ts'
+import { observationVisibleRows } from './observationVisibleRows.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -104,6 +105,7 @@ export function ObservationView() {
   const [pendingImport, setPendingImport] = useState<ObservationSheet | null>(null)
   const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
   const [draftResetRemovalFailed, setDraftResetRemovalFailed] = useState(false)
+  const [showOnlyOpenLines, setShowOnlyOpenLines] = useState(false)
   // The user's next field task is derived from the current draft; readiness remains authoritative.
   const nextAction = useMemo(() => observationNextAction(sheet), [sheet])
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
@@ -389,6 +391,18 @@ export function ObservationView() {
           {progress.availabilityRecorded}/{progress.totalLines} beschikbaarheid gemeten ·{' '}
           {progress.metadataCompleted}/{progress.metadataTotal} verplichte metadata ingevuld
         </span>
+        <button
+          className="ghost-button"
+          type="button"
+          data-observation-open-lines-toggle
+          aria-pressed={showOnlyOpenLines}
+          onClick={() => setShowOnlyOpenLines((current) => !current)}
+        >
+          {showOnlyOpenLines ? 'Toon alle regels' : 'Toon alleen open regels'}
+        </button>
+        <small className="observation-field-hint">
+          Dit filter verandert geen meetgegevens. Toon alle regels om een eerdere meting aan te passen.
+        </small>
         <p>
           Vul alleen gegevens in die je zelf hebt waargenomen. Een aparte controle
           moet daarna bepalen of beide winkelmetingen echt vergelijkbaar zijn.
@@ -662,7 +676,12 @@ export function ObservationView() {
             </div>
 
             <div className="observation-lines">
-              {observation.lines.map((line, lineIndex) => {
+              {showOnlyOpenLines && observationVisibleRows(observation, true).length === 0 && (
+                <p className="observation-field-hint" data-observation-no-open-lines>
+                  Alle regels van deze winkel zijn gemeten. Toon alle regels om ze te controleren.
+                </p>
+              )}
+              {observationVisibleRows(observation, showOnlyOpenLines).map(({ line, lineIndex }) => {
                 const product = line.observedProduct
                 const availability =
                   product.available === null ? '' : String(product.available)
