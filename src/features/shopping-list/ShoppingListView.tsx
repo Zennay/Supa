@@ -76,10 +76,20 @@ function canOverwriteStoredProgress(raw: string | null): boolean {
 }
 
 export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
-  const basketKey = useMemo(() => shoppingListBasketKey(basket), [basket])
+  const basketKey = useMemo(() => {
+    try {
+      return shoppingListBasketKey(basket)
+    } catch {
+      // A damaged basket is not a new empty shopping plan. Never show or
+      // persist checkmarks under a fabricated identity.
+      return null
+    }
+  }, [basket])
   const [progress, setProgress] = useState(() => ({
     basketKey,
-    ...readStoredProgress(basket),
+    ...(basketKey === null
+      ? { done: [], readDenied: false }
+      : readStoredProgress(basket)),
     dirty: false,
     retryAfterFailure: false,
   }))
@@ -88,28 +98,36 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
 
   // A genuinely empty plan has no shopping tasks. An empty row array with
   // inconsistent counters is not proof that the customer needs nothing.
-  const genuinelyEmpty =
-    basket.lines.length === 0 &&
-    basket.selectedMealCount === 0 &&
-    basket.matchedLineCount === 0 &&
-    basket.unresolvedLineCount === 0 &&
-    basket.totalCents === 0 &&
-    visibleStoreIdentity(basket.store?.id) &&
-    visibleStoreName(basket.store?.name)
+  const genuinelyEmpty = (() => {
+    if (basketKey === null) return false
+    try {
+      return basket.lines.length === 0 &&
+        basket.selectedMealCount === 0 &&
+        basket.matchedLineCount === 0 &&
+        basket.unresolvedLineCount === 0 &&
+        basket.totalCents === 0 &&
+        visibleStoreIdentity(basket.store?.id) &&
+        visibleStoreName(basket.store?.name)
+    } catch {
+      return false
+    }
+  })()
 
   useEffect(() => {
     if (progress.basketKey === basketKey) return
 
     setProgress({
       basketKey,
-      ...readStoredProgress(basket),
+      ...(basketKey === null
+        ? { done: [], readDenied: false }
+        : readStoredProgress(basket)),
       dirty: false,
       retryAfterFailure: false,
     })
   }, [basket, basketKey, progress.basketKey])
 
   useEffect(() => {
-    if (typeof window === 'undefined' || progress.basketKey !== basketKey) return
+    if (typeof window === 'undefined' || basketKey === null || progress.basketKey !== basketKey) return
     // Never persist a malformed zero-row basket just because it is visible.
     if (basket.lines.length === 0 && !genuinelyEmpty) return
 
@@ -151,6 +169,25 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
       setStorageWarning('unavailable')
     }
   }, [basket, basketKey, genuinelyEmpty, progress])
+
+  if (basketKey === null) {
+    return (
+      <section className="screen">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">In de winkel</span>
+            <h2>Boodschappenlijst</h2>
+          </div>
+        </div>
+        <p className="disclaimer" role="status">
+          Boodschappenlijst niet beschikbaar. Controleer je planning.
+        </p>
+        <p className="disclaimer" role="status">
+          Afdrukken is niet beschikbaar. Controleer eerst je boodschappenlijst.
+        </p>
+      </section>
+    )
+  }
 
   return (
     <section className="screen">
