@@ -1,0 +1,11 @@
+# Independent QA — direct M5 SHA must be own data, not computed or inherited
+
+**Source owner:** previously GitHub-hosted GREEN [product #2316](https://github.com/Zennay/Supa/pull/2316), frozen exact `d20bfe455752957ec92711d40c970870c4bfd96c`. Its unrelated primitive SHA string fix is already independently covered by QA #2317. **New issue:** [#2318](https://github.com/Zennay/Supa/issues/2318), correction owned separately by [product DRAFT #2319](https://github.com/Zennay/Supa/pull/2319).
+
+The direct pure `buildOfflineSelectorReviewQueue(report)` still reads `typeof snapshot.snapshotSha256` and `typeof snapshot.shapeSha256`, which can call a property getter or accept inherited primitive SHA values. Genuine `captureShape` produces **own primitive data properties**, not accessors. An invalid direct review report must never run a getter, let it leak sensitive text, or launder an inherited hash into trusted review.
+
+Independent QA-only synthetic suite: **16 total cases, five canonical valid controls and eleven intended original-source RED**. Cases include getter that throws a fake private string, getter returning valid SHA, inherited primitive SHA and inherited getter, both current and historical P1/P2/P3. Positive controls preserve genuine Product/abstain/unavailable review, opaque source tokens, false production, rights, selector and M5 flags. Entirely offline and fictional, no actual retailer prices, user data or HTTP.
+
+**Scope and proof:** add-only test and this documentation on immutable product source. Original-source negative test failures are **expected**, so the original PR is **DRAFT/HOLD/NO MERGE/NO DEPLOY**. Do not edit product source or another QA worker's tests. After product owner freezes corrected SHA descriptor implementation, replay the **exact same Git test blob** on a separate own QA branch and demand full exact-head GitHub-hosted Node/high audit/M1 permission+matching/TS-Vite build GREEN. No main, workflows or permanent VPS changes.
+
+**Project:** Supa M3 ACTIVE; actual human [#78](https://github.com/Zennay/Supa/issues/78) same-demand PLUS11/DekaMarkt11 in <=24h not provided, M4/M5 ineligible. Independent zCloud SQLite task scope/lease, source and QA review, current-main/trusted runner where applicable, source rights and explicit releasego are still prerequisites.
