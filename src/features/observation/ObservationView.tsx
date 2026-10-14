@@ -378,17 +378,32 @@ export function ObservationView() {
   }
 
   const downloadDraft = () => {
-    const blob = new Blob([`${JSON.stringify(sheet, null, 2)}\n`], {
-      type: 'application/json',
-    })
-    const href = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = href
-    anchor.download = `supa-m3-observation-${safeFilePart(sheet.study.studyId)}.json`
-    document.body.append(anchor)
-    anchor.click()
-    anchor.remove()
-    URL.revokeObjectURL(href)
+    let href: string | null = null
+    let anchor: HTMLAnchorElement | null = null
+    try {
+      const blob = new Blob([`${JSON.stringify(sheet, null, 2)}\n`], {
+        type: 'application/json',
+      })
+      href = URL.createObjectURL(blob)
+      anchor = document.createElement('a')
+      anchor.href = href
+      anchor.download = `supa-m3-observation-${safeFilePart(sheet.study.studyId)}.json`
+      document.body.append(anchor)
+      anchor.click()
+      // A click only starts a browser download; it cannot prove disk storage.
+      setImportStatus({
+        kind: 'success',
+        message: 'Download van je JSON-concept gestart. Controleer of het bestand echt is opgeslagen op je apparaat.',
+      })
+    } catch {
+      setImportStatus({
+        kind: 'error',
+        message: 'Download van je JSON-concept is mislukt. De ingevulde meting is behouden; controleer de downloadrechten van je browser en probeer opnieuw.',
+      })
+    } finally {
+      anchor?.remove()
+      if (href !== null) URL.revokeObjectURL(href)
+    }
   }
 
   const applyImportedDraft = (restored: ObservationSheet) => {
