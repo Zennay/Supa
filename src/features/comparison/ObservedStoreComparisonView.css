@@ -1,0 +1,140 @@
+.observed-compare-screen {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+
+.observed-compare-summary {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.observed-compare-summary > strong {
+  font-size: clamp(20px, 4vw, 29px);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.observed-compare-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.observed-compare-totals > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f0efe9;
+}
+
+.observed-compare-totals span,
+.observed-compare-totals small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.observed-compare-totals strong {
+  font-size: clamp(20px, 4vw, 25px);
+  overflow-wrap: anywhere;
+}
+
+.observed-compare-summary .primary-button {
+  justify-self: start;
+}
+
+.observed-compare-lines {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.observed-compare-header,
+.observed-compare-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+  padding: 13px 14px;
+}
+
+.observed-compare-header {
+  background: #f0efe9;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.observed-compare-row + .observed-compare-row {
+  border-top: 1px solid var(--line);
+}
+
+.observed-compare-ingredient,
+.observed-compare-price {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.observed-compare-ingredient strong,
+.observed-compare-price strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.observed-compare-price strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.observed-compare-price small,
+.observed-compare-ingredient small {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.observed-compare-price[data-price-status='missing'] strong,
+.observed-compare-price[data-price-status='unavailable'] strong,
+.observed-compare-price[data-price-status='untrusted'] strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.observed-compare-mobile-label {
+  display: none;
+}
+
+@media (max-width: 540px) {
+  .observed-compare-header {
+    display: none;
+  }
+
+  .observed-compare-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .observed-compare-ingredient {
+    grid-column: 1 / -1;
+  }
+
+  .observed-compare-mobile-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .observed-compare-totals > div {
+    padding: 10px;
+  }
+}
