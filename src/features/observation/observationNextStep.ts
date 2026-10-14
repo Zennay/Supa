@@ -4,6 +4,7 @@ import {
   observationSheetReadiness,
   observationWindowSummary,
   observationStoreMatchesExpectedRetailer,
+  validObservedAt,
   type M3ObservationSide,
   type ObservationSheet,
 } from '../../domain/m3ObservationSheet.ts'
@@ -87,8 +88,9 @@ function chooseStoreAction(
       }
     }
 
-    // A non-empty but unparsable date is an actionable field error.
-    if (key === 'observedAt' && !Number.isFinite(Date.parse(value))) {
+    // Use the *same* strict timestamp gate as canonical readiness: Date.parse
+    // alone accepts date-only, local-time and rolled-over calendar values.
+    if (key === 'observedAt' && validObservedAt(value) === null) {
       return {
         stage: 'store',
         side,
