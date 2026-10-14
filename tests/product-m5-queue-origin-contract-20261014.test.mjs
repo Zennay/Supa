@@ -66,7 +66,9 @@ test('M5 queue origin: current snapshots with malformed retailer origins are ref
     'shop\\name', '\u202eSHOP', 'é-shop', 'x'.repeat(129),
   ]) {
     const id = 'private-current'
-    reject(report([row(id, 'baseline_missing', snapshot(id, name))], false))
+    const current = snapshot(id)
+    current.supermarket = name
+    reject(report([row(id, 'baseline_missing', current)], false))
   }
 })
 
@@ -76,7 +78,9 @@ test('M5 queue origin: historical snapshots with malformed capture kinds are ref
     'x'.repeat(129),
   ]) {
     const id = 'private-history'
-    reject(report([row(id, 'removed', null, snapshot(id, 'fictional-market', kind))]))
+    const history = snapshot(id)
+    history.kind = kind
+    reject(report([row(id, 'removed', null, history)]))
   }
 })
 
