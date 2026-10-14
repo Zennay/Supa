@@ -51,6 +51,7 @@ test('real browser evidence only records localhost URLs, exact GitHub SHAs and f
   assert.match(source, /assert\.match\(value \?\? '', \/\^\[a-f0-9\]\{40\}\$\/i/)
   assert.match(source, /githubRunId: process\.env\.GITHUB_RUN_ID/)
   assert.match(source, /githubRunAttempt: process\.env\.GITHUB_RUN_ATTEMPT/)
+  assert.match(source, /checks\.push\('corrupt-planner-and-checklist-recover-safely'\)/)
   assert.match(source, /checks\.push\('rendered-basket-list-line-count-agrees'\)/)
 
   for (const name of [
@@ -59,6 +60,7 @@ test('real browser evidence only records localhost URLs, exact GitHub SHAs and f
     'shopping-item-checked.png',
     'shopping-reloaded.png',
     'shopping-empty-week.png',
+    'shopping-recovered-default.png',
   ]) {
     assert.ok(source.includes(`await screenshot(sessionId, '${name}')`), name)
     assert.ok(source.includes(`'${name}'`), name)
