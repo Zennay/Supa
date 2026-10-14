@@ -179,6 +179,7 @@ test('real App preserves in-session edits across tabs and clears warning on reco
   disk.writeBlocked = true
   const app = mount(disk)
   try {
+    app.render() // run the initial save effect before observing its warning
     assert.match(app.alert(), /niet opgeslagen/)
     app.planner().onBudgetChange(42.75)
     assert.equal(app.planner().budget, 42.75)
@@ -206,6 +207,7 @@ test('real App does not overwrite unknown future records, but can save after exp
     assert.match(app.alert(), /niet opgeslagen/)
     disk.raw = null
     app.planner().onBudgetChange(30)
+    app.render() // flush the save effect after the explicit edit
     assert.equal(JSON.parse(disk.raw).budget, 30)
     assert.equal(app.alert(), '')
   } finally { app.close() }
