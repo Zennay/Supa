@@ -323,7 +323,12 @@ async function preflightBoundedManifest(directory) {
         !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(record.id) ||
         seenIds.has(record.id) ||
         !canonicalOrigin(record.supermarket) ||
-        !canonicalOrigin(record.kind)) fail()
+        !canonicalOrigin(record.kind) ||
+        // A syntactically invalid success digest can never pass the later
+        // real HTML SHA comparison. Reject the entire raw cohort before any
+        // source file is opened, but never treat this shape check as a proof.
+        (record.success && (typeof record.sha256 !== 'string' ||
+          !/^[a-f0-9]{64}$/.test(record.sha256)))) fail()
     seenIds.add(record.id)
   }
   return parsed.results
