@@ -36,7 +36,7 @@ function syntheticSheet({ unavailableCandidateIndex = -1 } = {}) {
       const requirement = sheet.requirements[index]
       line.observedProduct = {
         productId: `${shop.id}-fictional-${index}`,
-        productName: `Fictional test item ${index}`,
+        productName: requirement.query,
         packAmount: requirement.amount,
         packUnit: requirement.unit,
         packCount: 1,
@@ -99,7 +99,7 @@ test('M3 CLI chain: genuine-format fictional 11+11 demand stays private and cann
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.equal('participantKey' in report, false)
   assert.doesNotMatch(published, /private-qa-participant-007/)
-  assert.doesNotMatch(published, /Fictional test item/)
+  assert.doesNotMatch(published, /fictional-plus-a-fictional-0/)
   assert.match(report.evidenceBoundary, /never sufficient/)
 })
 
