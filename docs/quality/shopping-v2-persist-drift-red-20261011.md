@@ -1,0 +1,8 @@
+# Shopping v2 persistence stale-identity QA — expected RED
+
+- Parent: [product DRAFT #1532](https://github.com/Zennay/Supa/pull/1532) at immutable `e6243828b86fefd9fd78230fff27587ffc842e1a`, issue [#1056](https://github.com/Zennay/Supa/issues/1056).
+- Potential gap: `openShoppingProgressStorageV2().persist()` writes the last serialized identity without validating that its pinned physical-demand identity still describes the currently held mutable basket. `toggle()` and `rebase()` validate this; `persist()` does not.
+- Synthetic runnable tests cover (1) matched pack-count mutation after toggle before persist, (2) invalidated store after toggle, and (3) a price-only metadata change which should remain persistable with checks preserved.
+- Expected original behavior: **two targeted failing tests** (stale write returned true) and one passing money-only control. The tests do not claim a stale checkbox was restored to a physically different basket; the existing v2 restore path rejects wrong identities. This probes the narrower controller's 'never write stale state' contract and no-clobber behavior at write time.
+- Suggested owner resolution: revalidate the live basket identity against the last pinned session identity at persistence; on mismatch or invalid basket refuse write without falsely returning success, or document a stricter caller lifecycle contract if the owner explicitly chooses that behavior.
+- Add-only QA test + QA contract; original product module, UI and other owner tests remain untouched. **DRAFT / HOLD / NO MERGE / NO DEPLOY** pending product owner #1532 approval, verified zCloud lease, exact-head CI and permanent relevant browser/mobile/VPS checks. Unrelated genuine M3 #78 remains open.
