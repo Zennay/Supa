@@ -10,12 +10,12 @@ import { parseSchemaOrgProduct } from '../src/data/schemaOrgProduct.ts'
 // Every HTML fragment is invented; no live requests or retailer information.
 const ERROR = /^Error: Invalid inspected Schema.org parse result$/
 const provenance = {
-  supermarket: 'fictional-store', kind: 'product', url: 'https://example.invalid/fake',
+  supermarket: 'plus', kind: 'product', url: 'https://www.plus.nl/fictional-fixture',
   capturedAt: '2026-10-14T00:00:00Z', sha256: 'a'.repeat(64),
 }
 function inspected(html, parserResult) {
   const source = {
-    id: 'fake-source', supermarket: 'fictional-store', kind: 'product',
+    id: 'fake-source', supermarket: 'plus', kind: 'product',
     success: true, integrity: 'verified',
     manifestSha256: createHash('sha256').update(html).digest('hex'),
     html: inspectHtml(html),
