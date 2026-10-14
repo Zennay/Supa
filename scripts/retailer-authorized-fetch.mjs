@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { SOURCES, validateSources } from './m1-capture-sources.mjs'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 
@@ -22,7 +23,17 @@ export async function fetchAuthorizedRetailerHtml({
       !Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_HTML_BYTES) {
     throw new Error('Invalid collection limits')
   }
-  const gate = evaluateSourcePermissionGate(permissionDocument)
+  // Real fetch cannot trust a caller-created in-memory "permission" object.
+  // Load the repo's canonical reviewed rights register and require an explicit
+  // operator switch. Injected transports remain mockable for offline tests.
+  const usingRealTransport = fetchImpl === fetch
+  if (usingRealTransport && process.env.SUPA_LIVE_RETAILER_CAPTURE !== '1') {
+    throw new Error('Live retailer capture requires operator activation')
+  }
+  const rights = usingRealTransport
+    ? JSON.parse(await readFile('evidence/m1/source-permission-gate.v1.json', 'utf8'))
+    : permissionDocument
+  const gate = evaluateSourcePermissionGate(rights)
   if (!gate.productionReady) throw new Error('Retailer permission not granted')
   const source = SOURCES.find((entry) => entry.id === sourceId)
   if (!source) throw new Error('Source is not in the pinned allowlist')
