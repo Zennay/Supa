@@ -132,7 +132,7 @@ test('archived Firefox image evidence binds every PNG to byte length, dimensions
   assert.match(source, /png\.readUInt32BE\(16\)/)
   assert.match(source, /png\.readUInt32BE\(20\)/)
   assert.match(source, /screenshotIntegrity\.push\(/)
-  assert.match(source, /assert\.equal\(screenshotIntegrity\.length, 9/
+  assert.match(source, /assert\.equal\(screenshotIntegrity\.length, 9/)
   assert.match(source, /screenshotIntegrity,\n/)
   assert.match(source, /retailerDataObserved: false/)
   assert.match(source, /realSavingsClaimEligible: false/)
