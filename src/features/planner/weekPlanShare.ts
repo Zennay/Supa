@@ -32,7 +32,9 @@ export function formatShareableWeek(input: ShareableWeek): string {
       input.plannedMeals.length > MAX_DAYS ||
       input.activeDays.length > MAX_DAYS ||
       input.recipes.length > MAX_RECIPES ||
-      !Number.isFinite(input.budget) || input.budget < 0) {
+      !Number.isFinite(input.budget) || input.budget < 0 ||
+      !Number.isSafeInteger(Math.round(input.budget * 100)) ||
+      input.budget !== Math.round(input.budget * 100) / 100) {
     throw new Error('Weekmenu niet beschikbaar')
   }
 
