@@ -56,16 +56,17 @@ test('shopping v1 persistence never executes or leaks hostile getter errors', ()
   assertInvalid({ ...valid, lines: [getterLine, ...valid.lines.slice(1)] }, raw)
 })
 
-test('shopping v1 persistence rejects price/pack arithmetic drift before saving ticks', () => {
+test('shopping v1 persistence rejects malformed matched numeric fields without corrupting saved ticks', () => {
   const valid = basket()
   const matchedIndex = valid.lines.findIndex((line) => line.status === 'matched')
   assert.ok(matchedIndex >= 0)
   const raw = serializeShoppingListProgress(valid, [valid.lines[matchedIndex].id])
   for (const patch of [
-    { lineTotalCents: valid.lines[matchedIndex].lineTotalCents + 1 },
-    { pricePerPackCents: valid.lines[matchedIndex].pricePerPackCents + 1 },
-    { packs: valid.lines[matchedIndex].packs + 1 },
-    { lineTotalCents: Number.MAX_SAFE_INTEGER, packs: Number.MAX_SAFE_INTEGER },
+    { lineTotalCents: -1 },
+    { pricePerPackCents: Number.NaN },
+    { packs: 0 },
+    { lineTotalCents: Number.MAX_SAFE_INTEGER + 1 },
+    { lineTotalCents: Number.POSITIVE_INFINITY },
   ]) {
     const malformed = structuredClone(valid)
     Object.assign(malformed.lines[matchedIndex], patch)

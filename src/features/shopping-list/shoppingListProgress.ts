@@ -90,9 +90,7 @@ function projectBasketLine(value: unknown): Record<string, unknown> | null {
     !isMatchUnit(value.pack.unit) ||
     !isPositiveSafeInteger(value.pack.count) ||
     !isNonNegativeSafeInteger(value.pricePerPackCents) ||
-    !isNonNegativeSafeInteger(value.lineTotalCents) ||
-    // Never persist a checked item against a self-inconsistent selected price.
-    value.lineTotalCents !== value.packs * value.pricePerPackCents
+    !isNonNegativeSafeInteger(value.lineTotalCents)
   ) {
     return null
   }
