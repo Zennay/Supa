@@ -1,0 +1,16 @@
+# Future offline M5 — pinned full-cohort root and supermarket inodes (14 October 2026)
+
+**Product-core 1/2, issue #2226.** Exact source parent is frozen hosted-green product DRAFT #2223 `304ca0f17ce5119bbe9238ff55fce5bdb8a960ff`. Independent QA, other product lanes, UI/Planner/M3, original M1 inspector, main, workflows, permanent VPS and real retailer data remain untouched.
+
+## Discovered gap
+The earlier product #2223 pinned source root and store directories *for each individual HTML file*. The complete M5 snapshot still re-opened the same store path for the next successful record. A store path could be renamed then replaced by a different regular directory between rows. Two matching-SHA but differently owned source files could therefore be presented as one supermarket's coherent capture cohort.
+
+## Correction
+`withPinnedCaptureTree(directory, callback)` now opens the original root once with Linux O_RDONLY|O_DIRECTORY|O_NOFOLLOW and verifies inode `(dev, ino)` against lstat. It opens and caches each distinct store directory by `/proc/self/fd/<root-fd>/<store>`, verifies `(dev,ino)`, and keeps every store descriptor alive until all successful HTML files have been copied to the private M5 snapshot. Repeated store names reuse the identical pinned store inode after path replacement; new stores still resolve under the original root inode after the root pathname is changed. Each final file is opened nofollow from the pinned store, byte-bounded, SHA-verified, UTF-8 checked and copied to 0700/0600 snapshot files. The unmodified M1 inspector then reads that snapshot. Descriptors close on success and failure. The existing `withPinnedCaptureStore` test-helper API delegates to the same tree mechanism. P1-only cohorts skip file-descriptor acquisition entirely.
+
+## Synthetic tests
+`tests/product-m5-pinned-cohort-20261014.test.mjs` adds 10 deterministic fictional offline scenarios: two same-store source reads separated by normal directory replacement, a different store first opened after the root was renamed/replaced with an alias, and same-store access after borrowed symlink insertion (all read original pinned bytes); a third store symlink rejected after valid earlier store; source/store path grammar; callback errors; no-HTML P1; multiple P2 and independent historical P3; private anonymous CLI output for mixed stores. No retailer HTTP, identifiable user information, price or measured savings.
+
+## Limits and release gate
+This enforces **post-pin same-cohort directory identity**, but it does not make the initial original manifest/read snapshots fully atomic or guarantee protection from adversarial privileged file replacements before pinning or same-UID snapshot-folder access. This is future offline manual M5 review hardening, not permissions or price-evidence proof. Supa **M3 ACTIVE**, human same-demand 11 PLUS + 11 DekaMarkt within 24h issue #78 OPEN, M4/M5 ineligible.
+**DRAFT/HOLD/NO MERGE/NO DEPLOY** until independent zCloud SQLite task/write scope claim lease, original product and quality-validation owner review, exact hosted CI, safe newest-main/integration and trusted VPS when applicable, genuine human #78 field evidence and explicit human releasego.
