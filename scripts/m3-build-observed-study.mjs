@@ -1,6 +1,6 @@
 import { mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { writeDerivedM3Output } from './m3-source-output-preservation.mjs'
+import { assertNoSymlinkedM3OutputParents, writeDerivedM3Output } from './m3-source-output-preservation.mjs'
 import { pathToFileURL } from 'node:url'
 
 import { matchIngredient } from '../src/domain/matching.ts'
@@ -412,6 +412,7 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(study, null, 2)}\n`
 
   if (output) {
+    await assertNoSymlinkedM3OutputParents(output)
     await mkdir(dirname(output), { recursive: true, mode: 0o700 })
     await writeDerivedM3Output(input, output, serialized)
   } else {
