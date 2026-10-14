@@ -5,6 +5,7 @@ import { IngredientReuseCard } from './IngredientReuseCard.tsx'
 import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
 import { RecipePriceExplanation } from './RecipePriceExplanation'
+import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -42,6 +43,15 @@ export function PlannerView({
     basketUnresolvedLineCount,
   )
   const budgetKnown = budgetAssessment.status === 'known'
+  // Only a strictly validated cent-native lower bound can prove minimum
+  // overspend while unfinished matches keep the final total uncertain.
+  const knownMinimumOverrunCents = !budgetKnown
+    ? plannerKnownMinimumOverrunCents({
+        knownCostCents: basketTotalCents,
+        budgetEuros: budget,
+        unresolvedLineCount: basketUnresolvedLineCount,
+      })
+    : null
   // Derive reuse from current active recipe choices. No packet, leftover or
   // monetary savings conclusion can be inferred from ingredient overlap.
   const ingredientRecipes = recipes.filter(
@@ -85,7 +95,9 @@ export function PlannerView({
               ? budgetAssessment.budgetState.overBudget
                 ? `${euro.format(Math.abs(budgetAssessment.budgetState.remaining))} boven budget`
                 : `${euro.format(budgetAssessment.budgetState.remaining)} over`
-              : `${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`}
+              : knownMinimumOverrunCents !== null
+                ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget · ${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`
+                : `${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`}
           </span>
         </div>
 
@@ -138,8 +150,12 @@ export function PlannerView({
               {budgetAssessment.unresolvedLineCount === 1
                 ? 'productmatch is'
                 : 'productmatches zijn'}{' '}
-              onopgelost. Daarom is dit alleen het bekende minimum; SUPA claimt
-              nog niet dat je binnen of boven budget zit.
+              onopgelost. Daarom is dit alleen het bekende minimum;
+              {knownMinimumOverrunCents !== null ? (
+                <> de bekende kosten liggen al minimaal {euro.formatCents(knownMinimumOverrunCents)} boven je budget. Het uiteindelijke tekort kan groter zijn.</>
+              ) : (
+                <> SUPA kan nog niet bepalen of je binnen of boven budget zit.</>
+              )}
             </>
           )}
         </p>
