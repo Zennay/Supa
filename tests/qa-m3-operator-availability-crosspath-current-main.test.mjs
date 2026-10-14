@@ -13,6 +13,8 @@ import {
 import { renderM3FieldVisitCard } from '../src/domain/m3FieldVisitCard.ts'
 import { observationRetailerCopy } from '../src/features/observation/observationPresentation.ts'
 import { observationNextAction } from '../src/features/observation/observationNextStep.ts'
+import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
+import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
 
 const NOW = Date.parse('2026-10-14T18:30:00Z')
 const trustedPack = (index) => ({
@@ -147,4 +149,46 @@ test('independent QA: true with erased pack/price remains incomplete; toggling n
   assert.equal(no.priceCents, null)
   assert.equal(observationLineCollectionComplete(line), true)
   assert.equal(observationSheetReadiness(sheet, NOW).ready, true)
+})
+
+test('independent QA: official converter and assessor never treat measured-no or unmeasured as savings', () => {
+  const observedNo = completeFictionalSheet()
+  const index = 3 // fictional cauliflower requirement, never a retailer observation
+  const original = observedNo.candidate.lines[index].observedProduct
+  observedNo.candidate.lines[index].observedProduct = {
+    ...original,
+    available: false,
+    productName: 'Synthetic stale private value',
+    priceCents: 1,
+    packAmount: 999,
+  }
+  // An upstream caller may pass a noncanonical raw JSON object. Even if stale
+  // monetary bytes survive in that object, a measured unavailable item is an
+  // unresolved ingredient, not a zero/one-cent purchasable product.
+  const study = buildWeeklyBasketStudyFromObservationSheet(observedNo)
+  const line = study.candidate.basket.lines[index]
+  assert.equal(line.status, 'unresolved')
+  assert.ok(line.reasons.includes('observed product unavailable'))
+  assert.equal(Object.hasOwn(line, 'lineTotalCents'), false)
+  assert.equal(Object.hasOwn(line, 'pricePerPackCents'), false)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: NOW })
+  assert.equal(result.claimable, false)
+  assert.equal(result.comparison.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
+  assert.equal(result.comparison.savingsCents, null)
+  assert.equal(result.comparison.deltaCents, null)
+
+  const unmeasured = completeFictionalSheet()
+  unmeasured.candidate.lines[index].observedProduct = {
+    ...original,
+    available: null,
+    priceCents: 1,
+  }
+  assert.equal(observationSheetReadiness(unmeasured, NOW).ready, false)
+  assert.throws(() => buildWeeklyBasketStudyFromObservationSheet(unmeasured),
+    /observedProduct.available must be true or false/)
+  const safelyRestored = restoreObservationSheetDraft(JSON.stringify(unmeasured))
+  assert.ok(safelyRestored)
+  assert.equal(safelyRestored.candidate.lines[index].observedProduct.available, null)
+  assert.equal(safelyRestored.candidate.lines[index].observedProduct.priceCents, null)
 })
