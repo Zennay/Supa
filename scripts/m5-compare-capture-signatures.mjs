@@ -31,6 +31,14 @@ function digest(value) {
 // Only canonical, bounded M1 origin metadata may be compared. An absent,
 // object-valued, control-bearing or non-canonical origin must not silently
 // produce an 'unchanged' (P3) source-review result. No source label is echoed.
+// Canonical identity is shared by raw manifest admission and the exported
+// in-memory comparison API. Bound IDs before filesystem work or JSON reports;
+// M1 inspector still independently checks path-shaped IDs after preflight.
+function canonicalSourceId(value) {
+  return typeof value === 'string' && value.length >= 1 &&
+    value.length <= 128 && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+}
+
 function requireCanonicalOrigin(source) {
   const canonical = (value) => typeof value === 'string' &&
     value.length > 0 && value.length <= 128 &&
@@ -91,7 +99,7 @@ function requireBoundedHtmlShape(html) {
 // This fingerprint deliberately excludes names, prices, URLs, DOM text,
 // embedded-state payloads, and unknown keys (which may include private data).
 export function captureShape(source) {
-  if (!source || typeof source !== 'object' || typeof source.id !== 'string') {
+  if (!source || typeof source !== 'object' || !canonicalSourceId(source.id)) {
     throw new Error('Invalid inspected source')
   }
   // The M1 inspector always produces an explicit boolean. Do not interpret
@@ -319,8 +327,7 @@ async function preflightBoundedManifest(directory) {
     value.length > 0 && value.length <= 128 &&
     /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
   for (const record of parsed.results) {
-    if (typeof record.id !== 'string' ||
-        !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(record.id) ||
+    if (!canonicalSourceId(record.id) ||
         seenIds.has(record.id) ||
         !canonicalOrigin(record.supermarket) ||
         !canonicalOrigin(record.kind) ||
