@@ -279,7 +279,7 @@ h3, p { margin: 0; }
     532px
   );
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   padding: 6px;
   gap: 4px;
   border: 1px solid var(--line);
@@ -290,6 +290,7 @@ h3, p { margin: 0; }
 }
 
 .bottom-nav button {
+  min-width: 0;
   min-height: 44px;
   border: 0;
   border-radius: 999px;
