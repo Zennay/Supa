@@ -40,6 +40,22 @@ test('M3 visible line proof orders exact differences without causal or retailer 
   }), [])
   assert.deepEqual(comparisonLineHighlights({ ...comparison,
     lineDeltas: comparison.lineDeltas.map((line, index) =>
+      index === 0 ? { ...line, baselineLineTotalCents: line.baselineLineTotalCents + 1,
+        candidateLineTotalCents: line.candidateLineTotalCents + 1 } : line),
+  }), [], 'each store total must agree with its full physical line ledger')
+  assert.deepEqual(comparisonLineHighlights({ ...comparison,
+    baselineTotalCents: comparison.baselineTotalCents + 1,
+  }), [], 'declared totals must match line provenance')
+  assert.deepEqual(comparisonLineHighlights({ ...comparison,
+    lineDeltas: comparison.lineDeltas.map((line, index) =>
+      index === 0 ? { ...line, ingredientLabel: ' ' + line.ingredientLabel } : line),
+  }), [], 'no padded display labels')
+  assert.deepEqual(comparisonLineHighlights({ ...comparison,
+    lineDeltas: comparison.lineDeltas.map((line, index) =>
+      index === 0 ? { ...line, ingredientLabel: 'A'.repeat(181) } : line),
+  }), [], 'no unbounded user labels')
+  assert.deepEqual(comparisonLineHighlights({ ...comparison,
+    lineDeltas: comparison.lineDeltas.map((line, index) =>
       index === 0 ? { ...line, ingredientLabel: 'Rijst\u202emalicious' } : line),
   }), [])
 })
