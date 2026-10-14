@@ -51,7 +51,7 @@ function study(baselineAt, candidateAt) {
     .filter(value => /^\d{4}-\d{2}-\d{2}T/.test(value))
     .map(value => value.slice(0, 10))
     .sort()
-  const latestLocalDate = localDays.at(-1) ?? '2026-10-25'
+  const latestLocalDate = localDays.at(-1) ?? '2025-10-26'
   const monday = new Date(`${latestLocalDate}T12:00:00Z`)
   monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7)
   const weekStart = monday.toISOString().slice(0, 10)
@@ -91,11 +91,11 @@ function assertUnknownAtWindowBoundary(result) {
 }
 
 test('M3 exactly-24h observations remain eligible across winter-time offset change', () => {
-  // The first observation is 2026-10-25 00:30Z; the second is
-  // 2026-10-26 00:30Z, even though the local wall clocks differ by 23h.
+  // The first observation is 2025-10-26 00:30Z; the second is
+  // 2025-10-27 00:30Z, even though the local wall clocks differ by 23h.
   const value = study(
-    '2026-10-25T02:30:00+02:00',
-    '2026-10-26T01:30:00+01:00',
+    '2025-10-26T02:30:00+02:00',
+    '2025-10-27T01:30:00+01:00',
   )
   const result = assessWeeklyBasketStudy(value)
   assert.equal(result.observationWindowHours, 24)
@@ -114,8 +114,8 @@ test('M3 exactly-24h observations remain eligible across winter-time offset chan
 test('M3 observations 1ms beyond 24h fail closed even across different offsets', () => {
   const result = assessWeeklyBasketStudy(
     study(
-      '2026-10-25T02:30:00+02:00',
-      '2026-10-26T01:30:00.001+01:00',
+      '2025-10-26T02:30:00+02:00',
+      '2025-10-27T01:30:00.001+01:00',
     ),
   )
   assert.ok(result.observationWindowHours > 24)
@@ -125,13 +125,13 @@ test('M3 observations 1ms beyond 24h fail closed even across different offsets',
 test('M3 checks actual instants, not wall-clock strings, during the DST fold', () => {
   const cases = [
     // Both describe the same instant.
-    ['2026-10-25T02:30:00+02:00', '2026-10-25T01:30:00+01:00', 0],
+    ['2025-10-26T02:30:00+02:00', '2025-10-26T01:30:00+01:00', 0],
     // The duplicated 02:30 local time describes instants one hour apart.
-    ['2026-10-25T02:30:00+02:00', '2026-10-25T02:30:00+01:00', 1],
+    ['2025-10-26T02:30:00+02:00', '2025-10-26T02:30:00+01:00', 1],
     // Same absolute distance, reversed observation order.
-    ['2026-10-26T01:30:00+01:00', '2026-10-25T02:30:00+02:00', 24],
+    ['2025-10-27T01:30:00+01:00', '2025-10-26T02:30:00+02:00', 24],
     // Month boundary must not be read as a 24-hour change in the day number.
-    ['2026-10-31T23:30:00Z', '2026-11-01T00:15:00Z', 0.75],
+    ['2025-10-31T23:30:00Z', '2025-11-01T00:15:00Z', 0.75],
   ]
 
   for (const [baselineAt, candidateAt, expectedHours] of cases) {
@@ -146,9 +146,9 @@ test('M3 checks actual instants, not wall-clock strings, during the DST fold', (
 test('M3 absolute time window rejects distant but deceptively similar local times', () => {
   const cases = [
     // Same clock display one day later, but an extra hour in UTC.
-    ['2026-10-25T02:30:00+02:00', '2026-10-26T02:30:00+01:00'],
+    ['2025-10-26T02:30:00+02:00', '2025-10-27T02:30:00+01:00'],
     // Reverse direction is also out of scope.
-    ['2026-10-26T02:30:00+01:00', '2026-10-25T02:30:00+02:00'],
+    ['2025-10-27T02:30:00+01:00', '2025-10-26T02:30:00+02:00'],
   ]
 
   for (const [baselineAt, candidateAt] of cases) {
@@ -165,17 +165,17 @@ test('M3 absolute time window rejects distant but deceptively similar local time
 
 test('M3 rejects invalid timezone/date fields without inferring a savings outcome', () => {
   const invalidTimes = [
-    '2026-10-25T02:30:00', // missing explicit timezone
-    '2026-10-25T02:30:00+25:00',
-    '2026-10-25T02:30:00+01:60',
-    '2026-10-25T02:30:60Z',
+    '2025-10-26T02:30:00', // missing explicit timezone
+    '2025-10-26T02:30:00+25:00',
+    '2025-10-26T02:30:00+01:60',
+    '2025-10-26T02:30:60Z',
     '2026-02-30T02:30:00Z',
-    '2026-10-25',
+    '2025-10-26',
   ]
 
   for (const timestamp of invalidTimes) {
     for (const side of ['baseline', 'candidate']) {
-      const value = study('2026-10-25T00:30:00Z', '2026-10-25T01:30:00Z')
+      const value = study('2025-10-26T00:30:00Z', '2025-10-26T01:30:00Z')
       value[side].observedAt = timestamp
       const result = assessWeeklyBasketStudy(value)
       assert.equal(result.claimable, false, `${side} ${timestamp}`)

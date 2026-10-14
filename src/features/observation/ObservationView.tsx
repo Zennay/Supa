@@ -133,8 +133,8 @@ export function ObservationView() {
   // The user's next field task is derived from the current draft; readiness remains authoritative.
   const nextAction = useMemo(() => observationNextAction(sheet), [sheet])
   const progress = useMemo(() => observationSheetProgress(sheet), [sheet])
-  const readiness = useMemo(() => observationSheetReadiness(sheet), [sheet])
-  const windowSummary = useMemo(() => observationWindowSummary(sheet), [sheet])
+  const readiness = useMemo(() => observationSheetReadiness(sheet, Date.now()), [sheet])
+  const windowSummary = useMemo(() => observationWindowSummary(sheet, Date.now()), [sheet])
   const nextIncomplete = useMemo(
     () => nextIncompleteObservationLine(sheet),
     [sheet],

@@ -33,7 +33,7 @@ test('incomplete or unobserved M3 data cannot skip human evidence to export', ()
   sheet.study.studyId = 'test'
   assert.notEqual(observationNextAction(sheet).stage, 'export')
   assert.equal(before.study.studyId, '')
-  assert.match(source, /const readiness = useMemo\(\(\) => observationSheetReadiness\(sheet\), \[sheet\]\)/)
+  assert.match(source, /const readiness = useMemo\(\(\) => observationSheetReadiness\(sheet, Date\.now\(\)\), \[sheet\]\)/)
   assert.match(source, /const downloadDraft = \(\) =>/)
   assert.doesNotMatch(source, /window\.location\s*=|window\.open\(/)
 })

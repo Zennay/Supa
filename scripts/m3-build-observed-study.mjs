@@ -72,7 +72,9 @@ function validTimestamp(value) {
     if (offsetHour > 23 || offsetMinute > 59) return false
   }
 
-  return Number.isFinite(Date.parse(value))
+  // A future instant is never an already observed manual retailer capture.
+  const observedAtMs = Date.parse(value)
+  return Number.isFinite(observedAtMs) && observedAtMs <= Date.now()
 }
 
 function sameJson(left, right) {

@@ -98,6 +98,7 @@ function validTimestamp(value: unknown) {
   }
 
   const timestamp = Date.parse(value)
+  // Deterministic domain parser: the evaluation clock is an explicit caller input.
   return Number.isFinite(timestamp) ? timestamp : null
 }
 
@@ -254,6 +255,20 @@ export function assessWeeklyBasketStudy(
 
   const baselineObservedAt = validTimestamp(study.baseline.observedAt)
   const candidateObservedAt = validTimestamp(study.candidate.observedAt)
+  const referenceNowMs = validOptionsContainer
+    ? (options as { referenceNowMs?: unknown }).referenceNowMs
+    : undefined
+  if (referenceNowMs !== undefined &&
+    (typeof referenceNowMs !== 'number' || !Number.isFinite(referenceNowMs))) {
+    reasons.push('assessment reference clock is malformed')
+  } else if (typeof referenceNowMs === 'number') {
+    if (baselineObservedAt !== null && baselineObservedAt > referenceNowMs) {
+      reasons.push('baseline observedAt is later than assessment reference time')
+    }
+    if (candidateObservedAt !== null && candidateObservedAt > referenceNowMs) {
+      reasons.push('candidate observedAt is later than assessment reference time')
+    }
+  }
   let observationWindowHours: number | null = null
 
   if (baselineObservedAt !== null && candidateObservedAt !== null) {
