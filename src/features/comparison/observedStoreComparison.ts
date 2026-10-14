@@ -25,6 +25,7 @@ export type ObservedComparisonRow = {
   unit: string
   plus: ObservedPriceLine
   dekamarkt: ObservedPriceLine
+  differenceCents: number | null
 }
 
 export type ObservedStoreTotals = {
@@ -236,14 +237,26 @@ export function buildObservedComparisonPreview(
   }
 
   return {
-    rows: sheet.requirements.map((requirement, index) => ({
-      id: requirement.id,
-      ingredientLabel: requirement.label,
-      amount: requirement.amount,
-      unit: requirement.unit,
-      plus: plus.lines[index],
-      dekamarkt: deka.lines[index],
-    })),
+    rows: sheet.requirements.map((requirement, index) => {
+      const plusLine = plus.lines[index]
+      const dekaLine = deka.lines[index]
+      const difference = plusLine.totalCents !== null && dekaLine.totalCents !== null
+        ? plusLine.totalCents - dekaLine.totalCents
+        : null
+      return {
+        id: requirement.id,
+        ingredientLabel: requirement.label,
+        amount: requirement.amount,
+        unit: requirement.unit,
+        plus: plusLine,
+        dekamarkt: dekaLine,
+        // A row-by-row difference is useful during collection, but never
+        // authorizes a whole-basket winner while any evidence is incomplete.
+        differenceCents: difference !== null && Number.isSafeInteger(difference)
+          ? difference
+          : null,
+      }
+    }),
     plus: plus.totals,
     dekamarkt: deka.totals,
     outcome,
