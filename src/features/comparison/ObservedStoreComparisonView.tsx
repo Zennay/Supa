@@ -151,6 +151,15 @@ export function ObservedStoreComparisonView({
             <div className="observed-compare-ingredient">
               <strong>{row.ingredientLabel}</strong>
               <small>Benodigd: {row.amount} {row.unit}</small>
+              {row.differenceCents !== null && (
+                <small className="observed-compare-row-delta" data-observed-row-delta>
+                  {row.differenceCents === 0
+                    ? 'Zelfde regelprijs'
+                    : row.differenceCents > 0
+                      ? `DekaMarkt ${euro.formatCents(row.differenceCents)} voordeliger op deze regel`
+                      : `PLUS ${euro.formatCents(-row.differenceCents)} voordeliger op deze regel`}
+                </small>
+              )}
             </div>
             <div className="observed-compare-price" data-price-side="plus" data-price-status={row.plus.status}>
               <span className="observed-compare-mobile-label">PLUS</span>
