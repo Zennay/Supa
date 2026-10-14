@@ -108,6 +108,13 @@ function projectBasketLine(value: unknown): Record<string, unknown> | null {
     !isNonNegativeSafeInteger(lineTotalCents)
   ) return null
 
+  // A checked identity must reflect a coherent physical price snapshot.
+  // Reject overflow as well as mismatched cents; never coerce or recompute
+  // caller-owned basket facts. Valid existing v1 keys remain byte-identical.
+  const expectedLineTotalCents = packs * pricePerPackCents
+  if (!Number.isSafeInteger(expectedLineTotalCents) ||
+      lineTotalCents !== expectedLineTotalCents) return null
+
   return {
     id,
     status,
