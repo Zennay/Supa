@@ -13,7 +13,7 @@ import {
 // Independent pure BigInt cent string oracle, not euro.formatCents().
 function decimalCents(value) {
   const cents = BigInt(value)
-  const whole = (cents / 100n).toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.')
+  const whole = (cents / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
   return `${whole},${(cents % 100n).toString().padStart(2, '0')}`
 }
 
