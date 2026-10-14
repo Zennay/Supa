@@ -103,7 +103,7 @@ test('M5 canonical real M1 WebPage abstention remains valid for P3', () => {
   const queue=buildOfflineSelectorReviewQueue(compareInspections(
     {sourceCount:1,sources:[source]},{sourceCount:1,sources:[structuredClone(source)]}))
   assert.equal(queue.actions[0].priority,'P3')
-  assert.equal(queue.actions[0].schemaOrgStatus,'abstain')
+  assert.equal(queue.actions[0].status,'unchanged')
   assert.equal(queue.m5Eligible,false)
 })
 test('M5 parser errors cannot be substituted for Product evidence', () => {
