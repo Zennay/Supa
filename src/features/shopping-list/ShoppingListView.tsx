@@ -115,7 +115,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
                     current.basketKey === basketKey ? current.done : []
                   return {
                     basketKey,
-                    done: checked
+                    done: currentDone.includes(line.id)
                       ? currentDone.filter((id) => id !== line.id)
                       : [...currentDone, line.id],
                   }
