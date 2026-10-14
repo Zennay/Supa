@@ -40,18 +40,18 @@ test('independent: every selected-week subset exports exactly its canonical sele
         assert.deepEqual(selectedLines, expected, `${context}: must only export selected canonical meals`)
         assert.equal(headerLines.length, includeBudget ? 1 : 0, `${context}: budget opt-in required`)
         if (includeBudget) {
-          assert.match(headerLines[0], /€\\s*35,25/)
+          assert.match(headerLines[0], /€\s*35,25/)
         } else {
           assert.doesNotMatch(copied, /€|weekbudget/i)
         }
-        if (!includeDetails) assert.doesNotMatch(copied, /\\d+ min · \\d+ porties/)
+        if (!includeDetails) assert.doesNotMatch(copied, /\d+ min · \d+ porties/)
         else assert.equal(
-          selectedLines.filter((line) => / · \\d+ min · \\d+ porties$/.test(line)).length,
+          selectedLines.filter((line) => / · \d+ min · \d+ porties$/.test(line)).length,
           expected.length,
           `${context}: each selected recipe has serving details`,
         )
         assert.equal(lines.includes('Geen maaltijden geselecteerd.'), days.length === 0)
-        assert.match(copied, /Dit is een planning, geen prijsopgave\\./)
+        assert.match(copied, /Dit is een planning, geen prijsopgave\./)
         assert.doesNotMatch(copied, /besparing|bespaard|6,40|5,80|4,90/i)
       }
     }
