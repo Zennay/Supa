@@ -34,6 +34,7 @@ import {
 } from './observationDraftPersistence.ts'
 import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
 import { observationNextAction } from './observationNextStep.ts'
+import { readableObservationIssue } from './observationReadinessCopy.ts'
 import { ObservationNextActionCard } from './ObservationNextActionCard.tsx'
 
 type Side = 'baseline' | 'candidate'
@@ -410,7 +411,7 @@ export function ObservationView() {
             </p>
             <ul>
               {readiness.issues.slice(0, 6).map((issue) => (
-                <li key={issue}>{issue}</li>
+                <li key={issue}>{readableObservationIssue(issue)}</li>
               ))}
             </ul>
             {readiness.issues.length > 6 && (
