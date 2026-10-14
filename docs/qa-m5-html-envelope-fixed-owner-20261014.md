@@ -1,0 +1,9 @@
+# Independent HTML-envelope original→corrected M5 quality proof
+
+**Fixed product owner [DRAFT #2310](https://github.com/Zennay/Supa/pull/2310)** frozen exactly `33e224453989bea7098eedb47f1ebb68f499f469`, previously successful [CI #38510286605](https://github.com/Zennay/Supa/actions/runs/38510286605). Original source [product #2306](https://github.com/Zennay/Supa/pull/2306) `acdb51dd5b1ab146d0ccd3855a153acd4e3cbd81`. Independent original [QA DRAFT #2314](https://github.com/Zennay/Supa/pull/2314) adds only 15 synthetic tests for issue [#2309](https://github.com/Zennay/Supa/issues/2309).
+
+This corrected-source QA child imports the **exact byte-identical original Git test blob `f3ffb47d7d3365b97b19dcebe0d76f69b77b503f`**. Four normal positives, eleven negative property-getter/inherited metadata cases across the complete M1 HTML envelope and application/json scripts. Require generic private failure and zero execution of arbitrary getters while preserving real fake parsed Product P2, abstain P2, failed M1 P1, bounded app-json and all release flags false.
+
+Only test/doc ADD paths, never modify product/other worker branches, source data/main/UI/M1/M3/CI/workflow/permanent VPS. Require **this branch's own exact-head** full GitHub Node, high audit, M1 matching/source-permission and TS/Vite production build before corrected-GREEN claim; the upstream product green alone is insufficient. All data fictional and offline.
+
+Supa **M3 ACTIVE**. Human genuine [#78 PLUS11+DekaMarkt11 same-demand field pair <=24h](https://github.com/Zennay/Supa/issues/78) absent; M4/M5 ineligible. **DRAFT/HOLD/NO MERGE/NO DEPLOY** until independent zCloud SQLite write scope/task lease, original source/QA owners, current-main/trusted runner if applicable, actual field permissions/savings evidence and explicit human releasego.
