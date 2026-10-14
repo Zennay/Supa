@@ -6,6 +6,7 @@ import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
+import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
@@ -198,7 +199,7 @@ export function App() {
           <span className="brand-mark">S</span>
           <strong>SUPA</strong>
         </div>
-        <button className="avatar" aria-label="Profiel">ZE</button>
+        <IdentityAvatar />
       </header>
 
       <div className="content">
@@ -277,6 +278,7 @@ export function App() {
       <nav className="bottom-nav" aria-label="Hoofdnavigatie">
         {tabs.map((item) => (
           <button
+            type="button"
             key={item.id}
             className={tab === item.id ? 'active' : ''}
             aria-current={tab === item.id ? 'page' : undefined}
