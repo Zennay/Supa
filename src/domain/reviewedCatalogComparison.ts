@@ -229,6 +229,30 @@ export function compareReviewedCatalogs({
     }
   })
 
+  // Two distinct ingredient lines can select the same *physical* SKU.
+  // Rounding each demand independently would charge that one package twice.
+  // Until a shared-pack allocation can be displayed transparently, withhold
+  // those line costs and the entire winner rather than inventing savings.
+  for (const shop of SHOPS) {
+    const seenLineProducts = new Set<string>()
+    const sharedLineProducts = new Set<string>()
+    for (const line of lines) {
+      if (line[shop].status !== 'matched' || !line[shop].productId) continue
+      const id = line[shop].productId
+      if (seenLineProducts.has(id)) sharedLineProducts.add(id)
+      seenLineProducts.add(id)
+    }
+    if (sharedLineProducts.size > 0) {
+      sourceTrusted = false
+      for (const line of lines) {
+        if (line[shop].productId && sharedLineProducts.has(line[shop].productId)) {
+          line[shop] = unknown()
+          line.differenceCents = null
+        }
+      }
+    }
+  }
+
   const storeSummaries = Object.fromEntries(SHOPS.map((shop) => {
     const complete = sourceTrusted && lines.every((line) => line[shop].status === 'matched')
     const values = lines.map((line) => line[shop].totalCents)
