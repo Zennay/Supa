@@ -80,10 +80,10 @@ test('independent current-main QA: routed saved ticks, paper and shopping rows a
       const printed = renderedPaper(html)
       assert.equal(printCheckedRows(html), expected, `paper mask ${mask}`)
       assert.equal(liveCheckedCount(html), expected, `live list mask ${mask}`)
-      const physicalRows = [...printed.matchAll(/<li>([\\s\\S]*?)<\\/li>/g)].map(match => match[1])
+      const physicalRows = [...printed.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(match => match[1])
       assert.equal(physicalRows.length, base.lines.length, `paper rows for mask ${mask}`)
       assert.equal((printed.match(/☐/g) ?? []).length, base.lines.length - expected)
-      const liveRows = [...html.matchAll(/<button\\b[^>]*class="shopping-row[^"]*"[^>]*>[\\s\\S]*?<\\/button>/g)]
+      const liveRows = [...html.matchAll(/<button\b[^>]*class="shopping-row[^"]*"[^>]*>[\s\S]*?<\/button>/g)]
         .map(match => match[0])
       assert.equal(liveRows.length, base.lines.length, `live rows for mask ${mask}`)
       for (const [index, line] of base.lines.entries()) {
