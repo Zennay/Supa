@@ -195,6 +195,29 @@ small{display:block;color:#50645e;line-height:1.5;margin-top:5px}td span{display
 }
 
 export async function main(argv = process.argv.slice(2)) {
+  if (argv.length === 1 && argv[0] === '--help') {
+    // Human-oriented, static help: do not access any participant file, price
+    // endpoint or network connection just to discover CLI usage.
+    const guide = [
+      'Supa · privé PLUS versus DekaMarkt productvergelijking (M3)',
+      '',
+      '1. Gebruik het canonieke formulier voor dezelfde 11 boodschappen bij beide winkels.',
+      '2. Noteer echte prijzen en verpakkingen binnen 24 uur, met dezelfde prijscontext.',
+      '3. Bewaar het formulier uitsluitend lokaal; gebruik geen namen of accountgegevens.',
+      '',
+      'Maak rechtstreeks een leesbaar HTML-overzicht:',
+      '  node --experimental-strip-types scripts/m3-private-comparison-html.mjs --sheet <veldformulier.json> --output <vergelijking.html>',
+      '',
+      'Of gebruik een eerder opgeslagen privé-vergelijkingsbestand:',
+      '  node --experimental-strip-types scripts/m3-private-comparison-html.mjs <vergelijking.json> --output <vergelijking.html>',
+      '',
+      'Het rapport wordt privé opgeslagen (0600). Onbekende prijzen blijven onbekend.',
+      'Een voorlopig goedkoopste mandje is geen onafhankelijk geverifieerde besparingsclaim.',
+      'De echte PLUS/DekaMarkt-veldmeting en bronrechten blijven afzonderlijk vereist.',
+    ].join('\n')
+    process.stdout.write(guide + '\n')
+    return guide
+  }
   const fromSheet = argv.length === 4 && argv[0] === '--sheet' && argv[2] === '--output'
   const fromComparison = argv.length === 3 && argv[1] === '--output'
   const input = fromSheet ? argv[1] : argv[0]
