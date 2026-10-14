@@ -77,7 +77,7 @@ export function formatShareableWeek(input: ShareableWeek): string {
 
     chosen.push(
       `${meal.day}: ${recipe.title}` +
-      (input.includeDetails ? ` · ${recipe.minutes} min · ${recipe.servings} porties` : ''),
+      (input.includeDetails ? ` · ${recipe.minutes} min · ${recipe.servings} ${recipe.servings === 1 ? 'portie' : 'porties'}` : ''),
     )
   }
   if (chosen.length !== active.size) throw new Error('Weekmenu niet beschikbaar')
