@@ -21,6 +21,13 @@ The optional offline command `node scripts/m5-check-core-retailer-coverage.mjs c
 
 Eight extra synthetic tests check identical independent copies, extra-brand removal, additions, array/root alias refusal, guarded accessor failure, and the actual comparison CLI's exit codes. These complement the original 13 cases: **21 new cases in this child PR**.
 
+## Identity and market-reference change detection (third product increment)
+
+Even when all candidate IDs remain present, silently renaming a banner or replacing its pinned public WUR/Consumentenbond research reference can mislead future reviewers. The offline comparison now reports only the affected **canonical banner IDs** in `changedCandidateIds` when `name` or `researchUrl` changes; it does **not** echo either name or URL. A different root `screenedAt` produces `screeningDateChanged=true`, without claiming the dates prove independent observations. These conditions cause `humanReviewRequired=true` and exit 2 on the comparison CLI. The original owner's exact schema, access policy and evidence URL allowlist are validated before reading anything; malformed metadata is rejected without invoking getter functions.
+
+Seven additional fictional regression cases cover changed names, changed permitted research citations, changed global dates, stable results under row reordering, getter refusal, and the corresponding actual CLI exit and privacy invariants. **Total 28 tests** (13 core + 8 snapshot-set + 7 source-metadata). This remains a market research workflow only, never a legal or product-data approval.
+
+
 Thirteen fully fictional tests include missing Boni, missing PLUS+DekaMarkt, a decoy replacement despite same total count, unchanged original object, invalid purpose and permission claims, real CLI output and safe CLI failure. **No retailer URL is fetched**; only original research references in owner data are read locally. No customer/product prices, user IDs, tokens, scraping, proxy use or network requests.
 
 ## Roadmap and review restrictions
