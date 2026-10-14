@@ -66,6 +66,12 @@ const packAmountInput = evaluate(
   {},
 ).ObservationPackAmountInput
 
+const packCountInput = evaluate(
+  compile('../src/features/observation/ObservationPackCountInput.tsx',
+    'ObservationPackCountInput.tsx', '__no_css__'),
+  {},
+).ObservationPackCountInput
+
 const actualView = compile('../src/features/observation/ObservationView.tsx',
   'ObservationView.tsx', 'ObservationView.css')
 
@@ -93,6 +99,7 @@ function renderView(sheet) {
     './ObservationNextActionCard.tsx': { ObservationNextActionCard: card },
     './ObservationPriceInput.tsx': { ObservationPriceInput: priceInput },
     './ObservationPackAmountInput.tsx': { ObservationPackAmountInput: packAmountInput },
+    './ObservationPackCountInput.tsx': { ObservationPackCountInput: packCountInput },
   }
   const ObservationView = evaluate(actualView, modules).ObservationView
   return renderToStaticMarkup(React.createElement(ObservationView))

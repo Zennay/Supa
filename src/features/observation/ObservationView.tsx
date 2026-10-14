@@ -24,7 +24,6 @@ import {
   observationTimestampFromDate,
 } from './observationCollectionUi.ts'
 import {
-  observationPackCount,
 } from './observationNumericInput.ts'
 import {
   persistObservationDraft,
@@ -36,6 +35,7 @@ import { readableObservationIssue } from './observationReadinessCopy.ts'
 import { ObservationNextActionCard } from './ObservationNextActionCard.tsx'
 import { ObservationPriceInput } from './ObservationPriceInput.tsx'
 import { ObservationPackAmountInput } from './ObservationPackAmountInput.tsx'
+import { ObservationPackCountInput } from './ObservationPackCountInput.tsx'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -764,17 +764,12 @@ export function ObservationView() {
                           </label>
                           <label>
                             Aantal per verpakking
-                            <input
-                              type="number"
-                              min="1"
-                              step="1"
-                              value={product.packCount}
-                              onChange={(event) =>
-                                updateProduct(side, lineIndex, {
-                                  packCount: observationPackCount(
-                                    event.target.value,
-                                  ),
-                                })
+                            <ObservationPackCountInput
+                              key={`${side}:${line.ingredientId}`}
+                              count={product.packCount}
+                              label={`${side === 'baseline' ? 'PLUS' : 'DekaMarkt'} · ${line.ingredientLabel} · aantal per verpakking`}
+                              onCountChange={(packCount) =>
+                                updateProduct(side, lineIndex, { packCount })
                               }
                             />
                           </label>
