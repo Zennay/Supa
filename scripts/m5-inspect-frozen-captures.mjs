@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import {
-  chmod, lstat, mkdir, mkdtemp, open, realpath, rm, writeFile,
+  chmod, mkdir, mkdtemp, open, rm, writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { inspectCaptureDirectory } from './m1-inspect-captures.mjs'
+import { withPinnedCaptureStore } from './m5-pin-capture-store.mjs'
 
 const HTML_BYTE_LIMIT = 8 * 1024 * 1024
 const HTML_COHORT_BYTE_LIMIT = 8 * 1024 * 1024
@@ -99,14 +100,13 @@ export async function inspectFrozenCaptureDirectory(
     const madeFolders = new Set()
     for (const row of sources) {
       if (!row.success) continue
-      const originalFolder = path.join(directory, row.supermarket)
-      const folder = await lstat(originalFolder)
-      if (!folder.isDirectory() || folder.isSymbolicLink() ||
-          await realpath(originalFolder) !== path.resolve(originalFolder)) invalid()
-
-      const sourcePath = path.join(originalFolder, row.id + '.html')
-      const bytes = await readVerifiedHtml(
-        sourcePath, row.sha256, HTML_COHORT_BYTE_LIMIT - total,
+      // Pin original root + supermarket directory inodes during the HTML
+      // read. An attacker replacing an original parent pathname later cannot
+      // redirect the O_NOFOLLOW HTML open to a borrowed external file.
+      const bytes = await withPinnedCaptureStore(directory, row.supermarket,
+        (pinnedFilePath) => readVerifiedHtml(
+          pinnedFilePath(row.id), row.sha256, HTML_COHORT_BYTE_LIMIT - total,
+        ),
       )
       total += bytes.length
       if (!madeFolders.has(row.supermarket)) {
