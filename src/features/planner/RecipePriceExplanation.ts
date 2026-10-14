@@ -1,5 +1,5 @@
 import { createElement } from 'react'
-import { euro } from '../../lib/money'
+import { euro } from '../../lib/money.ts'
 
 type RecipePriceExplanationProps = {
   estimatedCost: unknown
