@@ -50,6 +50,10 @@ test('M3 observed-week workflow keeps every evidence-boundary dependency in its 
     'src/domain/matching.ts',
     'src/domain/basketComparison.ts',
     'src/domain/savingsAttribution.ts',
+    'src/features/observation/**',
+    'tests/product-m3-observation-stale-tab-*.test.mjs',
+    'tests/product-m3-unreadable-local-draft-recovery.test.mjs',
+    'tests/qa-m3-stale-draft-*.test.mjs',
     'src/features/observation/ObservationView.tsx',
     'src/features/observation/observationNextStep.ts',
     'src/features/observation/observationCollectionUi.ts',
@@ -202,5 +206,32 @@ test('M3 live field collection UI cannot bypass permanent VPS path selection', a
     assert.notEqual(without, workflow)
     assert.ok(!hasQuotedPathTrigger(without, path),
       'path-removal mutation must be caught for ' + path)
+  }
+})
+
+test('M3 private draft cross-tab source and QA changes retrigger permanent runner', async () => {
+  const yaml = await readFile(workflowPath, 'utf8')
+  const segment = /^  pull_request:\s*\n    paths:\s*\n((?:      - [^\n]+\n)+)/mu.exec(yaml)?.[1]
+  assert.ok(segment, 'M3 PR path list must exist')
+  const selected = segment.split('\n').filter(Boolean).map((line) =>
+    JSON.parse(line.trim().slice(2)),
+  )
+  const guards = [
+    'src/features/observation/**',
+    'tests/product-m3-observation-stale-tab-*.test.mjs',
+    'tests/product-m3-unreadable-local-draft-recovery.test.mjs',
+    'tests/qa-m3-stale-draft-*.test.mjs',
+  ]
+  function requireFieldCoverage(paths) {
+    for (const guard of guards) {
+      assert.ok(paths.includes(guard), 'M3 field protection path must trigger permanent runner: ' + guard)
+    }
+  }
+  requireFieldCoverage(selected)
+  for (const guard of guards) {
+    const mutated = selected.filter((entry) => entry !== guard)
+    assert.notDeepEqual(mutated, selected)
+    assert.throws(() => requireFieldCoverage(mutated),
+      /M3 field protection path must trigger permanent runner/u)
   }
 })
