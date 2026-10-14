@@ -130,7 +130,7 @@ for (const [label, delta] of [
       }),
       evidence: [],
     })
-    assert.equal(result.status, 'partial')
+    assert.equal(result.status, 'partial', JSON.stringify({ result, baselineTotalCents, candidateTotalCents, delta }))
     assert.equal(result.fullyAttributed, false)
     assert.equal(result.comparisonDeltaCents, delta)
     assert.equal(result.effectTotals.unknownCents, delta)
