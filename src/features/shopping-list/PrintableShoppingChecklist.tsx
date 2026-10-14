@@ -7,7 +7,18 @@ import './PrintableShoppingChecklist.css'
  * Never persists, uploads, guesses unavailable products or prints prices.
  */
 export function PrintableShoppingChecklist({ basket }: { basket: OneStoreBasket }) {
-  const printable = preparePrintableShoppingChecklist(basket)
+  // A corrupted or sparse basket must never crash the shopping tab or produce
+  // a plausible-looking paper checklist. Keep the interactive list available.
+  let printable: ReturnType<typeof preparePrintableShoppingChecklist>
+  try {
+    printable = preparePrintableShoppingChecklist(basket)
+  } catch {
+    return (
+      <p className="disclaimer" role="status">
+        Afdrukken is niet beschikbaar. Controleer eerst je boodschappenlijst.
+      </p>
+    )
+  }
 
   return (
     <section className="supa-printable-shopping" aria-label="Papieren boodschappenlijst">
