@@ -23,11 +23,16 @@ assert.deepEqual(compiled.diagnostics, [])
 
 function mountedSnapshot(openedText, currentText) {
   let nextState
+  // The current component binds opened text to a snapshot revision. Mount
+  // the same shape that a real explicit click creates, not a legacy string.
+  const initialState = openedText === null
+    ? null
+    : { text: openedText, revision: 0 }
   const reactHooks = {
     useId: () => 'shopping-copy-test',
-    useRef: () => ({ current: null }),
-    useState: () => [openedText, (update) => {
-      nextState = typeof update === 'function' ? update(openedText) : update
+    useRef: (initial) => ({ current: initial }),
+    useState: () => [initialState, (update) => {
+      nextState = typeof update === 'function' ? update(initialState) : update
     }],
   }
   const loaded = { exports: {} }
@@ -69,7 +74,7 @@ test('changed planner basket never silently opens new private shopping copy', ()
 test('user-initiated open and close bind the exact current copy text', () => {
   const initial = mountedSnapshot(null, 'Boodschappenlijst vandaag')
   initial.button.props.onClick()
-  assert.equal(initial.getNextState(), 'Boodschappenlijst vandaag')
+  assert.deepEqual(initial.getNextState(), { text: 'Boodschappenlijst vandaag', revision: 0 })
   const opened = mountedSnapshot('Boodschappenlijst vandaag', 'Boodschappenlijst vandaag')
   opened.button.props.onClick()
   assert.equal(opened.getNextState(), null)
