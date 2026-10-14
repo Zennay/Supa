@@ -80,8 +80,21 @@ test('independent current-main QA: routed saved ticks, paper and shopping rows a
       const printed = renderedPaper(html)
       assert.equal(printCheckedRows(html), expected, `paper mask ${mask}`)
       assert.equal(liveCheckedCount(html), expected, `live list mask ${mask}`)
-      assert.equal((printed.match(/<li>/g) ?? []).length, base.lines.length)
+      const physicalRows = [...printed.matchAll(/<li>([\\s\\S]*?)<\\/li>/g)].map(match => match[1])
+      assert.equal(physicalRows.length, base.lines.length, `paper rows for mask ${mask}`)
       assert.equal((printed.match(/☐/g) ?? []).length, base.lines.length - expected)
+      const liveRows = [...html.matchAll(/<button\\b[^>]*class="shopping-row[^"]*"[^>]*>[\\s\\S]*?<\\/button>/g)]
+        .map(match => match[0])
+      assert.equal(liveRows.length, base.lines.length, `live rows for mask ${mask}`)
+      for (const [index, line] of base.lines.entries()) {
+        const shouldCheck = selected.includes(line.id)
+        assert.equal(physicalRows[index].includes('☑'), shouldCheck,
+          `paper row ${line.id} incorrectly checked for mask ${mask}`)
+        assert.equal(physicalRows[index].includes('☐'), !shouldCheck,
+          `paper row ${line.id} checkbox missing for mask ${mask}`)
+        assert.equal(/aria-pressed="true"/.test(liveRows[index]), shouldCheck,
+          `live row ${line.id} incorrectly checked for mask ${mask}`)
+      }
       assert.match(html, /Geen liveprijzen of besparingsbewijs/)
       assert.doesNotMatch(html, /€|priceCents|savingsCents|publicSavingsClaimEligible|participantKey|<script\b/i)
       assert.deepEqual(base, before, `source basket must remain unchanged, mask ${mask}`)
