@@ -30,10 +30,14 @@ export function comparisonLineHighlights(
 
   const seen = new Set<string>()
   let sum = 0
+  let baselineSum = 0
+  let candidateSum = 0
   for (const line of comparison.lineDeltas) {
     if (!line || typeof line !== 'object' ||
-        typeof line.id !== 'string' || !line.id.trim() || seen.has(line.id) ||
+        typeof line.id !== 'string' || !line.id.trim() || line.id.trim() !== line.id ||
+        line.id.length > 128 || seen.has(line.id) ||
         typeof line.ingredientLabel !== 'string' ||
+        line.ingredientLabel.length > 180 || line.ingredientLabel.trim() !== line.ingredientLabel ||
         !/[\p{L}\p{N}]/u.test(line.ingredientLabel) ||
         /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(line.ingredientLabel) ||
         !Number.isSafeInteger(line.baselineLineTotalCents) || line.baselineLineTotalCents < 0 ||
@@ -42,9 +46,13 @@ export function comparisonLineHighlights(
         line.deltaCents !== line.candidateLineTotalCents - line.baselineLineTotalCents) return []
     seen.add(line.id)
     sum += line.deltaCents
-    if (!Number.isSafeInteger(sum)) return []
+    baselineSum += line.baselineLineTotalCents
+    candidateSum += line.candidateLineTotalCents
+    if (!Number.isSafeInteger(sum) || !Number.isSafeInteger(baselineSum) ||
+        !Number.isSafeInteger(candidateSum)) return []
   }
-  if (sum !== comparison.deltaCents) return []
+  if (sum !== comparison.deltaCents || baselineSum !== comparison.baselineTotalCents ||
+      candidateSum !== comparison.candidateTotalCents) return []
 
   const max = Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 3) : 3
   return comparison.lineDeltas
