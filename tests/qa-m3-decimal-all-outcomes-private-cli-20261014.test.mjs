@@ -59,7 +59,7 @@ for (const [price, outcome, privateSavings] of [
       assert.equal(evidence.candidateTotalCents, 3135 * price)
       assert.equal(evidence.outcome, outcome)
       assert.equal(evidence.savingsCents, privateSavings)
-      assert.equal(evidence.deltaCents, privateSavings)
+      assert.equal(evidence.deltaCents, -privateSavings, 'delta is candidate minus baseline')
       assert.equal(evidence.claimable, true, 'synthetic local math can be internally assessed')
       assert.equal(evidence.publicSavingsClaimEligible, false)
       assert.equal(Object.hasOwn(evidence, 'participantKey'), false)
