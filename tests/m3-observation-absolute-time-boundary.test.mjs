@@ -43,13 +43,26 @@ function basket(store, priceDelta = 0) {
 }
 
 function study(baselineAt, candidateAt) {
+  // Timezone tests vary across March/October and cross local Sunday→Monday.
+  // Anchor the declared week to the latest local observation date so the
+  // 7-day week / 2-day advance-shopping contract is also physically coherent.
+  // These tests still assert the *same original* UTC elapsed-time boundaries.
+  const localDays = [baselineAt, candidateAt]
+    .filter(value => /^\d{4}-\d{2}-\d{2}T/.test(value))
+    .map(value => value.slice(0, 10))
+    .sort()
+  const latestLocalDate = localDays.at(-1) ?? '2026-10-25'
+  const monday = new Date(`${latestLocalDate}T12:00:00Z`)
+  monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7)
+  const weekStart = monday.toISOString().slice(0, 10)
+
   return {
     schemaVersion: 1,
     studyId: 'synthetic-absolute-window',
     participantKey: 'synthetic-student',
     population: 'independently living students',
     region: 'Leiden',
-    weekStart: '2026-10-19',
+    weekStart,
     priceContext: 'in-store',
     baseline: {
       evidenceId: 'synthetic-plus-proof',
