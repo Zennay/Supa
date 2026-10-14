@@ -118,3 +118,21 @@ test('M3 CLI chain: one genuinely unavailable-looking fictional item stays unkno
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.match(report.reasons.join(' '), /unresolved ingredients/)
 })
+
+test('M3 CLI chain: untouched field template is refused and cannot create purported evidence', async () => {
+  const sheet = buildObservationSheet()
+  assert.equal(sheet.evidenceStatus, 'collection-template-not-evidence')
+  const directory = await mkdtemp(join(tmpdir(), 'supa-m3-unfilled-template-'))
+  const input = join(directory, 'unfilled-collection-template.json')
+  const output = join(directory, 'evidence', 'must-not-exist.json')
+  try {
+    await writeFile(input, JSON.stringify(sheet), 'utf8')
+    const conversion = cli('scripts/m3-build-observed-study.mjs', [
+      input, '--output', output,
+    ])
+    assert.notEqual(conversion.status, 0, 'an empty form cannot become observed evidence')
+    await assert.rejects(readFile(output, 'utf8'), /ENOENT/)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
