@@ -1,8 +1,7 @@
 import { mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { privateM3OutputFailure } from './m3-private-file-errors.mjs'
 import { pathToFileURL } from 'node:url'
-import { assertNoSymlinkedM3OutputParents, writeDerivedM3Output } from './m3-source-output-preservation.mjs'
+import { assertNoSymlinkedM3OutputParents, writeDerivedM3Output, privateM3OutputFailure } from './m3-source-output-preservation.mjs'
 
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
 import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
