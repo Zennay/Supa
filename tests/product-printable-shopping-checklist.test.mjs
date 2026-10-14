@@ -97,12 +97,12 @@ test('multipacks show both outer packages and real inner physical units', () => 
 
 test('exact decimal physical-pack boundaries do not overbuy across g/kg, ml/l and multipacks', () => {
   const cases = [
-    [0.3, 'g', 0.1, 'g', 1, 3, '3 × 0.1 g'],
-    [0.6, 'g', 0.2, 'g', 1, 3, '3 × 0.2 g'],
+    [0.3, 'g', 0.1, 'g', 1, 3, '3 × 0,1 g'],
+    [0.6, 'g', 0.2, 'g', 1, 3, '3 × 0,2 g'],
     [0.3, 'kg', 100, 'g', 1, 3, '3 × 100 g'],
     [0.35, 'l', 175, 'ml', 1, 2, '2 × 175 ml'],
-    [0.00007, 'l', 0.07, 'ml', 1, 1, '1 × 0.07 ml'],
-    [0.6, 'l', 0.2, 'l', 2, 2, '2 verpakkingen van 2 × 0.2 l'],
+    [0.00007, 'l', 0.07, 'ml', 1, 1, '1 × 0,07 ml'],
+    [0.6, 'l', 0.2, 'l', 2, 2, '2 verpakkingen van 2 × 0,2 l'],
     [3, 'piece', 2, 'piece', 2, 1, '1 verpakking van 2 × 2 stuks'],
     [5e-324, 'g', 5e-324, 'g', 1, 1, '1 × 5e-324 g'],
   ]
