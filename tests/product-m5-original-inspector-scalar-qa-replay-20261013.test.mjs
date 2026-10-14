@@ -65,6 +65,7 @@ test('M5 shape positive: real malformed JSON-LD parseError=true remains tracked 
   const valid = source()
   const bad = source()
   bad.html = inspectHtml('<script type="application/ld+json">{not-json}</script>')
+  bad.manifestSha256 = 'b'.repeat(64)
   assert.equal(bad.html.jsonLd[0].parseError, true)
   const report = compare(bad, valid)
   assert.equal(report.changes[0].status, 'shape_changed')
