@@ -73,3 +73,25 @@ test('plain oversized baskets and arrays also abstain instead of rendering a mon
     candidate: {}, comparison: {},
   })
 })
+
+test('cumulative key budget stops descriptor reads on a later nested basket', () => {
+  const recordWithKeys = (count) => {
+    let reads = 0
+    const keys = Array.from({ length: count }, (_, index) => `synthetic-${index}`)
+    const proxy = new Proxy({}, {
+      ownKeys() { return keys },
+      getOwnPropertyDescriptor() {
+        reads++
+        return { configurable: true, enumerable: true, writable: true, value: 1 }
+      },
+    })
+    return { proxy, reads: () => reads }
+  }
+  const first = recordWithKeys(5000)
+  const second = recordWithKeys(3500)
+  expectNoMoney({
+    baseline: first.proxy, candidate: second.proxy, comparison: {},
+  })
+  assert.equal(first.reads(), 5000, 'first permitted basket is inspected once')
+  assert.equal(second.reads(), 0, 'later basket must be rejected BEFORE any descriptor trap')
+})
