@@ -129,6 +129,7 @@ test('M3 attribution rejects a non-zero planning effect inside a same-demand sto
 test('M3 attribution rejects blank comparison line identities before evidence lookup', () => {
   const result = attributeSavingsEffects({
     comparison: comparison({
+      outcome: 'same',
       baselineTotalCents: 100,
       candidateTotalCents: 100,
       deltaCents: 0,
