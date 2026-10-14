@@ -184,6 +184,19 @@ export function buildOfflineSelectorReviewQueue(report) {
   if (foundCurrent !== report.captureCount || driftCount !== report.driftCount) invalid()
   actions.sort((a, b) => a.priority.localeCompare(b.priority) ||
     a.action.localeCompare(b.action) || a.sourceToken.localeCompare(b.sourceToken))
+
+  // Aggregates are derived ONLY from canonical validated action rows. The
+  // bounded 200-item report never needs to expose source IDs, URLs, prices,
+  // DOM payloads or per-source metadata to show a human the review workload.
+  const priorityCounts = { P1: 0, P2: 0, P3: 0 }
+  const statusCounts = Object.fromEntries(Object.keys(STATUS_ACTION).map(
+    (status) => [status, 0],
+  ))
+  for (const action of actions) {
+    priorityCounts[action.priority] += 1
+    statusCounts[action.status] += 1
+  }
+
   return {
     contractVersion: 1,
     mode: 'offline_selector_review_queue_only',
@@ -191,6 +204,11 @@ export function buildOfflineSelectorReviewQueue(report) {
     baselineProvided: report.baselineProvided,
     sourceCount: foundCurrent,
     driftCount,
+    summary: {
+      actionCount: actions.length,
+      priorityCounts,
+      statusCounts,
+    },
     reviewerActionRequired: true,
     selectorVerified: false,
     rightsVerified: false,
