@@ -297,7 +297,8 @@ test('real React M3 next-action card names the exact field rather than a generic
   product.priceCents = null
   const before = structuredClone(sheet)
   const html = renderView(sheet)
-  const cardHtml = html.match(/class="observation-next-action"[\\s\\S]*?<\\/div>/)?.[0] ?? ''
+  const start = html.indexOf('class="observation-next-action"')
+  const cardHtml = start < 0 ? '' : html.slice(start, html.indexOf('</div>', start) + 6)
   assert.match(cardHtml, /Volgende: PLUS/)
   assert.match(cardHtml, /werkelijk geobserveerde prijs per verpakking/)
   assert.doesNotMatch(cardHtml, /Controleer beschikbaarheid, product, verpakking en prijs/)
