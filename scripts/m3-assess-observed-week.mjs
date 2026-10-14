@@ -29,6 +29,16 @@ function requireString(value, path) {
   assert(typeof value === 'string' && value.trim().length > 0, `${path} must be a non-empty string`)
 }
 
+// M3 reports must never repeat direct contact identifiers supplied as descriptive
+// metadata. Validation refuses unsafe fields rather than silently redacting
+// retailer identities or editing the original private field evidence.
+const DIRECT_EMAIL_PATTERN = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/iu
+
+function requireReportSafeMetadata(value, path) {
+  requireString(value, path)
+  assert(!DIRECT_EMAIL_PATTERN.test(value), `${path} contains a direct email identifier; private report refused`)
+}
+
 function requireNonNegativeInteger(value, path) {
   assert(
     Number.isSafeInteger(value) && value >= 0,
@@ -130,8 +140,8 @@ function validateBasketLine(line, path) {
 function validateBasket(basket, path) {
   requireRecord(basket, path)
   requireRecord(basket.store, `${path}.store`)
-  requireString(basket.store.id, `${path}.store.id`)
-  requireString(basket.store.name, `${path}.store.name`)
+  requireReportSafeMetadata(basket.store.id, `${path}.store.id`)
+  requireReportSafeMetadata(basket.store.name, `${path}.store.name`)
   requireNonNegativeInteger(basket.selectedMealCount, `${path}.selectedMealCount`)
   assert(Array.isArray(basket.lines), `${path}.lines must be an array`)
   basket.lines.forEach((line, index) => validateBasketLine(line, `${path}.lines[${index}]`))
@@ -191,8 +201,8 @@ export function validateObservedWeekInput(study) {
     KEY_PATTERN.test(study.participantKey),
     'participantKey must be a pseudonymous path-safe key',
   )
-  requireString(study.population, 'population')
-  requireString(study.region, 'region')
+  requireReportSafeMetadata(study.population, 'population')
+  requireReportSafeMetadata(study.region, 'region')
   requireString(study.weekStart, 'weekStart')
   assert(
     ALLOWED_PRICE_CONTEXTS.has(study.priceContext),
