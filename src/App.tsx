@@ -203,6 +203,25 @@ export function App() {
 
       <div className="content">
         {tab === 'planner' && (
+          <PlannerView
+            budget={budget}
+            activeDays={activeDays}
+            plannedMeals={plannedMeals}
+            recipes={m2Recipes}
+            basketTotalCents={basket.totalCents}
+            basketUnresolvedLineCount={basket.unresolvedLineCount}
+            onBudgetChange={(nextBudget) =>
+              setPreferences((current) => ({
+                ...current,
+                budget: nextBudget,
+              }))
+            }
+            onToggleDay={toggleDay}
+            onRecipeChange={changeRecipe}
+            onReset={resetPlan}
+          />
+        )}
+        {tab === 'planner' && (
           <section className="week-share-panel" aria-label="Weekmenu delen">
             <div className="week-share-actions">
               <span>Deel je geplande maaltijden, zonder winkelprijzen.</span>
@@ -242,25 +261,6 @@ export function App() {
               />
             )}
           </section>
-        )}
-        {tab === 'planner' && (
-          <PlannerView
-            budget={budget}
-            activeDays={activeDays}
-            plannedMeals={plannedMeals}
-            recipes={m2Recipes}
-            basketTotalCents={basket.totalCents}
-            basketUnresolvedLineCount={basket.unresolvedLineCount}
-            onBudgetChange={(nextBudget) =>
-              setPreferences((current) => ({
-                ...current,
-                budget: nextBudget,
-              }))
-            }
-            onToggleDay={toggleDay}
-            onRecipeChange={changeRecipe}
-            onReset={resetPlan}
-          />
         )}
         {tab === 'basket' && (
           <BasketView

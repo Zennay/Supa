@@ -33,6 +33,13 @@ test('actual routed Planner renders the private M3 sharing controls and no prepa
     assert.match(shareBlock, /aria-live="polite"/)
     assert.match(html, /Geplande maaltijden/)
 
+    // SUPA is planner-first and budget-first on narrow screens: the actual
+    // weekly plan must appear before secondary sharing tools in document flow.
+    const planPosition = html.indexOf('Plan eerst. Vergelijk daarna.')
+    const sharingPosition = html.indexOf('aria-label="Weekmenu delen"')
+    assert.ok(planPosition >= 0 && sharingPosition > planPosition,
+      'the selected meal plan is the primary screen, before optional sharing')
+
     // Render the actual conditional export component (not mounted until
     // consentfully requested by the user) and prove copy selection affordance.
     const { WeekShareManualCopy } = await vite.ssrLoadModule(
