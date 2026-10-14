@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -123,6 +123,40 @@ for (const kind of ['converter', 'assessment']) {
         assert.equal(run.stdout, '')
         assert.match(run.stderr, /refusing symlinked M3 derived output file/u)
         assert.doesNotMatch(run.stderr, /fictional-only|synthetic-symlink-parent/u)
+        assert.equal(await readFile(input, 'utf8'), original)
+        assert.equal(await readFile(unrelated, 'utf8'), sentinel)
+        assert.equal(await readFile(linkedOutput, 'utf8'), sentinel)
+      } finally { await rm(root, { recursive: true, force: true }) }
+    })
+}
+
+// An output path hardlinked to a separate existing file has no symlink to
+// detect; nlink > 1 must also fail before any truncate/write.
+for (const kind of ['converter', 'assessment']) {
+  test(`M3 ${kind} never clobbers a separate preexisting hardlink target`,
+    { skip: process.platform === 'win32' }, async () => {
+      const root = await mkdtemp(join(tmpdir(), `supa-m3-output-hardlink-${kind}-`))
+      try {
+        const input = join(root, 'fictional-input.json')
+        const unrelated = join(root, 'unrelated-keep-exact.json')
+        const linkedOutput = join(root, 'hardlinked-report-output.json')
+        const sentinel = 'KEEP_UNRELATED_SYNTHETIC_CONTENT_UNCHANGED\n'
+        const payload = kind === 'converter' ? inputSheet() : buildWeeklyBasketStudyFromObservationSheet(inputSheet())
+        await writeFile(input, JSON.stringify(payload))
+        await writeFile(unrelated, sentinel)
+        await link(unrelated, linkedOutput)
+        assert.equal((await stat(unrelated)).nlink, 2)
+        const original = await readFile(input, 'utf8')
+        const command = kind === 'converter'
+          ? 'scripts/m3-build-observed-study.mjs'
+          : 'scripts/m3-assess-observed-week.mjs'
+        const run = spawnSync(process.execPath,
+          ['--experimental-strip-types', command, input, '--output', linkedOutput],
+          { cwd: process.cwd(), encoding: 'utf8', timeout: 15000 })
+        assert.ifError(run.error)
+        assert.notEqual(run.status, 0)
+        assert.equal(run.stdout, '')
+        assert.match(run.stderr, /refusing multiply-linked M3 derived output file/u)
         assert.equal(await readFile(input, 'utf8'), original)
         assert.equal(await readFile(unrelated, 'utf8'), sentinel)
         assert.equal(await readFile(linkedOutput, 'utf8'), sentinel)

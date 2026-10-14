@@ -60,6 +60,11 @@ export async function writeDerivedM3Output(input, output, serialized) {
   if (outputMetadata && !outputMetadata.isFile()) {
     throw new Error('refusing nonregular M3 derived output file')
   }
+  // Rewriting a hardlinked report would silently modify an unrelated path
+  // sharing its inode; keep intentional single-link regular-file reruns.
+  if (outputMetadata && outputMetadata.nlink > 1) {
+    throw new Error('refusing multiply-linked M3 derived output file')
+  }
   const source = await stat(input)
   let target
   try {
