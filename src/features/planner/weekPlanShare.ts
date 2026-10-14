@@ -12,14 +12,18 @@ export type ShareableWeek = {
 const MAX_DAYS = 14
 const MAX_RECIPES = 100
 const MAX_LABEL = 120
-const BAD_LABEL = /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/
+// Reject control/format and Unicode line/paragraph separators, including
+// zero-width and bidi spoofing. Dutch diacritics and readable non-ASCII stay valid.
+const BAD_LABEL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u
+const HAS_VISIBLE_TEXT = /[\p{L}\p{N}]/u
 
 function safeLabel(value: unknown): value is string {
   return typeof value === 'string' &&
     value.length > 0 &&
     value.length <= MAX_LABEL &&
     value === value.trim() &&
-    !BAD_LABEL.test(value)
+    !BAD_LABEL.test(value) &&
+    HAS_VISIBLE_TEXT.test(value)
 }
 
 /**
