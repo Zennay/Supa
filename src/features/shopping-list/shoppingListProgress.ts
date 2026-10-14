@@ -55,58 +55,71 @@ function numberForBasketKey(value: number): number | string {
   return value
 }
 
+/**
+ * Persisted checkmarks must be bound to the basket's OWN observed facts,
+ * never prototype fallbacks or accessor side effects. Descriptor reads also
+ * avoid invoking a caller's getters (Proxy descriptor traps fail closed above).
+ */
+function ownFact(record: Record<string, unknown>, field: string): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(record, field)
+  return descriptor && Object.hasOwn(descriptor, 'value')
+    ? descriptor.value
+    : undefined
+}
+
 function projectBasketLine(value: unknown): Record<string, unknown> | null {
-  if (!isRecord(value) || !isNonBlankString(value.id)) return null
-  if (!isRecord(value.requirement) || !isMatchUnit(value.requirement.unit)) {
-    return null
-  }
+  if (!isRecord(value)) return null
+  const id = ownFact(value, 'id')
+  const status = ownFact(value, 'status')
+  const requirement = ownFact(value, 'requirement')
+  if (!isNonBlankString(id) || !isRecord(requirement)) return null
+  const amount = ownFact(requirement, 'amount')
+  const unit = ownFact(requirement, 'unit')
+  if (!isMatchUnit(unit)) return null
 
-  if (value.status === 'unresolved') {
-    if (
-      value.requirement.amount !== null &&
-      typeof value.requirement.amount !== 'number'
-    ) {
-      return null
-    }
-
+  if (status === 'unresolved') {
+    if (amount !== null && typeof amount !== 'number') return null
     return {
-      id: value.id,
-      status: value.status,
-      amount:
-        value.requirement.amount === null
-          ? null
-          : numberForBasketKey(value.requirement.amount),
-      unit: value.requirement.unit,
+      id,
+      status,
+      amount: amount === null ? null : numberForBasketKey(amount),
+      unit,
     }
   }
 
-  if (value.status !== 'matched') return null
+  if (status !== 'matched') return null
+  const productId = ownFact(value, 'productId')
+  const packs = ownFact(value, 'packs')
+  const pack = ownFact(value, 'pack')
+  const pricePerPackCents = ownFact(value, 'pricePerPackCents')
+  const lineTotalCents = ownFact(value, 'lineTotalCents')
+  if (!isRecord(pack)) return null
+  const packAmount = ownFact(pack, 'amount')
+  const packUnit = ownFact(pack, 'unit')
+  const packCount = ownFact(pack, 'count')
   if (
-    !isPositiveFiniteNumber(value.requirement.amount) ||
-    !isNonBlankString(value.productId) ||
-    !isPositiveSafeInteger(value.packs) ||
-    !isRecord(value.pack) ||
-    !isPositiveFiniteNumber(value.pack.amount) ||
-    !isMatchUnit(value.pack.unit) ||
-    !isPositiveSafeInteger(value.pack.count) ||
-    !isNonNegativeSafeInteger(value.pricePerPackCents) ||
-    !isNonNegativeSafeInteger(value.lineTotalCents)
-  ) {
-    return null
-  }
+    !isPositiveFiniteNumber(amount) ||
+    !isNonBlankString(productId) ||
+    !isPositiveSafeInteger(packs) ||
+    !isPositiveFiniteNumber(packAmount) ||
+    !isMatchUnit(packUnit) ||
+    !isPositiveSafeInteger(packCount) ||
+    !isNonNegativeSafeInteger(pricePerPackCents) ||
+    !isNonNegativeSafeInteger(lineTotalCents)
+  ) return null
 
   return {
-    id: value.id,
-    status: value.status,
-    amount: value.requirement.amount,
-    unit: value.requirement.unit,
-    productId: value.productId,
-    packs: value.packs,
-    packAmount: value.pack.amount,
-    packUnit: value.pack.unit,
-    packCount: value.pack.count,
-    pricePerPackCents: value.pricePerPackCents,
-    lineTotalCents: value.lineTotalCents,
+    id,
+    status,
+    amount,
+    unit,
+    productId,
+    packs,
+    packAmount,
+    packUnit,
+    packCount,
+    pricePerPackCents,
+    lineTotalCents,
   }
 }
 
@@ -122,33 +135,28 @@ function shoppingListBasketState(basket: unknown): ShoppingListBasketState | nul
 }
 
 function projectShoppingListBasketState(basket: unknown): ShoppingListBasketState | null {
-  if (
-    !isRecord(basket) ||
-    !isRecord(basket.store) ||
-    !isNonBlankString(basket.store.id) ||
-    !Array.isArray(basket.lines)
-  ) {
-    return null
-  }
+  if (!isRecord(basket)) return null
+  const store = ownFact(basket, 'store')
+  const basketLines = ownFact(basket, 'lines')
+  if (!isRecord(store) || !Array.isArray(basketLines)) return null
+  const storeId = ownFact(store, 'id')
+  if (!isNonBlankString(storeId)) return null
 
   const validIds = new Set<string>()
   const lines: Record<string, unknown>[] = []
-
-  for (const value of basket.lines) {
-    const line = projectBasketLine(value)
+  // Read only OWN dense elements, not values inherited from Array.prototype
+  // or accessible via a caller's get trap.
+  for (let index = 0; index < basketLines.length; index++) {
+    const line = projectBasketLine(ownFact(basketLines, String(index)))
     if (!line || typeof line.id !== 'string' || validIds.has(line.id)) {
       return null
     }
-
     validIds.add(line.id)
     lines.push(line)
   }
 
   return {
-    basketKey: JSON.stringify({
-      storeId: basket.store.id,
-      lines,
-    }),
+    basketKey: JSON.stringify({ storeId, lines }),
     validIds,
   }
 }
