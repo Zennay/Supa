@@ -8,7 +8,9 @@ import { inspectCaptureDirectory } from './m1-inspect-captures.mjs'
 const MAX_SOURCES = 100
 const MAX_CAPTURE_MANIFEST_BYTES = 8 * 1024 * 1024
 const MAX_CAPTURE_HTML_BYTES = 8 * 1024 * 1024
-const MAX_AGGREGATE_HTML_BYTES = 32 * 1024 * 1024
+// Keep the entire offline capture review cohort at the same 8 MiB ceiling as
+// a single HTML file. Multiple individually-valid captures may exhaust it.
+const MAX_AGGREGATE_HTML_BYTES = 8 * 1024 * 1024
 const MAX_JSON_LD_BLOCKS = 128
 const MAX_APPLICATION_JSON_SCRIPTS = 128
 const MAX_JSON_LD_ENTRIES = 256
