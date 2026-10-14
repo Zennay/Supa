@@ -93,7 +93,7 @@ test('M3 permanent VPS gate excludes untrusted fork pull-request heads', async (
   const workflow = await readFile(workflowPath, 'utf8')
   assert.match(workflow, /^\s*runs-on:\s*self-hosted\s*$/m)
   assert.match(workflow, /github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository/)
-  assert.match(workflow, /if:\s*github\.event_name\s*==\s*'workflow_dispatch'\s*\|\|\s*\(github\.event_name\s*==\s*'pull_request'[^\n]*github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository\)/)
+  assert.match(workflow, /if:\s*\(github\.event_name\s*==\s*'workflow_dispatch'\s*&&\s*github\.ref\s*==\s*'refs\/heads\/main'\)\s*\|\|\s*\(github\.event_name\s*==\s*'pull_request'[^\n]*github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository\)/)
   assert.match(workflow, /uses:\s*actions\/checkout@[0-9a-f]{40}\s+# v\d+\.\d+\.\d+\s*\n\s*with:\s*\n\s*persist-credentials:\s*false/)
 })
 
@@ -155,4 +155,22 @@ test('M3 field-pack upload is dispatch-only on the actual step, not a nearby ste
   )
   assert.notEqual(duplicate, workflow)
   assert.throws(() => validateDispatchOnlyFieldPackUpload(duplicate))
+})
+
+test('M3 manual field-run pack runs only on the current main ref', async () => {
+  const yaml = await readFile(workflowPath, 'utf8')
+  const jobCondition = yaml.split(/\r?\n/u).find((line) => line.startsWith('    if: '))
+  const trustedCondition = "    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository)"
+  assert.equal(jobCondition, trustedCondition,
+    'branch-pinned workflow_dispatch and same-repository main PR condition must both remain exact')
+
+  for (const invalid of [
+    "    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository)",
+    trustedCondition.replace(" && github.ref == 'refs/heads/main'", ''),
+    trustedCondition.replace('refs/heads/main', 'refs/heads/feature'),
+    trustedCondition.replace("github.event.pull_request.head.repo.full_name == github.repository", 'true'),
+  ]) {
+    assert.notEqual(invalid, trustedCondition)
+    assert.notEqual(invalid, jobCondition, 'unsafe manual dispatch or PR condition would bypass source pin')
+  }
 })
