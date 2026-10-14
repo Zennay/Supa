@@ -121,6 +121,8 @@ test('independent sources with same IDs but different HTML shape remain P1 human
   const prior=product('FAKE-DRIFT')
   const latest=structuredClone(prior)
   latest.html.jsonLd[0].keys.push('@graph')
+  // A genuine shape change also requires different SHA-verified HTML bytes.
+  latest.manifestSha256='b'.repeat(64)
   const q=buildOfflineSelectorReviewQueue(compareInspections(
     cohort([latest]),cohort([prior])))
   assert.equal(q.actions[0].priority,'P1')
