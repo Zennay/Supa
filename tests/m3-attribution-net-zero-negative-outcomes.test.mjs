@@ -5,10 +5,25 @@ import { attributeSavingsEffects } from '../src/domain/savingsAttribution.ts'
 // Deliberately minimal claimable comparison snapshots: isolate attribution's
 // contract from retailer fixtures and avoid manufacturing real price evidence.
 function snapshot(entries) {
-  const lines = entries.map(([id, deltaCents]) => ({ id, deltaCents }))
+  const lines = entries.map(([id, deltaCents]) => {
+    const baselineLineTotalCents = 100 + Math.max(0, -deltaCents)
+    return {
+      id,
+      baselineLineTotalCents,
+      candidateLineTotalCents: baselineLineTotalCents + deltaCents,
+      deltaCents,
+    }
+  })
+  const baselineTotalCents = lines.reduce((sum, line) => sum + line.baselineLineTotalCents, 0)
+  const candidateTotalCents = lines.reduce((sum, line) => sum + line.candidateLineTotalCents, 0)
+  const deltaCents = candidateTotalCents - baselineTotalCents
   return {
     claimable: true,
-    deltaCents: lines.reduce((sum, line) => sum + line.deltaCents, 0),
+    outcome: deltaCents < 0 ? 'better' : deltaCents > 0 ? 'worse' : 'same',
+    baselineTotalCents,
+    candidateTotalCents,
+    deltaCents,
+    savingsCents: -deltaCents,
     lineDeltas: lines,
     reasons: [],
   }
