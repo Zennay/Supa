@@ -135,3 +135,17 @@ test('archived Firefox image evidence binds every PNG to byte length, dimensions
   assert.match(source, /retailerDataObserved: false/)
   assert.match(source, /realSavingsClaimEligible: false/)
 })
+
+
+test('rendered planner and one-store basket disclose identical Dutch money and uncertainty', async () => {
+  const source = await readFile(browserScript, 'utf8')
+  assert.match(source, /checks\.push\('planner-basket-same-euro-and-uncertainty'\)/)
+  assert.match(source, /checks\.push\('budget-only-keeps-basket-euros-unchanged'\)/)
+  assert.match(source, /assert\.equal\(basketFinancial\.cost, originalPlannerCost\.knownCost/)
+  assert.match(source, /assert\.equal\(basketFinancial\.disclosure,/)
+  assert.match(source, /originalPlannerCost\.knownCost\.startsWith\('min\.'\)/)
+  assert.match(source, /assert\.equal\(afterBudgetOnlyCost\.value, originalPlannerCost\.knownCost/)
+  assert.match(source, /assert\.equal\(sameBasketCost, basketFinancial\.cost/)
+  assert.match(source, /assert\.equal\(afterBudgetOnlyCost\.budgetMax, '30'\)/)
+  assert.match(source, /realSavingsClaimEligible: false/)
+})
