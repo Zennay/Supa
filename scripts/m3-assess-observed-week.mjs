@@ -250,7 +250,8 @@ function storeSummary(evidence) {
 
 export function buildObservedWeekReport(study) {
   validateObservedWeekInput(study)
-  const assessment = assessWeeklyBasketStudy(study)
+  // External report boundary supplies the real processing clock. Domain stays pure.
+  const assessment = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
 
   return {
     schemaVersion: 1,
