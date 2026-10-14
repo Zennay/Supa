@@ -33,11 +33,18 @@ export function observationStoreMatchesExpectedRetailer(
   side: M3ObservationSide,
   storeName: string,
 ) {
-  const normalized = normalizedRetailerName(storeName)
-  if (side === 'baseline') {
-    return normalized.split(/\s+/).includes('plus')
-  }
-  return normalized.replace(/\s+/g, '').includes('dekamarkt')
+  if (typeof storeName !== 'string') return false
+  const words = normalizedRetailerName(storeName).split(/\s+/)
+  // A substring of another retailer's name is not proof of brand identity.
+  // Refuse contradictory labels containing both retailers.
+  const hasPlus = words.includes('plus')
+  const hasDekaMarkt = words.includes('dekamarkt') || words.some(
+    (word, index) => word === 'deka' && words[index + 1] === 'markt',
+  )
+  if (hasPlus && hasDekaMarkt) return false
+  if (side === 'baseline') return hasPlus
+  if (side === 'candidate') return hasDekaMarkt
+  return false
 }
 
 export type ObservationRequirement = {
@@ -529,6 +536,24 @@ function nonBlank(value: string) {
   return typeof value === 'string' && /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
 }
 
+// A full-looking private field sheet is not exportable if its metadata would
+// fail the canonical JSON converter's date, key or price-context checks.
+const M3_STUDY_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,63}$/
+const M3_WEEK_START_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function validM3WeekStart(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const match = M3_WEEK_START_PATTERN.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+}
+
 // The collection screen, its 24-hour deadline and the M3 converter must
 // agree about which observedAt values identify a real, timezone-qualified day.
 // Date.parse alone accepts locale strings, date-only values and rolled-over dates.
@@ -551,7 +576,10 @@ export function validObservedAt(value: string, referenceNowMs = Number.POSITIVE_
     Number(match[4]) > 23 ||
     Number(match[5]) > 59 ||
     Number(match[6] ?? '0') > 59 ||
-    (match[7] !== 'Z' && (Number(match[8]) > 23 || Number(match[9]) > 59))
+    (match[7] !== 'Z' && (
+      Number(match[8]) > 14 || Number(match[9]) > 59 ||
+      (Number(match[8]) === 14 && Number(match[9]) !== 0)
+    ))
   ) {
     return null
   }
@@ -585,6 +613,21 @@ export function observationSheetReadiness(
   for (const [label, value] of studyFields) {
     if (!nonBlank(value)) issues.push(`${label} ontbreekt.`)
   }
+  if (nonBlank(sheet.study.studyId) && !M3_STUDY_KEY_PATTERN.test(sheet.study.studyId)) {
+    issues.push('Study ID moet een veilige pseudonieme sleutel zijn.')
+  }
+  if (nonBlank(sheet.study.participantKey) &&
+      !M3_STUDY_KEY_PATTERN.test(sheet.study.participantKey)) {
+    issues.push('Participant key moet een veilige pseudonieme sleutel zijn.')
+  }
+  if (nonBlank(sheet.study.weekStart) && !validM3WeekStart(sheet.study.weekStart)) {
+    issues.push('Week start moet een geldige datum in JJJJ-MM-DD zijn.')
+  }
+  if (nonBlank(sheet.study.priceContext) &&
+      sheet.study.priceContext !== 'in-store' &&
+      sheet.study.priceContext !== 'online-order') {
+    issues.push('Prijscontext moet in-store of online-order zijn.')
+  }
 
   const observations: Array<[string, M3ObservationSide, StoreObservation]> = [
     ['Winkel A', 'baseline', sheet.baseline],
@@ -605,6 +648,11 @@ export function observationSheetReadiness(
     }
     if (!nonBlank(observation.evidenceId)) {
       issues.push(`${label}: evidence ID ontbreekt.`)
+    }
+    // An unsupported source is not a human observation, even when all 11
+    // product lines happen to contain numbers.
+    if (!['manual-cart', 'receipt', 'consented-export'].includes(observation.source)) {
+      issues.push(`${label}: kies een geldige herkomst (winkelmand, bon of toegestane export).`)
     }
     if (!nonBlank(observation.provenanceNote)) {
       issues.push(`${label}: provenance-notitie ontbreekt.`)
@@ -663,6 +711,14 @@ export function observationSheetReadiness(
     sheet.baseline.store.id.trim() === sheet.candidate.store.id.trim()
   ) {
     issues.push('Winkel A en Winkel B moeten verschillende winkel-ID\'s hebben.')
+  }
+
+  if (
+    nonBlank(sheet.baseline.evidenceId) &&
+    nonBlank(sheet.candidate.evidenceId) &&
+    sheet.baseline.evidenceId.trim() === sheet.candidate.evidenceId.trim()
+  ) {
+    issues.push('Winkel A en Winkel B moeten verschillende evidence-ID\'s hebben.')
   }
 
   if (observedTimes.length === 2) {
