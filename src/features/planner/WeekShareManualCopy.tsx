@@ -31,7 +31,6 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
         ref={textareaRef}
         id="week-share-text"
         readOnly
-        autoFocus
         rows={rows}
         value={text}
         onFocus={(event) => event.currentTarget.select()}
