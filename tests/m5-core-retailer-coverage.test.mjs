@@ -396,7 +396,8 @@ test('core candidate replacement cannot pass review by preserving total count', 
     assert.deepEqual(result.addedCandidateIds, ['fictional-market-banner'])
     assert.deepEqual(result.removedCandidateIds, ['boni'])
     assert.equal(result.coreCovered, false)
-    assert.equal(result.candidateCount, undefined)
+    assert.equal(result.currentCandidateCount, 17)
+    assert.equal(result.previousCandidateCount, 17)
     assert.equal(result.m5Eligible, false)
   } finally {
     await rm(dir, { recursive: true, force: true })
