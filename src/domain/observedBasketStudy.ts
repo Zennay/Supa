@@ -101,6 +101,28 @@ function validTimestamp(value: unknown) {
   return Number.isFinite(timestamp) ? timestamp : null
 }
 
+// The planned week is a civil-date interval, not a rolling UTC hours window.
+// Allow advance shopping on the two preceding days as well as the seven days
+// of the plan. Read each observedAt's own explicitly validated local date.
+const PRE_WEEK_SHOPPING_DAYS = 2
+const PLANNED_WEEK_DAYS = 7
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+function localCalendarDayIndex(date: string) {
+  const [year, month, day] = date.split('-').map(Number)
+  return Math.floor(Date.UTC(year, month - 1, day) / MS_PER_DAY)
+}
+
+function matchesDeclaredPlanningWeek(weekStart: string, observedAt: string) {
+  const daysFromWeekStart =
+    localCalendarDayIndex(observedAt.slice(0, 10)) -
+    localCalendarDayIndex(weekStart)
+  return (
+    daysFromWeekStart >= -PRE_WEEK_SHOPPING_DAYS &&
+    daysFromWeekStart < PLANNED_WEEK_DAYS
+  )
+}
+
 function validateEvidence(
   label: 'baseline' | 'candidate',
   evidence: ObservedBasketEvidence,
@@ -241,6 +263,24 @@ export function assessWeeklyBasketStudy(
       reasons.push(
         `basket observations are ${observationWindowHours.toFixed(2)}h apart; max is ${maxObservationWindowHours}h`,
       )
+    }
+  }
+
+  // Only validated calendar dates/timestamps participate in week cohesion;
+  // each price observation must belong to this week or its two shopping days
+  // before the plan, independently of the separate <=24h store-pair gate.
+  if (validCalendarDate(study.weekStart)) {
+    if (
+      baselineObservedAt !== null &&
+      !matchesDeclaredPlanningWeek(study.weekStart, study.baseline.observedAt)
+    ) {
+      reasons.push('baseline observation is outside the declared planning week shopping window')
+    }
+    if (
+      candidateObservedAt !== null &&
+      !matchesDeclaredPlanningWeek(study.weekStart, study.candidate.observedAt)
+    ) {
+      reasons.push('candidate observation is outside the declared planning week shopping window')
     }
   }
 
