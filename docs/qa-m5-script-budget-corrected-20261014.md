@@ -1,0 +1,5 @@
+# Independent corrected-source M5 HTML-script budget acceptance (HOLD)
+
+Issue #2273, frozen corrected product #2274 `1a623c7c9a5525c5cd349f61959d62b8964b4c31` based on original source #2269. Own independent **19-case test** byte-identical to original-source QA expected RED, plus own QA-only provenance note. Verify exact-head GitHub hosted full npm/test/high audit/M1 source-permission/matching/build before marking GREEN. Covers individual and sum >8MiB failures, oversized UTF-16 descriptor IDs, zero/null ID and true <=8MiB in-memory shape boundaries, real M1 `inspectHtml` tiny fictional HTML, no input mutation, privacy and false release flags, 100-source bounds inherited.
+
+Supa M3 ACTIVE, authentic human issue #78 11 PLUS+11 DekaMarkt same-demand ≤24h OPEN; M4/M5 ineligible. No actual retailer, prices, users, API calls, production permission. **DRAFT/HOLD/NO MERGE/NO DEPLOY** until independent zCloud SQLite write-lease scope, original source+QA owner reviews, latest-main/trusted VPS when relevant, actual field proof and human releasego.
