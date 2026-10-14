@@ -3,6 +3,8 @@ import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import {
+  basketComparisonCanShowMoney,
+  basketComparisonHeadline,
   basketCostDisclosure,
   basketLineExplanation,
   basketReviewSummary,
@@ -15,24 +17,6 @@ import { comparisonLineHighlights, comparisonLineHighlightCopy } from './compari
 function quantity(amount: number | null, unit: string) {
   const label = quantityUnitLabelNl(unit, amount)
   return amount === null ? `? ${label}` : `${amount} ${label}`
-}
-
-function comparisonTitle(
-  comparison: BasketComparison,
-  candidate: OneStoreBasket,
-) {
-  if (!comparison.claimable || comparison.outcome === 'unknown') {
-    return 'Nog geen betrouwbare vergelijking'
-  }
-
-  if (comparison.outcome === 'same') {
-    return 'Beide testmanden zijn even duur'
-  }
-
-  const difference = euro.formatCents(Math.abs(comparison.savingsCents ?? 0))
-  return comparison.outcome === 'better'
-    ? `${candidate.store.name} ligt ${difference} lager`
-    : `${candidate.store.name} ligt ${difference} hoger`
 }
 
 export function BasketView({
@@ -68,7 +52,9 @@ export function BasketView({
     basket.lines.length > 0 &&
     comparisonBaseline.lines.length > 0 &&
     comparisonCandidate.lines.length > 0
-  const displayComparison = hasComparableDemand
+  const comparisonCanShowMoney = hasComparableDemand &&
+    basketComparisonCanShowMoney(comparison, comparisonCandidate)
+  const displayComparison = comparisonCanShowMoney
     ? comparison
     : { ...comparison, outcome: 'unknown' as const, claimable: false }
   const comparisonWarning = hasComparableDemand
@@ -78,8 +64,8 @@ export function BasketView({
       comparison.reasons.length,
     )
     : 'Plan eerst een maaltijd; zonder boodschappen is er geen financieel verschil te vergelijken.'
-  const comparisonHighlights = displayComparison.claimable
-    ? comparisonLineHighlights(displayComparison)
+  const comparisonHighlights = comparisonCanShowMoney
+    ? comparisonLineHighlights(comparison)
     : []
   const reviewSummary = basketReviewSummary(basket.unresolvedLineCount)
   const basketLines = orderBasketLinesForReview(basket.lines)
@@ -125,7 +111,7 @@ export function BasketView({
       <div className="comparison-card" data-comparison-outcome={displayComparison.outcome}>
         <span className="eyebrow">Gecontroleerde winkelvergelijking</span>
         <strong>{hasComparableDemand
-          ? comparisonTitle(displayComparison, comparisonCandidate)
+          ? basketComparisonHeadline(displayComparison, comparisonCandidate)
           : 'Plan eerst maaltijden om winkels te vergelijken'}</strong>
         <div className="comparison-totals">
           <div>
