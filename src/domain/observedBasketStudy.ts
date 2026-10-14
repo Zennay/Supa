@@ -97,6 +97,12 @@ function validTimestamp(value: unknown) {
     if (offsetHour > 23 || offsetMinute > 59) return null
   }
 
+  // Date.parse rounds away any fractional digits after milliseconds. A
+  // purported 24h+1ns capture cannot become an exactly-24h money claim.
+  // Extra zero digits remain accepted because they add no elapsed time.
+  const fractionalSeconds = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1]
+  if (fractionalSeconds && /[1-9]/.test(fractionalSeconds.slice(3))) return null
+
   const timestamp = Date.parse(value)
   // Deterministic domain parser: the evaluation clock is an explicit caller input.
   return Number.isFinite(timestamp) ? timestamp : null
