@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { buildFictionalPricedSheet } from '../scripts/m3-rehearse-field-run.mjs'
 import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
-import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
+import { buildObservedWeekReport, validateObservedWeekInput } from '../scripts/m3-assess-observed-week.mjs'
 import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
 
 // Only fictional values. The M3 field evidence gate #78 remains human-only.
@@ -110,4 +110,25 @@ test('synthetic exact-pack conversion reaches the canonical private M3 assessmen
   assert.equal(report.publicSavingsClaimEligible, false,
     'fictional prices never authorize public consumer savings')
   assert.match(report.evidenceBoundary, /one observed week is study evidence only/i)
+})
+
+test('private M3 report refuses the old inflated pack count even if displayed money is reconciled', () => {
+  const sheet = buildFictionalPricedSheet()
+  const riceIndex = sheet.requirements.findIndex(
+    (entry) => entry.amount === 450 && entry.unit === 'g',
+  )
+  sheet.baseline.lines[riceIndex].observedProduct.packAmount = 0.144
+  const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  // A caller cannot bypass the exact pack trust gate by adjusting every
+  // associated cent total to agree with the *wrong* 3126-pack count.
+  const line = study.baseline.basket.lines[riceIndex]
+  assert.equal(line.status, 'matched')
+  line.packs = 3126
+  line.lineTotalCents = 312600
+  study.baseline.basket.totalCents += 100
+
+  assert.throws(() => validateObservedWeekInput(study),
+    /packs must equal the quantity required/)
+  assert.throws(() => buildObservedWeekReport(study),
+    /packs must equal the quantity required/)
 })
