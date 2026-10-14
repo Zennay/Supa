@@ -3,6 +3,7 @@ import test from 'node:test'
 import { buildObservationSheet, observationSheetReadiness, observationWindowSummary } from '../src/domain/m3ObservationSheet.ts'
 import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
+import { observationNextAction } from '../src/features/observation/observationNextStep.ts'
 
 // Independent cross-path QA of future *absolute instants*, not calendar labels.
 // Inputs and all money amounts are fictional; no retailer observations/claims.
@@ -145,4 +146,19 @@ test('M3 QA historical DST fallback 24h plus one millisecond never becomes savin
   assert.equal(result.comparison.outcome, 'unknown')
   assert.equal(result.comparison.savingsCents, null)
   assert.ok(result.observationWindowHours > 24)
+})
+
+test('M3 QA next-action hint cannot advertise export for a future capture', () => {
+  const valid = fictionalReadySheet()
+  // A complete fictional historic sheet should have no incomplete field task.
+  assert.equal(observationNextAction(valid).stage, 'export')
+  for (const side of ['baseline', 'candidate']) {
+    const future = fictionalReadySheet()
+    future[side].observedAt = '2099-10-10T12:00:00Z'
+    assert.notEqual(
+      observationNextAction(future).stage,
+      'export',
+      side + ' future observedAt must not be described as export-ready',
+    )
+  }
 })
