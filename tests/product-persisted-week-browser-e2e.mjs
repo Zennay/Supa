@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 
 const baseUrl = process.env.PRODUCT_WEEK_BASE_URL ?? 'http://127.0.0.1:4179'
 const driverUrl = process.env.PRODUCT_WEEK_WEBDRIVER_URL ?? 'http://127.0.0.1:4457'
 const artifactDirectory = process.env.PRODUCT_WEEK_ARTIFACT_DIR ?? 'artifacts/product-week-browser'
+const screenshotIntegrity = []
 
 for (const [label, raw] of [['app', baseUrl], ['webdriver', driverUrl]]) {
   const url = new URL(raw)
@@ -51,8 +53,21 @@ async function screenshot(sessionId, name) {
   const encoded = await request(`/session/${sessionId}/screenshot`)
   assert.equal(typeof encoded, 'string', 'Firefox screenshot must be base64')
   assert.match(encoded, /^[a-zA-Z0-9+/]+={0,2}$/, 'Firefox screenshot encoding is malformed')
-  await writeFile(`${artifactDirectory}/${name}`, Buffer.from(encoded, 'base64'), {
-    mode: 0o600,
+  const png = Buffer.from(encoded, 'base64')
+  assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a',
+    'Firefox screenshot must be a PNG image')
+  assert.ok(png.byteLength >= 24, 'PNG must contain image dimensions')
+  const width = png.readUInt32BE(16)
+  const height = png.readUInt32BE(20)
+  assert.ok(width > 0 && width <= 10000 && height > 0 && height <= 10000,
+    'Screenshot dimensions must be reasonable')
+  await writeFile(`${artifactDirectory}/${name}`, png, { mode: 0o600 })
+  screenshotIntegrity.push({
+    filename: name,
+    width,
+    height,
+    bytes: png.byteLength,
+    sha256: createHash('sha256').update(png).digest('hex'),
   })
 }
 
@@ -316,6 +331,8 @@ try {
   checks.push('corrupt-planner-and-checklist-recover-safely')
   await screenshot(sessionId, 'shopping-recovered-default.png')
 
+  assert.equal(screenshotIntegrity.length, 6,
+    'All six fixture-only UI screenshots must be present before success')
   await writeFile(`${artifactDirectory}/result.json`,
     JSON.stringify({
       schemaVersion: 1,
@@ -324,6 +341,7 @@ try {
       pullRequestHeadSha: process.env.PRODUCT_WEEK_HEAD_SHA ?? null,
       githubRunId: process.env.GITHUB_RUN_ID ?? null,
       githubRunAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null,
+      screenshotIntegrity,
       screenshots: [
         'planner-changed.png',
         'basket-controlled-demo.png',
