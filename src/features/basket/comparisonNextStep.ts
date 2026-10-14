@@ -71,6 +71,85 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+/**
+ * Snapshot only own data descriptors before invoking the presentation advisor.
+ *
+ * Getters can throw, disclose private values or change between checks. Proxy
+ * reflection is unavoidably trap-capable; all traps are contained by the public
+ * boundary below. Original retailer/basket objects are never mutated.
+ *
+ * Bounded cloning also protects the rendering path against cycles, deep nesting,
+ * giant/sparse arrays and surprising inherited records.
+ */
+function snapshotOwnGuidanceData(value: unknown): unknown {
+  const active = new WeakSet<object>()
+  let visited = 0
+  const copy = (item: unknown, depth: number): unknown => {
+    if (item === null || typeof item !== 'object') {
+      if (typeof item === 'function' || typeof item === 'symbol') {
+        throw new Error('unsupported guidance value')
+      }
+      return item
+    }
+    if (++visited > 8192 || depth > 24 || active.has(item)) {
+      throw new Error('invalid guidance data shape')
+    }
+    active.add(item)
+    try {
+      const isArray = Array.isArray(item)
+      const descriptors = Object.getOwnPropertyDescriptors(item)
+      const keys = Reflect.ownKeys(descriptors)
+      if (keys.length > 8192) throw new Error('guidance record too large')
+      for (const key of keys) {
+        // The descriptor map is a fresh ordinary object returned by the
+        // language runtime. Never read a property from the source itself.
+        if (typeof key === 'symbol') throw new Error('symbol guidance field')
+        const property = descriptors[key]
+        if (!property || !('value' in property)) {
+          throw new Error('guidance accessor not allowed')
+        }
+      }
+      if (isArray) {
+        const lengthDescriptor = descriptors.length
+        const length = lengthDescriptor?.value
+        if (!Number.isSafeInteger(length) || length > 2048) {
+          throw new Error('invalid guidance array length')
+        }
+        const result: unknown[] = new Array(length)
+        if (keys.length !== length + 1) {
+          throw new Error('sparse or extended guidance array')
+        }
+        for (let index = 0; index < length; index++) {
+          const property = descriptors[String(index)]
+          if (!property || !('value' in property)) {
+            throw new Error('sparse guidance array')
+          }
+          result[index] = copy(property.value, depth + 1)
+        }
+        return result
+      }
+      const result: Record<string, unknown> = Object.create(null)
+      for (const key of keys) {
+        if (typeof key !== 'string') throw new Error('symbol guidance field')
+        const property = descriptors[key]
+        if (!property || !('value' in property)) {
+          throw new Error('guidance accessor not allowed')
+        }
+        Object.defineProperty(result, key, {
+          value: copy(property.value, depth + 1),
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        })
+      }
+      return result
+    } finally {
+      active.delete(item)
+    }
+  }
+  return copy(value, 0)
+}
+
 function safeNonnegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
@@ -142,7 +221,7 @@ function consistentLineTrace(
   return summedDifference === comparison.deltaCents
 }
 
-export function comparisonNextStep(input: {
+function comparisonNextStepFromSnapshot(input: {
   comparison: BasketComparison
   baseline: OneStoreBasket
   candidate: OneStoreBasket
@@ -259,4 +338,25 @@ export function comparisonNextStep(input: {
   }
 
   return step('comparison-ready')
+}
+
+/**
+ * Consumer-facing comparison guidance must never throw, echo untrusted
+ * accessor messages, or promote unknown basket data to monetary proof.
+ */
+export function comparisonNextStep(input: {
+  comparison: BasketComparison
+  baseline: OneStoreBasket
+  candidate: OneStoreBasket
+}): ComparisonNextStep {
+  try {
+    const snapshot = snapshotOwnGuidanceData(input) as {
+      comparison: BasketComparison
+      baseline: OneStoreBasket
+      candidate: OneStoreBasket
+    }
+    return comparisonNextStepFromSnapshot(snapshot)
+  } catch {
+    return step('review-data')
+  }
 }
