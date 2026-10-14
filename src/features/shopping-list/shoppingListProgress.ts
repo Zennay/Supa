@@ -90,7 +90,9 @@ function projectBasketLine(value: unknown): Record<string, unknown> | null {
     !isMatchUnit(value.pack.unit) ||
     !isPositiveSafeInteger(value.pack.count) ||
     !isNonNegativeSafeInteger(value.pricePerPackCents) ||
-    !isNonNegativeSafeInteger(value.lineTotalCents)
+    !isNonNegativeSafeInteger(value.lineTotalCents) ||
+    // Never persist a checked item against a self-inconsistent selected price.
+    value.lineTotalCents !== value.packs * value.pricePerPackCents
   ) {
     return null
   }
@@ -110,7 +112,18 @@ function projectBasketLine(value: unknown): Record<string, unknown> | null {
   }
 }
 
+// Browser-restored baskets may include trapped getters or revoked Proxies.
+// Treat any inaccessible runtime shape as invalid, never execute its error text
+// through a UI-bound serialization or readiness path.
 function shoppingListBasketState(basket: unknown): ShoppingListBasketState | null {
+  try {
+    return projectShoppingListBasketState(basket)
+  } catch {
+    return null
+  }
+}
+
+function projectShoppingListBasketState(basket: unknown): ShoppingListBasketState | null {
   if (
     !isRecord(basket) ||
     !isRecord(basket.store) ||
