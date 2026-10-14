@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
+import { formatShareableWeek } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
@@ -54,6 +55,8 @@ function readPlannerPreferences() {
 export function App() {
   const [tab, setTab] = useState<Tab>('planner')
   const [preferences, setPreferences] = useState(readPlannerPreferences)
+  const [manualWeekCopy, setManualWeekCopy] = useState<string | null>(null)
+  const [weekCopyMessage, setWeekCopyMessage] = useState('')
   const { budget, activeDays, recipeByDay } = preferences
 
   const plannedMeals = useMemo(
@@ -123,6 +126,37 @@ export function App() {
     }
   }, [preferences])
 
+  useEffect(() => {
+    // The export belongs to one exact plan snapshot; don't keep a stale draft
+    // visible after the user changes the plan or budget.
+    setManualWeekCopy(null)
+    setWeekCopyMessage('')
+  }, [preferences])
+
+  const copyWeekPlan = async () => {
+    let text: string
+    try {
+      text = formatShareableWeek({ plannedMeals, activeDays, recipes: m2Recipes, budget })
+    } catch {
+      setManualWeekCopy(null)
+      setWeekCopyMessage('Weekmenu niet beschikbaar')
+      return
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text)
+        setManualWeekCopy(null)
+        setWeekCopyMessage('Weekmenu gekopieerd')
+        return
+      } catch {
+        // On restricted browsers offer the actual text to copy manually.
+      }
+    }
+    setManualWeekCopy(text)
+    setWeekCopyMessage('Selecteer de tekst hieronder om te kopiëren')
+  }
+
   const toggleDay = (day: string) => {
     setPreferences((current) => ({
       ...current,
@@ -157,6 +191,29 @@ export function App() {
       </header>
 
       <div className="content">
+        {tab === 'planner' && (
+          <section className="week-share-panel" aria-label="Weekmenu delen">
+            <div className="week-share-actions">
+              <span>Deel je geselecteerde maaltijden zonder prijzen.</span>
+              <button type="button" className="ghost-button" onClick={copyWeekPlan}>
+                Kopieer weekmenu
+              </button>
+            </div>
+            <p role="status" aria-live="polite">{weekCopyMessage}</p>
+            {manualWeekCopy !== null && (
+              <div className="week-share-manual">
+                <label htmlFor="week-share-text">Weekmenu om handmatig te kopiëren</label>
+                <textarea
+                  id="week-share-text"
+                  readOnly
+                  rows={Math.min(activeDays.length + 6, 14)}
+                  value={manualWeekCopy}
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+              </div>
+            )}
+          </section>
+        )}
         {tab === 'planner' && (
           <PlannerView
             budget={budget}
