@@ -280,6 +280,42 @@ try {
   checks.push('intentionally-empty-week-persists-without-phantom-groceries')
   await screenshot(sessionId, 'shopping-empty-week.png')
 
+  // Genuine browser recovery: broken local planner and checklist storage
+  // must never crash the app, resurrect checked rows or create retail claims.
+  await script(sessionId, `
+    localStorage.setItem('supa:planner-preferences:v2', '{broken-json')
+    localStorage.setItem('supa:shopping-list-progress:v1', '{broken-json')
+    return true
+  `)
+  await request(`/session/${sessionId}/refresh`, { method: 'POST', body: '{}' })
+  await until(sessionId,
+    'return document.querySelector(".screen")?.textContent.includes("4 maaltijden actief")',
+    'corrupt saved week recovered to deterministic default',
+  )
+  const recoveredPreferences = await until(sessionId, `
+    const raw = localStorage.getItem('supa:planner-preferences:v2')
+    try {
+      const saved = JSON.parse(raw)
+      return saved.budget === 35 && saved.activeDays.length === 4
+    } catch { return false }
+  `, 'recovered default saved planner preferences')
+  assert.equal(recoveredPreferences, true)
+  await nav(sessionId, 'Mand')
+  await until(sessionId, `
+    const comparison = document.querySelector('.comparison-card')
+    return comparison && comparison.textContent.includes('geen live-besparingsclaim')
+  `, 'synthetic-only comparison still disclosed on recovered plan')
+  await nav(sessionId, 'Lijst')
+  await until(sessionId,
+    'return document.querySelectorAll("button.shopping-row").length > 0',
+    'recovered default week creates actual shopping rows',
+  )
+  assert.equal(await script(sessionId,
+    'return document.querySelectorAll("button.shopping-row.checked").length'), 0,
+    'corrupt persisted checks must not count as completed groceries')
+  checks.push('corrupt-planner-and-checklist-recover-safely')
+  await screenshot(sessionId, 'shopping-recovered-default.png')
+
   await writeFile(`${artifactDirectory}/result.json`,
     JSON.stringify({
       schemaVersion: 1,
@@ -294,6 +330,7 @@ try {
         'shopping-item-checked.png',
         'shopping-reloaded.png',
         'shopping-empty-week.png',
+        'shopping-recovered-default.png',
       ],
       checks,
       retailerDataObserved: false,
