@@ -35,3 +35,9 @@ Thirteen fully fictional tests include missing Boni, missing PLUS+DekaMarkt, a d
 **Supa M3 ACTIVE.** Genuine [human field #78](https://github.com/Zennay/Supa/issues/78) still requires one PLUS baseline and DekaMarkt candidate for the **same eleven grocery needs, within 24h and one price context**. M4 and M5 are **INELIGIBLE**, as are production ingest and savings claims. The separate permission request path is [#74](https://github.com/Zennay/Supa/issues/74) and Notion PWQ-25.
 
 **DRAFT/HOLD/NO MERGE/NO DEPLOY** until the original #2090 product owner and independent QA review, independently verified zCloud SQLite writer/scope lease, exact GitHub-hosted tests and current-main/trusted-runner gates where applicable, genuine human field and lawful source evidence, and explicit release approval. This isolated child does not touch any existing owner files or branch, M1/M3 UI, runner/VPS, workflows or permission status. A future owner can integrate just these three add-only paths once the parent is approved.
+
+## Fail-closed comparison CLI review gate (fourth product increment)
+
+The comparison CLI now returns **exit 2 for *every* candidate-set or metadata change**, including **new candidate additions**. Previously an addition was visibly marked `humanReviewRequired=true` but still returned exit 0, allowing automated jobs to overlook the human-review decision. A complete, independently allocated and fully unchanged pair still exits 0 for the limited *inventory-diff check* only. Neither outcome permits source access: `historicalEvidenceVerified=false`, `rightsVerified=false`, `productionReady=false`, `m5Eligible=false`.
+
+Two more synthetic CLI regressions exercise the exact prior gap and an equal-count swap (removed required Boni plus a fictional added banner). **30 new cases total** (13 base, 8 version change, 7 metadata and 2 reviewer-exit). This command reads *local JSON only* and never contacts real stores.
