@@ -158,3 +158,24 @@ test('opt-in sharing includes practical preparation times and serving counts, ne
     message: 'Weekmenu niet beschikbaar',
   })
 })
+
+test('prepared share output is hidden synchronously when the plan or sharing options change', async () => {
+  const { currentWeekSharePreview } = await import('../src/features/planner/weekPlanShare.ts')
+  const initial = input()
+  const snapshot = (data, includeBudget = false, includeDetails = false) =>
+    JSON.stringify([data.plannedMeals, data.activeDays, data.budget, includeBudget, includeDetails])
+  const priorKey = snapshot(initial)
+  const draft = { sourceKey: priorKey, text: formatShareableWeek(initial) }
+
+  assert.equal(currentWeekSharePreview(draft, priorKey), draft.text)
+  assert.equal(currentWeekSharePreview(null, priorKey), null)
+  assert.equal(currentWeekSharePreview(draft, snapshot({ ...initial, budget: 40 })), null)
+  assert.equal(currentWeekSharePreview(draft, snapshot({ ...initial, activeDays: ['Ma'] })), null)
+  assert.equal(currentWeekSharePreview(draft, snapshot({
+    ...initial,
+    plannedMeals: initial.plannedMeals.map((meal) =>
+      meal.day === 'Ma' ? { ...meal, recipeId: 'pasta' } : meal),
+  })), null)
+  assert.equal(currentWeekSharePreview(draft, snapshot(initial, true)), null)
+  assert.equal(currentWeekSharePreview(draft, snapshot(initial, false, true)), null)
+})

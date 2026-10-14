@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
-import { formatShareableWeek } from './features/planner/weekPlanShare'
+import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
+import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
@@ -55,7 +56,7 @@ function readPlannerPreferences() {
 export function App() {
   const [tab, setTab] = useState<Tab>('planner')
   const [preferences, setPreferences] = useState(readPlannerPreferences)
-  const [manualWeekCopy, setManualWeekCopy] = useState<string | null>(null)
+  const [manualWeekCopy, setManualWeekCopy] = useState<WeekSharePreview | null>(null)
   const [includeWeekBudget, setIncludeWeekBudget] = useState(false)
   const [includeWeekDetails, setIncludeWeekDetails] = useState(false)
   const [weekCopyMessage, setWeekCopyMessage] = useState('')
@@ -69,6 +70,17 @@ export function App() {
       })),
     [recipeByDay],
   )
+
+  // Bind prepared copy to the exact user-visible plan state. Clearing it in
+  // an effect alone happens after render and briefly exposes stale personal text.
+  const shareSourceKey = JSON.stringify([
+    plannedMeals,
+    activeDays,
+    budget,
+    includeWeekBudget,
+    includeWeekDetails,
+  ])
+  const currentManualCopy = currentWeekSharePreview(manualWeekCopy, shareSourceKey)
 
   const basket = useMemo(
     () =>
@@ -137,14 +149,17 @@ export function App() {
 
   const prepareWeekPlanCopy = () => {
     try {
-      setManualWeekCopy(formatShareableWeek({
-        plannedMeals,
-        activeDays,
-        recipes: m2Recipes,
-        budget,
-        includeBudget: includeWeekBudget,
-        includeDetails: includeWeekDetails,
-      }))
+      setManualWeekCopy({
+        sourceKey: shareSourceKey,
+        text: formatShareableWeek({
+          plannedMeals,
+          activeDays,
+          recipes: m2Recipes,
+          budget,
+          includeBudget: includeWeekBudget,
+          includeDetails: includeWeekDetails,
+        }),
+      })
       setWeekCopyMessage('Selecteer en kopieer de tekst hieronder')
     } catch {
       setManualWeekCopy(null)
@@ -219,7 +234,7 @@ export function App() {
               Bereidingstijd en porties opnemen
             </label>
             <p role="status" aria-live="polite">{weekCopyMessage}</p>
-            {manualWeekCopy !== null && (
+            {currentManualCopy !== null && (
               <div className="week-share-manual">
                 <label htmlFor="week-share-text">Weekmenu om handmatig te kopiëren</label>
                 <textarea
@@ -227,7 +242,7 @@ export function App() {
                   readOnly
                   autoFocus
                   rows={Math.min(activeDays.length + 6, 14)}
-                  value={manualWeekCopy}
+                  value={currentManualCopy}
                   onFocus={(event) => event.currentTarget.select()}
                 />
               </div>

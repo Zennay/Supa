@@ -92,3 +92,16 @@ export function formatShareableWeek(input: ShareableWeek): string {
     'Receptschattingen en echte winkelprijzen zijn niet inbegrepen.',
   ].join('\n')
 }
+
+/**
+ * Never show prepared private share text after the user's plan or any sharing
+ * preference changes, even during the render before an effect clears state.
+ */
+export type WeekSharePreview = { sourceKey: string; text: string }
+
+export function currentWeekSharePreview(
+  preview: WeekSharePreview | null,
+  sourceKey: string,
+): string | null {
+  return preview && preview.sourceKey === sourceKey ? preview.text : null
+}
