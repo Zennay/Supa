@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { privateM3OutputFailure } from './m3-private-file-errors.mjs'
+import { privateM3OutputFailure } from './m3-source-output-preservation.mjs'
 
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 
