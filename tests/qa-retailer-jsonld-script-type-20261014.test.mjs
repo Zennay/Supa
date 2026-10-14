@@ -72,3 +72,13 @@ test('EXPECTED RED: both shops with only data-type scripts must never produce a 
   assert.equal(result.comparison.cheaperStore,null)
   assert.equal(result.comparison.savingsCents,null)
 })
+
+test('EXPECTED RED: HTML comments containing apparent JSON-LD must never become retailer price evidence', () => {
+  const commented = `<!-- ${html('type="application/ld+json"')} -->`
+  const parsed = parseOfflineRetailerSnapshot({
+    source: sourcePlus, html: commented, capturedAt: TODAY,
+  })
+  assert.equal(parsed.scriptsInspected, 0,
+    'HTML comments contain no actual script elements')
+  assert.equal(parsed.observations.length, 0)
+})
