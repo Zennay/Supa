@@ -114,6 +114,8 @@ export function ObservationView() {
     [sheet],
   )
   const nextTaskSelector = observationNextTaskSelector(nextAction)
+  const canNavigateReview = nextAction.stage === 'review'
+  const canNavigateExport = nextAction.stage === 'export' && readiness.ready
   const canJumpToNextLine =
     nextAction.stage === 'line' && nextIncomplete !== null &&
     nextIncomplete.side === nextAction.side &&
@@ -164,6 +166,20 @@ export function ObservationView() {
   }
 
   const jumpToNextIncomplete = () => {
+    // Review navigation only reveals existing validation messages. Never submit data.
+    if (canNavigateReview) {
+      const review = document.querySelector<HTMLElement>('[data-observation-review-target]')
+      review?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      review?.focus({ preventScroll: true })
+      return
+    }
+    // Export navigation focuses an existing explicit download button; never clicks it.
+    if (canNavigateExport) {
+      const exportButton = document.querySelector<HTMLButtonElement>('[data-observation-export-target]')
+      exportButton?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      exportButton?.focus({ preventScroll: true })
+      return
+    }
     // The selector is generated from literal whitelists, never a user-supplied ID.
     if (nextTaskSelector !== null) {
       const input = document.querySelector<HTMLInputElement | HTMLSelectElement>(nextTaskSelector)
@@ -370,11 +386,14 @@ export function ObservationView() {
           className="ghost-button observation-next-button"
           type="button"
           onClick={jumpToNextIncomplete}
-          disabled={nextTaskSelector === null && !canJumpToNextLine}
+          disabled={nextTaskSelector === null && !canJumpToNextLine && !canNavigateReview && !canNavigateExport}
         >
           {nextAction.stage === 'line'
             ? nextObservationActionLabel(sheet, nextIncomplete)
-            : nextTaskSelector !== null ? `Ga naar: ${nextAction.title}` : 'Geen volgende invoerstap'}
+            : nextTaskSelector !== null ? `Ga naar: ${nextAction.title}`
+            : canNavigateReview ? 'Ga naar: controlepunten'
+            : canNavigateExport ? 'Ga naar: JSON-concept bewaren'
+            : 'Geen volgende invoerstap'}
         </button>
         {windowSummary.state === 'single-observation' && (
           <p>
@@ -400,6 +419,8 @@ export function ObservationView() {
 
       <div
         className={`observation-readiness ${readiness.ready ? 'is-ready' : ''}`}
+        data-observation-review-target
+        tabIndex={-1}
         aria-live="polite"
       >
         <div>
@@ -829,7 +850,7 @@ export function ObservationView() {
       })}
 
       <div className="observation-actions">
-        <button className="primary-button" type="button" onClick={downloadDraft}>
+        <button className="primary-button" type="button" data-observation-export-target onClick={downloadDraft}>
           JSON-concept bewaren
         </button>
         <label className="ghost-button observation-import-button">
