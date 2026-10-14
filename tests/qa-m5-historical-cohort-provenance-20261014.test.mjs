@@ -10,6 +10,7 @@ const verified = (id) => ({
   id, supermarket: 'fictional-store', kind: 'product',
   captureStatus: 'verified', snapshotSha256: SHA_A, shapeSha256: SHA_B,
   schemaOrgStatus: 'abstain',
+  hasNextData: false, jsonLdCount: 0, jsonLdParseErrors: 0,
 })
 const unavailable = (id) => ({
   id, supermarket: 'fictional-store', kind: 'product',
