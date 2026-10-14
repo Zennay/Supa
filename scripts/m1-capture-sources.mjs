@@ -47,6 +47,14 @@ const HOST_BY_SUPERMARKET = new Map([
   ['dekamarkt', 'www.dekamarkt.nl'],
 ])
 const SUPPORTED_KINDS = new Set(['product', 'catalog', 'offers'])
+const EXPECTED_SOURCE_KEYS = new Set([
+  'plus:product',
+  'plus:catalog',
+  'plus:offers',
+  'dekamarkt:product',
+  'dekamarkt:catalog',
+  'dekamarkt:offers',
+])
 const MAX_BYTES = 5 * 1024 * 1024
 const TIMEOUT_MS = 20_000
 
@@ -66,14 +74,35 @@ function expectedHost(supermarket) {
 }
 
 export function validateSources(sources = SOURCES) {
+  if (!Array.isArray(sources)) {
+    throw new Error(
+      `M1 capture source matrix must contain exactly ${EXPECTED_SOURCE_KEYS.size} sources`,
+    )
+  }
+
   const ids = new Set()
+  const sourceKeys = new Set()
+
   for (const source of sources) {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
+      throw new Error('Invalid source entry')
+    }
     if (!isSafeSourceId(source.id) || ids.has(source.id)) {
       throw new Error(`Invalid or duplicate source id: ${source.id}`)
     }
     ids.add(source.id)
 
     const host = expectedHost(source.supermarket)
+    if (!SUPPORTED_KINDS.has(source.kind)) {
+      throw new Error(`Unsupported source kind: ${source.kind}`)
+    }
+
+    const sourceKey = `${source.supermarket}:${source.kind}`
+    if (!EXPECTED_SOURCE_KEYS.has(sourceKey) || sourceKeys.has(sourceKey)) {
+      throw new Error(`Invalid or duplicate source matrix entry: ${sourceKey}`)
+    }
+    sourceKeys.add(sourceKey)
+
     const url = new URL(source.url)
     if (
       url.protocol !== 'https:' ||
@@ -86,10 +115,19 @@ export function validateSources(sources = SOURCES) {
         `Source does not match supermarket allowlist (${source.supermarket} -> https://${host}): ${source.url}`,
       )
     }
-    if (!SUPPORTED_KINDS.has(source.kind)) {
-      throw new Error(`Unsupported source kind: ${source.kind}`)
-    }
   }
+
+  if (sources.length !== EXPECTED_SOURCE_KEYS.size) {
+    throw new Error(
+      `M1 capture source matrix must contain exactly ${EXPECTED_SOURCE_KEYS.size} sources`,
+    )
+  }
+
+  const missing = [...EXPECTED_SOURCE_KEYS].filter((key) => !sourceKeys.has(key))
+  if (missing.length > 0) {
+    throw new Error(`M1 capture source matrix is incomplete: ${missing.join(', ')}`)
+  }
+
   return true
 }
 

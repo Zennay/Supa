@@ -128,3 +128,50 @@ test('M1 capture rejects credential-bearing allowlisted URLs', () => {
     /does not match supermarket allowlist/,
   )
 })
+
+
+test('M1 capture validator rejects empty, incomplete and malformed source containers', () => {
+  assert.throws(
+    () => validateSources([]),
+    /must contain exactly 6 sources/,
+  )
+  assert.throws(
+    () => validateSources(SOURCES.slice(0, 5)),
+    /must contain exactly 6 sources/,
+  )
+  assert.throws(
+    () => validateSources(null),
+    /must contain exactly 6 sources/,
+  )
+
+  const malformed = [...SOURCES]
+  malformed[0] = null
+  assert.throws(
+    () => validateSources(malformed),
+    /Invalid source entry/,
+  )
+})
+
+test('M1 capture validator rejects duplicate retailer-kind pairs even with unique ids', () => {
+  const duplicatePair = SOURCES.map((source) => ({ ...source }))
+  const plusOffers = duplicatePair.find(
+    (source) => source.supermarket === 'plus' && source.kind === 'offers',
+  )
+  const dekaOffersIndex = duplicatePair.findIndex(
+    (source) => source.supermarket === 'dekamarkt' && source.kind === 'offers',
+  )
+
+  duplicatePair[dekaOffersIndex] = {
+    ...plusOffers,
+    id: 'plus-offers-duplicate-pair',
+  }
+
+  assert.throws(
+    () => validateSources(duplicatePair),
+    /Invalid or duplicate source matrix entry: plus:offers/,
+  )
+})
+
+test('M1 capture validator accepts the complete matrix independent of source order', () => {
+  assert.equal(validateSources([...SOURCES].reverse()), true)
+})
