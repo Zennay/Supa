@@ -30,7 +30,6 @@ import {
   removeObservationDraft,
 } from './observationDraftPersistence.ts'
 import { observationDraftFileSizeAllowed } from './observationDraftImport.ts'
-import { observationDraftStorageStatus } from './observationDraftStorageGuard.ts'
 import { observationNextAction, observationNextTaskSelector } from './observationNextStep.ts'
 import { readableObservationIssue } from './observationReadinessCopy.ts'
 import { ObservationNextActionCard } from './ObservationNextActionCard.tsx'
