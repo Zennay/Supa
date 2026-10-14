@@ -1,0 +1,15 @@
+# Offline M5 review-queue baseline population admission (14 October 2026)
+
+Product-core owner 1/2; new issue [#2241](https://github.com/Zennay/Supa/issues/2241), isolated draft child of frozen product #2240 exact SHA `1e50d05c1df369c6691c1c5d55c034e2fc7c5f66`. No original QA, other product branches, M1 comparator/inspector, M3 collector, Supa UI, main, workflows, permanent VPS or source-rights changes.
+
+## Two fail-open cases
+`buildOfflineSelectorReviewQueue` previously limited current `captureCount <= 100` and total union `changes.length <= 200`, but not the number of historical snapshots actually supplied. Pure input with 200 historical-only `removed` records passed despite M1's physical 100-source maximum per capture directory. Second case: a report with `baselineProvided:false` could still carry a non-null old current/baseline pair if status was `unavailable`, falsely suggesting no historical evidence.
+
+## Correction
+On each validated dense `changes` row, count non-null historical snapshots, reject any over 100, and reject any historical snapshot if `baselineProvided === false`. Keep current count ceiling 100 and union ceiling 200 independent: valid disjoint 100-current +100-historical captures still produce 200 sorted human-only actions. Existing historical `unchanged`, legitimate no-history P1 unavailable, no-history P2 baseline_missing, and baseline-provided added P2 remain unchanged, including opaque source tokens, manual review gates, false production/eligibility/rights flags and input immutability.
+
+## Product synthetic tests
+13 new product-owned tests in `tests/product-m5-baseline-population-20261014.test.mjs`: reject 101 and 200 historical-only; allow exactly 100 historical removals, and valid 100+100 disjoint union; reject unavailable-P1 forged historical verified or unavailable source in nominally no-baseline report; accept actual P1 without history, legitimate P2 with/without baseline, true historical P3, empty comparison, and prove invalid inputs unchanged and output tokens never include fictional source labels. The earlier 14-case `tests/product-m5-dense-review-records-20261014.test.mjs` on frozen parent is adjusted in this child so its 200-row positive sample corresponds to *physically possible* 100+100 distinct-source union. Entirely fictional local records, no network, users, retailer data or real prices.
+
+## Safety and release hold
+This narrows a future offline M5 manual reviewer pure API, not a guarantee about atomic original filesystem reads, successful retailer permissions, prices or savings. Supa **M3 ACTIVE** until true human same-demand PLUS 11 + DekaMarkt 11 within 24h [#78](https://github.com/Zennay/Supa/issues/78) are collected and assessed. M4/M5 not eligible. **DRAFT/HOLD/NO MERGE/NO DEPLOY** until independent zCloud SQLite task-write lease/claim, original product & independent QA reviews, exact CI and safe latest-main/permanent trusted runner as applicable, genuine #78 evidence and explicit human releasego.

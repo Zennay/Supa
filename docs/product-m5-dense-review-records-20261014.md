@@ -1,0 +1,15 @@
+# Offline M5 selector queue — dense canonical action array admission (14 Oct 2026)
+
+**Product-core 1/2**, issue [#2238](https://github.com/Zennay/Supa/issues/2238). Isolated new branch from exact green product owner #2235 commit `524c4b5292b11fbeab239a7937d9c20948734abc`. No changes to original M1 inspector, M5 capture comparator, independent QA or any other product-owner branch, Supa Planner/M3, main, CI workflows or permanent VPS.
+
+## Problem
+The exported pure `buildOfflineSelectorReviewQueue(report)` consumes M5's comparison report and returns private, anonymous human selector-review actions. It previously checked only `report.changes.length <= 200`, then used `report.changes.map(...)` for record validation. Because JavaScript Array.map skips absent indexed slots, a sparse but length-bounded array with declared counts of zero was accepted and produced a sparse `actions` array, which `JSON.stringify` would serialize with null placeholders. Missing source rows thus never passed review validation but appeared in an otherwise valid queue. Separate object-shape checks also allowed arrays with assigned named properties masquerading as `change`, `current`, or `baseline` records in the direct pure API.
+
+## Narrow correction
+Before any hashing/output, iterate all declared `report.changes` indices and require `Object.hasOwn` for each. Explicitly reject array values disguised as `change`, `current`, or `baseline` objects. The existing canonical one-to-one ID, status/P1–P3 mapping, snapshot hashes and provenance rules, max 200 source changes, deterministic action sort, opaque source token construction, `productionReady=false`, `rightsVerified=false` and `m5Eligible=false` remain intact. Legitimate dense normal-origin historical and no-baseline reports continue to work. Source-bearing CLI stderr remains fixed/generic on error.
+
+## Synthetic product-owned checks
+`tests/product-m5-dense-review-records-20261014.test.mjs` adds 14 local-only pure API scenarios: entirely holey array, a leading hole with real P2, an internal gap between P1/P2, sparse 200-slot array, masquerading `change` array, masquerading verified/unavailable current arrays, masquerading historical array; positive dense P1/P2, P3, P1 origin shift, exact 200-row valid historical removals, >200 rejection, unchanged deterministic source-token ordering on input permutation. Inputs are fictional, no network, no users or real supermarket prices.
+
+## HOLD and scope limits
+This is defensive input validation for an *offline human-only future M5 review queue*, not source-permission evidence, current product price observation, a live scrapers/retailer API, M4 beta or M5 release readiness. Supa remains **M3 ACTIVE** with genuine human same-demand [#78](https://github.com/Zennay/Supa/issues/78) PLUS 11 + DekaMarkt 11 in 24 hours still open. **DRAFT/HOLD/NO MERGE/NO DEPLOY** until independently verified zCloud SQLite task scope-write lease, original product and QA owner review, hosted CI, safe latest-main/trusted permanent runner when applicable, human field evidence and explicit releasego.
