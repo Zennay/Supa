@@ -30,9 +30,9 @@ test('routed M3 Mand refuses optimistic same-price claim when no groceries are p
       outcome: 'same', claimable: true, savingsCents: 0, deltaCents: 0,
       lineDeltas: [], reasons: [],
     }
-    const render = (basket, baseline, candidate) => renderToStaticMarkup(
+    const render = (basket, baseline, candidate, comparison = optimistic) => renderToStaticMarkup(
       createElement(BasketView, {
-        basket, comparison: optimistic,
+        basket, comparison,
         comparisonBaseline: { ...baseline, store: { id: 'fictional-plus', name: 'PLUS fictief' } },
         comparisonCandidate: { ...candidate, store: { id: 'fictional-deka', name: 'DekaMarkt fictief' } },
       }),
@@ -49,11 +49,31 @@ test('routed M3 Mand refuses optimistic same-price claim when no groceries are p
     assert.deepEqual(empty, before)
 
     // Guard is not a global disabling of valid, nonempty same-price baskets.
-    const complete = render(matched, matched, matched)
+    // Unlike an optimistic incomplete runtime stub, an actual claim carries
+    // both exact full-basket cent totals and a reconciled zero-cent delta.
+    const reconciled = {
+      ...optimistic,
+      baselineTotalCents: matched.totalCents,
+      candidateTotalCents: matched.totalCents,
+      lineDeltas: matched.lines.map((line) => ({
+        id: line.id,
+        ingredientLabel: line.ingredientLabel,
+        baselineLineTotalCents: line.lineTotalCents,
+        candidateLineTotalCents: line.lineTotalCents,
+        deltaCents: 0,
+      })),
+    }
+    const complete = render(matched, matched, matched, reconciled)
     assert.match(complete, /data-comparison-outcome="same"/)
     assert.match(complete, /Beide testmanden zijn even duur/)
-    assert.match(complete, /M3 controlled testdata/)
+    assert.match(complete, /Vergelijking van voorbeeldprijzen voor dezelfde week en een volledige mand/)
+    assert.match(complete, /Geen actuele winkelprijzen of bewezen besparing/)
+    assert.doesNotMatch(complete, /M3 controlled testdata|M2 testfixture|productie-liveprijs/)
     assert.doesNotMatch(complete, /Plan eerst maaltijden om winkels te vergelijken/)
+    const incompleteClaim = render(matched, matched, matched, optimistic)
+    assert.match(incompleteClaim, /data-comparison-outcome="unknown"/)
+    assert.doesNotMatch(incompleteClaim, /Beide testmanden zijn even duur/)
+    assert.match(incompleteClaim, /Geen financieel verschil tonen/)
   } finally {
     await vite.close()
   }
