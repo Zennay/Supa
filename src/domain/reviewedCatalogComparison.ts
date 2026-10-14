@@ -93,6 +93,24 @@ export function compareReviewedCatalogs({
       sourceTrusted = false
       continue
     }
+    // An Offer may advertise a future or expired price. Its snapshot time
+    // being recent is not proof that this exact checkout price is valid now.
+    // Invalid or contradictory dates also withhold the entire basket winner.
+    if (raw.offer) {
+      const { validFrom, validTo } = raw.offer
+      const parseBound = (value: string, isEnd: boolean) =>
+        // Schema.org date-only priceValidUntil is inclusive through the UTC day.
+        Date.parse(isEnd && /^\\d{4}-\\d{2}-\\d{2}$/.test(value)
+          ? value + 'T23:59:59.999Z' : value)
+      const from = validFrom === null ? null : parseBound(validFrom, false)
+      const to = validTo === null ? null : parseBound(validTo, true)
+      if ((from !== null && (!Number.isFinite(from) || from > nowMs)) ||
+          (to !== null && (!Number.isFinite(to) || to < nowMs)) ||
+          (from !== null && to !== null && from > to)) {
+        sourceTrusted = false
+        continue
+      }
+    }
     observedTimes.push(time)
 
     if (raw.availability === 'unavailable' ||
