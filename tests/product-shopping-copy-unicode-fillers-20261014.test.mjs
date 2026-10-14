@@ -49,7 +49,7 @@ test('visible grocery text with combining marks, emoji selectors and fillers sta
   const id = value.lines[index].id
   value.store.name = 'PLUS \u115fmarkt'
   value.lines[index].ingredientLabel = 'Cafe\u0301\u2800bonen'
-  value.lines[index].productName = 'Rijst\u3164\ufe0f verpakking'
+  value.lines[index].productName = 'Rijst\u3164 verpakking'
   const before = structuredClone(value)
   const text = buildShoppingListCopyText(value, [id])
   assert.equal(typeof text, 'string')
@@ -59,6 +59,10 @@ test('visible grocery text with combining marks, emoji selectors and fillers sta
   assert.match(text, /\[x\] Rijst verpakking/u)
   assert.doesNotMatch(text, /[\u115f\u1160\u3164\uffa0\u2800]/u)
   assert.deepEqual(value, before)
+  // Emoji presentation selector is supported when paired with a visible base.
+  const emoji = structuredClone(value)
+  emoji.store.name = '🛒\ufe0f PLUS'
+  assert.match(buildShoppingListCopyText(emoji), /Boodschappenlijst — 🛒\ufe0f PLUS/u)
 })
 
 test('old mark-only and selector-only labels remain rejected without altering prices', () => {
