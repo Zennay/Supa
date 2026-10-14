@@ -145,8 +145,19 @@ test('M3 stale-tab correction is wired to both save and delete and retains recov
   assert.ok(save.indexOf('observationDraftStorageStatus(') >= 0)
   assert.ok(save.indexOf('observationDraftStorageStatus(') < save.indexOf('persistObservationDraft('))
   const clear = source.slice(source.indexOf('  const clearDraft = () =>'), source.indexOf('  const jumpToNextIncomplete ='))
-  assert.ok(clear.indexOf('observationDraftStorageStatus(') >= 0)
-  assert.ok(clear.indexOf('observationDraftStorageStatus(') < clear.indexOf('removeObservationDraft('))
+  // Product-core may isolate the destructive removal in a helper and guard
+  // the actual user action wrapper. In both designs the public button must
+  // reach the storage comparison before it can reach removeItem.
+  const wrapper = clear.includes('const clearDraftWithConflictGuard =')
+    ? clear.slice(clear.indexOf('const clearDraftWithConflictGuard ='))
+    : clear
+  assert.ok(wrapper.indexOf('observationDraftStorageStatus(') >= 0)
+  if (wrapper !== clear) {
+    assert.ok(wrapper.indexOf('observationDraftStorageStatus(') < wrapper.indexOf('clearDraft()'))
+    assert.match(source, /onClick={clearDraftWithConflictGuard}/u)
+  } else {
+    assert.ok(clear.indexOf('observationDraftStorageStatus(') < clear.indexOf('removeObservationDraft('))
+  }
   const vite = await createServer({
     server: { middlewareMode: true }, appType: 'custom',
     optimizeDeps: { noDiscovery: true, include: [] }, logLevel: 'error',
