@@ -130,6 +130,7 @@ function snapshotOwnGuidanceData(value: unknown): unknown {
       }
       const result: Record<string, unknown> = Object.create(null)
       for (const key of keys) {
+        if (typeof key !== 'string') throw new Error('symbol guidance field')
         const property = descriptors[key]
         if (!property || !('value' in property)) {
           throw new Error('guidance accessor not allowed')
