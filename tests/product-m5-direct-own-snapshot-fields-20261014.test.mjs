@@ -139,7 +139,7 @@ test('direct queue valid no-baseline P2, failed P1, verified historical P3 remai
     assert.equal(result.rightsVerified,false)
     assert.equal(result.productionReady,false)
     assert.equal(result.m5Eligible,false)
-    assert.doesNotMatch(JSON.stringify(result),/ordinary|offline|stable|fictional-market/)
+    assert.doesNotMatch(JSON.stringify(result),/ordinary|good-failure|stable|fictional-market/)
   }
 })
 test('direct queue valid Product M1→M5 pair keeps P3 and opaque labels',()=>{
