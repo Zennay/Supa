@@ -62,7 +62,8 @@ function hasValidRequirementShape(value: unknown): value is IngredientRequiremen
   const requirement = value as Record<string, unknown>
   return (
     typeof requirement.id === 'string' &&
-    requirement.id.trim().length > 0 &&
+    requirement.id.length > 0 &&
+    requirement.id === requirement.id.trim() &&
     typeof requirement.query === 'string' &&
     requirement.query.trim().length > 0 &&
     (requirement.amount === null || typeof requirement.amount === 'number') &&
@@ -76,7 +77,10 @@ function hasValidCandidateShape(value: unknown): value is ProductCandidate {
   const candidate = value as Record<string, unknown>
   return (
     typeof candidate.id === 'string' &&
+    candidate.id.length > 0 &&
+    candidate.id === candidate.id.trim() &&
     typeof candidate.name === 'string' &&
+    candidate.name.trim().length > 0 &&
     (candidate.packAmount === null || typeof candidate.packAmount === 'number') &&
     isMatchUnit(candidate.packUnit) &&
     (candidate.packCount === undefined ||
@@ -213,7 +217,7 @@ function scoreCandidate(
     required.family === pack.family
   ) {
     if (pack.amount >= required.amount) {
-      const oversupplyRatio = pack.amount / Math.max(required.amount, 1)
+      const oversupplyRatio = pack.amount / required.amount
       if (oversupplyRatio <= 1.5) {
         score += 20
         reasons.push('pack closely covers requirement')
