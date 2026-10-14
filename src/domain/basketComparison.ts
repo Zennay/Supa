@@ -1,4 +1,5 @@
 import type { BasketTraceLine, OneStoreBasket } from './basket.ts'
+import { calculateDecimalPackCount } from './decimalPackArithmetic.ts'
 
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
 
@@ -88,7 +89,10 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
   const pack = baseQuantity(effectivePackAmount, line.pack.unit)
   const expectedPacks =
     required && pack && required.family === pack.family
-      ? Math.ceil(required.amount / pack.amount)
+      ? calculateDecimalPackCount(
+          [{ amount: line.requirement.amount, unit: line.requirement.unit }],
+          { amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count },
+        )
       : null
   const expectedLineTotalCents = line.packs * line.pricePerPackCents
 
@@ -113,6 +117,15 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
   )
 }
 
+// Native Array.filter/some skip absent physical slots. Sparse checkout evidence
+// must never look complete simply because a hole disappeared in iteration.
+function hasMissingOwnLine(lines: unknown[]): boolean {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!Object.hasOwn(lines, index)) return true
+  }
+  return false
+}
+
 function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   const reasons: string[] = []
   const rawLines: unknown[] = Array.isArray(basket.lines) ? basket.lines : []
@@ -125,6 +138,8 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
 
   if (!Array.isArray(basket.lines)) {
     reasons.push(`${label} basket lines are not an array`)
+  } else if (hasMissingOwnLine(rawLines)) {
+    reasons.push(`${label} basket contains an unobserved physical line slot`)
   } else if (rawLines.some((line) => !supportedBasketLine(line))) {
     reasons.push(`${label} basket contains an unsupported line shape or status`)
   }
@@ -216,6 +231,17 @@ function unknownComparison(
   }
 }
 
+// Compare the exact physical quantity rather than a display-unit spelling.
+// Bidirectional exact ceiling=1 refuses even the tiniest true discrepancy.
+function samePhysicalDemand(
+  left: MatchedBasketLine['requirement'],
+  right: MatchedBasketLine['requirement'],
+): boolean {
+  if (left.amount === right.amount && left.unit === right.unit) return true
+  return calculateDecimalPackCount([left], { amount: right.amount, unit: right.unit }) === 1 &&
+    calculateDecimalPackCount([right], { amount: left.amount, unit: left.unit }) === 1
+}
+
 export function compareFullBaskets({
   baseline,
   candidate,
@@ -268,8 +294,7 @@ export function compareFullBaskets({
     }
 
     if (
-      baselineLine.requirement.amount !== candidateLine.requirement.amount ||
-      baselineLine.requirement.unit !== candidateLine.requirement.unit
+      !samePhysicalDemand(baselineLine.requirement, candidateLine.requirement)
     ) {
       reasons.push(`ingredient demand differs for ${id}`)
       continue
