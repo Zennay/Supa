@@ -56,6 +56,8 @@ function app() {
     if (name === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
     // This interaction/storage harness does not exercise selectable export UI.
     if (name === './ShoppingListCopyButton') return { ShoppingListCopyButton: () => null }
+    // Only the dedicated SSR/print suites render this paper-only component.
+    if (name === './PrintableShoppingChecklist') return { PrintableShoppingChecklist: () => null }
     throw Error('Unexpected v1 source dependency: ' + name)
   }
   const module = { exports: {} }
