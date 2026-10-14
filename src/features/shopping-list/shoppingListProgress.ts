@@ -60,7 +60,7 @@ function numberForBasketKey(value: number): number | string {
  * never prototype fallbacks or accessor side effects. Descriptor reads also
  * avoid invoking a caller's getters (Proxy descriptor traps fail closed above).
  */
-function ownFact(record: Record<string, unknown>, field: string): unknown {
+function ownFact(record: object, field: string): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(record, field)
   return descriptor && Object.hasOwn(descriptor, 'value')
     ? descriptor.value
