@@ -130,7 +130,7 @@ test('direct queue valid no-baseline P2, failed P1, verified historical P3 remai
   const start=buildOfflineSelectorReviewQueue(report([
     row('baseline_missing',verified('ordinary')),row('unavailable',unavailable('offline'))]))
   assert.deepEqual(start.actions.map(x=>x.priority),['P1','P2'])
-  const old=verified('stable')
+  const old=verified('secret-source-stable')
   const steady=buildOfflineSelectorReviewQueue(report(
     [row('unchanged',old,structuredClone(old))],true))
   assert.equal(steady.actions[0].priority,'P3')
@@ -139,7 +139,7 @@ test('direct queue valid no-baseline P2, failed P1, verified historical P3 remai
     assert.equal(result.rightsVerified,false)
     assert.equal(result.productionReady,false)
     assert.equal(result.m5Eligible,false)
-    assert.doesNotMatch(JSON.stringify(result),/ordinary|good-failure|stable|fictional-market/)
+    assert.doesNotMatch(JSON.stringify(result),/ordinary|good-failure|secret-source-stable|fictional-market/)
   }
 })
 test('direct queue valid Product M1→M5 pair keeps P3 and opaque labels',()=>{
