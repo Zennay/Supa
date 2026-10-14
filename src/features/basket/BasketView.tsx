@@ -59,11 +59,26 @@ export function BasketView({
     comparisonCandidate.totalCents,
     comparisonCandidate.unresolvedLineCount,
   )
-  const comparisonWarning = comparisonWarningCopy(
-    comparisonBaseline.unresolvedLineCount,
-    comparisonCandidate.unresolvedLineCount,
-    comparison.reasons.length,
-  )
+  // The domain comparator's older owner branch is still pending. Do not
+  // imply equal prices or savings for an empty plan in the live routed UI,
+  // even if an upstream comparison incorrectly says it is claimable.
+  const hasComparableDemand =
+    basket.selectedMealCount > 0 &&
+    comparisonBaseline.selectedMealCount > 0 &&
+    comparisonCandidate.selectedMealCount > 0 &&
+    basket.lines.length > 0 &&
+    comparisonBaseline.lines.length > 0 &&
+    comparisonCandidate.lines.length > 0
+  const displayComparison = hasComparableDemand
+    ? comparison
+    : { ...comparison, outcome: 'unknown' as const, claimable: false }
+  const comparisonWarning = hasComparableDemand
+    ? comparisonWarningCopy(
+      comparisonBaseline.unresolvedLineCount,
+      comparisonCandidate.unresolvedLineCount,
+      comparison.reasons.length,
+    )
+    : 'Plan eerst een maaltijd; zonder boodschappen is er geen financieel verschil te vergelijken.'
   const reviewSummary = basketReviewSummary(basket.unresolvedLineCount)
   const basketLines = orderBasketLinesForReview(basket.lines)
 
@@ -105,9 +120,11 @@ export function BasketView({
         </p>
       </div>
 
-      <div className="comparison-card" data-comparison-outcome={comparison.outcome}>
+      <div className="comparison-card" data-comparison-outcome={displayComparison.outcome}>
         <span className="eyebrow">Gecontroleerde winkelvergelijking</span>
-        <strong>{comparisonTitle(comparison, comparisonCandidate)}</strong>
+        <strong>{hasComparableDemand
+          ? comparisonTitle(displayComparison, comparisonCandidate)
+          : 'Plan eerst maaltijden om winkels te vergelijken'}</strong>
         <div className="comparison-totals">
           <div>
             <span>Baseline · {comparisonBaseline.store.name}</span>
@@ -122,7 +139,7 @@ export function BasketView({
             </strong>
           </div>
         </div>
-        {comparison.claimable ? (
+        {displayComparison.claimable ? (
           <p className="disclaimer">
             M3 controlled testdata · zelfde week en volledige mand · geen
             live-besparingsclaim.
