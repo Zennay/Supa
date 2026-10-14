@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
 import { buildShoppingListCopyText } from './shoppingListCopyText'
 import { selectShoppingCopyText } from './selectShoppingCopyText'
@@ -16,16 +16,17 @@ export function ShoppingListCopyButton({
   basket: OneStoreBasket
   doneLineIds: readonly string[]
 }) {
-  const [expanded, setExpanded] = useState(false)
   const text = buildShoppingListCopyText(basket, doneLineIds)
+  // Opening belongs to an exact user-visible snapshot, not future planner states.
+  const [expandedText, setExpandedText] = useState<string | null>(null)
+  const expanded = Boolean(text && expandedText === text)
   const fieldId = useId()
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => setExpanded(false), [basket, doneLineIds])
 
   function toggleExport() {
     if (!text) return
-    setExpanded(current => !current)
+    setExpandedText(current => current === text ? null : text)
   }
 
   return (
