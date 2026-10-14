@@ -47,6 +47,9 @@ test('M3 financial title requires the same physical ledger as both displayed exa
     const changes = [
       [{ ...comparison, lineDeltas: [] }, baseline, candidate],
       [{ ...comparison, lineDeltas: null }, baseline, candidate],
+      [{ ...comparison, reasons: null }, baseline, candidate],
+      [{ ...comparison, reasons: undefined }, baseline, candidate],
+      [null, baseline, candidate],
       [{ ...comparison, savingsCents: NaN }, baseline, candidate],
       [{ ...comparison, outcome: comparison.outcome === 'better' ? 'worse' : 'better' }, baseline, candidate],
       [{ ...comparison, baselineTotalCents: comparison.baselineTotalCents + 1 }, baseline, candidate],
