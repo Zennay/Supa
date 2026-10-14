@@ -80,6 +80,10 @@ function requireBoundedHtmlShape(html) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
   }
+  // Every application/json body is part of the SAME SHA-verified bounded
+  // HTML document. Pure inspections must not invent impossible 8MiB+ scripts
+  // or sum multiple individually-valid descriptors past the physical cap.
+  let applicationJsonBytes = 0
   for (let i = 0; i < html.applicationJsonScripts.length; i += 1) {
     if (!Object.hasOwn(html.applicationJsonScripts, i) ||
         !html.applicationJsonScripts[i] ||
@@ -88,9 +92,13 @@ function requireBoundedHtmlShape(html) {
         !Object.hasOwn(html.applicationJsonScripts[i], 'id') ||
         !Object.hasOwn(html.applicationJsonScripts[i], 'bytes') ||
         (html.applicationJsonScripts[i].id !== null &&
-          typeof html.applicationJsonScripts[i].id !== 'string') ||
+          (typeof html.applicationJsonScripts[i].id !== 'string' ||
+           html.applicationJsonScripts[i].id.length > MAX_CAPTURE_HTML_BYTES)) ||
         !Number.isSafeInteger(html.applicationJsonScripts[i].bytes) ||
-        html.applicationJsonScripts[i].bytes < 0) {
+        html.applicationJsonScripts[i].bytes < 0 ||
+        html.applicationJsonScripts[i].bytes > MAX_CAPTURE_HTML_BYTES ||
+        (applicationJsonBytes += html.applicationJsonScripts[i].bytes) >
+          MAX_CAPTURE_HTML_BYTES) {
       throw new Error('Invalid or unbounded inspected HTML shape')
     }
   }
