@@ -50,6 +50,12 @@ test('M3 observed-week workflow keeps every evidence-boundary dependency in its 
     'src/domain/matching.ts',
     'src/domain/basketComparison.ts',
     'src/domain/savingsAttribution.ts',
+    'src/features/observation/ObservationView.tsx',
+    'src/features/observation/observationNextStep.ts',
+    'src/features/observation/observationCollectionUi.ts',
+    'src/features/observation/observationRequiredLineField.ts',
+    'tests/product-m3-observation-live-clock-20261014.test.mjs',
+    'tests/product-m3-observation-next-action-live-ssr.test.mjs',
     'tests/m3-observation-sheet.test.mjs',
     'tests/m3-build-observed-study.test.mjs',
     'tests/m3-observed-study-report.test.mjs',
@@ -172,5 +178,29 @@ test('M3 manual field-run pack runs only on the current main ref', async () => {
   ]) {
     assert.notEqual(invalid, trustedCondition)
     assert.notEqual(invalid, jobCondition, 'unsafe manual dispatch or PR condition would bypass source pin')
+  }
+})
+
+test('M3 live field collection UI cannot bypass permanent VPS path selection', async () => {
+  const workflow = await readFile(workflowPath, 'utf8')
+  const relevant = [
+    'src/features/observation/ObservationView.tsx',
+    'src/features/observation/observationNextStep.ts',
+    'src/features/observation/observationCollectionUi.ts',
+    'src/features/observation/observationRequiredLineField.ts',
+    'tests/product-m3-observation-live-clock-20261014.test.mjs',
+    'tests/product-m3-observation-next-action-live-ssr.test.mjs',
+  ]
+
+  // Require explicit changes to each live human field form boundary, not only
+  // the canonical financial converter: UI can advertise a stale export while
+  // the converter still fails closed. No test calls actual retailer endpoints.
+  for (const path of relevant) {
+    const needle = '      - "' + path + '"'
+    assert.ok(workflow.includes(needle), 'permanent M3 runner skips live field path ' + path)
+    const without = workflow.replace(needle, '')
+    assert.notEqual(without, workflow)
+    assert.ok(!hasQuotedPathTrigger(without, path),
+      'path-removal mutation must be caught for ' + path)
   }
 })
