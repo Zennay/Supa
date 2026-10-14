@@ -1,0 +1,9 @@
+# Independent frozen RED → corrected GREEN proof — M5 SHA own-data provenance
+
+**Product correction [#2319](https://github.com/Zennay/Supa/pull/2319):** frozen corrected owner `433a5bf5ed53937a67aa6c90bd5eada4c6364add`; parent [#2316](https://github.com/Zennay/Supa/pull/2316) exact `d20bfe455752957ec92711d40c970870c4bfd96c`. This child performs QA **only**, separate from product code.
+
+Original independent [QA DRAFT #2320](https://github.com/Zennay/Supa/pull/2320) HEAD `10a8d875d07a2de1f4732dbee4f26235f347bc75` added 16 synthetic cases for own SHA-256 descriptors on current and baseline direct M5 human-only reports. This corrected QA branch imports **byte-identical unchanged original Git test blob `6c64428e68185c79494dab62bec2cd3c3e3d204c`**. No original assertion weakened. Original five valid controls must remain admitted, eleven hostile inherited/getter digest cases must now fail closed with generic errors, zero private getter execution. Genuine M1 Product/abstain/unavailable still produce manual P1/P2/P3 with opaque source tokens, and all rights/production/selector/M5 flags false.
+
+**Release/ownership:** add-only tests plus this evidence note, no product/other QA branch code/main/M1/M3/UI/workflows/permanent VPS changed. Require **this exact QA head's own GitHub-hosted** all Node tests, npm high audit, M1 benchmark+permission and TS/Vite production build GREEN. Product-owner green is not independent acceptance; original expected-RED QA is never mergeable.
+
+Supa **M3 ACTIVE**. Genuine human [issue #78](https://github.com/Zennay/Supa/issues/78) 11 PLUS+11 DekaMarkt same demand <=24h is still required before actual savings claims, source rights or M4/M5 release. **DRAFT/HOLD/NO MERGE/NO DEPLOY** pending verified independent zCloud SQLite task scope/write lease, original source+QA reviews, latest-main/trusted runner where relevant, actual retailer rights and human releasego.
