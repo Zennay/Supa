@@ -180,7 +180,7 @@ try {
   `)
   assert.ok(originalPlannerCost, 'planner budget disclosure missing after saved week')
   assert.equal(originalPlannerCost.max, '40')
-  assert.match(originalPlannerCost.knownCost, /€\\s*[0-9]/)
+  assert.match(originalPlannerCost.knownCost, /€\s*[0-9]/)
   if (originalPlannerCost.knownCost.startsWith('min.')) {
     assert.match(originalPlannerCost.budgetStatus, /mandregels? open/)
     assert.equal(originalPlannerCost.label, 'Bekend minimum van het weekbudget')
