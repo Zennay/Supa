@@ -133,28 +133,19 @@ export function App() {
     setWeekCopyMessage('')
   }, [preferences])
 
-  const copyWeekPlan = async () => {
-    let text: string
+  const prepareWeekPlanCopy = () => {
     try {
-      text = formatShareableWeek({ plannedMeals, activeDays, recipes: m2Recipes, budget })
+      setManualWeekCopy(formatShareableWeek({
+        plannedMeals,
+        activeDays,
+        recipes: m2Recipes,
+        budget,
+      }))
+      setWeekCopyMessage('Selecteer en kopieer de tekst hieronder')
     } catch {
       setManualWeekCopy(null)
       setWeekCopyMessage('Weekmenu niet beschikbaar')
-      return
     }
-
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(text)
-        setManualWeekCopy(null)
-        setWeekCopyMessage('Weekmenu gekopieerd')
-        return
-      } catch {
-        // On restricted browsers offer the actual text to copy manually.
-      }
-    }
-    setManualWeekCopy(text)
-    setWeekCopyMessage('Selecteer de tekst hieronder om te kopiëren')
   }
 
   const toggleDay = (day: string) => {
@@ -194,9 +185,9 @@ export function App() {
         {tab === 'planner' && (
           <section className="week-share-panel" aria-label="Weekmenu delen">
             <div className="week-share-actions">
-              <span>Deel je geselecteerde maaltijden zonder prijzen.</span>
-              <button type="button" className="ghost-button" onClick={copyWeekPlan}>
-                Kopieer weekmenu
+              <span>Deel je geplande maaltijden, zonder winkelprijzen.</span>
+              <button type="button" className="ghost-button" onClick={prepareWeekPlanCopy}>
+                Toon kopieertekst
               </button>
             </div>
             <p role="status" aria-live="polite">{weekCopyMessage}</p>
@@ -206,6 +197,7 @@ export function App() {
                 <textarea
                   id="week-share-text"
                   readOnly
+                  autoFocus
                   rows={Math.min(activeDays.length + 6, 14)}
                   value={manualWeekCopy}
                   onFocus={(event) => event.currentTarget.select()}
