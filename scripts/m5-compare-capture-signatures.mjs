@@ -281,9 +281,24 @@ function observationInstants(results) {
   return times
 }
 
+// Lexically different paths can resolve to the very same M1 capture tree.
+// Compare the underlying directory identity rather than argv strings or
+// path.normalize(), including symlink/relative aliases. This conservative
+// offline preflight does not claim a race-free filesystem snapshot.
+async function requireIndependentCaptureRoots(currentDir, baselineDir) {
+  const [current, baseline] = await Promise.all([stat(currentDir), stat(baselineDir)])
+  if (!current.isDirectory() || !baseline.isDirectory() ||
+      (current.dev === baseline.dev && current.ino === baseline.ino)) {
+    throw new Error('Independent historical capture directory required')
+  }
+}
+
 export async function compareCaptureDirectories(currentDir, baselineDir = null) {
   const currentRows = await preflightBoundedManifest(currentDir)
   const baselineRows = baselineDir ? await preflightBoundedManifest(baselineDir) : null
+  // Keep the existing whole-manifest structural checks first, but do not
+  // read HTML or assign P3 to one directory masquerading as its own baseline.
+  if (baselineDir) await requireIndependentCaptureRoots(currentDir, baselineDir)
   // Every successful source needs a valid time before *any* HTML is read.
   const currentTimes = observationInstants(currentRows)
   const baselineTimes = baselineRows ? observationInstants(baselineRows) : null
