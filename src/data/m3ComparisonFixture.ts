@@ -6,12 +6,12 @@ export const m3BaselineStore: Store = { ...m2Store }
 
 export const m3CandidateStore: Store = {
   id: 'm3-candidate-store',
-  name: 'M3 testwinkel B',
+  name: 'Voorbeeldwinkel B',
 }
 
 function withGaramMasala(products: StoreProduct[], storeId: string): StoreProduct[] {
   return [
-    ...products.map((product) => ({ ...product })),
+    ...products.map((product) => ({ ...product, storeId })),
     {
       id: `${storeId}-garam-50`,
       storeId,
@@ -30,7 +30,6 @@ export const m3CandidateProducts: StoreProduct[] = withGaramMasala(
   m2Products.map((product) => ({
     ...product,
     id: `m3-b-${product.id}`,
-    storeId: m3CandidateStore.id,
     priceCents: Math.max(0, product.priceCents - 10),
   })),
   m3CandidateStore.id,
