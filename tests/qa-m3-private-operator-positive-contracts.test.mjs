@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmod, link, lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { link, lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -119,5 +119,3 @@ test('M3 converter and assessor preserve original synthetic unavailable field sh
   })
 })
 
-// A known permissive-output regeneration gap belongs to the held RED suite;
-// chmod is intentionally NOT used as a passing expectation here.
