@@ -14,6 +14,7 @@ function jobHasSafeAdmission(workflow) {
   // runner. A step-level check occurs too late: runner already allocated.
   return new RegExp(
     '^  rendered-persisted-week:\\n' +
+      '(?:    #[^\\n]*\\n)*' +
       '    ' + guard.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
       '\\n    runs-on: self-hosted\\s*$',
     'm',
@@ -39,6 +40,16 @@ test('positive: hypothetical good job-level same-repository admission passes onl
     '    runs-on: self-hosted\n    steps:\n      - ' + guard,
   )
   assert.equal(jobHasSafeAdmission(trusted), true)
+  // Comments may document the security condition; this must not falsely RED
+  // the corrected owner workflow, provided the IF remains job-level.
+  const documented = trusted.replace(
+    '  rendered-persisted-week:\n    ' + guard,
+    '  rendered-persisted-week:\n' +
+      '    # independent admission context\n' +
+      '    # reject fork heads before runner allocation\n' +
+      '    ' + guard,
+  )
+  assert.equal(jobHasSafeAdmission(documented), true)
   assert.equal(jobHasSafeAdmission(missing), false,
     'read-only token permissions alone do not isolate persistent runner')
   assert.equal(jobHasSafeAdmission(tooLate), false,
