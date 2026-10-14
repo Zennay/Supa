@@ -27,7 +27,15 @@ function loadArrow(name, parameters) {
   }
   visit(tree)
   assert.ok(expression && ts.isArrowFunction(expression), 'actual handler missing: ' + name)
-  return new Function(...parameters, 'return (' + expression.getText(tree) + ')')
+  // The screen contains TypeScript-local types (e.g. let href: string | null).
+  // Transpile the original AST closure instead of evaluating raw TS text.
+  const compiled = ts.transpileModule(
+    'const __qaHandler = ' + expression.getText(tree) + ';',
+    { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+      fileName: 'ObservationRecoveryHandler.ts', reportDiagnostics: true },
+  )
+  assert.deepEqual(compiled.diagnostics, [], name + ' should transpile without diagnostics')
+  return new Function(...parameters, compiled.outputText + '\nreturn __qaHandler')
 }
 
 const makeReset = loadArrow('clearUnrecognizedDraft', [
