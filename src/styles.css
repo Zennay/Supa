@@ -428,3 +428,79 @@ h3, p { margin: 0; }
     transition-duration: .01ms !important;
   }
 }
+
+
+/* The share action stays inside Planner without claiming retailer prices. */
+.week-share-panel {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: var(--surface-strong);
+}
+
+.week-share-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.week-share-actions > span,
+.week-share-panel > p,
+.week-share-manual label {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.week-share-actions > span { min-width: 0; }
+.week-share-actions > button { flex: 0 0 auto; }
+
+.week-share-panel > p:empty { display: none; }
+.week-share-manual { display: grid; gap: 6px; }
+.week-share-manual textarea {
+  display: block;
+  width: 100%;
+  min-height: 128px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  resize: vertical;
+  font: inherit;
+}
+
+@media (max-width: 390px) {
+  .week-share-actions { align-items: stretch; flex-direction: column; }
+  .week-share-actions > button { width: 100%; }
+}
+
+.week-share-privacy {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.week-share-privacy input { width: 20px; height: 20px; flex: 0 0 auto; }
+
+.week-share-copy-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.week-share-copy-tools > label { min-width: 0; }
+.week-share-copy-tools > button { flex: 0 0 auto; }
+
+@media (max-width: 390px) {
+  .week-share-copy-tools { align-items: stretch; flex-direction: column; }
+  .week-share-copy-tools > button { width: 100%; }
+}
