@@ -214,8 +214,8 @@ export async function main(argv = process.argv.slice(2)) {
       'Het rapport wordt privé opgeslagen (0600). Onbekende prijzen blijven onbekend.',
       'Een voorlopig goedkoopste mandje is geen onafhankelijk geverifieerde besparingsclaim.',
       'De echte PLUS/DekaMarkt-veldmeting en bronrechten blijven afzonderlijk vereist.',
-    ].join('\\n')
-    process.stdout.write(guide + '\\n')
+    ].join('\n')
+    process.stdout.write(guide + '\n')
     return guide
   }
   const fromSheet = argv.length === 4 && argv[0] === '--sheet' && argv[2] === '--output'
