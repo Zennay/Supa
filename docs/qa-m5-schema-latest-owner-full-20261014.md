@@ -1,0 +1,9 @@
+# Independent Supa M5 Schema.org QA — latest source-owner replay, HOLD
+
+Scope: quality-validation 2/2, issue #2282. **Exact frozen corrected product** DRAFT #2284 commit 79bbd6afe6a45510db83a5075e8e2ae08ae9522b, including product-owner's later fixture repairs (the earlier source SHA 012d137391de7c46e126ef98127f89bbfed8b96e included two positive product test fixtures inconsistent with the new failed-capture schema trust contract). Those product-side fixtures are **unchanged here**.
+
+Independent QA side: 33 distinct add-only test file paths, imported by immutable original Git blob from earlier QA draft #2288, representing **314 prior independent QA checks plus 21 newly authored Schema.org tests = 335 independent QA scenarios**. This new branch intentionally rebases that same QA test content on latest corrected **owner** source, instead of modifying product-owned tests or the prior QA branch. No product code, original QA branches, main, M1/M3/UI, workflow or permanent VPS changes. All inputs fictional/local; no retailer, real price or participant capture.
+
+Tests require own verified Schema.org parse outcome observation/abstain, no getter/inherited/null/type-forged statuses, failed captures no parser data, true P1/P2/P3 manual-only and all false source-permission, production and M5 eligibility gates. Validate exact hosted CI for THIS QA HEAD (Node tests, high audit 0, M1 matching/source permission, TypeScript/Vite production build); never infer green from original source-only run.
+
+**Supa M3 ACTIVE; human issue #78 same-demand 11 PLUS + 11 DekaMarkt within 24 hours OPEN; M4/M5 INELIGIBLE. DRAFT/HOLD/NO MERGE/NO DEPLOY** until independent zCloud SQLite scope/task write lease, original product/QA review, latest-main/trusted runner as relevant, human field measurement, and explicit releasego.
