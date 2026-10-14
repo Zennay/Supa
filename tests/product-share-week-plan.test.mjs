@@ -135,7 +135,7 @@ test('M3 copied menu preserves readable Dutch names, accents and honest optional
   }
   const result = formatShareableWeek(edited)
   assert.match(result, /Ma: Crème brûlée met peren/)
-  assert.match(result, /Weekbudget \\(eigen voorkeur\\): €\\s*35,25/)
+  assert.match(result, /Weekbudget \(eigen voorkeur\): €\s*35,25/)
   assert.match(result, /Dit is een planning, geen prijsopgave/)
   assert.doesNotMatch(result, /bespaard|echte prijzen:/)
 })
