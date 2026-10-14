@@ -1,6 +1,7 @@
 import { readFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { buildPrivateM3ProductComparison } from './m3-private-product-comparison.mjs'
 import {
   assertNoSymlinkedM3OutputParents,
   writeDerivedM3Output,
@@ -185,22 +186,32 @@ small{display:block;color:#50645e;line-height:1.5;margin-top:5px}td span{display
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  if (argv.length !== 3 || argv[1] !== '--output' ||
-      !argv[0] || argv[0].startsWith('-') ||
-      !argv[2] || argv[2].startsWith('-') || argv[2] !== argv[2].trim()) {
-    throw new Error('usage: m3-private-comparison-html <private-comparison.json> --output <private-report.html>')
+  const fromSheet = argv.length === 4 && argv[0] === '--sheet' && argv[2] === '--output'
+  const fromComparison = argv.length === 3 && argv[1] === '--output'
+  const input = fromSheet ? argv[1] : argv[0]
+  const output = fromSheet ? argv[3] : argv[2]
+  if ((!fromSheet && !fromComparison) ||
+      typeof input !== 'string' || !input || input.startsWith('-') ||
+      typeof output !== 'string' || !output || output.startsWith('-') ||
+      output !== output.trim()) {
+    throw new Error('usage: m3-private-comparison-html [--sheet] <local-field-sheet-or-private-comparison.json> --output <private-report.html>')
   }
-  let report
+
+  let raw
   try {
-    report = JSON.parse(await readFile(argv[0], 'utf8'))
+    raw = JSON.parse(await readFile(input, 'utf8'))
   } catch {
-    throw new Error('private M3 comparison JSON could not be read')
+    throw new Error('private M3 comparison input could not be read')
   }
+  // One-command local field-sheet mode reuses the identical canonical
+  // converter/assessment gates as the separate JSON-to-HTML route. Never
+  // invent a retailer price, trust an unverified observation or log raw input.
+  const report = fromSheet ? buildPrivateM3ProductComparison(raw) : raw
   const rendered = renderPrivateM3ProductComparisonHtml(report)
   try {
-    await assertNoSymlinkedM3OutputParents(argv[2])
-    await mkdir(dirname(argv[2]), { recursive: true, mode: 0o700 })
-    await writeDerivedM3Output(argv[0], argv[2], rendered)
+    await assertNoSymlinkedM3OutputParents(output)
+    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
+    await writeDerivedM3Output(input, output, rendered)
   } catch (error) { throw privateM3OutputFailure(error) }
   return rendered
 }
