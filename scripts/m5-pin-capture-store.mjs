@@ -16,8 +16,10 @@ function segment(value) {
 // later rows. Linux /proc/self/fd child lookups then remain anchored to the
 // original inodes after a root/store pathname is renamed or replaced.
 // Unsupported platforms fail closed; no fallback to mutable original paths.
-export async function withPinnedCaptureTree(directory, inspectCohort) {
-  if (process.platform !== 'linux' || typeof inspectCohort !== 'function') invalid()
+export async function withPinnedCaptureTree(directory, inspectCohort, expectedIdentity = null) {
+  if (process.platform !== 'linux' || typeof inspectCohort !== 'function' ||
+      (expectedIdentity !== null &&
+       (!expectedIdentity.root || !(expectedIdentity.stores instanceof Map)))) invalid()
 
   let rootHandle
   try {
@@ -29,7 +31,10 @@ export async function withPinnedCaptureTree(directory, inspectCohort) {
     const openedRoot = await rootHandle.stat()
     if (!openedRoot.isDirectory() ||
         openedRoot.dev !== originalRoot.dev ||
-        openedRoot.ino !== originalRoot.ino) invalid()
+        openedRoot.ino !== originalRoot.ino ||
+        (expectedIdentity &&
+         (openedRoot.dev !== expectedIdentity.root.dev ||
+          openedRoot.ino !== expectedIdentity.root.ino))) invalid()
   } catch {
     if (rootHandle) await rootHandle.close()
     invalid()
@@ -52,7 +57,11 @@ export async function withPinnedCaptureTree(directory, inspectCohort) {
             constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
           const pinned = await handle.stat()
           if (!pinned.isDirectory() ||
-              pinned.dev !== before.dev || pinned.ino !== before.ino) invalid()
+              pinned.dev !== before.dev || pinned.ino !== before.ino ||
+              (expectedIdentity &&
+               (!expectedIdentity.stores.has(storeName) ||
+                pinned.dev !== expectedIdentity.stores.get(storeName).dev ||
+                pinned.ino !== expectedIdentity.stores.get(storeName).ino))) invalid()
         } catch {
           if (handle) await handle.close()
           invalid()
