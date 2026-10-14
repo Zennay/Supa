@@ -100,7 +100,12 @@ export function buildOfflineSelectorReviewQueue(report) {
         // Canonical M1->M5 captureShape() always emits these own, bounded
         // inspection signals on successful captures. Forged counts or a
         // fabricated parse-error majority must not become reviewable P1/P3.
-        if (!HEX_HASH.test(snapshot.snapshotSha256) ||
+        // RegExp#test coerces objects to strings (possibly executing custom
+        // toString/Symbol.toPrimitive). Canonical M1 SHA-256 fingerprints
+        // are primitive text; reject forged wrappers before any regex call.
+        if (typeof snapshot.snapshotSha256 !== 'string' ||
+            typeof snapshot.shapeSha256 !== 'string' ||
+            !HEX_HASH.test(snapshot.snapshotSha256) ||
             !HEX_HASH.test(snapshot.shapeSha256) ||
             !VERIFIED_SCHEMA_ORG_STATUSES.has(snapshot.schemaOrgStatus) ||
             !Object.hasOwn(snapshot, 'hasNextData') ||
