@@ -59,7 +59,8 @@ test('non-own current sources getter is rejected before alias check without exec
   let calls=0
   const current=cohort([product()])
   Object.defineProperty(current,'sources',{get(){calls++;throw Error('PRIVATE')}})
-  rejectHistory(current,cohort([product()]))
+  assert.throws(()=>compareInspections(current,cohort([product()])),
+    /^Error: Invalid or unbounded current inspection$/)
   assert.equal(calls,0)
 })
 test('historical sources getter is rejected before alias check without execution',()=>{
