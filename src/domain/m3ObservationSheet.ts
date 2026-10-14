@@ -506,9 +506,7 @@ export function observationSheetProgress(sheet: ObservationSheet) {
     sheet.candidate.store.id,
     sheet.candidate.store.name,
   ]
-  const metadataCompleted = metadataValues.filter(
-    (value) => value.trim().length > 0,
-  ).length
+  const metadataCompleted = metadataValues.filter(nonBlank).length
 
   return {
     totalLines,
@@ -526,7 +524,9 @@ export type ObservationSheetReadiness = {
 }
 
 function nonBlank(value: string) {
-  return value.trim().length > 0
+  // An invisible-only label or provenance note is not a recorded observation.
+  // Preserve actual Unicode letters, digits, accents and visible symbols.
+  return typeof value === 'string' && /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
 }
 
 // The collection screen, its 24-hour deadline and the M3 converter must
