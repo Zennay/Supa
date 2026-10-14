@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 import ts from 'typescript'
+import { createServer } from 'vite'
+import { serializeShoppingListProgress, shoppingListProgressStorageKey } from '../src/features/shopping-list/shoppingListProgress.ts'
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import {
   m2DefaultActiveDays, m2InitialPlan, m2Products, m2Recipes, m2Store,
@@ -97,4 +99,44 @@ test('real shopping route forwards only its currently valid checked state into t
   )
   assert.match(routedSource, /const done = progress\.basketKey === basketKey \? progress\.done : \[\]/)
   assert.doesNotMatch(printerSource, /localStorage|fetch\(|clipboard|writeFile|setItem/)
+})
+
+test('real routed React SSR prints saved checkmarks only for the exact current basket', async () => {
+  const value = basket()
+  const lineId = value.lines[0].id
+  const saved = serializeShoppingListProgress(value, [lineId])
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  const vite = await createServer({
+    server: { middlewareMode: true, hmr: false },
+    appType: 'custom',
+    optimizeDeps: { noDiscovery: true, include: [] },
+    logLevel: 'error',
+  })
+  try {
+    const { ShoppingListView } = await vite.ssrLoadModule('/src/features/shopping-list/ShoppingListView.tsx')
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { localStorage: {
+        getItem: (key) => key === shoppingListProgressStorageKey ? saved : null,
+      } },
+    })
+
+    const currentHtml = renderToStaticMarkup(React.createElement(ShoppingListView, { basket: value }))
+    assert.equal((currentHtml.match(/☑/g) ?? []).length, 1)
+    assert.equal((currentHtml.match(/class="shopping-row checked/g) ?? []).length, 1)
+    assert.doesNotMatch(currentHtml, /€|savingsCents|priceCents|participantKey/)
+
+    // The persisted old basket must not mark any paper row after a store change.
+    const switchedBasket = structuredClone(value)
+    switchedBasket.store.id = 'foreign-physical-store'
+    const switchedHtml = renderToStaticMarkup(
+      React.createElement(ShoppingListView, { basket: switchedBasket }),
+    )
+    assert.equal((switchedHtml.match(/☑/g) ?? []).length, 0)
+    assert.equal((switchedHtml.match(/class="shopping-row checked/g) ?? []).length, 0)
+  } finally {
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
+    else delete globalThis.window
+    await vite.close()
+  }
 })
