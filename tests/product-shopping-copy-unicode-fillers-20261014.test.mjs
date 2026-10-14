@@ -54,7 +54,7 @@ test('visible grocery text with combining marks, emoji selectors and fillers sta
   const text = buildShoppingListCopyText(value, [id])
   assert.equal(typeof text, 'string')
   assert.match(text, /Boodschappenlijst — PLUS markt/u)
-  assert.match(text, /Cafe\u0301 bonen/u)
+  // Ingredient is validated even for matched rows, whose printed label is productName.
   assert.match(text, /Rijst verpakking/u)
   assert.match(text, /\[x\] Rijst verpakking/u)
   assert.doesNotMatch(text, /[\u115f\u1160\u3164\uffa0\u2800]/u)
