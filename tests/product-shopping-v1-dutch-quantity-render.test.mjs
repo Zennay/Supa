@@ -48,7 +48,7 @@ test('product: routed shopping list renders Dutch piece/unknown units without ch
       },
       {
         name: 'two one-piece packs',
-        line: { ...matched, packs: 2, pack: { amount: 1, unit: 'piece', count: 1 } },
+        line: { ...matched, packs: 2, lineTotalCents: 2 * matched.pricePerPackCents, pack: { amount: 1, unit: 'piece', count: 1 } },
         expected: '2 × 1 stuk',
         canonical: 'piece',
       },
@@ -75,6 +75,10 @@ test('product: routed shopping list renders Dutch piece/unknown units without ch
         lines: [line],
         matchedLineCount: line.status === 'matched' ? 1 : 0,
         unresolvedLineCount: line.status === 'unresolved' ? 1 : 0,
+      }
+      if (line.status === 'matched') {
+        assert.equal(line.lineTotalCents, line.packs * line.pricePerPackCents,
+          `${name}: synthetic physical totals must be financially coherent`)
       }
       const before = structuredClone(basket)
       const html = render(basket)
