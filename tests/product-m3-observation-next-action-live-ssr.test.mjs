@@ -188,7 +188,7 @@ test('task-first integration does not auto-export or change the canonical readin
   )
   assert.match(source, /const nextAction = useMemo\(\(\) => observationNextAction\(sheet\), \[sheet\]\)/)
   assert.match(source, /<ObservationNextActionCard action=\{nextAction\} \/>/)
-  assert.match(source, /const readiness = useMemo\(\(\) => observationSheetReadiness\(sheet\), \[sheet\]\)/)
+  assert.match(source, /const readiness = useMemo\(\(\) => observationSheetReadiness\(sheet, Date\\.now\\(\\)\), \[sheet\]\)/)
   assert.match(source, /onClick=\{jumpToNextIncomplete\}/)
   assert.match(source, /const downloadDraft = \(\) =>/)
 })
