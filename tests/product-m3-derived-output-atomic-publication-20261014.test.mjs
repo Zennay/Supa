@@ -98,6 +98,35 @@ test('M3 unrelated hardlinks remain unchanged and source aliases are refused', (
     assert.equal(await readFile(output, 'utf8'), await readFile(input, 'utf8'))
   }))
 
+test('M3 concurrent report writers publish one complete snapshot, never mixed bytes', () =>
+  sandbox(async ({ input, output }) => {
+    const a = 'A'.repeat(2048)
+    const b = 'B'.repeat(2048)
+    await writeFile(output, 'OLD_COMPLETE\\n')
+    let started
+    let release
+    const firstChunkWritten = new Promise(resolve => { started = resolve })
+    const resume = new Promise(resolve => { release = resolve })
+    async function* firstWriter() {
+      yield a.slice(0, 1024)
+      started()
+      await resume
+      yield a.slice(1024)
+    }
+    const first = writeDerivedM3Output(input, output, firstWriter())
+    try {
+      await firstChunkWritten
+      assert.equal(await readFile(output, 'utf8'), 'OLD_COMPLETE\\n')
+      await writeDerivedM3Output(input, output, b)
+      assert.equal(await readFile(output, 'utf8'), b)
+    } finally {
+      release()
+      await first
+    }
+    assert.equal(await readFile(output, 'utf8'), a)
+    assert.equal((await stat(output)).mode & 0o777, 0o600)
+  }))
+
 test('M3 final-path symlink never modifies an unrelated victim file', () =>
   sandbox(async ({ root, input, output }) => {
     const victim = join(root, 'private-victim.txt')
