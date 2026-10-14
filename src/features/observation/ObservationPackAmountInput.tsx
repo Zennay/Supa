@@ -31,6 +31,16 @@ export function observationEditablePackAmount(amount: number | null): string {
   return text.replace('.', ',')
 }
 
+/** A malformed quantity must not erase a previously observed package measurement. */
+export function observationPackAmountEditDecision(
+  text: unknown,
+): { kind: 'accept'; value: number | null } | { kind: 'reject' } {
+  if (typeof text !== 'string') return { kind: 'reject' }
+  if (!text.trim()) return { kind: 'accept', value: null }
+  const parsed = observationFinalPackAmount(text)
+  return parsed === null ? { kind: 'reject' } : { kind: 'accept', value: parsed }
+}
+
 export function ObservationPackAmountInput({
   amount,
   label,
@@ -42,10 +52,12 @@ export function ObservationPackAmountInput({
 }) {
   const hintId = useId()
   const [editingText, setEditingText] = useState<string | null>(null)
+  const [rejected, setRejected] = useState(false)
   const currentText = editingText ?? observationEditablePackAmount(amount)
-  const invalid =
+  const invalid = rejected || (
     editingText !== null && editingText.trim() !== '' &&
     observationFinalPackAmount(editingText) === null
+  )
 
   return (
     <>
@@ -57,19 +69,31 @@ export function ObservationPackAmountInput({
         aria-describedby={invalid ? hintId : undefined}
         autoComplete="off"
         value={currentText}
-        onFocus={() => setEditingText(observationEditablePackAmount(amount))}
-        onChange={(event) => setEditingText(event.target.value)}
+        onFocus={() => {
+          setEditingText(observationEditablePackAmount(amount))
+          setRejected(false)
+        }}
+        onChange={(event) => {
+          setEditingText(event.target.value)
+          setRejected(false)
+        }}
         onBlur={(event) => {
           // Draft auto-save receives a completed physical amount or null,
           // never an in-progress comma, exponent or rounded quantity.
-          onAmountChange(observationFinalPackAmount(event.currentTarget.value))
+          const decision = observationPackAmountEditDecision(event.currentTarget.value)
+          if (decision.kind === 'accept') {
+            if (decision.value !== amount) onAmountChange(decision.value)
+            setRejected(false)
+          } else {
+            setRejected(true)
+          }
           setEditingText(null)
         }}
       />
       {invalid && (
         <small role="status" id={hintId}>
           Vul een positieve verpakkingshoeveelheid in, bijvoorbeeld 0,75.
-          Gebruik geen duizendtallen of een afgebroken decimaal.
+          Gebruik geen duizendtallen of een afgebroken decimaal. Ongeldige invoer is niet opgeslagen; een eerder gemeten hoeveelheid blijft behouden.
         </small>
       )}
     </>
