@@ -71,6 +71,9 @@ function app(initial) {
     if (name === 'react/jsx-runtime') return nativeRequire(name)
     if (name === '../../lib/quantityPresentation') return { quantityUnitLabelNl }
     if (name === './shoppingListProgress') return persisted
+    // This legacy test harness exercises storage and checkbox state only;
+    // a separate routed Vite/React SSR test exercises the real banner.
+    if (name === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
     throw Error('Unknown production import ' + name)
   }
   const module = { exports: {} }
