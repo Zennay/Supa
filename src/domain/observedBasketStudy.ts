@@ -381,9 +381,10 @@ function hasObservedStudyContainers(value: unknown): value is WeeklyBasketStudy 
 
 function invalidObservedStudyAssessment(): WeeklyBasketStudyAssessment {
   const reasons = ['observed study contains malformed evidence or basket containers']
-  // Null totals are deliberate for malformed runtime JSON. The static
-  // BasketComparison contract applies only to validated, physical baskets.
-  const missingTotal = null as number
+  // Invalid money is not a price. NaN satisfies the static number
+  // boundary while serialized private JSON represents the absence as null.
+  // Unknown comparisons never display or add this sentinel.
+  const missingTotal = Number.NaN
   const comparison: BasketComparison = {
     outcome: 'unknown',
     claimable: false,
