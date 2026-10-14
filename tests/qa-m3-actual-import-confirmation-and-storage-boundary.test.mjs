@@ -45,7 +45,7 @@ const newApply = loadHandler('applyImportedDraft', [
 const newImport = loadHandler('importDraft', [
   'observationDraftFileSizeAllowed', 'setPendingImport', 'setImportStatus',
   'restoreObservationSheetDraft', 'observationSheetHasUserInput', 'sheet',
-  'applyImportedDraft',
+  'applyImportedDraft', 'importRequestRef', 'sheetRevisionRef', 'latestSheetRef',
 ])
 
 function importedSheet() {
@@ -82,6 +82,7 @@ function harness({ existing = false, quarantined = false } = {}) {
     observationDraftFileSizeAllowed, setPendingImport, setImportStatus,
     restoreObservationSheetDraft, observationSheetHasUserInput,
     state.sheet, apply,
+    { current: 0 }, { current: 0 }, { current: state.sheet },
   )
   return { state, apply, importFile }
 }
