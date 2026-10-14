@@ -1,4 +1,5 @@
 import type { BasketComparison } from '../../domain/basketComparison.ts'
+import type { OneStoreBasket } from '../../domain/basket.ts'
 import { euro } from '../../lib/money.ts'
 
 export type ComparisonLineHighlight = {
@@ -53,6 +54,47 @@ export function hasTrustedComparisonLineEvidence(comparison: BasketComparison): 
   if (sum !== comparison.deltaCents || baselineSum !== comparison.baselineTotalCents ||
       candidateSum !== comparison.candidateTotalCents) return false
   return true
+}
+
+/**
+ * A direct caller cannot forge a complete headline by passing a valid-looking
+ * comparison that contradicts either of the actual physical baskets on screen.
+ * Incomplete baskets, duplicate line IDs, extra/missing rows and changed prices
+ * all abstain. This never accesses retailer data.
+ */
+export function comparisonMatchesVisibleBaskets(
+  comparison: BasketComparison,
+  baseline: OneStoreBasket,
+  candidate: OneStoreBasket,
+): boolean {
+  if (!hasTrustedComparisonLineEvidence(comparison)) return false
+  if (!baseline || !candidate ||
+      !Array.isArray(baseline.lines) || !Array.isArray(candidate.lines) ||
+      baseline.unresolvedLineCount !== 0 || candidate.unresolvedLineCount !== 0 ||
+      baseline.matchedLineCount !== baseline.lines.length ||
+      candidate.matchedLineCount !== candidate.lines.length ||
+      baseline.lines.length !== comparison.lineDeltas.length ||
+      candidate.lines.length !== comparison.lineDeltas.length ||
+      baseline.totalCents !== comparison.baselineTotalCents ||
+      candidate.totalCents !== comparison.candidateTotalCents) return false
+
+  const actual = (basket: OneStoreBasket, key: 'baselineLineTotalCents' | 'candidateLineTotalCents') => {
+    const lines = new Map<string, { ingredientLabel: string; lineTotalCents: number }>()
+    for (const line of basket.lines) {
+      if (!line || line.status !== 'matched' ||
+          typeof line.id !== 'string' || lines.has(line.id) ||
+          !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0) return false
+      lines.set(line.id, line)
+    }
+    if (lines.size !== comparison.lineDeltas.length) return false
+    return comparison.lineDeltas.every((line) => {
+      const physical = lines.get(line.id)
+      return physical !== undefined && physical.ingredientLabel === line.ingredientLabel &&
+        physical.lineTotalCents === line[key]
+    })
+  }
+  return actual(baseline, 'baselineLineTotalCents') &&
+    actual(candidate, 'candidateLineTotalCents')
 }
 
 export function comparisonLineHighlights(
