@@ -112,7 +112,13 @@ export function buildOfflineSelectorReviewQueue(report) {
             !Object.hasOwn(snapshot, 'jsonLdParseErrors') ||
             !Number.isSafeInteger(snapshot.jsonLdParseErrors) ||
             snapshot.jsonLdParseErrors < 0 ||
-            snapshot.jsonLdParseErrors > snapshot.jsonLdCount) invalid()
+            snapshot.jsonLdParseErrors > snapshot.jsonLdCount ||
+            // Canonical M1 cannot produce a positive Product observation
+            // when no JSON-LD record parsed successfully. The exported
+            // direct queue accepts prebuilt reports too, so it must apply
+            // this necessary provenance check independently of captureShape.
+            (snapshot.schemaOrgStatus === 'candidate_observation' &&
+             snapshot.jsonLdCount === snapshot.jsonLdParseErrors)) invalid()
       } else if (snapshot.captureStatus === 'unavailable') {
         // Failed captures have no inspected HTML or successful M1 signals.
         if (snapshot.snapshotSha256 !== null ||
