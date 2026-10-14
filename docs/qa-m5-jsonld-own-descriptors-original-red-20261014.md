@@ -1,0 +1,11 @@
+# QA 2/2 — forged JSON-LD accessors must not reach M5 shape fingerprinting
+
+**Issue:** [#2304](https://github.com/Zennay/Supa/issues/2304), owned by product-core in separate [DRAFT #2306](https://github.com/Zennay/Supa/pull/2306). **Frozen original source:** independent prior hosted-green product [#2296](https://github.com/Zennay/Supa/pull/2296) exact `57ce76010cdc47046457cb6633932226d0f8e866`.
+
+Canonical M1 `inspectHtml()` returns own JSON-LD record `type`, `keys` arrays and optional `parseError` primitive descriptors. Before the product-owned #2306 correction the pure M5 `captureShape` reads `record.type`, `record.keys`, and indexed array entries through ordinary property access: untrusted getters may execute, inherited metadata may be accepted, and different properties may be read at admission and later hashing.
+
+**Independent QA-only witness:** 14 entirely invented local tests; **5 canonical accepted controls** (Product, genuine fake `inspectHtml`, failed JSON-LD abstain, failed M1 P1, length bound) and **9 expected SOURCE RED cases** (type/key/parseError getters, inherited type/keys/parseError, numeric index getters at list and term levels). The negative assertions require one generic `Invalid or unbounded inspected HTML shape` without touching private getter code. All rights, selector, production and M5 flags false, no private source identifiers in review queue. No real retailer data or HTTP.
+
+**Scope:** exactly two new QA ADD files on independent frozen original source; no product code, original product/QA peer branch, main, CI/workflows, M1/M3/UI or permanent VPS edits. Do not merge original expected-RED branch. After product-owner separately freezes a corrected source, replay the **identical immutable Git test blob** and require exact hosted full Node/audit/M1 matching/rights gate/TS-Vite build; do not relax tests.
+
+Supa **M3 ACTIVE**; authentic human [PLUS 11+DekaMarkt 11 same-demand ≤24h #78](https://github.com/Zennay/Supa/issues/78) absent, M4/M5 ineligible. **DRAFT/HOLD/NO MERGE/NO DEPLOY** pending independently verified zCloud SQLite task/lease, original product+QA review, current-main/trusted runner as appropriate, actual field/source-rights proof and explicit human releasego.
