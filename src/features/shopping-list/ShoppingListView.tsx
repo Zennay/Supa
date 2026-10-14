@@ -83,6 +83,8 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
 
           return (
             <button
+              type="button"
+              aria-pressed={checked}
               className={
                 line.status === 'unresolved'
                   ? checked
