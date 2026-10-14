@@ -152,7 +152,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
         <p role="alert" className="disclaimer">
           {storageWarning === 'protected'
             ? 'Afvinken is tijdelijk en niet opgeslagen. Je eerdere opgeslagen gegevens blijven bewaard.'
-            : 'Afvinken is tijdelijk en niet opgeslagen omdat opslag niet beschikbaar is.'}
+            : 'Afvinken is tijdelijk en niet opgeslagen omdat opslag niet beschikbaar is. Eventuele eerdere opgeslagen gegevens blijven bewaard.'}
         </p>
       )}
 
