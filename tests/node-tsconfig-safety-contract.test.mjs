@@ -11,6 +11,11 @@ test('Node/Vite TypeScript project keeps strict build safety', () => {
   assert.equal(config.compilerOptions.composite, true)
   assert.equal(config.compilerOptions.noEmit, true)
   assert.equal(config.compilerOptions.moduleResolution, 'Bundler')
+  assert.equal(
+    config.compilerOptions.noFallthroughCasesInSwitch,
+    true,
+    'Vite config switches must fail type-checking when a case falls through unintentionally',
+  )
 })
 
 test('Node/Vite TypeScript project stays scoped to the Vite config', () => {

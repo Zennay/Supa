@@ -9,6 +9,11 @@ test('application TypeScript keeps strict compile-time validation enabled', () =
   assert.equal(options.strict, true)
   assert.equal(options.isolatedModules, true)
   assert.equal(options.noEmit, true)
+  assert.equal(
+    options.noFallthroughCasesInSwitch,
+    true,
+    'application switches must fail type-checking when a case falls through unintentionally',
+  )
 })
 
 test('application source cannot silently bypass TypeScript safety', () => {
