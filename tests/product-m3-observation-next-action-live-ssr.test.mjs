@@ -14,6 +14,7 @@ import * as draftPersistence from '../src/features/observation/observationDraftP
 import * as draftImport from '../src/features/observation/observationDraftImport.ts'
 import { observationNextAction, observationNextTaskSelector } from '../src/features/observation/observationNextStep.ts'
 import * as observationReadinessCopy from '../src/features/observation/observationReadinessCopy.ts'
+import * as observationRequiredLineField from '../src/features/observation/observationRequiredLineField.ts'
 
 const require = createRequire(import.meta.url)
 const jsxRuntime = require('react/jsx-runtime')
@@ -100,6 +101,7 @@ function renderView(sheet) {
     './ObservationPriceInput.tsx': { ObservationPriceInput: priceInput },
     './ObservationPackAmountInput.tsx': { ObservationPackAmountInput: packAmountInput },
     './ObservationPackCountInput.tsx': { ObservationPackCountInput: packCountInput },
+    './observationRequiredLineField.ts': observationRequiredLineField,
   }
   const ObservationView = evaluate(actualView, modules).ObservationView
   return renderToStaticMarkup(React.createElement(ObservationView))
