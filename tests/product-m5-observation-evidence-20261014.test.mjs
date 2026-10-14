@@ -103,7 +103,8 @@ test('M5 candidate evidence: real M1 inspectHtml parses fictional Product and al
   assert.equal(proof.schemaOrgStatus,'candidate_observation')
   // The internal pure shape still includes the source ID for matching; only
   // the public human review queue must redact it. Never echo Product payload.
-  assert.doesNotMatch(JSON.stringify(proof),/\\"name\\":\\"Fictional\\"|\\"observation\\":/)
+  assert.equal(Object.hasOwn(proof,'observation'),false)
+  assert.doesNotMatch(JSON.stringify(proof), /name":"Fictional"/)
   const comparison=compareInspections({sourceCount:1,sources:[source]},
     {sourceCount:1,sources:[structuredClone(source)]})
   const queue=buildOfflineSelectorReviewQueue(comparison)
@@ -112,6 +113,7 @@ test('M5 candidate evidence: real M1 inspectHtml parses fictional Product and al
   assert.equal(queue.rightsVerified,false)
   assert.equal(queue.productionReady,false)
   assert.equal(queue.m5Eligible,false)
+  assert.doesNotMatch(JSON.stringify(queue),/fictional-product|Fictional|fictional-store/)
 })
 
 test('M5 candidate evidence: true changed fictional Product HTML remains P1 human-only',()=>{
