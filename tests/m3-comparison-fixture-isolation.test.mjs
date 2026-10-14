@@ -20,6 +20,55 @@ test('M3 baseline fixture does not alias M2 store or product objects', () => {
   }
 })
 
+test('M3 comparison fixture binds every product to its declared store', () => {
+  assert.equal(
+    m3BaselineProducts.every(
+      (product) => product.storeId === m3BaselineStore.id,
+    ),
+    true,
+  )
+  assert.equal(
+    m3CandidateProducts.every(
+      (product) => product.storeId === m3CandidateStore.id,
+    ),
+    true,
+  )
+})
+
+test('M3 candidate fixture changes only candidate identity, store and price', () => {
+  assert.equal(m3CandidateProducts.length, m2Products.length + 1)
+  assert.equal(m3CandidateProducts.length, m3BaselineProducts.length)
+
+  for (const m2Product of m2Products) {
+    const candidate = m3CandidateProducts.find(
+      (product) => product.id === `m3-b-${m2Product.id}`,
+    )
+
+    assert.ok(candidate)
+    assert.deepEqual(candidate, {
+      ...m2Product,
+      id: `m3-b-${m2Product.id}`,
+      storeId: m3CandidateStore.id,
+      priceCents: Math.max(0, m2Product.priceCents - 10),
+    })
+  }
+
+  const baselineGaram = m3BaselineProducts.find(
+    (product) => product.id === `${m3BaselineStore.id}-garam-50`,
+  )
+  const candidateGaram = m3CandidateProducts.find(
+    (product) => product.id === `${m3CandidateStore.id}-garam-50`,
+  )
+
+  assert.ok(baselineGaram)
+  assert.ok(candidateGaram)
+  assert.deepEqual(candidateGaram, {
+    ...baselineGaram,
+    id: `${m3CandidateStore.id}-garam-50`,
+    storeId: m3CandidateStore.id,
+  })
+})
+
 test('M3 candidate fixture remains independent from M2 product objects', () => {
   for (const m2Product of m2Products) {
     const candidate = m3CandidateProducts.find(
@@ -62,4 +111,11 @@ test('canonical M3 comparison fixture is immutable at exported boundaries', () =
   assert.throws(() => {
     m3CandidateProducts.pop()
   }, TypeError)
+})
+
+test('candidate comparison label contains no internal milestone jargon (#592)', () => {
+  assert.equal(m3CandidateStore.id, 'm3-candidate-store')
+  assert.equal(m3CandidateStore.name, 'Voorbeeldwinkel B')
+  assert.doesNotMatch(m3CandidateStore.name, /\\bM[0-9]+\\b|testwinkel|testfixture/i)
+  assert.deepEqual(m3CandidateProducts.map((product) => product.storeId), Array(m3CandidateProducts.length).fill(m3CandidateStore.id))
 })
