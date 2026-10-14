@@ -39,7 +39,11 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
     distinctSources.add(entry.sourceId)
     const source = SOURCES.find((candidate) => candidate.id === entry.sourceId)
     if (!source) throw new Error('Offline snapshot source is not on the allowlist')
-    const file = await realpath(join(root, entry.htmlFile))
+    const candidatePath = join(root, entry.htmlFile)
+    if ((await lstat(candidatePath)).isSymbolicLink()) {
+      throw new Error('Input is not a bounded ordinary file')
+    }
+    const file = await realpath(candidatePath)
     if (!file.startsWith(root + sep)) throw new Error('Offline HTML must be inside manifest folder')
     const html = await readBoundedFile(file, MAX_HTML_BYTES)
     const extracted = parseOfflineRetailerSnapshot({
