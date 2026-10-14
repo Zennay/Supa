@@ -1,0 +1,9 @@
+# Independent M5 preflight inode attestation — 14 Oct 2026
+
+**Actual Supa M3 ACTIVE; #78 genuine human PLUS 11 + DekaMarkt 11 same-demand basket within 24h OPEN, M4/M5 INELIGIBLE.** Only local invented future M5 offline data and private synthetic tests, not customer, retailer rights or real prices/savings.
+
+**Frozen owner:** product DRAFT #2231 SHA `12b12a7a077a620456b03d0fd0de80f380d06bef`, original parent #2227 SHA `5639f3b3b10200b5e42b78b42dec3bc017adb1aa`. Copy 20 unchanged Git QA test blobs (160 independent cases) from fixed hosted QA #2229 exact SHA `891c14ab177ddae9709aaab6b0b8f06453a9c975`; add one new 7-case independent preflight dev/ino identity contract Git blob `65f7bd4fdf5d7da778f858eda8306192d0e021e5` exact same bytes as original-source expected RED #2232, and own provenance doc.
+
+**Adversarial proof:** after bounded original lstat preflight records root, store and HTML dev/ino, individually rename original root/store/HTML away and replace old path with a *new regular inode holding exactly the same bytes and SHA*. New production passing expectedIdentity must reject wrong later opened descriptor/inode before treating it as original source. Missing store or source-file identity proof also rejects; valid original physical identity and legacy no-proof direct synthetic API remain positive. All without timer races, real retailer HTTP or production changes. Original #2227 lacks optional identity enforcement and is intentionally expected RED with exact same test Git blob. The corrected whole-cohort reader still preserves SHA, bounded input, private anonymous CLI and P1/P2/P3 manual-only.
+
+**HOLD:** DRAFT/NO MERGE/NO DEPLOY pending verified zCloud SQLite task-write scope claim+lease, original product+QA reviews, exact-head CI, latest-main/trusted VPS where appropriate, genuine human #78 and explicit releasego. No claim of malicious privileged/same-UID tampering or in-place content atomicity.
