@@ -82,10 +82,20 @@ export function renderPrivateM3ComparisonCsv(report) {
   const full = report.fullBasket
   // Never present partial known subtotals as full basket totals or a retailer
   // winner. The verified-retailer flag is always FALSE for this private draft.
-  const footer = full.comparable
-    ? row([t('VOORLOPIGE VOLLEDIGE MAND'), n(money(full.plusTotalCents)),
-      n(money(full.dekamarktTotalCents)), n(money(full.deltaCents))])
-    : row([t('VOLLEDIGE MAND ONBEKEND'), t('Niet alle producten/evidence vergelijkbaar')])
+  const summary = Array.from({ length: HEADERS.length }, () => n(''))
+  summary[0] = t(full.comparable
+    ? 'VOORLOPIGE VOLLEDIGE MAND' : 'VOLLEDIGE MAND ONBEKEND')
+  if (full.comparable) {
+    // Keep every cent value under its actual spreadsheet column, rather
+    // than placing a store total beneath the unrelated demand column.
+    summary[9] = n(money(full.plusTotalCents))
+    summary[16] = n(money(full.dekamarktTotalCents))
+    summary[17] = n(money(full.deltaCents))
+    summary[18] = t('Uitsluitend lokaal, niet onafhankelijk geverifieerd')
+  } else {
+    summary[18] = t('Niet alle producten/evidence vergelijkbaar')
+  }
+  const footer = row(summary)
   const header = row(HEADERS.map(t))
   const advisory = row([
     t('PRIVE / NIET GEVERIFIEERD'), t('Geen actuele prijsfeed en geen publieke besparingsclaim'),
