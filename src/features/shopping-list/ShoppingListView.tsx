@@ -30,6 +30,29 @@ function readStoredProgress(basket: OneStoreBasket) {
   }
 }
 
+// A v1 client must not destroy unsupported, newer or unreadable persisted state.
+// Refuse writes until the key is absent or a strictly recognized v1 snapshot.
+function canOverwriteStoredProgress(raw: string | null): boolean {
+  if (raw === null) return true
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
+    const record = parsed as Record<string, unknown>
+    return (
+      record.schemaVersion === 1 &&
+      typeof record.basketKey === 'string' &&
+      record.basketKey.length > 0 &&
+      Array.isArray(record.doneLineIds) &&
+      record.doneLineIds.every((id: unknown) => typeof id === 'string') &&
+      Object.keys(record).every((key) =>
+        key === 'schemaVersion' || key === 'basketKey' || key === 'doneLineIds'
+      )
+    )
+  } catch {
+    return false
+  }
+}
+
 export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   const basketKey = useMemo(() => shoppingListBasketKey(basket), [basket])
   const [progress, setProgress] = useState(() => ({
@@ -60,6 +83,10 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     if (typeof window === 'undefined' || progress.basketKey !== basketKey) return
 
     try {
+      // Re-read immediately before write. This is protective, not atomic
+      // cross-tab compare-and-swap; any access denial must also prevent writes.
+      const stored = window.localStorage.getItem(shoppingListProgressStorageKey)
+      if (!canOverwriteStoredProgress(stored)) return
       window.localStorage.setItem(
         shoppingListProgressStorageKey,
         serializeShoppingListProgress(basket, progress.done),
