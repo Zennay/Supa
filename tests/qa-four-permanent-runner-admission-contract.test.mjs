@@ -7,11 +7,16 @@ const guardedPullRequest =
   "github.event_name != 'pull_request' || " + sameRepo
 const manualOrTrustedMain =
   "github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main' && " + sameRepo + ')'
+const pinnedM3ManualOrTrustedMain =
+  manualOrTrustedMain.replace(
+    "github.event_name == 'workflow_dispatch'",
+    "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')",
+  )
 
 const workflows = [
   ['m1-data-capture.yml', manualOrTrustedMain, true],
   ['m2-vps-e2e.yml', guardedPullRequest, true],
-  ['m3-observed-week-report.yml', manualOrTrustedMain, true],
+  ['m3-observed-week-report.yml', pinnedM3ManualOrTrustedMain, true],
   ['vps-mobile-foundation.yml', guardedPullRequest, false],
 ]
 
@@ -54,6 +59,16 @@ for (const [file, condition, manual] of workflows) {
       '    runs-on: self-hosted\n    steps:\n      - name: Misplaced guard\n        if: ' + condition,
     )
     assert.throws(() => assertPermanentRunnerAdmission(late, condition, manual))
+
+    if (file === 'm3-observed-week-report.yml') {
+      const staleBranch = workflow.replace("github.ref == 'refs/heads/main'", "github.ref == 'refs/heads/feature'")
+      assert.notEqual(staleBranch, workflow)
+      assert.throws(() => assertPermanentRunnerAdmission(staleBranch, condition, manual))
+
+      const unrestrictedManual = workflow.replace(condition, manualOrTrustedMain)
+      assert.notEqual(unrestrictedManual, workflow)
+      assert.throws(() => assertPermanentRunnerAdmission(unrestrictedManual, condition, manual))
+    }
 
     const persisted = workflow.replace('persist-credentials: false', 'persist-credentials: true')
     assert.throws(() => assertPermanentRunnerAdmission(persisted, condition, manual))
