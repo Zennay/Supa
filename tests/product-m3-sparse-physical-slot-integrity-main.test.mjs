@@ -55,7 +55,7 @@ for (const expected of ['better', 'same', 'worse']) {
     assert.equal(result.claimable, true)
     assert.equal(result.outcome, expected)
     assert.equal(result.lineDeltas.length, 1)
-    assert.equal(result.savingsCents, -result.deltaCents)
+    assert.equal(result.savingsCents, result.deltaCents === 0 ? 0 : -result.deltaCents)
     assert.deepEqual(result.reasons, [])
   })
 }
