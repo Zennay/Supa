@@ -10,7 +10,7 @@ function source(supermarket, kind = 'product', success = true) {
     integrity: success ? 'verified' : undefined,
     manifestSha256: success ? sha : undefined,
     html: success ? { hasNextData: false, jsonLd: [], applicationJsonScripts: [] } : undefined,
-    schemaOrgProduct: { type: 'abstain' } }
+    ...(success ? { schemaOrgProduct: { type: 'abstain' } } : {}) }
 }
 const report = (now, before) => compareInspections(
   { sourceCount: 1, sources: [now] },
