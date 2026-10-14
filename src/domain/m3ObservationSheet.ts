@@ -557,7 +557,8 @@ export function validObservedAt(value: string) {
   }
 
   const timestamp = Date.parse(value)
-  return Number.isFinite(timestamp) ? timestamp : null
+  // Readiness and field-window guidance cannot accept future store visits.
+  return Number.isFinite(timestamp) && timestamp <= Date.now() ? timestamp : null
 }
 
 export function observationSheetReadiness(
