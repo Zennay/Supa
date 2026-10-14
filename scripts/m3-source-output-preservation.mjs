@@ -74,9 +74,11 @@ export async function writeDerivedM3Output(input, output, serialized) {
   await checkDestination()
   const staged = join(parent, `.${basename(output)}.${randomUUID()}.m3-tmp`)
   let handle
+  let stagedCreated = false
   let published = false
   try {
     handle = await open(staged, 'wx', 0o600)
+    stagedCreated = true
     // writeFile accepts both strings and async iterables. In particular an
     // interrupted async serialization may not expose partial final output.
     await handle.writeFile(serialized, { encoding: 'utf8' })
@@ -91,6 +93,8 @@ export async function writeDerivedM3Output(input, output, serialized) {
     published = true
   } finally {
     if (handle) await handle.close()
-    if (!published) await rm(staged, { force: true })
+    // Only unlink a staging path created by this attempt. A failed exclusive
+    // open (including an improbable name collision) owns no file to clean.
+    if (stagedCreated && !published) await rm(staged, { force: true })
   }
 }
