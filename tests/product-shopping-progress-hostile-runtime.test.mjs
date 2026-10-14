@@ -44,7 +44,7 @@ test('shopping v1 persistence never executes or leaks hostile getter errors', ()
   }
   const malformed = { ...valid, store: hostileStore }
   assertInvalid(malformed, raw)
-  assert.ok(attempted >= 3)
+  // Own-data snapshots must reject accessor-backed store IDs without executing private getters.\n  assert.equal(attempted, 0)
   const revoked = Proxy.revocable(valid, {})
   revoked.revoke()
   assertInvalid(revoked.proxy, raw)
