@@ -73,6 +73,11 @@ function validTimestamp(value) {
     if (offsetHour > 23 || offsetMinute > 59) return false
   }
 
+  // Date.parse loses submillisecond fractional precision; nonzero hidden
+  // digits cannot support an inclusive <=24h evidence or money claim.
+  const fractionalSeconds = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1]
+  if (fractionalSeconds && /[1-9]/.test(fractionalSeconds.slice(3))) return false
+
   // A future instant is never an already observed manual retailer capture.
   const observedAtMs = Date.parse(value)
   return Number.isFinite(observedAtMs) && observedAtMs <= Date.now()
