@@ -48,6 +48,26 @@ export async function writeDerivedM3Output(input, output, serialized) {
   await assertNoSymlinkedM3OutputParents(output)
   const source = await stat(input)
   const parent = dirname(output)
+  const pinnedParent = await lstat(parent)
+  if (!pinnedParent.isDirectory()) {
+    throw new Error('refusing non-directory M3 output parent')
+  }
+
+  function samePhysicalFile(left, right) {
+    return left && right && left.dev === right.dev && left.ino === right.ino
+  }
+
+  async function assertUnchangedParent() {
+    const current = await lstat(parent)
+    if (!current.isDirectory() || !samePhysicalFile(pinnedParent, current)) {
+      throw new Error('M3 output parent changed during private report publication')
+    }
+  }
+
+  async function unchangedStagingFile(identity, path) {
+    const current = await lstat(path)
+    return current.isFile() && samePhysicalFile(identity, current)
+  }
 
   async function checkDestination() {
     let existing
@@ -75,10 +95,12 @@ export async function writeDerivedM3Output(input, output, serialized) {
   const staged = join(parent, `.${basename(output)}.${randomUUID()}.m3-tmp`)
   let handle
   let stagedCreated = false
+  let stagedIdentity
   let published = false
   try {
     handle = await open(staged, 'wx', 0o600)
     stagedCreated = true
+    stagedIdentity = await handle.stat()
     // writeFile accepts both strings and async iterables. In particular an
     // interrupted async serialization may not expose partial final output.
     await handle.writeFile(serialized, { encoding: 'utf8' })
@@ -88,13 +110,32 @@ export async function writeDerivedM3Output(input, output, serialized) {
     handle = undefined
 
     await assertNoSymlinkedM3OutputParents(output)
+    await assertUnchangedParent()
     await checkDestination()
+    if (!(await unchangedStagingFile(stagedIdentity, staged))) {
+      throw new Error('M3 staging file changed before report publication')
+    }
     await rename(staged, output)
     published = true
   } finally {
-    if (handle) await handle.close()
-    // Only unlink a staging path created by this attempt. A failed exclusive
-    // open (including an improbable name collision) owns no file to clean.
-    if (stagedCreated && !published) await rm(staged, { force: true })
+    try {
+      if (handle) await handle.close()
+    } finally {
+      // A moved/replaced parent or stolen staging pathname must never cause
+      // cleanup to unlink an unrelated private file. In such a hostile race
+      // the original staging inode may remain at its moved location: a
+      // path-only Node API cannot safely locate or remove that original.
+      if (stagedCreated && stagedIdentity && !published) {
+        try {
+          await assertNoSymlinkedM3OutputParents(output)
+          await assertUnchangedParent()
+          if (await unchangedStagingFile(stagedIdentity, staged)) {
+            await rm(staged, { force: true })
+          }
+        } catch {
+          // Refuse unsafe path-based cleanup, preserving unrelated files.
+        }
+      }
+    }
   }
 }
