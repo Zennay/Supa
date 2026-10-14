@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { lstat, readFile, realpath, stat } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { lstat, open, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -256,14 +257,23 @@ async function preflightBoundedManifest(directory) {
   const fail = () => { throw new Error('Invalid or oversized M1 capture manifest') }
   let parsed
   try {
-    // Manifest may not be borrowed through an alias outside this capture tree.
-    const info = await lstat(manifestPath)
-    if (!info.isFile() || info.nlink !== 1 ||
-        !Number.isSafeInteger(info.size) ||
-        info.size > MAX_CAPTURE_MANIFEST_BYTES) fail()
-    const raw = await readFile(manifestPath, 'utf8')
-    if (Buffer.byteLength(raw, 'utf8') > MAX_CAPTURE_MANIFEST_BYTES) fail()
-    parsed = JSON.parse(raw)
+    // Pin the *opened* manifest inode: a separate lstat(path) then
+    // readFile(path) could read a different object after a path swap.
+    // O_NOFOLLOW refuses final-component symbolic links on Linux.
+    const handle = await open(manifestPath, constants.O_RDONLY | constants.O_NOFOLLOW)
+    try {
+      const info = await handle.stat()
+      if (!info.isFile() || info.nlink !== 1 ||
+          !Number.isSafeInteger(info.size) ||
+          info.size > MAX_CAPTURE_MANIFEST_BYTES) fail()
+      const raw = await handle.readFile('utf8')
+      // A concurrent writer can still grow an already-open inode. Treat
+      // the actual bytes read as untrusted regardless of the prior stat.
+      if (Buffer.byteLength(raw, 'utf8') > MAX_CAPTURE_MANIFEST_BYTES) fail()
+      parsed = JSON.parse(raw)
+    } finally {
+      await handle.close()
+    }
   } catch {
     fail()
   }
