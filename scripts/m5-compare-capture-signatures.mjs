@@ -254,7 +254,7 @@ function captureObservationInstant(value) {
 // allowing an exact-limit file while catching concurrent growth before
 // allocating or parsing further. This bounds this preflight's input bytes;
 // it does not protect separate M1-inspector rereads of the manifest.
-async function readBoundedManifest(handle) {
+export async function readBoundedManifest(handle) {
   const chunks = []
   let total = 0
   while (true) {
