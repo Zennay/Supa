@@ -26,7 +26,7 @@ function safeSegment(value) {
 // followed by a separate pathname read. The bytes are also bounded *during*
 // reads in case the file grows after fstat(). A matching original-byte SHA is
 // required before any private snapshot is created for this source.
-async function readVerifiedHtml(sourcePath, declaredSha, remainingBytes) {
+async function readVerifiedHtml(sourcePath, declaredSha, remainingBytes, expectedFile = null) {
   let handle
   try {
     handle = await open(sourcePath, constants.O_RDONLY | constants.O_NOFOLLOW)
@@ -34,7 +34,9 @@ async function readVerifiedHtml(sourcePath, declaredSha, remainingBytes) {
     const limit = Math.min(HTML_BYTE_LIMIT, remainingBytes)
     if (!info.isFile() || info.nlink !== 1 ||
         !Number.isSafeInteger(info.size) || info.size < 0 ||
-        info.size > limit) invalid()
+        info.size > limit ||
+        (expectedFile && (info.dev !== expectedFile.dev ||
+                          info.ino !== expectedFile.ino))) invalid()
 
     const chunks = []
     let size = 0
@@ -72,11 +74,13 @@ async function readVerifiedHtml(sourcePath, declaredSha, remainingBytes) {
 // product callers always use the original M1 inspector.
 export async function inspectFrozenCaptureDirectory(
   directory, manifest, inspector = inspectCaptureDirectory,
+  expectedIdentity = null,
 ) {
   if (!manifest || !Array.isArray(manifest.results) ||
       manifest.milestone !== 'M1 Data Feasibility' ||
       manifest.bounded !== true || manifest.results.length > 100 ||
-      manifest.sourceCount !== manifest.results.length) invalid()
+      manifest.sourceCount !== manifest.results.length ||
+      (expectedIdentity && !(expectedIdentity.files instanceof Map))) invalid()
   const sources = manifest.results
   // Reject unsafe entire manifest inputs before opening any HTML.
   const ids = new Set()
@@ -107,8 +111,13 @@ export async function inspectFrozenCaptureDirectory(
         for (const row of sources) {
           if (!row.success) continue
           const pinnedFilePath = await getStorePath(row.supermarket)
+          const expectedFile = expectedIdentity?.files.get(
+            row.supermarket + '\0' + row.id,
+          ) ?? null
+          if (expectedIdentity && !expectedFile) invalid()
           const bytes = await readVerifiedHtml(
             pinnedFilePath(row.id), row.sha256, HTML_COHORT_BYTE_LIMIT - total,
+            expectedFile,
           )
           total += bytes.length
           if (!madeFolders.has(row.supermarket)) {
@@ -118,7 +127,7 @@ export async function inspectFrozenCaptureDirectory(
           await writeFile(path.join(privateRoot, row.supermarket, row.id + '.html'),
             bytes, { mode: 0o600, flag: 'wx' })
         }
-      })
+      }, expectedIdentity)
     }
     return await inspector(privateRoot)
   } finally {
