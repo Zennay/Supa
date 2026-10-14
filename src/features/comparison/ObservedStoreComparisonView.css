@@ -93,6 +93,12 @@
   font-variant-numeric: tabular-nums;
 }
 
+.observed-compare-ingredient .observed-compare-row-delta {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+
 .observed-compare-price small,
 .observed-compare-ingredient small {
   font-size: 12px;
