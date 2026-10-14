@@ -14,6 +14,7 @@ const STATUS_ACTION = Object.freeze({
 const HEX_HASH = /^[a-f\d]{64}$/
 const MAX_CHANGES = 200
 const MAX_CAPTURE_SOURCES = 100
+const MAX_SOURCE_ID_UNITS = 128
 const VERIFIED_SCHEMA_ORG_STATUSES = new Set(['candidate_observation', 'abstain'])
 
 // Reject malformed UTF-16 before UTF-8 hashing: unpaired surrogates are
@@ -34,6 +35,13 @@ function validUnicodeSourceId(id) {
 
 function invalid() {
   throw new Error('Invalid offline capture comparison report')
+}
+
+// The direct pure queue API must honour the same M1 origin contract as the
+// upstream M5 capture comparer; equal missing or forged origins are not proof.
+function canonicalOrigin(value) {
+  return typeof value === 'string' && value.length >= 1 &&
+    value.length <= 128 && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
 }
 
 function sourceToken(id) {
@@ -65,7 +73,7 @@ export function buildOfflineSelectorReviewQueue(report) {
   let driftCount = 0
   const actions = report.changes.map((change) => {
     if (!change || typeof change !== 'object' || Array.isArray(change) ||
-        typeof change.id !== 'string' || !change.id || change.id.length > 512 ||
+        typeof change.id !== 'string' || !change.id || change.id.length > MAX_SOURCE_ID_UNITS ||
         !validUnicodeSourceId(change.id) ||
         typeof change.status !== 'string' || !Object.hasOwn(STATUS_ACTION, change.status) ||
         seen.has(change.id)) invalid()
@@ -81,7 +89,9 @@ export function buildOfflineSelectorReviewQueue(report) {
     for (const snapshot of [current, baseline]) {
       if (snapshot === null) continue
       if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot) ||
-          snapshot.id !== change.id) invalid()
+          snapshot.id !== change.id ||
+          !canonicalOrigin(snapshot.supermarket) ||
+          !canonicalOrigin(snapshot.kind)) invalid()
       // Only metadata produced by the canonical M1 captureShape() contract is
       // eligible for a human-only queue. Inconsistent or invented provenance
       // cannot be upgraded to a nominal review action.
