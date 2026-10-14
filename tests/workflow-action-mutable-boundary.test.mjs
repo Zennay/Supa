@@ -48,7 +48,7 @@ test('mutable action references cannot hide behind quoted YAML uses values', () 
     "    - uses: 'actions/setup-node@main'",
     '    - uses: actions/cache@v4',
     '    - uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # pinned',
-  ].join('\\n')
+  ].join('\n')
   const found = [...fixture.matchAll(/^\\s*(?:-\\s*)?uses:\\s*['"]?([^@\\s#'"]+)@([^\\s#'"]+)['"]?.*$/gm)]
     .filter(([, , ref]) => !isImmutableCommitRef(ref))
     .map(([, action, ref]) => action + '@' + ref)
