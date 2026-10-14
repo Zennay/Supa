@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { privateM3OutputFailure } from './m3-source-output-preservation.mjs'
 
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 
@@ -28,25 +29,20 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(buildObservationSheet(), null, 2)}\n`
 
   if (output) {
-    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
     try {
+      await mkdir(dirname(output), { recursive: true, mode: 0o700 })
       await writeFile(output, serialized, {
         encoding: 'utf8',
         flag: 'wx',
         mode: 0o600,
       })
     } catch (error) {
-      if (
-        error !== null &&
-        typeof error === 'object' &&
-        'code' in error &&
-        error.code === 'EEXIST'
-      ) {
-        throw new Error(
-          `refusing to overwrite existing observation sheet: ${output}`,
-        )
+      if (error !== null && typeof error === 'object' &&
+          'code' in error && error.code === 'EEXIST') {
+        // Keep the no-clobber reason without revealing a private basename.
+        throw new Error('refusing to overwrite existing observation sheet')
       }
-      throw error
+      throw privateM3OutputFailure(error)
     }
   } else {
     process.stdout.write(serialized)
