@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { buildFictionalPricedSheet } from '../scripts/m3-rehearse-field-run.mjs'
@@ -11,8 +12,9 @@ import { buildFictionalPricedSheet } from '../scripts/m3-rehearse-field-run.mjs'
 // helper used by the product owner's own tests. All prices/data are fictional.
 const cli = (script, input, output) =>
   spawnSync(process.execPath, [
-    '--experimental-strip-types', script, input, '--output', output,
-  ], { encoding: 'utf8', timeout: 20_000 })
+    '--experimental-strip-types', fileURLToPath(new URL('../' + script, import.meta.url)),
+    input, '--output', output,
+  ], { encoding: 'utf8', timeout: 20_000, cwd: dirname(input) })
 
 function privateSandbox(callback) {
   const root = mkdtempSync(join(tmpdir(), 'supa-qa-decimal-m3-'))
