@@ -97,3 +97,25 @@ test('opt-in print stylesheet gates paper visibility and offers 44px click targe
   assert.match(css, /\.supa-printable-shopping__paper\s*\{\s*display:\s*block !important;/)
   assert.match(css, /break-inside:\s*avoid/)
 })
+
+test('real paper view does not certify a blank-looking matched product', () => {
+  const value = structuredClone(basket())
+  const matched = value.lines.find(line => line.status === 'matched')
+  assert.ok(matched)
+  matched.productName = '\u2800'
+  const html = render(value)
+  assert.match(html, /Product nog te kiezen/)
+  assert.match(html, /handmatig kiezen/)
+  assert.doesNotMatch(html, /\u2800/)
+  assert.doesNotMatch(html, /€|besparing bewezen/i)
+})
+
+test('real paper view fails closed on a visually spoofed shopping task ID', () => {
+  const value = structuredClone(basket())
+  const matched = value.lines.find(line => line.status === 'matched')
+  assert.ok(matched)
+  matched.id += '\u3164'
+  const html = render(value)
+  assert.match(html, /Afdrukken is niet beschikbaar/)
+  assert.doesNotMatch(html, /class="supa-printable-shopping__paper"|<li>/)
+})
