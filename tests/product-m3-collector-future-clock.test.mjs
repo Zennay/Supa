@@ -39,8 +39,8 @@ test('M3 collector readiness preserves valid historical two-store captures', () 
   const sheet = sheetWithObservedTimes(
     '2026-10-04T12:00:00Z', '2026-10-04T13:00:00Z',
   )
-  assert.deepEqual(observationSheetReadiness(sheet), { ready: true, issues: [] })
-  assert.equal(observationWindowSummary(sheet).state, 'within-window')
+  assert.deepEqual(observationSheetReadiness(sheet, Date.now()), { ready: true, issues: [] })
+  assert.equal(observationWindowSummary(sheet, Date.now()).state, 'within-window')
 })
 
 test('M3 collector cannot report export-ready when either store timestamp is in the future', () => {
@@ -49,7 +49,7 @@ test('M3 collector cannot report export-ready when either store timestamp is in 
       '2026-10-04T12:00:00Z', '2026-10-04T13:00:00Z',
     )
     sheet[futureSide].observedAt = '2099-10-10T13:00:00+01:00'
-    const status = observationSheetReadiness(sheet)
+    const status = observationSheetReadiness(sheet, Date.now())
     assert.equal(status.ready, false, futureSide)
     assert.ok(
       status.issues.some(issue => /observatietijd/.test(issue)),
@@ -62,8 +62,8 @@ test('M3 collector cannot call a wholly future 1-hour-apart pair ready or within
   const sheet = sheetWithObservedTimes(
     '2099-10-10T12:00:00Z', '2099-10-10T08:00:00-05:00',
   )
-  const status = observationSheetReadiness(sheet)
+  const status = observationSheetReadiness(sheet, Date.now())
   assert.equal(status.ready, false)
   assert.ok(status.issues.some(issue => /observatietijd/.test(issue)))
-  assert.notEqual(observationWindowSummary(sheet).state, 'within-window')
+  assert.notEqual(observationWindowSummary(sheet, Date.now()).state, 'within-window')
 })
