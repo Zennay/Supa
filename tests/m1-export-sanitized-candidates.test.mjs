@@ -47,13 +47,13 @@ async function writeInspection(root, sources) {
 test('exports only sanitized trusted product observations with capture provenance', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-'))
   const source = {
-    id: 'ah-product',
-    supermarket: 'ah',
+    id: 'dekamarkt-product',
+    supermarket: 'dekamarkt',
     kind: 'product',
     success: true,
     integrity: 'verified',
-    requestedUrl: 'https://www.ah.nl/producten/product/example',
-    finalUrl: 'https://www.ah.nl/producten/product/example',
+    requestedUrl: 'https://www.dekamarkt.nl/product/example',
+    finalUrl: 'https://www.dekamarkt.nl/product/example',
     capturedAt: '2026-10-04T00:00:30.000Z',
     manifestSha256: 'a'.repeat(64),
   }
@@ -71,7 +71,7 @@ test('exports only sanitized trusted product observations with capture provenanc
   const candidatePath = path.join(
     root,
     'sanitized-candidates',
-    'ah-product.json',
+    'dekamarkt-product.json',
   )
   const serialized = await readFile(candidatePath, 'utf8')
   const candidate = JSON.parse(serialized)
@@ -110,8 +110,8 @@ test('records product abstentions without exporting guessed fixtures', async () 
   const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-none-'))
   await writeInspection(root, [
     {
-      id: 'ah-product',
-      supermarket: 'ah',
+      id: 'dekamarkt-product',
+      supermarket: 'dekamarkt',
       kind: 'product',
       success: true,
       integrity: 'verified',
@@ -130,16 +130,70 @@ test('records product abstentions without exporting guessed fixtures', async () 
   ])
 })
 
-test('rejects unsafe product source ids before writing sanitized candidate paths', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-unsafe-'))
+test('rejects product candidates outside the current retailer pair', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-scope-'))
   const source = {
-    id: '../ah-product',
+    id: 'ah-product',
     supermarket: 'ah',
     kind: 'product',
     success: true,
     integrity: 'verified',
     requestedUrl: 'https://www.ah.nl/producten/product/example',
     finalUrl: 'https://www.ah.nl/producten/product/example',
+    capturedAt: '2026-10-04T00:00:30.000Z',
+    manifestSha256: 'a'.repeat(64),
+  }
+  source.schemaOrgProduct = {
+    type: 'observation',
+    observation: observationFor(source),
+  }
+
+  await writeInspection(root, [source])
+
+  await assert.rejects(
+    () => exportSanitizedCandidates(root),
+    /out-of-scope product supermarket/,
+  )
+})
+
+test('rejects malformed product success flags before candidate export', async () => {
+  for (const success of ['false', 1, {}, []]) {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-success-'))
+    const source = {
+      id: 'plus-product',
+      supermarket: 'plus',
+      kind: 'product',
+      success,
+      integrity: 'verified',
+      requestedUrl: 'https://www.plus.nl/product/example',
+      finalUrl: 'https://www.plus.nl/product/example',
+      capturedAt: '2026-10-04T00:00:30.000Z',
+      manifestSha256: 'b'.repeat(64),
+    }
+    source.schemaOrgProduct = {
+      type: 'observation',
+      observation: observationFor(source),
+    }
+
+    await writeInspection(root, [source])
+
+    await assert.rejects(
+      () => exportSanitizedCandidates(root),
+      /invalid product success flag/,
+    )
+  }
+})
+
+test('rejects unsafe product source ids before writing sanitized candidate paths', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-unsafe-'))
+  const source = {
+    id: '../dekamarkt-product',
+    supermarket: 'dekamarkt',
+    kind: 'product',
+    success: true,
+    integrity: 'verified',
+    requestedUrl: 'https://www.dekamarkt.nl/product/example',
+    finalUrl: 'https://www.dekamarkt.nl/product/example',
     capturedAt: '2026-10-04T00:00:30.000Z',
     manifestSha256: 'a'.repeat(64),
   }
@@ -159,13 +213,13 @@ test('rejects unsafe product source ids before writing sanitized candidate paths
 test('rejects duplicate product source ids before candidate files can overwrite each other', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'supa-m1-candidates-duplicate-'))
   const first = {
-    id: 'ah-product',
-    supermarket: 'ah',
+    id: 'dekamarkt-product',
+    supermarket: 'dekamarkt',
     kind: 'product',
     success: true,
     integrity: 'verified',
-    requestedUrl: 'https://www.ah.nl/producten/product/example',
-    finalUrl: 'https://www.ah.nl/producten/product/example',
+    requestedUrl: 'https://www.dekamarkt.nl/product/example',
+    finalUrl: 'https://www.dekamarkt.nl/product/example',
     capturedAt: '2026-10-04T00:00:30.000Z',
     manifestSha256: 'a'.repeat(64),
   }
