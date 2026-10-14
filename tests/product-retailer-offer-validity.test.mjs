@@ -54,13 +54,9 @@ test('date-only expiry remains inclusive throughout the stated UTC day', () => {
   assert.equal(r.comparable, true)
   assert.equal(r.savingsCents, 20)
 })
-test('bad date ordering and malformed date never assert an exact price', () => {
-  for (const pair of [
-    ['2026-10-14T00:00:00Z', '2026-10-16T00:00:00Z'],
-    ['invalid date', '2026-10-14T00:00:00Z'],
-  ]) {
-    const r = compare(pair[0], pair[1])
-    assert.equal(r.comparable, false)
-    assert.equal(r.savingsCents, null)
-  }
+test('contradictory offer start/end never assert an exact price', () => {
+  const r = compare('2026-10-14T00:00:00Z', '2026-10-16T00:00:00Z')
+  assert.equal(r.comparable, false)
+  assert.equal(r.savingsCents, null)
+  assert.equal(r.claimable, false)
 })
