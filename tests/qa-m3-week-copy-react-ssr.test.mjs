@@ -31,9 +31,16 @@ test('independent: actual M3 planner share UI defaults to private, accessible ma
     assert.match(sharePanel, /Mijn weekbudget ook opnemen \(optioneel\)/)
     assert.match(sharePanel, /role="status"[^>]*aria-live="polite"/)
 
-    const checkbox = sharePanel.match(/<input\b[^>]*type="checkbox"[^>]*>/)?.[0]
-    assert.ok(checkbox, 'budget option must be a real keyboard-operable checkbox')
-    assert.doesNotMatch(checkbox, /(?:^|\s)checked(?:=|\s|>)/, 'private budget must start unchecked')
+    assert.match(sharePanel, /Bereidingstijd en porties opnemen/)
+    const checkboxes = [...sharePanel.matchAll(/<input\b[^>]*type="checkbox"[^>]*>/g)]
+      .map((match) => match[0])
+    assert.equal(checkboxes.length, 2, 'budget and details must be two distinct opt-ins')
+    for (const [index, checkbox] of checkboxes.entries()) {
+      assert.doesNotMatch(checkbox, /(?:^|\s)checked(?:=|\s|>)/,
+        `privacy option ${index} must start unchecked`)
+    }
+    assert.equal((sharePanel.match(/class="week-share-privacy"/g) ?? []).length, 2,
+      'each opt-in must have a clickable accessible label')
     assert.doesNotMatch(sharePanel, /<textarea\b/, 'share text must not exist before explicit user action')
     assert.doesNotMatch(html, /€\s*\d+[,.]\d{2}.*weekmenu/i, 'initial UI must not disclose a user budget')
   } finally {
