@@ -43,6 +43,15 @@ export function PlannerView({
     basketUnresolvedLineCount,
   )
   const budgetKnown = budgetAssessment.status === 'known'
+  // The basket already uses canonical integer cents. Do not subtract floating
+  // euros and then let the strict formatter silently show an em dash.
+  const budgetCents = Math.round(budget * 100)
+  const exactRemainingCents =
+    Number.isSafeInteger(basketTotalCents) && basketTotalCents >= 0 &&
+    Number.isSafeInteger(budgetCents) && budget >= 0 &&
+    budget === budgetCents / 100
+      ? budgetCents - basketTotalCents
+      : null
   // Only a strictly validated cent-native lower bound can prove minimum
   // overspend while unfinished matches keep the final total uncertain.
   const knownMinimumOverrunCents = !budgetKnown
@@ -92,9 +101,11 @@ export function PlannerView({
             aria-live="polite"
           >
             {budgetKnown
-              ? budgetAssessment.budgetState.overBudget
-                ? `${euro.format(Math.abs(budgetAssessment.budgetState.remaining))} boven budget`
-                : `${euro.format(budgetAssessment.budgetState.remaining)} over`
+              ? exactRemainingCents === null
+                ? 'Budgetgegevens controleren'
+                : exactRemainingCents < 0
+                  ? `${euro.formatCents(-exactRemainingCents)} boven budget`
+                  : `${euro.formatCents(exactRemainingCents)} over`
               : knownMinimumOverrunCents !== null
                 ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget · ${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`
                 : `${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`}
