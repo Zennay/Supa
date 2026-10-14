@@ -48,7 +48,7 @@ function study(baselineAt, candidateAt) {
   // 7-day week / 2-day advance-shopping contract is also physically coherent.
   // These tests still assert the *same original* UTC elapsed-time boundaries.
   const localDays = [baselineAt, candidateAt]
-    .filter(value => /^\\d{4}-\\d{2}-\\d{2}T/.test(value))
+    .filter(value => /^\d{4}-\d{2}-\d{2}T/.test(value))
     .map(value => value.slice(0, 10))
     .sort()
   const latestLocalDate = localDays.at(-1) ?? '2026-10-25'
