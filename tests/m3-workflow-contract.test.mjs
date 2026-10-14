@@ -54,6 +54,8 @@ test('M3 observed-week workflow keeps every evidence-boundary dependency in its 
     'tests/m3-build-observed-study.test.mjs',
     'tests/m3-observed-study-report.test.mjs',
     'tests/m3-savings-attribution.test.mjs',
+    'tests/qa-m3-attribution-root-shape.test.mjs',
+    'tests/qa-m3-attribution-guard-edge-controls.test.mjs',
     'tests/m3-workflow-contract.test.mjs',
     'tests/m3-workflow-transitive-trigger-closure.test.mjs',
     'package.json',
@@ -93,4 +95,17 @@ test('M3 permanent VPS gate excludes untrusted fork pull-request heads', async (
   assert.match(workflow, /github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository/)
   assert.match(workflow, /if:\s*github\.event_name\s*==\s*'workflow_dispatch'\s*\|\|\s*\(github\.event_name\s*==\s*'pull_request'[^\n]*github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository\)/)
   assert.match(workflow, /uses:\s*actions\/checkout@[0-9a-f]{40}\s+# v\d+\.\d+\.\d+\s*\n\s*with:\s*\n\s*persist-credentials:\s*false/)
+})
+
+test('M3 independent attribution test paths cannot silently lose VPS trigger coverage', async () => {
+  const workflow = await readFile(workflowPath, 'utf8')
+  for (const path of [
+    'tests/qa-m3-attribution-root-shape.test.mjs',
+    'tests/qa-m3-attribution-guard-edge-controls.test.mjs',
+  ]) {
+    assert.equal(hasQuotedPathTrigger(workflow, path), true)
+    const mutant = workflow.replace('      - "' + path + '"', '')
+    assert.notEqual(mutant, workflow, 'missing QA path fixture: ' + path)
+    assert.equal(hasQuotedPathTrigger(mutant, path), false)
+  }
 })
