@@ -38,7 +38,7 @@ test('real shopping tab fails closed for invalid basket shapes without touching 
     const corruptMoney = structuredClone(valid)
     const matched = corruptMoney.lines.find((line) => line.status === 'matched')
     assert.ok(matched)
-    matched.lineTotalCents += 1
+    matched.pricePerPackCents = Number.NaN
     const revoked = Proxy.revocable(valid, {})
     revoked.revoke()
     for (const basket of [sparse, corruptMoney, revoked.proxy, null, undefined]) {
