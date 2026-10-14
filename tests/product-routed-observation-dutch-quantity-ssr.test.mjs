@@ -4,7 +4,12 @@ import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
-import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
+import {
+  buildObservationSheet,
+  OBSERVATION_DRAFT_STORAGE_KEY,
+  restoreObservationSheetDraft,
+  withObservedProductAvailability,
+} from '../src/domain/m3ObservationSheet.ts'
 
 test('actual routed Meten collector presents Dutch amounts but preserves canonical schema values', async () => {
   const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
@@ -28,9 +33,40 @@ test('actual routed Meten collector presents Dutch amounts but preserves canonic
     assert.match(html, /M3 · echte winkelobservatie/)
     assert.match(html, /nodig: 1 stuk|nodig: [2-9] stuks/)
     assert.doesNotMatch(html, /nodig: \d+ piece/)
-    assert.equal((html.match(/<option value="piece">stuk<\/option>/g) ?? []).length, 22,
-      'each of the 11 baseline and 11 candidate collection lines has one localized selector')
-    assert.doesNotMatch(html, />piece<\/option>/)
+    // Empty observation templates never show pack inputs until a product
+    // is explicitly marked available by the human collector.
+    assert.equal((html.match(/<option value="piece">stuk<\\/option>/g) ?? []).length, 0)
+    assert.doesNotMatch(html, />piece<\\/option>/)
+
+    const withOneProductEach = {
+      ...sheet,
+      baseline: {
+        ...sheet.baseline,
+        lines: sheet.baseline.lines.map((line, index) => index === 0
+          ? { ...line, observedProduct: withObservedProductAvailability(line.observedProduct, true) }
+          : line),
+      },
+      candidate: {
+        ...sheet.candidate,
+        lines: sheet.candidate.lines.map((line, index) => index === 0
+          ? { ...line, observedProduct: withObservedProductAvailability(line.observedProduct, true) }
+          : line),
+      },
+    }
+    const json = JSON.stringify(withOneProductEach)
+    assert.ok(restoreObservationSheetDraft(json), 'editable M3 availability is a valid local draft')
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { localStorage: { getItem(key) {
+        assert.equal(key, OBSERVATION_DRAFT_STORAGE_KEY)
+        return json
+      } } },
+    })
+    const availableHtml = renderToStaticMarkup(createElement(ObservationView))
+    assert.equal((availableHtml.match(/<option value="piece">stuk<\\/option>/g) ?? []).length, 2,
+      'both store forms render Dutch labels after a real availability selection')
+    assert.doesNotMatch(availableHtml, />piece<\\/option>/)
+    assert.match(availableHtml, /nodig: 1 stuk|nodig: [2-9] stuks/)
     assert.match(html, /collection-template-not-evidence/)
     assert.deepEqual(sheet, snapshot)
     assert.ok(sheet.baseline.lines.every(line => line.observedProduct.available === null))
