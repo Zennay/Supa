@@ -121,8 +121,8 @@ test('real App restored empty week renders no phantom meals or budgeted savings'
     assert.equal(basket.totalCents, 0)
     assert.equal(basket.lines.length, 0)
   }
-  assert.equal(comparison.outcome, 'same')
-  assert.equal(comparison.savingsCents, 0)
+  // Empty-week financial claims belong to comparator owner #1012 / issue #1051.
+  // Do not assert the currently incorrect 'same/claimable' return on main.
 })
 
 test('real Basket view with an unresolved candidate shows no financial difference', async (t) => {
