@@ -123,6 +123,48 @@ test('M3 complete offline flow converts fictional 22-line field sheet into priva
   }
 })
 
+test('M3 one-command --sheet mode renders real canonical 22-line inputs without creating extra files', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'supa-m3-one-command-'))
+  try {
+    const sheetPath = join(root, secret + '-raw-sheet.json')
+    const output = join(root, 'private-shopping-table.html')
+    const sheet = buildFictionalPricedSheet(90)
+    sheet.study.population = secret
+    const original = JSON.stringify(sheet)
+    await writeFile(sheetPath, original, { mode: 0o600 })
+    const result = spawnSync(process.execPath, [
+      '--experimental-strip-types', cli,
+      '--sheet', sheetPath, '--output', output,
+    ], { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stdout, '')
+    assert.equal(result.stderr, '')
+    assert.equal((await stat(output)).mode & 0o777, 0o600)
+    assert.equal(await readFile(sheetPath, 'utf8'), original)
+    const rendered = await readFile(output, 'utf8')
+    assert.match(rendered, /DekaMarkt is goedkoper/)
+    assert.match(rendered, /€ 11,00/)
+    assert.match(rendered, /€ 9,90/)
+    assert.doesNotMatch(rendered, new RegExp(secret))
+
+    const incomplete = buildFictionalPricedSheet(90)
+    incomplete.candidate.lines[0].observedProduct.available = false
+    const incompletePath = join(root, 'incomplete.json')
+    const secondHtml = join(root, 'incomplete.html')
+    await writeFile(incompletePath, JSON.stringify(incomplete), { mode: 0o600 })
+    const second = spawnSync(process.execPath, [
+      '--experimental-strip-types', cli,
+      '--sheet', incompletePath, '--output', secondHtml,
+    ], { encoding: 'utf8' })
+    assert.equal(second.status, 0, second.stderr)
+    assert.match(await readFile(secondHtml, 'utf8'), /Nog geen betrouwbare winnaar/)
+    assert.doesNotMatch(await readFile(secondHtml, 'utf8'),
+      /DekaMarkt is goedkoper voor dit volledige gemeten mandje/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('M3 HTML real CLI writes a private 0600 report, no source clobber or private path log', async () => {
   const root = await mkdtemp(join(tmpdir(), 'supa-m3-html-test-'))
   try {
