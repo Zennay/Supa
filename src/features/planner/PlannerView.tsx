@@ -3,6 +3,7 @@ import type { PlannedMeal, Recipe } from '../../domain/types'
 import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { IngredientReuseCard } from './IngredientReuseCard.tsx'
+import { RecipeReusePreviewPanel } from './RecipeReusePreviewPanel.tsx'
 import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
 import { RecipePriceExplanation } from './RecipePriceExplanation'
@@ -273,6 +274,14 @@ export function PlannerView({
       </div>
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
+      {hasIngredientData && (
+        <RecipeReusePreviewPanel
+          plannedMeals={plannedMeals}
+          activeDays={activeDays}
+          recipes={ingredientRecipes}
+          onChooseRecipe={onRecipeChange}
+        />
+      )}
 
       <div className="insight-card">
         <span className="eyebrow">M2 verticale slice</span>
