@@ -167,3 +167,43 @@ test('reject changed PNG dimensions or dishonest byte counts', () => {
     })
   }
 })
+
+test('reject an archive claiming a different GitHub run or malformed attempt', () => {
+  for (const patch of [{ githubRunId: '999999999' }, { githubRunAttempt: '0' }]) {
+    const meta = { ...sample(), ...patch }
+    withFixture({ meta }, r => {
+      assert.notEqual(r.status, 0)
+      assert.equal(r.stdout, '')
+    })
+  }
+})
+
+test('reject a screenshot manifest that omits or duplicates image-attestation records', () => {
+  for (const change of [
+    m => { m.screenshotIntegrity = [] },
+    m => { m.screenshotIntegrity.push({ ...m.screenshotIntegrity[0] }) },
+    m => { m.screenshots = ['fictional-browser.png', 'fictional-browser.png'] },
+  ]) {
+    const meta = sample()
+    change(meta)
+    withFixture({ meta }, r => {
+      assert.notEqual(r.status, 0)
+      assert.equal(r.stdout, '')
+    })
+  }
+})
+
+test('reject duplicate or forged checkpoint claims rather than trusting green run prose', () => {
+  for (const checks of [
+    ['initial-planner-render', 'initial-planner-render'],
+    ['initial-planner-render', 'fake/checkpoint'],
+    [],
+  ]) {
+    const meta = sample()
+    meta.checks = checks
+    withFixture({ meta }, r => {
+      assert.notEqual(r.status, 0)
+      assert.equal(r.stdout, '')
+    })
+  }
+})
