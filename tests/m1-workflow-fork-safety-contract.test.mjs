@@ -28,7 +28,7 @@ test('M1 fork guard keeps the existing permanent-runner evidence contract', () =
   assert.match(workflow, /run:\s*npm test/)
   assert.match(workflow, /run:\s*npm run m1:matching-benchmark/)
   assert.match(workflow, /run:\s*node scripts\/m1-capture-sources\.mjs/)
-  assert.match(workflow, /uses:\s*actions\/upload-artifact@v4/)
+  assert.match(workflow, /uses:\s*actions\/upload-artifact@[0-9a-f]{40}\s+# v\d+\.\d+\.\d+/)
   assert.match(
     workflow,
     /tests\/m1-workflow-fork-safety-contract\.test\.mjs/,
