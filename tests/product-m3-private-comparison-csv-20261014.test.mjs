@@ -65,7 +65,7 @@ test('M3 CSV escapes formula injection, separators, quotes and newlines in produ
   fixture.lines[3].plus.productName = '@evil, data'
   const csv = renderPrivateM3ComparisonCsv(fixture)
   assert.match(csv, /"' =HYPERLINK\(""https:\/\/fake\.example/)
-  assert.match(csv, /"'+cmd/)
+  assert.match(csv, /"'\\+cmd/)
   assert.match(csv, /"'-1\+1"/)
   assert.match(csv, /"'@evil/)
   assert.doesNotMatch(csv, /\r\n@SUM/)
