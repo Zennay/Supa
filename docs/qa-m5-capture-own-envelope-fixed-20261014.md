@@ -1,0 +1,9 @@
+# Independent M5 capture source envelope, corrected-owner proof
+
+**Issue:** [#2329](https://github.com/Zennay/Supa/issues/2329). Corrected product owned separately in [DRAFT #2331](https://github.com/Zennay/Supa/pull/2331), frozen exact SHA `71623b7285a2bda5db7e0da9141da8696fe76fbc`. Original pre-fix owner [#2327](https://github.com/Zennay/Supa/pull/2327), frozen `fb27e9bff4e372579bdab05ff7978a51d51bd50d`.
+
+Independent original [QA DRAFT #2333](https://github.com/Zennay/Supa/pull/2333) source head `902cebc7e7cdaf877214c1f59a3205a87b74b329`, 22 local invented M1→M5 source-origin/integrity acceptance tests. This corrected-source QA imports **the exact same immutable Git test blob `4925f480d2fb22e66b318079a2da38acbc0d7501`** from the original, byte-for-byte with no relaxed assertions. All four valid canonical controls must remain manual P1/P2/P3, and eighteen original source-RED getter/inherited/ToString/array/boxed digest conditions must now be generically rejected with **zero private code execution**. No real users, retailer sources, prices or network. Anonymous source tokens, all rights/selector/production/M5 false.
+
+Exactly two own QA add-only test/doc files; do not edit product, earlier QA branches, main/M1/M3/UI/CI/workflows/permanent VPS. Independent full **this exact-head GitHub-hosted** Node/high npm audit/M1 permission+matching/TS-Vite build GREEN is required; product owner green alone does not suffice.
+
+Supa **M3 ACTIVE**; human [#78](https://github.com/Zennay/Supa/issues/78) authentic 11 PLUS+11 DekaMarkt same basket <=24h and source rights still missing; M4/M5 ineligible. **DRAFT/HOLD/NO MERGE/NO DEPLOY** until independent zCloud SQLite task/scope write lease, original product+QA owners, current-main/trusted runner as applicable and explicit human field/source-rights releasego.
