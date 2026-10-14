@@ -69,8 +69,10 @@ test('a completely empty planned week cannot be described as a financial compari
     basket(baselineStore, { activeDays: [] }),
     basket(candidateStore, { activeDays: [] }),
   )
-  assert.equal(result.comparison.claimable, true, 'records existing comparator regression for owner')
-  assert.equal(result.comparison.outcome, 'same')
+  // Canonical main already fixed #1051: an empty comparison is UNKNOWN,
+  // never a claimable equal-price basket. Guidance still asks for meals.
+  assert.equal(result.comparison.claimable, false)
+  assert.equal(result.comparison.outcome, 'unknown')
   assert.equal(comparisonNextStep(result).code, 'choose-meals')
   assert.equal(comparisonNextStep(result).canShowDifference, false)
 })
