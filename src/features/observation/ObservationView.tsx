@@ -18,6 +18,7 @@ import {
   type StoreObservation,
 } from '../../domain/m3ObservationSheet.ts'
 import { observationRetailerCopy } from './observationPresentation.ts'
+import { ObservationPackUnitOptions, ObservationRequirementText } from './ObservationQuantityFields'
 import {
   nextObservationActionLabel,
   observationPriceCents,
@@ -35,8 +36,6 @@ const sourceOptions: { value: ObservationSource; label: string }[] = [
   { value: 'receipt', label: 'Bon' },
   { value: 'consented-export', label: 'Export met toestemming' },
 ]
-
-const packUnits = ['g', 'kg', 'ml', 'l', 'piece'] as const
 
 function toLocalDateTimeValue(value: string) {
   if (!value) return ''
@@ -583,9 +582,10 @@ export function ObservationView() {
                     <summary>
                       <div>
                         <strong>{line.ingredientLabel}</strong>
-                        <span>
-                          nodig: {line.requirement.amount} {line.requirement.unit}
-                        </span>
+                        <ObservationRequirementText
+                          amount={line.requirement.amount}
+                          unit={line.requirement.unit}
+                        />
                       </div>
                       <span className="line-state">
                         {product.available === true
@@ -689,11 +689,7 @@ export function ObservationView() {
                               }
                             >
                               <option value="">Kies</option>
-                              {packUnits.map((unit) => (
-                                <option value={unit} key={unit}>
-                                  {unit}
-                                </option>
-                              ))}
+                              <ObservationPackUnitOptions />
                             </select>
                           </label>
                           <label>
