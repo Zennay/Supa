@@ -124,7 +124,9 @@ test('invalid list and changed planning cannot resurrect an earlier open text ar
   render(value, []).click()
   assert.equal(render(value, []).expanded, true)
   const changed = basket()
-  changed.lines[0].ingredientLabel = 'Andere echte boodschappenregel'
+  const matched = changed.lines.find(line => line.status === 'matched')
+  assert.ok(matched)
+  matched.productName = 'Ander gecontroleerd winkelproduct'
   const next = render(changed, [])
   assert.equal(next.expanded, false)
   assert.equal(render(value, []).expanded, false)
