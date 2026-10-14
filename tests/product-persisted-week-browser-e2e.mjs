@@ -328,6 +328,12 @@ try {
   assert.equal(await script(sessionId,
     'return document.querySelectorAll("button.shopping-row.checked").length'), 0,
     'corrupt persisted checks must not count as completed groceries')
+  const canonicalDefaultShoppingRows = await script(sessionId, `
+    return [...document.querySelectorAll('button.shopping-row')]
+      .map((row) => row.textContent.trim())
+  `)
+  assert.ok(canonicalDefaultShoppingRows.length > 0,
+    'default screenshot must represent a physical test basket')
   checks.push('corrupt-planner-and-checklist-recover-safely')
   await screenshot(sessionId, 'shopping-recovered-default.png')
 
@@ -405,6 +411,12 @@ try {
   assert.equal(await script(sessionId,
     'return document.querySelectorAll("button.shopping-row.checked").length'), 0,
     'old checked row must not resurrect after reset page reload')
+  const afterResetRows = await script(sessionId, `
+    return [...document.querySelectorAll('button.shopping-row')]
+      .map((row) => row.textContent.trim())
+  `)
+  assert.deepEqual(afterResetRows, canonicalDefaultShoppingRows,
+    'Reset must recreate the identical physical shopping products, packs and quantities')
   checks.push('explicit-reset-restores-week-budget-and-clears-stale-checks')
   await screenshot(sessionId, 'shopping-explicit-reset.png')
 
