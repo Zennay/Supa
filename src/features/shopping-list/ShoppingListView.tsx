@@ -98,14 +98,20 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
 
   // A genuinely empty plan has no shopping tasks. An empty row array with
   // inconsistent counters is not proof that the customer needs nothing.
-  const genuinelyEmpty =
-    basket.lines.length === 0 &&
-    basket.selectedMealCount === 0 &&
-    basket.matchedLineCount === 0 &&
-    basket.unresolvedLineCount === 0 &&
-    basket.totalCents === 0 &&
-    visibleStoreIdentity(basket.store?.id) &&
-    visibleStoreName(basket.store?.name)
+  const genuinelyEmpty = (() => {
+    if (basketKey === null) return false
+    try {
+      return basket.lines.length === 0 &&
+        basket.selectedMealCount === 0 &&
+        basket.matchedLineCount === 0 &&
+        basket.unresolvedLineCount === 0 &&
+        basket.totalCents === 0 &&
+        visibleStoreIdentity(basket.store?.id) &&
+        visibleStoreName(basket.store?.name)
+    } catch {
+      return false
+    }
+  })()
 
   useEffect(() => {
     if (progress.basketKey === basketKey) return
