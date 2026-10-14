@@ -75,7 +75,7 @@ for (const side of ['baseline', 'candidate']) {
       assert.notEqual(observationWindowSummary(sheet).state, 'within-window')
       assert.throws(
         () => buildWeeklyBasketStudyFromObservationSheet(sheet),
-        new RegExp(side + '\\\\.observedAt must be a valid timestamp'),
+        { message: side + '.observedAt must be a valid timestamp' },
         side + ': ' + futureAt,
       )
       // Direct study API cannot convert a future capture into savings by
