@@ -536,6 +536,24 @@ function nonBlank(value: string) {
   return typeof value === 'string' && /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
 }
 
+// A full-looking private field sheet is not exportable if its metadata would
+// fail the canonical JSON converter's date, key or price-context checks.
+const M3_STUDY_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,63}$/
+const M3_WEEK_START_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function validM3WeekStart(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const match = M3_WEEK_START_PATTERN.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+}
+
 // The collection screen, its 24-hour deadline and the M3 converter must
 // agree about which observedAt values identify a real, timezone-qualified day.
 // Date.parse alone accepts locale strings, date-only values and rolled-over dates.
@@ -594,6 +612,21 @@ export function observationSheetReadiness(
 
   for (const [label, value] of studyFields) {
     if (!nonBlank(value)) issues.push(`${label} ontbreekt.`)
+  }
+  if (nonBlank(sheet.study.studyId) && !M3_STUDY_KEY_PATTERN.test(sheet.study.studyId)) {
+    issues.push('Study ID moet een veilige pseudonieme sleutel zijn.')
+  }
+  if (nonBlank(sheet.study.participantKey) &&
+      !M3_STUDY_KEY_PATTERN.test(sheet.study.participantKey)) {
+    issues.push('Participant key moet een veilige pseudonieme sleutel zijn.')
+  }
+  if (nonBlank(sheet.study.weekStart) && !validM3WeekStart(sheet.study.weekStart)) {
+    issues.push('Week start moet een geldige datum in JJJJ-MM-DD zijn.')
+  }
+  if (nonBlank(sheet.study.priceContext) &&
+      sheet.study.priceContext !== 'in-store' &&
+      sheet.study.priceContext !== 'online-order') {
+    issues.push('Prijscontext moet in-store of online-order zijn.')
   }
 
   const observations: Array<[string, M3ObservationSide, StoreObservation]> = [
