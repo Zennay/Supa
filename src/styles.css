@@ -478,3 +478,14 @@ h3, p { margin: 0; }
   .week-share-actions { align-items: stretch; flex-direction: column; }
   .week-share-actions > button { width: 100%; }
 }
+
+.week-share-privacy {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.week-share-privacy input { width: 20px; height: 20px; flex: 0 0 auto; }

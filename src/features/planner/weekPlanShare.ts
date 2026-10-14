@@ -6,6 +6,7 @@ export type ShareableWeek = {
   activeDays: readonly string[]
   recipes: readonly Recipe[]
   budget: number
+  includeBudget?: boolean
 }
 
 const MAX_DAYS = 14
@@ -32,6 +33,7 @@ export function formatShareableWeek(input: ShareableWeek): string {
       input.plannedMeals.length > MAX_DAYS ||
       input.activeDays.length > MAX_DAYS ||
       input.recipes.length > MAX_RECIPES ||
+      (input.includeBudget !== undefined && typeof input.includeBudget !== 'boolean') ||
       !Number.isFinite(input.budget) || input.budget < 0 ||
       !Number.isSafeInteger(Math.round(input.budget * 100)) ||
       input.budget !== Math.round(input.budget * 100) / 100) {
@@ -64,10 +66,9 @@ export function formatShareableWeek(input: ShareableWeek): string {
   }
   if (chosen.length !== active.size) throw new Error('Weekmenu niet beschikbaar')
 
-  const budgetLabel = euro.format(input.budget)
   return [
     'SUPA · Weekmenu',
-    `Weekbudget (eigen voorkeur): ${budgetLabel}`,
+    ...(input.includeBudget ? [`Weekbudget (eigen voorkeur): ${euro.format(input.budget)}`] : []),
     '',
     ...(chosen.length ? chosen : ['Geen maaltijden geselecteerd.']),
     '',

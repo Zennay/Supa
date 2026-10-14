@@ -14,6 +14,7 @@ const input = () => ({
 test('copies only active meals in canonical day order, not persisted toggle order', () => {
   const data = input()
   data.activeDays = ['Wo', 'Ma']
+  data.includeBudget = true
   const before = structuredClone(data)
   const result = formatShareableWeek(data)
   assert.match(result, /^SUPA · Weekmenu\nWeekbudget \(eigen voorkeur\): €\s*35,00/m)
@@ -22,6 +23,13 @@ test('copies only active meals in canonical day order, not persisted toggle orde
   assert.match(result, /geen prijsopgave/i)
   assert.match(result, /echte winkelprijzen zijn niet inbegrepen/i)
   assert.deepEqual(data, before, 'copy must never mutate the live planner state')
+})
+
+test('private share omits personal weekbudget until the user explicitly opts in', () => {
+  const data = input()
+  assert.doesNotMatch(formatShareableWeek(data), /Weekbudget|€/)
+  assert.match(formatShareableWeek({ ...data, includeBudget: true }), /Weekbudget.*35,00/)
+  assert.throws(() => formatShareableWeek({ ...data, includeBudget: 'yes' }), /Weekmenu niet beschikbaar/)
 })
 
 test('empty planned week is explicitly empty rather than claiming recipes', () => {

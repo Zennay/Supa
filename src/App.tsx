@@ -56,6 +56,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>('planner')
   const [preferences, setPreferences] = useState(readPlannerPreferences)
   const [manualWeekCopy, setManualWeekCopy] = useState<string | null>(null)
+  const [includeWeekBudget, setIncludeWeekBudget] = useState(false)
   const [weekCopyMessage, setWeekCopyMessage] = useState('')
   const { budget, activeDays, recipeByDay } = preferences
 
@@ -140,6 +141,7 @@ export function App() {
         activeDays,
         recipes: m2Recipes,
         budget,
+        includeBudget: includeWeekBudget,
       }))
       setWeekCopyMessage('Selecteer en kopieer de tekst hieronder')
     } catch {
@@ -190,6 +192,18 @@ export function App() {
                 Toon kopieertekst
               </button>
             </div>
+            <label className="week-share-privacy">
+              <input
+                type="checkbox"
+                checked={includeWeekBudget}
+                onChange={(event) => {
+                  setIncludeWeekBudget(event.target.checked)
+                  setManualWeekCopy(null)
+                  setWeekCopyMessage('')
+                }}
+              />
+              Mijn weekbudget ook opnemen (optioneel)
+            </label>
             <p role="status" aria-live="polite">{weekCopyMessage}</p>
             {manualWeekCopy !== null && (
               <div className="week-share-manual">
