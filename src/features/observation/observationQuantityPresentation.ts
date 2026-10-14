@@ -25,7 +25,7 @@ export function observationRequiredQuantityCopy(
   amount: number | null,
   unit: MatchUnit,
 ): string {
-  const isValidAmount = typeof amount === 'number' && Number.isFinite(amount)
+  const isValidAmount = typeof amount === 'number' && Number.isFinite(amount) && amount >= 0
   const displayedAmount = isValidAmount ? String(amount) : '?'
 
   // A malformed runtime amount must never render NaN or Infinity.
