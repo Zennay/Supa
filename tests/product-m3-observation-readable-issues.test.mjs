@@ -41,7 +41,7 @@ test('24-hour and missing price checks are never suppressed or promoted to evide
 
 test('real routed Meten renders readable issues without changing original readiness', () => {
   const source = readFileSync(new URL('../src/features/observation/ObservationView.tsx', import.meta.url), 'utf8')
-  assert.match(source, /observationSheetReadiness\(sheet\)/)
+  assert.match(source, /observationSheetReadiness\(sheet, Date\\.now\\(\\)\)/)
   assert.match(source, /readableObservationIssue\(issue\)/)
   assert.match(source, /<ObservationNextActionCard action=\{nextAction\} \/>/)
   assert.doesNotMatch(source, /issues\.filter\(/)
