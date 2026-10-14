@@ -8,7 +8,7 @@ const SHOPS: Shop[] = ['plus', 'dekamarkt']
 const DAY = 24 * 60 * 60 * 1000
 
 export type CatalogLine = {
-  status: 'matched' | 'unknown'
+  status: 'matched' | 'availability_unknown' | 'unknown'
   productName: string | null
   productId: string | null
   packs: number | null
@@ -95,7 +95,7 @@ export function compareReviewedCatalogs({
     }
     observedTimes.push(time)
 
-    if (raw.availability !== 'available' ||
+    if (raw.availability === 'unavailable' ||
         !Number.isSafeInteger(raw.currentPriceCents) ||
         raw.currentPriceCents === null || raw.currentPriceCents < 0 ||
         typeof raw.sourceProductId !== 'string' || !raw.sourceProductId.trim()) {
@@ -155,7 +155,8 @@ export function compareReviewedCatalogs({
       const total = packs * item.priceCents
       if (!Number.isSafeInteger(total) || total < 0) return unknown()
       return {
-        status: 'matched', productName: item.name, productId: item.id,
+        status: item.original.availability === 'available' ? 'matched' : 'availability_unknown',
+        productName: item.name, productId: item.id,
         packs, packPriceCents: item.priceCents, totalCents: total,
         sourceUrl: item.original.provenance.url,
         capturedAt: item.original.provenance.capturedAt,
