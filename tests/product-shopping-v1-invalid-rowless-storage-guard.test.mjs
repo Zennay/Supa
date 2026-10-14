@@ -49,6 +49,9 @@ function mountAndRunEffects(snapshot, originalRecord = 'PRESERVE_THESE_UNKNOWN_B
     if (name === 'react/jsx-runtime') return require(name)
     if (name === '../../lib/quantityPresentation') return { quantityUnitLabelNl }
     if (name === './shoppingListProgress') return progress
+    // This legacy test harness exercises storage and checkbox state only;
+    // a separate routed Vite/React SSR test exercises the real banner.
+    if (name === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
     throw new Error('Unexpected shopping-v1 import: ' + name)
   }
   const module = { exports: {} }
