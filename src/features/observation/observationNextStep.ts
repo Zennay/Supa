@@ -9,6 +9,10 @@ import {
   type ObservationSheet,
 } from '../../domain/m3ObservationSheet.ts'
 import { nextObservationActionLabel } from './observationCollectionUi.ts'
+import {
+  observationNextRequiredProductField,
+  type ObservationRequiredField,
+} from './observationRequiredLineField.ts'
 
 /**
  * A task-first hint for a person collecting a real store observation.
@@ -49,6 +53,26 @@ const storeSteps = [
   ['observedAt', 'Leg de datum en tijd vast', 'Meet beide winkels binnen 24 uur van elkaar.'],
   ['provenanceNote', 'Beschrijf hoe je deze prijzen vastlegde', 'Noteer bijvoorbeeld winkelmand, kassabon of een export met toestemming.'],
 ] as const
+
+/**
+ * Explicit field-specific next steps for the real 11+11 collection workflow.
+ * Keep these instructions independent from user/retailer-supplied text,
+ * and never infer availability, package measurements or a store price.
+ */
+const lineFieldGuidance: Record<ObservationRequiredField, string> = {
+  available:
+    'Controleer eerst in de echte winkel of dit product verkrijgbaar is. Kies beschikbaar of niet beschikbaar; onbekend is geen meting.',
+  productName:
+    'Noteer de werkelijke productnaam die je bij deze winkel ziet. Neem geen naam over van de andere winkel.',
+  packAmount:
+    'Meet of lees de werkelijke hoeveelheid per verpakking af. Gebruik geen geschatte hoeveelheid.',
+  packUnit:
+    'Kies de eenheid die bij de geobserveerde verpakking hoort (bijvoorbeeld gram, milliliter of stuks).',
+  packCount:
+    'Vul het werkelijke aantal van die verpakking in. Gebruik een positief geheel aantal.',
+  priceCents:
+    'Noteer de werkelijk geobserveerde prijs per verpakking. Vul geen prijs in op basis van een gok.',
+}
 
 function missing(value: unknown): boolean {
   return typeof value !== 'string' || value.trim().length === 0
@@ -128,13 +152,22 @@ function nextForValidSheet(sheet: ObservationSheet): ObservationNextAction {
 
     const line = nextIncompleteObservationLine(sheet)
     if (line && line.side === side) {
+      const currentLine = sheet[side].lines.find(
+        (candidate) => candidate.ingredientId === line.ingredientId,
+      )
+      const missingField = currentLine
+        ? observationNextRequiredProductField(currentLine)
+        : null
+      // The canonical pending task must point at one unresolved field. Do not
+      // advertise a vague next step or fabricate completed evidence otherwise.
+      if (!missingField) return reviewAction
       return {
         stage: 'line',
         side,
         ingredientId: line.ingredientId,
         title: nextObservationActionLabel(sheet, line),
-        detail:
-          'Controleer beschikbaarheid, product, verpakking en prijs. Laat onbekende gegevens open; vul niets op basis van een gok in.',
+        detail: lineFieldGuidance[missingField] +
+          ' Laat onbekende gegevens open; vul niets op basis van een gok in.',
       }
     }
   }
