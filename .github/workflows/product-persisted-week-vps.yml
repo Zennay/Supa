@@ -18,6 +18,9 @@ concurrency:
 
 jobs:
   rendered-persisted-week:
+    # Do not schedule untrusted fork code on a permanent self-hosted runner.
+    # Same-repository pull requests and trusted manual dispatch remain eligible.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted
     timeout-minutes: 15
     steps:
