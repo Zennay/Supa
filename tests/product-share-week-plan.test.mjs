@@ -77,3 +77,65 @@ test('malformed or control-character recipe titles cannot spoof exported plan li
     assert.throws(() => formatShareableWeek(mutated), /Weekmenu niet beschikbaar/)
   }
 })
+
+test('M3 copied menu rejects Unicode paragraph, line and zero-width format injection (#2360)', () => {
+  for (const injected of [
+    'Tikka\u2028Vr: Nepmenu',
+    'Tikka\u2029Vr: Nepmenu',
+    'Tikka\u200bextra',
+    'Tikka\u200crecept',
+    'Tikka\u200dextra',
+    'Tikka\u2060extra',
+    'Tikka\ufeffextra',
+    '\u200b',
+    '\u200c',
+    '\u200d',
+    '\u2060',
+  ]) {
+    const base = input()
+    const malformedTitle = {
+      ...base,
+      recipes: base.recipes.map((entry) =>
+        entry.id === 'tikka' ? { ...entry, title: injected } : entry),
+    }
+    assert.throws(
+      () => formatShareableWeek(malformedTitle),
+      { message: 'Weekmenu niet beschikbaar' },
+    )
+    const malformedDay = {
+      ...base,
+      activeDays: [injected],
+      plannedMeals: [{ day: injected, recipeId: 'tikka' }],
+    }
+    assert.throws(
+      () => formatShareableWeek(malformedDay),
+      { message: 'Weekmenu niet beschikbaar' },
+    )
+    const malformedId = {
+      ...base,
+      plannedMeals: [{ day: 'Ma', recipeId: injected }],
+      activeDays: ['Ma'],
+      recipes: [{ ...base.recipes[0], id: injected }],
+    }
+    assert.throws(
+      () => formatShareableWeek(malformedId),
+      { message: 'Weekmenu niet beschikbaar' },
+    )
+  }
+})
+
+test('M3 copied menu preserves readable Dutch names, accents and honest optional budget', () => {
+  const base = input()
+  const edited = {
+    ...base,
+    recipes: base.recipes.map((entry) =>
+      entry.id === 'tikka' ? { ...entry, title: 'Crème brûlée met peren' } : entry),
+    includeBudget: true,
+    budget: 35.25,
+  }
+  const result = formatShareableWeek(edited)
+  assert.match(result, /Ma: Crème brûlée met peren/)
+  assert.match(result, /Weekbudget \\(eigen voorkeur\\): €\\s*35,25/)
+  assert.match(result, /Dit is een planning, geen prijsopgave/)
+  assert.doesNotMatch(result, /bespaard|echte prijzen:/)
+})
