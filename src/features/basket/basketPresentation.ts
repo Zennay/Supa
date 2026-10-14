@@ -20,7 +20,7 @@ export function basketCostDisclosure(
       : complete
         ? 0
         : 1
-  const formattedAmount = euro.format(totalCents / 100)
+  const formattedAmount = euro.formatCents(totalCents)
 
   return complete
     ? {
