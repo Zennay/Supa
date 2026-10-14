@@ -127,7 +127,9 @@ test('the actual ObservationView renders one task-first accessible guide on a fr
   assert.doesNotMatch(html, />Preflight<|>Study ID<|>Pseudonieme participant key</)
   assert.doesNotMatch(html, />Klaar voor de M3-converter</)
 
-  assert.match(html, /class="ghost-button observation-next-button"[^>]*disabled=""/, 'study setup cannot jump past metadata')
+  assert.doesNotMatch(html, /class="ghost-button observation-next-button"[^>]*disabled/)
+  assert.match(html, /Ga naar: Geef deze meting een code/)
+  assert.match(html, /data-observation-study-field="studyId"/)
   assert.match(html, /Nog .* controle/)
   assert.deepEqual(sheet, before, 'render never mutates input evidence')
 })
