@@ -51,6 +51,9 @@ function app() {
     if (name === 'react/jsx-runtime') return require(name)
     if (name === '../../lib/quantityPresentation') return { quantityUnitLabelNl }
     if (name === './shoppingListProgress') return saved
+    // This legacy test harness exercises storage and checkbox state only;
+    // a separate routed Vite/React SSR test exercises the real banner.
+    if (name === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
     throw Error('Unexpected v1 source dependency: ' + name)
   }
   const module = { exports: {} }
