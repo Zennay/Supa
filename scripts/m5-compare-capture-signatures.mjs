@@ -4,7 +4,7 @@ import { lstat, open, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { inspectCaptureDirectory } from './m1-inspect-captures.mjs'
+import { inspectFrozenCaptureDirectory } from './m5-inspect-frozen-captures.mjs'
 
 const MAX_SOURCES = 100
 const MAX_CAPTURE_MANIFEST_BYTES = 8 * 1024 * 1024
@@ -345,7 +345,7 @@ async function preflightBoundedManifest(directory) {
           !/^[a-f0-9]{64}$/.test(record.sha256)))) fail()
     seenIds.add(record.id)
   }
-  return parsed.results
+  return parsed
 }
 
 // Check *both* structural manifests before timestamp or HTML inspection.
@@ -422,8 +422,10 @@ export async function compareCaptureDirectories(currentDir, baselineDir = null) 
   // validate both raw manifests before inspecting any successful HTML.
   await requireRegularCaptureRoot(currentDir)
   if (baselineDir) await requireRegularCaptureRoot(baselineDir)
-  const currentRows = await preflightBoundedManifest(currentDir)
-  const baselineRows = baselineDir ? await preflightBoundedManifest(baselineDir) : null
+  const currentManifest = await preflightBoundedManifest(currentDir)
+  const baselineManifest = baselineDir ? await preflightBoundedManifest(baselineDir) : null
+  const currentRows = currentManifest.results
+  const baselineRows = baselineManifest?.results ?? null
   await requireRegularCaptureTree(currentDir, currentRows)
   if (baselineRows) await requireRegularCaptureTree(baselineDir, baselineRows)
   // Keep the existing whole-manifest structural checks first, but do not
@@ -442,8 +444,12 @@ export async function compareCaptureDirectories(currentDir, baselineDir = null) 
       }
     }
   }
-  const current = await inspectCaptureDirectory(currentDir)
-  const baseline = baselineDir ? await inspectCaptureDirectory(baselineDir) : null
+  // M1 remains canonical, but it now inspects a verified bounded private
+  // snapshot rather than re-opening the mutable original source filenames.
+  const current = await inspectFrozenCaptureDirectory(currentDir, currentManifest)
+  const baseline = baselineManifest
+    ? await inspectFrozenCaptureDirectory(baselineDir, baselineManifest)
+    : null
   return compareInspections(current, baseline)
 }
 
