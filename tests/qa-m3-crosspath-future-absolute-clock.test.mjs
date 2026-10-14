@@ -7,6 +7,8 @@ import { observationNextAction } from '../src/features/observation/observationNe
 
 // Independent cross-path QA of future *absolute instants*, not calendar labels.
 // Inputs and all money amounts are fictional; no retailer observations/claims.
+// Pure domain helpers require a deterministic caller-provided evaluation clock.
+const EVALUATION_CLOCK_MS = Date.parse('2026-10-14T12:00:00Z')
 function fictionalReadySheet() {
   const sheet = buildObservationSheet()
   Object.assign(sheet.study, {
@@ -51,9 +53,9 @@ test('M3 QA past absolute instants with different local offsets retain trustwort
   const sheet = fictionalReadySheet()
   sheet.baseline.observedAt = '2026-10-04T14:00:00+02:00'
   sheet.candidate.observedAt = '2026-10-04T08:00:00-05:00'
-  const ready = observationSheetReadiness(sheet)
+  const ready = observationSheetReadiness(sheet, EVALUATION_CLOCK_MS)
   assert.equal(ready.ready, true, ready.issues.join('; '))
-  assert.equal(observationWindowSummary(sheet).state, 'within-window')
+  assert.equal(observationWindowSummary(sheet, EVALUATION_CLOCK_MS).state, 'within-window')
   const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
   const result = assessWeeklyBasketStudy(study)
   assert.equal(result.claimable, true)
@@ -70,10 +72,10 @@ for (const side of ['baseline', 'candidate']) {
     ]) {
       const sheet = fictionalReadySheet()
       sheet[side].observedAt = futureAt
-      const readiness = observationSheetReadiness(sheet)
+      const readiness = observationSheetReadiness(sheet, EVALUATION_CLOCK_MS)
       assert.equal(readiness.ready, false, side + ': ' + futureAt)
       assert.ok(readiness.issues.some(reason => /observatietijd/u.test(reason)), side + ': ' + futureAt)
-      assert.notEqual(observationWindowSummary(sheet).state, 'within-window')
+      assert.notEqual(observationWindowSummary(sheet, EVALUATION_CLOCK_MS).state, 'within-window')
       assert.throws(
         () => buildWeeklyBasketStudyFromObservationSheet(sheet),
         { message: side + '.observedAt must be a valid timestamp' },
@@ -98,9 +100,9 @@ test('M3 QA a wholly future one-hour pair is not a valid observed 24-hour window
   const sheet = fictionalReadySheet()
   sheet.baseline.observedAt = '2099-10-10T12:00:00Z'
   sheet.candidate.observedAt = '2099-10-10T08:00:00-05:00'
-  const ready = observationSheetReadiness(sheet)
+  const ready = observationSheetReadiness(sheet, EVALUATION_CLOCK_MS)
   assert.equal(ready.ready, false)
-  assert.notEqual(observationWindowSummary(sheet).state, 'within-window')
+  assert.notEqual(observationWindowSummary(sheet, EVALUATION_CLOCK_MS).state, 'within-window')
   assert.throws(() => buildWeeklyBasketStudyFromObservationSheet(sheet), /observedAt must be a valid timestamp/u)
   const pastStudy = buildWeeklyBasketStudyFromObservationSheet(fictionalReadySheet())
   pastStudy.baseline.observedAt = sheet.baseline.observedAt
@@ -121,9 +123,9 @@ test('M3 QA historical DST fallback exactly 24h is accepted on both observation 
   // exact elapsed UTC time is 24h, despite the local wall clock differing.
   sheet.baseline.observedAt = '2025-10-25T12:00:00+02:00'
   sheet.candidate.observedAt = '2025-10-26T11:00:00+01:00'
-  const status = observationSheetReadiness(sheet)
+  const status = observationSheetReadiness(sheet, EVALUATION_CLOCK_MS)
   assert.equal(status.ready, true, status.issues.join('; '))
-  const window = observationWindowSummary(sheet)
+  const window = observationWindowSummary(sheet, EVALUATION_CLOCK_MS)
   assert.equal(window.state, 'within-window')
   assert.equal(window.deltaHours, 24)
   const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
@@ -138,8 +140,8 @@ test('M3 QA historical DST fallback 24h plus one millisecond never becomes savin
   sheet.study.weekStart = '2025-10-27'
   sheet.baseline.observedAt = '2025-10-25T12:00:00+02:00'
   sheet.candidate.observedAt = '2025-10-26T11:00:00.001+01:00'
-  assert.equal(observationSheetReadiness(sheet).ready, false)
-  assert.equal(observationWindowSummary(sheet).state, 'outside-window')
+  assert.equal(observationSheetReadiness(sheet, EVALUATION_CLOCK_MS).ready, false)
+  assert.equal(observationWindowSummary(sheet, EVALUATION_CLOCK_MS).state, 'outside-window')
   const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
   const result = assessWeeklyBasketStudy(study)
   assert.equal(result.claimable, false)
