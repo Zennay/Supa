@@ -289,10 +289,19 @@ async function preflightBoundedManifest(directory) {
   // inspector would already have read HTML. Reject ambiguous source identity
   // here, on both manifests, before any successful-source filesystem I/O.
   const seenIds = new Set()
+  // A malformed later row must not force the M1 inspector to read HTML
+  // from earlier success rows before discovering an invalid source origin.
+  // Apply exactly the downstream comparator's canonical origin contract
+  // to all raw rows, including unavailable/P1 results.
+  const canonicalOrigin = (value) => typeof value === 'string' &&
+    value.length > 0 && value.length <= 128 &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
   for (const record of parsed.results) {
     if (typeof record.id !== 'string' ||
         !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(record.id) ||
-        seenIds.has(record.id)) fail()
+        seenIds.has(record.id) ||
+        !canonicalOrigin(record.supermarket) ||
+        !canonicalOrigin(record.kind)) fail()
     seenIds.add(record.id)
   }
   return parsed.results
