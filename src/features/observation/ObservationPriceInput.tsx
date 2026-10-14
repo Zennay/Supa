@@ -12,6 +12,12 @@ export function observationEditablePriceText(priceCents: number | null): string 
   return `${whole},${cents}`
 }
 
+/** Commit only a finished amount; "2," is an edit in progress, not an observed €2. */
+export function observationFinalPriceCents(text: unknown): number | null {
+  if (typeof text !== 'string' || /[.,]$/.test(text.trim())) return null
+  return observationPriceCents(text)
+}
+
 export function ObservationPriceInput({
   priceCents,
   onPriceChange,
@@ -21,16 +27,16 @@ export function ObservationPriceInput({
   label: string
   onPriceChange: (value: number | null) => void
 }) {
-  // Keep an in-progress entry visible while its canonical cent value changes.
-  // Without this local buffer, a controlled input reformats "1," to "1,00"
-  // before a person can type the cents.
+  // Do not persist a half-typed value. The canonical draft changes only on
+  // blur, so "2," or temporarily invalid digits cannot become a false
+  // observed store price through localStorage autosave.
   const hintId = useId()
   const [editingText, setEditingText] = useState<string | null>(null)
   const currentText = editingText ?? observationEditablePriceText(priceCents)
   const invalidEntry =
     editingText !== null &&
     editingText.trim() !== '' &&
-    observationPriceCents(editingText) === null
+    observationFinalPriceCents(editingText) === null
 
   return (
     <>
@@ -44,12 +50,12 @@ export function ObservationPriceInput({
         aria-describedby={invalidEntry ? hintId : undefined}
         onFocus={() => setEditingText(observationEditablePriceText(priceCents))}
         onChange={(event) => {
-          const nextText = event.target.value
-          setEditingText(nextText)
-          // Invalid or partial values are not accepted as prices in a saved draft.
-          onPriceChange(observationPriceCents(nextText))
+          setEditingText(event.target.value)
         }}
-        onBlur={() => setEditingText(null)}
+        onBlur={(event) => {
+          onPriceChange(observationFinalPriceCents(event.currentTarget.value))
+          setEditingText(null)
+        }}
       />
       {invalidEntry && (
         <small id={hintId} role="status">
