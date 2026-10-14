@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { buildFictionalPricedSheet } from '../scripts/m3-rehearse-field-run.mjs'
@@ -42,8 +43,8 @@ test('M3 full private CLI path is invariant under exact mass unit / multipack re
         ['scripts/m3-assess-observed-week.mjs', studyFile, reportFile],
       ]) {
         const run = spawnSync(process.execPath,
-          ['--experimental-strip-types', script, input, '--output', output],
-          { encoding: 'utf8', timeout: 20000 },
+          ['--experimental-strip-types', fileURLToPath(new URL('../' + script, import.meta.url)), input, '--output', output],
+          { encoding: 'utf8', timeout: 20000, cwd: root },
         )
         assert.equal(run.status, 0, `${variant.label} ${script}: ${run.stderr}`)
         assert.equal(run.stdout, '')
