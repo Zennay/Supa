@@ -5,14 +5,6 @@ import test from 'node:test'
 
 const workflowDir = '.github/workflows'
 
-const legacyMutableRefs = new Set([
-  '.github/workflows/m1-data-capture.yml|actions/checkout@v4',
-  '.github/workflows/m1-data-capture.yml|actions/setup-node@v4',
-  '.github/workflows/m1-data-capture.yml|actions/upload-artifact@v4',
-  '.github/workflows/m3-observed-week-report.yml|actions/checkout@v4',
-  '.github/workflows/m3-observed-week-report.yml|actions/setup-node@v4',
-  '.github/workflows/m3-observed-week-report.yml|actions/upload-artifact@v4',
-])
 
 function isImmutableCommitRef(ref) {
   return /^[0-9a-f]{40}$/i.test(ref)
@@ -31,12 +23,12 @@ test('workflows cannot introduce new mutable action references', async () => {
     const path = join(workflowDir, name)
     const workflow = await readFile(path, 'utf8')
 
-    for (const match of workflow.matchAll(/^\s*(?:-\s*)?uses:\s*([^@\s#]+)@([^\s#]+).*$/gm)) {
+    for (const match of workflow.matchAll(/^\s*(?:-\s*)?uses:\s*['"]?([^@\s#'"]+)@([^\s#'"]+)['"]?.*$/gm)) {
       const [, action, ref] = match
       if (isImmutableCommitRef(ref)) continue
 
       const key = `${path}|${action}@${ref}`
-      if (!legacyMutableRefs.has(key)) unexpectedMutableRefs.push(key)
+      unexpectedMutableRefs.push(key)
     }
   }
 
@@ -46,7 +38,19 @@ test('workflows cannot introduce new mutable action references', async () => {
     [
       'new mutable GitHub Actions references are forbidden;',
       'pin the action to a full 40-character commit SHA instead',
-      'or, for the two existing owner-controlled M1/M3 refs, land the pin in their active workflow PR',
     ].join(' '),
   )
+})
+
+test('mutable action references cannot hide behind quoted YAML uses values', () => {
+  const fixture = [
+    '    - uses: "actions/checkout@v4" # legacy mutable',
+    "    - uses: 'actions/setup-node@main'",
+    '    - uses: actions/cache@v4',
+    '    - uses: "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" # pinned',
+  ].join('\n')
+  const found = [...fixture.matchAll(/^\s*(?:-\s*)?uses:\s*['"]?([^@\s#'"]+)@([^\s#'"]+)['"]?.*$/gm)]
+    .filter(([, , ref]) => !isImmutableCommitRef(ref))
+    .map(([, action, ref]) => action + '@' + ref)
+  assert.deepEqual(found, ['actions/checkout@v4', 'actions/setup-node@main', 'actions/cache@v4'])
 })

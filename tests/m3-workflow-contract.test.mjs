@@ -84,5 +84,5 @@ test('M3 permanent VPS gate excludes untrusted fork pull-request heads', async (
   assert.match(workflow, /^\s*runs-on:\s*self-hosted\s*$/m)
   assert.match(workflow, /github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository/)
   assert.match(workflow, /if:\s*github\.event_name\s*==\s*'workflow_dispatch'\s*\|\|\s*\(github\.event_name\s*==\s*'pull_request'[^\n]*github\.event\.pull_request\.head\.repo\.full_name\s*==\s*github\.repository\)/)
-  assert.match(workflow, /uses:\s*actions\/checkout@v4\s*\n\s*with:\s*\n\s*persist-credentials:\s*false/)
+  assert.match(workflow, /uses:\s*actions\/checkout@[0-9a-f]{40}\s+# v\d+\.\d+\.\d+\s*\n\s*with:\s*\n\s*persist-credentials:\s*false/)
 })
