@@ -11,6 +11,8 @@ The existing App restores `plannerPreferences` and passes one selected set of da
 
 Additional **rendered financial honesty** controls now exercise the real Basket TSX in both directions: an unavailable synthetic product must produce an explicit `unknown` warning rather than a signed price/savings difference; a synthetic more-expensive candidate must be labelled **higher**, not **lower**, and retain the conspicuous no-live-savings disclaimer. The rendered App must also safely restore the documented deterministic default after malformed local planner storage. These checks use controlled test data only and are not observed market prices.
 
+5. Restore a genuinely empty saved week and a populated saved week independently; **cross-compare them in either baseline/candidate orientation**. They must yield `unknown`, no claimable signed difference, null monetary deltas and no line attribution. This distinct-demand safety regression passes on current main and does not weaken the separately owned empty-vs-empty defect #1051.
+
 The tests deliberately import the canonical M2/M3 fixtures; no manual retailer requests, HTML captures, product source approvals, participant metadata or live/savings claims are introduced. The check guards a future composition regression, **not** the M3 milestone. The genuine same-demand 11+11 PLUS/DekaMarkt observation remains [#78](https://github.com/Zennay/Supa/issues/78) and must be collected by a human in a shared 24-hour price context.
 
 Review/merge gate: exact-head hosted CI, applicable permanent browser/VPS proof, independent write-lease/preflight and approval from the active product/QA owners. This branch is **DRAFT/HOLD/NO MERGE/NO DEPLOY**, independent from other open product-core feature branches.
