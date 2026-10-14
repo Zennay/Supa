@@ -20,8 +20,8 @@ function matched(source) {
   assert.ok(line, 'canonical M2 basket contains matched fictional line')
   return line
 }
-const FILLERS = ['\\u115F', '\\u1160', '\\u3164', '\\uFFA0', '\\u2800']
-const INVISIBLE_CONTROL = ['\\u200b', '\\u202e', '\\u2028', '\\u2029', '\\n', '\\r']
+const FILLERS = ['\u115F', '\u1160', '\u3164', '\uFFA0', '\u2800']
+const INVISIBLE_CONTROL = ['\u200b', '\u202e', '\u2028', '\u2029', '\n', '\r']
 const ID = 'qa-physical-line'
 
 test('QA independent: all 5 Unicode blank families maintain matched physical truth across position variants', () => {
@@ -74,7 +74,7 @@ test('QA independent: combined blank-only names always require human choice whil
 
 test('QA independent: 5 blank and 6 control character families reject invisible / padded physical IDs', () => {
   let cases = 0
-  for (const marker of [...FILLERS, ...INVISIBLE_CONTROL, '\\t', '\\u0000']) {
+  for (const marker of [...FILLERS, ...INVISIBLE_CONTROL, '\t', '\u0000']) {
     for (const id of [marker + ID, ID + marker, 'part' + marker + '-two']) {
       const source = basket()
       matched(source).id = id
@@ -86,7 +86,7 @@ test('QA independent: 5 blank and 6 control character families reject invisible 
     }
   }
   assert.equal(cases, 39)
-  for (const id of [' ' + ID, ID + ' ', '\\u200b', '\\u2800', '\\u3164']) {
+  for (const id of [' ' + ID, ID + ' ', '\u200b', '\u2800', '\u3164']) {
     const source = basket()
     matched(source).id = id
     assert.throws(() => preparePrintableShoppingChecklist(source),
@@ -99,7 +99,7 @@ test('QA independent: unreconciled invisible ingredient labels stay manual and n
     const source = basket()
     const line = matched(source)
     line.status = 'unresolved'
-    line.ingredientLabel = filler + '\\u200b'
+    line.ingredientLabel = filler + '\u200b'
     const printed = preparePrintableShoppingChecklist(source)
     const row = printed.lines.find(x => x.id === line.id)
     assert.equal(row.label, 'Onbekend ingrediënt')
