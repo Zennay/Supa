@@ -57,7 +57,7 @@ test('M3 QA past absolute instants with different local offsets retain trustwort
   assert.equal(ready.ready, true, ready.issues.join('; '))
   assert.equal(observationWindowSummary(sheet, EVALUATION_CLOCK_MS).state, 'within-window')
   const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: EVALUATION_CLOCK_MS })
   assert.equal(result.claimable, true)
   assert.equal(result.comparison.outcome, 'better')
   assert.equal(result.comparison.claimable, true)
@@ -85,13 +85,13 @@ for (const side of ['baseline', 'candidate']) {
       // bypassing the canonical collector/converter validation.
       const validPast = buildWeeklyBasketStudyFromObservationSheet(fictionalReadySheet())
       validPast[side].observedAt = futureAt
-      const result = assessWeeklyBasketStudy(validPast)
+      const result = assessWeeklyBasketStudy(validPast, { referenceNowMs: EVALUATION_CLOCK_MS })
       assert.equal(result.claimable, false, side + ': ' + futureAt)
       assert.equal(result.comparison.claimable, false)
       assert.equal(result.comparison.outcome, 'unknown')
       assert.equal(result.comparison.deltaCents, null)
       assert.equal(result.comparison.savingsCents, null)
-      assert.ok(result.reasons.some(reason => reason.includes(side + ' observedAt is not a valid timestamp')))
+      assert.ok(result.reasons.some(reason => reason.includes(side + ' observedAt is later than assessment reference time')))
     }
   })
 }
@@ -107,12 +107,12 @@ test('M3 QA a wholly future one-hour pair is not a valid observed 24-hour window
   const pastStudy = buildWeeklyBasketStudyFromObservationSheet(fictionalReadySheet())
   pastStudy.baseline.observedAt = sheet.baseline.observedAt
   pastStudy.candidate.observedAt = sheet.candidate.observedAt
-  const assessment = assessWeeklyBasketStudy(pastStudy)
+  const assessment = assessWeeklyBasketStudy(pastStudy, { referenceNowMs: EVALUATION_CLOCK_MS })
   assert.equal(assessment.claimable, false)
   assert.equal(assessment.comparison.outcome, 'unknown')
   assert.equal(assessment.comparison.savingsCents, null)
-  assert.ok(assessment.reasons.some(reason => reason.includes('baseline observedAt is not a valid timestamp')))
-  assert.ok(assessment.reasons.some(reason => reason.includes('candidate observedAt is not a valid timestamp')))
+  assert.ok(assessment.reasons.some(reason => reason.includes('baseline observedAt is later than assessment reference time')))
+  assert.ok(assessment.reasons.some(reason => reason.includes('candidate observedAt is later than assessment reference time')))
 })
 
 
@@ -129,7 +129,7 @@ test('M3 QA historical DST fallback exactly 24h is accepted on both observation 
   assert.equal(window.state, 'within-window')
   assert.equal(window.deltaHours, 24)
   const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: EVALUATION_CLOCK_MS })
   assert.equal(result.claimable, true)
   assert.equal(result.observationWindowHours, 24)
   assert.equal(result.comparison.outcome, 'better')
@@ -143,7 +143,7 @@ test('M3 QA historical DST fallback 24h plus one millisecond never becomes savin
   assert.equal(observationSheetReadiness(sheet, EVALUATION_CLOCK_MS).ready, false)
   assert.equal(observationWindowSummary(sheet, EVALUATION_CLOCK_MS).state, 'outside-window')
   const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: EVALUATION_CLOCK_MS })
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
   assert.equal(result.comparison.savingsCents, null)
