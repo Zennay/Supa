@@ -42,7 +42,7 @@ test('M3 private report preserves exact same/worse signed monetary outcomes', ()
     const report = buildPrivateM3ProductComparison(buildFictionalPricedSheet(priceCents))
     assert.equal(report.fullBasket.outcome, outcome)
     assert.equal(report.fullBasket.provisionalSavingsCents, savings)
-    assert.equal(report.fullBasket.deltaCents, -savings)
+    assert.equal(report.fullBasket.deltaCents, savings === 0 ? 0 : -savings)
     assert.equal(report.publicSavingsClaimEligible, false)
   }
 })
