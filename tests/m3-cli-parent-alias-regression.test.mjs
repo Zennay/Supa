@@ -107,22 +107,18 @@ for (const [label, alias] of [
   })
 }
 
-test('a distinct new report under a symlink directory remains a safe synthetic positive control', async () => {
+test('a distinct report under a symlinked ancestor is rejected without exposing private data (#1140)', async () => {
   await withSyntheticInputs(async (ctx) => {
     const converted = run(converter, ctx.sheetPath, '--output', ctx.studyPath)
     assert.equal(converted.status, 0, converted.stderr)
+    const originalStudy = await readFile(ctx.studyPath, 'utf8')
     const reportPath = join(ctx.second, 'separate-report.json')
     const assessed = run(assessor, ctx.studyPath, '--output', reportPath)
-    assert.equal(assessed.status, 0, assessed.stderr)
-    const reportText = await readFile(reportPath, 'utf8')
-    const report = JSON.parse(reportText)
-    assert.equal(report.claimable, false)
-    assert.equal(report.outcome, 'unknown')
-    assert.equal(report.savingsCents, null)
-    assert.equal(report.deltaCents, null)
-    assert.equal(report.publicSavingsClaimEligible, false)
-    assert.equal(reportText.includes('synthetic-private-marker'), false)
-    assert.equal(reportText.includes('PRIVATE_SYNTHETIC_PROVENANCE'), false)
+    assert.notEqual(assessed.status, 0, 'a distinct output is not safe through a symlinked parent')
+    assertNoPrivateOutput(assessed)
+    assert.match(assessed.stderr, /refusing symlinked M3 output parent directory/u)
+    await assert.rejects(readFile(join(ctx.dir, 'separate-report.json')), { code: 'ENOENT' })
+    assert.equal(await readFile(ctx.studyPath, 'utf8'), originalStudy)
     assert.equal(await readFile(ctx.sheetPath, 'utf8'), ctx.originalSheet)
   })
 })
