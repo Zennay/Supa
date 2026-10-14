@@ -52,6 +52,8 @@ function mountAndRunEffects(snapshot, originalRecord = 'PRESERVE_THESE_UNKNOWN_B
     // This legacy test harness exercises storage and checkbox state only;
     // a separate routed Vite/React SSR test exercises the real banner.
     if (name === './ShoppingListCompletionBanner') return { ShoppingListCompletionBanner: () => null }
+    // This interaction/storage harness does not exercise selectable export UI.
+    if (name === './ShoppingListCopyButton') return { ShoppingListCopyButton: () => null }
     throw new Error('Unexpected shopping-v1 import: ' + name)
   }
   const module = { exports: {} }
