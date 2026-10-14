@@ -54,6 +54,12 @@ const card = evaluate(
   { './ObservationNextActionCard.css': {} },
 ).ObservationNextActionCard
 
+const priceInput = evaluate(
+  compile('../src/features/observation/ObservationPriceInput.tsx',
+    'ObservationPriceInput.tsx', '__no_css__'),
+  { './observationCollectionUi.ts': collectionUi },
+).ObservationPriceInput
+
 const actualView = compile('../src/features/observation/ObservationView.tsx',
   'ObservationView.tsx', 'ObservationView.css')
 
@@ -79,6 +85,7 @@ function renderView(sheet) {
     './observationNextStep.ts': { observationNextAction, observationNextTaskSelector },
     './observationReadinessCopy.ts': observationReadinessCopy,
     './ObservationNextActionCard.tsx': { ObservationNextActionCard: card },
+    './ObservationPriceInput.tsx': { ObservationPriceInput: priceInput },
   }
   const ObservationView = evaluate(actualView, modules).ObservationView
   return renderToStaticMarkup(React.createElement(ObservationView))
