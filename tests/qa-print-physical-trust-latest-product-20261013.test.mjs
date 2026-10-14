@@ -44,9 +44,9 @@ test('canonical 11-line projection is price-free, sorted identically, and detach
 
 test('equivalent mass, volume and piece multipacks remain physically minimal across units', () => {
   for (const [requiredAmount, requiredUnit, packAmount, packUnit, count, outerPacks, display] of [
-    [1200, 'g', 0.5, 'kg', 1, 3, '3 × 0.5 kg'],
+    [1200, 'g', 0.5, 'kg', 1, 3, '3 × 0,5 kg'],
     [1.2, 'kg', 500, 'g', 1, 3, '3 × 500 g'],
-    [1500, 'ml', 0.5, 'l', 2, 2, '2 verpakkingen van 2 × 0.5 l'],
+    [1500, 'ml', 0.5, 'l', 2, 2, '2 verpakkingen van 2 × 0,5 l'],
     [2.5, 'l', 250, 'ml', 2, 5, '5 verpakkingen van 2 × 250 ml'],
     [6, 'piece', 2, 'piece', 2, 2, '2 verpakkingen van 2 × 2 stuks'],
   ]) {
