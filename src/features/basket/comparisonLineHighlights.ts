@@ -1,4 +1,4 @@
-import type { BasketComparison } from '../../domain/basketComparison.ts'
+import { compareFullBaskets, type BasketComparison } from '../../domain/basketComparison.ts'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { euro } from '../../lib/money.ts'
 
@@ -100,8 +100,38 @@ export function comparisonMatchesVisibleBaskets(
         physical.lineTotalCents === line[key]
     })
   }
-  return actual(baseline, 'baselineLineTotalCents') &&
-    actual(candidate, 'candidateLineTotalCents')
+  if (!actual(baseline, 'baselineLineTotalCents') ||
+      !actual(candidate, 'candidateLineTotalCents')) return false
+
+  // Current row IDs, labels and cents are necessary, but not sufficient:
+  // altered ingredients, pack sizes, pack counts and matching confidence can
+  // change the physical basket while leaving all displayed cents identical.
+  // Re-run the canonical physical comparison on the two *visible* baskets so
+  // the headline never outlives its actual ingredient/pack arithmetic.
+  try {
+    const physicallyCurrent = compareFullBaskets({ baseline, candidate })
+    if (!physicallyCurrent.claimable ||
+        physicallyCurrent.outcome !== comparison.outcome ||
+        physicallyCurrent.baselineTotalCents !== comparison.baselineTotalCents ||
+        physicallyCurrent.candidateTotalCents !== comparison.candidateTotalCents ||
+        physicallyCurrent.deltaCents !== comparison.deltaCents ||
+        physicallyCurrent.savingsCents !== comparison.savingsCents ||
+        physicallyCurrent.lineDeltas.length !== comparison.lineDeltas.length) return false
+
+    const currentById = new Map(physicallyCurrent.lineDeltas.map(line => [line.id, line]))
+    return currentById.size === comparison.lineDeltas.length &&
+      comparison.lineDeltas.every(line => {
+        const current = currentById.get(line.id)
+        return current !== undefined &&
+          current.ingredientLabel === line.ingredientLabel &&
+          current.baselineLineTotalCents === line.baselineLineTotalCents &&
+          current.candidateLineTotalCents === line.candidateLineTotalCents &&
+          current.deltaCents === line.deltaCents
+      })
+  } catch {
+    // Loaded malformed runtime state must never unlock a money claim.
+    return false
+  }
 }
 
 export function comparisonLineHighlights(
