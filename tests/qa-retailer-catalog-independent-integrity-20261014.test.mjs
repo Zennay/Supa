@@ -140,3 +140,24 @@ test('invalid amounts and impossible same-basket demand must not invent cents', 
     /duplicate/,
   )
 })
+
+test('EXPECTED RED: a 500ml label must not be priced as a declared 1000ml pack', () => {
+  const input = [
+    observation('plus', 129, {
+      pack: { amount: 1000, unit: 'ml', rawText: '500 ml' },
+    }),
+    observation('dekamarkt', 119),
+  ]
+  const original = JSON.stringify(input)
+  refusesWinner(compare(input))
+  assert.equal(JSON.stringify(input), original, 'evidence must remain unchanged')
+})
+
+test('EXPECTED RED: a 1000ml label must not be priced as a declared 500ml pack', () => {
+  refusesWinner(compare([
+    observation('plus', 129, {
+      pack: { amount: 500, unit: 'ml', rawText: '1 l' },
+    }),
+    observation('dekamarkt', 119),
+  ]))
+})
