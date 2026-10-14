@@ -98,7 +98,8 @@ function validTimestamp(value: unknown) {
   }
 
   const timestamp = Date.parse(value)
-  return Number.isFinite(timestamp) ? timestamp : null
+  // Do not issue any financial outcome for observations dated after processing.
+  return Number.isFinite(timestamp) && timestamp <= Date.now() ? timestamp : null
 }
 
 // The planned week is a civil-date interval, not a rolling UTC hours window.
