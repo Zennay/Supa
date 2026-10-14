@@ -17,7 +17,7 @@ const html = '<!doctype html><html><body>fictional offline source</body></html>'
 const sha256 = createHash('sha256').update(html).digest('hex')
 const record = (id, extra = {}) => ({
   id, supermarket: 'imaginary-store', kind: 'product', success: true,
-  requestedUrl: 'https://example.invalid/PAYLOAD',
+  requestedUrl: 'https://example.invalid/source',
   capturedAt: '2026-10-13T12:00:00.000Z', sha256, ...extra,
 })
 const BAD = Buffer.from('PAYLOAD', 'utf8')
@@ -90,7 +90,9 @@ for (const [kind, bytes] of invalidForms) {
   test('product manifest encoding: later malformed current requestedUrl ' + kind +
        ' rejects before first successful HTML read', async () => {
     await scoped(async (root) => {
-      const now = await create(root, 'now', [record('earlier-ok'), record('bad')], {
+      const now = await create(root, 'now', [record('earlier-ok'), record('bad', {
+        requestedUrl: 'https://example.invalid/PAYLOAD',
+      })], {
         invalid: bytes,
       }) // First successful HTML is intentionally missing.
       await expectEarlyRefusal(now)
@@ -103,6 +105,7 @@ test('product manifest encoding: bad older capture refused before current HTML',
     const now = await create(root, 'now', [record('earlier-ok')])
     const old = await create(root, 'old', [record('earlier-ok', {
       capturedAt: '2026-10-12T12:00:00.000Z',
+      requestedUrl: 'https://example.invalid/PAYLOAD',
     })], { invalid: Buffer.from([0xff]) })
     await expectEarlyRefusal(now, old)
   })
