@@ -13,7 +13,7 @@ test('M3 Dutch price editor keeps integer cents and renders comma input without 
     logLevel: 'error',
   })
   try {
-    const { ObservationPriceInput, observationEditablePriceText } =
+    const { ObservationPriceInput, observationEditablePriceText, observationFinalPriceCents } =
       await vite.ssrLoadModule('/src/features/observation/ObservationPriceInput.tsx')
 
     for (const [cents, expected] of [
@@ -55,6 +55,13 @@ test('M3 Dutch price editor keeps integer cents and renders comma input without 
       ['NaN', null], ['1.000,00', null],
     ]) {
       assert.equal(observationPriceCents(entered), expectedCents)
+    }
+    for (const [entered, committed] of [
+      ['2,49', 249], ['2.49', 249], ['0,01', 1], ['2,', null],
+      ['2.', null], ['2,4', 240], ['2,499', null], ['-1', null],
+      ['', null], [null, null], [42, null],
+    ]) {
+      assert.equal(observationFinalPriceCents(entered), committed)
     }
   } finally {
     await vite.close()
