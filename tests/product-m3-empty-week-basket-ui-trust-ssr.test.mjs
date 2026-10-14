@@ -52,7 +52,9 @@ test('routed M3 Mand refuses optimistic same-price claim when no groceries are p
     const complete = render(matched, matched, matched)
     assert.match(complete, /data-comparison-outcome="same"/)
     assert.match(complete, /Beide testmanden zijn even duur/)
-    assert.match(complete, /M3 controlled testdata/)
+    assert.match(complete, /Vergelijking van voorbeeldprijzen voor dezelfde week en een volledige mand/)
+    assert.match(complete, /Geen actuele winkelprijzen of bewezen besparing/)
+    assert.doesNotMatch(complete, /M3 controlled testdata|M2 testfixture|productie-liveprijs/)
     assert.doesNotMatch(complete, /Plan eerst maaltijden om winkels te vergelijken/)
   } finally {
     await vite.close()
