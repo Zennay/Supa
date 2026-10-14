@@ -64,6 +64,9 @@ test('M5 shape positive: canonical real M1 inspectHtml booleans and script descr
 test('M5 shape positive: real malformed JSON-LD parseError=true remains tracked as shape evidence', () => {
   const valid = source()
   const bad = source()
+  // Different HTML bytes must have a different verified source SHA; sharing
+  // the earlier fixture's static SHA is impossible under canonical M1.
+  bad.manifestSha256 = 'b'.repeat(64)
   bad.html = inspectHtml('<script type="application/ld+json">{not-json}</script>')
   assert.equal(bad.html.jsonLd[0].parseError, true)
   const report = compare(bad, valid)
