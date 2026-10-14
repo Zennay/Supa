@@ -215,7 +215,7 @@ export function compareInspections(current, baseline = null) {
 // and excessive fractional precision, so validate the components first.
 // Timestamps are private control data: never put a source value in an error.
 function captureObservationInstant(value) {
-  const match = typeof value === 'string' && /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d{1,3}))?(Z|[+-]\\d{2}:\\d{2})$/.exec(value)
+  const match = typeof value === 'string' && /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/.exec(value)
   if (!match) throw new Error('Invalid capture observation time')
   const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number)
   const millis = Number((match[7] ?? '').padEnd(3, '0') || 0)
