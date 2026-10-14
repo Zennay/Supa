@@ -9,6 +9,7 @@ const B = 'b'.repeat(64)
 const ok = (id, supermarket = 'fictional-store', kind = 'product') => ({
   id, supermarket, kind, captureStatus: 'verified',
   snapshotSha256: A, shapeSha256: B, schemaOrgStatus: 'abstain',
+  hasNextData: false, jsonLdCount: 0, jsonLdParseErrors: 0,
 })
 const failed = (id) => ({
   id, supermarket: 'fictional-store', kind: 'product',
