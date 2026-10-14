@@ -1,0 +1,9 @@
+# Independent M5 JSON-LD provenance original→corrected QA replay
+
+Immutable fixed product [DRAFT #2306](https://github.com/Zennay/Supa/pull/2306) source SHA **`acdb51dd5b1ab146d0ccd3855a153acd4e3cbd81`**, already hosted-green via [CI #38509835448](https://github.com/Zennay/Supa/actions/runs/38509835448). Independent original-source [QA DRAFT #2311](https://github.com/Zennay/Supa/pull/2311) on old #2296 source `57ce76010cdc47046457cb6633932226d0f8e866` wrote 14 fictional own JSON-LD descriptor acceptance tests. This corrected-source child includes **exact byte-identical Git blob `85305b93dd878154b7514c6abe6280be0b5f3d22`**, unchanged from original QA. No assertions, original product or other QA branches touched.
+
+Five positives: real fake inspected Product, ordinary own Product data, canonical JSON-LD parse failure abstain, legitimate first failed M1 P1, array bounds. Nine negatives: own-only type, keys and parseError data fields, own indexed type/keys and JSON-LD row fields; no inherited metadata, no private arbitrary getters evaluated. Errors generic, all review queue rights/production/M5 flags false and opaque tokens. This is **synthetic local** validation only, not a live retailer or user/price dataset.
+
+Own QA branch adds just test file plus this document. Require **its own** hosted full CI Node/high audit/M1 source permission/matching/TS-Vite build before claiming corrected-GREEN. Preserve immutable Git blob and branch evidence; do not force-update original source/QA branches. No main/M3/UI/workflows/permanent VPS changes.
+
+Supa **M3 ACTIVE**; actual same-demand 11 PLUS+11 DekaMarkt paired 24h field [#78](https://github.com/Zennay/Supa/issues/78) absent. M4/M5 ineligible; **DRAFT/HOLD/NO MERGE/NO DEPLOY** until independent zCloud SQLite lease/task write scope, product and QA owners, trusted current-main runner where applicable, human field rights/evidence and explicit releasego.
