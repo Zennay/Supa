@@ -28,7 +28,7 @@ export async function main(argv = process.argv.slice(2)) {
   const serialized = `${JSON.stringify(buildObservationSheet(), null, 2)}\n`
 
   if (output) {
-    await mkdir(dirname(output), { recursive: true })
+    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
     try {
       await writeFile(output, serialized, {
         encoding: 'utf8',
