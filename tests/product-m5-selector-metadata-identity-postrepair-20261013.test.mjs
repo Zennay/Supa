@@ -10,9 +10,9 @@ const B = 'b'.repeat(64)
 const C = 'c'.repeat(64)
 
 const verified = (id, sha = H, shape = B, schemaOrgStatus = 'abstain') =>
-  ({ id, captureStatus: 'verified', snapshotSha256: sha, shapeSha256: shape, schemaOrgStatus })
+  ({ id, supermarket: 'fictional-market', kind: 'product', captureStatus: 'verified', snapshotSha256: sha, shapeSha256: shape, schemaOrgStatus })
 const unavailable = (id) =>
-  ({ id, captureStatus: 'unavailable', snapshotSha256: null, shapeSha256: null, schemaOrgStatus: 'unknown' })
+  ({ id, supermarket: 'fictional-market', kind: 'product', captureStatus: 'unavailable', snapshotSha256: null, shapeSha256: null, schemaOrgStatus: 'unknown' })
 const change = (id, status, current, baseline) => ({ id, status, current, baseline })
 const DRIFT = new Set(['added', 'removed', 'unavailable', 'shape_changed'])
 
