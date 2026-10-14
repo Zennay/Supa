@@ -84,7 +84,7 @@ test('independent QA: current store identity/name and any changed live recipe as
   ]) {
     assert.equal(acceptPlanRecipeSwap(preview, m2InitialPlan, activeDays, store, m2Products).status, 'stale')
   }
-  const changedPlan = m2InitialPlan.map((m) => m.day === 'Wo' ? { ...m, recipeId: 'pasta' } : m)
+  const changedPlan = m2InitialPlan.map((m) => m.day === 'Wo' ? { ...m, recipeId: 'tikka' } : m)
   assert.equal(acceptPlanRecipeSwap(preview, changedPlan, activeDays, m2Store, m2Products).status, 'stale')
 })
 
