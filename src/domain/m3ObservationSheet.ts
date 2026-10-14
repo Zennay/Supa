@@ -535,7 +535,7 @@ function nonBlank(value: string) {
 const M3_CANONICAL_OBSERVED_AT =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-](\d{2}):(\d{2}))$/
 
-export function validObservedAt(value: string) {
+export function validObservedAt(value: string, referenceNowMs = Number.POSITIVE_INFINITY) {
   if (typeof value !== 'string') return null
   const match = M3_CANONICAL_OBSERVED_AT.exec(value)
   if (!match) return null
@@ -557,12 +557,13 @@ export function validObservedAt(value: string) {
   }
 
   const timestamp = Date.parse(value)
-  // Readiness and field-window guidance cannot accept future store visits.
-  return Number.isFinite(timestamp) && timestamp <= Date.now() ? timestamp : null
+  // Deterministic: external operator must explicitly supply the real clock.
+  return Number.isFinite(timestamp) && timestamp <= referenceNowMs ? timestamp : null
 }
 
 export function observationSheetReadiness(
   sheet: ObservationSheet,
+  referenceNowMs = Number.POSITIVE_INFINITY,
 ): ObservationSheetReadiness {
   const issues: string[] = []
 
@@ -603,7 +604,7 @@ export function observationSheetReadiness(
       issues.push(`${label}: provenance-notitie ontbreekt.`)
     }
 
-    const observedAt = validObservedAt(observation.observedAt)
+    const observedAt = validObservedAt(observation.observedAt, referenceNowMs)
     if (observedAt === null) {
       issues.push(`${label}: geldige observatietijd ontbreekt.`)
     } else {
@@ -687,9 +688,10 @@ export type ObservationWindowSummary =
 
 export function observationWindowSummary(
   sheet: ObservationSheet,
+  referenceNowMs = Number.POSITIVE_INFINITY,
 ): ObservationWindowSummary {
-  const baselineAt = validObservedAt(sheet.baseline.observedAt)
-  const candidateAt = validObservedAt(sheet.candidate.observedAt)
+  const baselineAt = validObservedAt(sheet.baseline.observedAt, referenceNowMs)
+  const candidateAt = validObservedAt(sheet.candidate.observedAt, referenceNowMs)
 
   if (baselineAt === null && candidateAt === null) {
     return { state: 'not-started' }
