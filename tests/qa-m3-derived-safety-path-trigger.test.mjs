@@ -9,6 +9,7 @@ const required = [
   'tests/qa-m3-derived-output-private-directories.test.mjs',
   'tests/qa-m3-derived-symlink-parent-guard.test.mjs',
   'tests/qa-m3-derived-safety-path-trigger.test.mjs',
+  'tests/qa-m3-private-operator-positive-contracts.test.mjs',
 ]
 
 function pathsFromYaml(yaml) {
