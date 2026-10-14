@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { assertNoSymlinkedM3OutputParents, writeDerivedM3Output } from './m3-source-output-preservation.mjs'
 
 import { assessWeeklyBasketStudy } from '../src/domain/observedBasketStudy.ts'
+import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
 import {
   M3_EXPECTED_RETAILERS,
   observationStoreMatchesExpectedRetailer,
@@ -104,8 +105,15 @@ function validateMatchedLine(line, path) {
     required && pack && required.family === pack.family,
     `${path}.pack must be compatible with the ingredient requirement`,
   )
+  // Use the same exact decimal arithmetic as the canonical converter and
+  // basket comparator. Binary Math.ceil may demand a phantom extra pack at
+  // integer boundaries (e.g. 450 g / 0.144 g is exactly 3,125 packs).
+  const exactPacks = calculateDecimalPackCount(
+    [{ amount: line.requirement.amount, unit: line.requirement.unit }],
+    { amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count },
+  )
   assert(
-    line.packs === Math.ceil(required.amount / pack.amount),
+    exactPacks !== null && line.packs === exactPacks,
     `${path}.packs must equal the quantity required by requirement and pack size`,
   )
   assert(

@@ -4,6 +4,7 @@ import { assertNoSymlinkedM3OutputParents, writeDerivedM3Output } from './m3-sou
 import { pathToFileURL } from 'node:url'
 
 import { matchIngredient } from '../src/domain/matching.ts'
+import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
 import {
   M3_EXPECTED_RETAILERS,
   observationStoreMatchesExpectedRetailer,
@@ -71,6 +72,11 @@ function validTimestamp(value) {
       .map(Number)
     if (offsetHour > 23 || offsetMinute > 59) return false
   }
+
+  // Date.parse loses submillisecond fractional precision; nonzero hidden
+  // digits cannot support an inclusive <=24h evidence or money claim.
+  const fractionalSeconds = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1]
+  if (fractionalSeconds && /[1-9]/.test(fractionalSeconds.slice(3))) return false
 
   // A future instant is never an already observed manual retailer capture.
   const observedAtMs = Date.parse(value)
@@ -214,10 +220,21 @@ function buildObservedLine(line, requirement, path) {
     )
   }
 
-  const packs = Math.ceil(required.amount / pack.amount)
+  // Exact decimal division avoids a phantom extra pack when an observed
+  // decimal quantity lands on a true integer boundary (450 / 0.144 = 3125).
+  // The converter must never calculate or disclose money from an unsafe pack.
+  const packs = calculateDecimalPackCount(
+    [{ amount: requirement.amount, unit: requirement.unit }],
+    { amount: observed.packAmount, unit: observed.packUnit, count: packCount },
+  )
+  if (packs === null) {
+    return unresolvedLine(requirement, [
+      ...decision.reasons, 'observed pack count cannot be calculated exactly',
+    ])
+  }
   const lineTotalCents = packs * observed.priceCents
 
-  if (!Number.isSafeInteger(packs) || !Number.isSafeInteger(lineTotalCents)) {
+  if (!Number.isSafeInteger(lineTotalCents)) {
     return unresolvedLine(requirement, [
       ...decision.reasons,
       'observed basket quantity or monetary total exceeds the safe integer range',
