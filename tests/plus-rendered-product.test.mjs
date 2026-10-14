@@ -130,3 +130,41 @@ test('PLUS rendered evidence binds parsed product identity to the source URL', a
     reason: 'PLUS rendered evidence product identity does not match source URL',
   })
 })
+
+
+test('PLUS Product JSON-LD URL must identify the exact rendered captured page', async () => {
+  const valid = await fixture()
+  assert.equal(parsePlusRenderedProductEvidence(valid).type, 'observation')
+
+  for (const url of [
+    'https://www.plus.nl/product/andere-slug-579010',
+    'https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-999999',
+    'https://example.invalid/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010',
+    'https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010?foo=bar',
+    ' https://www.plus.nl/product/zuivelmeester-halfvolle-melk-pak-1000-ml-579010 ',
+    '', null, 579010,
+  ]) {
+    const evidence = await fixture()
+    evidence.jsonLd.url = url
+    assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+      type: 'abstain',
+      reason: 'PLUS rendered evidence Product JSON-LD URL does not match source URL',
+    })
+  }
+
+  const withoutUrl = await fixture()
+  delete withoutUrl.jsonLd.url
+  assert.equal(parsePlusRenderedProductEvidence(withoutUrl).type, 'observation')
+})
+
+test('PLUS Product declared URL provenance also binds supported @graph records', async () => {
+  const evidence = await fixture()
+  evidence.jsonLd = { '@context': 'https://schema.org', '@graph': [evidence.jsonLd] }
+  assert.equal(parsePlusRenderedProductEvidence(evidence).type, 'observation')
+
+  evidence.jsonLd['@graph'][0].url = 'https://www.plus.nl/product/andere-slug-579010'
+  assert.deepEqual(parsePlusRenderedProductEvidence(evidence), {
+    type: 'abstain',
+    reason: 'PLUS rendered evidence Product JSON-LD URL does not match source URL',
+  })
+})
