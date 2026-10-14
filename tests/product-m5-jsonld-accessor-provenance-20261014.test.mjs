@@ -59,6 +59,13 @@ test('M5 refuses inherited keys metadata even if plausible',()=>{
   const record=Object.assign(Object.create({keys:['@type']}),{type:['Product']})
   rejects(sample([record]))
 })
+test('M5 rejects inherited parseError accessor without executing getter',()=>{
+  throwsWithoutGetter((get)=>{
+    const record=Object.assign(Object.create(Object.defineProperty({},'parseError',{get})),
+      {type:['Product'],keys:['@type']})
+    rejects(sample([record]))
+  })
+})
 test('M5 cannot evaluate a getter in the JSON-LD type array',()=>{
   throwsWithoutGetter((get)=>{
     const types=['Product']
