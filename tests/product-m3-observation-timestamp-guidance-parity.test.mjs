@@ -26,6 +26,16 @@ function preparedSheet(side) {
   store.store.id = side + '-leiden'
   store.evidenceId = side + '-timestamp-fixture'
   store.provenanceNote = 'Fictieve regressietest zonder echte prijzen'
+  if (side === 'candidate') {
+    // The task guide deliberately completes PLUS before addressing DekaMarkt.
+    // Complete all baseline fields/rows to exercise the candidate field.
+    sheet.baseline.store.name = 'PLUS Leiden'
+    sheet.baseline.store.id = 'plus-leiden'
+    sheet.baseline.evidenceId = 'baseline-timestamp-fixture'
+    sheet.baseline.provenanceNote = 'Fictieve regressietest zonder echte prijzen'
+    sheet.baseline.observedAt = '2026-10-14T08:00:00Z'
+    for (const line of sheet.baseline.lines) line.observedProduct.available = false
+  }
   return sheet
 }
 
