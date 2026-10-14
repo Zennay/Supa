@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { assessCoreRetailerCoverage, CORE_MARKET_BANNERS } from '../scripts/m5-check-core-retailer-coverage.mjs'
+import { assessCoreRetailerCoverage, compareCoreRetailerInventories, CORE_MARKET_BANNERS } from '../scripts/m5-check-core-retailer-coverage.mjs'
 
 const sourceFile = new URL('../docs/m5-retailer-discovery.v1.json', import.meta.url)
 const source = JSON.parse(await readFile(sourceFile, 'utf8'))
@@ -149,4 +149,103 @@ test('unknown CLI options fail closed without source data', () => {
   assert.equal(run.status, 2)
   assert.equal(run.stdout, '')
   assert.equal(run.stderr, 'Invalid offline retailer coverage input\n')
+})
+
+test('independent unchanged research inventories report no changes and no historical proof', () => {
+  const result = compareCoreRetailerInventories(copy(), copy())
+  assert.deepEqual(result.addedCandidateIds, [])
+  assert.deepEqual(result.removedCandidateIds, [])
+  assert.equal(result.changed, false)
+  assert.equal(result.humanReviewRequired, false)
+  assert.equal(result.historicalEvidenceVerified, false)
+  assert.equal(result.rightsVerified, false)
+  assert.equal(result.m5Eligible, false)
+})
+
+test('future inventory removal of an additional banner is visible even with core still complete', () => {
+  const previous = copy()
+  const current = copy()
+  current.sources = current.sources.filter((source) => source.id !== 'odin')
+  const report = compareCoreRetailerInventories(current, previous)
+  assert.equal(report.coreCovered, true)
+  assert.deepEqual(report.removedCandidateIds, ['odin'])
+  assert.equal(report.changed, true)
+  assert.equal(report.humanReviewRequired, true)
+  assert.equal(report.productionReady, false)
+})
+
+test('previously missing valid candidate surfaces as added not as approved data', () => {
+  const previous = copy()
+  previous.sources = previous.sources.filter((source) => source.id !== 'boni')
+  const report = compareCoreRetailerInventories(copy(), previous)
+  assert.deepEqual(report.addedCandidateIds, ['boni'])
+  assert.deepEqual(report.removedCandidateIds, [])
+  assert.equal(report.coreCovered, true)
+  assert.equal(report.rightsVerified, false)
+  assert.equal(report.historicalEvidenceVerified, false)
+})
+
+test('compare refuses to treat same inventory object as historical evidence', () => {
+  const current = copy()
+  assert.throws(() => compareCoreRetailerInventories(current, current),
+    /Distinct inventory inputs required/)
+})
+
+test('compare refuses separate wrappers around one sources array', () => {
+  const current = copy()
+  const previous = { ...current }
+  assert.throws(() => compareCoreRetailerInventories(current, previous),
+    /Distinct inventory inputs required/)
+})
+
+test('comparison validates owner schema before invoking malicious root sources accessor', () => {
+  const current = copy()
+  const previous = copy()
+  let called = 0
+  Object.defineProperty(previous, 'sources', {
+    enumerable: true,
+    get() { called++; throw Error('PRIVATE-RESEARCH-TRAP') },
+  })
+  assert.throws(() => compareCoreRetailerInventories(current, previous), /schema fields/)
+  assert.equal(called, 0)
+})
+
+test('comparison CLI exits 2 on optional-banner removal and keeps rights false', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m5-inventory-diff-'))
+  try {
+    const previous = join(dir, 'previous.json')
+    const current = join(dir, 'current.json')
+    await writeFile(previous, JSON.stringify(copy()), { mode: 0o600 })
+    const changed = copy()
+    changed.sources = changed.sources.filter((source) => source.id !== 'odin')
+    await writeFile(current, JSON.stringify(changed), { mode: 0o600 })
+    const run = call([current, '--baseline', previous])
+    assert.equal(run.status, 2, run.stderr)
+    const result = JSON.parse(run.stdout)
+    assert.equal(result.coreCovered, true)
+    assert.deepEqual(result.removedCandidateIds, ['odin'])
+    assert.equal(result.historicalEvidenceVerified, false)
+    assert.equal(result.productionReady, false)
+    assert.equal(result.m5Eligible, false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('comparison CLI accepts independent identical valid copies without release claim', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m5-inventory-same-'))
+  try {
+    const previous = join(dir, 'previous.json')
+    const current = join(dir, 'current.json')
+    await writeFile(previous, JSON.stringify(copy()), { mode: 0o600 })
+    await writeFile(current, JSON.stringify(copy()), { mode: 0o600 })
+    const run = call([current, '--baseline', previous])
+    assert.equal(run.status, 0, run.stderr)
+    const result = JSON.parse(run.stdout)
+    assert.equal(result.changed, false)
+    assert.equal(result.historicalEvidenceVerified, false)
+    assert.equal(result.rightsVerified, false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
