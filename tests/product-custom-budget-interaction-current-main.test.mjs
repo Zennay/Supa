@@ -136,7 +136,7 @@ test('invalid or sub-cent budgets stay unsaved with accessible errors; retry suc
 test('normal fixed-price budget chips stay non-submit actions', () => {
   const ui = harness()
   const forty = ui.find('button', (p) => p.type === 'button' &&
-    p['aria-pressed'] === false && p.children === '€ 40,00')
+    p['aria-pressed'] === false && typeof p.children === 'string' && p.children.replaceAll('\u00a0', ' ').replaceAll('\u202f', ' ') === '€ 40,00')
   forty.props.onClick()
   assert.deepEqual(ui.updates, [40])
 })
