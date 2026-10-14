@@ -31,16 +31,19 @@ test('M3 Dutch price editor keeps integer cents and renders comma input without 
 
     const html = renderToStaticMarkup(createElement(ObservationPriceInput, {
       priceCents: 249,
+      label: 'PLUS · rijst · prijs per verpakking',
       onPriceChange: () => assert.fail('SSR may not modify observed prices'),
     }))
     assert.match(html, /type="text"/)
     assert.match(html, /inputMode="decimal"/)
     assert.match(html, /value="2,49"/)
     assert.match(html, /aria-invalid="false"/)
+    assert.match(html, /aria-label="PLUS · rijst · prijs per verpakking"/)
     assert.doesNotMatch(html, /type="number"|onChange|navigator\.clipboard|besparing bewezen/)
 
     const emptyHtml = renderToStaticMarkup(createElement(ObservationPriceInput, {
       priceCents: null,
+      label: 'DekaMarkt · rijst · prijs per verpakking',
       onPriceChange: () => assert.fail('empty SSR may not create a price'),
     }))
     assert.match(emptyHtml, /value=""/)
