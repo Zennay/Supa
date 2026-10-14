@@ -39,7 +39,16 @@
   gap: 12px;
 }
 
+.observation-card-heading > div {
+  min-width: 0;
+}
+
+.observation-card-heading h3 {
+  overflow-wrap: anywhere;
+}
+
 .observation-count {
+  flex: 0 0 auto;
   min-width: 48px;
   padding: 7px 10px;
   border-radius: 999px;
@@ -136,6 +145,8 @@
 .observation-line summary > div {
   display: grid;
   gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .observation-line summary span {
