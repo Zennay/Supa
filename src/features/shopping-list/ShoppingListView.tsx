@@ -8,6 +8,21 @@ import {
   shoppingListProgressStorageKey,
 } from './shoppingListProgress'
 
+// An empty checklist is trustworthy only when its store identity is readable.
+// This guards the empty-state message, not ordinary populated product rows.
+const invisibleStoreFillers = /[\u115F\u1160\u3164\uFFA0\u2800]/gu
+
+function visibleStoreIdentity(value: unknown): boolean {
+  return typeof value === 'string' &&
+    value === value.trim() &&
+    /[\p{L}\p{N}]/u.test(value.replace(invisibleStoreFillers, ''))
+}
+
+function visibleStoreName(value: unknown): boolean {
+  return typeof value === 'string' &&
+    /[\p{L}\p{N}\p{S}]/u.test(value.replace(invisibleStoreFillers, ''))
+}
+
 function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
   if (line.status === 'unresolved') {
     return `${line.requirement.amount ?? '?'} ${quantityUnitLabelNl(line.requirement.unit, line.requirement.amount)} · handmatig kiezen`
@@ -75,7 +90,9 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     basket.selectedMealCount === 0 &&
     basket.matchedLineCount === 0 &&
     basket.unresolvedLineCount === 0 &&
-    basket.totalCents === 0
+    basket.totalCents === 0 &&
+    visibleStoreIdentity(basket.store?.id) &&
+    visibleStoreName(basket.store?.name)
 
   useEffect(() => {
     if (progress.basketKey === basketKey) return
