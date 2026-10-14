@@ -18,6 +18,7 @@ test('actual observed same-demand 11+11 prices produce an explainable DekaMarkt 
   assert.equal(comparison.outcome, 'better')
   assert.equal(comparison.savingsCents, 110)
   assert.equal(comparison.comparable, true)
+  assert.equal(comparison.rows[0].differenceCents, 10)
   assert.equal(comparison.rows.every((row) =>
     row.plus.status === 'priced' && row.dekamarkt.status === 'priced'), true)
   assert.equal(JSON.stringify(sheet), original, 'comparison must not modify stored field evidence')
@@ -44,6 +45,7 @@ test('missing prices show known subtotal but never manufacture full basket savin
   assert.equal(comparison.dekamarkt.knownSubtotalCents, 900)
   assert.equal(comparison.dekamarkt.complete, false)
   assert.equal(comparison.rows[0].dekamarkt.status, 'missing')
+  assert.equal(comparison.rows[0].differenceCents, null)
   assert.equal(comparison.outcome, 'unknown')
   assert.equal(comparison.savingsCents, null)
   assert.equal(comparison.comparable, false)
@@ -72,6 +74,7 @@ test('real canonical decimal pack arithmetic powers row and total comparison', (
   const comparison = buildObservedComparisonPreview(sheet, NOW)
   assert.equal(comparison.rows[index].plus.packs, 3125)
   assert.equal(comparison.rows[index].dekamarkt.packs, 3125)
+  assert.equal(comparison.rows[index].differenceCents, 31250)
   assert.equal(comparison.plus.knownSubtotalCents, 313500)
   assert.equal(comparison.dekamarkt.knownSubtotalCents, 282150)
   assert.equal(comparison.savingsCents, 31350)
