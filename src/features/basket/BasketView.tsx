@@ -62,7 +62,7 @@ export function BasketView({
     ? comparisonWarningCopy(
       comparisonBaseline.unresolvedLineCount,
       comparisonCandidate.unresolvedLineCount,
-      comparison.reasons.length,
+      Array.isArray(comparison?.reasons) ? comparison.reasons.length : 1,
     )
     : 'Plan eerst een maaltijd; zonder boodschappen is er geen financieel verschil te vergelijken.'
   const comparisonHighlights = comparisonCanShowMoney
