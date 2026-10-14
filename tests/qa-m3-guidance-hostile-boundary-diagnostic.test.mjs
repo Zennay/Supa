@@ -44,17 +44,14 @@ test('M3 independent QA diagnostic: root accessor must not execute in consumer g
 })
 
 test('M3 independent QA diagnostic: root throwing Proxy trap cannot escape consumer guidance', () => {
-  let executed = 0
   const input = new Proxy({}, {
     get() {
-      executed += 1
       throw Error('qa-private-synthetic-trap')
     },
   })
+  // Browser code cannot reliably detect arbitrary Proxies without risking
+  // traps. It must nevertheless prevent exceptions reaching the caller.
   safeAdvice(input)
-  // A browser cannot identify arbitrary Proxy objects without risking traps;
-  // preventing uncaught failures is the universal acceptance requirement.
-  assert.ok(executed >= 0)
 })
 
 test('M3 independent QA diagnostic: revoked Proxy root must fail closed', () => {
