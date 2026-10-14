@@ -84,7 +84,10 @@ test('valid explicit instants advance the task even when daylight-saving offsets
     const sheet = preparedSheet('baseline')
     sheet.baseline.observedAt = time
     assert.notEqual(validObservedAt(time), null, time)
-    const action = observationNextAction(sheet)
+    // This historic DST syntax fixture runs before 2026-10-25 in real CI.
+    // Evaluate it against a fictional later clock instead of pretending
+    // an actual future visit has already been observed by the operator.
+    const action = observationNextAction(sheet, Date.parse('2026-10-26T12:00:00Z'))
     assert.equal(action.stage, 'line', `valid time ${time} should advance to a real ingredient`)
     assert.equal(action.side, 'baseline')
     assert.equal(action.ingredientId, sheet.baseline.lines[0].ingredientId)
