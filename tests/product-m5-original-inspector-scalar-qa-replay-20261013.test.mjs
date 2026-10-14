@@ -80,7 +80,8 @@ test('M5 shape positive: canonical null-id and positive-byte application script 
   const shape = captureShape(left)
   assert.match(shape.shapeSha256, /^[a-f0-9]{64}$/)
   assert.deepEqual(left, before)
-  const queue = buildOfflineSelectorReviewQueue(compare(left, left))
+  // Keep historical evidence separate from the current in-memory capture.
+  const queue = buildOfflineSelectorReviewQueue(compare(left, structuredClone(left)))
   assert.equal(queue.actions.length, 1)
   assert.equal(queue.actions[0].priority, 'P3')
 })
