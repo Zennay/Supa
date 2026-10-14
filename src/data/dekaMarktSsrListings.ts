@@ -95,10 +95,6 @@ function positiveMoneyCents(value: unknown): number | null {
   return cents !== null && cents > 0 ? cents : null
 }
 
-function validIso(value: unknown): value is string {
-  return typeof value === 'string' && Number.isFinite(Date.parse(value))
-}
-
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const TIMESTAMP_PATTERN =
   /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
@@ -354,8 +350,8 @@ function parseOfferProduct(
     outerNormalPrice === null ||
     typeof label !== 'string' ||
     !label.trim() ||
-    !validIso(outerStart) ||
-    !validIso(outerEnd) ||
+    !validCapturedAt(outerStart) ||
+    !validCapturedAt(outerEnd) ||
     Date.parse(outerStart) > Date.parse(outerEnd)
   ) {
     return null
@@ -400,8 +396,8 @@ function parseOfferProduct(
     return null
   }
 
-  const validFrom = validIso(productStart) ? productStart : outerStart
-  const validTo = validIso(productEnd) ? productEnd : outerEnd
+  const validFrom = validCapturedAt(productStart) ? productStart : outerStart
+  const validTo = validCapturedAt(productEnd) ? productEnd : outerEnd
   if (Date.parse(validFrom) > Date.parse(validTo)) return null
 
   const pack = normalizePackText(packaging)
