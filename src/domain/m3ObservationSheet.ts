@@ -33,11 +33,18 @@ export function observationStoreMatchesExpectedRetailer(
   side: M3ObservationSide,
   storeName: string,
 ) {
-  const normalized = normalizedRetailerName(storeName)
-  if (side === 'baseline') {
-    return normalized.split(/\s+/).includes('plus')
-  }
-  return normalized.replace(/\s+/g, '').includes('dekamarkt')
+  if (typeof storeName !== 'string') return false
+  const words = normalizedRetailerName(storeName).split(/\s+/)
+  // A substring of another retailer's name is not proof of brand identity.
+  // Refuse contradictory labels containing both retailers.
+  const hasPlus = words.includes('plus')
+  const hasDekaMarkt = words.includes('dekamarkt') || words.some(
+    (word, index) => word === 'deka' && words[index + 1] === 'markt',
+  )
+  if (hasPlus && hasDekaMarkt) return false
+  if (side === 'baseline') return hasPlus
+  if (side === 'candidate') return hasDekaMarkt
+  return false
 }
 
 export type ObservationRequirement = {
