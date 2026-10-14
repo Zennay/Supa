@@ -46,7 +46,7 @@ function expectRefused(candidate, label) {
   )
 }
 
-test('QA shopping v1: 112 numeric/shape mutations do not authorize storage', () => {
+test('QA shopping v1: 78 numeric/shape mutations do not authorize storage', () => {
   const cases = [
     ['packs', [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '2', null], 'packs'],
     ['pricePerPackCents', [-1, 0.1, NaN, Infinity, '100', null, undefined], 'pricePerPackCents'],
