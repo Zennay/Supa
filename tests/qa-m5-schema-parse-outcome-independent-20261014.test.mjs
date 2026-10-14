@@ -19,6 +19,13 @@ const source = (schemaOrgProduct = { type: 'abstain' }) => ({
   schemaOrgProduct,
   html: { hasNextData: false, jsonLd: [], applicationJsonScripts: [] },
 })
+const observedSource = (additional = {}) => {
+  // The newer M1 trust boundary requires both a real parser discriminator and
+  // synthetically parsed JSON-LD; old positive mocks carried only the type.
+  const item = source({ type: 'observation', observation: {}, ...additional })
+  item.html.jsonLd = [{ type: ['Product'], keys: ['@type', 'offers'] }]
+  return item
+}
 const fail = input => {
   const before = structuredClone(input)
   assert.throws(() => captureShape(input), err =>
@@ -136,7 +143,7 @@ test('independent M5 schema: real canonical abstain remains private P3', () => {
   assert.equal(report.changes[0].current.schemaOrgStatus, 'abstain')
 })
 test('independent M5 schema: real candidate observation remains manual only P2 without baseline', () => {
-  const now = source({ type: 'observation', name: 'never-expose-example' })
+  const now = observedSource({ name: 'never-expose-example' })
   const report = compareInspections({ sourceCount: 1, sources: [now] })
   const out = checkPrivate(report)
   assert.equal(report.changes[0].current.schemaOrgStatus, 'candidate_observation')
@@ -144,7 +151,7 @@ test('independent M5 schema: real candidate observation remains manual only P2 w
   assert.doesNotMatch(JSON.stringify(out), /never-expose-example/)
 })
 test('independent M5 schema: nested candidate payload getter is never touched', () => {
-  const x = source({ type: 'observation' })
+  const x = observedSource()
   let invoked = 0
   Object.defineProperty(x.schemaOrgProduct, 'product', {
     get() { invoked++; throw new Error('secret payload getter') },
@@ -162,7 +169,7 @@ test('independent M5 schema: actual fictional M1 HTML inspection stays valid P3'
   assert.equal(out.actions[0].priority, 'P3')
 })
 test('independent M5 schema: genuine corrected candidate decision makes P1 when HTML changes', () => {
-  const now = source({ type: 'observation' })
+  const now = observedSource()
   const old = source({ type: 'abstain' })
   now.manifestSha256 = B
   const out = checkPrivate(comparison(now, old))
