@@ -178,7 +178,13 @@ export function captureShape(source) {
         !Object.hasOwn(observationDescriptor, 'value') ||
         !observation || typeof observation !== 'object' ||
         Array.isArray(observation) ||
-        !source.html.jsonLd.some((record) => record.parseError !== true)) {
+        // M1's Schema.org parser can observe a Product only from an
+        // explicit Product type (case-insensitive) or a JSON-LD @graph
+        // containing a nested Product. Another successfully parsed page
+        // type alone cannot justify a positive observation decision.
+        !source.html.jsonLd.some((record) => record.parseError !== true &&
+          (record.type.some((type) => type.toLowerCase() === 'product') ||
+           record.keys.includes('@graph')))) {
       throw new Error('Invalid inspected Schema.org parse result')
     }
   } else if (observationDescriptor &&
