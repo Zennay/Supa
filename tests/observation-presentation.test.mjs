@@ -13,7 +13,7 @@ test('observation retailer copy explains the PLUS first-store step in plain lang
     storePlaceholder: `Bijv. ${M3_EXPECTED_RETAILERS.baseline} Leiden`,
     storeIdPlaceholder: `${M3_EXPECTED_RETAILERS.baseline.toLowerCase()}-leiden-...`,
     guidance:
-      `Meet deze mand eerst bij ${M3_EXPECTED_RETAILERS.baseline}. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`,
+      `Meet deze mand eerst bij ${M3_EXPECTED_RETAILERS.baseline}. Gebruik de officiële lijst met dezelfde ingrediënten en hoeveelheden voor beide winkels, in één regio en één prijscontext. Noteer het echte meetmoment met tijdzone, de bron en de feitelijke beschikbaarheid per product. Onbekend is niet hetzelfde als niet beschikbaar: gok geen product of prijs. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`,
   })
 })
 
@@ -25,7 +25,7 @@ test('observation retailer copy explains the DekaMarkt comparison step in plain 
     storePlaceholder: `Bijv. ${M3_EXPECTED_RETAILERS.candidate} Leiden`,
     storeIdPlaceholder: `${M3_EXPECTED_RETAILERS.candidate.toLowerCase()}-leiden-...`,
     guidance:
-      `Meet daarna dezelfde mand bij ${M3_EXPECTED_RETAILERS.candidate}. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`,
+      `Meet daarna precies dezelfde ingrediënten en hoeveelheden bij ${M3_EXPECTED_RETAILERS.candidate}, binnen 24 uur van de eerste meting en in dezelfde regio en prijscontext. Noteer het echte meetmoment met tijdzone, de bron en feitelijke beschikbaarheid per product. Onbekend is niet hetzelfde als niet beschikbaar: gok geen product of prijs. Gebruik hier geen andere supermarkt, anders kan SUPA de winkels niet betrouwbaar vergelijken.`,
   })
 })
 
