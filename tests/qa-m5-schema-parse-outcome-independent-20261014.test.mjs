@@ -122,7 +122,8 @@ test('independent M5 schema: unsuccessful capture without parser metadata stays 
   assert.equal(out.schemaOrgStatus, 'unknown')
 })
 test('independent M5 schema: unsuccessful capture with own undefined decision remains canonical', () => {
-  const x = source(undefined)
+  const x = source()
+  x.schemaOrgProduct = undefined
   x.success = false
   const out = captureShape(x)
   assert.equal(out.captureStatus, 'unavailable')
