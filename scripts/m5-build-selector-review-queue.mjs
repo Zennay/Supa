@@ -13,6 +13,7 @@ const STATUS_ACTION = Object.freeze({
 })
 const HEX_HASH = /^[a-f\d]{64}$/
 const MAX_CHANGES = 200
+const MAX_CAPTURE_SOURCES = 100
 const VERIFIED_SCHEMA_ORG_STATUSES = new Set(['candidate_observation', 'abstain'])
 
 // Reject malformed UTF-16 before UTF-8 hashing: unpaired surrogates are
@@ -47,7 +48,7 @@ export function buildOfflineSelectorReviewQueue(report) {
       report.reviewerActionRequired !== true ||
       typeof report.baselineProvided !== 'boolean' ||
       !Number.isSafeInteger(report.captureCount) || report.captureCount < 0 ||
-      report.captureCount > 100 ||
+      report.captureCount > MAX_CAPTURE_SOURCES ||
       !Number.isSafeInteger(report.driftCount) || report.driftCount < 0 ||
       !Array.isArray(report.changes) || report.changes.length > MAX_CHANGES) invalid()
 
@@ -60,6 +61,7 @@ export function buildOfflineSelectorReviewQueue(report) {
 
   const seen = new Set()
   let foundCurrent = 0
+  let foundBaseline = 0
   let driftCount = 0
   const actions = report.changes.map((change) => {
     if (!change || typeof change !== 'object' || Array.isArray(change) ||
@@ -69,6 +71,13 @@ export function buildOfflineSelectorReviewQueue(report) {
         seen.has(change.id)) invalid()
     seen.add(change.id)
     const { current, baseline, status } = change
+    // A physical M1 historical cohort is independently capped at 100, even
+    // when the union with current sources contains up to 200 distinct IDs.
+    // No-baseline reports must NEVER smuggle historical records inside a
+    // nominally valid P1 unavailable state.
+    if (baseline !== null) {
+      if (!report.baselineProvided || ++foundBaseline > MAX_CAPTURE_SOURCES) invalid()
+    }
     for (const snapshot of [current, baseline]) {
       if (snapshot === null) continue
       if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot) ||
