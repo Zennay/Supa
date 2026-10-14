@@ -18,6 +18,12 @@ export const M3_EXPECTED_RETAILERS = {
   candidate: 'DekaMarkt',
 } as const
 
+const KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,63}$/
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIMESTAMP_PATTERN =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
+const ALLOWED_PRICE_CONTEXTS = new Set<PriceContext>(['in-store', 'online-order'])
+
 export type M3ObservationSide = keyof typeof M3_EXPECTED_RETAILERS
 
 function normalizedRetailerName(value: string) {
@@ -529,8 +535,41 @@ function nonBlank(value: string) {
   return value.trim().length > 0
 }
 
+function validCalendarDate(value: string) {
+  const match = DATE_PATTERN.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
 function validObservedAt(value: string) {
   if (!nonBlank(value)) return null
+
+  const match = TIMESTAMP_PATTERN.exec(value)
+  if (!match || !validCalendarDate(match[1])) return null
+
+  const hour = Number(match[2])
+  const minute = Number(match[3])
+  const second = Number(match[4] ?? '0')
+  if (hour > 23 || minute > 59 || second > 59) return null
+
+  if (match[5] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[5]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return null
+  }
+
   const timestamp = Date.parse(value)
   return Number.isFinite(timestamp) ? timestamp : null
 }
@@ -553,6 +592,25 @@ export function observationSheetReadiness(
     if (!nonBlank(value)) issues.push(`${label} ontbreekt.`)
   }
 
+  if (nonBlank(sheet.study.studyId) && !KEY_PATTERN.test(sheet.study.studyId)) {
+    issues.push('Study ID moet een padveilige sleutel zijn.')
+  }
+  if (
+    nonBlank(sheet.study.participantKey) &&
+    !KEY_PATTERN.test(sheet.study.participantKey)
+  ) {
+    issues.push('Participant key moet een pseudonieme padveilige sleutel zijn.')
+  }
+  if (nonBlank(sheet.study.weekStart) && !validCalendarDate(sheet.study.weekStart)) {
+    issues.push('Week start moet een geldige datum in YYYY-MM-DD-formaat zijn.')
+  }
+  if (
+    nonBlank(sheet.study.priceContext) &&
+    !ALLOWED_PRICE_CONTEXTS.has(sheet.study.priceContext as PriceContext)
+  ) {
+    issues.push('Prijscontext moet in-store of online-order zijn.')
+  }
+
   const observations: Array<[string, M3ObservationSide, StoreObservation]> = [
     ['Winkel A', 'baseline', sheet.baseline],
     ['Winkel B', 'candidate', sheet.candidate],
@@ -572,6 +630,8 @@ export function observationSheetReadiness(
     }
     if (!nonBlank(observation.evidenceId)) {
       issues.push(`${label}: evidence ID ontbreekt.`)
+    } else if (!KEY_PATTERN.test(observation.evidenceId)) {
+      issues.push(`${label}: evidence ID moet een padveilige sleutel zijn.`)
     }
     if (!nonBlank(observation.provenanceNote)) {
       issues.push(`${label}: provenance-notitie ontbreekt.`)
