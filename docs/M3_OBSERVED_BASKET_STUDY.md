@@ -55,6 +55,16 @@ For the GitHub Actions path, dispatch `.github/workflows/m3-observed-week-report
 
 This revision pin is provenance only: it does not make the generated sheet evidence and it does not authorize automated retailer reuse. The genuine observation, shared price context, timestamps and converter/assessment gates below remain mandatory.
 
+## Praktische veldmeting: checklist, review en afwijkingen
+
+De echte [M3-meting met dezelfde 11 boodschappen bij PLUS en DekaMarkt](https://github.com/Zennay/Supa/issues/78) is nog niet voltooid. Gebruik naast dit canonieke contract de volgende **lege werkdocumenten**; zij zijn geen bewijs van een supermarktprijs of besparing:
+
+- [Veldchecklist voor beide winkels](product/m3-field-operator-checklist.md) — wat je vooraf kiest en ter plekke feitelijk vastlegt.
+- [Leeg beslisformulier voor de reviewer](product/m3-field-decision-record-template.md) — bewijsverwijzingen, gedeelde prijscontext, ontbrekende regels en de werkelijke uitslag.
+- [Beslisregels bij verschillen](M3_FIELD_DISCREPANCY_TRIAGE.md) — D01–D12 voor bijvoorbeeld verpakkingsverschillen, ontbrekende producten, prijzen, voorwaarden en twijfel.
+
+Begin pas met echte waarnemingen na het vastleggen van de dan actuele `main`-commit, geldige bron-/toestemmingsafspraken en één vaste prijscontext. De **PLUS- en DekaMarkt-zijde moeten identieke vraag dekken binnen 24 uur**. Sla privébonnen en persoonsgegevens nooit op in Git. Ook een volledig gecontroleerde enkele meting rechtvaardigt geen openbare algemene besparingsclaim of automatische M4-vrijgave.
+
 ## Manual observation sheet
 
 Generate the exact aggregated demand for the current proven four-meal planner fixture before visiting or manually checking two stores:
