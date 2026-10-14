@@ -64,6 +64,8 @@ test('real browser evidence only records localhost URLs, exact GitHub SHAs and f
     'shopping-empty-week.png',
     'shopping-recovered-default.png',
     'shopping-explicit-reset.png',
+    'shopping-reset-desktop.png',
+    'shopping-reset-mobile.png',
   ]) {
     assert.ok(source.includes(`await screenshot(sessionId, '${name}')`), name)
     assert.ok(source.includes(`'${name}'`), name)
@@ -130,7 +132,7 @@ test('archived Firefox image evidence binds every PNG to byte length, dimensions
   assert.match(source, /png\.readUInt32BE\(16\)/)
   assert.match(source, /png\.readUInt32BE\(20\)/)
   assert.match(source, /screenshotIntegrity\.push\(/)
-  assert.match(source, /assert\.equal\(screenshotIntegrity\.length, 7/)
+  assert.match(source, /assert\.equal\(screenshotIntegrity\.length, 9/
   assert.match(source, /screenshotIntegrity,\n/)
   assert.match(source, /retailerDataObserved: false/)
   assert.match(source, /realSavingsClaimEligible: false/)
@@ -148,4 +150,18 @@ test('rendered planner and one-store basket disclose identical Dutch money and u
   assert.match(source, /assert\.equal\(sameBasketCost, basketFinancial\.cost/)
   assert.match(source, /assert\.equal\(afterBudgetOnlyCost\.budgetMax, '30'\)/)
   assert.match(source, /realSavingsClaimEligible: false/)
+})
+
+
+test('rendered desktop/mobile viewport changes preserve the physical basket and nav contract', async () => {
+  const source = await readFile(browserScript, 'utf8')
+  assert.match(source, /checks\.push\('desktop-centered-shell-navigation-and-groceries'\)/)
+  assert.match(source, /checks\.push\('mobile-viewport-return-preserves-exact-groceries'\)/)
+  assert.match(source, /width: 960, height: 760/)
+  assert.match(source, /width: 430, height: 932/)
+  assert.match(source, /desktop\.scrollWidth <= desktop\.width \+ 2/)
+  assert.match(source, /mobile\.scrollWidth <= mobile\.width \+ 2/)
+  assert.match(source, /assert\.deepEqual\(mobile\.rows, canonicalDefaultShoppingRows/)
+  assert.match(source, /assert\.equal\(desktop\.checkedRows, 0\)/)
+  assert.match(source, /assert\.equal\(mobile\.checkedRows, 0\)/)
 })
