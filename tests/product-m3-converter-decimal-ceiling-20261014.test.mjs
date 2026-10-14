@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import { buildFictionalPricedSheet } from '../scripts/m3-rehearse-field-run.mjs'
 import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
+import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
 import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
 
 // Only fictional values. The M3 field evidence gate #78 remains human-only.
@@ -89,4 +90,24 @@ test('unsafe observed pack arithmetic fails closed without inventing a price', (
   assert.equal(rice.status, 'unresolved')
   assert.equal(study.baseline.basket.unresolvedLineCount, 1)
   assert.equal(study.baseline.basket.totalCents, 1000)
+})
+
+test('synthetic exact-pack conversion reaches the canonical private M3 assessment without false arithmetic drift', () => {
+  const sheet = buildFictionalPricedSheet()
+  const riceIndex = sheet.requirements.findIndex(
+    (entry) => entry.amount === 450 && entry.unit === 'g',
+  )
+  sheet.baseline.lines[riceIndex].observedProduct.packAmount = 0.144
+  sheet.baseline.lines[riceIndex].observedProduct.packUnit = 'g'
+  const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+  const report = buildObservedWeekReport(study)
+
+  assert.equal(study.baseline.basket.lines[riceIndex].packs, 3125)
+  assert.equal(report.baselineTotalCents, 313500)
+  assert.equal(report.candidateTotalCents, 990)
+  assert.equal(report.outcome, 'better')
+  assert.equal(report.savingsCents, 313500 - 990)
+  assert.equal(report.publicSavingsClaimEligible, false,
+    'fictional prices never authorize public consumer savings')
+  assert.equal(report.m4BetaEligible, false)
 })
