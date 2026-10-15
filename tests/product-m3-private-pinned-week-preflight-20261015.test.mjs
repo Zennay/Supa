@@ -176,3 +176,20 @@ test('M3 private weekly CLI refuses nonblocking Linux FIFO for either input with
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('M3 pinned weekly preflight rejects >24h, out-of-plan-week and future captures', () => {
+  const tooFar = syntheticStudy()
+  tooFar.candidate.observedAt = '2026-10-16T12:00:00Z'
+  assert.throws(() => evaluate(tooFar), /preflight refused/)
+  const wrongWeek = syntheticStudy()
+  wrongWeek.weekStart = '2026-10-01'
+  assert.throws(() => evaluate(wrongWeek), /preflight refused/)
+  const future = syntheticStudy()
+  future.weekStart = '2035-10-15'
+  future.baseline.observedAt = '2035-10-15T09:00:00Z'
+  future.candidate.observedAt = '2035-10-15T11:00:00Z'
+  assert.throws(() => evaluate(future), /preflight refused/)
+  const invalidWeekDate = syntheticStudy()
+  invalidWeekDate.weekStart = '2026-10-32'
+  assert.throws(() => evaluate(invalidWeekDate), /preflight refused/)
+})
