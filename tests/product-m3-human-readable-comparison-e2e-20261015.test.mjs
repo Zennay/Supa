@@ -16,14 +16,14 @@ const makeHtml = (price, stock = 'InStock') => '<html><script type="application/
       priceCurrency:'EUR',availability:'https://schema.org/'+stock}}) +
   '</script></html>'
 
-async function fixture(t, stock = 'InStock') {
+async function fixture(t, stock = 'InStock', requirements = [{id:'milk',query:'halfvolle melk',amount:1000,unit:'ml'}]) {
   const dir=await mkdtemp(join(tmpdir(),'supa-preview-fullflow-'))
   t.after(()=>rm(dir,{recursive:true,force:true}))
   await writeFile(join(dir,'plus.html'),makeHtml('1.29'))
   await writeFile(join(dir,'deka.html'),makeHtml('1.19',stock))
   const file=join(dir,'manifest.json')
   await writeFile(file,JSON.stringify({version:1,
-    requirements:[{id:'milk',query:'halfvolle melk',amount:1000,unit:'ml'}],
+    requirements,
     snapshots:[
       {sourceId:'plus-product-halfvolle-melk',htmlFile:'plus.html',capturedAt},
       {sourceId:'dekamarkt-product-halfvolle-melk',htmlFile:'deka.html',capturedAt},
@@ -53,4 +53,21 @@ test('actual offline M3 unstocked DekaMarkt HTML abstains from public and privat
   const view=renderPrivateComparison(report)
   assert.match(view,/GEEN VOLLEDIGE MANDVERGELIJKING/)
   assert.doesNotMatch(view,/ALLEEN OFFLINE MANDVERSCHIL/)
+})
+
+test('actual M3 operator view counts one physical pack shared across two ingredients only once',async t=>{
+  const file=await fixture(t,'InStock',[
+    {id:'breakfast-milk',query:'halfvolle melk',amount:400,unit:'ml'},
+    {id:'dinner-milk',query:'halfvolle melk',amount:400,unit:'ml'},
+  ])
+  const report=await compareLocalRetailerSnapshots(file,nowMs)
+  assert.equal(report.comparison.comparable,true)
+  assert.equal(report.comparison.stores.plus.subtotalCents,129)
+  assert.equal(report.comparison.stores.dekamarkt.subtotalCents,119)
+  assert.equal(report.comparison.savingsCents,10)
+  assert.equal(report.comparison.lines[1].plus.packs,0)
+  const preview=renderPrivateComparison(report)
+  assert.match(preview,/onderdeel gedeeld pak \\(niet gratis\\)/)
+  assert.match(preview,/ALLEEN OFFLINE MANDVERSCHIL: DekaMarkt lager €0,10/)
+  assert.doesNotMatch(preview,/GEVERIFIEERDE EUROBESPARING: €0,10/)
 })
