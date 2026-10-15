@@ -124,3 +124,18 @@ test('runner fails closed when pages stop yielding products (layout drift)', asy
   assert.equal(summary.pages, 40)
   store.close()
 })
+
+test('fuzzy matching rejects thin or contradicting name evidence', () => {
+  const p = (id, retailer_id, name, extra = {}) => ({ id, retailer_id, name, brand: 'Huisman', gtins: [], pack_amount: 335, pack_unit: 'g', pack_count: 1, ...extra })
+  const groups = matchProducts([
+    p(1, 'vomar', 'Huisman Zaanse Mosterd', { gtins: ['8710605031024'] }),
+    p(2, 'dirk', 'Huisman Mosterd grof'), // one shared word only
+    p(3, 'vomar', 'Huggies DryNites girl 8-13 jaar', { brand: 'Huggies', gtins: ['5029053527581'], pack_amount: 1, pack_unit: 'piece', pack_count: 9 }),
+    p(4, 'dirk', 'Huggies DryNites girl 8-15 jaar', { brand: 'Huggies', pack_amount: 1, pack_unit: 'piece', pack_count: 9 }),
+    p(5, 'aldi', 'Huisman Mosterd variatie', { pack_text: '300-335 g' }), // multi-variant offer
+  ])
+  for (const id of [2, 4, 5]) {
+    const g = groups.find((x) => x.members.some((m) => m.productId === id))
+    assert.equal(g.members.length, 1, `product ${id} must stay single`)
+  }
+})

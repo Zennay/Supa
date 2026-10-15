@@ -86,6 +86,8 @@ export function parsePack(text) {
     const amount = num(multi[2]) * factor
     if (count > 0 && amount > 0) return { amount: round(amount), unit: base, count }
   }
+  // Ranges ("350-390 g") describe several variants, not one pack.
+  if (/\d\s*[-–]\s*\d+(?:[.,]\d+)?\s*[a-z]/.test(s)) return empty
   const single = SINGLE_RE.exec(s)
   if (single) {
     const [base, factor] = UNIT_MAP.get(single[2].toLowerCase())
@@ -175,6 +177,17 @@ export function nameTokens(name, brand) {
     .replace(new RegExp(`\\b\\d+(?:[.,]\\d+)?\\s*(${UNIT_PATTERN})\\b`, 'g'), ' ')
     .split(' ')
     .filter((t) => t && !NAME_STOPWORDS.has(t) && !brandTokens.has(t) && !/^\d+$/.test(t))
+}
+
+// Numbers that are part of the product identity (age 8-15, 0% fat, 4 kazen),
+// i.e. digits left over after pack sizes are removed.
+export function nameNumbers(name) {
+  return foldText(name)
+    .replace(new RegExp(`\\b\\d+(?:[.,]\\d+)?\\s*(${UNIT_PATTERN})\\b`, 'g'), ' ')
+    .split(' ')
+    .filter((t) => /^\d+$/.test(t))
+    .sort()
+    .join(',')
 }
 
 export function normalizeAvailability(value) {

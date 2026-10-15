@@ -65,7 +65,7 @@ Prijzen zijn altijd de online/webwinkelprijs op het observatiemoment. Ontbreekt 
 ## Matching
 
 1. **EAN (exact):** producten met dezelfde globale EAN zijn hetzelfde artikel, ook via secundaire EAN's. Winkelinterne codes (prefix 02/20–29, gewichtsartikelen) worden nooit gebruikt.
-2. **Merk + inhoud + naam (conservatief):** voor ketens zonder EAN (Dirk, DekaMarkt, ALDI, Lidl). Een product sluit alleen aan bij een cluster als het merk exact gelijk is, de totale inhoud gelijk is (±1%), de naam-tokens voldoende overeenkomen (Dice ≥ 0,6) en er een duidelijke winnaar is (marge ≥ 0,1). Ook mag die keten nog niet in het cluster zitten.
+2. **Merk + inhoud + naam (conservatief):** voor ketens zonder EAN (Dirk, DekaMarkt, ALDI, Lidl). Een product sluit alleen aan bij een cluster als het merk exact gelijk is, de totale inhoud gelijk is (±1%), de naam-tokens voldoende overeenkomen (Dice ≥ 0,75, minstens twee gedeelde woorden tenzij beide namen uit één woord bestaan, en geen afwijkende getallen in de naam zoals 8-13 vs 8-15) en er een duidelijke winnaar is (marge ≥ 0,1). Ook mag die keten nog niet in het cluster zitten.
 3. Anders blijft het product `single`. Een gemiste match is goedkoper dan een verkeerde prijsvergelijking.
 
 Huismerken (PLUS, Dirk "1 de Beste", AH, …) worden dus níet aan elkaar gekoppeld als "vergelijkbaar". Dat is een aparte, latere stap (equivalentie i.p.v. identiteit). Dirk en DekaMarkt delen wel het huismerk "1 de Beste" en worden via merk + inhoud + naam gekoppeld.

@@ -6,9 +6,9 @@
 //    the cluster has no product from that retailer yet, and name tokens are
 //    similar enough with a clear winner. Otherwise it stays on its own:
 //    a missed match is cheaper than a wrong price comparison.
-import { foldText, isGlobalGtin, nameTokens } from './normalize.mjs'
+import { foldText, isGlobalGtin, nameNumbers, nameTokens, parsePack } from './normalize.mjs'
 
-export const FUZZY_MIN_SCORE = 0.6
+export const FUZZY_MIN_SCORE = 0.75
 export const FUZZY_MIN_MARGIN = 0.1
 
 class UnionFind {
@@ -30,6 +30,18 @@ class UnionFind {
   }
 }
 
+// Name similarity, or 0 when the evidence is too thin: a single shared word
+// only counts when both names consist of that one word, and differing
+// identity numbers (age 8-15 vs 8-13, 0% vs 20+) never match.
+export function nameScore(a, b) {
+  if (a.nums && b.nums && a.nums !== b.nums) return 0
+  const setB = new Set(b.tokens)
+  const common = new Set(a.tokens.filter((t) => setB.has(t))).size
+  if (common === 0) return 0
+  if (common === 1 && !(new Set(a.tokens).size === 1 && setB.size === 1)) return 0
+  return dice(a.tokens, b.tokens)
+}
+
 export function dice(a, b) {
   if (!a.length || !b.length) return 0
   const setB = new Set(b)
@@ -41,6 +53,9 @@ export function dice(a, b) {
 
 function packKey(p) {
   if (p.pack_amount === null || p.pack_amount === undefined || !p.pack_unit) return null
+  // Pack texts that do not describe one pack (ranges such as "350-390 g") veto
+  // fuzzy matching even if an older parser stored an amount for them.
+  if (/\d\s*[-–]\s*\d/.test(p.pack_text ?? '') && parsePack(p.pack_text).amount === null) return null
   const total = p.pack_amount * (p.pack_count || 1)
   return { unit: p.pack_unit, total }
 }
@@ -80,6 +95,7 @@ export function matchProducts(products) {
       ...p,
       brandKey: foldText(p.brand),
       tokens: nameTokens(p.name, p.brand),
+      nums: nameNumbers(p.name),
       pack: packKey(p),
     }
     prepared.set(p.id, info)
@@ -120,7 +136,7 @@ export function matchProducts(products) {
       let best = 0
       for (const m of members) {
         if (m.brandKey !== info.brandKey || !samePack(m.pack, info.pack)) continue
-        best = Math.max(best, dice(info.tokens, m.tokens))
+        best = Math.max(best, nameScore(info, m))
       }
       if (best > 0) candidates.push({ root: r, score: best })
     }
@@ -178,7 +194,7 @@ export function matchProducts(products) {
 // Recompute canonical products + matches inside the database.
 export function rebuildMatches(store, { at = new Date().toISOString() } = {}) {
   const rows = store.all(`
-    SELECT p.id, p.retailer_id, p.name, p.brand, p.category, p.pack_amount, p.pack_unit,
+    SELECT p.id, p.retailer_id, p.name, p.brand, p.category, p.pack_text, p.pack_amount, p.pack_unit,
            p.pack_count, group_concat(g.gtin) AS gtins
     FROM products p LEFT JOIN product_gtins g ON g.product_id = p.id
     GROUP BY p.id`)
