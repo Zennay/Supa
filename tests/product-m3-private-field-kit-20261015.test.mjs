@@ -131,3 +131,10 @@ test('blank kit rejects malformed destinations or incomplete data before writing
     await rm(root, { recursive: true, force: true })
   }
 })
+
+
+test('npm field kit command uses local offline generator without contacting retailer', async () => {
+  const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+  assert.equal(packageJson.scripts['m3:prepare-field-kit'],
+    'node --experimental-strip-types scripts/m3-prepare-field-kit.mjs')
+})
