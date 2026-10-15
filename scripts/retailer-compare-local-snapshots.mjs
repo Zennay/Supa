@@ -25,6 +25,13 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
       !Array.isArray(manifest.snapshots) || manifest.snapshots.length < 2 ||
       manifest.snapshots.length > 100) throw new Error('Invalid offline comparison manifest')
 
+  // Requirements and the review clock must be canonical before any of the
+  // potentially 100 bounded HTML source files are opened. Incomplete but
+  // valid quantities still become a safe unknown comparison as before.
+  compareReviewedCatalogs({
+    requirements: manifest.requirements, observations: [], nowMs,
+  })
+
   const observations = []
   const captureSummary = []
   const distinctSources = new Set()
