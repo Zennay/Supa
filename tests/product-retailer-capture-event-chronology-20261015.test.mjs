@@ -64,3 +64,42 @@ test('product: nanosecond-reversed captures with disjoint IDs are rejected', asy
   const after = revisedCatalog(original, '2026-10-14T12:00:00.000000001Z', 'c', 'fake-after')
   assert.throws(() => review(before, after), /Private retailer fact change review refused/)
 })
+
+function withAdditionalCatalogCapture(batch, capturedAt, sha, prefix) {
+  const copy = structuredClone(batch)
+  const catalog = copy.results.find(x => x.accepted && x.key === 'plus:catalog')
+  assert.ok(catalog)
+  const additional = structuredClone(catalog)
+  for (const [i, row] of additional.observations.entries()) {
+    row.sourceProductId = prefix + '-' + i
+    row.provenance.capturedAt = capturedAt
+    row.provenance.sha256 = sha.repeat(64)
+  }
+  copy.results.push(additional)
+  copy.summary.sources++
+  copy.summary.acceptedSources++
+  copy.summary.observations += additional.observations.length
+  copy.summary.retailerCounts.plus += additional.observations.length
+  return copy
+}
+
+test('product: a multi-event catalog archive cannot rewind its latest physical page capture', async () => {
+  const original = await loadReviewedRepositoryFixtures()
+  const before = withAdditionalCatalogCapture(
+    original, '2026-10-14T12:00:00.000000002Z', 'b', 'fake-event-before')
+  const after = withAdditionalCatalogCapture(
+    original, '2026-10-14T12:00:00.000000001Z', 'c', 'fake-event-after')
+  assert.throws(() => review(before, after), /Private retailer fact change review refused/)
+})
+
+test('product: later page event among multiple historical events remains comparable', async () => {
+  const original = await loadReviewedRepositoryFixtures()
+  const before = withAdditionalCatalogCapture(
+    original, '2026-10-13T12:00:00.000000001Z', 'b', 'fake-event-before')
+  const after = withAdditionalCatalogCapture(
+    original, '2026-10-14T12:00:00.000000001Z', 'c', 'fake-event-after')
+  const report = review(before, after)
+  assert.ok(report.currentCaptureEvents > 6)
+  assert.equal(report.publicSavingsClaimEligible, false)
+  assert.equal(report.externalRequests, 0)
+})
