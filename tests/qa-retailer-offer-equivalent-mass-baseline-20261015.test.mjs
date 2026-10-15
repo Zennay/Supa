@@ -29,7 +29,7 @@ function neverPublic(report) {
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.equal(report.externalRequests, 0)
   assert.doesNotMatch(JSON.stringify(report),
-    /113651|Bananen|https?:\\/\\/|sourceProductId|currentPriceCents|offerPriceCents/i)
+    /113651|Bananen|https?:|sourceProductId|currentPriceCents|offerPriceCents/i)
 }
 
 test('historical control: matching original gram facts corroborate only the private baseline', async () => {
