@@ -134,9 +134,30 @@ export async function writeM3FieldKit(destination, kit) {
   const expectedFiles = [
     'collection-sheet.json', 'field-form.html', 'source-revision.json', 'START-HERE.txt',
   ]
-  if (!kit || typeof kit !== 'object' ||
-      Object.keys(kit).length !== expectedFiles.length ||
-      expectedFiles.some((file) => typeof kit[file] !== 'string')) {
+  // Snapshot exactly the four OWN data properties once. A caller-provided
+  // accessor (or Proxy get trap) must not swap canonical bytes between
+  // validation and writeFile. The final output uses ONLY this pinned snapshot.
+  // Descriptor reflection may itself trap; fail closed without echoing
+  // untrusted private values or exception text.
+  const pinned = Object.create(null)
+  try {
+    if (!kit || typeof kit !== 'object' || Array.isArray(kit)) {
+      throw new Error('invalid kit object')
+    }
+    const keys = Reflect.ownKeys(kit)
+    if (keys.length !== expectedFiles.length ||
+        keys.some((key) => typeof key !== 'string' || !expectedFiles.includes(key))) {
+      throw new Error('unexpected kit fields')
+    }
+    for (const file of expectedFiles) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(kit, file)
+      if (!descriptor || !Object.hasOwn(descriptor, 'value') ||
+          typeof descriptor.value !== 'string') {
+        throw new Error('unsafe kit field')
+      }
+      pinned[file] = descriptor.value
+    }
+  } catch {
     throw new Error('incomplete blank M3 field kit')
   }
   // The exported writer must not accept prefilled or substituted "blank"
@@ -145,7 +166,7 @@ export async function writeM3FieldKit(destination, kit) {
   // authenticates that revision against its current clean Git main checkout.
   let companion
   try {
-    companion = JSON.parse(kit['source-revision.json'])
+    companion = JSON.parse(pinned['source-revision.json'])
     assertRevision({
       branch: companion.sourceBranch,
       sha: companion.sourceCommitSha,
@@ -156,7 +177,7 @@ export async function writeM3FieldKit(destination, kit) {
   const canonical = buildM3FieldKit({
     branch: companion.sourceBranch, sha: companion.sourceCommitSha,
   })
-  if (expectedFiles.some((file) => kit[file] !== canonical[file])) {
+  if (expectedFiles.some((file) => pinned[file] !== canonical[file])) {
     throw new Error('refusing modified or prefilled M3 field kit')
   }
   const output = resolve(destination)
@@ -174,7 +195,7 @@ export async function writeM3FieldKit(destination, kit) {
   await mkdir(output, { mode: 0o700 })
   try {
     for (const file of expectedFiles) {
-      await writeFile(join(output, file), kit[file], {
+      await writeFile(join(output, file), pinned[file], {
         encoding: 'utf8', flag: 'wx', mode: 0o600,
       })
     }
