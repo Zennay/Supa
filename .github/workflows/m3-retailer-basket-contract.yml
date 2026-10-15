@@ -1,0 +1,43 @@
+name: M3 canonical retailer capture and offline basket validation
+
+on:
+  pull_request:
+    paths:
+      - "scripts/retailer-m3-authorized-22-capture.mjs"
+      - "scripts/retailer-m3-offline-22-snapshots.mjs"
+      - "tests/product-m3-22-authorized-retailer-capture.test.mjs"
+      - "tests/product-m3-offline-22-local-snapshots.test.mjs"
+      - ".github/workflows/m3-retailer-basket-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supa-m3-retailer-basket-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-offline-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Locked dependency graph
+        run: npm ci
+      - name: Dependency vulnerability gate
+        run: npm audit --audit-level=high
+      - name: Canonical retailer capture + local 22 HTML safety tests
+        run: node --experimental-strip-types --test tests/product-m3-22-authorized-retailer-capture.test.mjs tests/product-m3-offline-22-local-snapshots.test.mjs
+      - name: M1 matching invariants
+        run: npm run m1:matching-benchmark
+      - name: Source rights still correctly gated
+        run: npm run m1:source-permission-gate
+      - name: TypeScript and Vite production build
+        run: npm run build
