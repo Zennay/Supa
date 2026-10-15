@@ -15,8 +15,8 @@ function proposal(html,time=whenA,retailer='plus'){
     capturedAt:time,
   }})
 }
-const original='<article class="product-card"><span class="product-title"></span><b class="price-value"></b></article>'
-const modified='<article class="item-card"><span class="product-name"></span><b class="price-value"></b><i class="offer-deal"></i></article>'
+const original='<article class="product-card"><span class="product-title"></span><p class="price-value"></p></article>'
+const modified='<article class="item-card"><span class="product-name"></span><p class="price-value"></p><span class="offer-deal"></span></article>'
 const cli=(...args)=>spawnSync(process.execPath,
   [new URL('../scripts/retailer-private-selector-drift.mjs',import.meta.url).pathname,...args],
   {encoding:'utf8',timeout:20000,maxBuffer:2*1024*1024})
