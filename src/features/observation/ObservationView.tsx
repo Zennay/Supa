@@ -41,6 +41,7 @@ import {
   observationRequiredFieldLabels,
 } from './observationRequiredLineField.ts'
 import { observationVisibleRows } from './observationVisibleRows.ts'
+import { downloadBlankM3PaperWorksheet } from './downloadBlankM3PaperWorksheet.ts'
 
 type Side = 'baseline' | 'candidate'
 type StudyTextField = Exclude<
@@ -106,6 +107,7 @@ export function ObservationView() {
   const [draftPersistenceFailed, setDraftPersistenceFailed] = useState(false)
   const [draftResetRemovalFailed, setDraftResetRemovalFailed] = useState(false)
   const [showOnlyOpenLines, setShowOnlyOpenLines] = useState(false)
+  const [paperRevision, setPaperRevision] = useState('')
   // Never overwrite stored observations that this version cannot safely read.
   // The normal sheet is still usable in memory, but auto-save is quarantined.
   const [draftRecoveryNeeded, setDraftRecoveryNeeded] = useState<boolean>(() => {
@@ -417,6 +419,27 @@ export function ObservationView() {
     }))
   }
 
+  const downloadPaperWorksheet = () => {
+    // A version is operator-provided only; never infer HEAD or read draft
+    // storage. Reject malformed values BEFORE producing any paper file.
+    if (paperRevision !== '' && !/^[0-9a-f]{40}$/.test(paperRevision)) {
+      setImportStatus({
+        kind: 'error',
+        message: 'Codeversie ongeldig: vul exact 40 kleine hextekens in (0-9, a-f), of laat leeg en vul het papieren vakje later zelf in.',
+      })
+      return
+    }
+    // Generates only the canonical blank 11+11 paper worksheet, not the
+    // current person's private draft, prices, provenance or participant key.
+    const started = downloadBlankM3PaperWorksheet(paperRevision)
+    setImportStatus({
+      kind: started ? 'success' : 'error',
+      message: started
+        ? 'Het lege PLUS- en DekaMarkt-veldformulier wordt gedownload. Controleer of het bestand is opgeslagen. Print A4 liggend op 100% (precies twee bladen). De opgegeven softwareversie is niet automatisch geverifieerd; dit is geen meetbewijs.'
+        : 'Het lege veldformulier kon niet worden gedownload. Je huidige meetconcept is niet veranderd.',
+    })
+  }
+
   const downloadDraft = () => {
     let href: string | null = null
     let anchor: HTMLAnchorElement | null = null
@@ -547,6 +570,35 @@ export function ObservationView() {
         <small className="observation-field-hint">
           Dit filter verandert geen meetgegevens. Toon alle regels om een eerdere meting aan te passen.
         </small>
+        <div className="observation-paper-tools">
+          <label htmlFor="m3-paper-revision">
+            Codeversie voor veldformulier (optioneel; exacte Git commit SHA)
+          </label>
+          <input
+            id="m3-paper-revision"
+            type="text"
+            data-observation-paper-revision
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={40}
+            placeholder="40 kleine hextekens of leeg laten"
+            value={paperRevision}
+            onChange={(event) => setPaperRevision(event.target.value)}
+          />
+          <button
+            className="ghost-button"
+            type="button"
+            data-observation-paper-worksheet
+            onClick={downloadPaperWorksheet}
+          >
+            Download leeg veldformulier (PLUS + DekaMarkt)
+          </button>
+          <small className="observation-field-hint">
+            Twee lege A4-liggende bladen met dezelfde 11 boodschappen. De codeversie
+            wordt niet automatisch gecontroleerd tegen GitHub. Er worden geen
+            ingevulde metingen of prijzen meegestuurd; dit is geen meetbewijs.
+          </small>
+        </div>
         <p>
           Vul alleen gegevens in die je zelf hebt waargenomen. Een aparte controle
           moet daarna bepalen of beide winkelmetingen echt vergelijkbaar zijn.

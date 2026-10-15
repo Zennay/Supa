@@ -1,110 +1,12 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { buildObservationSheet, M3_EXPECTED_RETAILERS } from '../src/domain/m3ObservationSheet.ts'
+import { renderM3PaperChecklist } from '../src/features/observation/m3PaperWorksheet.ts'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 
-function htmlText(value) {
-  return String(value).replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[char])
-}
-function validatedRequirements(sheet) {
-  const items = sheet.requirements
-  if (!Array.isArray(items) || items.length !== 11) throw new Error('Expected 11 M3 requirements')
-  const seen = new Set()
-  for (const item of items) {
-    if (!item || typeof item.id !== 'string' || !item.id.trim() ||
-      seen.has(item.id) || typeof item.label !== 'string' ||
-      !item.label.trim() || !['g','kg','ml','l','piece'].includes(item.unit) ||
-      !Number.isFinite(item.amount) || item.amount <= 0) {
-      throw new Error('Invalid M3 paper requirement')
-    }
-    seen.add(item.id)
-  }
-  for (const side of ['baseline', 'candidate']) {
-    const lines = sheet[side]?.lines
-    if (!Array.isArray(lines) || lines.length !== items.length) {
-      throw new Error('Inconsistent M3 store rows')
-    }
-    for (let i = 0; i < items.length; i += 1) {
-      if (lines[i]?.ingredientId !== items[i].id ||
-        lines[i]?.ingredientLabel !== items[i].label ||
-        lines[i]?.requirement?.amount !== items[i].amount ||
-        lines[i]?.requirement?.unit !== items[i].unit) {
-        throw new Error('Store rows disagree with canonical M3 demand')
-      }
-    }
-  }
-  return items
-}
-function paperPage(side, items, fieldRunCommitSha) {
-  const store = htmlText(M3_EXPECTED_RETAILERS[side])
-  const cells = items.map((item, i) => {
-    const unit = item.unit === 'piece' ? (item.amount === 1 ? 'stuk' : 'stuks') : item.unit
-    return '<tr data-m3-row="' + (i + 1) + '"><td><strong>' +
-      (i + 1) + '. ' + htmlText(item.label) +
-      '</strong><small>Benodigd: ' + htmlText(item.amount + ' ' + unit) +
-      '</small></td><td></td><td></td><td></td><td></td><td>☐ ja ☐ nee ☐ onbekend</td></tr>'
-  }).join('\n')
-  return '<section class="page" data-m3-side="' + side + '">' +
-    '<p>SUPA M3 · veldmeting · blad ' + (side === 'baseline' ? '1/2' : '2/2') +
-    ' · Codeversie (SHA-40, door operator opgegeven): ' +
-    (fieldRunCommitSha ? htmlText(fieldRunCommitSha) : '__________________') + '</p>' +
-    '<h1>' + store + ' — dezelfde 11 boodschappen</h1>' +
-    '<p>Noteer alleen werkelijk geobserveerde waarden en laat onbekende gegevens leeg. Onbekend betekent nog niet onderzocht; niet verkrijgbaar is pas nee na controle.</p>' +
-    '<p>Gedeelde studiegegevens moeten op beide bladen gelijk zijn; gebruik alleen pseudonieme sleutels. Winkel-ID en bewijs-ID zijn per winkel verschillend.</p>' +
-    '<div class="metadata"><p>Studie-ID (zelfde beide bladen): __________________</p>' +
-    '<p>Deelnemercode (pseudoniem, geen naam/e-mail): __________________</p>' +
-    '<p>Doelgroep: _________________________</p>' +
-    '<p>Regio: _________________________</p>' +
-    '<p>Week vanaf (maandag): __________________________</p>' +
-    '<p>Prijscontext: ☐ in-store ☐ online-order (dezelfde bij beide winkels)</p>' +
-    '<p>Winkel-ID (uniek per winkel): __________________</p>' +
-    '<p>Filiaal / winkelnaam: __________________</p>' +
-    '<p>Bewijs-ID (uniek per meting): __________________</p>' +
-    '<p>Datum, tijd en tijdzone: __________________</p>' +
-    '<p>Bron: ☐ winkelmand ☐ bon ☐ toegestane export</p>' +
-    '<p>Herkomstnotitie (wat, waar, hoe): __________________</p></div>' +
-    '<table><thead><tr><th>Ingrediënt/behoefte</th><th>Gevonden product</th>' +
-    '<th>Inhoud per stuk (getal + eenheid)</th><th>Stuks per verkoopverpakking</th>' +
-    '<th>Prijs per verkoopverpakking (€)</th><th>Beschikbaar?</th></tr></thead><tbody>' +
-    cells + '</tbody></table>' +
-    '<p>Ja: product en prijs werkelijk gezien. Nee: gecontroleerd en niet verkrijgbaar. Onbekend: niet gecontroleerd.</p>' +
-    '<p>Bij nee en onbekend geen product of prijs invullen.</p>' +
-    '<p>Per verkrijgbaar product: noteer de inhoud per los stuk (g/kg/ml/l/stuk), het aantal stuks IN één verkoopverpakking (1 bij enkelpak; meer alleen bij multipack), en de prijs van die hele verkoopverpakking. NIET het aantal te kopen pakken; SUPA berekent dat.</p>' +
-    '<p>Herkomst / productlink / aanbieding / twijfel: __________________________________________________</p>' +
-    '<p>___________________________________________________________________________________________</p>' +
-    '<footer>Leeg invulblad; geen bewijs of besparingsclaim. Neem echte bevindingen over in SUPA Meten.</footer>' +
-    '</section>'
-}
-export function renderM3PaperChecklist(fieldRunCommitSha = '') {
-  // A printed revision is a human-supplied record, not an authenticated git
-  // attestation. Never infer the running process's HEAD or fabricate a SHA.
-  if (fieldRunCommitSha !== '' &&
-      (typeof fieldRunCommitSha !== 'string' || !/^[0-9a-f]{40}$/.test(fieldRunCommitSha))) {
-    throw new Error('Invalid M3 field-run commit SHA')
-  }
-  const requirements = validatedRequirements(buildObservationSheet())
-  const css = '@page{size:A4 landscape;margin:10mm}' +
-    'body{font:12px/1.2 Arial,sans-serif;color:#111;margin:0}' +
-    '.page{break-after:page;page-break-after:always}.page:last-child{break-after:auto;page-break-after:auto}' +
-    '.metadata{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px 16px;margin:9px 0}' +
-    '.metadata p{margin:1px 0}.page>p{margin:2px 0}h1{font-size:22px;margin:4px 0}' +
-    'table{width:100%;border-collapse:collapse;table-layout:fixed}' +
-    'th,td{border:1px solid #555;padding:2px;text-align:left;vertical-align:top}' +
-    'th{background:#eee}th:first-child{width:25%}th:nth-child(2){width:20%}' +
-    'th:nth-child(3){width:17%}th:nth-child(4){width:12%}th:nth-child(5){width:12%}th:last-child{width:14%}' +
-    'td{height:26px}td small{display:block}td:last-child{white-space:nowrap;font-size:10px}' +
-    'footer{border-top:1px solid #777;padding:5px 0;font-size:10px}' +
-    '@media screen{body{background:#eee}.page{background:#fff;max-width:1200px;padding:24px;margin:16px auto}}'
-  return '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<title>SUPA M3 printformulier</title><style>' + css + '</style></head><body>' +
-    paperPage('baseline', requirements, fieldRunCommitSha) +
-    paperPage('candidate', requirements, fieldRunCommitSha) +
-    '</body></html>\n'
-}
+// The same blank canonical A4 output is reused by the browser Meten screen.
+export { renderM3PaperChecklist } from '../src/features/observation/m3PaperWorksheet.ts'
+
 export async function main(argv = process.argv.slice(2)) {
   let output = null
   let fieldRunCommitSha = ''
