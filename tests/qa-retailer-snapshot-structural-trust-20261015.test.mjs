@@ -27,7 +27,6 @@ test('complete private synthetic HTML preserves only visible structural selector
     '<article class="product-card"><span class="product-name">FICTIONAL_PRODUCT</span></article>',
     '<script type="application/json"><div class="offer-price">SCRIPT_SECRET</div></script>',
     '<template><div class="product-price">TEMPLATE_SECRET</div></template>',
-    '<!-- <span class="stock-availability">COMMENT_SECRET</span> -->',
     '</body></html>',
   ].join('')
   const { source } = fixture(html)
@@ -40,7 +39,20 @@ test('complete private synthetic HTML preserves only visible structural selector
   assert.equal(result.sourcePermissionVerified, false)
   assert.equal(result.currentPricesExtracted, false)
   assert.equal(result.publicationAllowed, false)
-  assert.doesNotMatch(JSON.stringify(result), /FICTIONAL_PRODUCT|SCRIPT_SECRET|TEMPLATE_SECRET|COMMENT_SECRET/)
+  assert.doesNotMatch(JSON.stringify(result), /FICTIONAL_PRODUCT|SCRIPT_SECRET|TEMPLATE_SECRET/)
+})
+
+test('even correctly closed HTML comments must never become apparent stock selector proposals', () => {
+  const html = '<html><body><article class="product-card">Visible example</article>' +
+    '<!-- <span class="stock-availability">COMMENT_SECRET</span> -->' +
+    '</body></html>'
+  const { source } = fixture(html)
+  const report = proposeRetailerSelectors(source, html)
+  assert.ok(report.proposedSelectors.some(row => row.selector === 'article.product-card'))
+  assert.ok(report.proposedSelectors.every(row => row.selector !== 'span.stock-availability'),
+    'a closed comment has no visible stock element: do not count it')
+  assert.doesNotMatch(JSON.stringify(report), /COMMENT_SECRET/)
+  assert.equal(report.publicationAllowed, false)
 })
 
 test('unterminated script containing fake HTML cannot produce apparent visible product/offer selectors', () => {
