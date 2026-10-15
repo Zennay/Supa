@@ -154,11 +154,11 @@ export async function loadReviewedRepositoryFixtures() {
   return ingestReviewedBatch(records)
 }
 
-export async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), writeOutput = text => process.stdout.write(text)) {
   if (argv.length !== 0) throw new Error('Usage: node --experimental-strip-types scripts/retailer-reviewed-ingest-engine.mjs')
   const { summary } = await loadReviewedRepositoryFixtures()
   // Aggregate-only output; no price, product, person, URL or proxy is logged.
-  process.stdout.write(JSON.stringify(summary, null, 2) + '\n')
+  writeOutput(JSON.stringify(summary, null, 2) + '\n')
   if (summary.rejectedSources !== 0 || summary.acceptedSources !== 6) {
     process.exitCode = 2
   }
