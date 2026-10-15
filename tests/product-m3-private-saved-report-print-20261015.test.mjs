@@ -9,6 +9,7 @@ import {
   main,
   renderPrintablePrivateShoppingChecklist,
 } from '../scripts/retailer-private-shopping-checklist-html.mjs'
+import { compareLocalRetailerSnapshots } from '../scripts/retailer-compare-local-snapshots.mjs'
 
 const product = (price, shop) => ({
   status: 'matched', productId: 'fake-' + shop, productName: 'Fictief havermout',
@@ -56,6 +57,48 @@ test('saved offline JSON -> identical print lists with two stores and 0600 outpu
   assert.match(actual, /id="view-plus">Alleen PLUS/)
   assert.match(actual, /id="view-deka">Alleen DekaMarkt/)
   assert.doesNotMatch(actual, /secret-label|token=hidden|https:\/\/source\.invalid/)
+})
+
+const fictionalProductHtml = price =>
+  '<html><script type="application/ld+json">' + JSON.stringify({
+    '@type': 'Product', sku: 'fictional-oat-milk',
+    name: 'Fictieve halfvolle melk', weight: { value: '1000 ml' },
+    offers: { '@type': 'Offer', price, priceCurrency: 'EUR',
+      availability: 'https://schema.org/InStock' },
+  }) + '</script></html>'
+
+test('actual local fake HTML -> saved report -> remove original captures -> private print works', async t => {
+  const { dir } = await fixture(t)
+  const plus = join(dir, 'plus.html')
+  const deka = join(dir, 'deka.html')
+  const manifest = join(dir, 'snapshots.json')
+  await writeFile(plus, fictionalProductHtml('1.29'))
+  await writeFile(deka, fictionalProductHtml('1.19'))
+  const capturedAt = new Date(Date.now() - 30_000).toISOString()
+  await writeFile(manifest, JSON.stringify({
+    version: 1,
+    requirements: [{ id: 'milk', query: 'halfvolle melk', amount: 1500, unit: 'ml' }],
+    snapshots: [
+      { sourceId: 'plus-product-halfvolle-melk', htmlFile: 'plus.html', capturedAt },
+      { sourceId: 'dekamarkt-product-halfvolle-melk', htmlFile: 'deka.html', capturedAt },
+    ],
+  }))
+  const inspected = await compareLocalRetailerSnapshots(manifest)
+  const saved = join(dir, 'actual-offline-snapshot-report.json')
+  const payload = JSON.stringify(inspected)
+  await writeFile(saved, payload)
+  await rm(plus)
+  await rm(deka)
+  await rm(manifest)
+  const output = join(dir, 'restored-print.html')
+  const html = await main(['--report', saved, '--output', output])
+  assert.equal(html, renderPrintablePrivateShoppingChecklist(inspected))
+  assert.match(html, /2 hele verpakking/)
+  assert.match(html, /ALLEEN OFFLINE TOTAAL PLUS: €2,58/)
+  assert.match(html, /ALLEEN OFFLINE TOTAAL DekaMarkt: €2,38/)
+  assert.match(html, /Geen live prijzen/)
+  assert.equal(await readFile(saved, 'utf8'), payload)
+  assert.equal((await stat(output)).mode & 0o777, 0o600)
 })
 
 test('saved incomplete shop does not turn a partial subtotal into a whole basket', async t => {
