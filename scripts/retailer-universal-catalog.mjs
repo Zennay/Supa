@@ -3,6 +3,44 @@ import { validateRawProductObservation } from '../src/data/ingestion.ts'
 // All source formats are normalized by the existing strict retailer adapters
 // BEFORE entering this unified internal schema. This registry NEVER claims a
 // licensed/public catalog, and never merges two retailers by a fuzzy name.
+/**
+ * Direct callers can bypass six strict source adapters. Admit only real civil
+ * ISO clocks and compare PHYSICAL capture instants, including 1–9 decimal
+ * digits that Date.parse would otherwise truncate below milliseconds.
+ * This remains an offline provenance check, never permission to use prices.
+ */
+function physicalCaptureNanoseconds(capturedAt) {
+  const parts = typeof capturedAt === 'string'
+    ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2})$/.exec(capturedAt)
+    : null
+  if (!parts) throw new Error('Invalid retailer capture calendar or timestamp')
+  const year = Number(parts[1]), month = Number(parts[2]), day = Number(parts[3])
+  const calendar = new Date(Date.UTC(year, month - 1, day))
+  if (calendar.getUTCFullYear() !== year ||
+      calendar.getUTCMonth() !== month - 1 ||
+      calendar.getUTCDate() !== day ||
+      Number(parts[4]) > 23 || Number(parts[5]) > 59 ||
+      Number(parts[6] ?? 0) > 59) {
+    throw new Error('Invalid retailer capture calendar or timestamp')
+  }
+  const timezone = parts[8]
+  if (timezone !== 'Z') {
+    const [hours, minutes] = timezone.slice(1).split(':').map(Number)
+    if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) {
+      throw new Error('Invalid retailer capture UTC offset')
+    }
+  }
+  const millis = Date.parse(capturedAt)
+  if (!Number.isFinite(millis)) throw new Error('Invalid retailer capture instant')
+  const fractional = (parts[7] ?? '').padEnd(9, '0')
+  const nanos = BigInt(millis) * 1_000_000n +
+    BigInt(fractional.slice(3) || '0')
+  if (nanos > BigInt(Date.now()) * 1_000_000n) {
+    throw new Error('Future retailer capture instant')
+  }
+  return nanos
+}
+
 function safeId(value) {
   return typeof value === 'string' && /^[a-zA-Z0-9._-]{1,160}$/.test(value)
 }
@@ -17,10 +55,9 @@ function normalizedObservation(value) {
       origin.port || origin.searchParams.has('access_token')) {
     throw new Error('Untrusted retailer capture source URL')
   }
-  const captured = Date.parse(value.provenance.capturedAt)
-  if (!Number.isFinite(captured) || captured > Date.now()) {
-    throw new Error('Future or invalid retailer capture instant')
-  }
+  // Strict direct API admission: Date.parse alone normalizes impossible
+  // days such as February 30 and drops submillisecond source chronology.
+  physicalCaptureNanoseconds(value.provenance.capturedAt)
   const safeCents = n => n === null ||
     (Number.isSafeInteger(n) && n >= 0)
   if (!safeCents(value.currentPriceCents) ||
@@ -96,12 +133,16 @@ export function buildUniversalRetailerCatalog(batch) {
     }
   }
   const products = [...groups.values()].map(entry => {
-    const captures = entry.captures.sort((a, b) =>
+    const captures = entry.captures.sort((a, b) => {
+      const aTime = physicalCaptureNanoseconds(a.capturedAt)
+      const bTime = physicalCaptureNanoseconds(b.capturedAt)
+      return (aTime < bTime ? -1 : aTime > bTime ? 1 : 0) ||
       a.capturedAt.localeCompare(b.capturedAt) ||
       a.snapshotSha256.localeCompare(b.snapshotSha256) ||
       a.sourceKind.localeCompare(b.sourceKind) ||
       a.sourceUrl.localeCompare(b.sourceUrl) ||
-      truthSignature(a).localeCompare(truthSignature(b)))
+      truthSignature(a).localeCompare(truthSignature(b))
+    })
     const facts = new Set(captures.map(truthSignature))
     return {
       ...entry,
