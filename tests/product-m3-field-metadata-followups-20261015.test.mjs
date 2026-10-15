@@ -160,3 +160,45 @@ test('CLI retailer-only text shows common study + selected-store follow-ups, nev
   }
   assert.equal(await readFile(path, 'utf8'), original)
 })
+
+test('available product rows identify exact missing fields without disclosing observed product data', async t => {
+  const sheet = fictionalCompleteMetadata()
+  sheet.baseline.lines[0].observedProduct = {
+    productId: 'private_sku', productName: 'PRIVATE_PRODUCT_NAME_AND_PRICE',
+    packAmount: 450, packUnit: 'g', packCount: 1,
+    priceCents: null, available: true, sourceUrl: '', note: '',
+  }
+  sheet.candidate.lines[0].observedProduct = {
+    productId: '', productName: '\u2800',
+    packAmount: 0, packUnit: 'unknown', packCount: 1,
+    priceCents: null, available: true, sourceUrl: '', note: '',
+  }
+  const report = collect(sheet)
+  assert.deepEqual(report.retailers[0].pending[0].missingFields, ['priceCents'])
+  assert.deepEqual(report.retailers[1].pending[0].missingFields, [
+    'productName', 'packAmount', 'packUnit', 'priceCents',
+  ])
+  assert.equal(report.remainingTotalLines, 2)
+  assert.equal(report.readyForPrivateReview, false)
+  assert.equal(JSON.stringify(report).includes('PRIVATE_PRODUCT_NAME_AND_PRICE'), false)
+
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-operator-hint-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const path = join(dir, 'fictional.json')
+  await writeFile(path, JSON.stringify(sheet), { mode: 0o600 })
+  const plus = spawnSync(process.execPath,
+    ['--experimental-strip-types', CLI, path, '--text', '--store', 'plus'],
+    { cwd: dir, encoding: 'utf8', timeout: 20_000 })
+  const deka = spawnSync(process.execPath,
+    ['--experimental-strip-types', CLI, path, '--text', '--store', 'dekamarkt'],
+    { cwd: dir, encoding: 'utf8', timeout: 20_000 })
+  assert.equal(plus.status, 0, plus.stderr)
+  assert.equal(deka.status, 0, deka.stderr)
+  assert.match(plus.stdout, /nog nodig: Prijs per verpakking/)
+  assert.doesNotMatch(plus.stdout, /nog nodig: Productnaam/)
+  assert.match(deka.stdout, /nog nodig: Productnaam, Verpakkingshoeveelheid, Verpakkingseenheid, Prijs per verpakking/)
+  for (const view of [plus.stdout, deka.stdout]) {
+    assert.equal(view.includes('PRIVATE_PRODUCT_NAME_AND_PRICE'), false)
+    assert.equal(view.includes(privateMarker), false)
+  }
+});
