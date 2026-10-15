@@ -5,6 +5,18 @@ import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024
 
+// Rejecting the HTTP status, origin or headers before getReader() must
+// terminate the response body too. Without an explicit cancel, fetch may
+// continue downloading an oversized or untrusted stream in the background.
+async function cancelRejectedBody(response) {
+  try {
+    await response?.body?.cancel?.('retailer response rejected before streaming')
+  } catch {
+    // Keep the original response-validation error. Some synthetic/mock or
+    // already-closed streams reject cancellation.
+  }
+}
+
 /**
  * Network boundary for source-approved collection only. Disabled by default.
  * No public proxy use, circumvention, cookie/auth transport, recursive crawling,
@@ -51,17 +63,21 @@ export async function fetchAuthorizedRetailerHtml({
   })
   if (!response || response.url !== source.url || !response.ok ||
       response.status === 403 || response.status === 429) {
+    await cancelRejectedBody(response)
     throw new Error('Authorized retailer response unavailable')
   }
   if (!/^text\/html(?:\s*;|$)/i.test(response.headers?.get?.('content-type') ?? '')) {
+    await cancelRejectedBody(response)
     throw new Error('Authorized response is not HTML')
   }
   const declared = response.headers?.get?.('content-length')
   if (declared !== null && declared !== undefined &&
       (!/^\d+$/.test(declared) || Number(declared) > maxBytes)) {
+    await cancelRejectedBody(response)
     throw new Error('Authorized response exceeds byte limit')
   }
   if (!response.body?.getReader) {
+    await cancelRejectedBody(response)
     throw new Error('Bounded response streaming is required')
   }
 
