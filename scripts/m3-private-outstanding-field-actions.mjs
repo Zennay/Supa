@@ -65,6 +65,7 @@ function assertUnrepairedObservedFacts(serialized) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('private M3 draft has invalid root')
   }
+  const unavailableDetails = { baseline: 0, candidate: 0 }
   for (const side of ['baseline', 'candidate']) {
     const store = raw[side]
     if (!store || typeof store !== 'object' || Array.isArray(store) ||
@@ -82,20 +83,21 @@ function assertUnrepairedObservedFacts(serialized) {
           (!Number.isSafeInteger(product.packCount) || product.packCount < 1)) {
         throw new Error('private M3 draft has invalid observed pack count')
       }
-      // The Meten UI clears physical product and price details when an item is
-      // explicitly unavailable. An externally edited draft must not be marked
-      // completed while contradicting that absence with a product, pack or price.
-      // User notes/URLs remain allowed to explain genuine unavailability.
+      // The browser sometimes restores stale product details when availability
+      // changes to false. Keep the explicit unavailability (as canonical UI
+      // restoration does), but make the inconsistency visible for a human check.
+      // This cannot make the draft private-review-ready, and emits no raw facts.
       if (product.available === false &&
           ((typeof product.productName === 'string' && product.productName.trim() !== '') ||
            (typeof product.productId === 'string' && product.productId.trim() !== '') ||
            (product.packAmount !== null && product.packAmount !== undefined) ||
            (product.packUnit !== null && product.packUnit !== undefined) ||
            (product.priceCents !== null && product.priceCents !== undefined))) {
-        throw new Error('private M3 draft contradicts observed unavailability')
+        unavailableDetails[side] += 1
       }
     }
   }
+  return unavailableDetails
 }
 
 export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date.now()) {
@@ -103,7 +105,7 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
       referenceNowMs < 0) {
     throw new Error('invalid private M3 draft input or reference clock')
   }
-  assertUnrepairedObservedFacts(serialized)
+  const unavailableDetails = assertUnrepairedObservedFacts(serialized)
   const sheet = restoreObservationSheetDraft(serialized)
   if (!sheet) throw new Error('private M3 draft is not a canonical collection sheet')
 
@@ -147,9 +149,12 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
   const windowState = window.state
   const observationWindowExpired = window.state === 'single-observation' &&
     Date.parse(window.deadlineAt) < referenceNowMs
-  const pendingMetadata = pendingM3Metadata(readiness, windowState, observationWindowExpired)
+  const pendingMetadata = pendingM3Metadata(
+    readiness, windowState, observationWindowExpired, unavailableDetails,
+  )
   const readyForPrivateReview = plus.remainingLines === 0 &&
-    dekamarkt.remainingLines === 0 && readiness.ready
+    dekamarkt.remainingLines === 0 && readiness.ready &&
+    unavailableDetails.baseline === 0 && unavailableDetails.candidate === 0
 
   return {
     schemaVersion: 1,
@@ -161,6 +166,10 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
     observationWindowState: windowState,
     observationWindowExpired,
     pendingMetadata,
+    unavailableDetailWarnings: {
+      plus: unavailableDetails.baseline,
+      dekamarkt: unavailableDetails.candidate,
+    },
     pendingMetadataCount: pendingMetadata.study.length +
       pendingMetadata.plus.length + pendingMetadata.dekamarkt.length,
     expectedTotalLines: 22,
@@ -188,7 +197,7 @@ const PRIVATE_RETAILER_METADATA = [
   ['observedAt', 'Waarnemingstijd met tijdzone', 'geldige observatietijd ontbreekt.'],
 ]
 
-function pendingM3Metadata(readiness, windowState, observationWindowExpired) {
+function pendingM3Metadata(readiness, windowState, observationWindowExpired, unavailableDetails) {
   const issues = new Set(readiness.issues)
   const study = PRIVATE_STUDY_METADATA
     .filter(([, , reasons]) => reasons.some(reason => issues.has(reason)))
@@ -211,6 +220,12 @@ function pendingM3Metadata(readiness, windowState, observationWindowExpired) {
   if (windowState === 'outside-window' || observationWindowExpired) {
     study.push({ field: 'observationWindow', label: 'Meet beide winkels binnen maximaal 24 uur opnieuw' })
   }
+  const conflictAction = () => ({
+    field: 'unavailableDetails',
+    label: 'Controleer achtergebleven product- of prijsvelden bij niet-beschikbaarheid',
+  })
+  if (unavailableDetails.baseline > 0) plus.push(conflictAction())
+  if (unavailableDetails.candidate > 0) dekamarkt.push(conflictAction())
   return { study, plus, dekamarkt }
 }
 
