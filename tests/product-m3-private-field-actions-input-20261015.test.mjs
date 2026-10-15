@@ -100,3 +100,13 @@ test('private action input parser refuses flags and filenames with whitespace be
     await assert.rejects(() => readPrivateM3ActionDraft(path), /unsafe/)
   }
 })
+
+test('malformed UTF-8 bytes are rejected rather than repaired into field content', async t => {
+  const { dir, path } = await sandbox(t)
+  // Invalid two-byte sequence inside an otherwise JSON-shaped string.
+  const broken = Buffer.from([0x7b, 0x22, 0x6b, 0x22, 0x3a, 0x22, 0xc3, 0x28, 0x22, 0x7d])
+  await writeFile(path, broken, { mode: 0o600 })
+  await assert.rejects(() => readPrivateM3ActionDraft(path), /encoded data|UTF-8|encoding/i)
+  refusal(run(dir, path), dir)
+  assert.deepEqual(await readFile(path), broken)
+})
