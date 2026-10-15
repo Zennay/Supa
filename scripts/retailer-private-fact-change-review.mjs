@@ -50,6 +50,22 @@ function normalized(value) {
   fail()
 }
 
+function physicalProductFacts(observation) {
+  // One immutable HTML body at one URL cannot produce different product
+  // facts merely because its archived capture timestamp is expressed later.
+  // Exclude provenance time here; SHA/URL continuity is checked separately.
+  return normalized({
+    supermarket: observation.supermarket,
+    sourceProductId: observation.sourceProductId,
+    name: observation.name,
+    currentPriceCents: observation.currentPriceCents,
+    currency: observation.currency,
+    pack: observation.pack,
+    offer: observation.offer,
+    availability: observation.availability,
+  })
+}
+
 function latest(batch) {
   const rows = new Map()
   for (const result of batch.results) {
@@ -87,9 +103,14 @@ export function comparePrivateRetailerFactChanges(previous, current, {
 } = {}) {
   const before = evaluatePrivateAdapterHealth(previous, { referenceTime })
   const after = evaluatePrivateAdapterHealth(current, { referenceTime })
+  // A rejected source or missing adapter cannot establish product absence.
+  // Never count incomplete coverage as deletion or a store delisting.
   if (before.productionEnabled !== false || after.productionEnabled !== false ||
       before.permissionVerified !== false || after.permissionVerified !== false ||
-      before.externalRequests !== 0 || after.externalRequests !== 0) fail()
+      before.externalRequests !== 0 || after.externalRequests !== 0 ||
+      before.sixShapeCoverageComplete !== true ||
+      after.sixShapeCoverageComplete !== true ||
+      before.rejectedSources !== 0 || after.rejectedSources !== 0) fail()
   const oldRows = latest(previous)
   const newRows = latest(current)
   const perShape = Object.fromEntries(PAIRS.map(x => [x, ZERO()]))
@@ -108,6 +129,11 @@ export function comparePrivateRetailerFactChanges(previous, current, {
     if (next.when === old.when &&
         (next.sha !== old.sha || next.url !== old.url ||
           normalized(next.obs) !== normalized(old.obs))) fail()
+    // SHA-256 identifies the same source bytes. Different prices, promotions,
+    // packaging or stock with an unchanged SHA/URL are impossible evidence,
+    // even when a later time is recorded for the same underlying HTML.
+    if (next.sha === old.sha && next.url === old.url &&
+        physicalProductFacts(old.obs) !== physicalProductFacts(next.obs)) fail()
     comparisons++
     const a = old.obs, b = next.obs
     const changed = [
