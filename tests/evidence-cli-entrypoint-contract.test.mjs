@@ -17,6 +17,7 @@ const EXPECTED_EVIDENCE_SCRIPTS = [
   'm3:assess-observed-week',
   'm3:build-observed-study',
   'm3:create-observation-sheet',
+  'm3:prepare-field-kit',
   'm4:validate-beta-session',
 ]
 const EXPECTED_EVIDENCE_COMMANDS = {
@@ -42,6 +43,8 @@ const EXPECTED_EVIDENCE_COMMANDS = {
     'node --experimental-strip-types scripts/m3-build-observed-study.mjs',
   'm3:create-observation-sheet':
     'node --experimental-strip-types scripts/m3-create-observation-sheet.mjs',
+  'm3:prepare-field-kit':
+    'node --experimental-strip-types scripts/m3-prepare-field-kit.mjs',
   'm4:validate-beta-session': 'node scripts/m4-validate-beta-session.mjs',
 }
 const SAFE_NODE_COMMAND =
