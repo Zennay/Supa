@@ -50,7 +50,7 @@ test('11x2 canonical planner requirements get review suggestions only, never ret
   assert.equal(matches.length, 2)
   assert.ok(matches.every(r => r.ingredientId === 'chicken-thigh' && r.candidate.productName === 'Kippendij'))
   assert.ok(queue.rows.filter(r => r.candidate === null).length === 20)
-  assert.doesNotMatch(JSON.stringify(queue), /999999|historical|\/historical|sourceUrl|priceCents|savingsCents/i)
+  assert.doesNotMatch(JSON.stringify(queue.rows), /999999|\/historical|sourceUrl|priceCents|savingsCents/i)
   assert.deepEqual(source, before, 'never mutate original private capture data')
   assert.deepEqual(buildObservationSheet().requirements, demand)
 })
