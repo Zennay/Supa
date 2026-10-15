@@ -108,11 +108,20 @@ export async function fetchAuthorizedRetailerHtml({
     }
     reader.releaseLock()
   }
-  const html = Buffer.concat(parts).toString('utf8')
+  // Keep the captured HTTP bytes, parser input and published fingerprint in
+  // exact agreement. Buffer.toString silently substitutes U+FFFD for invalid
+  // sequences; a malformed response must not be treated as a price source.
+  const rawHtml = Buffer.concat(parts)
+  let html
+  try {
+    html = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(rawHtml)
+  } catch {
+    throw new Error('Invalid UTF-8 in authorized response HTML')
+  }
   return {
     source: { ...source },
     capturedAt: new Date(capturedAtMs).toISOString(),
-    sha256: createHash('sha256').update(Buffer.concat(parts)).digest('hex'),
+    sha256: createHash('sha256').update(rawHtml).digest('hex'),
     bytes,
     html,
   }
