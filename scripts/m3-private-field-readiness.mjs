@@ -11,6 +11,7 @@ import {
   restoreObservationSheetDraft,
   observationSheetProgress,
   observationStoreProgress,
+  observationLineCollectionComplete,
 } from '../src/domain/m3ObservationSheet.ts'
 import { buildWeeklyBasketStudyFromObservationSheet } from './m3-build-observed-study.mjs'
 import { createPrivateM3StudyCodePin } from './m3-field-code-pin.mjs'
@@ -53,6 +54,55 @@ async function readPrivateSheet(path) {
   }
 }
 
+// All output identifiers are fixed schema keys / 1-based canonical line
+// positions, never personal metadata values or retailer observation contents.
+const REQUIRED_METADATA_KEYS = Object.freeze([
+  'study.studyId', 'study.participantKey', 'study.population',
+  'study.region', 'study.weekStart', 'study.priceContext',
+  'baseline.evidenceId', 'baseline.observedAt', 'baseline.provenanceNote',
+  'baseline.store.id', 'baseline.store.name',
+  'candidate.evidenceId', 'candidate.observedAt', 'candidate.provenanceNote',
+  'candidate.store.id', 'candidate.store.name',
+])
+const VISIBLE_FIELD = /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u
+
+function privateMissingFieldPositions(sheet, progress) {
+  const metadataValues = [
+    sheet.study.studyId, sheet.study.participantKey, sheet.study.population,
+    sheet.study.region, sheet.study.weekStart, sheet.study.priceContext,
+    sheet.baseline.evidenceId, sheet.baseline.observedAt,
+    sheet.baseline.provenanceNote, sheet.baseline.store.id,
+    sheet.baseline.store.name, sheet.candidate.evidenceId,
+    sheet.candidate.observedAt, sheet.candidate.provenanceNote,
+    sheet.candidate.store.id, sheet.candidate.store.name,
+  ]
+  if (REQUIRED_METADATA_KEYS.length !== progress.metadataTotal ||
+      metadataValues.length !== progress.metadataTotal) refuse()
+  const missingMetadataFieldKeys = Object.freeze(REQUIRED_METADATA_KEYS.filter(
+    (_, index) => typeof metadataValues[index] !== 'string' ||
+      !VISIBLE_FIELD.test(metadataValues[index]),
+  ))
+  const plusMissingLineNumbers = Object.freeze(sheet.baseline.lines.flatMap(
+    (line, index) => observationLineCollectionComplete(line) ? [] : [index + 1],
+  ))
+  const dekamarktMissingLineNumbers = Object.freeze(sheet.candidate.lines.flatMap(
+    (line, index) => observationLineCollectionComplete(line) ? [] : [index + 1],
+  ))
+  // Check the checklist against the existing canonical M3 progress counter;
+  // refuse rather than silently offering misleading next actions on drift.
+  if (missingMetadataFieldKeys.length !== progress.metadataTotal - progress.metadataCompleted ||
+      plusMissingLineNumbers.length + dekamarktMissingLineNumbers.length !==
+        progress.totalLines - progress.completeLines) refuse()
+  return Object.freeze({
+    missingMetadataFieldKeys,
+    plusMissingLineNumbers,
+    dekamarktMissingLineNumbers,
+    nextMissingMetadataFieldKey: missingMetadataFieldKeys[0] ?? null,
+    nextMissingPlusLineNumber: plusMissingLineNumbers[0] ?? null,
+    nextMissingDekaLineNumber: dekamarktMissingLineNumbers[0] ?? null,
+  })
+}
+
 export function reviewPrivateM3FieldSheet(rawSheetBytes, expectedMainSha) {
   try {
     if (!Buffer.isBuffer(rawSheetBytes) || rawSheetBytes.length === 0 ||
@@ -64,6 +114,7 @@ export function reviewPrivateM3FieldSheet(rawSheetBytes, expectedMainSha) {
     const sheet = restoreObservationSheetDraft(raw)
     if (!sheet) refuse()
     const progress = observationSheetProgress(sheet)
+    const missingFields = privateMissingFieldPositions(sheet, progress)
     const plusProgress = observationStoreProgress(sheet.baseline)
     const dekaProgress = observationStoreProgress(sheet.candidate)
     const expected = buildObservationSheet().requirements.length * 2
@@ -120,6 +171,7 @@ export function reviewPrivateM3FieldSheet(rawSheetBytes, expectedMainSha) {
       dekamarktAvailabilityRecorded: dekaProgress.availabilityRecorded,
       metadataCompleteCount: progress.metadataCompleted,
       metadataRequiredCount: progress.metadataTotal,
+      ...missingFields,
       technicalStudyConversionPossible: converted,
       baselineUnresolvedLineCount: baselineUnresolved,
       candidateUnresolvedLineCount: candidateUnresolved,
