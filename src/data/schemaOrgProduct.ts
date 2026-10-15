@@ -192,6 +192,20 @@ function extractPrice(offers: JsonObject[], pack: RawPack, capturedAt: string): 
   const offer = offers[0]
   const capturedMs = Date.parse(capturedAt)
   if (!Number.isFinite(capturedMs)) return null
+  // A scheduled price observed before it starts (or after it ends) is not
+  // proof of a checkout quote, even when the later comparison clock falls
+  // inside the window. Capture-time validity and review-time validity are
+  // independent, mandatory checks.
+  for (const [raw, isEnd] of [
+    [offer.validFrom, false],
+    [offer.priceValidUntil, true],
+  ] as const) {
+    if (raw == null) continue
+    if (typeof raw !== 'string') return null
+    const bound = priceBoundTime(raw, isEnd)
+    if (!Number.isFinite(bound) ||
+        (isEnd ? bound < capturedMs : bound > capturedMs)) return null
+  }
   const prices = [
     cents(offer.price),
     ...priceSpecificationCandidates(offer).map((spec) =>
