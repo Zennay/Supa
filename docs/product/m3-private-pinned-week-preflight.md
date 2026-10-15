@@ -23,3 +23,7 @@ node --experimental-strip-types scripts/m3-verify-private-week-preflight.mjs /pr
 ```
 
 De preflight weigert een ongelijke, lege, niet-canonieke, hoofdletter- of nul-SHA met statuscode 1 en een generieke foutmelding zonder participant, path of prijs. Het standaardcommando met twee bestandsargumenten blijft werken voor reeds bestaande privéworkflows, maar controleert **niet** op verwachte hoofdbranchidentiteit. Controleer de juiste `main`-SHA bij het begin van de échte veldrun en bewaar de externe verificatie apart. Deze extra vergelijking bewijst niet zelfstandig dat GitHub bij de opname die SHA draaide, of dat er schriftelijke retailerrechten, echte waarnemingen of toestemming voor financiële claims bestaan. De vier authenticatie/toestemmings-/publicatievlaggen blijven **false**.
+
+## Begrensde verwerking van onbetrouwbare studie-JSON
+
+De invoer blijft beperkt tot **4 MiB**, maximaal **80 nestingsniveaus**, **50.000 objectveldnamen** en **100.000 JSON-waardeknooppunten** (ook de items van arrays). Dat laatste is belangrijk: een klein tekstbestand kan anders enorm veel losse getallen bevatten. De scanner verwerkt losse getallen, booleans en null voortaan rechtstreeks op de huidige positie, zonder steeds de volledige resterende JSON-tekst te kopiëren. Zowel normale geldige JSON-literals als overgrote aantallen elementen en dubbele gedecodeerde veldnamen zijn met synthetische tests afgedekt. Dit is een private beschikbaarheids-/integriteitsgrens, **geen bewijs** van echte waarnemingen of bronrechten.
