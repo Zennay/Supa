@@ -7,10 +7,10 @@ Status: **alleen voorbereiding voor menselijke 11×11 veldmeting**. Deze bundel 
 Werk op een **schone, actuele `main`**: `git switch main && git pull --ff-only`. Verifieer eerst dat je de bedoelde laatste main checkout gebruikt. Maak de bundel uitsluitend in een **nieuwe, niet-bestaande privémap** (geen repo-map die later wordt gecommit):
 
 ```sh
-npm run m3:prepare-field-kit -- --output-dir /private/path/naar/m3-veldbezoek
+node --experimental-strip-types scripts/m3-prepare-field-kit.mjs --output-dir /private/path/naar/m3-veldbezoek
 ```
 
-Het commando leest de **daadwerkelijke** Git-branch + exacte HEAD-SHA en vereist dat die gelijk is aan de lokaal bijgewerkte `origin/main`-verwijzing. Het weigert een featurebranch, detached HEAD, ongeldige SHA, achterlopende lokale main of gewijzigde gevolgde repositorybestanden. Er wordt **niet automatisch `git fetch`** uitgevoerd: `git pull --ff-only` voor het bezoek blijft verplicht. Er is geen door de gebruiker invoerbare `--sha` die zich als goedgekeurde code kan voordoen. Een opgegeven bestemming die al bestaat wordt nooit overschreven. Nieuwe privémap: mode 0700, vier bestanden mode 0600. Oudere symlinked output-ouderpaden worden geweigerd. De lokale bestanden blijven op het systeem, niet in de Git-repository.
+Gebruik bewust de rechtstreeks uitvoerbare Node-opdracht; het bestaande canonieke npm-evidencecommando-register wordt niet uitgebreid of verzwakt. Het commando leest de **daadwerkelijke** Git-branch + exacte HEAD-SHA en vereist dat die gelijk is aan de lokaal bijgewerkte `origin/main`-verwijzing. Het weigert een featurebranch, detached HEAD, ongeldige SHA, achterlopende lokale main of gewijzigde gevolgde repositorybestanden. Er wordt **niet automatisch `git fetch`** uitgevoerd: `git pull --ff-only` voor het bezoek blijft verplicht. Er is geen door de gebruiker invoerbare `--sha` die zich als goedgekeurde code kan voordoen. Een opgegeven bestemming die al bestaat wordt nooit overschreven. Nieuwe privémap: mode 0700, vier bestanden mode 0600. Oudere symlinked output-ouderpaden worden geweigerd. De lokale bestanden blijven op het systeem, niet in de Git-repository.
 
 Vier bestanden:
 
