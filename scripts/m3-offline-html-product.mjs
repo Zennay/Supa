@@ -8,13 +8,12 @@
  */
 import { createHash } from 'node:crypto'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
-import { priceInstantNs } from '../src/data/schemaOrgProduct.ts'
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_JSONLD_BYTES = 256 * 1024
 const MAX_JSONLD_SCRIPTS = 100
 const CAPTURED_AT_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/
+  /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})(?::(\\d{2})(?:\\.\\d{1,9})?)?(Z|([+-])(\\d{2}):(\\d{2}))$/
 
 function abstain(reason) {
   return {
@@ -42,11 +41,29 @@ function isJsonLdScript(attrs) {
   return type?.trim().toLowerCase() === 'application/ld+json'
 }
 
+
+function validCapturedAt(value) {
+  if (typeof value !== 'string') return false
+  const match = CAPTURED_AT_PATTERN.exec(value)
+  if (!match) return false
+  const [year, month, day, hour, minute, second, offHours, offMinutes] =
+    [match[1], match[2], match[3], match[4], match[5], match[6] ?? '00',
+      match[9] ?? '00', match[10] ?? '00'].map(Number)
+  const midnight = new Date(Date.UTC(year, month - 1, day))
+  if (midnight.getUTCFullYear() !== year ||
+      midnight.getUTCMonth() + 1 !== month ||
+      midnight.getUTCDate() !== day ||
+      hour > 23 || minute > 59 || second > 59 ||
+      offHours > 14 || offMinutes > 59 ||
+      (offHours === 14 && offMinutes !== 0)) return false
+  return Number.isFinite(Date.parse(value))
+}
+
 function validSource(source, capturedAt) {
   if (source?.kind !== 'product' || typeof source.url !== 'string' ||
       typeof capturedAt !== 'string' ||
       !CAPTURED_AT_PATTERN.test(capturedAt) ||
-      priceInstantNs(capturedAt, false) === null) return false
+      !validCapturedAt(capturedAt)) return false
   const routes = {
     plus: ['www.plus.nl', '/product/'],
     dekamarkt: ['www.dekamarkt.nl', '/producten/'],
