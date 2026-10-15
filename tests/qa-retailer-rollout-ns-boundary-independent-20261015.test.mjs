@@ -87,10 +87,8 @@ test('independent: audit reference one nanosecond before a real reviewed capture
   // The reference time is one nanosecond before the parsed millisecond
   // of original, so it is definitely prior to the PLUS capture.
   assert.ok(Date.parse(earlier) < Date.parse(ts))
+  const gate = await rights()
   assert.throws(() => planPrivateRetailerRollout(
-    awaitNever(), ingestReviewedBatch(records), { referenceTime: earlier }))
+    gate, ingestReviewedBatch(records), { referenceTime: earlier }),
+    /refused|invalid|timestamp/i)
 })
-
-// Pure helper is intentionally impossible: this test is rewritten below to
-// await the real bundled rights JSON before invoking the synchronous API.
-function awaitNever() { throw new Error('invalid test helper') }
