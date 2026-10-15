@@ -9,7 +9,7 @@ import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
 // A real, custom week selection over proven fixture recipes: a reusable
 // product path, not a fabricated user observation, live store query or quote.
 /**
- * Allow a person to swap among the three controlled, licensed M2 demo recipes
+ * Allow a person to swap among the three controlled local M2 demo recipes
  * on already-planned days. This changes physical ingredient demand only;
  * historical retailer candidates remain unpriced and review-only.
  *
@@ -24,7 +24,7 @@ export function selectedFixtureWeek(argv = []) {
       (argv.length !== 0 && (argv.length !== 2 ||
         !['--days', '--plan'].includes(argv[0]) ||
         typeof argv[1] !== 'string' || !argv[1]))) {
-    throw new Error('Invalid private planned-week review arguments')
+    throw new Error('Only approved private planned-week review arguments are accepted')
   }
   const allowedDays = new Set(m2DefaultActiveDays)
   const allowedRecipes = new Set(m2Recipes.map(recipe => recipe.id))
@@ -38,12 +38,12 @@ export function selectedFixtureWeek(argv = []) {
   const entries = argv[1].split(',')
   if (entries.length < 1 || entries.length > m2DefaultActiveDays.length ||
       new Set(entries).size !== entries.length) {
-    throw new Error('Select distinct currently planned fixture days only')
+    throw new Error('Only distinct currently planned fixture days are accepted')
   }
 
   if (argv[0] === '--days') {
     if (entries.some(day => !allowedDays.has(day))) {
-      throw new Error('Select distinct currently planned fixture day labels only')
+      throw new Error('Only currently planned fixture day labels are accepted')
     }
     return {
       days: m2DefaultActiveDays.filter(day => entries.includes(day)),
