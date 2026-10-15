@@ -150,3 +150,86 @@ test('10001 source records are rejected at input preflight, not silently truncat
     nowMs: NOW,
   }), /Invalid comparison input/)
 })
+
+
+function physicalProduct(shop, id, name, cents, stock = 'available') {
+  const source = observation(shop, stock)
+  return {
+    ...source,
+    sourceProductId: id, name,
+    currentPriceCents: cents,
+    provenance: {
+      ...source.provenance,
+      url: shop === 'plus'
+        ? 'https://www.plus.nl/product/' + id
+        : 'https://www.dekamarkt.nl/producten/' + id,
+    },
+  }
+}
+
+function asymmetric500(reverse = false) {
+  const demand = Array.from({ length: 500 }, (_, index) => ({
+    id: 'meal-' + index,
+    query: index < 250 ? 'halfvolle melk ontbijt' : 'halfvolle melk diner',
+    amount: 2, unit: 'ml',
+  }))
+  if (reverse) demand.reverse()
+  return demand
+}
+
+for (const reverse of [false, true]) {
+  for (const stock of ['available', 'unknown']) {
+    test('500 lines with asymmetric physical SKU attribution; reversed=' +
+      reverse + ', second DekaMarkt SKU stock=' + stock, () => {
+      // Independent physical purchase ledger: all 500 recipe requirements
+      // fit ONE PLUS 1L pack (129c), while DekaMarkt buys TWO DISTINCT
+      // 500ml SKUs at 80c+75c (quoted 155c).
+      const demand = asymmetric500(reverse)
+      const products = [
+        physicalProduct('plus', 'fictional-milk-all',
+          'Halfvolle melk ontbijt halfvolle melk diner', 129),
+        physicalProduct('dekamarkt', 'fictional-milk-breakfast',
+          'Halfvolle melk ontbijt', 80),
+        physicalProduct('dekamarkt', 'fictional-milk-dinner',
+          'Halfvolle melk diner', 75, stock),
+      ]
+      const r = compare(demand, products)
+      assert.equal(r.lines.length, 500)
+      assert.equal(r.stores.plus.subtotalCents, 129)
+      assert.equal(r.stores.dekamarkt.subtotalCents, 155)
+      assert.equal(r.lines[0].plus.sharedPackCoversIngredientIds.length, 500)
+      const ownerMilk = r.lines[0].plus
+      assert.equal(ownerMilk.packs, 1)
+      assert.equal(ownerMilk.totalCents, 129)
+      for (const line of r.lines) {
+        assert.equal(line.differenceCents, null,
+          'a shared PLUS pack vs two different Deka packs cannot show per-recipe savings')
+        assert.equal(line.plus.status, 'matched')
+      }
+      const breakfast = r.lines.filter(row => row.ingredient.includes('ontbijt'))
+      const dinner = r.lines.filter(row => row.ingredient.includes('diner'))
+      assert.equal(breakfast.length, 250)
+      assert.equal(dinner.length, 250)
+      assert.equal(
+        r.lines.filter(row => row.dekamarkt.sharedPackCoversIngredientIds).length, 2,
+      )
+      assert.equal(
+        breakfast.reduce((sum, row) => sum + row.dekamarkt.totalCents, 0), 80)
+      assert.equal(
+        dinner.reduce((sum, row) => sum + row.dekamarkt.totalCents, 0), 75)
+      if (stock === 'available') {
+        assert.equal(r.comparable, true)
+        assert.equal(r.cheaperStore, 'plus')
+        assert.equal(r.savingsCents, 26)
+      } else {
+        assert.equal(r.comparable, false)
+        assert.equal(r.cheaperStore, null)
+        assert.equal(r.savingsCents, null)
+        assert.equal(r.stores.dekamarkt.complete, false)
+        for (const line of dinner) {
+          assert.equal(line.dekamarkt.status, 'availability_unknown')
+        }
+      }
+    })
+  }
+}
