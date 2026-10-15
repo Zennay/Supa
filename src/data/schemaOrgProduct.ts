@@ -151,8 +151,15 @@ function priceBoundTime(raw: string, isEnd: boolean): number {
     const second = Number(timestamp[3] ?? '0')
     if (hour > 23 || minute > 59 || second > 59) return Number.NaN
     const zone = timestamp[4]
-    if (zone !== 'Z' && (Number(zone.slice(1, 3)) > 23 ||
-        Number(zone.slice(4, 6)) > 59)) return Number.NaN
+    // ISO 8601 UTC offsets cannot exceed ±14:00. +14:01, -15:00
+    // and even +23:59 may be parsed by JS engines but are not valid
+    // source timestamps for checkout-price evidence.
+    if (zone !== 'Z') {
+      const offsetHour = Number(zone.slice(1, 3))
+      const offsetMinute = Number(zone.slice(4, 6))
+      if (offsetHour > 14 || offsetMinute > 59 ||
+          (offsetHour === 14 && offsetMinute !== 0)) return Number.NaN
+    }
   }
   return Date.parse(isEnd && !suffix ? raw + 'T23:59:59.999Z' : raw)
 }
