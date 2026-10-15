@@ -52,3 +52,9 @@ Ongeldige studiecodes, onmogelijke kalenderdagen, een verkeerde supermarkt, een 
 Bij `--store plus` of `--store dekamarkt` zie je de gedeelde studietaken en alleen de gegevens van de gekozen winkel. JSON bevat uitsluitend vooraf gedefinieerde veldcodes/labels en aantallen; **geen** vrije winkel-, klant-, prijs-, bewijs- of tijdswaarden. De melding `readyForPrivateReview: true` zegt alleen dat een mens het formulier privé kan beoordelen en is nooit een bevestiging van echte winkelbewijzen, bronrechten of besparingen.
 
 Ook na `0 van 22` openstaande boodschappen kun je dus vervolgacties zien. Rond die af op basis van **echte** metingen en gebruik de bestaande converter en assessment voor iedere financiële beoordeling.
+
+## Nog te specificeren verpakking en prijs
+
+Voor een product dat al als **beschikbaar** is vastgelegd, specificeert de openstaande regel nu exact welke verplichte velden nog niet bruikbaar zijn: productnaam, verpakkingshoeveelheid, verpakkingseenheid, aantal per verkooppakket of prijs per verpakking. De notitie maakt bijvoorbeeld onderscheid tussen `nog nodig: Prijs per verpakking` en `nog nodig: Productnaam, Verpakkingshoeveelheid, Verpakkingseenheid, Prijs per verpakking`.
+
+Dit zijn uitsluitend vaste Nederlandstalige labels: de daadwerkelijke productnaam, gevonden prijs en bronnotities blijven privé en worden niet herhaald. Een daadwerkelijk als **niet beschikbaar** geregistreerde regel is al afgerond voor de veldregistratie, maar vormt nooit een fictieve geprijsde regel. Niets aan het canonieke beschikbaarheidscontract of de geldigheidsbeoordeling wordt gewijzigd.
