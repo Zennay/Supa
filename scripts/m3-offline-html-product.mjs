@@ -90,7 +90,10 @@ function extractJsonLdDocuments(html) {
   const active = withoutComments.replace(
     /<(template|noscript|textarea)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '',
   )
-  if (/<(?:template|noscript|textarea)\b/i.test(active)) return null
+  // Nested or malformed inert containers may leave script-looking fragments
+  // behind after conservative removal. A stray opener OR closer must refuse
+  // the entire snapshot, never promote an inert recommended price to active.
+  if (/<\/?(?:template|noscript|textarea)\b/i.test(active)) return null
 
   // A malformed script boundary must not enable a fallback to a different
   // (possibly cheaper) script that did happen to parse.
