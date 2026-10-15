@@ -16,6 +16,7 @@ import { observationNextAction, observationNextTaskSelector } from '../src/featu
 import * as observationReadinessCopy from '../src/features/observation/observationReadinessCopy.ts'
 import * as observationRequiredLineField from '../src/features/observation/observationRequiredLineField.ts'
 import * as observationVisibleRows from '../src/features/observation/observationVisibleRows.ts'
+import * as blankPaperDownload from '../src/features/observation/downloadBlankM3PaperWorksheet.ts'
 
 const require = createRequire(import.meta.url)
 const jsxRuntime = require('react/jsx-runtime')
@@ -104,6 +105,7 @@ function renderView(sheet) {
     './ObservationPackCountInput.tsx': { ObservationPackCountInput: packCountInput },
     './observationRequiredLineField.ts': observationRequiredLineField,
     './observationVisibleRows.ts': observationVisibleRows,
+    './downloadBlankM3PaperWorksheet.ts': blankPaperDownload,
   }
   const ObservationView = evaluate(actualView, modules).ObservationView
   return renderToStaticMarkup(React.createElement(ObservationView))

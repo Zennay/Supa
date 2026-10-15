@@ -2,7 +2,13 @@
 
 Dit offline hulpmiddel maakt twee **lege** A4-landschapbladen voor exact dezelfde elf canonieke ingrediëntenbehoeften: eerst PLUS, daarna DekaMarkt. Het gebruikt uitsluitend de bestaande SUPA M3-observatiesjabloon en doet geen netwerkverzoeken.
 
-## Uitvoeren
+## Download direct vanuit SUPA Meten
+
+Open de **Meten**-pagina in de SUPA-webapp en klik op **Download leeg veldformulier (PLUS + DekaMarkt)**. Er wordt lokaal één HTML-bestand met de twee lege A4-landschapbladen gemaakt. Hiervoor zijn **geen terminal, Node, internetverbinding met supermarkten of winkelrechten** nodig. De download gebruikt dezelfde canonieke 11 PLUS + 11 DekaMarkt-behoeften, HTML en print-CSS als het onderstaande CLI-script.
+
+De browserdownload bevat **nooit** een opgeslagen meting of lokale JSON-conceptinhoud: deelnemercodes, reeds ingevulde prijzen, bronverwijzingen en notities blijven op het apparaat en worden niet in het lege papier gekopieerd. Vul desgewenst vóór het downloaden **Codeversie voor veldformulier** in met de daadwerkelijk gebruikte Git-commit-SHA: precies **40 kleine hextekens**. SUPA valideert die invoer en drukt haar vervolgens identiek op **beide** bladen af. Laat het veld leeg als de codeversie nog niet onafhankelijk is vastgesteld: dan blijven beide papieren SHA-vakken blanco en kan de onderzoeker ze later **handmatig** invullen. De ingevoerde waarde wordt niet automatisch met GitHub geverifieerd en wordt niet in het lokale onderzoeksconcept opgeslagen. Klikken op downloaden is geen bewijs dat een bestand veilig op schijf staat; controleer de browserdownloads en het afdrukvoorbeeld. De onderstaande CLI kan eveneens optioneel expliciet de werkelijke commit-SHA afdrukken.
+
+## Uitvoeren via terminal (alternatief)
 
 Met de in het project gepinde Node-versie vanuit de repositoryroot:
 
