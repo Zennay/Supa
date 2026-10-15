@@ -109,3 +109,19 @@ test('rollout: exported CLI uses bundled fixtures and writes only aggregate safe
     await assert.rejects(() => main(bad))
   }
 })
+
+test('rollout: rejected extra PLUS sample needs human review, even beside an accepted sample', async () => {
+  const records = await Promise.all(RETAILER_REVIEWED_FIXTURES.map(file =>
+    readFile(new URL('../fixtures/m1/' + file, import.meta.url), 'utf8').then(JSON.parse)))
+  const rejected = structuredClone(records[0])
+  rejected.source.id += '-rejected'
+  rejected.browserEvidence.safety.antiBotBypass = true
+  const report = planPrivateRetailerRollout(await gate(), ingestReviewedBatch([...records, rejected]), {
+    referenceTime: initialClock,
+  })
+  assert.equal(report.historicalAcceptedShapes, 6)
+  assert.equal(report.retailers[0].shapes[0].rejectedSources, 1)
+  assert.equal(report.retailers[0].shapes[0].status, 'rejected-historical-input-needs-review')
+  assert.equal(report.retailers[0].nextActions.includes('review-rejected-adapter-evidence'), true)
+  assert.equal(report.productionEnabled, false)
+})
