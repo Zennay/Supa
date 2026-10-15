@@ -80,7 +80,11 @@ export function reviewPrivateM3FieldSheet(rawSheetBytes, expectedMainSha) {
     if (intakeComplete) {
       // Actual converter + *same-demand* private preflight, in-memory only.
       // Never serialize the private study, manifest, prices or participant.
-      const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
+      // Draft restoration intentionally normalizes recoverable user edits.
+      // Conversion proof MUST use the raw, unmodified source, otherwise a
+      // forged 24h gate or other mutated persisted field could be masked.
+      const originalSheet = JSON.parse(raw)
+      const study = buildWeeklyBasketStudyFromObservationSheet(originalSheet)
       const studyBytes = Buffer.from(JSON.stringify(study))
       const pinBytes = Buffer.from(JSON.stringify(
         createPrivateM3StudyCodePin(studyBytes, expectedMainSha),
