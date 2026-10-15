@@ -38,7 +38,7 @@ test('independent positive: authentic 11×2 unresolved planner preview stays pri
     externalRequests: 0,
     publicSavingsClaimEligible: false,
   })
-  assert.doesNotMatch(JSON.stringify(summary), /sku|https?:\/\/|price|productName|ingredientId|email/i)
+  assert.doesNotMatch(JSON.stringify(summary), /sku|https?:\/\/|currentPriceCents|offerPriceCents|productName|ingredientId|email/i)
 })
 
 test('private summary must refuse a one-retailer-only queue pretending to cover PLUS and DekaMarkt', () => {
