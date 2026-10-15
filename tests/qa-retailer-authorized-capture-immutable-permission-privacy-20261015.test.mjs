@@ -115,7 +115,7 @@ test('expected RED: grant accessor cannot revoke permission during validation an
     'retailer transport cannot run after permission is withdrawn mid-validation')
 })
 
-test('expected RED: CSS proposals must not reproduce source-embedded fictional product identifier or price tokens', async () => {
+test('expected RED: CSS proposals must not reproduce a source-embedded fictional product identifier', async () => {
   // A literal class name is NOT automatically safe metadata. It can contain
   // a product identity or price-looking token from the HTML source itself.
   const syntheticHtml = '<html><body>' +
@@ -130,9 +130,25 @@ test('expected RED: CSS proposals must not reproduce source-embedded fictional p
   const output = JSON.stringify(result)
   assert.equal(output.includes(FICTIONAL_MARKER), false,
     'the selector preview must not echo a product-specific source identifier')
-  assert.equal(output.includes('987654321'), false,
-    'the selector preview must not echo source-dependent price-shaped tokens')
   assert.equal(result.approvedSelectors, 0)
   assert.equal(result.readyForIngestion, false)
   assert.equal(result.currentPricesExtracted, false)
+})
+
+test('expected RED: CSS data-testid proposals must not reproduce source-dependent price-shaped tokens', async () => {
+  // This numeric marker is NOT a real price, just a controlled private
+  // source attribute value that must not be returned as safe metadata.
+  const priceMarker = '987654321'
+  const onlyFakePriceSource =
+    '<html><body><span data-testid="price-' + priceMarker + '">Mock</span></body></html>'
+  let calls = 0
+  const result = await captureToPrivateSelectorReview(options({
+    fetchFn: mockHtml(onlyFakePriceSource, () => { calls++ }),
+  }))
+  assert.equal(calls, 1)
+  assert.equal(JSON.stringify(result).includes(priceMarker), false,
+    'private source-dependent price-shaped tokens must not be disclosed as selectors')
+  assert.equal(result.approvedSelectors, 0)
+  assert.equal(result.currentPricesExtracted, false)
+  assert.equal(result.publicSavingsClaimEligible, false)
 })
