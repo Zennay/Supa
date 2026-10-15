@@ -89,7 +89,7 @@ test('HTTP 403/429 permanently hard-stop that host within this session, no rotat
 })
 
 test('three successes consume per-host quota even when time passes', async t => {
-  const tick = 1_760_553_600_000
+  const tick = Date.parse('2026-10-15T12:00:00.000Z')
   let ms = tick
   t.mock.method(Date, 'now', () => ms)
   const session = createAuthorizedRetailerCaptureSession()
