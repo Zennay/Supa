@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-// Independent only-add QA gate for newly merged 3-state paper workflow.
+// Independent QA gate for newly merged 3-state paper AND multipack workflow.
 // Do NOT change the shared permanent VPS workflow owned by another worker.
 const workflowPath = '.github/workflows/m3-observed-week-report.yml'
 const required = [
@@ -13,6 +13,8 @@ const required = [
   'tests/qa-m3-paper-observation-three-state-contract-20261015.test.mjs',
   'tests/qa-m3-paper-private-output-parent-integrity-20261015.test.mjs',
   'tests/qa-m3-paper-output-no-directory-side-effects-20261015.test.mjs',
+  'tests/product-m3-paper-multipack-clarity-20261015.test.mjs',
+  'tests/qa-m3-paper-multipack-pricing-contract-20261015.test.mjs',
 ]
 function paths(workflow) {
   const block = /^  pull_request:\s*\n    paths:\s*\n((?:      - .*\n)+)/m.exec(workflow)
@@ -32,11 +34,11 @@ function missing(selectors, files) {
   return files.filter(file => !selectors.some(pattern => globMatches(pattern, file)))
 }
 
-test('newly merged M3 physical paper printer and original QA paths must trigger the permanent trusted VPS', () => {
+test('newly merged M3 paper, multipack source and original QA paths must trigger the permanent trusted VPS', () => {
   const workflow = readFileSync(workflowPath, 'utf8')
   const absent = missing(paths(workflow), required)
   assert.deepEqual(absent, [],
-    'the permanent M3 PR gate misses paper observation or QA paths on current merged main')
+    'the permanent M3 PR gate misses paper, multipack or QA paths on current merged main')
 })
 
 test('M3 permanent VPS path correction must preserve same-repo/main/private execution guards', () => {
@@ -52,7 +54,7 @@ test('M3 permanent VPS path correction must preserve same-repo/main/private exec
   assert.match(w, /if-no-files-found: error/)
 })
 
-test('removing any 3-state paper path from a complete synthetic selector set is detected', () => {
+test('removing any paper or multipack path from a complete synthetic selector set is detected', () => {
   const baseline = paths(readFileSync(workflowPath, 'utf8'))
   const control = [...baseline, ...required]
   assert.deepEqual(missing(control, required), [])
