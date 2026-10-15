@@ -17,10 +17,25 @@ export function m3FieldSheetMatchesPlannerWeek(
   try {
     if (!Array.isArray(plannedMeals) || !Array.isArray(activeDays) ||
         plannedMeals.length !== m2InitialPlan.length ||
-        activeDays.length !== m2DefaultActiveDays.length ||
-        new Set(activeDays).size !== m2DefaultActiveDays.length ||
-        !activeDays.every(day =>
-          typeof day === 'string' && m2DefaultActiveDays.includes(day))) {
+        activeDays.length !== m2DefaultActiveDays.length) {
+      return false
+    }
+
+    // Array#every skips holes. Set iteration includes them as undefined and
+    // can therefore still report four distinct entries for three real days
+    // plus one missing slot. Read only own DATA descriptors: an inherited day
+    // or an accessor must never mask a changed M3 measurement week.
+    const selectedDays: string[] = []
+    for (let index = 0; index < m2DefaultActiveDays.length; index++) {
+      const slot = Object.getOwnPropertyDescriptor(activeDays, String(index))
+      if (!slot || !Object.hasOwn(slot, 'value') ||
+          typeof slot.value !== 'string' ||
+          !m2DefaultActiveDays.includes(slot.value)) {
+        return false
+      }
+      selectedDays.push(slot.value)
+    }
+    if (new Set(selectedDays).size !== m2DefaultActiveDays.length) {
       return false
     }
 
