@@ -65,6 +65,7 @@ export function renderPrintablePrivateShoppingChecklist(report) {
     '.store-filter legend{font-weight:700}.store-filter label{display:inline-flex;align-items:center;gap:8px;margin:4px 15px 4px 0}' +
     '.store-filter input{width:18px;height:18px}' +
     'body:has(#view-plus:checked) .shop-dekamarkt,body:has(#view-deka:checked) .shop-plus{display:none}' +
+    'body:has(#view-plus:checked) .grid,body:has(#view-deka:checked) .grid{grid-template-columns:minmax(0,650px)}' +
     'ol{padding-left:22px}li{padding:12px 0;border-bottom:1px solid #e1e7e3;overflow-wrap:anywhere}' +
     'label{display:flex;align-items:flex-start;gap:12px;cursor:pointer}' +
     'input{width:20px;height:20px;flex:none;accent-color:#18624c}' +
