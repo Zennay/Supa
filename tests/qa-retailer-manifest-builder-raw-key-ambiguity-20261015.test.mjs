@@ -118,8 +118,8 @@ test('operator CLI refuses ambiguous JSON without success output or a stray mani
     assert.equal(result.error, undefined)
     assert.equal(result.status, 2)
     assert.equal(result.stdout, '')
-    assert.match(result.stderr, /^Private reviewed manifest builder refused\\s*$/)
-    assert.doesNotMatch(result.stderr, /https?:\\/\\/|capture-0|\.json|sha256|token/i)
+    assert.match(result.stderr, /^Private reviewed manifest builder refused\s*$/)
+    assert.doesNotMatch(result.stderr, /https?:\/\/|capture-0|\.json|sha256|token/i)
     assert.ok(!(await readdir(dir)).includes('manifest.json'))
   } finally { await cleanup(dir) }
 })
