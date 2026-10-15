@@ -58,6 +58,43 @@ export function buildUniversalRetailerCatalog(batch) {
       batch.results.length === 0) {
     throw new Error('Only bounded reviewed offline ingestion batches are accepted')
   }
+  // Some direct callers intentionally supply only { mode } for a small
+  // synthetic offline cohort. If a declared summary field is present,
+  // however, its counts/permission status must match the ACTUAL accepted
+  // observations. An envelope is never authority for live/public claims.
+  const summary = batch.summary
+  const optional = (key, predicate) =>
+    !Object.hasOwn(summary, key) || predicate(summary[key])
+  if (!optional('productionEnabled', x => x === false) ||
+      !optional('permissionVerified', x => x === false) ||
+      !optional('publicSavingsClaimEligible', x => x === false) ||
+      !optional('sources', x => Number.isSafeInteger(x) && x === batch.results.length) ||
+      !optional('acceptedSources', x => Number.isSafeInteger(x) && x === batch.results.length) ||
+      !optional('rejectedSources', x => x === 0)) {
+    throw new Error('Refusing contradictory private retailer batch summary')
+  }
+  let rawObservationTotal = 0
+  const sourceObservations = { plus: 0, dekamarkt: 0 }
+  for (const result of batch.results) {
+    if (!result || result.accepted !== true || !Array.isArray(result.observations) ||
+        result.observations.length < 1 || result.observations.length > 256 ||
+        typeof result.key !== 'string' ||
+        !/^(plus|dekamarkt):(product|catalog|offers)$/.test(result.key)) {
+      throw new Error('Refusing incomplete private retailer batch source')
+    }
+    const store = result.key.split(':', 1)[0]
+    rawObservationTotal += result.observations.length
+    sourceObservations[store] += result.observations.length
+  }
+  if (!optional('observations', x => Number.isSafeInteger(x) && x === rawObservationTotal) ||
+      !optional('retailerCounts', x =>
+        x && typeof x === 'object' && !Array.isArray(x) &&
+        Object.keys(x).length === 2 &&
+        Object.hasOwn(x, 'plus') && Object.hasOwn(x, 'dekamarkt') &&
+        x.plus === sourceObservations.plus &&
+        x.dekamarkt === sourceObservations.dekamarkt)) {
+    throw new Error('Refusing inconsistent private retailer batch counters')
+  }
   const groups = new Map()
   let observationsCount = 0
   for (const result of batch.results) {
