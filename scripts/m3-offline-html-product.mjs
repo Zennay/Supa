@@ -13,7 +13,7 @@ const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_JSONLD_BYTES = 256 * 1024
 const MAX_JSONLD_SCRIPTS = 100
 const CAPTURED_AT_PATTERN =
-  /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})(?::(\\d{2})(?:\\.\\d{1,9})?)?(Z|([+-])(\\d{2}):(\\d{2}))$/
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|([+-])(\d{2}):(\d{2}))$/
 
 function abstain(reason) {
   return {
