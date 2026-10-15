@@ -44,7 +44,7 @@ function paperPage(side, items) {
     return '<tr data-m3-row="' + (i + 1) + '"><td><strong>' +
       (i + 1) + '. ' + htmlText(item.label) +
       '</strong><small>Benodigd: ' + htmlText(item.amount + ' ' + unit) +
-      '</small></td><td></td><td></td><td></td><td></td><td>☐ ja ☐ nee</td></tr>'
+      '</small></td><td></td><td></td><td></td><td></td><td>☐ ja ☐ nee ☐ onbekend</td></tr>'
   }).join('\n')
   return '<section class="page" data-m3-side="' + side + '">' +
     '<p>SUPA M3 · veldmeting · blad ' + (side === 'baseline' ? '1/2' : '2/2') + '</p>' +
