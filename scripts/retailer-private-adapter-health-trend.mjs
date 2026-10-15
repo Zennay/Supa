@@ -181,22 +181,35 @@ async function privateReport(name) {
   if (typeof name !== 'string' || !name || name.startsWith('-') || name.length > 500 ||
       !/^[a-z0-9][a-z0-9_.-]*\.json$/i.test(basename(name))) fail()
   const path = resolve(name)
-  let cur = path
-  for (;;) {
-    const stats = await lstat(cur)
-    if (stats.isSymbolicLink() ||
-        (cur === path && (!stats.isFile() || (stats.mode & 0o077) || stats.size > 65536))) fail()
-    const parent = dirname(cur)
-    if (parent === cur) break
-    cur = parent
+  const root = dirname(path)
+  // Private reports must stay in an owner-only staging directory, matching
+  // the private reviewed manifest builder/replay. A 0600 file alone does not
+  // pin directory metadata or reject a group/world-writable staging root.
+  async function privateAncestors() {
+    let cur = path
+    for (;;) {
+      const stats = await lstat(cur)
+      if (stats.isSymbolicLink() ||
+          (cur === path && (!stats.isFile() || stats.nlink !== 1 ||
+            (stats.mode & 0o077) !== 0 || stats.size > 65536)) ||
+          (cur === root && (!stats.isDirectory() || (stats.mode & 0o077) !== 0))) fail()
+      const parent = dirname(cur)
+      if (parent === cur) break
+      cur = parent
+    }
   }
+  await privateAncestors()
   const fd = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
     const stats = await fd.stat()
     if (!stats.isFile() || stats.nlink !== 1 || (stats.mode & 0o077) ||
         stats.size > 65536) fail()
+    // Recheck after descriptor acquisition and before accepting evidence, so
+    // a now-public directory is never silently reported as privately held.
+    await privateAncestors()
     const bytes = await fd.readFile()
     if (bytes.length > 65536) fail()
+    await privateAncestors()
     return parseUniqueReportJson(bytes)
   } finally { await fd.close() }
 }
