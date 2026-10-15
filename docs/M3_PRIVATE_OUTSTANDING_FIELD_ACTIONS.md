@@ -42,3 +42,13 @@ De tekstweergave vertaalt canonieke aantallen stuks naar natuurlijk Nederlands (
 De CLI leest uitsluitend een regulier **lokaal privébestand**: het bestand moet voor groep/anderen ontoegankelijk zijn (bijvoorbeeld `chmod 600 private-sheet.json`), mag geen symlink of hardlink zijn en mag maximaal 2 MiB groot zijn. Ook symbolische links in bovenliggende mappen worden geweigerd. Na openen wordt opnieuw gecontroleerd of het nog hetzelfde bestand is en niet tussentijds is gewijzigd; ongeldige UTF-8-bytes worden geweigerd in plaats van stilzwijgend gerepareerd, terwijl de leeslus zelf een harde bytegrens heeft; er wordt geen genormaliseerde/gewijzigde versie opgeslagen.
 
 Bij weigering verschijnt alleen een vaste foutmelding, nooit een pad, deelnemercode, bon of productprijs. Gebruik bij een weigering een normale map en maak een **eigen privé-kopie** van jouw formulier met correcte bestandsrechten; zet geen persoonlijke data of bonnetjes in Git. Deze padcontroles zijn best-effort tegen een gelijktijdig veranderend lokaal bestandssysteem, **geen volledige bescherming tegen een kwaadaardig proces dat parent-mappen tijdens het lezen verwisselt**. Deze functie verandert geen M3-bewijsregels, claimbeoordeling of retailer-toestemmingen.
+
+## Ontbrekende studie- en winkelgegevens
+
+Dezelfde checklist laat nu niet alleen de **22 boodschapregels**, maar ook de ontbrekende **zes algemene studievelden** en **vijf bewijsvelden per winkel** zien. Een volledig ingevulde boodschappentabel kan immers nog steeds ongeldig zijn wanneer een studiecode, pseudonieme deelnemercode, weekdatum, gezamenlijke prijscontext, winkelnaam, winkelcode, bewijscode, herkomstnotitie of waarnemingstijd ontbreekt.
+
+Ongeldige studiecodes, onmogelijke kalenderdagen, een verkeerde supermarkt, een toekomstige waarneming, dubbele winkel-/bewijscodes of een tijdsvenster van meer dan 24 uur worden als **vaste, Nederlandstalige herstelacties** getoond. Dit zijn beslisregels van het canonieke observatieformulier; er wordt niets automatisch als echt waargenomen aangemerkt.
+
+Bij `--store plus` of `--store dekamarkt` zie je de gedeelde studietaken en alleen de gegevens van de gekozen winkel. JSON bevat uitsluitend vooraf gedefinieerde veldcodes/labels en aantallen; **geen** vrije winkel-, klant-, prijs-, bewijs- of tijdswaarden. De melding `readyForPrivateReview: true` zegt alleen dat een mens het formulier privé kan beoordelen en is nooit een bevestiging van echte winkelbewijzen, bronrechten of besparingen.
+
+Ook na `0 van 22` openstaande boodschappen kun je dus vervolgacties zien. Rond die af op basis van **echte** metingen en gebruik de bestaande converter en assessment voor iedere financiële beoordeling.
