@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdtemp, writeFile, rm, symlink, link, stat, readFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, writeFile, rm, symlink, link, stat, readFile, mkdir, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -293,6 +293,37 @@ test('M3 code-pin CLI declines FIFO source and --verify FIFO manifest without bl
       assert.equal(run.stdout, '')
       assert.equal(run.stderr.includes(fifo), false)
     }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('M3 exclusive private output does not publish a partial target on real Linux file-limit failure', async (t) => {
+  if (process.platform !== 'linux') return t.skip('Linux ulimit -f required')
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-pin-atomic-'))
+  try {
+    const input = join(dir, 'study.json')
+    const output = join(dir, 'sidecar.json')
+    await writeFile(input, bytes, { mode: 0o600 })
+    const limited = spawnSync('bash', ['-c',
+      'ulimit -f 0; exec node scripts/m3-field-code-pin.mjs "$1" "$2" --output "$3"',
+      'm3-codepin', input, SHA, output,
+    ], { encoding: 'utf8', timeout: 2500 })
+    assert.notEqual(limited.status, 0)
+    assert.equal(limited.stdout, '')
+    assert.equal(limited.stderr.includes(input), false)
+    assert.equal(limited.stderr.includes(output), false)
+    await assert.rejects(stat(output), { code: 'ENOENT' })
+    // A retry after the forced write failure must not be blocked by a
+    // zero-byte/truncated output or by a failed staging artefact.
+    const retried = spawnSync(process.execPath,
+      ['scripts/m3-field-code-pin.mjs', input, SHA, '--output', output],
+      { encoding: 'utf8', timeout: 2500 })
+    assert.equal(retried.status, 0, retried.stderr)
+    assert.equal((await stat(output)).mode & 0o777, 0o600)
+    assert.equal(verifyPrivateM3StudyCodePin(bytes,
+      JSON.parse(await readFile(output, 'utf8'))), true)
+    assert.deepEqual((await readdir(dir)).sort(), ['sidecar.json', 'study.json'])
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
