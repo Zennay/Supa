@@ -13,6 +13,8 @@ Open het lokale HTML-bestand en druk af op A4 **liggend**. Het script overschrij
 ## Echte observatie uitvoeren
 
 - Vul één gedeelde geplande week in en kies **één prijscontext** (in-store of online-order) voor beide winkels.
+- Leg op beide bladen dezelfde **lege invulvelden voor studie-ID, pseudonieme deelnemercode, doelgroep en regio** vast. Herhaal identieke studiegegevens op beide papieren bladen (zonder namen, e-mails of echte account-ID's). Noteer `weekStart` als maandag `JJJJ-MM-DD` en hetzelfde prijscontextvakje op beide bladen.
+- Vul per winkel een **eigen winkel-ID, unieke bewijs-ID, winkelnaam/filiaal, observatietijd inclusief tijdzone, bron en concrete herkomstnotitie** in. Voor beide winkels moeten de winkel-ID's en bewijs-ID's juist verschillend zijn. Deze velden sluiten aan op de bestaande verplichte M3-`observationSheetReadiness`-controle; het papieren formulier zelf blijft volledig leeg en is geen meting.
 - Meet de PLUS-baseline en de DekaMarkt-vergelijkmand met exact dezelfde elf behoeften binnen maximaal **24 uur**.
 - Noteer filiaal, lokale observatietijd én tijdzone, geobserveerde bron, pseudonieme bewijsreferentie en productherkomst.
 - Kruis per regel precies één status aan: **ja** (werkelijk gecontroleerd en beschikbaar), **nee** (werkelijk gecontroleerd en niet verkrijgbaar), of **onbekend** (nog niet gecontroleerd). Een ongemeten regel is nooit `nee` en mag niet als volledige veldmeting worden beschouwd.

@@ -51,12 +51,19 @@ function paperPage(side, items) {
     '<p>SUPA M3 · veldmeting · blad ' + (side === 'baseline' ? '1/2' : '2/2') + '</p>' +
     '<h1>' + store + ' — dezelfde 11 boodschappen</h1>' +
     '<p>Noteer alleen werkelijk geobserveerde waarden en laat onbekende gegevens leeg. Onbekend betekent nog niet onderzocht; niet verkrijgbaar is pas nee na controle.</p>' +
-    '<div class="metadata"><p>Filiaal: __________________________</p>' +
-    '<p>Datum, tijd en tijdzone: __________________________</p>' +
+    '<p>Gedeelde studiegegevens moeten op beide bladen gelijk zijn; gebruik alleen pseudonieme sleutels. Winkel-ID en bewijs-ID zijn per winkel verschillend.</p>' +
+    '<div class="metadata"><p>Studie-ID (zelfde beide bladen): __________________</p>' +
+    '<p>Deelnemercode (pseudoniem, geen naam/e-mail): __________________</p>' +
+    '<p>Doelgroep: _________________________</p>' +
+    '<p>Regio: _________________________</p>' +
     '<p>Week vanaf (maandag): __________________________</p>' +
-    '<p>Pseudonieme bewijsreferentie (geen naam/e-mail): __________________________</p>' +
     '<p>Prijscontext: ☐ in-store ☐ online-order (dezelfde bij beide winkels)</p>' +
-    '<p>Bron: ☐ winkelmand ☐ bon ☐ toegestane export</p></div>' +
+    '<p>Winkel-ID (uniek per winkel): __________________</p>' +
+    '<p>Filiaal / winkelnaam: __________________</p>' +
+    '<p>Bewijs-ID (uniek per meting): __________________</p>' +
+    '<p>Datum, tijd en tijdzone: __________________</p>' +
+    '<p>Bron: ☐ winkelmand ☐ bon ☐ toegestane export</p>' +
+    '<p>Herkomstnotitie (wat, waar, hoe): __________________</p></div>' +
     '<table><thead><tr><th>Ingrediënt/behoefte</th><th>Gevonden product</th>' +
     '<th>Inhoud per stuk (getal + eenheid)</th><th>Stuks per verkoopverpakking</th>' +
     '<th>Prijs per verkoopverpakking (€)</th><th>Beschikbaar?</th></tr></thead><tbody>' +
@@ -80,7 +87,7 @@ export function renderM3PaperChecklist() {
     'th,td{border:1px solid #555;padding:5px;text-align:left;vertical-align:top}' +
     'th{background:#eee}th:first-child{width:25%}th:nth-child(2){width:20%}' +
     'th:nth-child(3){width:17%}th:nth-child(4){width:12%}th:nth-child(5){width:12%}th:last-child{width:14%}' +
-    'td{height:42px}td small{display:block}td:last-child{white-space:nowrap;font-size:10px}' +
+    'td{height:34px}td small{display:block}td:last-child{white-space:nowrap;font-size:10px}' +
     'footer{border-top:1px solid #777;padding:5px 0;font-size:10px}' +
     '@media screen{body{background:#eee}.page{background:#fff;max-width:1200px;padding:24px;margin:16px auto}}'
   return '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
