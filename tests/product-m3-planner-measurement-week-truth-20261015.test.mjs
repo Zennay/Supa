@@ -56,7 +56,7 @@ test('four sparse day slots and inherited/getter replacements cannot hide a chan
   for (let missing = 0; missing < untouchedDays.length; missing++) {
     const sparse = [...untouchedDays]
     delete sparse[missing]
-    const original = [...sparse]
+    const original = sparse.slice()
     assert.equal(sparse.length, 4)
     assert.equal(new Set(sparse).size, 4,
       'independent demonstration of Set sparse-hole false-positive')
