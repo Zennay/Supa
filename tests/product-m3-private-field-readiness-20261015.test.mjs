@@ -5,6 +5,9 @@ import { mkdtemp, mkdir, rm, writeFile, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
+import { buildWeeklyBasketStudyFromObservationSheet } from '../scripts/m3-build-observed-study.mjs'
+import { createPrivateM3StudyCodePin } from '../scripts/m3-field-code-pin.mjs'
+import { preflightPrivateM3Week } from '../scripts/m3-verify-private-week-preflight.mjs'
 import {
   reviewPrivateM3FieldSheet,
   main as fieldReviewMain,
@@ -228,4 +231,27 @@ test('M3 technically complete preview must not normalize away a forged original 
     reviewPrivateM3FieldSheet(bytes(syntheticFullSheet()), SHA).technicalStudyConversionPossible,
     true,
   )
+})
+
+test('private SHA-bound M3 preflight rejects invisible-only source context while unresolved 11x11 remains admissible', () => {
+  const original = buildWeeklyBasketStudyFromObservationSheet(syntheticFullSheet())
+  const proof = (study) => {
+    const studyBytes = bytes(study)
+    const pinBytes = bytes(createPrivateM3StudyCodePin(studyBytes, SHA))
+    return preflightPrivateM3Week(studyBytes, pinBytes, SHA)
+  }
+  const valid = proof(original)
+  assert.equal(valid.status, 'private-review-only')
+  assert.equal(valid.publicSavingsClaimEligible, false)
+  assert.equal(valid.canonicalDemandLineCount, 11)
+
+  for (const [side, field] of [
+    [null, 'population'], [null, 'region'],
+    ['baseline', 'provenanceNote'], ['candidate', 'provenanceNote'],
+  ]) {
+    const study = structuredClone(original)
+    const owner = side === null ? study : study[side]
+    owner[field] = String.fromCodePoint(0x200b, 0x2060, 0x0301)
+    assert.throws(() => proof(study), /M3 private study provenance preflight refused/)
+  }
 })
