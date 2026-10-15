@@ -77,3 +77,15 @@ test('broken cross-retailer observation ownership is refused without database mo
   if (changed.status === 0) rejects(audit(db))
   else assert.notEqual(changed.status, 0)
 }))
+
+test('credential-shaped query parameters are refused even with a valid PLUS HTTPS hostname', () => fixture(async db => {
+  const changed = change(db, "UPDATE source_snapshots SET source_url='https://www.plus.nl/producten?access_token=FAKE_SECRET' WHERE retailer_id='plus';")
+  assert.equal(changed.status, 0, changed.stderr)
+  rejects(audit(db))
+}))
+
+test('encoded and mixed-case retailer URL query credentials are rejected without echoing secrets', () => fixture(async db => {
+  const changed = change(db, "UPDATE source_snapshots SET source_url='https://www.plus.nl/producten?API%5FKEY=FAKE_SECRET' WHERE retailer_id='plus';")
+  assert.equal(changed.status, 0, changed.stderr)
+  rejects(audit(db))
+}))
