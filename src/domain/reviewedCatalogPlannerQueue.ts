@@ -146,7 +146,7 @@ function sourceCandidates(catalog: Catalog, store: typeof STORES[number]) {
     candidates.push({
       id: item.canonicalKey,
       name: capture.name,
-      packAmount: capture.pack.amount,
+      packAmount: capture.pack.amount!,
       packUnit: capture.pack.unit as MatchUnit,
       available: true,
     })
