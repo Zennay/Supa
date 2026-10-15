@@ -14,6 +14,7 @@ import { priceInstantNs } from '../src/data/schemaOrgProduct.ts'
 import { parseOfflineRetailerSnapshot } from './retailer-snapshot-adapters.mjs'
 import { compareReviewedCatalogs } from '../src/domain/reviewedCatalogComparison.ts'
 import { validateM3RetailerCapturePlan } from './retailer-m3-authorized-22-capture.mjs'
+import { renderPrivateComparison } from './retailer-show-private-comparison.mjs'
 
 const MAX_MANIFEST = 96 * 1024
 const MAX_HTML = 2 * 1024 * 1024
@@ -176,11 +177,22 @@ export async function compareOfflineM3RetailerBasket(manifestPath, nowMs = Date.
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  assert(argv.length === 2 && argv[0] === '--offline' &&
-    typeof argv[1] === 'string' && !argv[1].startsWith('-'),
-    'Usage: node --experimental-strip-types scripts/retailer-m3-offline-22-snapshots.mjs --offline private-manifest.json')
+  assert((argv.length === 2 || (argv.length === 3 && argv[2] === '--text')) &&
+    argv[0] === '--offline' && typeof argv[1] === 'string' &&
+    !argv[1].startsWith('-'),
+    'Usage: node --experimental-strip-types scripts/retailer-m3-offline-22-snapshots.mjs --offline private-manifest.json [--text]')
   const result = await compareOfflineM3RetailerBasket(argv[1])
-  process.stdout.write(JSON.stringify(result, null, 2) + '\n')
+  if (argv[2] === '--text') {
+    // Reuse the already reviewed private reporter with independent physical
+    // pack reconciliation. Never fabricate public savings or stock evidence.
+    process.stdout.write(renderPrivateComparison({
+      format: 'supa-local-snapshot-comparison-v1',
+      captureSummary: result.captureSummary,
+      comparison: result.comparison,
+    }) + '\n')
+  } else {
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n')
+  }
 }
 
 if (process.argv[1] && import.meta.url ===
