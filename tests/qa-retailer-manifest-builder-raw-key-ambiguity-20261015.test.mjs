@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmod, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -87,3 +88,38 @@ test('nested original capture-safety field cannot have contradictory duplicate k
 test('escaped spelling of an existing object name is still a duplicate', () =>
   expectRefusal(raw => replaceOnce(raw, '"version": 1,',
     '"\\u0076ersion": 99, "version": 1,')))
+
+test('the sixth staged retailer evidence file must be checked before emitting a manifest', async () => {
+  const dir = await stage()
+  try {
+    const path = join(dir, 'capture-5.json')
+    const original = await readFile(path, 'utf8')
+    const mutated = replaceOnce(original, '"version": 1,',
+      '"version": 17, "version": 1,')
+    assert.deepEqual(JSON.parse(mutated), JSON.parse(original))
+    await writeFile(path, mutated, { mode: 0o600 })
+    await assert.rejects(buildPrivateReviewedManifest(dir),
+      /Private reviewed manifest builder refused/)
+    assert.ok(!(await readdir(dir)).includes('manifest.json'))
+  } finally { await cleanup(dir) }
+})
+
+test('operator CLI refuses ambiguous JSON without success output or a stray manifest', async () => {
+  const dir = await stage()
+  try {
+    const path = join(dir, 'capture-0.json')
+    const source = await readFile(path, 'utf8')
+    await writeFile(path, replaceOnce(source, '"version": 1,',
+      '"version": 99, "version": 1,'), { mode: 0o600 })
+    const cli = new URL('../scripts/retailer-private-reviewed-manifest-builder.mjs', import.meta.url).pathname
+    const result = spawnSync(process.execPath,
+      ['--experimental-strip-types', cli, '--dir', dir],
+      { encoding: 'utf8', timeout: 45000, maxBuffer: 128 * 1024 })
+    assert.equal(result.error, undefined)
+    assert.equal(result.status, 2)
+    assert.equal(result.stdout, '')
+    assert.match(result.stderr, /^Private reviewed manifest builder refused\\s*$/)
+    assert.doesNotMatch(result.stderr, /https?:\\/\\/|capture-0|\.json|sha256|token/i)
+    assert.ok(!(await readdir(dir)).includes('manifest.json'))
+  } finally { await cleanup(dir) }
+})
