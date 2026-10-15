@@ -113,29 +113,52 @@ function samePhysicalReference(reference: unknown, pack: RawPack): boolean {
     packAmount === refAmount
 }
 
-function extractPrice(offers: JsonObject[], pack: RawPack): number | null {
-  const prices = offers
-    .flatMap((offer) => {
-      // AggregateOffer, including its lowPrice, is a marketplace range.
-      if (hasType(offer, 'AggregateOffer')) return []
+/** Dates on a nested price refer to that price, not just to its parent Offer. */
+function priceBoundTime(raw: string, isEnd: boolean): number {
+  return Date.parse(isEnd && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(raw)
+    ? raw + 'T23:59:59.999Z' : raw)
+}
 
-      return [
-        cents(offer.price),
-        ...priceSpecificationCandidates(offer).map((specification) => {
-          const hasReference = specification.referenceQuantity !== undefined
-          const isReference = hasType(specification, 'UnitPriceSpecification')
-          if (isReference || hasReference) {
-            if (!isReference ||
-                !samePhysicalReference(specification.referenceQuantity, pack)) {
-              return null
-            }
-          }
-          // Never promote an advertised price range to a fixed checkout price.
-          return cents(specification.price)
-        }),
-      ]
-    })
-    .filter((value): value is number => value !== null)
+function exactSpecPrice(specification: JsonObject, pack: RawPack): number | null {
+  if (hasType(specification, 'UnitPriceSpecification') ||
+      specification.referenceQuantity !== undefined) {
+    if (!hasType(specification, 'UnitPriceSpecification') ||
+        !samePhysicalReference(specification.referenceQuantity, pack)) {
+      return null
+    }
+  }
+  return cents(specification.price)
+}
+
+function specificationValidAt(specification: JsonObject, observedAt: number): boolean {
+  const fields = [
+    [specification.validFrom, false],
+    [specification.validThrough ?? specification.validTo, true],
+  ] as const
+  for (const [raw, isEnd] of fields) {
+    if (raw === undefined || raw === null) continue
+    if (typeof raw !== 'string' || !raw.trim()) return false
+    const value = priceBoundTime(raw, isEnd)
+    if (!Number.isFinite(value) ||
+        (isEnd ? value < observedAt : value > observedAt)) return false
+  }
+  const from = specification.validFrom
+  const to = specification.validThrough ?? specification.validTo
+  return from == null || to == null ||
+    priceBoundTime(from as string, false) <= priceBoundTime(to as string, true)
+}
+
+/** Never promote a multi-Offer collection to a single unbounded checkout quote. */
+function extractPrice(offers: JsonObject[], pack: RawPack, capturedAt: string): number | null {
+  if (offers.length !== 1 || hasType(offers[0], 'AggregateOffer')) return null
+  const offer = offers[0]
+  const capturedMs = Date.parse(capturedAt)
+  if (!Number.isFinite(capturedMs)) return null
+  const prices = [
+    cents(offer.price),
+    ...priceSpecificationCandidates(offer).map((spec) =>
+      specificationValidAt(spec, capturedMs) ? exactSpecPrice(spec, pack) : null),
+  ].filter((value): value is number => value !== null)
   return uniqueKnown(prices)
 }
 
@@ -223,16 +246,43 @@ function extractPack(product: JsonObject): RawPack {
   }
 }
 
-function buildOffer(offers: JsonObject[], price: number | null): RawOffer | null {
+/**
+ * Preserve the time interval of the actual price source. Intersect matching
+ * nested PriceSpecification windows with the containing Offer window.
+ * Otherwise a valid-at-capture quote could appear valid long after expiry.
+ */
+function buildOffer(offers: JsonObject[], price: number | null, pack: RawPack,
+  capturedAt: string): RawOffer | null {
   if (offers.length !== 1 || price === null) return null
+  const offer = offers[0]
+  const capturedMs = Date.parse(capturedAt)
+  const specs = priceSpecificationCandidates(offer)
+    .filter((spec) => exactSpecPrice(spec, pack) === price &&
+      specificationValidAt(spec, capturedMs))
+
+  const fromDates: string[] = []
+  const toDates: string[] = []
+  const add = (value: unknown, end: boolean) => {
+    if (typeof value === 'string' && value.trim()) {
+      (end ? toDates : fromDates).push(value.trim())
+    }
+  }
+  add(offer.validFrom, false)
+  add(offer.priceValidUntil, true)
+  for (const spec of specs) {
+    add(spec.validFrom, false)
+    add(spec.validThrough ?? spec.validTo, true)
+  }
+  const validFrom = fromDates.sort((a, b) =>
+    priceBoundTime(b, false) - priceBoundTime(a, false))[0] ?? null
+  const validTo = toDates.sort((a, b) =>
+    priceBoundTime(a, true) - priceBoundTime(b, true))[0] ?? null
 
   return {
-    label: 'schema.org Offer',
-    mechanics: null,
-    offerPriceCents: price,
-    originalPriceCents: null,
-    validFrom: asString(offers[0].validFrom),
-    validTo: asString(offers[0].priceValidUntil),
+    label: 'schema.org Offer', mechanics: null, offerPriceCents: price,
+    originalPriceCents: null, validFrom,
+    validTo: validTo && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(validTo)
+      ? validTo + 'T23:59:59.999Z' : validTo,
   }
 }
 
@@ -272,7 +322,7 @@ export function parseSchemaOrgProduct(
   }
 
   const pack = extractPack(product)
-  const price = extractPrice(offers, pack)
+  const price = extractPrice(offers, pack, provenance.capturedAt)
   if (price !== null && currency === null) {
     return {
       type: 'abstain',
@@ -287,7 +337,7 @@ export function parseSchemaOrgProduct(
     currentPriceCents: price,
     currency: 'EUR',
     pack,
-    offer: buildOffer(offers, price),
+    offer: buildOffer(offers, price, pack, provenance.capturedAt),
     availability: extractAvailability(offers),
     provenance,
   }
