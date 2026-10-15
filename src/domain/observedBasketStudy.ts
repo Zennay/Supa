@@ -265,13 +265,13 @@ function assessWeeklyBasketStudyCore(
   const configuredReferenceNowMs = validOptionsContainer
     ? (options as { referenceNowMs?: unknown }).referenceNowMs
     : undefined
-  // The public direct-assessment API must fail closed without an explicit
-  // deterministic test clock. A missing option does not disable the future
-  // observation guard; production reports continue to pass real Date.now().
-  const referenceNowMs = configuredReferenceNowMs === undefined
-    ? Date.now()
-    : configuredReferenceNowMs
-  if (typeof referenceNowMs !== 'number' || !Number.isFinite(referenceNowMs)) {
+  // The financial domain must remain deterministic: the caller must provide
+  // a validated evaluation time. Missing time cannot authorize a savings
+  // result; CLI and UI entry points supply the actual processing clock.
+  const referenceNowMs = configuredReferenceNowMs
+  if (referenceNowMs === undefined) {
+    reasons.push('assessment reference clock is required')
+  } else if (typeof referenceNowMs !== 'number' || !Number.isFinite(referenceNowMs)) {
     reasons.push('assessment reference clock is malformed')
   } else {
     if (baselineObservedAt !== null && baselineObservedAt > referenceNowMs) {
