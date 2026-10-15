@@ -8,25 +8,69 @@ import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
 
 // A real, custom week selection over proven fixture recipes: a reusable
 // product path, not a fabricated user observation, live store query or quote.
-function selectedDays(argv) {
-  if (!Array.isArray(argv) || (argv.length !== 0 &&
-      (argv.length !== 2 || argv[0] !== '--days' ||
-      typeof argv[1] !== 'string' || !argv[1]))) {
-    throw new Error('Invalid private planned-week review arguments')
+/**
+ * Allow a person to swap among the three controlled local M2 demo recipes
+ * on already-planned days. This changes physical ingredient demand only;
+ * historical retailer candidates remain unpriced and review-only.
+ *
+ * --days Ma,Do                 retains the default recipes on these days
+ * --plan Ma:pasta,Do:teriyaki  selects replacement recipes for these days
+ *
+ * Both flags are deliberately exclusive. Arbitrary days/recipes and external
+ * recipes are not permitted until their source/ingredient rights are reviewed.
+ */
+export function selectedFixtureWeek(argv = []) {
+  if (!Array.isArray(argv) ||
+      (argv.length !== 0 && (argv.length !== 2 ||
+        !['--days', '--plan'].includes(argv[0]) ||
+        typeof argv[1] !== 'string' || !argv[1]))) {
+    throw new Error('Only approved private planned-week review arguments are accepted')
   }
-  if (argv.length === 0) return [...m2DefaultActiveDays]
-  const days = argv[1].split(',')
-  const allowed = new Set(m2DefaultActiveDays)
-  if (days.length < 1 || days.length > 7 ||
-      new Set(days).size !== days.length ||
-      days.some(day => !allowed.has(day))) {
-    throw new Error('Select distinct currently planned fixture day labels only')
+  const allowedDays = new Set(m2DefaultActiveDays)
+  const allowedRecipes = new Set(m2Recipes.map(recipe => recipe.id))
+  if (argv.length === 0) {
+    return {
+      days: [...m2DefaultActiveDays],
+      plan: m2InitialPlan.map(meal => ({ ...meal })),
+    }
   }
-  return days
+
+  const entries = argv[1].split(',')
+  if (entries.length < 1 || entries.length > m2DefaultActiveDays.length ||
+      new Set(entries).size !== entries.length) {
+    throw new Error('Only distinct currently planned fixture days are accepted')
+  }
+
+  if (argv[0] === '--days') {
+    if (entries.some(day => !allowedDays.has(day))) {
+      throw new Error('Only currently planned fixture day labels are accepted')
+    }
+    return {
+      days: m2DefaultActiveDays.filter(day => entries.includes(day)),
+      plan: m2InitialPlan.map(meal => ({ ...meal })),
+    }
+  }
+
+  const chosen = new Map()
+  for (const entry of entries) {
+    const match = /^([A-Za-z]{2}):([a-z][a-z0-9-]{0,39})$/.exec(entry)
+    if (!match || !allowedDays.has(match[1]) || !allowedRecipes.has(match[2]) ||
+        chosen.has(match[1])) {
+      throw new Error('Only one approved fixture recipe per planned day is allowed')
+    }
+    chosen.set(match[1], match[2])
+  }
+  return {
+    days: m2DefaultActiveDays.filter(day => chosen.has(day)),
+    plan: m2InitialPlan.map(meal => ({
+      day: meal.day,
+      recipeId: chosen.get(meal.day) ?? meal.recipeId,
+    })),
+  }
 }
 
 export async function main(argv = process.argv.slice(2), write = text => process.stdout.write(text)) {
-  const days = selectedDays(argv)
+  const { days, plan } = selectedFixtureWeek(argv)
   const batch = await loadReviewedRepositoryFixtures()
   if (batch.summary.sources !== 6 || batch.summary.rejectedSources !== 0 ||
       batch.summary.productionEnabled !== false ||
@@ -35,7 +79,7 @@ export async function main(argv = process.argv.slice(2), write = text => process
   }
   const catalog = buildUniversalRetailerCatalog(batch)
   const week = buildDynamicReviewedWeek({
-    catalog, plan: m2InitialPlan, recipes: m2Recipes, activeDays: days,
+    catalog, plan, recipes: m2Recipes, activeDays: days,
   })
   const summary = reviewedPlannerQueueSummary(week.preview)
   const aggregate = {
