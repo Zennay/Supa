@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, writeFile, rm, symlink, link } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -79,6 +79,26 @@ test('M3 code-pin CLI prints only safe digest/flags and refuses invalid SHA with
     assert.equal(bad.status, 1)
     assert.equal(bad.stderr.includes(path), false)
     assert.equal(bad.stderr.includes('synthetic-plus'), false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('M3 code-pin CLI denies symlink and hardlink aliases of private input', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-pin-alias-'))
+  try {
+    const original = join(dir, 'private.json')
+    await writeFile(original, bytes, { mode: 0o600 })
+    const alias = join(dir, 'private-alias.json')
+    await symlink(original, alias)
+    const linkPath = join(dir, 'private-hardlink.json')
+    await link(original, linkPath)
+    for (const path of [alias, linkPath]) {
+      const run = spawnSync(process.execPath, ['scripts/m3-field-code-pin.mjs', path, SHA], { encoding: 'utf8' })
+      assert.equal(run.status, 1)
+      assert.equal(run.stderr.includes(path), false)
+      assert.equal(run.stdout, '')
+    }
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
