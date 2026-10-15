@@ -26,8 +26,8 @@ function refuseMoney(result) {
 }
 
 test('direct API samples the implicit clock once for an entire M3 comparison', (t) => {
-  const at = '2026-10-15T12:00:00Z'
-  const study = studyAt('2026-10-15T11:59:00Z', at)
+  const at = '2026-10-15T08:00:00Z'
+  const study = studyAt('2026-10-15T07:59:00Z', at)
   const unchanged = JSON.stringify(study)
   const now = Date.parse(at)
   let calls = 0
@@ -44,8 +44,8 @@ test('direct API samples the implicit clock once for an entire M3 comparison', (
 })
 
 test('explicit trusted evaluation instant bypasses ambient clock entirely', (t) => {
-  const study = studyAt('2026-10-15T11:59:00Z', '2026-10-15T12:00:00Z')
-  const at = Date.parse('2026-10-15T12:00:00Z')
+  const study = studyAt('2026-10-15T07:59:00Z', '2026-10-15T08:00:00Z')
+  const at = Date.parse('2026-10-15T08:00:00Z')
   let calls = 0
   t.mock.method(Date, 'now', () => { calls++; return 0 })
   const result = assessWeeklyBasketStudy(study, { referenceNowMs: at })
@@ -55,9 +55,9 @@ test('explicit trusted evaluation instant bypasses ambient clock entirely', (t) 
 })
 
 test('one-millisecond future candidate is private, unknown and financially unclaimable', (t) => {
-  const at = Date.parse('2026-10-15T12:00:00Z')
-  const study = studyAt('2026-10-15T11:59:00Z', '2026-10-15T12:00:00.001Z')
+  const at = Date.parse('2026-10-15T08:00:00Z')
+  const study = studyAt('2026-10-15T07:59:00Z', '2026-10-15T08:00:00.001Z')
   t.mock.method(Date, 'now', () => at)
   refuseMoney(assessWeeklyBasketStudy(study))
-  assert.equal(study.candidate.observedAt, '2026-10-15T12:00:00.001Z')
+  assert.equal(study.candidate.observedAt, '2026-10-15T08:00:00.001Z')
 })
