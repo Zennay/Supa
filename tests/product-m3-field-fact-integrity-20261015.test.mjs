@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 import { buildM3OutstandingFieldActions } from '../scripts/m3-private-outstanding-field-actions.mjs'
+import { buildFictionalPricedSheet } from '../scripts/m3-rehearse-field-run.mjs'
 
 const CLI = fileURLToPath(new URL('../scripts/m3-private-outstanding-field-actions.mjs', import.meta.url))
 const NOW = Date.parse('2026-10-15T12:00:00Z')
@@ -186,4 +187,26 @@ test('CLI explains contradictory unavailable price without echoing the hidden am
     }
   }
   assert.equal(await readFile(path, 'utf8'), original)
+})
+
+test('fully filled fictional 11+11 cannot become privately reviewable with hidden unavailable prices', () => {
+  const sheet = buildFictionalPricedSheet()
+  const original = sheet.baseline.lines[0].observedProduct
+  sheet.baseline.lines[0].observedProduct = { ...original, available: false }
+  const warned = count(sheet)
+  assert.equal(warned.remainingTotalLines, 0, 'explicitly absent means availability was recorded')
+  assert.equal(warned.unavailableDetailWarnings.plus, 1)
+  assert.equal(warned.unavailableDetailWarnings.dekamarkt, 0)
+  assert.equal(warned.readyForPrivateReview, false, 'stale money requires private correction')
+  assert.equal(warned.publicSavingsClaimEligible, false)
+  assert.equal(JSON.stringify(warned).includes(original.productName), false)
+  sheet.baseline.lines[0].observedProduct = {
+    ...buildObservationSheet().baseline.lines[0].observedProduct,
+    available: false,
+  }
+  const fixed = count(sheet)
+  assert.equal(fixed.unavailableDetailWarnings.plus, 0)
+  assert.equal(fixed.remainingTotalLines, 0)
+  assert.equal(fixed.readyForPrivateReview, true)
+  assert.equal(fixed.publicSavingsClaimEligible, false)
 })
