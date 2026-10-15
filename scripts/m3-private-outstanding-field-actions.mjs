@@ -77,8 +77,32 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
   }
 }
 
+function renderHumanChecklist(report) {
+  const lines = [
+    'SUPA M3 · nog te meten (geen geverifieerde winkelwaarneming)',
+    'Openstaande boodschappen: ' + report.remainingTotalLines + ' van 22.',
+  ]
+  for (const store of report.retailers) {
+    lines.push('', store.retailer + ': ' + store.remainingLines + ' van 11 nog te meten')
+    if (store.pending.length === 0) lines.push('  Geen openstaande regels.')
+    for (const item of store.pending) {
+      const nextStep = item.action === 'record-availability'
+        ? 'beschikbaarheid vastleggen'
+        : 'product, verpakking en prijs aanvullen'
+      lines.push('  - ' + item.ingredientLabel + ' (' +
+        item.requiredAmount + ' ' + item.requiredUnit + '): ' + nextStep)
+    }
+  }
+  lines.push('', 'Venster: ' + report.observationWindowState +
+    '. Privéreview mogelijk: ' + (report.readyForPrivateReview ? 'ja' : 'nee') + '.',
+    'Geen bewezen winkelprijzen of publieke besparingsclaim.')
+  return lines.join('\n') + '\n'
+}
+
 export async function main(argv = process.argv.slice(2)) {
-  if (argv.length !== 1 || typeof argv[0] !== 'string' ||
+  if ((argv.length !== 1 &&
+      !(argv.length === 2 && argv[1] === '--text')) ||
+      typeof argv[0] !== 'string' ||
       !argv[0].trim() || argv[0] !== argv[0].trim() ||
       argv[0].startsWith('-')) {
     throw new Error('usage: m3-private-outstanding-field-actions <private-sheet.json>')
@@ -90,7 +114,9 @@ export async function main(argv = process.argv.slice(2)) {
     throw new Error('could not read private M3 draft')
   }
   const result = buildM3OutstandingFieldActions(serialized)
-  process.stdout.write(JSON.stringify(result, null, 2) + '\n')
+  process.stdout.write(argv[1] === '--text'
+    ? renderHumanChecklist(result)
+    : JSON.stringify(result, null, 2) + '\n')
   return result
 }
 

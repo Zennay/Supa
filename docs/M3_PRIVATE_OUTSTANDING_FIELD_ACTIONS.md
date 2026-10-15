@@ -15,3 +15,13 @@ De uitvoer bevat **alle nog openstaande canonieke ingredientregels**, afzonderli
 Alle labels en hoeveelheden zijn afkomstig uit de M2-planner, nooit uit vrije gebruikerstekst. Vrije winkelinformatie, persoonsgegevens, prijzen, productnamen, bronlinks, evidence IDs en tijdstippen worden niet uitgegeven; alleen een grove status `not-started`, `single-observation`, `within-window` of `outside-window`. Een defect formulier wordt geweigerd; er wordt geen invoerbestand geschreven of overschreven.
 
 **Cruciaal:** `readyForPrivateReview` betekent hoogstens dat een operator privé kan nakijken; `verifiedRetailerObservations` en `publicSavingsClaimEligible` blijven ook bij complete fictieve testgegevens altijd `false`. De menselijke controle, exact 11+11 echt gemeten regels binnen 24 uur, dezelfde prijscontext en eventuele rechten op bronnen blijven verplicht. Dit vervangt noch de bestaande Meten-converter, noch de retailer-pipeline uit de concept-PR.
+
+## Nederlandstalige checklist
+
+Voor de operator zonder technische JSON-weergave:
+
+```sh
+node --experimental-strip-types scripts/m3-private-outstanding-field-actions.mjs private-sheet.json --text
+```
+
+Elk van beide winkels krijgt een blok met uitsluitend nog openstaande canonieke planneringrediënten. Je ziet of beschikbaarheid nog ontbreekt of dat product-/verpakkings-/prijsvelden aangevuld moeten worden. De tekst bevat nooit ingevoerde winkelprijzen, deelnemergegevens, bronlinks, klantproductnamen, bewijstijdstippen of bestandsnamen. Ook met alle 22 regels afgevinkt: géén onafhankelijk geverifieerde winkelwaarneming of openbare besparingsclaim.

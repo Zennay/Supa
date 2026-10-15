@@ -131,3 +131,40 @@ test('CLI rejects flags and unreadable paths without logging private names', asy
     assert.equal(command.stderr.includes(dir), false)
   }
 })
+
+test('Dutch --text lists pending PLUS and DekaMarkt without prices or private source', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-actions-text-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const path = join(dir, 'private-sheet.json')
+  const sheet = buildObservationSheet()
+  sheet.study.participantKey = 'SECRET_PARTICIPANT_SHOULD_NEVER_SHOW'
+  sheet.baseline.lines[0].observedProduct.available = false
+  sheet.candidate.lines[1].observedProduct.available = true
+  sheet.candidate.lines[1].observedProduct.productName = 'PRIVATE_PRODUCT_NAME'
+  sheet.candidate.lines[1].observedProduct.priceCents = 918273
+  await writeFile(path, JSON.stringify(sheet), { mode: 0o600 })
+  const result = call(dir, path, '--text')
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /PLUS: 10 van 11 nog te meten/)
+  assert.match(result.stdout, /DekaMarkt: 11 van 11 nog te meten/)
+  assert.match(result.stdout, /product, verpakking en prijs aanvullen/)
+  assert.match(result.stdout, /beschikbaarheid vastleggen/)
+  assert.match(result.stdout, /Geen bewezen winkelprijzen/)
+  assert.equal(result.stdout.includes('SECRET_PARTICIPANT_SHOULD_NEVER_SHOW'), false)
+  assert.equal(result.stdout.includes('PRIVATE_PRODUCT_NAME'), false)
+  assert.equal(result.stdout.includes('918273'), false)
+  assert.equal(result.stdout.includes(path), false)
+  assert.equal(result.stdout.startsWith('{'), false)
+})
+
+test('CLI rejects bad and extra text flags without displaying private paths', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-actions-text-errors-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  for (const args of [['--text'], ['private.json', '--json'], ['private.json', '--text', '--force']]) {
+    const command = call(dir, ...args)
+    assert.notEqual(command.status, 0)
+    assert.equal(command.stdout, '')
+    assert.match(command.stderr, /could not be generated/)
+    assert.equal(command.stderr.includes('private.json'), false)
+  }
+})
