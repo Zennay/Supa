@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createPrivateM3StudyCodePin } from '../scripts/m3-field-code-pin.mjs'
-import { preflightPrivateM3Week } from '../scripts/m3-verify-private-week-preflight.mjs'
+import { preflightPrivateM3Week, assertUnambiguousM3StudyJson } from '../scripts/m3-verify-private-week-preflight.mjs'
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 
 const SHA = '1234567890abcdef1234567890abcdef12345678'
@@ -192,4 +192,37 @@ test('M3 pinned weekly preflight rejects >24h, out-of-plan-week and future captu
   const invalidWeekDate = syntheticStudy()
   invalidWeekDate.weekStart = '2026-10-32'
   assert.throws(() => evaluate(invalidWeekDate), /preflight refused/)
+})
+
+test('M3 strict study JSON detects double identity and nested price or demand attestation', () => {
+  const raw = encoded(syntheticStudy()).toString('utf8')
+  const cases = [
+    raw.replace('"studyId":', '"studyId":"forged-identity","studyId":'),
+    raw.replace('"amount":', '"amount":99999,"amount":'),
+    raw.replace('"totalCents":', '"totalCents":99999,"totalCents":'),
+    raw.replace('"studyId":', '"st\\u0075dyId":"hidden-identity","studyId":'),
+  ]
+  for (const ambiguous of cases) {
+    // JSON.parse last-wins would otherwise produce the *normal* fixture.
+    assert.equal(JSON.parse(ambiguous).studyId, syntheticStudy().studyId)
+    const studyBytes = Buffer.from(ambiguous)
+    const properDigest = pinned(studyBytes)
+    assert.throws(() => preflightPrivateM3Week(studyBytes, properDigest), /preflight refused/)
+  }
+})
+
+test('M3 strict JSON scanner supports nested valid literals, escaped strings and refuses malformed shapes', () => {
+  const value = '{"a":{"x":[null,true,false,1.5e2,"escaped\\\\quote"]},"b":2}'
+  assert.doesNotThrow(() => assertUnambiguousM3StudyJson(value))
+  for (const hostile of [
+    '{"a":1,"a":2}',
+    '{"a":1,}',
+    '[{"x":1,"x":2}]',
+    '{"x":[1,2,]}',
+    '{"x":"unterminated}',
+    '{"x":01}',
+    '{"x":true} extra',
+  ]) {
+    assert.throws(() => assertUnambiguousM3StudyJson(hostile), /preflight refused/)
+  }
 })
