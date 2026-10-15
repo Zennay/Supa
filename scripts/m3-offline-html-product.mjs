@@ -128,8 +128,12 @@ function extractJsonLdDocuments(html) {
  * Input source = { supermarket:'plus'|'dekamarkt',kind:'product',url }.
  * Caller is responsible for source rights and for freshness/study comparison.
  */
-export function parseM3OfflineProductHtml({ source, html, capturedAt } = {}) {
+export function parseM3OfflineProductHtml(input = {}) {
   try {
+    if (!input || typeof input !== 'object') {
+      return abstain('invalid offline retailer product snapshot')
+    }
+    const { source, html, capturedAt } = input
     if (!validSource(source, capturedAt) ||
         typeof html !== 'string' ||
         Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES ||
