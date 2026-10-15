@@ -105,7 +105,17 @@ function samePhysicalReference(reference: unknown, pack: RawPack): boolean {
     physicalUnit === 'g' || physicalUnit === 'kg' ? 'mass'
       : physicalUnit === 'ml' || physicalUnit === 'l' ? 'volume'
         : physicalUnit === 'piece' ? 'piece' : 'unknown'
-  const packAmount = amount(pack.amount, pack.unit)
+  // ReferenceQuantity is for the entire purchasable SKU, not one inner
+  // carton of a multipack. The checkout price for "2 x 500 ml" must only be
+  // inferred from a physically equivalent 1000 ml (or 1 LTR) reference.
+  // Refuse uncertain labels/counts instead of treating an inner unit as a SKU.
+  const physicalPack = normalizePackText(pack.rawText)
+  if (physicalPack.amount !== pack.amount ||
+      physicalPack.unit !== pack.unit ||
+      !Number.isSafeInteger(physicalPack.count) || physicalPack.count <= 0) {
+    return false
+  }
+  const packAmount = amount(pack.amount * physicalPack.count, pack.unit)
   const refAmount = amount(parsed, unit)
   return family(pack.unit) !== 'unknown' && family(pack.unit) === family(unit) &&
     packAmount !== null && refAmount !== null &&
