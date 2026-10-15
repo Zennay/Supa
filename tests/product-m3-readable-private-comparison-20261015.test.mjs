@@ -26,3 +26,22 @@ test('operator refuses to show a row price contradicting package arithmetic',()=
   f.comparison.lines[0].plus.totalCents=1
   assert.match(renderPrivateComparison(f),/PLUS: prijs onbetrouwbaar/)
 })
+
+test('operator view exposes reviewed capture clocks even for empty sources',()=>{
+  const f=fixture()
+  f.captureSummary=[{supermarket:'plus',capturedAt:'2026-10-15T10:00:00.123456789Z',parsedProducts:0},
+    {supermarket:'dekamarkt',parsedProducts:0}]
+  const text=renderPrivateComparison(f)
+  assert.match(text,/vastgelegd 2026-10-15T10:00:00.123456789Z/)
+  assert.match(text,/registratietijd onbekend/)
+})
+
+test('operator explains invalid source proof separately from missing stock',()=>{
+  const f=fixture()
+  f.comparison.reason='invalid_or_stale_source'
+  f.comparison.comparable=false
+  f.comparison.savingsCents=null
+  const text=renderPrivateComparison(f)
+  assert.match(text,/bronregistratie is ongeldig of ouder/)
+  assert.doesNotMatch(text,/ALLEEN OFFLINE MANDVERSCHIL/)
+})
