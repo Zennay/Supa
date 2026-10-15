@@ -9,6 +9,9 @@ import {
 } from '../src/data/m2Fixture.ts'
 
 // Fully synthetic: this never reads or writes a real M3 observation.
+// Frozen evaluation instant after all simulated 2026 observations.
+const QA_REFERENCE_NOW_MS = Date.parse('2026-10-14T12:00:00Z')
+
 function basket(store, priceAdjustment = 0) {
   const products = m2Products.map(p => ({
     ...p, id: store.id + '-' + p.id, storeId: store.id,
@@ -64,7 +67,7 @@ for (const [field, label, invisible] of [
     const s = study()
     mutate(s, field, invisible)
     const before = structuredClone(s)
-    const check = assessWeeklyBasketStudy(s)
+    const check = assessWeeklyBasketStudy(s, { referenceNowMs: QA_REFERENCE_NOW_MS })
     assert.equal(check.claimable, false)
     assert.equal(check.comparison.outcome, 'unknown')
     assert.equal(check.comparison.deltaCents, null)
@@ -87,7 +90,7 @@ test('M3 independent: visible text with combining accents, RTL scripts and emoji
   s.population = 'cafe\u0301 studenten'
   s.baseline.provenanceNote = 'متجر - checked by tester'
   s.candidate.provenanceNote = '👩‍🍳 getoetste fictieve prijzen'
-  const check = assessWeeklyBasketStudy(s)
+  const check = assessWeeklyBasketStudy(s, { referenceNowMs: QA_REFERENCE_NOW_MS })
   const report = buildObservedWeekReport(s)
   assert.equal(check.claimable, true)
   assert.equal(check.comparison.outcome, 'better')
