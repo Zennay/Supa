@@ -73,6 +73,43 @@ test('unavailable physical row remains complete without inventing a product', ()
   assert.equal(result.publicSavingsClaimEligible, false)
 })
 
+test('explicitly unavailable original must not hide a contradictory priced product', () => {
+  const values = [
+    ['productName', 'PRIVATE_STALE_PRODUCT'],
+    ['productId', 'PRIVATE_STALE_PRODUCT_ID'],
+    ['packAmount', 500],
+    ['packUnit', 'g'],
+    ['priceCents', 0],
+    ['priceCents', 599],
+  ]
+  for (const side of ['baseline', 'candidate']) {
+    for (const [key, value] of values) {
+      const sheet = fixture()
+      const line = sheet[side].lines[0]
+      line.observedProduct.available = false
+      line.observedProduct[key] = value
+      assert.throws(() => count(sheet), /contradicts observed unavailability/,
+        'refuse ' + side + ' unavailable with ' + key)
+    }
+  }
+})
+
+test('unavailable row may retain a privacy-safe explanation note but no invented price', () => {
+  const sheet = fixture()
+  sheet.baseline.lines[0].observedProduct.available = false
+  sheet.baseline.lines[0].observedProduct.note = secret
+  sheet.baseline.lines[0].observedProduct.sourceUrl = 'https://example.invalid/PRIVATE_PATH'
+  sheet.candidate.lines[0].observedProduct.available = false
+  sheet.candidate.lines[0].observedProduct.note = secret
+  const result = count(sheet)
+  assert.equal(result.completedTotalLines, 2)
+  assert.equal(result.remainingTotalLines, 20)
+  assert.equal(result.publicSavingsClaimEligible, false)
+  assert.equal(result.verifiedRetailerObservations, false)
+  assert.equal(JSON.stringify(result).includes(secret), false)
+  assert.equal(JSON.stringify(result).includes('PRIVATE_PATH'), false)
+})
+
 test('malformed original fields refuse CLI JSON/text without leaking path or source', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'supa-m3-refuse-restored-source-'))
   t.after(() => rm(dir, { recursive: true, force: true }))
