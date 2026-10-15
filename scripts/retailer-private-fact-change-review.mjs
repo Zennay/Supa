@@ -50,6 +50,20 @@ function normalized(value) {
   fail()
 }
 
+/**
+ * An identical source URL and raw SHA-256 cannot yield different normalized
+ * product facts merely because its reviewed capture timestamp changed.
+ * Exclude ONLY the capture clock; every other product/price/availability fact
+ * is expected to be a deterministic interpretation of the same source bytes.
+ */
+function immutableSourceFacts(observation) {
+  return normalized([
+    observation.supermarket, observation.sourceProductId,
+    observation.name, observation.currentPriceCents, observation.currency,
+    observation.pack, observation.offer, observation.availability,
+  ])
+}
+
 function latest(batch) {
   const rows = new Map()
   for (const result of batch.results) {
@@ -105,6 +119,11 @@ export function comparePrivateRetailerFactChanges(previous, current, {
     if (!old) { count.added++; continue }
     if (!next) { count.missing++; continue }
     if (next.when < old.when) fail()
+    // Same source bytes under the same URL cannot represent a real retailer
+    // price, pack, stock or product-identity drift. A separate capture time
+    // does not make a contradictory parse of immutable bytes authentic.
+    if (next.sha === old.sha && next.url === old.url &&
+        immutableSourceFacts(old.obs) !== immutableSourceFacts(next.obs)) fail()
     if (next.when === old.when &&
         (next.sha !== old.sha || next.url !== old.url ||
           normalized(next.obs) !== normalized(old.obs))) fail()
