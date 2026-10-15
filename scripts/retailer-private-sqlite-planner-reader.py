@@ -79,6 +79,18 @@ def read_reviewed_catalog(path):
                 refuse()
         if {row[0] for row in sources} != set(HOSTS):
             refuse()
+        # Declared retailer_sources rows are NOT proof that those retailers
+        # contributed any captures. Before exposing a 2-store human review,
+        # require physical source/product/observation coverage on both sides.
+        # All tables are part of the fixed local schema (no dynamic input).
+        for table in ("source_snapshots", "products", "price_observations"):
+            try:
+                coverage = dict(con.execute(
+                    f"SELECT retailer_id, COUNT(*) FROM {table} GROUP BY retailer_id"))
+            except sqlite3.Error:
+                refuse()
+            if set(coverage) != set(HOSTS) or any(n < 1 for n in coverage.values()):
+                refuse()
         sql = """
             SELECT p.retailer_id,p.source_product_id,p.display_name,
                    s.kind,s.source_url,s.captured_at,s.content_sha256,
@@ -88,6 +100,7 @@ def read_reviewed_catalog(path):
                 ON p.retailer_id=o.retailer_id
                AND p.source_product_id=o.source_product_id
               JOIN source_snapshots s ON s.id=o.snapshot_id
+               AND s.retailer_id=o.retailer_id
              ORDER BY p.retailer_id,p.source_product_id,s.captured_at,s.id
         """
         try:
