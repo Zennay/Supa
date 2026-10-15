@@ -91,3 +91,10 @@ test('valid dated nested specification preserves both the price and its provenan
   assert.equal(r.savingsCents,20)
   assert.equal(r.claimable,false)
 })
+
+test('malformed explicit parent Offer dates cannot silently become unbounded prices',()=>{
+  for(const date of [{value:'2026-10-14T00:00:00Z'},12,false,'not-a-date','']) {
+    assertUnknown(offer('1.19',{priceValidUntil:date}))
+    assertUnknown(offer('1.19',{validFrom:date}))
+  }
+})
