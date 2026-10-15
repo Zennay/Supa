@@ -28,15 +28,21 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
   const observations = []
   const captureSummary = []
   const distinctSources = new Set()
+  const distinctCaptureFiles = new Set()
+  const distinctCaptureHashes = new Set()
   for (const entry of manifest.snapshots) {
     if (typeof entry?.sourceId !== 'string' ||
         typeof entry?.htmlFile !== 'string' ||
         !/^[A-Za-z0-9][A-Za-z0-9._-]*\.html$/.test(entry.htmlFile) ||
         isAbsolute(entry.htmlFile) || basename(entry.htmlFile) !== entry.htmlFile ||
-        distinctSources.has(entry.sourceId)) {
+        distinctSources.has(entry.sourceId) ||
+        distinctCaptureFiles.has(entry.htmlFile)) {
       throw new Error('Invalid or duplicate offline snapshot reference')
     }
     distinctSources.add(entry.sourceId)
+    // One local HTML capture is evidence for one retailer source only.
+    // Re-labelling it under another source ID is not independent proof.
+    distinctCaptureFiles.add(entry.htmlFile)
     const source = SOURCES.find((candidate) => candidate.id === entry.sourceId)
     if (!source) throw new Error('Offline snapshot source is not on the allowlist')
     const candidatePath = join(root, entry.htmlFile)
@@ -49,6 +55,14 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
     const extracted = parseOfflineRetailerSnapshot({
       source, html, capturedAt: entry.capturedAt,
     })
+    // Two differently named files can still contain a replay of the same
+    // captured page. Reject matching bytes across distinct source IDs so
+    // the offline preview cannot mint two-store evidence from one capture.
+    const captureHash = extracted.provenance.sha256
+    if (distinctCaptureHashes.has(captureHash)) {
+      throw new Error('Duplicate offline HTML capture reused across sources')
+    }
+    distinctCaptureHashes.add(captureHash)
     observations.push(...extracted.observations)
     captureSummary.push({
       sourceId: source.id,
