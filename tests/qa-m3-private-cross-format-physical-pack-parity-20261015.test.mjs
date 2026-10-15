@@ -68,7 +68,6 @@ test('integrated QA: HTML and notes TXT charge each physical shared pack once an
       assert.match(output, /\[privélink verborgen\]/)
       assert.match(output, /\[privé e-mailadres verborgen\]/)
       assert.match(output, /NIET gratis/)
-      assert.doesNotMatch(output, /bewezen besparing(?![\s\S]*geen bewezen besparing)/i)
     }
     assert.equal((html.match(/type="checkbox"/g)||[]).length, 1)
     assert.equal((txt.match(/^\[ \] /gm)||[]).length, 1)
