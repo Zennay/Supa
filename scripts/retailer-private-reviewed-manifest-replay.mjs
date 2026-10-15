@@ -128,7 +128,7 @@ function validManifest(manifest) {
 }
 
 /** A reviewed and SHA-pinned collection: output is counts ONLY, never evidence. */
-export async function replayPrivateReviewedCaptureDirectory(directory, {
+async function verifiedPrivateReviewedCaptureDirectory(directory, {
   referenceTime = new Date().toISOString(),
 } = {}) {
   if (typeof directory !== 'string' || !directory.trim() ||
@@ -160,6 +160,22 @@ export async function replayPrivateReviewedCaptureDirectory(directory, {
       catalog.status !== 'private-review-only' ||
       catalog.productionEnabled !== false ||
       catalog.publicSavingsClaimEligible !== false) fail()
+  return { batch, health, catalog }
+}
+
+/**
+ * Internal operator API for comparing two already reviewed PRIVATE directories.
+ * Uses identical SHA-pinned manifest/0600/nofollow/strict JSON validation as
+ * the existing public aggregate replay. The returned raw observations remain
+ * in the privileged in-process caller: never log or publish this result.
+ */
+export async function loadPrivateReviewedCaptureBatch(directory, options = {}) {
+  return (await verifiedPrivateReviewedCaptureDirectory(directory, options)).batch
+}
+
+/** Stable aggregate-only replay API for existing operator tools and tests. */
+export async function replayPrivateReviewedCaptureDirectory(directory, options = {}) {
+  const { health, catalog } = await verifiedPrivateReviewedCaptureDirectory(directory, options)
   return {
     schemaVersion: 1,
     mode: 'private-reviewed-capture-manifest-replay',
