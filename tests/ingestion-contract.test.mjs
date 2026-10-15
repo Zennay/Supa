@@ -36,7 +36,50 @@ test('money stays integer cents', () => {
         ...baseObservation,
         currentPriceCents: 1.29,
       }),
-    /integer cent value/,
+    /safe integer cent value/,
+  )
+})
+
+test('source money rejects integers outside JavaScript safe precision', () => {
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        currentPriceCents: Number.MAX_SAFE_INTEGER + 1,
+      }),
+    /safe integer cent value/,
+  )
+
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        offer: {
+          label: 'Bonus',
+          mechanics: null,
+          offerPriceCents: Number.MAX_SAFE_INTEGER + 1,
+          originalPriceCents: 129,
+          validFrom: null,
+          validTo: null,
+        },
+      }),
+    /Offer price.*safe integer cent value/,
+  )
+
+  assert.throws(
+    () =>
+      validateRawProductObservation({
+        ...baseObservation,
+        offer: {
+          label: 'Bonus',
+          mechanics: null,
+          offerPriceCents: 99,
+          originalPriceCents: Number.MAX_SAFE_INTEGER + 1,
+          validFrom: null,
+          validTo: null,
+        },
+      }),
+    /Original price.*safe integer cent value/,
   )
 })
 

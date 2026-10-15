@@ -85,10 +85,10 @@ function validIso(value: unknown): value is string {
 function validateNullableMoneyCents(value: unknown, label: string) {
   if (
     value !== null &&
-    (!Number.isInteger(value) || (value as number) < 0)
+    (!Number.isSafeInteger(value) || (value as number) < 0)
   ) {
     throw new Error(
-      `${label} must be null or a non-negative integer cent value`,
+      `${label} must be null or a non-negative safe integer cent value`,
     )
   }
 }
