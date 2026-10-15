@@ -23,9 +23,9 @@ function sameFile(before, after) {
     before.mtimeNs === after.mtimeNs && before.ctimeNs === after.ctimeNs
 }
 function privateRegular(stat) {
-  return stat.isFile() && stat.nlink === 1 &&
-    (stat.mode & 0o077) === 0 && stat.size >= 1 &&
-    stat.size <= MAX_PRIVATE_BYTES
+  return stat.isFile() && Number(stat.nlink) === 1 &&
+    (Number(stat.mode) & 0o077) === 0 && Number(stat.size) >= 1 &&
+    Number(stat.size) <= MAX_PRIVATE_BYTES
 }
 
 async function rejectSymlinkedParents(filename) {
