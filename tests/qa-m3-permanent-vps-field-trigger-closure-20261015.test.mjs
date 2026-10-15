@@ -42,10 +42,15 @@ function uncovered(paths, filenames) {
 
 test('M3 permanent VPS PR paths cover real human field kit and follow-on pinned private QA', () => {
   const paths = selectorPaths(readFileSync(workflowPath, 'utf8'))
-  for (const [area, filenames] of Object.entries(required)) {
-    const missing = uncovered(paths, filenames)
-    assert.deepEqual(missing, [], area + ' must trigger M3 VPS gate from a main-targeting same-repo PR')
-  }
+  const missingByArea = Object.fromEntries(
+    Object.entries(required).map(([area, filenames]) => [
+      area, uncovered(paths, filenames),
+    ]),
+  )
+  // Report all absent path families at once, not merely the first failing
+  // family. This makes the peer owner's single correction reviewable.
+  assert.deepEqual(missingByArea, { fieldKit: [], privateWeek: [] },
+    'every M3 private field/source/QA edit must trigger the permanent VPS gate')
 })
 
 test('M3 trigger guard still restricts VPS work to main-targeting same-repo PRs', () => {
