@@ -54,9 +54,21 @@ test('date-only expiry remains inclusive throughout the stated UTC day', () => {
   assert.equal(r.comparable, true)
   assert.equal(r.savingsCents, 20)
 })
-test('contradictory offer start/end never assert an exact price', () => {
-  const r = compare('2026-10-14T00:00:00Z', '2026-10-16T00:00:00Z')
-  assert.equal(r.comparable, false)
-  assert.equal(r.savingsCents, null)
-  assert.equal(r.claimable, false)
+test('contradictory offer window is refused at the parser rather than minting an observation', () => {
+  const source = SOURCES.find((s) => s.id === 'dekamarkt-product-halfvolle-melk')
+  const html = '<script type="application/ld+json">' + JSON.stringify({
+    '@type': 'Product', name: 'Halfvolle melk', sku: 'fictional-milk',
+    weight: { value: '1000 ml' },
+    offers: {
+      '@type': 'Offer', price: '1.19', priceCurrency: 'EUR',
+      availability: 'https://schema.org/InStock',
+      validFrom: '2026-10-16T00:00:00Z',
+      priceValidUntil: '2026-10-14T00:00:00Z',
+    },
+  }) + '</script>'
+  const snapshot = parseOfflineRetailerSnapshot({
+    source, html, capturedAt: '2026-10-15T09:00:00Z',
+  })
+  assert.equal(snapshot.observations.length, 0)
+  assert.equal(snapshot.rejected, 1)
 })
