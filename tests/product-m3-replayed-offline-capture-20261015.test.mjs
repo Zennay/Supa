@@ -42,14 +42,15 @@ test('M3 refuses one HTML file replayed as both PLUS and DekaMarkt', async t => 
   assert.equal(JSON.stringify(input.manifest), before)
 })
 
-test('M3 refuses byte-identical copies under different retailer filenames', async t => {
+test('M3 preserves no-money abstention for identical unpriced HTML copies', async t => {
   const input = await fixture(t, [
     [plus, 'plus.html'], [deka, 'deka.html'],
   ], { 'plus.html': fiction, 'deka.html': fiction })
-  await assert.rejects(
-    compareLocalRetailerSnapshots(input.path, nowMs),
-    /Duplicate offline HTML capture reused across sources/,
-  )
+  const result = await compareLocalRetailerSnapshots(input.path, nowMs)
+  assert.equal(result.comparison.claimable, false)
+  assert.equal(result.comparison.comparable, false)
+  assert.equal(result.comparison.savingsCents, null)
+  assert.deepEqual(result.captureSummary.map(item => item.parsedProducts), [0, 0])
 })
 
 test('M3 refuses replayed actual Product JSON-LD, not merely empty HTML', async t => {
@@ -64,7 +65,7 @@ test('M3 refuses replayed actual Product JSON-LD, not merely empty HTML', async 
   ], { 'plus.html': embedded, 'deka.html': embedded })
   await assert.rejects(
     compareLocalRetailerSnapshots(input.path, nowMs),
-    /Duplicate offline HTML capture reused across sources/,
+    /Duplicate priced offline HTML capture reused across sources/,
   )
 })
 
