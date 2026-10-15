@@ -7,6 +7,7 @@
  * purchase solely because they appear in another script.
  */
 import { createHash } from 'node:crypto'
+import { types as nodeTypes } from 'node:util'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024
@@ -57,6 +58,28 @@ function validCapturedAt(value) {
       offHours > 14 || offMinutes > 59 ||
       (offHours === 14 && offMinutes !== 0)) return false
   return Number.isFinite(Date.parse(value))
+}
+
+const SOURCE_FIELDS = Object.freeze(['kind', 'supermarket', 'url'])
+
+// Own-data-only immutable snapshot before any validation or HTML inspection.
+// Node's native Proxy test avoids executing caller-supplied reflection traps.
+function pinnedSourceIdentity(source) {
+  if (!source || typeof source !== 'object' || Array.isArray(source) ||
+      nodeTypes.isProxy(source) || Object.getPrototypeOf(source) !== Object.prototype) {
+    return null
+  }
+  const keys = Reflect.ownKeys(source)
+  if (keys.length !== SOURCE_FIELDS.length ||
+      !SOURCE_FIELDS.every((key) => keys.includes(key))) return null
+  const pinned = {}
+  for (const key of SOURCE_FIELDS) {
+    const descriptor = Object.getOwnPropertyDescriptor(source, key)
+    if (!descriptor || !('value' in descriptor) || !descriptor.enumerable ||
+        typeof descriptor.value !== 'string') return null
+    pinned[key] = descriptor.value
+  }
+  return Object.freeze(pinned)
 }
 
 function validSource(source, capturedAt) {
@@ -137,7 +160,8 @@ export function parseM3OfflineProductHtml(input = {}) {
       return abstain('invalid offline retailer product snapshot')
     }
     const { source, html, capturedAt } = input
-    if (!validSource(source, capturedAt) ||
+    const pinnedSource = pinnedSourceIdentity(source)
+    if (!pinnedSource || !validSource(pinnedSource, capturedAt) ||
         typeof html !== 'string' ||
         Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES ||
         Buffer.from(html, 'utf8').toString('utf8') !== html) {
@@ -148,9 +172,9 @@ export function parseM3OfflineProductHtml(input = {}) {
     if (extracted.count === 0) return abstain('no active JSON-LD script')
 
     const provenance = {
-      supermarket: source.supermarket,
-      kind: 'product',
-      url: source.url,
+      supermarket: pinnedSource.supermarket,
+      kind: pinnedSource.kind,
+      url: pinnedSource.url,
       capturedAt,
       sha256: createHash('sha256').update(Buffer.from(html, 'utf8')).digest('hex'),
     }
