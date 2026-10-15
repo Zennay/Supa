@@ -1,4 +1,5 @@
-import { lstat, readFile, realpath, writeFile } from 'node:fs/promises'
+import { lstat, open, realpath, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { SOURCES } from './m1-capture-sources.mjs'
@@ -13,9 +14,22 @@ async function readBoundedFile(filename, limit) {
   if (!info.isFile() || info.isSymbolicLink() || info.size > limit) {
     throw new Error('Input is not a bounded ordinary file')
   }
-  const body = await readFile(filename)
-  if (body.byteLength > limit) throw new Error('Input exceeded size limit')
-  return body.toString('utf8')
+  // Opening by name after lstat alone allows a symlink/FIFO swap during the
+  // await gap. Read from a pinned descriptor which refuses final symlinks
+  // and blocking special files, then confirm the actual descriptor is bounded.
+  const handle = await open(filename,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+  try {
+    const pinned = await handle.stat()
+    if (!pinned.isFile() || pinned.size > limit) {
+      throw new Error('Input is not a bounded ordinary file')
+    }
+    const body = await handle.readFile()
+    if (body.byteLength > limit) throw new Error('Input exceeded size limit')
+    return body.toString('utf8')
+  } finally {
+    await handle.close()
+  }
 }
 
 export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.now()) {
