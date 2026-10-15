@@ -13,7 +13,7 @@ import { buildM3OutstandingFieldActions } from '../scripts/m3-private-outstandin
 import { readPrivateM3ActionDraft } from '../scripts/m3-private-field-actions-input.mjs'
 
 const cli = fileURLToPath(new URL('../scripts/m3-private-outstanding-field-actions.mjs', import.meta.url))
-const privateMarker = 'PRIVATE-DO-NOT-PRINT-OBSERVATION-47'
+const privateMarker = 'private-do-not-print-observation-47'
 const refClock = Date.parse('2026-10-15T12:00:00.000Z')
 function invoke(cwd, input, ...flags) {
   return spawnSync(process.execPath,
