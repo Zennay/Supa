@@ -48,9 +48,11 @@ export function m3StudyWeekAlignment(argv = []) {
     changedRecipes,
     physicalStudyIngredientsPerStore: sheet.requirements.length,
     storesToObserve: [M3_EXPECTED_RETAILERS.baseline, M3_EXPECTED_RETAILERS.candidate],
-    canCollectUsingFrozenWorksheet: approved,
+    matchesFixedWorksheetDemand: approved,
+    retailerReusePermissionVerified: false,
+    fieldObservationEvidenceCollected: false,
     operatorInstruction: approved
-      ? 'Gebruik uitsluitend de vaste 11+11 veldwerkbladen; registreer echte observaties bij beide winkels binnen 24 uur.'
+      ? 'Deze planning past bij de vaste 11+11-vraag. Dit bevestigt geen bronrechten, echte winkelmetingen of veld-codeversie; controleer die voorwaarden afzonderlijk.'
       : 'Stop: de gekozen week wijkt af. Gebruik geen vast 11+11 veldformulier voor dit aangepaste plan. Herstel eerst de oorspronkelijke vier recepten en dagen.',
     evidenceStatus: 'preflight-only-not-an-observation',
     liveRetailerRequests: 0,
