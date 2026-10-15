@@ -204,6 +204,15 @@ function humanQuantity(amount, unit) {
   return quantity + ' ' + unit
 }
 
+// Human-readable coarse states, deliberately without revealing either store's
+// private observation timestamp or local timezone. JSON keeps its stable keys.
+const WINDOW_HELP = {
+  'not-started': 'nog geen geldige observatietijd; vul beide winkels in',
+  'single-observation': 'één winkel heeft een geldige observatietijd; meet de andere binnen 24 uur',
+  'within-window': 'twee geldige observatietijden binnen 24 uur; controleer alle overige velden',
+  'outside-window': 'langer dan 24 uur uit elkaar; voer een nieuwe gekoppelde meting uit',
+}
+
 function renderHumanChecklist(report, selection = 'both') {
   const retailers = selection === 'both'
     ? report.retailers
@@ -242,7 +251,7 @@ function renderHumanChecklist(report, selection = 'both') {
   if (selection === 'both' || selection === 'DekaMarkt') {
     showActions('DekaMarkt-meetgegevens', report.pendingMetadata.dekamarkt)
   }
-  lines.push('', 'Venster: ' + report.observationWindowState +
+  lines.push('', 'Meetvenster: ' + WINDOW_HELP[report.observationWindowState] +
     '. Privéreview mogelijk: ' + (report.readyForPrivateReview ? 'ja' : 'nee') + '.',
     'Geen bewezen winkelprijzen of publieke besparingsclaim.')
   return lines.join('\n') + '\n'
