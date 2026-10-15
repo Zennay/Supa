@@ -17,6 +17,17 @@ const SHAPES = ['product', 'catalog', 'offers']
 const RETAILERS = ['plus', 'dekamarkt']
 const fail = () => { throw new Error('Private source rollout matrix refused') }
 
+// Adapter health already validated civil timestamp grammar and chronology.
+// Compare the full 1–9 fractional digits, not rounded Date.parse milliseconds,
+// so archived captures only nanoseconds apart still have the correct ordering.
+function captureNanos(iso) {
+  const ms = Date.parse(iso)
+  if (!Number.isFinite(ms)) fail()
+  const fractional = /\\.(\\d{1,9})(?:Z|[+-]\\d{2}:\\d{2})$/.exec(iso)?.[1] ?? ''
+  return BigInt(ms) * 1_000_000n +
+    BigInt(fractional.padEnd(9, '0').slice(3) || '0')
+}
+
 /**
  * Convert actual offline health + reviewed source-rights evidence into an
  * operator-readable per-retailer action queue. Never enable live fetch.
@@ -51,7 +62,10 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
       const capturedAt = batch.results
         .filter(result => result.key === key && result.accepted === true)
         .map(result => result.observations[0].provenance.capturedAt)
-        .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null
+        .sort((left, right) => {
+          const a = captureNanos(left), b = captureNanos(right)
+          return a === b ? 0 : a > b ? -1 : 1
+        })[0] ?? null
       const status = bucket.accepted === 0
         ? 'no-accepted-historical-capture'
         : bucket.rejected > 0
