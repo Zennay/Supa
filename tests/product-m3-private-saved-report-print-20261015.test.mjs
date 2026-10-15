@@ -179,6 +179,49 @@ test('store flag accepts only canonical retailer names at final position', async
   }
 })
 
+test('printed product and ingredient text redacts emails and web links, without changing trusted totals', () => {
+  const report = offlinePreview()
+  report.comparison.lines[0].ingredient =
+    'Muesli https://private.example.invalid/cart?token=leakcode'
+  report.comparison.lines[0].plus.productName =
+    'Fictieve muesli contact+7@account.invalid'
+  report.comparison.lines[0].dekamarkt.productName =
+    'Fictieve granola www.other-private.invalid/order?key=secretcode'
+  for (const store of ['both', 'plus', 'dekamarkt']) {
+    const html = renderPrintablePrivateShoppingChecklist(report, store)
+    assert.doesNotMatch(html, /leakcode|secretcode|contact\+7@account\.invalid/)
+    assert.doesNotMatch(html, /private\.example\.invalid|other-private\.invalid|<a\b|href=/)
+    assert.match(html, /\[privélink verborgen\]/)
+    assert.match(html, /Geen live prijzen/)
+  }
+  const plus = renderPrintablePrivateShoppingChecklist(report, 'plus')
+  const deka = renderPrintablePrivateShoppingChecklist(report, 'dekamarkt')
+  assert.match(plus, /\[privé e-mailadres verborgen\]/)
+  assert.match(plus, /ALLEEN OFFLINE TOTAAL PLUS: €2,40/)
+  assert.match(deka, /ALLEEN OFFLINE TOTAAL DekaMarkt: €2,20/)
+  assert.doesNotMatch(deka, /contact|€2,40/)
+})
+
+test('saved private JSON redactable labels are not written or modified in source, only printed copy', async t => {
+  const { dir, file } = await fixture(t)
+  const report = offlinePreview()
+  report.comparison.lines[0].plus.productName =
+    'Speciaal product test+private@example.invalid'
+  report.comparison.lines[0].ingredient =
+    'noodzakelijk https://private.invalid/plan?id=1337'
+  await writeFile(file, JSON.stringify(report))
+  const before = await readFile(file)
+  const path = join(dir, 'local-redacted.html')
+  const html = await main(['--report', file, '--output', path, '--store', 'plus'])
+  assert.equal(await readFile(path, 'utf8'), html)
+  assert.deepEqual(await readFile(file), before)
+  assert.doesNotMatch(html, /test\+private@example\.invalid|private\.invalid\/plan|id=1337/)
+  assert.match(html, /\[privé e-mailadres verborgen\]/)
+  assert.match(html, /\[privélink verborgen\]/)
+  assert.match(html, /ALLEEN OFFLINE TOTAAL PLUS: €2,40/)
+  assert.equal((await stat(path)).mode & 0o777, 0o600)
+})
+
 test('saved incomplete shop does not turn a partial subtotal into a whole basket', async t => {
   const { dir, file } = await fixture(t)
   const data = offlinePreview()
