@@ -85,6 +85,23 @@ function normalizedHttpsUrl(input: unknown): string | null {
   }
 }
 
+function trustedRetailerProductSource(source: SourceSnapshotRef): string | null {
+  if (source?.kind !== 'product') return null
+  const href = normalizedHttpsUrl(source.url)
+  if (!href) return null
+  const hosts: Record<string, { host: string; route: string }> = {
+    plus: { host: 'www.plus.nl', route: '/product/' },
+    dekamarkt: { host: 'www.dekamarkt.nl', route: '/producten/' },
+    ah: { host: 'www.ah.nl', route: '/producten/product/' },
+  }
+  const expected = hosts[source.supermarket]
+  if (!expected) return null
+  const parsed = new URL(href)
+  return parsed.hostname === expected.host && parsed.port === '' &&
+    parsed.pathname.startsWith(expected.route) &&
+    parsed.pathname.length > expected.route.length ? href : null
+}
+
 /**
  * Selection is deliberately tied to a source-verified page URL, not a fuzzy
  * text match. The existing Schema.org parser remains the ONLY price, stock,
@@ -101,7 +118,7 @@ export function parseSchemaOrgProductForPage(
     const products = productNodes(jsonLd)
     if (products.length === 0) return refuses('no Product JSON-LD node')
 
-    const sourceUrl = normalizedHttpsUrl(provenance?.url)
+    const sourceUrl = trustedRetailerProductSource(provenance)
     if (!sourceUrl) return refuses('invalid captured product-page URL')
 
     if (products.length === 1) {
