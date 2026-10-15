@@ -15,11 +15,27 @@ const PAIRS = STORES.flatMap(store => KINDS.map(kind => store + ':' + kind))
 const fail = () => { throw new Error('Private retailer adapter health review refused') }
 const safeCount = value => Number.isSafeInteger(value) && value >= 0
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+// Match the existing PLUS/Deka adapter's safeCapturedAt grammar. Real
+// reviewed sources may use a UTC offset, minute precision or up to nine
+// fractional digits; Date.parse normalizes those to an absolute instant.
 const timestamp = value => {
-  if (typeof value !== 'string' ||
-      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value)) fail()
+  if (typeof value !== 'string') fail()
+  const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2})$/.exec(value)
+  if (!parts) fail()
+  const year = Number(parts[1]), month = Number(parts[2]), day = Number(parts[3])
+  const calendar = new Date(Date.UTC(year, month - 1, day))
+  if (calendar.getUTCFullYear() !== year ||
+      calendar.getUTCMonth() !== month - 1 ||
+      calendar.getUTCDate() !== day ||
+      Number(parts[4]) > 23 || Number(parts[5]) > 59 ||
+      Number(parts[6] ?? 0) > 59) fail()
+  const timezone = parts[8]
+  if (timezone !== 'Z') {
+    const [hours, minutes] = timezone.slice(1).split(':').map(Number)
+    if (hours > 23 || minutes > 59) fail()
+  }
   const ms = Date.parse(value)
-  if (!Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 19) !== value.slice(0, 19)) fail()
+  if (!Number.isFinite(ms)) fail()
   return ms
 }
 const emptyCoverage = () => ({
