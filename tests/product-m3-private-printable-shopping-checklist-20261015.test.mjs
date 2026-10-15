@@ -39,6 +39,22 @@ test('renders two separate physically-priced printable shopping checklists, with
   assert.doesNotMatch(html, /private-secret-123|goedkoopste winkel|BEWEZEN BESPARING/)
 })
 
+test('no-script retailer selection keeps exactly one supermarket visible and printable at a time', () => {
+  const html = renderPrintablePrivateShoppingChecklist(report())
+  assert.match(html, /<fieldset class="store-filter">/)
+  assert.match(html, /id="view-both" checked>Beide winkels/)
+  assert.match(html, /id="view-plus">Alleen PLUS/)
+  assert.match(html, /id="view-deka">Alleen DekaMarkt/)
+  assert.match(html, /class="shop shop-plus"/)
+  assert.match(html, /class="shop shop-dekamarkt"/)
+  assert.match(html, /body:has\(#view-plus:checked\) \.shop-dekamarkt/)
+  assert.match(html, /body:has\(#view-deka:checked\) \.shop-plus/)
+  assert.match(html, /@media print\{[^}]*\.store-filter\{display:none\}/)
+  assert.equal((html.match(/name="storeView"/g) || []).length, 3)
+  assert.equal((html.match(/name="storeView"[^>]*checked/g) || []).length, 1)
+  assert.doesNotMatch(html, /<script|onsubmit=|onclick=|localStorage|fetch\(/)
+})
+
 test('unknown stock on one shop keeps other shop total but never invents second total', () => {
   const data = report()
   data.comparison.lines[0].dekamarkt.status = 'availability_unknown'
