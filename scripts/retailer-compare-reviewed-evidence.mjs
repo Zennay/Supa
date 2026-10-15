@@ -1,4 +1,5 @@
-import { lstat, readFile, writeFile } from 'node:fs/promises'
+import { lstat, open, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { compareReviewedRetailerEvidence } from '../src/data/reviewedRetailerEvidence.ts'
 import { compareReviewedCatalogs } from '../src/domain/reviewedCatalogComparison.ts'
@@ -9,9 +10,22 @@ async function readJsonFile(filename) {
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_INPUT_BYTES) {
     throw new Error('Offline evidence file must be bounded and non-symlinked')
   }
-  const bytes = await readFile(filename)
-  if (bytes.byteLength > MAX_INPUT_BYTES) throw new Error('Offline evidence too large')
-  return JSON.parse(bytes.toString('utf8'))
+  // Pin the file descriptor after lstat. O_NOFOLLOW prevents a concurrent
+  // replacement of the final filename with a symlink, and O_NONBLOCK avoids
+  // waiting on a FIFO substituted after the metadata check.
+  const handle = await open(filename,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+  try {
+    const pinned = await handle.stat()
+    if (!pinned.isFile() || pinned.size > MAX_INPUT_BYTES) {
+      throw new Error('Offline evidence file must be bounded and non-symlinked')
+    }
+    const bytes = await handle.readFile()
+    if (bytes.byteLength > MAX_INPUT_BYTES) throw new Error('Offline evidence too large')
+    return JSON.parse(bytes.toString('utf8'))
+  } finally {
+    await handle.close()
+  }
 }
 
 export async function compareSavedRetailerEvidence(
