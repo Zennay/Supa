@@ -51,8 +51,13 @@ export function assertUnambiguousM3StudyJson(raw) {
       Buffer.byteLength(raw, 'utf8') > STUDY_MAX_BYTES) deny()
   let index = 0
   let examinedKeys = 0
+  let examinedValues = 0
   const maxNesting = 80
   const maxKeys = 50000
+  // Tiny array elements can multiply validation work even within 4 MiB.
+  const maxValues = 100000
+  // Sticky matching does not copy the remaining input for each primitive.
+  const primitivePattern = /(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/y
   const whitespace = () => {
     while (index < raw.length &&
       [9, 10, 13, 32].includes(raw.charCodeAt(index))) index += 1
@@ -85,7 +90,7 @@ export function assertUnambiguousM3StudyJson(raw) {
     }
   }
   const value = (depth) => {
-    if (depth > maxNesting) deny()
+    if (depth > maxNesting || ++examinedValues > maxValues) deny()
     whitespace()
     const ch = raw[index]
     if (ch === '"') {
@@ -131,10 +136,10 @@ export function assertUnambiguousM3StudyJson(raw) {
         expect(',')
       }
     }
-    const rest = raw.slice(index)
-    const match = /^(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/.exec(rest)
+    primitivePattern.lastIndex = index
+    const match = primitivePattern.exec(raw)
     if (!match) deny()
-    index += match[0].length
+    index = primitivePattern.lastIndex
   }
   value(0)
   whitespace()
@@ -197,7 +202,12 @@ function assertCanonicalCaptureWindow(study, report) {
   }
 }
 
-export function preflightPrivateM3Week(studyBytes, manifestBytes) {
+export function preflightPrivateM3Week(studyBytes, manifestBytes, ...revisionOptions) {
+  // No third argument means the documented legacy path. An explicitly passed
+  // undefined (e.g. an unset orchestrator config) MUST NOT silently downgrade
+  // requested verification through JavaScript default-parameter semantics.
+  if (revisionOptions.length > 1) deny()
+  const expectedMainSha = revisionOptions[0]
   if (!Buffer.isBuffer(studyBytes) || !Buffer.isBuffer(manifestBytes) ||
       studyBytes.length === 0 || studyBytes.length > STUDY_MAX_BYTES ||
       manifestBytes.length === 0 || manifestBytes.length > MANIFEST_MAX_BYTES) deny()
@@ -209,6 +219,14 @@ export function preflightPrivateM3Week(studyBytes, manifestBytes) {
   } catch {
     deny()
   }
+  // An operator may supply an independently checked current-main revision.
+  // This detects a mistaken/stale sidecar SHA; it is NOT GitHub authentication
+  // and cannot turn the private or public permission flags into true.
+  if (revisionOptions.length === 1 &&
+      (typeof expectedMainSha !== 'string' ||
+       !/^[0-9a-f]{40}$/.test(expectedMainSha) ||
+       /^0{40}$/.test(expectedMainSha) ||
+       manifest.sourceCommitSha !== expectedMainSha)) deny()
   if (!verifyPrivateM3StudyCodePin(studyBytes, manifest)) deny()
   const study = parseUtf8Json(studyBytes)
   let requiredLineCount
@@ -240,10 +258,13 @@ export function preflightPrivateM3Week(studyBytes, manifestBytes) {
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  if (argv.length !== 2) deny()
+  const expectRevision = argv.length === 4 && argv[2] === '--expect-main-sha'
+  if (argv.length !== 2 && !expectRevision) deny()
   const study = await boundedRegularFile(argv[0], STUDY_MAX_BYTES)
   const manifest = await boundedRegularFile(argv[1], MANIFEST_MAX_BYTES)
-  const result = preflightPrivateM3Week(study, manifest)
+  const result = expectRevision
+    ? preflightPrivateM3Week(study, manifest, argv[3])
+    : preflightPrivateM3Week(study, manifest)
   process.stdout.write(JSON.stringify(result, null, 2) + '\n')
   return result
 }
