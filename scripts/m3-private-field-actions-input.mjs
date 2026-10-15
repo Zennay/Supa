@@ -1,5 +1,6 @@
 import { constants } from 'node:fs'
 import { lstat, open } from 'node:fs/promises'
+import { TextDecoder } from 'node:util'
 
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 
@@ -55,13 +56,21 @@ export async function readPrivateM3ActionDraft(path) {
       }
       chunks.push(Buffer.from(buffer.subarray(0, bytesRead)))
     }
+    const finished = await handle.stat()
     await assertNoSymlinkedM3OutputParents(path)
     const final = await lstat(path)
-    if (!validPrivateInputFile(final) || !sameInode(pinned, final) ||
-        final.size !== total) {
+    if (!validPrivateInputFile(finished) || !validPrivateInputFile(final) ||
+        !sameInode(pinned, finished) || !sameInode(pinned, final) ||
+        finished.size !== total || final.size !== total ||
+        pinned.mtimeMs !== finished.mtimeMs ||
+        pinned.ctimeMs !== finished.ctimeMs ||
+        pinned.mtimeMs !== final.mtimeMs ||
+        pinned.ctimeMs !== final.ctimeMs) {
       throw new Error('private M3 input changed during read')
     }
-    return Buffer.concat(chunks, total).toString('utf8')
+    // Buffer.toString('utf8') silently replaces malformed bytes. A local
+    // operator draft must not pass a damaged byte stream as a valid capture.
+    return new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks, total))
   } finally {
     await handle.close()
   }
