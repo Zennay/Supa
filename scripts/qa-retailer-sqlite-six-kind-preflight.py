@@ -5,6 +5,7 @@ This is NOT a permission grant, live-data admission, or production reader.
 Use on a newly built PRIVATE 0600 SQLite export. Print only bounded counts.
 """
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -17,6 +18,9 @@ from urllib.parse import parse_qsl, quote, urlsplit
 HOSTS = {"plus": "www.plus.nl", "dekamarkt": "www.dekamarkt.nl"}
 RIGHTS = {"plus": "permission_required", "dekamarkt": "unresolved"}
 KINDS = {"product", "catalog", "offers"}
+UNITS = {"g", "kg", "ml", "l", "piece", "pack", "unknown"}
+STATES = {"available", "unavailable", "unknown"}
+MAX_SAFE_CENTS = 9_007_199_254_740_991
 EXPECTED = {(retailer, kind) for retailer in HOSTS for kind in KINDS}
 SHA = re.compile(r"^[a-f0-9]{64}$")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$")
@@ -110,15 +114,49 @@ def audit(path):
             "SELECT retailer_id,source_product_id FROM products"))
         check(len(product_keys) == sum(product_counts.values()))
         observations = list(conn.execute(
-            "SELECT o.snapshot_id,o.retailer_id,o.source_product_id,s.retailer_id,s.kind "
+            "SELECT o.snapshot_id,o.retailer_id,o.source_product_id,s.retailer_id,s.kind, "
+            "o.price_cents,o.currency,o.pack_text,o.pack_amount,o.pack_unit,o.availability, "
+            "o.offer_label,o.offer_price_cents,o.original_price_cents, "
+            "o.offer_valid_from,o.offer_valid_to "
             "FROM price_observations o LEFT JOIN source_snapshots s ON s.id=o.snapshot_id"))
         check(len(observations) >= len(snaps) and len(observations) <= 25000)
         evidence_count = {item: 0 for item in EXPECTED}
         observed_snapshot_ids = set()
         observed_product_keys = set()
-        for sid, retailer, product, snapshot_retailer, kind in observations:
+        now = datetime.now(timezone.utc)
+        for (sid, retailer, product, snapshot_retailer, kind, cents, currency,
+             pack_text, amount, unit, available, label, offer_cents,
+             original_cents, offer_start, offer_end) in observations:
             check(sid in ids and snapshot_retailer == retailer and
                   (retailer, kind) in EXPECTED)
+            # SQL CHECK constraints are NOT sufficient evidence: a local
+            # SQLite file can hold amounts outside JS safe integer cents,
+            # unbounded packs, or malformed offer validity after mutation.
+            check(currency == "EUR" and unit in UNITS and available in STATES)
+            check(all(value is None or (type(value) is int and
+                      0 <= value <= MAX_SAFE_CENTS)
+                      for value in (cents, offer_cents, original_cents)))
+            check(amount is None or (type(amount) in (int, float) and
+                  math.isfinite(amount) and 0 < amount < 1e12))
+            check(pack_text is None or (isinstance(pack_text, str) and
+                  len(pack_text) <= 256))
+            check(label is None or (isinstance(label, str) and
+                  0 < len(label.strip()) <= 1024))
+            if label is None:
+                check(offer_cents is None and original_cents is None and
+                      offer_start is None and offer_end is None)
+            times = []
+            for value in (offer_start, offer_end):
+                if value is None:
+                    times.append(None)
+                    continue
+                check(isinstance(value, str) and DATE.fullmatch(value) is not None)
+                instant = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                check(instant.utcoffset() is not None and
+                      abs(instant.utcoffset().total_seconds()) <= 14 * 3600 and
+                      instant.astimezone(timezone.utc) <= now)
+                times.append(instant)
+            check(times[0] is None or times[1] is None or times[0] <= times[1])
             evidence_count[(retailer, kind)] += 1
             observed_snapshot_ids.add(sid)
             observed_product_keys.add((retailer, product))
