@@ -7,6 +7,7 @@ import ts from 'typescript'
 import { m2InitialPlan, m2Products, m2Recipes, m2Store } from '../src/data/m2Fixture.ts'
 import { defaultPlannerPreferences, serializePlannerPreferences } from '../src/domain/plannerPreferences.ts'
 import { restorePlannerPreferencesWithCustomBudget } from '../src/features/planner/customWeekBudget.ts'
+import { m3FieldSheetMatchesPlannerWeek } from '../src/features/observation/m3PlannerMeasurementWeek.ts'
 import { canReplacePlannerRecord, persistPlannerRecord } from '../src/features/planner/plannerStorageGuard.ts'
 
 // Execute the real current App TSX, not a string-only source check. Every
@@ -109,6 +110,7 @@ function mount(disk, { denyGetter = false } = {}) {
       './features/basket/BasketView': { BasketView },
       './features/shopping-list/ShoppingListView': { ShoppingListView },
       './features/observation/ObservationView': { ObservationView },
+      './features/observation/m3PlannerMeasurementWeek': { m3FieldSheetMatchesPlannerWeek },
       './components/IdentityAvatar.tsx': { IdentityAvatar },
       './domain/basket': { buildOneStoreBasket: () => ({
         totalCents: 1500, unresolvedLineCount: 0, lines: [],
@@ -163,6 +165,31 @@ function mount(disk, { denyGetter = false } = {}) {
   }
   return { render, planner, alert, navigate, close }
 }
+
+test('real routed App warns when personal Planner changes no longer match fixed M3 11x2 field template', () => {
+  const app = mount(fakeDisk(null))
+  try {
+    app.navigate('Meten')
+    let props = app.render().find(node => node.type === ObservationView)?.props
+    assert.equal(props?.plannerWeekMatchesTemplate, true)
+    app.navigate('Planner')
+    app.planner().onToggleDay('Ma')
+    app.navigate('Meten')
+    props = app.render().find(node => node.type === ObservationView)?.props
+    assert.equal(props?.plannerWeekMatchesTemplate, false)
+    app.navigate('Planner')
+    app.planner().onToggleDay('Ma')
+    app.planner().onRecipeChange('Wo', 'tikka')
+    app.navigate('Meten')
+    props = app.render().find(node => node.type === ObservationView)?.props
+    assert.equal(props?.plannerWeekMatchesTemplate, false)
+    app.navigate('Planner')
+    app.planner().onRecipeChange('Wo', 'pasta')
+    app.navigate('Meten')
+    props = app.render().find(node => node.type === ObservationView)?.props
+    assert.equal(props?.plannerWeekMatchesTemplate, true)
+  } finally { app.close() }
+})
 
 test('real App displays unsaved warning when browser storage getter is denied', () => {
   const app = mount(fakeDisk(null), { denyGetter: true })
