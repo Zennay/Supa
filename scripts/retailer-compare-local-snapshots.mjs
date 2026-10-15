@@ -1,7 +1,8 @@
-import { lstat, open, realpath, writeFile } from 'node:fs/promises'
+import { lstat, open, realpath, link, unlink } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { randomUUID } from 'node:crypto'
 import { SOURCES } from './m1-capture-sources.mjs'
 import { parseOfflineRetailerSnapshot } from './retailer-snapshot-adapters.mjs'
 import { compareReviewedCatalogs } from '../src/domain/reviewedCatalogComparison.ts'
@@ -138,6 +139,37 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
   }
 }
 
+// Writing directly to the public --out path can leave a truncated/corrupt
+// report if the process exits during I/O. Commit only a fully synced 0600
+// same-directory temporary file, by an exclusive hard link. Unlike rename,
+// link refuses existing targets (including symlinks), so concurrent writers
+// cannot replace an existing report or publish partial JSON.
+async function publishPrivateReport(destination, payload) {
+  const dir = dirname(resolve(destination))
+  const temporary = join(dir, '.supa-m3-' + randomUUID() + '.tmp')
+  let handle
+  let created = false
+  try {
+    handle = await open(temporary,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW,
+      0o600)
+    created = true
+    await handle.writeFile(payload, 'utf8')
+    await handle.sync()
+    await handle.close()
+    handle = null
+    await link(temporary, destination)
+  } finally {
+    if (handle) await handle.close()
+    // Never delete a path we did not create if exclusive open fails.
+    if (created) {
+      await unlink(temporary).catch((error) => {
+        if (error.code !== 'ENOENT') throw error
+      })
+    }
+  }
+}
+
 export async function main(argv = process.argv.slice(2)) {
   if (argv.length !== 1 && !(argv.length === 3 && argv[1] === '--out')) {
     throw new Error('Usage: node --experimental-strip-types scripts/retailer-compare-local-snapshots.mjs manifest.json [--out result.json]')
@@ -145,7 +177,7 @@ export async function main(argv = process.argv.slice(2)) {
   const result = await compareLocalRetailerSnapshots(argv[0])
   const payload = JSON.stringify(result, null, 2) + '\n'
   if (argv.length === 3) {
-    await writeFile(argv[2], payload, { flag: 'wx', mode: 0o600 })
+    await publishPrivateReport(argv[2], payload)
     console.log('Offline comparison written to a new private file')
   } else {
     console.log(payload)
