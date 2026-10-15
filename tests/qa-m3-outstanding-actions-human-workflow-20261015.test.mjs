@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 import { buildFictionalPricedSheet } from '../scripts/m3-rehearse-field-run.mjs'
 import { buildM3OutstandingFieldActions } from '../scripts/m3-private-outstanding-field-actions.mjs'
+import { readPrivateM3ActionDraft } from '../scripts/m3-private-field-actions-input.mjs'
 
 const cli = fileURLToPath(new URL('../scripts/m3-private-outstanding-field-actions.mjs', import.meta.url))
 const privateMarker = 'PRIVATE-DO-NOT-PRINT-OBSERVATION-47'
@@ -159,4 +160,24 @@ test('independent operator: one-store flags never act as an implicit financial r
     assert.equal(denied.stderr.includes(dir), false)
   }
   assert.deepEqual(await readFile(input), bytes)
+})
+
+
+test('independent input budget: exact 2 MiB private regular file is readable but one extra byte is rejected', async t => {
+  const { dir, input } = await sandbox(t, buildObservationSheet())
+  const atLimit = Buffer.alloc(2 * 1024 * 1024, 0x61)
+  await writeFile(input, atLimit, { mode: 0o600 })
+  const decoded = await readPrivateM3ActionDraft(input)
+  assert.equal(decoded.length, atLimit.length)
+  assert.equal(decoded[0], 'a')
+  assert.equal(decoded.at(-1), 'a')
+  assert.deepEqual(await readFile(input), atLimit)
+  const overLimit = Buffer.concat([atLimit, Buffer.from('x')])
+  await writeFile(input, overLimit, { mode: 0o600 })
+  await assert.rejects(() => readPrivateM3ActionDraft(input), /unsafe private M3 input file/)
+  const cliFailure = invoke(dir, input, '--text', '--store', 'plus')
+  assert.notEqual(cliFailure.status, 0)
+  assert.equal(cliFailure.stdout, '')
+  assert.equal(cliFailure.stderr.includes(dir), false)
+  assert.deepEqual(await readFile(input), overLimit)
 })
