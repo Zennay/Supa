@@ -98,6 +98,18 @@ export function comparePrivateAdapterHealth(before, after) {
   }]))
   const missingNew = after.missingSourceKinds.filter(key => !before.missingSourceKinds.includes(key))
   const recovered = before.missingSourceKinds.filter(key => !after.missingSourceKinds.includes(key))
+  // Global totals may be unchanged when one reviewed retailer shape worsens
+  // while another recovers. Treat that as an offline *dataset* regression, not
+  // a claim about live stock, retailer behavior or publishable savings.
+  // Only controlled aggregate signal labels leave this private comparison.
+  const worsened = (field) => KEYS.some(key =>
+    after.byShape[key][field] > before.byShape[key][field])
+  const shapeSignals = [
+    ...(worsened('staleCaptures') ? ['more-stale-captures-in-source-shape'] : []),
+    ...(worsened('unknownPrices') ? ['more-unpriced-observations-in-source-shape'] : []),
+    ...(worsened('unknownAvailability') ? ['more-unknown-availability-in-source-shape'] : []),
+    ...(worsened('unknownPacks') ? ['more-unknown-packs-in-source-shape'] : []),
+  ]
   const signals = [
     ...(missingNew.length ? ['new-missing-source-shape'] : []),
     ...(after.rejectedSources > before.rejectedSources ? ['more-rejected-source-shapes'] : []),
@@ -106,6 +118,7 @@ export function comparePrivateAdapterHealth(before, after) {
     ...(after.inconsistentProducts > before.inconsistentProducts ? ['more-conflicted-products'] : []),
     ...(after.unknownPriceObservations > before.unknownPriceObservations
       ? ['more-unpriced-observations'] : []),
+    ...shapeSignals,
   ]
   return {
     schemaVersion: 1, mode: 'private-adapter-health-trend',
