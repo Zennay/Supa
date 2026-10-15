@@ -9,6 +9,7 @@ import {
   buildObservationSheet,
   restoreObservationSheetDraft,
   observationSheetProgress,
+  observationStoreProgress,
 } from '../src/domain/m3ObservationSheet.ts'
 import { buildWeeklyBasketStudyFromObservationSheet } from './m3-build-observed-study.mjs'
 import { createPrivateM3StudyCodePin } from './m3-field-code-pin.mjs'
@@ -59,6 +60,8 @@ export function reviewPrivateM3FieldSheet(rawSheetBytes, expectedMainSha) {
     const sheet = restoreObservationSheetDraft(raw)
     if (!sheet) refuse()
     const progress = observationSheetProgress(sheet)
+    const plusProgress = observationStoreProgress(sheet.baseline)
+    const dekaProgress = observationStoreProgress(sheet.candidate)
     const expected = buildObservationSheet().requirements.length * 2
     if (progress.totalLines !== expected || expected !== 22 ||
         progress.completeLines > expected ||
@@ -91,7 +94,9 @@ export function reviewPrivateM3FieldSheet(rawSheetBytes, expectedMainSha) {
     const nextAction = !intakeComplete
       ? (progress.metadataCompleted < progress.metadataTotal
         ? 'complete-private-study-metadata'
-        : 'complete-remaining-store-observations')
+        : plusProgress.completeLines < 11
+          ? 'complete-plus-observations'
+          : 'complete-dekamarkt-observations')
       : (baselineUnresolved + candidateUnresolved > 0
         ? 'review-unavailable-or-unmatched-products'
         : 'retain-private-observation-and-obtain-human-rights-review')
@@ -101,6 +106,10 @@ export function reviewPrivateM3FieldSheet(rawSheetBytes, expectedMainSha) {
       canonicalLineCount: expected,
       recordedAvailabilityCount: progress.availabilityRecorded,
       completeObservationLineCount: progress.completeLines,
+      plusCompleteLineCount: plusProgress.completeLines,
+      dekamarktCompleteLineCount: dekaProgress.completeLines,
+      plusAvailabilityRecorded: plusProgress.availabilityRecorded,
+      dekamarktAvailabilityRecorded: dekaProgress.availabilityRecorded,
       metadataCompleteCount: progress.metadataCompleted,
       metadataRequiredCount: progress.metadataTotal,
       technicalStudyConversionPossible: converted,
