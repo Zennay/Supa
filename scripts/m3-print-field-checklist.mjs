@@ -78,16 +78,16 @@ function paperPage(side, items) {
 }
 export function renderM3PaperChecklist() {
   const requirements = validatedRequirements(buildObservationSheet())
-  const css = '@page{size:A4 landscape;margin:12mm}' +
-    'body{font:12px/1.4 Arial,sans-serif;color:#111;margin:0}' +
+  const css = '@page{size:A4 landscape;margin:10mm}' +
+    'body{font:12px/1.2 Arial,sans-serif;color:#111;margin:0}' +
     '.page{break-after:page;page-break-after:always}.page:last-child{break-after:auto;page-break-after:auto}' +
-    '.metadata{display:grid;grid-template-columns:1fr 1fr;gap:1px 20px;margin:9px 0}' +
-    '.metadata p{margin:2px 0}h1{font-size:22px;margin:4px 0}' +
+    '.metadata{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px 16px;margin:9px 0}' +
+    '.metadata p{margin:1px 0}.page>p{margin:2px 0}h1{font-size:22px;margin:4px 0}' +
     'table{width:100%;border-collapse:collapse;table-layout:fixed}' +
-    'th,td{border:1px solid #555;padding:5px;text-align:left;vertical-align:top}' +
+    'th,td{border:1px solid #555;padding:2px;text-align:left;vertical-align:top}' +
     'th{background:#eee}th:first-child{width:25%}th:nth-child(2){width:20%}' +
     'th:nth-child(3){width:17%}th:nth-child(4){width:12%}th:nth-child(5){width:12%}th:last-child{width:14%}' +
-    'td{height:34px}td small{display:block}td:last-child{white-space:nowrap;font-size:10px}' +
+    'td{height:26px}td small{display:block}td:last-child{white-space:nowrap;font-size:10px}' +
     'footer{border-top:1px solid #777;padding:5px 0;font-size:10px}' +
     '@media screen{body{background:#eee}.page{background:#fff;max-width:1200px;padding:24px;margin:16px auto}}'
   return '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
