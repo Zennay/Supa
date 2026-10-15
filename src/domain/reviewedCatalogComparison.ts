@@ -235,7 +235,10 @@ export function compareReviewedCatalogs({
       ingredient: required.query,
       plus,
       dekamarkt,
-      differenceCents: plus.totalCents !== null && dekamarkt.totalCents !== null
+      // Quoted cents are not a realizable line saving unless stock for
+      // the exact pack is explicitly confirmed by BOTH retailers.
+      differenceCents: plus.status === 'matched' && dekamarkt.status === 'matched' &&
+        plus.totalCents !== null && dekamarkt.totalCents !== null
         ? dekamarkt.totalCents - plus.totalCents : null,
     }
   })
@@ -292,8 +295,9 @@ export function compareReviewedCatalogs({
   // Price differences must be computed AFTER shared physical pack allocation,
   // otherwise the row preview still reflects the old twice-rounded prices.
   for (const line of lines) {
-    line.differenceCents = line.plus.totalCents !== null &&
-      line.dekamarkt.totalCents !== null
+    line.differenceCents = line.plus.status === 'matched' &&
+      line.dekamarkt.status === 'matched' &&
+      line.plus.totalCents !== null && line.dekamarkt.totalCents !== null
       ? line.dekamarkt.totalCents - line.plus.totalCents : null
   }
 
