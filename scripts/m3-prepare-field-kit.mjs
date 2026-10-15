@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve, sep } from 'node:path'
+import { lstat, mkdir, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
@@ -125,6 +125,32 @@ function parseArgs(argv) {
   return argv[1]
 }
 
+/**
+ * Private filled retailer sheets must never sit inside ANY existing Git
+ * checkout, not merely inside the Supa checkout running this command.
+ * Worktrees use a .git FILE instead of a directory; both are refused.
+ * Do not follow or read the marker, which may itself be an untrusted link.
+ * This is an operator mistake guard, not a hostile-filesystem race sandbox.
+ */
+async function assertOutsideAnyGitCheckout(output) {
+  if (basename(output) === '.git') {
+    throw new Error('refusing M3 private output under a Git checkout')
+  }
+  let parent = dirname(output)
+  while (true) {
+    try {
+      await lstat(join(parent, '.git'))
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+      const next = dirname(parent)
+      if (next === parent) break
+      parent = next
+      continue
+    }
+    throw new Error('refusing M3 private output under a Git checkout')
+  }
+}
+
 export async function writeM3FieldKit(destination, kit) {
   if (typeof destination !== 'string' || !destination.trim() ||
       destination.trim() !== destination ||
@@ -189,6 +215,7 @@ export async function writeM3FieldKit(destination, kit) {
     throw new Error('refusing M3 field kit destination inside source repository')
   }
   await assertNoSymlinkedM3OutputParents(output)
+  await assertOutsideAnyGitCheckout(output)
   await mkdir(dirname(output), { recursive: true, mode: 0o700 })
   // mkdir without recursive refuses an existing directory, symlink, or file:
   // never replace or silently add data to an existing private evidence folder.
