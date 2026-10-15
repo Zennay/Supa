@@ -8,6 +8,10 @@ import {
   m2DefaultActiveDays, m2InitialPlan, m2Products, m2Recipes,
 } from '../src/data/m2Fixture.ts'
 
+// Frozen synthetic evaluation time follows all 2026 fixtures. Never use
+// the ambient clock inside the pure M3 financial assessor.
+const QA_REFERENCE_NOW_MS = Date.parse('2026-10-14T12:00:00Z')
+
 // Separate M2-generated synthetic basket, no real price, participant or receipt.
 function basket(storeId, adjustment) {
   const products = m2Products.map((p) => ({
@@ -60,7 +64,7 @@ for (const [field, invisible] of [
     else raw[field] = invisible
     const saved = JSON.stringify(raw)
     const restored = JSON.parse(saved)
-    const assessment = assessWeeklyBasketStudy(restored)
+    const assessment = assessWeeklyBasketStudy(restored, { referenceNowMs: QA_REFERENCE_NOW_MS })
     assert.equal(assessment.claimable, false)
     assert.equal(assessment.comparison.outcome, 'unknown')
     assert.equal(assessment.comparison.deltaCents, null)
@@ -84,7 +88,7 @@ test('M3 report allows visible Hangul/Braille mixed with blank fillers but stays
   s.baseline.provenanceNote = 'Echt leesbaar \u2800 bonnetje'
   s.candidate.provenanceNote = 'Student caf' + 'e\u0301'
   const before = JSON.stringify(s)
-  const actual = assessWeeklyBasketStudy(s)
+  const actual = assessWeeklyBasketStudy(s, { referenceNowMs: QA_REFERENCE_NOW_MS })
   const report = buildObservedWeekReport(s)
   assert.equal(actual.claimable, true)
   assert.equal(actual.comparison.outcome, 'better')
