@@ -7,6 +7,10 @@ const MAX_STUDY_BYTES = 4 * 1024 * 1024
 const COMMIT_SHA = /^[0-9a-f]{40}$/
 const DIGEST = /^[0-9a-f]{64}$/
 const FORMAT = 'supa-m3-private-study-code-pin-v1'
+const MANIFEST_KEYS = Object.freeze([
+  'format', 'sourceCommitSha', 'studySha256',
+  'codeRevisionVerified', 'retailerPermissionVerified', 'publicSavingsClaimEligible',
+])
 
 function fail() {
   throw new Error('Invalid private M3 study code-pin input')
@@ -48,13 +52,82 @@ export function createPrivateM3StudyCodePin(studyContent, sourceCommitSha) {
   })
 }
 
+// Manifest format is a *flat* six-field JSON object. Validate member identity
+// while scanning the original bytes: JSON.parse silently overwrites duplicates,
+// which can conceal a contradictory SHA or privacy/eligibility attestation.
+export function parseStrictPrivateM3Manifest(raw) {
+  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 4096) fail()
+  let offset = 0
+  const skipWhitespace = () => {
+    while (offset < raw.length && /[\\t\\n\\r ]/.test(raw[offset])) offset += 1
+  }
+  const consume = (char) => {
+    skipWhitespace()
+    if (raw[offset] !== char) fail()
+    offset += 1
+  }
+  const jsonString = () => {
+    skipWhitespace()
+    if (raw[offset] !== '"') fail()
+    const start = offset++
+    let closed = false
+    while (offset < raw.length) {
+      const char = raw[offset++]
+      if (char === '\\\\') {
+        if (offset >= raw.length) fail()
+        offset += 1
+      } else if (char === '"') {
+        closed = true
+        break
+      } else if (char.charCodeAt(0) < 0x20) {
+        fail()
+      }
+    }
+    if (!closed) fail()
+    try {
+      return JSON.parse(raw.slice(start, offset))
+    } catch {
+      fail()
+    }
+  }
+  const values = Object.create(null)
+  consume('{')
+  let count = 0
+  skipWhitespace()
+  while (raw[offset] !== '}') {
+    if (count > 0) consume(',')
+    const key = jsonString()
+    if (!MANIFEST_KEYS.includes(key) || Object.hasOwn(values, key)) fail()
+    consume(':')
+    skipWhitespace()
+    let value
+    if (raw[offset] === '"') {
+      value = jsonString()
+    } else if (raw.startsWith('false', offset)) {
+      value = false
+      offset += 5
+    } else if (raw.startsWith('true', offset)) {
+      value = true
+      offset += 4
+    } else {
+      fail()
+    }
+    values[key] = value
+    count += 1
+    if (count > MANIFEST_KEYS.length) fail()
+    skipWhitespace()
+    if (offset >= raw.length) fail()
+  }
+  consume('}')
+  skipWhitespace()
+  if (offset !== raw.length || count !== MANIFEST_KEYS.length) fail()
+  return Object.assign({}, values)
+}
+
 export function verifyPrivateM3StudyCodePin(studyContent, manifest) {
   try {
     if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return false
-    const expectedKeys = [
-      'format', 'sourceCommitSha', 'studySha256',
-      'codeRevisionVerified', 'retailerPermissionVerified', 'publicSavingsClaimEligible',
-    ]
+    const expectedKeys = MANIFEST_KEYS
     if (Object.getPrototypeOf(manifest) !== Object.prototype) return false
     const keys = Reflect.ownKeys(manifest)
     if (keys.length !== expectedKeys.length ||
@@ -81,7 +154,7 @@ export function verifyPrivateM3StudyCodePin(studyContent, manifest) {
 }
 
 async function readBoundedPrivateStudy(path) {
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
   try {
     const stat = await handle.stat()
     if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_STUDY_BYTES ||
@@ -140,7 +213,7 @@ export async function main(argv = process.argv.slice(2)) {
     try {
       const manifestBytes = await readBoundedPrivateStudy(argv[2])
       if (manifestBytes.length > 4096) throw new Error('invalid manifest')
-      manifest = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes))
+      manifest = parseStrictPrivateM3Manifest(new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes))
     } catch {
       throw new Error('Private M3 manifest could not be read or validated')
     }
