@@ -1,4 +1,5 @@
-import { mkdir } from 'node:fs/promises'
+import { lstat, mkdir, open } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { compareLocalRetailerSnapshots } from './retailer-compare-local-snapshots.mjs'
@@ -11,6 +12,34 @@ import {
 
 // Use the same validated, physical-purchase checklist as the text CLI.
 // The HTML layer must never rederive prices or decide which retailer wins.
+// A saved preview is private local data, not a licensed retailer feed. No
+// source URL is opened when loading it; the renderer separately validates
+// the full report envelope and every physical purchase before printing.
+const MAX_SAVED_PREVIEW_BYTES = 4 * 1024 * 1024
+async function readSavedPrivateComparison(filename) {
+  let handle
+  try {
+    const metadata = await lstat(filename)
+    if (!metadata.isFile() || metadata.isSymbolicLink() ||
+        metadata.size > MAX_SAVED_PREVIEW_BYTES) throw new Error('Invalid local report')
+    handle = await open(filename,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+    const pinned = await handle.stat()
+    if (!pinned.isFile() || pinned.size > MAX_SAVED_PREVIEW_BYTES) {
+      throw new Error('Invalid local report')
+    }
+    const buffer = await handle.readFile()
+    if (buffer.byteLength > MAX_SAVED_PREVIEW_BYTES) throw new Error('Invalid local report')
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(buffer)
+    return JSON.parse(decoded)
+  } catch {
+    // Never interpolate local input paths, raw labels or exception diagnostics.
+    throw new Error('Private offline comparison file could not be read')
+  } finally {
+    if (handle) await handle.close()
+  }
+}
+
 const escapeHtml = value => value.replace(/&/g, '&amp;')
   .replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -102,22 +131,32 @@ export async function main(argv = process.argv.slice(2)) {
       'Gebruik: node --experimental-strip-types ' +
       'scripts/retailer-private-shopping-checklist-html.mjs ' +
       '<lokaal-manifest.json> --output <prive-checklist.html>\n' +
+      'Of vanuit eerder lokaal opgeslagen vergelijking (zonder HTML-herlezing):\n' +
+      '  --report <lokale-vergelijking.json> --output <prive-checklist.html>\n' +
       'Geen winkelverkeer; geen live prijs of publieke besparingsclaim.\n'
     process.stdout.write(help)
     return help
   }
-  if (argv.length !== 3 || argv[1] !== '--output' ||
-      !argv[0] || argv[0].startsWith('-') ||
-      !argv[2] || argv[2].startsWith('-') || argv[2] !== argv[2].trim() ||
-      !argv[2].toLowerCase().endsWith('.html')) {
+  const savedMode = argv.length === 4 && argv[0] === '--report' &&
+    argv[2] === '--output'
+  const manifestMode = argv.length === 3 && argv[1] === '--output'
+  const input = savedMode ? argv[1] : argv[0]
+  const output = savedMode ? argv[3] : argv[2]
+  if ((!savedMode && !manifestMode) ||
+      typeof input !== 'string' || !input || input.startsWith('-') ||
+      typeof output !== 'string' || !output || output.startsWith('-') ||
+      output !== output.trim() || !output.toLowerCase().endsWith('.html')) {
     throw new Error('Invalid private offline checklist HTML arguments')
   }
-  const report = await compareLocalRetailerSnapshots(argv[0])
+  const report = savedMode
+    ? await readSavedPrivateComparison(input)
+    : await compareLocalRetailerSnapshots(input)
+  // No HTML is rendered or published if caller-owned report proof is malformed.
   const html = renderPrintablePrivateShoppingChecklist(report)
   try {
-    await assertNoSymlinkedM3OutputParents(argv[2])
-    await mkdir(dirname(argv[2]), { recursive: true, mode: 0o700 })
-    await writeDerivedM3Output(argv[0], argv[2], html)
+    await assertNoSymlinkedM3OutputParents(output)
+    await mkdir(dirname(output), { recursive: true, mode: 0o700 })
+    await writeDerivedM3Output(input, output, html)
   } catch (error) { throw privateM3OutputFailure(error) }
   return html
 }
