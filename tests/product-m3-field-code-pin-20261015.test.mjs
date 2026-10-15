@@ -103,3 +103,18 @@ test('M3 code-pin CLI denies symlink and hardlink aliases of private input', asy
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('M3 pin verification refuses inherited, accessor and hidden manifest fields', () => {
+  const valid = createPrivateM3StudyCodePin(bytes, SHA)
+  const hidden = { ...valid }
+  Object.defineProperty(hidden, 'invisible', { value: 'hidden', enumerable: false })
+  assert.equal(verifyPrivateM3StudyCodePin(bytes, hidden), false)
+  const symbol = { ...valid, [Symbol('secret')]: true }
+  assert.equal(verifyPrivateM3StudyCodePin(bytes, symbol), false)
+  const accessor = { ...valid }
+  Object.defineProperty(accessor, 'publicSavingsClaimEligible', { enumerable: true, get: () => false })
+  assert.equal(verifyPrivateM3StudyCodePin(bytes, accessor), false)
+  assert.equal(verifyPrivateM3StudyCodePin(bytes, Object.create(valid)), false)
+  const nullPrototype = Object.assign(Object.create(null), valid)
+  assert.equal(verifyPrivateM3StudyCodePin(bytes, nullPrototype), false)
+})
