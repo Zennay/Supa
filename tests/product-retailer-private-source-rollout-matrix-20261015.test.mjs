@@ -128,3 +128,19 @@ test('rollout: rejected extra PLUS sample needs human review, even beside an acc
   assert.equal(report.retailers[0].nextActions.includes('review-rejected-adapter-evidence'), true)
   assert.equal(report.productionEnabled, false)
 })
+
+test('rollout: +1 nanosecond newer reviewed capture wins over same-millisecond archive', async () => {
+  const records = await Promise.all(RETAILER_REVIEWED_FIXTURES.map(file =>
+    readFile(new URL('../fixtures/m1/' + file, import.meta.url), 'utf8').then(JSON.parse)))
+  const later = structuredClone(records[0])
+  later.source.id += '-one-nanosecond'
+  later.source.capturedAt = records[0].source.capturedAt.replace(/\.(\d{3})Z$/,
+    (_, millis) => '.' + millis + '000001Z')
+  assert.equal(Date.parse(later.source.capturedAt), Date.parse(records[0].source.capturedAt))
+  const result = planPrivateRetailerRollout(await gate(),
+    ingestReviewedBatch([...records, later]), { referenceTime: initialClock })
+  assert.equal(result.retailers[0].shapes[0].latestArchivedCapturedAt, later.source.capturedAt)
+  assert.equal(result.retailers[0].shapes[0].historicalSources, 2)
+  assert.equal(result.permissionVerifiedForNewCapture, false)
+  assert.equal(result.liveRetailerRequests, 0)
+})
