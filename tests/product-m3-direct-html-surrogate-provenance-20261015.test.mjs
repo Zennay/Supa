@@ -29,7 +29,7 @@ for(const [name,bad] of [
 for(const [name,html] of [
   ['plain ASCII',product],
   ['valid emoji',product+'🥛'],
-  ['UTF-8 BOM with emoji','\\uFEFF'+product+'🥛'],
+  ['UTF-8 BOM with emoji',String.fromCharCode(0xfeff)+product+'🥛'],
 ]) {
   test('direct M3 parser preserves valid bytes and digest '+name,()=>{
     const result=parseOfflineRetailerSnapshot({source,html,capturedAt})
