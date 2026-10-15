@@ -1,5 +1,81 @@
 import { createHash } from 'node:crypto'
+import { types as nodeTypes } from 'node:util'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
+
+/**
+ * A direct approved capture must not rely on getter/proxy fields that can
+ * mutate permissionGate/grant/source after permission checks and before
+ * invoking the caller-injected HTTP transport. Snapshot ALL nested inputs
+ * with own data descriptors first; never execute getter code.
+ */
+function inertCaptureValue(value, depth = 0) {
+  if (value === null || typeof value !== 'object') {
+    if (typeof value === 'function' || typeof value === 'symbol') {
+      throw new Error('Authorized capture requires inert permission data')
+    }
+    return value
+  }
+  if (depth > 10 || nodeTypes.isProxy(value)) {
+    throw new Error('Authorized capture requires inert permission data')
+  }
+  const array = Array.isArray(value)
+  const proto = Object.getPrototypeOf(value)
+  if (array ? proto !== Array.prototype
+    : proto !== Object.prototype && proto !== null) {
+    throw new Error('Authorized capture requires inert permission data')
+  }
+  const desc = Object.getOwnPropertyDescriptors(value)
+  if (Reflect.ownKeys(desc).some(k => typeof k !== 'string')) {
+    throw new Error('Authorized capture requires inert permission data')
+  }
+  if (array) {
+    const length = desc.length
+    if (!Object.hasOwn(length, 'value') || length.value > 256 ||
+        Reflect.ownKeys(desc).length !== length.value + 1) {
+      throw new Error('Authorized capture requires inert permission data')
+    }
+    const copy = []
+    for (let i = 0; i < length.value; i++) {
+      if (!desc[i] || !Object.hasOwn(desc[i], 'value')) {
+        throw new Error('Authorized capture requires inert permission data')
+      }
+      copy.push(inertCaptureValue(desc[i].value, depth + 1))
+    }
+    return copy
+  }
+  if (Object.keys(desc).length > 128) {
+    throw new Error('Authorized capture requires inert permission data')
+  }
+  const copy = Object.create(null)
+  for (const [key, descriptor] of Object.entries(desc)) {
+    if (key === '__proto__' || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Authorized capture requires inert permission data')
+    }
+    copy[key] = inertCaptureValue(descriptor.value, depth + 1)
+  }
+  return copy
+}
+
+function inertCaptureRequest(options) {
+  if (!options || typeof options !== 'object' || Array.isArray(options) ||
+      nodeTypes.isProxy(options)) {
+    throw new Error('Authorized capture requires inert permission data')
+  }
+  const desc = Object.getOwnPropertyDescriptors(options)
+  const allowed = ['source', 'permissionGate', 'grant', 'fetchFn', 'capturedAt']
+  if (Reflect.ownKeys(desc).some(key => !allowed.includes(key))) {
+    throw new Error('Authorized capture requires inert permission data')
+  }
+  const result = {}
+  for (const key of allowed) {
+    if (!desc[key]) continue
+    if (!Object.hasOwn(desc[key], 'value')) {
+      throw new Error('Authorized capture requires inert permission data')
+    }
+    result[key] = key === 'fetchFn' ? desc[key].value : inertCaptureValue(desc[key].value)
+  }
+  return result
+}
 
 // Reusable authorized capture transport. No live command automatically runs
 // this module; caller supplies explicit permission record and fetch capability.
@@ -96,9 +172,11 @@ async function collectBoundedBody(response) {
   return { html, bytes, sha256: createHash('sha256').update(all).digest('hex') }
 }
 
-export async function captureApprovedRetailerPage({
-  source, permissionGate, grant, fetchFn, capturedAt,
-} = {}) {
+export async function captureApprovedRetailerPage(options = {}) {
+  // Check ALL authorization records for accessors and unsafe aliases before
+  // even checking whether an external network transport was provided.
+  const { source, permissionGate, grant, fetchFn, capturedAt } =
+    inertCaptureRequest(options)
   // Fail closed without injection: there is no implicit network capability,
   // scheduler, scraping of unapproved domains or free-proxy fallback.
   if (typeof fetchFn !== 'function') throw new Error('Approved fetch transport required')
