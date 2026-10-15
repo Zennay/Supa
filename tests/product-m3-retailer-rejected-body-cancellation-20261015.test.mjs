@@ -137,7 +137,7 @@ test('fully read approved mock HTML at exactly the byte limit is not cancelled',
   const { request, getCalls } = await fetchMock(mocked.response, { maxBytes: 3 })
   const result = await request
   assert.equal(result.bytes, 3)
-  assert.equal(result.html, '\\u0001\\u0002\\u0003')
+  assert.deepEqual([...Buffer.from(result.html, 'utf8')], [1, 2, 3])
   assert.match(result.sha256, /^[a-f0-9]{64}$/)
   assert.equal(getCalls(), 1)
   assert.equal(mocked.cancelled(), 0, 'do not abort a successful complete capture')
