@@ -76,7 +76,7 @@ test('empty or claimable report is rejected',()=>{
   assert.throws(()=>renderPrivateShoppingChecklists(data),/Invalid or claimable/)
 })
 const html=price=>'<html><script type="application/ld+json">'+JSON.stringify({
-  '@type':'Product',sku:'fictional-milk',name:'Fictional milk carton',
+  '@type':'Product',sku:'fictional-milk',name:'Halfvolle melk',
   weight:{value:'1000 ml'},offers:{'@type':'Offer',price,priceCurrency:'EUR',
     availability:'https://schema.org/InStock'}})+'</script></html>'
 test('real offline local HTML -> comparator -> full-pack shopping checklist',async t=>{
@@ -96,7 +96,7 @@ test('real offline local HTML -> comparator -> full-pack shopping checklist',asy
   assert.match(text,/2 hele verpakking/)
   assert.match(text,/€2,58/)
   assert.match(text,/€2,38/)
-  assert.match(text,/Fictional milk carton/)
+  assert.match(text,/Halfvolle melk/)
   assert.match(text,/GEEN LIVE PRIJS/)
 })
 
