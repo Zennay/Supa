@@ -53,7 +53,7 @@ test('exact URL selects one target Product from a multi-Product recommendation g
 
 test('Product arrays and @type arrays select the same provenance-bound DekaMarkt node', () => {
   const graph = [
-    { '@type': ['WebPage', 'Product'], ...product('https://www.dekamarkt.nl/producten/another-fake', '55.00') },
+    { ...product('https://www.dekamarkt.nl/producten/another-fake', '55.00'), '@type': ['WebPage', 'Product'] },
     { '@graph': [product(deka.url, '2.00')] },
   ]
   const result = parseSchemaOrgProductForPage(graph, deka)
