@@ -58,9 +58,11 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
   }
   const plus = toDo('baseline', 'PLUS')
   const dekamarkt = toDo('candidate', 'DekaMarkt')
+  const readiness = observationSheetReadiness(sheet, referenceNowMs)
+  const windowState = observationWindowSummary(sheet, referenceNowMs).state
+  const pendingMetadata = pendingM3Metadata(readiness, windowState)
   const readyForPrivateReview = plus.remainingLines === 0 &&
-    dekamarkt.remainingLines === 0 &&
-    observationSheetReadiness(sheet, referenceNowMs).ready
+    dekamarkt.remainingLines === 0 && readiness.ready
 
   return {
     schemaVersion: 1,
@@ -69,12 +71,59 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
     verifiedRetailerObservations: false,
     publicSavingsClaimEligible: false,
     readyForPrivateReview,
-    observationWindowState: observationWindowSummary(sheet, referenceNowMs).state,
+    observationWindowState: windowState,
+    pendingMetadata,
+    pendingMetadataCount: pendingMetadata.study.length +
+      pendingMetadata.plus.length + pendingMetadata.dekamarkt.length,
     expectedTotalLines: 22,
     completedTotalLines: plus.completedLines + dekamarkt.completedLines,
     remainingTotalLines: plus.remainingLines + dekamarkt.remainingLines,
     retailers: [plus, dekamarkt],
   }
+}
+
+// Only a finite, source-owned set of canonical readiness messages is mapped.
+// Never copy an issue string, field value, private path or timestamp into output.
+const PRIVATE_STUDY_METADATA = [
+  ['studyId', 'Studiecode', ['Study ID ontbreekt.', 'Study ID moet een veilige pseudonieme sleutel zijn.']],
+  ['participantKey', 'Pseudonieme deelnemercode', ['Participant key ontbreekt.', 'Participant key moet een veilige pseudonieme sleutel zijn.']],
+  ['population', 'Doelgroep', ['Populatie ontbreekt.']],
+  ['region', 'Regio', ['Regio ontbreekt.']],
+  ['weekStart', 'Begindatum van de week', ['Week start ontbreekt.', 'Week start moet een geldige datum in JJJJ-MM-DD zijn.']],
+  ['priceContext', 'Gedeelde prijscontext', ['Prijscontext ontbreekt.', 'Prijscontext moet in-store of online-order zijn.']],
+]
+const PRIVATE_RETAILER_METADATA = [
+  ['storeName', 'Juiste winkelnaam', 'winkelnaam ontbreekt.', 'winkelnaam moet'],
+  ['storeId', 'Winkelcode', 'winkel-ID ontbreekt.'],
+  ['evidenceId', 'Bewijscode', 'evidence ID ontbreekt.'],
+  ['provenanceNote', 'Herkomstnotitie', 'provenance-notitie ontbreekt.'],
+  ['observedAt', 'Waarnemingstijd met tijdzone', 'geldige observatietijd ontbreekt.'],
+]
+
+function pendingM3Metadata(readiness, windowState) {
+  const issues = new Set(readiness.issues)
+  const study = PRIVATE_STUDY_METADATA
+    .filter(([, , reasons]) => reasons.some(reason => issues.has(reason)))
+    .map(([field, label]) => ({ field, label }))
+  const retailerFields = (prefix) => PRIVATE_RETAILER_METADATA
+    .filter(([, , ...reasons]) =>
+      reasons.some(reason => [...issues].some(issue => issue.startsWith(prefix + ': ' + reason))),
+    )
+    .map(([field, label]) => ({ field, label }))
+  const plus = retailerFields('Winkel A')
+  const dekamarkt = retailerFields('Winkel B')
+  if (issues.has("Winkel A en Winkel B moeten verschillende winkel-ID's hebben.")) {
+    plus.push({ field: 'distinctStoreId', label: 'Unieke winkelcode tegenover de andere winkel' })
+    dekamarkt.push({ field: 'distinctStoreId', label: 'Unieke winkelcode tegenover de andere winkel' })
+  }
+  if (issues.has("Winkel A en Winkel B moeten verschillende evidence-ID's hebben.")) {
+    plus.push({ field: 'distinctEvidenceId', label: 'Unieke bewijscode tegenover de andere winkel' })
+    dekamarkt.push({ field: 'distinctEvidenceId', label: 'Unieke bewijscode tegenover de andere winkel' })
+  }
+  if (windowState === 'outside-window') {
+    study.push({ field: 'observationWindow', label: 'Meet beide winkels binnen maximaal 24 uur opnieuw' })
+  }
+  return { study, plus, dekamarkt }
 }
 
 function humanQuantity(amount, unit) {
@@ -102,6 +151,18 @@ function renderHumanChecklist(report, selection = 'both') {
       lines.push('  - ' + item.ingredientLabel + ' (' +
         humanQuantity(item.requiredAmount, item.requiredUnit) + '): ' + nextStep)
     }
+  }
+  const showActions = (label, pending) => {
+    if (pending.length === 0) return
+    lines.push('', label + ': nog ' + pending.length + ' veld(en) te controleren')
+    for (const item of pending) lines.push('  - ' + item.label)
+  }
+  showActions('Studiegegevens', report.pendingMetadata.study)
+  if (selection === 'both' || selection === 'PLUS') {
+    showActions('PLUS-meetgegevens', report.pendingMetadata.plus)
+  }
+  if (selection === 'both' || selection === 'DekaMarkt') {
+    showActions('DekaMarkt-meetgegevens', report.pendingMetadata.dekamarkt)
   }
   lines.push('', 'Venster: ' + report.observationWindowState +
     '. Privéreview mogelijk: ' + (report.readyForPrivateReview ? 'ja' : 'nee') + '.',
