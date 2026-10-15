@@ -26,6 +26,15 @@ node --experimental-strip-types scripts/m3-private-outstanding-field-actions.mjs
 
 Elk van beide winkels krijgt een blok met uitsluitend nog openstaande canonieke planneringrediënten. Je ziet of beschikbaarheid nog ontbreekt of dat product-/verpakkings-/prijsvelden aangevuld moeten worden. De tekst bevat nooit ingevoerde winkelprijzen, deelnemergegevens, bronlinks, klantproductnamen, bewijstijdstippen of bestandsnamen. Ook met alle 22 regels afgevinkt: géén onafhankelijk geverifieerde winkelwaarneming of openbare besparingsclaim.
 
+Voor één bezoek aan één supermarkt kun je de tekstlijst beperken tot de **11 regels van die winkel**. Het volledige formulier, de private review-status en de normale JSON-uitvoer blijven exact hetzelfde:
+
+```sh
+node --experimental-strip-types scripts/m3-private-outstanding-field-actions.mjs private-sheet.json --text --store plus
+node --experimental-strip-types scripts/m3-private-outstanding-field-actions.mjs private-sheet.json --text --store dekamarkt
+```
+
+Ook de gefilterde checklist bevat geen winkelprijzen, individuele deelnemers of echte bewijzen. Ongeldige winkelkeuzes worden zonder bestandsuitlezing geweigerd.
+
 De tekstweergave vertaalt canonieke aantallen stuks naar natuurlijk Nederlands (`1 stuk`, `2 stuks`); de JSON-uitvoer en opgeslagen canonieke `piece`-eenheid blijven exact onveranderd.
 
 ## Veilig lokaal bestand lezen (privé M3)
