@@ -29,13 +29,23 @@ test('split 400ml and 0.4l of same physical SKU cannot charge twice',()=>{
     {id:'first',query:'halfvolle melk',amount:400,unit:'ml'},
     {id:'second',query:'halfvolle melk',amount:0.4,unit:'l'},
   ])
-  assert.equal(result.comparable,false)
-  assert.equal(result.cheaperStore,null)
-  assert.equal(result.savingsCents,null)
+  // The original safe-abstention contract now has a stronger product path:
+  // exact decimal pooling lets one physical pack cover both meal demands.
+  // No separate line can bill a second whole pack for the same SKU.
+  assert.equal(result.comparable,true)
+  assert.equal(result.cheaperStore,'dekamarkt')
+  assert.equal(result.savingsCents,10)
   assert.equal(result.claimable,false)
-  for(const line of result.lines) {
-    assert.equal(line.plus.totalCents,null)
-    assert.equal(line.dekamarkt.totalCents,null)
-    assert.equal(line.differenceCents,null)
-  }
+  assert.equal(result.stores.plus.subtotalCents,129)
+  assert.equal(result.stores.dekamarkt.subtotalCents,119)
+  assert.equal(result.lines[0].plus.packs,1)
+  assert.equal(result.lines[0].dekamarkt.packs,1)
+  assert.equal(result.lines[1].plus.packs,0)
+  assert.equal(result.lines[1].dekamarkt.packs,0)
+  assert.equal(result.lines[1].plus.sharedPackWithIngredientId,'first')
+  assert.equal(result.lines[1].dekamarkt.sharedPackWithIngredientId,'first')
+  assert.deepEqual(result.lines[0].plus.sharedPackCoversIngredientIds,['first','second'])
+  assert.deepEqual(result.lines[0].dekamarkt.sharedPackCoversIngredientIds,['first','second'])
+  assert.equal(result.lines[0].differenceCents,-10)
+  assert.equal(result.lines[1].differenceCents,0)
 })

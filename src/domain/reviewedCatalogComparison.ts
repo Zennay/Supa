@@ -17,6 +17,10 @@ export type CatalogLine = {
   totalCents: number | null
   sourceUrl: string | null
   capturedAt: string | null
+  /** First line's purchase covers all listed ingredient IDs, not separate packs. */
+  sharedPackCoversIngredientIds?: string[]
+  /** This line is covered by a shared purchase charged on that ingredient ID. */
+  sharedPackWithIngredientId?: string
 }
 
 export type CatalogComparison = {
@@ -231,33 +235,75 @@ export function compareReviewedCatalogs({
       ingredient: required.query,
       plus,
       dekamarkt,
-      differenceCents: plus.totalCents !== null && dekamarkt.totalCents !== null
+      // Quoted cents are not a realizable line saving unless stock for
+      // the exact pack is explicitly confirmed by BOTH retailers.
+      differenceCents: plus.status === 'matched' && dekamarkt.status === 'matched' &&
+        plus.totalCents !== null && dekamarkt.totalCents !== null
         ? dekamarkt.totalCents - plus.totalCents : null,
     }
   })
 
-  // Two distinct ingredient lines can select the same *physical* SKU.
-  // Rounding each demand independently would charge that one package twice.
-  // Until a shared-pack allocation can be displayed transparently, withhold
-  // those line costs and the entire winner rather than inventing savings.
+  // One physical SKU may satisfy multiple distinct planner ingredient IDs.
+  // Pool original, unrounded decimal demands before taking the whole-pack
+  // ceiling. Charge the shared purchase exactly ONCE, on its first line,
+  // and mark the other rows as covered by that purchase (zero *additional*
+  // packs, not a free product). This works independently per retailer.
+  // Unsafe quantities/overflow still withhold the winner rather than
+  // double-charging or silently rounding.
   for (const shop of SHOPS) {
-    const seenLineProducts = new Set<string>()
-    const sharedLineProducts = new Set<string>()
-    for (const line of lines) {
-      if (line[shop].status !== 'matched' || !line[shop].productId) continue
-      const id = line[shop].productId
-      if (seenLineProducts.has(id)) sharedLineProducts.add(id)
-      seenLineProducts.add(id)
-    }
-    if (sharedLineProducts.size > 0) {
-      sourceTrusted = false
-      for (const line of lines) {
-        if (line[shop].productId && sharedLineProducts.has(line[shop].productId)) {
-          line[shop] = unknown()
-          line.differenceCents = null
+    const grouped = new Map<string, number[]>()
+    lines.forEach((line, index) => {
+      // Quoted-but-unconfirmed stock must not double-count one physical
+      // pack in a provisional subtotal either. Preserve availability_unknown
+      // on those covered rows so no basket winner can be asserted.
+      if ((line[shop].status !== 'matched' &&
+           line[shop].status !== 'availability_unknown') ||
+          !line[shop].productId) return
+      const indices = grouped.get(line[shop].productId!) ?? []
+      indices.push(index)
+      grouped.set(line[shop].productId!, indices)
+    })
+    for (const [productId, indices] of grouped) {
+      if (indices.length < 2) continue
+      const item = catalog[shop].find((product) => product.id === productId)
+      const packs = item ? calculateDecimalPackCount(
+        indices.map((index) => ({
+          amount: requirements[index].amount!,
+          unit: requirements[index].unit,
+        })),
+        { amount: item.packAmount!, unit: item.packUnit, count: item.packCount! },
+      ) : null
+      const total = packs === null || !item ? null : packs * item.priceCents
+      if (total === null || !Number.isSafeInteger(total) || total < 0) {
+        sourceTrusted = false
+        for (const index of indices) lines[index][shop] = unknown()
+        continue
+      }
+      const ownerIndex = indices[0]
+      const ownerId = requirements[ownerIndex].id
+      lines[ownerIndex][shop] = {
+        ...lines[ownerIndex][shop],
+        packs,
+        totalCents: total,
+        sharedPackCoversIngredientIds: indices.map((index) => requirements[index].id),
+      }
+      for (const index of indices.slice(1)) {
+        lines[index][shop] = {
+          ...lines[index][shop],
+          packs: 0,
+          totalCents: 0,
+          sharedPackWithIngredientId: ownerId,
         }
       }
     }
+  }
+  // Price differences must be computed AFTER shared physical pack allocation,
+  // otherwise the row preview still reflects the old twice-rounded prices.
+  for (const line of lines) {
+    line.differenceCents = line.plus.status === 'matched' &&
+      line.dekamarkt.status === 'matched' &&
+      line.plus.totalCents !== null && line.dekamarkt.totalCents !== null
+      ? line.dekamarkt.totalCents - line.plus.totalCents : null
   }
 
   const storeSummaries = Object.fromEntries(SHOPS.map((shop) => {
