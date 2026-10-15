@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { buildReviewedRetailerSqlite } from './retailer-build-reviewed-universal-sqlite.mjs'
+import { checkReviewedSqliteExactParity } from './qa-retailer-reviewed-db-exact-parity.mjs'
 
 const GATE = fileURLToPath(new URL('./qa-retailer-sqlite-six-kind-preflight.py', import.meta.url))
 const HEALTH = fileURLToPath(new URL('./qa-retailer-sqlite-health-report.py', import.meta.url))
@@ -44,8 +45,14 @@ export async function buildOfflineQualityBundle(asOf = new Date().toISOString().
     if (built?.sources !== 6 || built.snapshots !== 6 || built.historicalOnly !== true ||
       built.databaseCreated !== true || built.productionEnabled !== false ||
       built.publicSavingsClaimEligible !== false || built.externalNetworkUsed !== false) reject()
+    const parity = await checkReviewedSqliteExactParity(db)
     const accepted = readJson(GATE, ['--database', db])
     const health = readJson(HEALTH, ['--database', db, '--as-of', reviewClock])
+    if (parity?.matchesOriginalFixtures !== true ||
+      parity.capturedSources !== 6 || parity.retailerCount !== 2 ||
+      parity.verifiedObservations !== built.observations ||
+      parity.historicalOnly !== true || parity.productionEnabled !== false ||
+      parity.publicSavingsClaimEligible !== false) reject()
     if (accepted?.accepted !== true || accepted.sourceKinds !== 6 ||
       accepted.productionEnabled !== false || accepted.publicSavingsClaimEligible !== false ||
       health?.sourceKinds !== 6 || health.historicalOnly !== true ||
@@ -68,6 +75,8 @@ export async function buildOfflineQualityBundle(asOf = new Date().toISOString().
       mode: 'historical-offline-retailer-quality-bundle',
       assessmentClock: reviewClock,
       sourceKinds: 6,
+      sourceFactParityVerified: true,
+      verifiedOriginalObservations: parity.verifiedObservations,
       snapshots: health.snapshots,
       products: health.products,
       observations: health.observations,
