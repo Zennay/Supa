@@ -12,6 +12,9 @@ import { buildObservedWeekReport } from '../scripts/m3-assess-observed-week.mjs'
 
 // All 22 line prices and product names are fictitious. The canonical M2
 // requirements are used unchanged; these are never field observations.
+// Frozen evaluation instant after all simulated 2026 observations.
+const QA_REFERENCE_NOW_MS = Date.parse('2026-10-14T12:00:00Z')
+
 function completedSyntheticSheet() {
   const sheet = buildObservationSheet()
   Object.assign(sheet.study, {
@@ -60,7 +63,7 @@ test('M3 cross-layer: readable synthetic observed data remains internally claima
   assert.equal(observationSheetProgress(sheet).completeLines, 22)
 
   const study = buildWeeklyBasketStudyFromObservationSheet(JSON.parse(original))
-  const assessment = assessWeeklyBasketStudy(study)
+  const assessment = assessWeeklyBasketStudy(study, { referenceNowMs: QA_REFERENCE_NOW_MS })
   const report = buildObservedWeekReport(study)
   assert.equal(assessment.claimable, true)
   assert.equal(assessment.comparison.outcome, 'better')
@@ -98,7 +101,7 @@ for (const [path, invisible] of [
       return
     }
 
-    const assessment = assessWeeklyBasketStudy(study)
+    const assessment = assessWeeklyBasketStudy(study, { referenceNowMs: QA_REFERENCE_NOW_MS })
     assert.equal(assessment.claimable, false)
     assert.equal(assessment.comparison.outcome, 'unknown')
     assert.equal(assessment.comparison.savingsCents, null)

@@ -10,6 +10,9 @@ import {
   m2Recipes,
 } from '../src/data/m2Fixture.ts'
 
+// Frozen evaluation instant after all simulated 2026 observations.
+const QA_REFERENCE_NOW_MS = Date.parse('2026-10-14T12:00:00Z')
+
 function syntheticBasket(storeId, delta) {
   return buildOneStoreBasket({
     store: { id: storeId, name: storeId === 'store-a' ? 'Synthetic store A' : 'Synthetic store B' },
@@ -76,7 +79,7 @@ for (const [name, invisible] of blankGlyphs) {
       parent[path.split('.').at(-1)] = invisible
       const before = JSON.stringify(study)
 
-      const result = assessWeeklyBasketStudy(study)
+      const result = assessWeeklyBasketStudy(study, { referenceNowMs: QA_REFERENCE_NOW_MS })
       assert.equal(result.claimable, false)
       assert.equal(result.comparison.claimable, false)
       assert.equal(result.comparison.outcome, 'unknown')
@@ -95,7 +98,7 @@ test('M3 assessment accepts visible Hangul, Braille, emoji and decomposed notes'
   study.region = '⠁⠃ Leiden'
   study.baseline.provenanceNote = 'Nota e\u0301'
   study.candidate.provenanceNote = '👩\u200D🍳 手動 123'
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: QA_REFERENCE_NOW_MS })
   assert.equal(result.claimable, true)
   assert.equal(result.comparison.outcome, 'better')
   assert.equal(result.observationWindowHours, 1)

@@ -16,6 +16,9 @@ import {
 
 // Fictional research evidence only. All 11 canonical M2 ingredients are
 // populated from the controlled, non-retailer test fixture.
+// Frozen evaluation instant after all simulated 2026 observations.
+const QA_REFERENCE_NOW_MS = Date.parse('2026-10-14T12:00:00Z')
+
 function makeBasket(store, deltaCents) {
   const products = [
     ...m2Products.map((product) => ({
@@ -75,7 +78,7 @@ function fictionalObservedWeek(weekStart = '2026-09-28') {
 test('QA M3: observation week and timestamps align for a complete synthetic same-demand basket', () => {
   const study = fictionalObservedWeek()
   const original = JSON.stringify(study)
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: QA_REFERENCE_NOW_MS })
 
   assert.equal(result.claimable, true)
   assert.equal(result.comparison.outcome, 'better')
@@ -89,7 +92,7 @@ for (const distantWeek of ['2025-09-29', '2027-09-27']) {
   test(`QA M3 EXPECTED RED: observation from Oct 2026 cannot prove week ${distantWeek}`, () => {
     const study = fictionalObservedWeek(distantWeek)
     const original = JSON.stringify(study)
-    const result = assessWeeklyBasketStudy(study)
+    const result = assessWeeklyBasketStudy(study, { referenceNowMs: QA_REFERENCE_NOW_MS })
 
     assert.equal(result.observationWindowHours, 1.25)
     assert.equal(result.claimable, false, 'unrelated study week must fail closed')
