@@ -21,8 +21,8 @@ function report() {
 test('prints physical whole packs and a private total per retailer, never source URL tokens',()=>{
   const out=renderPrivateShoppingChecklists(report())
   assert.match(out,/PRIVÉ BOODSCHAPPENCHECKLIST/)
-  assert.match(out,/PLUS.*€1,29/u)
-  assert.match(out,/DekaMarkt.*€1,19/u)
+  assert.match(out,/€1,29\/pak/u)
+  assert.match(out,/€1,19\/pak/u)
   assert.match(out,/1 hele verpakking/)
   assert.match(out,/ALLEEN OFFLINE TOTAAL PLUS: €1,29/)
   assert.match(out,/ALLEEN OFFLINE TOTAAL DekaMarkt: €1,19/)
