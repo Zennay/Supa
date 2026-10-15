@@ -369,7 +369,7 @@ function buildOffer(offers: JsonObject[], price: number | null, pack: RawPack,
     label: 'schema.org Offer', mechanics: null, offerPriceCents: price,
     originalPriceCents: null, validFrom,
     validTo: validTo && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(validTo)
-      ? validTo + 'T23:59:59.999Z' : validTo,
+      ? validTo + 'T23:59:59.999999999Z' : validTo,
   }
 }
 
