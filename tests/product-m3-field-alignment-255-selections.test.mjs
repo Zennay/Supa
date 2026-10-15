@@ -34,12 +34,14 @@ test('255 real controlled recipe/day week selections: only the exact four-meal r
             .map(row => row.day)
 
           assert.equal(summary.fixedStudyWeekMatches, expectedCanonical, argumentsByDay.join(','))
-          assert.equal(summary.canCollectUsingFrozenWorksheet, expectedCanonical)
+          assert.equal(summary.matchesFixedWorksheetDemand, expectedCanonical)
           assert.deepEqual(summary.missingDays, expectedMissingDays)
           assert.deepEqual(summary.changedRecipes.map(item => item.day), expectedChangedDays)
           assert.equal(summary.physicalStudyIngredientsPerStore, 11)
           assert.deepEqual(summary.storesToObserve, ['PLUS', 'DekaMarkt'])
           assert.equal(summary.evidenceStatus, 'preflight-only-not-an-observation')
+          assert.equal(summary.retailerReusePermissionVerified, false)
+          assert.equal(summary.fieldObservationEvidenceCollected, false)
           assert.equal(summary.publicSavingsClaimEligible, false)
           assert.equal(summary.liveRetailerRequests, 0)
           scenarios++
