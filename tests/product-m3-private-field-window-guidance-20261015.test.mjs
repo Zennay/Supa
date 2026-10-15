@@ -28,7 +28,7 @@ const cases = [
   },
   {
     state: 'single-observation', times: ['2020-01-01T08:00:00Z', ''],
-    expected: 'één winkel heeft een geldige observatietijd; meet de andere binnen 24 uur',
+    expected: 'de eerste meting is ouder dan 24 uur; meet beide winkels opnieuw',
   },
   {
     state: 'within-window', times: ['2020-01-01T08:00:00Z', '2020-01-02T08:00:00Z'],
@@ -44,6 +44,7 @@ test('M3 operator reports retain machine-readable window state without revealing
   for (const { state, times } of cases) {
     const report = buildM3OutstandingFieldActions(JSON.stringify(fixture(...times)), NOW)
     assert.equal(report.observationWindowState, state)
+    assert.equal(report.observationWindowExpired, state === 'single-observation')
     assert.equal(report.publicSavingsClaimEligible, false)
     assert.equal(report.verifiedRetailerObservations, false)
     assert.equal(JSON.stringify(report).includes('2020-01-0'), false)
@@ -85,4 +86,38 @@ test('future observational time remains unstarted and is never shown to operator
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /Meetvenster: nog geen geldige observatietijd/)
   assert.equal(result.stdout.includes('2099'), false)
+})
+
+test('one observed store expires strictly after 24h (not at the exact boundary)', () => {
+  const sheet = fixture('2026-10-14T12:00:00Z', '')
+  const exactly24h = buildM3OutstandingFieldActions(JSON.stringify(sheet), NOW)
+  const plusOneMs = buildM3OutstandingFieldActions(JSON.stringify(sheet), NOW + 1)
+  assert.equal(exactly24h.observationWindowState, 'single-observation')
+  assert.equal(exactly24h.observationWindowExpired, false)
+  assert.equal(exactly24h.pendingMetadata.study.some(f => f.field === 'observationWindow'), false)
+  assert.equal(plusOneMs.observationWindowState, 'single-observation')
+  assert.equal(plusOneMs.observationWindowExpired, true)
+  assert.equal(plusOneMs.pendingMetadata.study.some(f => f.field === 'observationWindow'), true)
+  assert.equal(plusOneMs.publicSavingsClaimEligible, false)
+  for (const report of [exactly24h, plusOneMs]) {
+    assert.equal(JSON.stringify(report).includes('2026-10-14T12:00'), false)
+    assert.equal(JSON.stringify(report).includes(PRIVATE_MARKER), false)
+  }
+})
+
+test('recent private one-store observation gives feasible 24h action on real CLI clock', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-recent-single-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const path = join(dir, 'recent.json')
+  const observedAt = new Date(Date.now() - 60_000).toISOString()
+  const sheet = fixture(observedAt, '')
+  await writeFile(path, JSON.stringify(sheet), { mode: 0o600 })
+  const result = spawnSync(process.execPath,
+    ['--experimental-strip-types', CLI, path, '--text', '--store', 'plus'],
+    { cwd: dir, encoding: 'utf8', timeout: 20_000 })
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /Meetvenster: één winkel heeft een geldige observatietijd; meet de andere binnen 24 uur/)
+  assert.doesNotMatch(result.stdout, /de eerste meting is ouder dan 24 uur/)
+  assert.equal(result.stdout.includes(observedAt), false)
+  assert.equal(result.stdout.includes(PRIVATE_MARKER), false)
 })
