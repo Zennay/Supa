@@ -23,6 +23,17 @@ Een geldige operatorrun vergelijkt dezelfde `maxAgeHours`-grens, precies dezelfd
 
 `newlyMissingShapes` en `recoveredShapes` beschrijven ontbrekende of teruggekeerde adapter-bronvormen **in de aangeleverde privédataset**. `perShape` toont uitsluitend verschillen in aantallen geaccepteerde bronnen, geweigerde bronnen, observaties, verouderde captures en onbekende prijsvelden. `reviewSignals` meldt onder andere minder geaccepteerde bronnen, meer afwijzingen, ouder wordende captures of meer interne feitenconflicten. De functie geeft nooit een productnaam, bron-URL, prijsbedrag, SHA of SKU terug.
 
+### Bronvorm-verslechtering mag niet worden weggemiddeld
+
+**Nieuwe product-core detectie (#2979):** de algemene tellers kunnen gelijk blijven terwijl PLUS verslechtert en DekaMarkt tegelijk herstelt. Daarom markeert `datasetRegressionSignalsDetected` nu ook een toename **binnen een van de zes afzonderlijke retailer×bronvorm-buckets**. De vier privacyveilige, vaste `reviewSignals` zijn:
+
+- `more-stale-captures-in-source-shape` — historische broncaptures raken lokaal verouderd.
+- `more-unpriced-observations-in-source-shape` — onbekende prijzen in een bronvorm nemen toe.
+- `more-unknown-availability-in-source-shape` — de adapter verliest bekende beschikbaarheidsinformatie.
+- `more-unknown-packs-in-source-shape` — de adapter verliest bekende verpakkingseenheden/-hoeveelheden.
+
+De exacte aantallen blijven afleesbaar uit **de bestaande** `perShape`-velden voor stale en unknown prices; voor availability en packs wordt het regressiesignaal veilig afgeleid uit de gevalideerde interne `byShape`-tellers. Er worden geen productdetails of ruwe bronnen toegevoegd aan de uitvoer. Een signaal is een opdracht voor **menselijke interne review van dataset/dekking**, geen bewijs dat de supermarkt zelf prijzen, voorraad of assortiment heeft aangepast. Verbeteringen elders maken een lokaal regressiesignaal niet ongedaan; een volledig identieke dataset blijft zonder signalen.
+
 **Interpretatie:** minder waarnemingen is niet hetzelfde als minder voorraad of een door de supermarkt verwijderd artikel. Ander extractievenster, veranderende rechten of een afwijkend reviewsample kunnen ook de oorzaak zijn. Vergelijkbare bronpopulaties en expliciete code-/capturepins zijn nodig om echte dekking te interpreteren. Alle uitvoer blijft `humanReviewRequired:true`, `permissionVerified:false`, `productionEnabled:false`, `livePricesAvailable:false`, `publicSavingsClaimEligible:false` en `externalRequests:0`.
 
 De externe M3-releasevoorwaarden blijven onveranderd: schriftelijke rechten #74, menselijke echte gelijk-tijdige PLUS/DekaMarkt 11×2 basket #78, broncodepin #205, permanente VPS runner #2833.
