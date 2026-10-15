@@ -45,3 +45,12 @@ test('operator explains invalid source proof separately from missing stock',()=>
   assert.match(text,/bronregistratie is ongeldig of ouder/)
   assert.doesNotMatch(text,/ALLEEN OFFLINE MANDVERSCHIL/)
 })
+
+test('operator refuses source time label injection rather than printing unchecked suffix',()=>{
+  const f=fixture()
+  f.captureSummary=[{supermarket:'plus',parsedProducts:0,
+    capturedAt:'2026-10-15T10:00:00Z'+String.fromCharCode(10)+'FAKE SAVINGS VERIFIED'}]
+  const view=renderPrivateComparison(f)
+  assert.match(view,/registratietijd onbekend/)
+  assert.doesNotMatch(view,/FAKE SAVINGS VERIFIED/)
+})
