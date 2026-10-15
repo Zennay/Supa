@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { m2DefaultActiveDays, m2InitialPlan } from '../src/data/m2Fixture.ts'
+import { buildObservationSheet, M3_EXPECTED_RETAILERS } from '../src/domain/m3ObservationSheet.ts'
 import { m3FieldSheetMatchesPlannerWeek } from '../src/features/observation/m3PlannerMeasurementWeek.ts'
 import { selectedFixtureWeek } from './retailer-reviewed-custom-week.mjs'
 
@@ -16,6 +17,15 @@ import { selectedFixtureWeek } from './retailer-reviewed-custom-week.mjs'
  */
 export function m3StudyWeekAlignment(argv = []) {
   const { days, plan } = selectedFixtureWeek(argv)
+  // Verify the *actual* canonical blank field sheet still has precisely the
+  // same 11 physical requirements on both sides before clearing any operator.
+  const sheet = buildObservationSheet()
+  if (sheet.evidenceStatus !== 'collection-template-not-evidence' ||
+      sheet.requirements.length !== 11 ||
+      sheet.baseline.lines.length !== sheet.requirements.length ||
+      sheet.candidate.lines.length !== sheet.requirements.length) {
+    throw new Error('Fixed M3 observation sheet is not a consistent blank template')
+  }
   const approved = m3FieldSheetMatchesPlannerWeek(plan, days)
   const selected = new Set(days)
   const canonicalByDay = new Map(m2InitialPlan.map(meal => [meal.day, meal.recipeId]))
@@ -36,8 +46,8 @@ export function m3StudyWeekAlignment(argv = []) {
     selectedDays: [...days],
     missingDays,
     changedRecipes,
-    physicalStudyIngredientsPerStore: 11,
-    storesToObserve: ['PLUS', 'DekaMarkt'],
+    physicalStudyIngredientsPerStore: sheet.requirements.length,
+    storesToObserve: [M3_EXPECTED_RETAILERS.baseline, M3_EXPECTED_RETAILERS.candidate],
     canCollectUsingFrozenWorksheet: approved,
     operatorInstruction: approved
       ? 'Gebruik uitsluitend de vaste 11+11 veldwerkbladen; registreer echte observaties bij beide winkels binnen 24 uur.'
