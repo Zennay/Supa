@@ -12,7 +12,7 @@ import sqlite3
 import stat
 import sys
 from datetime import datetime, timezone
-from urllib.parse import quote, urlsplit
+from urllib.parse import parse_qsl, quote, urlsplit
 
 HOSTS = {"plus": "www.plus.nl", "dekamarkt": "www.dekamarkt.nl"}
 RIGHTS = {"plus": "permission_required", "dekamarkt": "unresolved"}
@@ -52,6 +52,11 @@ def source_ok(retailer, kind, url, captured, digest):
     check(parsed.scheme == "https" and parsed.hostname == HOSTS[retailer]
           and parsed.username is None and parsed.password is None
           and parsed.port is None and not parsed.fragment)
+    # Refuse URL query bearer/API credentials even if HTTPS hostname is trusted.
+    sensitive = {"access_token", "token", "api_key", "apikey", "auth",
+                 "authorization", "session", "secret", "password", "signature"}
+    check(not any(key.casefold().replace("-", "_") in sensitive
+                  for key, _ in parse_qsl(parsed.query, keep_blank_values=True)))
     check(isinstance(captured, str) and DATE.fullmatch(captured) is not None)
     instant = datetime.fromisoformat(captured.replace("Z", "+00:00"))
     check(instant.utcoffset() is not None and
