@@ -168,3 +168,31 @@ test('QA: backdated operator audit clock cannot turn later reviewed capture into
     await Promise.all([first, second].map(dir => rm(dir, { recursive: true, force: true })))
   }
 })
+
+
+test('QA: manifest-pinned malformed UTF-8 source is refused even with matching SHA-256', async () => {
+  const first = await archived()
+  const second = await archived()
+  try {
+    const malformed = Buffer.from([0x7b, 0x22, 0x76, 0x22, 0x3a, 0xff, 0x7d])
+    await writeFile(join(second, 'capture-0.json'), malformed)
+    const path = join(second, 'manifest.json')
+    const manifest = JSON.parse(await readFile(path, 'utf8'))
+    manifest.sources[0].sha256 = DIGEST(malformed)
+    await writeFile(path, JSON.stringify(manifest) + '\n')
+    assert.equal(manifest.sources[0].sha256, DIGEST(await readFile(join(second, 'capture-0.json'))))
+    await checkRefusal(first, second)
+  } finally {
+    await Promise.all([first, second].map(dir => rm(dir, { recursive: true, force: true })))
+  }
+})
+
+test('QA: impossible audit calendar date refuses without touching valid private archives', async () => {
+  const first = await archived()
+  const second = await archived()
+  try {
+    await checkRefusal(first, second, '2026-02-30T12:00:00Z')
+  } finally {
+    await Promise.all([first, second].map(dir => rm(dir, { recursive: true, force: true })))
+  }
+})
