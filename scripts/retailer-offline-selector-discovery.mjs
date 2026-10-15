@@ -68,11 +68,14 @@ export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
   }
 
   const sha256 = createHash('sha256').update(html, 'utf8').digest('hex')
+  const signalMarkup = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(template|noscript|textarea|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
   const structuredSignals = {
-    schemaOrgProduct: /"@type"\s*:\s*"Product"/i.test(html),
-    nextData: /<script\b[^>]*\bid=["']__NEXT_DATA__["']/i.test(html),
-    nuxtData: /<script\b[^>]*\bid=["']__NUXT_DATA__["']/i.test(html),
-    jsonLd: /<script\b[^>]*\btype=["']application\/ld\+json["']/i.test(html),
+    schemaOrgProduct: /"@type"\s*:\s*"Product"/i.test(signalMarkup),
+    nextData: /<script\b[^>]*\bid=["']__NEXT_DATA__["']/i.test(signalMarkup),
+    nuxtData: /<script\b[^>]*\bid=["']__NUXT_DATA__["']/i.test(signalMarkup),
+    jsonLd: /<script\b[^>]*\btype=["']application\/ld\+json["']/i.test(signalMarkup),
   }
 
   // Ambiguous unterminated inert markup is rejected; do not accidentally
