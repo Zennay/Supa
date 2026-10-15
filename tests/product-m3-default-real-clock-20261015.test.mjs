@@ -54,11 +54,15 @@ function requireNoMoney(result) {
   assert.deepEqual(result.comparison.lineDeltas, [])
 }
 
-test('historical fictional same-week basket remains comparable with omitted clock', () => {
-  const result = assessWeeklyBasketStudy(fictionalStudy())
-  assert.equal(result.claimable, true, result.reasons.join('; '))
-  assert.equal(result.comparison.outcome, 'better')
-  assert.equal(result.observationWindowHours, 1)
+test('missing clock never authorizes finance; explicit real-clock historical baskets remain comparable', () => {
+  const study = fictionalStudy()
+  const withoutClock = assessWeeklyBasketStudy(study)
+  requireNoMoney(withoutClock)
+  assert.ok(withoutClock.reasons.includes('assessment reference clock is required'))
+  const withClock = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
+  assert.equal(withClock.claimable, true, withClock.reasons.join('; '))
+  assert.equal(withClock.comparison.outcome, 'better')
+  assert.equal(withClock.observationWindowHours, 1)
 })
 
 test('omitted clock refuses a fictional 2099 basket pair despite valid 1-hour window', () => {
@@ -69,8 +73,11 @@ test('omitted clock refuses a fictional 2099 basket pair despite valid 1-hour wi
   const result = assessWeeklyBasketStudy(study)
   requireNoMoney(result)
   assert.equal(result.observationWindowHours, 1)
-  assert.ok(result.reasons.some(reason => reason.includes('baseline observedAt is later than assessment reference time')))
-  assert.ok(result.reasons.some(reason => reason.includes('candidate observedAt is later than assessment reference time')))
+  assert.ok(result.reasons.includes('assessment reference clock is required'))
+  const withClock = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
+  requireNoMoney(withClock)
+  assert.ok(withClock.reasons.some(reason => reason.includes('baseline observedAt is later than assessment reference time')))
+  assert.ok(withClock.reasons.some(reason => reason.includes('candidate observedAt is later than assessment reference time')))
 })
 
 test('omitted clock rejects future baseline and candidate independently', () => {
@@ -79,23 +86,25 @@ test('omitted clock rejects future baseline and candidate independently', () => 
     study[side].observedAt = '2099-10-10T12:00:00+14:00'
     const result = assessWeeklyBasketStudy(study)
     requireNoMoney(result)
-    assert.ok(result.reasons.some(reason => reason.includes(side + ' observedAt is later than assessment reference time')))
+    assert.ok(result.reasons.includes('assessment reference clock is required'))
+    const withClock = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
+    requireNoMoney(withClock)
+    assert.ok(withClock.reasons.some(reason => reason.includes(side + ' observedAt is later than assessment reference time')))
   }
 })
 
-test('exact evaluation instant with timezone offset remains valid at real clock', (t) => {
+test('explicit exact evaluation instant with timezone offset remains valid', () => {
   const now = Date.parse('2026-10-15T12:00:00Z')
-  t.mock.method(Date, 'now', () => now)
   const study = fictionalStudy()
   study.weekStart = '2026-10-12'
   study.baseline.observedAt = '2026-10-15T12:00:00+01:00'
   study.candidate.observedAt = '2026-10-15T14:00:00+02:00'
-  const exact = assessWeeklyBasketStudy(study)
+  const exact = assessWeeklyBasketStudy(study, { referenceNowMs: now })
   assert.equal(exact.claimable, true, exact.reasons.join('; '))
   assert.equal(exact.observationWindowHours, 1)
 
   study.candidate.observedAt = '2026-10-15T14:00:00.001+02:00'
-  const future = assessWeeklyBasketStudy(study)
+  const future = assessWeeklyBasketStudy(study, { referenceNowMs: now })
   requireNoMoney(future)
   assert.ok(future.reasons.some(reason => reason.includes('candidate observedAt is later than assessment reference time')))
 })
