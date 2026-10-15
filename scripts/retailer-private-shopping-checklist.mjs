@@ -1,6 +1,59 @@
 import { pathToFileURL } from 'node:url'
 import { compareLocalRetailerSnapshots } from './retailer-compare-local-snapshots.mjs'
 
+import { types as utilTypes } from 'node:util'
+
+
+// The pure exported formatter accepts caller-owned JS objects. Pin all data
+// before reading even one field: Proxy#get and accessor callbacks must never
+// run to decide what is a paid physical pack. Unlike JSON.stringify, own-data
+// descriptors do not invoke getters. Exotic/inherited rows safely become
+// missing evidence; accessor/Proxy inputs fail with a generic private error.
+const unsafeInput = () => new Error('Invalid or claimable offline shopping checklist input')
+function pinOwnData(value, depth = 0, state = { nodes: 0, active: new WeakSet() }) {
+  if (value === null || value === undefined ||
+      typeof value === 'string' || typeof value === 'boolean' ||
+      typeof value === 'number') return value
+  if (typeof value !== 'object') throw unsafeInput()
+  if (utilTypes.isProxy(value)) throw unsafeInput()
+  if (++state.nodes > 60000 || depth > 20 || state.active.has(value)) {
+    throw unsafeInput()
+  }
+  const proto = Object.getPrototypeOf(value)
+  if (Array.isArray(value)) {
+    if (proto !== Array.prototype || value.length > 10000) return null
+    const descriptors = Object.getOwnPropertyDescriptors(value)
+    if (Reflect.ownKeys(descriptors).length !== value.length + 1) return null
+    state.active.add(value)
+    try {
+      const result = []
+      for (let i = 0; i < value.length; i++) {
+        const own = descriptors[String(i)]
+        if (!own || !Object.hasOwn(own, 'value')) return null
+        result.push(pinOwnData(own.value, depth + 1, state))
+      }
+      return result
+    } finally {
+      state.active.delete(value)
+    }
+  }
+  if (proto !== Object.prototype && proto !== null) return null
+  const descriptors = Object.getOwnPropertyDescriptors(value)
+  const result = Object.create(null)
+  state.active.add(value)
+  try {
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (typeof key !== 'string' || !Object.hasOwn(descriptors[key], 'value')) {
+        throw unsafeInput()
+      }
+      result[key] = pinOwnData(descriptors[key].value, depth + 1, state)
+    }
+  } finally {
+    state.active.delete(value)
+  }
+  return result
+}
+
 const safeMoney = n => Number.isSafeInteger(n) && n >= 0
 const euro = n => '€' + (n / 100).toFixed(2).replace('.', ',')
 function safeLabel(value) {
@@ -24,13 +77,14 @@ function safeRow(row) {
  * Never asserts public savings, never downloads retailer pages.
  */
 export function renderPrivateShoppingChecklists(report) {
-  const comparison = report?.comparison
-  if (report?.format !== 'supa-local-snapshot-comparison-v1' ||
+  const pinnedReport = pinOwnData(report)
+  const comparison = pinnedReport?.comparison
+  if (pinnedReport?.format !== 'supa-local-snapshot-comparison-v1' ||
       !comparison || comparison.provenance !== 'offline-snapshot-preview' ||
       comparison.claimable !== false ||
       !Array.isArray(comparison.lines) || comparison.lines.length === 0 ||
       comparison.lines.length > 500 ||
-      !comparison.stores?.plus || !comparison.stores?.dekamarkt) {
+      !comparison.stores || typeof comparison.stores !== 'object') {
     throw new Error('Invalid or claimable offline shopping checklist input')
   }
   const output = [
@@ -86,8 +140,8 @@ export function renderPrivateShoppingChecklists(report) {
         product + ' · ' + euro(row.packPriceCents) + '/pak · ' +
         euro(row.totalCents) + ' lokaal totaal')
     }
-    const trustedSum = safeMoney(sum) && comparison.stores[shop].subtotalCents === sum
-    const printable = complete && trustedSum && comparison.stores[shop].complete === true
+    const trustedSum = safeMoney(sum) && comparison.stores?.[shop]?.subtotalCents === sum
+    const printable = complete && trustedSum && comparison.stores?.[shop]?.complete === true
     output.push(printable
       ? 'ALLEEN OFFLINE TOTAAL ' + title + ': ' + euro(sum)
       : 'GEEN BETROUWBAAR VOLLEDIG TOTAAL ' + title + ': ontbrekende of tegenstrijdige gegevens')
