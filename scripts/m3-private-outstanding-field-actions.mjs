@@ -131,8 +131,11 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
   const plus = toDo('baseline', 'PLUS')
   const dekamarkt = toDo('candidate', 'DekaMarkt')
   const readiness = observationSheetReadiness(sheet, referenceNowMs)
-  const windowState = observationWindowSummary(sheet, referenceNowMs).state
-  const pendingMetadata = pendingM3Metadata(readiness, windowState)
+  const window = observationWindowSummary(sheet, referenceNowMs)
+  const windowState = window.state
+  const observationWindowExpired = window.state === 'single-observation' &&
+    Date.parse(window.deadlineAt) < referenceNowMs
+  const pendingMetadata = pendingM3Metadata(readiness, windowState, observationWindowExpired)
   const readyForPrivateReview = plus.remainingLines === 0 &&
     dekamarkt.remainingLines === 0 && readiness.ready
 
@@ -144,6 +147,7 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
     publicSavingsClaimEligible: false,
     readyForPrivateReview,
     observationWindowState: windowState,
+    observationWindowExpired,
     pendingMetadata,
     pendingMetadataCount: pendingMetadata.study.length +
       pendingMetadata.plus.length + pendingMetadata.dekamarkt.length,
@@ -172,7 +176,7 @@ const PRIVATE_RETAILER_METADATA = [
   ['observedAt', 'Waarnemingstijd met tijdzone', 'geldige observatietijd ontbreekt.'],
 ]
 
-function pendingM3Metadata(readiness, windowState) {
+function pendingM3Metadata(readiness, windowState, observationWindowExpired) {
   const issues = new Set(readiness.issues)
   const study = PRIVATE_STUDY_METADATA
     .filter(([, , reasons]) => reasons.some(reason => issues.has(reason)))
@@ -192,7 +196,7 @@ function pendingM3Metadata(readiness, windowState) {
     plus.push({ field: 'distinctEvidenceId', label: 'Unieke bewijscode tegenover de andere winkel' })
     dekamarkt.push({ field: 'distinctEvidenceId', label: 'Unieke bewijscode tegenover de andere winkel' })
   }
-  if (windowState === 'outside-window') {
+  if (windowState === 'outside-window' || observationWindowExpired) {
     study.push({ field: 'observationWindow', label: 'Meet beide winkels binnen maximaal 24 uur opnieuw' })
   }
   return { study, plus, dekamarkt }
@@ -251,7 +255,10 @@ function renderHumanChecklist(report, selection = 'both') {
   if (selection === 'both' || selection === 'DekaMarkt') {
     showActions('DekaMarkt-meetgegevens', report.pendingMetadata.dekamarkt)
   }
-  lines.push('', 'Meetvenster: ' + WINDOW_HELP[report.observationWindowState] +
+  const windowHelp = report.observationWindowExpired
+    ? 'de eerste meting is ouder dan 24 uur; meet beide winkels opnieuw'
+    : WINDOW_HELP[report.observationWindowState]
+  lines.push('', 'Meetvenster: ' + windowHelp +
     '. Privéreview mogelijk: ' + (report.readyForPrivateReview ? 'ja' : 'nee') + '.',
     'Geen bewezen winkelprijzen of publieke besparingsclaim.')
   return lines.join('\n') + '\n'
