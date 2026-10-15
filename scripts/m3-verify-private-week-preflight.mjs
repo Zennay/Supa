@@ -5,6 +5,7 @@
  */
 import { open, constants } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 import { parseStrictPrivateM3Manifest, verifyPrivateM3StudyCodePin } from './m3-field-code-pin.mjs'
 import { validateObservedWeekInput, buildObservedWeekReport } from './m3-assess-observed-week.mjs'
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
@@ -23,6 +24,10 @@ async function boundedRegularFile(path, maxBytes) {
   if (typeof path !== 'string' || !path || path.startsWith('-')) deny()
   let handle
   try {
+    // O_NOFOLLOW only constrains the final basename: reject static symlinks
+    // anywhere in the source/manifest ancestor chain before opening.
+    // This is not descriptor-relative protection against hostile races.
+    await assertNoSymlinkedM3OutputParents(path)
     handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     const stat = await handle.stat()
     if (!stat.isFile() || stat.nlink !== 1 ||
