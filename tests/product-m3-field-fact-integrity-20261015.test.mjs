@@ -65,8 +65,11 @@ test('invalid available packCount never silently becomes the restorer default of
 
 test('unavailable physical row remains complete without inventing a product', () => {
   const sheet = fixture()
-  sheet.baseline.lines[0].observedProduct.available = false
-  sheet.baseline.lines[0].observedProduct.packCount = 0
+  sheet.baseline.lines[0].observedProduct = {
+    ...buildObservationSheet().baseline.lines[0].observedProduct,
+    available: false,
+    packCount: 0,
+  }
   const result = count(sheet)
   assert.equal(result.retailers[0].completedLines, 1)
   assert.equal(result.verifiedRetailerObservations, false)
@@ -86,7 +89,10 @@ test('explicitly unavailable original must not hide a contradictory priced produ
     for (const [key, value] of values) {
       const sheet = fixture()
       const line = sheet[side].lines[0]
-      line.observedProduct.available = false
+      line.observedProduct = {
+        ...buildObservationSheet()[side].lines[0].observedProduct,
+        available: false,
+      }
       line.observedProduct[key] = value
       assert.throws(() => count(sheet), /contradicts observed unavailability/,
         'refuse ' + side + ' unavailable with ' + key)
@@ -96,7 +102,10 @@ test('explicitly unavailable original must not hide a contradictory priced produ
 
 test('unavailable row may retain a privacy-safe explanation note but no invented price', () => {
   const sheet = fixture()
-  sheet.baseline.lines[0].observedProduct.available = false
+  sheet.baseline.lines[0].observedProduct = {
+    ...buildObservationSheet().baseline.lines[0].observedProduct,
+    available: false,
+  }
   sheet.baseline.lines[0].observedProduct.note = secret
   sheet.baseline.lines[0].observedProduct.sourceUrl = 'https://example.invalid/PRIVATE_PATH'
   sheet.candidate.lines[0].observedProduct.available = false
