@@ -307,3 +307,40 @@ test('M3 complete synthetically unavailable field week has empty, immutable next
   assert.equal(x.publicSavingsClaimEligible, false)
   assert.equal(x.fieldObservationVerified, false)
 })
+
+test('M3 pinned-week CLI refuses symlinked ancestor for both private study and SHA sidecar', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-preflight-parents-'))
+  try {
+    const actual = join(dir, 'private-origin')
+    await mkdir(actual)
+    const studyBytes = bytes(buildWeeklyBasketStudyFromObservationSheet(syntheticFullSheet()))
+    const pinBytes = bytes(createPrivateM3StudyCodePin(studyBytes, SHA))
+    const study = join(actual, 'study.json')
+    const pin = join(actual, 'manifest.json')
+    await writeFile(study, studyBytes, { mode: 0o600 })
+    await writeFile(pin, pinBytes, { mode: 0o600 })
+    const command = (sourceStudy, sourcePin) => spawnSync(process.execPath, [
+      '--experimental-strip-types', 'scripts/m3-verify-private-week-preflight.mjs',
+      sourceStudy, sourcePin, '--expect-main-sha', SHA,
+    ], { encoding: 'utf8', timeout: 7000 })
+    const healthy = command(study, pin)
+    assert.equal(healthy.error, undefined, String(healthy.error))
+    assert.equal(healthy.status, 0, healthy.stderr)
+    assert.equal(JSON.parse(healthy.stdout).publicSavingsClaimEligible, false)
+    const alias = join(dir, 'unsafe-parent-link')
+    await symlink(actual, alias)
+    for (const [studyPath, pinPath] of [
+      [join(alias, 'study.json'), pin],
+      [study, join(alias, 'manifest.json')],
+    ]) {
+      const denied = command(studyPath, pinPath)
+      assert.equal(denied.error, undefined, String(denied.error))
+      assert.equal(denied.status, 1)
+      assert.equal(denied.stdout, '')
+      assert.equal(denied.stderr.trim(), 'M3 private study provenance preflight refused')
+      assert.doesNotMatch(denied.stderr, /private-origin|unsafe-parent-link|manifest\.json|study\.json/)
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
