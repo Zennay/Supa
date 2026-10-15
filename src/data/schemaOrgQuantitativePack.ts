@@ -19,6 +19,18 @@ const UNITS: Record<string, string> = {
   C62: 'st',
 }
 
+// Schema.org unitText is explicit free text rather than a UN/CEFACT code.
+// Only these exact ordinary mass/volume/count words have an unambiguous
+// physical interpretation. Promotions and retailer-specific labels abstain.
+const UNIT_TEXT: Record<string, string> = {
+  g: 'g', gram: 'g', grams: 'g',
+  kg: 'kg', kilogram: 'kg', kilograms: 'kg',
+  ml: 'ml', milliliter: 'ml', milliliters: 'ml',
+  millilitre: 'ml', millilitres: 'ml',
+  l: 'l', liter: 'l', liters: 'l', litre: 'l', litres: 'l',
+  st: 'st', stuk: 'st', stuks: 'st', piece: 'st', pieces: 'st',
+}
+
 function ownData(object: object, field: string): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(object, field)
   if (!descriptor) return undefined
@@ -54,16 +66,30 @@ function quantitative(value: unknown, position: 'weight' | 'size'):
     return { type: 'absent' }
   }
   const rawCode = ownData(value, 'unitCode')
-  if (rawCode === undefined) return { type: 'absent' }
-  if (typeof rawCode !== 'string' || !Object.hasOwn(UNITS, rawCode)) {
+  const rawText = ownData(value, 'unitText')
+  if (rawCode === undefined && rawText === undefined) {
+    return { type: 'absent' }
+  }
+  const coded = typeof rawCode === 'string' && Object.hasOwn(UNITS, rawCode)
+    ? UNITS[rawCode] : null
+  const written = typeof rawText === 'string' &&
+    Object.hasOwn(UNIT_TEXT, rawText.trim().toLowerCase())
+    ? UNIT_TEXT[rawText.trim().toLowerCase()] : null
+  // Either explicit field being invalid is an error, even if another field
+  // looks plausible. Two present fields must agree on a single physical unit.
+  if ((rawCode !== undefined && coded === null) ||
+      (rawText !== undefined && written === null) ||
+      (coded !== null && written !== null && coded !== written)) {
     return { type: 'unsafe' }
   }
-  if (position === 'weight' && rawCode !== 'GRM' && rawCode !== 'KGM') {
+  const unit = coded ?? written
+  if (unit === null ||
+      (position === 'weight' && unit !== 'g' && unit !== 'kg')) {
     return { type: 'unsafe' }
   }
   const amount = decimalNumber(ownData(value, 'value'))
   if (amount === null) return { type: 'unsafe' }
-  return { type: 'recognized', value: amount + ' ' + UNITS[rawCode] }
+  return { type: 'recognized', value: amount + ' ' + unit }
 }
 
 /**
