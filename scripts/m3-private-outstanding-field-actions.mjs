@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readPrivateM3ActionDraft } from './m3-private-field-actions-input.mjs'
 import { pathToFileURL } from 'node:url'
 
 import {
@@ -109,7 +109,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   let serialized
   try {
-    serialized = await readFile(argv[0], 'utf8')
+    serialized = await readPrivateM3ActionDraft(argv[0])
   } catch {
     throw new Error('could not read private M3 draft')
   }
