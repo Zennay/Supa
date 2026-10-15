@@ -14,9 +14,27 @@ import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservatio
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const REVISION_RE = /^[0-9a-f]{40}$/
 
-function assertRevision(revision) {
-  if (!revision || revision.branch !== 'main' ||
-      typeof revision.sha !== 'string' || !REVISION_RE.test(revision.sha)) {
+function checkedRevision(revision) {
+  // Source-code provenance is evidence metadata. Never let caller-controlled
+  // getters supply one SHA for validation and a different one for the guide
+  // or revision manifest. Pin exactly two OWN data descriptors one time.
+  try {
+    if (!revision || typeof revision !== 'object' || Array.isArray(revision)) {
+      throw new Error('invalid revision')
+    }
+    const keys = Reflect.ownKeys(revision)
+    if (keys.length !== 2 || !keys.includes('branch') || !keys.includes('sha')) {
+      throw new Error('unexpected revision fields')
+    }
+    const branch = Reflect.getOwnPropertyDescriptor(revision, 'branch')
+    const sha = Reflect.getOwnPropertyDescriptor(revision, 'sha')
+    if (!branch || !Object.hasOwn(branch, 'value') || branch.value !== 'main' ||
+        !sha || !Object.hasOwn(sha, 'value') ||
+        typeof sha.value !== 'string' || !REVISION_RE.test(sha.value)) {
+      throw new Error('invalid revision values')
+    }
+    return { branch: 'main', sha: sha.value }
+  } catch {
     throw new Error('M3 field kit requires an exact clean main checkout')
   }
 }
@@ -40,15 +58,14 @@ export function currentMainRevision() {
       throw new Error('dirty checkout')
     }
     const revision = { branch, sha }
-    assertRevision(revision)
-    return revision
+    return checkedRevision(revision)
   } catch {
     throw new Error('M3 field kit requires an exact clean main checkout')
   }
 }
 
 export function buildM3FieldKit(revision) {
-  assertRevision(revision)
+  const pinnedRevision = checkedRevision(revision)
   const sheet = buildObservationSheet()
   if (sheet.requirements.length !== 11 || sheet.baseline.lines.length !== 11 ||
       sheet.candidate.lines.length !== 11) {
@@ -75,7 +92,7 @@ export function buildM3FieldKit(revision) {
     kind: 'm3-blank-manual-field-kit-revision',
     evidenceStatus: 'collection-kit-not-evidence',
     sourceBranch: 'main',
-    sourceCommitSha: revision.sha,
+    sourceCommitSha: pinnedRevision.sha,
     canonicalDemandSha256: demandSha256,
     baselineRetailer: 'PLUS',
     candidateRetailer: 'DekaMarkt',
@@ -86,7 +103,7 @@ export function buildM3FieldKit(revision) {
   }
   const guide = [
     'SUPA M3 · lege veldmeetbundel (GEEN WINKELBEWIJS)',
-    'Codeversie main: ' + revision.sha,
+    'Codeversie main: ' + pinnedRevision.sha,
     'Vaste eisen: 11 dezelfde ingredienten bij PLUS en DekaMarkt.',
     'Prijscontext: kies voor beide winkels in-store OF online-order.',
     'Waarnemingen: maximaal 24 uur uiteen. Noteer echte ISO-tijd met tijdzone.',
@@ -193,7 +210,7 @@ export async function writeM3FieldKit(destination, kit) {
   let companion
   try {
     companion = JSON.parse(pinned['source-revision.json'])
-    assertRevision({
+    checkedRevision({
       branch: companion.sourceBranch,
       sha: companion.sourceCommitSha,
     })
