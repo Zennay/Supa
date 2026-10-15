@@ -27,7 +27,15 @@ async function readBoundedFile(filename, limit) {
     }
     const body = await handle.readFile()
     if (body.byteLength > limit) throw new Error('Input exceeded size limit')
-    return body.toString('utf8')
+    // A lossy Buffer.toString() silently replaces malformed UTF-8 bytes,
+    // so the later source SHA would fingerprint different bytes. Refuse such
+    // captures and retain a valid UTF-8 BOM when present: the parsed string
+    // can then be re-encoded byte-for-byte to match the pinned source file.
+    try {
+      return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(body)
+    } catch {
+      throw new Error('Invalid UTF-8 in offline snapshot input')
+    }
   } finally {
     await handle.close()
   }
