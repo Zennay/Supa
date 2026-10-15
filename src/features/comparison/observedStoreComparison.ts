@@ -226,6 +226,12 @@ function hasCanonicalComparisonShape(
   }
 
   for (const side of ['baseline', 'candidate'] as const) {
+    // Direct callers do not necessarily pass through the localStorage draft
+    // restorer. Validate retailer metadata before storeBasket ever calls trim.
+    // Invalid structures abstain using the canonical no-money fallback.
+    const store = sheet[side]?.store
+    if (!store || typeof store !== 'object' || Array.isArray(store) ||
+        typeof store.id !== 'string' || typeof store.name !== 'string') return false
     const lines = sheet[side]?.lines
     if (!Array.isArray(lines) || lines.length !== canonical.requirements.length) return false
     for (let index = 0; index < canonical.requirements.length; index += 1) {
