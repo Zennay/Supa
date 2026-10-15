@@ -59,7 +59,9 @@ export function parseStrictPrivateM3Manifest(raw) {
   if (typeof raw !== 'string' || raw.length === 0 || raw.length > 4096) fail()
   let offset = 0
   const skipWhitespace = () => {
-    while (offset < raw.length && /[\\t\\n\\r ]/.test(raw[offset])) offset += 1
+    while (offset < raw.length && [9, 10, 13, 32].includes(raw.charCodeAt(offset))) {
+      offset += 1
+    }
   }
   const consume = (char) => {
     skipWhitespace()
