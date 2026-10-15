@@ -97,7 +97,13 @@ export function compareReviewedCatalogs({
     // passing the Schema.org parser. Do not let Date.parse truncate +1ns
     // chronology or treat a malformed timestamp as priced evidence.
     const capturedNs = priceInstantNs(raw.provenance.capturedAt, false)
-    if (capturedNs === null || capturedNs > nowNs ||
+    // Offer end dates may legitimately be date-only, but a priced *source*
+    // capture must identify one absolute instant. The exported comparator can
+    // receive RawProductObservation directly without the local manifest or
+    // adapter preflight, so reject date-only source clocks here as well.
+    const absoluteCapture = typeof raw.provenance.capturedAt === 'string' &&
+      /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:[.][0-9]{1,9})?)?(?:Z|[+-][0-9]{2}:[0-9]{2})$/.test(raw.provenance.capturedAt)
+    if (!absoluteCapture || capturedNs === null || capturedNs > nowNs ||
         nowNs - capturedNs > DAY_NS) {
       sourceTrusted = false
       continue
