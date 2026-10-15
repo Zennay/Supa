@@ -49,7 +49,7 @@ function paperPage(side, items) {
   return '<section class="page" data-m3-side="' + side + '">' +
     '<p>SUPA M3 · veldmeting · blad ' + (side === 'baseline' ? '1/2' : '2/2') + '</p>' +
     '<h1>' + store + ' — dezelfde 11 boodschappen</h1>' +
-    '<p>Noteer uitsluitend echt geobserveerde waarden; laat onbekende gegevens leeg.</p>' +
+    '<p>Noteer alleen werkelijk geobserveerde waarden. Onbekend betekent nog niet onderzocht; niet verkrijgbaar is pas nee na controle.</p>' +
     '<div class="metadata"><p>Filiaal: __________________________</p>' +
     '<p>Datum, tijd en tijdzone: __________________________</p>' +
     '<p>Week vanaf (maandag): __________________________</p>' +
@@ -58,8 +58,10 @@ function paperPage(side, items) {
     '<p>Bron: ☐ winkelmand ☐ bon ☐ toegestane export</p></div>' +
     '<table><thead><tr><th>Ingrediënt/behoefte</th><th>Gevonden product</th>' +
     '<th>Verpakking (hoeveelheid + eenheid)</th><th>Aantal pakken</th>' +
-    '<th>Prijs per pak (€)</th><th>Beschikbaar?</th></tr></thead><tbody>' +
+    '<th>Prijs per pak (€)</th><th>Waargenomen?</th></tr></thead><tbody>' +
     cells + '</tbody></table>' +
+    '<p>Ja: product en prijs werkelijk gezien. Nee: gecontroleerd en niet verkrijgbaar. Onbekend: niet gecontroleerd.</p>' +
+    '<p>Bij nee en onbekend geen product of prijs invullen.</p>' +
     '<p>Herkomst / productlink / aanbieding / twijfel: __________________________________________________</p>' +
     '<p>___________________________________________________________________________________________</p>' +
     '<footer>Leeg invulblad; geen bewijs of besparingsclaim. Neem echte bevindingen over in SUPA Meten.</footer>' +
@@ -74,9 +76,9 @@ export function renderM3PaperChecklist() {
     '.metadata p{margin:2px 0}h1{font-size:22px;margin:4px 0}' +
     'table{width:100%;border-collapse:collapse;table-layout:fixed}' +
     'th,td{border:1px solid #555;padding:5px;text-align:left;vertical-align:top}' +
-    'th{background:#eee}th:first-child{width:25%}th:nth-child(2){width:22%}' +
-    'th:nth-child(3){width:19%}th:nth-child(4){width:12%}th:nth-child(5){width:12%}th:last-child{width:10%}' +
-    'td{height:39px}td small{display:block}td:last-child{white-space:nowrap;font-size:10px}' +
+    'th{background:#eee}th:first-child{width:25%}th:nth-child(2){width:20%}' +
+    'th:nth-child(3){width:17%}th:nth-child(4){width:12%}th:nth-child(5){width:12%}th:last-child{width:14%}' +
+    'td{height:42px}td small{display:block}td:last-child{white-space:nowrap;font-size:10px}' +
     'footer{border-top:1px solid #777;padding:5px 0;font-size:10px}' +
     '@media screen{body{background:#eee}.page{background:#fff;max-width:1200px;padding:24px;margin:16px auto}}'
   return '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
