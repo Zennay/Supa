@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  mkdtemp, readFile, writeFile, stat, rm, symlink, link, access,
+  mkdtemp, mkdir, readFile, writeFile, stat, rm, symlink, link, access,
 } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -95,6 +95,23 @@ test('symbolic-link input is refused without touching its ordinary private sourc
   await assert.rejects(() => main(['--report', alias, '--output', output]),
     /Private offline comparison file could not be read/)
   assert.deepEqual(await readFile(file), before)
+  await assert.rejects(access(output))
+})
+
+test('symlinked ancestor directory of saved report is refused before reading private content', async t => {
+  const { dir } = await fixture(t)
+  const actual = join(dir, 'real-capture')
+  await mkdir(actual)
+  const source = join(actual, 'saved.json')
+  await writeFile(source, JSON.stringify(offlinePreview()))
+  const aliasDir = join(dir, 'alias-capture')
+  await symlink(actual, aliasDir, 'dir')
+  const alias = join(aliasDir, 'saved.json')
+  const output = join(dir, 'not-created.html')
+  const before = await readFile(source)
+  await assert.rejects(() => main(['--report', alias, '--output', output]),
+    /Private offline comparison file could not be read/)
+  assert.deepEqual(await readFile(source), before)
   await assert.rejects(access(output))
 })
 
