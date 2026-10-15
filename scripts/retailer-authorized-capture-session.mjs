@@ -57,7 +57,9 @@ export function createAuthorizedRetailerCaptureSession() {
   async function captureOne(input) {
     const request = snapshotRequest(input)
     const transport = request.fetchFn
-    return captureApprovedRetailerPage({
+    let reserved = null
+    try {
+      return await captureApprovedRetailerPage({
       ...request,
       fetchFn: async (url, init) => {
         // The canonical capture validates its permission gate and exact HTTPS
@@ -78,6 +80,7 @@ export function createAuthorizedRetailerCaptureSession() {
         // Reserve BEFORE invoking the injected transport. A concurrent call
         // cannot bypass the budget while the first response is pending.
         state.inFlight = true
+        reserved = state
         state.attempts++
         state.nextEligibleAt = now + MIN_GAP_MS
         let response
@@ -87,8 +90,6 @@ export function createAuthorizedRetailerCaptureSession() {
           state.nextEligibleAt = Math.max(state.nextEligibleAt,
             Date.now() + ERROR_COOLDOWN_MS)
           refuse()
-        } finally {
-          state.inFlight = false
         }
         if (response?.status === 403 || response?.status === 429) {
           state.blocked = true
@@ -101,6 +102,11 @@ export function createAuthorizedRetailerCaptureSession() {
         return response
       },
     })
+    } finally {
+      // Reserve the host until the source reader has also finished verifying
+      // the bounded HTML body, not merely until response headers arrive.
+      if (reserved) reserved.inFlight = false
+    }
   }
 
   function status() {
