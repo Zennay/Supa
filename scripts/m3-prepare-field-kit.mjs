@@ -139,6 +139,26 @@ export async function writeM3FieldKit(destination, kit) {
       expectedFiles.some((file) => typeof kit[file] !== 'string')) {
     throw new Error('incomplete blank M3 field kit')
   }
+  // The exported writer must not accept prefilled or substituted "blank"
+  // artifacts. Rebuild all four canonical bytes from the claimed companion
+  // revision *before* touching the filesystem. The actual CLI additionally
+  // authenticates that revision against its current clean Git main checkout.
+  let companion
+  try {
+    companion = JSON.parse(kit['source-revision.json'])
+    assertRevision({
+      branch: companion.sourceBranch,
+      sha: companion.sourceCommitSha,
+    })
+  } catch {
+    throw new Error('invalid blank M3 kit revision companion')
+  }
+  const canonical = buildM3FieldKit({
+    branch: companion.sourceBranch, sha: companion.sourceCommitSha,
+  })
+  if (expectedFiles.some((file) => kit[file] !== canonical[file])) {
+    throw new Error('refusing modified or prefilled M3 field kit')
+  }
   const output = resolve(destination)
   await assertNoSymlinkedM3OutputParents(output)
   await mkdir(dirname(output), { recursive: true, mode: 0o700 })
@@ -156,7 +176,7 @@ export async function writeM3FieldKit(destination, kit) {
     // deleting a raced replacement directory or user-created evidence.
     throw new Error('incomplete blank M3 kit; inspect new private directory')
   }
-  return { files: expectedFiles, sourceCommitSha: JSON.parse(kit['source-revision.json']).sourceCommitSha }
+  return { files: expectedFiles, sourceCommitSha: companion.sourceCommitSha }
 }
 
 export async function main(argv = process.argv.slice(2)) {
