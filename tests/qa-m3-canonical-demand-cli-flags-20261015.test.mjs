@@ -26,11 +26,13 @@ test('M3 --out does not treat a second option token as a private output filename
   t.after(() => rm(directory, { recursive: true, force: true }))
 
   for (const flag of ['--force', '--overwrite', '--out', '--help', '-']) {
-    const result = invoke(directory, ['--out', flag])
-    assert.equal(result.error, undefined, result.error?.message)
-    assert.notEqual(result.status, 0, `--out ${flag} must be rejected, not accepted as a file`)
-    assert.equal(existsSync(join(directory, flag)), false, `rejected ${flag} must not leave a file`)
-    assert.equal(result.stdout.includes('Private M3 eleven-line requirements created'), false)
+    await t.test(`reject flag-like destination ${flag}`, () => {
+      const result = invoke(directory, ['--out', flag])
+      assert.equal(result.error, undefined, result.error?.message)
+      assert.notEqual(result.status, 0, `--out ${flag} must be rejected, not accepted as a file`)
+      assert.equal(existsSync(join(directory, flag)), false, `rejected ${flag} must not leave a file`)
+      assert.equal(result.stdout.includes('Private M3 eleven-line requirements created'), false)
+    })
   }
 })
 
