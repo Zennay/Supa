@@ -67,7 +67,7 @@ test('actual M3 operator view counts one physical pack shared across two ingredi
   assert.equal(report.comparison.savingsCents,10)
   assert.equal(report.comparison.lines[1].plus.packs,0)
   const preview=renderPrivateComparison(report)
-  assert.match(preview,/onderdeel gedeeld pak \\(niet gratis\\)/)
+  assert.ok(preview.includes('onderdeel gedeeld pak (niet gratis)'))
   assert.match(preview,/ALLEEN OFFLINE MANDVERSCHIL: DekaMarkt lager €0,10/)
   assert.doesNotMatch(preview,/GEVERIFIEERDE EUROBESPARING: €0,10/)
 })
