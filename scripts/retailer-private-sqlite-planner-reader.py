@@ -98,14 +98,20 @@ def read_reviewed_catalog(path):
         # observations) must not be silently counted as a complete catalog.
         # These are local offline evidence checks; no public/price authority.
         try:
-            snapshot_kinds = dict(con.execute(
-                "SELECT retailer_id, kind, COUNT(*) FROM source_snapshots "
-                "GROUP BY retailer_id, kind"))
-            observed_kinds = dict(con.execute(
-                "SELECT o.retailer_id, s.kind, COUNT(*) "
-                "FROM price_observations o JOIN source_snapshots s "
-                "ON s.id = o.snapshot_id AND s.retailer_id = o.retailer_id "
-                "GROUP BY o.retailer_id, s.kind"))
+            snapshot_kinds = {
+                (retailer, kind): count
+                for retailer, kind, count in con.execute(
+                    "SELECT retailer_id, kind, COUNT(*) FROM source_snapshots "
+                    "GROUP BY retailer_id, kind")
+            }
+            observed_kinds = {
+                (retailer, kind): count
+                for retailer, kind, count in con.execute(
+                    "SELECT o.retailer_id, s.kind, COUNT(*) "
+                    "FROM price_observations o JOIN source_snapshots s "
+                    "ON s.id = o.snapshot_id AND s.retailer_id = o.retailer_id "
+                    "GROUP BY o.retailer_id, s.kind")
+            }
         except sqlite3.Error:
             refuse()
         if (set(snapshot_kinds) != REQUIRED_PILOT_SOURCE_KINDS or
