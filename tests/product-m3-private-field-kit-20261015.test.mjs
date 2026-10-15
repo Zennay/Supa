@@ -174,3 +174,81 @@ test('private collection kit never writes under the Git source tree, even with d
   }
   await assert.rejects(lstat(candidate), { code: 'ENOENT' })
 })
+
+test('exported writer rejects getter-swapped prices and forged proof flags before creating output', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'supa-m3-getter-refusal-'))
+  try {
+    const canonical = buildM3FieldKit(revision())
+    for (const filename of ['collection-sheet.json', 'source-revision.json']) {
+      const destination = join(root, filename.replace(/[^a-z]/gu, '-'))
+      const caller = { ...canonical }
+      let reads = 0
+      Object.defineProperty(caller, filename, {
+        enumerable: true,
+        configurable: true,
+        get() {
+          reads += 1
+          if (reads < 3) return canonical[filename]
+          if (filename === 'collection-sheet.json') {
+            return canonical[filename].replace('"available": null', '"available": true')
+          }
+          return canonical[filename].replace('"publicSavingsClaimEligible": false',
+            '"publicSavingsClaimEligible": true')
+        },
+      })
+      await assert.rejects(writeM3FieldKit(destination, caller), /incomplete blank M3 field kit/u)
+      assert.equal(reads, 0, 'a dynamic accessor must never be called while validating private evidence')
+      await assert.rejects(lstat(destination), { code: 'ENOENT' })
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('exported writer pins validated bytes, not later Proxy get traps', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'supa-m3-proxy-snapshot-'))
+  try {
+    const canonical = buildM3FieldKit(revision())
+    let gets = 0
+    const dynamic = new Proxy(canonical, {
+      get(target, property) {
+        gets += 1
+        if (property === 'source-revision.json') {
+          return target[property].replace('"verifiedRetailerObservations": false',
+            '"verifiedRetailerObservations": true')
+        }
+        return target[property]
+      },
+    })
+    const destination = join(root, 'private-output')
+    await writeM3FieldKit(destination, dynamic)
+    assert.equal(gets, 0, 'accessors and Proxy get traps cannot override pinned bytes')
+    for (const [file, bytes] of Object.entries(canonical)) {
+      assert.equal(await readFile(join(destination, file), 'utf8'), bytes)
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('exported writer rejects symbols, inherited and malformed descriptor records', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'supa-m3-descriptor-guard-'))
+  try {
+    const original = buildM3FieldKit(revision())
+    const inherited = Object.create({ 'START-HERE.txt': original['START-HERE.txt'] })
+    for (const key of ['collection-sheet.json', 'field-form.html', 'source-revision.json']) {
+      inherited[key] = original[key]
+    }
+    const symbol = { ...original, [Symbol('unexpected')]: 'private' }
+    const throwingProxy = new Proxy(original, {
+      ownKeys() { throw new Error('PRIVATE-SENTINEL-DO-NOT-LOG') },
+    })
+    for (const [index, input] of [inherited, symbol, throwingProxy].entries()) {
+      const output = join(root, 'denied-' + index)
+      await assert.rejects(writeM3FieldKit(output, input), /incomplete blank M3 field kit/u)
+      await assert.rejects(lstat(output), { code: 'ENOENT' })
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
