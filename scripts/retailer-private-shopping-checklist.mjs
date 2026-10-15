@@ -42,7 +42,7 @@ export function renderPrivateShoppingChecklists(report) {
     output.push('', '== ' + title + ' ==')
     let sum = 0
     let complete = true
-    const paidSku = new Set()
+    const paidSku = new Map()
     for (const line of comparison.lines) {
       const row = line?.[shop]
       const ingredient = safeLabel(line?.ingredient)
@@ -52,19 +52,30 @@ export function renderPrivateShoppingChecklists(report) {
         continue
       }
       if (row.packs === 0) {
-        // Covered by one purchase already printed above. Never show free SKUs.
+        // A zero-pack row is not a free product and requires PROOF that the
+        // previously paid SKU explicitly covers this ingredient demand.
+        const paid = paidSku.get(row.productId)
+        if (!paid || typeof line?.ingredientId !== 'string' ||
+            paid.ownerId !== row.sharedPackWithIngredientId ||
+            !paid.coveredIds.includes(line.ingredientId)) {
+          complete = false
+          output.push('[?] ' + ingredient + ': gedeeld pak niet te bewijzen')
+          continue
+        }
         output.push('[=] ' + ingredient + ': gedekt door eerder gedeeld pak; NIET gratis')
         continue
       }
       const product = safeLabel(row.productName)
       const productId = typeof row.productId === 'string' ? row.productId : null
       // Repeated paid IDs would mean duplicate shopping purchases.
-      if (productId && paidSku.has(productId)) {
+      if (!productId || paidSku.has(productId)) {
         complete = false
         output.push('[?] ' + ingredient + ': dubbel product-ID, controleren')
         continue
       }
-      if (productId) paidSku.add(productId)
+      paidSku.set(productId, { ownerId: line?.ingredientId,
+        coveredIds: Array.isArray(row.sharedPackCoversIngredientIds)
+          ? row.sharedPackCoversIngredientIds : [] })
       sum += row.totalCents
       if (!safeMoney(sum)) {
         complete = false
