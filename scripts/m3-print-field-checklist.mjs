@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { buildObservationSheet, M3_EXPECTED_RETAILERS } from '../src/domain/m3ObservationSheet.ts'
+import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 
 function htmlText(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({
@@ -94,7 +95,12 @@ export async function main(argv = process.argv.slice(2)) {
   }
   const content = renderM3PaperChecklist()
   if (argv.length === 0) return process.stdout.write(content)
+  // Preserve raw path segments: resolving first can hide a symlink before /../.
+  // Reuse the same static private M3 output-parent guard as derived reports.
+  // This is not a descriptor-relative guarantee against concurrent path swaps.
+  await assertNoSymlinkedM3OutputParents(argv[1])
   await mkdir(dirname(argv[1]), { recursive: true, mode: 0o700 })
+  await assertNoSymlinkedM3OutputParents(argv[1])
   await writeFile(argv[1], content, { flag: 'wx', mode: 0o600, encoding: 'utf8' })
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
