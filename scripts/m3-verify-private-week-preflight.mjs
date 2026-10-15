@@ -202,7 +202,12 @@ function assertCanonicalCaptureWindow(study, report) {
   }
 }
 
-export function preflightPrivateM3Week(studyBytes, manifestBytes, expectedMainSha = null) {
+export function preflightPrivateM3Week(studyBytes, manifestBytes, ...revisionOptions) {
+  // No third argument means the documented legacy path. An explicitly passed
+  // undefined (e.g. an unset orchestrator config) MUST NOT silently downgrade
+  // requested verification through JavaScript default-parameter semantics.
+  if (revisionOptions.length > 1) deny()
+  const expectedMainSha = revisionOptions[0]
   if (!Buffer.isBuffer(studyBytes) || !Buffer.isBuffer(manifestBytes) ||
       studyBytes.length === 0 || studyBytes.length > STUDY_MAX_BYTES ||
       manifestBytes.length === 0 || manifestBytes.length > MANIFEST_MAX_BYTES) deny()
@@ -217,7 +222,7 @@ export function preflightPrivateM3Week(studyBytes, manifestBytes, expectedMainSh
   // An operator may supply an independently checked current-main revision.
   // This detects a mistaken/stale sidecar SHA; it is NOT GitHub authentication
   // and cannot turn the private or public permission flags into true.
-  if (expectedMainSha !== null &&
+  if (revisionOptions.length === 1 &&
       (typeof expectedMainSha !== 'string' ||
        !/^[0-9a-f]{40}$/.test(expectedMainSha) ||
        /^0{40}$/.test(expectedMainSha) ||
@@ -257,7 +262,9 @@ export async function main(argv = process.argv.slice(2)) {
   if (argv.length !== 2 && !expectRevision) deny()
   const study = await boundedRegularFile(argv[0], STUDY_MAX_BYTES)
   const manifest = await boundedRegularFile(argv[1], MANIFEST_MAX_BYTES)
-  const result = preflightPrivateM3Week(study, manifest, expectRevision ? argv[3] : null)
+  const result = expectRevision
+    ? preflightPrivateM3Week(study, manifest, argv[3])
+    : preflightPrivateM3Week(study, manifest)
   process.stdout.write(JSON.stringify(result, null, 2) + '\n')
   return result
 }
