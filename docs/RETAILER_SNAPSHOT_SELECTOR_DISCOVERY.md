@@ -18,7 +18,7 @@ Het programma controleert bronidentiteit, exacte toegestane retailerhost, status
 
 ## 2. Website verschilt per keten, database niet
 
-De offline verkenner haalt **voorstel-selectors** (`tag.class`) en structuurindicatoren (`Product`/ `Offer` JSON-LD, Nuxt script, herkenbare naam-/prijs-/verpakkingklassen) uit de reeds opgeslagen pagina. De output bevat géén naam, individuele productprijs of ruwe pagina-inhoud. Een voorstel is expliciet `UNVERIFIED_PROPOSAL`; geen automatische promoteroute en geen bewijs dat een selector live werkt.
+De offline verkenner haalt **voorstel-selectors** (`tag.class`) en structuurindicatoren (`Product`/ `Offer` JSON-LD, Nuxt script, herkenbare naam-/prijs-/verpakkingklassen) uit de reeds opgeslagen pagina. De output bevat géén naam, individuele productprijs of ruwe pagina-inhoud. Extra `possibleFieldSelectors`-groepen koppelen geschikte **structuurnaam-hints** aan `name`, `price`, `package`, `offer` en `availability`, zodat een AI/reviewer gericht kan controleren. Ook deze suggesties zijn nadrukkelijk `UNVERIFIED_FIELD_HINT` en mogen nooit automatisch de productieparser activeren. Een mislukte M1-response zonder HTML/SHA wordt in een gedeeltelijk manifest voortaan eerlijk `CAPTURE_UNAVAILABLE`, niet stilzwijgend genegeerd en niet als selector geaccepteerd. Een voorstel is expliciet `UNVERIFIED_PROPOSAL`; geen automatische promoteroute en geen bewijs dat een selector live werkt.
 
 Per keten blijft een aparte bronadapter nodig (PLUS: rendered DOM; DekaMarkt: SSR/Nuxt). Een reviewer — eventueel AI met toegang tot de snapshots — vergelijkt de **echte captured HTML**, controleert de betreffende velden op meerdere producten, legt de versie/bronhash vast en voegt pas daarna passende adaptertests/fixtures toe.
 
