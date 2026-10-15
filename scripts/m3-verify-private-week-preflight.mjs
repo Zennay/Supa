@@ -71,6 +71,32 @@ function requireCanonicalWeek(study) {
   return expected.length
 }
 
+function canonicalCalendarDay(value) {
+  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) deny()
+  const instant = Date.parse(value + 'T00:00:00Z')
+  if (!Number.isFinite(instant) ||
+      new Date(instant).toISOString().slice(0, 10) !== value) deny()
+  return Math.floor(instant / 86400000)
+}
+
+function assertCanonicalCaptureWindow(study, report) {
+  const windowHours = report.observationWindowHours
+  if (typeof windowHours !== 'number' || !Number.isFinite(windowHours) ||
+      windowHours > 24 || windowHours < 0) deny()
+  const weekStart = canonicalCalendarDay(study.weekStart)
+  const referenceNow = Date.now()
+  for (const side of ['baseline', 'candidate']) {
+    const observedAt = study[side].observedAt
+    if (typeof observedAt !== 'string') deny()
+    const instant = Date.parse(observedAt)
+    if (!Number.isFinite(instant) || instant > referenceNow) deny()
+    // The calendar day as observed locally, not a rolling UTC window;
+    // canonical M3 allows shopping on the 2 days before or 7 week days.
+    const localDay = canonicalCalendarDay(observedAt.slice(0, 10))
+    if (localDay < weekStart - 2 || localDay >= weekStart + 7) deny()
+  }
+}
+
 export function preflightPrivateM3Week(studyBytes, manifestBytes) {
   if (!Buffer.isBuffer(studyBytes) || !Buffer.isBuffer(manifestBytes) ||
       studyBytes.length === 0 || studyBytes.length > STUDY_MAX_BYTES ||
@@ -91,6 +117,7 @@ export function preflightPrivateM3Week(studyBytes, manifestBytes) {
     validateObservedWeekInput(study)
     requiredLineCount = requireCanonicalWeek(study)
     report = buildObservedWeekReport(study)
+    assertCanonicalCaptureWindow(study, report)
   } catch {
     deny()
   }
@@ -103,10 +130,7 @@ export function preflightPrivateM3Week(studyBytes, manifestBytes) {
     privateStudyBytesMatch: true,
     canonicalDemandLineCount: requiredLineCount,
     sameDemandLineCount: requiredLineCount,
-    observationWindowWithin24Hours:
-      typeof report.observationWindowHours === 'number' &&
-      Number.isFinite(report.observationWindowHours) &&
-      report.observationWindowHours <= 24,
+    observationWindowWithin24Hours: true,
     sourceCommitSha: manifest.sourceCommitSha,
     sourceCommitShaAuthenticated: false,
     codeRevisionVerified: false,
