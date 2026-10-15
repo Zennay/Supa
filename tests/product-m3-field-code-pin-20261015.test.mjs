@@ -118,3 +118,46 @@ test('M3 pin verification refuses inherited, accessor and hidden manifest fields
   const nullPrototype = Object.assign(Object.create(null), valid)
   assert.equal(verifyPrivateM3StudyCodePin(bytes, nullPrototype), false)
 })
+
+test('M3 verify CLI confirms exact private byte digest and refuses modified originals', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-pin-verify-'))
+  try {
+    const study = join(dir, 'study.json')
+    const manifest = join(dir, 'manifest.json')
+    await writeFile(study, bytes, { mode: 0o600 })
+    await writeFile(manifest, JSON.stringify(createPrivateM3StudyCodePin(bytes, SHA)), { mode: 0o600 })
+    const matched = spawnSync(process.execPath, ['scripts/m3-field-code-pin.mjs', '--verify', study, manifest], { encoding: 'utf8' })
+    assert.equal(matched.status, 0, matched.stderr)
+    const result = JSON.parse(matched.stdout)
+    assert.deepEqual(result, {
+      privateStudyBytesMatch: true,
+      codeRevisionVerified: false,
+      retailerPermissionVerified: false,
+      publicSavingsClaimEligible: false,
+    })
+    await writeFile(study, Buffer.concat([bytes, Buffer.from(' ')]))
+    const changed = spawnSync(process.execPath, ['scripts/m3-field-code-pin.mjs', '--verify', study, manifest], { encoding: 'utf8' })
+    assert.equal(changed.status, 1)
+    assert.equal(changed.stdout, '')
+    assert.equal(changed.stderr.includes(study), false)
+    assert.equal(changed.stderr.includes('synthetic-plus'), false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('M3 verify CLI rejects forged manifest permission and savings flags', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-pin-flags-'))
+  try {
+    const study = join(dir, 'study.json')
+    const manifest = join(dir, 'manifest.json')
+    await writeFile(study, bytes, { mode: 0o600 })
+    await writeFile(manifest, JSON.stringify({ ...createPrivateM3StudyCodePin(bytes, SHA), publicSavingsClaimEligible: true }), { mode: 0o600 })
+    const run = spawnSync(process.execPath, ['scripts/m3-field-code-pin.mjs', '--verify', study, manifest], { encoding: 'utf8' })
+    assert.equal(run.status, 1)
+    assert.equal(run.stdout, '')
+    assert.equal(run.stderr.includes(manifest), false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
