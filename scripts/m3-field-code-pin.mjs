@@ -50,14 +50,30 @@ export function createPrivateM3StudyCodePin(studyContent, sourceCommitSha) {
 export function verifyPrivateM3StudyCodePin(studyContent, manifest) {
   try {
     if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return false
-    if (Object.keys(manifest).length !== 6 ||
-        manifest.format !== FORMAT || typeof manifest.sourceCommitSha !== 'string' ||
-        typeof manifest.studySha256 !== 'string' || !DIGEST.test(manifest.studySha256) ||
-        manifest.codeRevisionVerified !== false ||
-        manifest.retailerPermissionVerified !== false ||
-        manifest.publicSavingsClaimEligible !== false) return false
-    const expected = createPrivateM3StudyCodePin(studyContent, manifest.sourceCommitSha)
-    return Object.keys(expected).every((key) => manifest[key] === expected[key])
+    const expectedKeys = [
+      'format', 'sourceCommitSha', 'studySha256',
+      'codeRevisionVerified', 'retailerPermissionVerified', 'publicSavingsClaimEligible',
+    ]
+    if (Object.getPrototypeOf(manifest) !== Object.prototype) return false
+    const keys = Reflect.ownKeys(manifest)
+    if (keys.length !== expectedKeys.length ||
+        !expectedKeys.every((key) => keys.includes(key))) return false
+
+    // Read each primitive own data field once. A prototype/getter must not be
+    // able to switch evidence or authorization flags between validation steps.
+    const pinned = {}
+    for (const key of expectedKeys) {
+      const descriptor = Object.getOwnPropertyDescriptor(manifest, key)
+      if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) return false
+      pinned[key] = descriptor.value
+    }
+    if (pinned.format !== FORMAT || typeof pinned.sourceCommitSha !== 'string' ||
+        typeof pinned.studySha256 !== 'string' || !DIGEST.test(pinned.studySha256) ||
+        pinned.codeRevisionVerified !== false ||
+        pinned.retailerPermissionVerified !== false ||
+        pinned.publicSavingsClaimEligible !== false) return false
+    const expected = createPrivateM3StudyCodePin(studyContent, pinned.sourceCommitSha)
+    return expectedKeys.every((key) => pinned[key] === expected[key])
   } catch {
     return false
   }
