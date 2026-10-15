@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, lstat, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
   buildM3FieldKit,
@@ -156,4 +157,20 @@ test('exported private writer rejects forged or prefilled kit bytes before creat
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('private collection kit never writes under the Git source tree, even with dot-dot paths', async () => {
+  const root = fileURLToPath(new URL('../', import.meta.url))
+  const kit = buildM3FieldKit(revision())
+  const candidate = join(root, 'artifacts', 'private-m3-should-not-exist-20261015')
+  const paths = [
+    root,
+    candidate,
+    join(root, 'tests', '..', 'private-m3-should-not-exist-20261015'),
+    join(root, '.git', 'private-m3-should-not-exist-20261015'),
+  ]
+  for (const path of paths) {
+    await assert.rejects(writeM3FieldKit(path, kit), /inside source repository/u)
+  }
+  await assert.rejects(lstat(candidate), { code: 'ENOENT' })
 })
