@@ -50,6 +50,9 @@ test('canonical private 0600 M3 draft still produces safe JSON and human checkli
       assert.equal(report.publicSavingsClaimEligible, false)
     } else {
       assert.match(result.stdout, /nog te meten/)
+      assert.match(result.stdout, /Bloemkool \\(2 stuks\\)/)
+      assert.doesNotMatch(result.stdout, /\\bpiece\\b/)
+
       assert.equal(result.stdout.includes(secret), false)
     }
   }
