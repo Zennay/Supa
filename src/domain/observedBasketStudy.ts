@@ -262,13 +262,18 @@ function assessWeeklyBasketStudyCore(
 
   const baselineObservedAt = validTimestamp(study.baseline.observedAt)
   const candidateObservedAt = validTimestamp(study.candidate.observedAt)
-  const referenceNowMs = validOptionsContainer
+  const configuredReferenceNowMs = validOptionsContainer
     ? (options as { referenceNowMs?: unknown }).referenceNowMs
     : undefined
-  if (referenceNowMs !== undefined &&
-    (typeof referenceNowMs !== 'number' || !Number.isFinite(referenceNowMs))) {
+  // The public direct-assessment API must fail closed without an explicit
+  // deterministic test clock. A missing option does not disable the future
+  // observation guard; production reports continue to pass real Date.now().
+  const referenceNowMs = configuredReferenceNowMs === undefined
+    ? Date.now()
+    : configuredReferenceNowMs
+  if (typeof referenceNowMs !== 'number' || !Number.isFinite(referenceNowMs)) {
     reasons.push('assessment reference clock is malformed')
-  } else if (typeof referenceNowMs === 'number') {
+  } else {
     if (baselineObservedAt !== null && baselineObservedAt > referenceNowMs) {
       reasons.push('baseline observedAt is later than assessment reference time')
     }
