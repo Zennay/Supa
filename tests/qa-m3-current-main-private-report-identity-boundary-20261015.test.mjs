@@ -85,9 +85,8 @@ test('M3 private report: direct emails in every echoed metadata surface are refu
       mutate(sheet)
       // This is an explicit report privacy gate, not a claim that the
       // paper-readiness UX must independently reject each metadata surface.
-      const converted = buildWeeklyBasketStudyFromObservationSheet(sheet)
       assert.throws(
-        () => buildObservedWeekReport(converted),
+        () => buildObservedWeekReport(buildWeeklyBasketStudyFromObservationSheet(sheet)),
         /direct email identifier; private report refused/,
       )
     })
