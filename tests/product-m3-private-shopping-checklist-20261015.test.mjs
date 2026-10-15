@@ -16,7 +16,7 @@ function report() {
       comparable:true,cheaperStore:'dekamarkt',savingsCents:10,
       stores:{plus:{complete:true,subtotalCents:129},
         dekamarkt:{complete:true,subtotalCents:119}},
-      lines:[{ingredient:'melk',plus:row(129),dekamarkt:row(119)}]}}
+      lines:[{ingredientId:'milk',ingredient:'melk',plus:row(129),dekamarkt:row(119)}]}}
 }
 test('prints physical whole packs and a private total per retailer, never source URL tokens',()=>{
   const out=renderPrivateShoppingChecklists(report())
@@ -39,7 +39,9 @@ test('shared pack is charged once and never described as free',()=>{
   const data=report()
   data.comparison.stores.plus.subtotalCents=129
   data.comparison.stores.dekamarkt.subtotalCents=119
-  data.comparison.lines.push({ingredient:'extra melk',
+  data.comparison.lines[0].plus.sharedPackCoversIngredientIds=['milk','second-milk']
+  data.comparison.lines[0].dekamarkt.sharedPackCoversIngredientIds=['milk','second-milk']
+  data.comparison.lines.push({ingredientId:'second-milk',ingredient:'extra melk',
     plus:{...row(129),packs:0,totalCents:0,sharedPackWithIngredientId:'melk'},
     dekamarkt:{...row(119),packs:0,totalCents:0,sharedPackWithIngredientId:'melk'}})
   const text=renderPrivateShoppingChecklists(data)
@@ -69,7 +71,7 @@ test('empty or claimable report is rejected',()=>{
   const data=report()
   data.comparison.lines=[]
   assert.throws(()=>renderPrivateShoppingChecklists(data),/Invalid or claimable/)
-  data.comparison.lines=[{ingredient:'melk',plus:row(129),dekamarkt:row(119)}]
+  data.comparison.lines=[{ingredientId:'milk',ingredient:'melk',plus:row(129),dekamarkt:row(119)}]
   data.comparison.claimable=true
   assert.throws(()=>renderPrivateShoppingChecklists(data),/Invalid or claimable/)
 })
@@ -96,4 +98,15 @@ test('real offline local HTML -> comparator -> full-pack shopping checklist',asy
   assert.match(text,/€2,38/)
   assert.match(text,/Fictional milk carton/)
   assert.match(text,/GEEN LIVE PRIJS/)
+})
+
+test('forged covered SKU without a paid owner is unknown rather than a free item',()=>{
+  const data=report()
+  data.comparison.lines[0].plus.packs=0
+  data.comparison.lines[0].plus.totalCents=0
+  data.comparison.lines[0].plus.sharedPackWithIngredientId='ghost-owner'
+  data.comparison.stores.plus.subtotalCents=0
+  const out=renderPrivateShoppingChecklists(data)
+  assert.match(out,/gedeeld pak niet te bewijzen/)
+  assert.doesNotMatch(out,/ALLEEN OFFLINE TOTAAL PLUS:/)
 })
