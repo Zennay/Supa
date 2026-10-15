@@ -52,6 +52,18 @@ const HOST_BY_SUPERMARKET: Record<SupermarketId, string> = {
   dekamarkt: 'www.dekamarkt.nl',
 }
 
+// A product observation must point at that retailer's product route,
+// not a same-host search, account or marketing page. Keep catalog/offers
+// provenance untouched: those are valid separately reviewed source kinds.
+const PRODUCT_ROUTES_BY_SUPERMARKET: Record<SupermarketId, readonly string[]> = {
+  // Older reviewed AH M1 fixtures use /product/:slug, while modern
+  // product pages use /producten/product/:id/:slug. Both identify an
+  // individual product; account and search routes never do.
+  ah: ['/product/', '/producten/product/'],
+  plus: ['/product/'],
+  dekamarkt: ['/producten/'],
+}
+
 const SOURCE_PAGE_KINDS = new Set<SourcePageKind>([
   'product',
   'catalog',
@@ -127,6 +139,27 @@ function validateSnapshotRef(
     throw new Error(
       `Product observation provenance must use HTTPS on ${expectedHost}`,
     )
+  }
+
+  // Same hostname does not imply the same public retailer service.
+  // Reject credentials and custom HTTPS ports before they can become
+  // credited sources or surface in a basket's sourceUrl metadata.
+  // WHATWG URL normalizes an explicit :443 to the default empty port.
+  if (url.username !== '' || url.password !== '' || url.port !== '') {
+    throw new Error(
+      'Product observation provenance must use a public HTTPS retailer origin without credentials or custom port',
+    )
+  }
+
+  if (provenance.kind === 'product') {
+    const recognizedProductRoute = PRODUCT_ROUTES_BY_SUPERMARKET[observationSupermarket]
+      .some((prefix) =>
+        url.pathname.startsWith(prefix) && url.pathname.length > prefix.length)
+    if (!recognizedProductRoute) {
+      throw new Error(
+        'Product observation provenance must reference a retailer product route',
+      )
+    }
   }
 
   if (!validIso(provenance.capturedAt)) {
@@ -244,6 +277,17 @@ export function validateRawProductObservation(
   validateOffer(observation.offer)
   validateSnapshotRef(observation.supermarket, observation.provenance)
   validateNullableMoneyCents(observation.currentPriceCents, 'Current price')
+
+  // An unconditionally stated exact Offer must agree with its checkout price.
+  // Conditional promotion mechanics have their own multi-pack semantics and
+  // must not be interpreted as a second unconditional per-pack price.
+  if (observation.offer !== null &&
+      observation.offer.mechanics === null &&
+      observation.offer.offerPriceCents !== null &&
+      observation.currentPriceCents !== null &&
+      observation.offer.offerPriceCents !== observation.currentPriceCents) {
+    throw new Error('Unconditional Offer price contradicts current checkout cents')
+  }
 
   return observation
 }

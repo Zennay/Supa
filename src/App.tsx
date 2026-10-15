@@ -6,6 +6,7 @@ import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
+import { ObservedStoreComparisonView } from './features/comparison/ObservedStoreComparisonView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
@@ -29,11 +30,12 @@ import {
   m3CandidateStore,
 } from './data/m3ComparisonFixture'
 
-type Tab = 'planner' | 'basket' | 'list' | 'observe'
+type Tab = 'planner' | 'basket' | 'compare' | 'list' | 'observe'
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'planner', label: 'Planner' },
   { id: 'basket', label: 'Mand' },
+  { id: 'compare', label: 'Vergelijk' },
   { id: 'list', label: 'Lijst' },
   { id: 'observe', label: 'Meten' },
 ]
@@ -300,6 +302,9 @@ export function App() {
             comparisonBaseline={comparisonBaseline}
             comparisonCandidate={comparisonCandidate}
           />
+        )}
+        {tab === 'compare' && (
+          <ObservedStoreComparisonView onOpenObservation={() => setTab('observe')} />
         )}
         {tab === 'list' && <ShoppingListView basket={basket} />}
         {tab === 'observe' && <ObservationView />}
