@@ -9,10 +9,13 @@ import {
   evaluateManifestFreshness,
 } from '../scripts/m1-evaluate-freshness.mjs'
 
-function manifest(results) {
+function manifest(results, overrides = {}) {
   return {
     milestone: 'M1 Data Feasibility',
+    bounded: true,
+    sourceCount: results.length,
     results,
+    ...overrides,
   }
 }
 
@@ -31,6 +34,38 @@ function result(overrides = {}) {
   }
 }
 
+test('freshness rejects unbounded capture manifests', () => {
+  for (const bounded of [false, 'true', null, undefined]) {
+    assert.throws(
+      () =>
+        evaluateManifestFreshness(manifest([result()], { bounded }), {
+          now: new Date('2026-10-04T01:00:00.000Z'),
+        }),
+      /must be explicitly bounded/,
+    )
+  }
+})
+
+test('freshness rejects declared source counts that do not match results', () => {
+  assert.throws(
+    () =>
+      evaluateManifestFreshness(manifest([result()], { sourceCount: 2 }), {
+        now: new Date('2026-10-04T01:00:00.000Z'),
+      }),
+    /sourceCount 2 does not match results length 1/,
+  )
+})
+
+test('empty capture manifests are never freshness-acceptable', () => {
+  const report = evaluateManifestFreshness(manifest([]), {
+    now: new Date('2026-10-04T01:00:00.000Z'),
+  })
+
+  assert.equal(report.sourceCount, 0)
+  assert.equal(report.freshCount, 0)
+  assert.equal(report.acceptable, false)
+})
+
 test('marks a recent successful capture fresh and preserves validators', () => {
   const report = evaluateManifestFreshness(manifest([result()]), {
     now: new Date('2026-10-04T01:00:00.000Z'),
@@ -43,6 +78,29 @@ test('marks a recent successful capture fresh and preserves validators', () => {
   assert.equal(report.sources[0].validators.etagPresent, true)
   assert.equal(report.sources[0].validators.lastModifiedPresent, true)
   assert.equal(report.sources[0].upstreamLastModifiedAgeHours, 2)
+})
+
+test('capture freshness rejects underspecified timestamps', () => {
+  for (const capturedAt of [
+    '2026-10-04',
+    '2026-10-04 00:00:00Z',
+    '2026-02-31T00:00:00.000Z',
+    '2026-10-04T24:00:00.000Z',
+    '2026-10-04T00:00:00.000+24:00',
+  ]) {
+    const report = evaluateManifestFreshness(
+      manifest([result({ capturedAt })]),
+      {
+        now: new Date('2026-10-04T01:00:00.000Z'),
+      },
+    )
+
+    assert.equal(report.acceptable, false)
+    assert.equal(report.staleCount, 1)
+    assert.equal(report.sources[0].captureAgeHours, null)
+    assert.equal(report.sources[0].freshness, 'stale')
+    assert.ok(report.sources[0].reasons.includes('invalid-captured-at'))
+  }
 })
 
 test('marks an old capture stale without pretending Last-Modified proves freshness', () => {
@@ -101,6 +159,24 @@ test('failed captures are never freshness-acceptable', () => {
   assert.equal(report.failedCount, 1)
   assert.equal(report.sources[0].freshness, 'failed')
   assert.ok(report.sources[0].reasons.includes('capture-failed'))
+})
+
+test('malformed truthy success flags cannot make capture evidence acceptable', () => {
+  for (const success of ['false', 1, {}, []]) {
+    const report = evaluateManifestFreshness(
+      manifest([result({ success })]),
+      {
+        now: new Date('2026-10-04T01:00:00.000Z'),
+      },
+    )
+
+    assert.equal(report.acceptable, false)
+    assert.equal(report.failedCount, 1)
+    assert.equal(report.sources[0].success, false)
+    assert.equal(report.sources[0].freshness, 'failed')
+    assert.ok(report.sources[0].reasons.includes('invalid-success-flag'))
+    assert.ok(report.sources[0].reasons.includes('capture-failed'))
+  }
 })
 
 test('writes freshness.json into the capture artifact', async () => {

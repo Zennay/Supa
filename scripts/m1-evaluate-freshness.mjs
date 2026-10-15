@@ -11,6 +11,43 @@ function parseDate(value) {
   return Number.isFinite(ms) ? ms : null
 }
 
+const CAPTURE_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/
+
+function parseCaptureTimestamp(value) {
+  if (typeof value !== 'string') return null
+  const match = CAPTURE_TIMESTAMP_PATTERN.exec(value)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
+  const second = Number(match[6])
+  if (hour > 23 || minute > 59 || second > 59) return null
+
+  const calendarDate = new Date(Date.UTC(year, month - 1, day))
+  if (
+    calendarDate.getUTCFullYear() !== year ||
+    calendarDate.getUTCMonth() !== month - 1 ||
+    calendarDate.getUTCDate() !== day
+  ) {
+    return null
+  }
+
+  if (match[7] !== 'Z') {
+    const [offsetHour, offsetMinute] = match[7]
+      .slice(1)
+      .split(':')
+      .map(Number)
+    if (offsetHour > 23 || offsetMinute > 59) return null
+  }
+
+  const ms = Date.parse(value)
+  return Number.isFinite(ms) ? ms : null
+}
+
 function hoursBetween(olderMs, newerMs) {
   return Math.max(0, (newerMs - olderMs) / 3_600_000)
 }
@@ -28,6 +65,18 @@ export function evaluateManifestFreshness(
   if (!Array.isArray(manifest.results)) {
     throw new Error('Capture manifest results must be an array')
   }
+  if (manifest.bounded !== true) {
+    throw new Error('Capture manifest must be explicitly bounded')
+  }
+  if (
+    !Number.isSafeInteger(manifest.sourceCount) ||
+    manifest.sourceCount < 0 ||
+    manifest.sourceCount !== manifest.results.length
+  ) {
+    throw new Error(
+      `Capture manifest sourceCount ${manifest.sourceCount} does not match results length ${manifest.results.length}`,
+    )
+  }
   if (!Number.isFinite(maxCaptureAgeHours) || maxCaptureAgeHours <= 0) {
     throw new Error('maxCaptureAgeHours must be a positive number')
   }
@@ -38,7 +87,9 @@ export function evaluateManifestFreshness(
   }
 
   const sources = manifest.results.map((result) => {
-    const capturedAtMs = parseDate(result.capturedAt)
+    const successFlagValid = typeof result.success === 'boolean'
+    const captureSucceeded = result.success === true
+    const capturedAtMs = parseCaptureTimestamp(result.capturedAt)
     const captureAgeHours =
       capturedAtMs === null ? null : hoursBetween(capturedAtMs, nowMs)
     const captureIsFuture =
@@ -57,7 +108,8 @@ export function evaluateManifestFreshness(
     }
 
     const reasons = []
-    if (!result.success) reasons.push('capture-failed')
+    if (!successFlagValid) reasons.push('invalid-success-flag')
+    if (!captureSucceeded) reasons.push('capture-failed')
     if (capturedAtMs === null) reasons.push('invalid-captured-at')
     else if (captureIsFuture) reasons.push('capture-in-future')
     else if (captureAgeHours > maxCaptureAgeHours) reasons.push('capture-stale')
@@ -69,14 +121,14 @@ export function evaluateManifestFreshness(
       id: result.id,
       supermarket: result.supermarket,
       kind: result.kind,
-      success: Boolean(result.success),
+      success: captureSucceeded,
       status: result.status ?? null,
       capturedAt: result.capturedAt ?? null,
       captureAgeHours:
         captureAgeHours === null ? null : Number(captureAgeHours.toFixed(3)),
       maxCaptureAgeHours,
       freshness:
-        !result.success
+        !captureSucceeded
           ? 'failed'
           : captureIsFuture
             ? 'future'
@@ -113,9 +165,11 @@ export function evaluateManifestFreshness(
         !source.validators.etagPresent &&
         !source.validators.lastModifiedPresent,
     ).length,
-    acceptable: sources.every(
-      (source) => source.success && source.freshness === 'fresh',
-    ),
+    acceptable:
+      sources.length > 0 &&
+      sources.every(
+        (source) => source.success && source.freshness === 'fresh',
+      ),
     sources,
   }
 }
