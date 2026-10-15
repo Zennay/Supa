@@ -84,7 +84,7 @@ export function renderPrivateShoppingChecklists(report) {
       comparison.claimable !== false ||
       !Array.isArray(comparison.lines) || comparison.lines.length === 0 ||
       comparison.lines.length > 500 ||
-      !comparison.stores?.plus || !comparison.stores?.dekamarkt) {
+      !comparison.stores || typeof comparison.stores !== 'object') {
     throw new Error('Invalid or claimable offline shopping checklist input')
   }
   const output = [
