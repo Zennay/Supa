@@ -45,6 +45,13 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
       const key = retailerId + ':' + kind
       const bucket = health.byShape[key]
       if (!bucket || bucket.sources !== bucket.accepted + bucket.rejected) fail()
+      // The health gate has already validated every admitted provenance. Show
+      // the newest *archived* timestamp so an operator can see which exact
+      // captured snapshot the historical status refers to. Not a fresh price.
+      const capturedAt = batch.results
+        .filter(result => result.key === key && result.accepted === true)
+        .map(result => result.observations[0].provenance.capturedAt)
+        .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null
       const status = bucket.accepted === 0
         ? 'no-accepted-historical-capture'
         : bucket.rejected > 0
@@ -59,6 +66,7 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
         rejectedSources: bucket.rejected,
         historicalObservations: bucket.observations,
         staleHistoricalCaptures: bucket.staleCaptures,
+        latestArchivedCapturedAt: capturedAt,
         unknownPriceObservations: bucket.unknownPrices,
         verifiedCurrentPriceObservations: 0,
         eligibleForLiveCapture: false,
