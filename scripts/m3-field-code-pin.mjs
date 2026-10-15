@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { open, lstat, constants } from 'node:fs/promises'
+import { open, lstat, constants, mkdtemp, link, rm } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { dirname, join, resolve, parse } from 'node:path'
 
@@ -236,13 +236,25 @@ export async function main(argv = process.argv.slice(2)) {
   if (outputMode) {
     try {
       const outputPath = await assertPrivateNewOutput(argv[3])
-      const handle = await open(outputPath,
-        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-        0o600)
+      // Stage under a newly owned 0700 directory on the *same* filesystem.
+      // The public final name never exists until every byte has been written,
+      // fsynced and the staging descriptor safely closed. Hard-link creates
+      // that name atomically and fails if another process owns the target.
+      const stagingDir = await mkdtemp(join(dirname(outputPath), '.supa-m3-codepin-'))
       try {
-        await handle.writeFile(JSON.stringify(manifest, null, 2) + '\n')
+        const stagingFile = join(stagingDir, 'manifest.json')
+        const handle = await open(stagingFile,
+          constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+          0o600)
+        try {
+          await handle.writeFile(JSON.stringify(manifest, null, 2) + '\n')
+          await handle.sync()
+        } finally {
+          await handle.close()
+        }
+        await link(stagingFile, outputPath)
       } finally {
-        await handle.close()
+        await rm(stagingDir, { recursive: true, force: true })
       }
     } catch {
       throw new Error('Private M3 code-pin destination refused or unavailable')
