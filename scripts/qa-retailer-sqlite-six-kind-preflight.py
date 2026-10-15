@@ -71,7 +71,11 @@ def audit(path):
         conn.execute("PRAGMA query_only = ON")
         conn.execute("PRAGMA trusted_schema = OFF")
         meta_rows = list(conn.execute("SELECT key,value FROM metadata"))
-        check(len(meta_rows) == len({key for key, _ in meta_rows}))
+        check(len(meta_rows) == 5 and
+              {key for key, _ in meta_rows} == {
+                  "schema_version", "origin", "production_enabled",
+                  "public_savings_claim_eligible", "requires_explicit_retailer_license",
+              })
         meta = dict(meta_rows)
         check(meta.get("schema_version") == "1" and
               meta.get("origin") == "offline-reviewed-snapshots-only" and
@@ -100,19 +104,29 @@ def audit(path):
         product_counts = dict(products)
         check(set(product_counts) == set(HOSTS) and
               all(0 < count <= 5000 for count in product_counts.values()))
+        # A plausible count is not proof every product has source evidence.
+        # Keep this structural check distinct from exact 16-row fixture parity.
+        product_keys = set(conn.execute(
+            "SELECT retailer_id,source_product_id FROM products"))
+        check(len(product_keys) == sum(product_counts.values()))
         observations = list(conn.execute(
             "SELECT o.snapshot_id,o.retailer_id,o.source_product_id,s.retailer_id,s.kind "
             "FROM price_observations o LEFT JOIN source_snapshots s ON s.id=o.snapshot_id"))
         check(len(observations) >= len(snaps) and len(observations) <= 25000)
         evidence_count = {item: 0 for item in EXPECTED}
+        observed_snapshot_ids = set()
+        observed_product_keys = set()
         for sid, retailer, product, snapshot_retailer, kind in observations:
             check(sid in ids and snapshot_retailer == retailer and
                   (retailer, kind) in EXPECTED)
             evidence_count[(retailer, kind)] += 1
+            observed_snapshot_ids.add(sid)
+            observed_product_keys.add((retailer, product))
             check(conn.execute(
                 "SELECT 1 FROM products WHERE retailer_id=? AND source_product_id=?",
                 (retailer, product)).fetchone() is not None)
         check(all(n > 0 for n in evidence_count.values()))
+        check(observed_snapshot_ids == ids and observed_product_keys == product_keys)
         return {
             "mode": "offline-retailer-six-kind-qa-only",
             "accepted": True,
