@@ -161,7 +161,7 @@ function parseUtf8Json(bytes) {
 // Incomplete *products* are allowed for private review; missing provenance is not.
 function hasVisibleM3Context(value) {
   return typeof value === 'string' &&
-    /[^\\p{M}\\p{Cf}\\p{Cc}\\p{Cs}\\s\\u115F\\u1160\\u3164\\uFFA0\\u2800]/u.test(value)
+    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
 }
 
 function requireVisibleM3Context(study) {
