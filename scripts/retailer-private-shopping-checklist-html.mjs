@@ -48,7 +48,7 @@ export function renderPrintablePrivateShoppingChecklist(report) {
     throw new Error('Invalid private checklist presentation')
   }
   const cards = shops.map(s => '<section aria-label="' + s.name +
-    '" class="shop"><h2>' + s.name + '</h2><ol>' + s.items.join('') +
+    '" class="shop shop-' + (s.name === 'PLUS' ? 'plus' : 'dekamarkt') + '"><h2>' + s.name + '</h2><ol>' + s.items.join('') +
     '</ol><p class="total">' + escapeHtml(s.total) + '</p></section>').join('\n')
   return '<!doctype html>\n<html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -61,6 +61,10 @@ export function renderPrintablePrivateShoppingChecklist(report) {
     '.warning{background:#fff5d9;border-left:5px solid #b67b11;padding:16px;line-height:1.55}' +
     '.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:20px}' +
     '.shop{background:white;border:1px solid #d7e5df;padding:18px;border-radius:12px}' +
+    '.store-filter{border:1px solid #d7e5df;border-radius:8px;background:white;padding:12px;margin-top:18px}' +
+    '.store-filter legend{font-weight:700}.store-filter label{display:inline-flex;align-items:center;gap:8px;margin:4px 15px 4px 0}' +
+    '.store-filter input{width:18px;height:18px}' +
+    'body:has(#view-plus:checked) .shop-dekamarkt,body:has(#view-deka:checked) .shop-plus{display:none}' +
     'ol{padding-left:22px}li{padding:12px 0;border-bottom:1px solid #e1e7e3;overflow-wrap:anywhere}' +
     'label{display:flex;align-items:flex-start;gap:12px;cursor:pointer}' +
     'input{width:20px;height:20px;flex:none;accent-color:#18624c}' +
@@ -71,6 +75,7 @@ export function renderPrintablePrivateShoppingChecklist(report) {
     'footer{margin-top:24px;color:#53635b;line-height:1.55}' +
     '@media(max-width:710px){.grid{grid-template-columns:1fr}body{padding:12px}}' +
     '@media print{:root{background:white}body{max-width:none;padding:0}' +
+    '.store-filter{display:none}' +
     '.grid{grid-template-columns:1fr}.shop{break-inside:avoid;box-shadow:none}' +
     'input:checked+span{text-decoration:none}}' +
     '</style></head><body><header><h1>SUPA · Boodschappen afvinken</h1>' +
@@ -79,7 +84,11 @@ export function renderPrintablePrivateShoppingChecklist(report) {
     'Geen live prijzen, geen winkeladvies, geen bewezen besparing. ' +
     'Controleer verpakking, actuele prijs en voorraad zelf in de winkel. ' +
     'Afvinken wordt niet opgeslagen en verstuurt niets.</div>' +
-    '<main class="grid">' + cards + '</main>' +
+    '<fieldset class="store-filter"><legend>Welke boodschappenlijst wil je bekijken of printen?</legend>' +
+    '<label><input type="radio" name="storeView" id="view-both" checked>Beide winkels</label>' +
+    '<label><input type="radio" name="storeView" id="view-plus">Alleen PLUS</label>' +
+    '<label><input type="radio" name="storeView" id="view-deka">Alleen DekaMarkt</label>' +
+    '</fieldset><main class="grid">' + cards + '</main>' +
     '<footer>Lokale vergelijking van snapshots. Een onbekende winkelregel ' +
     'mag nooit als volledig mandbedrag worden behandeld. ' +
     'Geen gegevens worden verzonden of automatisch bijgewerkt.</footer>' +
