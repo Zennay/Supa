@@ -171,7 +171,7 @@ function priceBoundTime(raw: string, isEnd: boolean): number {
  * exact timestamp on an integer nanosecond timeline (including date-only
  * inclusive end-of-day semantics).
  */
-function priceInstantNs(raw: string, isEnd: boolean): bigint | null {
+export function priceInstantNs(raw: string, isEnd: boolean): bigint | null {
   const millis = priceBoundTime(raw, isEnd)
   if (!Number.isSafeInteger(millis)) return null
   const fraction = /T[0-9]{2}:[0-9]{2}:[0-9]{2}[.]([0-9]{1,9})/.exec(raw)?.[1]
