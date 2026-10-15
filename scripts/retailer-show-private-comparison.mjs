@@ -4,6 +4,40 @@ import { compareLocalRetailerSnapshots } from './retailer-compare-local-snapshot
 const money = cents => '€' + (cents / 100).toFixed(2).replace('.', ',')
 const safe = cents => Number.isSafeInteger(cents) && cents >= 0
 
+
+// Terminal output must not interpret untrusted demand text as ANSI, bidi
+// reordering or a new line of apparently verified financial evidence.
+function safeIngredientLabel(raw) {
+  if (typeof raw !== 'string') return 'onbekend ingrediënt'
+  const clean = raw.replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/gu, ' ')
+    .replace(/\s+/gu, ' ').trim().slice(0, 100)
+  return clean || 'onbekend ingrediënt'
+}
+
+// Reconcile every claimed matched line with integer whole packs before
+// displaying any confident basket-level money. Shared physical packs are
+// counted once (covered rows are zero additional packs, not free items).
+function hasPhysicalBasketProof(comparison) {
+  if (!Array.isArray(comparison.lines) || comparison.lines.length === 0) return false
+  for (const shop of ['plus', 'dekamarkt']) {
+    let sum = 0
+    for (const line of comparison.lines) {
+      const row = line?.[shop]
+      if (!row || row.status !== 'matched' || !safe(row.packPriceCents) ||
+          !Number.isSafeInteger(row.packs) || row.packs < 0 ||
+          (row.packs === 0 && typeof row.sharedPackWithIngredientId !== 'string')) {
+        return false
+      }
+      const physicalCost = row.packs * row.packPriceCents
+      if (!safe(physicalCost) || row.totalCents !== physicalCost) return false
+      sum += physicalCost
+      if (!safe(sum)) return false
+    }
+    if (comparison.stores?.[shop]?.subtotalCents !== sum) return false
+  }
+  return true
+}
+
 function describe(row) {
   if (!row || row.status === 'unknown') return 'niet gevonden'
   if (row.status !== 'matched' && row.status !== 'availability_unknown') return 'niet vergelijkbaar'
@@ -25,7 +59,7 @@ export function renderPrivateComparison(report) {
   if (report?.format !== 'supa-local-snapshot-comparison-v1' ||
       !Array.isArray(report.captureSummary) || !c ||
       c.provenance !== 'offline-snapshot-preview' || c.claimable !== false ||
-      !Array.isArray(c.lines) || c.lines.length > 500 ||
+      !Array.isArray(c.lines) || c.lines.length === 0 || c.lines.length > 500 ||
       !c.stores?.plus || !c.stores?.dekamarkt) {
     throw new Error('Invalid or claimable offline comparison')
   }
@@ -46,14 +80,21 @@ export function renderPrivateComparison(report) {
   }
   out.push('', 'Mandregels:')
   for (const line of c.lines) {
-    const label = typeof line?.ingredient === 'string' && line.ingredient.trim() ?
-      line.ingredient.replaceAll(String.fromCharCode(10), ' ').replaceAll(String.fromCharCode(13), ' ').replaceAll(String.fromCharCode(9), ' ').slice(0, 100) : 'onbekend ingrediënt'
+    const label = safeIngredientLabel(line?.ingredient)
     out.push('  ' + label + ':')
     out.push('    PLUS: ' + describe(line?.plus))
     out.push('    DekaMarkt: ' + describe(line?.dekamarkt))
     const delta = line?.differenceCents
-    const safeDelta = Number.isSafeInteger(delta) && Number.isSafeInteger(Math.abs(delta)) &&
-      line?.plus?.status === 'matched' && line?.dekamarkt?.status === 'matched'
+    const expectedDelta = safe(line?.dekamarkt?.totalCents) && safe(line?.plus?.totalCents) ?
+      line.dekamarkt.totalCents - line.plus.totalCents : null
+    const safeDelta = Number.isSafeInteger(delta) &&
+      expectedDelta === delta && Number.isSafeInteger(expectedDelta) &&
+      line?.plus?.status === 'matched' && line?.dekamarkt?.status === 'matched' &&
+      safe(line.plus.packPriceCents) && safe(line.dekamarkt.packPriceCents) &&
+      Number.isSafeInteger(line.plus.packs) && Number.isSafeInteger(line.dekamarkt.packs) &&
+      line.plus.packs >= 0 && line.dekamarkt.packs >= 0 &&
+      line.plus.packs * line.plus.packPriceCents === line.plus.totalCents &&
+      line.dekamarkt.packs * line.dekamarkt.packPriceCents === line.dekamarkt.totalCents
     out.push('    Offline regelverschil: ' + (safeDelta ?
       (delta < 0 ? 'DekaMarkt lager ' : delta > 0 ? 'PLUS lager ' : 'gelijk ') + money(Math.abs(delta))
       : 'niet aantoonbaar'))
@@ -68,7 +109,8 @@ export function renderPrivateComparison(report) {
   const computedWinner = !safeBasket ? null : basketDifference > 0 ? 'plus' :
     basketDifference < 0 ? 'dekamarkt' : 'equal'
   if (c.comparable === true && p.complete === true && d.complete === true &&
-      safeBasket && c.savingsCents === Math.abs(basketDifference) &&
+      hasPhysicalBasketProof(c) && safeBasket &&
+      c.savingsCents === Math.abs(basketDifference) &&
       c.cheaperStore === computedWinner) {
     const winner = c.cheaperStore === 'equal' ? 'gelijke prijs' :
       c.cheaperStore === 'plus' ? 'PLUS lager' : 'DekaMarkt lager'
