@@ -77,6 +77,12 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
   }
 }
 
+function humanQuantity(amount, unit) {
+  const quantity = String(amount).replace('.', ',')
+  if (unit === 'piece') return quantity + ' ' + (amount === 1 ? 'stuk' : 'stuks')
+  return quantity + ' ' + unit
+}
+
 function renderHumanChecklist(report) {
   const lines = [
     'SUPA M3 · nog te meten (geen geverifieerde winkelwaarneming)',
@@ -90,7 +96,7 @@ function renderHumanChecklist(report) {
         ? 'beschikbaarheid vastleggen'
         : 'product, verpakking en prijs aanvullen'
       lines.push('  - ' + item.ingredientLabel + ' (' +
-        item.requiredAmount + ' ' + item.requiredUnit + '): ' + nextStep)
+        humanQuantity(item.requiredAmount, item.requiredUnit) + '): ' + nextStep)
     }
   }
   lines.push('', 'Venster: ' + report.observationWindowState +
