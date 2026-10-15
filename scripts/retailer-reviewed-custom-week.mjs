@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
+import { types as nodeTypes } from 'node:util'
 import { m2DefaultActiveDays, m2InitialPlan, m2Recipes } from '../src/data/m2Fixture.ts'
 import { buildDynamicReviewedWeek } from '../src/domain/reviewedCatalogPlannedWeek.ts'
 import { reviewedPlannerQueueSummary } from './retailer-reviewed-planner-queue.mjs'
@@ -20,28 +21,47 @@ import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
  * recipes are not permitted until their source/ingredient rights are reviewed.
  */
 export function selectedFixtureWeek(argv = []) {
-  if (!Array.isArray(argv) ||
-      (argv.length !== 0 && (argv.length !== 2 ||
-        !['--days', '--plan'].includes(argv[0]) ||
-        typeof argv[1] !== 'string' || !argv[1]))) {
+  // Only inert own data may choose a frozen study week. A Proxy can
+  // intercept indexed GET without changing its underlying descriptors.
+  if (nodeTypes.isProxy(argv) || !Array.isArray(argv)) {
     throw new Error('Only approved private planned-week review arguments are accepted')
+  }
+  const length = Object.getOwnPropertyDescriptor(argv, 'length')?.value
+  if (length !== 0 && length !== 2) {
+    throw new Error('Only approved private planned-week review arguments are accepted')
+  }
+  let flag
+  let value
+  if (length === 2) {
+    const flagProperty = Object.getOwnPropertyDescriptor(argv, '0')
+    const valueProperty = Object.getOwnPropertyDescriptor(argv, '1')
+    if (!flagProperty || !Object.hasOwn(flagProperty, 'value') ||
+        !valueProperty || !Object.hasOwn(valueProperty, 'value')) {
+      throw new Error('Only own data arguments are accepted for private planned-week review')
+    }
+    flag = flagProperty.value
+    value = valueProperty.value
+    if ((flag !== '--days' && flag !== '--plan') ||
+        typeof value !== 'string' || !value) {
+      throw new Error('Only approved private planned-week review arguments are accepted')
+    }
   }
   const allowedDays = new Set(m2DefaultActiveDays)
   const allowedRecipes = new Set(m2Recipes.map(recipe => recipe.id))
-  if (argv.length === 0) {
+  if (length === 0) {
     return {
       days: [...m2DefaultActiveDays],
       plan: m2InitialPlan.map(meal => ({ ...meal })),
     }
   }
 
-  const entries = argv[1].split(',')
+  const entries = value.split(',')
   if (entries.length < 1 || entries.length > m2DefaultActiveDays.length ||
       new Set(entries).size !== entries.length) {
     throw new Error('Only distinct currently planned fixture days are accepted')
   }
 
-  if (argv[0] === '--days') {
+  if (flag === '--days') {
     if (entries.some(day => !allowedDays.has(day))) {
       throw new Error('Only currently planned fixture day labels are accepted')
     }
