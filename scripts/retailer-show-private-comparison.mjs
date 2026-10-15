@@ -39,7 +39,7 @@ export function renderPrivateComparison(report) {
   out.push('', 'Mandregels:')
   for (const line of c.lines) {
     const label = typeof line?.ingredient === 'string' && line.ingredient.trim() ?
-      line.ingredient.replace(/[\\r\\n\\t]/g, ' ').slice(0, 100) : 'onbekend ingrediënt'
+      line.ingredient.replaceAll(String.fromCharCode(10), ' ').replaceAll(String.fromCharCode(13), ' ').replaceAll(String.fromCharCode(9), ' ').slice(0, 100) : 'onbekend ingrediënt'
     out.push('  ' + label + ':')
     out.push('    PLUS: ' + describe(line?.plus))
     out.push('    DekaMarkt: ' + describe(line?.dekamarkt))
@@ -61,7 +61,7 @@ export function renderPrivateComparison(report) {
     out.push('ALLEEN OFFLINE MANDVERSCHIL: ' + winner + ' ' + money(c.savingsCents))
   } else out.push('GEEN VOLLEDIGE MANDVERGELIJKING: ontbrekende/onzekere producten of voorraad')
   out.push('Niet gebruiken als live winkeladvies of bewezen besparing.', '')
-  return out.join('\\n')
+  return out.join(String.fromCharCode(10))
 }
 
 export async function main(argv = process.argv.slice(2)) {
