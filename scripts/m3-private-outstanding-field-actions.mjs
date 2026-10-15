@@ -26,7 +26,7 @@ const MISSING_PRODUCT_FIELD_LABELS = {
   packCount: 'Aantal per verpakking',
   priceCents: 'Prijs per verpakking',
 }
-const M3_VISIBLE_TEXT = /[^\\p{M}\\p{Cf}\\p{Cc}\\p{Cs}\\s\\u115F\\u1160\\u3164\\uFFA0\\u2800]/u
+const M3_VISIBLE_TEXT = /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u
 
 function missingObservedProductFields(product) {
   if (product.available !== true) {
