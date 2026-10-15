@@ -29,7 +29,7 @@ for (const [kind, path, ingredientCount, retailerRows] of COMMANDS) {
     assert.equal(record.livePricesAvailable, false)
     assert.equal(record.publicSavingsClaimEligible, false)
     assert.equal(record.externalRequests, 0)
-    assert.doesNotMatch(result.stdout, /https?:|sourceUrl|productName|productId|ingredientId|priceCents|capturedAt|participant|€|saving/i)
+    assert.doesNotMatch(result.stdout, /https?:|sourceUrl|productName|productId|ingredientId|priceCents|capturedAt|participant|€|actualSavingsCents|savingsPercent|claimedSavings/i)
   })
 
   test(kind + ' invalid recipe cannot create any stdout or reveal source paths', () => {
