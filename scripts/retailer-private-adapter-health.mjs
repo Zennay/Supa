@@ -32,11 +32,17 @@ const timestamp = value => {
   const timezone = parts[8]
   if (timezone !== 'Z') {
     const [hours, minutes] = timezone.slice(1).split(':').map(Number)
-    if (hours > 23 || minutes > 59) fail()
+    // Real civil UTC offsets cannot exceed ±14:00.
+    if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) fail()
   }
   const ms = Date.parse(value)
   if (!Number.isFinite(ms)) fail()
-  return ms
+  // Date.parse truncates below one millisecond. Preserve all 1-9 digits
+  // so a +1ns future capture cannot be admitted as current/historical.
+  // The first three fractional digits are already included in parsed ms.
+  const fractional = (parts[7] ?? '').padEnd(9, '0')
+  const subMillisecond = BigInt(fractional.slice(3) || '0')
+  return BigInt(ms) * 1_000_000n + subMillisecond
 }
 const emptyCoverage = () => ({
   sources: 0, accepted: 0, rejected: 0, observations: 0,
@@ -92,12 +98,14 @@ export function evaluatePrivateAdapterHealth(batch, {
     if (!isObject(source) || source.supermarket !== retailer || source.kind !== kind ||
         typeof source.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(source.sha256) ||
         typeof source.url !== 'string') fail()
-    const event = JSON.stringify([result.key, source.url, source.sha256, source.capturedAt])
+    // A different lexical offset can denote the same physical instant.
+    // Bind event identity to absolute nanoseconds, not timestamp spelling.
+    const when = timestamp(source.capturedAt)
+    const event = JSON.stringify([result.key, source.url, source.sha256, when.toString()])
     if (identities.has(event)) fail()
     identities.add(event)
-    const when = timestamp(source.capturedAt)
     if (when > now) fail()
-    if (now - when > maxAgeHours * 60 * 60 * 1000) bucket.staleCaptures++
+    if (now - when > BigInt(maxAgeHours) * 3_600_000_000_000n) bucket.staleCaptures++
     const seenProducts = new Set()
     for (let j = 0; j < result.observations.length; j++) {
       if (!Object.hasOwn(result.observations, j)) fail()
