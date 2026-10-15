@@ -1,4 +1,5 @@
 import type { SourceSnapshotRef } from './ingestion.ts'
+import { structuredSchemaOrgPack } from './schemaOrgQuantitativePack.ts'
 import {
   parseSchemaOrgProduct,
   type SchemaOrgParseResult,
@@ -86,7 +87,34 @@ function normalizedHttpsUrl(input: unknown): string | null {
 }
 
 function readSelectedProduct(product: DataObject, source: SourceSnapshotRef): SchemaOrgParseResult {
-  const result = parseSchemaOrgProduct(product, source)
+  const pack = structuredSchemaOrgPack(product)
+  if (pack.status === 'unsafe') {
+    return refuses('selected Product has ambiguous physical packaging')
+  }
+  // Snapshot own descriptors without invoking accessor properties or mutating
+  // the captured JSON-LD. Never re-enter unrelated nested @graph Product nodes
+  // after a single provenance-bound product has already been selected.
+  const keys = Reflect.ownKeys(product)
+  if (keys.length > 64) return refuses('selected Product has excessive fields')
+  const selected: DataObject = Object.create(null)
+  for (const key of keys) {
+    if (typeof key !== 'string') return refuses('selected Product has unsafe fields')
+    if (key === '@graph') continue
+    const descriptor = Object.getOwnPropertyDescriptor(product, key)
+    if (!descriptor || !('value' in descriptor)) {
+      return refuses('selected Product has unsafe fields')
+    }
+    Object.defineProperty(selected, key, {
+      value: descriptor.value,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    })
+  }
+  if (pack.status === 'normalized') {
+    selected.weight = { value: pack.weightText }
+  }
+  const result = parseSchemaOrgProduct(selected, source)
   // Legacy parser diagnostics can include a raw attacker-controlled currency.
   // This offline operator boundary must not echo untrusted product metadata.
   return result.type === 'observation' ? result :
