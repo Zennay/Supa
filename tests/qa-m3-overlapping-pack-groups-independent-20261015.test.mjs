@@ -32,11 +32,11 @@ function product(shop, id, name, price, unit = 'ml', amount = 500, availability 
 function inventory(withRice, uncertain = false) {
   const rows = [
     // PLUS physical groups: [breakfast,dinner] and [snack].
-    product('plus', 'shared-ab', 'Halfvolle melk ontbijt diner', 120),
+    product('plus', 'shared-ab', 'Halfvolle melk ontbijt halfvolle melk diner', 120),
     product('plus', 'single-c', 'Halfvolle melk snack', 70),
     // DekaMarkt physical groups: [breakfast] and [dinner,snack].
     product('dekamarkt', 'single-a', 'Halfvolle melk ontbijt', 90),
-    product('dekamarkt', 'shared-bc', 'Halfvolle melk diner snack', 85,
+    product('dekamarkt', 'shared-bc', 'Halfvolle melk diner halfvolle melk snack', 85,
       'ml', 500, uncertain ? 'unknown' : 'available'),
   ]
   if (withRice) {
@@ -142,7 +142,7 @@ for (const [order, three] of permutations(requirements).entries()) {
 }
 
 test('independent symmetric three-ingredient physical group still allows owner-group cents', () => {
-  const all = 'Halfvolle melk ontbijt diner snack'
+  const all = 'Halfvolle melk ontbijt halfvolle melk diner halfvolle melk snack'
   const rows = [
     product('plus', 'shared-abc', all, 129),
     product('dekamarkt', 'shared-abc', all, 119),
