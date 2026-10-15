@@ -44,6 +44,17 @@ async function readSavedPrivateComparison(filename) {
   }
 }
 
+// Printed shopping labels can originate from caller-entered ingredient names
+// or retailer Product.name text. They are not permission to disclose direct
+// contact identifiers or embedded links in an exported / shared HTML file.
+// Only render-time redaction: never rewrite price calculations or input proof.
+const PRIVATE_WEB_LINK = /(?:https?:\/\/|www\.)[^\s<>"']+/giu
+const PRIVATE_EMAIL = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/giu
+function redactPrivateLabel(value) {
+  return value.replace(PRIVATE_WEB_LINK, '[privélink verborgen]')
+    .replace(PRIVATE_EMAIL, '[privé e-mailadres verborgen]')
+}
+
 const escapeHtml = value => value.replace(/&/g, '&amp;')
   .replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -69,7 +80,7 @@ export function renderPrintablePrivateShoppingChecklist(report, store = 'both') 
     const shared = line.startsWith('[=] ')
     const unknown = line.startsWith('[?] ')
     if (purchase || shared || unknown) {
-      const label = escapeHtml(line.slice(4))
+      const label = escapeHtml(redactPrivateLabel(line.slice(4)))
       active.items.push('<li class="' + (purchase ? 'buy' : shared ? 'shared' : 'unknown') +
         '">' + (purchase
           ? '<label><input type="checkbox" aria-label="Afvinken: ' +
