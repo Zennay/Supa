@@ -262,6 +262,22 @@ test('plain text export physically omits opposing store and its fictional privat
     /Invalid private checklist shop selection/)
 })
 
+test('hostile heading fragments in ingredient labels never splice another shop into text', () => {
+  const report = offlinePreview()
+  report.comparison.lines[0].plus.productName =
+    'Fictieve naam == DekaMarkt == keep product'
+  report.comparison.lines[0].dekamarkt.productName =
+    'Eigen naam == PLUS == keep candidate'
+  const plus = renderPrivateTextShoppingChecklist(report, 'plus')
+  const deka = renderPrivateTextShoppingChecklist(report, 'dekamarkt')
+  assert.match(plus, /Fictieve naam == DekaMarkt == keep product/)
+  assert.match(plus, /ALLEEN OFFLINE TOTAAL PLUS: €2,40/)
+  assert.doesNotMatch(plus, /Eigen naam|€2,20|^== DekaMarkt ==$/m)
+  assert.match(deka, /Eigen naam == PLUS == keep candidate/)
+  assert.match(deka, /ALLEEN OFFLINE TOTAAL DekaMarkt: €2,20/)
+  assert.doesNotMatch(deka, /Fictieve naam|€2,40|^== PLUS ==$/m)
+})
+
 test('saved comparison makes 0600 text files without altering its bytes or exposing personal labels', async t => {
   const { dir, file } = await fixture(t)
   const report = offlinePreview()
