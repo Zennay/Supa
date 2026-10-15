@@ -38,6 +38,8 @@ De illustratieve URL is **geen geverifieerd product**. Gebruik de echte door de 
 
 ```sh
 node --experimental-strip-types scripts/retailer-m3-offline-22-snapshots.mjs --offline /private/m3-2026-10-15/manifest.json
+# Of leesbare Nederlandse mandregels:
+node --experimental-strip-types scripts/retailer-m3-offline-22-snapshots.mjs --offline /private/m3-2026-10-15/manifest.json --text
 ```
 
 De importer voert **nul HTTP-verzoeken** uit, controleert bronhashes en tijden en geeft de bestaande volledige mandvergelijking. Als één relevante Productprijs, voorraad of eenheid niet betrouwbaar kan worden bewezen, is de uitkomst `unknown`, niet kunstmatig goedkoper. Output en SHA's kunnen broninformatie identificeren: voer dit alleen privé uit. Een lokale HTML-preview is **geen** wettelijke toestemming om sites te harvesten en niet vanzelf menselijk geverifieerd checkoutbewijs voor M3-mijlpaal #78.
