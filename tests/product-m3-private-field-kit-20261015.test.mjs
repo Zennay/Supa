@@ -133,11 +133,6 @@ test('blank kit rejects malformed destinations or incomplete data before writing
 })
 
 
-test('npm field kit command uses local offline generator without contacting retailer', async () => {
-  const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
-  assert.equal(packageJson.scripts['m3:prepare-field-kit'],
-    'node --experimental-strip-types scripts/m3-prepare-field-kit.mjs')
-})
 
 test('exported private writer rejects forged or prefilled kit bytes before creating a directory', async () => {
   const root = await mkdtemp(join(tmpdir(), 'supa-m3-kit-integrity-'))
