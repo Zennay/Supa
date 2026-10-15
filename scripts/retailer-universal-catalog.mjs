@@ -10,6 +10,24 @@ function safeId(value) {
 function normalizedObservation(value) {
   validateRawProductObservation(value)
   if (!safeId(value.sourceProductId)) throw new Error('Unsafe/missing retail product identity')
+  // A direct caller must not bypass source trust by providing a structurally
+  // valid yet credential-bearing URL, impossible clock or unsafe money value.
+  const origin = new URL(value.provenance.url)
+  if (origin.username || origin.password || origin.hash ||
+      origin.port || origin.searchParams.has('access_token')) {
+    throw new Error('Untrusted retailer capture source URL')
+  }
+  const captured = Date.parse(value.provenance.capturedAt)
+  if (!Number.isFinite(captured) || captured > Date.now()) {
+    throw new Error('Future or invalid retailer capture instant')
+  }
+  const safeCents = n => n === null ||
+    (Number.isSafeInteger(n) && n >= 0)
+  if (!safeCents(value.currentPriceCents) ||
+      (value.offer && (!safeCents(value.offer.offerPriceCents) ||
+        !safeCents(value.offer.originalPriceCents)))) {
+    throw new Error('Untrusted retailer capture cent amount')
+  }
   return {
     sourceKind: value.provenance.kind,
     snapshotSha256: value.provenance.sha256,
@@ -65,8 +83,11 @@ export function buildUniversalRetailerCatalog(batch) {
       }
       if (entries.captures.some(c => c.snapshotSha256 === normalized.snapshotSha256 &&
           c.sourceKind === normalized.sourceKind &&
+          c.sourceUrl === normalized.sourceUrl &&
+          c.capturedAt === normalized.capturedAt &&
           truthSignature(c) === truthSignature(normalized))) {
-        // Repeated identical source facts are idempotent, never extra products.
+        // Only the exact same physical capture event is idempotent. A
+        // different time/URL with identical HTML is independent provenance.
         continue
       }
       entries.captures.push(normalized)
@@ -77,7 +98,10 @@ export function buildUniversalRetailerCatalog(batch) {
   const products = [...groups.values()].map(entry => {
     const captures = entry.captures.sort((a, b) =>
       a.capturedAt.localeCompare(b.capturedAt) ||
-      a.snapshotSha256.localeCompare(b.snapshotSha256))
+      a.snapshotSha256.localeCompare(b.snapshotSha256) ||
+      a.sourceKind.localeCompare(b.sourceKind) ||
+      a.sourceUrl.localeCompare(b.sourceUrl) ||
+      truthSignature(a).localeCompare(truthSignature(b)))
     const facts = new Set(captures.map(truthSignature))
     return {
       ...entry,
