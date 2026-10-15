@@ -20,7 +20,7 @@ function noMoneyReport(clocks) {
         plus: { complete: false, subtotalCents: null },
         dekamarkt: { complete: false, subtotalCents: null },
       },
-      lines: [],
+      lines: [{ ingredientId: 'fictional', ingredient: 'fictional melk', plus: { status: 'unknown' }, dekamarkt: { status: 'unknown' }, differenceCents: null }],
     },
   }
 }
