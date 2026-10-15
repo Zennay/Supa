@@ -13,7 +13,7 @@ test('M3 paper observation: all 22 store rows distinguish observed yes, observed
   assert.equal((html.match(/Ja: product en prijs werkelijk gezien/g) || []).length, 2)
   assert.equal((html.match(/Onbekend: niet gecontroleerd/g) || []).length, 2)
   assert.equal((html.match(/Bij nee en onbekend geen product of prijs invullen/g) || []).length, 2)
-  assert.equal((html.match(/<th>Waargenomen\?<\/th>/g) || []).length, 2)
+  assert.equal((html.match(/<th>Beschikbaar\?<\/th>/g) || []).length, 2)
   assert.equal(buildObservationSheet().baseline.lines.length, 11)
   assert.equal(buildObservationSheet().candidate.lines.length, 11)
 })
