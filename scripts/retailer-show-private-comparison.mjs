@@ -37,8 +37,12 @@ export function renderPrivateComparison(report) {
   for (const source of report.captureSummary) {
     const name = source?.supermarket === 'plus' ? 'PLUS' :
       source?.supermarket === 'dekamarkt' ? 'DekaMarkt' : 'onbekend'
+    const clock = typeof source?.capturedAt === 'string' &&
+      /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}/.test(source.capturedAt)
+      ? source.capturedAt : 'registratietijd onbekend'
     out.push('  ' + name + ': ' + (Number.isSafeInteger(source?.parsedProducts) &&
-      source.parsedProducts >= 0 ? source.parsedProducts : 0) + ' productobservaties')
+      source.parsedProducts >= 0 ? source.parsedProducts : 0) +
+      ' productobservaties · vastgelegd ' + clock)
   }
   out.push('', 'Mandregels:')
   for (const line of c.lines) {
@@ -69,7 +73,9 @@ export function renderPrivateComparison(report) {
     const winner = c.cheaperStore === 'equal' ? 'gelijke prijs' :
       c.cheaperStore === 'plus' ? 'PLUS lager' : 'DekaMarkt lager'
     out.push('ALLEEN OFFLINE MANDVERSCHIL: ' + winner + ' ' + money(c.savingsCents))
-  } else out.push('GEEN VOLLEDIGE MANDVERGELIJKING: ontbrekende/onzekere producten of voorraad')
+  } else out.push(c.reason === 'invalid_or_stale_source'
+    ? 'GEEN VOLLEDIGE MANDVERGELIJKING: bronregistratie is ongeldig of ouder dan de M3-venstergrens'
+    : 'GEEN VOLLEDIGE MANDVERGELIJKING: ontbrekende/onzekere producten of voorraad')
   out.push('Niet gebruiken als live winkeladvies of bewezen besparing.', '')
   return out.join(String.fromCharCode(10))
 }
