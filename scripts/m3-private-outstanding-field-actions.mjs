@@ -16,6 +16,35 @@ import {
  *
  * This is an operator aide, NOT independent proof of a genuine store visit.
  */
+// Canonical static product-field hints. Raw product names, prices and notes
+// must never reach an operator JSON/TXT report.
+const MISSING_PRODUCT_FIELD_LABELS = {
+  availability: 'Beschikbaarheid',
+  productName: 'Productnaam',
+  packAmount: 'Verpakkingshoeveelheid',
+  packUnit: 'Verpakkingseenheid',
+  packCount: 'Aantal per verpakking',
+  priceCents: 'Prijs per verpakking',
+}
+const M3_VISIBLE_TEXT = /[^\\p{M}\\p{Cf}\\p{Cc}\\p{Cs}\\s\\u115F\\u1160\\u3164\\uFFA0\\u2800]/u
+
+function missingObservedProductFields(product) {
+  if (product.available !== true) {
+    return product.available === false ? [] : ['availability']
+  }
+  const missing = []
+  if (typeof product.productName !== 'string' ||
+      !M3_VISIBLE_TEXT.test(product.productName)) missing.push('productName')
+  if (product.packAmount === null || !Number.isFinite(product.packAmount) ||
+      product.packAmount <= 0) missing.push('packAmount')
+  if (product.packUnit === null || product.packUnit === 'unknown') missing.push('packUnit')
+  if (!Number.isSafeInteger(product.packCount) || product.packCount < 1) missing.push('packCount')
+  if (!Number.isSafeInteger(product.priceCents) || product.priceCents < 0) {
+    missing.push('priceCents')
+  }
+  return missing
+}
+
 export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date.now()) {
   if (typeof serialized !== 'string' || !Number.isSafeInteger(referenceNowMs) ||
       referenceNowMs < 0) {
@@ -46,6 +75,7 @@ export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date
         requiredUnit: expected.unit,
         action: line.observedProduct.available === true
           ? 'complete-product-pack-and-price' : 'record-availability',
+        missingFields: missingObservedProductFields(line.observedProduct),
       }]
     })
     return {
@@ -148,8 +178,14 @@ function renderHumanChecklist(report, selection = 'both') {
       const nextStep = item.action === 'record-availability'
         ? 'beschikbaarheid vastleggen'
         : 'product, verpakking en prijs aanvullen'
+      const missingLabels = item.missingFields
+        .filter(field => Object.hasOwn(MISSING_PRODUCT_FIELD_LABELS, field))
+        .map(field => MISSING_PRODUCT_FIELD_LABELS[field])
       lines.push('  - ' + item.ingredientLabel + ' (' +
-        humanQuantity(item.requiredAmount, item.requiredUnit) + '): ' + nextStep)
+        humanQuantity(item.requiredAmount, item.requiredUnit) + '): ' + nextStep +
+        (item.action === 'complete-product-pack-and-price' && missingLabels.length
+          ? ' — nog nodig: ' + missingLabels.join(', ')
+          : ''))
     }
   }
   const showActions = (label, pending) => {
