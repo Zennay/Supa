@@ -95,3 +95,44 @@ test('different physical amount even with kg conversion remains incomparable', a
   assert.ok(report.corroboratedHistoricalBaselines < original.corroboratedHistoricalBaselines)
   neverPublic(report)
 })
+
+test('matching physical number alone cannot join mass and volume evidence', async () => {
+  const batch = await reviewed()
+  const original = review(batch)
+  // Intentionally synthetic invalid *equivalence*, not a retailer product fact.
+  banana(batch, 'catalog').pack = { rawText: '1000 ml', amount: 1000, unit: 'ml' }
+  const report = review(batch)
+  assert.ok(report.incomparablePackages > original.incomparablePackages)
+  assert.ok(report.corroboratedHistoricalBaselines < original.corroboratedHistoricalBaselines)
+  neverPublic(report)
+})
+
+test('synthetic milk offer: 1 l and 1000 ml must corroborate identically', async () => {
+  const batch = await reviewed()
+  const catalog = batch.results.find(r => r.key === 'dekamarkt:catalog')
+    .observations.find(o => o.sourceProductId === '115873')
+  const offer = batch.results.find(r => r.key === 'dekamarkt:offers').observations[0]
+  assert.ok(catalog && offer)
+  // In-memory contract-only counterfactual on genuine archived shapes. The
+  // following imagined milk discount is NOT an observed retailer offer or
+  // evidence of real-world savings; source data on disk stays unchanged.
+  offer.sourceProductId = catalog.sourceProductId
+  offer.name = catalog.name
+  offer.currentPriceCents = catalog.currentPriceCents - 1
+  offer.offer = {
+    label: 'synthetic unit comparison only', mechanics: null,
+    offerPriceCents: catalog.currentPriceCents - 1,
+    originalPriceCents: catalog.currentPriceCents,
+    validFrom: null, validTo: null,
+  }
+  offer.pack = { rawText: '1 l', amount: 1, unit: 'l' }
+  const baseline = review(batch)
+  assert.ok(baseline.corroboratedHistoricalBaselines >= 1)
+  offer.pack = { rawText: '1000 ml', amount: 1000, unit: 'ml' }
+  const report = review(batch)
+  assert.equal(report.corroboratedHistoricalBaselines,
+    baseline.corroboratedHistoricalBaselines,
+    'same liters, retailer, product and baseline cannot become incomparable')
+  assert.equal(report.incomparablePackages, baseline.incomparablePackages)
+  neverPublic(report)
+})
