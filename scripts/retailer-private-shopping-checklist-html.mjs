@@ -164,6 +164,7 @@ export async function main(argv = process.argv.slice(2)) {
   const input = savedMode ? core[1] : core[0]
   const output = savedMode ? core[3] : core[2]
   if ((!savedMode && !manifestMode) ||
+      (withStore && store === 'both') ||
       (store !== 'both' && store !== 'plus' && store !== 'dekamarkt') ||
       typeof input !== 'string' || !input || input.startsWith('-') ||
       typeof output !== 'string' || !output || output.startsWith('-') ||
