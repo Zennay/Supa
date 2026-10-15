@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from urllib.parse import quote, urlsplit
 
 HOSTS = {"plus": "www.plus.nl", "dekamarkt": "www.dekamarkt.nl"}
+PILOT_KINDS = {"product", "catalog", "offers"}
+REQUIRED_PILOT_SOURCE_KINDS = {(retailer, kind) for retailer in HOSTS for kind in PILOT_KINDS}
 UNITS = {"g", "kg", "ml", "l", "piece", "pack", "unknown"}
 STATES = {"available", "unavailable", "unknown"}
 KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$")
@@ -91,6 +93,32 @@ def read_reviewed_catalog(path):
                 refuse()
             if set(coverage) != set(HOSTS) or any(n < 1 for n in coverage.values()):
                 refuse()
+        # The reviewed M3 pilot is six independent retailer/kind sources.
+        # A missing offers/listing feed (or a declared feed with zero product
+        # observations) must not be silently counted as a complete catalog.
+        # These are local offline evidence checks; no public/price authority.
+        try:
+            snapshot_kinds = {
+                (retailer, kind): count
+                for retailer, kind, count in con.execute(
+                    "SELECT retailer_id, kind, COUNT(*) FROM source_snapshots "
+                    "GROUP BY retailer_id, kind")
+            }
+            observed_kinds = {
+                (retailer, kind): count
+                for retailer, kind, count in con.execute(
+                    "SELECT o.retailer_id, s.kind, COUNT(*) "
+                    "FROM price_observations o JOIN source_snapshots s "
+                    "ON s.id = o.snapshot_id AND s.retailer_id = o.retailer_id "
+                    "GROUP BY o.retailer_id, s.kind")
+            }
+        except sqlite3.Error:
+            refuse()
+        if (set(snapshot_kinds) != REQUIRED_PILOT_SOURCE_KINDS or
+                set(observed_kinds) != REQUIRED_PILOT_SOURCE_KINDS or
+                any(value < 1 for value in snapshot_kinds.values()) or
+                any(value < 1 for value in observed_kinds.values())):
+            refuse()
         sql = """
             SELECT p.retailer_id,p.source_product_id,p.display_name,
                    s.kind,s.source_url,s.captured_at,s.content_sha256,
