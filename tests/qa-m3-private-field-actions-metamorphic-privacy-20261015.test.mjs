@@ -13,6 +13,8 @@ import { buildM3OutstandingFieldActions } from '../scripts/m3-private-outstandin
 // collection COMPLETENESS may determine public operator-facing checklists.
 // Changing raw customer, product, prices, URLs, notes or timestamps *without*
 // changing availability/completeness or the coarse window must not leak.
+// Keep deterministic direct-API reference clock while the CLI uses Date.now().
+// Both variants' test observations must stay in the past in real CI runs.
 const NOW = Date.parse('2026-10-15T12:00:00Z')
 const CLI = fileURLToPath(new URL('../scripts/m3-private-outstanding-field-actions.mjs', import.meta.url))
 const secrets = [
@@ -36,8 +38,8 @@ function privateDraft(tag) {
   sheet.baseline.store.name = first ? 'PLUS PRIVATE_STORE_ALPHA' : 'PLUS PRIVATE_STORE_BETA'
   sheet.baseline.provenanceNote = first ? 'SECRET_URL_ALPHA' : 'SECRET_URL_BETA'
   sheet.candidate.store.name = first ? 'DekaMarkt PRIVATE_STORE_ALPHA' : 'DekaMarkt PRIVATE_STORE_BETA'
-  sheet.baseline.observedAt = first ? '2026-10-15T08:00:00Z' : '2026-10-15T09:00:00Z'
-  sheet.candidate.observedAt = first ? '2026-10-15T08:30:00Z' : '2026-10-15T09:30:00Z'
+  sheet.baseline.observedAt = first ? '2020-10-15T08:00:00Z' : '2020-10-15T09:00:00Z'
+  sheet.candidate.observedAt = first ? '2020-10-15T08:30:00Z' : '2020-10-15T09:30:00Z'
 
   const unavailable = sheet.baseline.lines[0].observedProduct
   unavailable.available = false
@@ -59,7 +61,7 @@ function rejectSecrets(value) {
   for (const secret of secrets) {
     assert.equal(value.includes(secret), false, 'operator output must not contain '+secret)
   }
-  assert.equal(/1357924|2468135|2026-10-15T0[89]:/.test(value), false)
+  assert.equal(/1357924|2468135|2020-10-15T0[89]:/.test(value), false)
 }
 
 test('M3 independent privacy metamorphism: different private evidence has identical JSON action report', () => {
@@ -108,4 +110,17 @@ test('M3 actions respond to real availability changes, rather than ignoring the 
   assert.equal(next.completedTotalLines, previous.completedTotalLines + 1)
   assert.equal(next.verifiedRetailerObservations, false)
   assert.equal(next.publicSavingsClaimEligible, false)
+})
+
+
+test('M3 metamorphic historical fixture timestamps stay ordered and predate the actual CLI clock', () => {
+  for (const variant of ['ALPHA', 'BETA']) {
+    const sheet = privateDraft(variant)
+    const baseline = Date.parse(sheet.baseline.observedAt)
+    const candidate = Date.parse(sheet.candidate.observedAt)
+    assert.equal(candidate - baseline, 30 * 60 * 1000)
+    assert.ok(Number.isFinite(baseline) && baseline < NOW)
+    assert.ok(Number.isFinite(candidate) && candidate < NOW)
+    assert.ok(candidate < Date.now(), 'the CLI tests use the real clock, unlike pure-API tests')
+  }
 })
