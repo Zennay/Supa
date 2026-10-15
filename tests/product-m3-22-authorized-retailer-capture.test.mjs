@@ -181,3 +181,30 @@ test('shared physical product URLs are fetched once rather than priced repeatedl
   assert.equal(transport.calls.length, 21)
   assert.equal(result.claimable, false)
 })
+
+
+test('operator template CLI creates exactly 22 private blank URL slots and never overwrites', async t => {
+  const { mkdtemp, rm, readFile, stat } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { spawnSync } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  const folder = await mkdtemp(join(tmpdir(), 'supa-m3-url-template-'))
+  t.after(() => rm(folder, { recursive: true, force: true }))
+  const filename = join(folder, 'private-22-product-plan.json')
+  const script = fileURLToPath(
+    new URL('../scripts/retailer-m3-authorized-22-capture.mjs', import.meta.url))
+  const args = ['--experimental-strip-types', script, '--template', filename]
+  const first = spawnSync(process.execPath, args, { encoding: 'utf8' })
+  assert.equal(first.status, 0, first.stderr)
+  const template = JSON.parse(await readFile(filename, 'utf8'))
+  assert.equal(template.products.length, 22)
+  assert.equal(template.products.filter(row => row.supermarket === 'plus').length, 11)
+  assert.equal(template.products.filter(row => row.supermarket === 'dekamarkt').length, 11)
+  assert.ok(template.products.every(row => row.url === '' && typeof row.query === 'string'))
+  assert.equal((await stat(filename)).mode & 0o077, 0)
+  const frozen = await readFile(filename)
+  const second = spawnSync(process.execPath, args, { encoding: 'utf8' })
+  assert.notEqual(second.status, 0, 'existing private plan must not be overwritten')
+  assert.deepEqual(await readFile(filename), frozen)
+})
