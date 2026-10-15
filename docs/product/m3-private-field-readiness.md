@@ -19,7 +19,7 @@ Controleer **onafhankelijk** de echte 40-tekens `main`-SHA van het gebruikte ond
 node --experimental-strip-types scripts/m3-private-field-readiness.mjs /private/m3-formulier.json --expect-main-sha ECHTE_40_HEX_MAIN_SHA
 ```
 
-Een SHA die alleen door de operator wordt ingevoerd, is **niet door deze tool tegen GitHub geauthenticeerd**. Vervang de placeholder door de gecontroleerde kleine hex SHA (exact 40 tekens). De tool weigert ontbrekende, nul-, ongeldige en niet-canonieke versies, en weigert een niet-regulier invoerbestand, symlink naar de finale bestandsnaam, hardlink, Linux-pipe, >4 MiB, malformed UTF-8 of dubbele (ook Unicode-geëscapete) JSON-veldnamen. Bovenliggende directory-symlinks en kwaadwillige gelijktijdige directorywissels vereisen aanvullende descriptor-gebaseerde maatregelen; behandel dit niet als algemene adversarial filesystem sandbox.
+Een SHA die alleen door de operator wordt ingevoerd, is **niet door deze tool tegen GitHub geauthenticeerd**. Vervang de placeholder door de gecontroleerde kleine hex SHA (exact 40 tekens). De tool weigert ontbrekende, nul-, ongeldige en niet-canonieke versies, en weigert een niet-regulier invoerbestand, symlink naar de finale bestandsnaam, hardlink, Linux-pipe, >4 MiB, malformed UTF-8 of dubbele (ook Unicode-geëscapete) JSON-veldnamen. Statisch gesymlinkte **bovenliggende directories** worden óók geweigerd. Voor kwaadwillige gelijktijdige directorywissels is nog steeds descriptor-relatieve `openat`-achtige bescherming nodig; behandel dit niet als een racevrije adversarial filesystem sandbox.
 
 ## Wat de uitkomst betekent
 
