@@ -10,6 +10,10 @@ function describe(row) {
   if (row.status === 'availability_unknown') return 'voorraad onbekend: geen betrouwbare aankoopprijs'
   if (!safe(row.packPriceCents) || !safe(row.totalCents) ||
       !Number.isSafeInteger(row.packs) || row.packs < 0) return 'prijs onbetrouwbaar'
+  // A formatter should not turn a forged or accidentally corrupted row
+  // into a believable price; the integer pack cost must equal the subtotal.
+  if (!safe(row.packs * row.packPriceCents) ||
+      row.totalCents !== row.packs * row.packPriceCents) return 'prijs onbetrouwbaar'
   if (row.packs === 0) return row.sharedPackWithIngredientId ?
     'onderdeel gedeeld pak (niet gratis)' : 'niet vergelijkbaar'
   return row.packs + ' × ' + money(row.packPriceCents) + ' = ' + money(row.totalCents)
@@ -54,8 +58,14 @@ export function renderPrivateComparison(report) {
   const d = c.stores.dekamarkt
   out.push('', 'Bekend subtotaal PLUS: ' + (safe(p.subtotalCents) ? money(p.subtotalCents) : 'onbekend'))
   out.push('Bekend subtotaal DekaMarkt: ' + (safe(d.subtotalCents) ? money(d.subtotalCents) : 'onbekend'))
+  const basketDifference = safe(p.subtotalCents) && safe(d.subtotalCents) ?
+    d.subtotalCents - p.subtotalCents : null
+  const safeBasket = basketDifference !== null && Number.isSafeInteger(basketDifference)
+  const computedWinner = !safeBasket ? null : basketDifference > 0 ? 'plus' :
+    basketDifference < 0 ? 'dekamarkt' : 'equal'
   if (c.comparable === true && p.complete === true && d.complete === true &&
-      safe(c.savingsCents) && ['plus', 'dekamarkt', 'equal'].includes(c.cheaperStore)) {
+      safeBasket && c.savingsCents === Math.abs(basketDifference) &&
+      c.cheaperStore === computedWinner) {
     const winner = c.cheaperStore === 'equal' ? 'gelijke prijs' :
       c.cheaperStore === 'plus' ? 'PLUS lager' : 'DekaMarkt lager'
     out.push('ALLEEN OFFLINE MANDVERSCHIL: ' + winner + ' ' + money(c.savingsCents))
