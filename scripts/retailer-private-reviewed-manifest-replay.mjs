@@ -46,6 +46,20 @@ async function securePath(p, maxBytes) {
     return bytes
   } finally { await handle.close() }
 }
+// Manifest SHA authenticity does not protect a world-traversable or
+// world-writable staging directory. The private manifest builder requires
+// owner-only root access, so replay must enforce the exact same boundary.
+async function privateReviewedRoot(root) {
+  let current = root
+  for (;;) {
+    const s = await lstat(current)
+    if (s.isSymbolicLink() ||
+        (current === root && (!s.isDirectory() || (s.mode & 0o077) !== 0))) fail()
+    const parent = dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+}
 function parseStrictJson(bytes) {
   try {
     // JSON.parse accepts duplicate names and silently keeps the last value.
@@ -120,11 +134,13 @@ export async function replayPrivateReviewedCaptureDirectory(directory, {
   if (typeof directory !== 'string' || !directory.trim() ||
       directory.startsWith('-') || directory.length > 500) fail()
   const root = resolve(directory)
+  await privateReviewedRoot(root)
   const manifestBytes = await securePath(join(root, 'manifest.json'), 65536)
   const manifest = parseStrictJson(manifestBytes)
   validManifest(manifest)
   const records = []
   for (const entry of manifest.sources) {
+    await privateReviewedRoot(root)
     const bytes = await securePath(join(root, entry.file), 1024 * 1024)
     if (createHash('sha256').update(bytes).digest('hex') !== entry.sha256) fail()
     const record = parseStrictJson(bytes)
