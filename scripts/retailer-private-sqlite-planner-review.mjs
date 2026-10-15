@@ -10,31 +10,18 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { pathToFileURL, fileURLToPath } from 'node:url'
-import { m2DefaultActiveDays, m2InitialPlan, m2Recipes } from '../src/data/m2Fixture.ts'
+import { m2Recipes } from '../src/data/m2Fixture.ts'
 import { buildDynamicReviewedWeek } from '../src/domain/reviewedCatalogPlannedWeek.ts'
 import { buildReviewedRetailerSqlite } from './retailer-build-reviewed-universal-sqlite.mjs'
 import { reviewedPlannerQueueSummary } from './retailer-reviewed-planner-queue.mjs'
+import { selectedFixtureWeek } from './retailer-reviewed-custom-week.mjs'
 
 const READER = fileURLToPath(new URL('./retailer-private-sqlite-planner-reader.py', import.meta.url))
 
-function parseDays(argv) {
-  if (!Array.isArray(argv) || (argv.length !== 0 && (
-    argv.length !== 2 || argv[0] !== '--days' ||
-    typeof argv[1] !== 'string' || !argv[1]
-  ))) throw new Error('Only a bounded set of planned day labels is accepted')
-  if (argv.length === 0) return [...m2DefaultActiveDays]
-  const days = argv[1].split(',')
-  const valid = new Set(m2DefaultActiveDays)
-  if (days.length < 1 || days.length > 7 ||
-      new Set(days).size !== days.length ||
-      days.some(d => !valid.has(d))) {
-    throw new Error('Only unique days of this canonical private fixture are permitted')
-  }
-  return days
-}
-
 export async function buildPersistedReviewedWeek(argv = []) {
-  const days = parseDays(argv)
+  // Share the same strict fixture-only recipe choices with the in-memory preview.
+  // Refuse unapproved input BEFORE allocating a private SQLite workspace.
+  const { days, plan } = selectedFixtureWeek(argv)
   const folder = await mkdtemp(join(tmpdir(), 'supa-private-retailer-review-'))
   try {
     const database = join(folder, 'catalog-private.db')
@@ -57,7 +44,7 @@ export async function buildPersistedReviewedWeek(argv = []) {
     try { catalog = JSON.parse(reader.stdout) }
     catch { throw new Error('Private reviewed catalog IPC is malformed') }
     const week = buildDynamicReviewedWeek({
-      catalog, plan: m2InitialPlan, recipes: m2Recipes, activeDays: days,
+      catalog, plan, recipes: m2Recipes, activeDays: days,
     })
     const summary = reviewedPlannerQueueSummary(week.preview)
     return {
