@@ -22,7 +22,7 @@ const NS_PER_HOUR = 3_600_000_000_000n
 // the same capture and should not cause a false evidence rejection.
 function instant(value, limit) {
   const fields = typeof value === 'string'
-    ? /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})(?::(\\d{2})(?:\\.(\\d{1,9}))?)?(Z|[+-]\\d{2}:\\d{2})$/.exec(value)
+    ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2})$/.exec(value)
     : null
   if (!fields) fail()
   const year = Number(fields[1])
