@@ -99,6 +99,22 @@ test('M3 sidecar CLI rejects missing file and directory with generic private-saf
   }
 })
 
+test('M3 sidecar CLI rejects a regular study file larger than 4 MiB without leaking details', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-qa-sidecar-oversize-'))
+  try {
+    const path = join(dir, 'oversize-' + SECRET + '.json')
+    await writeFile(path, Buffer.concat([fixture, Buffer.alloc(LIMIT + 1 - fixture.length, 0x20)]), { mode: 0o600 })
+    const run = invoke(path)
+    assert.equal(run.error, undefined, String(run.error))
+    assert.equal(run.status, 1, run.stderr)
+    assert.equal(run.stdout, '')
+    assert.equal(run.stderr.includes(path), false)
+    assert.equal(run.stderr.includes(SECRET), false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('M3 sidecar CLI refuses a named pipe promptly instead of hanging at open() [security acceptance]', async () => {
   if (process.platform !== 'linux') return
   const dir = await mkdtemp(join(tmpdir(), 'supa-qa-sidecar-fifo-'))
