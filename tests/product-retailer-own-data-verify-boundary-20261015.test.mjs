@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { RETAILER_REVIEWED_FIXTURES } from '../scripts/retailer-reviewed-ingest-engine.mjs'
 import {
   main,
   runPrivateRetailerPipeline,
@@ -101,4 +105,35 @@ test('product: inert own input reaches normal private source refusal without cla
   await assert.rejects(verifyPrivateRetailerPipeline(fakeDir, {
     [Symbol('private')]: 'ignored',
   }), refusal)
+})
+
+test('product: invalid explicit audit clocks are refused before publishing a private manifest', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-product-bad-clock-'))
+  try {
+    for (const [index, fixture] of RETAILER_REVIEWED_FIXTURES.entries()) {
+      const contents = await readFile(new URL('../fixtures/m1/' + fixture, import.meta.url))
+      await writeFile(join(directory, 'capture-' + index + '.json'), contents,
+        { mode: 0o600, flag: 'wx' })
+    }
+    const before = await readdir(directory)
+    for (const badClock of [undefined, null, 42, {}, [], 'tomorrow',
+      '2026-02-30T10:00:00Z', '2026-10-15T25:00:00Z',
+      '2026-10-15T10:00:00+14:30', '2026-10-15T10:00:00.1234567890Z']) {
+      await assert.rejects(
+        runPrivateRetailerPipeline(directory, { referenceTime: badClock }),
+        refusal,
+      )
+      assert.deepEqual(await readdir(directory), before,
+        'invalid clock cannot create an irreversible no-clobber manifest')
+    }
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test('product: valid UTC-offset and nanosecond audit clocks keep the private path gate', async () => {
+  for (const value of ['2026-10-15T10:00Z', '2026-10-15T12:00:00.000000001+02:00',
+    '2026-10-15T05:00:00.000000009-05:00']) {
+    await assert.rejects(verifyPrivateRetailerPipeline(fakeDir, {
+      referenceTime: value,
+    }), refusal)
+  }
 })
