@@ -58,11 +58,12 @@ function paperPage(side, items) {
     '<p>Prijscontext: ☐ in-store ☐ online-order (dezelfde bij beide winkels)</p>' +
     '<p>Bron: ☐ winkelmand ☐ bon ☐ toegestane export</p></div>' +
     '<table><thead><tr><th>Ingrediënt/behoefte</th><th>Gevonden product</th>' +
-    '<th>Verpakking (hoeveelheid + eenheid)</th><th>Aantal pakken</th>' +
-    '<th>Prijs per pak (€)</th><th>Beschikbaar?</th></tr></thead><tbody>' +
+    '<th>Inhoud per stuk (getal + eenheid)</th><th>Stuks per verkoopverpakking</th>' +
+    '<th>Prijs per verkoopverpakking (€)</th><th>Beschikbaar?</th></tr></thead><tbody>' +
     cells + '</tbody></table>' +
     '<p>Ja: product en prijs werkelijk gezien. Nee: gecontroleerd en niet verkrijgbaar. Onbekend: niet gecontroleerd.</p>' +
     '<p>Bij nee en onbekend geen product of prijs invullen.</p>' +
+    '<p>Per verkrijgbaar product: noteer de inhoud per los stuk (g/kg/ml/l/stuk), het aantal stuks IN één verkoopverpakking (1 bij enkelpak; meer alleen bij multipack), en de prijs van die hele verkoopverpakking. NIET het aantal te kopen pakken; SUPA berekent dat.</p>' +
     '<p>Herkomst / productlink / aanbieding / twijfel: __________________________________________________</p>' +
     '<p>___________________________________________________________________________________________</p>' +
     '<footer>Leeg invulblad; geen bewijs of besparingsclaim. Neem echte bevindingen over in SUPA Meten.</footer>' +
