@@ -287,3 +287,47 @@ test('private field kit refuses OTHER Git repositories, worktrees and uncreated 
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('revision provenance rejects getter swaps and inherited or extra metadata before producing kit', () => {
+  const fake = 'a'.repeat(40)
+  const altered = 'b'.repeat(40)
+  let reads = 0
+  const getterRevision = { branch: 'main' }
+  Object.defineProperty(getterRevision, 'sha', {
+    enumerable: true,
+    get() {
+      reads += 1
+      return reads <= 2 ? fake : altered
+    },
+  })
+  assert.throws(() => buildM3FieldKit(getterRevision), /exact clean main checkout/u)
+  assert.equal(reads, 0, 'unsafe revision getter must never run')
+  const inherited = Object.create({ branch: 'main' })
+  inherited.sha = fake
+  assert.throws(() => buildM3FieldKit(inherited), /exact clean main checkout/u)
+  assert.throws(() => buildM3FieldKit({ branch: 'main', sha: fake, extra: 'x' }),
+    /exact clean main checkout/u)
+  assert.throws(() => buildM3FieldKit({ branch: 'main', sha: fake, [Symbol('hidden')]: 7 }),
+    /exact clean main checkout/u)
+})
+
+test('revision Proxy get trap never changes pinned SHA between companion and human guide', () => {
+  const fake = 'c'.repeat(40)
+  let reads = 0
+  const revision = new Proxy({ branch: 'main', sha: fake }, {
+    get(target, key) {
+      reads += 1
+      if (key === 'sha') return 'd'.repeat(40)
+      return target[key]
+    },
+  })
+  const kit = buildM3FieldKit(revision)
+  assert.equal(reads, 0, 'strict data descriptor snapshot avoids dynamic get traps')
+  const sidecar = JSON.parse(kit['source-revision.json'])
+  assert.equal(sidecar.sourceCommitSha, fake)
+  assert.match(kit['START-HERE.txt'], new RegExp('Codeversie main: ' + fake))
+  assert.doesNotMatch(kit['START-HERE.txt'], /dddddddddddddddddddddddddddddddddddddddd/u)
+  assert.throws(() => buildM3FieldKit(new Proxy({ branch: 'main', sha: fake }, {
+    ownKeys() { throw new Error('PRIVATE-DRAFT-PATH-DO-NOT-ECHO') },
+  })), /exact clean main checkout/u)
+})
