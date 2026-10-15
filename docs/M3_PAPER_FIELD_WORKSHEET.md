@@ -8,7 +8,7 @@ Met de in het project gepinde Node-versie vanuit de repositoryroot:
 
     node --experimental-strip-types scripts/m3-print-field-checklist.mjs --output ./supa-m3-veldformulier.html
 
-Open het lokale HTML-bestand en druk af op A4 **liggend**. Het script overschrijft geen bestaand bestand en maakt een nieuw document met private 0600-bestandsrechten. Zonder outputargument schrijft het alleen het lege formulier naar stdout.
+Open het lokale HTML-bestand en druk af op A4 **liggend**. Het script overschrijft geen bestaand bestand en maakt een nieuw document met private 0600-bestandsrechten. Zowel bestaande symbolische links in bovenliggende mappen als symbolische links vóór een letterlijk `/../`-segment worden geweigerd. Dit is een statische padcontrole; bij gelijktijdige kwaadwillige mapvervanging is Node-padgebaseerde bestandstoegang geen volledige racevrije sandbox. Zonder outputargument schrijft het alleen het lege formulier naar stdout.
 
 ## Echte observatie uitvoeren
 
