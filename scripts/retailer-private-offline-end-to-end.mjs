@@ -14,6 +14,34 @@ import { replayPrivateReviewedCaptureDirectory } from './retailer-private-review
 const fail = () => { throw new Error('Private offline retailer pipeline refused') }
 
 /**
+ * Validate the explicit audit clock BEFORE one-shot manifest creation.
+ * This grammar matches the downstream historical adapter-health clock:
+ * optional seconds, nanosecond fractions, and bounded civil UTC offsets.
+ * An explicit undefined/invalid value must never become an implicit now.
+ */
+function validReferenceTime(value) {
+  if (typeof value !== 'string') return false
+  const parts = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})(?::(\\d{2})(?:\\.(\\d{1,9}))?)?(Z|[+-]\\d{2}:\\d{2})$/.exec(value)
+  if (!parts) return false
+  const year = Number(parts[1])
+  const month = Number(parts[2])
+  const day = Number(parts[3])
+  const calendar = new Date(Date.UTC(year, month - 1, day))
+  if (calendar.getUTCFullYear() !== year ||
+      calendar.getUTCMonth() !== month - 1 ||
+      calendar.getUTCDate() !== day ||
+      Number(parts[4]) > 23 || Number(parts[5]) > 59 ||
+      Number(parts[6] ?? 0) > 59) return false
+  const timezone = parts[8]
+  if (timezone !== 'Z') {
+    const [hours, minutes] = timezone.slice(1).split(':').map(Number)
+    if (hours > 14 || minutes > 59 ||
+        (hours === 14 && minutes !== 0)) return false
+  }
+  return Number.isFinite(Date.parse(value))
+}
+
+/**
  * Snapshot only inert own data from the exported operator API. Neither
  * prototype accessors, own getters, nor Proxy traps may run before source I/O.
  */
@@ -26,7 +54,8 @@ function ownReviewerOptions(options) {
   if (keys.some(key => key !== 'referenceTime')) fail()
   if (keys.length === 0) return {}
   const descriptor = Object.getOwnPropertyDescriptor(options, 'referenceTime')
-  if (!descriptor || !Object.hasOwn(descriptor, 'value')) fail()
+  if (!descriptor || !Object.hasOwn(descriptor, 'value') ||
+      !validReferenceTime(descriptor.value)) fail()
   return { referenceTime: descriptor.value }
 }
 
