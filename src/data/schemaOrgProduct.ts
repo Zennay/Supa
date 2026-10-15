@@ -78,18 +78,59 @@ function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
  *
  * Keep unknown prices null rather than creating a fictitious basket winner.
  */
-function extractPrice(offers: JsonObject[]): number | null {
+/**
+ * A Schema.org reference price is a checkout pack price only if the stated
+ * referenceQuantity equals the Product's physical package. For example 1000
+ * MLT on a 1000 ml carton is exact; 1 KGM or 500 MLT is not. Keep non-
+ * equivalent and untyped references unknown rather than scaling a rate.
+ */
+function samePhysicalReference(reference: unknown, pack: RawPack): boolean {
+  if (!isObject(reference) || pack.amount === null) return false
+  const unitCode = asString(reference.unitCode)?.toUpperCase()
+  const normalizedUnit: Record<string, RawPack['unit']> = {
+    GRM: 'g', KGM: 'kg', MLT: 'ml', LTR: 'l', C62: 'piece',
+  }
+  const unit = unitCode ? normalizedUnit[unitCode] : undefined
+  const value = asString(reference.value)
+  if (!unit || !value || !/^\\d+(?:[.,]\\d+)?$/.test(value)) return false
+  const parsed = Number(value.replace(',', '.'))
+  if (!Number.isFinite(parsed) || parsed <= 0) return false
+
+  const amount = (quantity: number, physicalUnit: RawPack['unit']) => {
+    if (physicalUnit === 'g' || physicalUnit === 'ml' || physicalUnit === 'piece') return quantity
+    if (physicalUnit === 'kg' || physicalUnit === 'l') return quantity * 1000
+    return null
+  }
+  const family = (physicalUnit: RawPack['unit']) =>
+    physicalUnit === 'g' || physicalUnit === 'kg' ? 'mass'
+      : physicalUnit === 'ml' || physicalUnit === 'l' ? 'volume'
+        : physicalUnit === 'piece' ? 'piece' : 'unknown'
+  const packAmount = amount(pack.amount, pack.unit)
+  const refAmount = amount(parsed, unit)
+  return family(pack.unit) !== 'unknown' && family(pack.unit) === family(unit) &&
+    packAmount !== null && refAmount !== null &&
+    Number.isSafeInteger(packAmount) && Number.isSafeInteger(refAmount) &&
+    packAmount === refAmount
+}
+
+function extractPrice(offers: JsonObject[], pack: RawPack): number | null {
   const prices = offers
     .flatMap((offer) => {
-      // A marketplace/retailer price range never proves a purchasable SKU.
+      // AggregateOffer, including its lowPrice, is a marketplace range.
       if (hasType(offer, 'AggregateOffer')) return []
 
       return [
         cents(offer.price),
         ...priceSpecificationCandidates(offer).map((specification) => {
-          if (hasType(specification, 'UnitPriceSpecification') ||
-              specification.referenceQuantity !== undefined) return null
-          // LowPrice is a bound, not an exact checkout price.
+          const hasReference = specification.referenceQuantity !== undefined
+          const isReference = hasType(specification, 'UnitPriceSpecification')
+          if (isReference || hasReference) {
+            if (!isReference ||
+                !samePhysicalReference(specification.referenceQuantity, pack)) {
+              return null
+            }
+          }
+          // Never promote an advertised price range to a fixed checkout price.
           return cents(specification.price)
         }),
       ]
@@ -230,7 +271,8 @@ export function parseSchemaOrgProduct(
     }
   }
 
-  const price = extractPrice(offers)
+  const pack = extractPack(product)
+  const price = extractPrice(offers, pack)
   if (price !== null && currency === null) {
     return {
       type: 'abstain',
@@ -244,7 +286,7 @@ export function parseSchemaOrgProduct(
     name,
     currentPriceCents: price,
     currency: 'EUR',
-    pack: extractPack(product),
+    pack,
     offer: buildOffer(offers, price),
     availability: extractAvailability(offers),
     provenance,
