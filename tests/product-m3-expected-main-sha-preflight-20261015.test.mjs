@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 import { createPrivateM3StudyCodePin } from '../scripts/m3-field-code-pin.mjs'
-import { preflightPrivateM3Week } from '../scripts/m3-verify-private-week-preflight.mjs'
+import { preflightPrivateM3Week, assertUnambiguousM3StudyJson } from '../scripts/m3-verify-private-week-preflight.mjs'
 
 const MAIN = 'abcdef1234567890abcdef1234567890abcdef12'
 const WRONG = '1234567890abcdef1234567890abcdef12345678'
@@ -115,5 +115,24 @@ test('M3 CLI explicit main SHA policy succeeds privately, rejects wrong SHA and 
     assert.equal(JSON.parse(unpinned.stdout).codeRevisionVerified, false)
   } finally {
     await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('private M3 parser bounds number of scalar JSON values without rejecting valid many-value input', () => {
+  // 99,999 entries plus the root array reach the documented 100k budget.
+  const withinBudget = '[' + Array(99999).fill('0').join(',') + ']'
+  assert.doesNotThrow(() => assertUnambiguousM3StudyJson(withinBudget))
+  const overBudget = '[' + Array(100000).fill('0').join(',') + ']'
+  assert.throws(() => assertUnambiguousM3StudyJson(overBudget), /preflight refused/)
+})
+
+test('bounded sticky primitive scanner preserves exact JSON numeric and literal grammar', () => {
+  const valid = '[true,false,null,0,-0,12,-34.50,1e3,2E-4,6.022e+23,{"nested":[0,1]}]'
+  assert.doesNotThrow(() => assertUnambiguousM3StudyJson(valid))
+  for (const malformed of [
+    '[truefalse]', '[nul]', '[01]', '[1e]', '[2E+]', '[.5]', '[1.]',
+    '[NaN]', '[Infinity]', '[falsee]', '[true,]', '[--1]', '[1 2]',
+  ]) {
+    assert.throws(() => assertUnambiguousM3StudyJson(malformed), /preflight refused/)
   }
 })
