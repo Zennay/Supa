@@ -75,7 +75,7 @@ export function parseStrictPrivateM3Manifest(raw) {
     let closed = false
     while (offset < raw.length) {
       const char = raw[offset++]
-      if (char === '\\\\') {
+      if (char === '\\') {
         if (offset >= raw.length) fail()
         offset += 1
       } else if (char === '"') {
