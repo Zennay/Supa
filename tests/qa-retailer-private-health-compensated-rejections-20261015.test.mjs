@@ -34,10 +34,10 @@ function compensatedReviewPair(source, deteriorates, recovers) {
   before.acceptedSources += 2
   before.rejectedSources += 2
   before.sixShapeCoverageComplete = false
-  before.operatorActions.splice(
-    before.operatorActions.indexOf('obtain-written-retailer-source-rights'),
-    0, 'review-rejected-adapter-inputs',
-  )
+  // Canonical assessor action order: rejected source quality precedes
+  // freshness, conflict and unknown-price diagnostics.
+  assert.ok(!before.missingSourceKinds.length)
+  before.operatorActions.unshift('review-rejected-adapter-inputs')
   const after = clone(before)
   after.byShape[deteriorates].accepted--
   after.byShape[deteriorates].rejected++
