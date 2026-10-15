@@ -164,12 +164,19 @@ export function renderPrivateTextShoppingChecklist(report, store = 'both') {
     throw new Error('Invalid private checklist shop selection')
   }
   const plain = renderPrivateShoppingChecklists(report)
-  const plusStart = plain.indexOf('== PLUS ==')
-  const dekaStart = plain.indexOf('== DekaMarkt ==')
-  const footerStart = plain.lastIndexOf('Geen winkeladvies:')
-  if (plusStart < 0 || dekaStart <= plusStart || footerStart <= dekaStart) {
+  // Never split on a bare heading fragment: untrusted product labels may
+  // contain e.g. "== DekaMarkt ==" in the middle of an ingredient row.
+  // Headers and footer are generated on dedicated physical lines.
+  const plusHeader = plain.indexOf('\n== PLUS ==\n')
+  const dekaHeader = plain.indexOf('\n== DekaMarkt ==\n')
+  const footerHeader = plain.lastIndexOf('\nGeen winkeladvies:')
+  if (plusHeader < 0 || dekaHeader <= plusHeader ||
+      footerHeader <= dekaHeader) {
     throw new Error('Invalid private checklist presentation')
   }
+  const plusStart = plusHeader + 1
+  const dekaStart = dekaHeader + 1
+  const footerStart = footerHeader + 1
   const preamble = plain.slice(0, plusStart)
   const bothShops = plain.slice(plusStart, footerStart)
   const plusOnly = plain.slice(plusStart, dekaStart)
