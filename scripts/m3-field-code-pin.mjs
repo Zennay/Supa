@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
-import { open, constants } from 'node:fs/promises'
+import { open, lstat, constants } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { dirname, join, resolve, parse } from 'node:path'
 
 const MAX_STUDY_BYTES = 4 * 1024 * 1024
 const COMMIT_SHA = /^[0-9a-f]{40}$/
@@ -98,12 +99,34 @@ async function readBoundedPrivateStudy(path) {
   }
 }
 
+async function assertPrivateNewOutput(destination) {
+  if (typeof destination !== 'string' || !destination || destination.trim() !== destination ||
+      destination.startsWith('-') || destination.includes('\u0000')) fail()
+  const target = resolve(destination)
+  let parent = dirname(target)
+  while (true) {
+    const metadata = await lstat(parent)
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) fail()
+    try {
+      await lstat(join(parent, '.git'))
+      fail() // Refuse private evidence below any Git checkout or worktree.
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Invalid private M3 study code-pin input') throw error
+      if (!error || error.code !== 'ENOENT') fail()
+    }
+    if (parent === parse(parent).root) return target
+    parent = dirname(parent)
+  }
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const verifyMode = argv[0] === '--verify'
+  const outputMode = !verifyMode && argv.length === 4 && argv[2] === '--output'
   if ((verifyMode && argv.length !== 3) ||
-      (!verifyMode && (argv.length !== 2 || argv[0].startsWith('-'))) ||
-      argv.some((arg, index) => index > 0 && arg.startsWith('--'))) {
-    throw new Error('usage: m3-field-code-pin <private-study.json> <40-char-main-sha> OR --verify <private-study.json> <private-manifest.json>')
+      (!verifyMode && !outputMode && argv.length !== 2) ||
+      (!verifyMode && argv[0]?.startsWith('-')) ||
+      argv.some((arg, index) => index > 0 && arg.startsWith('--') && !(outputMode && index === 2))) {
+    throw new Error('usage: m3-field-code-pin <study.json> <40-char-main-sha> [--output <new-private-pin.json>] OR --verify <study.json> <private-pin.json>')
   }
   let bytes
   try {
@@ -135,6 +158,23 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   const manifest = createPrivateM3StudyCodePin(bytes, argv[1])
+  if (outputMode) {
+    try {
+      const outputPath = await assertPrivateNewOutput(argv[3])
+      const handle = await open(outputPath,
+        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+        0o600)
+      try {
+        await handle.writeFile(JSON.stringify(manifest, null, 2) + '\n')
+      } finally {
+        await handle.close()
+      }
+    } catch {
+      throw new Error('Private M3 code-pin destination refused or unavailable')
+    }
+    process.stdout.write('Private M3 code pin saved as a new private file\n')
+    return manifest
+  }
   process.stdout.write(JSON.stringify(manifest, null, 2) + '\n')
   return manifest
 }
