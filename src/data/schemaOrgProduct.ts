@@ -92,7 +92,7 @@ function samePhysicalReference(reference: unknown, pack: RawPack): boolean {
   }
   const unit = unitCode ? normalizedUnit[unitCode] : undefined
   const value = asString(reference.value)
-  if (!unit || !value || !/^\\d+(?:[.,]\\d+)?$/.test(value)) return false
+  if (!unit || !value || !/^[0-9]+(?:[.,][0-9]+)?$/.test(value)) return false
   const parsed = Number(value.replace(',', '.'))
   if (!Number.isFinite(parsed) || parsed <= 0) return false
 
