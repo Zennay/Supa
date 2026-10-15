@@ -211,3 +211,21 @@ test('M3 private CLI also rejects symlinked ancestor directories, not just final
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('M3 technically complete preview must not normalize away a forged original 24-hour contract', () => {
+  const tampered = syntheticFullSheet()
+  tampered.study.maxObservationWindowHours = 120
+  // Draft normalization can reset this to 24, but original converter MUST
+  // reject the actual user-provided source, even when all 22 rows look done.
+  assert.throws(
+    () => reviewPrivateM3FieldSheet(bytes(tampered), SHA),
+    (error) => error.message === 'Private M3 field readiness refused',
+  )
+  const malformed = syntheticFullSheet()
+  malformed.study.maxObservationWindowHours = null
+  assert.throws(() => reviewPrivateM3FieldSheet(bytes(malformed), SHA), /readiness refused/)
+  assert.equal(
+    reviewPrivateM3FieldSheet(bytes(syntheticFullSheet()), SHA).technicalStudyConversionPossible,
+    true,
+  )
+})
