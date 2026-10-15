@@ -15,6 +15,8 @@ const required = [
   'tests/qa-m3-paper-output-no-directory-side-effects-20261015.test.mjs',
   'tests/product-m3-paper-multipack-clarity-20261015.test.mjs',
   'tests/qa-m3-paper-multipack-pricing-contract-20261015.test.mjs',
+  'tests/product-m3-paper-required-metadata-20261015.test.mjs',
+  'tests/qa-m3-paper-required-metadata-readiness-20261015.test.mjs',
 ]
 function paths(workflow) {
   const block = /^  pull_request:\s*\n    paths:\s*\n((?:      - .*\n)+)/m.exec(workflow)
@@ -34,11 +36,11 @@ function missing(selectors, files) {
   return files.filter(file => !selectors.some(pattern => globMatches(pattern, file)))
 }
 
-test('newly merged M3 paper, multipack source and original QA paths must trigger the permanent trusted VPS', () => {
+test('current M3 paper, multipack, required metadata and independent QA paths must trigger the permanent trusted VPS', () => {
   const workflow = readFileSync(workflowPath, 'utf8')
   const absent = missing(paths(workflow), required)
   assert.deepEqual(absent, [],
-    'the permanent M3 PR gate misses paper, multipack or QA paths on current merged main')
+    'the permanent M3 PR gate misses paper, required metadata or QA paths on current merged main')
 })
 
 test('M3 permanent VPS path correction must preserve same-repo/main/private execution guards', () => {
