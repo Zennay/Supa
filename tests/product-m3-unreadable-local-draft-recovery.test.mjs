@@ -90,11 +90,12 @@ test('unsupported M3 local drafts cannot be autosaved, imported over, or reset w
   assert.match(src,
     /const \[draftRecoveryNeeded, setDraftRecoveryNeeded\] = useState<boolean>\(\(\) => \{[\s\S]*?restoreObservationSheetDraft\(saved\) === null/)
   assert.match(src,
-    /useEffect\(\(\) => \{\s*if \(draftRecoveryNeeded\) \{\s*setDraftPersistenceFailed\(true\)\s*return\s*\}[\s\S]*?!persistObservationDraft\(/)
+    /useEffect\(\(\) => \{\s*if \(draftRecoveryNeeded\) \{\s*setDraftPersistenceFailed\(true\)\s*return\s*\}[\s\S]*?observationDraftStorageStatus\([\s\S]*?!persistObservationDraft\(/)
   assert.match(src, /\}, \[sheet, draftRecoveryNeeded\]\)/)
   assert.match(src, /if \(draftRecoveryNeeded\) \{[\s\S]*?Import is gepauzeerd/)
   assert.match(src, /type="file"\s*disabled=\{draftRecoveryNeeded\}/)
-  assert.match(src, /onClick=\{clearDraft\}\s*disabled=\{draftRecoveryNeeded\}/)
+  assert.match(src, /onClick=\{clearDraftWithConflictGuard\}\s*disabled=\{draftRecoveryNeeded\}/)
+  assert.match(src, /const clearDraftWithConflictGuard = \(\) => \{[\s\S]*?observationDraftStorageStatus\([\s\S]*?if \(draftConflict \|\| status !== 'unchanged'\)[\s\S]*?return[\s\S]*?clearDraft\(\)/)
   assert.match(src, /data-observation-recovery-warning/)
   assert.match(src, /role="alert"/)
   assert.match(src, /const downloadUnrecognizedDraft = \(\) => \{/)
