@@ -114,7 +114,7 @@ export function proposeRetailerSelectors(source, html) {
   const jsonLdTypes = new Set()
   const jsonLdKeys = new Set()
   let invalidJsonLdCount = 0
-  const activeHtml = html.replace(/<!--[\\s\S]*?-->/g, '')
+  const activeHtml = html.replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<(?:template|noscript|textarea)\b[^>]*>[\s\S]*?<\/(?:template|noscript|textarea)\s*>/gi, '')
     .replace(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi, (_, attrs, script) => {
       const type = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs)
