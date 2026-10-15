@@ -1,0 +1,132 @@
+import type { SourceSnapshotRef } from './ingestion.ts'
+import {
+  parseSchemaOrgProduct,
+  type SchemaOrgParseResult,
+} from './schemaOrgProduct.ts'
+
+/**
+ * A conservative offline selector for an authorized, already-captured product
+ * page which embeds a Schema.org graph with several Product nodes.
+ *
+ * This module never downloads a page, guesses a product by label/price, or
+ * authorizes retailer ingestion. A multi-Product page must establish ONE exact
+ * product URL matching its recorded source URL, and ALL other product nodes
+ * must declare distinct URLs. Otherwise we refuse instead of selecting an
+ * arbitrary recommendation from the page.
+ */
+function refuses(reason: string): SchemaOrgParseResult {
+  return { type: 'abstain', reason }
+}
+
+type DataObject = Record<string, unknown>
+
+function readData(object: object, key: string): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(object, key)
+  if (!descriptor) return undefined
+  if (!('value' in descriptor)) throw new Error('accessor in JSON-LD')
+  return descriptor.value
+}
+
+function isProductType(raw: unknown): boolean {
+  const values = Array.isArray(raw) ? raw : [raw]
+  return values.some(
+    (value) => typeof value === 'string' && value.toLowerCase() === 'product',
+  )
+}
+
+function productNodes(jsonLd: unknown): DataObject[] {
+  const seen = new WeakSet<object>()
+  const result: DataObject[] = []
+  let visited = 0
+  function inspect(value: unknown, depth: number) {
+    if (value === null || typeof value !== 'object') return
+    if (++visited > 256 || depth > 8 || seen.has(value)) {
+      throw new Error('ambiguous or excessive JSON-LD graph')
+    }
+    seen.add(value)
+    if (Array.isArray(value)) {
+      if (value.length > 128) throw new Error('JSON-LD array too long')
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.hasOwn(value, index)) {
+          throw new Error('sparse JSON-LD array')
+        }
+        inspect(readData(value, String(index)), depth + 1)
+      }
+      return
+    }
+    const record = value as DataObject
+    if (isProductType(readData(record, '@type'))) {
+      result.push(record)
+      if (result.length > 32) throw new Error('too many Product nodes')
+    }
+    const graph = readData(record, '@graph')
+    if (graph !== undefined) {
+      if (!Array.isArray(graph)) throw new Error('invalid @graph')
+      inspect(graph, depth + 1)
+    }
+  }
+  inspect(jsonLd, 0)
+  return result
+}
+
+function normalizedHttpsUrl(input: unknown): string | null {
+  if (typeof input !== 'string' || input.length > 2048 || !input.trim()) {
+    return null
+  }
+  try {
+    const url = new URL(input)
+    if (url.protocol !== 'https:' || url.username || url.password ||
+        url.hash || url.href !== input) {
+      return null
+    }
+    return url.href
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Selection is deliberately tied to a source-verified page URL, not a fuzzy
+ * text match. The existing Schema.org parser remains the ONLY price, stock,
+ * currency, pack and source-provenance authority after selection.
+ *
+ * Missing/mismatched/duplicated URLs never silently fall back to the first
+ * node. Even a single Product with an explicitly contradictory URL abstains.
+ */
+export function parseSchemaOrgProductForPage(
+  jsonLd: unknown,
+  provenance: SourceSnapshotRef,
+): SchemaOrgParseResult {
+  try {
+    const products = productNodes(jsonLd)
+    if (products.length === 0) return refuses('no Product JSON-LD node')
+
+    const sourceUrl = normalizedHttpsUrl(provenance?.url)
+    if (!sourceUrl) return refuses('invalid captured product-page URL')
+
+    if (products.length === 1) {
+      const declared = readData(products[0], 'url')
+      if (declared !== undefined &&
+          normalizedHttpsUrl(declared) !== sourceUrl) {
+        return refuses('Product URL disagrees with captured page')
+      }
+      return parseSchemaOrgProduct(products[0], provenance)
+    }
+
+    const urls = products.map((product) =>
+      normalizedHttpsUrl(readData(product, 'url')))
+    if (urls.some((url) => url === null) ||
+        new Set(urls).size !== products.length) {
+      return refuses('multiple Product nodes lack distinct trusted URLs')
+    }
+    const matching = products.filter((_, index) => urls[index] === sourceUrl)
+    if (matching.length !== 1) {
+      return refuses('no unambiguous Product URL matches captured page')
+    }
+    return parseSchemaOrgProduct(matching[0], provenance)
+  } catch {
+    // Includes revoked Proxy/hostile getter/cyclic or oversized graph inputs;
+    // never echo retailer/customer-controlled content into an operator error.
+    return refuses('unsafe or malformed Product JSON-LD graph')
+  }
+}
