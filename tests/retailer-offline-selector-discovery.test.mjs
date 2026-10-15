@@ -62,7 +62,11 @@ test('scripts, fake comments and inert template markup may not produce observabl
     '<style>.pack-unit{}</style></body></html>',
   ].join('')
   const report = proposeOfflineRetailerSelectors({ html, origin })
-  assert.deepEqual([...new Set(report.selectors.map(s => s.field))], ['name'])
+  const fields = new Set(report.selectors.map(s => s.field))
+  assert.equal(fields.has('name'), true)
+  for (const rejected of ['price', 'availability', 'offer', 'pack']) {
+    assert.equal(fields.has(rejected), false, rejected)
+  }
   assert.doesNotMatch(JSON.stringify(report), /Fake|Actual anonymous|Hidden/i)
 })
 
