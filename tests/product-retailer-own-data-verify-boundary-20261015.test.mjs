@@ -129,6 +129,8 @@ test('product: invalid explicit audit clocks are refused before publishing a pri
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+// Deliberately place the audit clock after the synthetic historical captures;
+// replay semantics reject captures from the future, correctly and by design.
 test('product: valid UTC-offset and nanosecond clocks replay a real six-source private manifest', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'supa-product-valid-clock-'))
   try {
@@ -138,13 +140,13 @@ test('product: valid UTC-offset and nanosecond clocks replay a real six-source p
         { mode: 0o600, flag: 'wx' })
     }
     const created = await runPrivateRetailerPipeline(directory, {
-      referenceTime: '2026-10-15T12:00:00.000000001+02:00',
+      referenceTime: '2030-01-01T12:00:00.000000001+02:00',
     })
     assert.equal(created.manifestCreated, true)
     const originalManifest = await readFile(join(directory, 'manifest.json'))
-    for (const time of ['2026-10-15T10:00Z',
-      '2026-10-15T12:00:00.000000001+02:00',
-      '2026-10-15T05:00:00.000000009-05:00']) {
+    for (const time of ['2030-01-01T10:00Z',
+      '2030-01-01T12:00:00.000000001+02:00',
+      '2030-01-01T05:00:00.000000009-05:00']) {
       const verified = await verifyPrivateRetailerPipeline(directory, {
         referenceTime: time,
       })
