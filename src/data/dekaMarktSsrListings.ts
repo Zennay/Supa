@@ -131,7 +131,10 @@ function validCapturedAt(value: unknown): value is string {
       .slice(1)
       .split(':')
       .map(Number)
-    if (offsetHour > 23 || offsetMinute > 59) return false
+    // Civil UTC offsets are bounded by ±14:00; 14:01–23:59
+    // may parse in permissive JS engines but cannot prove capture time.
+    if (offsetHour > 14 || offsetMinute > 59 ||
+        (offsetHour === 14 && offsetMinute !== 0)) return false
   }
 
   return Number.isFinite(Date.parse(value))
