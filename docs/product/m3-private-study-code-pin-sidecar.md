@@ -11,6 +11,14 @@ umask 077
 node scripts/m3-field-code-pin.mjs /private/study.json "PASTE_40_HEX_MAIN_SHA_HERE" > /private/study-code-pin.json
 ```
 
+De gecontroleerde herstelcheck kan later op dezelfde privépaden draaien:
+
+```bash
+node scripts/m3-field-code-pin.mjs --verify /private/study.json /private/study-code-pin.json
+```
+
+Bij exact ongewijzigde studiebytes en een onvervalste sidecar toont hij alleen `privateStudyBytesMatch:true` en de drie blijvend false-vlaggen. Bij gewijzigde bytes, ongeldige sidecar of ontbrekend bestand is de uitvoer geen succes en blijven private paden en inhoud buiten de foutmelding. Dit verifieert alleen de **bytebinding**, niet de waarheid van de meting of de werkelijke Git-revisie.
+
 Het hulpmiddel leest alleen een regulier lokaal JSON-bestand, maximaal 4 MiB, zonder symlink of hardlink. Het maakt een **byte-exacte SHA-256** van het volledige bestand en toont uitsluitend manifestvelden. Persoons-/prijsregels worden niet naar stdout geschreven. De sidecar is uitsluitend een controle van de hash-binding; wijzigingen in het originele JSON na generatie maken de verificatie ongeldig. Bewaar beide bestanden privé, versleuteld/afgeschermd en buiten versiebeheer. Het hulpmiddel schrijft zelf niets naar schijf.
 
 `sourceCommitSha` is **door de operator opgegeven, niet door de tool tegen GitHub geverifieerd**. De drie vlaggen `codeRevisionVerified`, `retailerPermissionVerified` en `publicSavingsClaimEligible` blijven daarom expliciet **false**; zet ze nooit handmatig op true. Een digest is geen bewijs dat winkelobservaties echt, bevoegd of binnen 24 uur zijn verzameld.
