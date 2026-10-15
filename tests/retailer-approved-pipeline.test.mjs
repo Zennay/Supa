@@ -67,7 +67,8 @@ test('pipeline is disabled by default and cannot make any request with blocked r
   denied.sources[0].permissionStatus='permission_required'
   denied.sources[0].productionEnabled=false
   await assert.rejects(runApprovedRetailerComparison({
-    requirements:[],permissionDocument:denied,enableLive:true,
+    requirements:[{id:'milk',query:'halfvolle melk',amount:1000,unit:'ml'}],
+    permissionDocument:denied,enableLive:true,
     fetchImpl:transport,nowMs:now,
   }),/permission/)
   assert.equal(calls,0)

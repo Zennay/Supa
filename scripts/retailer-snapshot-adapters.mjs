@@ -5,6 +5,22 @@ import { validateSources } from './m1-capture-sources.mjs'
 const MAX_BYTES = 2 * 1024 * 1024
 const MAX_SCRIPTS = 100
 
+/** Interpret only genuine Script[type] attributes, not data-type/quoted text. */
+function isJsonLdScript(attrs) {
+  let rest = attrs
+  let type = null
+  while (rest.trim()) {
+    const attribute = /^\s+([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/.exec(rest)
+    if (!attribute) return false
+    if (attribute[1].toLowerCase() === 'type') {
+      if (type !== null) return false // duplicate type is ambiguous
+      type = attribute[2] ?? attribute[3] ?? attribute[4] ?? ''
+    }
+    rest = rest.slice(attribute[0].length)
+  }
+  return type?.trim().toLowerCase() === 'application/ld+json'
+}
+
 /**
  * Offline-only JSON-LD ingestion from a user-supplied / previously authorized
  * HTML snapshot. SSR Nuxt and rendered PLUS listing evidence continue to use
@@ -24,9 +40,10 @@ export function parseOfflineRetailerSnapshot({ source, html, capturedAt }) {
   const observations = []
   const failures = []
   let count = 0
-  for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
-    const attrs = match[1]
-    if (!/\btype\s*=\s*["']application\/ld\+json["']/i.test(attrs)) continue
+  // HTML comments are not active DOM scripts. Never accept their prices.
+  const activeHtml = html.replace(/<!--[\s\S]*?-->/g, '')
+  for (const match of activeHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
+    if (!isJsonLdScript(match[1])) continue
     count += 1
     if (count > MAX_SCRIPTS) throw new Error('Too many JSON-LD scripts')
     if (Buffer.byteLength(match[2], 'utf8') > 256 * 1024) {

@@ -88,12 +88,48 @@ export function compareReviewedCatalogs({
       continue
     }
     const time = Date.parse(raw.provenance.capturedAt)
-    if (!Number.isFinite(time) || time > nowMs ||
+    // Date.parse truncates >3 fractional-second digits. A timestamp with a
+    // positive nanosecond remainder at nowMs is strictly in the future.
+    const subMs = /[.][0-9]{3}([0-9]+)(?:Z|[+-][0-9]{2}:[0-9]{2})$/i.exec(
+      raw.provenance.capturedAt,
+    )
+    const strictlyFuture = time > nowMs ||
+      (time === nowMs && subMs !== null && /[1-9]/.test(subMs[1]))
+    if (!Number.isFinite(time) || strictlyFuture ||
         nowMs - time > DAY) {
       sourceTrusted = false
       continue
     }
+    // An Offer may advertise a future or expired price. Its snapshot time
+    // being recent is not proof that this exact checkout price is valid now.
+    // Invalid or contradictory dates also withhold the entire basket winner.
+    if (raw.offer) {
+      const { validFrom, validTo } = raw.offer
+      const parseBound = (value: string, isEnd: boolean) =>
+        // Schema.org date-only priceValidUntil is inclusive through the UTC day.
+        Date.parse(isEnd && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)
+          ? value + 'T23:59:59.999Z' : value)
+      const from = validFrom === null ? null : parseBound(validFrom, false)
+      const to = validTo === null ? null : parseBound(validTo, true)
+      if ((from !== null && (!Number.isFinite(from) || from > nowMs)) ||
+          (to !== null && (!Number.isFinite(to) || to < nowMs)) ||
+          (from !== null && to !== null && from > to)) {
+        sourceTrusted = false
+        continue
+      }
+    }
     observedTimes.push(time)
+
+    // Inventory contradictions matter even when one copy says "unavailable".
+    // Deduplicate identities before the price/stock usability filter.
+    if (typeof raw.sourceProductId === 'string' && raw.sourceProductId.trim()) {
+      const productKey = raw.supermarket + ':' + raw.sourceProductId
+      if (seenProducts.has(productKey)) {
+        sourceTrusted = false
+        continue
+      }
+      seenProducts.add(productKey)
+    }
 
     if (raw.availability === 'unavailable' ||
         !Number.isSafeInteger(raw.currentPriceCents) ||
@@ -101,13 +137,27 @@ export function compareReviewedCatalogs({
         typeof raw.sourceProductId !== 'string' || !raw.sourceProductId.trim()) {
       continue
     }
-    const productKey = raw.supermarket + ':' + raw.sourceProductId
-    if (seenProducts.has(productKey)) {
-      sourceTrusted = false
-      continue
-    }
-    seenProducts.add(productKey)
     const parsed = normalizePackText(raw.pack.rawText)
+    if (raw.pack.amount !== null && raw.pack.unit !== 'unknown' &&
+        parsed.amount !== null && parsed.unit !== 'unknown') {
+      // Numeric source quantities and recognizable label quantities must
+      // describe the same physical unit, not contradictory package sizes.
+      const physical = (amount: number, unit: string): [string, number] => {
+        if (unit === 'kg' || unit === 'g') {
+          return ['mass', amount * (unit === 'kg' ? 1000 : 1)]
+        }
+        if (unit === 'l' || unit === 'ml') {
+          return ['volume', amount * (unit === 'l' ? 1000 : 1)]
+        }
+        return [unit, amount]
+      }
+      const declared = physical(raw.pack.amount, raw.pack.unit)
+      const label = physical(parsed.amount, parsed.unit)
+      if (declared[0] !== label[0] || declared[1] !== label[1]) {
+        sourceTrusted = false
+        continue
+      }
+    }
     const packAmount = raw.pack.amount ?? parsed.amount
     const packUnit = raw.pack.unit === 'unknown' ? parsed.unit : raw.pack.unit
     const packCount = parsed.count
@@ -178,6 +228,30 @@ export function compareReviewedCatalogs({
         ? dekamarkt.totalCents - plus.totalCents : null,
     }
   })
+
+  // Two distinct ingredient lines can select the same *physical* SKU.
+  // Rounding each demand independently would charge that one package twice.
+  // Until a shared-pack allocation can be displayed transparently, withhold
+  // those line costs and the entire winner rather than inventing savings.
+  for (const shop of SHOPS) {
+    const seenLineProducts = new Set<string>()
+    const sharedLineProducts = new Set<string>()
+    for (const line of lines) {
+      if (line[shop].status !== 'matched' || !line[shop].productId) continue
+      const id = line[shop].productId
+      if (seenLineProducts.has(id)) sharedLineProducts.add(id)
+      seenLineProducts.add(id)
+    }
+    if (sharedLineProducts.size > 0) {
+      sourceTrusted = false
+      for (const line of lines) {
+        if (line[shop].productId && sharedLineProducts.has(line[shop].productId)) {
+          line[shop] = unknown()
+          line.differenceCents = null
+        }
+      }
+    }
+  }
 
   const storeSummaries = Object.fromEntries(SHOPS.map((shop) => {
     const complete = sourceTrusted && lines.every((line) => line[shop].status === 'matched')

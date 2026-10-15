@@ -68,16 +68,28 @@ export async function fetchAuthorizedRetailerHtml({
   const reader = response.body.getReader()
   const parts = []
   let bytes = 0
+  let completed = false
   try {
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        completed = true
+        break
+      }
       if (!(value instanceof Uint8Array)) throw new Error('Invalid HTML bytes')
       bytes += value.byteLength
       if (bytes > maxBytes) throw new Error('Authorized response exceeds byte limit')
       parts.push(value)
     }
   } finally {
+    // Releasing a reader lock does NOT cancel the underlying HTTP download.
+    // Explicitly stop a failed/oversized response before releasing the lock.
+    if (!completed) {
+      try { await reader.cancel('retailer response rejected') } catch {
+        // Preserve the original rejection instead of masking it with a
+        // secondary cancellation/closed-stream failure.
+      }
+    }
     reader.releaseLock()
   }
   const html = Buffer.concat(parts).toString('utf8')
