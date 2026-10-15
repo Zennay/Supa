@@ -66,6 +66,55 @@ function physicalProductFacts(observation) {
   })
 }
 
+/**
+ * SHA-256 covers the whole raw retailer page, not only products whose IDs
+ * happen to match in two reports. A catalog parser cannot invent, rename or
+ * drop an SKU while reusing the same raw URL+SHA at another capture time.
+ *
+ * Group cards by physical capture event first (a four-card HTML page is ONE
+ * event); then compare complete identity+fact sets for every repeated raw
+ * URL+SHA, including within a single historical batch.
+ */
+function assertImmutableSourceProductSets(previous, current) {
+  const signatures = new Map()
+  for (const batch of [previous, current]) {
+    const events = new Map()
+    for (const result of batch.results) {
+      if (!result.accepted) continue
+      if (!PAIRS.includes(result.key)) fail()
+      for (const obs of result.observations) {
+        if (!safeId(obs.sourceProductId)) fail()
+        const source = obs.provenance
+        const pageKey = JSON.stringify([result.key, source.url, source.sha256])
+        const timestamp = instantNanos(source.capturedAt).toString()
+        let timeline = events.get(pageKey)
+        if (!timeline) {
+          timeline = new Map()
+          events.set(pageKey, timeline)
+        }
+        let identities = timeline.get(timestamp)
+        if (!identities) {
+          identities = new Map()
+          timeline.set(timestamp, identities)
+        }
+        const product = physicalProductFacts(obs)
+        const seen = identities.get(obs.sourceProductId)
+        if (seen !== undefined && seen !== product) fail()
+        identities.set(obs.sourceProductId, product)
+      }
+    }
+    for (const [pageKey, timeline] of events) {
+      for (const identities of timeline.values()) {
+        const signature = JSON.stringify([...identities.entries()]
+          .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))
+        const earlier = signatures.get(pageKey)
+        if (earlier !== undefined && earlier !== signature) fail()
+        signatures.set(pageKey, signature)
+      }
+    }
+  }
+}
+
 function latest(batch) {
   const rows = new Map()
   for (const result of batch.results) {
@@ -111,6 +160,7 @@ export function comparePrivateRetailerFactChanges(previous, current, {
       before.sixShapeCoverageComplete !== true ||
       after.sixShapeCoverageComplete !== true ||
       before.rejectedSources !== 0 || after.rejectedSources !== 0) fail()
+  assertImmutableSourceProductSets(previous, current)
   const oldRows = latest(previous)
   const newRows = latest(current)
   const perShape = Object.fromEntries(PAIRS.map(x => [x, ZERO()]))
