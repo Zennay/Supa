@@ -76,7 +76,20 @@ test('UnitPriceSpecification reference kilograms never become a 1-liter pack pri
     })
   }
 })
-test('a concrete Offer.price remains authoritative when accompanied by display-only unit price', () => {
+test('a concrete checkout Offer.price remains valid when a unit-reference price is not for this pack', () => {
+  const candidate = {
+    ...exactOffer('1.19'),
+    priceSpecification: {
+      '@type': 'UnitPriceSpecification', price: '0.99', priceCurrency: 'EUR',
+      referenceQuantity: { value: 500, unitCode: 'MLT' },
+    },
+  }
+  const r = comparison(candidate)
+  assert.equal(r.comparable, true)
+  assert.equal(r.stores.dekamarkt.subtotalCents, 238)
+  assert.equal(r.claimable, false)
+})
+test('two contradictory exact checkout prices for the same physical pack must withhold savings', () => {
   const candidate = {
     ...exactOffer('1.19'),
     priceSpecification: {
@@ -84,10 +97,7 @@ test('a concrete Offer.price remains authoritative when accompanied by display-o
       referenceQuantity: { value: 1, unitCode: 'LTR' },
     },
   }
-  const r = comparison(candidate)
-  assert.equal(r.comparable, true)
-  assert.equal(r.stores.dekamarkt.subtotalCents, 238)
-  assert.equal(r.claimable, false)
+  expectUnknown(candidate)
 })
 test('one exact generic PriceSpecification is supported without referenceQuantity', () => {
   const offer = {
