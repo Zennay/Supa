@@ -50,6 +50,41 @@ test('M3 always refuses malformed, missing, duplicated and invented planner iden
   assert.equal(m3FieldSheetMatchesPlannerWeek(trapped, m2DefaultActiveDays), false)
 })
 
+test('four sparse day slots and inherited/getter replacements cannot hide a changed survey week', () => {
+  const unchangedPlan = copy(m2InitialPlan)
+  const untouchedDays = copy(m2DefaultActiveDays)
+  for (let missing = 0; missing < untouchedDays.length; missing++) {
+    const sparse = [...untouchedDays]
+    delete sparse[missing]
+    const original = [...sparse]
+    assert.equal(sparse.length, 4)
+    assert.equal(new Set(sparse).size, 4,
+      'independent demonstration of Set sparse-hole false-positive')
+    assert.equal(m3FieldSheetMatchesPlannerWeek(unchangedPlan, sparse), false,
+      'missing own indexed day slot ' + missing + ' must fail closed')
+    assert.equal(missing in sparse, false)
+    assert.deepEqual(sparse, original)
+    const inherited = [...untouchedDays]
+    delete inherited[missing]
+    const prototype = Object.create(Array.prototype)
+    prototype[missing] = untouchedDays[missing]
+    Object.setPrototypeOf(inherited, prototype)
+    assert.equal(m3FieldSheetMatchesPlannerWeek(unchangedPlan, inherited), false,
+      'a prototype-filled missing indexed day must not restore study trust')
+    const getter = [...untouchedDays]
+    Object.defineProperty(getter, missing, {
+      get() { throw new Error('sensitive live Planner getter') },
+      enumerable: true,
+      configurable: true,
+    })
+    assert.equal(m3FieldSheetMatchesPlannerWeek(unchangedPlan, getter), false,
+      'own getter must not run or impersonate a real selected day')
+  }
+  assert.deepEqual(unchangedPlan, m2InitialPlan)
+  assert.deepEqual(untouchedDays, m2DefaultActiveDays)
+  assert.equal(buildObservationSheet().evidenceStatus, 'collection-template-not-evidence')
+})
+
 test('the mismatch check never mutates the planner or real blank 11+11 field sheet', () => {
   const planned = copy(m2InitialPlan)
   const selected = copy(m2DefaultActiveDays)
