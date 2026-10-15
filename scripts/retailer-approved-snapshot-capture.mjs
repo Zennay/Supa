@@ -1,9 +1,79 @@
 import { createHash } from 'node:crypto'
+import { types as utilTypes } from 'node:util'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 
 // Reusable authorized capture transport. No live command automatically runs
 // this module; caller supplies explicit permission record and fetch capability.
 // It never proxies, authenticates, follows redirects or rotates on rate limits.
+
+/**
+ * Caller-provided grant/source/rights records are NOT trusted just because
+ * their fields currently look permissible. Read only own data descriptors and
+ * pin a detached plain-data snapshot BEFORE rights evaluation or transport.
+ * In particular never evaluate a grant getter after checking a permission
+ * status: it could revoke that status as a side effect.
+ */
+function requireOwnData(record, key, optional = false) {
+  if (!record || typeof record !== 'object' || Array.isArray(record) ||
+      utilTypes.isProxy(record) ||
+      ![Object.prototype, null].includes(Object.getPrototypeOf(record))) {
+    throw new Error('Immutable capture scope record required')
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(record, key)
+  if (!descriptor) {
+    if (optional) return undefined
+    throw new Error('Immutable capture scope field required')
+  }
+  if (!Object.hasOwn(descriptor, 'value')) {
+    throw new Error('Immutable capture scope fields cannot be accessors')
+  }
+  return descriptor.value
+}
+
+function snapshotScopeData(value, depth = 0, budget = { entries: 0 }, seen = new WeakSet()) {
+  if (value === null || typeof value === 'string' ||
+      typeof value === 'number' || typeof value === 'boolean' ||
+      typeof value === 'undefined') return value
+  if (typeof value !== 'object' || utilTypes.isProxy(value) || depth > 7 ||
+      seen.has(value)) {
+    throw new Error('Immutable capture permission data required')
+  }
+  const isArray = Array.isArray(value)
+  const prototype = Object.getPrototypeOf(value)
+  if (isArray ? prototype !== Array.prototype :
+    prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Immutable capture permission data must be plain')
+  }
+  seen.add(value)
+  const keys = Reflect.ownKeys(value)
+  budget.entries += keys.length
+  if (keys.length > 256 || budget.entries > 768) {
+    throw new Error('Capture permission data exceeds bounds')
+  }
+  const copy = isArray ? [] : Object.create(null)
+  for (const key of keys) {
+    if (isArray && key === 'length') continue
+    if (typeof key !== 'string' || key === '__proto__' ||
+        (isArray && !/^(?:0|[1-9][0-9]*)$/.test(key))) {
+      throw new Error('Capture permission data contains unsupported keys')
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Immutable capture permission data cannot have accessors')
+    }
+    const pinned = snapshotScopeData(descriptor.value, depth + 1, budget, seen)
+    Object.defineProperty(copy, key, {
+      value: pinned, enumerable: true, configurable: true, writable: true,
+    })
+  }
+  if (isArray && (keys.length - 1 !== value.length ||
+      Object.keys(copy).length !== value.length)) {
+    throw new Error('Sparse capture permission data is not accepted')
+  }
+  seen.delete(value)
+  return copy
+}
+
 const MAX_BODY_BYTES = 2 * 1024 * 1024
 const TIMEOUT_MS = 10000
 const ROUTES = Object.freeze({
@@ -96,12 +166,18 @@ async function collectBoundedBody(response) {
   return { html, bytes, sha256: createHash('sha256').update(all).digest('hex') }
 }
 
-export async function captureApprovedRetailerPage({
-  source, permissionGate, grant, fetchFn, capturedAt,
-} = {}) {
-  // Fail closed without injection: there is no implicit network capability,
-  // scheduler, scraping of unapproved domains or free-proxy fallback.
-  if (typeof fetchFn !== 'function') throw new Error('Approved fetch transport required')
+export async function captureApprovedRetailerPage(options = {}) {
+  // Fail closed without injection. Pin the ENTIRE authorization envelope first
+  // so neither source/grant accessors nor mutable gate arrays can change its
+  // meaning between the rights check and the one permitted transport call.
+  const fetchFn = requireOwnData(options, 'fetchFn', true)
+  if (typeof fetchFn !== 'function' || utilTypes.isProxy(fetchFn)) {
+    throw new Error('Approved fetch transport required')
+  }
+  const source = snapshotScopeData(requireOwnData(options, 'source'))
+  const grant = snapshotScopeData(requireOwnData(options, 'grant'))
+  const permissionGate = snapshotScopeData(requireOwnData(options, 'permissionGate'))
+  const capturedAt = requireOwnData(options, 'capturedAt', true)
   const target = checkedTarget(source)
   permittedForCapture(permissionGate, source, grant, target)
   const timestamp = capturedAt ?? new Date().toISOString()
