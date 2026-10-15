@@ -47,9 +47,54 @@ export async function runPrivateRetailerPipeline(directory, options = {}) {
     externalRequests: 0,
   }
 }
+
+/**
+ * Replay an existing operator-reviewed manifest without modifying or
+ * regenerating any evidence bytes. Safe for deterministic VPS job retries.
+ * An unpinned/mutated source, missing shape or private permission change
+ * refuses the entire verification; never falls back to a live request.
+ */
+export async function verifyPrivateRetailerPipeline(directory, options = {}) {
+  if (!options || typeof options !== 'object' || Array.isArray(options) ||
+      Object.keys(options).some(key => key !== 'referenceTime')) fail()
+  let replay
+  try {
+    replay = await replayPrivateReviewedCaptureDirectory(directory, options)
+  } catch { fail() }
+  if (!replay || replay.sources < 6 || replay.sources > 32 ||
+      replay.acceptedSources !== replay.sources ||
+      replay.sixShapeCoverageComplete !== true ||
+      replay.permissionVerified !== false ||
+      replay.productionEnabled !== false ||
+      replay.publicSavingsClaimEligible !== false ||
+      replay.livePricesAvailable !== false ||
+      replay.externalRequests !== 0) fail()
+  return {
+    schemaVersion: 1,
+    mode: 'private-offline-retailer-verified-pipeline',
+    manifestCreated: false,
+    manifestVerified: true,
+    pinnedSources: replay.sources,
+    acceptedSources: replay.acceptedSources,
+    observations: replay.observations,
+    products: replay.products,
+    captureEvents: replay.captureEvents,
+    conflictsNeedingReview: replay.conflictCount,
+    staleSources: replay.staleSources,
+    humanReviewRequired: true,
+    permissionVerified: false,
+    productionEnabled: false,
+    publicSavingsClaimEligible: false,
+    livePricesAvailable: false,
+    externalRequests: 0,
+  }
+}
 export async function main(argv = process.argv.slice(2), write = text => process.stdout.write(text)) {
-  if (!Array.isArray(argv) || argv.length !== 2 || argv[0] !== '--dir') fail()
-  const summary = await runPrivateRetailerPipeline(argv[1])
+  if (!Array.isArray(argv) || argv[0] !== '--dir' ||
+      !(argv.length === 2 || (argv.length === 3 && argv[2] === '--verify'))) fail()
+  const summary = argv.length === 3
+    ? await verifyPrivateRetailerPipeline(argv[1])
+    : await runPrivateRetailerPipeline(argv[1])
   write(JSON.stringify(summary, null, 2) + '\n')
   return summary
 }
