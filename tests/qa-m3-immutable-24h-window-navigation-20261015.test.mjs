@@ -5,6 +5,7 @@ import {
   buildObservationSheet,
   observationSheetReadiness,
   observationWindowSummary,
+  restoreObservationSheetDraft,
 } from '../src/domain/m3ObservationSheet.ts'
 import { observationNextAction } from '../src/features/observation/observationNextStep.ts'
 
@@ -110,4 +111,17 @@ test('QA #1081: malformed window values cannot silently re-authorize export', ()
     assert.ok(result.issues.length > 0, String(forgedWindow) + ' needs actionable feedback')
     assert.notEqual(observationNextAction(sheet, REFERENCE_NOW).stage, 'export')
   }
+})
+
+test('QA #1081: reopening a forged locally saved draft restores the canonical 24h limit', () => {
+  const sheet = fullyFictionalSheet(OVER_24H)
+  sheet.study.maxObservationWindowHours = 48
+  const serialized = JSON.stringify(sheet)
+  const restored = restoreObservationSheetDraft(serialized)
+  assert.ok(restored, 'a matching structurally valid draft may be restored')
+  assert.equal(restored.study.maxObservationWindowHours, 24)
+  assert.equal(observationWindowSummary(restored, REFERENCE_NOW).state, 'outside-window')
+  assert.equal(observationSheetReadiness(restored, REFERENCE_NOW).ready, false)
+  assert.equal(observationNextAction(restored, REFERENCE_NOW).stage, 'review')
+  assert.equal(JSON.stringify(sheet), serialized, 'restore must not modify untrusted saved data')
 })
