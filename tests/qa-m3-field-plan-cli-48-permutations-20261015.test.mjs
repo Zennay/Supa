@@ -19,15 +19,15 @@ function permutations(values) {
 }
 
 function cli(argv) {
-  const process = spawnSync(process.execPath, [
+  const execution = spawnSync(process.execPath, [
     '--experimental-strip-types', script, ...argv,
   ], { encoding: 'utf8', timeout: 10000, maxBuffer: 128 * 1024 })
-  assert.ifError(process.error)
-  assert.equal(process.status, 0, 'every complete canonical permutation is approved')
-  assert.equal(process.stderr, '')
-  assert.equal(process.stdout.split('\n').length, 2,
+  assert.ifError(execution.error)
+  assert.equal(execution.status, 0, 'every complete canonical permutation is approved')
+  assert.equal(execution.stderr, '')
+  assert.equal(execution.stdout.split('\n').length, 2,
     'write exactly one JSON summary line, no hidden side effects')
-  return JSON.parse(process.stdout)
+  return JSON.parse(execution.stdout)
 }
 
 function assertGenuineSafetyBoundary(summary, canonicalOrder) {
