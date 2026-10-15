@@ -6,7 +6,7 @@
  * but those responses never constitute evidence of a real retailer price.
  */
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { canonicalM3RetailerRequirements } from './retailer-canonical-m3-demand.mjs'
 import { parseOfflineRetailerSnapshot } from './retailer-snapshot-adapters.mjs'
@@ -239,6 +239,25 @@ export async function captureAuthorizedM3RetailerBasket({
 }
 
 export async function main(argv = process.argv.slice(2)) {
+  if (argv.length === 2 && argv[0] === '--template') {
+    const destination = argv[1]
+    assert(typeof destination === 'string' && destination.trim() &&
+      destination === destination.trim() && !destination.startsWith('-'),
+      'A new private M3 template path is required')
+    const requirements = canonicalM3RetailerRequirements()
+    const template = {
+      version: 1,
+      products: STORES.flatMap((supermarket) =>
+        requirements.map(({ id: ingredientId, query }) => ({
+          supermarket, ingredientId, query, url: '',
+        }))),
+    }
+    // Exclusive creation: never overwrite a genuine private operator draft.
+    await writeFile(destination, JSON.stringify(template, null, 2) + '\\n',
+      { flag: 'wx', mode: 0o600 })
+    process.stdout.write('Private canonical M3 URL plan created; enter only authorized product URLs\\n')
+    return template
+  }
   assert(argv.length === 2 && argv[0] === '--live' &&
     typeof argv[1] === 'string' && argv[1] &&
     !argv[1].startsWith('-'),
