@@ -15,7 +15,8 @@ Open het lokale HTML-bestand en druk af op A4 **liggend**. Het script overschrij
 - Vul één gedeelde geplande week in en kies **één prijscontext** (in-store of online-order) voor beide winkels.
 - Meet de PLUS-baseline en de DekaMarkt-vergelijkmand met exact dezelfde elf behoeften binnen maximaal **24 uur**.
 - Noteer filiaal, lokale observatietijd én tijdzone, geobserveerde bron, pseudonieme bewijsreferentie en productherkomst.
-- Schrijf alleen werkelijk geobserveerde productidentiteit, packgrootte, hoeveelheid, prijs per verpakking en beschikbaarheid op. Als iets ontbreekt: laat het onbekend, nooit verzinnen.
+- Kruis per regel precies één status aan: **ja** (werkelijk gecontroleerd en beschikbaar), **nee** (werkelijk gecontroleerd en niet verkrijgbaar), of **onbekend** (nog niet gecontroleerd). Een ongemeten regel is nooit `nee` en mag niet als volledige veldmeting worden beschouwd.
+- Vul bij **nee** en **onbekend** geen product of prijs in. Bij **ja** noteer je uitsluitend daadwerkelijk geobserveerde identiteit, verpakking, hoeveelheid en prijs per pak; geen aannames of geschatte kortingen.
 - Neem de echte gegevens daarna over in de SUPA Meten-interface en laat de canonieke converter en assessment de structurele geldigheid beoordelen. Bewaar bronbewijs op de daarvoor toegestane private locatie.
 
 Papier is **geen automatisch bewijs**, prijsdata, licentie/toestemming, besparingsclaim, beta- of M4/M5-go. Het formulier bevat zelf geen persoonsgegevens, echte winkelprijzen of aantoonbare besparingen. Vermijd namen, e-mails, accountgegevens en deelnemersidentiteiten. Menselijke [M3 veldtaak #78](https://github.com/Zennay/Supa/issues/78) blijft open tot echte 11 PLUS + 11 DekaMarkt waarnemingen geldig zijn gecontroleerd.
