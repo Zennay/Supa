@@ -21,13 +21,15 @@ node --experimental-strip-types scripts/m3-field-plan-alignment.mjs --days Ma,Di
 node --experimental-strip-types scripts/m3-field-plan-alignment.mjs --plan Ma:pasta,Di:teriyaki,Wo:pasta,Do:tikka
 ```
 
-Voor beide geeft het commando `fixedStudyWeekMatches:false`, `canCollectUsingFrozenWorksheet:false` en een leesbare reden (`missingDays` of `changedRecipes`).
+Voor beide geeft het commando `fixedStudyWeekMatches:false`, `matchesFixedWorksheetDemand:false` en een leesbare reden (`missingDays` of `changedRecipes`).
 
 ## Automatische exitstatus
 
 - **0** — gekozen demo-planning is dezelfde fysieke vaste onderzoeksweek; dit is *alleen* een planningscheck.
 - **3** — planning wijkt af; **stop**, gebruik de vaste 11×2-veldformulieren niet voor die aangepaste planning.
 - **2** — ongeldige/incomplete CLI-invoer; geen output met ruwe argumenten of persoonlijke waarden.
+
+Ook bij een geslaagde controle blijven `retailerReusePermissionVerified:false` en `fieldObservationEvidenceCollected:false`. Een match is **geen toestemming** om bronnen te hergebruiken en geen bestaand veldbewijs.
 
 De output bevat alleen gecontroleerde fictieve dag-/recept-ID's, verwachte winkelmerken, en een waarschuwing. De CLI leest geen lokale Planner-opslag, echte deelnemersgegevens of ingevulde observatiebestanden, stuurt geen HTTP-verzoeken en maakt geen winkelprijzen, besparingen of toestemming aan. Gebruik geen echte persoons- of bron-URL's als argument.
 
