@@ -148,10 +148,12 @@ async function publishPrivateReport(destination, payload) {
   const dir = dirname(resolve(destination))
   const temporary = join(dir, '.supa-m3-' + randomUUID() + '.tmp')
   let handle
+  let created = false
   try {
     handle = await open(temporary,
       constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW,
       0o600)
+    created = true
     await handle.writeFile(payload, 'utf8')
     await handle.sync()
     await handle.close()
@@ -159,9 +161,12 @@ async function publishPrivateReport(destination, payload) {
     await link(temporary, destination)
   } finally {
     if (handle) await handle.close()
-    await unlink(temporary).catch((error) => {
-      if (error.code !== 'ENOENT') throw error
-    })
+    // Never delete a path we did not create if exclusive open fails.
+    if (created) {
+      await unlink(temporary).catch((error) => {
+        if (error.code !== 'ENOENT') throw error
+      })
+    }
   }
 }
 
