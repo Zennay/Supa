@@ -48,8 +48,48 @@ async function securePath(p, maxBytes) {
 }
 function parseStrictJson(bytes) {
   try {
-    // No Unicode replacement permitted; raw evidence must be byte-faithful.
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+    // JSON.parse accepts duplicate names and silently keeps the last value.
+    // A SHA proves which bytes were reviewed, NOT that permission/provenance
+    // claims in those bytes have an unambiguous interpretation. Check raw
+    // object names at every depth before trusting either manifest or source.
+    const raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    const scopes = []
+    for (let i = 0; i < raw.length;) {
+      const ch = raw[i]
+      if (ch === '{' || ch === '[') {
+        if (scopes.length >= 128) fail()
+        scopes.push(ch === '{' ? new Set() : null)
+        i++
+        continue
+      }
+      if (ch === '}' || ch === ']') {
+        if (!scopes.length) fail()
+        scopes.pop()
+        i++
+        continue
+      }
+      if (ch !== '"') { i++; continue }
+      const start = i++
+      // Escaped quotes, slashes and Unicode escapes cannot terminate a name.
+      while (i < raw.length) {
+        if (raw[i] === '\\') { i += 2; continue }
+        if (raw[i++] === '"') break
+      }
+      let next = i
+      while (next < raw.length && (
+        raw[next] === ' ' || raw.charCodeAt(next) === 9 ||
+        raw.charCodeAt(next) === 13 || raw.charCodeAt(next) === 10)) next++
+      const keys = scopes.at(-1)
+      if (raw[next] === ':' && keys instanceof Set) {
+        // JSON.parse resolves escaped spellings, e.g. "source" and "s\\u006furce".
+        const name = JSON.parse(raw.slice(start, i))
+        if (keys.has(name)) fail()
+        keys.add(name)
+      }
+    }
+    // The built-in parser remains the authoritative grammar/number validator.
+    // Scanner only rejects ambiguous object names, never normalizes values.
+    return JSON.parse(raw)
   } catch { fail() }
 }
 function validManifest(manifest) {
