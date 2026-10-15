@@ -209,3 +209,16 @@ test('no-argument, null and hostile non-string inputs fail closed instead of thr
     assert.equal(parseM3OfflineProductHtml(args).type, 'abstain')
   }
 })
+
+
+test('nested inert templates and orphan end tags can never smuggle a lower priced Product', () => {
+  const hidden = script(product(PLUS.url, '0.01'))
+  const legitimate = script(product(PLUS.url, '3.11'))
+  const nested = '<template><template></template>' + hidden + '</template>' + legitimate
+  const orphan = '</noscript>' + hidden
+  for (const html of [nested, orphan]) {
+    const result = parse(html)
+    assert.equal(result.type, 'abstain')
+    assert.equal(result.publicSavingsClaimEligible, false)
+  }
+})
