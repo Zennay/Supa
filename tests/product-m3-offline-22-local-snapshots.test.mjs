@@ -119,3 +119,19 @@ test('CLI invalid private JSON never echoes source path, content or hidden value
   assert.doesNotMatch(child.stderr,/synthetic-person|invalid\.example|supa-m3-22-local-/)
   assert.match(child.stderr,/Private M3 offline comparison refused/)
 })
+
+
+test('Dutch private 22-line human comparison uses trusted physical basket reporter', async t => {
+  const { folder, manifestPath } = await createPrivateCollection()
+  t.after(() => rm(folder, { recursive: true, force: true }))
+  const child = spawnSync(process.execPath, [
+    '--experimental-strip-types', SCRIPT, '--offline', manifestPath, '--text',
+  ], { encoding: 'utf8' })
+  assert.equal(child.status, 0, child.stderr)
+  assert.match(child.stdout, /SUPA · PRIVATE OFFLINE BOODSCHAPPENVERGELIJKING/)
+  assert.match(child.stdout, /Kippendij/)
+  assert.match(child.stdout, /DekaMarkt/)
+  assert.match(child.stdout, /GEEN LIVE PRIJZEN/)
+  assert.match(child.stdout, /Niet gebruiken als live winkeladvies of bewezen besparing/)
+  assert.doesNotMatch(child.stdout, /supa-m3-22-local-|private-manifest\.json/)
+})
