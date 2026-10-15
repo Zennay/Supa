@@ -17,6 +17,7 @@ const required = [
   'tests/qa-m3-paper-multipack-pricing-contract-20261015.test.mjs',
   'tests/product-m3-paper-required-metadata-20261015.test.mjs',
   'tests/qa-m3-paper-required-metadata-readiness-20261015.test.mjs',
+  'tests/qa-m3-paper-fullbasket-private-report-matrix-20261015.test.mjs',
 ]
 function paths(workflow) {
   const block = /^  pull_request:\s*\n    paths:\s*\n((?:      - .*\n)+)/m.exec(workflow)
@@ -36,7 +37,7 @@ function missing(selectors, files) {
   return files.filter(file => !selectors.some(pattern => globMatches(pattern, file)))
 }
 
-test('current M3 paper, multipack, required metadata and independent QA paths must trigger the permanent trusted VPS', () => {
+test('current M3 paper, metadata, fullbasket report and independent QA paths must trigger the permanent trusted VPS', () => {
   const workflow = readFileSync(workflowPath, 'utf8')
   const absent = missing(paths(workflow), required)
   assert.deepEqual(absent, [],
