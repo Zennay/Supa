@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import {
   main,
   renderPrintablePrivateShoppingChecklist,
+  renderPrivateTextShoppingChecklist,
 } from '../scripts/retailer-private-shopping-checklist-html.mjs'
 import { compareLocalRetailerSnapshots } from '../scripts/retailer-compare-local-snapshots.mjs'
 
@@ -220,6 +221,91 @@ test('saved private JSON redactable labels are not written or modified in source
   assert.match(html, /\[privélink verborgen\]/)
   assert.match(html, /ALLEEN OFFLINE TOTAAL PLUS: €2,40/)
   assert.equal((await stat(path)).mode & 0o777, 0o600)
+})
+
+
+test('text shopping list uses unchanged paid whole-pack totals, no HTML or live retailer requests', () => {
+  const plain = renderPrivateTextShoppingChecklist(offlinePreview())
+  assert.match(plain, /== PLUS ==/)
+  assert.match(plain, /== DekaMarkt ==/)
+  assert.match(plain, /\[ \] havermout: 2 hele verpakking/)
+  assert.match(plain, /ALLEEN OFFLINE TOTAAL PLUS: €2,40/)
+  assert.match(plain, /ALLEEN OFFLINE TOTAAL DekaMarkt: €2,20/)
+  assert.match(plain, /GEEN LIVE PRIJS OF BEWEZEN BESPARING/)
+  assert.doesNotMatch(plain, /<!doctype|<script|<style|https:\/\/source\.invalid/)
+})
+
+test('plain text export physically omits opposing store and its fictional private prices', () => {
+  const report = offlinePreview()
+  report.comparison.lines[0].plus.productName = 'ALLEEN-PLUS-VISIBLE'
+  report.comparison.lines[0].dekamarkt.productName = 'ALLEEN-DEKA-VISIBLE'
+  const plus = renderPrivateTextShoppingChecklist(report, 'plus')
+  const deka = renderPrivateTextShoppingChecklist(report, 'dekamarkt')
+  assert.match(plus, /ALLEEN-PLUS-VISIBLE/)
+  assert.match(plus, /ALLEEN OFFLINE TOTAAL PLUS: €2,40/)
+  assert.doesNotMatch(plus, /DekaMarkt|ALLEEN-DEKA-VISIBLE|€2,20/)
+  assert.match(deka, /ALLEEN-DEKA-VISIBLE/)
+  assert.match(deka, /ALLEEN OFFLINE TOTAAL DekaMarkt: €2,20/)
+  assert.doesNotMatch(deka, /PLUS|ALLEEN-PLUS-VISIBLE|€2,40/)
+  assert.throws(() => renderPrivateTextShoppingChecklist(report,'other'),
+    /Invalid private checklist shop selection/)
+})
+
+test('saved comparison makes 0600 text files without altering its bytes or exposing personal labels', async t => {
+  const { dir, file } = await fixture(t)
+  const report = offlinePreview()
+  report.comparison.lines[0].plus.productName =
+    'Muesli orders+1@private.invalid www.secret.invalid/cart?id=token66'
+  report.comparison.lines[0].ingredient = 'yoghurt https://secret.invalid/cart?token=token77'
+  await writeFile(file, JSON.stringify(report))
+  const before = await readFile(file)
+  const output = join(dir, 'only-plus.txt')
+  const rendered = await main([
+    '--report', file, '--output', output, '--store', 'plus', '--format', 'text',
+  ])
+  assert.equal(await readFile(output, 'utf8'), rendered)
+  assert.equal((await stat(output)).mode & 0o777, 0o600)
+  assert.deepEqual(await readFile(file), before)
+  assert.doesNotMatch(rendered, /DekaMarkt|€2,20|token66|token77|orders\+1@|secret\.invalid/)
+  assert.match(rendered, /\[privélink verborgen\]/)
+  assert.match(rendered, /\[privé e-mailadres verborgen\]/)
+  assert.match(rendered, /ALLEEN OFFLINE TOTAAL PLUS: €2,40/)
+  assert.doesNotMatch(rendered, /<html|<input/)
+})
+
+test('incomplete saved report in text never promotes unknown retailer subtotal', async t => {
+  const { dir, file } = await fixture(t)
+  const report = offlinePreview()
+  report.comparison.lines[0].dekamarkt.status = 'availability_unknown'
+  await writeFile(file, JSON.stringify(report))
+  const output = join(dir, 'only-deka.txt')
+  const rendered = await main([
+    '--report', file, '--output', output, '--store', 'dekamarkt', '--format', 'text',
+  ])
+  assert.match(rendered, /GEEN BETROUWBAAR VOLLEDIG TOTAAL DekaMarkt/)
+  assert.doesNotMatch(rendered, /ALLEEN OFFLINE TOTAAL|€2,40|€2,20/)
+  assert.equal((await stat(output)).mode & 0o777, 0o600)
+})
+
+test('text flag requires explicit .txt suffix, valid order and cannot overwrite source', async t => {
+  const { dir, file } = await fixture(t)
+  const wrong = [
+    ['--report', file, '--output', join(dir, 'invalid.html'), '--format', 'text'],
+    ['--report', file, '--output', join(dir, 'invalid.txt'), '--format', 'html'],
+    ['--report', file, '--output', join(dir, 'invalid.txt'), '--store', 'plus'],
+    ['--report', file, '--output', join(dir, 'invalid.txt'), '--format', 'text', '--store', 'plus'],
+    ['--report', file, '--output', join(dir, 'invalid.txt'), '--format', 'text', '--format', 'text'],
+  ]
+  for(const args of wrong) {
+    await assert.rejects(() => main(args), /Invalid private offline checklist HTML arguments/)
+  }
+  const alias = join(dir, 'source.txt')
+  await link(file, alias)
+  const original = await readFile(file)
+  await assert.rejects(() => main([
+    '--report', file, '--output', alias, '--format', 'text',
+  ]), /refusing to overwrite M3 evidence input with derived output/)
+  assert.deepEqual(await readFile(file), original)
 })
 
 test('saved incomplete shop does not turn a partial subtotal into a whole basket', async t => {
