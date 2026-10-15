@@ -80,7 +80,7 @@ export function buildUniversalRetailerCatalog(batch) {
         result.observations.length < 1 || result.observations.length > 256 ||
         typeof result.key !== 'string' ||
         !/^(plus|dekamarkt):(product|catalog|offers)$/.test(result.key)) {
-      throw new Error('Refusing incomplete private retailer batch source')
+      throw new Error('Refusing incomplete or untrusted private retailer batch source')
     }
     const store = result.key.split(':', 1)[0]
     rawObservationTotal += result.observations.length
