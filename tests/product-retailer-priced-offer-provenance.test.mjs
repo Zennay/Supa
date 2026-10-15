@@ -98,3 +98,16 @@ test('malformed explicit parent Offer dates cannot silently become unbounded pri
     assertUnknown(offer('1.19',{validFrom:date}))
   }
 })
+
+test('malformed typed Offer date is rejected as invalid source evidence, not a normal undated quote',()=>{
+  const html='<script type="application/ld+json">'+JSON.stringify({
+    '@type':'Product',name:'Halfvolle melk',sku:'fictional-milk',
+    weight:{value:'1000 ml'},
+    offers:offer('1.19',{validFrom:{date:'2026-10-01'},priceValidUntil:'2026-10-16'}),
+  })+'</script>'
+  const result=parseOfflineRetailerSnapshot({
+    source:source('dekamarkt'),html,capturedAt,
+  })
+  assert.equal(result.observations.length,0)
+  assert.equal(result.rejected,1)
+})
