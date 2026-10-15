@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 import { createPrivateM3StudyCodePin } from '../scripts/m3-field-code-pin.mjs'
-import { preflightPrivateM3Week, assertUnambiguousM3StudyJson } from '../scripts/m3-verify-private-week-preflight.mjs'
+import { preflightPrivateM3Week, assertUnambiguousM3StudyJson, main as runPrivateWeekCLI } from '../scripts/m3-verify-private-week-preflight.mjs'
 
 const MAIN = 'abcdef1234567890abcdef1234567890abcdef12'
 const WRONG = '1234567890abcdef1234567890abcdef12345678'
@@ -134,5 +134,54 @@ test('bounded sticky primitive scanner preserves exact JSON numeric and literal 
     '[NaN]', '[Infinity]', '[falsee]', '[true,]', '[--1]', '[1 2]',
   ]) {
     assert.throws(() => assertUnambiguousM3StudyJson(malformed), /preflight refused/)
+  }
+})
+
+test('M3 direct API distinguishes omitted expected SHA from an explicitly undefined third option', () => {
+  const { studyBytes, pinBytes } = privatePair()
+  const legacy = preflightPrivateM3Week(studyBytes, pinBytes)
+  assert.equal(legacy.status, 'private-review-only')
+  for (const bad of [undefined, null, false, '', 0]) {
+    assert.throws(
+      () => preflightPrivateM3Week(studyBytes, pinBytes, bad),
+      (error) => error.message === 'M3 private study provenance preflight refused',
+    )
+  }
+  assert.throws(
+    () => preflightPrivateM3Week(studyBytes, pinBytes, MAIN, MAIN),
+    /preflight refused/,
+  )
+  assert.equal(preflightPrivateM3Week(studyBytes, pinBytes, MAIN).sourceCommitSha, MAIN)
+})
+
+test('M3 exported main refuses undefined requested revision with no private study stdout', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-api-undefined-'))
+  try {
+    const { studyBytes, pinBytes } = privatePair()
+    const study = join(dir, 'private-study.json')
+    const pin = join(dir, 'private-pin.json')
+    await writeFile(study, studyBytes, { mode: 0o600 })
+    await writeFile(pin, pinBytes, { mode: 0o600 })
+    let published = ''
+    const originalWrite = process.stdout.write
+    process.stdout.write = function(chunk, ...args) {
+      published += String(chunk)
+      return true
+    }
+    try {
+      await assert.rejects(
+        () => runPrivateWeekCLI([study, pin, '--expect-main-sha', undefined]),
+        (error) => error.message === 'M3 private study provenance preflight refused',
+      )
+      await assert.rejects(
+        () => runPrivateWeekCLI([study, pin, '--expect-main-sha', null]),
+        /preflight refused/,
+      )
+      assert.equal(published, '')
+    } finally {
+      process.stdout.write = originalWrite
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
   }
 })
