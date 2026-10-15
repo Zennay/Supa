@@ -21,6 +21,27 @@ Vul voor alle 22 rijen de `url` in, zonder de `ingredientId` te veranderen. PLUS
 
 Dit JSON-blok is **slechts één illustratieve rij**, geen compleet plan en geen bestaand geverifieerd PLUS-product. De generator maakt alle 22 echte ingrediëntcodes automatisch.
 
+## Zonder live scraperrecht: vergelijk lokaal bewaarde HTML
+
+De technische vergelijkingsketen werkt **nu al zonder supermarktverzoeken** wanneer je de originele HTML-pagina's zelf rechtmatig hebt gekregen (bijvoorbeeld onder een aparte toegestane onderzoeksafspraak). Deze invoermethode verzint geen prijzen of toestemming. Maak 22 snapshots van hetzelfde canonieke behoeftenlijstje binnen 24 uur. Zet de originele HTML-bytes als afzonderlijke eigen-beheer `0600` bestanden in een private directory. Voeg aan hetzelfde 22-productenplan een `snapshots`-array toe met exact één entry per **unieke** product-URL. Bijvoorbeeld:
+
+```json
+{
+  "supermarket": "plus",
+  "url": "https://www.plus.nl/product/authorized-example",
+  "htmlFile": "plus-voorbeeld.html",
+  "capturedAt": "2026-10-15T09:00:00Z"
+}
+```
+
+De illustratieve URL is **geen geverifieerd product**. Gebruik de echte door de operator vastgelegde bron-URL en tijd; `capturedAt` moet het werkelijke observatiemoment zijn. Het bijbehorende JSON-manifest bevat de oorspronkelijke `version` en alle 22 `products` van `--template`, plus de volledige `snapshots`-array. Alle bestanden en het manifest moeten 0600/private zijn, normale bestanden zonder symlink of hardlink. De importer weigert afwezige, dubbele en ongeldige items vóór prijsverwerking.
+
+```sh
+node --experimental-strip-types scripts/retailer-m3-offline-22-snapshots.mjs --offline /private/m3-2026-10-15/manifest.json
+```
+
+De importer voert **nul HTTP-verzoeken** uit, controleert bronhashes en tijden en geeft de bestaande volledige mandvergelijking. Als één relevante Productprijs, voorraad of eenheid niet betrouwbaar kan worden bewezen, is de uitkomst `unknown`, niet kunstmatig goedkoper. Output en SHA's kunnen broninformatie identificeren: voer dit alleen privé uit. Een lokale HTML-preview is **geen** wettelijke toestemming om sites te harvesten en niet vanzelf menselijk geverifieerd checkoutbewijs voor M3-mijlpaal #78.
+
 ## 2. Alleen na gecontroleerde bronrechten: haal prijzen op
 
 ```sh
