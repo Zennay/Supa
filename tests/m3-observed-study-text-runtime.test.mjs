@@ -72,7 +72,7 @@ function validStudy() {
 function assertFailsClosed(value, reason) {
   let result
   assert.doesNotThrow(() => {
-    result = assessWeeklyBasketStudy(value)
+    result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
   })
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
@@ -111,7 +111,7 @@ test('M3 assessment rejects non-string evidence text without coercion', () => {
 })
 
 test('M3 assessment preserves valid study behavior after runtime text hardening', () => {
-  const result = assessWeeklyBasketStudy(validStudy())
+  const result = assessWeeklyBasketStudy(validStudy(), { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, true)
   assert.equal(result.comparison.outcome, 'better')

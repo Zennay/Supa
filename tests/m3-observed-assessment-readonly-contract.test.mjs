@@ -82,8 +82,8 @@ test('M3 assessment is reproducible and read-only on frozen complete research in
   const snapshot = structuredClone(input)
   frozenCopy(input)
 
-  const first = assessWeeklyBasketStudy(input)
-  const second = assessWeeklyBasketStudy(input)
+  const first = assessWeeklyBasketStudy(input, { referenceNowMs: Date.now() })
+  const second = assessWeeklyBasketStudy(input, { referenceNowMs: Date.now() })
 
   assert.equal(first.claimable, true)
   assert.equal(first.comparison.outcome, 'better')
@@ -97,8 +97,8 @@ test('M3 invalid evidence remains frozen and produces repeatable unknown results
   const snapshot = structuredClone(input)
   frozenCopy(input)
 
-  const first = assessWeeklyBasketStudy(input)
-  const second = assessWeeklyBasketStudy(input)
+  const first = assessWeeklyBasketStudy(input, { referenceNowMs: Date.now() })
+  const second = assessWeeklyBasketStudy(input, { referenceNowMs: Date.now() })
 
   assert.equal(first.claimable, false)
   assert.equal(first.comparison.outcome, 'unknown')

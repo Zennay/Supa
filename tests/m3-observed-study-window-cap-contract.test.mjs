@@ -59,7 +59,7 @@ function controlledStudy(candidateObservedAt) {
 test('M3 rejects 48h override even when a 25h pair would otherwise compare', () => {
   const assessment = assessWeeklyBasketStudy(
     controlledStudy('2026-10-03T11:00:00Z'),
-    { maxObservationWindowHours: 48 },
+    { referenceNowMs: Date.now(),  maxObservationWindowHours: 48 },
   )
 
   assert.equal(assessment.claimable, false)
@@ -73,7 +73,7 @@ test('M3 rejects 48h override even when a 25h pair would otherwise compare', () 
 test('M3 disallows oversized override even for a pair already inside 24h', () => {
   const assessment = assessWeeklyBasketStudy(
     controlledStudy('2026-10-02T11:00:00Z'),
-    { maxObservationWindowHours: 25 },
+    { referenceNowMs: Date.now(),  maxObservationWindowHours: 25 },
   )
 
   assert.equal(assessment.claimable, false)
@@ -84,7 +84,7 @@ test('M3 disallows oversized override even for a pair already inside 24h', () =>
 test('M3 preserves explicit 24h boundary for complete controlled baskets', () => {
   const assessment = assessWeeklyBasketStudy(
     controlledStudy('2026-10-03T10:00:00Z'),
-    { maxObservationWindowHours: 24 },
+    { referenceNowMs: Date.now(),  maxObservationWindowHours: 24 },
   )
 
   assert.equal(assessment.observationWindowHours, 24)
@@ -95,7 +95,7 @@ test('M3 preserves explicit 24h boundary for complete controlled baskets', () =>
 test('M3 permits stricter configured windows but still rejects late evidence', () => {
   const assessment = assessWeeklyBasketStudy(
     controlledStudy('2026-10-02T23:00:00Z'),
-    { maxObservationWindowHours: 12 },
+    { referenceNowMs: Date.now(),  maxObservationWindowHours: 12 },
   )
 
   assert.equal(assessment.observationWindowHours, 13)
@@ -118,7 +118,7 @@ test('M3 cannot claim a mathematically neutral empty observed week', () => {
     }
   }
 
-  const assessment = assessWeeklyBasketStudy(value)
+  const assessment = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(assessment.claimable, false)
   assert.equal(assessment.comparison.outcome, 'unknown')
@@ -134,7 +134,7 @@ test('M3 cannot claim a populated basket whose meal count is zero', () => {
   value.baseline.basket.selectedMealCount = 0
   value.candidate.basket.selectedMealCount = 0
 
-  const assessment = assessWeeklyBasketStudy(value)
+  const assessment = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(assessment.claimable, false)
   assert.equal(assessment.comparison.outcome, 'unknown')
@@ -146,7 +146,7 @@ test('M3 cannot claim a populated basket whose meal count is zero', () => {
 test('M3 rejects an explicitly null assessment window instead of treating it as omitted', () => {
   const assessment = assessWeeklyBasketStudy(
     controlledStudy('2026-10-02T11:00:00Z'),
-    { maxObservationWindowHours: null },
+    { referenceNowMs: Date.now(),  maxObservationWindowHours: null },
   )
 
   assert.equal(assessment.claimable, false)
@@ -158,7 +158,7 @@ test('M3 rejects an explicitly null assessment window instead of treating it as 
 test('M3 preserves the canonical default for an omitted window override', () => {
   const assessment = assessWeeklyBasketStudy(
     controlledStudy('2026-10-03T10:00:00Z'),
-    {},
+    { referenceNowMs: Date.now(), },
   )
 
   assert.equal(assessment.observationWindowHours, 24)

@@ -33,7 +33,7 @@ test('M3 direct claim boundary safely refuses missing and scalar study roots', (
     ['undefined', undefined], ['null', null], ['number', 99],
     ['text', 'synthetic-data'], ['array', []],
   ]) {
-    assert.doesNotThrow(() => isSafelyUnknown(assessWeeklyBasketStudy(study), label))
+    assert.doesNotThrow(() => isSafelyUnknown(assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() }), label))
   }
 })
 
@@ -59,7 +59,7 @@ test('M3 refuses nested retailer evidence/basket/store/line containers without t
     const study = completeStudy()
     mutate(study)
     const original = JSON.stringify(study)
-    assert.doesNotThrow(() => isSafelyUnknown(assessWeeklyBasketStudy(study), name), name)
+    assert.doesNotThrow(() => isSafelyUnknown(assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() }), name), name)
     assert.equal(JSON.stringify(study), original, name + ': no evidence mutation')
   }
 })
@@ -70,7 +70,7 @@ test('M3 refuses a throwing nested runtime accessor rather than propagating its 
     enumerable: true,
     get() { throw new Error('private field content must not leak') },
   })
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
   isSafelyUnknown(result, 'throwing store')
   assert.doesNotMatch(result.reasons.join(' '), /private field content/)
 })
@@ -92,7 +92,7 @@ test('M3 evidence preflight never executes an accessor masquerading as a store o
         get() { getterCalls += 1; return store },
       })
     }
-    isSafelyUnknown(assessWeeklyBasketStudy(study), location + ' accessor')
+    isSafelyUnknown(assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() }), location + ' accessor')
     assert.equal(getterCalls, 0, 'no invocation of untrusted evidence getters')
   }
 })
@@ -100,7 +100,7 @@ test('M3 evidence preflight never executes an accessor masquerading as a store o
 test('normal full 11+11 synthetic M3 basket keeps claimability with stable inputs', () => {
   const study = completeStudy()
   const original = JSON.stringify(study)
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
   assert.equal(result.claimable, true)
   assert.equal(result.comparison.claimable, true)
   assert.equal(result.comparison.outcome, 'better')

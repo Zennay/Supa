@@ -66,7 +66,7 @@ function fictionalWeek(weekStart = '2026-09-28', baselineDate = '2026-10-02T17:0
 
 function assertUnknownAssessment(study) {
   const before = JSON.stringify(study)
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
   assert.equal(result.comparison.deltaCents, null)
@@ -79,7 +79,7 @@ function assertUnknownAssessment(study) {
 test('M3 valid synthetic complete week remains technically comparable (not public savings)', () => {
   const study = fictionalWeek()
   const before = JSON.stringify(study)
-  const result = assessWeeklyBasketStudy(study)
+  const result = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
   assert.equal(result.claimable, true)
   assert.equal(result.comparison.outcome, 'better')
   assert.equal(result.observationWindowHours, 1.25)
@@ -95,12 +95,12 @@ for (const otherWeek of ['2025-09-29', '2027-09-27']) {
 
 test('M3 permits purchasing on Saturday immediately preceding declared week', () => {
   const study = fictionalWeek('2026-09-28', '2026-09-26T18:00:00+02:00', '2026-09-26T19:00:00+02:00')
-  assert.equal(assessWeeklyBasketStudy(study).claimable, true)
+  assert.equal(assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() }).claimable, true)
 })
 
 test('M3 permits purchasing on final Sunday of declared week', () => {
   const study = fictionalWeek('2026-09-28', '2026-10-04T20:00:00+02:00', '2026-10-04T21:00:00+02:00')
-  assert.equal(assessWeeklyBasketStudy(study).claimable, true)
+  assert.equal(assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() }).claimable, true)
 })
 
 test('M3 rejects shopping three civil days before nominated week', () => {
@@ -113,7 +113,7 @@ test('M3 rejects shopping the Monday after nominated week', () => {
 
 test('M3 treats each observation local civil day as declared by its ISO offset near UTC midnight', () => {
   const study = fictionalWeek('2026-09-28', '2026-09-26T00:30:00+02:00', '2026-09-26T01:00:00+02:00')
-  assert.equal(assessWeeklyBasketStudy(study).claimable, true)
+  assert.equal(assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() }).claimable, true)
   const beforeSaturday = fictionalWeek('2026-09-28', '2026-09-25T23:30:00+02:00', '2026-09-25T23:50:00+02:00')
   assertUnknownAssessment(beforeSaturday)
 })
