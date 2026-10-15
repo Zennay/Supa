@@ -160,6 +160,54 @@ test('direct caller inherited and accessor properties cannot activate transport'
   assert.equal(networkCalls, 0)
 })
 
+test('stream body remains host-locked until source integrity read completes', async () => {
+  const session = createAuthorizedRetailerCaptureSession()
+  let streamController
+  let streamStarted
+  const entered = new Promise(resolve => { streamStarted = resolve })
+  const stream = new ReadableStream({
+    start(controller) { streamController = controller },
+  })
+  const first = session.captureOne({
+    ...approved(),
+    fetchFn: async () => {
+      streamStarted()
+      return new Response(stream, { status: 200,
+        headers: { 'content-type': 'text/html' } })
+    },
+  })
+  await entered
+  // Let the async body reader block on a still-open stream.
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(session.status().stores.plus.busy, true)
+  let extraNetwork = false
+  await assert.rejects(session.captureOne({
+    ...approved(), fetchFn: async () => { extraNetwork = true; return ok() },
+  }), /Retailer capture session refused/)
+  assert.equal(extraNetwork, false)
+  streamController.enqueue(new TextEncoder().encode(html))
+  streamController.close()
+  const result = await first
+  assert.equal(result.html, html)
+  assert.equal(session.status().stores.plus.busy, false)
+})
+
+test('nested permission getter is never executed before transport', async () => {
+  const session = createAuthorizedRetailerCaptureSession()
+  const input = approved()
+  let getterCalls = 0, calls = 0
+  Object.defineProperty(input.grant, 'reviewed', {
+    enumerable: true,
+    get() { getterCalls++; return true },
+  })
+  await assert.rejects(session.captureOne({
+    ...input, fetchFn: async () => { calls++; return ok() },
+  }), /Authorized capture requires inert permission data/)
+  assert.equal(getterCalls, 0)
+  assert.equal(calls, 0)
+  assert.equal(session.status().stores.plus.attemptedCaptures, 0)
+})
+
 test('no implicit fetch or scheduler is available', async () => {
   const session = createAuthorizedRetailerCaptureSession()
   await assert.rejects(session.captureOne(approved()),
