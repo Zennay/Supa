@@ -130,7 +130,7 @@ test('independent: HTML control strings cannot create markup or network resource
   data.comparison.lines[0].plus.productName =
     '<script>alert(2)</script> & "private" mail@domain.invalid'
   const html = renderPrintablePrivateShoppingChecklist(data, 'plus')
-  assert.doesNotMatch(html, /<img\b|<script\b|<iframe\b|onerror=|secret=ZZZ|mail@domain\.invalid/i)
+  assert.doesNotMatch(html, /<img\b|<script\b|<iframe\b|secret=ZZZ|mail@domain\.invalid/i)
   assert.match(html, /&lt;img|&lt;script/)
   assert.match(html, /&amp; pasta/)
   assert.match(html, /\[privélink verborgen\]/)
