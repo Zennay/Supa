@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, writeFile, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile, rm, stat, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -123,13 +123,35 @@ test('real local fixture -> comparator -> printable HTML on disk with private 06
   assert.doesNotMatch(html, /https:\/\/schema\.org|private-secret|<script/)
 })
 
-test('output cannot overwrite raw input or follow a final symlink', async t => {
+test('valid private manifest cannot be overwritten or used to follow output symlink', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'supa-private-print-alias-'))
   t.after(() => rm(dir, { recursive: true, force: true }))
-  const badManifest = join(dir, 'bad.html')
-  await writeFile(badManifest, 'not json')
-  await assert.rejects(() => main([badManifest, '--output', badManifest]))
-  assert.equal(await readFile(badManifest, 'utf8'), 'not json')
+  await writeFile(join(dir, 'plus.html'), offlineHtml('1.29'))
+  await writeFile(join(dir, 'deka.html'), offlineHtml('1.19'))
+  // Filename extension is not an authorization to overwrite raw input;
+  // a valid JSON manifest can itself be named *.html.
+  const manifest = join(dir, 'source-manifest.html')
+  await writeFile(manifest, JSON.stringify({
+    version: 1,
+    requirements: [{ id: 'milk', query: 'halfvolle melk', amount: 1500, unit: 'ml' }],
+    snapshots: [
+      { sourceId: 'plus-product-halfvolle-melk', htmlFile: 'plus.html',
+        capturedAt: new Date().toISOString() },
+      { sourceId: 'dekamarkt-product-halfvolle-melk', htmlFile: 'deka.html',
+        capturedAt: new Date().toISOString() },
+    ],
+  }))
+  const before = await readFile(manifest, 'utf8')
+  await assert.rejects(() => main([manifest, '--output', manifest]),
+    /refusing to overwrite M3 evidence input with derived output/)
+  assert.equal(await readFile(manifest, 'utf8'), before)
+  const sentinel = join(dir, 'private-source.txt')
+  await writeFile(sentinel, 'protected private source')
+  const output = join(dir, 'output.html')
+  await symlink(sentinel, output)
+  await assert.rejects(() => main([manifest, '--output', output]),
+    /refusing symlinked M3 derived output file/)
+  assert.equal(await readFile(sentinel, 'utf8'), 'protected private source')
 })
 
 test('argument validation prevents implicit output, network or arbitrary filename', async () => {
