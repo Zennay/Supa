@@ -52,6 +52,18 @@ const HOST_BY_SUPERMARKET: Record<SupermarketId, string> = {
   dekamarkt: 'www.dekamarkt.nl',
 }
 
+// A product observation must point at that retailer's product route,
+// not a same-host search, account or marketing page. Keep catalog/offers
+// provenance untouched: those are valid separately reviewed source kinds.
+const PRODUCT_ROUTES_BY_SUPERMARKET: Record<SupermarketId, readonly string[]> = {
+  // Older reviewed AH M1 fixtures use /product/:slug, while modern
+  // product pages use /producten/product/:id/:slug. Both identify an
+  // individual product; account and search routes never do.
+  ah: ['/product/', '/producten/product/'],
+  plus: ['/product/'],
+  dekamarkt: ['/producten/'],
+}
+
 const SOURCE_PAGE_KINDS = new Set<SourcePageKind>([
   'product',
   'catalog',
@@ -137,6 +149,17 @@ function validateSnapshotRef(
     throw new Error(
       'Product observation provenance must use a public HTTPS retailer origin without credentials or custom port',
     )
+  }
+
+  if (provenance.kind === 'product') {
+    const recognizedProductRoute = PRODUCT_ROUTES_BY_SUPERMARKET[observationSupermarket]
+      .some((prefix) =>
+        url.pathname.startsWith(prefix) && url.pathname.length > prefix.length)
+    if (!recognizedProductRoute) {
+      throw new Error(
+        'Product observation provenance must reference a retailer product route',
+      )
+    }
   }
 
   if (!validIso(provenance.capturedAt)) {
