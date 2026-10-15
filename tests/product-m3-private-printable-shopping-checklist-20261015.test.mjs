@@ -49,7 +49,10 @@ test('no-script retailer selection keeps exactly one supermarket visible and pri
   assert.match(html, /class="shop shop-dekamarkt"/)
   assert.match(html, /body:has\(#view-plus:checked\) \.shop-dekamarkt/)
   assert.match(html, /body:has\(#view-deka:checked\) \.shop-plus/)
-  assert.match(html, /@media print\{[^}]*\.store-filter\{display:none\}/)
+  // The print rule follows :root/body declarations containing their own braces.
+  // Restrict the check to the print stylesheet rather than assuming flat CSS.
+  const printCss = html.slice(html.indexOf('@media print{'), html.indexOf('</style>'))
+  assert.match(printCss, /\.store-filter\{display:none\}/)
   assert.equal((html.match(/name="storeView"/g) || []).length, 3)
   assert.equal((html.match(/name="storeView"[^>]*checked/g) || []).length, 1)
   assert.doesNotMatch(html, /<script|onsubmit=|onclick=|localStorage|fetch\(/)
