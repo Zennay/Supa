@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { parseSchemaOrgProduct } from '../src/data/schemaOrgProduct.ts'
+import { parseSchemaOrgProduct, priceInstantNs } from '../src/data/schemaOrgProduct.ts'
 import { validateSources } from './m1-capture-sources.mjs'
 
 const MAX_BYTES = 2 * 1024 * 1024
@@ -29,7 +29,9 @@ function isJsonLdScript(attrs) {
 export function parseOfflineRetailerSnapshot({ source, html, capturedAt }) {
   validateSources([source])
   if (typeof html !== 'string' || Buffer.byteLength(html, 'utf8') > MAX_BYTES ||
-      typeof capturedAt !== 'string' || !Number.isFinite(Date.parse(capturedAt))) {
+      typeof capturedAt !== 'string' ||
+      !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:[.][0-9]{1,9})?)?(?:Z|[+-][0-9]{2}:[0-9]{2})$/.test(capturedAt) ||
+      priceInstantNs(capturedAt, false) === null) {
     throw new Error('Invalid bounded offline snapshot')
   }
   const sha256 = createHash('sha256').update(html).digest('hex')
