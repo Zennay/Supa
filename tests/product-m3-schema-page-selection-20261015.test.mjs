@@ -121,7 +121,7 @@ test('existing parser still enforces EUR, stock and physically observed pack', (
     'https://www.plus.nl/product/other',
   )], plus)
   assert.equal(result.type, 'abstain')
-  assert.match(result.reason, /not EUR/)
+  assert.match(result.reason, /not verified/)
 })
 
 test('missing Product JSON-LD abstains without inventing price', () => {
@@ -169,4 +169,13 @@ test('only an actual retailer product-page source may select a priced Product', 
     assert.equal(result.type, 'abstain')
     assert.equal(result.reason, 'invalid captured product-page URL')
   }
+})
+
+test('hostile retailer currency never leaks from the legacy parser diagnosis', () => {
+  const poisoned = product()
+  poisoned.offers.priceCurrency = 'PRIVATE_CURRENCY_CONTACT_555'
+  const result = parseSchemaOrgProductForPage(poisoned, plus)
+  assert.equal(result.type, 'abstain')
+  assert.equal(result.reason, 'selected Product price, currency or provenance not verified')
+  assert.doesNotMatch(result.reason, /PRIVATE_CURRENCY_CONTACT_555/)
 })
