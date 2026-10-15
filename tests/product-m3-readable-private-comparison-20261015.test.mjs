@@ -10,3 +10,19 @@ test('shared physical package is not presented as free ingredient',()=>{const f=
 test('forged public-claimable result cannot be rendered as offline',()=>{const f=fixture();f.comparison.claimable=true;assert.throws(()=>renderPrivateComparison(f),/Invalid or claimable/)})
 
 test('operator text is readable across actual newline boundaries and keeps ingredient label',()=>{const out=renderPrivateComparison(fixture());assert.ok(out.includes(String.fromCharCode(10)+'Mandregels:'));assert.ok(out.includes('Fictional milk:'))})
+
+test('operator withholds forged basket winner or impossible savings totals',()=>{
+  const f=fixture()
+  f.comparison.savingsCents=9999
+  assert.match(renderPrivateComparison(f),/GEEN VOLLEDIGE MANDVERGELIJKING/)
+  assert.doesNotMatch(renderPrivateComparison(f),/ALLEEN OFFLINE MANDVERSCHIL/)
+  f.comparison.savingsCents=10
+  f.comparison.cheaperStore='plus'
+  assert.match(renderPrivateComparison(f),/GEEN VOLLEDIGE MANDVERGELIJKING/)
+})
+
+test('operator refuses to show a row price contradicting package arithmetic',()=>{
+  const f=fixture()
+  f.comparison.lines[0].plus.totalCents=1
+  assert.match(renderPrivateComparison(f),/PLUS: prijs onbetrouwbaar/)
+})
