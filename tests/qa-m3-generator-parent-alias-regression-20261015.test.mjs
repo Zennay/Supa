@@ -38,7 +38,7 @@ test('positive: a real nested output directory creates exactly one private canon
     assert.equal(sheet.requirements.length, 11)
     assert.equal(sheet.baseline.lines.length, 11)
     assert.equal(sheet.candidate.lines.length, 11)
-    assert.equal(sheet.evidenceStatus, 'unobserved')
+    assert.equal(sheet.evidenceStatus, 'collection-template-not-evidence')
     assert.equal((await stat(output)).mode & 0o777, 0o600)
   })
 })
