@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -31,6 +31,10 @@ export function currentMainRevision() {
     }).trim()
     const branch = git('symbolic-ref', '--quiet', '--short', 'HEAD')
     const sha = git('rev-parse', '--verify', 'HEAD')
+    // Refuse a locally out-of-date main relative to its tracked origin/main.
+    // This is not a remote freshness check: operator must fetch/pull first.
+    const trackedMain = git('rev-parse', '--verify', 'refs/remotes/origin/main')
+    if (sha !== trackedMain) throw new Error('local main not aligned')
     // A tracked local modification would make a commit pin misleading.
     if (git('status', '--porcelain', '--untracked-files=no')) {
       throw new Error('dirty checkout')
