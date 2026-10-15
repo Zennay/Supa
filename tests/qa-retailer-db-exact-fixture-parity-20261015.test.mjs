@@ -34,7 +34,7 @@ function assertDenied(outcome) {
   assert.equal(outcome.status, 2, outcome.stderr)
   assert.equal(outcome.stdout, '')
   assert.match(outcome.stderr, /^Private historical retailer source\/SQLite parity refused\s*$/)
-  assert.doesNotMatch(outcome.stderr, /https?:\/\/|\\/tmp\\/|Zuivelmeester|price_cents|source_product_id/i)
+  assert.doesNotMatch(outcome.stderr, /https?:\/\/|tmp|Zuivelmeester|price_cents|source_product_id/i)
 }
 
 test('exact historical PLUS and DekaMarkt source facts survive adapter -> SQLite without promotion or mutation', () =>
