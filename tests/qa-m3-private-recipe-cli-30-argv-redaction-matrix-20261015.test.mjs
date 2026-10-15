@@ -28,7 +28,7 @@ const invalid = [
   ['--plan', 'Ma:pasta\nDo:pasta'],
   ['--plan', 'Ma:pasta\t'],
   ['--plan', 'Ma:pasta\u200b'],
-  ['--plan', 'Ma:pasta\u0000'],
+  ['--plan', 'Ma:pasta\u000b'],
   ['--plan', '\u200bMa:pasta'],
   ['--plan', 'Ma:pasta;echo PRIVATE_TOKEN_DO_NOT_ECHO'],
   ['--plan', 'Ma:https://example.invalid/?key=PRIVATE_TOKEN_DO_NOT_ECHO'],
