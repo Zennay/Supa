@@ -139,3 +139,40 @@ test('M3 private preflight CLI uses only local files and never emits study ident
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('M3 preflight rejects oversized, malformed UTF-8 and malformed manifest byte envelopes', () => {
+  const input = encoded(syntheticStudy())
+  const pin = pinned(input)
+  assert.throws(() => preflightPrivateM3Week(Buffer.alloc(4 * 1024 * 1024 + 1), pin), /preflight refused/)
+  assert.throws(() => preflightPrivateM3Week(input, Buffer.alloc(4097)), /preflight refused/)
+  assert.throws(() => preflightPrivateM3Week(Buffer.from([0xff]), pin), /preflight refused/)
+  assert.throws(() => preflightPrivateM3Week(input, Buffer.from([0xff])), /preflight refused/)
+  assert.throws(() => preflightPrivateM3Week(input, Buffer.from('{"sourceCommitSha":"x"}')), /preflight refused/)
+})
+
+test('M3 private weekly CLI refuses nonblocking Linux FIFO for either input without emitting data', async (t) => {
+  if (process.platform !== 'linux') return t.skip('Linux mkfifo gate')
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-week-fifo-'))
+  try {
+    const study = join(dir, 'study.json')
+    const pin = join(dir, 'pin.json')
+    const fifo = join(dir, 'untrusted-pipe')
+    const bytes = encoded(syntheticStudy())
+    await writeFile(study, bytes, { mode: 0o600 })
+    await writeFile(pin, pinned(bytes), { mode: 0o600 })
+    const make = spawnSync('mkfifo', [fifo], { encoding: 'utf8', timeout: 2500 })
+    assert.equal(make.status, 0, make.stderr)
+    for (const args of [[fifo, pin], [study, fifo]]) {
+      const proc = spawnSync(process.execPath, ['--experimental-strip-types',
+        'scripts/m3-verify-private-week-preflight.mjs', ...args], {
+        encoding: 'utf8', timeout: 3000,
+      })
+      assert.equal(proc.error, undefined, String(proc.error))
+      assert.equal(proc.status, 1, proc.stderr)
+      assert.equal(proc.stdout, '')
+      assert.doesNotMatch(proc.stderr, new RegExp(dir))
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
