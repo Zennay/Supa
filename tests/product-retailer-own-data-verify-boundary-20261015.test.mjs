@@ -129,11 +129,30 @@ test('product: invalid explicit audit clocks are refused before publishing a pri
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
-test('product: valid UTC-offset and nanosecond audit clocks keep the private path gate', async () => {
-  for (const value of ['2026-10-15T10:00Z', '2026-10-15T12:00:00.000000001+02:00',
-    '2026-10-15T05:00:00.000000009-05:00']) {
-    await assert.rejects(verifyPrivateRetailerPipeline(fakeDir, {
-      referenceTime: value,
-    }), refusal)
-  }
+test('product: valid UTC-offset and nanosecond clocks replay a real six-source private manifest', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-product-valid-clock-'))
+  try {
+    for (const [index, fixture] of RETAILER_REVIEWED_FIXTURES.entries()) {
+      const contents = await readFile(new URL('../fixtures/m1/' + fixture, import.meta.url))
+      await writeFile(join(directory, 'capture-' + index + '.json'), contents,
+        { mode: 0o600, flag: 'wx' })
+    }
+    const created = await runPrivateRetailerPipeline(directory, {
+      referenceTime: '2026-10-15T12:00:00.000000001+02:00',
+    })
+    assert.equal(created.manifestCreated, true)
+    const originalManifest = await readFile(join(directory, 'manifest.json'))
+    for (const time of ['2026-10-15T10:00Z',
+      '2026-10-15T12:00:00.000000001+02:00',
+      '2026-10-15T05:00:00.000000009-05:00']) {
+      const verified = await verifyPrivateRetailerPipeline(directory, {
+        referenceTime: time,
+      })
+      assert.equal(verified.manifestVerified, true)
+      assert.equal(verified.pinnedSources, 6)
+      assert.equal(verified.publicSavingsClaimEligible, false)
+      assert.equal(verified.externalRequests, 0)
+      assert.deepEqual(await readFile(join(directory, 'manifest.json')), originalManifest)
+    }
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })
