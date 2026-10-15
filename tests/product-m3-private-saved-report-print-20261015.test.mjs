@@ -99,6 +99,17 @@ test('actual local fake HTML -> saved report -> remove original captures -> priv
   assert.doesNotMatch(dekaOnly, /ALLEEN OFFLINE TOTAAL PLUS:|€2,58|name="storeView"/)
   assert.equal((await stat(join(dir, 'plus-only.html'))).mode & 0o777, 0o600)
   assert.equal((await stat(join(dir, 'deka-only.html'))).mode & 0o777, 0o600)
+  // Real local fictional capture → physical packages → privacy-safe text;
+  // must not need a differently trusted price path than HTML.
+  const plusTxt = join(dir, 'plus-whole-packs.txt')
+  const textList = await main([
+    manifest, '--output', plusTxt, '--store', 'plus', '--format', 'text',
+  ])
+  assert.match(textList, /2 hele verpakking/)
+  assert.match(textList, /ALLEEN OFFLINE TOTAAL PLUS: €2,58/)
+  assert.doesNotMatch(textList, /DekaMarkt|€2,38|<!doctype|<script/)
+  assert.equal(await readFile(plusTxt, 'utf8'), textList)
+  assert.equal((await stat(plusTxt)).mode & 0o777, 0o600)
   const saved = join(dir, 'actual-offline-snapshot-report.json')
   const payload = JSON.stringify(inspected)
   await writeFile(saved, payload)
