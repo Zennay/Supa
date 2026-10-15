@@ -65,15 +65,13 @@ test('M3 private week accepts canonical unresolved 11x2 without granting financi
   assert.equal(result.publicSavingsClaimEligible, false)
 })
 
-test('M3 private week must refuse unsupported integer schemaVersion even with valid 11x2 basket', () => {
-  const case2 = study()
-  case2.schemaVersion = 2
-  assert.match(buildObservedWeekReport(case2).reasons.join(' '), /unsupported study schema version/)
-  reject(case2)
-  const case0 = study()
-  case0.schemaVersion = 0
-  assert.match(buildObservedWeekReport(case0).reasons.join(' '), /unsupported study schema version/)
-  reject(case0)
+test('M3 code-pin creator already blocks unsupported integer schema versions before preflight', () => {
+  for (const version of [0, 2]) {
+    const bogus = study()
+    bogus.schemaVersion = version
+    assert.match(buildObservedWeekReport(bogus).reasons.join(' '), /unsupported study schema version/)
+    assert.throws(() => check(bogus), /Invalid private M3 study code-pin input/)
+  }
 })
 
 test('M3 private week must refuse invisible-only student population metadata', () => {
