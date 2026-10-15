@@ -4,15 +4,7 @@ De **Meten**-werkbladen zijn bevroren op vier specifieke recepten en elf identie
 
 ## Uitvoeren (lokaal, volledig offline)
 
-Vanaf de repository-root op een computer met Node en npm gebruik je de ondersteunde SUPA-opdracht:
-
-```sh
-npm run --silent m3:preflight-week
-npm run --silent m3:preflight-week -- --days Do,Wo,Di,Ma
-npm run --silent m3:preflight-week -- --plan Ma:tikka,Di:teriyaki,Wo:pasta,Do:tikka
-```
-
-Met een gewijzigd weekmenu wordt de opdracht bewust met status **3** gestopt; met ongeldige argumenten status **2**. De uitvoer blijft privé en beweert nooit dat er winkelprijzen zijn gecontroleerd. Voor rechtstreekse operatorcontrole zonder npm kan hetzelfde script ook met Node worden gestart:
+Vanaf de repository-root op een computer met Node:
 
 ```sh
 node --experimental-strip-types scripts/m3-field-plan-alignment.mjs
