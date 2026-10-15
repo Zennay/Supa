@@ -1,0 +1,171 @@
+/**
+ * Read-only operational health over *already reviewed* six-adapter results.
+ * Counts represent the supplied offline dataset, not live retail coverage.
+ * No network, source URL, product name, price or SHA reaches the report.
+ */
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { validateRawProductObservation } from '../src/data/ingestion.ts'
+import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
+import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
+
+const STORES = ['plus', 'dekamarkt']
+const KINDS = ['product', 'catalog', 'offers']
+const PAIRS = STORES.flatMap(store => KINDS.map(kind => store + ':' + kind))
+const fail = () => { throw new Error('Private retailer adapter health review refused') }
+const safeCount = value => Number.isSafeInteger(value) && value >= 0
+const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+const timestamp = value => {
+  if (typeof value !== 'string' ||
+      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value)) fail()
+  const ms = Date.parse(value)
+  if (!Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 19) !== value.slice(0, 19)) fail()
+  return ms
+}
+const emptyCoverage = () => ({
+  sources: 0, accepted: 0, rejected: 0, observations: 0,
+  staleCaptures: 0, unknownPrices: 0, unknownAvailability: 0,
+  unknownPacks: 0, offerObservations: 0,
+})
+
+/**
+ * @param {object} batch result of ingestReviewedBatch (not raw retailer HTML)
+ * @param {object} options referenceTime is an explicit audit clock, NOT a license
+ */
+export function evaluatePrivateAdapterHealth(batch, {
+  referenceTime = new Date().toISOString(), maxAgeHours = 24,
+} = {}) {
+  const now = timestamp(referenceTime)
+  if (!Number.isSafeInteger(maxAgeHours) || maxAgeHours < 1 || maxAgeHours > 720 ||
+      !isObject(batch) || !isObject(batch.summary) ||
+      batch.summary.mode !== 'reviewed-offline-only' ||
+      batch.summary.productionEnabled !== false ||
+      batch.summary.permissionVerified !== false ||
+      batch.summary.publicSavingsClaimEligible !== false ||
+      !Array.isArray(batch.results) || batch.results.length < 1 ||
+      batch.results.length > 32 || !isObject(batch.summary.retailerCounts)) fail()
+
+  const byShape = Object.fromEntries(PAIRS.map(key => [key, emptyCoverage()]))
+  let acceptedSources = 0
+  let rejectedSources = 0
+  let observations = 0
+  const retailerCounts = { plus: 0, dekamarkt: 0 }
+  const accepted = []
+  const identities = new Set()
+  for (let i = 0; i < batch.results.length; i++) {
+    if (!Object.hasOwn(batch.results, i)) fail()
+    const result = batch.results[i]
+    if (!isObject(result) || !PAIRS.includes(result.key) ||
+        typeof result.accepted !== 'boolean' ||
+        !Array.isArray(result.observations) ||
+        (result.accepted ? result.reason !== null ||
+          result.observations.length === 0 || result.observations.length > 256
+          : typeof result.reason !== 'string' || result.observations.length !== 0)) fail()
+    const bucket = byShape[result.key]
+    bucket.sources++
+    if (!result.accepted) {
+      rejectedSources++
+      bucket.rejected++
+      continue
+    }
+    acceptedSources++
+    bucket.accepted++
+    const [retailer, kind] = result.key.split(':')
+    const first = result.observations[0]
+    const source = first?.provenance
+    if (!isObject(source) || source.supermarket !== retailer || source.kind !== kind ||
+        typeof source.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(source.sha256) ||
+        typeof source.url !== 'string') fail()
+    const event = JSON.stringify([result.key, source.url, source.sha256, source.capturedAt])
+    if (identities.has(event)) fail()
+    identities.add(event)
+    const when = timestamp(source.capturedAt)
+    if (when > now) fail()
+    if (now - when > maxAgeHours * 60 * 60 * 1000) bucket.staleCaptures++
+    const seenProducts = new Set()
+    for (let j = 0; j < result.observations.length; j++) {
+      if (!Object.hasOwn(result.observations, j)) fail()
+      const observation = result.observations[j]
+      try { validateRawProductObservation(observation) } catch { fail() }
+      const origin = observation.provenance
+      if (observation.supermarket !== retailer || !isObject(origin) ||
+          origin.supermarket !== retailer || origin.kind !== kind ||
+          origin.sha256 !== source.sha256 || origin.url !== source.url ||
+          origin.capturedAt !== source.capturedAt ||
+          typeof observation.sourceProductId !== 'string' ||
+          seenProducts.has(observation.sourceProductId)) fail()
+      seenProducts.add(observation.sourceProductId)
+      bucket.observations++
+      retailerCounts[retailer]++
+      observations++
+      if (observation.currentPriceCents === null) bucket.unknownPrices++
+      if (observation.availability === 'unknown') bucket.unknownAvailability++
+      if (observation.pack?.unit === 'unknown' || observation.pack?.amount === null) bucket.unknownPacks++
+      if (observation.offer !== null) bucket.offerObservations++
+    }
+    accepted.push(result)
+  }
+  if (batch.summary.sources !== batch.results.length ||
+      batch.summary.acceptedSources !== acceptedSources ||
+      batch.summary.rejectedSources !== rejectedSources ||
+      batch.summary.observations !== observations ||
+      !safeCount(batch.summary.retailerCounts.plus) ||
+      !safeCount(batch.summary.retailerCounts.dekamarkt) ||
+      batch.summary.retailerCounts.plus !== retailerCounts.plus ||
+      batch.summary.retailerCounts.dekamarkt !== retailerCounts.dekamarkt) fail()
+
+  // The existing universal product model resolves duplicate captures and
+  // identifies fact conflicts, without promoting historical prices to "current".
+  const catalog = accepted.length
+    ? buildUniversalRetailerCatalog({
+      summary: { mode: 'reviewed-offline-only' }, results: accepted,
+    })
+    : null
+  const missingSourceKinds = PAIRS.filter(key => byShape[key].accepted === 0)
+  const staleSources = PAIRS.reduce((sum, key) => sum + byShape[key].staleCaptures, 0)
+  const unknownPriceObservations = PAIRS.reduce((sum, key) => sum + byShape[key].unknownPrices, 0)
+  const inconsistentProducts = catalog?.conflictCount ?? 0
+  const operatorActions = [
+    ...(missingSourceKinds.length ? ['review-missing-source-shapes'] : []),
+    ...(rejectedSources ? ['review-rejected-adapter-inputs'] : []),
+    ...(staleSources ? ['review-capture-freshness'] : []),
+    ...(inconsistentProducts ? ['review-conflicting-product-facts'] : []),
+    ...(unknownPriceObservations ? ['review-missing-price-facts'] : []),
+    'obtain-written-retailer-source-rights',
+    'collect-genuine-two-store-m3-basket-evidence',
+  ]
+  return {
+    schemaVersion: 1,
+    mode: 'private-reviewed-adapter-health',
+    meaning: 'offline-dataset-only',
+    sources: batch.results.length,
+    acceptedSources, rejectedSources, observations,
+    products: catalog?.productCount ?? 0,
+    captureEvents: catalog?.captureCount ?? 0,
+    inconsistentProducts, staleSources, unknownPriceObservations,
+    maxAgeHours,
+    byShape,
+    missingSourceKinds,
+    sixShapeCoverageComplete: missingSourceKinds.length === 0 && rejectedSources === 0,
+    historicalFreshnessWithinWindow: staleSources === 0,
+    operatorActions,
+    humanReviewRequired: true, permissionVerified: false,
+    productionEnabled: false, livePricesAvailable: false,
+    publicSavingsClaimEligible: false, externalRequests: 0,
+  }
+}
+
+export async function main(argv = process.argv.slice(2), write = text => process.stdout.write(text)) {
+  if (!Array.isArray(argv) || argv.length !== 0) fail()
+  const batch = await loadReviewedRepositoryFixtures()
+  const report = evaluatePrivateAdapterHealth(batch)
+  write(JSON.stringify(report, null, 2) + '\n')
+  return report
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch(() => {
+    console.error('Private retailer adapter health review refused')
+    process.exitCode = 2
+  })
+}
