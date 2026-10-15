@@ -82,6 +82,18 @@ function assertUnrepairedObservedFacts(serialized) {
           (!Number.isSafeInteger(product.packCount) || product.packCount < 1)) {
         throw new Error('private M3 draft has invalid observed pack count')
       }
+      // The Meten UI clears physical product and price details when an item is
+      // explicitly unavailable. An externally edited draft must not be marked
+      // completed while contradicting that absence with a product, pack or price.
+      // User notes/URLs remain allowed to explain genuine unavailability.
+      if (product.available === false &&
+          ((typeof product.productName === 'string' && product.productName.trim() !== '') ||
+           (typeof product.productId === 'string' && product.productId.trim() !== '') ||
+           (product.packAmount !== null && product.packAmount !== undefined) ||
+           (product.packUnit !== null && product.packUnit !== undefined) ||
+           (product.priceCents !== null && product.priceCents !== undefined))) {
+        throw new Error('private M3 draft contradicts observed unavailability')
+      }
     }
   }
 }
