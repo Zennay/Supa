@@ -30,6 +30,12 @@ De optionele terminalschakelaar is uitsluitend `--store plus` of `--store dekama
 
 De optie werkt ook bij de oorspronkelijke lokale manifestmodus: `<manifest.json> --output <print.html> --store plus`. Er vindt geen winkelverkeer plaats.
 
+## Extra privacy bij afdrukken
+
+Productnamen en planneringrediënten kunnen per ongeluk een e-mailadres of webadres bevatten (bijvoorbeeld na kopiëren uit een account of winkelwagen). De **HTML-afdrukvariant** vervangt zulke adressen in de zichtbare tekst én checkbox-labels door `[privé e-mailadres verborgen]` of `[privélink verborgen]`. Dit werkt zowel voor de lijst met beide winkels als voor een afzonderlijke `--store`-export, én bij opgeslagen JSON. Het onderliggende bronbestand wordt niet gewijzigd en de al geverifieerde fysieke aantallen/winkeltotalen worden niet opnieuw berekend.
+
+Deze begrensde tekstafscherming detecteert niet alle soorten persoonsgegevens; gebruik uitsluitend geanonimiseerde, lokale bronbestanden en controleer de uiteindelijke afdruk voordat je die deelt. Het origineel blijft privé, en de uitvoer claimt nooit live prijzen of verifieerbare besparingen.
+
 **Niet verwarren:** --report importeert geen echte winkelwaarnemingen en is geen vergunning of besparingsbewijs. Ook een historische lokale vergelijking is nooit een actuele online prijs.
 
 ## Contract
@@ -42,4 +48,4 @@ De optie werkt ook bij de oorspronkelijke lokale manifestmodus: `<manifest.json>
 
     node --experimental-strip-types --test tests/product-m3-private-printable-shopping-checklist-20261015.test.mjs
 
-Tests controleren fysieke aankopen, onafhankelijk winkelgedrag, radioselectie voor weergave en print, gedeelde verpakking, HTML-escaping/CSP, complete lokale fixture→vergelijker→HTML, private bestandsrechten en argumentcontroles. Aanvullende opgeslagen-JSON-regressies: node --experimental-strip-types --test tests/product-m3-private-saved-report-print-20261015.test.mjs (15 synthetische cases, waaronder aparte privacy-uitvoer per winkel en een echte fictieve HTML→offline-rapport→bronbestanden verwijderen→print via JSON). Alleen synthetische voorbeelden; geen scraping, productie of publicatie.
+Tests controleren fysieke aankopen, onafhankelijk winkelgedrag, radioselectie voor weergave en print, gedeelde verpakking, HTML-escaping/CSP, complete lokale fixture→vergelijker→HTML, private bestandsrechten en argumentcontroles. Aanvullende opgeslagen-JSON-regressies: node --experimental-strip-types --test tests/product-m3-private-saved-report-print-20261015.test.mjs (17 synthetische cases, waaronder aparte privacy-uitvoer per winkel en een echte fictieve HTML→offline-rapport→bronbestanden verwijderen→print via JSON). Alleen synthetische voorbeelden; geen scraping, productie of publicatie.
