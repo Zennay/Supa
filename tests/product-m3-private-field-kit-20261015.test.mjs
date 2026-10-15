@@ -138,3 +138,27 @@ test('npm field kit command uses local offline generator without contacting reta
   assert.equal(packageJson.scripts['m3:prepare-field-kit'],
     'node --experimental-strip-types scripts/m3-prepare-field-kit.mjs')
 })
+
+test('exported private writer rejects forged or prefilled kit bytes before creating a directory', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'supa-m3-kit-integrity-'))
+  try {
+    const original = buildM3FieldKit(revision())
+    const prefills = [
+      { ...original, 'collection-sheet.json': original['collection-sheet.json']
+        .replace('"available": null', '"available": true') },
+      { ...original, 'field-form.html': original['field-form.html'] + '<script>unsafe</script>' },
+      { ...original, 'START-HERE.txt': original['START-HERE.txt'] + 'Prijs: € 0' },
+      { ...original, 'source-revision.json': JSON.stringify({
+        ...JSON.parse(original['source-revision.json']), canonicalDemandSha256: '0'.repeat(64),
+      }) },
+      { ...original, 'source-revision.json': '{broken' },
+    ]
+    for (const [index, kit] of prefills.entries()) {
+      const output = join(root, 'invalid-' + index)
+      await assert.rejects(writeM3FieldKit(output, kit))
+      await assert.rejects(lstat(output), { code: 'ENOENT' })
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
