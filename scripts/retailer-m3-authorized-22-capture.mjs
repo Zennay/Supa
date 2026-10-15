@@ -253,9 +253,9 @@ export async function main(argv = process.argv.slice(2)) {
         }))),
     }
     // Exclusive creation: never overwrite a genuine private operator draft.
-    await writeFile(destination, JSON.stringify(template, null, 2) + '\\n',
+    await writeFile(destination, JSON.stringify(template, null, 2) + '\n',
       { flag: 'wx', mode: 0o600 })
-    process.stdout.write('Private canonical M3 URL plan created; enter only authorized product URLs\\n')
+    process.stdout.write('Private canonical M3 URL plan created; enter only authorized product URLs\n')
     return template
   }
   assert(argv.length === 2 && argv[0] === '--live' &&
