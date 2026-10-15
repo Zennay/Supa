@@ -32,3 +32,17 @@ Voor echt bewijs moeten de bestaande geautoriseerde collector/converter en asses
 ## Extra canonieke metadatacontrole (issue #2864)
 
 De onderliggende privé M3 weekpreflight controleert nu ook dat `population`, `region`, `baseline.provenanceNote` en `candidate.provenanceNote` echt **zichtbare, betekenisvolle** inhoud bevatten. Een string van alleen onzichtbare Unicode-formaattekens, lege spaties of loshangende accentmarkeringen mag geen positieve `private-review-only` toelating krijgen. Dit volgt dezelfde zichtbaarheidstest als de canonieke studiebeoordelaar. Een werkelijk onopgeloste winkelmand (bijvoorbeeld niet-beschikbare producten) blijft **wel geldig voor private review**, zonder financiële claim. Het voorkomt dat ongeldige context ten onrechte dezelfde private toelatingsstatus krijgt als een echte, volledig gecontextualiseerde maar onopgeloste studie.
+
+## Concrete invulchecklist zonder privé-inhoud
+
+De operatoruitvoer toont naast de bestaande totalen voortaan drie onveranderlijke lijsten:
+
+- `missingMetadataFieldKeys`: uitsluitend **vaste technische veldnamen** uit het bestaande formulier, bijvoorbeeld `study.priceContext`, `baseline.provenanceNote` of `candidate.store.name`. Geen gebruikerswaarde wordt getoond. `nextMissingMetadataFieldKey` noemt het eerste ontbrekende veld.
+- `plusMissingLineNumbers`: de nog onvolledige **1-based** regelnummers 1–11 bij PLUS, met `nextMissingPlusLineNumber`.
+- `dekamarktMissingLineNumbers`: dezelfde canonieke 1–11 posities bij DekaMarkt, met `nextMissingDekaLineNumber`.
+
+Een lege lijst betekent dat in die categorie niets meer ontbreekt **qua invulling**, niet dat de externe feiten of toestemming geldig zijn. Bij een ogenschijnlijk compleet formulier blijft de strikte converter op de **originele bronbytes** nodig: een niet-canonieke tijdsgrens, vervalste vraaglijst of onjuist bronbewijs leidt nog altijd tot weigering. Alle lijsten worden afgeleid van bestaande canonical progress-validatie en onderling op consistente aantallen getoetst. Een ongeldige teller betekent een weigering in plaats van misleidende checklistinformatie. Geen productprijzen, winkelbonnen, deelnemerskeys, product-URL's of private bestandspaden in de uitvoer.
+
+## Extra private preflight-padbescherming
+
+De onderliggende `m3-verify-private-week-preflight.mjs` controleert nu niet alleen het laatste bestandspad (`O_NOFOLLOW`), maar weigert **ook statische symlinks in bovenliggende mappen**, zowel voor de originele onderzoeks-JSON als voor het SHA-sidecarbestand. De twee echte subprocess-regressies tonen dat een gewone lokale bron nog werkt en dat een gealiaste oudermap voor één van beide private inputs uitsluitend een generieke weigering zonder pad of prijzen geeft. Dit is een statische padveiligheidscontrole; kwaadwillige gelijktijdige directoryvervangingen zijn met standaard Node-pad-I/O niet volledig racevrij uitgesloten. De operator mag deze tool daarom niet als een volledige hostile-filesystem sandbox beschouwen.

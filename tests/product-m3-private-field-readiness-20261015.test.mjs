@@ -255,3 +255,92 @@ test('private SHA-bound M3 preflight rejects invisible-only source context while
     assert.throws(() => proof(study), /M3 private study provenance preflight refused/)
   }
 })
+
+test('M3 missing-field checklist identifies all sixteen fixed metadata keys and all 22 canonical positions', () => {
+  const x = reviewPrivateM3FieldSheet(bytes(blank()), SHA)
+  assert.equal(x.missingMetadataFieldKeys.length, 16)
+  assert.deepEqual(x.plusMissingLineNumbers, [1,2,3,4,5,6,7,8,9,10,11])
+  assert.deepEqual(x.dekamarktMissingLineNumbers, [1,2,3,4,5,6,7,8,9,10,11])
+  assert.equal(x.nextMissingMetadataFieldKey, 'study.studyId')
+  assert.equal(x.nextMissingPlusLineNumber, 1)
+  assert.equal(x.nextMissingDekaLineNumber, 1)
+  assert.equal(x.missingMetadataFieldKeys[5], 'study.priceContext')
+  assert.equal(x.missingMetadataFieldKeys[8], 'baseline.provenanceNote')
+  assert.equal(x.missingMetadataFieldKeys[13], 'candidate.provenanceNote')
+  assert.equal(Object.isFrozen(x.missingMetadataFieldKeys), true)
+  assert.equal(Object.isFrozen(x.plusMissingLineNumbers), true)
+  assert.equal(Object.isFrozen(x.dekamarktMissingLineNumbers), true)
+  assertPrivateFlags(x)
+})
+
+test('M3 field checklist reports only stable keys and positions for partially completed private evidence', () => {
+  const s = syntheticFullSheet()
+  s.study.population = '\u200b\u2060'
+  s.baseline.provenanceNote = '\u0301'
+  s.baseline.lines[3].observedProduct.available = null
+  s.candidate.lines[8].observedProduct.available = null
+  const x = reviewPrivateM3FieldSheet(bytes(s), SHA)
+  assert.deepEqual(x.missingMetadataFieldKeys, [
+    'study.population', 'baseline.provenanceNote',
+  ])
+  assert.deepEqual(x.plusMissingLineNumbers, [4])
+  assert.deepEqual(x.dekamarktMissingLineNumbers, [9])
+  assert.equal(x.nextMissingMetadataFieldKey, 'study.population')
+  assert.equal(x.nextMissingPlusLineNumber, 4)
+  assert.equal(x.nextMissingDekaLineNumber, 9)
+  assert.equal(x.completeObservationLineCount, 20)
+  assert.equal(x.technicalStudyConversionPossible, false)
+  assert.equal(x.nextAction, 'complete-private-study-metadata')
+  assert.doesNotMatch(JSON.stringify(x), /fictional-person-key|fictional region|fabricated test|\u200b|\u2060|\u0301|priceCents/)
+  assertPrivateFlags(x)
+})
+
+test('M3 complete synthetically unavailable field week has empty, immutable next-field checklist', () => {
+  const x = reviewPrivateM3FieldSheet(bytes(syntheticFullSheet()), SHA)
+  assert.deepEqual(x.missingMetadataFieldKeys, [])
+  assert.deepEqual(x.plusMissingLineNumbers, [])
+  assert.deepEqual(x.dekamarktMissingLineNumbers, [])
+  assert.equal(x.nextMissingMetadataFieldKey, null)
+  assert.equal(x.nextMissingPlusLineNumber, null)
+  assert.equal(x.nextMissingDekaLineNumber, null)
+  assert.equal(x.technicalStudyConversionPossible, true)
+  assert.equal(x.publicSavingsClaimEligible, false)
+  assert.equal(x.fieldObservationVerified, false)
+})
+
+test('M3 pinned-week CLI refuses symlinked ancestor for both private study and SHA sidecar', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-preflight-parents-'))
+  try {
+    const actual = join(dir, 'private-origin')
+    await mkdir(actual)
+    const studyBytes = bytes(buildWeeklyBasketStudyFromObservationSheet(syntheticFullSheet()))
+    const pinBytes = bytes(createPrivateM3StudyCodePin(studyBytes, SHA))
+    const study = join(actual, 'study.json')
+    const pin = join(actual, 'manifest.json')
+    await writeFile(study, studyBytes, { mode: 0o600 })
+    await writeFile(pin, pinBytes, { mode: 0o600 })
+    const command = (sourceStudy, sourcePin) => spawnSync(process.execPath, [
+      '--experimental-strip-types', 'scripts/m3-verify-private-week-preflight.mjs',
+      sourceStudy, sourcePin, '--expect-main-sha', SHA,
+    ], { encoding: 'utf8', timeout: 7000 })
+    const healthy = command(study, pin)
+    assert.equal(healthy.error, undefined, String(healthy.error))
+    assert.equal(healthy.status, 0, healthy.stderr)
+    assert.equal(JSON.parse(healthy.stdout).publicSavingsClaimEligible, false)
+    const alias = join(dir, 'unsafe-parent-link')
+    await symlink(actual, alias)
+    for (const [studyPath, pinPath] of [
+      [join(alias, 'study.json'), pin],
+      [study, join(alias, 'manifest.json')],
+    ]) {
+      const denied = command(studyPath, pinPath)
+      assert.equal(denied.error, undefined, String(denied.error))
+      assert.equal(denied.status, 1)
+      assert.equal(denied.stdout, '')
+      assert.equal(denied.stderr.trim(), 'M3 private study provenance preflight refused')
+      assert.doesNotMatch(denied.stderr, /private-origin|unsafe-parent-link|manifest\.json|study\.json/)
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
