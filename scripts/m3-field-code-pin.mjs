@@ -99,17 +99,43 @@ async function readBoundedPrivateStudy(path) {
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  if (argv.length !== 2 || argv[0].startsWith('-') || argv[1].startsWith('-')) {
-    throw new Error('usage: m3-field-code-pin <private-study.json> <40-char-main-commit-sha>')
+  const verifyMode = argv[0] === '--verify'
+  if ((verifyMode && argv.length !== 3) ||
+      (!verifyMode && (argv.length !== 2 || argv[0].startsWith('-'))) ||
+      argv.some((arg, index) => index > 0 && arg.startsWith('--'))) {
+    throw new Error('usage: m3-field-code-pin <private-study.json> <40-char-main-sha> OR --verify <private-study.json> <private-manifest.json>')
   }
   let bytes
   try {
-    bytes = await readBoundedPrivateStudy(argv[0])
+    bytes = await readBoundedPrivateStudy(argv[verifyMode ? 1 : 0])
   } catch {
     throw new Error('Private M3 study could not be read or validated')
   }
+
+  if (verifyMode) {
+    let manifest
+    try {
+      const manifestBytes = await readBoundedPrivateStudy(argv[2])
+      if (manifestBytes.length > 4096) throw new Error('invalid manifest')
+      manifest = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes))
+    } catch {
+      throw new Error('Private M3 manifest could not be read or validated')
+    }
+    if (!verifyPrivateM3StudyCodePin(bytes, manifest)) {
+      throw new Error('Private M3 study byte digest or code-pin contract did not match')
+    }
+    const result = Object.freeze({
+      privateStudyBytesMatch: true,
+      codeRevisionVerified: false,
+      retailerPermissionVerified: false,
+      publicSavingsClaimEligible: false,
+    })
+    process.stdout.write(JSON.stringify(result, null, 2) + '\\n')
+    return result
+  }
+
   const manifest = createPrivateM3StudyCodePin(bytes, argv[1])
-  process.stdout.write(JSON.stringify(manifest, null, 2) + '\n')
+  process.stdout.write(JSON.stringify(manifest, null, 2) + '\\n')
   return manifest
 }
 
