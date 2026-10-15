@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url'
 import { compareLocalRetailerSnapshots } from './retailer-compare-local-snapshots.mjs'
+import { priceInstantNs } from '../src/data/schemaOrgProduct.ts'
 
 const money = cents => '€' + (cents / 100).toFixed(2).replace('.', ',')
 const safe = cents => Number.isSafeInteger(cents) && cents >= 0
@@ -72,7 +73,8 @@ export function renderPrivateComparison(report) {
     const name = source?.supermarket === 'plus' ? 'PLUS' :
       source?.supermarket === 'dekamarkt' ? 'DekaMarkt' : 'onbekend'
     const clock = typeof source?.capturedAt === 'string' &&
-      /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:[.][0-9]{1,9})?)?(?:Z|[+-][0-9]{2}:[0-9]{2})$/.test(source.capturedAt)
+      /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:[.][0-9]{1,9})?)?(?:Z|[+-][0-9]{2}:[0-9]{2})$/.test(source.capturedAt) &&
+      priceInstantNs(source.capturedAt, false) !== null
       ? source.capturedAt : 'registratietijd onbekend'
     out.push('  ' + name + ': ' + (Number.isSafeInteger(source?.parsedProducts) &&
       source.parsedProducts >= 0 ? source.parsedProducts : 0) +
