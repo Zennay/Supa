@@ -30,7 +30,10 @@ export function canonicalM3RetailerRequirements() {
 export async function main(argv = process.argv.slice(2)) {
   if (argv.length !== 0 &&
       !(argv.length === 2 && argv[0] === '--out' &&
-        typeof argv[1] === 'string' && argv[1].trim())) {
+        typeof argv[1] === 'string' && argv[1].trim() &&
+        // A bare CLI option is never an explicit destination path. Keep
+        // absolute paths valid even when their basename resembles a flag.
+        !argv[1].startsWith('-'))) {
     throw new Error('Usage: node --experimental-strip-types scripts/retailer-canonical-m3-demand.mjs [--out private-requirements.json]')
   }
   const payload = JSON.stringify(canonicalM3RetailerRequirements(), null, 2) + '\n'
