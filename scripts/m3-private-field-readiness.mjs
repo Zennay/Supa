@@ -5,6 +5,7 @@
  */
 import { open, constants } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 import {
   buildObservationSheet,
   restoreObservationSheetDraft,
@@ -29,6 +30,9 @@ async function readPrivateSheet(path) {
   if (typeof path !== 'string' || !path || path.startsWith('-')) refuse()
   let handle
   try {
+    // O_NOFOLLOW guards only the final path component. Refuse statically
+    // symlinked ancestor directories too (not an openat race-proof sandbox).
+    await assertNoSymlinkedM3OutputParents(path)
     handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     const st = await handle.stat()
     if (!st.isFile() || st.nlink !== 1 || st.size <= 0 ||
