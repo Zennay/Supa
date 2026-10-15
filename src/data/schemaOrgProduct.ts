@@ -154,16 +154,6 @@ function extractPrice(offers: JsonObject[], pack: RawPack, capturedAt: string): 
   const offer = offers[0]
   const capturedMs = Date.parse(capturedAt)
   if (!Number.isFinite(capturedMs)) return null
-  // Malformed explicit Offer date fields must never silently disappear when
-  // buildOffer would otherwise coerce them to null (an unbounded price).
-  for (const [field, isEnd] of [
-    ['validFrom', false], ['priceValidUntil', true],
-  ] as const) {
-    const bound = offer[field]
-    if (bound === undefined || bound === null) continue
-    if (typeof bound !== 'string' || !bound.trim() ||
-        !Number.isFinite(priceBoundTime(bound, isEnd))) return null
-  }
   const prices = [
     cents(offer.price),
     ...priceSpecificationCandidates(offer).map((spec) =>
@@ -323,6 +313,22 @@ export function parseSchemaOrgProduct(
   }
 
   const offers = offerCandidates(product.offers)
+  // An explicitly malformed Offer window is invalid SOURCE evidence, not an
+  // ordinary unknown/missing price. Preserve the parser's abstain contract.
+  for (const offer of offers) {
+    for (const [field, isEnd] of [
+      ['validFrom', false], ['priceValidUntil', true],
+    ] as const) {
+      const value = offer[field]
+      if (value === null || value === undefined) continue
+      if (typeof value !== 'string' || !value.trim() ||
+          !Number.isFinite(priceBoundTime(value, isEnd))) {
+        return { type: 'abstain',
+          reason: 'Product JSON-LD observation failed trust validation: ' +
+            'Offer ' + field + ' must be a valid date/timestamp' }
+      }
+    }
+  }
   const currency = extractCurrency(offers)
   if (currency !== null && currency !== 'EUR') {
     return {
