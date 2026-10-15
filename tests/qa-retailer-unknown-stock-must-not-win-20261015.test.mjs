@@ -212,3 +212,81 @@ test('control: swapping independent retailer record order preserves known-stock 
     assert.equal(r.claimable, false)
   }
 })
+
+
+// Full-basket counterpart to the single-product availability lattice above.
+// One missing stock assertion, anywhere among 11 PLUS + 11 DekaMarkt prices,
+// must withhold the *entire* store comparison, even when other 21 lines match.
+// These are explicitly fictional grocery SKUs, never genuine field evidence.
+const basketNames = [
+  'avocado', 'amandelmelk', 'bloemkool', 'champignon', 'edamame',
+  'fusilli', 'havermout', 'kikkererwten', 'linzen', 'olijfolie', 'pindakaas',
+]
+const basketRequirements = basketNames.map((query, index) => ({
+  id: 'stock-demand-' + index,
+  query,
+  amount: 1000,
+  unit: 'g',
+}))
+
+function syntheticFullBasket() {
+  return basketNames.flatMap((name, index) => ['plus', 'dekamarkt'].map(shop => ({
+    supermarket: shop,
+    sourceProductId: 'fictional-basket-' + index,
+    name,
+    currentPriceCents: shop === 'plus' ? 125 + index : 115 + index,
+    currency: 'EUR',
+    pack: { rawText: '500 g', amount: 500, unit: 'g' },
+    availability: 'available',
+    offer: null,
+    provenance: {
+      supermarket: shop,
+      kind: 'product',
+      url: shop === 'plus'
+        ? 'https://www.plus.nl/product/fictional-' + index
+        : 'https://www.dekamarkt.nl/producten/fictional-' + index,
+      capturedAt: '2026-10-15T09:00:00Z',
+      sha256: (index + 1).toString(16).padStart(64, '0'),
+    },
+  })))
+}
+
+function compareFullBasket(rows) {
+  return compareReviewedCatalogs({
+    requirements: basketRequirements,
+    observations: rows,
+    nowMs: NOW,
+  })
+}
+
+test('control: every one of 22 fictional in-stock lines yields exact 220-cent full basket gap', () => {
+  const rows = syntheticFullBasket()
+  const before = JSON.stringify(rows)
+  const result = compareFullBasket(rows)
+  assert.equal(result.lines.length, 11)
+  assert.equal(result.comparable, true)
+  assert.equal(result.cheaperStore, 'dekamarkt')
+  assert.equal(result.savingsCents, 220)
+  assert.equal(result.claimable, false)
+  assert.equal(JSON.stringify(rows), before)
+})
+
+test('22 exhaustive positions: one unconfirmed stock observation blocks the entire basket', async t => {
+  for (let position = 0; position < 22; position += 1) {
+    await t.test('unknown stock at physical observed line ' + (position + 1), () => {
+      const rows = syntheticFullBasket()
+      rows[position].availability = 'unknown'
+      const before = JSON.stringify(rows)
+      const result = compareFullBasket(rows)
+      assert.equal(result.lines.length, 11)
+      assert.equal(result.comparable, false)
+      assert.equal(result.cheaperStore, null)
+      assert.equal(result.savingsCents, null)
+      assert.equal(result.claimable, false)
+      assert.equal(result.lines[Math.floor(position / 2)]
+        [position % 2 === 0 ? 'plus' : 'dekamarkt'].status,
+        'availability_unknown')
+      assert.equal(JSON.stringify(rows), before)
+    })
+  }
+})
