@@ -12,23 +12,27 @@ const offer=(price, extra={})=>({
   '@type':'Offer',price,priceCurrency:'EUR',
   availability:'https://schema.org/InStock',...extra,
 })
-function observed(shop,offers){
+function snapshot(shop,offers){
   const html='<script type="application/ld+json">'+JSON.stringify({
     '@type':'Product',sku:'fictional-milk',name:'Halfvolle melk',
     weight:{value:'1000 ml'},offers,
   })+'</script>'
-  const parsed=parseOfflineRetailerSnapshot({source:source(shop),html,capturedAt})
+  return parseOfflineRetailerSnapshot({source:source(shop),html,capturedAt})
+}
+function observed(shop,offers){
+  const parsed=snapshot(shop,offers)
   assert.equal(parsed.observations.length,1)
   return parsed.observations[0]
 }
 const compare=(candidate)=>compareReviewedCatalogs({
   requirements:[{id:'milk',query:'halfvolle melk',amount:1500,unit:'ml'}],
-  observations:[observed('plus',offer('1.29')),observed('dekamarkt',candidate)],
+  observations:[observed('plus',offer('1.29')),
+    ...snapshot('dekamarkt',candidate).observations],
   nowMs,
 })
 function assertUnknown(input){
-  const row=observed('dekamarkt',input)
-  assert.equal(row.currentPriceCents,null)
+  const rows=snapshot('dekamarkt',input).observations
+  assert.ok(rows.every((row)=>row.currentPriceCents===null))
   const r=compare(input)
   assert.equal(r.comparable,false)
   assert.equal(r.cheaperStore,null)
