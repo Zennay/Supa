@@ -83,3 +83,46 @@ test('product snapshot: changed own product count still falls back to manual sho
   assert.match(exposed.quantity, /handmatig kiezen/)
   assert.equal(buildShoppingListCopyText(original), null)
 })
+
+
+test('product snapshot: thrown hostile Error.message getter cannot execute while printing', () => {
+  const original = basket()
+  let reads = 0
+  const thrown = new Error('PRIVATE-UNTRUSTED-ERROR')
+  Object.defineProperty(thrown, 'message', {
+    configurable: true,
+    get() { reads++; throw new Error('PRIVATE-GEOGRAPHIC-STUDY-NOTE') },
+  })
+  const malicious = new Proxy(original, {
+    getOwnPropertyDescriptor() { throw thrown },
+  })
+  assert.throws(
+    () => preparePrintableShoppingChecklist(malicious),
+    error => error instanceof Error &&
+      error.message === 'Ongeldige boodschappenmand',
+  )
+  assert.equal(buildShoppingListCopyText(malicious), null)
+  assert.equal(reads, 0, 'raw thrown error getter is never inspected')
+})
+
+test('product snapshot: incomplete sparse arrays retain their original Dutch refusal message', () => {
+  const original = basket()
+  delete original.lines[1]
+  assert.throws(
+    () => preparePrintableShoppingChecklist(original),
+    /Onvolledige boodschappenmand/,
+  )
+  assert.equal(buildShoppingListCopyText(original), null)
+})
+
+test('product snapshot: array iterator override refuses even an otherwise valid row list', () => {
+  const original = basket()
+  let calls = 0
+  Object.defineProperty(original.lines, Symbol.iterator, {
+    configurable: true,
+    get() { calls++; return Array.prototype[Symbol.iterator] },
+  })
+  assert.throws(() => preparePrintableShoppingChecklist(original), /Onvolledige boodschappenmand/)
+  assert.equal(buildShoppingListCopyText(original), null)
+  assert.equal(calls, 0)
+})
