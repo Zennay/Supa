@@ -8,6 +8,9 @@ import {
 } from '../src/data/m2Fixture.ts'
 
 // M2 synthetic baskets only; no genuine retailer observation.
+// Frozen evaluation instant after all simulated 2026 observations.
+const QA_REFERENCE_NOW_MS = Date.parse('2026-10-14T12:00:00Z')
+
 function basket(store, discount = 0) {
   const products = [
     ...m2Products.map((product) => ({
@@ -65,7 +68,7 @@ for (const [field, code, invisible] of [
     if (field === 'region') s.region = invisible
     if (field === 'baseline.provenanceNote') s.baseline.provenanceNote = invisible
     if (field === 'candidate.provenanceNote') s.candidate.provenanceNote = invisible
-    const assessed = assessWeeklyBasketStudy(s)
+    const assessed = assessWeeklyBasketStudy(s, { referenceNowMs: QA_REFERENCE_NOW_MS })
     assert.equal(assessed.claimable, false)
     assert.equal(assessed.comparison.claimable, false)
     assert.equal(assessed.comparison.outcome, 'unknown')
@@ -87,7 +90,7 @@ test('M3 QA safe control: readable accents, emoji, RTL and normal timestamps rem
   s.region = 'ليدن - Leiden'
   s.baseline.provenanceNote = '🛒 Handmatig gecontroleerd - café'
   s.candidate.provenanceNote = 'دوكان - notitie via handmatig mandje'
-  const value = assessWeeklyBasketStudy(s)
+  const value = assessWeeklyBasketStudy(s, { referenceNowMs: QA_REFERENCE_NOW_MS })
   assert.equal(value.claimable, true)
   assert.equal(value.comparison.outcome, 'better')
   assert.equal(value.reasons.length, 0)
