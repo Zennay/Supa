@@ -1,4 +1,3 @@
-import type { PlannedMeal } from '../../domain/types.ts'
 import { m2DefaultActiveDays, m2InitialPlan } from '../../data/m2Fixture.ts'
 
 /**
@@ -39,13 +38,26 @@ export function m3FieldSheetMatchesPlannerWeek(
       return false
     }
 
+    // Planner meal records have the same trust boundary as selected days.
+    // Ordinary property reads can invoke getters or inherited prototype values,
+    // which can masquerade as a valid frozen study despite unstable input.
+    // Explicit indexed data descriptors also reject holes/getters in the rows.
     const recipesByDay = new Map<string, string>()
-    for (const item of plannedMeals as PlannedMeal[]) {
-      if (!item || typeof item.day !== 'string' ||
-          typeof item.recipeId !== 'string' || recipesByDay.has(item.day)) {
+    for (let index = 0; index < m2InitialPlan.length; index++) {
+      const rowSlot = Object.getOwnPropertyDescriptor(plannedMeals, String(index))
+      if (!rowSlot || !Object.hasOwn(rowSlot, 'value') ||
+          !rowSlot.value || typeof rowSlot.value !== 'object') {
         return false
       }
-      recipesByDay.set(item.day, item.recipeId)
+      const day = Object.getOwnPropertyDescriptor(rowSlot.value, 'day')
+      const recipeId = Object.getOwnPropertyDescriptor(rowSlot.value, 'recipeId')
+      if (!day || !recipeId ||
+          !Object.hasOwn(day, 'value') || !Object.hasOwn(recipeId, 'value') ||
+          typeof day.value !== 'string' || typeof recipeId.value !== 'string' ||
+          recipesByDay.has(day.value)) {
+        return false
+      }
+      recipesByDay.set(day.value, recipeId.value)
     }
     return m2InitialPlan.every(meal =>
       recipesByDay.get(meal.day) === meal.recipeId)
