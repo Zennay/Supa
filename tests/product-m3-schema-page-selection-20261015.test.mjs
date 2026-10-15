@@ -155,3 +155,18 @@ test('revoked Proxy and hostile accessor fail closed without leaking error messa
     assert.doesNotMatch(result.reason, /PRIVATE_EXFILTRATE_ME/)
   }
 })
+
+
+test('only an actual retailer product-page source may select a priced Product', () => {
+  for (const badSource of [
+    { ...plus, kind: 'catalog' },
+    { ...plus, url: 'https://www.plus.nl/aanbiedingen' },
+    { ...plus, url: 'https://www.plus.nl/product/' },
+    { ...plus, supermarket: 'dekamarkt' },
+    { ...plus, supermarket: 'unrecognized' },
+  ]) {
+    const result = parseSchemaOrgProductForPage(product(), badSource)
+    assert.equal(result.type, 'abstain')
+    assert.equal(result.reason, 'invalid captured product-page URL')
+  }
+})
