@@ -42,8 +42,8 @@ test('shared pack is charged once and never described as free',()=>{
   data.comparison.lines[0].plus.sharedPackCoversIngredientIds=['milk','second-milk']
   data.comparison.lines[0].dekamarkt.sharedPackCoversIngredientIds=['milk','second-milk']
   data.comparison.lines.push({ingredientId:'second-milk',ingredient:'extra melk',
-    plus:{...row(129),packs:0,totalCents:0,sharedPackWithIngredientId:'melk'},
-    dekamarkt:{...row(119),packs:0,totalCents:0,sharedPackWithIngredientId:'melk'}})
+    plus:{...row(129),packs:0,totalCents:0,sharedPackWithIngredientId:'milk'},
+    dekamarkt:{...row(119),packs:0,totalCents:0,sharedPackWithIngredientId:'milk'}})
   const text=renderPrivateShoppingChecklists(data)
   assert.match(text,/gedekt door eerder gedeeld pak; NIET gratis/)
   assert.equal(text.match(/€1,29\/pak/g)?.length,1)
