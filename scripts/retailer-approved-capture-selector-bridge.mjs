@@ -70,7 +70,7 @@ function inertCaptureOptions(options) {
 // source tokens: class names or data-testid attributes can encode a product
 // identifier or price. Only a bounded vocabulary of generic selectors leaves
 // the private captured HTML scope; unknown selectors stay in private review.
-const GENERIC_SELECTOR = /^(?:a\\[href\\^="\\/(?:product|producten)\\/"\\]|[a-z][a-z0-9-]{0,30}\\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|offer-card|product-name|item-card|item-name|price-tag|stock-label))$/
+const GENERIC_SELECTOR = /^(?:a\[href\^="\/(?:product|producten)\/"\]|[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|offer-card|product-name|item-card|item-name|price-tag|stock-label))$/
 function safeSelectorProposals(selectors) {
   if (!Array.isArray(selectors) || selectors.length > 24) refuse()
   return selectors.filter(row =>
