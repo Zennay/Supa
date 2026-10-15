@@ -29,7 +29,10 @@ for(const bad of [
       const before=JSON.stringify(report)
       const view=renderPrivateComparison(report)
       assert.ok(view.includes('registratietijd onbekend'))
-      assert.equal(view.includes('vastgelegd '+bad),false)
+      const affectedShop = location === 'plus' ? 'PLUS:' : 'DekaMarkt:'
+      const affectedLine = view.split(String.fromCharCode(10)).find(x => x.includes(affectedShop))
+      assert.ok(affectedLine?.includes('vastgelegd registratietijd onbekend'))
+      assert.equal(affectedLine?.includes(bad), false)
       assert.equal(JSON.stringify(report),before)
       assert.equal(view.includes('ALLEEN OFFLINE MANDVERSCHIL'),false)
     })
