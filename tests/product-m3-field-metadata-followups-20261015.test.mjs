@@ -81,10 +81,11 @@ test('invalid pseudonymous study key, invalid week, wrong retailer and future cl
   sheet.baseline.store.name = 'Unknown retailer PERSONAL-RAW-DONT-ECHO'
   sheet.candidate.observedAt = '2099-10-14T11:00:00Z'
   const report = collect(sheet)
-  assert.deepEqual(fields(report.pendingMetadata.study), ['studyId', 'weekStart'])
+  assert.deepEqual(fields(report.pendingMetadata.study), ['studyId', 'weekStart', 'observationWindow'])
   assert.deepEqual(fields(report.pendingMetadata.plus), ['storeName'])
   assert.deepEqual(fields(report.pendingMetadata.dekamarkt), ['observedAt'])
-  assert.equal(report.pendingMetadataCount, 4)
+  assert.equal(report.pendingMetadataCount, 5)
+  assert.equal(report.observationWindowExpired, true)
   assert.equal(report.readyForPrivateReview, false)
   assert.equal(JSON.stringify(report).includes('PERSONAL-RAW-DONT-ECHO'), false)
   assert.equal(JSON.stringify(report).includes('2099'), false)
