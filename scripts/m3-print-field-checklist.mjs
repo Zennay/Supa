@@ -58,7 +58,7 @@ function paperPage(side, items) {
     '<p>Bron: ☐ winkelmand ☐ bon ☐ toegestane export</p></div>' +
     '<table><thead><tr><th>Ingrediënt/behoefte</th><th>Gevonden product</th>' +
     '<th>Verpakking (hoeveelheid + eenheid)</th><th>Aantal pakken</th>' +
-    '<th>Prijs per pak (€)</th><th>Waargenomen?</th></tr></thead><tbody>' +
+    '<th>Prijs per pak (€)</th><th>Beschikbaar?</th></tr></thead><tbody>' +
     cells + '</tbody></table>' +
     '<p>Ja: product en prijs werkelijk gezien. Nee: gecontroleerd en niet verkrijgbaar. Onbekend: niet gecontroleerd.</p>' +
     '<p>Bij nee en onbekend geen product of prijs invullen.</p>' +
