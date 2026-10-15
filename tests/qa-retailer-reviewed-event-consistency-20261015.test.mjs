@@ -95,7 +95,11 @@ test('same SKU text across different retailers stays scoped, never becomes a com
   const deka = batch.results.find(r => r.key === 'dekamarkt:product').observations[0]
   deka.sourceProductId = plus.sourceProductId
   const report = review(batch)
-  assert.equal(report.retailerScopedProducts, 13)
+  const ids = new Set(batch.results.flatMap(row =>
+    row.observations.map(item => item.supermarket + ':' + item.sourceProductId)))
+  assert.ok(ids.has('plus:' + plus.sourceProductId))
+  assert.ok(ids.has('dekamarkt:' + plus.sourceProductId))
+  assert.equal(report.retailerScopedProducts, ids.size)
   assert.equal(report.productionEnabled, false)
 })
 
