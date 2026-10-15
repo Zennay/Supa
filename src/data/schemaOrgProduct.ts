@@ -105,7 +105,17 @@ function samePhysicalReference(reference: unknown, pack: RawPack): boolean {
     physicalUnit === 'g' || physicalUnit === 'kg' ? 'mass'
       : physicalUnit === 'ml' || physicalUnit === 'l' ? 'volume'
         : physicalUnit === 'piece' ? 'piece' : 'unknown'
-  const packAmount = amount(pack.amount, pack.unit)
+  // ReferenceQuantity is for the entire purchasable SKU, not one inner
+  // carton of a multipack. The checkout price for "2 x 500 ml" must only be
+  // inferred from a physically equivalent 1000 ml (or 1 LTR) reference.
+  // Refuse uncertain labels/counts instead of treating an inner unit as a SKU.
+  const physicalPack = normalizePackText(pack.rawText)
+  if (physicalPack.amount !== pack.amount ||
+      physicalPack.unit !== pack.unit ||
+      !Number.isSafeInteger(physicalPack.count) || physicalPack.count <= 0) {
+    return false
+  }
+  const packAmount = amount(pack.amount * physicalPack.count, pack.unit)
   const refAmount = amount(parsed, unit)
   return family(pack.unit) !== 'unknown' && family(pack.unit) === family(unit) &&
     packAmount !== null && refAmount !== null &&
@@ -182,6 +192,20 @@ function extractPrice(offers: JsonObject[], pack: RawPack, capturedAt: string): 
   const offer = offers[0]
   const capturedMs = Date.parse(capturedAt)
   if (!Number.isFinite(capturedMs)) return null
+  // A scheduled price observed before it starts (or after it ends) is not
+  // proof of a checkout quote, even when the later comparison clock falls
+  // inside the window. Capture-time validity and review-time validity are
+  // independent, mandatory checks.
+  for (const [raw, isEnd] of [
+    [offer.validFrom, false],
+    [offer.priceValidUntil, true],
+  ] as const) {
+    if (raw == null) continue
+    if (typeof raw !== 'string') return null
+    const bound = priceBoundTime(raw, isEnd)
+    if (!Number.isFinite(bound) ||
+        (isEnd ? bound < capturedMs : bound > capturedMs)) return null
+  }
   const prices = [
     cents(offer.price),
     ...priceSpecificationCandidates(offer).map((spec) =>
@@ -354,6 +378,21 @@ export function parseSchemaOrgProduct(
         return { type: 'abstain',
           reason: 'Product JSON-LD observation failed trust validation: ' +
             'Offer ' + field + ' must be a valid date/timestamp' }
+      }
+    }
+  }
+  // Contradictory parent Offer windows are malformed source evidence.
+  // Report parser abstention instead of hiding the dates behind an unknown
+  // price, matching the original RawOffer trust contract.
+  for (const offer of offers) {
+    if (typeof offer.validFrom === 'string' &&
+        typeof offer.priceValidUntil === 'string' &&
+        priceBoundTime(offer.validFrom, false) >
+          priceBoundTime(offer.priceValidUntil, true)) {
+      return {
+        type: 'abstain',
+        reason: 'Product JSON-LD observation failed trust validation: ' +
+          'Offer validity window cannot end before it starts',
       }
     }
   }
