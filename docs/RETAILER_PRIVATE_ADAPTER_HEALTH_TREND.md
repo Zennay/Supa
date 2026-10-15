@@ -17,7 +17,7 @@ node --experimental-strip-types --test tests/product-retailer-private-adapter-he
 
 **Let op:** de huidige standaard health-CLI gebruikt de zes **vaste historische fixtures**. Voor echte nieuwe vergelijkingen moet de door de adapter-API gecontroleerde dataset eerst veranderd/uitgebreid zijn; twee identieke fixture-runs leveren alleen nulverschillen of natuurlijke veroudering op, géén bewijs van nieuwe winkelwaarnemingen. De afgedrukte `historicalFreshnessWithinWindow` is altijd een lokale datasetleeftijd, geen live-prijsstempel.
 
-Een geldige operatorrun vergelijkt dezelfde `maxAgeHours`-grens, precies dezelfde schema- en privacycontracten, en leest uitsluitend reguliere 0600 JSON-bestanden tot 64 KiB. Symlinks, afwijkende tellingsvelden, onverwachte extra data en inconsistent opgetelde bronvormen worden geweigerd. Er zijn géén netwerkcalls.
+Een geldige operatorrun vergelijkt dezelfde `maxAgeHours`-grens, precies dezelfde schema- en privacycontracten, en leest uitsluitend reguliere 0600 JSON-bestanden tot 64 KiB. Symlinks, afwijkende tellingsvelden, onverwachte extra data, **dubbele JSON-objectnamen (ook Unicode-escape-equivalente sleutels op geneste niveaus)** en inconsistent opgetelde bronvormen worden geweigerd. De privé-CLI behandelt een onduidelijke JSON-provenance als ongeldig bewijs vóór het vergelijken; hij weigert beide invoerbestanden met een generieke fout zonder inhoud of bestandslocatie af te drukken. Er zijn géén netwerkcalls.
 
 ## Wat de uitvoer zegt
 
