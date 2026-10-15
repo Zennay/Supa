@@ -19,6 +19,17 @@ Een eerder gemaakte privévergelijking kan zonder de oorspronkelijke retailer-HT
 
 De optionele **--report**-route opent uitsluitend het reeds lokaal opgeslagen vergelijking-JSON: exact de vorm `supa-local-snapshot-comparison-v1`. Geen retailer-URL, HTML of API wordt opnieuw geopend. De bestaande strikte checklistcontrole moet ook bij dit bestand complete PLUS- en DekaMarkt-gegevens, niet-claimbare herkomst, aantallen, gedeelde-pakdekking en overeenkomende winkeltotalen valideren; een onbekend bedrag blijft onbekend. Een opzettelijk gewijzigd/vals bestand kan geen volledig totaal verzinnen. Niet-JSON, verkeerde Unicode, symlinks in bestandsnaam én oudermappen, niet-reguliere bestanden en documenten boven 4 MiB worden zonder privé-inhoud in foutmeldingen geweigerd. De afgedrukte lijst wordt atomair/privé met 0600 gepubliceerd, zonder het bronrapport te overschrijven.
 
+## Een winkelbestand zonder gegevens van de andere keten
+
+Voor één winkel kun je een **afzonderlijk HTML-bestand** maken dat de prijzen, productnamen en regels van de andere supermarkt niet bevat:
+
+    node --experimental-strip-types scripts/retailer-private-shopping-checklist-html.mjs --report pad/naar/opgeslagen-vergelijking.json --output pad/naar/alleen-plus.html --store plus
+    node --experimental-strip-types scripts/retailer-private-shopping-checklist-html.mjs --report pad/naar/opgeslagen-vergelijking.json --output pad/naar/alleen-dekamarkt.html --store dekamarkt
+
+De optionele terminalschakelaar is uitsluitend `--store plus` of `--store dekamarkt`, helemaal aan het einde. Zonder deze schakelaar blijft de bestaande keuze **Beide winkels / Alleen PLUS / Alleen DekaMarkt** binnen het HTML-bestand werken. Een verborgen winkel met de radioknoppen zit nog steeds *in het originele HTML-bestand*; **alleen een aparte --store-uitvoer** verwijdert de andere winkel daadwerkelijk uit het bestand. Het complete lokale bronrapport wordt eerst gevalideerd; de afdrukbare winkeluitvoer rekent geen nieuwe bedragen uit. Ontbrekende winkelprijzen blijven expliciet onbekend en elke aparte uitvoer heeft privé-bestandsrechten 0600. Ook in de winkel blijft actuele prijs en voorraad controleren noodzakelijk.
+
+De optie werkt ook bij de oorspronkelijke lokale manifestmodus: `<manifest.json> --output <print.html> --store plus`. Er vindt geen winkelverkeer plaats.
+
 **Niet verwarren:** --report importeert geen echte winkelwaarnemingen en is geen vergunning of besparingsbewijs. Ook een historische lokale vergelijking is nooit een actuele online prijs.
 
 ## Contract
@@ -31,4 +42,4 @@ De optionele **--report**-route opent uitsluitend het reeds lokaal opgeslagen ve
 
     node --experimental-strip-types --test tests/product-m3-private-printable-shopping-checklist-20261015.test.mjs
 
-Tests controleren fysieke aankopen, onafhankelijk winkelgedrag, radioselectie voor weergave en print, gedeelde verpakking, HTML-escaping/CSP, complete lokale fixture→vergelijker→HTML, private bestandsrechten en argumentcontroles. Aanvullende opgeslagen-JSON-regressies: node --experimental-strip-types --test tests/product-m3-private-saved-report-print-20261015.test.mjs (11 synthetische cases, inclusief echte fictieve HTML→offline-rapport→bronbestanden verwijderen→print via JSON). Alleen synthetische voorbeelden; geen scraping, productie of publicatie.
+Tests controleren fysieke aankopen, onafhankelijk winkelgedrag, radioselectie voor weergave en print, gedeelde verpakking, HTML-escaping/CSP, complete lokale fixture→vergelijker→HTML, private bestandsrechten en argumentcontroles. Aanvullende opgeslagen-JSON-regressies: node --experimental-strip-types --test tests/product-m3-private-saved-report-print-20261015.test.mjs (15 synthetische cases, waaronder aparte privacy-uitvoer per winkel en een echte fictieve HTML→offline-rapport→bronbestanden verwijderen→print via JSON). Alleen synthetische voorbeelden; geen scraping, productie of publicatie.
