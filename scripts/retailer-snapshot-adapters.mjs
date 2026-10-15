@@ -34,6 +34,13 @@ export function parseOfflineRetailerSnapshot({ source, html, capturedAt }) {
       priceInstantNs(capturedAt, false) === null) {
     throw new Error('Invalid bounded offline snapshot')
   }
+  // Direct callers may supply a JS string rather than a pinned local file.
+  // Ill-formed UTF-16 (isolated high/low surrogate) is silently replaced with
+  // U+FFFD by Buffer / createHash. Reject it instead of attributing a SHA-256
+  // to bytes which were never faithfully present in the supplied string.
+  if (Buffer.from(html, 'utf8').toString('utf8') !== html) {
+    throw new Error('Invalid UTF-8 source text in offline snapshot')
+  }
   const sha256 = createHash('sha256').update(html).digest('hex')
   const provenance = {
     supermarket: source.supermarket, kind: source.kind, url: source.url,
