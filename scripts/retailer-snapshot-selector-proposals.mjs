@@ -58,7 +58,7 @@ function validCapture(source, requireHash = true) {
       (requireHash ? (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)) : (expectedSha !== undefined && (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)))) ||
       typeof capturedAt !== 'string' ||
       !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(capturedAt) ||
-      !Number.isFinite(Date.parse(capturedAt))) reject('invalid capture identity/hash/timestamp')
+      (!Number.isFinite(Date.parse(capturedAt)) || Date.parse(capturedAt) > Date.now())) reject('invalid capture identity/hash/timestamp')
   let url
   try { url = new URL(urlValue) } catch { reject('invalid source URL') }
   if (url.protocol !== 'https:' || url.hostname !== HOSTS[supermarket] ||
@@ -88,12 +88,28 @@ function jsonLdShape(text, types, keys) {
   return true
 }
 
+function assertClosedInertMarkup(html) {
+  // Static tag extraction cannot distinguish script/template/comment text from
+  // real DOM if delimiters are truncated. Refuse the entire snapshot instead
+  // of treating an unterminated inert fragment as price/stock evidence.
+  const commentsRemoved = html.replace(/<!--[\s\S]*?-->/g, ' ')
+  if (commentsRemoved.includes('<!--') || commentsRemoved.includes('-->')) {
+    reject('unclosed inert HTML comment')
+  }
+  for (const tag of ['script', 'style', 'template', 'noscript', 'textarea', 'head', 'svg']) {
+    const opened = [...commentsRemoved.matchAll(new RegExp('<' + tag + '\\b', 'gi'))].length
+    const closed = [...commentsRemoved.matchAll(new RegExp('<\\/' + tag + '\\s*>', 'gi'))].length
+    if (opened !== closed) reject('unclosed inert HTML element')
+  }
+}
+
 export function proposeRetailerSelectors(source, html) {
   const identity = validCapture(source)
   if (typeof html !== 'string' ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES ||
       Buffer.from(html, 'utf8').toString('utf8') !== html ||
       sha256(html) !== identity.sha256) reject('HTML must be bounded, UTF-8 and match source SHA-256')
+  assertClosedInertMarkup(html)
   const scripts = []
   const jsonLdTypes = new Set()
   const jsonLdKeys = new Set()
