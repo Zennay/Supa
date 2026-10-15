@@ -13,3 +13,13 @@ De preflight doet **geen netwerkverzoeken**. Beide bestanden worden via een nonb
 De uitvoer bevat alleen algemene vlaggen en de opgegeven bron-SHA; **geen deelnemerssleutel, geobserveerde prijzen, winkelbonnen, persoonlijke notities of geldbedragen**. `codeRevisionVerified`, `retailerPermissionVerified`, `publicSavingsClaimEligible` en `sourceCommitShaAuthenticated` blijven altijd `false`. Een bron-SHA is slechts door de menselijke operator opgegeven: deze tool controleert niet of het daadwerkelijk de `main` commit tijdens de meting was.
 
 **Nog open vóór claim of volledige issue-sluiting:** collector- en convertercontract moeten, na vrijgave van actieve eigenaars, de commitpin duurzaam opnemen in `WeeklyBasketStudy` en in het canonieke assessmentrapport; huidige preflight is een apart privéproces. Ook ontbreken echte PLUS11 + Deka11 observaties binnen 24 uur ([#78](https://github.com/Zennay/Supa/issues/78)), schriftelijke bronrechten ([#74](https://github.com/Zennay/Supa/issues/74)), toepasselijke VPS-acceptatie en geautoriseerde zCloud SQLite-scopeclaim. Niet mergen of deployen op basis van hosted tests alleen.
+
+## Optionele extra operatorcontrole: verwachte `main`-SHA
+
+Controleer de daadwerkelijke GitHub-`main` commit **los** van het manifesteerproces en geef de 40 kleine hexadecimale tekens op als derde argumentpaar:
+
+```bash
+node --experimental-strip-types scripts/m3-verify-private-week-preflight.mjs /private/study.json /private/code-pin.json --expect-main-sha ACTUELE_40_HEX_MAIN_SHA
+```
+
+De preflight weigert een ongelijke, lege, niet-canonieke, hoofdletter- of nul-SHA met statuscode 1 en een generieke foutmelding zonder participant, path of prijs. Het standaardcommando met twee bestandsargumenten blijft werken voor reeds bestaande privéworkflows, maar controleert **niet** op verwachte hoofdbranchidentiteit. Controleer de juiste `main`-SHA bij het begin van de échte veldrun en bewaar de externe verificatie apart. Deze extra vergelijking bewijst niet zelfstandig dat GitHub bij de opname die SHA draaide, of dat er schriftelijke retailerrechten, echte waarnemingen of toestemming voor financiële claims bestaan. De vier authenticatie/toestemmings-/publicatievlaggen blijven **false**.
