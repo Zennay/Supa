@@ -156,6 +156,20 @@ function parseUtf8Json(bytes) {
   }
 }
 
+// Preserve the canonical assessor's distinction between visible evidence
+// context and strings made entirely of invisible Unicode format/mark codepoints.
+// Incomplete *products* are allowed for private review; missing provenance is not.
+function hasVisibleM3Context(value) {
+  return typeof value === 'string' &&
+    /[^\p{M}\p{Cf}\p{Cc}\p{Cs}\s\u115F\u1160\u3164\uFFA0\u2800]/u.test(value)
+}
+
+function requireVisibleM3Context(study) {
+  if (![study.population, study.region,
+        study.baseline.provenanceNote, study.candidate.provenanceNote]
+    .every(hasVisibleM3Context)) deny()
+}
+
 function requireCanonicalWeek(study) {
   const fixture = buildObservationSheet()
   const expected = fixture.requirements
@@ -233,6 +247,7 @@ export function preflightPrivateM3Week(studyBytes, manifestBytes, ...revisionOpt
   let report
   try {
     validateObservedWeekInput(study)
+    requireVisibleM3Context(study)
     requiredLineCount = requireCanonicalWeek(study)
     report = buildObservedWeekReport(study)
     assertCanonicalCaptureWindow(study, report)
