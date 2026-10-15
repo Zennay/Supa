@@ -52,6 +52,15 @@ export async function runApprovedRetailerComparison({
       html: snapshot.html,
       capturedAt: snapshot.capturedAt,
     })
+    // Do not mint two independently priced retailers from one replayed
+    // captured Product document. Mock/failure pages without usable products
+    // can be identical: they still produce no basket winner, so preserve
+    // their existing fail-closed behaviour instead of misreporting a price.
+    if (parsed.observations.length > 0 &&
+        captureSummary.some((previous) =>
+          previous.sha256 === snapshot.sha256 && previous.extractedProducts > 0)) {
+      throw new Error('Duplicate priced retailer capture across sources')
+    }
     observations.push(...parsed.observations)
     captureSummary.push({
       sourceId,
