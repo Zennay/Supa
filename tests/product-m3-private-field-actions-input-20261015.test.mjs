@@ -110,3 +110,39 @@ test('malformed UTF-8 bytes are rejected rather than repaired into field content
   refusal(run(dir, path), dir)
   assert.deepEqual(await readFile(path), broken)
 })
+
+test('one-store Dutch operator view shows only the selected canonical eleven-line task list', async t => {
+  const { dir, path, input } = await sandbox(t)
+  for (const [selection, expected, excluded] of [
+    ['plus', 'PLUS', 'DekaMarkt'],
+    ['dekamarkt', 'DekaMarkt', 'PLUS'],
+  ]) {
+    const result = run(dir, path, '--text', '--store', selection)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stderr, '')
+    assert.match(result.stdout, /Openstaande boodschappen: 11 van 11/)
+    assert.equal(result.stdout.includes(expected + ':'), true)
+    assert.equal(result.stdout.includes(excluded + ':'), false)
+    assert.match(result.stdout, /Bloemkool \(2 stuks\)/)
+    assert.equal(result.stdout.includes(secret), false)
+    assert.match(result.stdout, /Geen bewezen winkelprijzen of publieke besparingsclaim/)
+  }
+  const both = run(dir, path, '--text')
+  assert.equal(both.status, 0, both.stderr)
+  assert.match(both.stdout, /Openstaande boodschappen: 22 van 22/)
+  const unchangedJson = run(dir, path)
+  assert.equal(JSON.parse(unchangedJson.stdout).expectedTotalLines, 22)
+  assert.equal(JSON.parse(unchangedJson.stdout).retailers.length, 2)
+  assert.equal(await readFile(path, 'utf8'), input)
+})
+
+test('one-store operator selection refuses unexpected CLI flags without reading source', async t => {
+  const { dir, path } = await sandbox(t)
+  for (const args of [
+    ['--store', 'plus'], ['--text', '--store', 'both'],
+    ['--text', '--store', 'UNKNOWN'], ['--text', '--store'],
+    ['--text', '--store', 'plus', '--extra'],
+  ]) {
+    refusal(run(dir, path, ...args), dir)
+  }
+})
