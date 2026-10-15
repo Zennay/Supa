@@ -117,7 +117,7 @@ describe('product: six-adapter offline source health (private / no network)', ()
   it('refuses forged or unbound capture provenance, even with consistent summary counts', async () => {
     const original = await loadReviewedRepositoryFixtures()
     for (const mutation of [
-      b => { b.results[0].observations[0].provenance.sha256 = 'f'.repeat(64) },
+      b => { b.results[0].observations[0].provenance.sha256 = 'invalid-sha256' },
       b => { b.results[0].observations[0].supermarket = 'dekamarkt' },
       b => { b.results[0].key = 'plus:unknown' },
       b => { b.results[0].reason = 'allowed-but-wrong' },
