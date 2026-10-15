@@ -52,6 +52,15 @@ const HOST_BY_SUPERMARKET: Record<SupermarketId, string> = {
   dekamarkt: 'www.dekamarkt.nl',
 }
 
+// A product observation must point at that retailer's product route,
+// not a same-host search, account or marketing page. Keep catalog/offers
+// provenance untouched: those are valid separately reviewed source kinds.
+const PRODUCT_ROUTE_BY_SUPERMARKET: Record<SupermarketId, string> = {
+  ah: '/producten/product/',
+  plus: '/product/',
+  dekamarkt: '/producten/',
+}
+
 const SOURCE_PAGE_KINDS = new Set<SourcePageKind>([
   'product',
   'catalog',
@@ -137,6 +146,15 @@ function validateSnapshotRef(
     throw new Error(
       'Product observation provenance must use a public HTTPS retailer origin without credentials or custom port',
     )
+  }
+
+  if (provenance.kind === 'product') {
+    const prefix = PRODUCT_ROUTE_BY_SUPERMARKET[observationSupermarket]
+    if (!url.pathname.startsWith(prefix) || url.pathname.length <= prefix.length) {
+      throw new Error(
+        'Product observation provenance must reference a retailer product route',
+      )
+    }
   }
 
   if (!validIso(provenance.capturedAt)) {
