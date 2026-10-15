@@ -1,5 +1,5 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
-import { snapshotShoppingExportBasket } from './shoppingExportOwnData.ts'
+import { INCOMPLETE_SHOPPING_EXPORT, snapshotShoppingExportBasket } from './shoppingExportOwnData.ts'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation.ts'
 
 export type PrintableShoppingLine = {
@@ -174,8 +174,23 @@ function preparePrintableShoppingChecklistUnchecked(
 export function preparePrintableShoppingChecklist(
   basket: OneStoreBasket,
 ): PrintableShoppingChecklistData {
+  // Treat all exception objects from caller-owned descriptors as hostile.
+  // Even reading error.message can itself execute a user getter/Proxy trap.
+  // Only the internal immutable sentinel is allowed to cross this boundary.
+  let safeBasket: OneStoreBasket
   try {
-    return preparePrintableShoppingChecklistUnchecked(snapshotShoppingExportBasket(basket))
+    safeBasket = snapshotShoppingExportBasket(basket)
+  } catch (error) {
+    if (error === INCOMPLETE_SHOPPING_EXPORT) {
+      throw new Error('Onvolledige boodschappenmand')
+    }
+    throw new Error('Ongeldige boodschappenmand')
+  }
+
+  // The renderer now receives ONLY plain owned values. Its own validation
+  // errors can retain established Dutch UX labels for existing callers.
+  try {
+    return preparePrintableShoppingChecklistUnchecked(safeBasket)
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     if (message === 'Onvolledige boodschappenmand' ||
