@@ -101,6 +101,70 @@ test('actual local fake HTML -> saved report -> remove original captures -> priv
   assert.equal((await stat(output)).mode & 0o777, 0o600)
 })
 
+test('single-store renderer validates both inputs but emits no other shop product or price', () => {
+  const report = offlinePreview()
+  report.comparison.lines[0].plus.productName = 'PLUS-ONLY-PRODUCT-X7'
+  report.comparison.lines[0].dekamarkt.productName = 'DEKA-PRIVATE-PRODUCT-Z9'
+  const plus = renderPrintablePrivateShoppingChecklist(report, 'plus')
+  const deka = renderPrintablePrivateShoppingChecklist(report, 'dekamarkt')
+  assert.match(plus, /PLUS-ONLY-PRODUCT-X7/)
+  assert.match(plus, /ALLEEN OFFLINE TOTAAL PLUS: €2,40/)
+  assert.doesNotMatch(plus, /DEKA-PRIVATE-PRODUCT-Z9|€2,20|DekaMarkt|name="storeView"/)
+  assert.match(deka, /DEKA-PRIVATE-PRODUCT-Z9/)
+  assert.match(deka, /ALLEEN OFFLINE TOTAAL DekaMarkt: €2,20/)
+  assert.doesNotMatch(deka, /PLUS-ONLY-PRODUCT-X7|€2,40|PLUS|name="storeView"/)
+  assert.match(plus, /class="grid single-shop"/)
+  assert.match(deka, /class="grid single-shop"/)
+  assert.match(plus, /Geen live prijzen/)
+  assert.match(deka, /Geen live prijzen/)
+  assert.throws(() => renderPrintablePrivateShoppingChecklist(report, 'aldi'),
+    /Invalid private checklist shop selection/)
+})
+
+test('saved-report CLI writes two independently private single-store outputs, unchanged source', async t => {
+  const { dir, file } = await fixture(t)
+  const report = offlinePreview()
+  report.comparison.lines[0].plus.productName = 'PLUS-PRIVATE-LABEL'
+  report.comparison.lines[0].dekamarkt.productName = 'DEKA-PRIVATE-LABEL'
+  await writeFile(file, JSON.stringify(report))
+  const before = await readFile(file)
+  const plusPath = join(dir, 'only-plus.html')
+  const dekaPath = join(dir, 'only-dekamarkt.html')
+  const plus = await main(['--report', file, '--output', plusPath, '--store', 'plus'])
+  const deka = await main(['--report', file, '--output', dekaPath, '--store', 'dekamarkt'])
+  assert.equal(await readFile(plusPath, 'utf8'), plus)
+  assert.equal(await readFile(dekaPath, 'utf8'), deka)
+  assert.deepEqual(await readFile(file), before)
+  assert.equal((await stat(plusPath)).mode & 0o777, 0o600)
+  assert.equal((await stat(dekaPath)).mode & 0o777, 0o600)
+  assert.match(plus, /PLUS-PRIVATE-LABEL/)
+  assert.doesNotMatch(plus, /DEKA-PRIVATE-LABEL|€2,20/)
+  assert.match(deka, /DEKA-PRIVATE-LABEL/)
+  assert.doesNotMatch(deka, /PLUS-PRIVATE-LABEL|€2,40/)
+})
+
+test('selected shop with unknown price prints unknown, without unrelated shop prices', () => {
+  const report = offlinePreview()
+  report.comparison.lines[0].dekamarkt.status = 'availability_unknown'
+  const onlyDeka = renderPrintablePrivateShoppingChecklist(report, 'dekamarkt')
+  assert.match(onlyDeka, /GEEN BETROUWBAAR VOLLEDIG TOTAAL DekaMarkt/)
+  assert.doesNotMatch(onlyDeka, /ALLEEN OFFLINE TOTAAL|€2,40|€2,20/)
+  assert.match(renderPrintablePrivateShoppingChecklist(report, 'plus'),
+    /ALLEEN OFFLINE TOTAAL PLUS: €2,40/)
+})
+
+test('store flag accepts only canonical retailer names at final position', async () => {
+  for (const args of [
+    ['--report', 'a.json', '--output', 'out.html', '--store', 'both'],
+    ['--report', 'a.json', '--output', 'out.html', '--store', 'PLUS'],
+    ['--report', 'a.json', '--output', 'out.html', '--store', 'other'],
+    ['--report', 'a.json', '--output', 'out.html', '--store'],
+    ['--report', 'a.json', '--output', 'out.html', '--store', 'plus', 'extra'],
+  ]) {
+    await assert.rejects(() => main(args), /Invalid private offline checklist HTML arguments/)
+  }
+})
+
 test('saved incomplete shop does not turn a partial subtotal into a whole basket', async t => {
   const { dir, file } = await fixture(t)
   const data = offlinePreview()
