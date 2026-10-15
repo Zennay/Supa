@@ -89,6 +89,15 @@ test('no real discount: synthetic offer original price below current counts as i
   assert.ok(report.priceBackedOfferRows < original.priceBackedOfferRows)
 })
 
+test('a partial historical promotion with a plausible upcoming end remains unknown, never publishable', async () => {
+  const batch = await reviewed()
+  find(batch, 'offers', '113651').offer.validTo = '2026-10-20T00:00:00.000Z'
+  const report = audit(batch)
+  assert.ok(report.unknownOfferWindows >= 1)
+  assert.equal(report.publicSavingsClaimEligible, false)
+  assert.equal(report.livePricesAvailable, false)
+})
+
 test('a listed offer cannot silently disagree with its own observed current price', async () => {
   const batch = await reviewed()
   find(batch, 'offers', '113651').offer.offerPriceCents = 98
