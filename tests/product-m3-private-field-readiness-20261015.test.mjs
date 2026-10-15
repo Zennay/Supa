@@ -52,6 +52,8 @@ test('M3 private field readiness turns a fresh planner template into privacy-saf
   const result = reviewPrivateM3FieldSheet(bytes(blank()), SHA)
   assert.equal(result.canonicalLineCount, 22)
   assert.equal(result.completeObservationLineCount, 0)
+  assert.equal(result.plusCompleteLineCount, 0)
+  assert.equal(result.dekamarktCompleteLineCount, 0)
   assert.equal(result.recordedAvailabilityCount, 0)
   assert.equal(result.technicalStudyConversionPossible, false)
   assert.equal(result.nextAction, 'complete-private-study-metadata')
@@ -66,8 +68,12 @@ test('M3 private field readiness identifies missing lines without inventing veri
   const progress = reviewPrivateM3FieldSheet(bytes(s), SHA)
   assert.equal(progress.recordedAvailabilityCount, 21)
   assert.equal(progress.completeObservationLineCount, 21)
+  assert.equal(progress.plusCompleteLineCount, 11)
+  assert.equal(progress.dekamarktCompleteLineCount, 10)
+  assert.equal(progress.plusAvailabilityRecorded, 11)
+  assert.equal(progress.dekamarktAvailabilityRecorded, 10)
   assert.equal(progress.technicalStudyConversionPossible, false)
-  assert.equal(progress.nextAction, 'complete-remaining-store-observations')
+  assert.equal(progress.nextAction, 'complete-dekamarkt-observations')
   assertPrivateFlags(progress)
 })
 
@@ -75,6 +81,8 @@ test('M3 private field readiness runs REAL converter and strict preflight for co
   const result = reviewPrivateM3FieldSheet(bytes(syntheticFullSheet()), SHA)
   assert.equal(result.canonicalLineCount, 22)
   assert.equal(result.completeObservationLineCount, 22)
+  assert.equal(result.plusCompleteLineCount, 11)
+  assert.equal(result.dekamarktCompleteLineCount, 11)
   assert.equal(result.recordedAvailabilityCount, 22)
   assert.equal(result.metadataCompleteCount, result.metadataRequiredCount)
   assert.equal(result.technicalStudyConversionPossible, true)
@@ -167,4 +175,16 @@ test('M3 private readiness CLI does not block on named pipes with untrusted shee
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+test('M3 operator next action differentiates PLUS from DekaMarkt without showing product/participant', () => {
+  const s = syntheticFullSheet()
+  s.baseline.lines[5].observedProduct.available = null
+  const result = reviewPrivateM3FieldSheet(bytes(s), SHA)
+  assert.equal(result.plusCompleteLineCount, 10)
+  assert.equal(result.dekamarktCompleteLineCount, 11)
+  assert.equal(result.nextAction, 'complete-plus-observations')
+  assert.equal(result.technicalStudyConversionPossible, false)
+  assertPrivateFlags(result)
+  assert.doesNotMatch(JSON.stringify(result), /fictional|productName|priceCents/)
 })
