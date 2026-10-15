@@ -107,7 +107,7 @@ export function compareReviewedCatalogs({
       const { validFrom, validTo } = raw.offer
       const parseBound = (value: string, isEnd: boolean) =>
         // Schema.org date-only priceValidUntil is inclusive through the UTC day.
-        Date.parse(isEnd && /^\\d{4}-\\d{2}-\\d{2}$/.test(value)
+        Date.parse(isEnd && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)
           ? value + 'T23:59:59.999Z' : value)
       const from = validFrom === null ? null : parseBound(validFrom, false)
       const to = validTo === null ? null : parseBound(validTo, true)
