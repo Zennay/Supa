@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtemp, rm, writeFile, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, writeFile, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
@@ -187,4 +187,27 @@ test('M3 operator next action differentiates PLUS from DekaMarkt without showing
   assert.equal(result.technicalStudyConversionPossible, false)
   assertPrivateFlags(result)
   assert.doesNotMatch(JSON.stringify(result), /fictional|productName|priceCents/)
+})
+
+test('M3 private CLI also rejects symlinked ancestor directories, not just final aliases', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-ancestor-'))
+  try {
+    const real = join(dir, 'actual')
+    await mkdir(real)
+    const privateSheet = join(real, 'sheet.json')
+    await writeFile(privateSheet, bytes(syntheticFullSheet()), { mode: 0o600 })
+    const ancestorAlias = join(dir, 'linked-parent')
+    await symlink(real, ancestorAlias)
+    const proc = spawnSync(process.execPath, [
+      '--experimental-strip-types', 'scripts/m3-private-field-readiness.mjs',
+      join(ancestorAlias, 'sheet.json'), '--expect-main-sha', SHA,
+    ], { encoding: 'utf8', timeout: 7000 })
+    assert.equal(proc.error, undefined, String(proc.error))
+    assert.equal(proc.status, 1)
+    assert.equal(proc.stdout, '')
+    assert.equal(proc.stderr.trim(), 'Private M3 field readiness refused')
+    assert.doesNotMatch(proc.stderr, /linked-parent|sheet\.json|fictional/)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
