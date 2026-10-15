@@ -77,8 +77,8 @@ function parseStrictJson(bytes) {
       }
       let next = i
       while (next < raw.length && (
-        raw[next] === ' ' || raw[next] === '\\t' ||
-        raw[next] === '\\r' || raw[next] === '\\n')) next++
+        raw[next] === ' ' || raw.charCodeAt(next) === 9 ||
+        raw.charCodeAt(next) === 13 || raw.charCodeAt(next) === 10)) next++
       const keys = scopes.at(-1)
       if (raw[next] === ':' && keys instanceof Set) {
         // JSON.parse resolves escaped spellings, e.g. "source" and "s\\u006furce".
