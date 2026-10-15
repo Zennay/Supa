@@ -49,7 +49,7 @@ function paperPage(side, items) {
   return '<section class="page" data-m3-side="' + side + '">' +
     '<p>SUPA M3 · veldmeting · blad ' + (side === 'baseline' ? '1/2' : '2/2') + '</p>' +
     '<h1>' + store + ' — dezelfde 11 boodschappen</h1>' +
-    '<p>Noteer alleen werkelijk geobserveerde waarden. Onbekend betekent nog niet onderzocht; niet verkrijgbaar is pas nee na controle.</p>' +
+    '<p>Noteer alleen werkelijk geobserveerde waarden en laat onbekende gegevens leeg. Onbekend betekent nog niet onderzocht; niet verkrijgbaar is pas nee na controle.</p>' +
     '<div class="metadata"><p>Filiaal: __________________________</p>' +
     '<p>Datum, tijd en tijdzone: __________________________</p>' +
     '<p>Week vanaf (maandag): __________________________</p>' +
