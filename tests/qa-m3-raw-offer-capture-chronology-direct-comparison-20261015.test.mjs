@@ -60,7 +60,16 @@ test('positive: retailer price starting EXACTLY at capture can be compared', () 
   assert.equal(value.savingsCents, 20)
 })
 
-test('positive: price start after the review is already rejected', () => {
+test('positive: price start a whole millisecond after review is already rejected', () => {
+  const value = compare('2026-10-15T10:00:00.001Z')
+  assert.equal(value.comparable, false)
+  assert.equal(value.cheaperStore, null)
+  assert.equal(value.savingsCents, null)
+})
+
+// Source chronology has a second independent exact boundary at review time:
+// an Offer that starts +1ns after nowMs cannot be current review evidence.
+test('EXPECTED RED: RawOffer start +1ns after review cannot mint a winner', () => {
   const value = compare('2026-10-15T10:00:00.000000001Z')
   assert.equal(value.comparable, false)
   assert.equal(value.cheaperStore, null)
