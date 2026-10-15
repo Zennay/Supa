@@ -4,6 +4,7 @@ import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts
 import { matchIngredient } from '../../domain/matching.ts'
 import {
   M3_EXPECTED_RETAILERS,
+  buildObservationSheet,
   observationSheetReadiness,
   type M3ObservationSide,
   type ObservationRequirement,
@@ -191,20 +192,75 @@ function storeBasket(
   }
 }
 
+/**
+ * Reject any direct or tampered field draft that the canonical M3 converter
+ * would refuse. Checking every raw slot (not Array.every alone) also rejects
+ * sparse arrays, trailing duplicates, and forged planner requirements.
+ *
+ * Local draft restoration already enforces this contract, but callers can
+ * invoke this pure comparison function without going through restoration.
+ */
+function hasCanonicalComparisonShape(
+  sheet: ObservationSheet,
+  canonical: ObservationSheet,
+): boolean {
+  if (!sheet || sheet.schemaVersion !== canonical.schemaVersion ||
+      sheet.sheetType !== canonical.sheetType ||
+      sheet.evidenceStatus !== canonical.evidenceStatus ||
+      sheet.plannerFixture !== canonical.plannerFixture ||
+      sheet.selectedMealCount !== canonical.selectedMealCount ||
+      sheet.study?.maxObservationWindowHours !== 24 ||
+      !Array.isArray(sheet.requirements) ||
+      sheet.requirements.length !== canonical.requirements.length) {
+    return false
+  }
+
+  for (let index = 0; index < canonical.requirements.length; index += 1) {
+    const expected = canonical.requirements[index]
+    const actual = sheet.requirements[index]
+    if (!actual || actual.id !== expected.id ||
+        actual.label !== expected.label ||
+        actual.query !== expected.query ||
+        actual.amount !== expected.amount ||
+        actual.unit !== expected.unit) return false
+  }
+
+  for (const side of ['baseline', 'candidate'] as const) {
+    const lines = sheet[side]?.lines
+    if (!Array.isArray(lines) || lines.length !== canonical.requirements.length) return false
+    for (let index = 0; index < canonical.requirements.length; index += 1) {
+      const expected = canonical.requirements[index]
+      const line = lines[index]
+      if (!line || line.ingredientId !== expected.id ||
+          line.ingredientLabel !== expected.label ||
+          line.requirement?.amount !== expected.amount ||
+          line.requirement?.unit !== expected.unit) return false
+    }
+  }
+  return true
+}
+
 export function buildObservedComparisonPreview(
   sheet: ObservationSheet,
   referenceNowMs: number,
 ): ObservedComparisonPreview {
-  const plus = storeBasket(sheet, 'baseline')
-  const deka = storeBasket(sheet, 'candidate')
-  const readiness = observationSheetReadiness(sheet, referenceNowMs)
+  const canonical = buildObservationSheet()
+  const canonicalShape = hasCanonicalComparisonShape(sheet, canonical)
+  // Never publish money or attacker-supplied extra demand for a rejected
+  // shape. The blank canonical fallback is read-only and yields 11 unresolved
+  // rows; the operator's original sheet remains unmodified for correction.
+  const safeSheet = canonicalShape ? sheet : canonical
+  const plus = storeBasket(safeSheet, 'baseline')
+  const deka = storeBasket(safeSheet, 'candidate')
+  const readiness = observationSheetReadiness(safeSheet, referenceNowMs)
   const reasons = [...readiness.issues]
+  if (!canonicalShape) reasons.unshift('Boodschappenlijst wijkt af van de 11 vaste M3-productregels.')
   let outcome: ObservedComparisonPreview['outcome'] = 'unknown'
   let savingsCents: number | null = null
 
   // An observation sheet can be fully entered while its time, retailer,
   // product, source or demand provenance still makes the result untrustworthy.
-  if (readiness.ready) {
+  if (canonicalShape && readiness.ready) {
     const assessment = assessWeeklyBasketStudy({
       schemaVersion: 1,
       studyId: sheet.study.studyId,
@@ -237,7 +293,7 @@ export function buildObservedComparisonPreview(
   }
 
   return {
-    rows: sheet.requirements.map((requirement, index) => {
+    rows: safeSheet.requirements.map((requirement, index) => {
       const plusLine = plus.lines[index]
       const dekaLine = deka.lines[index]
       const difference = plusLine.totalCents !== null && dekaLine.totalCents !== null
