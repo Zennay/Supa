@@ -59,8 +59,18 @@ test('M3 --output refuses ancestor alias BEFORE creating a new directory outside
   await fixture(async ({ outside, parentAlias }) => {
     const unexpectedDir = join(outside, 'new-from-alias')
     await absent(unexpectedDir)
-    denied(run(join(parentAlias, 'new-from-alias', 'sheet.html')))
-    await absent(unexpectedDir)
+    const result = run(join(parentAlias, 'new-from-alias', 'sheet.html'))
+    // Inspect physical effects even when exit status is incorrect: otherwise
+    // the first assertion would hide an actually created outside directory.
+    const observedDir = await lstat(unexpectedDir).then(
+      stat => stat.isDirectory(), error => error?.code === 'ENOENT' ? false : Promise.reject(error),
+    )
+    const observedFile = await lstat(join(unexpectedDir, 'sheet.html')).then(
+      stat => stat.isFile(), error => error?.code === 'ENOENT' ? false : Promise.reject(error),
+    )
+    assert.deepEqual({ exitStatus: result.status, observedDir, observedFile },
+      { exitStatus: 1, observedDir: false, observedFile: false })
+    denied(result)
   })
 })
 
@@ -74,8 +84,16 @@ test('M3 --output rejects link-before-dotdot even when path would auto-create ex
     const unexpected = join(outside, 'new-behind-dotdot')
     await absent(unexpected)
     // Kernel follows link first, .. then escapes into outside directory.
-    denied(run(alias + '/../new-behind-dotdot/sheet.html'))
-    await absent(unexpected)
+    const result = run(alias + '/../new-behind-dotdot/sheet.html')
+    const observedDir = await lstat(unexpected).then(
+      stat => stat.isDirectory(), error => error?.code === 'ENOENT' ? false : Promise.reject(error),
+    )
+    const observedFile = await lstat(join(unexpected, 'sheet.html')).then(
+      stat => stat.isFile(), error => error?.code === 'ENOENT' ? false : Promise.reject(error),
+    )
+    assert.deepEqual({ exitStatus: result.status, observedDir, observedFile },
+      { exitStatus: 1, observedDir: false, observedFile: false })
+    denied(result)
     // Ordinary link guard remains independent of this dotdot variant.
     assert.equal((await lstat(parentAlias)).isSymbolicLink(), true)
   })
