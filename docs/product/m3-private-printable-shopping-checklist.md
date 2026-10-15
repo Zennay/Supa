@@ -30,6 +30,17 @@ De optionele terminalschakelaar is uitsluitend `--store plus` of `--store dekama
 
 De optie werkt ook bij de oorspronkelijke lokale manifestmodus: `<manifest.json> --output <print.html> --store plus`. Er vindt geen winkelverkeer plaats.
 
+## Privé boodschappenlijst als tekst (.txt)
+
+Wie liever een eenvoudige afvinknotitie maakt in een eigen offline notitie-app, kan exact dezelfde gevalideerde fysieke boodschappenlijst **zonder HTML, opmaakcode of de andere supermarkt** als leesbaar UTF-8-tekstbestand exporteren:
+
+    node --experimental-strip-types scripts/retailer-private-shopping-checklist-html.mjs --report pad/naar/opgeslagen-vergelijking.json --output pad/naar/alleen-plus.txt --store plus --format text
+    node --experimental-strip-types scripts/retailer-private-shopping-checklist-html.mjs --report pad/naar/opgeslagen-vergelijking.json --output pad/naar/alleen-dekamarkt.txt --store dekamarkt --format text
+
+De tekstexport werkt ook met de oorspronkelijke manifest-invoer. Laat `--store ...` weg voor beide winkels. Het optionele `--format text` moet **als laatste** staan en accepteert alleen een bestemming met extensie `.txt`; zonder dit argument blijft het huidige HTML-gedrag ongewijzigd. Elke afzonderlijke lijst gebruikt precies dezelfde vertrouwde fysieke verpakkings- en winkeltotaalvalidatie als de tekstchecklist en de afdrukweergave. Onbetrouwbaar of onvolledig bewijs levert géén volledig winkeltotaal op.
+
+Zichtbare link- en e-mailadressen in product- en ingrediëntnamen worden ook in de tekstuitvoer neutraal gemaakt. Dit filter herkent niet alle persoonsgegevens; ga zorgvuldig om met de lokale bron en met het delen van het resultaat. Elke uitvoer is nieuw, niet overschrijvend, privé (bestandsmodus 0600). Er vindt geen winkelverkeer plaats en er worden geen echte besparingen bewezen.
+
 ## Extra privacy bij afdrukken
 
 Productnamen en planneringrediënten kunnen per ongeluk een e-mailadres of webadres bevatten (bijvoorbeeld na kopiëren uit een account of winkelwagen). De **HTML-afdrukvariant** vervangt zulke adressen in de zichtbare tekst én checkbox-labels door `[privé e-mailadres verborgen]` of `[privélink verborgen]`. Dit werkt zowel voor de lijst met beide winkels als voor een afzonderlijke `--store`-export, én bij opgeslagen JSON. Het onderliggende bronbestand wordt niet gewijzigd en de al geverifieerde fysieke aantallen/winkeltotalen worden niet opnieuw berekend.
@@ -48,4 +59,4 @@ Deze begrensde tekstafscherming detecteert niet alle soorten persoonsgegevens; g
 
     node --experimental-strip-types --test tests/product-m3-private-printable-shopping-checklist-20261015.test.mjs
 
-Tests controleren fysieke aankopen, onafhankelijk winkelgedrag, radioselectie voor weergave en print, gedeelde verpakking, HTML-escaping/CSP, complete lokale fixture→vergelijker→HTML, private bestandsrechten en argumentcontroles. Aanvullende opgeslagen-JSON-regressies: node --experimental-strip-types --test tests/product-m3-private-saved-report-print-20261015.test.mjs (17 synthetische cases, waaronder aparte privacy-uitvoer per winkel en een echte fictieve HTML→offline-rapport→bronbestanden verwijderen→print via JSON). Alleen synthetische voorbeelden; geen scraping, productie of publicatie.
+Tests controleren fysieke aankopen, onafhankelijk winkelgedrag, radioselectie voor weergave en print, gedeelde verpakking, HTML-escaping/CSP, complete lokale fixture→vergelijker→HTML, private bestandsrechten en argumentcontroles. Aanvullende opgeslagen-JSON-regressies: node --experimental-strip-types --test tests/product-m3-private-saved-report-print-20261015.test.mjs (22 synthetische cases, waaronder aparte privacy-uitvoer per winkel en een echte fictieve HTML→offline-rapport→bronbestanden verwijderen→print via JSON). Alleen synthetische voorbeelden; geen scraping, productie of publicatie.
