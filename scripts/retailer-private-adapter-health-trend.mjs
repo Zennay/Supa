@@ -135,6 +135,48 @@ export function comparePrivateAdapterHealth(before, after) {
     livePricesAvailable: false, externalRequests: 0,
   }
 }
+// Private 0600 files still have an ambiguous meaning when object property
+// names repeat: JSON.parse would silently choose the final permission or
+// dataset count. Reject raw duplicates, including escaped equivalent keys,
+// before any report is admitted. Never echo private JSON or paths in errors.
+function parseUniqueReportJson(bytes) {
+  try {
+    const raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    const scopes = []
+    for (let i = 0; i < raw.length;) {
+      const ch = raw[i]
+      if (ch === '{' || ch === '[') {
+        if (scopes.length >= 128) fail()
+        scopes.push(ch === '{' ? new Set() : null)
+        i++
+        continue
+      }
+      if (ch === '}' || ch === ']') {
+        if (!scopes.length) fail()
+        scopes.pop()
+        i++
+        continue
+      }
+      if (ch !== '"') { i++; continue }
+      const start = i++
+      while (i < raw.length) {
+        if (raw[i] === '\\') { i += 2; continue }
+        if (raw[i++] === '"') break
+      }
+      let next = i
+      while (next < raw.length && (
+        raw[next] === ' ' || raw.charCodeAt(next) === 9 ||
+        raw.charCodeAt(next) === 10 || raw.charCodeAt(next) === 13)) next++
+      const scope = scopes.at(-1)
+      if (raw[next] === ':' && scope instanceof Set) {
+        const name = JSON.parse(raw.slice(start, i))
+        if (scope.has(name)) fail()
+        scope.add(name)
+      }
+    }
+    return JSON.parse(raw)
+  } catch { fail() }
+}
 async function privateReport(name) {
   if (typeof name !== 'string' || !name || name.startsWith('-') || name.length > 500 ||
       !/^[a-z0-9][a-z0-9_.-]*\.json$/i.test(basename(name))) fail()
@@ -155,7 +197,7 @@ async function privateReport(name) {
         stats.size > 65536) fail()
     const bytes = await fd.readFile()
     if (bytes.length > 65536) fail()
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+    return parseUniqueReportJson(bytes)
   } finally { await fd.close() }
 }
 export async function main(argv = process.argv.slice(2), write = data => process.stdout.write(data)) {
