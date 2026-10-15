@@ -90,7 +90,7 @@ export function compareReviewedCatalogs({
     const time = Date.parse(raw.provenance.capturedAt)
     // Date.parse truncates >3 fractional-second digits. A timestamp with a
     // positive nanosecond remainder at nowMs is strictly in the future.
-    const subMs = /\\.\\d{3}(\\d+)(?:Z|[+-]\\d{2}:\\d{2})$/i.exec(
+    const subMs = /[.][0-9]{3}([0-9]+)(?:Z|[+-][0-9]{2}:[0-9]{2})$/i.exec(
       raw.provenance.capturedAt,
     )
     const strictlyFuture = time > nowMs ||
