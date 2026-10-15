@@ -59,10 +59,13 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
     // captured page. Reject matching bytes across distinct source IDs so
     // the offline preview cannot mint two-store evidence from one capture.
     const captureHash = extracted.provenance.sha256
-    // The same unparseable/mock HTML at both stores cannot mint money and
-    // must retain the existing safe unknown preview. Only duplicate captures
-    // which actually yielded Product observations are ambiguous priced proof.
-    if (extracted.observations.length > 0) {
+    // A parsed Product with a null checkout price is *not* priced evidence.
+    // Duplicate unpriced pages remain safely incomparable; genuine available
+    // priced Products cannot be replayed as a second independent store.
+    if (extracted.observations.some((item) =>
+      item.availability === 'available' &&
+      Number.isSafeInteger(item.currentPriceCents) &&
+      item.currentPriceCents >= 0)) {
       if (distinctCaptureHashes.has(captureHash)) {
         throw new Error('Duplicate priced offline HTML capture reused across sources')
       }
