@@ -130,12 +130,12 @@ export async function main(argv = process.argv.slice(2)) {
       retailerPermissionVerified: false,
       publicSavingsClaimEligible: false,
     })
-    process.stdout.write(JSON.stringify(result, null, 2) + '\\n')
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n')
     return result
   }
 
   const manifest = createPrivateM3StudyCodePin(bytes, argv[1])
-  process.stdout.write(JSON.stringify(manifest, null, 2) + '\\n')
+  process.stdout.write(JSON.stringify(manifest, null, 2) + '\n')
   return manifest
 }
 
