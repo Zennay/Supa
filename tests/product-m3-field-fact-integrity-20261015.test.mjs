@@ -146,3 +146,28 @@ test('malformed original fields refuse CLI JSON/text without leaking path or sou
     assert.equal(await readFile(path, 'utf8'), input)
   }
 })
+
+test('CLI refuses contradictory unavailable price without echoing the hidden amount or file', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-private-contradiction-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const path = join(dir, 'PRIVATE-STORED-PRICE.json')
+  const sheet = fixture()
+  sheet.baseline.lines[0].observedProduct = {
+    ...buildObservationSheet().baseline.lines[0].observedProduct,
+    available: false,
+    priceCents: 839271,
+  }
+  const original = JSON.stringify(sheet)
+  await writeFile(path, original, { mode: 0o600 })
+  for (const flags of [[], ['--text'], ['--text', '--store', 'dekamarkt']]) {
+    const result = spawnSync(process.execPath,
+      ['--experimental-strip-types', CLI, path, ...flags],
+      { cwd: dir, encoding: 'utf8', timeout: 20_000 })
+    assert.notEqual(result.status, 0, result.stderr)
+    assert.equal(result.stdout, '')
+    assert.equal(result.stderr.includes('839271'), false)
+    assert.equal(result.stderr.includes('PRIVATE-STORED-PRICE'), false)
+    assert.equal(result.stderr.includes(secret), false)
+  }
+  assert.equal(await readFile(path, 'utf8'), original)
+})
