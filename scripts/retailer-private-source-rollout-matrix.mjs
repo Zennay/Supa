@@ -23,7 +23,7 @@ const fail = () => { throw new Error('Private source rollout matrix refused') }
 function captureNanos(iso) {
   const ms = Date.parse(iso)
   if (!Number.isFinite(ms)) fail()
-  const fractional = /\\.(\\d{1,9})(?:Z|[+-]\\d{2}:\\d{2})$/.exec(iso)?.[1] ?? ''
+  const fractional = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(iso)?.[1] ?? ''
   return BigInt(ms) * 1_000_000n +
     BigInt(fractional.padEnd(9, '0').slice(3) || '0')
 }
