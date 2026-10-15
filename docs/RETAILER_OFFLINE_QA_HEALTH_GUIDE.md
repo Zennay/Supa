@@ -4,6 +4,26 @@ Deze werkinstructie hoort bij de onafhankelijke quality-validation-tools voor de
 **private historische** PLUS- en DekaMarkt-pilot. Hij beschrijft wat uitvoerbaar
 is, en vooral wat níét als actuele of toegestane prijs mag worden uitgelegd.
 
+## Kortste veilige route: één opdracht
+
+De aanbevolen QA-run voor de zes lokale, reeds beoordeelde historische bronnen is:
+
+```sh
+node --experimental-strip-types scripts/qa-retailer-offline-quality-bundle.mjs \
+  --as-of 2026-10-15T00:00:00Z
+```
+
+Deze opdracht bouwt zelf een tijdelijke private SQLite-database, draait
+de strikte zes-bronnen-preflight, voert het historische kwaliteitsrapport uit,
+controleert dat de drie onafhankelijke aantallen overeenkomen en ruimt de
+tijdelijke database altijd op. Hij geeft **één anoniem JSON-resultaat** met
+per-winkel kwaliteitstellers, zonder prijzen, URLs, productnamen of PII. Er
+wordt geen bestand in de huidige map aangemaakt, en er gaat geen supermarkt-
+HTTP-verzoek uit. Verouderde captures blijven `stale`, nooit 'actueel'.
+
+De losse stappen hieronder blijven nuttig om een bestaande private database
+zelfstandig te auditen; zij hebben dezelfde beperkingen voor rechten en M3.
+
 ## Eén offline bronketen, drie controles
 
 Vanaf de repositoryroot met de gepinde Node- en Python 3-versies:
