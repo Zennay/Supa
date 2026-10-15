@@ -14,7 +14,10 @@ node --experimental-strip-types scripts/qa-retailer-offline-quality-bundle.mjs \
 ```
 
 Deze opdracht bouwt zelf een tijdelijke private SQLite-database, draait
-de strikte zes-bronnen-preflight, voert het historische kwaliteitsrapport uit,
+de strikte zes-bronnen-preflight, verifieert **iedere** opgeslagen
+historische SQL-waarneming tegen de originele zes reviewed fixtures via
+`qa-retailer-reviewed-db-exact-parity.mjs`, voert daarna het historische
+kwaliteitsrapport uit,
 controleert dat de drie onafhankelijke aantallen overeenkomen en ruimt de
 tijdelijke database altijd op. Hij geeft **één anoniem JSON-resultaat** met
 per-winkel kwaliteitstellers, zonder prijzen, URLs, productnamen of PII. Er

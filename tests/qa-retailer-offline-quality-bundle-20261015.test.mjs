@@ -17,6 +17,8 @@ function check(data) {
   assert.equal(data.mode, 'historical-offline-retailer-quality-bundle')
   assert.equal(data.assessmentClock, clock)
   assert.equal(data.sourceKinds, 6)
+  assert.equal(data.sourceFactParityVerified, true)
+  assert.equal(data.verifiedOriginalObservations, 16)
   assert.equal(data.snapshots, 6)
   assert.equal(data.products, 13)
   assert.equal(data.observations, 16)
