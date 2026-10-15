@@ -8,7 +8,7 @@ Maak een lokaal manifest met toegestane, reeds aanwezige offline HTML-snapshots 
 
     node --experimental-strip-types scripts/retailer-private-shopping-checklist-html.mjs pad/naar/manifest.json --output pad/naar/mijn-prive-boodschappen.html
 
-Open het resultaat lokaal in een browser, vink fysieke aankopen af en gebruik desgewenst Afdrukken / PDF afdrukken. Vinkjes bestaan uitsluitend in het geopende document en worden nergens opgeslagen of verzonden. Het bestand wordt via de bestaande M3 privé-outputbescherming gepubliceerd (rechten 0600, controle op symlinks, geen privépaden in foutmeldingen). Het HTML-bestand bevat geen externe CSS, fonts, JavaScript of HTTP-aanroepen; CSP blokkeert netwerk/script.
+Open het resultaat lokaal in een browser. Kies **Beide winkels**, **Alleen PLUS** of **Alleen DekaMarkt** om onderweg slechts de relevante fysieke aankopen en het bijbehorende private winkeltotaal te zien. De winkelkeuze werkt met gewone radioknoppen en browser-CSS, **zonder JavaScript of externe verbinding**; ook Afdrukken / PDF afdrukken respecteert die keuze en verbergt de keuzebalk. Vink de producten af tijdens het winkelen. Vinkjes bestaan uitsluitend in het geopende document en worden nergens opgeslagen of verzonden. Het bestand wordt via de bestaande M3 privé-outputbescherming gepubliceerd (rechten 0600, controle op symlinks, geen privépaden in foutmeldingen). Het HTML-bestand bevat geen externe CSS, fonts, JavaScript of HTTP-aanroepen; CSP blokkeert netwerk/script.
 
 ## Contract
 
@@ -20,4 +20,4 @@ Open het resultaat lokaal in een browser, vink fysieke aankopen af en gebruik de
 
     node --experimental-strip-types --test tests/product-m3-private-printable-shopping-checklist-20261015.test.mjs
 
-Tests controleren fysieke aankopen, onafhankelijk winkelgedrag, gedeelde verpakking, HTML-escaping/CSP, complete lokale fixture→vergelijker→HTML, private bestandsrechten en argumentcontroles. Alleen synthetische voorbeelden; geen scraping, productie of publicatie.
+Tests controleren fysieke aankopen, onafhankelijk winkelgedrag, radioselectie voor weergave en print, gedeelde verpakking, HTML-escaping/CSP, complete lokale fixture→vergelijker→HTML, private bestandsrechten en argumentcontroles. Alleen synthetische voorbeelden; geen scraping, productie of publicatie.
