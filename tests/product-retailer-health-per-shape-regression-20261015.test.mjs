@@ -29,19 +29,16 @@ const privateOutput = r => {
 function freshness(r) {
   r.staleSources = 1
   r.historicalFreshnessWithinWindow = false
-  r.operatorActions = [
-    'review-capture-freshness',
-    'obtain-written-retailer-source-rights',
-    'collect-genuine-two-store-m3-basket-evidence',
-  ]
+  if (!r.operatorActions.includes('review-capture-freshness')) {
+    r.operatorActions.unshift('review-capture-freshness')
+  }
 }
 function price(r) {
   r.unknownPriceObservations = 1
-  r.operatorActions = [
-    'review-missing-price-facts',
-    'obtain-written-retailer-source-rights',
-    'collect-genuine-two-store-m3-basket-evidence',
-  ]
+  if (!r.operatorActions.includes('review-missing-price-facts')) {
+    const where = r.operatorActions.indexOf('obtain-written-retailer-source-rights')
+    r.operatorActions.splice(where, 0, 'review-missing-price-facts')
+  }
 }
 test('six historical shapes remain stable, with no fictitious regression or permission', async () => {
   const before = await source()
