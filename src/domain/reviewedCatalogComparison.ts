@@ -1,11 +1,12 @@
 import { matchIngredient, type IngredientRequirement, type ProductCandidate } from './matching.ts'
 import { calculateDecimalPackCount } from './decimalPackArithmetic.ts'
 import { normalizePackText } from '../data/normalize.ts'
+import { priceInstantNs } from '../data/schemaOrgProduct.ts'
 import { validateRawProductObservation, type RawProductObservation } from '../data/ingestion.ts'
 
 type Shop = 'plus' | 'dekamarkt'
 const SHOPS: Shop[] = ['plus', 'dekamarkt']
-const DAY = 24 * 60 * 60 * 1000
+const DAY_NS = 24n * 60n * 60n * 1_000_000_000n
 
 export type CatalogLine = {
   status: 'matched' | 'availability_unknown' | 'unknown'
@@ -72,7 +73,8 @@ export function compareReviewedCatalogs({
   }
 
   const catalog: Record<Shop, Candidate[]> = { plus: [], dekamarkt: [] }
-  const observedTimes: number[] = []
+  const observedTimes: bigint[] = []
+  const nowNs = BigInt(nowMs) * 1_000_000n
   const seenProducts = new Set<string>()
   let sourceTrusted = true
 
@@ -87,16 +89,12 @@ export function compareReviewedCatalogs({
       sourceTrusted = false
       continue
     }
-    const time = Date.parse(raw.provenance.capturedAt)
-    // Date.parse truncates >3 fractional-second digits. A timestamp with a
-    // positive nanosecond remainder at nowMs is strictly in the future.
-    const subMs = /[.][0-9]{3}([0-9]+)(?:Z|[+-][0-9]{2}:[0-9]{2})$/i.exec(
-      raw.provenance.capturedAt,
-    )
-    const strictlyFuture = time > nowMs ||
-      (time === nowMs && subMs !== null && /[1-9]/.test(subMs[1]))
-    if (!Number.isFinite(time) || strictlyFuture ||
-        nowMs - time > DAY) {
+    // Raw observations can enter through the public domain API without
+    // passing the Schema.org parser. Do not let Date.parse truncate +1ns
+    // chronology or treat a malformed timestamp as priced evidence.
+    const capturedNs = priceInstantNs(raw.provenance.capturedAt, false)
+    if (capturedNs === null || capturedNs > nowNs ||
+        nowNs - capturedNs > DAY_NS) {
       sourceTrusted = false
       continue
     }
@@ -105,20 +103,22 @@ export function compareReviewedCatalogs({
     // Invalid or contradictory dates also withhold the entire basket winner.
     if (raw.offer) {
       const { validFrom, validTo } = raw.offer
-      const parseBound = (value: string, isEnd: boolean) =>
-        // Schema.org date-only priceValidUntil is inclusive through the UTC day.
-        Date.parse(isEnd && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)
-          ? value + 'T23:59:59.999Z' : value)
-      const from = validFrom === null ? null : parseBound(validFrom, false)
-      const to = validTo === null ? null : parseBound(validTo, true)
-      if ((from !== null && (!Number.isFinite(from) || from > nowMs)) ||
-          (to !== null && (!Number.isFinite(to) || to < nowMs)) ||
+      // An Offer must be effective both when its source was CAPTURED and
+      // when it is reviewed. Price start +1ns after either instant must
+      // never become a present checkout quote. Reuse the same exact clock
+      // and inclusive date-only end semantics as the Schema.org parser.
+      const from = validFrom === null ? null : priceInstantNs(validFrom, false)
+      const to = validTo === null ? null : priceInstantNs(validTo, true)
+      if ((validFrom !== null && from === null) ||
+          (validTo !== null && to === null) ||
+          (from !== null && (from > capturedNs || from > nowNs)) ||
+          (to !== null && (to < capturedNs || to < nowNs)) ||
           (from !== null && to !== null && from > to)) {
         sourceTrusted = false
         continue
       }
     }
-    observedTimes.push(time)
+    observedTimes.push(capturedNs)
 
     // Inventory contradictions matter even when one copy says "unavailable".
     // Deduplicate identities before the price/stock usability filter.
@@ -178,9 +178,16 @@ export function compareReviewedCatalogs({
     })
   }
 
-  if (observedTimes.length > 0 &&
-      Math.max(...observedTimes) - Math.min(...observedTimes) > DAY) {
-    sourceTrusted = false
+  // Comparing rounded JS milliseconds would silently accept a 24h + 1ns
+  // mixed-store window. Preserve full precision for every source pair.
+  if (observedTimes.length > 0) {
+    let oldest = observedTimes[0]
+    let newest = observedTimes[0]
+    for (const capturedNs of observedTimes) {
+      if (capturedNs < oldest) oldest = capturedNs
+      if (capturedNs > newest) newest = capturedNs
+    }
+    if (newest - oldest > DAY_NS) sourceTrusted = false
   }
 
   const unknown = (): CatalogLine => ({
