@@ -48,7 +48,12 @@ const escapeHtml = value => value.replace(/&/g, '&amp;')
   .replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 
-export function renderPrintablePrivateShoppingChecklist(report) {
+export function renderPrintablePrivateShoppingChecklist(report, store = 'both') {
+  if (store !== 'both' && store !== 'plus' && store !== 'dekamarkt') {
+    throw new Error('Invalid private checklist shop selection')
+  }
+  // Validate the complete offline comparison before filtering its presentation.
+  // The single-store variant contains no other retailer's product or cents.
   const plain = renderPrivateShoppingChecklists(report)
   const shops = []
   let active = null
@@ -80,7 +85,10 @@ export function renderPrintablePrivateShoppingChecklist(report) {
       shops[1].name !== 'DekaMarkt' || shops.some(s => !s.total)) {
     throw new Error('Invalid private checklist presentation')
   }
-  const cards = shops.map(s => '<section aria-label="' + s.name +
+  const visibleShops = store === 'both' ? shops : shops.filter(
+    s => (store === 'plus' ? s.name === 'PLUS' : s.name === 'DekaMarkt'),
+  )
+  const cards = visibleShops.map(s => '<section aria-label="' + s.name +
     '" class="shop shop-' + (s.name === 'PLUS' ? 'plus' : 'dekamarkt') + '"><h2>' + s.name + '</h2><ol>' + s.items.join('') +
     '</ol><p class="total">' + escapeHtml(s.total) + '</p></section>').join('\n')
   return '<!doctype html>\n<html lang="nl"><head><meta charset="utf-8">' +
@@ -99,6 +107,7 @@ export function renderPrintablePrivateShoppingChecklist(report) {
     '.store-filter input{width:18px;height:18px}' +
     'body:has(#view-plus:checked) .shop-dekamarkt,body:has(#view-deka:checked) .shop-plus{display:none}' +
     'body:has(#view-plus:checked) .grid,body:has(#view-deka:checked) .grid{grid-template-columns:minmax(0,650px)}' +
+    '.grid.single-shop{grid-template-columns:minmax(0,650px)}' +
     'ol{padding-left:22px}li{padding:12px 0;border-bottom:1px solid #e1e7e3;overflow-wrap:anywhere}' +
     'label{display:flex;align-items:flex-start;gap:12px;cursor:pointer}' +
     'input{width:20px;height:20px;flex:none;accent-color:#18624c}' +
@@ -113,16 +122,20 @@ export function renderPrintablePrivateShoppingChecklist(report) {
     '.grid{grid-template-columns:1fr}.shop{break-inside:avoid;box-shadow:none}' +
     'input:checked+span{text-decoration:none}}' +
     '</style></head><body><header><h1>SUPA · Boodschappen afvinken</h1>' +
-    '<p>Twee afzonderlijke winkels; hele fysieke verpakkingen, gedeelde aankopen slechts eenmaal.</p>' +
+    '<p>' + (store === 'both'
+      ? 'Twee afzonderlijke winkels; hele fysieke verpakkingen, gedeelde aankopen slechts eenmaal.'
+      : 'Privélijst voor uitsluitend ' + (store === 'plus' ? 'PLUS' : 'DekaMarkt') +
+        '; hele verpakkingen, gedeelde aankopen slechts eenmaal.') + '</p>' +
     '</header><div class="warning"><strong>PRIVÉ · ALLEEN OFFLINE.</strong> ' +
     'Geen live prijzen, geen winkeladvies, geen bewezen besparing. ' +
     'Controleer verpakking, actuele prijs en voorraad zelf in de winkel. ' +
     'Afvinken wordt niet opgeslagen en verstuurt niets.</div>' +
-    '<fieldset class="store-filter"><legend>Welke boodschappenlijst wil je bekijken of printen?</legend>' +
-    '<label><input type="radio" name="storeView" id="view-both" checked>Beide winkels</label>' +
-    '<label><input type="radio" name="storeView" id="view-plus">Alleen PLUS</label>' +
-    '<label><input type="radio" name="storeView" id="view-deka">Alleen DekaMarkt</label>' +
-    '</fieldset><main class="grid">' + cards + '</main>' +
+    (store === 'both' ? '<fieldset class="store-filter"><legend>Welke boodschappenlijst wil je bekijken of printen?</legend>' +
+      '<label><input type="radio" name="storeView" id="view-both" checked>Beide winkels</label>' +
+      '<label><input type="radio" name="storeView" id="view-plus">Alleen PLUS</label>' +
+      '<label><input type="radio" name="storeView" id="view-deka">Alleen DekaMarkt</label>' +
+      '</fieldset>' : '') +
+    '<main class="grid' + (store === 'both' ? '' : ' single-shop') + '">' + cards + '</main>' +
     '<footer>Lokale vergelijking van snapshots. Een onbekende winkelregel ' +
     'mag nooit als volledig mandbedrag worden behandeld. ' +
     'Geen gegevens worden verzonden of automatisch bijgewerkt.</footer>' +
@@ -137,16 +150,21 @@ export async function main(argv = process.argv.slice(2)) {
       '<lokaal-manifest.json> --output <prive-checklist.html>\n' +
       'Of vanuit eerder lokaal opgeslagen vergelijking (zonder HTML-herlezing):\n' +
       '  --report <lokale-vergelijking.json> --output <prive-checklist.html>\n' +
+      'Optioneel: voeg --store plus OF --store dekamarkt toe om alleen die winkel te exporteren.\n' +
       'Geen winkelverkeer; geen live prijs of publieke besparingsclaim.\n'
     process.stdout.write(help)
     return help
   }
-  const savedMode = argv.length === 4 && argv[0] === '--report' &&
-    argv[2] === '--output'
-  const manifestMode = argv.length === 3 && argv[1] === '--output'
-  const input = savedMode ? argv[1] : argv[0]
-  const output = savedMode ? argv[3] : argv[2]
+  const withStore = argv.length >= 2 && argv[argv.length - 2] === '--store'
+  const store = withStore ? argv[argv.length - 1] : 'both'
+  const core = withStore ? argv.slice(0, -2) : argv
+  const savedMode = core.length === 4 && core[0] === '--report' &&
+    core[2] === '--output'
+  const manifestMode = core.length === 3 && core[1] === '--output'
+  const input = savedMode ? core[1] : core[0]
+  const output = savedMode ? core[3] : core[2]
   if ((!savedMode && !manifestMode) ||
+      (store !== 'both' && store !== 'plus' && store !== 'dekamarkt') ||
       typeof input !== 'string' || !input || input.startsWith('-') ||
       typeof output !== 'string' || !output || output.startsWith('-') ||
       output !== output.trim() || !output.toLowerCase().endsWith('.html')) {
@@ -156,7 +174,7 @@ export async function main(argv = process.argv.slice(2)) {
     ? await readSavedPrivateComparison(input)
     : await compareLocalRetailerSnapshots(input)
   // No HTML is rendered or published if caller-owned report proof is malformed.
-  const html = renderPrintablePrivateShoppingChecklist(report)
+  const html = renderPrintablePrivateShoppingChecklist(report, store)
   try {
     await assertNoSymlinkedM3OutputParents(output)
     await mkdir(dirname(output), { recursive: true, mode: 0o700 })
