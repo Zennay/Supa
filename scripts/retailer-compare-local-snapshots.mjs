@@ -120,6 +120,9 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
     captureSummary.push({
       sourceId: source.id,
       supermarket: source.supermarket,
+      // Provenance is validated as an exact absolute ISO clock by the full
+      // manifest preflight, even when this snapshot yields zero prices.
+      capturedAt: entry.capturedAt,
       parsedProducts: extracted.observations.length,
       rejected: extracted.rejected,
       scriptsInspected: extracted.scriptsInspected,
