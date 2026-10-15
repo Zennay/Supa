@@ -175,8 +175,13 @@ function priceInstantNs(raw: string, isEnd: boolean): bigint | null {
   const millis = priceBoundTime(raw, isEnd)
   if (!Number.isSafeInteger(millis)) return null
   const fraction = /T[0-9]{2}:[0-9]{2}:[0-9]{2}[.]([0-9]{1,9})/.exec(raw)?.[1]
-  const subMillisecond = fraction === undefined
-    ? 0n : BigInt(fraction.padEnd(9, '0').slice(3))
+  // A date-only priceValidUntil includes the *whole* calendar day. The
+  // millisecond parser's 23:59:59.999 represents the first ns of the last
+  // millisecond, not its final ns. Do not discard up to 999,999 ns of a
+  // legitimately observed checkout quote at the end of that day.
+  const subMillisecond = isEnd && raw.length === 10
+    ? 999_999n
+    : fraction === undefined ? 0n : BigInt(fraction.padEnd(9, '0').slice(3))
   return BigInt(millis) * 1_000_000n + subMillisecond
 }
 
