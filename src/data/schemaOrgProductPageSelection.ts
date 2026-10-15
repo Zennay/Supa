@@ -85,6 +85,14 @@ function normalizedHttpsUrl(input: unknown): string | null {
   }
 }
 
+function readSelectedProduct(product: DataObject, source: SourceSnapshotRef): SchemaOrgParseResult {
+  const result = parseSchemaOrgProduct(product, source)
+  // Legacy parser diagnostics can include a raw attacker-controlled currency.
+  // This offline operator boundary must not echo untrusted product metadata.
+  return result.type === 'observation' ? result :
+    refuses('selected Product price, currency or provenance not verified')
+}
+
 function trustedRetailerProductSource(source: SourceSnapshotRef): string | null {
   if (source?.kind !== 'product') return null
   const href = normalizedHttpsUrl(source.url)
@@ -127,7 +135,7 @@ export function parseSchemaOrgProductForPage(
           normalizedHttpsUrl(declared) !== sourceUrl) {
         return refuses('Product URL disagrees with captured page')
       }
-      return parseSchemaOrgProduct(products[0], provenance)
+      return readSelectedProduct(products[0], provenance)
     }
 
     const urls = products.map((product) =>
@@ -140,7 +148,7 @@ export function parseSchemaOrgProductForPage(
     if (matching.length !== 1) {
       return refuses('no unambiguous Product URL matches captured page')
     }
-    return parseSchemaOrgProduct(matching[0], provenance)
+    return readSelectedProduct(matching[0], provenance)
   } catch {
     // Includes revoked Proxy/hostile getter/cyclic or oversized graph inputs;
     // never echo retailer/customer-controlled content into an operator error.
