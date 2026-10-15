@@ -31,6 +31,45 @@ async function directoryTrust(directory) {
     cur = parent
   }
 }
+// A valid SHA authenticates bytes, not ambiguous JSON semantics. Reject
+// duplicate object keys (including escape-equivalent spellings) before the
+// builder creates a manifest that the strict replay would later refuse.
+function parseUnambiguousReviewedJson(text) {
+  const stack = []
+  for (let i = 0; i < text.length;) {
+    const ch = text[i]
+    if (ch === '{' || ch === '[') {
+      if (stack.length >= 128) fail()
+      stack.push(ch === '{' ? new Set() : null)
+      i++
+      continue
+    }
+    if (ch === '}' || ch === ']') {
+      if (stack.length === 0) fail()
+      stack.pop()
+      i++
+      continue
+    }
+    if (ch !== '"') { i++; continue }
+    const start = i++
+    while (i < text.length) {
+      if (text[i] === '\\') { i += 2; continue }
+      if (text[i++] === '"') break
+    }
+    let next = i
+    while (next < text.length &&
+      (text[next] === ' ' || text.charCodeAt(next) === 9 ||
+       text.charCodeAt(next) === 10 || text.charCodeAt(next) === 13)) next++
+    const scope = stack.at(-1)
+    if (text[next] === ':' && scope instanceof Set) {
+      const key = JSON.parse(text.slice(start, i))
+      if (scope.has(key)) fail()
+      scope.add(key)
+    }
+  }
+  // JSON.parse remains grammar authority; scan only enforces unique names.
+  return JSON.parse(text)
+}
 async function boundedEvidence(path) {
   const info = await lstat(path)
   if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 ||
@@ -43,7 +82,7 @@ async function boundedEvidence(path) {
     const bytes = await fd.readFile()
     if (bytes.length > 1024 * 1024) fail()
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-    return { bytes, record: JSON.parse(text) }
+    return { bytes, record: parseUnambiguousReviewedJson(text) }
   } catch { fail() }
   finally { await fd.close() }
 }
