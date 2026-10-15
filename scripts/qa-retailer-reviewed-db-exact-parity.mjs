@@ -9,7 +9,7 @@ import { resolve } from 'node:path'
 import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
 
 const READ_SQLITE = `
-import json, os, sqlite3, stat, sys
+import json, os, sqlite3, stat, sys, unicodedata
 from urllib.parse import quote
 path = os.path.abspath(sys.argv[1])
 expected_count = int(sys.argv[2])
@@ -29,7 +29,15 @@ if os.stat(path).st_size > 16 * 1024 * 1024:
 with sqlite3.connect("file:" + quote(path) + "?mode=ro&immutable=1", uri=True, timeout=2) as db:
     db.execute("PRAGMA query_only=ON")
     db.execute("PRAGMA trusted_schema=OFF")
-    metadata = dict(db.execute("SELECT key,value FROM metadata"))
+    # Exact schema-v1 metadata: never silently accept an extra shadow grant
+    # beside the known private-only source licence markers.
+    meta_rows = list(db.execute("SELECT key,value FROM metadata"))
+    metadata = dict(meta_rows)
+    if len(meta_rows) != 5 or set(metadata) != {
+        "schema_version", "origin", "production_enabled",
+        "public_savings_claim_eligible", "requires_explicit_retailer_license"
+    }:
+        raise ValueError("unexpected private source metadata")
     if (metadata.get("schema_version") != "1" or
         metadata.get("origin") != "offline-reviewed-snapshots-only" or
         metadata.get("production_enabled") != "false" or
@@ -55,6 +63,21 @@ with sqlite3.connect("file:" + quote(path) + "?mode=ro&immutable=1", uri=True, t
     """))
     if len(rows) != n:
         raise ValueError("broken source-to-product ownership")
+    # A correct price count is not proof of a correct catalog: an additional
+    # unobserved retail product can silently survive the join above, and a
+    # corrupt derived search_name would never appear in price records.
+    # Verify the ENTIRE catalog has precisely the identities supported by
+    # physical observations, and index text exactly matches the importer.
+    catalog_rows = list(db.execute(
+        "SELECT retailer_id,source_product_id,display_name,search_name FROM products"))
+    observed_products = {(row[0], row[5]): row[6] for row in rows}
+    if len(catalog_rows) != len(observed_products):
+        raise ValueError("unobserved or absent retailer products")
+    for retailer, product_id, name, search_name in catalog_rows:
+        if (observed_products.get((retailer, product_id)) != name or
+            not isinstance(name, str) or
+            search_name != " ".join(unicodedata.normalize("NFKC", name).casefold().split())):
+            raise ValueError("inconsistent retailer product identity or search index")
     print(json.dumps(rows,ensure_ascii=False,separators=(",",":")))
 `
 
