@@ -4,11 +4,11 @@ Dit product-core hulpmiddel ondersteunt [issue #205](https://github.com/Zennay/S
 
 ## Gebruik (alleen lokaal, na geldige menselijke meting)
 
-Controleer eerst in GitHub welke echte *main*-revisie tijdens de veldmeting wordt gebruikt. Gebruik geen fictieve of ongetoetste SHA als bewijs. In een privémap buiten iedere Git-repository:
+Controleer eerst in GitHub welke echte *main*-revisie tijdens de veldmeting wordt gebruikt. Vervang de expliciete placeholder hieronder door die geverifieerde waarde (de placeholder zelf wordt door de CLI geweigerd). Gebruik geen fictieve of ongetoetste SHA als bewijs. In een privémap buiten iedere Git-repository:
 
 ```bash
 umask 077
-node scripts/m3-field-code-pin.mjs /private/study.json <echte-40-hex-main-commit-sha> > /private/study-code-pin.json
+node scripts/m3-field-code-pin.mjs /private/study.json "PASTE_40_HEX_MAIN_SHA_HERE" > /private/study-code-pin.json
 ```
 
 Het hulpmiddel leest alleen een regulier lokaal JSON-bestand, maximaal 4 MiB, zonder symlink of hardlink. Het maakt een **byte-exacte SHA-256** van het volledige bestand en toont uitsluitend manifestvelden. Persoons-/prijsregels worden niet naar stdout geschreven. De sidecar is uitsluitend een controle van de hash-binding; wijzigingen in het originele JSON na generatie maken de verificatie ongeldig. Bewaar beide bestanden privé, versleuteld/afgeschermd en buiten versiebeheer. Het hulpmiddel schrijft zelf niets naar schijf.
