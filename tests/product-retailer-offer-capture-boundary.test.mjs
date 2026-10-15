@@ -66,3 +66,20 @@ test('date-only expiry includes source capture and review throughout UTC last da
   assert.equal(candidate.currentPriceCents,119)
   assert.equal(compare(candidate).comparable,true)
 })
+
+test('contradictory price validity remains explicit parser-level abstention',()=>{
+  const source=SOURCES.find(x=>x.id==='dekamarkt-product-halfvolle-melk')
+  const html='<script type="application/ld+json">'+JSON.stringify({
+    '@type':'Product',name:'Halfvolle melk',sku:'fictional-milk',
+    weight:{value:'1000 ml'},
+    offers:{
+      '@type':'Offer',price:'1.19',priceCurrency:'EUR',
+      availability:'https://schema.org/InStock',
+      validFrom:'2026-10-16T00:00:00Z',
+      priceValidUntil:'2026-10-14T00:00:00Z',
+    },
+  })+'</script>'
+  const snap=parseOfflineRetailerSnapshot({source,html,capturedAt:at})
+  assert.equal(snap.observations.length,0)
+  assert.equal(snap.rejected,1)
+})
