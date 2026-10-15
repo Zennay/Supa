@@ -38,6 +38,7 @@ test('actual offline M3 HTML parser to readable basket shows correctly costed ph
   assert.equal(report.comparison.comparable,true)
   assert.equal(report.comparison.savingsCents,10)
   assert.equal(report.comparison.claimable,false)
+  assert.equal(report.captureSummary[0].capturedAt,capturedAt)
   const view=renderPrivateComparison(report)
   assert.match(view,/PLUS: 1 × €1,29 = €1,29/)
   assert.match(view,/DekaMarkt: 1 × €1,19 = €1,19/)
