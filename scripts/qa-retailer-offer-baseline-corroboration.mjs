@@ -142,11 +142,15 @@ export function reviewPrivateRetailerOffers(batch, {
       continue
     }
     totals.priceBackedOfferRows++
-    if (offer.validFrom === null || offer.validTo === null) {
+    // Validate EACH supplied boundary, including a partial/unknown window.
+    // A normal upcoming campaign end can be later than the review clock;
+    // reject implausibly distant dates, but do not label future expiry invalid.
+    const campaignLimit = asOfMs + 366 * 24 * 3600 * 1000
+    const start = offer.validFrom === null ? null : instant(offer.validFrom, campaignLimit)
+    const end = offer.validTo === null ? null : instant(offer.validTo, campaignLimit)
+    if (start === null || end === null) {
       totals.unknownOfferWindows++
     } else {
-      const start = instant(offer.validFrom, asOfMs)
-      const end = instant(offer.validTo, asOfMs)
       if (start > end) fail()
       if (timestamp < start || timestamp > end) totals.outOfWindowAtCapture++
     }
