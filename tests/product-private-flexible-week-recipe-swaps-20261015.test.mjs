@@ -4,6 +4,7 @@ import { m2InitialPlan, m2Recipes, m2DefaultActiveDays } from '../src/data/m2Fix
 import { buildDynamicReviewedWeek } from '../src/domain/reviewedCatalogPlannedWeek.ts'
 import { loadReviewedRepositoryFixtures } from '../scripts/retailer-reviewed-ingest-engine.mjs'
 import { buildUniversalRetailerCatalog } from '../scripts/retailer-universal-catalog.mjs'
+import { buildPersistedReviewedWeek } from '../scripts/retailer-private-sqlite-planner-review.mjs'
 import {
   selectedFixtureWeek,
   main as reviewedWeekCommand,
@@ -90,4 +91,23 @@ test('private CLI recipe swaps affect queue totals without leaking SKU, money or
   assert.deepEqual([originalWeek.uniqueIngredientNeeds, originalWeek.retailerReviewRows], [5, 10])
   const mix = await reviewedWeekCommand(['--plan', 'Ma:tikka,Do:teriyaki'], () => {})
   assert.deepEqual([mix.uniqueIngredientNeeds, mix.retailerReviewRows], [8, 16])
+})
+
+test('persisted private SQLite follows the exact same swapped recipe demand as memory preview', async () => {
+  const persisted = await buildPersistedReviewedWeek(['--plan', 'Do:pasta,Ma:pasta'])
+  assert.equal(persisted.mode, 'persisted-private-sqlite-to-dynamic-planner-review')
+  assert.deepEqual([
+    persisted.sourceSnapshots, persisted.selectedMealDays,
+    persisted.ingredientNeeds, persisted.retailerReviewRows,
+  ], [6, 2, 3, 6])
+  assert.equal(persisted.productionEnabled, false)
+  assert.equal(persisted.publicSavingsClaimEligible, false)
+  assert.equal(persisted.livePricesAvailable, false)
+  assert.equal(persisted.externalRequests, 0)
+  const oldChoice = await buildPersistedReviewedWeek(['--days', 'Ma,Do'])
+  assert.deepEqual([
+    oldChoice.selectedMealDays, oldChoice.ingredientNeeds, oldChoice.retailerReviewRows,
+  ], [2, 5, 10])
+  // Wrong recipes fail before the temp SQLite file or Python subprocess can run.
+  await assert.rejects(buildPersistedReviewedWeek(['--plan', 'Ma:unlicensed']))
 })
