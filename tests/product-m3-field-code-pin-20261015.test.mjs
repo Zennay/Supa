@@ -232,7 +232,7 @@ test('M3 strict sidecar parser rejects duplicate source revisions and forged fla
 
 test('M3 strict sidecar parser permits benign whitespace but rejects nested, trailing and missing fields', () => {
   const valid = createPrivateM3StudyCodePin(bytes, SHA)
-  assert.deepEqual(parseStrictPrivateM3Manifest('  \\n' + JSON.stringify(valid) + '\\t  '), valid)
+  assert.deepEqual(parseStrictPrivateM3Manifest('  ' + String.fromCharCode(10) + JSON.stringify(valid) + String.fromCharCode(9) + '  '), valid)
   for (const value of [
     JSON.stringify(valid) + 'not-json',
     JSON.stringify({ ...valid, unexpected: 'extra' }),
