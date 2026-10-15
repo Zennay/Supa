@@ -381,6 +381,21 @@ export function parseSchemaOrgProduct(
       }
     }
   }
+  // Contradictory parent Offer windows are malformed source evidence.
+  // Report parser abstention instead of hiding the dates behind an unknown
+  // price, matching the original RawOffer trust contract.
+  for (const offer of offers) {
+    if (typeof offer.validFrom === 'string' &&
+        typeof offer.priceValidUntil === 'string' &&
+        priceBoundTime(offer.validFrom, false) >
+          priceBoundTime(offer.priceValidUntil, true)) {
+      return {
+        type: 'abstain',
+        reason: 'Product JSON-LD observation failed trust validation: ' +
+          'Offer validity window cannot end before it starts',
+      }
+    }
+  }
   const currency = extractCurrency(offers)
   if (currency !== null && currency !== 'EUR') {
     return {
