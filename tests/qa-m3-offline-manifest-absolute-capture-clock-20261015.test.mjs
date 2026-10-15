@@ -40,10 +40,10 @@ const invalid = [
   ['impossible UTC offset -14:01', '2026-10-15T10:00:00-14:01'],
 ]
 for (const [description, timestamp] of invalid) {
-  test('QA M3 capture-clock preflight rejects ' + description + ' in BOTH source positions', async t => {
-    assert.ok(Number.isFinite(Date.parse(timestamp)),
-      'fixture must expose Date.parse permissiveness: ' + description)
-    for (const location of ['first', 'later']) {
+  for (const location of ['first', 'later']) {
+    test('QA M3 capture-clock preflight rejects ' + description + ' at ' + location + ' source', async t => {
+      assert.ok(Number.isFinite(Date.parse(timestamp)),
+        'fixture must expose Date.parse permissiveness: ' + description)
       const snapshots = location === 'first'
         ? [{ ...plus, capturedAt: timestamp }, deka]
         : [plus, { ...deka, capturedAt: timestamp }]
@@ -53,8 +53,8 @@ for (const [description, timestamp] of invalid) {
         /Invalid bounded offline snapshot/,
         description + ', ' + location + ': validate before missing HTML is opened',
       )
-    }
-  })
+    })
+  }
 }
 
 for (const timestamp of [
