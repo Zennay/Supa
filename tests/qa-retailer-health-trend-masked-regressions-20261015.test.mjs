@@ -81,10 +81,20 @@ test('QA: more unpriced PLUS facts must be flagged even when Deka source coverag
   const from = 'dekamarkt:catalog', to = 'plus:catalog'
   assert.ok(before.byShape[from].observations > 0)
   assert.ok(after.byShape[to].observations > 0)
+  // Reset only the artificial missing-price distribution, retaining all
+  // independently measured archived retailer counters and privacy gates.
+  for (const shape of Object.keys(before.byShape)) {
+    before.byShape[shape].unknownPrices = 0
+    after.byShape[shape].unknownPrices = 0
+  }
   before.byShape[from].unknownPrices = 1
   after.byShape[to].unknownPrices = 1
   ensureUnknownPriceAction(before)
   ensureUnknownPriceAction(after)
+  // All other original totals stay fixed. This is deliberate balancing:
+  // two individually internally valid health reports with identical totals.
+  assert.doesNotThrow(() => comparePrivateAdapterHealth(before, clone(before)))
+  assert.doesNotThrow(() => comparePrivateAdapterHealth(after, clone(after)))
   const trend = comparePrivateAdapterHealth(before, after)
   assert.equal(trend.perShape[to].unknownPriceDelta, 1)
   assert.equal(trend.perShape[from].unknownPriceDelta, -1)
@@ -95,9 +105,11 @@ test('QA: more unpriced PLUS facts must be flagged even when Deka source coverag
 test('QA: newly unknown availability must be diagnosed even if totals and price facts stay unchanged', async () => {
   const before = await baseline()
   const after = clone(before)
-  const shape = 'plus:product'
-  assert.ok(after.byShape[shape].observations > 0)
+  const shape = Object.keys(after.byShape).find(key =>
+    after.byShape[key].observations > after.byShape[key].unknownAvailability)
+  assert.ok(shape, 'historical fixtures must include at least one known availability')
   after.byShape[shape].unknownAvailability++
+  assert.doesNotThrow(() => comparePrivateAdapterHealth(after, clone(after)))
   const trend = comparePrivateAdapterHealth(before, after)
   assert.equal(trend.totalObservationDelta, 0)
   assert.equal(trend.publicSavingsClaimEligible, false)
@@ -108,9 +120,11 @@ test('QA: newly unknown availability must be diagnosed even if totals and price 
 test('QA: newly unknown packaging must not disappear from retailer trend quality warnings', async () => {
   const before = await baseline()
   const after = clone(before)
-  const shape = 'dekamarkt:product'
-  assert.ok(after.byShape[shape].observations > 0)
+  const shape = Object.keys(after.byShape).find(key =>
+    after.byShape[key].observations > after.byShape[key].unknownPacks)
+  assert.ok(shape, 'historical fixtures must include at least one known pack')
   after.byShape[shape].unknownPacks++
+  assert.doesNotThrow(() => comparePrivateAdapterHealth(after, clone(after)))
   const trend = comparePrivateAdapterHealth(before, after)
   assert.equal(trend.totalObservationDelta, 0)
   assert.equal(trend.externalRequests, 0)
