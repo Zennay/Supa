@@ -157,3 +157,58 @@ for (const [label, plusStock, dekaStock] of [
     noWinner(result)
   })
 }
+
+
+/**
+ * Full paired retailer availability lattice on the *integrated* M3 source.
+ * For any three-state pair, an all-known physical basket winner exists IFF
+ * both shops have explicitly confirmed availability. Run with multiple price
+ * directions, zero prices and ties to keep pricing independent of stock.
+ */
+for (const [plusPrice, dekaPrice, label] of [
+  [129, 119, 'Deka appears cheaper'],
+  [119, 129, 'PLUS appears cheaper'],
+  [119, 119, 'equal unit prices'],
+  [0, 0, 'free unit price at both shops'],
+]) {
+  test('exhaustive 3x3 availability pairs: ' + label, async (t) => {
+    for (const plusAvailability of ['available', 'unavailable', 'unknown']) {
+      for (const dekaAvailability of ['available', 'unavailable', 'unknown']) {
+        await t.test(plusAvailability + ' vs ' + dekaAvailability, () => {
+          const result = compare(
+            plusAvailability, dekaAvailability, plusPrice, dekaPrice)
+          if (plusAvailability !== 'available' || dekaAvailability !== 'available') {
+            noWinner(result)
+            return
+          }
+          assert.equal(result.comparable, true)
+          assert.equal(result.cheaperStore, dekaPrice < plusPrice ? 'dekamarkt'
+            : dekaPrice > plusPrice ? 'plus' : 'equal')
+          assert.equal(result.savingsCents, 2 * Math.abs(dekaPrice - plusPrice))
+        })
+      }
+    }
+  })
+}
+
+test('raw observation ordering cannot upgrade unknown Deka stock to a winner', () => {
+  const rows = [item('plus', 129, 'available'), item('dekamarkt', 119, 'unknown')]
+  for (const ordered of [rows, [...rows].reverse()]) {
+    const inputBefore = JSON.stringify(ordered)
+    const r = compareReviewedCatalogs({ requirements, observations: ordered, nowMs: NOW })
+    noWinner(r)
+    assert.equal(r.lines[0].dekamarkt.status, 'availability_unknown')
+    assert.equal(JSON.stringify(ordered), inputBefore)
+  }
+})
+
+test('control: swapping independent retailer record order preserves known-stock prices', () => {
+  const rows = [item('plus', 129, 'available'), item('dekamarkt', 119, 'available')]
+  for (const ordered of [rows, [...rows].reverse()]) {
+    const r = compareReviewedCatalogs({ requirements, observations: ordered, nowMs: NOW })
+    assert.equal(r.comparable, true)
+    assert.equal(r.cheaperStore, 'dekamarkt')
+    assert.equal(r.savingsCents, 20)
+    assert.equal(r.claimable, false)
+  }
+})
