@@ -16,7 +16,7 @@ Vier bestanden:
 
 1. `collection-sheet.json`: exact het nog lege officiële **11 PLUS + 11 DekaMarkt** observatiecontract uit `buildObservationSheet`, geen producten of prijzen ingevuld.
 2. `field-form.html`: twee direct printbare A4-landscape-invulbladen, automatisch uit dezelfde canonieke vraag opgebouwd. Ook dit is nog geen bewijs.
-3. `source-revision.json`: aanvullende bewijs-pin met de **werkelijke** schone `main` Git SHA, canonieke demand-SHA-256 en expliciete `not-evidence` flags.
+3. `source-revision.json`: aanvullende bewijs-pin met de **werkelijke** schone `main` Git SHA, canonieke demand-SHA-256 en expliciete `not-evidence` flags. De generator legt de SHA één keer als eigen datawaarde vast en gebruikt diezelfde waarde in de begeleidende tekst; variabele getters/Proxy-waarden kunnen niet ongemerkt een andere revisie invullen.
 4. `START-HERE.txt`: Nederlandse stappen inclusief exact 24-uurvenster, dezelfde prijscontext, expliciete onbekenden en veilige opvolgcommando's.
 
 Kies hetzelfde kanaal (beide fysieke winkels óf beide online), leg echte datum en tijdzone bij beide vast, verifieer voor elk van de 22 regels werkelijk product, voorraad, inhoud/eenheid, verpakkingsaantal, prijs per verpakking, herkomst en verplichte toestemming. Vul nooit een fictieve prijs in; `niet beschikbaar` blijft onbekend in een besparingsberekening.
