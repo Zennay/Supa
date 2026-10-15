@@ -114,7 +114,7 @@ test('existing private source or sibling manifest blocks fetch and preserves exi
 test('rejects unsafe output name and wrong arguments without network', async () => {
   const { dir, grantFile } = await temp()
   try {
-    for (const path of [join(dir, '../parent.html'), join(dir, '.hidden.html'), join(dir, 'not-json.json')]) {
+    for (const path of [dir + '/../parent.html', join(dir, '.hidden.html'), join(dir, 'not-json.json')]) {
       await assert.rejects(main([grantFile, path], { testGateDocument: gate }), /Invalid private snapshot output name/)
     }
     await assert.rejects(main([]), /Usage:/)
