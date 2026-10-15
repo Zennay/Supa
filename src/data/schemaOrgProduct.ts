@@ -113,10 +113,38 @@ function samePhysicalReference(reference: unknown, pack: RawPack): boolean {
     packAmount === refAmount
 }
 
-/** Dates on a nested price refer to that price, not just to its parent Offer. */
+/**
+ * Bound quoted prices by REAL calendar dates, never Date.parse's permissive
+ * rollover (2026-02-30 => March 2). This applies to Offer and nested
+ * PriceSpecification windows before they can become checkout evidence.
+ */
 function priceBoundTime(raw: string, isEnd: boolean): number {
-  return Date.parse(isEnd && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(raw)
-    ? raw + 'T23:59:59.999Z' : raw)
+  const date = /^([0-9]{4})-([0-9]{2})-([0-9]{2})/.exec(raw)
+  if (!date) return Number.NaN
+  const year = Number(date[1])
+  const month = Number(date[2])
+  const day = Number(date[3])
+  const calendar = new Date(0)
+  calendar.setUTCHours(0, 0, 0, 0)
+  calendar.setUTCFullYear(year, month - 1, day)
+  if (year < 1 || calendar.getUTCFullYear() !== year ||
+      calendar.getUTCMonth() !== month - 1 || calendar.getUTCDate() !== day) {
+    return Number.NaN
+  }
+
+  const suffix = raw.slice(10)
+  if (suffix) {
+    const timestamp = /^T([0-9]{2}):([0-9]{2})(?::([0-9]{2})(?:[.][0-9]{1,9})?)?(Z|[+-][0-9]{2}:[0-9]{2})$/.exec(suffix)
+    if (!timestamp) return Number.NaN
+    const hour = Number(timestamp[1])
+    const minute = Number(timestamp[2])
+    const second = Number(timestamp[3] ?? '0')
+    if (hour > 23 || minute > 59 || second > 59) return Number.NaN
+    const zone = timestamp[4]
+    if (zone !== 'Z' && (Number(zone.slice(1, 3)) > 23 ||
+        Number(zone.slice(4, 6)) > 59)) return Number.NaN
+  }
+  return Date.parse(isEnd && !suffix ? raw + 'T23:59:59.999Z' : raw)
 }
 
 function exactSpecPrice(specification: JsonObject, pack: RawPack): number | null {
