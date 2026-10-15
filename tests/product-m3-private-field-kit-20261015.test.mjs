@@ -252,3 +252,38 @@ test('exported writer rejects symbols, inherited and malformed descriptor record
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('private field kit refuses OTHER Git repositories, worktrees and uncreated descendants', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'supa-m3-cross-git-'))
+  const kit = buildM3FieldKit(revision())
+  try {
+    const checkout = join(root, 'another-app')
+    await mkdir(checkout)
+    await mkdir(join(checkout, '.git'))
+    const nested = join(checkout, 'not-yet-existing', 'very-private-kit')
+    await assert.rejects(writeM3FieldKit(nested, kit), /under a Git checkout/u)
+    await assert.rejects(lstat(join(checkout, 'not-yet-existing')), { code: 'ENOENT' })
+
+    // Additional worktrees identify their Git root using a .git FILE.
+    const worktree = join(root, 'linked-worktree')
+    await mkdir(worktree)
+    await writeFile(join(worktree, '.git'), 'gitdir: /synthetic/example/worktrees/test\n')
+    const worktreeOutput = join(worktree, 'private-kit')
+    await assert.rejects(writeM3FieldKit(worktreeOutput, kit), /under a Git checkout/u)
+    await assert.rejects(lstat(worktreeOutput), { code: 'ENOENT' })
+
+    // Never create a source-control metadata folder as an output destination.
+    const markerOutput = join(root, '.git')
+    await assert.rejects(writeM3FieldKit(markerOutput, kit), /under a Git checkout/u)
+    await assert.rejects(lstat(markerOutput), { code: 'ENOENT' })
+
+    // The control outside all Git repositories still works exactly as before.
+    const allowed = join(root, 'outside-all-checkouts')
+    await writeM3FieldKit(allowed, kit)
+    assert.equal((await lstat(allowed)).mode & 0o777, 0o700)
+    assert.equal(await readFile(join(allowed, 'source-revision.json'), 'utf8'),
+      kit['source-revision.json'])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
