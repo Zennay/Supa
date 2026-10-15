@@ -43,9 +43,109 @@ async function boundedRegularFile(path, maxBytes) {
   }
 }
 
+// A digest binds the original bytes, not the meaning of contradictory JSON.
+// Reject repeated *decoded* keys at every nesting depth before JSON.parse can
+// discard an earlier price, demand, retailer identity or participant field.
+export function assertUnambiguousM3StudyJson(raw) {
+  if (typeof raw !== 'string' || raw.length === 0 ||
+      Buffer.byteLength(raw, 'utf8') > STUDY_MAX_BYTES) deny()
+  let index = 0
+  let examinedKeys = 0
+  const maxNesting = 80
+  const maxKeys = 50000
+  const whitespace = () => {
+    while (index < raw.length &&
+      [9, 10, 13, 32].includes(raw.charCodeAt(index))) index += 1
+  }
+  const expect = (ch) => {
+    whitespace()
+    if (raw[index] !== ch) deny()
+    index += 1
+  }
+  const quoted = () => {
+    whitespace()
+    const start = index
+    if (raw[index++] !== '"') deny()
+    let ended = false
+    while (index < raw.length) {
+      const c = raw[index++]
+      if (c === '\\') {
+        if (index >= raw.length) deny()
+        index += 1
+      } else if (c === '"') {
+        ended = true
+        break
+      } else if (c.charCodeAt(0) < 0x20) deny()
+    }
+    if (!ended) deny()
+    try {
+      return JSON.parse(raw.slice(start, index))
+    } catch {
+      deny()
+    }
+  }
+  const value = (depth) => {
+    if (depth > maxNesting) deny()
+    whitespace()
+    const ch = raw[index]
+    if (ch === '"') {
+      quoted()
+      return
+    }
+    if (ch === '{') {
+      index += 1
+      whitespace()
+      if (raw[index] === '}') {
+        index += 1
+        return
+      }
+      const keys = new Set()
+      while (true) {
+        const key = quoted()
+        if (keys.has(key) || ++examinedKeys > maxKeys) deny()
+        keys.add(key)
+        expect(':')
+        value(depth + 1)
+        whitespace()
+        if (raw[index] === '}') {
+          index += 1
+          return
+        }
+        expect(',')
+      }
+    }
+    if (ch === '[') {
+      index += 1
+      whitespace()
+      if (raw[index] === ']') {
+        index += 1
+        return
+      }
+      while (true) {
+        value(depth + 1)
+        whitespace()
+        if (raw[index] === ']') {
+          index += 1
+          return
+        }
+        expect(',')
+      }
+    }
+    const rest = raw.slice(index)
+    const match = /^(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/.exec(rest)
+    if (!match) deny()
+    index += match[0].length
+  }
+  value(0)
+  whitespace()
+  if (index !== raw.length) deny()
+}
+
 function parseUtf8Json(bytes) {
   try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+    const raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    assertUnambiguousM3StudyJson(raw)
+    return JSON.parse(raw)
   } catch {
     deny()
   }
