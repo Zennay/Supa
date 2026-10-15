@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { open, constants } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 
 const MAX_STUDY_BYTES = 4 * 1024 * 1024
@@ -63,14 +63,32 @@ export function verifyPrivateM3StudyCodePin(studyContent, manifest) {
   }
 }
 
+async function readBoundedPrivateStudy(path) {
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    const stat = await handle.stat()
+    if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_STUDY_BYTES ||
+        stat.nlink !== 1) fail()
+    const buffer = Buffer.allocUnsafe(MAX_STUDY_BYTES + 1)
+    let used = 0
+    while (used < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, used, buffer.length - used, null)
+      if (bytesRead === 0) break
+      used += bytesRead
+    }
+    return sourceBytes(buffer.subarray(0, used))
+  } finally {
+    await handle.close()
+  }
+}
+
 export async function main(argv = process.argv.slice(2)) {
   if (argv.length !== 2 || argv[0].startsWith('-') || argv[1].startsWith('-')) {
     throw new Error('usage: m3-field-code-pin <private-study.json> <40-char-main-commit-sha>')
   }
   let bytes
   try {
-    const file = await readFile(argv[0])
-    bytes = sourceBytes(file)
+    bytes = await readBoundedPrivateStudy(argv[0])
   } catch {
     throw new Error('Private M3 study could not be read or validated')
   }
