@@ -19,6 +19,10 @@ const MAX_SAVED_PREVIEW_BYTES = 4 * 1024 * 1024
 async function readSavedPrivateComparison(filename) {
   let handle
   try {
+    // Reject symlinked ancestors as well as the final file: saved field
+    // evidence must not be fetched through an accidental directory alias.
+    // This preflight is not a hostile concurrent-filesystem sandbox.
+    await assertNoSymlinkedM3OutputParents(filename)
     const metadata = await lstat(filename)
     if (!metadata.isFile() || metadata.isSymbolicLink() ||
         metadata.size > MAX_SAVED_PREVIEW_BYTES) throw new Error('Invalid local report')
