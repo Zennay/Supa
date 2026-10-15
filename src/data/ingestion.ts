@@ -129,6 +129,16 @@ function validateSnapshotRef(
     )
   }
 
+  // Same hostname does not imply the same public retailer service.
+  // Reject credentials and custom HTTPS ports before they can become
+  // credited sources or surface in a basket's sourceUrl metadata.
+  // WHATWG URL normalizes an explicit :443 to the default empty port.
+  if (url.username !== '' || url.password !== '' || url.port !== '') {
+    throw new Error(
+      'Product observation provenance must use a public HTTPS retailer origin without credentials or custom port',
+    )
+  }
+
   if (!validIso(provenance.capturedAt)) {
     throw new Error('Product observation provenance must include a valid capturedAt')
   }
