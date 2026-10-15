@@ -58,6 +58,48 @@ export function buildUniversalRetailerCatalog(batch) {
       batch.results.length === 0) {
     throw new Error('Only bounded reviewed offline ingestion batches are accepted')
   }
+  // Direct JS consumers bypass the canonical ingest constructor. Never allow
+  // a seemingly successful private catalog built from forged summary claims.
+  // Some internal callers use { mode } only: missing optional fields remain
+  // intentionally supported, but any supplied field must agree with facts.
+  const summary = batch.summary
+  for (const key of ['productionEnabled', 'permissionVerified',
+    'publicSavingsClaimEligible']) {
+    if (Object.hasOwn(summary, key) && summary[key] !== false) {
+      throw new Error('Refusing untrusted retailer batch permission or publication claim')
+    }
+  }
+  const presentCount = (key, actual) => {
+    if (Object.hasOwn(summary, key) &&
+        (!Number.isSafeInteger(summary[key]) || summary[key] !== actual)) {
+      throw new Error('Refusing contradictory retailer batch source/observation count')
+    }
+  }
+  presentCount('sources', batch.results.length)
+  presentCount('acceptedSources', batch.results.length)
+  presentCount('rejectedSources', 0)
+  const actualObservations = batch.results.reduce((sum, result) =>
+    sum + (Array.isArray(result?.observations) ? result.observations.length : 0), 0)
+  presentCount('observations', actualObservations)
+  if (Object.hasOwn(summary, 'retailerCounts')) {
+    const counts = summary.retailerCounts
+    const expected = { plus: 0, dekamarkt: 0 }
+    if (counts === null || typeof counts !== 'object' ||
+        Array.isArray(counts) ||
+        Object.keys(counts).length !== 2 ||
+        !Object.hasOwn(counts, 'plus') || !Object.hasOwn(counts, 'dekamarkt')) {
+      throw new Error('Refusing untrusted retailer batch breakdown')
+    }
+    for (const result of batch.results) {
+      if (result?.key?.startsWith('plus:')) expected.plus +=
+        Array.isArray(result.observations) ? result.observations.length : 0
+      else if (result?.key?.startsWith('dekamarkt:')) expected.dekamarkt +=
+        Array.isArray(result.observations) ? result.observations.length : 0
+    }
+    if (counts.plus !== expected.plus || counts.dekamarkt !== expected.dekamarkt) {
+      throw new Error('Refusing contradictory retailer batch breakdown')
+    }
+  }
   const groups = new Map()
   let observationsCount = 0
   for (const result of batch.results) {
