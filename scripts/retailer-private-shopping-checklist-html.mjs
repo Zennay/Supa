@@ -153,6 +153,38 @@ export function renderPrintablePrivateShoppingChecklist(report, store = 'both') 
     '</body></html>\n'
 }
 
+/**
+ * Text is useful in a private notes app or as a large-font accessibility
+ * fallback. Reuse precisely the same physically-priced trusted formatter as
+ * HTML, then strip the unselected store from the actual serialized output.
+ * No different price arithmetic or public "winner" is introduced.
+ */
+export function renderPrivateTextShoppingChecklist(report, store = 'both') {
+  if (!['both', 'plus', 'dekamarkt'].includes(store)) {
+    throw new Error('Invalid private checklist shop selection')
+  }
+  const plain = renderPrivateShoppingChecklists(report)
+  const plusStart = plain.indexOf('== PLUS ==')
+  const dekaStart = plain.indexOf('== DekaMarkt ==')
+  const footerStart = plain.lastIndexOf('Geen winkeladvies:')
+  if (plusStart < 0 || dekaStart <= plusStart || footerStart <= dekaStart) {
+    throw new Error('Invalid private checklist presentation')
+  }
+  const preamble = plain.slice(0, plusStart)
+  const bothShops = plain.slice(plusStart, footerStart)
+  const plusOnly = plain.slice(plusStart, dekaStart)
+  const dekaOnly = plain.slice(dekaStart, footerStart)
+  const selected = store === 'both' ? bothShops
+    : store === 'plus' ? plusOnly : dekaOnly
+  const footer = plain.slice(footerStart)
+  const safe = (preamble + selected + footer).split('\n').map(line => (
+    line.startsWith('[ ] ') || line.startsWith('[=] ') || line.startsWith('[?] ')
+      ? redactPrivateLabel(line)
+      : line
+  ))
+  return safe.join('\n')
+}
+
 export async function main(argv = process.argv.slice(2)) {
   if (argv.length === 1 && argv[0] === '--help') {
     const help = 'SUPA · privé printbare winkelchecklists (offline M3)\n' +
@@ -162,37 +194,48 @@ export async function main(argv = process.argv.slice(2)) {
       'Of vanuit eerder lokaal opgeslagen vergelijking (zonder HTML-herlezing):\n' +
       '  --report <lokale-vergelijking.json> --output <prive-checklist.html>\n' +
       'Optioneel: voeg --store plus OF --store dekamarkt toe om alleen die winkel te exporteren.\n' +
+      'Optioneel: eindig met --format text en een .txt bestemming voor privé notities.\n' +
       'Geen winkelverkeer; geen live prijs of publieke besparingsclaim.\n'
     process.stdout.write(help)
     return help
   }
-  const withStore = argv.length >= 2 && argv[argv.length - 2] === '--store'
-  const store = withStore ? argv[argv.length - 1] : 'both'
-  const core = withStore ? argv.slice(0, -2) : argv
+  const withFormat = argv.length >= 2 && argv[argv.length - 2] === '--format'
+  const format = withFormat ? argv[argv.length - 1] : 'html'
+  const afterFormat = withFormat ? argv.slice(0, -2) : argv
+  const withStore = afterFormat.length >= 2 &&
+    afterFormat[afterFormat.length - 2] === '--store'
+  const store = withStore ? afterFormat[afterFormat.length - 1] : 'both'
+  const core = withStore ? afterFormat.slice(0, -2) : afterFormat
   const savedMode = core.length === 4 && core[0] === '--report' &&
     core[2] === '--output'
   const manifestMode = core.length === 3 && core[1] === '--output'
   const input = savedMode ? core[1] : core[0]
   const output = savedMode ? core[3] : core[2]
   if ((!savedMode && !manifestMode) ||
+      (withFormat && format !== 'text') ||
       (withStore && store === 'both') ||
       (store !== 'both' && store !== 'plus' && store !== 'dekamarkt') ||
       typeof input !== 'string' || !input || input.startsWith('-') ||
       typeof output !== 'string' || !output || output.startsWith('-') ||
-      output !== output.trim() || !output.toLowerCase().endsWith('.html')) {
+      output !== output.trim() ||
+      !(format === 'text'
+        ? output.toLowerCase().endsWith('.txt')
+        : output.toLowerCase().endsWith('.html'))) {
     throw new Error('Invalid private offline checklist HTML arguments')
   }
   const report = savedMode
     ? await readSavedPrivateComparison(input)
     : await compareLocalRetailerSnapshots(input)
   // No HTML is rendered or published if caller-owned report proof is malformed.
-  const html = renderPrintablePrivateShoppingChecklist(report, store)
+  const rendered = format === 'text'
+    ? renderPrivateTextShoppingChecklist(report, store)
+    : renderPrintablePrivateShoppingChecklist(report, store)
   try {
     await assertNoSymlinkedM3OutputParents(output)
     await mkdir(dirname(output), { recursive: true, mode: 0o700 })
-    await writeDerivedM3Output(input, output, html)
+    await writeDerivedM3Output(input, output, rendered)
   } catch (error) { throw privateM3OutputFailure(error) }
-  return html
+  return rendered
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
