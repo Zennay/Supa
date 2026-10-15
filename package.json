@@ -21,7 +21,11 @@
     "m3:build-observed-study": "node --experimental-strip-types scripts/m3-build-observed-study.mjs",
     "m3:assess-observed-week": "node --experimental-strip-types scripts/m3-assess-observed-week.mjs",
     "m4:validate-beta-session": "node scripts/m4-validate-beta-session.mjs",
-    "aud005:record-retailer-response": "node scripts/aud005-record-retailer-response.mjs"
+    "aud005:record-retailer-response": "node scripts/aud005-record-retailer-response.mjs",
+    "scrape": "node scraper/cli.mjs scrape",
+    "scrape:match": "node scraper/cli.mjs match",
+    "scrape:stats": "node scraper/cli.mjs stats",
+    "scrape:compare": "node scraper/cli.mjs compare"
   },
   "dependencies": {
     "react": "^19.1.1",
