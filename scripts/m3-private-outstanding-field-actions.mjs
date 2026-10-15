@@ -45,11 +45,53 @@ function missingObservedProductFields(product) {
   return missing
 }
 
+/**
+ * The shared draft restorer deliberately repairs invalid UI fields for old
+ * browser state. The local human-evidence operator tool must not quietly
+ * report a repaired source as an original measurement. In particular a fake
+ * collection source or a nonpositive/invalid packCount must never become a
+ * clean 11+11 progress signal through a permissive default.
+ *
+ * This preflight reads parsed JSON only (no user-controlled JS getters), and
+ * never returns any untrusted source fields or values.
+ */
+function assertUnrepairedObservedFacts(serialized) {
+  let raw
+  try {
+    raw = JSON.parse(serialized)
+  } catch {
+    throw new Error('private M3 draft is not canonical JSON')
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('private M3 draft has invalid root')
+  }
+  for (const side of ['baseline', 'candidate']) {
+    const store = raw[side]
+    if (!store || typeof store !== 'object' || Array.isArray(store) ||
+        !['manual-cart', 'receipt', 'consented-export'].includes(store.source) ||
+        !Array.isArray(store.lines) || store.lines.length !== 11) {
+      throw new Error('private M3 draft has invalid observation source')
+    }
+    for (const line of store.lines) {
+      const product = line && typeof line === 'object' && !Array.isArray(line)
+        ? line.observedProduct : null
+      if (!product || typeof product !== 'object' || Array.isArray(product)) {
+        throw new Error('private M3 draft has invalid observed product')
+      }
+      if (product.available === true &&
+          (!Number.isSafeInteger(product.packCount) || product.packCount < 1)) {
+        throw new Error('private M3 draft has invalid observed pack count')
+      }
+    }
+  }
+}
+
 export function buildM3OutstandingFieldActions(serialized, referenceNowMs = Date.now()) {
   if (typeof serialized !== 'string' || !Number.isSafeInteger(referenceNowMs) ||
       referenceNowMs < 0) {
     throw new Error('invalid private M3 draft input or reference clock')
   }
+  assertUnrepairedObservedFacts(serialized)
   const sheet = restoreObservationSheetDraft(serialized)
   if (!sheet) throw new Error('private M3 draft is not a canonical collection sheet')
 
