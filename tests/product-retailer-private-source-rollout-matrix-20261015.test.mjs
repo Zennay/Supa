@@ -33,6 +33,8 @@ test('rollout: actual six PLUS/Deka historical shapes are reviewable, not licens
     assert.equal(retailer.nextActions[0], 'obtain-and-verify-retailer-source-rights')
     for (const shape of retailer.shapes) {
       assert.equal(shape.status, 'historical-fixture-present')
+      assert.match(shape.latestArchivedCapturedAt, /^2026-10-04T/)
+      assert.equal(Date.parse(shape.latestArchivedCapturedAt) < Date.parse(initialClock), true)
       assert.equal(shape.eligibleForLiveCapture, false)
       assert.equal(shape.verifiedCurrentPriceObservations, 0)
     }
@@ -72,6 +74,7 @@ test('rollout: missing one historic source must be actionable, not passed as six
   const deka = report.retailers[1]
   assert.equal(deka.shapes[2].kind, 'offers')
   assert.equal(deka.shapes[2].status, 'no-accepted-historical-capture')
+  assert.equal(deka.shapes[2].latestArchivedCapturedAt, null)
   assert.equal(deka.nextActions.includes('review-missing-offline-source-shapes'), true)
   assert.equal(report.productionEnabled, false)
 })
