@@ -38,7 +38,7 @@ function validatedRequirements(sheet) {
   }
   return items
 }
-function paperPage(side, items) {
+function paperPage(side, items, fieldRunCommitSha) {
   const store = htmlText(M3_EXPECTED_RETAILERS[side])
   const cells = items.map((item, i) => {
     const unit = item.unit === 'piece' ? (item.amount === 1 ? 'stuk' : 'stuks') : item.unit
@@ -48,7 +48,9 @@ function paperPage(side, items) {
       '</small></td><td></td><td></td><td></td><td></td><td>☐ ja ☐ nee ☐ onbekend</td></tr>'
   }).join('\n')
   return '<section class="page" data-m3-side="' + side + '">' +
-    '<p>SUPA M3 · veldmeting · blad ' + (side === 'baseline' ? '1/2' : '2/2') + '</p>' +
+    '<p>SUPA M3 · veldmeting · blad ' + (side === 'baseline' ? '1/2' : '2/2') +
+    ' · Codeversie (SHA-40, door operator opgegeven): ' +
+    (fieldRunCommitSha ? htmlText(fieldRunCommitSha) : '__________________') + '</p>' +
     '<h1>' + store + ' — dezelfde 11 boodschappen</h1>' +
     '<p>Noteer alleen werkelijk geobserveerde waarden en laat onbekende gegevens leeg. Onbekend betekent nog niet onderzocht; niet verkrijgbaar is pas nee na controle.</p>' +
     '<p>Gedeelde studiegegevens moeten op beide bladen gelijk zijn; gebruik alleen pseudonieme sleutels. Winkel-ID en bewijs-ID zijn per winkel verschillend.</p>' +
@@ -76,7 +78,13 @@ function paperPage(side, items) {
     '<footer>Leeg invulblad; geen bewijs of besparingsclaim. Neem echte bevindingen over in SUPA Meten.</footer>' +
     '</section>'
 }
-export function renderM3PaperChecklist() {
+export function renderM3PaperChecklist(fieldRunCommitSha = '') {
+  // A printed revision is a human-supplied record, not an authenticated git
+  // attestation. Never infer the running process's HEAD or fabricate a SHA.
+  if (fieldRunCommitSha !== '' &&
+      (typeof fieldRunCommitSha !== 'string' || !/^[0-9a-f]{40}$/.test(fieldRunCommitSha))) {
+    throw new Error('Invalid M3 field-run commit SHA')
+  }
   const requirements = validatedRequirements(buildObservationSheet())
   const css = '@page{size:A4 landscape;margin:10mm}' +
     'body{font:12px/1.2 Arial,sans-serif;color:#111;margin:0}' +
@@ -93,23 +101,36 @@ export function renderM3PaperChecklist() {
   return '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<title>SUPA M3 printformulier</title><style>' + css + '</style></head><body>' +
-    paperPage('baseline', requirements) + paperPage('candidate', requirements) +
+    paperPage('baseline', requirements, fieldRunCommitSha) +
+    paperPage('candidate', requirements, fieldRunCommitSha) +
     '</body></html>\n'
 }
 export async function main(argv = process.argv.slice(2)) {
-  if (argv.length !== 0 && (argv.length !== 2 || argv[0] !== '--output' ||
-    !argv[1] || argv[1].trim() !== argv[1] || argv[1].startsWith('-'))) {
+  let output = null
+  let fieldRunCommitSha = ''
+  if (argv.length > 4 || argv.length % 2 !== 0) {
     throw new Error('Invalid paper checklist arguments')
   }
-  const content = renderM3PaperChecklist()
-  if (argv.length === 0) return process.stdout.write(content)
+  for (let i = 0; i < argv.length; i += 2) {
+    const flag = argv[i]
+    const value = argv[i + 1]
+    if (typeof value !== 'string' || !value || value.trim() !== value ||
+        value.startsWith('-')) {
+      throw new Error('Invalid paper checklist arguments')
+    }
+    if (flag === '--output' && output === null) output = value
+    else if (flag === '--field-run-sha' && !fieldRunCommitSha) fieldRunCommitSha = value
+    else throw new Error('Invalid paper checklist arguments')
+  }
+  const content = renderM3PaperChecklist(fieldRunCommitSha)
+  if (output === null) return process.stdout.write(content)
   // Preserve raw path segments: resolving first can hide a symlink before /../.
   // Reuse the same static private M3 output-parent guard as derived reports.
   // This is not a descriptor-relative guarantee against concurrent path swaps.
-  await assertNoSymlinkedM3OutputParents(argv[1])
-  await mkdir(dirname(argv[1]), { recursive: true, mode: 0o700 })
-  await assertNoSymlinkedM3OutputParents(argv[1])
-  await writeFile(argv[1], content, { flag: 'wx', mode: 0o600, encoding: 'utf8' })
+  await assertNoSymlinkedM3OutputParents(output)
+  await mkdir(dirname(output), { recursive: true, mode: 0o700 })
+  await assertNoSymlinkedM3OutputParents(output)
+  await writeFile(output, content, { flag: 'wx', mode: 0o600, encoding: 'utf8' })
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(() => {
