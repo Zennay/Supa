@@ -197,7 +197,7 @@ function assertCanonicalCaptureWindow(study, report) {
   }
 }
 
-export function preflightPrivateM3Week(studyBytes, manifestBytes) {
+export function preflightPrivateM3Week(studyBytes, manifestBytes, expectedMainSha = null) {
   if (!Buffer.isBuffer(studyBytes) || !Buffer.isBuffer(manifestBytes) ||
       studyBytes.length === 0 || studyBytes.length > STUDY_MAX_BYTES ||
       manifestBytes.length === 0 || manifestBytes.length > MANIFEST_MAX_BYTES) deny()
@@ -209,6 +209,14 @@ export function preflightPrivateM3Week(studyBytes, manifestBytes) {
   } catch {
     deny()
   }
+  // An operator may supply an independently checked current-main revision.
+  // This detects a mistaken/stale sidecar SHA; it is NOT GitHub authentication
+  // and cannot turn the private or public permission flags into true.
+  if (expectedMainSha !== null &&
+      (typeof expectedMainSha !== 'string' ||
+       !/^[0-9a-f]{40}$/.test(expectedMainSha) ||
+       /^0{40}$/.test(expectedMainSha) ||
+       manifest.sourceCommitSha !== expectedMainSha)) deny()
   if (!verifyPrivateM3StudyCodePin(studyBytes, manifest)) deny()
   const study = parseUtf8Json(studyBytes)
   let requiredLineCount
@@ -240,10 +248,11 @@ export function preflightPrivateM3Week(studyBytes, manifestBytes) {
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  if (argv.length !== 2) deny()
+  const expectRevision = argv.length === 4 && argv[2] === '--expect-main-sha'
+  if (argv.length !== 2 && !expectRevision) deny()
   const study = await boundedRegularFile(argv[0], STUDY_MAX_BYTES)
   const manifest = await boundedRegularFile(argv[1], MANIFEST_MAX_BYTES)
-  const result = preflightPrivateM3Week(study, manifest)
+  const result = preflightPrivateM3Week(study, manifest, expectRevision ? argv[3] : null)
   process.stdout.write(JSON.stringify(result, null, 2) + '\n')
   return result
 }
