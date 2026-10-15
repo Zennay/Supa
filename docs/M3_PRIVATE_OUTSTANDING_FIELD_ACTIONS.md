@@ -25,3 +25,9 @@ node --experimental-strip-types scripts/m3-private-outstanding-field-actions.mjs
 ```
 
 Elk van beide winkels krijgt een blok met uitsluitend nog openstaande canonieke planneringrediënten. Je ziet of beschikbaarheid nog ontbreekt of dat product-/verpakkings-/prijsvelden aangevuld moeten worden. De tekst bevat nooit ingevoerde winkelprijzen, deelnemergegevens, bronlinks, klantproductnamen, bewijstijdstippen of bestandsnamen. Ook met alle 22 regels afgevinkt: géén onafhankelijk geverifieerde winkelwaarneming of openbare besparingsclaim.
+
+## Veilig lokaal bestand lezen (privé M3)
+
+De CLI leest uitsluitend een regulier **lokaal privébestand**: het bestand moet voor groep/anderen ontoegankelijk zijn (bijvoorbeeld `chmod 600 private-sheet.json`), mag geen symlink of hardlink zijn en mag maximaal 2 MiB groot zijn. Ook symbolische links in bovenliggende mappen worden geweigerd. Na openen wordt opnieuw gecontroleerd of het nog hetzelfde bestand is, terwijl de leeslus zelf een harde bytegrens heeft; er wordt geen genormaliseerde/gewijzigde versie opgeslagen.
+
+Bij weigering verschijnt alleen een vaste foutmelding, nooit een pad, deelnemercode, bon of productprijs. Gebruik bij een weigering een normale map en maak een **eigen privé-kopie** van jouw formulier met correcte bestandsrechten; zet geen persoonlijke data of bonnetjes in Git. Deze padcontroles zijn best-effort tegen een gelijktijdig veranderend lokaal bestandssysteem, **geen volledige bescherming tegen een kwaadaardig proces dat parent-mappen tijdens het lezen verwisselt**. Deze functie verandert geen M3-bewijsregels, claimbeoordeling of retailer-toestemmingen.
