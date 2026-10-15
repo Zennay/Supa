@@ -4,11 +4,12 @@
 `proposeRetailerSelectors(source, html)`-proces, niet de productie-adapters,
 live scraping, productprijzen, rechten of de alternatieve selector-discovery API.
 
-De huidige statische bronreview onderdrukt *afgesloten* `script`,
-`template` en HTML-commentaar voor CSS-kandidaattelling. Als zo'n
-inert blok echter onvolledig eindigt, kan een naïeve tagscan het
-letterlijk aanwezige tekstfragment alsnog tellen alsof het tot de zichtbare
-product-DOM behoort. Voor winkelprijs/voorraad-aanbiedingsvoorstellen is
+De huidige statische bronreview onderdrukt afgesloten `script`- en
+`template`-fragmenten voor CSS-kandidaattelling. De bestaande
+commentaar-regex bevat bovendien een foutieve ontsnapping: zelfs een correct
+**afgesloten HTML-commentaar** kan aan de zichtbare tagscanner ontsnappen.
+Als een inert blok onvolledig eindigt, kan de naïeve tagscan bovendien
+letterlijke schijn-HTML tellen alsof het tot de zichtbare product-DOM behoort. Voor winkelprijs/voorraad-aanbiedingsvoorstellen is
 dit onjuist: de parser mag geen selectie suggereren uit een onzeker,
 niet-afgesloten inert fragment. Daarnaast maakt een SHA-256 van HTML
 een capture-**inhoud** verifieerbaar, maar geen in de **toekomst** opgegeven
@@ -21,14 +22,15 @@ node --experimental-strip-types --test tests/qa-retailer-snapshot-structural-tru
 ```
 
 - Positief: geldige lokale PLUS HTML met zichtbare structurele klassennamen
-  plus correct gesloten inert `script`, `template` en commentaar;
+  plus correct gesloten inert `script` en `template`;
   geen verborgen selector, productnaam, prijs of ongeoorloofde publicatie.
+- Negatief: correct afgesloten HTML-commentaar met schijn-voorraadklasse.
 - Negatief: onafgesloten JSON-script met schijn-aanbiedingsklasse.
 - Negatief: onafgesloten template met schijn-prijsklasse.
 - Negatief: onafgesloten HTML-commentaar met schijn-voorraadklasse.
 - Negatief: SHA-consistente fictieve HTML met capture-klok in 2035.
 
-**Acceptatie:** elk van de vier negatieve inputs wordt met een generieke
+**Acceptatie:** elk van de vijf negatieve inputs wordt met een generieke
 `Offline selector review refused` fout geweigerd. Geen productprijs,
 SKU, credential of URL mag door die fout worden onthuld. Laat een
 anderhalf-HTML- of browserinterpretatieconflict niet alsnog tot
