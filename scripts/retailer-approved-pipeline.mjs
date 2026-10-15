@@ -39,6 +39,7 @@ export async function runApprovedRetailerComparison({
   }
   const observations = []
   const captureSummary = []
+  const pricedCaptureHashes = new Set()
 
   // Deliberately serial, limited to the two pinned product pages.
   // Never fan out through a proxy pool or retry a retailer's 403/429.
@@ -52,14 +53,18 @@ export async function runApprovedRetailerComparison({
       html: snapshot.html,
       capturedAt: snapshot.capturedAt,
     })
-    // Do not mint two independently priced retailers from one replayed
-    // captured Product document. Mock/failure pages without usable products
-    // can be identical: they still produce no basket winner, so preserve
-    // their existing fail-closed behaviour instead of misreporting a price.
-    if (parsed.observations.length > 0 &&
-        captureSummary.some((previous) =>
-          previous.sha256 === snapshot.sha256 && previous.extractedProducts > 0)) {
-      throw new Error('Duplicate priced retailer capture across sources')
+    // One parsed Product may still have a null checkout price (or unavailable
+    // stock). Reject replay only when a valid, available exact price exists;
+    // identical unpriced metadata must preserve its no-money outcome.
+    const hasCheckoutPrice = parsed.observations.some((item) =>
+      item.availability === 'available' &&
+      Number.isSafeInteger(item.currentPriceCents) &&
+      item.currentPriceCents >= 0)
+    if (hasCheckoutPrice) {
+      if (pricedCaptureHashes.has(snapshot.sha256)) {
+        throw new Error('Duplicate priced retailer capture across sources')
+      }
+      pricedCaptureHashes.add(snapshot.sha256)
     }
     observations.push(...parsed.observations)
     captureSummary.push({
