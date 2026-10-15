@@ -59,11 +59,17 @@ export async function compareReviewedDirectories(beforeDirectory, afterDirectory
       afterDirectory.length > 500 || afterDirectory.startsWith('-') ||
       resolve(beforeDirectory) === resolve(afterDirectory) ||
       typeof referenceTime !== 'string') fail()
-  const [previous, current] = await Promise.all([
-    loadPrivateReviewedCaptureBatch(beforeDirectory, { referenceTime }),
-    loadPrivateReviewedCaptureBatch(afterDirectory, { referenceTime }),
-  ])
-  const report = comparePrivateRetailerFactChanges(previous, current, { referenceTime })
+  // A nonexistent/private input path must not reveal its exact name in a
+  // programmatic caller exception. Keep the same generic CLI refusal even
+  // when the existing underlying SHA-pinned loader fails.
+  let report
+  try {
+    const [previous, current] = await Promise.all([
+      loadPrivateReviewedCaptureBatch(beforeDirectory, { referenceTime }),
+      loadPrivateReviewedCaptureBatch(afterDirectory, { referenceTime }),
+    ])
+    report = comparePrivateRetailerFactChanges(previous, current, { referenceTime })
+  } catch { fail() }
   if (report.productionEnabled !== false || report.sourceRightsVerified !== false ||
       report.livePricesAvailable !== false ||
       report.publicSavingsClaimEligible !== false ||
