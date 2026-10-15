@@ -44,9 +44,30 @@ function validOrigin(observation, key, asOf) {
 function keyOf(observation) {
   return observation.supermarket + ':' + observation.sourceProductId
 }
+// Compare actual physical quantities, never the retailer's display unit.
+// Use exact, bounded milli-gram / micro-liter integer keys to avoid fuzzy
+// matching. Unknown units or sub-resolution / unsafe numeric quantities
+// remain incomparable instead of manufacturing offer corroboration.
+function physicalPackKey(pack) {
+  if (!object(pack) || typeof pack.amount !== 'number' ||
+      !Number.isFinite(pack.amount) || pack.amount <= 0) return null
+  const unit = pack.unit
+  if (unit === 'piece' || unit === 'pack') {
+    return unit + ':' + pack.amount
+  }
+  const dimension = unit === 'kg' || unit === 'g' ? 'mass' :
+    unit === 'l' || unit === 'ml' ? 'volume' : null
+  if (dimension === null) return null
+  const scale = unit === 'kg' || unit === 'l' ? 1_000_000 : 1_000
+  const scaled = pack.amount * scale
+  const rounded = Math.round(scaled)
+  if (!Number.isSafeInteger(rounded) || rounded <= 0 ||
+      Math.abs(scaled - rounded) > 1e-8) return null
+  return dimension + ':' + rounded
+}
 function samePack(a, b) {
-  return a.unit === b.unit && a.amount !== null &&
-    b.amount !== null && a.amount === b.amount
+  const left = physicalPackKey(a)
+  return left !== null && left === physicalPackKey(b)
 }
 export function reviewPrivateRetailerOffers(batch, {
   asOf = new Date().toISOString(), windowHours = 24,
