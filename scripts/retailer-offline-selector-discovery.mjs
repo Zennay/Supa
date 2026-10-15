@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { isIP } from 'node:net'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
 // exports product/price text, or labels proposed selectors as confirmed.
@@ -29,6 +30,7 @@ function validSnapshotOrigin(origin) {
     const timestamp = Date.parse(origin.capturedAt)
     return exact && url.protocol === 'https:' &&
       /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(url.hostname) &&
+      isIP(url.hostname) === 0 &&
       url.port === '' && !url.username && !url.password &&
       !url.search && !url.hash && url.hostname !== 'localhost' &&
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(origin.capturedAt) &&
