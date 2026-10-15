@@ -49,6 +49,9 @@ const VEGAN_QUALIFIERS = new Set([
 ])
 const VEGETARIAN_QUALIFIERS = new Set([
   'vegetarisch', 'vegetarische', 'vegetarian', 'veggie',
+  // Dutch retail shorthand for meat-free alternatives must not silently
+  // match an unqualified animal-meat shopping requirement.
+  'vega', 'vleesvrij', 'vleesvrije',
 ])
 function dietaryQualifier(value: string): 'vegan' | 'vegetarian' | 'unmarked' {
   const tokens = textTokens(value)
