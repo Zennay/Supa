@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
@@ -160,6 +160,13 @@ export async function writeM3FieldKit(destination, kit) {
     throw new Error('refusing modified or prefilled M3 field kit')
   }
   const output = resolve(destination)
+  // Later filled sheets contain private retailer observations and pseudonymous
+  // study metadata. They must never be generated under this Git checkout,
+  // where a routine `git add -A` could accidentally publish evidence.
+  // Resolve first to reject dot-dot traversal and relative child paths.
+  if (output === REPO_ROOT || output.startsWith(REPO_ROOT + sep)) {
+    throw new Error('refusing M3 field kit destination inside source repository')
+  }
   await assertNoSymlinkedM3OutputParents(output)
   await mkdir(dirname(output), { recursive: true, mode: 0o700 })
   // mkdir without recursive refuses an existing directory, symlink, or file:
