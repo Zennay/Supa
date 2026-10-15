@@ -1,6 +1,7 @@
 import { lstat, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { compareReviewedRetailerEvidence } from '../src/data/reviewedRetailerEvidence.ts'
+import { compareReviewedCatalogs } from '../src/domain/reviewedCatalogComparison.ts'
 
 const MAX_INPUT_BYTES = 5 * 1024 * 1024
 async function readJsonFile(filename) {
@@ -16,8 +17,12 @@ async function readJsonFile(filename) {
 export async function compareSavedRetailerEvidence(
   requirementsFile, plusEvidenceFile, dekaEvidenceFile, nowMs = Date.now(),
 ) {
-  const [requirements, plus, deka] = await Promise.all([
-    readJsonFile(requirementsFile),
+  // Validate the requested basket before opening either retailer evidence
+  // file. Invalid/duplicate demands or impossible review clocks cannot form a
+  // meaningful two-store comparison and must not trigger bulk source reads.
+  const requirements = await readJsonFile(requirementsFile)
+  compareReviewedCatalogs({ requirements, observations: [], nowMs })
+  const [plus, deka] = await Promise.all([
     readJsonFile(plusEvidenceFile),
     readJsonFile(dekaEvidenceFile),
   ])
