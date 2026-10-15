@@ -243,6 +243,14 @@ export function compareReviewedCatalogs({
     }
   })
 
+  // Record the *set* of ingredients served by each store's paid package.
+  // Each shared SKU group gets one unambiguous membership signature. If the
+  // stores group a basket differently, a cost attached to one display row
+  // does NOT represent a comparable single-ingredient purchase.
+  const pooledMembership: Record<Shop, Map<string, string>> = {
+    plus: new Map(), dekamarkt: new Map(),
+  }
+
   // One physical SKU may satisfy multiple distinct planner ingredient IDs.
   // Pool original, unrounded decimal demands before taking the whole-pack
   // ceiling. Charge the shared purchase exactly ONCE, on its first line,
@@ -265,6 +273,11 @@ export function compareReviewedCatalogs({
     })
     for (const [productId, indices] of grouped) {
       if (indices.length < 2) continue
+      const membershipKey = JSON.stringify(indices
+        .map((index) => requirements[index].id).sort())
+      for (const index of indices) {
+        pooledMembership[shop].set(requirements[index].id, membershipKey)
+      }
       const item = catalog[shop].find((product) => product.id === productId)
       const packs = item ? calculateDecimalPackCount(
         indices.map((index) => ({
@@ -297,11 +310,19 @@ export function compareReviewedCatalogs({
       }
     }
   }
-  // Price differences must be computed AFTER shared physical pack allocation,
-  // otherwise the row preview still reflects the old twice-rounded prices.
+  // Recompute only comparable *physical line/group* differences after
+  // shared pack allocation. For asymmetric grouping (e.g. PLUS supplies
+  // breakfast+dinner from one pack, DekaMarkt supplies two different SKUs),
+  // the cost allocated to either row is not an individual ingredient price.
+  // Keep the exact basket totals and basket winner, but WITHHOLD invented
+  // line-by-line savings on both affected rows.
   for (const line of lines) {
-    line.differenceCents = line.plus.status === 'matched' &&
-      line.dekamarkt.status === 'matched' &&
+    const plusGroup = pooledMembership.plus.get(line.ingredientId) ??
+      JSON.stringify([line.ingredientId])
+    const dekaGroup = pooledMembership.dekamarkt.get(line.ingredientId) ??
+      JSON.stringify([line.ingredientId])
+    line.differenceCents = plusGroup === dekaGroup &&
+      line.plus.status === 'matched' && line.dekamarkt.status === 'matched' &&
       line.plus.totalCents !== null && line.dekamarkt.totalCents !== null
       ? line.dekamarkt.totalCents - line.plus.totalCents : null
   }
