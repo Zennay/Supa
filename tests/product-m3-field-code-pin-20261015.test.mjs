@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdtemp, writeFile, rm, symlink, link } from 'node:fs/promises'
+import { mkdtemp, writeFile, rm, symlink, link, stat, readFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -157,6 +157,52 @@ test('M3 verify CLI rejects forged manifest permission and savings flags', async
     assert.equal(run.status, 1)
     assert.equal(run.stdout, '')
     assert.equal(run.stderr.includes(manifest), false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('M3 --output creates private exclusive sidecar and never overwrites', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-pin-output-'))
+  try {
+    const source = join(dir, 'study.json')
+    const target = join(dir, 'code-pin.json')
+    await writeFile(source, bytes, { mode: 0o600 })
+    const args = ['scripts/m3-field-code-pin.mjs', source, SHA, '--output', target]
+    const first = spawnSync(process.execPath, args, { encoding: 'utf8' })
+    assert.equal(first.status, 0, first.stderr)
+    assert.equal(first.stdout.includes('synthetic-plus'), false)
+    assert.equal((await stat(target)).mode & 0o777, 0o600)
+    const original = await readFile(target)
+    assert.equal(verifyPrivateM3StudyCodePin(bytes, JSON.parse(original.toString())), true)
+    const second = spawnSync(process.execPath, args, { encoding: 'utf8' })
+    assert.equal(second.status, 1)
+    assert.equal(second.stdout, '')
+    assert.deepEqual(await readFile(target), original)
+    assert.equal(second.stderr.includes(target), false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('M3 --output refuses symlinked parent and Git tree marker without writing', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-pin-paths-'))
+  try {
+    const source = join(dir, 'study.json')
+    await writeFile(source, bytes, { mode: 0o600 })
+    await mkdir(join(dir, 'clean'))
+    await symlink(join(dir, 'clean'), join(dir, 'alias'))
+    await mkdir(join(dir, 'checkout'))
+    await writeFile(join(dir, 'checkout', '.git'), 'gitdir: /private/elsewhere')
+    for (const target of [join(dir, 'alias', 'pin.json'), join(dir, 'checkout', 'pin.json')]) {
+      const outcome = spawnSync(process.execPath,
+        ['scripts/m3-field-code-pin.mjs', source, SHA, '--output', target], { encoding: 'utf8' })
+      assert.equal(outcome.status, 1)
+      assert.equal(outcome.stdout, '')
+      assert.equal(outcome.stderr.includes(target), false)
+    }
+    await assert.rejects(stat(join(dir, 'clean', 'pin.json')))
+    await assert.rejects(stat(join(dir, 'checkout', 'pin.json')))
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
