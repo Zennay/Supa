@@ -1,5 +1,9 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
 
+/** A private sentinel distinguishes our own incomplete indexed array from
+ * arbitrary exceptions thrown by untrusted caller-owned Proxy traps. */
+export const INCOMPLETE_SHOPPING_EXPORT = Symbol('incomplete-shopping-export')
+
 /**
  * A pasted/loaded basket is a runtime value, not a trustworthy TypeScript
  * instance. Copy only OWN DATA descriptors. Never enumerate user records or
@@ -34,7 +38,7 @@ function denseOwnedArray(value: unknown): unknown[] {
   // Own iterator overrides (including getter accessors) are not a trusted
   // canonical Array iterator. Never read or invoke the supplied iterator.
   if (Object.getOwnPropertyDescriptor(value, Symbol.iterator)) {
-    throw new Error('Onvolledige boodschappenmand')
+    throw INCOMPLETE_SHOPPING_EXPORT
   }
   const length = ownData(value, 'length')
   if (typeof length !== 'number' || !Number.isSafeInteger(length) ||
@@ -44,7 +48,7 @@ function denseOwnedArray(value: unknown): unknown[] {
   const rows: unknown[] = []
   for (let i = 0; i < length; i++) {
     if (!hasOwnData(value, String(i))) {
-      throw new Error('Onvolledige boodschappenmand')
+      throw INCOMPLETE_SHOPPING_EXPORT
     }
     rows.push(ownData(value, String(i)))
   }
