@@ -32,12 +32,12 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
     requirements: manifest.requirements, observations: [], nowMs,
   })
 
-  const observations = []
-  const captureSummary = []
   const distinctSources = new Set()
   const distinctCaptureFiles = new Set()
-  const distinctCaptureHashes = new Set()
-  for (const entry of manifest.snapshots) {
+  // First validate EVERY reference, before opening even the first source
+  // HTML file. A later duplicate, unsafe path or invalid timestamp must
+  // not cause needless processing of an earlier retailer capture.
+  const validatedSnapshots = manifest.snapshots.map((entry) => {
     if (typeof entry?.sourceId !== 'string' ||
         typeof entry?.htmlFile !== 'string' ||
         !/^[A-Za-z0-9][A-Za-z0-9._-]*\.html$/.test(entry.htmlFile) ||
@@ -47,11 +47,20 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
       throw new Error('Invalid or duplicate offline snapshot reference')
     }
     distinctSources.add(entry.sourceId)
-    // One local HTML capture is evidence for one retailer source only.
-    // Re-labelling it under another source ID is not independent proof.
     distinctCaptureFiles.add(entry.htmlFile)
     const source = SOURCES.find((candidate) => candidate.id === entry.sourceId)
     if (!source) throw new Error('Offline snapshot source is not on the allowlist')
+    if (typeof entry.capturedAt !== 'string' ||
+        !Number.isFinite(Date.parse(entry.capturedAt))) {
+      throw new Error('Invalid bounded offline snapshot')
+    }
+    return { entry, source }
+  })
+
+  const observations = []
+  const captureSummary = []
+  const distinctCaptureHashes = new Set()
+  for (const { entry, source } of validatedSnapshots) {
     const candidatePath = join(root, entry.htmlFile)
     if ((await lstat(candidatePath)).isSymbolicLink()) {
       throw new Error('Input is not a bounded ordinary file')
