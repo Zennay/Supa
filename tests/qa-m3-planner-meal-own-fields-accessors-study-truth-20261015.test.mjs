@@ -51,8 +51,8 @@ test('M3 positive control: canonical, reordered and frozen own-data rows match, 
 })
 
 for (const mode of modes) {
-  test('M3 must not silence fixed-week warning when a planned meal uses ' + mode + ' in any of the four day positions', () => {
-    for (let index = 0; index < original.length; index++) {
+  for (let index = 0; index < original.length; index++) {
+    test('M3 must reject plannedMeal ' + mode + ' on day ' + original[index].day, () => {
       const meals = structuredClone(original)
       meals[index] = corruptRow(meals[index], mode)
       const originalDay = original[index].day
@@ -60,8 +60,9 @@ for (const mode of modes) {
       assert.equal(meals[index].recipeId, original[index].recipeId)
       assert.equal(m3FieldSheetMatchesPlannerWeek(meals, allowedDays), false,
         mode + ' on day ' + originalDay + ' is not an own-data planned recipe, must warn')
-    }
-  })
+      assert.deepEqual(m2InitialPlan, original)
+    })
+  }
 }
 
 test('M3: ordinary changed and duplicated own-data plan rows continue to fail closed', () => {
