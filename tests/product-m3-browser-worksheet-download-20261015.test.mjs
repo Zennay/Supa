@@ -132,3 +132,35 @@ test('explicit user-supplied commit SHA is printed twice and unsafe revisions re
     URL.revokeObjectURL = revoke
   }
 })
+
+test('M3 browser click is denied after a blob URL exists: clean up without changing the private draft', () => {
+  const beforeDocument = globalThis.document
+  const create = URL.createObjectURL
+  const revoke = URL.revokeObjectURL
+  let removeCount = 0
+  let revoked = ''
+  let createCount = 0
+  try {
+    globalThis.document = {
+      createElement() {
+        return {
+          href: '', download: '',
+          click() { throw new Error('download denied by browser') },
+          remove() { removeCount++ },
+        }
+      },
+      body: { append() {} },
+      get localStorage() { throw new Error('M3 draft may not be read') },
+    }
+    URL.createObjectURL = () => { createCount++; return 'blob:denied-download' }
+    URL.revokeObjectURL = (url) => { revoked = url }
+    assert.equal(downloadBlankM3PaperWorksheet(), false)
+    assert.equal(createCount, 1)
+    assert.equal(removeCount, 1)
+    assert.equal(revoked, 'blob:denied-download')
+  } finally {
+    globalThis.document = beforeDocument
+    URL.createObjectURL = create
+    URL.revokeObjectURL = revoke
+  }
+})
