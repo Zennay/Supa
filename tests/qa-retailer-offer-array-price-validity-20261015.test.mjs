@@ -100,3 +100,12 @@ test('EXPECTED RED: PriceSpecification expired validThrough must not count as ch
 test('EXPECTED RED: PriceSpecification future validFrom must not count as checkout price', () => {
   expectUnknown(pricedSpecification('2026-10-16T00:00:00Z', '2026-10-20T00:00:00Z'))
 })
+
+test('positive: currently valid nested PriceSpecification keeps its genuine one-pack cents', () => {
+  const r = compare(pricedSpecification('2026-10-14T00:00:00Z', '2026-10-16T00:00:00Z'))
+  assert.equal(r.comparable, true)
+  assert.equal(r.stores.plus.subtotalCents, 258)
+  assert.equal(r.stores.dekamarkt.subtotalCents, 238)
+  assert.equal(r.savingsCents, 20)
+  assert.equal(r.claimable, false)
+})
