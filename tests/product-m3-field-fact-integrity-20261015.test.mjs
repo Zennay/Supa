@@ -76,7 +76,7 @@ test('unavailable physical row remains complete without inventing a product', ()
   assert.equal(result.publicSavingsClaimEligible, false)
 })
 
-test('explicitly unavailable original must not hide a contradictory priced product', () => {
+test('unavailable original with stale product facts remains recorded but cannot pass private review', () => {
   const values = [
     ['productName', 'PRIVATE_STALE_PRODUCT'],
     ['productId', 'PRIVATE_STALE_PRODUCT_ID'],
@@ -94,8 +94,13 @@ test('explicitly unavailable original must not hide a contradictory priced produ
         available: false,
       }
       line.observedProduct[key] = value
-      assert.throws(() => count(sheet), /contradicts observed unavailability/,
-        'refuse ' + side + ' unavailable with ' + key)
+      const report = count(sheet)
+      assert.equal(report.retailers[side === 'baseline' ? 0 : 1].completedLines >= 1, true)
+      assert.equal(report.unavailableDetailWarnings[side === 'baseline' ? 'plus' : 'dekamarkt'], 1)
+      assert.equal(report.readyForPrivateReview, false)
+      assert.equal(report.pendingMetadata[side === 'baseline' ? 'plus' : 'dekamarkt']
+        .some(row => row.field === 'unavailableDetails'), true)
+      assert.equal(JSON.stringify(report).includes('PRIVATE_STALE_'), false)
     }
   }
 })
@@ -147,7 +152,7 @@ test('malformed original fields refuse CLI JSON/text without leaking path or sou
   }
 })
 
-test('CLI refuses contradictory unavailable price without echoing the hidden amount or file', async t => {
+test('CLI explains contradictory unavailable price without echoing the hidden amount or file', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'supa-m3-private-contradiction-'))
   t.after(() => rm(dir, { recursive: true, force: true }))
   const path = join(dir, 'PRIVATE-STORED-PRICE.json')
@@ -163,11 +168,22 @@ test('CLI refuses contradictory unavailable price without echoing the hidden amo
     const result = spawnSync(process.execPath,
       ['--experimental-strip-types', CLI, path, ...flags],
       { cwd: dir, encoding: 'utf8', timeout: 20_000 })
-    assert.notEqual(result.status, 0, result.stderr)
-    assert.equal(result.stdout, '')
-    assert.equal(result.stderr.includes('839271'), false)
-    assert.equal(result.stderr.includes('PRIVATE-STORED-PRICE'), false)
-    assert.equal(result.stderr.includes(secret), false)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stderr, '')
+    assert.equal(result.stdout.includes('839271'), false)
+    assert.equal(result.stdout.includes('PRIVATE-STORED-PRICE'), false)
+    assert.equal(result.stdout.includes(secret), false)
+    if (flags.length) {
+      if (flags.includes('dekamarkt')) {
+        assert.equal(result.stdout.includes('Controleer achtergebleven product-'), false)
+      } else {
+        assert.match(result.stdout, /Controleer achtergebleven product- of prijsvelden/)
+      }
+    } else {
+      const report = JSON.parse(result.stdout)
+      assert.equal(report.unavailableDetailWarnings.plus, 1)
+      assert.equal(report.readyForPrivateReview, false)
+    }
   }
   assert.equal(await readFile(path, 'utf8'), original)
 })
