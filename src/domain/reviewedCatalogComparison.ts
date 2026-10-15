@@ -253,7 +253,12 @@ export function compareReviewedCatalogs({
   for (const shop of SHOPS) {
     const grouped = new Map<string, number[]>()
     lines.forEach((line, index) => {
-      if (line[shop].status !== 'matched' || !line[shop].productId) return
+      // Quoted-but-unconfirmed stock must not double-count one physical
+      // pack in a provisional subtotal either. Preserve availability_unknown
+      // on those covered rows so no basket winner can be asserted.
+      if ((line[shop].status !== 'matched' &&
+           line[shop].status !== 'availability_unknown') ||
+          !line[shop].productId) return
       const indices = grouped.get(line[shop].productId!) ?? []
       indices.push(index)
       grouped.set(line[shop].productId!, indices)
