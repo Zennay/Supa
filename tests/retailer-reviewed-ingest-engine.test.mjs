@@ -72,17 +72,11 @@ test('source hash, retailer source hostname and bounded capture safety cannot si
 
 test('no live network, source paths or prices are exposed by the aggregate CLI', async () => {
   const chunks = []
-  const original = process.stdout.write
-  try {
-    process.stdout.write = function (text) { chunks.push(String(text)); return true }
-    const result = await main([])
+  const result = await main([], text => { chunks.push(String(text)); return true })
     assert.equal(result.acceptedSources, 6)
     const output = chunks.join('')
     assert.deepEqual(JSON.parse(output), result)
     assert.doesNotMatch(output, /https?:\/\/|Zuivelmeester|@|productId|sourceProductId|currentPriceCents|pricePerPackCents|cookie|token/i)
     assert.equal(result.productionEnabled, false)
-  } finally {
-    process.stdout.write = original
-  }
-  await assert.rejects(() => main(['https://www.plus.nl']), /Usage:/)
+  await assert.rejects(() => main(['https://www.plus.nl'], () => {}), /Usage:/)
 })
