@@ -51,8 +51,13 @@ export function assertUnambiguousM3StudyJson(raw) {
       Buffer.byteLength(raw, 'utf8') > STUDY_MAX_BYTES) deny()
   let index = 0
   let examinedKeys = 0
+  let examinedValues = 0
   const maxNesting = 80
   const maxKeys = 50000
+  // Tiny array elements can multiply validation work even within 4 MiB.
+  const maxValues = 100000
+  // Sticky matching does not copy the remaining input for each primitive.
+  const primitivePattern = /(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/y
   const whitespace = () => {
     while (index < raw.length &&
       [9, 10, 13, 32].includes(raw.charCodeAt(index))) index += 1
@@ -85,7 +90,7 @@ export function assertUnambiguousM3StudyJson(raw) {
     }
   }
   const value = (depth) => {
-    if (depth > maxNesting) deny()
+    if (depth > maxNesting || ++examinedValues > maxValues) deny()
     whitespace()
     const ch = raw[index]
     if (ch === '"') {
@@ -131,10 +136,10 @@ export function assertUnambiguousM3StudyJson(raw) {
         expect(',')
       }
     }
-    const rest = raw.slice(index)
-    const match = /^(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/.exec(rest)
+    primitivePattern.lastIndex = index
+    const match = primitivePattern.exec(raw)
     if (!match) deny()
-    index += match[0].length
+    index = primitivePattern.lastIndex
   }
   value(0)
   whitespace()
