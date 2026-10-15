@@ -27,7 +27,25 @@ function owned(record, key) {
   const descriptor = Object.getOwnPropertyDescriptor(record, key)
   return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined
 }
-function validCapture(source) {
+function mapCandidateFields(suggestions) {
+  // Semantic hints for AI/human review; NOT parsed product values or vetted CSS.
+  const patterns = {
+    name: /name|naam|title/i,
+    price: /price|prijs/i,
+    package: /pack|complementary|unit|weight|size|gewicht/i,
+    offer: /offer|promo|aanbied|korting/i,
+    availability: /stock|availability|beschik/i,
+  }
+  return Object.fromEntries(Object.entries(patterns).map(([field, expression]) => [
+    field,
+    suggestions.filter(item => expression.test(item.selector))
+      .slice(0, 8).map(item => ({
+        selector: item.selector, status: 'UNVERIFIED_FIELD_HINT',
+        reviewerMustVerifySemantics: true,
+      })),
+  ]))
+}
+function validCapture(source, requireHash = true) {
   if (!source || typeof source !== 'object' || Array.isArray(source)) reject('malformed source')
   const supermarket = owned(source, 'supermarket')
   const kind = owned(source, 'kind')
@@ -37,7 +55,7 @@ function validCapture(source) {
   const expectedSha = owned(source, 'sha256')
   if (!Object.hasOwn(HOSTS, supermarket) || !KINDS.has(kind) ||
       typeof id !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,99}$/i.test(id) ||
-      typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha) ||
+      (requireHash ? (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)) : (expectedSha !== undefined && (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)))) ||
       typeof capturedAt !== 'string' ||
       !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(capturedAt) ||
       !Number.isFinite(Date.parse(capturedAt))) reject('invalid capture identity/hash/timestamp')
@@ -47,7 +65,7 @@ function validCapture(source) {
       url.port || url.username || url.password || url.search || url.hash) {
     reject('unapproved source host, URL or credentials')
   }
-  return { id, supermarket, kind, url: url.href, capturedAt, sha256: expectedSha }
+  return { id, supermarket, kind, url: url.href, capturedAt, sha256: expectedSha ?? null }
 }
 
 function jsonLdShape(text, types, keys) {
@@ -129,6 +147,7 @@ export function proposeRetailerSelectors(source, html) {
       invalidJsonLdCount,
     },
     proposedSelectors: suggestions,
+    possibleFieldSelectors: mapCandidateFields(suggestions),
     readyForScraping: false, sourcePermissionVerified: false,
     currentPricesExtracted: false, publicationAllowed: false,
   }
@@ -162,7 +181,8 @@ export async function proposeFromM1CaptureDirectory(dir) {
   const proposals = []
   const seen = new Set()
   for (const record of manifest.results) {
-    const source = validCapture(record)
+    if (typeof record.success !== 'boolean') reject('capture success flag missing')
+    const source = validCapture(record, record.success === true)
     if (seen.has(source.id)) reject('duplicate source ID')
     seen.add(source.id)
     if (record.success !== true) {
