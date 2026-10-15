@@ -164,6 +164,22 @@ function priceBoundTime(raw: string, isEnd: boolean): number {
   return Date.parse(isEnd && !suffix ? raw + 'T23:59:59.999Z' : raw)
 }
 
+/**
+ * JS Date.parse discards sub-millisecond precision, so it must never decide
+ * whether a source's Offer began *after* its capture by +1 ns or +1 us.
+ * Validate calendar/UTC offset with priceBoundTime first, then represent the
+ * exact timestamp on an integer nanosecond timeline (including date-only
+ * inclusive end-of-day semantics).
+ */
+function priceInstantNs(raw: string, isEnd: boolean): bigint | null {
+  const millis = priceBoundTime(raw, isEnd)
+  if (!Number.isSafeInteger(millis)) return null
+  const fraction = /T[0-9]{2}:[0-9]{2}:[0-9]{2}[.]([0-9]{1,9})/.exec(raw)?.[1]
+  const subMillisecond = fraction === undefined
+    ? 0n : BigInt(fraction.padEnd(9, '0').slice(3))
+  return BigInt(millis) * 1_000_000n + subMillisecond
+}
+
 function exactSpecPrice(specification: JsonObject, pack: RawPack): number | null {
   if (hasType(specification, 'UnitPriceSpecification') ||
       specification.referenceQuantity !== undefined) {
@@ -175,7 +191,7 @@ function exactSpecPrice(specification: JsonObject, pack: RawPack): number | null
   return cents(specification.price)
 }
 
-function specificationValidAt(specification: JsonObject, observedAt: number): boolean {
+function specificationValidAt(specification: JsonObject, observedAt: bigint): boolean {
   const fields = [
     [specification.validFrom, false],
     [specification.validThrough ?? specification.validTo, true],
@@ -183,22 +199,22 @@ function specificationValidAt(specification: JsonObject, observedAt: number): bo
   for (const [raw, isEnd] of fields) {
     if (raw === undefined || raw === null) continue
     if (typeof raw !== 'string' || !raw.trim()) return false
-    const value = priceBoundTime(raw, isEnd)
-    if (!Number.isFinite(value) ||
+    const value = priceInstantNs(raw, isEnd)
+    if (value === null ||
         (isEnd ? value < observedAt : value > observedAt)) return false
   }
   const from = specification.validFrom
   const to = specification.validThrough ?? specification.validTo
   return from == null || to == null ||
-    priceBoundTime(from as string, false) <= priceBoundTime(to as string, true)
+    priceInstantNs(from as string, false)! <= priceInstantNs(to as string, true)!
 }
 
 /** Never promote a multi-Offer collection to a single unbounded checkout quote. */
 function extractPrice(offers: JsonObject[], pack: RawPack, capturedAt: string): number | null {
   if (offers.length !== 1 || hasType(offers[0], 'AggregateOffer')) return null
   const offer = offers[0]
-  const capturedMs = Date.parse(capturedAt)
-  if (!Number.isFinite(capturedMs)) return null
+  const capturedNs = priceInstantNs(capturedAt, false)
+  if (capturedNs === null) return null
   // A scheduled price observed before it starts (or after it ends) is not
   // proof of a checkout quote, even when the later comparison clock falls
   // inside the window. Capture-time validity and review-time validity are
@@ -209,14 +225,14 @@ function extractPrice(offers: JsonObject[], pack: RawPack, capturedAt: string): 
   ] as const) {
     if (raw == null) continue
     if (typeof raw !== 'string') return null
-    const bound = priceBoundTime(raw, isEnd)
-    if (!Number.isFinite(bound) ||
-        (isEnd ? bound < capturedMs : bound > capturedMs)) return null
+    const bound = priceInstantNs(raw, isEnd)
+    if (bound === null ||
+        (isEnd ? bound < capturedNs : bound > capturedNs)) return null
   }
   const prices = [
     cents(offer.price),
     ...priceSpecificationCandidates(offer).map((spec) =>
-      specificationValidAt(spec, capturedMs) ? exactSpecPrice(spec, pack) : null),
+      specificationValidAt(spec, capturedNs) ? exactSpecPrice(spec, pack) : null),
   ].filter((value): value is number => value !== null)
   return uniqueKnown(prices)
 }
@@ -314,10 +330,11 @@ function buildOffer(offers: JsonObject[], price: number | null, pack: RawPack,
   capturedAt: string): RawOffer | null {
   if (offers.length !== 1 || price === null) return null
   const offer = offers[0]
-  const capturedMs = Date.parse(capturedAt)
+  const capturedNs = priceInstantNs(capturedAt, false)
+  if (capturedNs === null) return null
   const specs = priceSpecificationCandidates(offer)
     .filter((spec) => exactSpecPrice(spec, pack) === price &&
-      specificationValidAt(spec, capturedMs))
+      specificationValidAt(spec, capturedNs))
 
   const fromDates: string[] = []
   const toDates: string[] = []
@@ -332,10 +349,16 @@ function buildOffer(offers: JsonObject[], price: number | null, pack: RawPack,
     add(spec.validFrom, false)
     add(spec.validThrough ?? spec.validTo, true)
   }
-  const validFrom = fromDates.sort((a, b) =>
-    priceBoundTime(b, false) - priceBoundTime(a, false))[0] ?? null
-  const validTo = toDates.sort((a, b) =>
-    priceBoundTime(a, true) - priceBoundTime(b, true))[0] ?? null
+  // Select intersection boundaries at their *full* precision too. Sorting
+  // with millisecond subtraction could pick the wrong one within a millisecond.
+  const compare = (left: string, right: string, isEnd: boolean) => {
+    const a = priceInstantNs(left, isEnd)!
+    const b = priceInstantNs(right, isEnd)!
+    if (a === b) return 0
+    return (a < b ? -1 : 1) * (isEnd ? 1 : -1)
+  }
+  const validFrom = fromDates.sort((a, b) => compare(a, b, false))[0] ?? null
+  const validTo = toDates.sort((a, b) => compare(a, b, true))[0] ?? null
 
   return {
     label: 'schema.org Offer', mechanics: null, offerPriceCents: price,
