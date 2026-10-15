@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { SOURCES } from './m1-capture-sources.mjs'
 import { parseOfflineRetailerSnapshot } from './retailer-snapshot-adapters.mjs'
 import { compareReviewedCatalogs } from '../src/domain/reviewedCatalogComparison.ts'
+import { priceInstantNs } from '../src/data/schemaOrgProduct.ts'
 
 const MAX_MANIFEST_BYTES = 96 * 1024
 const MAX_HTML_BYTES = 2 * 1024 * 1024
@@ -64,8 +65,13 @@ export async function compareLocalRetailerSnapshots(manifestPath, nowMs = Date.n
     distinctCaptureFiles.add(entry.htmlFile)
     const source = SOURCES.find((candidate) => candidate.id === entry.sourceId)
     if (!source) throw new Error('Offline snapshot source is not on the allowlist')
+    // Captured-at provenance must be an explicit absolute ISO instant.
+    // Date.parse alone accepts local clocks, date-only strings, rollovers and
+    // impossible timezone offsets. Align with the exact nanosecond source
+    // price chronology validator before any retailer HTML is read.
     if (typeof entry.capturedAt !== 'string' ||
-        !Number.isFinite(Date.parse(entry.capturedAt))) {
+        !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:[.][0-9]{1,9})?)?(?:Z|[+-][0-9]{2}:[0-9]{2})$/.test(entry.capturedAt) ||
+        priceInstantNs(entry.capturedAt, false) === null) {
       throw new Error('Invalid bounded offline snapshot')
     }
     return { entry, source }
