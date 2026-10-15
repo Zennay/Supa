@@ -8,6 +8,12 @@ Met de in het project gepinde Node-versie vanuit de repositoryroot:
 
     node --experimental-strip-types scripts/m3-print-field-checklist.mjs --output ./supa-m3-veldformulier.html
 
+**Leg bij een echte veldrun eerst de exacte repository-commit vast (issue [#205](https://github.com/Zennay/Supa/issues/205)).** Dit formulier accepteert een **expliciet door de operator opgegeven** lowercase commit-SHA van precies 40 hextekens. Bijvoorbeeld, met de werkelijke `git rev-parse HEAD` van de gebruikte bronversie (controleer die lokaal; gebruik geen verzonnen voorbeeldwaarde voor een echte meting):
+
+    node --experimental-strip-types scripts/m3-print-field-checklist.mjs --field-run-sha "$(git rev-parse HEAD)" --output ./supa-m3-veldformulier-met-versie.html
+
+De opgegeven SHA staat identiek op **beide** papieren winkelbladen. Zonder `--field-run-sha` blijft het revisievakje **leeg**: Supa raadt of leest niet ongemerkt een codeversie. Het formulier verifieert niet zelfstandig of de opgegeven commit echt de gebruikte bron representeert; de operator moet de bronrevisie onafhankelijk vaststellen en het bewijs in de private onderzoeksregistratie bewaren. Deze print-functionaliteit slaat de SHA **nog niet** op in de digitale ObservationSheet, WeeklyBasketStudy of assessment: die volledige herkomstketen uit #205 blijft vereist voor M3-exit. Geen SHA, geen onderbouwde codeherkomstclaim.
+
 Open het lokale HTML-bestand en druk af op A4 **liggend**. De compacte printlay-out is op een lokale A4-landschap-reconstructie gecontroleerd op **één blad per supermarkt** (PLUS 1/2, DekaMarkt 2/2), met alle 11 ingrediënten en de vereiste studiegegevens per blad. Gebruik in de afdrukdialoog **A4, liggend, schaal 100%, geen browserkop-/voetteksten** en controleer in het **afdrukvoorbeeld** dat het precies twee pagina's zijn. Een printer of browser kan andere marges toepassen; als er toch extra pagina's verschijnen, druk dan niet af voordat de afdrukinstellingen kloppen. Dit is layoutcontrole, **geen daadwerkelijke supermarktmeting**. Het script overschrijft geen bestaand bestand en maakt een nieuw document met private 0600-bestandsrechten. Zowel bestaande symbolische links in bovenliggende mappen als symbolische links vóór een letterlijk `/../`-segment worden geweigerd. Dit is een statische padcontrole; bij gelijktijdige kwaadwillige mapvervanging is Node-padgebaseerde bestandstoegang geen volledige racevrije sandbox. Zonder outputargument schrijft het alleen het lege formulier naar stdout.
 
 ## Echte observatie uitvoeren
