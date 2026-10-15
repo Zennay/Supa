@@ -27,6 +27,7 @@ const PlannerView = () => {}
 const BasketView = () => {}
 const ShoppingListView = () => {}
 const ObservationView = () => {}
+const ObservedStoreComparisonView = () => {}
 const WeekShareManualCopy = () => {}
 const IdentityAvatar = () => {}
 
@@ -109,6 +110,7 @@ function mount(disk, { denyGetter = false } = {}) {
       './features/basket/BasketView': { BasketView },
       './features/shopping-list/ShoppingListView': { ShoppingListView },
       './features/observation/ObservationView': { ObservationView },
+      './features/comparison/ObservedStoreComparisonView': { ObservedStoreComparisonView },
       './components/IdentityAvatar.tsx': { IdentityAvatar },
       './domain/basket': { buildOneStoreBasket: () => ({
         totalCents: 1500, unresolvedLineCount: 0, lines: [],
@@ -184,6 +186,8 @@ test('real App preserves in-session edits across tabs and clears warning on reco
     app.planner().onBudgetChange(42.75)
     assert.equal(app.planner().budget, 42.75)
     app.navigate('Mand')
+    assert.match(app.alert(), /niet opgeslagen/)
+    app.navigate('Vergelijk')
     assert.match(app.alert(), /niet opgeslagen/)
     disk.writeBlocked = false
     app.navigate('Planner')

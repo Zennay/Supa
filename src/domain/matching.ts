@@ -43,6 +43,20 @@ const STOP_TOKENS = new Set([
   'doos',
 ])
 
+// Dietary qualifiers change the actual product, not merely its brand.
+const VEGAN_QUALIFIERS = new Set([
+  'vegan', 'veganistisch', 'veganistische', 'plantaardig', 'plantaardige',
+])
+const VEGETARIAN_QUALIFIERS = new Set([
+  'vegetarisch', 'vegetarische', 'vegetarian', 'veggie',
+])
+function dietaryQualifier(value: string): 'vegan' | 'vegetarian' | 'unmarked' {
+  const tokens = textTokens(value)
+  if (tokens.some((token) => VEGAN_QUALIFIERS.has(token))) return 'vegan'
+  if (tokens.some((token) => VEGETARIAN_QUALIFIERS.has(token))) return 'vegetarian'
+  return 'unmarked'
+}
+
 const MATCH_UNITS: ReadonlySet<string> = new Set([
   'g',
   'kg',
@@ -149,6 +163,10 @@ function scoreCandidate(
 ): { score: number; reasons: string[] } {
   if (!candidate.available) {
     return { score: -100, reasons: ['candidate unavailable'] }
+  }
+
+  if (dietaryQualifier(requirement.query) !== dietaryQualifier(candidate.name)) {
+    return { score: -100, reasons: ['different dietary product variant'] }
   }
 
   if (hasInvalidKnownAmount(candidate.packAmount)) {
