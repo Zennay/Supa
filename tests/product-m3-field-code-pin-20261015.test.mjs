@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process'
 import {
   createPrivateM3StudyCodePin,
   verifyPrivateM3StudyCodePin,
+  parseStrictPrivateM3Manifest,
 } from '../scripts/m3-field-code-pin.mjs'
 
 const SHA = '1234567890abcdef1234567890abcdef12345678'
@@ -203,6 +204,95 @@ test('M3 --output refuses symlinked parent and Git tree marker without writing',
     }
     await assert.rejects(stat(join(dir, 'clean', 'pin.json')))
     await assert.rejects(stat(join(dir, 'checkout', 'pin.json')))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('M3 strict sidecar parser rejects duplicate source revisions and forged flags before JSON last-wins', () => {
+  const valid = createPrivateM3StudyCodePin(bytes, SHA)
+  const manifest = JSON.stringify(valid)
+  assert.deepEqual(parseStrictPrivateM3Manifest(manifest), valid)
+  const conflictingSha = manifest.replace(
+    '"sourceCommitSha":',
+    '"sourceCommitSha":"' + 'f'.repeat(40) + '","sourceCommitSha":',
+  )
+  const conflictingFlag = manifest.replace(
+    '"publicSavingsClaimEligible":false',
+    '"publicSavingsClaimEligible":true,"publicSavingsClaimEligible":false',
+  )
+  const escapedName = manifest.replace(
+    '"sourceCommitSha":',
+    '"source\\\\u0043ommitSha":"' + 'f'.repeat(40) + '","sourceCommitSha":',
+  )
+  for (const candidate of [conflictingSha, conflictingFlag, escapedName]) {
+    assert.throws(() => parseStrictPrivateM3Manifest(candidate), /Invalid private M3/)
+  }
+})
+
+test('M3 strict sidecar parser permits benign whitespace but rejects nested, trailing and missing fields', () => {
+  const valid = createPrivateM3StudyCodePin(bytes, SHA)
+  assert.deepEqual(parseStrictPrivateM3Manifest('  \\n' + JSON.stringify(valid) + '\\t  '), valid)
+  for (const value of [
+    JSON.stringify(valid) + 'not-json',
+    JSON.stringify({ ...valid, unexpected: 'extra' }),
+    JSON.stringify({ ...valid, sourceCommitSha: undefined }),
+    JSON.stringify({ ...valid, studySha256: { nested: 'bad' } }),
+    JSON.stringify({ ...valid, codeRevisionVerified: 0 }),
+    '{"format":}',
+    '{"format":"x",}',
+  ]) {
+    assert.throws(() => parseStrictPrivateM3Manifest(value), /Invalid private M3/)
+  }
+})
+
+test('M3 --verify CLI refuses contradictory duplicate source or release-attestation keys', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-pin-duplicates-'))
+  try {
+    const study = join(dir, 'study.json')
+    const manifest = join(dir, 'manifest.json')
+    await writeFile(study, bytes, { mode: 0o600 })
+    const original = JSON.stringify(createPrivateM3StudyCodePin(bytes, SHA))
+    const hostile = [
+      original.replace('"sourceCommitSha":', '"sourceCommitSha":"' + 'f'.repeat(40) + '","sourceCommitSha":'),
+      original.replace('"publicSavingsClaimEligible":false', '"publicSavingsClaimEligible":true,"publicSavingsClaimEligible":false'),
+    ]
+    for (const input of hostile) {
+      await writeFile(manifest, input, { mode: 0o600 })
+      const run = spawnSync(process.execPath,
+        ['scripts/m3-field-code-pin.mjs', '--verify', study, manifest],
+        { encoding: 'utf8', timeout: 2500 })
+      assert.equal(run.status, 1, String(run.error ?? ''))
+      assert.equal(run.stdout, '')
+      assert.equal(run.stderr.includes(study), false)
+      assert.equal(run.stderr.includes(manifest), false)
+      assert.equal(run.stderr.includes('synthetic-plus'), false)
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('M3 code-pin CLI declines FIFO source and --verify FIFO manifest without blocking', async (t) => {
+  if (process.platform !== 'linux') return t.skip('Linux mkfifo acceptance')
+  const dir = await mkdtemp(join(tmpdir(), 'supa-m3-pin-fifo-'))
+  try {
+    const fifo = join(dir, 'unsafe-pipe')
+    const make = spawnSync('mkfifo', [fifo], { encoding: 'utf8' })
+    assert.equal(make.status, 0, make.stderr)
+    const study = join(dir, 'study.json')
+    await writeFile(study, bytes, { mode: 0o600 })
+    for (const args of [
+      [fifo, SHA],
+      ['--verify', study, fifo],
+    ]) {
+      const run = spawnSync(process.execPath, ['scripts/m3-field-code-pin.mjs', ...args],
+        { encoding: 'utf8', timeout: 2500 })
+      assert.equal(run.error, undefined, String(run.error))
+      assert.equal(run.status, 1, run.stderr)
+      assert.equal(run.stdout, '')
+      assert.equal(run.stderr.includes(fifo), false)
+    }
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
