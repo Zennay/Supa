@@ -54,3 +54,43 @@ test('operator refuses source time label injection rather than printing unchecke
   assert.match(view,/registratietijd onbekend/)
   assert.doesNotMatch(view,/FAKE SAVINGS VERIFIED/)
 })
+
+test('operator neutralizes ANSI and bidi controls without erasing normal Dutch accents',()=>{
+  const f=fixture()
+  const ansi=String.fromCharCode(0x1b)+'[2J'
+  const bidi=String.fromCharCode(0x202e)
+  const separator=String.fromCharCode(0x2028)
+  f.comparison.lines[0].ingredient='Crème fraîche 🥛'+ansi+bidi+separator+' melk'
+  const preview=renderPrivateComparison(f)
+  assert.ok(preview.includes('Crème fraîche 🥛'))
+  assert.ok(!preview.includes(ansi))
+  assert.ok(!preview.includes(bidi))
+  assert.ok(!preview.includes(separator))
+})
+
+test('operator refuses whole-basket winner for an empty or physically incomplete line collection',()=>{
+  const f=fixture()
+  f.comparison.lines=[]
+  assert.throws(()=>renderPrivateComparison(f),/Invalid or claimable/)
+  f.comparison.lines=[{ingredient:'milk',plus:line(129),dekamarkt:{status:'unknown'},differenceCents:null}]
+  const view=renderPrivateComparison(f)
+  assert.match(view,/GEEN VOLLEDIGE MANDVERGELIJKING/)
+  assert.doesNotMatch(view,/ALLEEN OFFLINE MANDVERSCHIL/)
+})
+
+test('operator refuses a per-line forged money headline even with a coherent root',()=>{
+  const f=fixture()
+  f.comparison.lines[0].differenceCents=-999
+  const view=renderPrivateComparison(f)
+  assert.match(view,/Offline regelverschil: niet aantoonbaar/)
+  assert.doesNotMatch(view,/DekaMarkt lager €9,99/)
+})
+
+test('operator refuses a negative pack price or altered per-shop whole-basket subtotal',()=>{
+  const f=fixture()
+  f.comparison.lines[0].plus.packPriceCents=-1
+  assert.doesNotMatch(renderPrivateComparison(f),/ALLEEN OFFLINE MANDVERSCHIL/)
+  f.comparison.lines[0].plus.packPriceCents=129
+  f.comparison.stores.plus.subtotalCents=1
+  assert.doesNotMatch(renderPrivateComparison(f),/ALLEEN OFFLINE MANDVERSCHIL/)
+})
