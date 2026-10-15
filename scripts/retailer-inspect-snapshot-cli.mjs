@@ -6,7 +6,7 @@ import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-dis
 
 // A reviewer can run this ONLY on a locally saved HTML snapshot with a pinned
 // SHA from an approved capture manifest. No browser/network/scrape entrypoint.
-export async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), writeOutput = text => process.stdout.write(text)) {
   if (argv.length !== 5) {
     throw new Error('Usage: inspect-snapshot <retailerId> <https-source-url> <capturedAt> <sha256> <html-file>')
   }
@@ -28,7 +28,7 @@ export async function main(argv = process.argv.slice(2)) {
   const report = proposeOfflineRetailerSelectors({
     html, origin: { retailerId, url, capturedAt },
   })
-  process.stdout.write(JSON.stringify(report, null, 2) + '\n')
+  writeOutput(JSON.stringify(report, null, 2) + '\n')
   return report
 }
 
