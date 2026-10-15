@@ -84,6 +84,20 @@ test('actual local fake HTML -> saved report -> remove original captures -> priv
     ],
   }))
   const inspected = await compareLocalRetailerSnapshots(manifest)
+  // The original manifest mode also supports a *truly isolated* one-store
+  // output, with no opposing retailer's pricing in the serialized HTML.
+  const plusOnly = await main([
+    manifest, '--output', join(dir, 'plus-only.html'), '--store', 'plus',
+  ])
+  assert.match(plusOnly, /ALLEEN OFFLINE TOTAAL PLUS: €2,58/)
+  assert.doesNotMatch(plusOnly, /DekaMarkt|€2,38|name="storeView"/)
+  const dekaOnly = await main([
+    manifest, '--output', join(dir, 'deka-only.html'), '--store', 'dekamarkt',
+  ])
+  assert.match(dekaOnly, /ALLEEN OFFLINE TOTAAL DekaMarkt: €2,38/)
+  assert.doesNotMatch(dekaOnly, /ALLEEN OFFLINE TOTAAL PLUS:|€2,58|name="storeView"/)
+  assert.equal((await stat(join(dir, 'plus-only.html'))).mode & 0o777, 0o600)
+  assert.equal((await stat(join(dir, 'deka-only.html'))).mode & 0o777, 0o600)
   const saved = join(dir, 'actual-offline-snapshot-report.json')
   const payload = JSON.stringify(inspected)
   await writeFile(saved, payload)
