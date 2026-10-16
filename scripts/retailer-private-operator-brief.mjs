@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { types as nodeTypes } from 'node:util'
 import { planPrivateRetailerRollout } from './retailer-private-source-rollout-matrix.mjs'
 import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
+import { evaluatePrivateAdapterHealth } from './retailer-private-adapter-health.mjs'
 
 const fail = () => { throw new Error('Offline winkelbron-startcontrole geweigerd') }
 const kinds = ['product', 'catalog', 'offers']
@@ -264,6 +265,126 @@ export function renderPrivateRetailerOperatorBrief(report) {
   return lines.join('\n') + '\n'
 }
 
+
+/**
+ * Triages missing historical pack/availability/offer facts from the already
+ * reviewed six-shape offline health assessment. No individual observations,
+ * source paths, prices, tokens or captured timestamps reach this output.
+ * Accept direct programmatic callers only after the same inert descriptor
+ * snapshot and strict cross-check against the canonical rollout matrix.
+ */
+export function renderPrivateRetailerCoverageBrief(health, rollout) {
+  health = snapshotReport(health)
+  rollout = snapshotReport(rollout)
+  if (!health || health.schemaVersion !== 1 ||
+      health.mode !== 'private-reviewed-adapter-health' ||
+      health.meaning !== 'offline-dataset-only' ||
+      health.humanReviewRequired !== true ||
+      health.permissionVerified !== false ||
+      health.productionEnabled !== false ||
+      health.livePricesAvailable !== false ||
+      health.publicSavingsClaimEligible !== false ||
+      health.externalRequests !== 0 ||
+      !health.byShape || typeof health.byShape !== 'object' ||
+      !safeCount(health.sources) ||
+      !safeCount(health.acceptedSources) ||
+      !safeCount(health.rejectedSources) ||
+      !safeCount(health.observations) ||
+      !safeCount(health.unknownPriceObservations) ||
+      !safeCount(health.staleSources) ||
+      health.sources !== health.acceptedSources + health.rejectedSources ||
+      !rollout || rollout.schemaVersion !== 1 ||
+      rollout.mode !== 'private-retailer-rollout-matrix' ||
+      rollout.productionEnabled !== false ||
+      rollout.rightsGateProductionReady !== false ||
+      !Array.isArray(rollout.retailers) ||
+      rollout.retailers.length !== 2 ||
+      Object.keys(health.byShape).length !== 6) fail()
+
+  const lines = [
+    'Aanvullende historische productdekking (NIET ACTUEEL):',
+  ]
+  let sources = 0
+  let accepted = 0
+  let rejected = 0
+  let observations = 0
+  let unknownPrices = 0
+  let stale = 0
+  const seen = new Set()
+  for (const retailer of rollout.retailers) {
+    if (!retailer || !stores.includes(retailer.retailerId) ||
+        seen.has(retailer.retailerId) || !Array.isArray(retailer.shapes) ||
+        retailer.shapes.length !== 3 ||
+        retailer.liveScrapingEnabled !== false ||
+        retailer.currentPricePublicationAllowed !== false) fail()
+    seen.add(retailer.retailerId)
+    const seenKinds = new Set()
+    let storeObservations = 0
+    let unknownAvailability = 0
+    let unknownPacks = 0
+    let offers = 0
+    for (const shape of retailer.shapes) {
+      if (!shape || !kinds.includes(shape.kind) ||
+          seenKinds.has(shape.kind)) fail()
+      seenKinds.add(shape.kind)
+      const key = retailer.retailerId + ':' + shape.kind
+      if (!Object.hasOwn(health.byShape, key)) fail()
+      const bucket = health.byShape[key]
+      if (!bucket || !safeCount(bucket.sources) ||
+          !safeCount(bucket.accepted) || !safeCount(bucket.rejected) ||
+          !safeCount(bucket.observations) ||
+          !safeCount(bucket.unknownPrices) ||
+          !safeCount(bucket.staleCaptures) ||
+          !safeCount(bucket.unknownAvailability) ||
+          !safeCount(bucket.unknownPacks) ||
+          !safeCount(bucket.offerObservations) ||
+          bucket.sources !== bucket.accepted + bucket.rejected ||
+          bucket.accepted !== shape.acceptedSources ||
+          bucket.rejected !== shape.rejectedSources ||
+          bucket.sources !== shape.historicalSources ||
+          bucket.observations !== shape.historicalObservations ||
+          bucket.unknownPrices !== shape.unknownPriceObservations ||
+          bucket.staleCaptures !== shape.staleHistoricalCaptures ||
+          bucket.unknownAvailability > bucket.observations ||
+          bucket.unknownPacks > bucket.observations ||
+          bucket.offerObservations > bucket.observations) fail()
+      sources += bucket.sources
+      accepted += bucket.accepted
+      rejected += bucket.rejected
+      observations += bucket.observations
+      unknownPrices += bucket.unknownPrices
+      stale += bucket.staleCaptures
+      storeObservations += bucket.observations
+      unknownAvailability += bucket.unknownAvailability
+      unknownPacks += bucket.unknownPacks
+      offers += bucket.offerObservations
+    }
+    if (seenKinds.size !== 3) fail()
+    lines.push(
+      (retailer.retailerId === 'plus' ? 'PLUS' : 'DekaMarkt') + ': ' +
+      storeObservations + ' historische productwaarnemingen; ' +
+      unknownAvailability + ' beschikbaarheid onbekend; ' +
+      unknownPacks + ' verpakking onbekend; ' +
+      offers + ' historische aanbiedingswaarnemingen.'
+    )
+    if (unknownAvailability || unknownPacks) {
+      lines.push('  Actie: ontbrekende beschikbaarheid/verpakking handmatig beoordelen vóór winkelmandvergelijking.')
+    }
+  }
+  if (seen.size !== 2 ||
+      sources !== health.sources ||
+      accepted !== health.acceptedSources ||
+      rejected !== health.rejectedSources ||
+      observations !== health.observations ||
+      unknownPrices !== health.unknownPriceObservations ||
+      stale !== health.staleSources ||
+      accepted !== rollout.retailers.reduce((count, row) =>
+        count + row.shapes.reduce((sum, shape) => sum + shape.acceptedSources, 0), 0) ||
+      stale !== rollout.staleHistoricalCaptures) fail()
+  lines.push('Deze cijfers komen uitsluitend uit historisch beoordeelde fixtures; geen live voorraad of actuele aanbiedingen.')
+  return lines.join('\n') + '\n'
+}
+
 /** A zero-argument dry-run against the six committed historical M1 shapes. */
 export async function main(argv = process.argv.slice(2),
   write = text => process.stdout.write(text)) {
@@ -274,7 +395,9 @@ export async function main(argv = process.argv.slice(2),
     new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url), 'utf8'))
   const batch = await loadReviewedRepositoryFixtures()
   const report = planPrivateRetailerRollout(rights, batch)
-  const brief = renderPrivateRetailerOperatorBrief(report)
+  const coverage = evaluatePrivateAdapterHealth(batch)
+  const brief = renderPrivateRetailerOperatorBrief(report) +
+    '\n' + renderPrivateRetailerCoverageBrief(coverage, report)
   write(brief)
   return brief
 }
