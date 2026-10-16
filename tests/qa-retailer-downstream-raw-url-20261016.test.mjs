@@ -37,9 +37,12 @@ for (const key of ['plus:catalog', 'dekamarkt:offers']) {
       assert.ok(selected?.accepted)
       assert.ok(selected.observations.length)
       const reviewedUrl = selected.observations[0].provenance.url
-      for (const observation of selected.observations) {
-        assert.equal(observation.provenance.url, reviewedUrl)
-        observation.provenance.url += suffix
+      // Adapter rows can share the same provenance object; modify each
+      // distinct archived source envelope exactly once, not once per SKU.
+      const sourceEnvelopes = new Set(selected.observations.map(row => row.provenance))
+      for (const provenance of sourceEnvelopes) {
+        assert.equal(provenance.url, reviewedUrl)
+        provenance.url += suffix
       }
       assert.notEqual(reviewedUrl + suffix, reviewedUrl)
       assert.equal(new URL(reviewedUrl + suffix).search, '')
