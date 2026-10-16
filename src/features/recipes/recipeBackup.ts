@@ -21,6 +21,12 @@ function safeLink(value: unknown): string | null {
       /^(?:\d+\.){3}\d+$/.test(url.hostname)) {
     throw new Error('Back-up bevat een onveilige receptlink.')
   }
+  for (const key of url.searchParams.keys()) {
+    if (/(?:oauth|saml|token|secret|password|signature|api[_-]?key|session|authorization|(?:^|[_-])(?:code|sig|auth|state)(?:$|[_-]))/i.test(key)) {
+      throw new Error('Back-up mag geen geheime inloggegevens in receptlinks bevatten.')
+    }
+  }
+  url.hash = ''
   return url.href
 }
 
@@ -29,7 +35,7 @@ export function exportRecipeBackup(state: LibraryState): string {
   if (state.error) throw new Error(state.error)
   const recipes: BackupRecipe[] = state.recipes.map(recipe => ({
     title: recipe.title, servings: recipe.servings, minutes: recipe.minutes,
-    source: recipe.source, sourceUrl: recipe.sourceUrl,
+    source: recipe.source, sourceUrl: recipe.source === 'url' ? safeLink(recipe.sourceUrl) : null,
     ingredients: recipe.ingredients.map(item => item.original), steps: [...recipe.steps],
   }))
   const text = JSON.stringify({ format: FORMAT, version: 1, recipes }, null, 2)
