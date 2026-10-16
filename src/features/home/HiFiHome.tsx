@@ -45,7 +45,7 @@ export function HiFiHome({ view, onNavigate, addedProducts, onToggleProduct }: P
       </header>
       <section className="hifi-week" aria-labelledby="hifi-week-title" data-figma-node="3307:4186">
         <div><h1 id="hifi-week-title">Weekplanning</h1><p>Maak een planning en ontdek wat je kunt besparen met aanbiedingen en overlappende ingrediënten.</p></div>
-        <div className="hifi-days">{['Z', 'M', 'D', 'W', 'D'].map((day, i) => <button key={i} onClick={() => onNavigate('planner')} aria-label="Open weekplanning"><span className={i === 0 ? 'hifi-today' : ''}>{day}</span><span>{19 + i}</span></button>)}</div>
+        <div className="hifi-days">{[{ day: 'Z', date: 19 }, { day: 'M', date: 20 }, { day: 'D', date: 21 }, { day: 'W', date: 22 }, { day: 'D', date: 23 }].map(({ day, date }) => <button key={date} onClick={() => onNavigate('planner')} aria-label="Open weekplanning"><span className={date === 19 ? 'hifi-today' : ''}>{day}</span><span>{date}</span></button>)}</div>
         <button className="hifi-plan-button" onClick={() => onNavigate('planner')}><FigmaImage asset={a.imgVector} alt="" />Plan en bespaar</button>
       </section>
     </> : <h1 className="hifi-page-title">{view === 'recipes' ? 'Recepten' : 'Producten'}</h1>}
