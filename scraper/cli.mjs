@@ -18,6 +18,7 @@ import { PoliteFetcher } from './lib/http.mjs'
 import { rebuildMatches } from './lib/match.mjs'
 import { runRetailer } from './lib/runner.mjs'
 import { compareApprovedLocalCatalog } from './retailer-compare-approved.mjs'
+import { planDailyRefresh } from './daily-refresh.mjs'
 
 const DEFAULT_DB = 'artifacts/scraper/supa-products.sqlite'
 
@@ -50,10 +51,33 @@ function selectAdapters() {
 }
 
 async function scrape() {
+  const selected = selectAdapters()
+  // The standalone scrape CLI is just as capable of doing retailer HTTP as
+  // the daily timer. Require both canonical M1 rights and per-store review
+  // BEFORE opening SQLite, creating a fetcher or starting Chromium.
+  // A policy that approves only Dirk must not authorize the nine-store
+  // default command or an explicit extra --retailer argument.
+  const policyPath = process.env.SUPA_SCRAPER_POLICY
+  if (typeof policyPath !== 'string' || !policyPath.trim()) {
+    throw new Error('Direct retailer scrape refused: reviewed policy required')
+  }
+  let permitted
+  try {
+    permitted = await planDailyRefresh({
+      policyPath,
+      sourceGatePath: process.env.SUPA_SOURCE_PERMISSION_GATE ||
+        'evidence/m1/source-permission-gate.v1.json',
+      now: new Date(),
+    })
+  } catch {
+    throw new Error('Direct retailer scrape refused: source rights unverified')
+  }
+  if (!selected.length || selected.some(adapter => !permitted.includes(adapter.id))) {
+    throw new Error('Direct retailer scrape refused: selected source not approved')
+  }
   const store = new ScrapeStore(opts.db)
   for (const u of unsupported) store.upsertRetailer(u)
   const fetcher = new PoliteFetcher({ minDelayMs: Number(opts.delay) })
-  const selected = selectAdapters()
   const renderer = selected.some((a) => a.mode === 'browser') ? new BrowserRenderer(fetcher) : null
   const log = (msg) => console.error(`${new Date().toISOString()} ${msg}`)
   log(`scraping ${selected.map((a) => a.id).join(', ')} into ${opts.db}`)
