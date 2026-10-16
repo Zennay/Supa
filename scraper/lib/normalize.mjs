@@ -8,12 +8,16 @@ export function toCents(value) {
   else if (typeof value === 'string') {
     let s = value.trim().replace(/^€\s*/, '').replace(/\s+/g, '')
     if (/^\d{1,3}(\.\d{3})+,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.')
-    else s = s.replace(',', '.')
-    if (!/^\d+(\.\d+)?$/.test(s)) return null
+    else if (/^\d+(?:[.,]\d{1,2})?$/.test(s)) s = s.replace(',', '.')
+    else return null
     n = Number(s)
   } else return null
   if (!Number.isFinite(n) || n < 0 || n > 100_000) return null
-  return Math.round(n * 100)
+  // Final payable prices must be exact cents; never round a third decimal.
+  // Numeric IEEE-754 representation may have insignificant arithmetic noise.
+  const rawCents = n * 100
+  const cents = Math.round(rawCents)
+  return Math.abs(rawCents - cents) <= 1e-8 ? cents : null
 }
 
 const UNIT_MAP = new Map([
@@ -78,6 +82,10 @@ export function parsePack(text) {
   const empty = { amount: null, unit: null, count: 1 }
   if (typeof text !== 'string' || !text.trim()) return empty
   const s = text.toLowerCase().replace(/ /g, ' ')
+  // A promotional second quantity changes the actual whole pack. Unknown is
+  // safer than silently using the first measured fragment for price matching.
+  const measured = [...s.matchAll(new RegExp(SINGLE_RE.source, 'gi'))]
+  if (measured.length > 1 || /\+\s*\d+(?:[.,]\d+)?\s*%\s*(?:extra|gratis|meer)\b/.test(s) || /\+\s*\d+\s*(?:gratis|extra|free)\b/.test(s)) return empty
 
   const multi = MULTI_RE.exec(s)
   if (multi) {
@@ -123,7 +131,12 @@ export function totalPackQuantity(pack) {
 // possible (GTIN-14 with leading 0 and UPC-12 collapse onto EAN-13).
 export function normalizeGtin(value) {
   if (value === null || value === undefined) return null
-  let s = String(value).replace(/\D/g, '')
+  // Check digits do not authenticate a code extracted from SKU prose or URLs.
+  // Only an actual primitive GTIN with visual spaces/hyphens is admissible.
+  if (typeof value !== 'string' && (typeof value !== 'number' || !Number.isSafeInteger(value))) return null
+  let s = String(value).trim()
+  if (!/^\d[\d -]*\d$/.test(s)) return null
+  s = s.replace(/[ -]/g, '')
   if (![8, 12, 13, 14].includes(s.length)) return null
   if (!/[1-9]/.test(s)) return null
   const digits = s.split('').map(Number)
@@ -194,9 +207,15 @@ export function normalizeAvailability(value) {
   if (value === true) return 'available'
   if (value === false) return 'unavailable'
   if (typeof value !== 'string') return 'unknown'
-  const v = value.toLowerCase()
-  if (/instock|instoreonly|limitedavailability|onlineonly/.test(v)) return 'available'
-  if (/outofstock|discontinued|soldout|preorder/.test(v)) return 'unavailable'
+  const v = value.trim().toLowerCase()
+  // Denials and negation outrank any incidental InStock substring.
+  const negated = /not[\\s_-]*in[\\s_-]*stock/.test(v)
+  const negative = /out[\\s_-]*of[\\s_-]*stock|discontinued|sold[\\s_-]*out|pre[\\s_-]*order/.test(v)
+  const positive = /in[\\s_-]*stock|instoreonly|limitedavailability|onlineonly/.test(v)
+  if (negated) return 'unavailable'
+  if (negative && positive) return 'unknown'
+  if (negative) return 'unavailable'
+  if (positive) return 'available'
   return 'unknown'
 }
 
