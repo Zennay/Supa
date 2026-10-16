@@ -38,7 +38,7 @@ function requireInertOrRefused(sources, label) {
   assert.equal(worksheet.observedStorePrices, 0)
   assert.equal(worksheet.evidenceStatus, 'collection-template-not-evidence')
   assert.equal(worksheet.rows, 10)
-  assert.doesNotMatch(worksheet.csv, FORBIDDEN_CONTROLS,
+  assert.equal(FORBIDDEN_CONTROLS.test(worksheet.csv), false,
     'no invisible directionality/formatting characters may survive into a human CSV')
   assert.equal(worksheet.csv.match(/UNOBSERVED_TEMPLATE_NOT_EVIDENCE/g)?.length, 10)
   return 'sanitized'
