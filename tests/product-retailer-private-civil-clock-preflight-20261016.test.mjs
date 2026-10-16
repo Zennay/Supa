@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
+import { civilCaptureInstantKey } from '../src/data/retailerCivilCaptureClock.ts'
 import {
   isValidPrivateCivilCaptureTime,
   ingestCivilClockCheckedReviewedBatch,
@@ -128,4 +129,66 @@ test('offline CLI emits only aggregate private counts and refuses arbitrary flag
     assert.equal(output.includes(sample.source.id), false)
   }
   await assert.rejects(main(['--url', 'https://www.plus.nl/']), /civil-clock preflight refused/)
+})
+
+test('physically identical retailer captures cannot be counted again under renamed IDs or legal UTC aliases', async t => {
+  const originals = await fixtures()
+  for (const original of originals) {
+    await t.test(original.source.supermarket + ':' + original.source.kind, () => {
+      const renamed = structuredClone(original)
+      renamed.source.id += '-duplicate'
+      // The original engine only deduplicates by source ID. An otherwise
+      // credible source with a renamed ID is not an independent observation.
+      assert.throws(
+        () => ingestCivilClockCheckedReviewedBatch([original, renamed]),
+        /civil-clock preflight refused/,
+      )
+      for (const [sign, hour] of [['-', 12], ['+', 14]]) {
+        const alias = structuredClone(renamed)
+        alias.source.capturedAt = offsetAlias(original.source.capturedAt, sign, hour)
+        assert.equal(Date.parse(alias.source.capturedAt), Date.parse(original.source.capturedAt))
+        assert.equal(
+          civilCaptureInstantKey(alias.source.capturedAt),
+          civilCaptureInstantKey(original.source.capturedAt),
+        )
+        assert.throws(
+          () => ingestCivilClockCheckedReviewedBatch([original, alias]),
+          /civil-clock preflight refused/,
+        )
+      }
+    })
+  }
+})
+
+test('duplicate physical source invalidates all-six historical private batch atomically', async () => {
+  const originals = await fixtures()
+  const duplicate = structuredClone(originals[5])
+  duplicate.source.id += '-copy'
+  duplicate.source.capturedAt = offsetAlias(duplicate.source.capturedAt, '+', 14)
+  assert.throws(
+    () => ingestCivilClockCheckedReviewedBatch([...originals, duplicate]),
+    /civil-clock preflight refused/,
+  )
+  const { summary } = ingestCivilClockCheckedReviewedBatch(originals)
+  assert.equal(summary.acceptedSources, 6)
+  assert.equal(summary.rejectedSources, 0)
+})
+
+test('capture instant identity preserves one-nanosecond physical separation', () => {
+  const referenceTime = Date.parse('2026-10-16T22:00:00Z')
+  const samples = [
+    '2026-10-16T21:00:00.123456789Z',
+    '2026-10-16T23:00:00.123456789+02:00',
+    '2026-10-16T09:00:00.123456789-12:00',
+  ]
+  const keys = samples.map(value => civilCaptureInstantKey(value, referenceTime))
+  assert.ok(keys.every(key => typeof key === 'string'))
+  assert.equal(new Set(keys).size, 1)
+  const later = civilCaptureInstantKey('2026-10-16T21:00:00.123456790Z', referenceTime)
+  const earlier = civilCaptureInstantKey('2026-10-16T21:00:00.123456788Z', referenceTime)
+  assert.equal(BigInt(later) - BigInt(keys[0]), 1n)
+  assert.equal(BigInt(keys[0]) - BigInt(earlier), 1n)
+  assert.equal(civilCaptureInstantKey('2026-10-16T09:00:00.123456789-13:00', referenceTime), null)
+  assert.equal(civilCaptureInstantKey('2026-02-30T21:00:00Z', referenceTime), null)
+  assert.equal(civilCaptureInstantKey('2099-01-01T00:00:00Z', referenceTime), null)
 })
