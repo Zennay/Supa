@@ -112,6 +112,7 @@ function mount(disk, { denyGetter = false } = {}) {
       './components/IdentityAvatar.tsx': { IdentityAvatar },
       './features/home/HiFiHome': { HiFiHome: () => {}, HiFiDemoList: () => {} },
       './features/home/figmaAssets': { figmaAssets: {} },
+      './components/FigmaImage': { FigmaImage: () => {} },
       './domain/basket': { buildOneStoreBasket: () => ({
         totalCents: 1500, unresolvedLineCount: 0, lines: [],
       }) },

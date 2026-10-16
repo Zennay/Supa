@@ -1,3 +1,4 @@
+import { FigmaImage } from './components/FigmaImage'
 import { useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
@@ -326,7 +327,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => navigate(item.id)}
           >
-            <img src={item.icon} alt="" />
+            <FigmaImage asset={item.icon} alt="" />
             <span className="hifi-sr-only">{item.label}</span>
           </button>
         ))}

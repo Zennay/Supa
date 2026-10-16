@@ -7,7 +7,7 @@ const appSource = await readFile(new URL('../src/App.tsx', import.meta.url), 'ut
 test('bottom navigation exposes the active destination with aria-current', () => {
   assert.match(
     appSource,
-    /<nav className="bottom-nav" aria-label="Hoofdnavigatie">[\s\S]*aria-current=\{tab === item\.id \? 'page' : undefined\}/,
+    /<nav className="bottom-nav hifi-nav" aria-label="Hoofdnavigatie">[\s\S]*aria-current=\{tab === item\.id \? 'page' : undefined\}/,
   )
 })
 
