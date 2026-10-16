@@ -92,6 +92,9 @@ export async function auditBundledHistoricalRetailerCaptures() {
 }
 
 export async function main(args = process.argv.slice(2), output = text => process.stdout.write(text)) {
+  // The exported CLI handler may be called by another JS module. Verify its
+  // argument array is inert before even consulting .length or any index.
+  args = snapshotInertReviewedEvidence(args)
   if (!Array.isArray(args) || args.length !== 0) {
     throw new Error('Usage: node --experimental-strip-types scripts/retailer-private-capture-identity-audit.mjs')
   }
