@@ -81,6 +81,16 @@ Huismerken (PLUS, Dirk "1 de Beste", AH, …) worden dus níet aan elkaar gekopp
 
 Fixture verversen: `npm run scrape -- --retailer spar --limit 3 --save-html /tmp/html`, daarna `node scraper/make-fixture.mjs /tmp/html/spar/<hash>.html.gz <url> fixtures/scraper/spar-product.html.gz`.
 
+## Nieuwe integratie met SUPA UI
+
+Dit is een **technische** multi-retailer branch, niet automatisch een juridisch goedgekeurde bron of een draaiende server.
+De nieuwe daily supervisor staat in daily-refresh.mjs; de echte, persistente SQLite staat in artifacts/scraper.
+De lokale, alleen-lezen prijszoekservice staat in retailer-search-api.mjs, met een veilige HTML-resultatenpagina op /retailer-zoeken en intern JSON-endpoint /api/retailer-products.
+SUPA toont nu een Zoek-tab met een same-origin HTML-formulier in een afgeschermde frame. De browsercomponent gebruikt bewust geen directe fetch/XHR; de bestaande SUPA production-network-boundary blijft intact.
+De timer-template staat in deploy/supa-retailer-refresh.timer en draait iedere dag omstreeks 04:15 Europe/Amsterdam **pas na installatie op de VPS**.
+Alle twaalf bronnen in daily-source-policy.example.json zijn standaard uit. Een expliciet per-source onderzocht juridisch gebruiksrecht is een projecteis; dat betekent niet dat naar Nederlands recht voor elke openbare prijs schriftelijke toestemming vereist is.
+PLUS en Deka blijven daarnaast geblokkeerd door evidence/m1/source-permission-gate.v1.json totdat de bestaande projecttoets op passende wijze is afgerond.
+Geen betaalde API nodig. Volledige uitrol en controle: docs/SCRAPER_DAILY_SEARCH_ROLLOUT.md.
 ## Periodiek draaien
 
 Een volledige run kost bij 1 verzoek/s per host enkele uren per keten (parallel over ketens). PLUS duurt het langst (headless rendering). Voorbeeld voor een dagelijkse run op een server:
