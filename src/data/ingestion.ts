@@ -164,6 +164,47 @@ function validatePack(pack: RawPack) {
   }
 }
 
+/**
+ * An offer window is a physical interval, not a Date.parse millisecond
+ * approximation. The latter silently normalizes impossible civil dates
+ * (February 30), and truncates 1–9-digit fractions before comparing prices.
+ *
+ * Dates without a time component remain valid and mean midnight UTC. With a
+ * time component, require an explicit Z or bounded UTC offset. Never infer
+ * the browser's locale/timezone for archived private price evidence.
+ */
+function offerInstantNanoseconds(raw: unknown): bigint | null {
+  if (typeof raw !== 'string') return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2}))?$/.exec(raw)
+  if (!match) return null
+
+  const year = Number(match[1]), month = Number(match[2]), day = Number(match[3])
+  if (year < 100 || month < 1 || month > 12 || day < 1 || day > 31) return null
+  const calendar = new Date(Date.UTC(year, month - 1, day))
+  if (calendar.getUTCFullYear() !== year ||
+      calendar.getUTCMonth() !== month - 1 ||
+      calendar.getUTCDate() !== day) return null
+
+  const hasClock = match[4] !== undefined
+  if (hasClock) {
+    if (Number(match[4]) > 23 || Number(match[5]) > 59 ||
+        Number(match[6]) > 59) return null
+    const offset = match[8]
+    if (offset !== 'Z') {
+      const hours = Number(offset.slice(1, 3))
+      const minutes = Number(offset.slice(4, 6))
+      if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) return null
+    }
+  }
+
+  // Date.parse is only used for the WHOLE millisecond after strict calendar
+  // validation. Compare the remaining six fractional digits as BigInt.
+  const millis = Date.parse(hasClock ? raw : raw + 'T00:00:00Z')
+  if (!Number.isFinite(millis)) return null
+  const fraction = (match[7] ?? '').padEnd(9, '0')
+  return BigInt(millis) * 1000000n + BigInt(fraction.slice(3) || '0')
+}
+
 function validateOffer(offer: RawOffer | null) {
   if (offer === null) return
   if (!offer || typeof offer !== 'object') {
@@ -184,17 +225,15 @@ function validateOffer(offer: RawOffer | null) {
   validateNullableMoneyCents(offer.offerPriceCents, 'Offer price')
   validateNullableMoneyCents(offer.originalPriceCents, 'Original price')
 
-  if (offer.validFrom !== null && !validIso(offer.validFrom)) {
+  const from = offer.validFrom === null ? null : offerInstantNanoseconds(offer.validFrom)
+  const to = offer.validTo === null ? null : offerInstantNanoseconds(offer.validTo)
+  if (offer.validFrom !== null && from === null) {
     throw new Error('Offer validFrom must be null or a valid date/timestamp')
   }
-  if (offer.validTo !== null && !validIso(offer.validTo)) {
+  if (offer.validTo !== null && to === null) {
     throw new Error('Offer validTo must be null or a valid date/timestamp')
   }
-  if (
-    offer.validFrom !== null &&
-    offer.validTo !== null &&
-    Date.parse(offer.validFrom) > Date.parse(offer.validTo)
-  ) {
+  if (from !== null && to !== null && from > to) {
     throw new Error('Offer validity window cannot end before it starts')
   }
 }
