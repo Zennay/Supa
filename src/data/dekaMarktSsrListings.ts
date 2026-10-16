@@ -145,7 +145,7 @@ function validCapturedAt(value: unknown): value is string {
 // Both inputs must have passed validCapturedAt before this helper is called.
 function physicalTimestampNanos(value: string): bigint {
   const milliseconds = Date.parse(value)
-  const fraction = /\\.(\\d{1,9})(?:Z|[+-]\\d{2}:\\d{2})$/.exec(value)?.[1] ?? ''
+  const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1] ?? ''
   return BigInt(milliseconds) * 1_000_000n +
     BigInt(fraction.padEnd(9, '0').slice(3) || '0')
 }
