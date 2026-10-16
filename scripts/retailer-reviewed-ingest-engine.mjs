@@ -184,8 +184,11 @@ export function ingestReviewedEvidence(record) {
 
 export function ingestReviewedBatch(records) {
   const entries = pinBatchEntries(records)
+  // Stage 1: pin and validate EVERY capture's retailer/shape/identity.
+  // No adapter executes until the full batch has passed source preflight;
+  // later hostile/duplicate input cannot leave an earlier partial ingest.
   const unique = new Set()
-  const results = []
+  const contexts = []
   for (const input of entries) {
     const context = validatedInput(input)
     const identifier = context.key + ':' + context.record.source.id
@@ -193,8 +196,10 @@ export function ingestReviewedBatch(records) {
       throw new Error('Duplicate reviewed capture identity')
     }
     unique.add(identifier)
-    results.push(ingestPinnedEvidence(context))
+    contexts.push(context)
   }
+  // Stage 2: run the six approved parsers on only the pinned sources.
+  const results = contexts.map(ingestPinnedEvidence)
   const accepted = results.filter(result => result.accepted)
   const summary = {
     mode: 'reviewed-offline-only',
