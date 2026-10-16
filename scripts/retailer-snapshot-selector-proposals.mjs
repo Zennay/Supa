@@ -4,6 +4,7 @@
  * or source permission. No HTTP, browser automation or remote DOM access.
  */
 import { createHash } from 'node:crypto'
+import { types as nodeTypes } from 'node:util'
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve, join, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -65,7 +66,10 @@ function validPhysicalCaptureInstant(iso) {
 }
 
 function validCapture(source, requireHash = true) {
-  if (!source || typeof source !== 'object' || Array.isArray(source)) reject('malformed source')
+  // Revoked and live Proxies must be rejected *before* descriptor reads or
+  // even Array.isArray (which throws for revoked Proxy objects).
+  if (!source || typeof source !== 'object' || nodeTypes.isProxy(source) ||
+      Array.isArray(source)) reject('malformed source')
   const supermarket = owned(source, 'supermarket')
   const kind = owned(source, 'kind')
   const urlValue = owned(source, 'finalUrl') ?? owned(source, 'requestedUrl') ?? owned(source, 'url')
