@@ -58,6 +58,12 @@ export async function runRetailer(adapter, {
   // fetch must not persist HTML or a paid price after the source is blocked.
   let aborted = null
   const handle = async (item) => {
+    // Discovery and expansion are untrusted work-item producers. Validate
+    // each requested source before *either* HTTP or browser rendering; checking
+    // the effective response URL afterwards cannot undo an off-source request.
+    if (!isTrustedResponseSource(item?.url, adapter.host)) {
+      throw new Error('retailer queued URL is outside approved HTTPS source origin')
+    }
     const res = await fetchPage(item.url)
     if (aborted) return []
     summary.pages += 1
