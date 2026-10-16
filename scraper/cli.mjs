@@ -43,7 +43,7 @@ function selectAdapters() {
   if (opts.retailer) {
     return opts.retailer.split(',').map((id) => {
       const adapter = getAdapter(id.trim())
-      if (!adapter) throw new Error(`unknown retailer ${id}; see "retailers"`)
+      if (!adapter) throw new Error('Direct retailer scrape refused: unsupported retailer selection')
       return adapter
     })
   }
@@ -51,7 +51,6 @@ function selectAdapters() {
 }
 
 async function scrape() {
-  const selected = selectAdapters()
   // The standalone scrape CLI is just as capable of doing retailer HTTP as
   // the daily timer. Require both canonical M1 rights and per-store review
   // BEFORE opening SQLite, creating a fetcher or starting Chromium.
@@ -72,6 +71,9 @@ async function scrape() {
   } catch {
     throw new Error('Direct retailer scrape refused: source rights unverified')
   }
+  // Never interpret or echo raw caller-selected retailer IDs until rights
+  // admission succeeds. Even after admission, unsupported IDs remain opaque.
+  const selected = selectAdapters()
   if (!selected.length || selected.some(adapter => !permitted.includes(adapter.id))) {
     throw new Error('Direct retailer scrape refused: selected source not approved')
   }
