@@ -62,23 +62,25 @@ export function saveLocalRecipeReviewDraft(
   draft: EditorRecipeDraft,
   expectedRevision: number | null,
   explicitDeviceStorageConsent: boolean,
+  expectedIncarnation: string | null = null,
 ): DraftStorageWrite | { status: 'consent_required' } {
   // Callers may cross JS/TS boundaries with form, URL or settings values.
   // Only explicit *primitive* boolean true authorizes unencrypted local I/O.
   // All other types must return before any storage.getItem/setItem call.
   if (explicitDeviceStorageConsent !== true) return { status: 'consent_required' }
-  return saveRecipeDeviceDraft(storage, id, draft, expectedRevision)
+  return saveRecipeDeviceDraft(storage, id, draft, expectedRevision, expectedIncarnation)
 }
 
 /** Recover a draft with new UI-only row IDs; preserve its need for review. */
 export function restoreLocalRecipeReviewDraft(storage: RecipeDraftStorage, id: string):
-  | { status: 'found'; draft: EditorRecipeDraft; revision: number }
+  | { status: 'found'; draft: EditorRecipeDraft; revision: number; incarnation?: string }
   | { status: 'missing' | 'protected' | 'unavailable' } {
   const stored = readRecipeDeviceDraft(storage, id)
   if (stored.status !== 'found') return { status: stored.status }
   return {
     status: 'found',
     revision: stored.record.revision,
+    ...(stored.record.reusedIdentity ? { incarnation: stored.record.incarnation } : {}),
     draft: prepareImportedRecipeForEditor(stored.record.draft),
   }
 }
