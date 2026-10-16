@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { isIP } from 'node:net'
+import { types as nodeTypes } from 'node:util'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
 // exports product/price text, or labels proposed selectors as confirmed.
@@ -24,6 +25,30 @@ const KNOWN_RETAILER_HOSTS = Object.freeze({
   plus: 'www.plus.nl',
   dekamarkt: 'www.dekamarkt.nl',
 })
+
+// A selector proposal can be called directly from JS, not only from decoded
+// JSON. Before reading any field, reject Proxy/getter/inherited identities.
+// Snapshot just the required own primitive data; never reuse caller records.
+function ownInertFields(input, names) {
+  if (input === null || typeof input !== 'object' ||
+      Array.isArray(input) || nodeTypes.isProxy(input)) {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+  const prototype = Object.getPrototypeOf(input)
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(input)
+  const keys = Reflect.ownKeys(descriptors)
+  if (keys.length !== names.length ||
+      keys.some(key => typeof key !== 'string' || !names.includes(key)) ||
+      names.some(key => !Object.hasOwn(descriptors, key) ||
+        !Object.hasOwn(descriptors[key], 'value'))) {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+  return Object.freeze(Object.fromEntries(names.map(name =>
+    [name, descriptors[name].value])))
+}
 
 function validPhysicalUtcTimestamp(value) {
   // Date.parse can normalize impossible days (Feb 30) and 24:00 into the
@@ -60,9 +85,11 @@ function validSnapshotOrigin(origin) {
 }
 
 export function assertValidOfflineSelectorOrigin(origin) {
-  if (!validSnapshotOrigin(origin)) {
+  const pinned = ownInertFields(origin, ['retailerId', 'url', 'capturedAt'])
+  if (!validSnapshotOrigin(pinned)) {
     throw new Error('Invalid or oversized offline retailer snapshot')
   }
+  return pinned
 }
 
 function removeInertMarkup(html) {
@@ -86,8 +113,9 @@ function attribute(attrs, name) {
   return match ? (match[1] ?? match[2]) : null
 }
 
-export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
-  assertValidOfflineSelectorOrigin(origin)
+export function proposeOfflineRetailerSelectors(request = {}) {
+  const { html, origin } = ownInertFields(request, ['html', 'origin'])
+  const pinnedOrigin = assertValidOfflineSelectorOrigin(origin)
   if (typeof html !== 'string' ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES ||
       Buffer.from(html, 'utf8').toString('utf8') !== html) {
@@ -167,9 +195,9 @@ export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
     schemaVersion: 1,
     mode: 'offline-selector-proposals-only',
     source: {
-      retailerId: origin.retailerId,
+      retailerId: pinnedOrigin.retailerId,
       sha256,
-      capturedAt: origin.capturedAt,
+      capturedAt: pinnedOrigin.capturedAt,
     },
     bytes: Buffer.byteLength(html, 'utf8'),
     scannedTags: inspectedTags,
