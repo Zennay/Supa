@@ -10,7 +10,11 @@ import { runRetailer } from '../scraper/lib/runner.mjs'
 const HOST = 'qa-source.example.test'
 const base = `https://${HOST}/fictional/article-`
 
-async function run({ count = 8, concurrency = 4, limit = 3, host = HOST } = {}) {
+async function run(options = {}) {
+  const { count = 8, concurrency = 4, limit = 3 } = options
+  // A caller that explicitly passes undefined is testing an absent host;
+  // destructuring `host = HOST` would silently re-authorize this fixture.
+  const host = Object.hasOwn(options, 'host') ? options.host : HOST
   const requested = []
   const store = {
     upsertRetailer() {},
