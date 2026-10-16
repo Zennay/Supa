@@ -19,7 +19,7 @@ test('accepts exact physical aliases in real civil UTC offset endpoints', () => 
 })
 
 test('rejects impossible negative UTC civil offsets and positive overflow', () => {
-  for (const offset of ['-12:01', '-13:00', '-14:00', '-13:59', '+14:01', '+15:00', '+13:60']) {
+  for (const offset of ['-12:01', '-13:00', '-14:00', '-13:59', '-00:00', '+14:01', '+15:00', '+13:60']) {
     assert.equal(physicalCaptureNanoseconds(`2026-10-04T18:08:57.837123456${offset}`), null, offset)
   }
   assert.notEqual(physicalCaptureNanoseconds('2026-10-04T18:08:57-11:59'), null)
