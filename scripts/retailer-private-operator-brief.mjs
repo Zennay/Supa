@@ -60,7 +60,7 @@ function snapshotReport(value, state = { seen: new WeakSet(), nodes: 0 }, depth 
     const keys = Reflect.ownKeys(value)
     if (keys.length !== value.length + 1 ||
         keys.some(key => typeof key !== 'string' ||
-          (key !== 'length' && !/^(?:0|[1-9]\\d*)$/.test(key)))) fail()
+          (key !== 'length' && !/^(?:0|[1-9]\d*)$/.test(key)))) fail()
     return Array.from({ length: value.length }, (_, index) => {
       const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
       if (!descriptor || !Object.hasOwn(descriptor, 'value')) fail()
