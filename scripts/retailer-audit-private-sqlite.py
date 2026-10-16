@@ -52,6 +52,10 @@ def approved_path(value):
     require(stat.S_ISREG(mode.st_mode) and mode.st_nlink == 1)
     require(stat.S_IMODE(mode.st_mode) == 0o600)
     require(100 <= mode.st_size <= MAX_BYTES)
+    # This audits a *finished* import, never a mutable WAL writer's view.
+    # immutable=1 would otherwise ignore uncheckpointed WAL transactions.
+    require(not any(os.path.lexists(str(target) + suffix)
+                    for suffix in ("-wal", "-shm", "-journal")))
     with target.open("rb") as handle:
         require(handle.read(16) == b"SQLite format 3\x00")
     return target
