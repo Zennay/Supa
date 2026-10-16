@@ -12,7 +12,7 @@ export const RESEARCH_SOURCES = Object.freeze([
   { id: 'dirk-halvarine', store: 'dirk', kind: 'product', url: 'https://www.dirk.nl/boodschappen/zuivel-kaas/boter-margarine/1%20de%20beste%20halvarine/113861' },
   { id: 'hoogvliet-magere-melk', store: 'hoogvliet', kind: 'product', url: 'https://www.hoogvliet.com/product/melkan-magere-melk' },
   { id: 'jumbo-halfvolle-melk', store: 'jumbo', kind: 'product', url: 'https://www.jumbo.com/producten/jumbo-halfvolle-melk-500ml-753539PAK' },
-])
+].map(source => Object.freeze(source)))
 const HOSTS = Object.freeze({ ah: 'www.ah.nl', dirk: 'www.dirk.nl', hoogvliet: 'www.hoogvliet.com', jumbo: 'www.jumbo.com' })
 const MAX_BYTES = 5 * 1024 * 1024
 const MAX_HEADER_BYTES = 64 * 1024
