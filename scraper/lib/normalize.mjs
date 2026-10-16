@@ -219,6 +219,25 @@ export function normalizeAvailability(value) {
   return 'unknown'
 }
 
+// Unverified or synthetic IDs must not become shared persistent archive keys.
+function normalizeSourceId(value) {
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) && value >= 0 ? String(value) : null
+  }
+  if (typeof value !== 'string') return null
+  const id = value.trim()
+  if (!id || id.length > 256 ||
+      /[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/.test(id) ||
+      /^(?:undefined|null|nan|\[object object\])$/i.test(id)) return null
+  return id
+}
+
+function isKnownCents(value) {
+  return value === null ||
+    (typeof value === 'number' && Number.isSafeInteger(value) &&
+      value > 0 && value <= 10_000_000)
+}
+
 // Build a canonical product record; adapters fill what they know.
 export function makeRecord(fields) {
   const pack =
@@ -232,7 +251,7 @@ export function makeRecord(fields) {
   const gtin = normalizeGtin(fields.gtin)
   return {
     retailer: fields.retailer,
-    sourceId: String(fields.sourceId),
+    sourceId: normalizeSourceId(fields.sourceId),
     url: fields.url ?? null,
     name: cleanText(fields.name),
     brand: cleanText(fields.brand),
@@ -254,5 +273,9 @@ export function makeRecord(fields) {
 }
 
 export function isValidRecord(record) {
-  return Boolean(record && record.retailer && record.sourceId && record.name)
+  return Boolean(record &&
+    typeof record.retailer === 'string' && record.retailer.trim() &&
+    typeof record.sourceId === 'string' && record.sourceId === normalizeSourceId(record.sourceId) &&
+    typeof record.name === 'string' && record.name.trim() &&
+    isKnownCents(record.priceCents) && isKnownCents(record.promoPriceCents))
 }
