@@ -31,6 +31,25 @@ test('one private M3 preflight binds real six reviewed adapter shapes, catalog, 
   assert.equal(report.requiredSourceShapes, 6)
   assert.equal(report.missingSourceShapes, 0)
   assert.equal(report.completeHistoricalSourceShapeCoverage, true)
+  assert.equal(report.perSourceShape.length, 6)
+  assert.deepEqual(
+    [...new Set(report.perSourceShape.map(row => row.retailer))].sort(),
+    ['dekamarkt', 'plus'],
+  )
+  assert.deepEqual(
+    [...new Set(report.perSourceShape.map(row => row.kind))].sort(),
+    ['catalog', 'offers', 'product'],
+  )
+  assert.equal(
+    report.perSourceShape.reduce((sum, row) => sum + row.archivedObservations, 0),
+    report.acceptedHistoricalObservations,
+  )
+  assert.ok(report.perSourceShape.every(row =>
+    row.verifiedCurrentPriceObservations === 0 &&
+    !Object.hasOwn(row, 'sourceUrl') &&
+    !Object.hasOwn(row, 'sha256') &&
+    !Object.hasOwn(row, 'productName')),
+  )
   assert.ok(report.acceptedHistoricalObservations > 0)
   assert.ok(report.normalizedPrivateProducts > 0)
   assert.ok(report.archivedOfferRows > 0)
