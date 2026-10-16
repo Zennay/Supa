@@ -67,9 +67,34 @@ export function PrivateRecipeStudio({
     validLibrary = false
   }
   const ids = validLibrary ? libraryIds : []
-  const current = validLibrary
+  // Snapshot host-controlled week selection before sending it into the child
+  // planner. Missing data and accessor values are review-only, never render
+  // exceptions or secretly accepted day selections.
+  const safeDays: Record<string, string | null> = {}
+  let validSelection = false
+  try {
+    if (selectedDays && typeof selectedDays === 'object' && !Array.isArray(selectedDays) &&
+        (Object.getPrototypeOf(selectedDays) === Object.prototype ||
+         Object.getPrototypeOf(selectedDays) === null)) {
+      const descriptors = Object.getOwnPropertyDescriptors(selectedDays)
+      const weekDays = new Set(['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'])
+      validSelection = true
+      for (const [day, descriptor] of Object.entries(descriptors)) {
+        if (!weekDays.has(day) || !Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+            !(descriptor.value == null || typeof descriptor.value === 'string')) {
+          validSelection = false
+          break
+        }
+        safeDays[day] = descriptor.value ?? null
+      }
+    }
+  } catch {
+    validSelection = false
+  }
+  const validHostState = validLibrary && validSelection
+  const current = validHostState
     ? prepareUnpricedPrivateRecipe(draft, draftLocalId, ids)
-    : { status: 'review_required' as const, reasons: ['invalid_private_recipe_library'] }
+    : { status: 'review_required' as const, reasons: ['invalid_private_recipe_host_state'] }
   // Parent updates are asynchronous: reserve this rendered ID synchronously,
   // before invoking the parent's callback, so double-clicks cannot enqueue
   // two creates from the same stale recipe-ID snapshot.
@@ -78,7 +103,7 @@ export function PrivateRecipeStudio({
   function confirm(reviewed: EditorRecipeDraft) {
     // Re-evaluate the event-time draft, not an earlier optimistic UI preview.
     // Refuse any importer/unknown amount/pending warning/ID conflict.
-    if (submitted || !validLibrary) return
+    if (submitted || !validHostState) return
     const decision = prepareUnpricedPrivateRecipe(reviewed, draftLocalId, ids)
     if (decision.status === 'unpriced_ready') {
       submitted = true
@@ -102,8 +127,8 @@ export function PrivateRecipeStudio({
           'Dit recept kan aan je lokale lijst worden toegevoegd; prijs en winkel blijven onbekend.'),
     createElement(PrivateRecipeWeekPlanner, {
       key:'planner',
-      recipes: validLibrary ? recipes : [],
-      selection:selectedDays,
+      recipes: validHostState ? recipes : [],
+      selection:safeDays,
       onSelectionChange:onSelectedDaysChange,
     }),
   ])
