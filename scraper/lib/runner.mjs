@@ -122,7 +122,9 @@ export async function runRetailer(adapter, {
         return fetcher.request(url, options)
       },
       async getText(url, options) {
-        return (await this.request(url, options)).text
+        // Lexically bound to the approved request method even when callers
+        // detach getText or invoke it with a different JavaScript receiver.
+        return (await scopedFetcher.request(url, options)).text
       },
     })
     const discovered = adapter.discover({ fetcher: scopedFetcher, log })
