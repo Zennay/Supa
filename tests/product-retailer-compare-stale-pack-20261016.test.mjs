@@ -77,6 +77,18 @@ test('stale matched 1×500g and 2×250g cannot expose fictional prices', async t
   assert.equal(out.result.matchedGroups,0)
   assert.doesNotMatch(out.text,/€\d/)
 })
+test('a stale same-canonical gram-versus-ml mismatch cannot show prices', async t=>{
+  const out=await inspect(await fixture(t,(db,{b})=>
+    db.db.prepare('UPDATE products SET pack_unit=?,pack_text=? WHERE id=?').run('ml','500 ml',b)))
+  assert.equal(out.result.displayedRows,0)
+  assert.doesNotMatch(out.text,/€\d/)
+})
+test('a fractional legacy multipack count cannot authorize stored price equivalence', async t=>{
+  const out=await inspect(await fixture(t,(db,{b})=>
+    db.db.prepare('UPDATE products SET pack_count=? WHERE id=?').run(1.5,b)))
+  assert.equal(out.result.displayedRows,0)
+  assert.doesNotMatch(out.text,/€\d/)
+})
 test('missing physical dimensions abstain before any individual price text', async t=>{
   const out=await inspect(await fixture(t,(db,{b})=>
     db.db.prepare('UPDATE products SET pack_amount=NULL WHERE id=?').run(b)))
