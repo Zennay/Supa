@@ -65,11 +65,11 @@ function packKey(p) {
   // fuzzy matching even if an older parser stored an amount for them.
   if (/\d\s*[-–]\s*\d/.test(p.pack_text ?? '') && parsePack(p.pack_text).amount === null) return null
   const total = p.pack_amount * count
-  return Number.isFinite(total) && total > 0 ? { unit: p.pack_unit, total } : null
+  return Number.isFinite(total) && total > 0 ? { unit: p.pack_unit, total, count } : null
 }
 
 function samePack(a, b) {
-  if (!a || !b || a.unit !== b.unit) return false
+  if (!a || !b || a.unit !== b.unit || a.count !== b.count) return false
   return Math.abs(a.total - b.total) <= Math.max(a.total, b.total) * 0.01
 }
 
@@ -157,7 +157,7 @@ export function matchProducts(products) {
 
   const blockKey = (info) =>
     info.brandKey && info.pack
-      ? `${info.brandKey}|${info.pack.unit}|${Math.round(info.pack.total)}`
+      ? `${info.brandKey}|${info.pack.unit}|${info.pack.count}|${Math.round(info.pack.total)}`
       : null
   const blocks = new Map()
   const addToBlock = (info, root) => {
