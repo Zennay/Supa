@@ -100,3 +100,18 @@ test('empty valid backup is not a destructive reset and can be restored safely',
   assert.deepEqual(imported.recipes, current.recipes)
   assert.deepEqual(parseRecipeBackup('{"format":"supa-private-recipes-backup","version":1,"recipes":[]}'), [])
 })
+
+test('portable export refuses authentication query secrets and drops unneeded URL fragments', () => {
+  const source = { ...own('own-url', 'From safe URL'), source:'url', sourceUrl:'https://recipes.example.org/pasta?utm_source=supa#recipe' }
+  const valid = JSON.parse(exportRecipeBackup({recipes:[source],raw:null,error:null}))
+  assert.equal(valid.recipes[0].sourceUrl, 'https://recipes.example.org/pasta?utm_source=supa')
+  for (const query of ['?access_token=private', '?code=oauth-secret', '?oauth_token=private', '?SAMLResponse=private', '?api_key=private', '?authorization=BearerPrivate']) {
+    const compromised = { ...source, sourceUrl:'https://recipes.example.org/pasta'+query }
+    assert.throws(() => exportRecipeBackup({recipes:[compromised],raw:null,error:null}), /geheime inloggegevens/, query)
+    const payload = { format:'supa-private-recipes-backup', version:1, recipes:[{
+      title:source.title, servings:source.servings, minutes:source.minutes, source:'url', sourceUrl:compromised.sourceUrl,
+      ingredients:source.ingredients.map(i => i.original), steps:source.steps,
+    }] }
+    assert.throws(() => parseRecipeBackup(JSON.stringify(payload)), /geheime inloggegevens/, query)
+  }
+})
