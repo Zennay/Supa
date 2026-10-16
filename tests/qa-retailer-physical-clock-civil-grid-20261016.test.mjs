@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { readFile } from 'node:fs/promises'
 import {
   physicalCaptureNanoseconds,
   samePhysicalCaptureInstant,
 } from '../scripts/retailer-physical-civil-clock.mjs'
 import {
   RETAILER_REVIEWED_FIXTURES,
-  readBoundedRegularReviewedFixture,
 } from '../scripts/retailer-reviewed-ingest-engine.mjs'
 
 // Independent QA1 frozen product #3715: exact civil chronology, not source approval.
@@ -106,8 +105,8 @@ test('a distinct one-nanosecond recapture never collapses into a differently off
 
 test('each of six actual archived PLUS/Deka clocks survives physical legal aliasing', async t => {
   const root = new URL('../fixtures/m1/', import.meta.url)
-  const records = await Promise.all(RETAILER_REVIEWED_FIXTURES.map(name =>
-    readBoundedRegularReviewedFixture(fileURLToPath(new URL(name, root)))))
+  const records = await Promise.all(RETAILER_REVIEWED_FIXTURES.map(async name =>
+    JSON.parse(await readFile(new URL(name, root), 'utf8'))))
   assert.equal(records.length, 6)
   for (const record of records) {
     const source = record.source
