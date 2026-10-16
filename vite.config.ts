@@ -3,10 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  server: { proxy: { '/api/retailer-products': 'http://127.0.0.1:4317' } },
+  preview: { strictPort: true, proxy: { '/api/retailer-products': 'http://127.0.0.1:4317' } },
   build: {
     sourcemap: false,
   },
-  preview: {
-    strictPort: true,
-  },
+
 })
