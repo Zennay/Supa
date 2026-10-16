@@ -182,7 +182,9 @@ export async function captureApprovedRetailerPage(options = {}) {
   if (typeof fetchFn !== 'function') throw new Error('Approved fetch transport required')
   const target = checkedTarget(source)
   permittedForCapture(permissionGate, source, grant, target)
-  const timestamp = capturedAt ?? new Date().toISOString()
+  // An omitted clock can be stamped when captured; an explicitly invalid
+  // null/false value must not silently become an alleged capture instant.
+  const timestamp = capturedAt === undefined ? new Date().toISOString() : capturedAt
   // Date.parse may *normalize* impossible civil dates (e.g. 30 February)
   // into March. Only accept exact round-trip Gregorian UTC milliseconds:
   // an invalid instant must never consume the operator's HTTP capability or
