@@ -4,6 +4,7 @@ import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
+import { cookablePlannerRecipes } from './cookablePlannerRecipes'
 import './recipes.css'
 
 function keyed<T>(items: readonly T[], identity: (item: T) => string) {
@@ -15,14 +16,14 @@ function keyed<T>(items: readonly T[], identity: (item: T) => string) {
   })
 }
 
-const examples = [
-  { id: 'thai', title: 'Thai red curry', image: a.recipeThai, minutes: 40, price: '6.20', saving: '1.50' },
-  { id: 'quesadillas', title: 'Quesadillas', image: a.recipeQuesadillas, minutes: 15, price: '3.75', saving: '3.60' },
-  { id: 'fried', title: 'Fried rice', image: a.imgRecepten, minutes: 15, price: '2.65', saving: '2.50' },
-  { id: 'bao', title: 'Bao buns', image: a.imgRecepten1, minutes: 20, price: '4.45', saving: '2.50' },
-  { id: 'katsu', title: 'Katsu curry', image: a.imgRecepten2, minutes: 40, price: '6.20', saving: '2.50' },
-  { id: 'pasta', title: 'Groente pasta', image: a.recipePasta, minutes: 15, price: '6.20', saving: '2.50' },
-]
+const examples = cookablePlannerRecipes.map(recipe => ({
+  ...recipe,
+  // A product-supplied dish photo is only used when the existing Figma asset
+  // actually depicts that meal; other dishes keep their Figma card geometry.
+  image: recipe.id === 'pasta' ? a.recipePasta : null,
+  sourceLabel: 'Recept in planner',
+}))
+
 const blank = { title: '', servings: '2', minutes: '20', ingredients: '', steps: '' }
 function initialLibrary(): LibraryState {
   if (typeof window === 'undefined') return { recipes: [], raw: null, error: null }
@@ -36,7 +37,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [filter, setFilter] = useState<'all' | 'own' | 'favorites'>('all')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [sort, setSort] = useState(false)
-  const [favorites, setFavorites] = useState<string[]>(['quesadillas'])
+  const [favorites, setFavorites] = useState<string[]>([])
   const [mode, setMode] = useState<'manual' | 'url'>('manual')
   const [form, setForm] = useState(blank)
   const [url, setUrl] = useState('')
@@ -91,20 +92,20 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     finally { saving.current = false }
   }
   return <div className="hifi-home recipe-library" data-figma-node="3342:5608">
-    <header className="recipe-heading"><button className="recipe-back" onClick={onBack} aria-label="Terug naar Home"><FigmaImage asset={a.recipeBack} alt="" /></button><h1>{filter === 'own' ? 'Mijn eigen recepten' : 'Mijn favoriete recepten'}</h1></header>
+    <header className="recipe-heading"><button className="recipe-back" onClick={onBack} aria-label="Terug naar Home"><FigmaImage asset={a.recipeBack} alt="" /></button><h1>{filter === 'own' ? 'Mijn eigen recepten' : 'Alle recepten'}</h1></header>
     <div className="hifi-search-row"><label className="hifi-search"><FigmaImage asset={a.recipeSearch} alt="" /><input type="search" aria-label="Zoek recepten" placeholder="Zoek recepten" value={query} onChange={e => setQuery(e.target.value)} /></label><button className="hifi-filter" aria-label="Receptfilters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><FigmaImage asset={a.imgVector2} alt="" /></button></div>
     {filtersOpen && <div className="recipe-tabs" aria-label="Receptfilter">{(['all', 'own', 'favorites'] as const).map((id, i) => <button key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>{['Alle recepten', 'Eigen recepten', 'Favorieten'][i]}</button>)}</div>}
     <section className="hifi-section"><div className="hifi-section-heading"><div><h2>Recepten</h2><p className="recipe-count">{demo.length + own.length} recepten</p></div><button aria-label="Sorteer recepten op naam" aria-pressed={sort} onClick={() => setSort(!sort)}><FigmaImage asset={a.recipeSort} alt="" /></button></div>
-      <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe ? '' : ' own-recipe-card'}`} key={recipe.id}>
-        {'image' in recipe && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
+      <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe && recipe.image ? '' : ' own-recipe-card'}`} key={recipe.id}>
+        {'image' in recipe && recipe.image && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
         <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); detail.current?.showModal() }} />
-        <div className="hifi-recipe-top">{'saving' in recipe ? <span className="hifi-saving"><FigmaImage asset={a.imgVector3} alt="" />-€{recipe.saving}</span> : <span className="hifi-saving">Eigen recept</span>}<button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
-        <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{'price' in recipe ? `€${recipe.price} p.p` : `${recipe.servings ?? '?'} porties`}</span></p></div>
+        <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
+        <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p></div>
       </article>)}</div>
       {!demo.length && !own.length && <p className="hifi-empty">{query ? 'Geen recepten gevonden. Probeer een andere zoekterm.' : 'Voeg je eerste eigen recept toe of importeer een receptlink.'}</p>}
     </section>
     <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button></div>
-    {!!demo.length && <p className="recipe-note">Ontwerpvoorbeelden · prijzen en aanbiedingen zijn niet actueel.</p>}
+    {!!demo.length && <p className="recipe-note">Deze drie SUPA-plannerrecepten bevatten volledige ingrediënten en bereidingsstappen. Winkelprijzen en besparingen zijn niet geverifieerd.</p>}
     {library.error && <p role="alert">{library.error}</p>}<p role="status" className="hifi-feedback">{message}</p>
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
       <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : 'Eigen recept toevoegen'}</h2>
@@ -113,6 +114,6 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <p>Onbekende hoeveelheden blijven als tekst bewaard. Vul ze aan voordat je een boodschappenberekening maakt.</p>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>Opslaan in mijn recepten</button></section>}
       {error && <p role="alert" className="recipe-error">{error}</p>}
     </dialog>
-    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend.</p></> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}</>}</dialog>
+    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-planner-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p></> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}</>}</dialog>
   </div>
 }
