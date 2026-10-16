@@ -14,5 +14,5 @@ test('bottom navigation exposes the active destination with aria-current', () =>
 test('bottom navigation keeps semantic state conditional instead of marking inactive tabs current', () => {
   assert.doesNotMatch(appSource, /aria-current=["']page["']/)
   assert.match(appSource, /className=\{tab === item\.id \? 'active' : ''\}/)
-  assert.match(appSource, /<button[\s\S]*onClick=\{\(\) => setTab\(item\.id\)\}/)
+  assert.match(appSource, /<button[\s\S]*onClick=\{\(\) => navigate\(item\.id\)\}/)
 })
