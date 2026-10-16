@@ -32,4 +32,5 @@ test('malformed method, nonces, extra keys and paths are refused', async () => {
     }
     const r = await fetch(base + '/health?supa_probe=' + '0'.repeat(32), { method: 'POST' })
     assert.equal(r.status, 404)
-  })})
+  })
+})
