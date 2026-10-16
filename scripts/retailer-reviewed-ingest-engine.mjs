@@ -68,9 +68,8 @@ function provenanceMatches(source, observation) {
     actual.sha256 === source.sha256
 }
 
-export function ingestReviewedEvidence(record) {
-  // No caller-supplied getters, Proxy traps, or mutable alias reach an adapter.
-  record = snapshotInertReviewedEvidence(record)
+function ingestSafeReviewedEvidence(record) {
+  // Internal only: record already detached at the public entrypoint.
   const { key, parser } = validatedInput(record)
   let parsed
   try {
@@ -108,6 +107,10 @@ export function ingestReviewedEvidence(record) {
   return { key, accepted: true, reason: null, observations }
 }
 
+export function ingestReviewedEvidence(record) {
+  return ingestSafeReviewedEvidence(snapshotInertReviewedEvidence(record))
+}
+
 export function ingestReviewedBatch(records) {
   // Snapshot the whole collection BEFORE accessing .length, iterators or source IDs.
   records = snapshotInertReviewedEvidence(records)
@@ -123,7 +126,7 @@ export function ingestReviewedBatch(records) {
       throw new Error('Duplicate reviewed capture identity')
     }
     unique.add(identifier)
-    results.push(ingestReviewedEvidence(record))
+    results.push(ingestSafeReviewedEvidence(record))
   }
   const accepted = results.filter(result => result.accepted)
   const summary = {
