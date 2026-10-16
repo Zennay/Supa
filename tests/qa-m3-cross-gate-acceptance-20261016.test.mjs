@@ -83,7 +83,7 @@ test('QA integration: ageing captures stay archived and unlicensed in every outp
       }
     }
     const output = JSON.stringify(report)
-    assert.doesNotMatch(output, /https?:\\/\\/|sha256|currentPriceCents|offerPriceCents|sourceProductId/i)
+    assert.doesNotMatch(output, /https?:|sha256|currentPriceCents|offerPriceCents|sourceProductId/i)
   }
 })
 
