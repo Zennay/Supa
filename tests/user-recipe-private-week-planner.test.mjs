@@ -106,8 +106,8 @@ test('rejects inherited recipe identity without invoking prototype getter',()=>{
   const good=makeRecipe()
   let reads=0
   const hostile=Object.create({ get id(){ reads++; return good.id } })
-  Object.assign(hostile,good)
-  delete hostile.id
+  const { id: ignoredInheritedId, ...safeFields } = good
+  Object.assign(hostile,safeFields)
   const r=createPrivateRecipeWeekPreview([hostile],{Ma:good.id})
   assert.equal(reads,0)
   assert.deepEqual(r,{status:'review_required',reason:'invalid_selection'})
