@@ -54,7 +54,8 @@ export function snapshotInertReviewedEvidence(value) {
         const result = []
         for (let i = 0; i < length.value; i++) {
           const property = descriptors[i]
-          if (!property || !Object.hasOwn(property, 'value')) refuse()
+          if (!property || !Object.hasOwn(property, 'value') ||
+              property.enumerable !== true) refuse()
           result.push(copy(property.value, depth + 1))
         }
         if (keys.some(key => key !== 'length' &&
@@ -68,7 +69,8 @@ export function snapshotInertReviewedEvidence(value) {
         if (typeof key !== 'string') refuse()
         addBytes(key)
         const property = descriptors[key]
-        if (!property || !Object.hasOwn(property, 'value')) refuse()
+        if (!property || !Object.hasOwn(property, 'value') ||
+              property.enumerable !== true) refuse()
         Object.defineProperty(result, key, {
           value: copy(property.value, depth + 1),
           configurable: true, enumerable: true, writable: true,
