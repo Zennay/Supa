@@ -60,7 +60,7 @@ def utc_instant_nanoseconds(text):
     safe_timestamp(text)
     match = ISO.fullmatch(text)
     check(match is not None, "invalid timestamp")
-    fraction = re.search(r"\\.(\\d{1,9})(?:Z|[+-]\\d{2}:\\d{2})$", text)
+    fraction = re.search(r"\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$", text)
     frac_ns = int(fraction.group(1).ljust(9, "0")) if fraction else 0
     parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     whole = parsed.replace(microsecond=0).astimezone(timezone.utc)
