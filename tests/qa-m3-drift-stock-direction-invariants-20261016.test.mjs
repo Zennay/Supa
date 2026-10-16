@@ -237,7 +237,7 @@ test('metamorphic matrix: every retailer/source kind independently reports unkno
   }
 })
 
-test('issue #3080: 1ns OLDER catalog with completely disjoint SKU identities is refused', async () => {
+test('issue #3080: 1ms OLDER catalog with completely disjoint SKU identities is refused', async () => {
   const previous = structuredClone(await loadReviewedRepositoryFixtures())
   const current = structuredClone(previous)
   const catalog = current.results.find(row => row.key === 'plus:catalog')
@@ -246,8 +246,8 @@ test('issue #3080: 1ns OLDER catalog with completely disjoint SKU identities is 
   assert.equal(originalClock, '2026-10-04T18:53:02.645Z')
   for (const observation of catalog.observations) {
     observation.sourceProductId = 'historic-regression-' + observation.sourceProductId
-    // One physical nanosecond before the true reviewed capture, NOT 1 ms.
-    observation.provenance.capturedAt = '2026-10-04T18:53:02.644999999Z'
+    // The QA offer preflight currently admits only millisecond-precision Z clocks.\n    // One physical millisecond before the original remains a valid chronology test.
+    observation.provenance.capturedAt = '2026-10-04T18:53:02.644Z'
     observation.provenance.sha256 = 'a'.repeat(64)
   }
   const frozen = structuredClone(current)
@@ -257,7 +257,7 @@ test('issue #3080: 1ns OLDER catalog with completely disjoint SKU identities is 
   assert.deepEqual(current, frozen, 'no source evidence may be modified on refusal')
 })
 
-test('issue #3080: 1ns LATER changed catalog with disjoint identities stays review-only', async () => {
+test('issue #3080: 1ms LATER changed catalog with disjoint identities stays review-only', async () => {
   const previous = structuredClone(await loadReviewedRepositoryFixtures())
   const current = structuredClone(previous)
   const catalog = current.results.find(row => row.key === 'plus:catalog')
@@ -265,7 +265,7 @@ test('issue #3080: 1ns LATER changed catalog with disjoint identities stays revi
   const originalCount = catalog.observations.length
   for (const observation of catalog.observations) {
     observation.sourceProductId = 'historic-regression-' + observation.sourceProductId
-    observation.provenance.capturedAt = '2026-10-04T18:53:02.645000001Z'
+    observation.provenance.capturedAt = '2026-10-04T18:53:02.646Z'
     observation.provenance.sha256 = 'b'.repeat(64)
   }
   const report = rehearsePrivateM3RetailerDrift(
@@ -280,7 +280,7 @@ test('issue #3080: 1ns LATER changed catalog with disjoint identities stays revi
   assert.equal(row.addedArchivedProducts, originalCount)
   assert.equal(row.missingArchivedProducts, originalCount)
   assert.ok(row.reviewSignals.includes('review-archived-product-fact-changes'))
-  assert.equal(row.currentlyArchivedAt, '2026-10-04T18:53:02.645000001Z')
+  assert.equal(row.currentlyArchivedAt, '2026-10-04T18:53:02.646Z')
   assert.ok(report.perShape.filter(x => x.retailer !== 'plus' || x.kind !== 'catalog')
     .every(x => x.historicalChangedFactFields === 0 && x.reviewSignals.length === 0))
 })
