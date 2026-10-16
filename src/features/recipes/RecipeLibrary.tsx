@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport'
-import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
+import { readRecipeLibrary, saveRecipeLibrary, updateSavedRecipe, deleteSavedRecipe, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import './recipes.css'
@@ -52,6 +52,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [message, setMessage] = useState('')
   const [selected, setSelected] = useState<SavedRecipe | typeof examples[number] | null>(null)
   const [preview, setPreview] = useState<UserRecipeDraft | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const editor = useRef<HTMLDialogElement>(null)
   const detail = useRef<HTMLDialogElement>(null)
   const request = useRef<AbortController | null>(null)
@@ -63,10 +64,31 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   if (sort) { demo.sort((x, y) => x.title.localeCompare(y.title, 'nl')); own.sort((x, y) => x.title.localeCompare(y.title, 'nl')) }
   const favorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
   function openEditor(next: 'manual' | 'url') {
-    request.current?.abort(); setBusy(false); setMode(next); setForm(blank); setSource(null); setUrl(''); setPreview(null); setError(''); saving.current = false
+    request.current?.abort(); setBusy(false); setMode(next); setEditingId(null); setForm(blank); setSource(null); setUrl(''); setPreview(null); setError(''); saving.current = false
     editor.current?.showModal()
   }
   function closeEditor() { request.current?.abort(); setBusy(false); editor.current?.close() }
+  function editOwnRecipe(recipe: SavedRecipe) {
+    request.current?.abort(); detail.current?.close(); setBusy(false); setEditingId(recipe.id)
+    setMode('manual'); setSource(recipe.sourceUrl); setPreview(null); setError(''); setMessage('')
+    setForm({
+      title: recipe.title, servings: recipe.servings?.toString() ?? '',
+      minutes: recipe.minutes?.toString() ?? '',
+      ingredients: recipe.ingredients.map(item => item.original).join('\n'),
+      steps: recipe.steps.join('\n'),
+    })
+    editor.current?.showModal()
+  }
+  function removeOwnRecipe(recipe: SavedRecipe) {
+    if (!window.confirm(`Wil je "${recipe.title}" definitief van dit apparaat verwijderen?`)) return
+    try {
+      const next = deleteSavedRecipe(window.localStorage, library, recipe.id)
+      setLibrary(next); setSelected(null); detail.current?.close()
+      setFavorites(current => current.filter(id => id !== recipe.id))
+      window.dispatchEvent(new Event('supa-recipes-changed'))
+      setMessage(`${recipe.title} is verwijderd.`)
+    } catch (e) { setMessage(e instanceof Error ? e.message : 'Verwijderen is niet gelukt.') }
+  }
   async function importLink(event: FormEvent) {
     event.preventDefault(); request.current?.abort()
     const controller = new AbortController(); request.current = controller
@@ -90,9 +112,15 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     if (!preview || saving.current) return
     saving.current = true
     try {
-      const recipe = { ...reviewRecipe(preview), id: `own-${crypto.randomUUID()}`, savedAt: new Date().toISOString() }
-      const next = saveRecipeLibrary(window.localStorage, library, [recipe, ...library.recipes])
-      setLibrary(next); window.dispatchEvent(new Event('supa-recipes-changed')); setFilter('own'); setQuery(''); setMessage(`${recipe.title} is op dit apparaat opgeslagen. Recepten met volledige hoeveelheden staan ook in de planner.`); closeEditor()
+      const recipe = reviewRecipe(preview)
+      const next = editingId
+        ? updateSavedRecipe(window.localStorage, library, editingId, recipe)
+        : saveRecipeLibrary(window.localStorage, library, [{
+            ...recipe, id: `own-${crypto.randomUUID()}`, savedAt: new Date().toISOString(),
+          }, ...library.recipes])
+      setLibrary(next); window.dispatchEvent(new Event('supa-recipes-changed')); setFilter('own'); setQuery('')
+      setMessage(`${recipe.title} is ${editingId ? 'bijgewerkt' : 'op dit apparaat opgeslagen'}. Recepten met volledige hoeveelheden staan ook in de planner.`)
+      closeEditor()
     } catch (e) { setError(e instanceof Error ? e.message : 'Opslaan is niet gelukt. Je invoer blijft staan.') }
     finally { saving.current = false }
   }
@@ -113,12 +141,16 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     {!!demo.length && <p className="recipe-note">Zes uitgewerkte SUPA-recepten met ingrediënten en bereidingsstappen, ook beschikbaar in Planner. Dit zijn geen supermarktaanbiedingen; prijzen en besparingen zijn niet geverifieerd.</p>}
     {library.error && <p role="alert">{library.error}</p>}<p role="status" className="hifi-feedback">{message}</p>
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
-      <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : 'Eigen recept toevoegen'}</h2>
+      <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{editingId ? 'Eigen recept bewerken' : mode === 'url' ? 'Recept importeren' : 'Eigen recept toevoegen'}</h2>
       {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
         : <form className="recipe-form" onSubmit={check} onChange={() => setPreview(null)}><label>Naam van het recept<input required maxLength={160} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label><div className="recipe-form-row"><label>Porties<input required type="number" min="1" max="1000" value={form.servings} onChange={e => setForm({ ...form, servings: e.target.value })} /></label><label>Minuten<input required type="number" min="1" max="1440" value={form.minutes} onChange={e => setForm({ ...form, minutes: e.target.value })} /></label></div><label>Ingrediënten<textarea required rows={5} placeholder={'200 g rijst\n1 paprika\n250 ml kokosmelk'} value={form.ingredients} onChange={e => setForm({ ...form, ingredients: e.target.value })} /></label><small>Eén ingrediënt per regel, met hoeveelheid en eenheid.</small><label>Bereiding<textarea required rows={5} placeholder="Eén stap per regel" value={form.steps} onChange={e => setForm({ ...form, steps: e.target.value })} /></label>{source && <p>Bron: <a href={source} target="_blank" rel="noopener noreferrer">Bekijk het oorspronkelijke recept</a></p>}<button className="recipe-primary">Controleer recept</button></form>}
       {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <p>Onbekende hoeveelheden blijven als tekst bewaard. Vul ze aan voordat je een boodschappenberekening maakt.</p>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>Opslaan in mijn recepten</button></section>}
       {error && <p role="alert" className="recipe-error">{error}</p>}
     </dialog>
-    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p></> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}</>}</dialog>
+    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p></> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}
+      {'savedAt' in selected && <div className="recipe-add-actions">
+        <button onClick={() => selected && 'savedAt' in selected && editOwnRecipe(selected)}>Bewerk eigen recept</button>
+        <button onClick={() => selected && 'savedAt' in selected && removeOwnRecipe(selected)}>Verwijder eigen recept</button>
+      </div>}</>}</dialog>
   </div>
 }
