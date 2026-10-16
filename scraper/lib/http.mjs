@@ -136,8 +136,13 @@ export class PoliteFetcher {
   async schedule(host, task) {
     const state = this.hostState(host)
     const run = state.chain.then(async () => {
+      // A queued task can outlive an earlier 401/403 response that blocks
+      // this retailer. Re-check the circuit after the host queue *and* any
+      // politeness sleep, immediately before entering the HTTP transport.
+      if (state.blocked) throw new HostBlockedError(host, state.blocked)
       const wait = state.nextAt - this.now()
       if (wait > 0) await this.sleep(wait)
+      if (state.blocked) throw new HostBlockedError(host, state.blocked)
       try {
         return await task()
       } finally {
