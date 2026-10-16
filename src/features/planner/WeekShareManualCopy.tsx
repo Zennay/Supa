@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { downloadPreparedWeekMenu } from './downloadWeekMenuText.ts'
 import { selectWeekMenuText } from './selectWeekMenuText.ts'
 
 type WeekShareManualCopyProps = {
@@ -12,10 +13,37 @@ type WeekShareManualCopyProps = {
  */
 export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [saveFeedback, setSaveFeedback] = useState<{ sourceText: string; message: string } | null>(null)
 
   const selectText = () => {
     const textarea = textareaRef.current
     selectWeekMenuText(textarea, text)
+  }
+
+  const saveWeekMenu = () => {
+    const saved = downloadPreparedWeekMenu(textareaRef.current, text, {
+      createObjectURL: (content) =>
+        URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' })),
+      triggerDownload: (url, filename) => {
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = filename
+        anchor.rel = 'noopener'
+        document.body.appendChild(anchor)
+        try { anchor.click() } finally { anchor.remove() }
+      },
+      // Waiting one tick for the browser to begin its own download avoids
+      // revoking the Blob before mobile browsers have consumed the URL.
+      scheduleRevoke: (url) => {
+        window.setTimeout(() => URL.revokeObjectURL(url), 3000)
+      },
+    })
+    setSaveFeedback({
+      sourceText: text,
+      message: saved
+        ? 'Download gestart. Controleer je downloads op dit apparaat.'
+        : 'Download niet beschikbaar. Selecteer en kopieer de tekst handmatig.',
+    })
   }
 
   return (
@@ -24,6 +52,9 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
         <label htmlFor="week-share-text">Weekmenu om handmatig te kopiëren</label>
         <button type="button" className="ghost-button" onClick={selectText}>
           Selecteer alle tekst
+        </button>
+        <button type="button" className="ghost-button" onClick={saveWeekMenu}>
+          Bewaar als tekstbestand
         </button>
       </div>
       <textarea
@@ -34,6 +65,9 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
         value={text}
         onFocus={(event) => event.currentTarget.select()}
       />
+      {saveFeedback?.sourceText === text && (
+        <p role="status" aria-live="polite" className="disclaimer">{saveFeedback.message}</p>
+      )}
     </div>
   )
 }
