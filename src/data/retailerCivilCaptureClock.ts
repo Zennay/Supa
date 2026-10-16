@@ -36,3 +36,20 @@ export function isValidCivilCaptureAt(value: unknown, referenceTime: number = Da
   const cutoffNs = (BigInt(referenceTime) + 60_000n) * 1_000_000n
   return captureNs <= cutoffNs
 }
+
+/**
+ * Stable physical instant (nanosecond resolution), regardless of equivalent
+ * legal UTC-offset spelling. Caller must not count two differently named
+ * records of the same physical capture as independent source evidence.
+ *
+ * Null is intentionally fail-closed for malformed/future civil time. This is
+ * not proof that a claimed source hash/URL is authentic.
+ */
+export function civilCaptureInstantKey(value: unknown, referenceTime: number = Date.now()): string | null {
+  if (!isValidCivilCaptureAt(value, referenceTime)) return null
+  const match = CLOCK.exec(value)
+  if (!match) return null
+  const fractionalTail = (match[7] ?? '').padEnd(9, '0').slice(3)
+  return (BigInt(Date.parse(value)) * 1_000_000n +
+    BigInt(fractionalTail || '0')).toString()
+}
