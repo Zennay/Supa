@@ -230,7 +230,15 @@ export async function loadReviewedRepositoryFixtures() {
 }
 
 export async function main(argv = process.argv.slice(2), writeOutput = text => process.stdout.write(text)) {
-  if (argv.length !== 0) throw new Error('Usage: node --experimental-strip-types scripts/retailer-reviewed-ingest-engine.mjs')
+  // The offline fixture CLI accepts exactly zero inert arguments. Never
+  // inspect a caller Proxy or accessor-disguised argv before this check.
+  if (nodeTypes.isProxy(argv) || !Array.isArray(argv) ||
+      Object.getPrototypeOf(argv) !== Array.prototype ||
+      Reflect.ownKeys(Object.getOwnPropertyDescriptors(argv)).length !== 1 ||
+      !Object.hasOwn(Object.getOwnPropertyDescriptors(argv), 'length') ||
+      Object.getOwnPropertyDescriptor(argv, 'length').value !== 0) {
+    throw new Error('Usage: node --experimental-strip-types scripts/retailer-reviewed-ingest-engine.mjs')
+  }
   const { summary } = await loadReviewedRepositoryFixtures()
   // Aggregate-only output; no price, product, person, URL or proxy is logged.
   writeOutput(JSON.stringify(summary, null, 2) + '\n')
