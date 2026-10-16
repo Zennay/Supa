@@ -5,6 +5,15 @@ const FORMAT = 'supa-private-recipes-backup'
 const MAX_BYTES = 2_000_000
 const MAX_RECIPES = 100
 
+/**
+ * File.size is measured in UTF-8 bytes, not JavaScript UTF-16 code units.
+ * Reject obviously oversized text before encoding to bound temporary memory.
+ * TextEncoder works identically in modern browsers and native Node tests.
+ */
+function withinBackupByteBudget(value: string): boolean {
+  return value.length <= MAX_BYTES && new TextEncoder().encode(value).byteLength <= MAX_BYTES
+}
+
 type Storage = Pick<globalThis.Storage, 'getItem' | 'setItem'>
 type BackupRecipe = Pick<UserRecipeDraft, 'title' | 'servings' | 'minutes' | 'source' | 'sourceUrl'> & {
   ingredients: string[]
@@ -39,13 +48,13 @@ export function exportRecipeBackup(state: LibraryState): string {
     ingredients: recipe.ingredients.map(item => item.original), steps: [...recipe.steps],
   }))
   const text = JSON.stringify({ format: FORMAT, version: 1, recipes }, null, 2)
-  if (text.length > MAX_BYTES) throw new Error('De receptenverzameling is te groot om te exporteren.')
+  if (!withinBackupByteBudget(text)) throw new Error('De receptenverzameling is te groot om te exporteren.')
   return text
 }
 
 /** Validate every recipe before touching storage: corrupted backups never replace data. */
 export function parseRecipeBackup(text: string): UserRecipeDraft[] {
-  if (typeof text !== 'string' || text.length > MAX_BYTES) throw new Error('Back-upbestand is te groot of ongeldig.')
+  if (typeof text !== 'string' || !withinBackupByteBudget(text)) throw new Error('Back-upbestand is te groot of ongeldig.')
   let payload: unknown
   try { payload = JSON.parse(text) } catch { throw new Error('Back-upbestand bevat geen geldige JSON.') }
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Geen Supa-receptenback-up.')
