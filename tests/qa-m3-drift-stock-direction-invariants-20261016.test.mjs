@@ -111,3 +111,85 @@ test('future-dated supposedly reviewed source is never accepted as current evide
     gate, previous, current, { referenceTime: AT }), /refused/i)
   assert.deepEqual(current, original)
 })
+
+test('two stores can degrade in different ways without leaking stock signals between source kinds', async () => {
+  const previous = structuredClone(await loadReviewedRepositoryFixtures())
+  const impacted = ['plus:product', 'dekamarkt:product']
+  for (const source of previous.results) {
+    if (impacted.includes(source.key)) {
+      assert.ok(source.observations.length > 0)
+      for (const observation of source.observations) observation.availability = 'available'
+    }
+  }
+  const current = structuredClone(previous)
+  const counts = new Map()
+  for (const source of current.results) {
+    if (!impacted.includes(source.key)) continue
+    counts.set(source.key, source.observations.length)
+    for (const observation of source.observations) {
+      observation.availability = source.key === 'plus:product' ? 'unknown' : 'unavailable'
+      observation.provenance.capturedAt =
+        new Date(Date.parse(observation.provenance.capturedAt) + 86_400_000).toISOString()
+      observation.provenance.sha256 = source.key === 'plus:product'
+        ? 'a'.repeat(64) : 'f'.repeat(64)
+    }
+  }
+  const report = rehearsePrivateM3RetailerDrift(
+    await rights(), previous, current, { referenceTime: AT })
+  assert.equal(report.alertShapeCount, 2)
+  assert.equal(report.releaseDecision, 'hold')
+  assert.equal(report.currentAvailabilityVerified, false)
+  assert.equal(report.publicSavingsClaimEligible, false)
+  const plus = report.perShape.find(row => row.retailer === 'plus' && row.kind === 'product')
+  const deka = report.perShape.find(row => row.retailer === 'dekamarkt' && row.kind === 'product')
+  assert.equal(plus.archiveStockUnknownDelta, counts.get('plus:product'))
+  assert.equal(plus.archiveStockUnavailableDelta, 0)
+  assert.equal(deka.archiveStockUnavailableDelta, counts.get('dekamarkt:product'))
+  assert.equal(deka.archiveStockUnknownDelta, 0)
+  assert.ok(plus.reviewSignals.includes('more-unknown-archived-availability'))
+  assert.ok(!plus.reviewSignals.includes('more-unavailable-archived-products'))
+  assert.ok(deka.reviewSignals.includes('more-unavailable-archived-products'))
+  assert.ok(!deka.reviewSignals.includes('more-unknown-archived-availability'))
+  for (const row of report.perShape.filter(x => x.kind !== 'product')) {
+    assert.equal(row.historicalChangedFactFields, 0)
+    assert.deepEqual(row.reviewSignals, [])
+  }
+})
+
+test('identical historical six-shape archives must not invent drift when input row order differs', async () => {
+  const previous = structuredClone(await loadReviewedRepositoryFixtures())
+  const current = structuredClone(previous)
+  current.results.reverse()
+  const report = rehearsePrivateM3RetailerDrift(
+    await rights(), previous, current, { referenceTime: AT })
+  assert.equal(report.releaseDecision, 'hold')
+  assert.equal(report.historicalSourceShapes, 6)
+  assert.equal(report.alertShapeCount, 0)
+  assert.equal(report.archivedChangedFactFields, 0)
+  assert.deepEqual(report.operatorAlertKinds, [])
+  assert.ok(report.perShape.every(row =>
+    row.historicalChangedFactFields === 0 &&
+    row.archiveStockUnknownDelta === 0 &&
+    row.archiveStockUnavailableDelta === 0))
+})
+
+test('integrated historical drift API rejects active source values without invoking getter or Proxy traps', async () => {
+  const base = structuredClone(await loadReviewedRepositoryFixtures())
+  const gate = await rights()
+  let calls = 0
+  const ownGetter = structuredClone(base)
+  Object.defineProperty(ownGetter.results[0].observations[0].provenance, 'capturedAt', {
+    configurable: true,
+    enumerable: true,
+    get() { calls++; throw new Error('untrusted-clock-getter') },
+  })
+  assert.throws(() => rehearsePrivateM3RetailerDrift(
+    gate, base, ownGetter, { referenceTime: AT }), /refused/i)
+  const proxy = new Proxy(structuredClone(base), {
+    get() { calls++; throw new Error('untrusted-batch-proxy') },
+    ownKeys() { calls++; throw new Error('untrusted-batch-proxy') },
+  })
+  assert.throws(() => rehearsePrivateM3RetailerDrift(
+    gate, base, proxy, { referenceTime: AT }), /refused/i)
+  assert.equal(calls, 0)
+})
