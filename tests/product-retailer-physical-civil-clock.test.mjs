@@ -55,6 +55,6 @@ test('rejects forged caller values without invoking getters or coercions', () =>
   assert.equal(physicalCaptureNanoseconds(hostile), null)
   assert.equal(samePhysicalCaptureInstant(ORIGINAL, hostile), false)
   assert.equal(physicalCaptureNanoseconds(null), null)
-  assert.equal(physicalCaptureNanoseconds('2026-10-04T18:08:57.837Z\\n'), null)
+  assert.equal(physicalCaptureNanoseconds('2026-10-04T18:08:57.837Z\n'), null)
   assert.equal(coerced, 0)
 })
