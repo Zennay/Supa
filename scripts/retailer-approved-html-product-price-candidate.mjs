@@ -44,6 +44,26 @@ function activePriceValidity(blocks, capturedAt) {
     const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
     const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) return null
+    // A syntactically shaped timestamp still needs a real civil clock and a
+    // determinate UTC offset. JS normalizes 24:00, and accepts +23:59 even
+    // though legal real-world time zones cannot exceed UTC+14:00.
+    if (timestamp) {
+      const clock = /^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|([+-])(\d{2}):(\d{2}))$/i.exec(value)
+      if (!clock) return null
+      const hour = Number(clock[1])
+      const minute = Number(clock[2])
+      const second = Number(clock[3])
+      if (hour > 23 || minute > 59 || second > 59) return null
+      if (clock[5]) {
+        const offsetHours = Number(clock[6])
+        const offsetMinutes = Number(clock[7])
+        if (offsetMinutes > 59 || offsetHours * 60 + offsetMinutes > 14 * 60) {
+          return null
+        }
+        // RFC3339 -00:00 means an unknown local offset, not confirmed UTC.
+        if (clock[5] === '-' && offsetHours === 0 && offsetMinutes === 0) return null
+      }
+    }
     const millis = Date.parse(value)
     if (!Number.isFinite(millis)) return null
     return { millis: dateOnly && inclusiveEnd ? millis + 86_400_000 : millis,
