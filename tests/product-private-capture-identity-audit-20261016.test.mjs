@@ -92,6 +92,65 @@ test('rejects unapproved retailer/shape, malformed digests, empty batch and huge
   }
 })
 
+test('never counts impossible Gregorian and physically future clocks as reviewed sources', async () => {
+  const original = await read(plusFile)
+  for (const fakeClock of [
+    '2026-02-30T18:08:57.837Z',
+    '2026-04-31T18:08:57.837Z',
+    '2099-10-16T18:08:57.837Z',
+    '2026-10-04T18:08:57.837+15:00',
+  ]) {
+    const sample = structuredClone(original)
+    sample.source.capturedAt = fakeClock
+    assert.throws(() => auditPhysicalRetailerCaptures([sample]),
+      /Invalid private retailer capture identity/)
+  }
+})
+
+test('unreviewed retailer origin, credential-named query, fragment and raw delimiters fail closed', async () => {
+  const original = await read(plusFile)
+  const cases = [
+    original.source.url.replace('www.plus.nl', 'unapproved.example.invalid'),
+    original.source.url + '?access_token=FICTIONAL',
+    original.source.url + '#fictional',
+    original.source.url + '?',
+    original.source.url + '#',
+    original.source.url.replace('https://', 'http://'),
+  ]
+  for (const url of cases) {
+    const sample = structuredClone(original)
+    sample.source.url = url
+    assert.throws(() => auditPhysicalRetailerCaptures([sample]),
+      /Invalid private retailer capture identity/)
+  }
+})
+
+test('equivalent Z, +00:00 and +02:00 instants are one physical capture', async () => {
+  const original = await read(plusFile)
+  for (const clock of [
+    original.source.capturedAt.replace('Z', '+00:00'),
+    '2026-10-04T20:08:57.837+02:00',
+  ]) {
+    const alias = structuredClone(original)
+    alias.source.id += '-alternate-clock'
+    alias.source.capturedAt = clock
+    assert.throws(() => auditPhysicalRetailerCaptures([original, alias]),
+      /Duplicate physical/)
+  }
+})
+
+test('genuinely distinct offset instants and nanoseconds remain independently auditable', async () => {
+  const original = await read(plusFile)
+  const later = structuredClone(original)
+  later.source.id += '-later-offset'
+  later.source.capturedAt = '2026-10-04T20:08:57.837+01:00'
+  assert.equal(auditPhysicalRetailerCaptures([original, later]).uniquePhysicalCaptures, 2)
+  const oneNanosecondLater = structuredClone(original)
+  oneNanosecondLater.source.id += '-one-nano'
+  oneNanosecondLater.source.capturedAt = '2026-10-04T18:08:57.837000001Z'
+  assert.equal(auditPhysicalRetailerCaptures([original, oneNanosecondLater]).uniquePhysicalCaptures, 2)
+})
+
 test('detaches inert input without executing getters or traversing non-enumerable source', async () => {
   const sample = await read(plusFile)
   let called = false
