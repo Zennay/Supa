@@ -89,7 +89,7 @@ test('non-string caller timestamp refuses before any transport or user coercion'
   const timestamp = { toString() { coerced++; return '2026-01-01T12:00:00.000Z' } }
   await assert.rejects(captureApprovedRetailerPage({
     ...synthetic(timestamp), fetchFn: async () => { calls++; return mockResponse() },
-  }), /Invalid source capture clock/)
+  }), /Authorized capture requires inert permission data|Invalid source capture clock/)
   assert.equal(calls, 0)
   assert.equal(coerced, 0)
 })
