@@ -189,5 +189,5 @@ test('product review metrics do not disclose HTML, URLs, names or price records'
   const summary = session.status()
   assert.deepEqual(summary.privateProductReviewCounts.plus, { accepted: 1, abstained: 0 })
   assert.deepEqual(summary.privateProductReviewCounts.dekamarkt, { accepted: 0, abstained: 0 })
-  assert.doesNotMatch(JSON.stringify(summary), /fictional-milk|FICTIONAL-MILK|\\.nl\\/|currentPriceCents|<script|2\\.45/)
+  assert.doesNotMatch(JSON.stringify(summary), /fictional-milk|FICTIONAL-MILK|www[.]plus|currentPriceCents|<script|2[.]45/)
 })
