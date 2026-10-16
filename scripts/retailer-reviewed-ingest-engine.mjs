@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
+import { snapshotInertReviewedEvidence } from './retailer-inert-json-admission.mjs'
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
 import { parsePlusRenderedProductEvidence } from '../src/data/plusRenderedProduct.ts'
 import {
@@ -68,6 +69,8 @@ function provenanceMatches(source, observation) {
 }
 
 export function ingestReviewedEvidence(record) {
+  // No caller-supplied getters, Proxy traps, or mutable alias reach an adapter.
+  record = snapshotInertReviewedEvidence(record)
   const { key, parser } = validatedInput(record)
   let parsed
   try {
@@ -106,6 +109,8 @@ export function ingestReviewedEvidence(record) {
 }
 
 export function ingestReviewedBatch(records) {
+  // Snapshot the whole collection BEFORE accessing .length, iterators or source IDs.
+  records = snapshotInertReviewedEvidence(records)
   if (!Array.isArray(records) || records.length === 0 || records.length > 32) {
     throw new Error('Reviewed batch requires 1–32 source records')
   }
