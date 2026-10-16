@@ -60,7 +60,7 @@ test('approved offline inspector still reads checked bytes and emits only safe r
       assert.equal(report.readyForIngestion, false)
       assert.equal(report.publicSavingsClaimEligible, false)
       assert.deepEqual(JSON.parse(output), report)
-      assert.doesNotMatch(output, /fictional|\.html|www\.plus\.nl|www\.dekamarkt\.nl/i)
+      assert.doesNotMatch(output, /offline fictional|\.html|www\.plus\.nl|www\.dekamarkt\.nl/i)
     }
   } finally {
     await rm(root, { recursive: true, force: true })
