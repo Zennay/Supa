@@ -11,7 +11,7 @@ node --experimental-strip-types scripts/retailer-reviewed-ingest-engine.mjs
 node --experimental-strip-types --test tests/retailer-reviewed-ingest-engine.test.mjs
 ```
 
-De CLI leest exact zes gecontroleerde repositoryfixtures met een limiet van 1 MiB per bestand. Hij voert **geen HTTP-aanvragen** uit en geeft uitsluitend aantallen en status terug; geen producten, individuele prijzen, bron-URL's of persoonlijke gegevens. De functie `ingestReviewedBatch(records)` geeft gestructureerde gevalideerde `RawProductObservation`-records terug voor toekomstig intern ingestwerk, maar schakelt **geen** retailerproductie in.
+De CLI leest exact zes gecontroleerde repositoryfixtures met een limiet van 1 MiB per bestand. De loader gebruikt nu voor iedere historische bron een met `O_NOFOLLOW` geopende reguliere bestandsdescriptor. Symlinks, hardlink-aliases en gewijzigde dev/inode/grootte/mtime/ctime tussen padinspectie, open en uitlezen worden geweigerd. De bytes moeten bovendien strikt geldige UTF-8 zijn. Daarmee wordt vermeden dat een lokaal verwisseld of onjuist gecodeerd archief stilzwijgend een brongegeven wordt. Alleen de zes vaste repositorypaden worden door de CLI geladen; er wordt nog steeds geen nieuwe winkel-URL benaderd. Hij voert **geen HTTP-aanvragen** uit en geeft uitsluitend aantallen en status terug; geen producten, individuele prijzen, bron-URL's of persoonlijke gegevens. De functie `ingestReviewedBatch(records)` geeft gestructureerde gevalideerde `RawProductObservation`-records terug voor toekomstig intern ingestwerk, maar schakelt **geen** retailerproductie in.
 
 ## Veiligheid bij directe JavaScript-invoer
 
