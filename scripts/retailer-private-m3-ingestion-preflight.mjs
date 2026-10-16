@@ -143,6 +143,26 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
       catalog.productionEnabled !== false ||
       catalog.publicSavingsClaimEligible !== false) refuse()
 
+  // Canonical health has already validated every accepted observation, but
+  // its rollout projection does not expose source-stock uncertainty. Keep
+  // the three mutually exclusive observed states separate: UNKNOWN stock is
+  // never treated as purchasable, even for an apparently valid price/pack.
+  // This is *archived* evidence, not a real-time availability promise.
+  const stockByShape = new Map(SHAPES.map(key => [key, {
+    unknown: 0, unavailable: 0, available: 0,
+  }]))
+  for (const result of batch.results) {
+    const stock = stockByShape.get(result.key)
+    if (!stock || result.accepted !== true ||
+        !Array.isArray(result.observations)) refuse()
+    for (const observation of result.observations) {
+      if (observation.availability === 'unknown') stock.unknown++
+      else if (observation.availability === 'unavailable') stock.unavailable++
+      else if (observation.availability === 'available') stock.available++
+      else refuse()
+    }
+  }
+
   // Six shape-level diagnostics are explicitly public-safe aggregates. They
   // identify the retailer/source TYPE needing offline review without revealing
   // any captured URL, digest, SKU, product name or price.
@@ -156,6 +176,14 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
       archivedObservations: shape.historicalObservations,
       staleHistoricalSources: shape.staleHistoricalCaptures,
       unknownHistoricalPrices: shape.unknownPriceObservations,
+      // A retailer capture can carry a valid historical price while stock
+      // is unknown or explicitly unavailable. None is a checkout claim.
+      unknownHistoricalAvailability:
+        stockByShape.get(retailer.retailerId + ':' + shape.kind).unknown,
+      unavailableHistoricalObservations:
+        stockByShape.get(retailer.retailerId + ':' + shape.kind).unavailable,
+      availableHistoricalObservations:
+        stockByShape.get(retailer.retailerId + ':' + shape.kind).available,
       latestArchivedCapturedAt: shape.latestArchivedCapturedAt,
       verifiedCurrentPriceObservations: 0,
     })))
@@ -166,7 +194,13 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
         !isCount(row.rejectedHistoricalSources) ||
         !isCount(row.archivedObservations) ||
         !isCount(row.staleHistoricalSources) ||
-        !isCount(row.unknownHistoricalPrices)) ||
+        !isCount(row.unknownHistoricalPrices) ||
+        !isCount(row.unknownHistoricalAvailability) ||
+        !isCount(row.unavailableHistoricalObservations) ||
+        !isCount(row.availableHistoricalObservations) ||
+        row.unknownHistoricalAvailability +
+          row.unavailableHistoricalObservations +
+          row.availableHistoricalObservations !== row.archivedObservations) ||
       shapeDiagnostics.reduce((sum, row) => sum + row.archivedObservations, 0) !==
         batch.summary.observations) refuse()
 
@@ -184,6 +218,10 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
       ? ['resolve-conflicting-archived-product-facts'] : []),
     ...(selection.historicalSourceEventsOutsideOfferReview > 0
       ? ['review-additional-archived-source-events-outside-offer-comparison'] : []),
+    ...(shapeDiagnostics.some(row => row.unknownHistoricalAvailability > 0)
+      ? ['review-unknown-historical-retailer-stock'] : []),
+    ...(shapeDiagnostics.some(row => row.unavailableHistoricalObservations > 0)
+      ? ['review-unavailable-historical-retailer-stock'] : []),
     ...(uncorroboratedOffers > 0
       ? ['review-unverified-historical-offer-baselines'] : []),
     'obtain-written-retailer-reuse-rights',
@@ -202,6 +240,14 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
     missingSourceShapes: rollout.missingHistoricalShapeCount,
     staleHistoricalSources: rollout.staleHistoricalCaptures,
     acceptedHistoricalObservations: batch.summary.observations,
+    historicalStockUnknownObservations: shapeDiagnostics.reduce((sum, row) =>
+      sum + row.unknownHistoricalAvailability, 0),
+    historicalStockUnavailableObservations: shapeDiagnostics.reduce((sum, row) =>
+      sum + row.unavailableHistoricalObservations, 0),
+    historicalStockAvailableObservations: shapeDiagnostics.reduce((sum, row) =>
+      sum + row.availableHistoricalObservations, 0),
+    // Archived stock counts must not be interpreted as current purchasability.
+    currentStockCoverageVerified: false,
     perSourceShape: shapeDiagnostics,
     normalizedPrivateProducts: catalog.productCount,
     conflictingPrivateProducts: catalog.conflictCount,
