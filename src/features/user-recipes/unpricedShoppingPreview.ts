@@ -51,7 +51,18 @@ export function prepareUnpricedShoppingPreview(
       typeof recipe.id !== 'string' ||
       !/^private-recipe:[A-Za-z0-9_-]{1,64}$/.test(recipe.id) ||
       ids.has(recipe.id) || !Array.isArray(recipe.ingredients) ||
-      recipe.ingredients.length === 0) return unavailable
+      recipe.ingredients.length === 0 || recipe.ingredients.length > 100 ||
+      typeof recipe.title !== 'string' || recipe.title.trim().length < 2 ||
+      !Number.isSafeInteger(recipe.minutes) || recipe.minutes <= 0 ||
+      !Number.isSafeInteger(recipe.servings) || recipe.servings < 1 ||
+      recipe.servings > 1000 || !Array.isArray(recipe.tags) ||
+      recipe.ingredients.some((row) => !row ||
+        typeof row.id !== 'string' || !row.id.startsWith('private-ingredient:') ||
+        typeof row.label !== 'string' || !row.label.trim() ||
+        typeof row.query !== 'string' || !row.query.trim() ||
+        !['g', 'ml', 'piece'].includes(row.unit) ||
+        typeof row.amount !== 'number' || !Number.isFinite(row.amount) ||
+        row.amount <= 0 || row.amount > 1_000_000)) return unavailable
     ids.add(recipe.id)
   }
   if (!plan.every((meal) => meal && typeof meal.day === 'string' &&
