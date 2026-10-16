@@ -1,7 +1,8 @@
-import { readFile, stat } from 'node:fs/promises'
+import { lstat, open } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
-import { resolve } from 'node:path'
+import { resolve, dirname } from 'node:path'
 
 import { snapshotInertReviewedEvidence } from './retailer-inert-json-admission.mjs'
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
@@ -146,18 +147,107 @@ export function ingestReviewedBatch(records) {
   return { summary, results }
 }
 
+// A local archived JSON source must have exactly one meaning. JSON.parse alone
+// silently accepts duplicate keys (last wins), including escaped spellings of
+// source/capturedAt/offer cents. Inspect bounded raw UTF-8 before parsing.
+function parseUnambiguousReviewedFixture(bytes) {
+  try {
+    const raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    const objects = []
+    for (let i = 0; i < raw.length;) {
+      const ch = raw[i]
+      if (ch === '{' || ch === '[') {
+        if (objects.length >= 128) throw new Error('too deeply nested')
+        objects.push(ch === '{' ? new Set() : null)
+        i++
+        continue
+      }
+      if (ch === '}' || ch === ']') {
+        if (objects.length === 0) throw new Error('unbalanced')
+        objects.pop()
+        i++
+        continue
+      }
+      if (ch !== '"') { i++; continue }
+      const start = i++
+      while (i < raw.length) {
+        if (raw[i] === '\\') { i += 2; continue }
+        if (raw[i++] === '"') break
+      }
+      let next = i
+      while (next < raw.length && /[ \n\r\t]/.test(raw[next])) next++
+      const scope = objects.at(-1)
+      if (raw[next] === ':' && scope instanceof Set) {
+        const name = JSON.parse(raw.slice(start, i))
+        if (scope.has(name)) throw new Error('duplicate key')
+        scope.add(name)
+      }
+    }
+    return JSON.parse(raw)
+  } catch {
+    throw new Error('Ambiguous or invalid reviewed fixture JSON')
+  }
+}
+
+// Explicitly resolve one canonical filesystem path and reject every symbolic
+// ancestor in that *same* pathname before and after the descriptor read.
+async function assertNoReviewedFixtureSymlinkAncestor(full) {
+  let path = full
+  for (;;) {
+    const stat = await lstat(path)
+    if (stat.isSymbolicLink()) {
+      throw new Error('Reviewed fixture must be a bounded regular file (symlink ancestor refused)')
+    }
+    const parent = dirname(path)
+    if (parent === path) break
+    path = parent
+  }
+}
+
+// Strict local archive reader. Exported for synthetic filesystem regression
+// tests only; the actual six-fixture loader below still fixes all its names.
+export async function readBoundedRegularReviewedFixture(filesystemPath) {
+  if (typeof filesystemPath !== 'string' || !filesystemPath ||
+      filesystemPath.length > 2048) {
+    throw new Error('Reviewed fixture must be a bounded regular file')
+  }
+  const full = resolve(filesystemPath)
+  await assertNoReviewedFixtureSymlinkAncestor(full)
+  const original = await lstat(full)
+  if (!original.isFile() || original.isSymbolicLink() ||
+      original.nlink !== 1 || original.size > 1024 * 1024) {
+    throw new Error('Reviewed fixture must be a bounded regular file')
+  }
+  const handle = await open(full, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    const opened = await handle.stat()
+    const stable = (a, b) => a.isFile() && b.isFile() &&
+      a.dev === b.dev && a.ino === b.ino && a.nlink === 1 && b.nlink === 1 &&
+      a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs
+    if (!stable(original, opened)) {
+      throw new Error('Reviewed fixture identity changed')
+    }
+    const bytes = await handle.readFile()
+    const finalStat = await handle.stat()
+    if (bytes.length !== original.size || bytes.length > 1024 * 1024 ||
+        !stable(opened, finalStat) ||
+        !stable(finalStat, await lstat(full))) {
+      throw new Error('Reviewed fixture identity changed')
+    }
+    await assertNoReviewedFixtureSymlinkAncestor(full)
+    return parseUnambiguousReviewedFixture(bytes)
+  } finally {
+    await handle.close()
+  }
+}
+
 export async function loadReviewedRepositoryFixtures() {
   // Only these exact bundled files. No user-defined path, URL, HTTP or proxy.
   const root = new URL('../fixtures/m1/', import.meta.url)
   const records = []
   for (const file of RETAILER_REVIEWED_FIXTURES) {
     const url = new URL(file, root)
-    const filesystemPath = fileURLToPath(url)
-    const info = await stat(filesystemPath)
-    if (!info.isFile() || info.size > 1024 * 1024) {
-      throw new Error('Reviewed fixture must be a bounded regular file')
-    }
-    records.push(JSON.parse(await readFile(url, 'utf8')))
+    records.push(await readBoundedRegularReviewedFixture(fileURLToPath(url)))
   }
   return ingestReviewedBatch(records)
 }
