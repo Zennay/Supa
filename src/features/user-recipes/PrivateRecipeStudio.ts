@@ -32,7 +32,7 @@ export function PrivateRecipeStudio({
   onSelectedDaysChange: (next: Record<string, string | null>) => void
   onCancelDraft: () => void
 }) {
-  const ids = Array.isArray(recipes) ? recipes.map((recipe) => recipe.id) : []
+  const ids = Array.isArray(recipes) ? recipes.map((recipe: UnpricedPrivateRecipe) => recipe.id) : []
   const current = prepareUnpricedPrivateRecipe(draft, draftLocalId, ids)
 
   function confirm(reviewed: EditorRecipeDraft) {
