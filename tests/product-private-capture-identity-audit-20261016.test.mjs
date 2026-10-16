@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import {
   auditPhysicalRetailerCaptures,
   auditBundledHistoricalRetailerCaptures,
+  ingestPhysicallyDistinctReviewedBatch,
   main,
 } from '../scripts/retailer-private-capture-identity-audit.mjs'
 
@@ -102,6 +103,25 @@ test('detaches inert input without executing getters or traversing non-enumerabl
   const hidden = await read(plusFile)
   Object.defineProperty(hidden, 'source', { value: hidden.source, enumerable: false })
   assert.throws(() => auditPhysicalRetailerCaptures([hidden]), /inert JSON/)
+})
+
+test('opt-in private batch entrypoint accepts genuine historical cross-store captures with rights disabled', async () => {
+  const result = ingestPhysicallyDistinctReviewedBatch([await read(plusFile), await read(dekaFile)])
+  assert.equal(result.summary.acceptedSources, 2)
+  assert.equal(result.summary.rejectedSources, 0)
+  assert.equal(result.summary.productionEnabled, false)
+  assert.equal(result.summary.permissionVerified, false)
+  assert.equal(result.summary.publicSavingsClaimEligible, false)
+})
+
+test('opt-in private batch entrypoint refuses a second ID for one physical page before ingestion', async () => {
+  const plus = await read(plusFile)
+  const alias = structuredClone(plus)
+  alias.source.id += '-fictional-second-id'
+  assert.throws(
+    () => ingestPhysicallyDistinctReviewedBatch([plus, alias]),
+    /Duplicate physical/,
+  )
 })
 
 test('exported CLI refuses hostile argv without triggering Proxy traps', async () => {
