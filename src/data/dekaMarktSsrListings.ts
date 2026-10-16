@@ -140,6 +140,14 @@ function validCapturedAt(value: unknown): value is string {
   return Number.isFinite(Date.parse(value))
 }
 
+// Capture provenance is about an ALREADY completed request. Promotional
+// validTo dates may legitimately be in the future: do not reuse this stricter
+// boundary for Nuxt offer validity windows.
+function validSourceCapturedAt(value: unknown): value is string {
+  return validCapturedAt(value) &&
+    Date.parse(value) <= Date.now() + 60_000
+}
+
 function validateEvidenceBoundary(
   evidence: DekaMarktListingEvidenceBase & { evidenceType?: unknown },
   expectedType:
@@ -180,12 +188,19 @@ function validateEvidenceBoundary(
     if (!routeMatches) {
       return `DekaMarkt evidence source route does not match ${expectedKind}`
     }
+    if (url.search || url.hash ||
+        (url.href !== evidence.source.url &&
+         evidence.source.url !== url.href.replace(
+           'https://www.dekamarkt.nl/', 'https://www.dekamarkt.nl:443/',
+         ))) {
+      return 'DekaMarkt evidence source must use the credential-free public HTTPS host'
+    }
   } catch {
     return 'DekaMarkt evidence source must contain a valid URL'
   }
 
   if (
-    !validCapturedAt(evidence.source.capturedAt) ||
+    !validSourceCapturedAt(evidence.source.capturedAt) ||
     !/^[a-f0-9]{64}$/.test(evidence.source.sha256)
   ) {
     return 'DekaMarkt evidence source provenance is incomplete'
