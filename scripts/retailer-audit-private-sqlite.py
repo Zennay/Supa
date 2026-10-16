@@ -7,10 +7,12 @@ turn a reviewed offline import into verified current basket evidence.
 import json
 import os
 from pathlib import Path
+import re
 import sqlite3
 import stat
 import sys
-from urllib.parse import quote
+from datetime import datetime, timezone
+from urllib.parse import parse_qsl, quote, urlsplit
 
 REFUSAL = "Private historical retailer SQLite audit refused; no data published"
 HOSTS = {
@@ -91,6 +93,31 @@ def audit(path):
         require(set(snapshots) == {
             (retailer, kind) for retailer in HOSTS for kind in KINDS
         })
+        # A named source shape is not evidence if it stores no observations.
+        # Verify every stored origin instead of trusting a forged aggregate.
+        origins = db.execute(
+            "SELECT s.retailer_id, s.source_url, s.captured_at, "
+            "COUNT(p.snapshot_id) FROM source_snapshots AS s "
+            "LEFT JOIN price_observations AS p ON p.snapshot_id=s.id "
+            "GROUP BY s.id"
+        ).fetchall()
+        require(len(origins) == 6)
+        for retailer, url, captured_at, count in origins:
+            require(count > 0 and isinstance(url, str))
+            parsed = urlsplit(url)
+            require(parsed.scheme == "https" and parsed.hostname == HOSTS[retailer][0])
+            require(parsed.username is None and parsed.password is None and
+                    parsed.port is None and not parsed.fragment)
+            forbidden = {"access_token", "api_key", "apikey", "password",
+                         "token", "auth", "authorization", "session"}
+            require(not any(key.casefold() in forbidden
+                            for key, _ in parse_qsl(parsed.query, keep_blank_values=True)))
+            require(isinstance(captured_at, str) and re.fullmatch(
+                r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})",
+                captured_at
+            ) is not None)
+            parsed_time = datetime.fromisoformat(captured_at.replace("Z", "+00:00"))
+            require(parsed_time <= datetime.now(timezone.utc))
         product_count = db.execute("SELECT COUNT(*) FROM products").fetchone()[0]
         observation_count = db.execute(
             "SELECT COUNT(*) FROM price_observations"
