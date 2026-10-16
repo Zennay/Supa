@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "scripts/m1-capture-sources.mjs"
+      - "scripts/m1-check-source-permission-gate.mjs"
+      - "evidence/m1/source-permission-gate.v1.json"
       - "tests/m1-capture-sources.test.mjs"
       - "tests/ingestion-contract.test.mjs"
       - "tests/normalization.test.mjs"
