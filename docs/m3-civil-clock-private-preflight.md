@@ -1,6 +1,6 @@
 # M3 — opt-in civil UTC capture preflight (private only)
 
-This isolated product-core entrypoint prevents the known **P1 #3701** UTC−13/−14 provenance issue from reaching the existing six-adapter `ingestReviewedBatch` **when the new entrypoint is used**. It does **not** change the currently unguarded adapters or their existing callers; it is **not a complete resolution of #3701** until the owner integrates the same fail-closed civil check at each authoritative source boundary.
+The pure reusable source validator lives at `src/data/retailerCivilCaptureClock.ts::isValidCivilCaptureAt`; the opt-in runtime preflight imports it directly, so an authorized adapter owner can use precisely the same clock boundary when integrating the six source parsers. No existing parser calls this module yet.\n\nThis isolated product-core entrypoint prevents the known **P1 #3701** UTC−13/−14 provenance issue from reaching the existing six-adapter `ingestReviewedBatch` **when the new entrypoint is used**. It does **not** change the currently unguarded adapters or their existing callers; it is **not a complete resolution of #3701** until the owner integrates the same fail-closed civil check at each authoritative source boundary.
 
 ## Reproducible invocation
 
