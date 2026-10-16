@@ -15,9 +15,9 @@ const MAX_RECIPES = 100
 const MAX_LABEL = 120
 // The Planner can restore or edit meals in a different insertion order.
 // Share a genuine week as a week, rather than exposing storage order.
-const WEEKDAY_RANK = new Map([
+const WEEKDAY_RANK = new Map<string, number>([
   'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo',
-].map((day, index) => [day, index]))
+].map((day, index): [string, number] => [day, index]))
 // Reject control/format and Unicode line/paragraph separators, including
 // zero-width and bidi spoofing. Dutch diacritics and readable non-ASCII stay valid.
 const BAD_LABEL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u
