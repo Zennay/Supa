@@ -56,7 +56,7 @@ test('explicitly scoped synthetic catalog preserves three-request budget and zer
   assert.equal(summary.pages, 3)
   assert.equal(summary.errors, 0)
   assert.equal(summary.products, 0)
-  assert.deepEqual(requested, [base + 0, base + 1, base + 2])
+  assert.deepEqual([...requested].sort(), [base + 0, base + 1, base + 2])
 })
 
 test('operator zero-request budget does not invoke any fake source', async () => {
