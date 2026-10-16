@@ -87,6 +87,42 @@ function parseUniqueJson(source) {
   return JSON.parse(source)
 }
 
+// Comments and inert template/RCDATA contents are not active script nodes.
+// Mask those regions BEFORE the bounded script-tag scanner. Masking rather
+// than deleting keeps safe tag boundaries separated and avoids promoting
+// script-looking text from inside an HTML comment or a <template>.
+// This is deliberately conservative: malformed/incomplete inert blocks
+// cannot contribute source-price evidence.
+function maskInertHtml(html) {
+  const tokens = /<!--[\s\S]*?(?:-->|$)|<\/?(?:template|textarea|title|noscript)\b[^>]*>/gi
+  let masked = ''
+  let cursor = 0
+  const contexts = []
+  for (const match of html.matchAll(tokens)) {
+    const start = match.index
+    masked += contexts.length ? ' '.repeat(start - cursor) : html.slice(cursor, start)
+    const token = match[0]
+    masked += ' '.repeat(token.length)
+    cursor = start + token.length
+    if (token.startsWith('<!--')) continue
+    const close = /^<\//u.test(token)
+    const name = /^<\/?(template|textarea|title|noscript)\b/iu.exec(token)?.[1]?.toLowerCase()
+    if (!name) continue
+    const active = contexts.at(-1)
+    if (!active) {
+      if (!close) contexts.push(name)
+    } else if (close && active === name) {
+      contexts.pop()
+    } else if (!close && active === 'template') {
+      // Nested templates and RCDATA inside a template stay inert until
+      // their matching enclosing end tag; other markup is simply ignored.
+      contexts.push(name)
+    }
+  }
+  masked += contexts.length ? ' '.repeat(html.length - cursor) : html.slice(cursor)
+  return masked
+}
+
 export function readAuthorizedHtmlScriptEvidence(html) {
   if (typeof html !== 'string' ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
@@ -98,7 +134,7 @@ export function readAuthorizedHtmlScriptEvidence(html) {
   let nuxtSeen = false
   let count = 0
   const scriptPattern = /<script\b([^<>]{0,1500})>([\s\S]*?)<\/script\s*>/gi
-  for (const match of html.matchAll(scriptPattern)) {
+  for (const match of maskInertHtml(html).matchAll(scriptPattern)) {
     if (++count > MAX_SCRIPT_TAGS) return invalid()
     const attr = attributes(match[1])
     if (!attr) return invalid()
