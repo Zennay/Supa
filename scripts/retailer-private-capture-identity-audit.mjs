@@ -34,6 +34,7 @@ export function auditPhysicalRetailerCaptures(input) {
   if (!Array.isArray(records) || records.length < 1 || records.length > 32) fail()
 
   const physical = new Set()
+  const rawCapture = new Set()
   const logical = new Set()
   const counts = { plus: 0, dekamarkt: 0 }
   for (const record of records) {
@@ -57,9 +58,13 @@ export function auditPhysicalRetailerCaptures(input) {
     const physicalKey = JSON.stringify([
       key, record.evidenceType, source.url, source.capturedAt, source.sha256,
     ])
-    if (physical.has(physicalKey) || logical.has(logicalKey)) {
+    // An identical immutable page/timestamp/hash is one physical capture,
+    // even if a caller also relabels the retailer, adapter kind or type.
+    const rawCaptureKey = JSON.stringify([source.url, source.capturedAt, source.sha256])
+    if (physical.has(physicalKey) || rawCapture.has(rawCaptureKey) || logical.has(logicalKey)) {
       throw new Error('Duplicate physical or labeled reviewed capture')
     }
+    rawCapture.add(rawCaptureKey)
     physical.add(physicalKey)
     logical.add(logicalKey)
     counts[source.supermarket]++
