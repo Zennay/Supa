@@ -32,6 +32,12 @@ function requireProductRequest(request) {
 
 export function createAuthorizedRetailerProductPreviewSession() {
   const session = createAuthorizedRetailerCaptureSession()
+  // Purely aggregate per-retailer parser outcomes, distinct from validated
+  // transport captures. No URLs, HTML, product IDs or monetary fields.
+  const reviews = new Map([
+    ['plus', { accepted: 0, abstained: 0 }],
+    ['dekamarkt', { accepted: 0, abstained: 0 }],
+  ])
 
   async function previewOne(request) {
     requireProductRequest(request)
@@ -65,6 +71,10 @@ export function createAuthorizedRetailerProductPreviewSession() {
       preview.observation?.provenance?.url === captured.source.url &&
       preview.observation?.provenance?.capturedAt === captured.source.capturedAt
     if (preview.type !== 'abstain' && !matching) refuse()
+    const counts = reviews.get(captured.source.retailerId)
+    if (!counts) refuse()
+    if (matching) counts.accepted++
+    else counts.abstained++
     // Errors/abstentions never reveal partial unverified price observations.
     return {
       schemaVersion: 1,
@@ -89,6 +99,12 @@ export function createAuthorizedRetailerProductPreviewSession() {
 
   return Object.freeze({
     previewOne,
-    status: () => session.status(),
+    status: () => ({
+      ...session.status(),
+      privateProductReviewCounts: Object.fromEntries(
+        [...reviews.entries()].map(([retailer, counts]) =>
+          [retailer, { accepted: counts.accepted, abstained: counts.abstained }]),
+      ),
+    }),
   })
 }
