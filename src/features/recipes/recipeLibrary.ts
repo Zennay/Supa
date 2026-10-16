@@ -53,3 +53,23 @@ export function saveRecipeLibrary(storage: Storage, previous: LibraryState, reci
   storage.setItem(RECIPE_LIBRARY_KEY, raw)
   return { recipes: checked.recipes, raw, error: null }
 }
+
+/**
+ * Update an existing user recipe without changing its stable identity or
+ * creation timestamp. The underlying CAS prevents stale tabs losing edits.
+ */
+export function updateSavedRecipe(
+  storage: Storage, previous: LibraryState, id: string, draft: UserRecipeDraft,
+): LibraryState {
+  if (!previous.recipes.some(recipe => recipe.id === id)) throw new Error('Dit recept bestaat niet meer. Herlaad de pagina.')
+  const reviewed = reviewRecipe(draft)
+  return saveRecipeLibrary(storage, previous, previous.recipes.map(recipe =>
+    recipe.id === id ? { ...reviewed, id: recipe.id, savedAt: recipe.savedAt } : recipe,
+  ))
+}
+
+/** Delete only a known own-recipe ID; never delete unknown or demo recipes. */
+export function deleteSavedRecipe(storage: Storage, previous: LibraryState, id: string): LibraryState {
+  if (!previous.recipes.some(recipe => recipe.id === id)) throw new Error('Dit recept bestaat niet meer. Herlaad de pagina.')
+  return saveRecipeLibrary(storage, previous, previous.recipes.filter(recipe => recipe.id !== id))
+}
