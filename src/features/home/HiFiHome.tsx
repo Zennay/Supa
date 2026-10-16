@@ -3,7 +3,7 @@ import { useRef, useState } from 'react'
 import { figmaAssets as a } from './figmaAssets'
 import { upcomingHomeWeek } from './homeWeekDates'
 import { RecipeLibrary } from '../recipes/RecipeLibrary'
-import { cookablePlannerRecipes } from '../recipes/cookablePlannerRecipes'
+import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
 
@@ -14,9 +14,12 @@ export const designProducts = [
   { id: 'cola-pack', name: 'Coca-Cola Zero sugar zero caffeine & calories 4-pack', image: a.imgProductFoto2, logo: a.imgDirk1, store: 'Hoogvliet', crop: 'hoogvliet', unit: '6L', unitPrice: '€1.54/L', old: '€9.26', price: '€7.96' },
   { id: 'cola-regular', name: 'Coca Cola Regular 1,5 liter fles', image: a.imgProductFoto3, logo: a.imgDirk2, store: 'Jumbo', crop: 'jumbo', unit: '1.5L', unitPrice: '€1.09/L', old: '€2.15', price: '€1.64' },
 ]
-const designRecipes = cookablePlannerRecipes.map(recipe => ({
+const designRecipes = curatedFigmaRecipes.filter(recipe =>
+  recipe.id === 'supa-fried-rice' || recipe.id === 'supa-bao' || recipe.id === 'supa-katsu',
+).map(recipe => ({
   ...recipe,
-  image: recipe.id === 'pasta' ? a.recipePasta : null,
+  image: recipe.id === 'supa-fried-rice' ? a.imgRecepten :
+    recipe.id === 'supa-bao' ? a.imgRecepten1 : a.imgRecepten2,
 }))
 
 type Props = {
