@@ -55,7 +55,7 @@ export function assessRecipeSourceUrl(value: unknown): RecipeUrlAssessment {
   // user secrets into a future server-side downloader or a diagnostic log.
   for (const key of parsed.searchParams.keys()) {
     const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '')
-    if (privateQueryKeys.has(key.toLowerCase()) || privateQueryKeys.has(normalized) ||
+    if (key.includes('%') || privateQueryKeys.has(key.toLowerCase()) || privateQueryKeys.has(normalized) ||
         /(?:token|secret|password|session|apikey|authorization)/.test(normalized)) {
       return { accepted: false, reason: 'credentialed_url' }
     }
