@@ -39,6 +39,36 @@ function unavailable(reason, captured) {
   }
 }
 
+// Deka pages can carry both Schema.org lowercase Offer.price and a legacy
+// uppercase Price, while Nuxt has a corroborating value. A generic parser
+// must not select either case spelling and silently discard its contradictory
+// sibling before the Deka-specific cross-check has an opportunity to refuse.
+function conflictingCaseOfferPrices(blocks) {
+  const stack = [...blocks]
+  while (stack.length) {
+    const value = stack.pop()
+    if (!value || typeof value !== 'object') continue
+    if (Array.isArray(value)) {
+      stack.push(...value)
+      continue
+    }
+    const keys = Object.keys(value)
+    const explicitPrices = keys.filter(key => key.toLowerCase() === 'price')
+    if (explicitPrices.length > 1) {
+      const cents = explicitPrices.map(key => {
+        const amount = Number(value[key])
+        const scaled = amount * 100
+        const rounded = Math.round(scaled)
+        return Number.isFinite(scaled) && Number.isSafeInteger(rounded) &&
+          Math.abs(scaled - rounded) <= 1e-7 ? rounded : null
+      })
+      if (cents.some(c => c === null || c !== cents[0])) return true
+    }
+    stack.push(...Object.values(value))
+  }
+  return false
+}
+
 /**
  * Caller supplies the exact source, permission document, reviewed one-URL
  * grant and injected fetchFn. The existing capture method checks all of
@@ -80,6 +110,13 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
   const blocks = scripts.jsonLdBlocks
   if (scripts.invalid || blocks.length === 0 || blocks.length > MAX_JSONLD_BLOCKS) {
     return unavailable('missing_or_invalid_jsonld', captured)
+  }
+  // The Deka JSON-LD/Nuxt pair may expose both case variants of Price.
+  // Refuse any same-object contradiction before a generic parser could
+  // successfully produce a private candidate and skip Nuxt corroboration.
+  if (provenance.supermarket === 'dekamarkt' &&
+      conflictingCaseOfferPrices(blocks)) {
+    return unavailable('contradictory_same_page_price_evidence', captured)
   }
   // All blocks are reviewed together: a second conflicting Product cannot be
   // ignored just because the first one offers a temptingly cheap price.
