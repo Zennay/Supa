@@ -91,6 +91,155 @@ const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|banan
 export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const original = text(raw, 400)
   if (!original) throw new Error('Ingredientregel ontbreekt')
+  // A single-unit match must never consume only the first part of
+  // "1 kg 250 g bloem" and mistake "250 g" for a product name.
+  const amountPattern = '(?:\\d+\\s+)?\\d+\\/\\d+|\\d+(?:[.,]\\d+)?|[½¼¾]'
+  const compound = original.match(new RegExp(
+    '^(' + amountPattern + ')\\s*([a-z]+)\\s+(' + amountPattern +
+    ')\\s*([a-z]+)\\s+(.+)/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
+  if (!match) return { original, label: original, query: original.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid of eenheid ontbreekt' }
+  const amount = quantity(match[1])
+  const tail = match[2].trim()
+  const wordMatch = tail.match(/^([^\s,]+)(?:\s+|,\s*)(.*)$/u)
+  const word = (wordMatch ? wordMatch[1] : tail).toLowerCase()
+  const metric = units[word]
+  const label = metric ? (wordMatch?.[2] || '').trim() : tail
+  const inferredPiece = !metric && pieceNouns.test(tail)
+  if (!amount || !Number.isFinite(amount) || amount > 100_000 || !label) {
+    return { original, label: label || original, query: (label || original).toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Controleer de hoeveelheid en het ingrediënt' }
+  }
+  if (!metric && !inferredPiece) {
+    return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Onbekende maat: voer een metrische hoeveelheid in' }
+  }
+  const unit = metric?.unit || 'piece'
+  const normalized = rounded(amount * (metric?.factor || 1))
+  if (!Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
+    return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid is buiten bereik' }
+  }
+  return { original, label, query: label.toLocaleLowerCase('nl'), amount: normalized, unit, reviewReason: null }
+}
+
+function normalizedDraft(input: {
+  source: 'manual' | 'url'
+  sourceUrl: string | null
+  title: unknown
+  servings: unknown
+  minutes: unknown
+  steps: string[]
+  ingredients: string[]
+}): UserRecipeDraft {
+  const title = text(input.title, 160)
+  if (!title) throw new Error('Recepttitel ontbreekt')
+  if (!input.ingredients.length || input.ingredients.length > MAX_INGREDIENTS) throw new Error('Ongeldig aantal ingrediënten')
+  if (input.steps.length > MAX_STEPS) throw new Error('Te veel bereidingsstappen')
+  const ingredients = input.ingredients.map(normalizeIngredientLine)
+  const servings = positiveNumber(input.servings, 1000)
+  const minutes = positiveNumber(input.minutes, 1440)
+  const warnings = ingredients.flatMap((ingredient, index) =>
+    ingredient.reviewReason ? ['Ingrediënt ' + (index + 1) + ': ' + ingredient.reviewReason] : [])
+  if (servings === null) warnings.push('Porties ontbreken of zijn onduidelijk')
+  if (minutes === null) warnings.push('Bereidingstijd ontbreekt of is onduidelijk')
+  return {
+    source: input.source, sourceUrl: input.sourceUrl, title, servings, minutes,
+    steps: input.steps.map(step => text(step, 5000)).filter(Boolean),
+    ingredients, warnings, status: 'needs_review',
+  }
+}
+
+export function createManualRecipeDraft(input: {
+  title: string; servings?: number | null; minutes?: number | null;
+  ingredients: string[]; steps?: string[]
+}): UserRecipeDraft {
+  return normalizedDraft({
+    source: 'manual', sourceUrl: null, title: input.title,
+    servings: input.servings, minutes: input.minutes,
+    ingredients: input.ingredients, steps: input.steps || [],
+  })
+}
+
+function stepsFrom(value: unknown, depth = 0): string[] {
+  if (depth > 8) return []
+  if (typeof value === 'string') return [text(value, 5000)].filter(Boolean)
+  if (Array.isArray(value)) return value.flatMap(item => stepsFrom(item, depth + 1)).slice(0, MAX_STEPS)
+  if (record(value)) {
+    if (value['@type'] === 'HowToSection' && Array.isArray(value.itemListElement)) {
+      return stepsFrom(value.itemListElement, depth + 1)
+    }
+    return stepsFrom(value.text ?? value.itemListElement ?? value.name, depth + 1)
+  }
+  return []
+}
+
+function locateRecipe(value: unknown, depth = 0): Record<string, unknown> | null {
+  if (depth > 5) return null
+  if (Array.isArray(value)) {
+    for (const node of value.slice(0, 200)) {
+      const found = locateRecipe(node, depth + 1)
+      if (found) return found
+    }
+  } else if (record(value)) {
+    const types = Array.isArray(value['@type']) ? value['@type'] : [value['@type']]
+    if (types.some(type => typeof type === 'string' && /^(?:https?:\/\/schema\.org\/)?Recipe$/i.test(type))) return value
+    return locateRecipe(value['@graph'], depth + 1) || locateRecipe(value.mainEntity, depth + 1)
+  }
+  return null
+}
+
+/**
+ * Parse already-retrieved HTML. This function performs NO network operations.
+ * Its caller must enforce SSRF, redirect, private-IP, size and time limits.
+ */
+export function importRecipeFromHtml(html: string, sourceUrl: string): UserRecipeDraft {
+  if (typeof html !== 'string' || !html || html.length > MAX_HTML) throw new Error('HTML ontbreekt of is te groot')
+  let parsedUrl: URL
+  try { parsedUrl = new URL(sourceUrl) } catch { throw new Error('Ongeldige receptlink') }
+  if (parsedUrl.protocol !== 'https:' || !parsedUrl.hostname || parsedUrl.username || parsedUrl.password) {
+    throw new Error('Alleen publieke HTTPS-receptlinks zijn toegestaan')
+  }
+  const script = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
+  let match: RegExpExecArray | null
+  while ((match = script.exec(html)) !== null) {
+    if (!/\btype\s*=\s*(?:"application\/ld\+json"|'application\/ld\+json'|application\/ld\+json)(?=[\s>]|$)/i.test(match[1])) continue
+    if (match[2].length > 200_000) continue
+    let data: unknown
+    try { data = JSON.parse(match[2]) } catch { continue }
+    const recipe = locateRecipe(data)
+    if (!recipe) continue
+    const ingredients = Array.isArray(recipe.recipeIngredient) ? recipe.recipeIngredient : []
+    const lines = ingredients.map(item => typeof item === 'string' ? item : record(item) ? text(item.name) : '').filter(Boolean)
+    if (!lines.length) throw new Error('Geen herkenbare ingrediënten; vul het recept handmatig in')
+    return normalizedDraft({
+      source: 'url', sourceUrl: parsedUrl.toString(),
+      title: recipe.name,
+      servings: recipeServings(recipe.recipeYield),
+      minutes: recipeMinutes(recipe.totalTime) ?? recipeMinutes(recipe.cookTime),
+      ingredients: lines,
+      steps: stepsFrom(recipe.recipeInstructions),
+    })
+  }
+  throw new Error('Geen schema.org/Recipe gevonden; vul het recept handmatig in')
+}
+, 'iu'))
+  if (compound) {
+    const first = quantity(compound[1])
+    const second = quantity(compound[3])
+    const firstUnit = units[compound[2].toLowerCase()]
+    const secondUnit = units[compound[4].toLowerCase()]
+    const label = compound[5].trim()
+    if (first !== null && second !== null &&
+        Number.isFinite(first) && Number.isFinite(second) &&
+        first > 0 && second > 0 && first <= 100_000 && second <= 100_000 &&
+        firstUnit && secondUnit && firstUnit.unit === secondUnit.unit &&
+        label && !/^\\d+(?:[.,]\\d+)?\\s+(?:g|kg|ml|l|oz|lb)\\b/i.test(label)) {
+      const normalized = rounded(first * firstUnit.factor + second * secondUnit.factor)
+      if (Number.isFinite(normalized) && normalized > 0 && normalized <= 1_000_000) {
+        return { original, label, query: label.toLocaleLowerCase('nl'),
+          amount: normalized, unit: firstUnit.unit, reviewReason: null }
+      }
+    }
+    return { original, label: original, query: original.toLocaleLowerCase('nl'),
+      amount: null, unit: null, reviewReason: 'Controleer de samengestelde hoeveelheden' }
+  }
   const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
   if (!match) return { original, label: original, query: original.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid of eenheid ontbreekt' }
   const amount = quantity(match[1])
