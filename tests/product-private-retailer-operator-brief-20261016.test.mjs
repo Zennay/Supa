@@ -140,17 +140,18 @@ test('a complete reviewed zero-capture shape still gives honest missing-input gu
   kind.rejectedSources += accepted
   kind.staleHistoricalCaptures = 0
   kind.historicalObservations = 0
+  kind.unknownPriceObservations = 0
   kind.latestArchivedCapturedAt = null
   kind.status = 'no-accepted-historical-capture'
   adjusted.staleHistoricalCaptures -= report.retailers[0].shapes[0].staleHistoricalCaptures
-  const acts = adjusted.retailers[0].nextActions
-  if (!acts.includes('review-missing-offline-source-shapes'))
-    acts.splice(1, 0, 'review-missing-offline-source-shapes')
-  if (!acts.includes('review-rejected-adapter-evidence'))
-    acts.splice(acts.length - 1, 0, 'review-rejected-adapter-evidence')
-  if (!adjusted.retailers[0].shapes.some(shape => shape.staleHistoricalCaptures > 0))
-    adjusted.retailers[0].nextActions = acts.filter(action =>
-      action !== 'review-historical-capture-freshness')
+  adjusted.retailers[0].nextActions = [
+    'obtain-and-verify-retailer-source-rights',
+    'review-missing-offline-source-shapes',
+    'review-rejected-adapter-evidence',
+    ...(adjusted.retailers[0].shapes.some(shape => shape.staleHistoricalCaptures > 0)
+      ? ['review-historical-capture-freshness'] : []),
+    'validate-new-captures-offline-before-separate-release-approval',
+  ]
   const brief = renderPrivateRetailerOperatorBrief(adjusted)
   assert.match(brief, /geen goedgekeurde historische invoer/)
   assert.match(brief, /ontbrekende bronvormen onderzoeken/)
