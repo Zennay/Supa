@@ -28,8 +28,40 @@ function isEuroPrice(source, inheritedCurrency) {
     (typeof specified === 'string' && specified.trim().toUpperCase() === 'EUR')
 }
 
+// JSON-LD object keys can differ only by case while asserting contradictory
+// monetary evidence. A first-match, case-insensitive pick() would otherwise
+// silently use whichever spelling is encountered first. Require agreement
+// among ALL explicitly present spellings before admitting any price.
+function conflictingCaseEvidence(source) {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return false
+  const keys = Object.keys(source)
+  for (const field of ['price', 'lowprice', 'pricecurrency']) {
+    const variants = keys.filter(key => key.toLowerCase() === field)
+    if (variants.length < 2) continue
+    const normalized = variants.map(key => {
+      const value = source[key]
+      if (field === 'pricecurrency') {
+        return typeof value === 'string' && value.trim()
+          ? value.trim().toUpperCase() : null
+      }
+      return toCents(value)
+    })
+    if (normalized.some(value => value === null || value !== normalized[0])) {
+      return true
+    }
+  }
+  return false
+}
+
 export function schemaOrgPrices(offers) {
   const list = (Array.isArray(offers) ? offers : [offers]).filter(Boolean)
+  // Currency and price variants must agree in every direct Offer and nested
+  // priceSpecification. Do not select the cheapest of conflicting assertions.
+  if (list.some(offer =>
+    conflictingCaseEvidence(offer) ||
+    [pick(offer, ['priceSpecification'])].flat().filter(Boolean).some(conflictingCaseEvidence))) {
+    return { priceCents: null, promoPriceCents: null }
+  }
   const prices = []
   let regular = null
   let validity = {}
