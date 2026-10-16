@@ -5,6 +5,7 @@ import type {
 } from './ingestion.ts'
 import { validateRawProductObservation } from './ingestion.ts'
 import { normalizeMoneyToCents, normalizePackText } from './normalize.ts'
+import { snapshotInertHistoricalEvidence } from './inertHistoricalEvidence.ts'
 
 export const PLUS_RENDERED_LISTING_SELECTORS = {
   cardAnchor: 'a[href^="/product/"]',
@@ -407,7 +408,11 @@ function hasDuplicateProductIdentity(
 export function parsePlusRenderedCatalogEvidence(
   evidence: PlusRenderedCatalogEvidence,
 ): PlusRenderedListingsParseResult {
-  const boundaryError = validateEvidenceBoundary(
+  // Make a detached JSON-shaped copy before touching caller-owned descriptors.
+  const safe = snapshotInertHistoricalEvidence(evidence)
+  if (!safe) return { type: 'abstain', reason: 'non-inert archived source evidence' }
+  evidence = safe
+const boundaryError = validateEvidenceBoundary(
     evidence,
     'plus-browser-rendered-catalog',
     'catalog',
@@ -442,7 +447,11 @@ export function parsePlusRenderedCatalogEvidence(
 export function parsePlusRenderedOffersEvidence(
   evidence: PlusRenderedOffersEvidence,
 ): PlusRenderedListingsParseResult {
-  const boundaryError = validateEvidenceBoundary(
+  // Make a detached JSON-shaped copy before touching caller-owned descriptors.
+  const safe = snapshotInertHistoricalEvidence(evidence)
+  if (!safe) return { type: 'abstain', reason: 'non-inert archived source evidence' }
+  evidence = safe
+const boundaryError = validateEvidenceBoundary(
     evidence,
     'plus-browser-rendered-offers',
     'offers',
