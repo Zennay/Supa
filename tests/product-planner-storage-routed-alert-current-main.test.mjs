@@ -67,10 +67,10 @@ function mount(disk, { denyGetter = false } = {}) {
   const browser = denyGetter
     ? Object.defineProperty({}, 'localStorage', {
         get() { throw new Error('fictional getter denial') },
-        addEventListener() {},
-        removeEventListener() {},
       })
     : { localStorage: disk, addEventListener() {}, removeEventListener() {} }
+  browser.addEventListener = () => {}
+  browser.removeEventListener = () => {}
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
   const slots = []
   let index = 0
