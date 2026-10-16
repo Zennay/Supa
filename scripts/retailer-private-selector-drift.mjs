@@ -166,10 +166,26 @@ async function readPrivate(path){
     return JSON.parse(json)
   }finally{await handle.close()}
 }
+// Direct callers may invoke this private CLI function with an array containing
+// getters, inherited indices or Proxy traps. Refuse before resolve/readPrivate.
+function pinnedCliArgs(argv) {
+  if (nodeTypes.isProxy(argv) || !Array.isArray(argv) ||
+      Object.getPrototypeOf(argv) !== Array.prototype || argv.length !== 4) fail()
+  const descriptors = Object.getOwnPropertyDescriptors(argv)
+  const keys = Reflect.ownKeys(descriptors)
+  if (keys.length !== 5 || !Object.hasOwn(descriptors, 'length') ||
+      keys.some(key => key !== 'length' &&
+        (typeof key !== 'string' || !/^[0-3]$/.test(key) ||
+          !Object.hasOwn(descriptors[key], 'value')))) fail()
+  const values = Array.from({ length: 4 }, (_, i) => descriptors[i]?.value)
+  if (values.some(value => typeof value !== 'string')) fail()
+  return values
+}
 export async function main(argv=process.argv.slice(2),write=x=>process.stdout.write(x)){
-  if(!Array.isArray(argv)||argv.length!==4||
-    argv[0]!=='--before'||argv[2]!=='--after'||resolve(argv[1])===resolve(argv[3]))fail()
-  const report=compareOfflineSelectorProposals(await readPrivate(argv[1]),await readPrivate(argv[3]))
+  const args=pinnedCliArgs(argv)
+  if(args[0]!=='--before'||args[2]!=='--after'||
+    resolve(args[1])===resolve(args[3]))fail()
+  const report=compareOfflineSelectorProposals(await readPrivate(args[1]),await readPrivate(args[3]))
   write(JSON.stringify(report)+'\n')
   return report
 }
