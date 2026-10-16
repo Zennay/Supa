@@ -1,0 +1,17 @@
+[Unit]
+Description=SUPA approved supermarket prices daily refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=supa
+WorkingDirectory=/opt/supa
+EnvironmentFile=/etc/supa/scraper.env
+ExecStart=/usr/bin/node /opt/supa/scraper/daily-refresh.mjs
+TimeoutStartSec=12h
+NoNewPrivileges=true
+PrivateTmp=true
+
+# This runs nothing when SUPA_SCRAPER_POLICY has no allowed source.
+# Do not enable a retailer merely because its parser works.
