@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import stat
 import sys
 import unicodedata
 from urllib.parse import parse_qsl, urlsplit
@@ -67,6 +68,26 @@ def utc_instant_nanoseconds(text):
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
     delta = whole - epoch
     return (delta.days * 86400 + delta.seconds) * 1_000_000_000 + frac_ns
+
+
+def safe_local_path(value):
+    """Refuse symbolic links in ANY lexical ancestor, not just the file.
+
+    This is a static preflight before reading/creating a local file; it does
+    not assert race-free defense against concurrent hostile directory swaps.
+    """
+    check(isinstance(value, str) and 0 < len(value) <= 4096 and
+          not any(ord(char) < 32 or ord(char) == 127 for char in value),
+          "unsafe private filesystem path")
+    path = Path(value).absolute()
+    check(".." not in path.parts, "ambiguous private filesystem path")
+    for component in (path, *path.parents):
+        try:
+            info = component.lstat()
+        except FileNotFoundError:
+            continue
+        check(not stat.S_ISLNK(info.st_mode), "symlinked private path refused")
+    return path
 
 
 def safe_string(value, label):
@@ -183,7 +204,7 @@ def prepare(batch):
 
 def import_batch(batch, destination):
     rows = prepare(batch)  # Validate fully BEFORE touching the destination.
-    dest = Path(destination).absolute()
+    dest = safe_local_path(destination)
     check(dest.parent.is_dir(), "destination parent directory must exist")
     check(not dest.is_symlink(), "destination symlink refused")
     fd = os.open(dest, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -246,7 +267,7 @@ def main():
     parser.add_argument("--input", required=True)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
-    source = Path(args.input)
+    source = safe_local_path(args.input)
     check(source.is_file() and not source.is_symlink() and source.stat().st_size <= 8 * 1024 * 1024,
           "offline JSON input must be a small regular file")
     batch = json.loads(source.read_text(encoding="utf-8"), object_pairs_hook=no_duplicates)
