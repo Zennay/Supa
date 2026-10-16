@@ -66,7 +66,15 @@ export function ingestCivilClockCheckedReviewedBatch(records) {
         !KINDS.has(record.source.supermarket + ':' + record.source.kind) ||
         !isValidPrivateCivilCaptureTime(record.source.capturedAt, now)) fail()
   }
-  return ingestReviewedBatch(copies)
+  const batch = ingestReviewedBatch(copies)
+  // The plain engine supports partial review; this opt-in stricter gate never
+  // returns a deceptively complete-looking partially admitted collection.
+  if (batch.summary.rejectedSources !== 0 ||
+      batch.summary.acceptedSources !== copies.length ||
+      batch.summary.productionEnabled !== false ||
+      batch.summary.permissionVerified !== false ||
+      batch.summary.publicSavingsClaimEligible !== false) fail()
+  return batch
 }
 
 /** Offline CLI: only six fixed, checked-in sanitized historical fixtures. */
