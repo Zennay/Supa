@@ -244,6 +244,18 @@ export function rebuildMatches(store, { at = new Date().toISOString() } = {}) {
     gtins: r.gtins ? String(r.gtins).split(',') : [],
   }))
   const groups = matchProducts(products)
+  // The schema deliberately has UNIQUE(canonical_products.gtin). If an EAN
+  // appears on incompatible physical packs, both distinct canonical groups
+  // must preserve separate rows. A contradictory EAN is no longer a unique
+  // canonical identity: store NULL on every conflicting canonical group,
+  // while keeping the original individual product_gtins evidence intact.
+  const canonicalGtinCounts = new Map()
+  for (const group of groups) {
+    const gtin = group.canonical.gtin
+    if (gtin !== null) {
+      canonicalGtinCounts.set(gtin, (canonicalGtinCounts.get(gtin) ?? 0) + 1)
+    }
+  }
   const retailerOf = new Map(products.map((p) => [p.id, p.retailer_id]))
 
   const db = store.db
@@ -259,8 +271,10 @@ export function rebuildMatches(store, { at = new Date().toISOString() } = {}) {
     db.exec('DELETE FROM product_matches; DELETE FROM canonical_products;')
     for (const group of groups) {
       const c = group.canonical
+      const retainedGtin = c.gtin !== null && canonicalGtinCounts.get(c.gtin) > 1
+        ? null : c.gtin
       const { id } = insertCanonical.get(
-        c.gtin,
+        retainedGtin,
         c.name,
         c.brand,
         c.pack_amount,
