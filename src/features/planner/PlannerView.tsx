@@ -24,6 +24,7 @@ type PlannerViewProps = {
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
   onReset: () => void
+  onOpenList?: () => void
 }
 
 export function PlannerView({
@@ -37,6 +38,7 @@ export function PlannerView({
   onToggleDay,
   onRecipeChange,
   onReset,
+  onOpenList,
 }: PlannerViewProps) {
   const [customOpen, setCustomOpen] = useState(false)
   const [customDraft, setCustomDraft] = useState('')
@@ -95,13 +97,14 @@ export function PlannerView({
     : null
 
   return (
-    <section className="screen">
-      <div className="section-heading">
+    <section className="screen planner-screen">
+      <div className="section-heading planner-heading">
         <div>
-          <span className="eyebrow">Deze week</span>
-          <h2>Plan eerst. Vergelijk daarna.</h2>
+          <span className="eyebrow">Jouw week, jouw smaak</span>
+          <h2>Wat eten we deze week?</h2>
+          <p className="planner-intro">Kies je gerechten, pas je budget aan en SUPA regelt de boodschappen.</p>
         </div>
-        <button type="button" className="ghost-button" onClick={onReset}>Reset</button>
+        <button type="button" className="ghost-button reset-button" onClick={onReset}>Opnieuw</button>
       </div>
 
       <section className="budget-card" aria-labelledby="weekbudget-title">
@@ -231,7 +234,15 @@ export function PlannerView({
         </p>
       </section>
 
-      <div className="day-grid" aria-label="Geplande maaltijden">
+      <section className="meal-area" aria-labelledby="meal-area-title">
+        <div className="meal-area-heading">
+          <div>
+            <span className="eyebrow">Kies wat bij je past</span>
+            <h3 id="meal-area-title">Jouw weekmenu</h3>
+          </div>
+          <span className="meal-count">{activeDays.length} van {plannedMeals.length} dagen</span>
+        </div>
+        <div className="day-grid" aria-label="Geplande maaltijden">
         {plannedMeals.map((item) => {
           const recipe = recipes.find((candidate) => candidate.id === item.recipeId)
           if (!recipe) return null
@@ -271,7 +282,14 @@ export function PlannerView({
             </article>
           )
         })}
-      </div>
+        </div>
+        {onOpenList && (
+          <button type="button" className="planner-list-action" onClick={onOpenList}>
+            <span>Bekijk je boodschappenlijst</span>
+            <span aria-hidden="true">↗</span>
+          </button>
+        )}
+      </section>
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
       {hasIngredientData && (
@@ -284,12 +302,9 @@ export function PlannerView({
       )}
 
       <div className="insight-card">
-        <span className="eyebrow">M2 verticale slice</span>
-        <strong>Je receptkeuzes sturen nu dezelfde mand en boodschappenlijst aan.</strong>
-        <p>
-          Onzekere productmatches worden niet ingevuld: ze blijven zichtbaar
-          als controlepunt in Mand en Lijst.
-        </p>
+        <span className="eyebrow">Alles op één plek</span>
+        <strong>Een fijne week begint met een simpel plan.</strong>
+        <p>Verander gerust van gerecht. Je boodschappenlijst past zich meteen aan. Twijfelachtige producten markeren we voor controle.</p>
       </div>
     </section>
   )
