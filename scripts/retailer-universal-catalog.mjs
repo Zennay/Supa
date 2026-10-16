@@ -150,11 +150,22 @@ function normalizedObservation(value) {
 }
 
 function truthSignature(record) {
-  // Category/source kind and capture time are NOT authority to silently choose
-  // between unequal prices, packs or availability.
+  // Retailer facts are validated values, never JS object own-key insertion
+  // order. A reordered plain object must not create a second false capture
+  // or invent a product-price conflict for the same immutable source event.
+  // Explicit field order also prevents optional extra record metadata from
+  // changing the source-price consistency signal. The provenance tuple
+  // (SHA, source kind, URL, time) is compared separately at dedup admission.
+  const pack = record.pack
+  const offer = record.offer
   return JSON.stringify([
     record.name, record.currentPriceCents, record.currency,
-    record.pack, record.offer, record.availability,
+    [pack.rawText, pack.amount, pack.unit],
+    offer === null ? null : [
+      offer.label, offer.mechanics, offer.offerPriceCents,
+      offer.originalPriceCents, offer.validFrom, offer.validTo,
+    ],
+    record.availability,
   ])
 }
 
