@@ -18,6 +18,19 @@ const record=(v,keys)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&
   Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k))
 const integer=(v,max)=>Number.isSafeInteger(v)&&v>=0&&v<=max
 const fail=()=>{throw new Error('Private selector drift comparison refused')}
+// A stored selector proposal is an archive claim, not a fresh HTML capture.
+// Date.parse normalizes impossible civil days: only exact physical UTC dates
+// may participate in drift/change chronology or hash-linked source proof.
+function physicalCaptureMilliseconds(value) {
+  if (typeof value !== 'string') return null
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,3}))?Z$/.exec(value)
+  if (!match) return null
+  const milliseconds = Date.parse(value)
+  if (!Number.isFinite(milliseconds) || milliseconds > Date.now()) return null
+  if (new Date(milliseconds).toISOString() !==
+      match[1] + '.' + (match[2] ?? '').padEnd(3, '0') + 'Z') return null
+  return milliseconds
+}
 function canonical(report) {
   if(!record(report,KEYS)||
     report.schemaVersion!==1||report.mode!=='offline-selector-proposals-only'||
@@ -27,10 +40,7 @@ function canonical(report) {
     !record(report.source,['retailerId','sha256','capturedAt'])||
     !['plus','dekamarkt'].includes(report.source.retailerId)||
     typeof report.source.sha256!=='string'||!/^[a-f0-9]{64}$/.test(report.source.sha256)||
-    typeof report.source.capturedAt!=='string'||
-    !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(report.source.capturedAt)||
-    !Number.isFinite(Date.parse(report.source.capturedAt))||
-    Date.parse(report.source.capturedAt)>Date.now()||
+    physicalCaptureMilliseconds(report.source.capturedAt) === null||
     !integer(report.bytes,2*1024*1024)||!integer(report.scannedTags,25000)||
     !record(report.structuredSignals,SIGNALS)||
     !SIGNALS.every(k=>typeof report.structuredSignals[k]==='boolean')||
