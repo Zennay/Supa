@@ -93,3 +93,48 @@ test('unfinished decimal input stays on the same semantic row and yields to exte
   assert.equal(displayMetricEditorAmount(undefined, null), '')
   assert.equal(displayMetricEditorAmount('2,5', 2.5), '2,5')
 })
+
+function importedAmbiguousRecipeForReview() {
+  return prepareImportedRecipeForEditor({
+    ...emptyUserRecipeDraft(),
+    source: 'url',
+    sourceUrl: 'https://example.invalid/fictional-recipe',
+    title: 'Verzonnen soep',
+    servings: 2,
+    ingredients: [{
+      original: 'twee schepjes bloem', label: 'Bloem', query: 'bloem',
+      amount: 100, unit: 'g',
+      reviewReason: 'Controleer conversie van schepjes naar massa',
+    }],
+  })
+}
+
+test('cosmetic ingredient label changes retain imported quantity uncertainty and original',()=>{
+  const source=importedAmbiguousRecipeForReview()
+  const edited=updateEditorIngredient(source,0,{label:'Volkorenbloem'})
+  const again=updateEditorIngredient(edited,0,{label:'Bloem voor soep'})
+  assert.equal(again.ingredients[0].reviewReason,'Controleer conversie van schepjes naar massa')
+  assert.equal(canConfirmUserRecipeDraft(again),false)
+  assert.equal(source.ingredients[0].label,'Bloem')
+  assert.equal(again.ingredients[0].original,'twee schepjes bloem')
+})
+
+test('unrelated new ingredient and cosmetic edit cannot clear imported review',()=>{
+  const source=importedAmbiguousRecipeForReview()
+  const two=addEditorIngredient(source)
+  const named=updateEditorIngredient(two,0,{label:'Tarwebloem'})
+  const complete=updateEditorIngredient(named,1,{label:'Water',amount:250,unit:'ml'})
+  assert.equal(complete.ingredients[0].reviewReason,'Controleer conversie van schepjes naar massa')
+  assert.equal(complete.ingredients[1].reviewReason,null)
+  assert.equal(canConfirmUserRecipeDraft(complete),false)
+})
+
+test('only meaningful metric correction can clear imported review and produce confirmable draft',()=>{
+  const source=importedAmbiguousRecipeForReview()
+  const noop=updateEditorIngredient(source,0,{amount:100,unit:'g'})
+  assert.equal(canConfirmUserRecipeDraft(noop),false)
+  const fixed=updateEditorIngredient(noop,0,{amount:200,unit:'g'})
+  assert.equal(fixed.ingredients[0].reviewReason,null)
+  assert.equal(canConfirmUserRecipeDraft(fixed),true)
+  assert.ok(source.ingredients[0].reviewReason)
+})
