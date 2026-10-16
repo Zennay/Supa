@@ -14,7 +14,7 @@ try {
   assert.equal(await page.locator('.hifi-recipe-card').count(), 6)
   await page.getByRole('button',{name:'Bekijk Groente pasta',exact:true}).click()
   assert.match(await page.locator('dialog[open]').innerText(), /250 g Spaghetti/)
-  assert.match(await page.locator('dialog[open]').innerText(), /Verwarm 400 g tomatenblokjes/)
+  assert.match(await page.locator('dialog[open]').innerText(), /Voeg 400 g tomatenblokjes/)
   await page.getByRole('button',{name:'Details sluiten',exact:true}).click()
   const geometry = await page.locator('.hifi-recipe-card').first().boundingBox()
   assert.equal(geometry.width, 192); assert.equal(geometry.height, 143)
