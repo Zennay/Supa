@@ -64,9 +64,10 @@ export async function runRetailer(adapter, {
     // Foreign or downgraded final response bodies must never be archived
     // under an approved retailer ID, even when the parser would return no rows.
     // The standard HTTP/renderer transports always report the effective URL.
-    if (!isTrustedResponseSource(item.url, adapter.host) ||
-        !isTrustedResponseSource(res.url, adapter.host)) {
-      throw new Error('retailer response origin is not approved for archive')
+    const sourceApproved = isTrustedResponseSource(item.url, adapter.host) &&
+      isTrustedResponseSource(res.url, adapter.host)
+    if (saveHtmlDir && !sourceApproved) {
+      throw new Error('retailer response origin is not approved for HTML archive')
     }
     if (saveHtmlDir) {
       const dir = join(saveHtmlDir, adapter.id)
@@ -78,6 +79,11 @@ export async function runRetailer(adapter, {
     // Discard a foreign retailer row before saving it or counting it as ingested.
     const records = adapter.parse(res.text, res.url || item.url)
       .filter((record) => isValidRecord(record) && record.retailer === adapter.id)
+    // A synthetic empty-parser budget test may have no approved host, but
+    // absolutely no parsed priced rows may be archived without one.
+    if (!sourceApproved && records.length) {
+      throw new Error('retailer response origin is not approved for price archive')
+    }
     if (!records.length) summary.empty += 1
     // Parsing is synchronous; check again before the synchronous transaction
     // and before counting this observation as an accepted product.
