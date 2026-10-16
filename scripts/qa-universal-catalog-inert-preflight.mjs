@@ -15,11 +15,13 @@ const LIMITS = Object.freeze({ maxDepth: 32, maxNodes: 50000, maxObjectKeys: 409
 
 /**
  * Inspect only inert own-property DESCRIPTORS: never evaluate a caller getter,
- * Proxy trap, inherited value, symbol, mutable alias or coercion hook.
+ * Proxy trap, inherited value, symbol, cycle or coercion hook.
  * All successful output is detached, canonical private JSON and frozen.
  */
 export function pinInertPrivateCatalogInput(value) {
-  const seen = new WeakSet()
+  // Track only the ACTIVE ancestry path: duplicate references are valid JSON
+  // data after individually detached copying, while actual cycles are not.
+  const ancestry = new WeakSet()
   let nodes = 0
   function pin(input, depth) {
     if (++nodes > LIMITS.maxNodes || depth > LIMITS.maxDepth) fail()
@@ -28,8 +30,8 @@ export function pinInertPrivateCatalogInput(value) {
       if (!Number.isFinite(input)) fail()
       return input
     }
-    if (!input || typeof input !== 'object' || types.isProxy(input) || seen.has(input)) fail()
-    seen.add(input)
+    if (!input || typeof input !== 'object' || types.isProxy(input) || ancestry.has(input)) fail()
+    ancestry.add(input)
     const proto = Object.getPrototypeOf(input)
     if (Array.isArray(input)) {
       if (proto !== Array.prototype) fail()
@@ -44,6 +46,7 @@ export function pinInertPrivateCatalogInput(value) {
             property.enumerable !== true) fail()
         array.push(pin(property.value, depth + 1))
       }
+      ancestry.delete(input)
       return Object.freeze(array)
     }
     if (proto !== Object.prototype && proto !== null) fail()
@@ -62,6 +65,7 @@ export function pinInertPrivateCatalogInput(value) {
         writable: false,
       })
     }
+    ancestry.delete(input)
     return Object.freeze(object)
   }
   return pin(value, 0)
