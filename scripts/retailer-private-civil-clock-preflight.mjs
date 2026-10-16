@@ -49,12 +49,9 @@ export function isValidPrivateCivilCaptureTime(value, referenceTime = Date.now()
  * Clone the entire untrusted input via the already shared inert JSON boundary
  * before reading length, source properties, or user-supplied iterators.
  */
-export function ingestCivilClockCheckedReviewedBatch(records, options = {}) {
-  const safeOptions = snapshotInertReviewedEvidence(options)
-  if (!safeOptions || typeof safeOptions !== 'object' || Array.isArray(safeOptions) ||
-      Object.keys(safeOptions).some(key => key !== 'referenceTime') ||
-      (safeOptions.referenceTime !== undefined && !Number.isFinite(safeOptions.referenceTime))) fail()
-  const now = safeOptions.referenceTime ?? Date.now()
+export function ingestCivilClockCheckedReviewedBatch(records) {
+  if (arguments.length !== 1) fail()
+  const now = Date.now()
   const copies = snapshotInertReviewedEvidence(records)
   if (!Array.isArray(copies) || copies.length < 1 || copies.length > 32) fail()
   for (const record of copies) {
