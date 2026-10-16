@@ -32,8 +32,33 @@ export function PrivateRecipeStudio({
   onSelectedDaysChange: (next: Record<string, string | null>) => void
   onCancelDraft: () => void
 }) {
-  const ids = Array.isArray(recipes) ? recipes.map((recipe: UnpricedPrivateRecipe) => recipe.id) : []
-  const current = prepareUnpricedPrivateRecipe(draft, draftLocalId, ids)
+  // Read library identities as *own data only*. A host can temporarily
+  // supply a stale/malformed collection; never allow that state to bypass
+  // duplicate checks or trigger a recipe ID getter during render.
+  const libraryIds: string[] = []
+  let validLibrary = Array.isArray(recipes) && recipes.length <= 100
+  if (validLibrary) {
+    try {
+      const known = new Set<string>()
+      for (const recipe of recipes) {
+        if (!recipe || typeof recipe !== 'object') { validLibrary = false; break }
+        const descriptor = Object.getOwnPropertyDescriptor(recipe, 'id')
+        const id = descriptor?.value
+        if (!Object.prototype.hasOwnProperty.call(descriptor ?? {}, 'value') ||
+            typeof id !== 'string' ||
+            !/^private-recipe:[A-Za-z0-9_-]{1,64}$/.test(id) ||
+            known.has(id)) { validLibrary = false; break }
+        known.add(id)
+        libraryIds.push(id)
+      }
+    } catch {
+      validLibrary = false
+    }
+  }
+  const ids = validLibrary ? libraryIds : []
+  const current = validLibrary
+    ? prepareUnpricedPrivateRecipe(draft, draftLocalId, ids)
+    : { status: 'review_required' as const, reasons: ['invalid_private_recipe_library'] }
   // Parent updates are asynchronous: reserve this rendered ID synchronously,
   // before invoking the parent's callback, so double-clicks cannot enqueue
   // two creates from the same stale recipe-ID snapshot.
@@ -42,7 +67,7 @@ export function PrivateRecipeStudio({
   function confirm(reviewed: EditorRecipeDraft) {
     // Re-evaluate the event-time draft, not an earlier optimistic UI preview.
     // Refuse any importer/unknown amount/pending warning/ID conflict.
-    if (submitted) return
+    if (submitted || !validLibrary) return
     const decision = prepareUnpricedPrivateRecipe(reviewed, draftLocalId, ids)
     if (decision.status === 'unpriced_ready') {
       submitted = true
@@ -66,7 +91,7 @@ export function PrivateRecipeStudio({
           'Dit recept kan aan je lokale lijst worden toegevoegd; prijs en winkel blijven onbekend.'),
     createElement(PrivateRecipeWeekPlanner, {
       key:'planner',
-      recipes,
+      recipes: validLibrary ? recipes : [],
       selection:selectedDays,
       onSelectionChange:onSelectedDaysChange,
     }),
