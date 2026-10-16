@@ -12,7 +12,7 @@ De module `scripts/retailer-approved-html-product-price-candidate.mjs` levert de
 - Meerdere conflicterende Product-nodes, ongeldige JSON-LD, onjuiste Product-URL of onbekende bron? **Review vereist**, geen willekeurig goedkoopste product kiezen.
 - Retailsite weigert of rate-limitt? De bestaande capture stopt op 403/429; geen proxy/CAPTCHA/retry.
 
-**Belangrijk:** DekaMarkt gebruikt óók een specifieke SSR/Nuxt-structuur. Die reeds bestaande adapter blijft nodig voor pagina's zonder complete JSON-LD. De nieuwe route leest bewust géén verzonnen `Price`-veld als een bewezen schema.org-prijs. Ze vervangt de zes adapters niet: ze is een aanvulling op echte strikt passende HTML-productpagina's.
+**DekaMarkt SSR/Nuxt-fallback nu ook echt toegevoegd:** `scripts/retailer-approved-deka-nuxt-product.mjs` leest in *dezelfde* geautoriseerde HTML-capture exact één `__NUXT_DATA__` payload. Product-ID moet overeenkomen met de product-URL én JSON-LD `mpn`; Nuxt-prijs moet in hele centen overeenkomen met dezelfde pagina's expliciete EUR JSON-LD `Price`, en naam/verpakking/voorraad moeten kloppen. Bij verschil of onbekende gegevens blijft de uitkomst `review_required`. De originele uitgebreide historische Deka-parser met aparte GitHub-run/artifactbewijs blijft ongemoeid en wordt niet omzeild met verzonnen run-ID's. De nieuwe brug is op deze manier ook geschikt voor het historische Deka SSR-gegevensformaat, mits de bron echt geautoriseerd en bevestigd is.
 
 ## Programmatic contract (alleen bij aantoonbare bronrechten)
 
@@ -37,6 +37,7 @@ Uitvoering van echte PLUS/DekaMarkt-verzoeken is **momenteel expliciet geblokkee
 
 ```bash
 node --experimental-strip-types --test tests/product-retailer-approved-html-price-candidate-20261016.test.mjs
+node --experimental-strip-types --test tests/product-retailer-approved-deka-nuxt-price-candidate-20261016.test.mjs
 npm test
 npm run m1:source-permission-gate
 npm run build
