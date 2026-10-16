@@ -132,11 +132,11 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
   if (scripts.invalid || blocks.length === 0 || blocks.length > MAX_JSONLD_BLOCKS) {
     return unavailable('missing_or_invalid_jsonld', captured)
   }
-  // The Deka JSON-LD/Nuxt pair may expose both case variants of Price.
-  // Refuse any same-object contradiction before a generic parser could
-  // successfully produce a private candidate and skip Nuxt corroboration.
-  if (provenance.supermarket === 'dekamarkt' &&
-      conflictingCaseOfferPrices(blocks)) {
+  // All approved retailers must refuse same-object price contradictions.
+  // Otherwise the generic Schema.org parser can select PLUS offer.price
+  // while silently discarding an explicitly different Offer.Price/PRICE.
+  // Deka's independent Nuxt corroboration remains separately required.
+  if (conflictingCaseOfferPrices(blocks)) {
     return unavailable('contradictory_same_page_price_evidence', captured)
   }
   // All blocks are reviewed together: a second conflicting Product cannot be
