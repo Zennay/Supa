@@ -16,6 +16,7 @@ import { planPrivateRetailerRollout } from './retailer-private-source-rollout-ma
 import { reviewPrivateRetailerOffers } from './qa-retailer-offer-baseline-corroboration.mjs'
 import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
 import { loadPrivateReviewedCaptureBatch } from './retailer-private-reviewed-manifest-replay.mjs'
+import { snapshotInertPrivateM3Sources } from './retailer-private-m3-inert-source-boundary.mjs'
 
 const refuse = () => { throw new Error('Private M3 integrated retailer preflight refused') }
 const isCount = value => Number.isSafeInteger(value) && value >= 0
@@ -109,6 +110,13 @@ function chooseOneHistoricalCapturePerShape(batch) {
 
 export function assessPrivateM3RetailerIngestion(permissionGate, batch, options = {}) {
   const { referenceTime, inputMode } = inertPreflightOptions(options)
+  // The exported API is callable with arbitrary JS objects, not just JSON.
+  // Copy and seal source rights AND the complete 6–32 reviewed source graph
+  // before rollout/catalog/offer/stock readers can touch caller-owned values.
+  // Accessors/Proxies must never be invoked during source validation.
+  const inert = snapshotInertPrivateM3Sources(permissionGate, batch)
+  permissionGate = inert.permissionGate
+  batch = inert.batch
   // The offer-audit clock admits UTC with at most millisecond precision;
   // reject other formats instead of silently rounding nanoseconds.
   if (typeof referenceTime !== 'string' ||
