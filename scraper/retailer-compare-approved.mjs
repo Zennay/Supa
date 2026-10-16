@@ -8,6 +8,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { types as nodeTypes } from 'node:util'
 import { planDailyRefresh } from './daily-refresh.mjs'
 import { findFreshProducts } from './retailer-search-api.mjs'
+import { matchProducts } from './lib/match.mjs'
 
 const fail = () => { throw new Error('Private matched retailer comparison refused') }
 // Persisted product_matches may have been built before pack-safe matching.
@@ -98,8 +99,10 @@ export async function compareApprovedLocalCatalog(options = {}) {
     // timestamp, available stock and a physically ACTIVE offer price.
     const fresh = findFreshProducts(database, approved, query, now)
     const idStmt = database.prepare(
-      'SELECT m.canonical_id, p.pack_amount, p.pack_unit, ' +
-      'p.pack_count, p.pack_text FROM product_matches m ' +
+      'SELECT m.canonical_id, p.id AS product_id, p.name AS stored_name, ' +
+      'p.brand AS stored_brand, p.gtin, ' +
+      '(SELECT GROUP_CONCAT(g.gtin) FROM product_gtins g WHERE g.product_id=p.id) AS gtins, ' +
+      'p.pack_amount, p.pack_unit, p.pack_count, p.pack_text FROM product_matches m ' +
       'JOIN products p ON p.id = m.product_id ' +
       'WHERE p.retailer_id=? AND p.url=? LIMIT 2')
     groups = new Map()
@@ -110,8 +113,13 @@ export async function compareApprovedLocalCatalog(options = {}) {
       if (matches.length !== 1 ||
           !Number.isSafeInteger(matches[0].canonical_id)) continue
       const key = matches[0].canonical_id
-      const packKey = physicalPackKey(matches[0])
-      if (!packKey) { invalidGroups.add(key); continue }
+      const product = matches[0]
+      const packKey = physicalPackKey(product)
+      if (!packKey || !Number.isSafeInteger(product.product_id) ||
+          typeof product.stored_name !== 'string' || !product.stored_name.trim()) {
+        invalidGroups.add(key)
+        continue
+      }
       if (!groups.has(key)) groups.set(key, [])
       const rows = groups.get(key)
       // One retailer having several physical rows under one canonical ID is
@@ -123,6 +131,15 @@ export async function compareApprovedLocalCatalog(options = {}) {
       }
       rows.push({
           packKey,
+          identity: {
+            id: product.product_id,
+            retailer_id: row.supermarket,
+            name: product.stored_name, brand: product.stored_brand,
+            gtins: typeof product.gtins === 'string' ? product.gtins.split(',') :
+              (typeof product.gtin === 'string' ? [product.gtin] : []),
+            pack_amount: product.pack_amount, pack_unit: product.pack_unit,
+            pack_count: product.pack_count, pack_text: product.pack_text,
+          },
           supermarket: row.supermarket,
           name: printable(row.name),
           priceCents: row.priceCents,
@@ -135,6 +152,14 @@ export async function compareApprovedLocalCatalog(options = {}) {
     // later rendering must never re-admit stale canonical links.
     for (const [key, rows] of groups) {
       if (rows.some(row => row.packKey !== rows[0].packKey)) invalidGroups.add(key)
+      // Archived canonical IDs are hints, not guarantees of a current
+      // identity match. Recompute the existing conservative matching logic
+      // over the freshly admitted source products before showing prices.
+      if (!invalidGroups.has(key) && rows.length >= 2) {
+        const freshIdentity = matchProducts(rows.map(row => row.identity))
+        if (freshIdentity.length !== 1 ||
+            freshIdentity[0].members.length !== rows.length) invalidGroups.add(key)
+      }
       if (invalidGroups.has(key)) groups.delete(key)
     }
   } catch {
