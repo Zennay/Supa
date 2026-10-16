@@ -1,0 +1,50 @@
+name: SUPA Figma public preview
+
+on:
+  push:
+    branches:
+      - preview/supa-figma-live-20261016
+  workflow_dispatch:
+
+concurrency:
+  group: supa-figma-pages-preview
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  preview:
+    if: github.repository == 'Zennay/Supa'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build explicitly rights-safe Figma-only static preview
+        env:
+          VITE_SUPA_PUBLIC_PREVIEW: 'true'
+        run: npm run build -- --base=/Supa/
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload static preview
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+      - name: Deploy Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
