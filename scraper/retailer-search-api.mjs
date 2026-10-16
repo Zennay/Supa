@@ -6,6 +6,7 @@ import { createServer } from 'node:http'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { types as utilTypes } from 'node:util'
 import { adapters } from './adapters/index.mjs'
 import { planDailyRefresh } from './daily-refresh.mjs'
 import { renderRetailerSearchHtml } from './retailer-search-html.mjs'
@@ -61,12 +62,41 @@ function offerInstantNanos(value) {
     BigInt((m[7] ?? '').padEnd(9, '0').slice(3) || '0')
 }
 
+/**
+ * Direct JS callers are not automatically trusted just because the HTTP path
+ * passes ordinary strings. Do not call user-defined Array accessors, iterators
+ * or Date methods while deciding whether any database search is allowed.
+ */
+function admitSearchInputs(approvedIds, clock) {
+  if (utilTypes.isProxy(approvedIds) || !Array.isArray(approvedIds) ||
+      Object.getPrototypeOf(approvedIds) !== Array.prototype ||
+      approvedIds.length < 1 || approvedIds.length > 12) return null
+  const descriptors = Object.getOwnPropertyDescriptors(approvedIds)
+  if (Reflect.ownKeys(descriptors).length !== approvedIds.length + 1) return null
+  const copied = []
+  for (let index = 0; index < approvedIds.length; index++) {
+    const descriptor = descriptors[index]
+    if (!descriptor || !descriptor.enumerable ||
+        !Object.hasOwn(descriptor, 'value') ||
+        typeof descriptor.value !== 'string' ||
+        !Object.hasOwn(expectedHosts, descriptor.value)) return null
+    copied.push(descriptor.value)
+  }
+  if (utilTypes.isProxy(clock) || !(clock instanceof Date) ||
+      Object.getPrototypeOf(clock) !== Date.prototype ||
+      Reflect.ownKeys(clock).length > 0) return null
+  const ms = Date.prototype.getTime.call(clock)
+  if (!Number.isFinite(ms)) return null
+  return { ids: [...new Set(copied)], now: new Date(ms) }
+}
+
 export function findFreshProducts(database, approvedIds, query, now = new Date()) {
   const q = queryText(query)
-  if (!q || !Array.isArray(approvedIds) || approvedIds.length === 0 ||
-      approvedIds.length > 12 || !Number.isFinite(now?.getTime?.()) ||
-      approvedIds.some(id => !Object.hasOwn(expectedHosts,id))) return []
-  const ids = [...new Set(approvedIds)]
+  if (!q) return []
+  const admitted = admitSearchInputs(approvedIds, now)
+  if (!admitted) return []
+  const ids = admitted.ids
+  now = admitted.now
   const sql = 'SELECT p.retailer_id, r.name AS retailer_name, p.name, p.brand, ' +
     'p.pack_text, p.pack_amount, p.pack_count, p.pack_unit, p.url, ' +
     'lp.price_cents, lp.promo_price_cents, lp.promo_valid_until, ' +
