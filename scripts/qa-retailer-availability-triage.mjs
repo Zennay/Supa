@@ -97,7 +97,7 @@ export function reviewPrivateRetailerAvailability(batch, options = {}) {
     unavailableProductsNotPurchasable: true,
     currentStockVerified: false,
     historicalOnly: true,
-    permissionsVerified: false,
+    permissionVerified: false,
     liveRequests: 0,
     productionEnabled: false,
     publicSavingsClaimEligible: false,
