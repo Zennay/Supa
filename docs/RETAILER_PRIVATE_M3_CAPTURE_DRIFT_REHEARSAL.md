@@ -47,6 +47,10 @@ worden afgewezen; het CLI-programma retourneert daarbij uitsluitend
    [bronfeitvergelijking](../scripts/retailer-private-fact-change-review.mjs).
    Een gelijkwaardige SHA+URL mag niet nieuwe productfeiten fabriceren;
    onvergelijkbare/teruggedraaide producttijdlijnen worden geweigerd.
+   Ook op **dezelfde fysieke captuurtijd** mag de oorspronkelijke
+   SHA/bron-URL niet verschillen, zelfs wanneer alle product-ID's van een
+   HTML-pagina plots anders zijn. Dat is een onbewijsbare broncontinuïteit,
+   geen geldige "nieuw assortiment"-waarneming.
 3. Aanvullend: ook de **laatste fysieke tijd per bronsoort** mag nooit teruglopen,
    zelfs wanneer alle product-ID's anders zijn (dan zou een gewone
    productvergelijking geen overlappende producten zien). Timestampafstanden
