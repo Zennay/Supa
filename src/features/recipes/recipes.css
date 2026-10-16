@@ -1,0 +1,30 @@
+.recipe-library { padding-top: 52px; }
+.recipe-heading { display: flex; gap: 8px; align-items: center; min-height: 50px; }
+.recipe-heading h1 { font-family: Poppins, -apple-system, sans-serif; font-size: 18px; letter-spacing: -.216px; color: #333; }
+.recipe-back { padding: 0; border: 0; background: none; width: 40px; height: 40px; flex-shrink: 0; }
+.recipe-count { font-size: 14px; color: #848484; margin-top: 2px; }
+.recipe-library .hifi-section-heading { padding: 0; }
+.recipe-library .hifi-favorite[aria-pressed=true] { background: none; outline: none; }
+.recipe-note { color: #848484; font-size: 11px; line-height: 1.5; }
+.recipe-add-actions, .recipe-tabs { display: flex; gap: 8px; }
+.recipe-add-actions button, .recipe-tabs button { flex: 1; border: 0; border-radius: 24px; padding: 12px; min-height: 44px; background: white; font-size: 13px; }
+.recipe-add-actions button:first-child, .recipe-tabs button[aria-pressed=true] { background: #005135; color: #76f8ca; }
+.own-recipe-card { background: #176650; }
+.recipe-dialog { padding-top: 36px; }
+.recipe-dialog .recipe-close { position: absolute; top: 8px; right: 8px; border: 0; border-radius: 50%; background: #f3f4f6; width: 40px; height: 40px; font-size: 24px; }
+.hifi-dialog .recipe-form { display: grid; gap: 14px; margin-top: 20px; }
+.recipe-form label { display: grid; gap: 6px; font-size: 14px; font-weight: 500; }
+.recipe-form input, .recipe-form textarea { font: inherit; width: 100%; min-width: 0; border: 1px solid #d8e4de; border-radius: 12px; padding: 12px; background: #f8faf9; }
+.recipe-form textarea { resize: vertical; }
+.recipe-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.recipe-form button, .recipe-primary { border: 0; border-radius: 24px; padding: 14px; min-height: 44px; cursor: pointer; }
+.recipe-dialog .recipe-primary { background: #005135; color: #76f8ca; font-weight: 600; width: 100%; }
+.recipe-primary:disabled { opacity: .5; cursor: wait; }
+.recipe-review { background: #f3f4f6; padding: 16px; border-radius: 16px; margin-top: 20px; }
+.recipe-dialog h3 { font-size: 16px; margin: 20px 0 10px; }
+.recipe-dialog ul, .recipe-dialog ol { padding-left: 22px; font-size: 14px; line-height: 1.6; }
+.recipe-dialog li { margin-bottom: 8px; overflow-wrap: anywhere; }
+.recipe-dialog small { color: #65726a; }
+.recipe-dialog a { color: #006642; overflow-wrap: anywhere; }
+.recipe-error { background: #fff2e5; border-radius: 12px; padding: 12px; margin-top: 12px; }
+@media (max-width: 390px) { .recipe-heading h1 { font-size: 16px; } }

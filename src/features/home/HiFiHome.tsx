@@ -2,6 +2,7 @@ import { FigmaImage } from '../../components/FigmaImage'
 import { useRef, useState } from 'react'
 import { figmaAssets as a } from './figmaAssets'
 import { upcomingHomeWeek } from './homeWeekDates'
+import { RecipeLibrary } from '../recipes/RecipeLibrary'
 
 export type HiFiTab = 'home' | 'recipes' | 'products'
 export const designProducts = [
@@ -38,6 +39,8 @@ export function HiFiHome({ view, onNavigate, addedProducts, onToggleProduct, act
   const products = designProducts.filter(matches)
   const toggleFavorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
   const changeView = (next: HiFiTab) => { setQuery(''); onNavigate(next) }
+
+  if (view === 'recipes') return <RecipeLibrary onBack={() => onNavigate('home')} />
 
   return <div className="hifi-home" data-figma-node="3307:4224">
     {view === 'home' ? <>

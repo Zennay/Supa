@@ -1,0 +1,27 @@
+name: Figma recipe assets
+on:
+  pull_request:
+    paths: ['.github/workflows/figma-recipe-assets.yml']
+permissions:
+  contents: read
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download original recipe assets
+        env:
+          FIGMA_ASSET_BASE: https://www.figma.com/api/mcp/asset/164b170a-fb69-4a3b-92ce-96f0320b6875
+        run: |
+          set -euo pipefail
+          mkdir -p recipes
+          for asset in d982c.png 51c5a.png 609e9.png e7952.svg 24e73.svg de68b.svg ca0a3.svg; do
+            curl -fsSL --retry 2 --max-time 30 "$FIGMA_ASSET_BASE/$asset" -o "recipes/$asset"
+            test -s "recipes/$asset"
+          done
+          file recipes/*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: supa-original-recipe-assets
+          path: recipes/
+          retention-days: 1
