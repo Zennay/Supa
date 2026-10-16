@@ -34,12 +34,20 @@ export function PrivateRecipeStudio({
 }) {
   const ids = Array.isArray(recipes) ? recipes.map((recipe: UnpricedPrivateRecipe) => recipe.id) : []
   const current = prepareUnpricedPrivateRecipe(draft, draftLocalId, ids)
+  // Parent updates are asynchronous: reserve this rendered ID synchronously,
+  // before invoking the parent's callback, so double-clicks cannot enqueue
+  // two creates from the same stale recipe-ID snapshot.
+  let submitted = false
 
   function confirm(reviewed: EditorRecipeDraft) {
     // Re-evaluate the event-time draft, not an earlier optimistic UI preview.
     // Refuse any importer/unknown amount/pending warning/ID conflict.
+    if (submitted) return
     const decision = prepareUnpricedPrivateRecipe(reviewed, draftLocalId, ids)
-    if (decision.status === 'unpriced_ready') onAddReviewedRecipe(decision.recipe)
+    if (decision.status === 'unpriced_ready') {
+      submitted = true
+      onAddReviewedRecipe(decision.recipe)
+    }
   }
 
   return createElement('section', {
