@@ -53,3 +53,22 @@ jobs:
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" push --force origin HEAD:refs/heads/preview-dist
           echo 'Static preview branch updated: preview-dist'
+      - name: Verify public preview HTML and JavaScript over HTTPS
+        run: |
+          set -euo pipefail
+          site='https://raw.githack.com/Zennay/Supa/preview-dist'
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error --location --max-time 20 "$site/index.html" -o preview-index.html && grep -Fq '<title>SUPA</title>' preview-index.html; then
+              break
+            fi
+            echo "Public preview not yet propagated (attempt $attempt)"
+            sleep 5
+          done
+          grep -Fq '<title>SUPA</title>' preview-index.html
+          script_path="$(grep -oE 'assets/index-[^" ]+\.js' preview-index.html | head -n1)"
+          style_path="$(grep -oE 'assets/index-[^" ]+\.css' preview-index.html | head -n1)"
+          test -n "$script_path" && test -n "$style_path"
+          curl --fail --silent --show-error --location --max-time 20 "$site/$script_path" -o preview-script.js
+          curl --fail --silent --show-error --location --max-time 20 "$site/$style_path" -o preview-styles.css
+          test -s preview-script.js && test -s preview-styles.css
+          echo "Public preview verified: $site/index.html"
