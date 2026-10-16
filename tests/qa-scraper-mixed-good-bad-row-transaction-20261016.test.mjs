@@ -11,6 +11,9 @@ import { makeRecord } from '../scraper/lib/normalize.mjs'
 const row = (id, priceCents) => makeRecord({
   retailer: 'qa-fixture',
   sourceId: id,
+  // The synthetic valid record also carries its explicit approved source
+  // article URL; source provenance is independent of the price validation.
+  url: 'https://example.test/products/' + encodeURIComponent(String(id)),
   name: 'Synthetic offline ' + id,
   priceCents,
   availability: 'available',
