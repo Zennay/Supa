@@ -64,7 +64,9 @@ export function ingestCivilClockCheckedReviewedBatch(records) {
 
 /** Offline CLI: only six fixed, checked-in sanitized historical fixtures. */
 export async function main(argv = process.argv.slice(2), write = text => process.stdout.write(text)) {
-  if (!Array.isArray(argv) || argv.length !== 0 || typeof write !== 'function') fail()
+  // Never inspect a hostile argv Proxy or accessor-backed array directly.
+  const inertArgv = snapshotInertReviewedEvidence(argv)
+  if (!Array.isArray(inertArgv) || inertArgv.length !== 0 || typeof write !== 'function') fail()
   const root = new URL('../fixtures/m1/', import.meta.url)
   const records = []
   for (const name of RETAILER_REVIEWED_FIXTURES) {
@@ -74,7 +76,7 @@ export async function main(argv = process.argv.slice(2), write = text => process
   if (summary.acceptedSources !== 6 || summary.rejectedSources !== 0 ||
       summary.productionEnabled !== false || summary.permissionVerified !== false ||
       summary.publicSavingsClaimEligible !== false) fail()
-  write(JSON.stringify({ ...summary, civilClockPreflight: true }, null, 2) + '\n')
+  write(JSON.stringify({ ...summary, civilClockPreflight: true, physicalCaptureAliasGuard: true }, null, 2) + '\n')
   return summary
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
