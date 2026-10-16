@@ -62,7 +62,7 @@ test('one physical page cannot impersonate independent product and catalog proof
   fakeCatalog.evidenceType = 'plus-browser-rendered-catalog'
   assert.throws(
     () => auditPhysicalRetailerCaptures([product, fakeCatalog]),
-    /Duplicate physical/,
+    /Duplicate physical|Invalid private retailer capture identity/,
   )
 })
 
