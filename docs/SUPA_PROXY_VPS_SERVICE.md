@@ -10,6 +10,24 @@ Configure a real public domain and HTTPS server you control. For GET /health?sup
 
 The 32-character hex challenge changes for every request. No redirects, cookies, credentials or third-party test endpoints. An invalid or absent domain causes the service to fail **before any network requests**. A sample *.example host is a placeholder only and cannot perform actual checks.
 
+
+## Included optional owned echo origin
+
+This PR also includes a minimal loopback-only Node responder. It listens on 127.0.0.1:12789 and returns the strict nonce challenge in Content-Length. An operator-controlled HTTPS reverse proxy with a real domain/certificate is **still mandatory**. Example Caddy site config, on a domain you own:
+
+    probe.your-real-owned-domain.nl {
+      reverse_proxy 127.0.0.1:12789
+    }
+
+After installing the reviewed files, enable the local responder as your VPS user:
+
+    cp deploy/systemd-user/supa-proxy-echo.service ~/.config/systemd/user/
+    systemctl --user daemon-reload
+    systemctl --user enable --now supa-proxy-echo.service
+    curl -fsS 'http://127.0.0.1:12789/health?supa_probe=0123456789abcdef0123456789abcdef'
+
+The final curl must return the expected ASCII body. The local HTTP origin is **never** a substitute for publicly reachable HTTPS on your OWNED domain; public proxies cannot reach your VPS's loopback. Configure the trusted reverse proxy only under a separately reviewed TLS/DNS change.
+
 ## Deploy on VPS as ubuntu user (after reviewed PR integration)
 
 Check that the reviewed Supa checkout is at /home/ubuntu/Supa and Node 22+ is available on the user service PATH; adapt the unit if either differs.
