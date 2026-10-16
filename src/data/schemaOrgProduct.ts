@@ -225,6 +225,13 @@ export function parseSchemaOrgProduct(
   }
 
   const offers = offerCandidates(product.offers)
+  // An AggregateOffer describes a catalogue or price range, never an
+  // observed checkout amount for this physical pack. Its lowPrice cannot
+  // corroborate a concrete per-unit price, even if it has one bound, matches
+  // a separate Offer by coincidence, or advertises InStock availability.
+  if (offers.some((offer) => hasType(offer, 'AggregateOffer'))) {
+    return { type: 'abstain', reason: 'AggregateOffer does not certify one physical unit price' }
+  }
   const currency = extractCurrency(offers)
   if (currency !== null && currency !== 'EUR') {
     return {
