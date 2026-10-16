@@ -83,6 +83,8 @@ test('PLUS: explicit mocked authorized capture yields one private source-bound p
   }
   assert.equal(session.status().stores.plus.verifiedCaptures, 1)
   assert.equal(session.status().stores.dekamarkt.verifiedCaptures, 0)
+  assert.deepEqual(session.status().privateProductReviewCounts.plus, { accepted: 1, abstained: 0 })
+  assert.deepEqual(session.status().privateProductReviewCounts.dekamarkt, { accepted: 0, abstained: 0 })
   assert.doesNotMatch(JSON.stringify(result), /<script/)
 })
 
@@ -101,6 +103,7 @@ test('DekaMarkt: one true page-bound private observation, unrelated cheap recomm
   assert.equal(result.privateProductObservation.supermarket, 'dekamarkt')
   assert.equal(result.currentPriceVerified, false)
   assert.equal(session.status().stores.dekamarkt.verifiedCaptures, 1)
+  assert.deepEqual(session.status().privateProductReviewCounts.dekamarkt, { accepted: 1, abstained: 0 })
 })
 
 test('rights refusal consumes zero requests and prevents offline preview from bypassing M1', async () => {
@@ -114,6 +117,7 @@ test('rights refusal consumes zero requests and prevents offline preview from by
   }), /Explicit retailer source permission required/)
   assert.equal(called, 0)
   assert.equal(session.status().stores.plus.attemptedCaptures, 0)
+  assert.deepEqual(session.status().privateProductReviewCounts.plus, { accepted: 0, abstained: 0 })
 })
 
 test('catalog/offers and poisoned caller getters refuse before any transport', async () => {
@@ -153,6 +157,7 @@ test('mismatched JSON-LD Product stays private abstention, not a price guess', a
   assert.equal(result.readyForIngestion, false)
   assert.equal(result.publicSavingsClaimEligible, false)
   assert.equal(session.status().stores.plus.verifiedCaptures, 1)
+  assert.deepEqual(session.status().privateProductReviewCounts.plus, { accepted: 0, abstained: 1 })
   assert.doesNotMatch(JSON.stringify(result), /0\.01|fictional-other/)
 })
 
@@ -173,4 +178,16 @@ test('HTTP 429 hard-stops host; no implicit network, retries or public reports',
   assert.equal(called, 1)
   assert.equal(session.status().scheduledCaptureEnabled, false)
   assert.equal(session.status().proxyRotationEnabled, false)
+})
+
+test('product review metrics do not disclose HTML, URLs, names or price records', async () => {
+  const session = createAuthorizedRetailerProductPreviewSession()
+  const accepted = await session.previewOne({
+    ...request(), fetchFn: async () => response(html('plus')),
+  })
+  assert.equal(accepted.reviewStatus, 'product-needs-human-review')
+  const summary = session.status()
+  assert.deepEqual(summary.privateProductReviewCounts.plus, { accepted: 1, abstained: 0 })
+  assert.deepEqual(summary.privateProductReviewCounts.dekamarkt, { accepted: 0, abstained: 0 })
+  assert.doesNotMatch(JSON.stringify(summary), /fictional-milk|FICTIONAL-MILK|\\.nl\\/|currentPriceCents|<script|2\\.45/)
 })
