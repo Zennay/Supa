@@ -113,6 +113,8 @@ function mount(disk, { denyGetter = false } = {}) {
       './features/home/HiFiHome': { HiFiHome: () => {}, HiFiDemoList: () => {} },
       './features/home/figmaAssets': { figmaAssets: {} },
       './components/FigmaImage': { FigmaImage: () => {} },
+      './features/recipes/recipeLibrary': { readRecipeLibrary: () => ({ recipes: [], raw: null, error: null }) },
+      './features/recipes/plannerRecipes': { toPlannerRecipe: () => null },
       './domain/basket': { buildOneStoreBasket: () => ({
         totalCents: 1500, unresolvedLineCount: 0, lines: [],
       }) },
