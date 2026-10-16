@@ -15,7 +15,7 @@ test('nested conflicting offer object keys are refused at any depth', () => {
 })
 
 test('duplicate keys with equivalent decoded Unicode escapes are ambiguous', () => {
-  const source = String.raw`{"url":"https://source.example.test/a","\\u0075rl":"https://else.invalid/a"}`
+  const source = String.raw`{"url":"https://source.example.test/a","\u0075rl":"https://else.invalid/a"}`
   const evidence = readAuthorizedHtmlScriptEvidence(jsonld(source))
   assert.equal(evidence.invalid, true)
 })
