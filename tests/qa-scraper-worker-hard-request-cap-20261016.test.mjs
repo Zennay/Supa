@@ -13,6 +13,9 @@ async function exercise({ concurrency, limit, available = 12 }) {
   let storedSummary
   const adapter = {
     id: 'qa-synthetic-retailer',
+    // This is a permitted in-process fictional source, not live retailer I/O.
+    // Request-budget QA must not rely on an unauthorised missing-host bypass.
+    host: 'example.test',
     concurrency,
     mode: 'http',
     async *discover() {
