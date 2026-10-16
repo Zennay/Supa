@@ -55,11 +55,15 @@ test('six original historical shapes surface only catalog-backed conflict review
   const report = planPrivateRetailerRollout(await rights(), batch, { referenceTime })
   const catalog = buildUniversalRetailerCatalog(batch)
   verifyPrivateFlags(report)
+  assert.equal(report.historicalConflictingProductCount, catalog.conflictCount)
   for (const retailerId of ['plus', 'dekamarkt']) {
-    const hasCatalogConflict = catalog.products.some(product =>
-      product.retailerId === retailerId && product.consistency !== 'consistent')
+    const expectedCount = catalog.products.filter(product =>
+      product.retailerId === retailerId && product.consistency !== 'consistent').length
+    const retailer = report.retailers.find(row => row.retailerId === retailerId)
+    assert.ok(retailer)
+    assert.equal(retailer.historicalConflictingProductCount, expectedCount)
     assert.equal(actions(report, retailerId).includes('review-conflicting-product-facts'),
-      hasCatalogConflict, 'accepted historical shapes can already disagree')
+      expectedCount > 0, 'accepted historical shapes can already disagree')
   }
 })
 
@@ -77,6 +81,11 @@ for (const affected of ['plus', 'dekamarkt']) {
     const other = affected === 'plus' ? 'dekamarkt' : 'plus'
     assert.deepEqual(actions(report, other), actions(originalReport, other),
       'a different retailer must retain its pre-existing historical review actions')
+    assert.equal(report.retailers.find(row => row.retailerId === other)
+      .historicalConflictingProductCount,
+    originalReport.retailers.find(row => row.retailerId === other)
+      .historicalConflictingProductCount,
+    'conflicts in one store cannot inflate review workload in the other')
     assert.deepEqual(batch, unchanged, 'review does not alter historical evidence')
     assert.equal(JSON.stringify(report).includes('currentPriceCents'), false)
     assert.equal(JSON.stringify(report).includes('sourceProductId'), false)
@@ -89,6 +98,9 @@ test('both retailers independently retain their historical conflict-review actio
   withConflictingProduct(batch, 'dekamarkt', 'f')
   const report = planPrivateRetailerRollout(await rights(), batch, { referenceTime })
   verifyPrivateFlags(report)
+  const storeCounts = report.retailers.map(row => row.historicalConflictingProductCount)
+  assert.equal(storeCounts.reduce((sum, count) => sum + count, 0),
+    report.historicalConflictingProductCount, 'retailer totals must reconcile')
   for (const retailerId of ['plus', 'dekamarkt']) {
     assert.ok(actions(report, retailerId).includes('review-conflicting-product-facts'))
     assert.ok(actions(report, retailerId)
