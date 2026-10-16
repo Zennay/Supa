@@ -444,6 +444,18 @@ function parseOfferProduct(
   }
 }
 
+// A captured page may repeat the same source product under multiple cards.
+// Never turn this into multiple separately priced products in a reviewed batch.
+function hasDuplicateProductIdentities(observations: RawProductObservation[]): boolean {
+  const seen = new Set<string>()
+  for (const observation of observations) {
+    const id = observation.sourceProductId
+    if (id === null || seen.has(id)) return true
+    seen.add(id)
+  }
+  return false
+}
+
 export function parseDekaMarktSsrCatalogEvidence(
   evidence: DekaMarktSsrCatalogEvidence,
 ): DekaMarktListingsParseResult {
@@ -471,6 +483,9 @@ export function parseDekaMarktSsrCatalogEvidence(
       type: 'abstain',
       reason: 'DekaMarkt catalog yielded no trusted product observations',
     }
+  }
+  if (hasDuplicateProductIdentities(observations)) {
+    return { type: 'abstain', reason: 'DekaMarkt catalog contains duplicate product identities' }
   }
 
   return {
@@ -531,6 +546,9 @@ export function parseDekaMarktSsrOffersEvidence(
       type: 'abstain',
       reason: 'DekaMarkt offers yielded no trusted product observations',
     }
+  }
+  if (hasDuplicateProductIdentities(observations)) {
+    return { type: 'abstain', reason: 'DekaMarkt offers contain duplicate product identities' }
   }
 
   return {
