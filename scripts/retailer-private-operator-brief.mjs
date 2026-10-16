@@ -253,7 +253,9 @@ export function renderPrivateRetailerOperatorBrief(report) {
 /** A zero-argument dry-run against the six committed historical M1 shapes. */
 export async function main(argv = process.argv.slice(2),
   write = text => process.stdout.write(text)) {
-  if (!Array.isArray(argv) || argv.length !== 0) fail()
+  // Array.isArray(revokedProxy) itself throws; inspect before touching argv.
+  // Node's native proxy test does not invoke user getters or Proxy handlers.
+  if (nodeTypes.isProxy(argv) || !Array.isArray(argv) || argv.length !== 0) fail()
   const rights = JSON.parse(await readFile(
     new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url), 'utf8'))
   const batch = await loadReviewedRepositoryFixtures()
