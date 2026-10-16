@@ -52,12 +52,20 @@ export function dice(a, b) {
 }
 
 function packKey(p) {
-  if (p.pack_amount === null || p.pack_amount === undefined || !p.pack_unit) return null
+  // A zero/negative/nonfinite quantity or a fractional/zero pack count
+  // cannot establish pack equivalence, regardless of barcode, brand or name.
+  // SQL imports may have historical invalid facts: abstain instead of
+  // accidentally treating pack_count=0 as a single package via `|| 1`.
+  if (typeof p.pack_amount !== 'number' ||
+      !Number.isFinite(p.pack_amount) || p.pack_amount <= 0 ||
+      typeof p.pack_unit !== 'string' || !p.pack_unit) return null
+  const count = p.pack_count ?? 1
+  if (!Number.isSafeInteger(count) || count < 1) return null
   // Pack texts that do not describe one pack (ranges such as "350-390 g") veto
   // fuzzy matching even if an older parser stored an amount for them.
   if (/\d\s*[-–]\s*\d/.test(p.pack_text ?? '') && parsePack(p.pack_text).amount === null) return null
-  const total = p.pack_amount * (p.pack_count || 1)
-  return { unit: p.pack_unit, total }
+  const total = p.pack_amount * count
+  return Number.isFinite(total) && total > 0 ? { unit: p.pack_unit, total } : null
 }
 
 function samePack(a, b) {
