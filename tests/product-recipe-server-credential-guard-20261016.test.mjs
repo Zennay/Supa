@@ -12,6 +12,11 @@ const blockedQueries = [
   '?authorization=FICTIONAL_SECRET', '?sessionId=FICTIONAL_SECRET',
   '?state=FICTIONAL_SECRET', '?pkce_verifier=FICTIONAL_SECRET',
   '?%2563ode=FICTIONAL_SECRET', '?code%255Fverifier=FICTIONAL_SECRET',
+  '?%25252563ode=FICTIONAL_SECRET',
+  '?%25252553AMLResponse=FICTIONAL_SECRET',
+  '?%25252570kce_verifier=FICTIONAL_SECRET',
+  '?%25252541uth%2525252dCode=FICTIONAL_SECRET',
+  '?%252525252563ode=FICTIONAL_SECRET',
 ]
 
 test('server import URL preflight refuses credentialed HTTPS query keys without echoing secret', () => {
@@ -29,6 +34,7 @@ test('server still admits harmless article, language and search page parameters'
   for (const query of [
     '?pagina=2', '?recept=quiche&bron=app', '?barcode=12345678',
     '?taal=nl-NL&print=true', '?recipeVersion=3',
+    '?%25252563ategory=vegetables',
   ]) {
     const parsed = recipeUrl(host + query + '#ingredienten')
     assert.equal(parsed.search, query)
