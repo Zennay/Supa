@@ -6,10 +6,11 @@ import { runRetailer } from '../scraper/lib/runner.mjs'
 
 // Two independent offline boundary controls: do not weaken source evidence
 // admission when preserving the old synthetic, zero-price request-budget QA.
-async function run({ priced, saveHtmlDir = null } = {}) {
+async function run({ priced, host = null, saveHtmlDir = null } = {}) {
   const saved = []
   const adapter = {
-    id: 'fictional', name: 'Fictional source without configured host',
+    id: 'fictional', name: 'Fictional local-only HTTP fixture',
+    host,
     mode: 'http',
     async *discover() { yield { kind: 'product', url: 'https://fictional.example.test/item' } },
     parse() {
@@ -32,8 +33,8 @@ async function run({ priced, saveHtmlDir = null } = {}) {
   return { result: await runRetailer(adapter, { store, fetcher, limit: 1, saveHtmlDir }), saved }
 }
 
-test('inert no-host mock parser can count one page without creating retailer evidence', async () => {
-  const { result, saved } = await run({ priced: false })
+test('explicitly scoped fictional mock parser can count one page without creating retailer evidence', async () => {
+  const { result, saved } = await run({ priced: false, host: 'fictional.example.test' })
   assert.equal(result.status, 'ok')
   assert.equal(result.pages, 1)
   assert.equal(result.products, 0)
@@ -43,6 +44,15 @@ test('inert no-host mock parser can count one page without creating retailer evi
 test('no-host mock cannot persist a price even when source URL looks plausible', async () => {
   const { result, saved } = await run({ priced: true })
   assert.equal(result.products, 0)
+  assert.equal(result.pages, 0, 'unscoped source must be blocked before any transport')
   assert.ok(result.errors >= 1)
+  assert.deepEqual(saved, [])
+})
+
+test('unattributed even empty-parser mock cannot fetch without explicit source host', async () => {
+  const { result, saved } = await run({ priced: false })
+  assert.equal(result.pages, 0)
+  assert.equal(result.products, 0)
+  assert.equal(result.errors, 1)
   assert.deepEqual(saved, [])
 })
