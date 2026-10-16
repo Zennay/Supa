@@ -78,6 +78,7 @@ jobs:
           test -n "$asset"
           curl -fsS "http://127.0.0.1:8765/assets/$(basename "$asset")" -o /dev/null
       - name: Publish to isolated static preview branch (never main)
+        id: publish
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -103,13 +104,15 @@ jobs:
             git commit -qm "deploy(demo): publish main-based Supa fixture-only browser preview"
             git push -q origin HEAD:refs/heads/supa-browser-demo-site
           fi
-          echo "Preview: https://raw.githack.com/${GITHUB_REPOSITORY}/supa-browser-demo-site/index.html"
+          deploy_sha="$(git rev-parse HEAD)"
+          echo "deploy_sha=${deploy_sha}" >> "$GITHUB_OUTPUT"
+          echo "Preview: https://raw.githack.com/${GITHUB_REPOSITORY}/${deploy_sha}/index.html"
 
       - name: Check the externally published browser URL and its JavaScript
         shell: bash
         run: |
           set -euo pipefail
-          base="https://raw.githack.com/Zennay/Supa/supa-browser-demo-site/"
+          base="https://raw.githack.com/${GITHUB_REPOSITORY}/${{ steps.publish.outputs.deploy_sha }}/"
           verified=0
           for attempt in $(seq 1 24); do
             if curl -fL --connect-timeout 8 --max-time 16 -sS "${base}index.html" -o /tmp/supa-public.html &&
