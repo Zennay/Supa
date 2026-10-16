@@ -188,7 +188,9 @@ function validateEvidenceBoundary(
     if (!routeMatches) {
       return `DekaMarkt evidence source route does not match ${expectedKind}`
     }
-    if (url.search || url.hash ||
+    // WHATWG URL.search/hash omit bare '?' and '#' delimiters: preserve
+    // exact reviewed source identity by refusing the raw bytes as well.
+    if (/[?#]/.test(evidence.source.url) || url.search || url.hash ||
         (url.href !== evidence.source.url &&
          evidence.source.url !== url.href.replace(
            'https://www.dekamarkt.nl/', 'https://www.dekamarkt.nl:443/',
