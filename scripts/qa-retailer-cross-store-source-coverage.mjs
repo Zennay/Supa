@@ -40,11 +40,11 @@ function utcNs(value, asOf) {
   // Review capture instants physically, not via Date.parse's millisecond
   // truncation. One extra nanosecond can change a 24-hour evidence gate.
   if (typeof value !== 'string' ||
-      !/^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{1,9})?Z$/.test(value)) fail()
+      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(value)) fail()
   const ms = Date.parse(value)
   if (!Number.isFinite(ms) ||
       new Date(ms).toISOString().slice(0,19) !== value.slice(0,19)) fail()
-  const fraction = /\\.(\\d{1,9})Z$/.exec(value)?.[1] ?? ''
+  const fraction = /\.(\d{1,9})Z$/.exec(value)?.[1] ?? ''
   const nanos = BigInt(ms) * 1_000_000n +
     BigInt(fraction.padEnd(9, '0').slice(3) || '0')
   if (nanos > asOf) fail()
