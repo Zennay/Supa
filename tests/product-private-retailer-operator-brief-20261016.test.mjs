@@ -451,3 +451,43 @@ test('direct historical coverage cannot mask forbidden retailer rights or claime
     assert.throws(() => renderPrivateRetailerCoverageBrief(health, changed), /geweigerd/)
   }
 })
+
+test('historical coverage refuses divergent review windows and forged six-shape/freshness flags', async () => {
+  const { batch, report } = await historicalReport()
+  const health = evaluatePrivateAdapterHealth(batch, {
+    referenceTime: report.referenceTime,
+    maxAgeHours: report.maxAgeHours,
+  })
+  const cases = [
+    current => { current.maxAgeHours = 720 },
+    current => { current.sixShapeCoverageComplete = !current.sixShapeCoverageComplete },
+    current => { current.historicalFreshnessWithinWindow = !current.historicalFreshnessWithinWindow },
+    current => { current.missingSourceKinds = ['plus:product'] },
+    current => { current.inconsistentProducts++ },
+  ]
+  for (const falsify of cases) {
+    const forged = structuredClone(health)
+    falsify(forged)
+    assert.throws(() => renderPrivateRetailerCoverageBrief(forged, report), /geweigerd/)
+  }
+})
+
+test('historical coverage cannot drop required written rights or archive repair actions', async () => {
+  const { batch, report } = await historicalReport()
+  const health = evaluatePrivateAdapterHealth(batch, {
+    referenceTime: report.referenceTime,
+    maxAgeHours: report.maxAgeHours,
+  })
+  assert.ok(health.operatorActions.includes('obtain-written-retailer-source-rights'))
+  for (const drop of [
+    'obtain-written-retailer-source-rights',
+    'collect-genuine-two-store-m3-basket-evidence',
+  ]) {
+    const modified = structuredClone(health)
+    modified.operatorActions = modified.operatorActions.filter(action => action !== drop)
+    assert.throws(() => renderPrivateRetailerCoverageBrief(modified, report), /geweigerd/)
+  }
+  const reordered = structuredClone(health)
+  reordered.operatorActions.reverse()
+  assert.throws(() => renderPrivateRetailerCoverageBrief(reordered, report), /geweigerd/)
+})
