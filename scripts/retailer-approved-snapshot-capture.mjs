@@ -140,31 +140,44 @@ function permittedForCapture(gate, source, grant, target) {
   }
 }
 
+// A fetch response can still be streaming after an explicit refusal. Releasing
+// its reader lock alone does NOT close the upstream connection. Cancel unread
+// bytes, preserving the original privacy-safe rejection if cancellation fails.
+async function cancelUnreadBody(body) {
+  try { await body?.cancel?.() } catch { /* best effort: keep original refusal */ }
+}
+
 async function collectBoundedBody(response) {
   if (!response?.body || typeof response.body.getReader !== 'function') {
     throw new Error('Missing streaming HTML body')
   }
   const contentType = response.headers?.get?.('content-type') || ''
-  if (!/^text\/html(?:\s*;|$)/i.test(contentType.trim())) {
+  if (!/^text\\/html(?:\\s*;|$)/i.test(contentType.trim())) {
+    await cancelUnreadBody(response.body)
     throw new Error('Source did not return HTML')
   }
   const declared = response.headers?.get?.('content-length')
-  if (declared && (!/^\d+$/.test(declared) || Number(declared) > MAX_BODY_BYTES)) {
+  if (declared && (!/^\\d+$/.test(declared) || Number(declared) > MAX_BODY_BYTES)) {
+    await cancelUnreadBody(response.body)
     throw new Error('Declared snapshot exceeds size budget')
   }
   const reader = response.body.getReader()
   const chunks = []
   let bytes = 0
+  let fullyRead = false
   try {
     for (;;) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) { fullyRead = true; break }
       if (!(value instanceof Uint8Array)) throw new Error('Invalid HTML chunk')
       bytes += value.byteLength
       if (bytes > MAX_BODY_BYTES) throw new Error('Snapshot exceeds size budget')
       chunks.push(value)
     }
   } finally {
+    if (!fullyRead) {
+      try { await reader.cancel() } catch { /* retain the source refusal */ }
+    }
     reader.releaseLock()
   }
   const all = Buffer.concat(chunks)
