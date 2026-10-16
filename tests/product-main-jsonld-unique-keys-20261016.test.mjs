@@ -112,3 +112,48 @@ test('identical member names in distinct array objects do not cause false duplic
   assert.equal(selected.observation.currentPriceCents, 245)
   assert.equal(selected.publicSavingsClaimEligible, false)
 })
+
+test('external src on a declared JSON-LD data block refuses private product price', () => {
+  const json = JSON.stringify(good)
+  for (const attrs of [
+    'type="application/ld+json" src="https://untrusted.invalid/page.js"',
+    'TYPE="application/ld+json" SRC="/fake.js"',
+    'type="application/ld+json" src',
+    'src=\'/test.js\' type="application/ld+json"',
+  ]) {
+    const result = parseM3OfflineProductHtml({
+      source, capturedAt: time, html: '<script ' + attrs + '>' + json + '</script>',
+    })
+    assert.equal(result.type, 'abstain', attrs)
+    assert.equal(Object.hasOwn(result, 'observation'), false)
+    assert.equal(result.publicSavingsClaimEligible, false)
+  }
+})
+
+test('data-src metadata never disables truly inline JSON-LD and src in unrelated non-JSON-LD is not product evidence', () => {
+  const valid = JSON.stringify(good)
+  for (const attrs of [
+    'type="application/ld+json" data-src="ignore"',
+    'data-src="src=fake" type="application/ld+json"',
+  ]) {
+    assert.equal(parseM3OfflineProductHtml({
+      source, capturedAt: time, html: '<script ' + attrs + '>' + valid + '</script>',
+    }).observation.currentPriceCents, 245)
+  }
+  const ignored = '<script src="/other.js" type="text/javascript">console.log(1)</script>'
+  assert.equal(parseM3OfflineProductHtml({
+    source, capturedAt: time, html: ignored + page(valid),
+  }).observation.currentPriceCents, 245)
+})
+
+test('untrusted external JSON-LD src poisons the entire physical page even if a second valid product follows', () => {
+  const valid = JSON.stringify(good)
+  for (const combined of [
+    '<script src="/untrusted" type="application/ld+json">' + valid + '</script>' + page(valid),
+    page(valid) + '<script type="application/ld+json" src>' + valid + '</script>',
+  ]) {
+    const result = parseM3OfflineProductHtml({ source, capturedAt: time, html: combined })
+    assert.equal(result.type, 'abstain')
+    assert.equal(result.publicSavingsClaimEligible, false)
+  }
+})
