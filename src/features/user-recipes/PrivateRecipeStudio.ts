@@ -4,6 +4,62 @@ import type { EditorRecipeDraft } from './userRecipeDraftEditor.ts'
 import { PrivateRecipeWeekPlanner } from './PrivateRecipeWeekPlanner.ts'
 import type { PrivateWeekSelection } from './privateWeekPlanner.ts'
 
+
+/**
+ * Detach the complete user-owned library entry before both the planner and
+ * studio callback consult it. Checking ID alone is insufficient: title,
+ * ingredients and nested item fields can also be accessor-backed values.
+ * Browser objects cannot be inspected for Proxy identity reliably, so do not
+ * claim this is a general sandbox for arbitrary JS Proxy code.
+ */
+function inertLocalRecipe(value: unknown, seen = new WeakSet<object>(),
+  budget = { count: 0 }, depth = 0): unknown {
+  if (++budget.count > 4096 || depth > 16) throw new Error('invalid private recipe data')
+  if (value === null || value === undefined ||
+      typeof value === 'string' || typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))) return value
+  if (typeof value !== 'object' || seen.has(value)) {
+    throw new Error('invalid private recipe data')
+  }
+  seen.add(value)
+  const array = Array.isArray(value)
+  const proto = Object.getPrototypeOf(value)
+  if (array ? proto !== Array.prototype :
+      proto !== Object.prototype && proto !== null) {
+    throw new Error('invalid private recipe data')
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value)
+  if (Reflect.ownKeys(descriptors).some(key => typeof key !== 'string')) {
+    throw new Error('invalid private recipe data')
+  }
+  if (array) {
+    const count = descriptors.length?.value
+    if (!Number.isSafeInteger(count) || count > 256 ||
+        Reflect.ownKeys(descriptors).length !== count + 1) {
+      throw new Error('invalid private recipe data')
+    }
+    const copy: unknown[] = []
+    for (let index = 0; index < count; index++) {
+      const item = descriptors[index]
+      if (!item || !Object.prototype.hasOwnProperty.call(item, 'value')) {
+        throw new Error('invalid private recipe data')
+      }
+      copy.push(inertLocalRecipe(item.value, seen, budget, depth + 1))
+    }
+    return copy
+  }
+  if (Object.keys(descriptors).length > 64) throw new Error('invalid private recipe data')
+  const copy: Record<string, unknown> = {}
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (key === '__proto__' || key.length > 128 ||
+        !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error('invalid private recipe data')
+    }
+    copy[key] = inertLocalRecipe(descriptor.value, seen, budget, depth + 1)
+  }
+  return copy
+}
+
 /**
  * Standalone opt-in composition of existing review form + private week planner.
  * Parent owns state, persistence, ID issuance and user authorization; this
@@ -36,6 +92,7 @@ export function PrivateRecipeStudio({
   // supply a stale/malformed collection; never allow that state to bypass
   // duplicate checks or trigger a recipe ID getter during render.
   const libraryIds: string[] = []
+  const libraryCopy: UnpricedPrivateRecipe[] = []
   let validLibrary = false
   try {
     // A sparse array or an inherited/accessor array slot must not provide
@@ -51,8 +108,10 @@ export function PrivateRecipeStudio({
           validLibrary = false
           break
         }
-        const recipe = slot.value
-        if (!recipe || typeof recipe !== 'object') { validLibrary = false; break }
+        const recipe = inertLocalRecipe(slot.value) as UnpricedPrivateRecipe
+        if (!recipe || typeof recipe !== 'object' ||
+            typeof recipe.title !== 'string' || !recipe.title.trim() ||
+            !Array.isArray(recipe.ingredients)) { validLibrary = false; break }
         const descriptor = Object.getOwnPropertyDescriptor(recipe, 'id')
         const id = descriptor?.value
         if (!Object.prototype.hasOwnProperty.call(descriptor ?? {}, 'value') ||
@@ -61,6 +120,7 @@ export function PrivateRecipeStudio({
             known.has(id)) { validLibrary = false; break }
         known.add(id)
         libraryIds.push(id)
+        libraryCopy.push(recipe)
       }
     }
   } catch {
@@ -82,6 +142,11 @@ export function PrivateRecipeStudio({
       for (const [day, descriptor] of Object.entries(descriptors)) {
         if (!weekDays.has(day) || !Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
             !(descriptor.value == null || typeof descriptor.value === 'string')) {
+          validSelection = false
+          break
+        }
+        if (typeof descriptor.value === 'string' && descriptor.value !== '' &&
+            !libraryIds.includes(descriptor.value)) {
           validSelection = false
           break
         }
@@ -127,7 +192,7 @@ export function PrivateRecipeStudio({
           'Dit recept kan aan je lokale lijst worden toegevoegd; prijs en winkel blijven onbekend.'),
     createElement(PrivateRecipeWeekPlanner, {
       key:'planner',
-      recipes: validHostState ? recipes : [],
+      recipes: validHostState ? libraryCopy : [],
       selection:safeDays,
       onSelectionChange:onSelectedDaysChange,
     }),
