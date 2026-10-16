@@ -149,6 +149,18 @@ test('an archived source clock regression is refused even when product IDs are d
 })
 
 // No invocation may read inherited properties, accessors or proxy getters.
+test('same-clock SHA change with all disjoint SKU identities cannot masquerade as a new catalog', async () => {
+  const older = structuredClone(await loadReviewedRepositoryFixtures())
+  const candidate = structuredClone(older)
+  for (const ob of candidate.results[0].observations) {
+    ob.sourceProductId = 'counterfactual-' + ob.sourceProductId
+    ob.provenance.sha256 = 'a'.repeat(64)
+    // Same physical capture time + different SHA is impossible continuity.
+  }
+  assert.throws(() => rehearsePrivateM3RetailerDrift(
+    await rights(), older, candidate, { referenceTime: AT }), /refused/)
+})
+
 test('operator CLI rejects invalid/sparse/accessor/proxy argv before reading any evidence', async () => {
   const rejects = [
     [], ['--before-dir', '/a'], ['--after-dir', '/b'],
