@@ -112,6 +112,18 @@ test('multi-capture private archive retains all reviewed events but selects only
     const before = await archiveSignature(directory)
     const report = await main(['--dir', directory, '--at', CLOCK], () => {})
     assert.equal(report.historicalSourceEvents, 8)
+    assert.equal(report.historicalStockUnknownObservations +
+      report.historicalStockUnavailableObservations +
+      report.historicalStockAvailableObservations,
+      report.acceptedHistoricalObservations)
+    assert.equal(report.currentStockCoverageVerified, false)
+    assert.ok(report.perSourceShape.every(row =>
+      row.unknownHistoricalAvailability +
+        row.unavailableHistoricalObservations +
+        row.availableHistoricalObservations === row.archivedObservations))
+    assert.equal(report.perSourceShape.reduce((n, row) =>
+      n + row.unknownHistoricalAvailability, 0),
+    report.historicalStockUnknownObservations)
     assert.equal(report.selectedSourceEventsForOfferReview, 6)
     assert.equal(report.sourceEventsOutsideOfferReview, 2)
     assert.equal(report.offerReviewSelectionPolicy,
