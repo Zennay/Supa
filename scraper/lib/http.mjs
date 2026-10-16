@@ -147,7 +147,7 @@ export class PoliteFetcher {
       attempt += 1
       try {
         return await this.schedule(host, () =>
-          this.once(url, { accept, method, body, headers }),
+          this.once(url, { accept, method, body, headers, skipRobots }),
         )
       } catch (error) {
         if (error instanceof HttpStatusError) {
@@ -174,47 +174,108 @@ export class PoliteFetcher {
     }
   }
 
-  async once(url, { accept, method, body, headers }) {
+  async once(url, { accept, method, body, headers, skipRobots = false }) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), this.timeoutMs)
+    const origin = new URL(url)
+    // Never let a per-source approval silently become a browser-like redirect
+    // permission. Absolute HTTPS, one exact host, no userinfo/custom port.
+    const approved = (candidate) => candidate.protocol === 'https:' &&
+      candidate.hostname === origin.hostname &&
+      candidate.port === origin.port &&
+      candidate.username === '' && candidate.password === ''
+    if (!approved(origin)) {
+      clearTimeout(timer)
+      throw new Error('retailer HTTP source is not an approved HTTPS origin')
+    }
+
+    const seen = new Set()
+    let current = origin.href
     try {
-      this.stats.requests += 1
-      const res = await this.fetchImpl(url, {
-        method,
-        body,
-        redirect: 'follow',
-        signal: controller.signal,
-        headers: {
-          'user-agent': this.userAgent,
-          accept: accept ?? 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'accept-language': 'nl-NL,nl;q=0.9,en;q=0.5',
-          ...headers,
-        },
-      })
-      if (!res.ok) {
-        const error = new HttpStatusError(url, res.status)
-        const retryAfter = Number(res.headers.get('retry-after'))
-        if (Number.isFinite(retryAfter)) error.retryAfter = retryAfter
-        try {
+      for (let hop = 0; hop <= 5; hop += 1) {
+        if (seen.has(current)) throw new Error('retailer HTTP redirect loop refused')
+        seen.add(current)
+        this.stats.requests += 1
+        const res = await this.fetchImpl(current, {
+          method,
+          body,
+          // A default fetch redirect follows a foreign Location *before*
+          // scope/robots/pacing can be rechecked. Manual redirects are mandatory.
+          redirect: 'manual',
+          signal: controller.signal,
+          headers: {
+            'user-agent': this.userAgent,
+            accept: accept ?? 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'accept-language': 'nl-NL,nl;q=0.9,en;q=0.5',
+            ...headers,
+          },
+        })
+        const final = new URL(res.url || current)
+        if (!approved(final)) {
           await res.body?.cancel()
-        } catch {
-          // ignore
+          throw new Error('retailer HTTP redirected outside approved HTTPS origin')
         }
-        throw error
+
+        if (res.status >= 300 && res.status < 400) {
+          const location = res.headers.get('location')
+          // Do not forward authenticated or POST requests on redirect.
+          if (!location || (method !== 'GET' && method !== 'HEAD') || hop === 5) {
+            await res.body?.cancel()
+            throw new Error('retailer HTTP redirect refused (missing target, unsafe method or hop limit)')
+          }
+          let target
+          try {
+            target = new URL(location, final)
+          } catch {
+            await res.body?.cancel()
+            throw new Error('retailer HTTP redirect target is malformed')
+          }
+          if (!approved(target)) {
+            await res.body?.cancel()
+            throw new Error('retailer HTTP redirect target is not an approved HTTPS origin')
+          }
+          // The initial robots.txt check is NOT enough for a redirected path.
+          if (!skipRobots && this.respectRobots &&
+              !isAllowed(this.hostState(origin.host).robots, this.userAgent, target.href)) {
+            await res.body?.cancel()
+            throw new RobotsDisallowedError(target.href)
+          }
+          await res.body?.cancel()
+          const robots = this.hostState(origin.host).robots
+          await this.sleep(Math.max(
+            this.minDelayMs,
+            (crawlDelaySeconds(robots, this.userAgent) ?? 0) * 1000,
+          ))
+          current = target.href
+          continue
+        }
+
+        if (!res.ok) {
+          const error = new HttpStatusError(current, res.status)
+          const retryAfter = Number(res.headers.get('retry-after'))
+          if (Number.isFinite(retryAfter)) error.retryAfter = retryAfter
+          try {
+            await res.body?.cancel()
+          } catch {
+            // ignore
+          }
+          throw error
+        }
+        const buffer = Buffer.from(await res.arrayBuffer())
+        if (buffer.length > this.maxBytes) {
+          throw new Error('retailer HTTP response exceeds maximum bytes')
+        }
+        const bytes =
+          buffer[0] === 0x1f && buffer[1] === 0x8b ? gunzipSync(buffer) : buffer
+        this.stats.bytes += buffer.length
+        return {
+          url: final.href,
+          status: res.status,
+          contentType: res.headers.get('content-type') ?? '',
+          text: bytes.toString('utf8'),
+        }
       }
-      const buffer = Buffer.from(await res.arrayBuffer())
-      if (buffer.length > this.maxBytes) {
-        throw new Error(`response too large (${buffer.length} bytes) for ${url}`)
-      }
-      const bytes =
-        buffer[0] === 0x1f && buffer[1] === 0x8b ? gunzipSync(buffer) : buffer
-      this.stats.bytes += buffer.length
-      return {
-        url: res.url || url,
-        status: res.status,
-        contentType: res.headers.get('content-type') ?? '',
-        text: bytes.toString('utf8'),
-      }
+      throw new Error('retailer HTTP redirect hop limit reached')
     } finally {
       clearTimeout(timer)
     }
