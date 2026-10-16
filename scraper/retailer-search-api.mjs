@@ -64,7 +64,7 @@ export function findFreshProducts(database, approvedIds, query, now = new Date()
     // the product row is fresh and the promotional cents are positive.
     const parseBound = value => value === null ? null :
       typeof value === 'string' &&
-      /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value)
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
         ? Date.parse(value) : NaN
     const starts = parseBound(row.promo_valid_from)
     const ends = parseBound(row.promo_valid_until)
