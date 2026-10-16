@@ -7,6 +7,8 @@ import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
+import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
+import { figmaAssets } from './features/home/figmaAssets'
 import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
@@ -29,13 +31,14 @@ import {
   m3CandidateStore,
 } from './data/m3ComparisonFixture'
 
-type Tab = 'planner' | 'basket' | 'list' | 'observe'
+type Tab = 'home' | 'recipes' | 'products' | 'planner' | 'basket' | 'list' | 'observe'
 
-const tabs: { id: Tab; label: string }[] = [
-  { id: 'planner', label: 'Planner' },
-  { id: 'basket', label: 'Mand' },
-  { id: 'list', label: 'Lijst' },
-  { id: 'observe', label: 'Meten' },
+const tabs: { id: Tab; label: string; icon: string }[] = [
+  { id: 'home', label: 'Home', icon: figmaAssets.imgVector5 },
+  { id: 'planner', label: 'Planner', icon: figmaAssets.imgButton },
+  { id: 'recipes', label: 'Recepten', icon: figmaAssets.imgButton1 },
+  { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2 },
+  { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3 },
 ]
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
@@ -66,7 +69,12 @@ function readPlannerPreferences(): {
 }
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('planner')
+  const [tab, setTab] = useState<Tab>('home')
+  const [designProductIds, setDesignProductIds] = useState<string[]>([])
+  const isHiFiView = tab === 'home' || tab === 'recipes' || tab === 'products'
+  const navigate = (next: Tab) => { setTab(next); window.scrollTo(0, 0) }
+  const toggleDesignProduct = (id: string) => setDesignProductIds(current =>
+    current.includes(id) ? current.filter(item => item !== id) : [...current, id])
   const [initialLoad] = useState(readPlannerPreferences)
   const [preferences, setPreferences] = useState(() => initialLoad.preferences)
   const [persistenceWarning, setPersistenceWarning] = useState<PersistenceWarning>(initialLoad.warning)
@@ -216,16 +224,19 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
+    <main className={`app-shell${isHiFiView ? ' hifi-shell' : ''}`}>
+      {!isHiFiView && <header className="topbar">
         <div>
           <span className="brand-mark">S</span>
           <strong>SUPA</strong>
         </div>
         <IdentityAvatar />
-      </header>
+      </header>}
 
       <div className="content">
+        {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
+        {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
+        {tab === 'list' && <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />}
         {persistenceWarning && (
           <p role="alert" className="disclaimer" aria-live="assertive">
             {persistenceWarning === 'protected'
@@ -305,16 +316,17 @@ export function App() {
         {tab === 'observe' && <ObservationView />}
       </div>
 
-      <nav className="bottom-nav" aria-label="Hoofdnavigatie">
+      <nav className="bottom-nav hifi-nav" aria-label="Hoofdnavigatie">
         {tabs.map((item) => (
           <button
             type="button"
             key={item.id}
             className={tab === item.id ? 'active' : ''}
             aria-current={tab === item.id ? 'page' : undefined}
-            onClick={() => setTab(item.id)}
+            onClick={() => navigate(item.id)}
           >
-            {item.label}
+            <img src={item.icon} alt="" />
+            <span className="hifi-sr-only">{item.label}</span>
           </button>
         ))}
       </nav>
