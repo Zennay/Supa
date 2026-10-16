@@ -27,7 +27,7 @@ async function offlineCapture(records) {
     host: 'example.test',
     status: 'active',
     mode: 'http',
-    async *discover() { yield { kind: 'product', url: 'https://example.test/fixture' } },
+    async *discover() { yield { kind: 'catalog', url: 'https://example.test/fixture' } },
     parse() { return records },
   }
   const store = {

@@ -20,6 +20,22 @@ function isTrustedResponseSource(value, retailerHost) {
   }
 }
 
+
+// A product-detail fetch is evidence only for the requested article or its
+// real same-origin redirect. Sibling SKUs on the same host are not equivalent;
+// catalog pages may still yield multiple independently linked articles.
+function matchesProductArticle(recordUrl, item, effectiveUrl) {
+  if (item?.kind !== 'product') return true
+  const canonicalArticle = (url) => {
+    const parsed = new URL(url)
+    parsed.hash = '' // fragments are not part of the article identity
+    return parsed.href
+  }
+  const recordArticle = canonicalArticle(recordUrl)
+  return recordArticle === canonicalArticle(item.url) ||
+    recordArticle === canonicalArticle(effectiveUrl)
+}
+
 // Scrape one retailer into the store. Returns a summary; never throws for
 // per-page problems (they are counted), only aborts on a host block or a
 // sustained error rate (selector drift / outage => fail closed).
@@ -93,7 +109,8 @@ export async function runRetailer(adapter, {
       ? adapter.parse(res.text, res.url || item.url).filter((record) =>
           isValidRecord(record) &&
           record.retailer === adapter.id &&
-          isTrustedResponseSource(record.url, adapter.host),
+          isTrustedResponseSource(record.url, adapter.host) &&
+          matchesProductArticle(record.url, item, res.url),
         )
       : []
     if (!sourceApproved) {
