@@ -77,13 +77,29 @@ export function updateEditorIngredient(
     const next = { ...ingredient, ...patch }
     next.label = next.label.trimStart().slice(0, MAX_TEXT)
     next.query = next.label.toLowerCase()
+    // Imported, unverified conversions are not fixed by renaming the food.
+    // Only a genuine metric amount/unit change can lift that source review.
+    // Ordinary editor "required field" messages remain recomputed below.
+    const metricChanged =
+      (Object.prototype.hasOwnProperty.call(patch, 'amount') && patch.amount !== ingredient.amount) ||
+      (Object.prototype.hasOwnProperty.call(patch, 'unit') && patch.unit !== ingredient.unit)
+    const validationMessage = new Set([
+      'Vul een hoeveelheid in.',
+      'Vul een ingrediëntnaam in.',
+      'Vul een geldige hoeveelheid in.',
+      'Kies gram, milliliter of stuks.',
+      'Vul een ingrediëntnaam en hoeveelheid in.',
+    ])
+    const unresolvedSourceReview =
+      !metricChanged && ingredient.reviewReason !== null &&
+      !validationMessage.has(ingredient.reviewReason)
     next.reviewReason = !next.label.trim()
       ? 'Vul een ingrediëntnaam in.'
       : !validAmount(next.amount)
         ? 'Vul een geldige hoeveelheid in.'
         : !['g', 'ml', 'piece'].includes(next.unit ?? '')
           ? 'Kies gram, milliliter of stuks.'
-          : null
+          : unresolvedSourceReview ? ingredient.reviewReason : null
     return next
   })
   return { ...draft, ingredients }
