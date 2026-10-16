@@ -13,6 +13,10 @@ Eén owner-only Git-tree gebaseerd op canonical immutable `main cac55435ddb77228
 
 De nieuwe productfunctie `src/features/user-recipes/recipeDraftFlow.ts` voert portievoorstel, onveilige bronlinkmelding, expliciete gebruikersinstemming voor lokale conceptbewaring en herstel met nieuwe UI-rijidentiteiten samen. `tests/user-recipe-owned-module-integration-20261016.test.mjs` oefent deze koppeling werkelijk uit inclusief unknown/fractional ingrediënten, 2→4-porties, bronlink met credentials, privacy-redactie, revisieconflict, geen-netwerk- en geen-cloudclaims.
 
+## Eigen recepten → ongeprijsd boodschappenlijstvoorstel
+
+Een additionele productmodule `src/features/user-recipes/userRecipeShoppingNeeds.ts` zet alleen de gekozen porties van één privérecept om in een **ongeprijsde** lijst met duidelijk onbekende hoeveelheden. Ze hergebruikt de bestaande gecontroleerde `sumDecimalAmounts` uit de M3 decimal-engine, telt alleen exact dezelfde label + query + eenheid samen, en houdt gram en milliliter bewust gescheiden. Bij ontbreken oorspronkelijke porties, afronding of halve stuks blijft de rij zichtbaar onder `review_required`; een `null` wordt nooit €0 of een gratis winkelproduct. Geen retailer/productmatching, geen verzonnen besparingen, geen wijziging aan het echte M3 mandje of Planner. De bijbehorende acht nieuwe tests dekken 2→4-porties, 0.1+0.2 exact, onbekende cups, eenheden, halve stuks, grenswaarden en bronwaarschuwingen.
+
 ## Expliciete grenzen
 
 - De actieve peer [JSON-LD-intakeparser #3264](https://github.com/Zennay/Supa/pull/3264) is **niet** ingekopieerd of veranderd. Dit bewijs toont compatibiliteit tussen **eigen** bouwstenen, niet al werkende bron-HTML download.
