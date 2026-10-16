@@ -27,7 +27,7 @@ The *canonical* `captureApprovedRetailerPage` validates the entire inert permiss
 
 - One session keeps **independent PLUS and DekaMarkt host budgets** (three attempts max per host; >=10 s between attempts).
 - One request per host at a time; the lock stays held through bounded HTML streaming and integrity verification, not just the HTTP headers.
-- Any 403 or 429 irreversibly blocks that host **in this session**. A transport error or non-200 response adds a 60-second cooldown; the code never retries automatically.
+- Any 403 or 429 irreversibly blocks that host **in this session**. A transport error, non-200 response, **or malformed/incomplete HTTP-200 body** adds a 60-second cooldown; the code never retries automatically. A malformed response cannot be polled again after only the ordinary 10-second gap.
 - No proxy fallback/rotation, implicit network client, fetch schedule, cookies/credentials, automatic redirects or source permission escalation.
 - The scope is **one in-memory session**. This is not a distributed/global rate limiter; it must not be used to defeat a retailer block by creating new sessions. A future orchestrator needs separate host-wide coordination and operator approval.
 
