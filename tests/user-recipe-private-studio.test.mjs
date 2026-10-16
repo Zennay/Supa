@@ -196,3 +196,32 @@ test('valid own-ID library preserves event-time confirmation and unknown-price c
   assert.equal(added[0].estimatedCost,null)
   assert.equal(added[0].priceStatus,'unknown')
 })
+
+test('sparse or accessor recipe collection slots cannot create local drafts',()=>{
+  const added=[]
+  const sparse=new Array(1)
+  const propertyReads={count:0}
+  const accessor=[]
+  Object.defineProperty(accessor,0,{enumerable:true,configurable:true,
+    get(){propertyReads.count++;return existing()}})
+  accessor.length=1
+  for (const recipes of [sparse,accessor]) {
+    const p=props({recipes,onAddReviewedRecipe:recipe=>added.push(recipe)})
+    const accept=confirmationCallback(p)
+    accept(p.draft)
+  }
+  assert.equal(propertyReads.count,0)
+  assert.equal(added.length,0)
+})
+
+test('revoked recipe library Proxy fails closed before any recipe is added',()=>{
+  const revoked=Proxy.revocable([], {})
+  revoked.revoke()
+  const added=[]
+  const p=props({recipes:revoked.proxy,onAddReviewedRecipe:recipe=>added.push(recipe)})
+  assert.doesNotThrow(()=>{
+    const accept=confirmationCallback(p)
+    accept(p.draft)
+  })
+  assert.equal(added.length,0)
+})
