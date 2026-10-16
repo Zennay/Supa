@@ -8,6 +8,7 @@
  */
 import { createHash } from 'node:crypto'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
+import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_JSONLD_BYTES = 256 * 1024
@@ -28,17 +29,24 @@ function abstain(reason) {
 function isJsonLdScript(attrs) {
   let rest = attrs
   let type = null
+  let externalSrc = false
   while (rest.trim()) {
     const match =
       /^\s+([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>\x60]+)))?/.exec(rest)
     if (!match) return false
-    if (match[1].toLowerCase() === 'type') {
+    const attribute = match[1].toLowerCase()
+    if (attribute === 'type') {
       if (type !== null) return false
       type = match[2] ?? match[3] ?? match[4] ?? ''
+    } else if (attribute === 'src') {
+      // A JSON-LD data block bearing src is NOT authenticated inline HTML.
+      // Refuse the whole page rather than silently select a later product.
+      externalSrc = true
     }
     rest = rest.slice(match[0].length)
   }
-  return type?.trim().toLowerCase() === 'application/ld+json'
+  if (type?.trim().toLowerCase() !== 'application/ld+json') return false
+  return externalSrc ? null : true
 }
 
 
@@ -106,14 +114,16 @@ function extractJsonLdDocuments(html) {
   let matched = 0
   for (const script of active.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
     matched += 1
-    if (!isJsonLdScript(script[1])) continue
+    const inline = isJsonLdScript(script[1])
+    if (inline === null) return null
+    if (!inline) continue
     count += 1
     if (count > MAX_JSONLD_SCRIPTS ||
         Buffer.byteLength(script[2], 'utf8') > MAX_JSONLD_BYTES) {
       return null
     }
     try {
-      documents.push(JSON.parse(script[2]))
+      documents.push(parseUniqueKeyRetailerJson(script[2]))
     } catch {
       // Fail the *whole* page. It is unsafe to use a later, valid looking
       // product price after another declared JSON-LD script was corrupted.
