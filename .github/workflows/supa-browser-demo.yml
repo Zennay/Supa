@@ -104,3 +104,27 @@ jobs:
             git push -q origin HEAD:refs/heads/supa-browser-demo-site
           fi
           echo "Preview: https://raw.githack.com/${GITHUB_REPOSITORY}/supa-browser-demo-site/index.html"
+
+      - name: Check the externally published browser URL and its JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://raw.githack.com/Zennay/Supa/supa-browser-demo-site/"
+          verified=0
+          for attempt in $(seq 1 24); do
+            if curl -fL --connect-timeout 8 --max-time 16 -sS "${base}index.html" -o /tmp/supa-public.html &&
+              grep -q 'SUPA TESTVERSIE' /tmp/supa-public.html; then
+              verified=1
+              break
+            fi
+            sleep 5
+          done
+          if [ "$verified" != 1 ]; then
+            echo '::error::External public preview URL not serving the stamped page'
+            exit 1
+          fi
+          asset=$(grep -oE '\./assets/[a-zA-Z0-9_-]+\.js' /tmp/supa-public.html | head -n 1)
+          test -n "$asset"
+          curl -fL --connect-timeout 8 --max-time 30 -sS "${base}${asset#./}" -o /tmp/supa-public-js
+          test "$(wc -c </tmp/supa-public-js)" -gt 10000
+          echo "HTTP 200 published HTML and JS confirmed: ${base}index.html"
