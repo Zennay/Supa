@@ -4,6 +4,7 @@ import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { readRecipeLibrary, saveRecipeLibrary, updateSavedRecipe, deleteSavedRecipe, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
+import { readRecipeFavorites, toggleRecipeFavorite, removeRecipeFavorite } from './recipeFavorites'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import './recipes.css'
 
@@ -42,7 +43,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [filter, setFilter] = useState<'all' | 'own' | 'favorites'>('all')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [sort, setSort] = useState(false)
-  const [favorites, setFavorites] = useState<string[]>([])
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try { return readRecipeFavorites(window.localStorage).ids } catch { return [] }
+  })
   const [mode, setMode] = useState<'manual' | 'url'>('manual')
   const [form, setForm] = useState(blank)
   const [url, setUrl] = useState('')
@@ -62,7 +66,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const demo = filter === 'own' ? [] : examples.filter(matches)
   const own = library.recipes.filter(matches)
   if (sort) { demo.sort((x, y) => x.title.localeCompare(y.title, 'nl')); own.sort((x, y) => x.title.localeCompare(y.title, 'nl')) }
-  const favorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
+  function favorite(id: string) {
+    try { setFavorites(toggleRecipeFavorite(window.localStorage, id).ids) }
+    catch (e) { setMessage(e instanceof Error ? e.message : 'Favoriet kon niet worden opgeslagen.') }
+  }
   function openEditor(next: 'manual' | 'url') {
     request.current?.abort(); setBusy(false); setMode(next); setEditingId(null); setForm(blank); setSource(null); setUrl(''); setPreview(null); setError(''); saving.current = false
     editor.current?.showModal()
@@ -84,7 +91,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     try {
       const next = deleteSavedRecipe(window.localStorage, library, recipe.id)
       setLibrary(next); setSelected(null); detail.current?.close()
-      setFavorites(current => current.filter(id => id !== recipe.id))
+      try { setFavorites(removeRecipeFavorite(window.localStorage, recipe.id).ids) }
+      catch { setFavorites(current => current.filter(id => id !== recipe.id)) }
       window.dispatchEvent(new Event('supa-recipes-changed'))
       setMessage(`${recipe.title} is verwijderd.`)
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Verwijderen is niet gelukt.') }
