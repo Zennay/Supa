@@ -20,6 +20,12 @@ De vergelijking accepteert uitsluitend **fysiek geldige UTC-brontijden** met 0�
 
 Dit is uitsluitend een controle van de herkomstclaim in **eerder opgeslagen privé-JSON**. De comparator voert zelf geen HTML-capture uit en kan de oorspronkelijke winkeldata of auteursrechten niet onafhankelijk bewijzen. Bij ongeldige input wordt niets als CSS, product of besparing gepubliceerd; de uitvoer blijft een menselijke beoordelingsmelding zonder brongegevens.
 
+## Veilige lokaal opgeslagen invoer
+
+Ook wanneer een JavaScript-module de vergelijking rechtstreeks aanroept, accepteert de tool uitsluitend **gewone, eigen data-eigenschappen** voor het voorstel, de bron, de gestructureerde signalen en alle selectorregels. Getter-properties, Proxy-objecten, overgeërfde identiteit, extra symbolische velden en ongeldige of gemanipuleerde selector-arrays worden geweigerd **zonder hun uitvoerbare getters of traps te starten**. De gegevens worden vastgepind voordat de verschillen worden berekend.
+
+Voor de CLI gelden dezelfde garanties voor de vier argumenten (`--before`, pad, `--after`, pad). Een Proxy of een index-getter kan dus geen ander privaat bestand laten openen tijdens de argumentcontrole. Bestaande gewone private `0600` JSON-bestanden en originele bronvoorstellen blijven bruikbaar. Dit is een synthetische programma-invoerbeveiliging en betekent niet dat historische winkeltoestemming, echte bronprijzen of menselijke winkelwagenmetingen zijn bewezen.
+
 **Wat drift niet bewijst:** dat een CSS selector werkelijk een artikel, prijs of beschikbaarheid in de browser oplevert. Productieadapters moeten nog per keten gevalideerd worden, alleen met expliciet geautoriseerde data en tegen de geschreven rechtenregisters. De M3-releasevoorwaarden [#74](https://github.com/Zennay/Supa/issues/74), [#78](https://github.com/Zennay/Supa/issues/78), [#205](https://github.com/Zennay/Supa/issues/205), [#2833](https://github.com/Zennay/Supa/issues/2833) blijven open.
 
 Tests: `node --experimental-strip-types --test tests/product-retailer-private-selector-drift-20261015.test.mjs`, met werkelijk geproduceerde offline proposal-objecten en lokale 0600 JSON-bestanden.
