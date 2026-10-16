@@ -104,6 +104,15 @@ test('detaches inert input without executing getters or traversing non-enumerabl
   assert.throws(() => auditPhysicalRetailerCaptures([hidden]), /inert JSON/)
 })
 
+test('exported CLI refuses hostile argv without triggering Proxy traps', async () => {
+  let accessed = false
+  const hostile = new Proxy([], {
+    get() { accessed = true; throw Error('executed argv trap') },
+  })
+  await assert.rejects(() => main(hostile), /inert JSON/)
+  assert.equal(accessed, false)
+})
+
 test('fixed-fixture CLI emits no URL, amount, product, personal value or permission elevation', async () => {
   let actual = ''
   const report = await main([], chunk => { actual += chunk })
