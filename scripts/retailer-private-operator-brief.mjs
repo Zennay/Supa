@@ -172,6 +172,7 @@ export function renderPrivateRetailerOperatorBrief(report) {
 
   const referenceNanos = physicalReviewInstant(report.referenceTime)
   if (referenceNanos > BigInt(Date.now()) * 1_000_000n) fail()
+  const freshnessWindowNanos = BigInt(report.maxAgeHours) * 3_600_000_000_000n
   const lines = [
     'SUPA — offline winkelbron-startcontrole',
     'ALLEEN HISTORISCHE BRONNEN. Geen live ophalen, geplande vernieuwing, actuele prijzen of besparingsclaims.',
@@ -213,6 +214,8 @@ export function renderPrivateRetailerOperatorBrief(report) {
           !safeCount(shape.unknownPriceObservations) ||
           shape.historicalSources !== shape.acceptedSources + shape.rejectedSources ||
           shape.staleHistoricalCaptures > shape.acceptedSources ||
+          // Every accepted capture yielded at least one reviewed observation.
+          shape.historicalObservations < shape.acceptedSources ||
           shape.unknownPriceObservations > shape.historicalObservations ||
           shape.status !== expectedShapeStatus(shape) ||
           (shape.acceptedSources === 0 && shape.latestArchivedCapturedAt !== null) ||
@@ -222,6 +225,17 @@ export function renderPrivateRetailerOperatorBrief(report) {
               physicalReviewInstant(shape.latestArchivedCapturedAt) > referenceNanos)) ||
           shape.eligibleForLiveCapture !== false ||
           shape.verifiedCurrentPriceObservations !== 0) fail()
+      // The newest archived capture independently anchors the stale-source
+      // count: if even the newest is old, at least one is stale. Conversely,
+      // when newest is inside the window, not *every* capture can be stale.
+      // Neither direction claims present-day retailer price freshness.
+      if (shape.acceptedSources > 0) {
+        const age = referenceNanos -
+          physicalReviewInstant(shape.latestArchivedCapturedAt)
+        if ((age > freshnessWindowNanos && shape.staleHistoricalCaptures === 0) ||
+            (age <= freshnessWindowNanos &&
+              shape.staleHistoricalCaptures === shape.acceptedSources)) fail()
+      }
       observedKinds.add(shape.kind)
       if (shape.acceptedSources) acceptedStore++
       else missing++
