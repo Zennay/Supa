@@ -40,7 +40,7 @@ function exported(url) {
 const dangerousKeys = [
   ['double-encoded OAuth code', '%2563ode'],
   ['triple-encoded OAuth code', '%252563ode'],
-  ['encoded SAMLResponse letter', 'SAML%2552esponse'],
+  ['encoded SAMLResponse letter', 'S%2541MLResponse'],
   ['direct PKCE verifier', 'pkce_verifier'],
 ]
 for (const [description, key] of dangerousKeys) {
