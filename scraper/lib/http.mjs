@@ -38,6 +38,26 @@ export class HttpStatusError extends Error {
   }
 }
 
+// Reject unsafe initial transport targets BEFORE robots.txt or any HTTP I/O.
+// WHATWG URL canonicalises disguised numeric IPv4 spellings into dot-decimal.
+// A caller's retailer policy is a separate, stricter admission gate.
+function assertPublicHttpsTarget(value) {
+  let parsed
+  try { parsed = new URL(value) } catch {
+    throw new Error('retailer HTTP unsafe retailer target: not an approved HTTPS origin')
+  }
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, '')
+  const forbidden = parsed.protocol !== 'https:' || !!parsed.port ||
+    !!parsed.username || !!parsed.password || !hostname ||
+    hostname.startsWith('[') ||
+    /^\d+(?:\.\d+){3}$/.test(hostname) ||
+    /^(?:localhost|.*\.localhost|.*\.local|.*\.internal|.*\.home\.arpa)$/.test(hostname)
+  if (forbidden) {
+    throw new Error('retailer HTTP unsafe retailer target: not an approved HTTPS origin')
+  }
+  return parsed
+}
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export class PoliteFetcher {
@@ -86,7 +106,7 @@ export class PoliteFetcher {
   }
 
   async robotsFor(url) {
-    const { origin, host } = new URL(url)
+    const { origin, host } = assertPublicHttpsTarget(url)
     const state = this.hostState(host)
     if (state.robots !== undefined) return state.robots
     if (!state.robotsPromise) {
@@ -133,7 +153,7 @@ export class PoliteFetcher {
   }
 
   async request(url, { skipRobots = false, accept, method = 'GET', body, headers = {} } = {}) {
-    const { host } = new URL(url)
+    const { host } = assertPublicHttpsTarget(url)
     const state = this.hostState(host)
     if (state.blocked) throw new HostBlockedError(host, state.blocked)
 
@@ -177,7 +197,7 @@ export class PoliteFetcher {
   async once(url, { accept, method, body, headers, skipRobots = false }) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), this.timeoutMs)
-    const origin = new URL(url)
+    const origin = assertPublicHttpsTarget(url)
     // Never let a per-source approval silently become a browser-like redirect
     // permission. Absolute HTTPS, one exact host, no userinfo/custom port.
     const approved = (candidate) => candidate.protocol === 'https:' &&
