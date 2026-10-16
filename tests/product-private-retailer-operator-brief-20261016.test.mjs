@@ -463,7 +463,7 @@ test('historical coverage refuses divergent review windows and forged six-shape/
     current => { current.sixShapeCoverageComplete = !current.sixShapeCoverageComplete },
     current => { current.historicalFreshnessWithinWindow = !current.historicalFreshnessWithinWindow },
     current => { current.missingSourceKinds = ['plus:product'] },
-    current => { current.inconsistentProducts++ },
+    current => { current.inconsistentProducts = current.inconsistentProducts === 0 ? 1 : 0 },
   ]
   for (const falsify of cases) {
     const forged = structuredClone(health)
