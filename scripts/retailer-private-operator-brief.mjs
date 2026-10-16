@@ -9,6 +9,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { types as nodeTypes } from 'node:util'
 import { planPrivateRetailerRollout } from './retailer-private-source-rollout-matrix.mjs'
 import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
 
@@ -36,6 +37,53 @@ const rightLabels = {
   permitted: 'rechtenstatus positief; afzonderlijke live-vrijgave blijft nodig',
 }
 const safeCount = number => Number.isSafeInteger(number) && number >= 0 && number <= 50000
+
+/**
+ * The public renderer also has programmatic callers. Never execute a caller
+ * getter or Proxy while preparing the human-facing review. Copy only bounded,
+ * own, plain data descriptors BEFORE reading or formatting any field.
+ * This does not claim caller input is licensed, fresh or production-ready.
+ */
+function snapshotReport(value, state = { seen: new WeakSet(), nodes: 0 }, depth = 0) {
+  if (++state.nodes > 512 || depth > 12) fail()
+  if (value === null || typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))) return value
+  if (typeof value === 'string') {
+    if (value.length > 2048) fail()
+    return value
+  }
+  if (!value || typeof value !== 'object' || nodeTypes.isProxy(value) ||
+      state.seen.has(value)) fail()
+  state.seen.add(value)
+  if (Array.isArray(value)) {
+    if (value.length > 512) fail()
+    const keys = Reflect.ownKeys(value)
+    if (keys.length !== value.length + 1 ||
+        keys.some(key => typeof key !== 'string' ||
+          (key !== 'length' && !/^(?:0|[1-9]\\d*)$/.test(key)))) fail()
+    return Array.from({ length: value.length }, (_, index) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) fail()
+      return snapshotReport(descriptor.value, state, depth + 1)
+    })
+  }
+  const proto = Object.getPrototypeOf(value)
+  if (proto !== Object.prototype && proto !== null) fail()
+  const keys = Reflect.ownKeys(value)
+  if (keys.length > 128) fail()
+  const output = Object.create(null)
+  for (const key of keys) {
+    if (typeof key !== 'string' || key.length > 128) fail()
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') ||
+        descriptor.enumerable !== true) fail()
+    Object.defineProperty(output, key, {
+      value: snapshotReport(descriptor.value, state, depth + 1),
+      enumerable: true, writable: true, configurable: true,
+    })
+  }
+  return output
+}
 
 function expectedShapeStatus(shape) {
   return shape.acceptedSources === 0 ? 'no-accepted-historical-capture'
@@ -65,6 +113,7 @@ function expectedNextActions(retailer) {
  * allowlists, not source-controlled or retailer-provided strings.
  */
 export function renderPrivateRetailerOperatorBrief(report) {
+  report = snapshotReport(report)
   if (!report || typeof report !== 'object' ||
       report.schemaVersion !== 1 ||
       report.mode !== 'private-retailer-rollout-matrix' ||
