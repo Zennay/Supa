@@ -11,6 +11,7 @@ import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
 import { readRecipeLibrary } from './features/recipes/recipeLibrary'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes'
+import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
 import { figmaAssets } from './features/home/figmaAssets'
 import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
@@ -47,10 +48,10 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
 const plannerStorageKey = 'supa:planner-preferences:v2'
 function availableRecipes() {
   try {
-    if (typeof window === 'undefined') return m2Recipes
+    if (typeof window === 'undefined') return [...m2Recipes, ...curatedFigmaRecipes]
     const own = readRecipeLibrary(window.localStorage).recipes.flatMap(recipe => { const projected = toPlannerRecipe(recipe); return projected ? [projected] : [] })
-    return [...m2Recipes, ...own]
-  } catch { return m2Recipes }
+    return [...m2Recipes, ...curatedFigmaRecipes, ...own]
+  } catch { return [...m2Recipes, ...curatedFigmaRecipes] }
 }
 
 type PersistenceWarning = 'unavailable' | 'protected' | null
