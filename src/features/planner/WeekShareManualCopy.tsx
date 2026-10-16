@@ -14,13 +14,23 @@ type WeekShareManualCopyProps = {
 export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [saveFeedback, setSaveFeedback] = useState<{ sourceText: string; message: string } | null>(null)
+  const [selectFeedback, setSelectFeedback] = useState<{ sourceText: string; message: string } | null>(null)
 
   const selectText = () => {
-    const textarea = textareaRef.current
-    selectWeekMenuText(textarea, text)
+    // This action is user initiated. On a restricted mobile browser, guide
+    // manual copy instead of silently assuming native selection worked.
+    const selected = selectWeekMenuText(textareaRef.current, text)
+    setSaveFeedback(null)
+    setSelectFeedback({
+      sourceText: text,
+      message: selected
+        ? 'Tekst geselecteerd. Kies Kopieer op je apparaat.'
+        : 'Automatisch selecteren lukt niet. Houd de tekst ingedrukt om te kopiëren.',
+    })
   }
 
   const saveWeekMenu = () => {
+    setSelectFeedback(null)
     const saved = downloadPreparedWeekMenu(textareaRef.current, text, {
       createObjectURL: (content) =>
         URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' })),
@@ -65,6 +75,9 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
       <button type="button" className="ghost-button" onClick={saveWeekMenu}>
         Bewaar als tekstbestand
       </button>
+      {selectFeedback?.sourceText === text && (
+        <p role="status" aria-live="polite" className="disclaimer">{selectFeedback.message}</p>
+      )}
       {saveFeedback?.sourceText === text && (
         <p role="status" aria-live="polite" className="disclaimer">{saveFeedback.message}</p>
       )}
