@@ -11,3 +11,5 @@
 .search-result-price {font-size:19px; font-weight:800; white-space:nowrap;}
 .search-result-bottom {display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;}
 .search-result-bottom a {font-size:13px; color:var(--ink); text-decoration:underline; font-weight:700; }
+
+.retailer-search-frame{display:block;width:100%;height:calc(100dvh - 265px);min-height:470px;border:0;border-radius:14px;background:var(--surface)}
