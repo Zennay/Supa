@@ -43,11 +43,6 @@ try {
   await page.getByRole('button',{name:'Bekijk Mijn testcurry',exact:true}).click()
   await page.getByRole('button',{name:'Bewerk eigen recept',exact:true}).click()
   await page.getByLabel('Naam van het recept').fill('Mijn testcurry aangepast')
-  const editDialogState = await page.locator('dialog').evaluateAll(dialogs =>
-    dialogs.map(dialog => ({ open: dialog.open, title: dialog.querySelector('h2')?.textContent,
-      labels: [...dialog.querySelectorAll('label')].map(label => label.textContent?.trim()),
-      inputs: [...dialog.querySelectorAll('input,textarea')].map(input => input.outerHTML.slice(0,140)) })))
-  console.log('RECIPE EDIT DOM',JSON.stringify({editDialogState,errors}))
   await page.getByLabel('Ingrediënten',{exact:true}).fill('500 g rijst\n250 ml kokosmelk')
   await page.getByRole('button',{name:'Controleer recept',exact:true}).click()
   await page.getByRole('button',{name:'Opslaan in mijn recepten',exact:true}).click()
