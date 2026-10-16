@@ -52,7 +52,7 @@ export class ScrapeStore {
         `INSERT OR IGNORE INTO product_gtins(product_id, gtin) VALUES (?, ?)`,
       ),
       latestPrice: this.db.prepare(`
-        SELECT id, price_cents, promo_price_cents, promo_label, promo_valid_until, availability
+        SELECT id, price_cents, promo_price_cents, promo_label, promo_valid_from, promo_valid_until, availability
         FROM prices WHERE product_id = ? ORDER BY last_seen_at DESC, id DESC LIMIT 1`),
       touchPrice: this.db.prepare(
         `UPDATE prices SET last_seen_at = ?, run_id = ? WHERE id = ?`,
@@ -139,6 +139,7 @@ export class ScrapeStore {
       latest.price_cents === record.priceCents &&
       latest.promo_price_cents === record.promoPriceCents &&
       latest.promo_label === record.promoLabel &&
+      latest.promo_valid_from === record.promoValidFrom &&
       latest.promo_valid_until === record.promoValidUntil &&
       latest.availability === record.availability
     if (same) s.touchPrice.run(at, runId, latest.id)
