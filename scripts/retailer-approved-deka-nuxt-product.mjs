@@ -28,6 +28,40 @@ function oneDekaProduct(jsonLdBlocks) {
   return products.length === 1 && values.length <= 8 ? products[0] : null
 }
 
+
+/**
+ * A JSON-LD pack claim is corroborating evidence, never a replacement for
+ * Nuxt packaging. Compare the complete physical quantity and pack structure,
+ * normalizing kg->g and l->ml; refuse unclear/unsupported explicit claims.
+ * Historical Deka pages with no weight claim keep their existing contract.
+ */
+function corroboratesDeclaredWeight(claim, nuxtPack) {
+  const claimedText = typeof claim === 'string' ? claim :
+    data(claim) && typeof claim.value === 'string' ? claim.value : null
+  if (!claimedText) return false
+  const declared = normalizePackText(claimedText)
+  if (declared.amount === null || declared.unit === 'unknown' ||
+      nuxtPack.amount === null || nuxtPack.unit === 'unknown' ||
+      declared.count !== nuxtPack.count) return false
+  const base = (pack) => {
+    switch (pack.unit) {
+      case 'l': return ['volume', pack.amount * 1000]
+      case 'ml': return ['volume', pack.amount]
+      case 'kg': return ['mass', pack.amount * 1000]
+      case 'g': return ['mass', pack.amount]
+      case 'piece': return ['pieces', pack.amount]
+      default: return null
+    }
+  }
+  const left = base(declared)
+  const right = base(nuxtPack)
+  return left !== null && right !== null &&
+    left[0] === right[0] &&
+    Number.isSafeInteger(left[1] * 1_000_000) &&
+    Number.isSafeInteger(right[1] * 1_000_000) &&
+    Math.abs(left[1] - right[1]) <= 1e-9
+}
+
 export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks } = {}) {
   try {
     if (typeof html !== 'string' || html.length > 2 * 1024 * 1024 ||
@@ -83,6 +117,12 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
         normalizeMoneyToCents(String(offer.Price)) !== cents ||
         (ld['@id'] !== undefined && ld['@id'] !== provenance.url + '#product') ||
         (offer.url !== undefined && offer.url !== provenance.url)) return fail()
+
+    // A matching 85-cent pair is insufficient if JSON-LD declares a
+    // different physical pack from the observed Nuxt product packaging.
+    // Absence is permitted for the historical uppercase-only shape.
+    if (Object.hasOwn(ld, 'weight') &&
+        !corroboratesDeclaredWeight(ld.weight, pack)) return fail()
 
     const observation = validateRawProductObservation({
       supermarket: 'dekamarkt',
