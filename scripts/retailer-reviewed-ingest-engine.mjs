@@ -278,7 +278,7 @@ async function assertNoReviewedFixtureSymlinkAncestor(full) {
   for (;;) {
     const stat = await lstat(path)
     if (stat.isSymbolicLink()) {
-      throw new Error('Reviewed fixture symlink ancestor refused')
+      throw new Error('Reviewed fixture must be a bounded regular file (symlink ancestor refused)')
     }
     const parent = dirname(path)
     if (parent === path) break
