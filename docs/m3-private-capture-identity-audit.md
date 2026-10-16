@@ -3,7 +3,7 @@
 A reviewed `source.id` is a mutable app label, not proof that an HTML/SSR
 capture happened twice. This **additive** operator audit checks the immutable
 physical identity tuple *(retailer, kind, evidence type, exact source URL,
-capture instant at nanosecond precision, SHA-256)* before claiming distinct historical source counts. The audit rejects impossible Gregorian dates, future timestamps beyond 60 seconds, invalid timezone offsets, unapproved retailer domains and source URL query/fragment/credential suffixes. Equivalent ISO-8601 offset spellings of the same physical capture count as one identity.
+capture instant at nanosecond precision, SHA-256)* before claiming distinct historical source counts. The audit rejects impossible Gregorian dates, future timestamps beyond 60 seconds, physically impossible timezone offsets (below UTC−12:00 or above UTC+14:00), unapproved retailer domains and source URL query/fragment/credential suffixes. Equivalent ISO-8601 offset spellings of the same physical capture count as one identity.
 
 ## Run
 
