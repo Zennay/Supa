@@ -12,6 +12,8 @@ node scripts/retailer-private-source-rollout-matrix.mjs
 
 The report compares the per-retailer catalog conflict decisions with canonical adapter health. If a retailer has a conflict, **only that retailer** receives `review-conflicting-product-facts` in `nextActions`. The other retailer is not flagged unless its own accepted history is inconsistent. This is a mandatory manual investigation; do not silently select the newest incompatible archived fact as a verified price.
 
+The report includes `historicalConflictingProductCount` per retailer and as a reconciled overall count. These numbers represent distinct inconsistent **archived** catalog product groups needing human review, not validated current products or store prices. They reveal no SKU, name, source URL, timestamp or snapshot hash. The sum of retailer counts must match the top-level count.
+
 Other actions for missing source shapes, rejected captures, staleness and written permissions stay independent. All output remains review-only and omits product identifiers, exact prices, origins and private source hashes. Historic captures do not establish current shelf or checkout prices.
 
 ## Regression and independent acceptance
