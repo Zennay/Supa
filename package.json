@@ -25,7 +25,9 @@
     "scrape": "node scraper/cli.mjs scrape",
     "scrape:match": "node scraper/cli.mjs match",
     "scrape:stats": "node scraper/cli.mjs stats",
-    "scrape:compare": "node scraper/cli.mjs compare"
+    "scrape:compare": "node scraper/cli.mjs compare",
+    "scrape:daily": "node scraper/daily-refresh.mjs",
+    "scrape:serve": "node scraper/retailer-search-api.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
