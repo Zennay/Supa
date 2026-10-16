@@ -81,6 +81,14 @@ test('operator SHA-pinned six-source archive produces same safe counts without m
     assert.doesNotMatch(output[0], /https?:\/\/|sourceProductId|sha256|snapshotSha256|currentPriceCents|capture-[0-9]\.json/i)
     assert.equal(output[0].includes(directory), false)
     assert.deepEqual(await archiveSignature(directory), before)
+    // Exercise the actual operator binary, not merely its exported function.
+    const executable = spawnSync(process.execPath, [
+      '--experimental-strip-types', SCRIPT, '--dir', directory, '--at', CLOCK,
+    ], { encoding: 'utf8', timeout: 30_000 })
+    assert.equal(executable.status, 0)
+    assert.equal(executable.stderr, '')
+    assert.deepEqual(JSON.parse(executable.stdout), report)
+    assert.equal(executable.stdout.includes(directory), false)
     // A second read is idempotent: this path never recreates manifest.json.
     await main(['--dir', directory, '--at', CLOCK], () => {})
     assert.deepEqual(await archiveSignature(directory), before)
@@ -114,12 +122,8 @@ test('private operator CLI rejects inherited slots, own getters, proxies and uns
   Object.defineProperty(argv, '1', { get() { calls++; return '/not/used' } })
   await assert.rejects(main(argv), /preflight refused/)
   const inherited = new Array(2)
-  Object.defineProperty(Array.prototype, '__privateTestOnlyNeverUsed', {
-    configurable: true, get() { calls++; return '/not/used' },
-  })
-  try {
-    await assert.rejects(main(inherited), /preflight refused/)
-  } finally { delete Array.prototype.__privateTestOnlyNeverUsed }
+  // Sparse positional slots must not read inherited values.
+  await assert.rejects(main(inherited), /preflight refused/)
   const proxy = new Proxy(['--dir', '/not/used'], {
     get() { calls++; throw new Error('must not run') },
     getOwnPropertyDescriptor() { calls++; throw new Error('must not run') },
