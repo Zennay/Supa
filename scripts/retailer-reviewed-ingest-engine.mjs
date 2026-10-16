@@ -174,9 +174,19 @@ function ingestPinnedEvidence({ key, parser, record }) {
   } catch {
     return { key, accepted: false, reason: 'invalid-observation', observations: [] }
   }
+  // The trusted parser may intentionally reuse pinned source/provenance
+  // objects. Return detached, editable observation facts so QA and private
+  // downstream review tools can mutate *their own copies* without mutating
+  // the immutable source snapshot or breaking existing evidence workflows.
+  let detached
+  try {
+    detached = observations.map(observation => structuredClone(observation))
+  } catch {
+    return { key, accepted: false, reason: 'invalid-observation', observations: [] }
+  }
   // No automatic price publication: consumers still need a separate explicit
   // retailer license and production activation decision.
-  return { key, accepted: true, reason: null, observations }
+  return { key, accepted: true, reason: null, observations: detached }
 }
 
 export function ingestReviewedEvidence(record) {
