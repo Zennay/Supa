@@ -33,11 +33,34 @@ if (result.status === 'candidate_needs_review') {
 
 Uitvoering van echte PLUS/DekaMarkt-verzoeken is **momenteel expliciet geblokkeerd** door `evidence/m1/source-permission-gate.v1.json`: PLUS is `permission_required`, DekaMarkt `unresolved`, beide `productionEnabled:false`. Er is dus geen werkende publieke live scraper of dagcrontab en dit wijzigingspakket verandert die regels niet. Productiedekking vergt aantoonbaar geldige bronautorisatie en een door zCloud gecoördineerde release.
 
+## Nieuwe tweede schakel: veilige privé-prijsarchivering
+
+`scripts/retailer-approved-private-price-snapshot-store.mjs` exporteert `writePrivateRetailerPriceSnapshot([result, ...], 'pad/review-20261016.json')`. De functie valideert iedere kandidaat opnieuw op originele bronhash, retailer-URL, tijdstip, EUR-centen, fysieke verpakking, `available`, ingest-contract en alle **niet-publiceerbaar**-velden. Ook `review_required` blijft expliciet bewaard, maar **zonder verzonnen prijs**. Het resultaat is een exclusief aangemaakt lokaal JSON-bestand met bestandsrechten `0600`, geen overschrijven en geen automatische productdatabase-publicatie. Een symlink in de doelmap, duplicaat-snapshot, Proxy/getter of gemanipuleerde `productionEnabled` wordt vóór bestandswijziging afgewezen.
+
+```js
+import { captureApprovedProductPriceCandidate } from './scripts/retailer-approved-html-product-price-candidate.mjs'
+import { writePrivateRetailerPriceSnapshot } from './scripts/retailer-approved-private-price-snapshot-store.mjs'
+
+const candidate = await captureApprovedProductPriceCandidate({
+  source, permissionGate, grant, fetchFn, capturedAt,
+})
+const outcome = await writePrivateRetailerPriceSnapshot(
+  [candidate], '/eigen-beveiligde-map/nieuwe-review.json')
+```
+
+Dit is een *operator-/bewijsarchief*, nog niet de voor Supa-gebruikers zichtbare prijsdatabase. Het gebruikt **geen betaalde API** en haalt geen site op zonder afzonderlijk bewezen expliciete bronrechten. `verifiedCurrentCheckoutPrices: 0` blijft altijd zo. Uiteindelijk kunnen maximaal 22 afzonderlijk toegestane producten uit dezelfde plan-/prijscontext privé worden beoordeeld; die 22 zijn nog niet automatisch live opgehaald.
+
+## Onafhankelijke HTML-parserbeveiliging
+
+De nieuwe `scripts/retailer-approved-html-script-evidence.mjs` herkent exact het HTML-attribuut `type` bij JSON-LD en `id` bij `__NUXT_DATA__`. `data-type`, `data-id`, `aria-id`, neptekst *binnen andere attribuutwaarden* en dubbele echte sleutels worden **niet** als gezaghebbende bronmetadata vertrouwd. Dit is een afzonderlijke beveiliging van **deze PR's eigen prijsroute** en verandert niet de parallel ontwikkelde offline binder van een andere worker ([QA-issue #3358](https://github.com/Zennay/Supa/issues/3358)).
+
 ## Herhaalbare tests
 
 ```bash
 node --experimental-strip-types --test tests/product-retailer-approved-html-price-candidate-20261016.test.mjs
 node --experimental-strip-types --test tests/product-retailer-approved-deka-nuxt-price-candidate-20261016.test.mjs
+node --experimental-strip-types --test tests/product-retailer-approved-html-script-evidence-20261016.test.mjs
+node --experimental-strip-types --test tests/product-retailer-approved-private-price-snapshot-store-20261016.test.mjs
 npm test
 npm run m1:source-permission-gate
 npm run build
@@ -45,4 +68,4 @@ npm run build
 
 De tests geven **uitsluitend fictieve in-memory HTML + fictieve toestemming**, dus nul echte externe requests. Ze testen beide retailers, centbedragen, g/ml-verpakkingen, hash, meervoudige Product-nodes, oude snapshots, onbekende voorraad, foutieve bron, misvormde JSON, echte check-in-rights-denial, 403/429, onjuiste content-type en het ontbreken van retries.
 
-Dit maakt de ontbrekende **capture → productgegevens → prijsvalidatie**-schakel concreet uitvoerbaar. Er volgt pas na afzonderlijke bronrechten en review een dagverversing, database-write, PWA-integratie en M3 live kassabonvergelijking. De bestaande verkennende 22 regels uit [issue #78](https://github.com/Zennay/Supa/issues/78#issuecomment-6210818832) blijven bruikbaar als zoek-/reviewlijst maar zijn geen actuele observaties.
+Dit maakt de ontbrekende **capture → productgegevens → prijsvalidatie**-schakel concreet uitvoerbaar. Er volgt pas na afzonderlijke bronrechten en review een dagverversing, productie-database-write, PWA-integratie en M3 live kassabonvergelijking. De bestaande verkennende 22 regels uit [issue #78](https://github.com/Zennay/Supa/issues/78#issuecomment-6210818832) blijven bruikbaar als zoek-/reviewlijst maar zijn geen actuele observaties.
