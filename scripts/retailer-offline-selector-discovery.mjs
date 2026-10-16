@@ -18,6 +18,24 @@ const FIELD_RULES = Object.freeze({
   availability: /(?:^|[-_])(stock|available|availability|inventory)(?:$|[-_])/i,
 })
 
+// Known merchant attribution must match the genuine public hostname.
+// Unknown research retailers remain usable, always in offline review mode.
+const KNOWN_RETAILER_HOSTS = Object.freeze({
+  plus: 'www.plus.nl',
+  dekamarkt: 'www.dekamarkt.nl',
+})
+
+function validPhysicalUtcTimestamp(value) {
+  // Date.parse can normalize impossible days (Feb 30) and 24:00 into the
+  // following day; demand a byte-equivalent UTC civil instant on roundtrip.
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,3}))?Z$/.exec(value)
+  if (!match) return false
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp) || timestamp > Date.now()) return false
+  return new Date(timestamp).toISOString() ===
+    match[1] + '.' + (match[2] ?? '').padEnd(3, '0') + 'Z'
+}
+
 function validSnapshotOrigin(origin) {
   if (!origin || typeof origin !== 'object' || Array.isArray(origin)) return false
   if (typeof origin.retailerId !== 'string' ||
@@ -27,14 +45,15 @@ function validSnapshotOrigin(origin) {
   try {
     const url = new URL(origin.url)
     const exact = url.href === origin.url
-    const timestamp = Date.parse(origin.capturedAt)
+    const expectedHost = Object.hasOwn(KNOWN_RETAILER_HOSTS, origin.retailerId)
+      ? KNOWN_RETAILER_HOSTS[origin.retailerId] : null
     return exact && url.protocol === 'https:' &&
       /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(url.hostname) &&
       isIP(url.hostname) === 0 &&
       url.port === '' && !url.username && !url.password &&
       !url.search && !url.hash && url.hostname !== 'localhost' &&
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(origin.capturedAt) &&
-      Number.isFinite(timestamp) && timestamp <= Date.now()
+      (expectedHost === null || url.hostname === expectedHost) &&
+      validPhysicalUtcTimestamp(origin.capturedAt)
   } catch {
     return false
   }
