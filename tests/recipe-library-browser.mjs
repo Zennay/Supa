@@ -88,13 +88,11 @@ try {
   assert.equal(exported.format, 'supa-private-recipes-backup')
   assert.equal(exported.recipes.length, 2)
   assert.equal('id' in exported.recipes[0], false)
+  // Native window.confirm explicitly authorizes a non-destructive merge.
+  page.once('dialog', dialog => dialog.accept())
   await page.locator('input[aria-label="Supa receptenback-up bestand"]').setInputFiles({
     name:'my-private-recipes.json',mimeType:'application/json',buffer:Buffer.from(backup),
   })
-  // Native window.confirm explicitly authorizes a non-destructive merge.
-  page.once('dialog', dialog => dialog.accept())
-  await page.getByRole('button',{name:'Herstel back-up',exact:true}).click().catch(() => {})
-  // The file selection itself fires change; do a second fresh opt-in import if necessary.
   await page.getByText(/2 recepten veilig toegevoegd/).waitFor()
   assert.equal(await page.getByRole('button',{name:'Bekijk Mijn testcurry aangepast',exact:true}).count(), 2)
   const corruptFile = '{"format":"supa-private-recipes-backup","version":99,"recipes":[]}'
