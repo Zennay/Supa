@@ -126,3 +126,18 @@ test('invalid endpoint and state path fail before fetching or probing', async ()
     ownedHost: 'example.com', fetchCandidates: async () => { invoked = true; return [] } }))
   assert.equal(invoked, false)
 })
+
+test('failed first batch cannot starve fresh untested candidates on later timer cycles', async () => {
+  const stateFile = await tempFile()
+  const sampled = []
+  const candidates = Array.from({ length: 13 }, (_, n) => 'http://8.8.8.' + (n + 1) + ':8080')
+  const args = { stateFile, ownedUrl: url, ownedHost: host, maxChecks: 5,
+    fetchCandidates: async () => candidates,
+    probe: async (candidate) => { sampled.push(candidate); return { ok: false, ownedEndpoint: true, latencyMs: 9 } },
+  }
+  const first = await runCycle({ ...args, now: 1000 })
+  assert.equal(first.probed, 5)
+  const second = await runCycle({ ...args, now: 1000 + 5 * 60_000 })
+  assert.equal(second.probed, 5)
+  assert.equal(new Set(sampled).size, 10)
+})

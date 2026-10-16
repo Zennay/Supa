@@ -209,7 +209,10 @@ export async function runCycle({
       refreshed = true
     } catch { feedFailure = true }
   }
-  const due = pool.dueForProbe(now).slice(0, maxChecks)
+  // Prioritize untried candidates: failed proxies must not monopolize every tick.
+  const due = pool.dueForProbe(now)
+    .sort((a, b) => pool.entries.get(a).failures - pool.entries.get(b).failures)
+    .slice(0, maxChecks)
   let probed = 0
   for (const candidate of due) {
     const outcome = await probe(candidate, endpoint).catch(() => ({ ok: false, ownedEndpoint: false }))
