@@ -36,3 +36,12 @@ Git-blobs `a27daba6028c139ebaccac7d183cf6008512a741` en
 `33d91ac955c3e28ec6da9ea0dff09335349cdd95`.
 De QA-ownerbranch is zelf niet aangepast. Deze technische
 in-process inputbescherming is geen live retailer-exploit of bewijs van toestemming.
+
+## Onafhankelijke P1-acceptatie 16 oktober: QA #3237 en #3238
+
+- [P1 #3239](https://github.com/Zennay/Supa/issues/3239) betreft het exporteerbare health-CLI argv-pad: directe Proxy length-getters konden voor de veiligheidscontrole draaien. De eerder geplaatste product-commit a01f4b2 weigert Proxy/revoked/gespoofde argv voor invoerlezen. Originele [QA #3237](https://github.com/Zennay/Supa/pull/3237) is ongewijzigd gereplayed, byte-identieke blob f1e824abb24a15259e7135b0ef94e3adc0935cfd.
+- [QA #3238](https://github.com/Zennay/Supa/pull/3238) vond nog een case-insensitive credential-query afwijking: geparste bron-URLs met ACCESS_TOKEN/Access_Token en percent-escaped spelling werden niet geweigerd door de bestaande directe catalogus. De nieuwe eigen private entrypoint weigert deze sleutels na inert kopiëren en voor het aanroepen van de gedeelde catalogus. Geen live URL-request, geen input-URL in fouttekst.
+- Alle twee onafhankelijke [QA #3238](https://github.com/Zennay/Supa/pull/3238) bestandblobs zijn exact overgenomen: 71a788a6c3e4d95b3dd576666d584204fc8452ca (echte zes historische retailer-vormen en credential-variant), ceb7defc88fef6eae685cf0a35add98e3ea34c98 (exact 1/2 MiB UTF-8 budgets en 10.000-arrayrand). Eigen extra regressies testen vijf gemengde/escaped querysleutels en een normale historische metadata-query.
+- De oude directe catalogus-fix blijft apart eigendom van [PR #3210](https://github.com/Zennay/Supa/pull/3210); dit is uitsluitend de additive wrapper, niet het sluiten van die bestaande P1. De definitieve CI op exacte nieuwe HEAD is nodig voordat de onafhankelijke drie originele CLI RED en één credential RED als GREEN worden gemeld.
+
+Ongewijzigde grenzen: offline-historisch, geen bronrechten, live prijzen, externe requests, publieke besparing of automatische productiedeploy.
