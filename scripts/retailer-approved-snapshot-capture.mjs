@@ -183,9 +183,18 @@ export async function captureApprovedRetailerPage(options = {}) {
   const target = checkedTarget(source)
   permittedForCapture(permissionGate, source, grant, target)
   const timestamp = capturedAt ?? new Date().toISOString()
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp) ||
-      !Number.isFinite(Date.parse(timestamp)) ||
-      Date.parse(timestamp) > Date.now() + 60_000) {
+  // Date.parse may *normalize* impossible civil dates (e.g. 30 February)
+  // into March. Only accept exact round-trip Gregorian UTC milliseconds:
+  // an invalid instant must never consume the operator's HTTP capability or
+  // be represented as original retailer evidence.
+  if (typeof timestamp !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp)) {
+    throw new Error('Invalid source capture clock')
+  }
+  const instant = Date.parse(timestamp)
+  if (!Number.isFinite(instant) ||
+      new Date(instant).toISOString() !== timestamp ||
+      instant > Date.now() + 60_000) {
     throw new Error('Invalid source capture clock')
   }
   const response = await fetchFn(target, {
