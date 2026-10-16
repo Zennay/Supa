@@ -174,3 +174,47 @@ test('unknown historical prices are explicitly visible but never treated as curr
   corrupt.unknownPriceObservations = corrupt.historicalObservations + 1
   assert.throws(() => renderPrivateRetailerOperatorBrief(forged), /geweigerd/)
 })
+
+test('direct operator boundary rejects getters, Proxy traps and sparse arrays without executing them', async () => {
+  const { report } = await historicalReport()
+  let executed = 0
+  const getter = structuredClone(report)
+  Object.defineProperty(getter.retailers[0], 'permissionStatus', {
+    enumerable: true,
+    get() { executed++; throw new Error('SECRET SHOULD NEVER RUN') },
+  })
+  assert.throws(() => renderPrivateRetailerOperatorBrief(getter), /geweigerd/)
+  assert.equal(executed, 0)
+  const nested = structuredClone(report)
+  Object.defineProperty(nested.retailers[1].shapes[0], 'historicalSources', {
+    enumerable: true,
+    get() { executed++; return 999 },
+  })
+  assert.throws(() => renderPrivateRetailerOperatorBrief(nested), /geweigerd/)
+  assert.equal(executed, 0)
+  const proxied = new Proxy(report, {
+    get() { executed++; throw new Error('SECRET PROXY EXECUTED') },
+    ownKeys() { executed++; return [] },
+  })
+  assert.throws(() => renderPrivateRetailerOperatorBrief(proxied), /geweigerd/)
+  const revoked = Proxy.revocable(structuredClone(report), {})
+  revoked.revoke()
+  assert.throws(() => renderPrivateRetailerOperatorBrief(revoked.proxy), /geweigerd/)
+  assert.equal(executed, 0)
+  const sparse = structuredClone(report)
+  delete sparse.retailers[0].nextActions[0]
+  assert.throws(() => renderPrivateRetailerOperatorBrief(sparse), /geweigerd/)
+})
+
+test('direct operator copy has bounded depth and cannot silently omit extra array members', async () => {
+  const { report } = await historicalReport()
+  const cyclic = structuredClone(report)
+  cyclic.retailers[0].self = cyclic
+  assert.throws(() => renderPrivateRetailerOperatorBrief(cyclic), /geweigerd/)
+  const huge = structuredClone(report)
+  huge.retailers[0].nextActions.length = 513
+  assert.throws(() => renderPrivateRetailerOperatorBrief(huge), /geweigerd/)
+  const inherited = structuredClone(report)
+  Object.setPrototypeOf(inherited.retailers[1], { permissionStatus: 'permitted' })
+  assert.throws(() => renderPrivateRetailerOperatorBrief(inherited), /geweigerd/)
+})
