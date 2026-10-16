@@ -40,11 +40,15 @@ export function previewLocalRecipePortions(
     : null
   const sourceNotReviewed = source.source === 'url' &&
     (!sourceAssessment || sourceAssessment.accepted === false)
+  // Review of the original import/measurement/provenance cannot disappear
+  // merely because scaled ingredient numbers are valid. Shopping needs uses
+  // this same source-level warning requirement.
+  const originalWarningsPending = !Array.isArray(source.warnings) || source.warnings.length > 0
   return {
     draft: scaled.draft,
     portionWarnings: scaled.warnings,
     sourceAssessment,
-    needsReview: sourceNotReviewed ||
+    needsReview: sourceNotReviewed || originalWarningsPending ||
       scaled.status === 'needs_review' ||
       !canConfirmUserRecipeDraft(scaled.draft),
     fetchAuthorized: false,
