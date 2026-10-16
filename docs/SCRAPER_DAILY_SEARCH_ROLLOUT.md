@@ -8,7 +8,7 @@ Dit vervolg bouwt voort op bestaande branch feat/retailer-scrapers met negen act
 - scraper/daily-refresh.mjs roept de bestaande eigen CLI aan voor toegestane retailers; schrijft waarnemingen in persistente SQLite en hergebruikt de bestaande prijs-, actie- en EAN-matching.
 - PLUS en Deka blijven extra geblokkeerd door evidence/m1/source-permission-gate.v1.json zolang dit project niet apart goedgekeurd is.
 - scraper/retailer-search-api.mjs biedt op 127.0.0.1:4317 een databasezoekendpoint. Alleen beschikbare prijzen van maximaal 24 uur oud, bron-URL geverifieerd, verlopen aanbiedingen genegeerd, maximaal 40 resultaten.
-- src/features/search/RetailerSearchView.tsx en de tab Zoeken tonen supermarkt, product, verpakking, prijs, URL en tijd; zonder bruikbare bron staat er expliciet geen actuele prijs.
+- src/features/search/RetailerSearchView.tsx en de tab Zoeken bevatten een normaal formulier zonder fetch of iframe. De eigen server-rendered resultaatpagina toont supermarkt, product, verpakking, prijs, URL en tijd; zonder bruikbare bron staat er expliciet geen actuele prijs.
 
 ## Juridisch: niet iedere scraper vereist schriftelijke toestemming
 
