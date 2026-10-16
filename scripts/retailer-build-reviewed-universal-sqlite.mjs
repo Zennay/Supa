@@ -20,7 +20,12 @@ function refuse() {
   throw new Error('Historical reviewed retailer import refused; no live prices or public claims generated')
 }
 async function verifyNewFileTarget(path) {
-  if (typeof path !== 'string' || !path.trim() || path.startsWith('-')) refuse()
+  // A Node filesystem path containing NUL/control code units throws native
+  // ERR_INVALID_ARG_VALUE with the private destination embedded in its error.
+  // Fail with the fixed domain refusal *before* any resolve/lstat or I/O.
+  if (typeof path !== 'string' || !path.trim() || path.startsWith('-') ||
+      path.length > 4096 ||
+      /[\\u0000-\\u001f\\u007f]/u.test(path)) refuse()
   const target = resolve(path)
   let parent = target
   while (true) {
