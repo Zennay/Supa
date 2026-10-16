@@ -429,3 +429,25 @@ test('historical coverage derives actionable unknown stock or packaging review f
   assert.match(text, /geen live voorraad of actuele aanbiedingen/)
   assert.doesNotMatch(text, /€|https?:|sourceProductId/)
 })
+
+test('direct historical coverage cannot mask forbidden retailer rights or claimed live publication', async () => {
+  const { batch, report } = await historicalReport()
+  const health = evaluatePrivateAdapterHealth(batch, {
+    referenceTime: report.referenceTime,
+    maxAgeHours: report.maxAgeHours,
+  })
+  const cases = [
+    changed => { changed.retailers[0].scheduledRefreshEnabled = true },
+    changed => { changed.retailers[0].permissionStatus = 'permitted' },
+    changed => { changed.retailers[0].nextActions = [] },
+    changed => { changed.publicSavingsClaimEligible = true },
+    changed => { changed.permissionVerifiedForNewCapture = true },
+    changed => { changed.retailers[1].shapes[0].status = 'historical-fixture-present' },
+    changed => { changed.retailers[1].shapes[0].latestArchivedCapturedAt = '2030-01-01T00:00:00Z' },
+  ]
+  for (const corrupt of cases) {
+    const changed = structuredClone(report)
+    corrupt(changed)
+    assert.throws(() => renderPrivateRetailerCoverageBrief(health, changed), /geweigerd/)
+  }
+})
