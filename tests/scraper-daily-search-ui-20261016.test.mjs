@@ -18,10 +18,15 @@ const approved = (id='dirk') => ({
   evidenceUrl:'https://example.test/legal-review',
   scopeNote:'Fictional scoped legal review FOR TESTS ONLY, not real permissions.',
 })
+// Synthetic test registry conforms to the real canonical M1 schema, but
+// preserves an explicitly DENIED retailer grant. No live source is permitted.
 const defaultGate = {
+  version:1, milestone:'M1 Data Feasibility', reviewedAt:'2026-10-16',
   sources:['plus','dekamarkt'].map(supermarket=>({
-    supermarket,permissionStatus:'permission_required',productionEnabled:false,
-    evidence:[{kind:'official_terms'}],
+    supermarket,technicalStatus:'proven',
+    permissionStatus:'permission_required',productionEnabled:false,
+    evidence:[{kind:'official_terms',url:'https://example.test/no-real-rights',
+      finding:'Fictional terms only; there is no permission to collect.'}],
   })),
 }
 async function temp(t){
