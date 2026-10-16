@@ -20,7 +20,7 @@ const printable = value => String(value).replace(
 // from an untrusted options object directly.
 function ownOptions(input) {
   if (input === null || typeof input !== 'object' ||
-      Array.isArray(input) || nodeTypes.isProxy(input)) fail()
+      nodeTypes.isProxy(input) || Array.isArray(input)) fail()
   const proto = Object.getPrototypeOf(input)
   if (proto !== Object.prototype && proto !== null) fail()
   const descriptors = Object.getOwnPropertyDescriptors(input)
