@@ -5,6 +5,7 @@ This tool cannot approve retailer source rights, publish historic prices or
 turn a reviewed offline import into verified current basket evidence.
 """
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -12,6 +13,7 @@ import sqlite3
 import stat
 import sys
 import time
+import unicodedata
 from datetime import datetime, timezone
 from urllib.parse import parse_qsl, quote, urlsplit
 
@@ -29,6 +31,9 @@ META = {
     "requires_explicit_retailer_license": "true",
 }
 MAX_BYTES = 32 * 1024 * 1024
+MAX_SAFE_CENTS = 9_007_199_254_740_991
+MAX_PACK_AMOUNT = 1_000_000_000_000
+PRODUCT_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,100}")
 ISO_TIMESTAMP = re.compile(
     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})"
 )
@@ -59,6 +64,56 @@ def utc_instant_nanoseconds(value):
     whole = parsed.replace(microsecond=0).astimezone(timezone.utc)
     delta = whole - EPOCH
     return (delta.days * 86400 + delta.seconds) * 1_000_000_000 + nanos
+
+
+def valid_cents(value):
+    # SQLite INTEGER affinity does not guarantee a physically INTEGER value:
+    # REAL 123.5 may survive CHECK(price_cents >= 0). Mirror the importer.
+    return value is None or (type(value) is int and
+                             0 <= value <= MAX_SAFE_CENTS)
+
+
+def valid_pack_amount(value):
+    # Reject TEXT passing SQLite's dynamic type ordering and nonfinite REALs.
+    return value is None or (type(value) in (int, float) and
+                             math.isfinite(value) and 0 < value < MAX_PACK_AMOUNT)
+
+
+def valid_product_name(value):
+    return (isinstance(value, str) and
+            bool(value.strip()) and len(value) <= 1024 and
+            value == value.strip())
+
+
+def normalized_product_name(value):
+    return " ".join(unicodedata.normalize("NFKC", value).casefold().split())
+
+
+def validate_imported_facts(db):
+    """Independently validate persisted facts even for direct SQL audit callers.
+
+    The SQL schema intentionally provides only structural CHECKs, not the full
+    importer contract. A forged but relationally consistent archive must not
+    gain an 'integrity verified' decision.
+    """
+    for product_id, display, search in db.execute(
+        "SELECT source_product_id, display_name, search_name FROM products"
+    ):
+        require(isinstance(product_id, str) and
+                PRODUCT_KEY.fullmatch(product_id) is not None)
+        require(valid_product_name(display))
+        require(isinstance(search, str) and
+                search == normalized_product_name(display))
+
+    for current, offer, original, pack, pack_text, label in db.execute(
+        "SELECT price_cents,offer_price_cents,original_price_cents,"
+        "pack_amount,pack_text,offer_label FROM price_observations"
+    ):
+        require(valid_cents(current) and valid_cents(offer) and
+                valid_cents(original) and valid_pack_amount(pack))
+        require(pack_text is None or
+                isinstance(pack_text, str) and len(pack_text) <= 256)
+        require(label is None or valid_product_name(label))
 
 
 def approved_path(value):
@@ -146,6 +201,7 @@ def audit(path):
             "SELECT COUNT(*) FROM price_observations"
         ).fetchone()[0]
         require(0 < product_count <= 1536 and 0 < observation_count <= 1536)
+        validate_imported_facts(db)
         # An observation's retailer must match the snapshot AND product; FK
         # alone allows the first relationship to drift across two valid stores.
         require(db.execute(
