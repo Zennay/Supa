@@ -51,6 +51,25 @@ function physicalNanos(value) {
 }
 
 /**
+ * A physical event at the SAME instant cannot have two unrelated original
+ * source identities when the two operator archives claim continuity. A fact
+ * comparator that matches only shared product IDs otherwise misses an entire
+ * catalog whose ID scheme was replaced at the same physical capture instant.
+ */
+function eventIdentityAt(batch, key, when) {
+  for (const item of batch.results) {
+    if (item.key !== key || item.accepted !== true) continue
+    const first = item.observations[0]?.provenance
+    if (!first || typeof first.sha256 !== 'string' ||
+        typeof first.url !== 'string') fail()
+    if (physicalNanos(first.capturedAt) === when) {
+      return { sha: first.sha256, url: first.url }
+    }
+  }
+  fail()
+}
+
+/**
  * Accept only independently canonical already-reviewed in-memory batches.
  * No source URL, SKU, individual price or original SHA leaves this function.
  */
@@ -92,8 +111,14 @@ export function rehearsePrivateM3RetailerDrift(permissionGate, previous, current
         !earlier.latestArchivedCapturedAt || !later.latestArchivedCapturedAt) fail()
     // An entire source kind cannot move BACKWARD in physical archived time,
     // even if its product IDs changed so that the fact diff has no shared SKU.
-    if (physicalNanos(later.latestArchivedCapturedAt) <
-        physicalNanos(earlier.latestArchivedCapturedAt)) fail()
+    const previousInstant = physicalNanos(earlier.latestArchivedCapturedAt)
+    const currentInstant = physicalNanos(later.latestArchivedCapturedAt)
+    if (currentInstant < previousInstant) fail()
+    if (currentInstant === previousInstant) {
+      const oldEvent = eventIdentityAt(previous, key, previousInstant)
+      const newEvent = eventIdentityAt(current, key, currentInstant)
+      if (oldEvent.sha !== newEvent.sha || oldEvent.url !== newEvent.url) fail()
+    }
     if (!changeKinds.every(field => safe(diff[field]))) fail()
     const changedFacts = changeKinds.reduce((n, field) => n + diff[field], 0)
     if (!safe(changedFacts) ||
