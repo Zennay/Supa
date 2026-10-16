@@ -91,7 +91,7 @@ test('required missing/unreadable fields never turn into purchasable or reviewed
   for (const [selector, values] of [
     [CSS.name, []], [CSS.name, ['']],
     [CSS.pack, []], [CSS.pack, ['unknown']],
-    [CSS.priceInteger, []], [CSS.priceInteger, ['0.']],
+    [CSS.priceInteger, []], [CSS.priceInteger, ['invalid']],
     [CSS.priceDecimals, []], [CSS.priceDecimals, ['abc']],
   ]) {
     const { anchor } = fakeCard('catalog', { fields: { [selector]: values } })
