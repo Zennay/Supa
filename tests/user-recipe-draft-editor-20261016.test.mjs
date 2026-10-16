@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   emptyUserRecipeDraft, parseMetricEditorAmount,
   updateEditorIngredient, addEditorIngredient, removeEditorIngredient,
-  canConfirmUserRecipeDraft, prepareImportedRecipeForEditor,
+  canConfirmUserRecipeDraft, prepareImportedRecipeForEditor, displayMetricEditorAmount,
 } from '../src/features/user-recipes/userRecipeDraftEditor.ts'
 
 test('empty manual draft starts in review, not as saved priced recipe', () => {
@@ -76,4 +76,20 @@ test('imported parser drafts receive stable local row IDs without modifying orig
   assert.equal('clientId' in imported.ingredients[0], false)
   const updated = updateEditorIngredient(adapted, 0, { label: 'Tomaat' })
   assert.equal(updated.ingredients[0].clientId, adapted.ingredients[0].clientId)
+})
+
+test('unfinished decimal input stays on the same semantic row and yields to external amount changes', () => {
+  const start = emptyUserRecipeDraft()
+  const another = addEditorIngredient(start)
+  const [first, second] = another.ingredients
+  assert.notEqual(first.clientId, second.clientId)
+  const rawByClientId = { [first.clientId]: '1,', [second.clientId]: '2,5' }
+  assert.equal(displayMetricEditorAmount(rawByClientId[first.clientId], null), '1,')
+  assert.equal(displayMetricEditorAmount(rawByClientId[second.clientId], 2.5), '2,5')
+  const shifted = removeEditorIngredient(another, 0)
+  assert.equal(shifted.ingredients[0].clientId, second.clientId)
+  assert.equal(displayMetricEditorAmount(rawByClientId[shifted.ingredients[0].clientId], 2.5), '2,5')
+  assert.equal(displayMetricEditorAmount(rawByClientId[second.clientId], 10), '10')
+  assert.equal(displayMetricEditorAmount(undefined, null), '')
+  assert.equal(displayMetricEditorAmount('2,5', 2.5), '2,5')
 })
