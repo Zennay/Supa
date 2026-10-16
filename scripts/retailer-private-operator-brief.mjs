@@ -129,6 +129,7 @@ export function renderPrivateRetailerOperatorBrief(report) {
           !safeCount(shape.unknownPriceObservations) ||
           shape.historicalSources !== shape.acceptedSources + shape.rejectedSources ||
           shape.staleHistoricalCaptures > shape.acceptedSources ||
+          shape.unknownPriceObservations > shape.historicalObservations ||
           shape.status !== expectedShapeStatus(shape) ||
           (shape.acceptedSources === 0 && shape.latestArchivedCapturedAt !== null) ||
           (shape.acceptedSources > 0 &&
@@ -142,7 +143,8 @@ export function renderPrivateRetailerOperatorBrief(report) {
       stale += shape.staleHistoricalCaptures
       lines.push('  ' + shapeLabels[shape.kind] + ': ' + statuses[shape.status] +
         ' (' + shape.acceptedSources + ' geaccepteerde, ' +
-        shape.rejectedSources + ' afgekeurde archiefbronnen)')
+        shape.rejectedSources + ' afgekeurde archiefbronnen; ' +
+        shape.unknownPriceObservations + ' historische prijswaarnemingen onbekend)')
     }
     if (observedKinds.size !== 3 || retailer.acceptedHistoricalShapes !== acceptedStore ||
         !retailer.nextActions.length ||
@@ -151,6 +153,9 @@ export function renderPrivateRetailerOperatorBrief(report) {
         JSON.stringify(retailer.nextActions) !==
           JSON.stringify(expectedNextActions(retailer))) fail()
     accepted += acceptedStore
+    if (retailer.shapes.some(shape => shape.unknownPriceObservations > 0)) {
+      lines.push('Aandacht: historische waarnemingen zonder bruikbare prijs; controleer bronextractie handmatig.')
+    }
     lines.push('Vervolg: ' + retailer.nextActions.map(action => actions[action]).join('; ') + '.', '')
   }
   if (seen.size !== 2 || accepted !== report.historicalAcceptedShapes ||
