@@ -117,3 +117,13 @@ test('gram/piece identities stay separate to avoid quantity drift', () => {
   assert.equal(result.status, 'unpriced_ready')
   assert.notEqual(result.recipe.ingredients[0].id, result.recipe.ingredients[1].id)
 })
+
+test('importer metric ceiling remains enforced despite permissive editor', () => {
+  const draft = reviewedDraft()
+  draft.ingredients[0].amount = 1_000_001
+  const out = prepareUnpricedPrivateRecipe(draft, 'oversize')
+  assert.equal(out.status, 'review_required')
+  assert.ok(out.reasons.includes('metric_amount_exceeds_import_contract'))
+  draft.ingredients[0].amount = 1_000_000
+  assert.equal(prepareUnpricedPrivateRecipe(draft, 'limit').status, 'unpriced_ready')
+})
