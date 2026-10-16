@@ -88,5 +88,27 @@ test('revoked programmatic catalog Proxy must refuse cleanly without leaked nati
     get() { throw new Error('unexpected caller trap execution') },
   })
   revoke()
-  assert.throws(() => buildUniversalRetailerCatalog(proxy), untrusted)
+  assert.throws(
+    () => buildUniversalRetailerCatalog(proxy),
+    error => !(error instanceof TypeError) && untrusted.test(String(error)),
+    'reject revoked Proxy with catalog-level domain error, not a leaked engine TypeError',
+  )
+})
+
+test('nested pack-data Proxy cannot execute descriptor/get traps during catalog assembly [EXPECTED RED]', async () => {
+  const batch = await loadReviewedRepositoryFixtures()
+  let traps = 0
+  const item = batch.results[0].observations[0]
+  item.pack = new Proxy(item.pack, {
+    get(target, name, receiver) {
+      traps++
+      return Reflect.get(target, name, receiver)
+    },
+    getOwnPropertyDescriptor(target, name) {
+      traps++
+      return Reflect.getOwnPropertyDescriptor(target, name)
+    },
+  })
+  assert.throws(() => buildUniversalRetailerCatalog(batch), untrusted)
+  assert.equal(traps, 0, 'pack parsing must not execute arbitrary caller Proxy')
 })
