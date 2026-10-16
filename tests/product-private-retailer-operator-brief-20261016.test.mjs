@@ -157,3 +157,20 @@ test('a complete reviewed zero-capture shape still gives honest missing-input gu
   assert.match(brief, /afgekeurde broninvoer beoordelen/)
   assert.doesNotMatch(brief, /https?:|sourceProductId|currentPriceCents/)
 })
+
+test('unknown historical prices are explicitly visible but never treated as current evidence', async () => {
+  const { report } = await historicalReport()
+  const withUnknown = structuredClone(report)
+  const bucket = withUnknown.retailers[0].shapes.find(shape => shape.historicalObservations > 0)
+  assert.ok(bucket)
+  bucket.unknownPriceObservations = 1
+  const text = renderPrivateRetailerOperatorBrief(withUnknown)
+  assert.match(text, /1 historische prijswaarnemingen onbekend/)
+  assert.match(text, /controleer bronextractie handmatig/)
+  assert.match(text, /geen live ophalen/i)
+  assert.doesNotMatch(text, /https?:|sourceProductId|currentPriceCents|€/)
+  const forged = structuredClone(withUnknown)
+  const corrupt = forged.retailers[0].shapes.find(shape => shape.kind === bucket.kind)
+  corrupt.unknownPriceObservations = corrupt.historicalObservations + 1
+  assert.throws(() => renderPrivateRetailerOperatorBrief(forged), /geweigerd/)
+})
