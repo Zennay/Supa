@@ -107,6 +107,16 @@ export function createAuthorizedRetailerCaptureSession() {
       // An HTTP 200 alone is never successful evidence.
       if (reserved) reserved.verified++
       return capture
+    } catch (error) {
+      // Even HTTP 200 can contain an invalid type, malformed stream or
+      // oversized/unreadable HTML. Do not hammer a broken source after these
+      // capture-body failures. Authorization refusals reserve no host.
+      if (reserved) {
+        reserved.nextEligibleAt = Math.max(
+          reserved.nextEligibleAt, Date.now() + ERROR_COOLDOWN_MS,
+        )
+      }
+      throw error
     } finally {
       // Reserve the host until the source reader has also finished verifying
       // the bounded HTML body, not merely until response headers arrive.
