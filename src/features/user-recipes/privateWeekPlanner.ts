@@ -36,10 +36,17 @@ export function createPrivateRecipeWeekPreview(
     const descriptors = Object.getOwnPropertyDescriptors(selection)
     const days = new Set<string>(privateWeekDays)
     const knownRecipes = new Set<string>()
+    const inspectedRecipes: Array<{ id: string; recipe: UnpricedPrivateRecipe }> = []
     for (const recipe of recipes) {
-      if (!recipe || typeof recipe.id !== 'string' ||
-          knownRecipes.has(recipe.id)) return invalid
-      knownRecipes.add(recipe.id)
+      if (!recipe || typeof recipe !== 'object') return invalid
+      // Read the identity descriptor, never the value through arbitrary
+      // caller getters or its prototype. Reuse the inspected value below.
+      const ownId = Object.getOwnPropertyDescriptor(recipe, 'id')
+      if (!ownId || !Object.prototype.hasOwnProperty.call(ownId, 'value') ||
+          typeof ownId.value !== 'string' || ownId.value.length === 0 ||
+          knownRecipes.has(ownId.value)) return invalid
+      knownRecipes.add(ownId.value)
+      inspectedRecipes.push({ id: ownId.value, recipe })
     }
     for (const [day, descriptor] of Object.entries(descriptors)) {
       if (!days.has(day) || !Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
@@ -61,7 +68,10 @@ export function createPrivateRecipeWeekPreview(
       }
     }
     if (plan.length === 0) return { status: 'review_required', reason: 'no_recipes_selected' }
-    const chosen = recipes.filter((recipe) => plan.some((meal) => meal.recipeId === recipe.id))
+    const selectedIds = new Set(plan.map((meal) => meal.recipeId))
+    const chosen = inspectedRecipes
+      .filter(({ id }) => selectedIds.has(id))
+      .map(({ recipe }) => recipe)
     const preview = prepareUnpricedShoppingPreview(plan, chosen, activeDays)
     if (preview.status !== 'manual_review_only') return invalid
 

@@ -101,3 +101,60 @@ test('controlled UI escapes malicious recipe title rather than rendering HTML',(
   assert.ok(r.includes('&lt;script&gt;'))
   assert.ok(!r.includes('<script>'))
 })
+
+test('rejects inherited recipe identity without invoking prototype getter',()=>{
+  const good=makeRecipe()
+  let reads=0
+  const hostile=Object.create({ get id(){ reads++; return good.id } })
+  const { id: ignoredInheritedId, ...safeFields } = good
+  Object.assign(hostile,safeFields)
+  const r=createPrivateRecipeWeekPreview([hostile],{Ma:good.id})
+  assert.equal(reads,0)
+  assert.deepEqual(r,{status:'review_required',reason:'invalid_selection'})
+})
+
+test('rejects own recipe identity accessor without invoking getter',()=>{
+  const good=makeRecipe()
+  let reads=0
+  const hostile={...good}
+  Object.defineProperty(hostile,'id',{enumerable:true,get(){reads++;return good.id}})
+  const r=createPrivateRecipeWeekPreview([hostile],{Ma:good.id})
+  assert.equal(reads,0)
+  assert.deepEqual(r,{status:'review_required',reason:'invalid_selection'})
+})
+
+test('valid own recipe ID still creates one unpriced checklist after hardened admission',()=>{
+  const good=makeRecipe()
+  const result=createPrivateRecipeWeekPreview([good],{Ma:good.id})
+  assert.equal(result.status,'preview_ready')
+  assert.equal(result.preview.savingsVerified,false)
+  assert.equal(result.preview.unresolvedItemCount,1)
+})
+
+test('controlled week UI shows review-only status when parent selection is absent',()=>{
+  const good=makeRecipe()
+  for (const selection of [null, undefined]) {
+    assert.deepEqual(createPrivateRecipeWeekPreview([good],selection),
+      {status:'review_required',reason:'invalid_selection'})
+    const html=renderToStaticMarkup(createElement(PrivateRecipeWeekPlanner,{
+      recipes:[good],selection,onSelectionChange:()=>{throw new Error('no writes')},
+    }))
+    assert.match(html,/Controleer de recepten/)
+    assert.doesNotMatch(html,/Boodschappen uit mijn recepten/)
+    assert.doesNotMatch(html,/€/)
+  }
+})
+
+test('week UI must not invoke recipe ID or title accessors while refusing invalid state',()=>{
+  const good=makeRecipe()
+  let called=0
+  const hostile={...good}
+  Object.defineProperty(hostile,'id',{enumerable:true,get(){called++;return good.id}})
+  Object.defineProperty(hostile,'title',{enumerable:true,get(){called++;return good.title}})
+  const html=renderToStaticMarkup(createElement(PrivateRecipeWeekPlanner,{
+    recipes:[hostile],selection:{Ma:good.id},onSelectionChange:()=>{},
+  }))
+  assert.equal(called,0)
+  assert.match(html,/Controleer de recepten/)
+  assert.doesNotMatch(html,/Boodschappen uit mijn recepten/)
+})
