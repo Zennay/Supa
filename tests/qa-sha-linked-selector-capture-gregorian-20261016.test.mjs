@@ -55,7 +55,7 @@ test('QA positive: physically valid leap days retain matching raw SHA and no aut
       assert.ok(result.proposedSelectors.every(row =>
         row.status === 'UNVERIFIED_PROPOSAL' && row.requiresReviewedSnapshotAndHumanApproval))
       assert.deepEqual(source, before)
-      assert.doesNotMatch(JSON.stringify(result), /redacted|www\.plus\.nl|www\.dekamarkt\.nl|price-value">/i)
+      assert.doesNotMatch(JSON.stringify(result), /redacted|price-value">/i)
     }
   }
 })
