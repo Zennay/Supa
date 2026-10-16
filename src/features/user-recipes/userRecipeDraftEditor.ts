@@ -24,6 +24,8 @@ export type EditorRecipeDraft = {
 
 const MAX_TEXT = 180
 const MAX_INGREDIENTS = 100
+// Match the canonical metric importer: physical g/ml/piece cannot exceed this.
+const MAX_METRIC_AMOUNT = 1_000_000
 let ingredientSequence = 0
 function newClientIngredientId(): string {
   ingredientSequence += 1
@@ -31,7 +33,7 @@ function newClientIngredientId(): string {
 }
 
 function validAmount(value: number | null): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000_000 &&
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= MAX_METRIC_AMOUNT &&
     Math.abs(value * 1000 - Math.round(value * 1000)) <= 1e-7
 }
 
@@ -53,7 +55,7 @@ export function prepareImportedRecipeForEditor(
 export function parseMetricEditorAmount(value: string): number | null {
   if (!/^(?:\d{1,9})(?:[.,]\d{1,3})?$/.test(value.trim())) return null
   const amount = Number(value.trim().replace(',', '.'))
-  return Number.isFinite(amount) && amount > 0 && amount <= 1_000_000_000 ? amount : null
+  return Number.isFinite(amount) && amount > 0 && amount <= MAX_METRIC_AMOUNT ? amount : null
 }
 
 /**
