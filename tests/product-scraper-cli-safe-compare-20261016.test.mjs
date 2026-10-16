@@ -139,6 +139,20 @@ test('future-starting fictional discount cannot leak through historical SQL effe
 })
 test('real child CLI command is denied by default, even if local DB has fictional prices',async t=>{
   const f=await fixture(t)
+  // The actual CLI intentionally reads wall-clock now. Pin a FRESH synthetic
+  // price capture and campaign relative to that wall clock; a fixed 12:00
+  // promotion correctly expires when GitHub runs tests later in the day.
+  const wall = new Date()
+  const db = new ScrapeStore(f.dbPath)
+  db.saveRecord(f.record('dirk',{
+    promoValidFrom:new Date(wall.getTime()-60_000).toISOString(),
+    promoValidUntil:new Date(wall.getTime()+60_000).toISOString(),
+  }),{at:wall.toISOString()})
+  db.saveRecord(f.record('spar'),{at:wall.toISOString()})
+  db.close()
+  const scoped = policy(['dirk','spar'])
+  for (const item of scoped.sources) item.reviewedAt = wall.toISOString().slice(0,10)
+  await writeFile(f.policyPath,JSON.stringify(scoped))
   const cli=fileURLToPath(new URL('../scraper/cli.mjs', import.meta.url))
   const denied=spawnSync(process.execPath,[cli,'compare','fictieve','--db',f.dbPath],{
     encoding:'utf8',timeout:30000,
