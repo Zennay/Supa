@@ -88,3 +88,72 @@ test('reject conflicting archive counts, swapped retailer identities and incompl
     assert.throws(() => renderPrivateRetailerOperatorBrief(clone), /geweigerd/)
   }
 })
+
+test('cannot silently suppress genuine rights or freshness actions in operator handoff', async () => {
+  const { report } = await historicalReport()
+  const cases = [
+    current => { current.retailers[0].nextActions =
+      current.retailers[0].nextActions.filter(action =>
+        action !== 'obtain-and-verify-retailer-source-rights') },
+    current => { current.retailers[1].nextActions = [
+      'validate-new-captures-offline-before-separate-release-approval',
+    ] },
+    current => { current.retailers[0].nextActions.reverse() },
+    current => { current.retailers[0].sourceRightsReadyForProduction = true },
+    current => { current.rightsGateProductionReady = true },
+  ]
+  for (const corrupt of cases) {
+    const clone = structuredClone(report)
+    corrupt(clone)
+    assert.throws(() => renderPrivateRetailerOperatorBrief(clone), /geweigerd/)
+  }
+})
+
+test('historical status cannot contradict the same source-shape facts', async () => {
+  const { report } = await historicalReport()
+  const cases = [
+    current => { current.retailers[0].shapes[0].status = 'historical-fixture-present' },
+    current => { current.retailers[0].shapes[0].status = 'no-accepted-historical-capture' },
+    current => { current.retailers[0].shapes[0].latestArchivedCapturedAt = null },
+    current => { current.retailers[1].shapes[1].staleHistoricalCaptures = 50001 },
+    current => { current.maxAgeHours = 0 },
+    current => { current.referenceTime = 'yesterday' },
+  ]
+  // Mutate only a single field per case; shape clocks and actions are not
+  // independently trusted assertions of catalog publication readiness.
+  for (const corrupt of cases) {
+    const clone = structuredClone(report)
+    corrupt(clone)
+    assert.throws(() => renderPrivateRetailerOperatorBrief(clone), /geweigerd/)
+  }
+})
+
+test('a complete reviewed zero-capture shape still gives honest missing-input guidance', async () => {
+  const { report } = await historicalReport()
+  const adjusted = structuredClone(report)
+  const kind = adjusted.retailers[0].shapes[0]
+  const accepted = kind.acceptedSources
+  adjusted.historicalAcceptedShapes--
+  adjusted.missingHistoricalShapeCount++
+  adjusted.retailers[0].acceptedHistoricalShapes--
+  kind.acceptedSources = 0
+  kind.rejectedSources += accepted
+  kind.staleHistoricalCaptures = 0
+  kind.historicalObservations = 0
+  kind.latestArchivedCapturedAt = null
+  kind.status = 'no-accepted-historical-capture'
+  adjusted.staleHistoricalCaptures -= report.retailers[0].shapes[0].staleHistoricalCaptures
+  const acts = adjusted.retailers[0].nextActions
+  if (!acts.includes('review-missing-offline-source-shapes'))
+    acts.splice(1, 0, 'review-missing-offline-source-shapes')
+  if (!acts.includes('review-rejected-adapter-evidence'))
+    acts.splice(acts.length - 1, 0, 'review-rejected-adapter-evidence')
+  if (!adjusted.retailers[0].shapes.some(shape => shape.staleHistoricalCaptures > 0))
+    adjusted.retailers[0].nextActions = acts.filter(action =>
+      action !== 'review-historical-capture-freshness')
+  const brief = renderPrivateRetailerOperatorBrief(adjusted)
+  assert.match(brief, /geen goedgekeurde historische invoer/)
+  assert.match(brief, /ontbrekende bronvormen onderzoeken/)
+  assert.match(brief, /afgekeurde broninvoer beoordelen/)
+  assert.doesNotMatch(brief, /https?:|sourceProductId|currentPriceCents/)
+})
