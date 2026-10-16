@@ -27,8 +27,12 @@ export function parseDetailresultProduct(html, url, { retailer, fileBase }) {
       )
     : []
   const idFromUrl = /\/(\d+)\/?$/.exec(new URL(url).pathname)?.[1]
-  const info =
-    candidates.find((c) => String(c.productId) === idFromUrl) ?? candidates[0]
+  // A Nuxt candidate belongs to this page only when its actual numeric
+  // article identity matches the canonical product route. Never silently
+  // borrow the first unrelated product/price from an embedded payload.
+  if (candidates.length && !idFromUrl) return []
+  const info = candidates.find((c) => String(c.productId) === idFromUrl)
+  if (candidates.length && !info) return []
 
   if (info) {
     const a = info.productAssortment
