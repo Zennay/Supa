@@ -223,10 +223,14 @@ export async function captureApprovedRetailerPage(options = {}) {
     signal: AbortSignal.timeout(TIMEOUT_MS),
   })
   if (response?.status === 403 || response?.status === 429) {
+    // Rate limits and forbidden responses must not leave a streaming
+    // connection alive. This never reissues or rotates the rejected request.
+    await cancelUnreadBody(response?.body)
     throw new Error('Retailer refused or rate-limited capture; no retry/rotation')
   }
   if (response?.status !== 200 || response?.ok !== true ||
       (response.url && response.url !== target)) {
+    await cancelUnreadBody(response?.body)
     throw new Error('Retailer capture failed or redirected')
   }
   const body = await collectBoundedBody(response)
