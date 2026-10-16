@@ -37,6 +37,28 @@ const rightLabels = {
 }
 const safeCount = number => Number.isSafeInteger(number) && number >= 0 && number <= 50000
 
+function expectedShapeStatus(shape) {
+  return shape.acceptedSources === 0 ? 'no-accepted-historical-capture'
+    : shape.rejectedSources > 0 ? 'rejected-historical-input-needs-review'
+      : shape.staleHistoricalCaptures > 0
+        ? 'archived-capture-outside-review-window'
+        : 'historical-fixture-present'
+}
+
+function expectedNextActions(retailer) {
+  return [
+    ...(!retailer.sourceRightsReadyForProduction
+      ? ['obtain-and-verify-retailer-source-rights'] : []),
+    ...(retailer.shapes.some(shape => shape.acceptedSources === 0)
+      ? ['review-missing-offline-source-shapes'] : []),
+    ...(retailer.shapes.some(shape => shape.rejectedSources > 0)
+      ? ['review-rejected-adapter-evidence'] : []),
+    ...(retailer.shapes.some(shape => shape.staleHistoricalCaptures > 0)
+      ? ['review-historical-capture-freshness'] : []),
+    'validate-new-captures-offline-before-separate-release-approval',
+  ]
+}
+
 /**
  * Intentionally accept only reports that still state the historical-only,
  * no-live/no-publication policy. All human-facing text comes from local
@@ -54,6 +76,12 @@ export function renderPrivateRetailerOperatorBrief(report) {
       report.scheduledRefreshEnabled !== false ||
       report.publicSavingsClaimEligible !== false ||
       report.productionEnabled !== false ||
+      report.rightsGateProductionReady !== false ||
+      !Number.isSafeInteger(report.maxAgeHours) ||
+      report.maxAgeHours < 1 || report.maxAgeHours > 720 ||
+      typeof report.referenceTime !== 'string' ||
+      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(report.referenceTime) ||
+      !Number.isFinite(Date.parse(report.referenceTime)) ||
       !Array.isArray(report.retailers) || report.retailers.length !== 2 ||
       report.retailerCount !== 2 || report.expectedShapeCount !== 6 ||
       !safeCount(report.historicalAcceptedShapes) ||
@@ -73,6 +101,9 @@ export function renderPrivateRetailerOperatorBrief(report) {
     if (!retailer || !stores.includes(retailer.retailerId) ||
         seen.has(retailer.retailerId) ||
         !Object.hasOwn(rightLabels, retailer.permissionStatus) ||
+        typeof retailer.sourceRightsReadyForProduction !== 'boolean' ||
+        (retailer.permissionStatus !== 'permitted' &&
+          retailer.sourceRightsReadyForProduction !== false) ||
         retailer.liveScrapingEnabled !== false ||
         retailer.scheduledRefreshEnabled !== false ||
         retailer.currentPricePublicationAllowed !== false ||
@@ -98,6 +129,11 @@ export function renderPrivateRetailerOperatorBrief(report) {
           !safeCount(shape.unknownPriceObservations) ||
           shape.historicalSources !== shape.acceptedSources + shape.rejectedSources ||
           shape.staleHistoricalCaptures > shape.acceptedSources ||
+          shape.status !== expectedShapeStatus(shape) ||
+          (shape.acceptedSources === 0 && shape.latestArchivedCapturedAt !== null) ||
+          (shape.acceptedSources > 0 &&
+            (typeof shape.latestArchivedCapturedAt !== 'string' ||
+              shape.latestArchivedCapturedAt.length > 64)) ||
           shape.eligibleForLiveCapture !== false ||
           shape.verifiedCurrentPriceObservations !== 0) fail()
       observedKinds.add(shape.kind)
@@ -111,7 +147,9 @@ export function renderPrivateRetailerOperatorBrief(report) {
     if (observedKinds.size !== 3 || retailer.acceptedHistoricalShapes !== acceptedStore ||
         !retailer.nextActions.length ||
         retailer.nextActions.some(action => !Object.hasOwn(actions, action)) ||
-        new Set(retailer.nextActions).size !== retailer.nextActions.length) fail()
+        new Set(retailer.nextActions).size !== retailer.nextActions.length ||
+        JSON.stringify(retailer.nextActions) !==
+          JSON.stringify(expectedNextActions(retailer))) fail()
     accepted += acceptedStore
     lines.push('Vervolg: ' + retailer.nextActions.map(action => actions[action]).join('; ') + '.', '')
   }
