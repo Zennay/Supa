@@ -1,4 +1,4 @@
-name: SUPA Figma public preview
+name: SUPA public Figma static preview
 
 on:
   push:
@@ -7,24 +7,19 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: supa-figma-pages-preview
+  group: supa-figma-static-preview
   cancel-in-progress: true
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
-  preview:
+  publish:
     if: github.repository == 'Zennay/Supa'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - name: Checkout
+      - name: Checkout preview source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -33,18 +28,28 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Install locked dependencies
+      - name: Install pinned dependencies
         run: npm ci
-      - name: Build explicitly rights-safe Figma-only static preview
+      - name: Build rights-safe Figma preview without source catalog reuse
         env:
           VITE_SUPA_PUBLIC_PREVIEW: 'true'
-        run: npm run build -- --base=/Supa/
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload static preview
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: dist
-      - name: Deploy Pages
-        id: deploy
-        uses: actions/deploy-pages@v4
+        run: npm run build -- --base=./
+      - name: Stage static preview
+        run: |
+          touch dist/.nojekyll
+          printf 'Static UI preview. No live supermarket price feed or recipe import server.\n' > dist/README.txt
+      - name: Publish generated static dist to dedicated public branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd dist
+          git init -b published
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m "Figma preview for ${GITHUB_SHA}"
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" push --force origin HEAD:refs/heads/preview-dist
+          echo 'Static preview branch updated: preview-dist'
