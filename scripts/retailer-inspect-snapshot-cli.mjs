@@ -2,7 +2,7 @@ import { readFile, lstat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
+import { assertValidOfflineSelectorOrigin, proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 
 // A reviewer can run this ONLY on a locally saved HTML snapshot with a pinned
 // SHA from an approved capture manifest. No browser/network/scrape entrypoint.
@@ -14,6 +14,9 @@ export async function main(argv = process.argv.slice(2), writeOutput = text => p
   if (!/^[a-f0-9]{64}$/.test(expectedSha256)) {
     throw new Error('Offline source SHA-256 required')
   }
+  // Reject forged retailer/domain or impossible source calendar before any
+  // private path metadata/read. Reuse the exact direct-selector provenance gate.
+  assertValidOfflineSelectorOrigin({ retailerId, url, capturedAt })
   const path = resolve(filename)
   const metadata = await lstat(path)
   if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 2 * 1024 * 1024) {
