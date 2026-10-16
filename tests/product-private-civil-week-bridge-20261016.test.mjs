@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { m2DefaultActiveDays } from '../src/data/m2Fixture.ts'
+import { m2DefaultActiveDays, m2InitialPlan, m2Recipes } from '../src/data/m2Fixture.ts'
 import {
   RETAILER_REVIEWED_FIXTURES,
   readBoundedRegularReviewedFixture,
@@ -95,6 +95,64 @@ test('invalid or untrusted day selection fails before historical fixture consump
   const poisoned = ['Ma']
   Object.defineProperty(poisoned, 0, { enumerable: true, get() { touched++; throw Error('getter fired') } })
   assert.throws(() => buildCivilClockCheckedPrivatePlannedWeek(originals, poisoned), /inert JSON/)
+  assert.equal(touched, 0)
+})
+
+
+test('real custom local recipe plan supports Friday and repeat-recipe scaling without source promotion', async () => {
+  const records = await realFixtures()
+  const customPlan = [
+    ...structuredClone(m2InitialPlan),
+    { day: 'Vr', recipeId: 'tikka' },
+  ]
+  const customRecipes = structuredClone(m2Recipes)
+  const originalPlan = structuredClone(customPlan)
+  const result = buildCivilClockCheckedPrivatePlannedWeek(
+    records, ['Ma', 'Do', 'Vr'], { plan: customPlan, recipes: customRecipes },
+  )
+  assert.equal(result.summary.selectedPlanSource, 'custom-private')
+  assert.equal(result.summary.activeDays, 3)
+  assert.equal(result.summary.ingredientNeeds, 5)
+  assert.equal(result.summary.retailerReviewRows, 10)
+  assert.equal(result.summary.publicSavingsClaimEligible, false)
+  assert.equal(result.summary.externalRequests, 0)
+  const chicken = result.privateReview.preview.rows.filter(row => row.ingredientId === 'chicken-thigh')
+  assert.equal(chicken.length, 2)
+  assert.ok(chicken.every(row => row.required.amount === 900 && row.required.unit === 'g'))
+  assert.deepEqual(customPlan, originalPlan)
+  const friday = buildCivilClockCheckedPrivatePlannedWeek(
+    records, ['Vr'], { plan: customPlan, recipes: customRecipes },
+  )
+  assert.equal(friday.summary.ingredientNeeds, 5)
+  assert.equal(friday.summary.retailerReviewRows, 10)
+  assert.doesNotMatch(JSON.stringify(friday.summary), /sourceUrl|capturedAt|priceCents|https:\/\//)
+})
+
+test('custom planner inputs fail atomically for missing recipes, drift, forged keys, Proxy and getters', async () => {
+  const records = await realFixtures()
+  const plan = structuredClone(m2InitialPlan)
+  const recipes = structuredClone(m2Recipes)
+  assert.throws(() => buildCivilClockCheckedPrivatePlannedWeek(
+    records, ['Ma'], { plan, recipes: recipes.slice(1) }), /Missing recipe/)
+  const duplicate = [...plan, { day: 'Ma', recipeId: 'tikka' }]
+  assert.throws(() => buildCivilClockCheckedPrivatePlannedWeek(
+    records, ['Ma'], { plan: duplicate, recipes }), /Ambiguous planned day/)
+  assert.throws(() => buildCivilClockCheckedPrivatePlannedWeek(
+    records, ['Ma'], { plan, recipes, permissionVerified: true }), /bridge refused/)
+  assert.throws(() => buildCivilClockCheckedPrivatePlannedWeek(
+    records, ['Ma'], { plan, recipes: [] }), /bridge refused/)
+  const poisoned = { plan, recipes }
+  let touched = 0
+  Object.defineProperty(poisoned, 'plan', {
+    enumerable: true,
+    get() { touched++; throw Error('getter executed') },
+  })
+  assert.throws(() => buildCivilClockCheckedPrivatePlannedWeek(records, ['Ma'], poisoned), /inert JSON/)
+  assert.equal(touched, 0)
+  const proxy = new Proxy({ plan, recipes }, {
+    get() { touched++; throw Error('proxy executed') },
+  })
+  assert.throws(() => buildCivilClockCheckedPrivatePlannedWeek(records, ['Ma'], proxy), /inert JSON/)
   assert.equal(touched, 0)
 })
 
