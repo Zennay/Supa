@@ -45,6 +45,25 @@ function mapCandidateFields(suggestions) {
       })),
   ]))
 }
+// Captures admit 0–9 fractional UTC digits. Date.parse on its own silently
+// normalizes impossible days, and truncates sub-millisecond future instants.
+// Require a real civil timestamp roundtrip, then compare physical nanoseconds.
+function validPhysicalCaptureInstant(iso) {
+  if (typeof iso !== 'string') return false
+  const parts = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$/.exec(iso)
+  if (!parts) return false
+  const milliseconds = Date.parse(iso)
+  if (!Number.isFinite(milliseconds)) return false
+  const fraction = parts[2] ?? ''
+  const millisecondText = fraction.padEnd(3, '0').slice(0, 3)
+  if (new Date(milliseconds).toISOString() !==
+      parts[1] + '.' + millisecondText + 'Z') return false
+  const residualNanos = fraction.padEnd(9, '0').slice(3)
+  const physicalNanos = BigInt(milliseconds) * 1_000_000n +
+    BigInt(residualNanos || '0')
+  return physicalNanos <= BigInt(Date.now()) * 1_000_000n
+}
+
 function validCapture(source, requireHash = true) {
   if (!source || typeof source !== 'object' || Array.isArray(source)) reject('malformed source')
   const supermarket = owned(source, 'supermarket')
@@ -56,9 +75,7 @@ function validCapture(source, requireHash = true) {
   if (!Object.hasOwn(HOSTS, supermarket) || !KINDS.has(kind) ||
       typeof id !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,99}$/i.test(id) ||
       (requireHash ? (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)) : (expectedSha !== undefined && (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)))) ||
-      typeof capturedAt !== 'string' ||
-      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(capturedAt) ||
-      (!Number.isFinite(Date.parse(capturedAt)) || Date.parse(capturedAt) > Date.now())) reject('invalid capture identity/hash/timestamp')
+      !validPhysicalCaptureInstant(capturedAt)) reject('invalid capture identity/hash/timestamp')
   let url
   try { url = new URL(urlValue) } catch { reject('invalid source URL') }
   if (url.protocol !== 'https:' || url.hostname !== HOSTS[supermarket] ||

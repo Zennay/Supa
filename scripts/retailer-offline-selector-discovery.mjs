@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { isIP } from 'node:net'
+import { types as nodeTypes } from 'node:util'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
 // exports product/price text, or labels proposed selectors as confirmed.
@@ -18,6 +19,48 @@ const FIELD_RULES = Object.freeze({
   availability: /(?:^|[-_])(stock|available|availability|inventory)(?:$|[-_])/i,
 })
 
+// Known merchant attribution must match the genuine public hostname.
+// Unknown research retailers remain usable, always in offline review mode.
+const KNOWN_RETAILER_HOSTS = Object.freeze({
+  plus: 'www.plus.nl',
+  dekamarkt: 'www.dekamarkt.nl',
+})
+
+// A selector proposal can be called directly from JS, not only from decoded
+// JSON. Before reading any field, reject Proxy/getter/inherited identities.
+// Snapshot just the required own primitive data; never reuse caller records.
+function ownInertFields(input, names) {
+  if (input === null || typeof input !== 'object' ||
+      Array.isArray(input) || nodeTypes.isProxy(input)) {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+  const prototype = Object.getPrototypeOf(input)
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(input)
+  const keys = Reflect.ownKeys(descriptors)
+  if (keys.length !== names.length ||
+      keys.some(key => typeof key !== 'string' || !names.includes(key)) ||
+      names.some(key => !Object.hasOwn(descriptors, key) ||
+        !Object.hasOwn(descriptors[key], 'value'))) {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+  return Object.freeze(Object.fromEntries(names.map(name =>
+    [name, descriptors[name].value])))
+}
+
+function validPhysicalUtcTimestamp(value) {
+  // Date.parse can normalize impossible days (Feb 30) and 24:00 into the
+  // following day; demand a byte-equivalent UTC civil instant on roundtrip.
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,3}))?Z$/.exec(value)
+  if (!match) return false
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp) || timestamp > Date.now()) return false
+  return new Date(timestamp).toISOString() ===
+    match[1] + '.' + (match[2] ?? '').padEnd(3, '0') + 'Z'
+}
+
 function validSnapshotOrigin(origin) {
   if (!origin || typeof origin !== 'object' || Array.isArray(origin)) return false
   if (typeof origin.retailerId !== 'string' ||
@@ -27,17 +70,26 @@ function validSnapshotOrigin(origin) {
   try {
     const url = new URL(origin.url)
     const exact = url.href === origin.url
-    const timestamp = Date.parse(origin.capturedAt)
+    const expectedHost = Object.hasOwn(KNOWN_RETAILER_HOSTS, origin.retailerId)
+      ? KNOWN_RETAILER_HOSTS[origin.retailerId] : null
     return exact && url.protocol === 'https:' &&
       /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(url.hostname) &&
       isIP(url.hostname) === 0 &&
       url.port === '' && !url.username && !url.password &&
       !url.search && !url.hash && url.hostname !== 'localhost' &&
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(origin.capturedAt) &&
-      Number.isFinite(timestamp) && timestamp <= Date.now()
+      (expectedHost === null || url.hostname === expectedHost) &&
+      validPhysicalUtcTimestamp(origin.capturedAt)
   } catch {
     return false
   }
+}
+
+export function assertValidOfflineSelectorOrigin(origin) {
+  const pinned = ownInertFields(origin, ['retailerId', 'url', 'capturedAt'])
+  if (!validSnapshotOrigin(pinned)) {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+  return pinned
 }
 
 function removeInertMarkup(html) {
@@ -61,9 +113,10 @@ function attribute(attrs, name) {
   return match ? (match[1] ?? match[2]) : null
 }
 
-export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
-  if (!validSnapshotOrigin(origin) ||
-      typeof html !== 'string' ||
+export function proposeOfflineRetailerSelectors(request = {}) {
+  const { html, origin } = ownInertFields(request, ['html', 'origin'])
+  const pinnedOrigin = assertValidOfflineSelectorOrigin(origin)
+  if (typeof html !== 'string' ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES ||
       Buffer.from(html, 'utf8').toString('utf8') !== html) {
     throw new Error('Invalid or oversized offline retailer snapshot')
@@ -142,9 +195,9 @@ export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
     schemaVersion: 1,
     mode: 'offline-selector-proposals-only',
     source: {
-      retailerId: origin.retailerId,
+      retailerId: pinnedOrigin.retailerId,
       sha256,
-      capturedAt: origin.capturedAt,
+      capturedAt: pinnedOrigin.capturedAt,
     },
     bytes: Buffer.byteLength(html, 'utf8'),
     scannedTags: inspectedTags,

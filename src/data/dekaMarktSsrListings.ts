@@ -140,6 +140,16 @@ function validCapturedAt(value: unknown): value is string {
   return Number.isFinite(Date.parse(value))
 }
 
+// Capture and promotion dates support 1–9 decimal digits. Date.parse only
+// compares milliseconds, and can accept a reversed interval of just 1 ns.
+// Both inputs must have passed validCapturedAt before this helper is called.
+function physicalTimestampNanos(value: string): bigint {
+  const milliseconds = Date.parse(value)
+  const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1] ?? ''
+  return BigInt(milliseconds) * 1_000_000n +
+    BigInt(fraction.padEnd(9, '0').slice(3) || '0')
+}
+
 function validateEvidenceBoundary(
   evidence: DekaMarktListingEvidenceBase & { evidenceType?: unknown },
   expectedType:
@@ -355,7 +365,7 @@ function parseOfferProduct(
     !label.trim() ||
     !validCapturedAt(outerStart) ||
     !validCapturedAt(outerEnd) ||
-    Date.parse(outerStart) > Date.parse(outerEnd)
+    physicalTimestampNanos(outerStart) > physicalTimestampNanos(outerEnd)
   ) {
     return null
   }
@@ -401,7 +411,7 @@ function parseOfferProduct(
 
   const validFrom = validCapturedAt(productStart) ? productStart : outerStart
   const validTo = validCapturedAt(productEnd) ? productEnd : outerEnd
-  if (Date.parse(validFrom) > Date.parse(validTo)) return null
+  if (physicalTimestampNanos(validFrom) > physicalTimestampNanos(validTo)) return null
 
   const pack = normalizePackText(packaging)
   if (pack.amount === null || pack.unit === 'unknown') return null
@@ -434,6 +444,18 @@ function parseOfferProduct(
   }
 }
 
+// A captured page may repeat the same source product under multiple cards.
+// Never turn this into multiple separately priced products in a reviewed batch.
+function hasDuplicateProductIdentities(observations: RawProductObservation[]): boolean {
+  const seen = new Set<string>()
+  for (const observation of observations) {
+    const id = observation.sourceProductId
+    if (id === null || seen.has(id)) return true
+    seen.add(id)
+  }
+  return false
+}
+
 export function parseDekaMarktSsrCatalogEvidence(
   evidence: DekaMarktSsrCatalogEvidence,
 ): DekaMarktListingsParseResult {
@@ -461,6 +483,9 @@ export function parseDekaMarktSsrCatalogEvidence(
       type: 'abstain',
       reason: 'DekaMarkt catalog yielded no trusted product observations',
     }
+  }
+  if (hasDuplicateProductIdentities(observations)) {
+    return { type: 'abstain', reason: 'DekaMarkt catalog contains duplicate product identities' }
   }
 
   return {
@@ -521,6 +546,9 @@ export function parseDekaMarktSsrOffersEvidence(
       type: 'abstain',
       reason: 'DekaMarkt offers yielded no trusted product observations',
     }
+  }
+  if (hasDuplicateProductIdentities(observations)) {
+    return { type: 'abstain', reason: 'DekaMarkt offers contain duplicate product identities' }
   }
 
   return {
