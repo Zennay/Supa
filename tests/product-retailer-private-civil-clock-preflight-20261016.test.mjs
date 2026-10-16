@@ -84,6 +84,9 @@ test('strict civil Gregorian dates, source clock chronology, and missing zone fa
     '2026-10-16T22:00:00.1234567890Z',
   ]
   for (const s of invalid) assert.equal(isValidPrivateCivilCaptureTime(s, fixed), false, s)
+  assert.equal(isValidPrivateCivilCaptureTime('2026-10-16T22:01:00.000000000Z', fixed), true)
+  assert.equal(isValidPrivateCivilCaptureTime('2026-10-16T22:01:00.000000001Z', fixed), false)
+  assert.equal(isValidPrivateCivilCaptureTime('2026-10-16T22:00:59.999999999Z', fixed), true)
 })
 
 test('untrusted input/options cannot trigger getters or proxy traps before inert admission', async () => {
