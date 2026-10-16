@@ -21,7 +21,7 @@ De CLI accepteert **geen argumenten**. Geen URL, proxy, winkelaccount, bestandsr
 - Per keten: de huidige licentiestatus en concrete acties voor brontoestemming, ontbrekende/afgekeurde bestanden, ouderdom en afzonderlijke nieuwe capture-beoordeling.
 - Een onmiskenbare waarschuwing dat **geen** live scraping, automatische refresh, actuele retailerprijs, publieke publicatie of bewezen besparing beschikbaar is.
 
-Een geslaagde technische test betekent alleen dat het historische offline pad reproduceerbaar is. De controle activeert nooit productie. Bij een intern onjuist rapport, ontbrekende zes-bronnenstructuur of tegenstrijdige rechten-/publicatievlag wordt de uitvoer geweigerd.
+Een geslaagde technische test betekent alleen dat het historische offline pad reproduceerbaar is. De controle activeert nooit productie. Bij een intern onjuist rapport, ontbrekende zes-bronnenstructuur of tegenstrijdige rechten-/publicatievlag wordt de uitvoer geweigerd. Ook een bron die als *geaccepteerd* telt maar geen historische productwaarneming bevat, wordt geweigerd. De fysieke timestamp van de **nieuwste** geaccepteerde opname wordt gecontroleerd tegen het beoordelingsvenster: als zelfs die te oud is, mag het overzicht niet claimen dat alle opnamen binnen de termijn vallen; als de nieuwste nog binnen de termijn valt, mogen niet alle bronnen als verouderd zijn aangemerkt. De bronherkomst blijft privé en er wordt nooit automatisch een actuele prijs uit afgeleid.
 
 ## Wat nog nodig is voor M3
 
