@@ -11,13 +11,13 @@ import { findFreshProducts } from './retailer-search-api.mjs'
 
 const fail = () => { throw new Error('Private matched retailer comparison refused') }
 // Persisted product_matches may have been built before pack-safe matching.
- // A canonical ID alone is not a trustworthy whole-pack price equivalence.
+// A canonical ID alone is not a trustworthy whole-pack price equivalence.
 const physicalPackKey = ({pack_amount, pack_unit, pack_count, pack_text}) => {
   if (typeof pack_amount !== 'number' || !Number.isFinite(pack_amount) ||
       pack_amount <= 0 || !['g', 'ml', 'piece'].includes(pack_unit) ||
       !Number.isSafeInteger(pack_count) || pack_count <= 0 ||
       typeof pack_text !== 'string' || !pack_text.trim() ||
-      /\\d\\s*[-–]\\s*\\d/.test(pack_text)) return null
+      /\d\s*[-–]\s*\d/.test(pack_text)) return null
   const total = pack_amount * pack_count
   if (!Number.isFinite(total) || total <= 0) return null
   return JSON.stringify([pack_unit, pack_count, total])
