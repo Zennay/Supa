@@ -15,6 +15,7 @@ import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
 import { planPrivateRetailerRollout } from './retailer-private-source-rollout-matrix.mjs'
 import { reviewPrivateRetailerOffers } from './qa-retailer-offer-baseline-corroboration.mjs'
 import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
+import { loadPrivateReviewedCaptureBatch } from './retailer-private-reviewed-manifest-replay.mjs'
 
 const refuse = () => { throw new Error('Private M3 integrated retailer preflight refused') }
 const isCount = value => Number.isSafeInteger(value) && value >= 0
@@ -24,9 +25,29 @@ const isCount = value => Number.isSafeInteger(value) && value >= 0
  * responses) and the independent canonical source permission register.
  * The clock is the private audit clock, never the date of a live quote.
  */
-export function assessPrivateM3RetailerIngestion(permissionGate, batch, {
-  referenceTime = new Date().toISOString(),
-} = {}) {
+function inertPreflightOptions(options) {
+  // Programmatic JS callers must not be able to trigger inherited/getter/Proxy
+  // code merely by requesting an offline audit. Only own inert data is read.
+  if (options === null || typeof options !== 'object' ||
+      Array.isArray(options) || nodeTypes.isProxy(options)) refuse()
+  const proto = Object.getPrototypeOf(options)
+  if (proto !== Object.prototype && proto !== null) refuse()
+  const descriptors = Object.getOwnPropertyDescriptors(options)
+  if (Reflect.ownKeys(descriptors).some(key =>
+    typeof key !== 'string' ||
+    !['referenceTime', 'inputMode'].includes(key) ||
+    !Object.hasOwn(descriptors[key], 'value'))) refuse()
+  const referenceTime = Object.hasOwn(descriptors, 'referenceTime')
+    ? descriptors.referenceTime.value : new Date().toISOString()
+  const inputMode = Object.hasOwn(descriptors, 'inputMode')
+    ? descriptors.inputMode.value : 'reviewed-in-memory-batch'
+  if (!['reviewed-in-memory-batch', 'bundled-historical-fixtures',
+    'operator-private-manifest'].includes(inputMode)) refuse()
+  return { referenceTime, inputMode }
+}
+
+export function assessPrivateM3RetailerIngestion(permissionGate, batch, options = {}) {
+  const { referenceTime, inputMode } = inertPreflightOptions(options)
   // The offer-audit clock admits UTC with at most millisecond precision;
   // reject other formats instead of silently rounding nanoseconds.
   if (typeof referenceTime !== 'string' ||
@@ -106,7 +127,8 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, {
   return {
     schemaVersion: 1,
     mode: 'private-m3-integrated-ingestion-preflight',
-    evidence: 'reviewed-historical-fixtures-only',
+    evidence: 'reviewed-historical-captures-only',
+    inputMode,
     reviewedAt: referenceTime,
     acceptedSourceShapes: rollout.historicalAcceptedShapes,
     requiredSourceShapes: rollout.expectedShapeCount,
@@ -129,7 +151,8 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, {
     requiresHumanReview: true,
     requiresWrittenReuseRights: true,
     requiresGenuineM3FieldEvidence: true,
-    technicalFixtureOnly: true,
+    historicalReviewedOnly: true,
+    operatorSuppliedPrivateSources: inputMode === 'operator-private-manifest',
     liveRequests: 0,
     permissionVerified: false,
     productionEnabled: false,
@@ -142,28 +165,59 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, {
 function checkedCliArgs(argv) {
   if (!Array.isArray(argv) || nodeTypes.isProxy(argv) ||
       Object.getPrototypeOf(argv) !== Array.prototype) refuse()
-  const descriptors = Object.getOwnPropertyDescriptors(argv)
-  const length = descriptors.length?.value
-  if (length === 0 && Reflect.ownKeys(descriptors).length === 1) {
-    return new Date().toISOString()
+  const desc = Object.getOwnPropertyDescriptors(argv)
+  const length = desc.length?.value
+  if (![0, 2, 4].includes(length) ||
+      Reflect.ownKeys(desc).length !== length + 1) refuse()
+  const args = []
+  for (let index = 0; index < length; index++) {
+    if (!Object.hasOwn(desc[index] ?? {}, 'value') ||
+        typeof desc[index].value !== 'string') refuse()
+    args.push(desc[index].value)
   }
-  if (length !== 2 || Reflect.ownKeys(descriptors).length !== 3 ||
-      !Object.hasOwn(descriptors[0] ?? {}, 'value') ||
-      !Object.hasOwn(descriptors[1] ?? {}, 'value') ||
-      descriptors[0].value !== '--at' ||
-      typeof descriptors[1].value !== 'string') refuse()
-  return descriptors[1].value
+  if (length === 0) return {
+    referenceTime: new Date().toISOString(), directory: null,
+  }
+  if (length === 2 && args[0] === '--at') return {
+    referenceTime: args[1], directory: null,
+  }
+  if ((length === 2 || length === 4) && args[0] === '--dir' &&
+      (length === 2 || args[2] === '--at') &&
+      args[1].trim() && args[1].length <= 500 && !args[1].startsWith('-')) {
+    return {
+      referenceTime: length === 4 ? args[3] : new Date().toISOString(),
+      directory: args[1],
+    }
+  }
+  refuse()
 }
 
-/** Only embedded reviewed M1 data and canonical source-rights file; NO HTTP. */
+/**
+ * Default: bundled six M1 snapshots. --dir: *already reviewed*, SHA-pinned
+ * immutable 0600 manifest/sources loaded with the existing descriptor-safe,
+ * nofollow private manifest verifier. Reads only; never creates a manifest,
+ * writes a file, runs an HTTP request, or emits individual product/price facts.
+ */
 export async function main(argv = process.argv.slice(2),
   write = text => process.stdout.write(text)) {
-  const referenceTime = checkedCliArgs(argv)
+  const { referenceTime, directory } = checkedCliArgs(argv)
   const permissionGate = JSON.parse(await readFile(
     new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url), 'utf8'))
-  const batch = await loadReviewedRepositoryFixtures()
+  let batch
+  if (directory === null) {
+    batch = await loadReviewedRepositoryFixtures()
+  } else {
+    // This integrated baseline audit requires one source event for each
+    // of six shapes. Do not silently drop older or additional captures.
+    try {
+      batch = await loadPrivateReviewedCaptureBatch(directory, { referenceTime })
+      if (batch.results.length !== 6 || batch.summary.sources !== 6) refuse()
+    } catch { refuse() }
+  }
   const report = assessPrivateM3RetailerIngestion(permissionGate, batch, {
     referenceTime,
+    inputMode: directory === null
+      ? 'bundled-historical-fixtures' : 'operator-private-manifest',
   })
   write(JSON.stringify(report, null, 2) + '\n')
   return report
