@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { link, mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -61,4 +61,41 @@ test('strict UTF-8, oversize, and unsafe path types never create an accepted arc
     await assert.rejects(readBoundedRegularReviewedFixture(new Proxy({},{
       get(){throw new Error('unexpected getter')},
     })),/bounded regular file/)
+  }))
+
+test('ambiguous duplicate provenance and price money cannot pass the raw reviewed file boundary', () =>
+  tempFile(async ({file}) => {
+    const ambiguous = [
+      '{"version":1,"source":{"supermarket":"plus"},"source":{"supermarket":"dekamarkt"}}',
+      String.raw`{"source":{"capturedAt":"2026-10-04T18:15:30.306Z","captured\u0041t":"2026-10-05T18:15:30.306Z"}}`,
+      '{"offer":{"offerPriceCents":199,"offerPriceCents":1}}',
+    ]
+    for (const source of ambiguous) {
+      await writeFile(file,source,{mode:0o600})
+      await assert.rejects(readBoundedRegularReviewedFixture(file),/Ambiguous|invalid/)
+    }
+    await writeFile(file,'{"source":{"capturedAt":"2026-10-04T18:15:30.306Z"},"offer":{"offerPriceCents":199}}',{mode:0o600})
+    const parsed=await readBoundedRegularReviewedFixture(file)
+    assert.equal(parsed.offer.offerPriceCents,199)
+  }))
+
+test('a linked parent or two-hop linked ancestor cannot impersonate a reviewed archive', () =>
+  tempFile(async ({dir}) => {
+    const actual=join(dir,'actual')
+    await mkdir(actual,{mode:0o700})
+    const file=join(actual,'private.json')
+    await writeFile(file,'{"schemaVersion":1}',{mode:0o600})
+    const alias=join(dir,'alias')
+    await symlink(actual,alias,'dir')
+    await assert.rejects(
+      readBoundedRegularReviewedFixture(join(alias,'private.json')),
+      /symlink ancestor|Reviewed fixture/i,
+    )
+    const second=join(dir,'second-alias')
+    await symlink(alias,second,'dir')
+    await assert.rejects(
+      readBoundedRegularReviewedFixture(join(second,'private.json')),
+      /symlink ancestor|Reviewed fixture/i,
+    )
+    assert.deepEqual(await readBoundedRegularReviewedFixture(file),{schemaVersion:1})
   }))
