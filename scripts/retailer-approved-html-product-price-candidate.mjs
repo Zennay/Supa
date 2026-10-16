@@ -11,7 +11,7 @@
  */
 import { createHash } from 'node:crypto'
 import { captureApprovedRetailerPage } from './retailer-approved-snapshot-capture.mjs'
-import { extractJsonLdValues } from './m1-inspect-captures.mjs'
+import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
 import { parseDekaNuxtFromAuthorizedHtml } from './retailer-approved-deka-nuxt-product.mjs'
 
@@ -76,9 +76,9 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
     sha256: captured.source.sha256,
   }
 
-  const blocks = extractJsonLdValues(captured.html)
-  if (blocks.length === 0 || blocks.length > MAX_JSONLD_BLOCKS ||
-      blocks.some(value => value?.__supaParseError === true)) {
+  const scripts = readAuthorizedHtmlScriptEvidence(captured.html)
+  const blocks = scripts.jsonLdBlocks
+  if (scripts.invalid || blocks.length === 0 || blocks.length > MAX_JSONLD_BLOCKS) {
     return unavailable('missing_or_invalid_jsonld', captured)
   }
   // All blocks are reviewed together: a second conflicting Product cannot be
