@@ -26,10 +26,10 @@ const DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 /** Parse only physically possible four-digit Gregorian civil source clocks. */
 export function isValidPrivateCivilCaptureTime(value, referenceTime = Date.now()) {
-  if (typeof value !== 'string' || !Number.isFinite(referenceTime)) return false
+  if (typeof value !== 'string' || !Number.isSafeInteger(referenceTime)) return false
   const m = CLOCK.exec(value)
   if (!m) return false
-  const [, yy, mo, dd, hh, mi, ss, , zone, sign, oh, om] = m
+  const [, yy, mo, dd, hh, mi, ss, fraction, zone, sign, oh, om] = m
   const year = Number(yy), month = Number(mo), day = Number(dd)
   const hour = Number(hh), minute = Number(mi), second = Number(ss)
   if (year < 1 || month < 1 || month > 12 ||
@@ -40,8 +40,14 @@ export function isValidPrivateCivilCaptureTime(value, referenceTime = Date.now()
     if (offsetMinute > 59 || offsetHour > (sign === '-' ? 12 : 14) ||
         (offsetHour === (sign === '-' ? 12 : 14) && offsetMinute !== 0)) return false
   }
+  // Date.parse truncates to milliseconds. Keep the remaining six digits so a
+  // source captured even 1ns after the allowed physical cutoff cannot pass.
   const timestamp = Date.parse(value)
-  return Number.isFinite(timestamp) && timestamp <= referenceTime + 60_000
+  if (!Number.isFinite(timestamp)) return false
+  const remainingNs = BigInt((fraction ?? '').padEnd(9, '0').slice(3) || '0')
+  const capturedNs = BigInt(timestamp) * 1_000_000n + remainingNs
+  const latestNs = (BigInt(referenceTime) + 60_000n) * 1_000_000n
+  return capturedNs <= latestNs
 }
 
 /**
