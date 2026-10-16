@@ -148,3 +148,28 @@ test('offline ingest CLI refuses Proxy, foreign and accessor argv with no fixtur
   assert.equal(accepted.acceptedSources,6)
   assert.doesNotMatch(output,/currentPriceCents|sourceProductId|https?:\/\//)
 })
+
+test('whole-batch source preflight rejects later malicious capture without getter execution', async () => {
+  const first = await evidence()
+  const second = structuredClone(first)
+  second.source.id += '-later'
+  let calls = 0
+  const realValue = second.source.id
+  Object.defineProperty(second.source, 'id', {
+    enumerable: true, configurable: true,
+    get(){calls++;return realValue},
+  })
+  const unchanged = structuredClone(first)
+  assert.throws(() => ingestReviewedBatch([first,second]), refused)
+  assert.equal(calls,0)
+  assert.deepEqual(first, unchanged)
+})
+
+test('whole-batch detects exact duplicate reviewed source before returning any results', async () => {
+  const actual = await evidence()
+  const duplicate = structuredClone(actual)
+  assert.throws(
+    () => ingestReviewedBatch([actual,duplicate]),
+    /Duplicate reviewed capture identity/,
+  )
+})
