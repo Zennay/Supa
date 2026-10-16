@@ -59,6 +59,12 @@ function validSnapshotOrigin(origin) {
   }
 }
 
+export function assertValidOfflineSelectorOrigin(origin) {
+  if (!validSnapshotOrigin(origin)) {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+}
+
 function removeInertMarkup(html) {
   // Conservative best-effort static analysis, NOT a browser-equivalent parser.
   // Never inspect nested scripts, comments, inputs, head/style or inert markup.
@@ -81,8 +87,8 @@ function attribute(attrs, name) {
 }
 
 export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
-  if (!validSnapshotOrigin(origin) ||
-      typeof html !== 'string' ||
+  assertValidOfflineSelectorOrigin(origin)
+  if (typeof html !== 'string' ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES ||
       Buffer.from(html, 'utf8').toString('utf8') !== html) {
     throw new Error('Invalid or oversized offline retailer snapshot')
