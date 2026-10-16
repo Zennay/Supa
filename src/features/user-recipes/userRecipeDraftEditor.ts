@@ -56,6 +56,16 @@ export function parseMetricEditorAmount(value: string): number | null {
   return Number.isFinite(amount) && amount > 0 && amount <= 1_000_000_000 ? amount : null
 }
 
+/**
+ * Keep an in-progress Dutch decimal (e.g. "1,") visible only while it still
+ * belongs to the same current model value. A parent-side portions update
+ * invalidates stale raw text rather than hiding the changed amount.
+ */
+export function displayMetricEditorAmount(raw: string | undefined, amount: number | null): string {
+  if (raw !== undefined && parseMetricEditorAmount(raw) === amount) return raw
+  return amount === null ? '' : String(amount)
+}
+
 export function updateEditorIngredient(
   draft: EditorRecipeDraft,
   index: number,
