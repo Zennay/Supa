@@ -292,11 +292,19 @@ export function renderPrivateRetailerCoverageBrief(health, rollout) {
       !safeCount(health.observations) ||
       !safeCount(health.unknownPriceObservations) ||
       !safeCount(health.staleSources) ||
+      !safeCount(health.inconsistentProducts) ||
+      !Array.isArray(health.missingSourceKinds) ||
+      !Array.isArray(health.operatorActions) ||
+      typeof health.sixShapeCoverageComplete !== 'boolean' ||
+      typeof health.historicalFreshnessWithinWindow !== 'boolean' ||
       health.sources !== health.acceptedSources + health.rejectedSources ||
       !rollout || rollout.schemaVersion !== 1 ||
       rollout.mode !== 'private-retailer-rollout-matrix' ||
       rollout.productionEnabled !== false ||
       rollout.rightsGateProductionReady !== false ||
+      !Number.isSafeInteger(health.maxAgeHours) ||
+      health.maxAgeHours < 1 || health.maxAgeHours > 720 ||
+      health.maxAgeHours !== rollout.maxAgeHours ||
       !Array.isArray(rollout.retailers) ||
       rollout.retailers.length !== 2 ||
       Object.keys(health.byShape).length !== 6) fail()
@@ -385,6 +393,25 @@ export function renderPrivateRetailerCoverageBrief(health, rollout) {
       accepted !== rollout.retailers.reduce((count, row) =>
         count + row.shapes.reduce((sum, shape) => sum + shape.acceptedSources, 0), 0) ||
       stale !== rollout.staleHistoricalCaptures) fail()
+  // A valid bucket total cannot justify a forged reviewer-wide status or
+  // a disappeared mandatory action. Reconstruct those claims deterministically
+  // from the already cross-checked six source-shape health buckets.
+  const missingKinds = stores.flatMap(store => kinds.map(kind => store + ':' + kind))
+    .filter(key => health.byShape[key].accepted === 0)
+  const expectedActions = [
+    ...(missingKinds.length ? ['review-missing-source-shapes'] : []),
+    ...(rejected ? ['review-rejected-adapter-inputs'] : []),
+    ...(stale ? ['review-capture-freshness'] : []),
+    ...(health.inconsistentProducts ? ['review-conflicting-product-facts'] : []),
+    ...(unknownPrices ? ['review-missing-price-facts'] : []),
+    'obtain-written-retailer-source-rights',
+    'collect-genuine-two-store-m3-basket-evidence',
+  ]
+  if (JSON.stringify(health.missingSourceKinds) !== JSON.stringify(missingKinds) ||
+      health.sixShapeCoverageComplete !==
+        (missingKinds.length === 0 && rejected === 0) ||
+      health.historicalFreshnessWithinWindow !== (stale === 0) ||
+      JSON.stringify(health.operatorActions) !== JSON.stringify(expectedActions)) fail()
   lines.push('Deze cijfers komen uitsluitend uit historisch beoordeelde fixtures; geen live voorraad of actuele aanbiedingen.')
   return lines.join('\n') + '\n'
 }
