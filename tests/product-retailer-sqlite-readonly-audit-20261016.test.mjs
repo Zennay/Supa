@@ -124,3 +124,23 @@ test('symbolic links, unsafe permissions, corrupted SQLite and bad argv fail clo
   writeFileSync(corrupt, 'not a database', { mode: 0o600 })
   denied(run(['--db', corrupt]))
 }))
+
+test('a counterfeit external source URL cannot be represented as PLUS reviewed provenance', () => scoped((_, db) => {
+  edit(db, "UPDATE source_snapshots SET source_url='https://fictional.invalid/promo' WHERE retailer_id='plus' AND kind='product'")
+  denied(run(['--db', db]))
+}))
+
+test('escaped or mixed-case query credential names never enter a trusted archive report', () => scoped((_, db) => {
+  edit(db, "UPDATE source_snapshots SET source_url='https://www.plus.nl/fictional?AcCeSs%5FToKeN=synthetic' WHERE retailer_id='plus' AND kind='offers'")
+  denied(run(['--db', db]))
+}))
+
+test('impossible future historical capture clock cannot pass read-only provenance audit', () => scoped((_, db) => {
+  edit(db, "UPDATE source_snapshots SET captured_at='2099-01-01T00:00:00Z' WHERE retailer_id='plus' AND kind='catalog'")
+  denied(run(['--db', db]))
+}))
+
+test('all six named source snapshots must physically contain at least one observation', () => scoped((_, db) => {
+  edit(db, "DELETE FROM price_observations WHERE snapshot_id=(SELECT id FROM source_snapshots WHERE retailer_id='dekamarkt' AND kind='offers')")
+  denied(run(['--db', db]))
+}))
