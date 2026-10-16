@@ -219,8 +219,8 @@ export function App() {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <span className="brand-mark">S</span>
-          <strong>SUPA</strong>
+          <span className="brand-mark" aria-hidden="true">s<span className="brand-mark-dot">.</span></span>
+          <span className="brand-copy"><strong>SUPA</strong><small>Eat well. Spend smart.</small></span>
         </div>
         <IdentityAvatar />
       </header>
@@ -250,6 +250,7 @@ export function App() {
             onToggleDay={toggleDay}
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
+            onOpenList={() => setTab('list')}
           />
         )}
         {tab === 'planner' && (
@@ -314,7 +315,13 @@ export function App() {
             aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => setTab(item.id)}
           >
-            {item.label}
+            <span className={`nav-icon nav-icon-${item.id}`} aria-hidden="true">{{
+              planner: '▦',
+              basket: '▤',
+              list: '☑',
+              observe: '◷',
+            }[item.id]}</span>
+            <span>{item.label}</span>
           </button>
         ))}
       </nav>
