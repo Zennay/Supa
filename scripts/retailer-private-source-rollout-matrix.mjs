@@ -65,6 +65,17 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
   if ([...conflictRetailers].some(id => !RETAILERS.includes(id)) ||
       health.operatorActions.includes('review-conflicting-product-facts') !==
         (conflictRetailers.size > 0)) fail()
+  // Publish review workload *counts*, never product identifiers, prices or
+  // capture hashes. Catalog consistency is already canonical and reviewed.
+  const conflictCounts = Object.fromEntries(RETAILERS.map(id => [id, 0]))
+  for (const product of catalog?.products ?? []) {
+    if (!RETAILERS.includes(product.retailerId)) fail()
+    if (product.consistency !== 'consistent') {
+      conflictCounts[product.retailerId]++
+    }
+  }
+  if (RETAILERS.reduce((sum, id) => sum + conflictCounts[id], 0) !==
+      (catalog?.conflictCount ?? 0)) fail()
 
   const retailers = RETAILERS.map(retailerId => {
     const source = permissionGate.sources.find(row => row.supermarket === retailerId)
@@ -122,6 +133,7 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
       sourceRightsReadyForProduction: !rightsBlocked,
       technicalAdapterShapeCount: SHAPES.length,
       acceptedHistoricalShapes: kinds.filter(k => k.acceptedSources > 0).length,
+      historicalConflictingProductCount: conflictCounts[retailerId],
       shapes: kinds,
       nextActions: actions,
       liveScrapingEnabled: false,
@@ -138,6 +150,7 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
     expectedShapeCount: RETAILERS.length * SHAPES.length,
     historicalAcceptedShapes: retailers.reduce((sum, row) =>
       sum + row.acceptedHistoricalShapes, 0),
+    historicalConflictingProductCount: catalog?.conflictCount ?? 0,
     staleHistoricalCaptures: health.staleSources,
     missingHistoricalShapeCount: health.missingSourceKinds.length,
     rightsGateProductionReady: rights.productionReady,
