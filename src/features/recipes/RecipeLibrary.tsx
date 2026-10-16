@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport'
-import { readRecipeLibrary, saveRecipeLibrary, updateSavedRecipe, deleteSavedRecipe, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
+import { readRecipeLibrary, saveRecipeLibrary, updateSavedRecipe, deleteSavedRecipe, duplicateSavedRecipe, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { readRecipeFavorites, toggleRecipeFavorite, removeRecipeFavorite } from './recipeFavorites'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
@@ -86,6 +86,15 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     })
     editor.current?.showModal()
   }
+  function duplicateOwnRecipe(recipe: SavedRecipe) {
+    try {
+      const next = duplicateSavedRecipe(window.localStorage, library, recipe.id,
+        `own-${crypto.randomUUID()}`, new Date().toISOString())
+      setLibrary(next); detail.current?.close(); setSelected(null); setFilter('own'); setQuery('')
+      window.dispatchEvent(new Event('supa-recipes-changed'))
+      setMessage(`Een kopie van ${recipe.title} staat bij je eigen recepten.`)
+    } catch (e) { setMessage(e instanceof Error ? e.message : 'Dupliceren is niet gelukt.') }
+  }
   function removeOwnRecipe(recipe: SavedRecipe) {
     if (!window.confirm(`Wil je "${recipe.title}" definitief van dit apparaat verwijderen?`)) return
     try {
@@ -158,6 +167,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p></> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}
       {'savedAt' in selected && <div className="recipe-add-actions">
         <button onClick={() => selected && 'savedAt' in selected && editOwnRecipe(selected)}>Bewerk eigen recept</button>
+        <button onClick={() => selected && 'savedAt' in selected && duplicateOwnRecipe(selected)}>Dupliceer recept</button>
         <button onClick={() => selected && 'savedAt' in selected && removeOwnRecipe(selected)}>Verwijder eigen recept</button>
       </div>}</>}</dialog>
   </div>
