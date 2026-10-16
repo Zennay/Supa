@@ -35,9 +35,17 @@ function activePriceValidity(blocks, capturedAt) {
     const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value)
     const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
     if (!dateOnly && !timestamp) return null
+    // Date.parse() silently rolls impossible civil days (2020-02-30T...)
+    // forward to March. Validate the source calendar date before converting
+    // any explicit UTC/offset instant, not just YYYY-MM-DD entries.
+    const year = Number(value.slice(0, 4))
+    const month = Number(value.slice(5, 7))
+    const day = Number(value.slice(8, 10))
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+    const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) return null
     const millis = Date.parse(value)
     if (!Number.isFinite(millis)) return null
-    if (dateOnly && new Date(millis).toISOString().slice(0, 10) !== value) return null
     return { millis: dateOnly && inclusiveEnd ? millis + 86_400_000 : millis,
       exclusiveEnd: dateOnly && inclusiveEnd }
   }
