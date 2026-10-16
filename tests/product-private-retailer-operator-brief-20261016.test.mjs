@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { loadReviewedRepositoryFixtures } from '../scripts/retailer-reviewed-ingest-engine.mjs'
 import { planPrivateRetailerRollout } from '../scripts/retailer-private-source-rollout-matrix.mjs'
+import { evaluatePrivateAdapterHealth } from '../scripts/retailer-private-adapter-health.mjs'
 import {
-  main, renderPrivateRetailerOperatorBrief,
+  main, renderPrivateRetailerOperatorBrief, renderPrivateRetailerCoverageBrief,
 } from '../scripts/retailer-private-operator-brief.mjs'
 
 async function historicalReport() {
@@ -337,4 +338,94 @@ test('operator cannot count a reviewed source with zero product observations', a
   accepted.historicalObservations = accepted.acceptedSources - 1
   accepted.unknownPriceObservations = 0
   assert.throws(() => renderPrivateRetailerOperatorBrief(fabricated), /geweigerd/)
+})
+
+
+test('historical six-source product coverage shows pack/stock/offer diagnostics without private prices', async () => {
+  const { batch, report } = await historicalReport()
+  const health = evaluatePrivateAdapterHealth(batch, {
+    referenceTime: report.referenceTime,
+    maxAgeHours: report.maxAgeHours,
+  })
+  const output = renderPrivateRetailerCoverageBrief(health, report)
+  assert.match(output, /Aanvullende historische productdekking/)
+  assert.match(output, /PLUS: \d+ historische productwaarnemingen/)
+  assert.match(output, /DekaMarkt: \d+ historische productwaarnemingen/)
+  assert.match(output, /beschikbaarheid onbekend/)
+  assert.match(output, /verpakking onbekend/)
+  assert.match(output, /historische aanbiedingswaarnemingen/)
+  assert.match(output, /geen live voorraad of actuele aanbiedingen/)
+  assert.doesNotMatch(output, /https?:|sourceProductId|sha256|capturedAt|currentPriceCents|€|access_token/)
+  let written = ''
+  const emitted = await main([], text => { written += text })
+  assert.equal(emitted, written)
+  assert.match(written, /Aanvullende historische productdekking/)
+  assert.match(written, /live-ingestie en publieke prijzen blijven UIT/)
+})
+
+test('historical stock and packaging coverage rejects fabricated mismatched counters', async () => {
+  const { batch, report } = await historicalReport()
+  const real = evaluatePrivateAdapterHealth(batch, {
+    referenceTime: report.referenceTime,
+    maxAgeHours: report.maxAgeHours,
+  })
+  const shape = 'plus:product'
+  const cases = [
+    altered => { altered.byShape[shape].observations++ },
+    altered => { altered.byShape[shape].accepted++ },
+    altered => { altered.byShape[shape].unknownPrices++ },
+    altered => { altered.byShape[shape].unknownPacks = altered.byShape[shape].observations + 1 },
+    altered => { altered.byShape[shape].unknownAvailability = altered.byShape[shape].observations + 1 },
+    altered => { altered.byShape[shape].offerObservations = altered.byShape[shape].observations + 1 },
+    altered => { altered.byShape[shape].sources++ },
+    altered => { altered.sources++ },
+    altered => { altered.externalRequests = 1 },
+    altered => { altered.productionEnabled = true },
+    altered => { altered.byShape['unreviewed:product'] = altered.byShape[shape] },
+  ]
+  for (const corrupt of cases) {
+    const changed = structuredClone(real)
+    corrupt(changed)
+    assert.throws(() => renderPrivateRetailerCoverageBrief(changed, report), /geweigerd/)
+  }
+})
+
+test('historical coverage refuses active getters and revoked proxies before running traps', async () => {
+  const { batch, report } = await historicalReport()
+  const health = evaluatePrivateAdapterHealth(batch, {
+    referenceTime: report.referenceTime,
+    maxAgeHours: report.maxAgeHours,
+  })
+  let sideEffects = 0
+  const active = new Proxy(health, {
+    get() { sideEffects++; throw new Error('SYNTHETIC TRUST TRAP') },
+  })
+  assert.throws(() => renderPrivateRetailerCoverageBrief(active, report), /geweigerd/)
+  assert.equal(sideEffects, 0)
+  const revoked = Proxy.revocable(health, {})
+  revoked.revoke()
+  assert.throws(() => renderPrivateRetailerCoverageBrief(revoked.proxy, report), /geweigerd/)
+  const accessor = structuredClone(health)
+  Object.defineProperty(accessor.byShape['plus:product'], 'unknownPacks', {
+    enumerable: true, get() { sideEffects++; return 999 },
+  })
+  assert.throws(() => renderPrivateRetailerCoverageBrief(accessor, report), /geweigerd/)
+  assert.equal(sideEffects, 0)
+})
+
+test('historical coverage derives actionable unknown stock or packaging review from archive only', async () => {
+  const { batch, report } = await historicalReport()
+  const actual = evaluatePrivateAdapterHealth(batch, {
+    referenceTime: report.referenceTime,
+    maxAgeHours: report.maxAgeHours,
+  })
+  const synthetic = structuredClone(actual)
+  const bucket = synthetic.byShape['plus:product']
+  assert.ok(bucket.observations > 0)
+  bucket.unknownAvailability = 1
+  bucket.unknownPacks = 1
+  const text = renderPrivateRetailerCoverageBrief(synthetic, report)
+  assert.match(text, /Actie: ontbrekende beschikbaarheid\/verpakking handmatig beoordelen/)
+  assert.match(text, /geen live voorraad of actuele aanbiedingen/)
+  assert.doesNotMatch(text, /€|https?:|sourceProductId/)
 })
