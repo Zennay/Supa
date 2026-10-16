@@ -164,7 +164,12 @@ function validHttpsPlusUrl(
     // tracking fragment, credential-bearing query or noncanonical spelling
     // was never part of its reviewed provenance.
     return (
-      url.search === '' && url.hash === '' && url.href === value &&
+      url.search === '' && url.hash === '' &&
+      // WHATWG URL deliberately canonicalizes the explicit default :443
+      // port away. Keep that historical valid HTTPS form, but still refuse
+      // arbitrary URL spellings, queries and fragments.
+      (url.href === value ||
+       value === url.href.replace('https://www.plus.nl/', 'https://www.plus.nl:443/')) &&
       (url.pathname === expectedRoute ||
         url.pathname.startsWith(`${expectedRoute}/`))
     )
