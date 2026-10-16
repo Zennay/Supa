@@ -19,7 +19,27 @@ export function recipeUrl(input) {
   if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443') ||
       isIP(url.hostname.replace(/^\[|\]$/g, '')) || !url.hostname.includes('.') ||
       /\.(localhost|local|internal|test|invalid)$/i.test(url.hostname)) throw new Error('Gebruik een publieke HTTPS-receptlink.')
-  for (const key of url.searchParams.keys()) if (/token|password|secret|auth|api.?key|signature/i.test(key)) throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
+  // URLSearchParams decodes one layer. Repeatedly decoded query keys can be
+  // interpreted as credentials by downstream sites; refuse them before DNS/IO.
+  const credentialKey = /(?:token|password|secret|oauth|saml|session|signature|authorization|pkce|api.?key|(?:^|[_-])(?:auth|code|verifier|state|sig)(?:$|[_-]))/i
+  for (const parameter of url.searchParams.keys()) {
+    let key = parameter
+    // One decoding layer was already applied by URLSearchParams. Inspect
+    // *every* subsequent layer, not just the final string: otherwise
+    // %25252563ode can reach another decoder as a credentialed "code" key.
+    // Over-encoded or malformed keys fail closed without reflecting secrets.
+    let resolved = false
+    for (let depth = 0; depth < 8; depth++) {
+      key = key.normalize('NFKC')
+      if (credentialKey.test(key)) throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
+      if (!key.includes('%')) { resolved = true; break }
+      try { key = decodeURIComponent(key) }
+      catch { throw new Error('Gebruik een openbare receptlink zonder inloggegevens.') }
+    }
+    if (!resolved || credentialKey.test(key.normalize('NFKC')) || key.includes('%')) {
+      throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
+    }
+  }
   url.hash = ''
   return url
 }
