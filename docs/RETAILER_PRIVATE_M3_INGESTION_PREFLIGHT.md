@@ -18,8 +18,9 @@ node --experimental-strip-types --test tests/product-retailer-private-m3-ingesti
 Het commando kan nu ook een **bestaande, uitsluitend-lezen**
 reviewmap verwerken die eerder via
 [`retailer-private-reviewed-manifest-builder.mjs`](../scripts/retailer-private-reviewed-manifest-builder.mjs)
-is voorbereid. Vereist: precies zes afzonderlijke gecontroleerde
-product-, catalogus- en aanbiedingenrecords voor PLUS en DekaMarkt, met een
+is voorbereid. Vereist: **6–32 afzonderlijke, gecontroleerde**
+product-, catalogus- en aanbiedingenrecords voor PLUS en DekaMarkt, met
+alle zes combinatievormen (twee winkels × drie bronsoorten) en een
 `manifest.json` die de originele bronbestandsbytes per SHA-256 vastlegt.
 De map moet eigenaar-afgeschermd zijn (0700), de reguliere bronbestanden
 0600, zonder symlinks of hardlinks. Er worden NOOIT manifesten gemaakt,
@@ -38,9 +39,26 @@ De controle roept de bestaande integriteitsbewuste SHA-manifestreplay aan
 en verwerkt pas daarna de **privé in het proces** beschikbare observaties.
 Er worden uitsluitend zes bronsoortaggregaten en overkoepelende aantallen
 uitgegeven. Bij SHA-afwijking/missende bron wordt zonder stdout generiek
-geweigerd. Meerdere opnames van één bronsoort binnen dezelfde map worden
-nog niet tot één kortings-baseline samengevoegd: deze M3-controle weigert
-daarom bewust meer dan de zes toegelaten individuele bronvormen.
+geweigerd. Alle 6–32 gebeurtenissen blijven meetellen in brongezondheid,
+historische productregistratie en tegenstrijdigheidscontrole. Voor de
+`24h` **historische kortings-baselinecontrole** wordt uitsluitend de
+fysiek meest recente capture per winkel × bronsoort geselecteerd; selectie
+gebeurt op de volledige UTC-instant inclusief submilliseconden. Opnames
+die in die ene vergelijking niet meetellen worden **apart gerapporteerd**
+(`sourceEventsOutsideOfferReview`,
+`olderHistoricalOfferRowsNotCompared`), met een expliciete actie voor
+menselijke controle. Twee afwijkende gebeurtenissen met dezelfde fysieke
+tijd en dezelfde bronsoort worden geweigerd in plaats van willekeurig
+gekozen. Dit is geen keuze van de huidige prijs, geen vervanging van
+bronhistorie en nooit bewijs van korting zonder menselijke observatie.
+
+De per-bronsoort status benoemt ook
+`latestArchivedCapturedAt`: het laatst vastgelegde *historische* moment,
+niet een nieuwe opname. De huidige oude main-baselinecorroborator kan
+bepaalde geldige UTC-offsets en 9-decimale tijdstempels nog conservatief
+afwijzen totdat onafhankelijke [QA-fix #3108](https://github.com/Zennay/Supa/pull/3108)
+formeel geïntegreerd is; deze preflight omzeilt of herdefinieert die
+QA-veiligheidsgrens niet.
 
 Geen nieuwe URL, internetverbinding, externe toestemming of huidige prijs
 volgt uit deze route. Origineel historisch bewijs kan eveneens in de operator-
