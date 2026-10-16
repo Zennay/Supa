@@ -252,8 +252,14 @@ export class PoliteFetcher {
 
         if (!res.ok) {
           const error = new HttpStatusError(current, res.status)
-          const retryAfter = Number(res.headers.get('retry-after'))
-          if (Number.isFinite(retryAfter)) error.retryAfter = retryAfter
+          // Missing Retry-After is null; Number(null) === 0 is NOT a
+          // server-requested zero-second cooldown. Never honour negative or
+          // nonfinite values as delays; the caller's 30s fallback applies.
+          const retryHeader = res.headers.get('retry-after')
+          const retryAfter = typeof retryHeader === 'string' && retryHeader.trim()
+            ? Number(retryHeader)
+            : NaN
+          if (Number.isFinite(retryAfter) && retryAfter >= 0) error.retryAfter = retryAfter
           try {
             await res.body?.cancel()
           } catch {
