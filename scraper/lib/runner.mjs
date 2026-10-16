@@ -51,7 +51,10 @@ export async function runRetailer(adapter, {
       const name = createHash('sha1').update(item.url).digest('hex').slice(0, 16)
       writeFileSync(join(dir, `${name}.html.gz`), gzipSync(`<!-- ${item.url} -->\n${res.text}`))
     }
-    const records = adapter.parse(res.text, res.url || item.url).filter(isValidRecord)
+    // Source authorization is scoped to the running adapter, never to parser claims.
+    // Discard a foreign retailer row before saving it or counting it as ingested.
+    const records = adapter.parse(res.text, res.url || item.url)
+      .filter((record) => isValidRecord(record) && record.retailer === adapter.id)
     if (!records.length) summary.empty += 1
     const at = new Date().toISOString()
     store.transaction(() => {
@@ -73,27 +76,34 @@ export async function runRetailer(adapter, {
 
     // Hands out the next work item; generator access is serialised.
     const nextItem = () => {
+      // Reserve each request inside this serialized handout, never before an
+      // awaited discovery call in separate workers. Fresh skips cost no budget.
       const result = pulling.then(async () => {
-        while (!queue.length && !exhausted) {
-          const next = await discovered.next()
-          if (next.done) exhausted = true
-          else queue.push(next.value)
+        while (!aborted && started < limit) {
+          while (!queue.length && !exhausted) {
+            const next = await discovered.next()
+            if (next.done) exhausted = true
+            else queue.push(next.value)
+          }
+          const item = queue.shift()
+          if (!item) return null
+          if (item.kind === 'product' && fresh.has(item.url)) {
+            summary.skipped += 1
+            continue
+          }
+          started += 1
+          return item
         }
-        return queue.shift() ?? null
+        return null
       })
       pulling = result.catch(() => {})
       return result
     }
 
     const worker = async () => {
-      while (!aborted && started < limit) {
+      while (!aborted) {
         const item = await nextItem()
-        if (!item) return
-        if (item.kind === 'product' && fresh.has(item.url)) {
-          summary.skipped += 1
-          continue
-        }
-        started += 1
+        if (!item || aborted) return
         try {
           queue.unshift(...(await handle(item)))
         } catch (error) {
