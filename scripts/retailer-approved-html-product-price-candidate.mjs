@@ -32,8 +32,8 @@ function activePriceValidity(blocks, capturedAt) {
   function parseBoundary(raw, inclusiveEnd) {
     if (typeof raw !== 'string') return null
     const value = raw.trim()
-    const dateOnly = /^\\d{4}-\\d{2}-\\d{2}$/.test(value)
-    const timestamp = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$/i.test(value)
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
     if (!dateOnly && !timestamp) return null
     const millis = Date.parse(value)
     if (!Number.isFinite(millis)) return null
