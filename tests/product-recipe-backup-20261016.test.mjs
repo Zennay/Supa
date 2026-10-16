@@ -115,3 +115,39 @@ test('portable export refuses authentication query secrets and drops unneeded UR
     assert.throws(() => parseRecipeBackup(JSON.stringify(payload)), /geheime inloggegevens/, query)
   }
 })
+
+test('UTF-8 payload ceiling matches real file byte size, not code units (#3629)', () => {
+  const heavyStep = 'é'.repeat(5000)
+  const recipes = [1, 2, 3].map(index => ({
+    ...own('own-utf8-' + index, 'Unicode recept ' + index),
+    steps: Array.from({ length: 100 }, () => heavyStep),
+  }))
+  const storage = memory()
+  const state = saveRecipeLibrary(storage, readRecipeLibrary(storage), recipes)
+  assert.equal(state.error, null)
+  const raw = JSON.stringify({
+    format: 'supa-private-recipes-backup', version: 1,
+    recipes: recipes.map(item => ({
+      title: item.title, source: item.source, sourceUrl: item.sourceUrl,
+      servings: item.servings, minutes: item.minutes,
+      ingredients: item.ingredients.map(i => i.original), steps: item.steps,
+    })),
+  })
+  assert.ok(raw.length < 2_000_000, 'valid JSON fits in UTF-16 character count')
+  assert.ok(Buffer.byteLength(raw, 'utf8') > 2_000_000, 'UTF-8 file exceeds actual byte limit')
+  assert.throws(() => parseRecipeBackup(raw), /Back-upbestand is te groot of ongeldig/)
+  assert.throws(() => exportRecipeBackup(state), /te groot om te exporteren/)
+})
+
+test('ordinary accented Dutch recipe backs up and restores losslessly', () => {
+  const source = own('own-accents', 'Citroën crème brûlée', ['100 g crème fraîche'])
+  source.steps = ['Roer crème fraîche, voeg citroën toe.']
+  const storage = memory()
+  const state = saveRecipeLibrary(storage, readRecipeLibrary(storage), [source])
+  const raw = exportRecipeBackup(state)
+  assert.ok(Buffer.byteLength(raw, 'utf8') <= 2_000_000)
+  const parsed = parseRecipeBackup(raw)
+  assert.equal(parsed[0].title, 'Citroën crème brûlée')
+  assert.equal(parsed[0].ingredients[0].original, '100 g crème fraîche')
+  assert.deepEqual(parsed[0].steps, ['Roer crème fraîche, voeg citroën toe.'])
+})
