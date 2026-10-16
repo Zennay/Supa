@@ -99,6 +99,10 @@ test('never counts impossible Gregorian and physically future clocks as reviewed
     '2026-04-31T18:08:57.837Z',
     '2099-10-16T18:08:57.837Z',
     '2026-10-04T18:08:57.837+15:00',
+    '2026-10-04T18:08:57.837-13:00',
+    '2026-10-04T18:08:57.837-14:00',
+    '2026-10-04T18:08:57.837-12:01',
+    '2026-10-04T18:08:57.837+14:01',
   ]) {
     const sample = structuredClone(original)
     sample.source.capturedAt = fakeClock
