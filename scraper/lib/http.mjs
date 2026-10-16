@@ -276,9 +276,22 @@ export class PoliteFetcher {
           // server-requested zero-second cooldown. Never honour negative or
           // nonfinite values as delays; the caller's 30s fallback applies.
           const retryHeader = res.headers.get('retry-after')
-          const retryAfter = typeof retryHeader === 'string' && retryHeader.trim()
-            ? Number(retryHeader)
-            : NaN
+          let retryAfter = NaN
+          if (typeof retryHeader === 'string' && retryHeader.trim()) {
+            const header = retryHeader.trim()
+            // Preserve existing numeric delay-seconds semantics. An HTTP-date
+            // expresses an absolute deadline and must use the injected clock.
+            retryAfter = Number(header)
+            if (!Number.isFinite(retryAfter)) {
+              const at = Date.parse(header)
+              // Date.parse alone admits non-HTTP dates and normalized invalid
+              // dates. Require canonical IMF-fixdate before trusting a deadline.
+              if (Number.isFinite(at) && new Date(at).toUTCString() === header &&
+                  at > this.now()) {
+                retryAfter = Math.ceil((at - this.now()) / 1000)
+              }
+            }
+          }
           if (Number.isFinite(retryAfter) && retryAfter >= 0) error.retryAfter = retryAfter
           try {
             await res.body?.cancel()
@@ -287,9 +300,47 @@ export class PoliteFetcher {
           }
           throw error
         }
-        const buffer = Buffer.from(await res.arrayBuffer())
-        if (buffer.length > this.maxBytes) {
-          throw new Error('retailer HTTP response exceeds maximum bytes')
+        // Native WHATWG response bodies must be counted as they arrive.
+        // arrayBuffer() first would allocate the entire remote response before
+        // enforcing the source budget; refusing afterwards is too late.
+        let buffer
+        if (res.body && typeof res.body.getReader === 'function') {
+          const reader = res.body.getReader()
+          const chunks = []
+          let total = 0
+          let finished = false
+          try {
+            for (;;) {
+              const { done, value } = await reader.read()
+              if (done) {
+                finished = true
+                break
+              }
+              const chunk = Buffer.from(value)
+              total += chunk.byteLength
+              if (total > this.maxBytes) {
+                await reader.cancel()
+                throw new Error('retailer HTTP response exceeds maximum bytes')
+              }
+              chunks.push(chunk)
+            }
+            buffer = Buffer.concat(chunks, total)
+          } finally {
+            // Release the reader on success; cancel unread network input on
+            // read errors too. The explicit over-budget cancellation above
+            // immediately stops production even with a slow remote stream.
+            if (!finished) {
+              try { await reader.cancel() } catch { /* already closed */ }
+            }
+            reader.releaseLock()
+          }
+        } else {
+          // Legacy injected transports without a WHATWG body are retained for
+          // deterministic existing tests; real fetch Responses expose a stream.
+          buffer = Buffer.from(await res.arrayBuffer())
+          if (buffer.length > this.maxBytes) {
+            throw new Error('retailer HTTP response exceeds maximum bytes')
+          }
         }
         let bytes = buffer
         if (buffer[0] === 0x1f && buffer[1] === 0x8b) {
