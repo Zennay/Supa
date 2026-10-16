@@ -26,11 +26,7 @@ async function probe(method, mode = 'http') {
         headers: { get: () => 'text/html' },
         body: null,
         async arrayBuffer() {
-          return Buffer.from('<html>fictional inert page</html>').buffer.slice(
-            Buffer.from('<html>fictional inert page</html>').byteOffset,
-            Buffer.from('<html>fictional inert page</html>').byteOffset +
-              Buffer.from('<html>fictional inert page</html>').byteLength,
-          )
+          return Uint8Array.from(Buffer.from('<html>fictional inert page</html>')).buffer
         },
       }
     },
