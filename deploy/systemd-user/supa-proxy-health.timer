@@ -1,0 +1,12 @@
+[Unit]
+Description=Recheck Supa proxy pool every 5 minutes (feed refresh every 60)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+RandomizedDelaySec=15s
+Persistent=true
+Unit=supa-proxy-health.service
+
+[Install]
+WantedBy=timers.target
