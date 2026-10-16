@@ -154,7 +154,7 @@ export function saveRecipeDeviceDraft(
   const draft = safeDraft(input)
   if (!draft) return { status: 'invalid' }
   const previous = readRecipeDeviceDraft(storage, id)
-  if (previous.status === 'protected' || previous.status === 'unavailable') return previous
+  if (previous.status === 'protected' || previous.status === 'unavailable') return { status: previous.status }
   if ((previous.status === 'missing') !== (expectedRevision === null) ||
       (previous.status === 'found' && previous.record.revision !== expectedRevision)) {
     return { status: 'conflict' }
@@ -187,7 +187,7 @@ export function deleteRecipeDeviceDraft(
   const key = storageKey(id)
   if (!key || !Number.isSafeInteger(expectedRevision) || expectedRevision < 1) return { status: 'invalid' }
   const current = readRecipeDeviceDraft(storage, id)
-  if (current.status === 'protected' || current.status === 'unavailable') return current
+  if (current.status === 'protected' || current.status === 'unavailable') return { status: current.status }
   if (current.status !== 'found' || current.record.revision !== expectedRevision) {
     return { status: 'conflict' }
   }
