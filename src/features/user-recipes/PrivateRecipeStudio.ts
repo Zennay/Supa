@@ -1,5 +1,4 @@
-import { createElement } from 'react'
-import { UserRecipeDraftEditor } from './UserRecipeDraftEditor.tsx'
+import { createElement, type ComponentType } from 'react'
 import { prepareUnpricedPrivateRecipe, type UnpricedPrivateRecipe } from './reviewedRecipeBasketBridge.ts'
 import type { EditorRecipeDraft } from './userRecipeDraftEditor.ts'
 import { PrivateRecipeWeekPlanner } from './PrivateRecipeWeekPlanner.ts'
@@ -20,8 +19,11 @@ export function PrivateRecipeStudio({
   onAddReviewedRecipe,
   onSelectedDaysChange,
   onCancelDraft,
+  EditorComponent,
 }: {
   draft: EditorRecipeDraft
+  /** Inject existing UserRecipeDraftEditor from the authenticated host. */
+  EditorComponent: ComponentType<{ draft: EditorRecipeDraft; onChange: (draft: EditorRecipeDraft) => void; onConfirm: (draft: EditorRecipeDraft) => void; onCancel: () => void }>
   draftLocalId: string
   recipes: readonly UnpricedPrivateRecipe[]
   selectedDays: PrivateWeekSelection
@@ -46,7 +48,7 @@ export function PrivateRecipeStudio({
     createElement('h2', { key:'title' }, 'Mijn recepten'),
     createElement('p', { key:'privacy' },
       'Maak een eigen recept en plan je week. Dit is een lokale voorvertoning: er wordt niets online opgeslagen of gepubliceerd.'),
-    createElement(UserRecipeDraftEditor, {
+    createElement(EditorComponent, {
       key:'editor', draft, onChange:onDraftChange, onConfirm:confirm, onCancel:onCancelDraft,
     }),
     current.status === 'review_required'
