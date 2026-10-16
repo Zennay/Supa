@@ -5,6 +5,7 @@ import type {
 } from './ingestion.ts'
 import { validateRawProductObservation } from './ingestion.ts'
 import { normalizeMoneyToCents, normalizePackText } from './normalize.ts'
+import { snapshotInertHistoricalEvidence } from './inertHistoricalEvidence.ts'
 
 type JsonObject = Record<string, unknown>
 
@@ -454,6 +455,10 @@ function parseOfferProduct(
 export function parseDekaMarktSsrCatalogEvidence(
   evidence: DekaMarktSsrCatalogEvidence,
 ): DekaMarktListingsParseResult {
+  // Make a detached JSON-shaped copy before touching caller-owned descriptors.
+  const safe = snapshotInertHistoricalEvidence(evidence)
+  if (!safe) return { type: 'abstain', reason: 'non-inert archived source evidence' }
+  evidence = safe
   const boundaryError = validateEvidenceBoundary(
     evidence,
     'dekamarkt-public-ssr-nuxt-catalog',
@@ -490,6 +495,10 @@ export function parseDekaMarktSsrCatalogEvidence(
 export function parseDekaMarktSsrOffersEvidence(
   evidence: DekaMarktSsrOffersEvidence,
 ): DekaMarktListingsParseResult {
+  // Make a detached JSON-shaped copy before touching caller-owned descriptors.
+  const safe = snapshotInertHistoricalEvidence(evidence)
+  if (!safe) return { type: 'abstain', reason: 'non-inert archived source evidence' }
+  evidence = safe
   const boundaryError = validateEvidenceBoundary(
     evidence,
     'dekamarkt-public-ssr-nuxt-offers',
