@@ -8,6 +8,7 @@
  */
 import { createHash } from 'node:crypto'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
+import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_JSONLD_BYTES = 256 * 1024
@@ -113,7 +114,7 @@ function extractJsonLdDocuments(html) {
       return null
     }
     try {
-      documents.push(JSON.parse(script[2]))
+      documents.push(parseUniqueKeyRetailerJson(script[2]))
     } catch {
       // Fail the *whole* page. It is unsafe to use a later, valid looking
       // product price after another declared JSON-LD script was corrupted.
