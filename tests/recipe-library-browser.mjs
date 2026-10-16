@@ -11,8 +11,8 @@ try {
   await page.getByRole('button', {name:'Recepten',exact:true}).click()
   await page.locator('.hifi-recipe-photo').first().waitFor()
   await page.evaluate(() => Promise.all([...document.images].map(img => img.decode().catch(() => {}))))
-  assert.equal(await page.locator('.hifi-recipe-card').count(), 3)
-  await page.getByRole('button',{name:'Bekijk Romige tomatenpasta',exact:true}).click()
+  assert.equal(await page.locator('.hifi-recipe-card').count(), 6)
+  await page.getByRole('button',{name:'Bekijk Groente pasta',exact:true}).click()
   assert.match(await page.locator('dialog[open]').innerText(), /250 g Spaghetti/)
   assert.match(await page.locator('dialog[open]').innerText(), /Verwarm 400 g tomatenblokjes/)
   await page.getByRole('button',{name:'Details sluiten',exact:true}).click()
@@ -56,5 +56,5 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),true)
   await page.screenshot({path:'artifacts/recipe-ui/own-recipes-320.png',fullPage:true})
   assert.deepEqual(errors,[])
-  await writeFile('artifacts/recipe-ui/result.json',JSON.stringify({status:'passed',checks:['three canonical cookable planner recipes','192x143 geometry','all local images loaded','manual recipe review/save','reload persistence','canonical planner recipe','URL import review/save UI with synthetic response','320px overflow','no runtime errors']},null,2))
+  await writeFile('artifacts/recipe-ui/result.json',JSON.stringify({status:'passed',checks:['six real, fully specified recipes with matching Figma photos','192x143 geometry','all local images loaded','manual recipe review/save','reload persistence','canonical planner recipe','URL import review/save UI with synthetic response','320px overflow','no runtime errors']},null,2))
 } finally { await browser.close() }
