@@ -209,9 +209,9 @@ export function normalizeAvailability(value) {
   if (typeof value !== 'string') return 'unknown'
   const v = value.trim().toLowerCase()
   // Denials and negation outrank any incidental InStock substring.
-  const negated = /not[\\s_-]*in[\\s_-]*stock/.test(v)
-  const negative = /out[\\s_-]*of[\\s_-]*stock|discontinued|sold[\\s_-]*out|pre[\\s_-]*order/.test(v)
-  const positive = /in[\\s_-]*stock|instoreonly|limitedavailability|onlineonly/.test(v)
+  const negated = /not[\s_-]*in[\s_-]*stock/.test(v)
+  const negative = /out[\s_-]*of[\s_-]*stock|discontinued|sold[\s_-]*out|pre[\s_-]*order/.test(v)
+  const positive = /in[\s_-]*stock|instoreonly|limitedavailability|onlineonly/.test(v)
   if (negated) return 'unavailable'
   if (negative && positive) return 'unknown'
   if (negative) return 'unavailable'
