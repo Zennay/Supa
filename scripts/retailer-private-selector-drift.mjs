@@ -186,25 +186,49 @@ function parseUniquePrivateJson(bytes) {
     return JSON.parse(raw)
   } catch { fail() }
 }
+// A private archive is not a free-form path: pin its regular-file identity
+// and enforce an owner-only immediate staging directory. A hardlink cannot
+// impersonate a second historical capture under a different file name.
+async function inspectPrivateArchivePath(full) {
+  let cur = full
+  let leaf
+  for (;;) {
+    const stat = await lstat(cur)
+    if (stat.isSymbolicLink()) fail()
+    if (cur === full) {
+      if (!stat.isFile() || stat.nlink !== 1 ||
+          (stat.mode & 0o077) || stat.size > 65536) fail()
+      leaf = stat
+    } else if (cur === dirname(full) &&
+        (!stat.isDirectory() || (stat.mode & 0o077))) fail()
+    const parent = dirname(cur)
+    if (parent === cur) break
+    cur = parent
+  }
+  return leaf
+}
+const sameArchive = (a,b) =>
+  a.dev === b.dev && a.ino === b.ino && a.nlink === b.nlink &&
+  a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs
+
 async function readPrivate(path){
   if(typeof path!=='string'||!path||path.startsWith('-')||path.length>500||
     !/^[a-z0-9][a-z0-9_.-]*\.json$/i.test(basename(path)))fail()
   const full=resolve(path)
-  let cur=full
-  while(true){
-    const s=await lstat(cur)
-    if(s.isSymbolicLink())fail()
-    if(cur===full&&(!s.isFile()||(s.mode&0o077)||s.size>65536))fail()
-    const parent=dirname(cur)
-    if(parent===cur)break
-    cur=parent
-  }
+  const first=await inspectPrivateArchivePath(full)
   const handle=await open(full,constants.O_RDONLY|constants.O_NOFOLLOW)
   try{
-    const s=await handle.stat()
-    if(!s.isFile()||(s.mode&0o077)||s.size>65536)fail()
+    const opened=await handle.stat()
+    if (!opened.isFile() || opened.nlink !== 1 ||
+        (opened.mode & 0o077) || opened.size > 65536 ||
+        !sameArchive(first,opened)) fail()
+    // Recheck the named source after taking the descriptor, including parent
+    // privacy. Refuse if another writer exchanged the file at this path.
+    if (!sameArchive(opened,await inspectPrivateArchivePath(full))) fail()
     const bytes=await handle.readFile()
-    if(bytes.length>65536)fail()
+    const after=await handle.stat()
+    if(bytes.length>65536 || !sameArchive(opened,after) ||
+        !sameArchive(after,await inspectPrivateArchivePath(full))) fail()
     return parseUniquePrivateJson(bytes)
   }finally{await handle.close()}
 }
