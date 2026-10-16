@@ -57,7 +57,10 @@ function activePriceValidity(blocks, capturedAt) {
       if (clock[5]) {
         const offsetHours = Number(clock[6])
         const offsetMinutes = Number(clock[7])
-        if (offsetMinutes > 59 || offsetHours * 60 + offsetMinutes > 14 * 60) {
+        // Civil timezone extremes are asymmetric: UTC-12:00 through
+        // UTC+14:00. ISO's syntactic -23:59 is not trustworthy store evidence.
+        const maxMinutes = clock[5] === '-' ? 12 * 60 : 14 * 60
+        if (offsetMinutes > 59 || offsetHours * 60 + offsetMinutes > maxMinutes) {
           return null
         }
         // RFC3339 -00:00 means an unknown local offset, not confirmed UTC.
