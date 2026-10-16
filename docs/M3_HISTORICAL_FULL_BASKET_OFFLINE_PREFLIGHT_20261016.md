@@ -29,3 +29,17 @@ Een succesvolle run bewijst **uitsluitend** dat de offline keten op bekende hist
 M3 kan pas extern worden afgesloten nadat schriftelijke PLUS/Deka-bronrechten [#74](https://github.com/Zennay/Supa/issues/74), een echte menselijke **zelfde 11×2 mand binnen 24 uur** [#78](https://github.com/Zennay/Supa/issues/78), veldbron-SHA [#205](https://github.com/Zennay/Supa/issues/205), de permanente betrouwbare M3 VPS-validatie [#2833](https://github.com/Zennay/Supa/issues/2833) en de gescopeerde zCloud-writer-coördinatie bevestigd zijn.
 
 **Geen** externe fetch, proxyverzoek, CAPTCHA, scraper scheduler, prijspublicatie of productie-deploy wordt door dit nieuwe commando uitgevoerd.
+
+## Nieuwe integratie: alleen na deze controle een privédatabase schrijven
+
+De bestaande uitvoerbare offline SQLite-builder `scripts/retailer-build-reviewed-universal-sqlite.mjs` gebruikt nu **dezelfde zes-bron→catalogus→11×2 plannercontrole vóór aanmaken van de database**. Dit is functionele toelating op de echte, historische archieffacts, geen alleenstaande losse checklist:
+
+```bash
+node --experimental-strip-types scripts/retailer-build-reviewed-universal-sqlite.mjs --out /beveiligd/lokaal/pad/reviewed.db
+```
+
+De bestaande SQLite-beveiliging (nieuwe file, 0600 rechten, geen overschrijven, atomische Python-import en lokale opslag van herkomst en historische observaties) blijft intact. De geaggregeerde JSON CLI-uitvoer vermeldt nu ook `canonicalPlannerNeeds: 11`, `twoStoreReviewRows: 22` en `fullBasketFieldComparisonVerified: false`.
+
+Ook rechtstreekse JavaScript-aanroepen van de geëxporteerde SQLite-builder-CLI krijgen een inerte, begrensde kopie van `argv` vóór het lezen van `length` of de outputlocatie; een actieve/revoked Proxy of gespoofde array wordt geweigerd **vóór iedere bestandsmutatie**.
+
+Nieuwe tests gebruiken de echte zes M1-captures, bouwen daadwerkelijk een 0600-SQLite bestand, bewijzen no-overwrite en controleren zowel een echt Node-subproces als niet uitvoerbare Proxy-argumenten. Hieruit volgt nooit een toestemming om de private SQLite-bron als actuele winkelprijzendatabase te gebruiken.
