@@ -5,15 +5,24 @@
  * No clipboard API, storage write, or network privileges.
  */
 export function selectWeekMenuText(
-  field: Pick<HTMLTextAreaElement, 'value' | 'readOnly' | 'focus' | 'select' | 'setSelectionRange'> | null,
+  field: (Pick<HTMLTextAreaElement, 'value' | 'readOnly' | 'focus' | 'select' | 'setSelectionRange'> &
+    Partial<Pick<HTMLTextAreaElement, 'selectionStart' | 'selectionEnd'>>) | null,
   expectedText: string,
 ): boolean {
   if (!field || !field.readOnly || !expectedText || field.value !== expectedText) return false
   try {
     field.focus()
-    if (field.value !== expectedText) return false
+    if (!field.readOnly || field.value !== expectedText) return false
     field.select()
+    if (!field.readOnly || field.value !== expectedText) return false
     field.setSelectionRange(0, expectedText.length)
+    if (!field.readOnly || field.value !== expectedText) return false
+    // Real textarea controls expose these numeric positions. Some mobile
+    // browsers quietly ignore selection requests; do not announce success
+    // when the native positions prove no full range was selected.
+    if (typeof field.selectionStart === 'number' &&
+        typeof field.selectionEnd === 'number' &&
+        (field.selectionStart !== 0 || field.selectionEnd !== expectedText.length)) return false
     return true
   } catch {
     // Selection may be forbidden on this device. Manual long-press remains.
