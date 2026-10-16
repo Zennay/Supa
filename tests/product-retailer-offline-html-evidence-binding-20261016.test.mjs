@@ -131,3 +131,43 @@ test('untrusted accessors, revoked Proxies, sparse nested data and fake approval
   sparse.jsonLd.offers.priceSpecification = new Array(1)
   assert.throws(() => bindPrivateReviewedHtmlEvidence(plus.captured, sparse), /binding refused/)
 })
+
+function runWithRehashedSyntheticHtml(original, changedHtml) {
+  const record = structuredClone(original.reviewed)
+  const sha256 = createHash('sha256').update(changedHtml, 'utf8').digest('hex')
+  record.source.sha256 = sha256
+  if (record.browserEvidence) record.browserEvidence.renderedHtmlSha256 = sha256
+  if (record.captureEvidence) record.captureEvidence.bytes = Buffer.byteLength(changedHtml)
+  const capture = {
+    ...original.captured, html: changedHtml,
+    bytes: Buffer.byteLength(changedHtml),
+    source: { ...original.captured.source, sha256 },
+  }
+  return bindPrivateReviewedHtmlEvidence(capture, record)
+}
+
+test('data-type lookalike must not impersonate literal JSON-LD script attribute', async () => {
+  const original = syntheticReviewedHtml(await fixture('plus-rendered-product-halfvolle-melk.v1.json'))
+  const changedHtml = original.captured.html.replace(
+    'type="application/ld+json"', 'data-type="application/ld+json"')
+  assert.throws(() => runWithRehashedSyntheticHtml(original, changedHtml), /binding refused/)
+})
+
+test('data-id lookalike must not impersonate literal Nuxt script id', async () => {
+  const original = syntheticReviewedHtml(await fixture('dekamarkt-product-halfvolle-melk.v1.json'))
+  const changedHtml = original.captured.html.replace(
+    'id="__NUXT_DATA__"', 'data-id="__NUXT_DATA__"')
+  assert.throws(() => runWithRehashedSyntheticHtml(original, changedHtml), /binding refused/)
+})
+
+test('JSON-LD inside HTML comments or template is inert, not an observation', async () => {
+  const original = syntheticReviewedHtml(await fixture('plus-rendered-product-halfvolle-melk.v1.json'))
+  const script = /<script type="application\/ld\+json">[\s\S]*?<\/script>/.exec(original.captured.html)?.[0]
+  assert.ok(script)
+  for(const replacement of ['<!--' + script + '-->', '<template>' + script + '</template>']) {
+    const changedHtml = original.captured.html.replace(script, replacement)
+    assert.throws(() => runWithRehashedSyntheticHtml(original, changedHtml), /binding refused/)
+  }
+  assert.throws(() => runWithRehashedSyntheticHtml(
+    original, original.captured.html + '<!-- unclosed'), /binding refused/)
+})
