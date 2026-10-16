@@ -32,7 +32,8 @@ test('userinfo, credential-looking query parameters and percent encoded names ar
   for (const value of [
     'https://user:pw@www.ok.nl/recept', 'https://www.ok.nl?access_token=abc',
     'https://www.ok.nl?Client-Secret=abc', 'https://www.ok.nl?%74oken=abc',
-    'https://www.ok.nl?SESSION_id=abc', 'https://%6Cocalhost/recept',
+    'https://www.ok.nl?SESSION_id=abc', 'https://www.ok.nl?%2574oken=abc',
+    'https://%6Cocalhost/recept',
   ]) assert.equal(allowed(value), false, value)
 })
 
