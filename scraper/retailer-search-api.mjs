@@ -38,6 +38,10 @@ export function findFreshProducts(database, approvedIds, query, now = new Date()
   const sql = 'SELECT p.retailer_id, r.name AS retailer_name, p.name, p.brand, ' +
     'p.pack_text, p.pack_amount, p.pack_count, p.pack_unit, p.url, ' +
     'lp.price_cents, lp.promo_price_cents, lp.promo_valid_until, ' +
+    // Existing deployed SQLite "latest_prices" views lack the campaign start.
+    // Read from the exact same latest price row without migrating the view.
+    '(SELECT price.promo_valid_from FROM prices price WHERE price.product_id=p.id ' +
+    'ORDER BY price.last_seen_at DESC, price.id DESC LIMIT 1) AS promo_valid_from, ' +
     'lp.observed_at, lp.availability ' +
     'FROM products p JOIN retailers r ON r.id=p.retailer_id ' +
     'JOIN latest_prices lp ON lp.product_id=p.id ' +
@@ -56,10 +60,18 @@ export function findFreshProducts(database, approvedIds, query, now = new Date()
         now.getTime()-timestamp < 0 || now.getTime()-timestamp > MAX_AGE_MS ||
         !cents(row.price_cents) || !text(row.name) ||
         !text(row.retailer_name,90)) continue
+    // A future or reversed campaign is not a current discount, even when
+    // the product row is fresh and the promotional cents are positive.
+    const parseBound = value => value === null ? null :
+      typeof value === 'string' &&
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+        ? Date.parse(value) : NaN
+    const starts = parseBound(row.promo_valid_from)
+    const ends = parseBound(row.promo_valid_until)
     const hasOffer = cents(row.promo_price_cents) &&
-      (!row.promo_valid_until ||
-       (Number.isFinite(Date.parse(row.promo_valid_until)) &&
-        Date.parse(row.promo_valid_until)>=now.getTime()))
+      (starts === null || Number.isFinite(starts) && starts <= now.getTime()) &&
+      (ends === null || Number.isFinite(ends) && ends >= now.getTime()) &&
+      (starts === null || ends === null || starts <= ends)
     const effective = hasOffer && row.promo_price_cents<row.price_cents
       ? row.promo_price_cents : row.price_cents
     if (!cents(effective)) continue
