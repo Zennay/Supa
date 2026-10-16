@@ -38,6 +38,13 @@ function safeLink(value: unknown): string | null {
     let key = encodedKey
     let resolved = false
     for (let layer = 0; layer < 8; layer += 1) {
+      // Percent-encoded query delimiters can become an entirely new auth
+      // parameter if a downstream importer or link resolver decodes again.
+      // Reject that ambiguity, including control characters, instead of
+      // serializing a portable URL that changes meaning across applications.
+      if (/[&=?#\u0000-\u001f\u007f]/u.test(key)) {
+        throw new Error('Back-up bevat een onveilige receptlink.')
+      }
       const normalized = key.normalize('NFKC').toLowerCase()
       const compact = normalized.replace(/[-_\s]/g, '')
       if (/(?:oauth|saml|token|secret|password|signature|apikey|session|authorization|pkce|codeverifier|codechallenge|authcode)/.test(compact) ||
