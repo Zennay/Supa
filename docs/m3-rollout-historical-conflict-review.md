@@ -1,6 +1,6 @@
 # M3 private retailer rollout: historical product conflicts
 
-The six offline reviewed PLUS/DekaMarkt adapter shapes are **historical**, even when all six are accepted. An accepted capture can contain a competing fact for the same product: price, offer, pack or availability. Shape coverage is therefore not a consistency verdict.
+The six offline reviewed PLUS/DekaMarkt adapter shapes are **historical**, even when all six are accepted. **The bundled six-shape history already contains conflicting product facts; do not assume the untouched fixture is conflict-free.** An accepted capture can contain a competing fact for the same product: price, offer, pack or availability. Shape coverage is therefore not a consistency verdict.
 
 ## Operator interpretation
 
@@ -16,7 +16,7 @@ Other actions for missing source shapes, rejected captures, staleness and writte
 
 ## Regression and independent acceptance
 
-- `node --test tests/product-m3-rollout-per-retailer-conflict-20261016.test.mjs` uses cloned sanitized fixture data, two fictional conflicting captures, and checks PLUS-only, DekaMarkt-only, both, and pristine history. It also checks source-permission and publication denials.
+- `node --test tests/product-m3-rollout-per-retailer-conflict-20261016.test.mjs` uses cloned sanitized fixture data, two fictional conflicting captures, and checks catalog-backed baseline review, injected PLUS/DekaMarkt changes without altering unrelated store actions, both-store changes, and forged production permission. Baseline status is derived from real historical catalog facts, not from a fabricated conflict-free expectation. It also checks source-permission and publication denials.
 - Independently replay the **unchanged** QA evidence in [#3301](https://github.com/Zennay/Supa/pull/3301) against the fixed product head. That original RED/now expected GREEN is separate from the newly authored product tests.
 - Review and applicable exact-head hosted/VPS CI still precede integration into `main`. Do not merge QA drafts solely because a suite turns green.
 
