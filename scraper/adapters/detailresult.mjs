@@ -79,7 +79,12 @@ export function parseDetailresultProduct(html, url, { retailer, fileBase }) {
   const hasMpn = Object.hasOwn(ld, 'mpn')
   const hasArticleUrl = Object.hasOwn(ld, 'url')
   if (!hasMpn && !hasArticleUrl) return []
-  if (hasMpn && String(ld.mpn) !== idFromUrl) return []
+  if (hasMpn && !(
+    (typeof ld.mpn === 'string' && ld.mpn === idFromUrl) ||
+    (typeof ld.mpn === 'number' && Number.isSafeInteger(ld.mpn) &&
+      String(ld.mpn) === idFromUrl)
+  )) return []
+  if (hasArticleUrl && typeof ld.url !== 'string') return []
   if (hasArticleUrl) {
     let declared
     try { declared = new URL(ld.url) } catch { return [] }
