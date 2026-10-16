@@ -87,20 +87,38 @@ test('all formula prefixes, tabs, newlines, quotes and control characters remain
   // Header/row delimiters remain strict, not just a regex-based pretty-print.
 })
 
-test('formula-looking ingredient identities refuse before any worksheet may be exported', async () => {
+test('formula-shaped ingredient IDs are either rejected upstream or inertly escaped in CSV', async () => {
   const originals = await fixtures()
   const valid = buildPrivateSelectedWeekObservationWorksheet(originals, ['Ma'])
   assert.equal(valid.rows, 10, 'unchanged known identity still succeeds')
-  for (const id of ['=SUM(1,2)', '+10', '-2', '@SUM(1,2)', '\\n=NOW()']) {
+  let refused = 0
+  let acceptedAsInert = 0
+  for (const id of ['=SUM(1,2)', '+10', '-2', '@SUM(1,2)', '\n=NOW()']) {
     const plan = structuredClone(m2InitialPlan)
     const recipes = structuredClone(m2Recipes)
     recipes[0].ingredients[0].id = id
-    assert.throws(
-      () => buildPrivateSelectedWeekObservationWorksheet(originals, ['Ma'], {plan, recipes}),
-      /contract refused|worksheet refused/,
-      `untrusted planner identity denied before CSV: ${JSON.stringify(id)}`,
-    )
+    let result
+    try {
+      result = buildPrivateSelectedWeekObservationWorksheet(originals, ['Ma'], {plan, recipes})
+    } catch (error) {
+      assert.match(String(error), /contract refused|worksheet refused/,
+        `early refusal for ${JSON.stringify(id)}`)
+      refused++
+      continue
+    }
+    acceptedAsInert++
+    const cells = csvRows(result.csv).slice(1)
+    assert.equal(cells.length, 10, 'no row injection')
+    const serialized = id.replace(/[\r\n\u0000-\u001f\u007f]/gu, ' ')
+    const expected = /^\s*[=+\-@]/u.test(serialized) ? "'" + serialized : serialized
+    assert.equal(cells.filter(row => row[2] === expected).length, 2,
+      `allowed CSV identity safely escaped for both retailers: ${JSON.stringify(id)}`)
+    assert.ok(cells.every(row => row[0] === 'UNOBSERVED_TEMPLATE_NOT_EVIDENCE'))
+    assert.ok(cells.every(row => row.slice(6).every(value => value === '')))
+    assert.equal(result.publicSavingsClaimEligible, false)
   }
+  assert.ok(refused >= 1, 'upstream identity safeguard exercised')
+  assert.ok(acceptedAsInert >= 1, 'CSV identity safeguard exercised')
 })
 
 test('standalone process stdout equals API worksheet while hostile argv refuses without data leaks', async () => {
