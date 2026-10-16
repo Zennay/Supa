@@ -4,7 +4,8 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { prepareUnpricedPrivateRecipe } from '../src/features/user-recipes/reviewedRecipeBasketBridge.ts'
 import { PrivateRecipeStudio } from '../src/features/user-recipes/PrivateRecipeStudio.ts'
-import { UserRecipeDraftEditor } from '../src/features/user-recipes/UserRecipeDraftEditor.tsx'
+
+function MockEditor() { return createElement('h3', {}, 'Mijn recept controleren') }
 
 function draft(overrides={}) {
   return {
@@ -21,14 +22,14 @@ function existing(){
 }
 function props(overrides={}){
   return {
-    draft:draft(),draftLocalId:'new-one',recipes:[existing()],selectedDays:{Ma:'private-recipe:saved-one'},
+    EditorComponent:MockEditor,draft:draft(),draftLocalId:'new-one',recipes:[existing()],selectedDays:{Ma:'private-recipe:saved-one'},
     onDraftChange:()=>{},onAddReviewedRecipe:()=>{},onSelectedDaysChange:()=>{},onCancelDraft:()=>{},
     ...overrides,
   }
 }
 function confirmationCallback(parameters){
   const outer=PrivateRecipeStudio(parameters)
-  const editor=outer.props.children.find((child)=>child?.type===UserRecipeDraftEditor)
+  const editor=outer.props.children.find((child)=>child?.type===MockEditor)
   assert.ok(editor)
   return editor.props.onConfirm
 }
