@@ -54,6 +54,12 @@ export function prepareUnpricedPrivateRecipe(
         reasons.push('metric_amount_exceeds_import_contract')
         break
       }
+      // A fraction of a physical piece (e.g. 0.5 egg/onion) requires an
+      // explicit user decision. The canonical portion scaler also marks this
+      // fractional_piece; valid decimal g/ml remain ordinary unpriced facts.
+      if (ingredient.unit === 'piece' && !Number.isInteger(ingredient.amount)) {
+        reasons.push('fractional_piece_needs_human_review')
+      }
       if (!ingredient ||
         typeof ingredient.query !== 'string' ||
         !ingredient.query.trim() ||
