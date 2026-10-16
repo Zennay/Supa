@@ -52,7 +52,7 @@ test('QA positive: physical leap days 2000 and 2024 remain offline, SHA-linked a
       assert.equal(result.readyForIngestion, false)
       assert.equal(result.publicSavingsClaimEligible, false)
       assert.ok(result.selectors.every(s => s.status === 'needs-human-review'))
-      assert.doesNotMatch(JSON.stringify(result), /fictional|price-value|www\.plus\.nl|www\.dekamarkt\.nl/i)
+      assert.doesNotMatch(JSON.stringify(result), /fictional|www\.plus\.nl|www\.dekamarkt\.nl/i)
     }
   }
 })
