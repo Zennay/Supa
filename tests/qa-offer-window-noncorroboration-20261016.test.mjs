@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { loadReviewedRepositoryFixtures } from '../scripts/retailer-reviewed-ingest-engine.mjs'
@@ -95,6 +94,6 @@ test('inclusive start and end time boundaries preserve valid archive corroborati
       original.corroboratedHistoricalBaselines, edge)
     assert.equal(report.publicSavingsClaimEligible, false)
     assert.doesNotMatch(JSON.stringify(report),
-      /https?:\\/\\/|sourceProductId|offerPriceCents|currentPriceCents|Zuivelmeester/i)
+      /https?:|sourceProductId|offerPriceCents|currentPriceCents|Zuivelmeester/i)
   }
 })
