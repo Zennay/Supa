@@ -115,6 +115,36 @@ function assertImmutableSourceProductSets(previous, current) {
   }
 }
 
+/**
+ * Capture order belongs to a physical retailer source page, not to an SKU.
+ * Catalogs can replace every product identifier between two revisions.
+ * Compare the most recent event per (retailer, source kind, URL) first so an
+ * older archive cannot masquerade as new additions and removals.
+ *
+ * Use the original nanosecond-aware clock parser: Date.parse alone loses
+ * submillisecond ordering. Distinct URLs are not interchangeable evidence.
+ */
+function latestSourceCaptureEvents(batch) {
+  const events = new Map()
+  for (const result of batch.results) {
+    if (!result.accepted) continue
+    if (!PAIRS.includes(result.key)) fail()
+    for (const observation of result.observations) {
+      const source = observation.provenance
+      const page = JSON.stringify([result.key, source.url])
+      const capture = { when: instantNanos(source.capturedAt), sha: source.sha256 }
+      const previous = events.get(page)
+      if (!previous || previous.when < capture.when) {
+        events.set(page, capture)
+      } else if (previous.when === capture.when && previous.sha !== capture.sha) {
+        // One page at one physical instant cannot have two raw HTML bodies.
+        fail()
+      }
+    }
+  }
+  return events
+}
+
 function latest(batch) {
   const rows = new Map()
   for (const result of batch.results) {
@@ -161,6 +191,14 @@ export function comparePrivateRetailerFactChanges(previous, current, {
       after.sixShapeCoverageComplete !== true ||
       before.rejectedSources !== 0 || after.rejectedSources !== 0) fail()
   assertImmutableSourceProductSets(previous, current)
+  const oldCaptures = latestSourceCaptureEvents(previous)
+  const newCaptures = latestSourceCaptureEvents(current)
+  for (const [page, old] of oldCaptures) {
+    const next = newCaptures.get(page)
+    if (!next) continue // A genuinely different page has no shared timeline.
+    if (next.when < old.when ||
+        (next.when === old.when && next.sha !== old.sha)) fail()
+  }
   const oldRows = latest(previous)
   const newRows = latest(current)
   const perShape = Object.fromEntries(PAIRS.map(x => [x, ZERO()]))
