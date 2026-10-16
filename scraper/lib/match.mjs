@@ -90,7 +90,10 @@ function sameGtinPhysicalPack(a, b) {
   return Boolean(packA && packB &&
     Number.isFinite(packA.total) && packA.total > 0 &&
     Number.isFinite(packB.total) && packB.total > 0 &&
-    samePack(packA, packB))
+    // A shared EAN does not authorize the ±1% heuristic used by fuzzy
+    // brand/name candidates. Payable full-pack prices require the same
+    // explicit normalized physical amount, never merely a close amount.
+    packA.unit === packB.unit && packA.total === packB.total)
 }
 
 
