@@ -65,16 +65,56 @@ function samePack(a, b) {
   return Math.abs(a.total - b.total) <= Math.max(a.total, b.total) * 0.01
 }
 
+/**
+ * Two records claiming the same GTIN must also describe the same measurable
+ * physical pack. Unknown/invalid dimensions or pack counts cannot establish
+ * a trusted cross-retailer identity. Count is explicit: 1×500g and 2×250g
+ * can have the same weight but are different retail packs for price comparison.
+ */
+function sameGtinPhysicalPack(a, b) {
+  const countA = a.pack_count ?? 1
+  const countB = b.pack_count ?? 1
+  if (!Number.isSafeInteger(countA) || countA < 1 ||
+      !Number.isSafeInteger(countB) || countB < 1 ||
+      countA !== countB) return false
+  const packA = packKey(a)
+  const packB = packKey(b)
+  return Boolean(packA && packB &&
+    Number.isFinite(packA.total) && packA.total > 0 &&
+    Number.isFinite(packB.total) && packB.total > 0 &&
+    samePack(packA, packB))
+}
+
+
 // products: [{ id, retailer_id, name, brand, gtins: string[], pack_amount, pack_unit, pack_count }]
 export function matchProducts(products) {
   const uf = new UnionFind()
+  // A barcode is an identity clue, not permission to compare contradictory
+  // physical packs. Keep track of every member in an accepted GTIN cluster:
+  // a bridge between two otherwise incompatible packs must not transitively
+  // turn two different quantities into one cross-store price identity.
   const byGtin = new Map()
+  const gtinMembers = new Map(products.map(product => [product.id, [product]]))
   for (const p of products) {
     uf.find(p.id)
     for (const gtin of p.gtins ?? []) {
       if (!isGlobalGtin(gtin)) continue
-      if (byGtin.has(gtin)) uf.union(byGtin.get(gtin), p.id)
-      else byGtin.set(gtin, p.id)
+      const candidates = byGtin.get(gtin) ?? []
+      for (const previous of candidates) {
+        const leftRoot = uf.find(previous.id)
+        const rightRoot = uf.find(p.id)
+        if (leftRoot === rightRoot) continue
+        const left = gtinMembers.get(leftRoot)
+        const right = gtinMembers.get(rightRoot)
+        if (!left.every(a => right.every(b => sameGtinPhysicalPack(a, b)))) continue
+        uf.union(leftRoot, rightRoot)
+        const root = uf.find(leftRoot)
+        gtinMembers.delete(leftRoot)
+        gtinMembers.delete(rightRoot)
+        gtinMembers.set(root, [...left, ...right])
+      }
+      candidates.push(p)
+      byGtin.set(gtin, candidates)
     }
   }
 
