@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { downloadPreparedWeekMenu } from './downloadWeekMenuText.ts'
-import { selectWeekMenuText } from './selectWeekMenuText.ts'
+import { selectWeekMenuText, weekMenuSelectionFeedback } from './selectWeekMenuText.ts'
 
 type WeekShareManualCopyProps = {
   text: string
@@ -23,9 +23,7 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
     setSaveFeedback(null)
     setSelectFeedback({
       sourceText: text,
-      message: selected
-        ? 'Tekst geselecteerd. Kies Kopieer op je apparaat.'
-        : 'Automatisch selecteren lukt niet. Houd de tekst ingedrukt om te kopiëren.',
+      message: weekMenuSelectionFeedback(selected),
     })
   }
 
