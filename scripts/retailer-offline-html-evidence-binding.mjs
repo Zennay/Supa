@@ -85,13 +85,23 @@ function uniqueJson(raw) {
 }
 
 function scriptsFrom(html) {
+  // Never treat inert comments, template content or attribute lookalikes
+  // (data-id/data-type) as actual JSON-LD or Nuxt script evidence.
+  const starts = (html.match(/<!--/g) ?? []).length
+  const ends = (html.match(/-->/g) ?? []).length
+  if (starts !== ends) fail()
+  const clean = html.replace(/<!--[\s\S]*?-->/g, '')
+  const opened = [...clean.matchAll(/<template\b/gi)].length
+  const closed = [...clean.matchAll(/<\/template\s*>/gi)].length
+  if (opened !== closed) fail()
+  const eligible = clean.replace(/<template\b[^>]*>[\s\S]*?<\/template\s*>/gi, '')
   const found = []
   let match
-  while ((match = SCRIPT.exec(html))) {
+  while ((match = SCRIPT.exec(eligible))) {
     if (found.length >= 50 || Buffer.byteLength(match[2], 'utf8') > MAX_EVIDENCE) fail()
     const attrs = match[1]
-    const id = /\bid\s*=\s*(?:"([^"]+)"|'([^']+)')/i.exec(attrs)
-    const type = /\btype\s*=\s*(?:"([^"]+)"|'([^']+)')/i.exec(attrs)
+    const id = /(?:^|\s)id\s*=\s*(?:"([^"]+)"|'([^']+)')/i.exec(attrs)
+    const type = /(?:^|\s)type\s*=\s*(?:"([^"]+)"|'([^']+)')/i.exec(attrs)
     const scriptId = id ? (id[1] ?? id[2]) : null
     const scriptType = type ? (type[1] ?? type[2]) : null
     if (scriptId === '__NUXT_DATA__' || scriptType === 'application/ld+json') {
