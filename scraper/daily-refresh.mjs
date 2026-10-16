@@ -10,8 +10,14 @@ import { readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { reviewedRetailerIds } from './daily-source-policy.mjs'
+import { evaluateSourcePermissionGate } from '../scripts/m1-check-source-permission-gate.mjs'
 
 export function permittedDailyIds(policy,canonicalGate,now=new Date()){
+  // Validate the ENTIRE canonical two-retailer registry first, even if the
+  // independently scoped daily policy enables only one retailer (or none).
+  // A first-match PLUS/Deka row alone cannot establish permission when its
+  // sibling, version, review chronology or duplicate rows are invalid.
+  evaluateSourcePermissionGate(canonicalGate)
   const ids=reviewedRetailerIds(policy,now)
   for(const id of ids){
     if(id!=='plus'&&id!=='dekamarkt')continue
