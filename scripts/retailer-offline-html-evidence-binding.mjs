@@ -14,7 +14,6 @@ import { ingestReviewedEvidence } from './retailer-reviewed-ingest-engine.mjs'
 const fail = () => { throw new Error('Private HTML-to-retailer evidence binding refused') }
 const MAX_HTML = 2 * 1024 * 1024
 const MAX_EVIDENCE = 1024 * 1024
-const SCRIPT = /<script\b([^<>]{0,512})>([\s\S]*?)<\/script\s*>/gi
 
 function inert(value, seen = new WeakSet(), depth = 0, budget = { count: 0 }) {
   if (++budget.count > 30000 || depth > 40) fail()
@@ -84,28 +83,94 @@ function uniqueJson(raw) {
   try { return JSON.parse(raw) } catch { fail() }
 }
 
+// Only literal HTML script start-tag attributes establish JSON-LD/Nuxt
+// evidence. Regex searches over the full tag can confuse an attribute value
+// (e.g. data-notes="text type='application/ld+json'") with a real type.
+function scriptAttributes(openTag) {
+  const attrs = Object.create(null)
+  const source = openTag.slice(7, -1)
+  let pos = 0
+  while (pos < source.length) {
+    while (pos < source.length && /[\t\n\r\f ]/.test(source[pos])) pos++
+    if (pos === source.length) break
+    const name = /^[a-z_:][a-z0-9_:.-]*/i.exec(source.slice(pos))?.[0]
+    if (!name) fail()
+    pos += name.length
+    const key = name.toLowerCase()
+    if (Object.hasOwn(attrs, key)) fail()
+    while (pos < source.length && /[\t\n\r\f ]/.test(source[pos])) pos++
+    let value = null
+    if (source[pos] === '=') {
+      pos++
+      while (pos < source.length && /[\t\n\r\f ]/.test(source[pos])) pos++
+      const quote = source[pos]
+      if (quote === '"' || quote === "'") {
+        const close = source.indexOf(quote, pos + 1)
+        if (close < 0) fail()
+        value = source.slice(pos + 1, close)
+        pos = close + 1
+      } else {
+        const match = /^[^\s"'<>`=]+/.exec(source.slice(pos))
+        if (!match) fail()
+        value = match[0]
+        pos += value.length
+      }
+    }
+    attrs[key] = value
+  }
+  return attrs
+}
+
+function tagEnd(html, start) {
+  let quote = null
+  for (let index = start + 1; index < html.length; index++) {
+    const ch = html[index]
+    if (quote !== null) {
+      if (ch === quote) quote = null
+    } else if (ch === '"' || ch === "'") quote = ch
+    else if (ch === '>') return index
+  }
+  fail()
+}
+
 function scriptsFrom(html) {
-  // Never treat inert comments, template content or attribute lookalikes
-  // (data-id/data-type) as actual JSON-LD or Nuxt script evidence.
+  // Skip HTML comments and complete inert/raw-text DOM regions. If nesting,
+  // closing or termination is ambiguous, fail closed rather than mistake a
+  // non-live script for an observed price. This is not a browser DOM parser.
   const starts = (html.match(/<!--/g) ?? []).length
   const ends = (html.match(/-->/g) ?? []).length
   if (starts !== ends) fail()
-  const clean = html.replace(/<!--[\s\S]*?-->/g, '')
-  const opened = [...clean.matchAll(/<template\b/gi)].length
-  const closed = [...clean.matchAll(/<\/template\s*>/gi)].length
-  if (opened !== closed) fail()
-  const eligible = clean.replace(/<template\b[^>]*>[\s\S]*?<\/template\s*>/gi, '')
+  let clean = html.replace(/<!--[\s\S]*?-->/g, '')
+  if (/<plaintext\b/i.test(clean)) fail()
+  for (const element of ['template', 'noscript', 'textarea', 'style',
+    'title', 'xmp', 'iframe', 'svg']) {
+    const open = new RegExp('<' + element + '\\b', 'gi')
+    const close = new RegExp('<\\/' + element + '\\s*>', 'gi')
+    if ([...clean.matchAll(open)].length !== [...clean.matchAll(close)].length) fail()
+    clean = clean.replace(new RegExp('<' + element + '\\b[^>]*>[\\s\\S]*?<\\/' +
+      element + '\\s*>', 'gi'), '')
+    // Nested, unfinished or otherwise ambiguous inert markup is not proof.
+    if (new RegExp('<\\/?' + element + '\\b', 'i').test(clean)) fail()
+  }
   const found = []
-  let match
-  while ((match = SCRIPT.exec(eligible))) {
-    if (found.length >= 50 || Buffer.byteLength(match[2], 'utf8') > MAX_EVIDENCE) fail()
-    const attrs = match[1]
-    const id = /(?:^|\s)id\s*=\s*(?:"([^"]+)"|'([^']+)')/i.exec(attrs)
-    const type = /(?:^|\s)type\s*=\s*(?:"([^"]+)"|'([^']+)')/i.exec(attrs)
-    const scriptId = id ? (id[1] ?? id[2]) : null
-    const scriptType = type ? (type[1] ?? type[2]) : null
-    if (scriptId === '__NUXT_DATA__' || scriptType === 'application/ld+json') {
-      found.push({ id: scriptId, type: scriptType, body: match[2] })
+  let position = 0
+  while (position < clean.length) {
+    const next = clean.indexOf('<', position)
+    if (next < 0) break
+    const end = tagEnd(clean, next)
+    const openTag = clean.slice(next, end + 1)
+    position = end + 1
+    if (!/^<script(?:\s|>)/i.test(openTag)) continue
+    const attrs = scriptAttributes(openTag)
+    const closing = /<\/script\s*>/gi
+    closing.lastIndex = position
+    const match = closing.exec(clean)
+    if (!match) fail()
+    const body = clean.slice(position, match.index)
+    position = closing.lastIndex
+    if (found.length >= 50 || Buffer.byteLength(body, 'utf8') > MAX_EVIDENCE) fail()
+    if (attrs.id === '__NUXT_DATA__' || attrs.type === 'application/ld+json') {
+      found.push({ id: attrs.id ?? null, type: attrs.type ?? null, body })
     }
   }
   return found
