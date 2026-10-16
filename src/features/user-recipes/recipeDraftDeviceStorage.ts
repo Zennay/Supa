@@ -34,6 +34,9 @@ export type DeviceDraftRecord = {
   revision: number
   savedAt: string
   draft: DeviceRecipeDraft
+  // Recreated same-ID drafts require an incarnation token for subsequent edits.
+  incarnation?: string
+  reusedIdentity?: true
 }
 
 export type DraftStorageRead =
@@ -115,31 +118,57 @@ function safeDraft(value: unknown): DeviceRecipeDraft | null {
   }
 }
 
-function recordFromRaw(raw: string): DeviceDraftRecord | null {
+type StoredDraft = DeviceDraftRecord | 'tombstone' | null
+
+function recordFromRaw(raw: string): StoredDraft {
   if (new TextEncoder().encode(raw).byteLength > MAX_BYTES) return null
   let parsed: unknown
   try { parsed = JSON.parse(raw) } catch { return null }
-  if (!plainRecord(parsed) || parsed.format !== 'supa-recipe-device-draft' ||
+  if (!plainRecord(parsed)) return null
+  // A deletion retains only a marker, NEVER recipe content. Without a marker
+  // re-creating the same externally supplied ID would recycle revision 1 and
+  // let an old tab overwrite/delete a completely unrelated new draft (ABA).
+  if (parsed.format === 'supa-recipe-device-tombstone') {
+    if (parsed.version !== 1 || typeof parsed.nonce !== 'string' ||
+        !DRAFT_ID.test(parsed.nonce)) return null
+    return 'tombstone'
+  }
+  if (parsed.format !== 'supa-recipe-device-draft' ||
       parsed.version !== 1 || !Number.isSafeInteger(parsed.revision) ||
       (parsed.revision as number) < 1 || !boundedText(parsed.savedAt, 35) ||
       Number.isNaN(Date.parse(parsed.savedAt as string))) return null
   if (!plainRecord(parsed.draft) || parsed.draft.sourceUrl !== null ||
       parsed.draft.status !== 'needs_review') return null
+  if (parsed.reusedIdentity !== undefined &&
+      (parsed.reusedIdentity !== true || typeof parsed.incarnation !== 'string' ||
+        !DRAFT_ID.test(parsed.incarnation))) return null
+  if (parsed.reusedIdentity === undefined && parsed.incarnation !== undefined) return null
   const draft = safeDraft(parsed.draft)
   return draft ? {
     format: 'supa-recipe-device-draft', version: 1, revision: parsed.revision as number,
     savedAt: parsed.savedAt as string, draft,
+    ...(parsed.reusedIdentity === true
+      ? { reusedIdentity: true as const, incarnation: parsed.incarnation as string }
+      : {}),
   } : null
 }
 
-export function readRecipeDeviceDraft(storage: RecipeDraftStorage, id: string): DraftStorageRead {
+type StoredSlot = DraftStorageRead | { status: 'tombstone' }
+
+function readStoredSlot(storage: RecipeDraftStorage, id: string): StoredSlot {
   const key = storageKey(id)
   if (!key) return { status: 'protected' }
   let raw: string | null
   try { raw = storage.getItem(key) } catch { return { status: 'unavailable' } }
   if (raw === null) return { status: 'missing' }
   const record = recordFromRaw(raw)
+  if (record === 'tombstone') return { status: 'tombstone' }
   return record ? { status: 'found', record } : { status: 'protected' }
+}
+
+export function readRecipeDeviceDraft(storage: RecipeDraftStorage, id: string): DraftStorageRead {
+  const slot = readStoredSlot(storage, id)
+  return slot.status === 'tombstone' ? { status: 'missing' } : slot
 }
 
 export function saveRecipeDeviceDraft(
@@ -147,16 +176,20 @@ export function saveRecipeDeviceDraft(
   id: string,
   input: DeviceDraftInput,
   expectedRevision: number | null,
+  expectedIncarnation: string | null = null,
 ): DraftStorageWrite {
   const key = storageKey(id)
   if (!key || (expectedRevision !== null &&
     (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1))) return { status: 'invalid' }
   const draft = safeDraft(input)
   if (!draft) return { status: 'invalid' }
-  const previous = readRecipeDeviceDraft(storage, id)
+  const previous = readStoredSlot(storage, id)
   if (previous.status === 'protected' || previous.status === 'unavailable') return { status: previous.status }
-  if ((previous.status === 'missing') !== (expectedRevision === null) ||
-      (previous.status === 'found' && previous.record.revision !== expectedRevision)) {
+  const missingOrDeleted = previous.status === 'missing' || previous.status === 'tombstone'
+  if (missingOrDeleted !== (expectedRevision === null) ||
+      (previous.status === 'found' && previous.record.revision !== expectedRevision) ||
+      (previous.status === 'found' && previous.record.reusedIdentity === true &&
+        previous.record.incarnation !== expectedIncarnation)) {
     return { status: 'conflict' }
   }
   const revision = previous.status === 'found' ? previous.record.revision + 1 : 1
@@ -165,13 +198,18 @@ export function saveRecipeDeviceDraft(
   const record: DeviceDraftRecord = {
     format: 'supa-recipe-device-draft', version: 1, revision,
     savedAt: new Date().toISOString(), draft,
+    ...(previous.status === 'tombstone'
+      ? { reusedIdentity: true as const, incarnation: createDeviceDraftId() }
+      : previous.status === 'found' && previous.record.reusedIdentity === true
+        ? { reusedIdentity: true as const, incarnation: previous.record.incarnation }
+        : {}),
   }
   const serialized = JSON.stringify(record)
   if (new TextEncoder().encode(serialized).byteLength > MAX_BYTES) return { status: 'invalid' }
 
   // LocalStorage read-then-write is NOT an atomic CAS transaction. Re-check
   // reduces ordinary stale-tab overwrite but is not cross-tab serializable.
-  const lastCheck = readRecipeDeviceDraft(storage, id)
+  const lastCheck = readStoredSlot(storage, id)
   if (lastCheck.status !== previous.status ||
       (lastCheck.status === 'found' && previous.status === 'found' &&
         lastCheck.record.revision !== previous.record.revision)) return { status: 'conflict' }
@@ -183,14 +221,26 @@ export function deleteRecipeDeviceDraft(
   storage: RecipeDraftStorage,
   id: string,
   expectedRevision: number,
+  expectedIncarnation: string | null = null,
 ): DraftStorageWrite {
   const key = storageKey(id)
   if (!key || !Number.isSafeInteger(expectedRevision) || expectedRevision < 1) return { status: 'invalid' }
   const current = readRecipeDeviceDraft(storage, id)
   if (current.status === 'protected' || current.status === 'unavailable') return { status: current.status }
-  if (current.status !== 'found' || current.record.revision !== expectedRevision) {
+  if (current.status !== 'found' || current.record.revision !== expectedRevision ||
+      (current.record.reusedIdentity === true &&
+        current.record.incarnation !== expectedIncarnation)) {
     return { status: 'conflict' }
   }
-  try { storage.removeItem(key) } catch { return { status: 'unavailable' } }
+  // A real delete removes the *draft contents*, but retains a tiny opaque
+  // tombstone so later same-ID creation cannot be confused with the old tab.
+  // This is not an atomic compare-and-swap between multiple browser tabs.
+  const tombstone = JSON.stringify({
+    format: 'supa-recipe-device-tombstone', version: 1, nonce: createDeviceDraftId(),
+  })
+  const last = readStoredSlot(storage, id)
+  if (last.status !== 'found' || last.record.revision !== current.record.revision ||
+      last.record.incarnation !== current.record.incarnation) return { status: 'conflict' }
+  try { storage.setItem(key, tombstone) } catch { return { status: 'unavailable' } }
   return { status: 'deleted' }
 }
