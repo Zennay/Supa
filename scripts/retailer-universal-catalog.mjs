@@ -122,7 +122,12 @@ function normalizedObservation(value) {
   // valid yet credential-bearing URL, impossible clock or unsafe money value.
   const origin = new URL(value.provenance.url)
   if (origin.username || origin.password || origin.hash ||
-      origin.port || origin.searchParams.has('access_token')) {
+      origin.port ||
+      // WHATWG URLSearchParams decodes %41 and similar encodings, but .has()
+      // is case sensitive. A credential-bearing source URL must never become
+      // reviewed evidence merely by changing the key's ASCII case.
+      [...origin.searchParams.keys()].some(name =>
+        name.toLowerCase() === 'access_token')) {
     throw new Error('Untrusted retailer capture source URL')
   }
   // Strict direct API admission: Date.parse alone normalizes impossible
