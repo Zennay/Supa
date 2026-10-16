@@ -10,6 +10,7 @@
 import { normalizeMoneyToCents, normalizePackText } from '../src/data/normalize.ts'
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
 import { normalizeSchemaOrgAvailability } from '../src/data/schemaOrgProduct.ts'
+import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
 
 const fail = () => ({ type: 'abstain', reason: 'DekaMarkt Nuxt product cannot be independently corroborated' })
 const data = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -18,17 +19,6 @@ const deref = (values, index) => Number.isSafeInteger(index) &&
 const scalar = (values, ref) => {
   const value = deref(values, ref)
   return ['string', 'number', 'boolean'].includes(typeof value) ? value : null
-}
-function extractNuxtArray(html) {
-  const scripts = [...html.matchAll(/<script\b([^>]{0,1500})>([\s\S]*?)<\/script\s*>/gi)]
-    .filter(match => /\bid\s*=\s*(?:"__NUXT_DATA__"|'__NUXT_DATA__')/i.test(match[1]))
-  if (scripts.length !== 1 || scripts[0][2].length > 1024 * 1024) return null
-  try {
-    const values = JSON.parse(scripts[0][2])
-    return Array.isArray(values) && values.length <= 25000 ? values : null
-  } catch {
-    return null
-  }
 }
 function oneDekaProduct(jsonLdBlocks) {
   // Deka's historical product page supplied a single flat JSON-LD Product
@@ -52,8 +42,9 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
         parsedUrl.search || parsedUrl.hash ||
         parsedUrl.href !== provenance.url) return fail()
 
-    const values = extractNuxtArray(html)
-    if (!values) return fail()
+    const scriptEvidence = readAuthorizedHtmlScriptEvidence(html)
+    const values = scriptEvidence.nuxtPayload
+    if (scriptEvidence.invalid || !values) return fail()
     const references = []
     for (const entry of values) {
       if (!data(entry)) continue
