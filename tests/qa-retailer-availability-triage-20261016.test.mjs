@@ -19,7 +19,7 @@ function releaseHold(report) {
   assert.equal(report.mode, 'private-reviewed-retailer-availability-qa')
   assert.equal(report.historicalOnly, true)
   assert.equal(report.currentStockVerified, false)
-  assert.equal(report.permissionsVerified, false)
+  assert.equal(report.permissionVerified, false)
   assert.equal(report.productionEnabled, false)
   assert.equal(report.publicSavingsClaimEligible, false)
   assert.equal(report.releaseDecision, 'hold')
