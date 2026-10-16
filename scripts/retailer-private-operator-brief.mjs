@@ -394,8 +394,11 @@ export async function main(argv = process.argv.slice(2),
   const rights = JSON.parse(await readFile(
     new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url), 'utf8'))
   const batch = await loadReviewedRepositoryFixtures()
-  const report = planPrivateRetailerRollout(rights, batch)
-  const coverage = evaluatePrivateAdapterHealth(batch)
+  // One physical reference clock binds both independent historical reviews;
+  // avoid an artificial disagreement near the age-window boundary.
+  const referenceTime = new Date().toISOString()
+  const report = planPrivateRetailerRollout(rights, batch, { referenceTime })
+  const coverage = evaluatePrivateAdapterHealth(batch, { referenceTime })
   const brief = renderPrivateRetailerOperatorBrief(report) +
     '\n' + renderPrivateRetailerCoverageBrief(coverage, report)
   write(brief)
