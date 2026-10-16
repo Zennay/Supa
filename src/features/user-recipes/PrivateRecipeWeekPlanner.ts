@@ -26,9 +26,27 @@ export function PrivateRecipeWeekPlanner({
 }) {
   const result = createPrivateRecipeWeekPreview(recipes, selection)
 
-  const safeRecipes = Array.isArray(recipes)
-    ? recipes.filter((recipe) => recipe && /^private-recipe:[A-Za-z0-9_-]{1,64}$/.test(recipe.id))
-    : []
+  // The pure preview refuses missing/hostile parent selection. Do not
+  // dereference that same rejected object again while rendering the UI.
+  const invalidSelection = result.status === 'review_required' && result.reason === 'invalid_selection'
+  const safeSelection: PrivateWeekSelection = invalidSelection ? {} : selection
+
+  // Treat recipe options as untrusted caller data too: reading an accessor
+  // here would undo the pure planner's fail-closed identity admission.
+  const safeRecipes: Array<{ id: string; title: string }> = []
+  if (Array.isArray(recipes) && !invalidSelection) {
+    try {
+      for (const recipe of recipes) {
+        if (!recipe || typeof recipe !== 'object') continue
+        const id = Object.getOwnPropertyDescriptor(recipe, 'id')?.value
+        const title = Object.getOwnPropertyDescriptor(recipe, 'title')?.value
+        if (typeof id === 'string' && /^private-recipe:[A-Za-z0-9_-]{1,64}$/.test(id) &&
+            typeof title === 'string') safeRecipes.push({ id, title })
+      }
+    } catch {
+      safeRecipes.length = 0
+    }
+  }
 
   function chooseDay(day: PrivateWeekDay, event: ChangeEvent<HTMLSelectElement>) {
     const nextId = event.currentTarget.value
@@ -36,7 +54,7 @@ export function PrivateRecipeWeekPlanner({
     if (result.status === 'review_required' && result.reason === 'invalid_selection') return
     const next: Record<string, string | null> = {}
     for (const currentDay of privateWeekDays) {
-      const old = Object.getOwnPropertyDescriptor(selection, currentDay)
+      const old = Object.getOwnPropertyDescriptor(safeSelection, currentDay)
       next[currentDay] = typeof old?.value === 'string' && old.value !== ''
         ? old.value : null
     }
@@ -46,7 +64,7 @@ export function PrivateRecipeWeekPlanner({
 
   const editors = privateWeekDays.map((day) => {
     const id = 'supa-private-week-' + day.toLowerCase()
-    const chosen = Object.getOwnPropertyDescriptor(selection, day)?.value
+    const chosen = Object.getOwnPropertyDescriptor(safeSelection, day)?.value
     const options = [
       createElement('option', { key:'empty', value:'' }, 'Geen recept'),
       ...safeRecipes.map((recipe) =>
