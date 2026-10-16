@@ -13,6 +13,11 @@ const forbiddenSuffixes = [
   'localhost', 'local', 'internal', 'onion', 'lan', 'home.arpa',
   'test', 'invalid', 'example', 'corp',
 ]
+// Query keys are decoded by URLSearchParams before normalization. Keep this
+// separate from plain substring secrets: a harmless recipe "postcode" must
+// not be confused with an OAuth authorization code.
+const authFlowQueryKey = /(?:oauthcode|authcode|authorizationcode|codeverifier|codechallenge|pkce(?:verifier|challenge)|saml(?:response|request)|oauthstate|samlassertion)/
+
 const privateQueryKeys = new Set([
   'token', 'access_token', 'refresh_token', 'id_token', 'api_key',
   'apikey', 'client_secret', 'authorization', 'auth', 'password',
@@ -56,7 +61,8 @@ export function assessRecipeSourceUrl(value: unknown): RecipeUrlAssessment {
   for (const key of parsed.searchParams.keys()) {
     const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '')
     if (key.includes('%') || privateQueryKeys.has(key.toLowerCase()) || privateQueryKeys.has(normalized) ||
-        /(?:token|secret|password|session|apikey|authorization)/.test(normalized)) {
+        /(?:token|secret|password|session|apikey|authorization)/.test(normalized) ||
+        authFlowQueryKey.test(normalized)) {
       return { accepted: false, reason: 'credentialed_url' }
     }
   }
