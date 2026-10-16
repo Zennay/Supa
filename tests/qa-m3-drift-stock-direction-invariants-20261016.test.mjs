@@ -193,3 +193,46 @@ test('integrated historical drift API rejects active source values without invok
     gate, base, proxy, { referenceTime: AT }), /refused/i)
   assert.equal(calls, 0)
 })
+
+test('metamorphic matrix: every retailer/source kind independently reports unknown vs unavailable deterioration', async () => {
+  const original = await loadReviewedRepositoryFixtures()
+  const gate = await rights()
+  for (const key of SHAPES) {
+    for (const nextStatus of ['unknown', 'unavailable']) {
+      const previous = structuredClone(original)
+      const earlier = previous.results.find(source => source.key === key)
+      assert.ok(earlier && earlier.observations.length > 0, 'genuine archived source ' + key)
+      for (const row of earlier.observations) row.availability = 'available'
+      const current = structuredClone(previous)
+      const changed = current.results.find(source => source.key === key)
+      for (const row of changed.observations) {
+        row.availability = nextStatus
+        row.provenance.capturedAt =
+          new Date(Date.parse(row.provenance.capturedAt) + 86_400_000).toISOString()
+        row.provenance.sha256 = nextStatus === 'unknown' ? 'c'.repeat(64) : 'd'.repeat(64)
+      }
+      const report = rehearsePrivateM3RetailerDrift(
+        gate, previous, current, { referenceTime: AT })
+      assert.equal(report.releaseDecision, 'hold', key + ': ' + nextStatus)
+      assert.equal(report.liveRequests, 0)
+      assert.equal(report.permissionVerified, false)
+      assert.equal(report.currentAvailabilityVerified, false)
+      assert.equal(report.alertShapeCount, 1, key + ': ' + nextStatus)
+      const selected = report.perShape.find(row => row.retailer + ':' + row.kind === key)
+      assert.ok(selected)
+      const expectedSignal = nextStatus === 'unknown'
+        ? 'more-unknown-archived-availability' : 'more-unavailable-archived-products'
+      const rejectedSignal = nextStatus === 'unknown'
+        ? 'more-unavailable-archived-products' : 'more-unknown-archived-availability'
+      assert.equal(nextStatus === 'unknown'
+        ? selected.archiveStockUnknownDelta : selected.archiveStockUnavailableDelta,
+      earlier.observations.length, key)
+      assert.ok(selected.reviewSignals.includes(expectedSignal), key + ': ' + nextStatus)
+      assert.ok(!selected.reviewSignals.includes(rejectedSignal), key + ': ' + nextStatus)
+      assert.ok(report.perShape.filter(row => row.retailer + ':' + row.kind !== key)
+        .every(row => row.archiveStockUnknownDelta === 0 &&
+          row.archiveStockUnavailableDelta === 0 && row.reviewSignals.length === 0),
+      'unmodified retailer/source partitions must be stable: ' + key)
+    }
+  }
+})
