@@ -459,7 +459,7 @@ export function parseDekaMarktSsrCatalogEvidence(
   const safe = snapshotInertHistoricalEvidence(evidence)
   if (!safe) return { type: 'abstain', reason: 'non-inert archived source evidence' }
   evidence = safe
-const boundaryError = validateEvidenceBoundary(
+  const boundaryError = validateEvidenceBoundary(
     evidence,
     'dekamarkt-public-ssr-nuxt-catalog',
     'catalog',
@@ -499,7 +499,7 @@ export function parseDekaMarktSsrOffersEvidence(
   const safe = snapshotInertHistoricalEvidence(evidence)
   if (!safe) return { type: 'abstain', reason: 'non-inert archived source evidence' }
   evidence = safe
-const boundaryError = validateEvidenceBoundary(
+  const boundaryError = validateEvidenceBoundary(
     evidence,
     'dekamarkt-public-ssr-nuxt-offers',
     'offers',
