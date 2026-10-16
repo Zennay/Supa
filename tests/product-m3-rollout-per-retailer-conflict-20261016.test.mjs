@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { loadReviewedRepositoryFixtures } from '../scripts/retailer-reviewed-ingest-engine.mjs'
 import { planPrivateRetailerRollout } from '../scripts/retailer-private-source-rollout-matrix.mjs'
+import { buildUniversalRetailerCatalog } from '../scripts/retailer-universal-catalog.mjs'
 
 const referenceTime = '2026-10-05T01:00:00.000Z'
 const rights = async () => JSON.parse(await readFile(
@@ -49,12 +50,17 @@ function verifyPrivateFlags(report) {
     row.currentPricePublicationAllowed === false), true)
 }
 
-test('six original historical shapes never create a false conflict-review requirement', async () => {
+test('six original historical shapes surface only catalog-backed conflict review', async () => {
   const batch = await loadReviewedRepositoryFixtures()
   const report = planPrivateRetailerRollout(await rights(), batch, { referenceTime })
+  const catalog = buildUniversalRetailerCatalog(batch)
   verifyPrivateFlags(report)
-  assert.equal(actions(report, 'plus').includes('review-conflicting-product-facts'), false)
-  assert.equal(actions(report, 'dekamarkt').includes('review-conflicting-product-facts'), false)
+  for (const retailerId of ['plus', 'dekamarkt']) {
+    const hasCatalogConflict = catalog.products.some(product =>
+      product.retailerId === retailerId && product.consistency !== 'consistent')
+    assert.equal(actions(report, retailerId).includes('review-conflicting-product-facts'),
+      hasCatalogConflict, 'accepted historical shapes can already disagree')
+  }
 })
 
 for (const affected of ['plus', 'dekamarkt']) {
@@ -62,11 +68,15 @@ for (const affected of ['plus', 'dekamarkt']) {
     const batch = structuredClone(await loadReviewedRepositoryFixtures())
     withConflictingProduct(batch, affected, affected === 'plus' ? 'e' : 'f')
     const unchanged = structuredClone(batch)
-    const report = planPrivateRetailerRollout(await rights(), batch, { referenceTime })
+    const gate = await rights()
+    const originalReport = planPrivateRetailerRollout(gate,
+      await loadReviewedRepositoryFixtures(), { referenceTime })
+    const report = planPrivateRetailerRollout(gate, batch, { referenceTime })
     verifyPrivateFlags(report)
     assert.equal(actions(report, affected).includes('review-conflicting-product-facts'), true)
     const other = affected === 'plus' ? 'dekamarkt' : 'plus'
-    assert.equal(actions(report, other).includes('review-conflicting-product-facts'), false)
+    assert.deepEqual(actions(report, other), actions(originalReport, other),
+      'a different retailer must retain its pre-existing historical review actions')
     assert.deepEqual(batch, unchanged, 'review does not alter historical evidence')
     assert.equal(JSON.stringify(report).includes('currentPriceCents'), false)
     assert.equal(JSON.stringify(report).includes('sourceProductId'), false)
