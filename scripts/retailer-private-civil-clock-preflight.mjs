@@ -9,7 +9,7 @@
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { snapshotInertReviewedEvidence } from './retailer-inert-json-admission.mjs'
-import { isValidCivilCaptureAt as isValidPrivateCivilCaptureTime } from '../src/data/retailerCivilCaptureClock.ts'
+import { isValidCivilCaptureAt as isValidPrivateCivilCaptureTime, civilCaptureInstantKey } from '../src/data/retailerCivilCaptureClock.ts'
 export { isValidPrivateCivilCaptureTime }
 import {
   ingestReviewedBatch,
@@ -30,11 +30,26 @@ export function ingestCivilClockCheckedReviewedBatch(records) {
   const now = Date.now()
   const copies = snapshotInertReviewedEvidence(records)
   if (!Array.isArray(copies) || copies.length < 1 || copies.length > 32) fail()
+  // ID aliases and physically equivalent timezone spellings must never count
+  // one archived source twice. The same capture is identified by retailer,
+  // shape, exact archived URL + SHA and its physical nanosecond UTC instant,
+  // NOT the arbitrary record.source.id or textual clock offset.
+  const physicalIdentities = new Set()
   for (const record of copies) {
     if (!record || typeof record !== 'object' || Array.isArray(record) ||
         !record.source || typeof record.source !== 'object' ||
         !KINDS.has(record.source.supermarket + ':' + record.source.kind) ||
+        typeof record.source.url !== 'string' ||
+        typeof record.source.sha256 !== 'string' ||
         !isValidPrivateCivilCaptureTime(record.source.capturedAt, now)) fail()
+    const instant = civilCaptureInstantKey(record.source.capturedAt, now)
+    if (instant === null) fail()
+    const identity = JSON.stringify([
+      record.source.supermarket, record.source.kind,
+      record.source.url, record.source.sha256, instant,
+    ])
+    if (physicalIdentities.has(identity)) fail()
+    physicalIdentities.add(identity)
   }
   const batch = ingestReviewedBatch(copies)
   // The plain engine supports partial review; this opt-in stricter gate never
