@@ -7,6 +7,8 @@ import { importRecipeLink } from './importRecipeLink'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import './recipes.css'
 
+const staticPublicPreview = import.meta.env.VITE_SUPA_PUBLIC_PREVIEW === 'true'
+
 function keyed<T>(items: readonly T[], identity: (item: T) => string) {
   const occurrences = new Map<string, number>()
   return items.map(value => {
@@ -109,7 +111,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       </article>)}</div>
       {!demo.length && !own.length && <p className="hifi-empty">{query ? 'Geen recepten gevonden. Probeer een andere zoekterm.' : 'Voeg je eerste eigen recept toe of importeer een receptlink.'}</p>}
     </section>
-    <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button></div>
+    <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button disabled={staticPublicPreview} title={staticPublicPreview ? 'Deze statische preview heeft nog geen receptimportserver.' : undefined} onClick={() => openEditor('url')}>Importeer via link</button></div>
+    {staticPublicPreview && <p className="recipe-note">De publieke preview draait zonder backend. Eigen recepten handmatig toevoegen werkt op dit apparaat; import via link volgt na de backend-publicatie.</p>}
     {!!demo.length && <p className="recipe-note">Zes uitgewerkte SUPA-recepten met ingrediënten en bereidingsstappen, ook beschikbaar in Planner. Dit zijn geen supermarktaanbiedingen; prijzen en besparingen zijn niet geverifieerd.</p>}
     {library.error && <p role="alert">{library.error}</p>}<p role="status" className="hifi-feedback">{message}</p>
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
