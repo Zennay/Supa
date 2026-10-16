@@ -8,6 +8,7 @@ import { lstat, open } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { types as nodeTypes } from 'node:util'
 
 const FIELDS=['product','name','price','pack','offer','availability']
 const SIGNALS=['schemaOrgProduct','nextData','nuxtData','jsonLd']
@@ -60,8 +61,54 @@ function canonical(report) {
   }
   return out
 }
+// Programmatic direct comparisons are possible in addition to parsed private
+// JSON. Never execute caller accessors/traps or trust prototype fields when
+// reading a stored source identity, selector shape, or timestamp. Clone and
+// pin all supported properties before performing any comparison.
+function ownDataRecord(input, fields) {
+  if (!input || typeof input !== 'object' || Array.isArray(input) ||
+      nodeTypes.isProxy(input)) fail()
+  const prototype = Object.getPrototypeOf(input)
+  if (prototype !== Object.prototype && prototype !== null) fail()
+  const descriptors = Object.getOwnPropertyDescriptors(input)
+  const keys = Reflect.ownKeys(descriptors)
+  if (keys.length !== fields.length ||
+      keys.some(key => typeof key !== 'string' || !fields.includes(key)) ||
+      fields.some(key => !Object.hasOwn(descriptors, key) ||
+        !Object.hasOwn(descriptors[key], 'value'))) fail()
+  return Object.freeze(Object.fromEntries(fields.map(key =>
+    [key, descriptors[key].value])))
+}
+function ownSelectors(input) {
+  if (nodeTypes.isProxy(input) || !Array.isArray(input) ||
+      Object.getPrototypeOf(input) !== Array.prototype || input.length > 24) fail()
+  const descriptors = Object.getOwnPropertyDescriptors(input)
+  const keys = Reflect.ownKeys(descriptors)
+  if (keys.length !== input.length + 1 ||
+      !Object.hasOwn(descriptors, 'length') ||
+      keys.some(key => key !== 'length' &&
+        (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key) ||
+          Number(key) >= input.length || !Object.hasOwn(descriptors[key], 'value')))) fail()
+  return Object.freeze(Array.from({ length: input.length }, (_, i) => {
+    const descriptor = descriptors[i]
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) fail()
+    return ownDataRecord(descriptor.value, ['field','selector','instances','status'])
+  }))
+}
+function pinnedProposal(input) {
+  const report = ownDataRecord(input, KEYS)
+  return Object.freeze({
+    ...report,
+    source: ownDataRecord(report.source, ['retailerId','sha256','capturedAt']),
+    structuredSignals: ownDataRecord(report.structuredSignals, SIGNALS),
+    selectors: ownSelectors(report.selectors),
+  })
+}
+
 /** The outcome is NOT an approved or active selector configuration. */
 export function compareOfflineSelectorProposals(before,after) {
+  before=pinnedProposal(before)
+  after=pinnedProposal(after)
   const a=canonical(before),b=canonical(after)
   if(before.source.retailerId!==after.source.retailerId||
     Date.parse(after.source.capturedAt)<Date.parse(before.source.capturedAt))fail()
