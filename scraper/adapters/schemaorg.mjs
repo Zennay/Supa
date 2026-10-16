@@ -19,17 +19,27 @@ function pick(obj, keys) {
   return undefined
 }
 
+// Missing currency is retained for legacy source formats, but any explicit
+// currency other than EUR is not an amount of euro cents. Currency at the
+// nested specification level overrides the parent Offer currency.
+function isEuroPrice(source, inheritedCurrency) {
+  const specified = pick(source, ['priceCurrency']) ?? inheritedCurrency
+  return specified === undefined || specified === null ||
+    (typeof specified === 'string' && specified.trim().toUpperCase() === 'EUR')
+}
+
 export function schemaOrgPrices(offers) {
   const list = (Array.isArray(offers) ? offers : [offers]).filter(Boolean)
   const prices = []
   let regular = null
   let validity = {}
   for (const offer of list) {
-    const direct = toCents(pick(offer, ['price', 'lowPrice']))
+    const currency = pick(offer, ['priceCurrency'])
+    const direct = isEuroPrice(offer) ? toCents(pick(offer, ['price', 'lowPrice'])) : null
     if (direct !== null) prices.push(direct)
     const specs = [pick(offer, ['priceSpecification'])].flat().filter(Boolean)
     for (const spec of specs) {
-      const cents = toCents(pick(spec, ['price']))
+      const cents = isEuroPrice(spec, currency) ? toCents(pick(spec, ['price'])) : null
       if (cents === null) continue
       if (/strikethrough|listprice|srp/i.test(String(spec.priceType ?? ''))) regular = cents
       else {
