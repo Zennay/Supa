@@ -75,7 +75,8 @@ test('no accessor or Proxy may execute at the dashboard input boundary', async (
   })
   assert.throws(() => renderOfflineM3Dashboard(other), /dashboard refused/)
   assert.equal(nestedCalls, 0)
-  assert.throws(() => renderOfflineM3Dashboard(new Proxy(await reviewedReport(), {
+  const proxyBase = await reviewedReport()
+  assert.throws(() => renderOfflineM3Dashboard(new Proxy(proxyBase, {
     get() { throw Error('NEVER_EXECUTE') },
   })), /dashboard refused/)
   const fake = await reviewedReport()
