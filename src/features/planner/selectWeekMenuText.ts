@@ -20,3 +20,10 @@ export function selectWeekMenuText(
     return false
   }
 }
+
+/** Honest action result for assistive tech; selecting is not the same as copying. */
+export function weekMenuSelectionFeedback(selected: boolean): string {
+  return selected
+    ? 'Tekst geselecteerd. Kies Kopieer op je apparaat.'
+    : 'Automatisch selecteren lukt niet. Houd de tekst ingedrukt om te kopiëren.'
+}
