@@ -12,7 +12,7 @@ The 32-character hex challenge changes for every request. No redirects, cookies,
 
 ## Deploy on VPS as ubuntu user (after reviewed PR integration)
 
-Check that the reviewed Supa checkout is at /home/ubuntu/Supa and Node 22+ is installed at /usr/bin/node; adapt the unit if either differs.
+Check that the reviewed Supa checkout is at /home/ubuntu/Supa and Node 22+ is available on the user service PATH; adapt the unit if either differs.
 
     cd /home/ubuntu/Supa && git pull --ff-only
     mkdir -p -m 700 ~/.config ~/.local/state/supa-proxy-health ~/.config/systemd/user
