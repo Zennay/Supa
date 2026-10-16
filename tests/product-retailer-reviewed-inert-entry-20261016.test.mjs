@@ -124,3 +124,24 @@ test('a batch cannot amortize many individually valid strings into an unbounded 
   const acceptable = Array.from({ length: 2 }, () => 'gewone boodschappen')
   assert.deepEqual(snapshotInertReviewedEvidence(acceptable), acceptable)
 })
+
+test('non-enumerable source facts cannot be laundered into visible reviewed JSON', async () => {
+  const source = await plusFixture()
+  const hidden = structuredClone(source)
+  Object.defineProperty(hidden.source, 'supermarket', {
+    value: 'plus', enumerable: false,
+  })
+  assert.throws(() => ingestReviewedEvidence(hidden), /inert JSON/)
+  assert.throws(() => ingestReviewedBatch([hidden]), /inert JSON/)
+  const extra = structuredClone(source)
+  Object.defineProperty(extra, 'hiddenReviewerMetadata', {
+    value: { usedForRelease: true }, enumerable: false,
+  })
+  assert.throws(() => ingestReviewedEvidence(extra), /inert JSON/)
+  const indexed = [structuredClone(source)]
+  Object.defineProperty(indexed, '0', {
+    value: source, enumerable: false, configurable: true,
+  })
+  assert.throws(() => ingestReviewedBatch(indexed), /inert JSON/)
+  assert.equal(ingestReviewedEvidence(source).accepted, true)
+})
