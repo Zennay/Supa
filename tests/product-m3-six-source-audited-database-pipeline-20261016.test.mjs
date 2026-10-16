@@ -73,7 +73,7 @@ test('integrated pipeline never overwrites an existing evidence database or leak
 test('integrated CLI rejects malformed flags and paths with zero publication', async () => {
   await privateWorkspace(async (folder, db) => {
     for (const args of [[], ['--out'], ['--out', db, '--live'],
-      ['--enable-network'], ['--out', db.replace('.sqlite', '\0.sqlite')]]) {
+      ['--enable-network'], ['--out', db.replace('.sqlite', '\n.sqlite')]]) {
       const result = run(args)
       assert.equal(result.status, 2, result.stderr)
       assert.equal(result.stdout, '')
