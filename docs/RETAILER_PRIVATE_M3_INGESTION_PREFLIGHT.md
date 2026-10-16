@@ -72,6 +72,28 @@ Er zijn **nul** netwerkverzoeken. Zonder argument geldt de auditklok van nu.
 `--at` is alleen een reproduceerbare UTC-auditklok, geen bewijs van een
 nieuwe opname of actuele prijs.
 
+## Historische voorraadzekerheid (product-core + onafhankelijke QA)
+
+De onafhankelijke quality-validation [#3111](https://github.com/Zennay/Supa/pull/3111)
+signaleerde terecht dat een product met een geldige historische prijs
+nog steeds **onbekende voorraad** of **expliciet niet beschikbaar** kan zijn.
+Deze geïntegreerde product-core preflight rapporteert nu daarom per keten ×
+bronsoort exact de historische aantallen:
+`unknownHistoricalAvailability`,
+`unavailableHistoricalObservations` en
+`availableHistoricalObservations`. Hun som **moet** gelijk zijn aan alle
+historische observaties in die bronsoort. Ook de totaalcijfers
+`historicalStockUnknownObservations`,
+`historicalStockUnavailableObservations` en
+`historicalStockAvailableObservations` sluiten op de ingestie aan;
+bij onmogelijke tellingen wordt de hele preflight geweigerd.
+
+Onzeker of niet-beschikbaar wordt **nooit automatisch koopbaar**.
+`currentStockCoverageVerified:false`,
+`productionEnabled:false` en `releaseDecision:"hold"` blijven altijd
+staan. Voor onzekere voorraad wordt expliciet menselijke verificatie
+gevraagd; geen gerapporteerd voorraadgegeven is een live voorraadcheck.
+
 De JSON-uitvoer bevat uitsluitend totalen, inclusief een uitsplitsing per keten en per bronsoort (PLUS/DekaMarkt × product/catalogus/aanbiedingen) met reviewstatus en aantallen; er verlaten geen productrijen de privéomgeving. De gecontroleerde uitsplitsing telt exact op tot het totaal van de adapterobservaties. Verder toont het geaccepteerde bronsoorten,
 historische productobservaties, tegenstrijdige productfeiten, verouderde
 archieven en wel/niet onafhankelijk bevestigde historische aanbiedingen.
