@@ -45,3 +45,11 @@ in-process inputbescherming is geen live retailer-exploit of bewijs van toestemm
 - De oude directe catalogus-fix blijft apart eigendom van [PR #3210](https://github.com/Zennay/Supa/pull/3210); dit is uitsluitend de additive wrapper, niet het sluiten van die bestaande P1. De definitieve CI op exacte nieuwe HEAD is nodig voordat de onafhankelijke drie originele CLI RED en één credential RED als GREEN worden gemeld.
 
 Ongewijzigde grenzen: offline-historisch, geen bronrechten, live prijzen, externe requests, publieke besparing of automatische productiedeploy.
+
+## Nieuwe directe health-API parity na onafhankelijke QA #3241
+
+De onafhankelijk bevroren [QA #3241](https://github.com/Zennay/Supa/pull/3241) bewees op een eerdere product-SHA dat de **directe zes-adapter health-API** gemengde (en %-encoded) querysleutels van `access_token` nog accepteerde terwijl deze privé-catalogusingang die al weigerde. De drie oorspronkelijke ongepatchte RED-cases staan nu byte-identiek in de productbranch (Git blob `fb50837f60cb07ac64a271688661617247dcd177`).
+
+De health-evaluator gebruikt nu intern exact dezelfde begrensde privé-catalogusfunctie voor de geaccepteerde historische capture-gegevens. Daardoor kan de directe health-ingang niet meer via de oudere, afzonderlijk beheerde universele catalogus-validator de credential-sleutelcontrole overslaan. Niets van de bron-adapters, hun andere ownerbranches of de bronrechten is aangepast. Herhaal de oorspronkelijke QA op de definitieve HEAD vóór het claimen van RED→GREEN.
+
+Deze privacy- en invoercontrole is slechts een lokaal in-process codecontract. Er is geen echte token gecapteerd of verstuurd, er zijn geen retailwebverzoeken gedaan en dit bewijst geen toestemming om prijzen te gebruiken.
