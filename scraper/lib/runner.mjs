@@ -54,6 +54,13 @@ export async function runRetailer(adapter, {
     return fetcher.request(url)
   }
 
+  // Hostless transports are only kept for existing deterministic,
+  // non-archiving fake-budget fixtures. A real PoliteFetcher, browser renderer
+  // or configured retailer never receives this exemption.
+  const inertUnattributedProbe = !adapter.host &&
+    adapter.mode === 'http' && !saveHtmlDir &&
+    !(fetcher instanceof PoliteFetcher)
+
   // Host blocks are terminal for this run: completion of another concurrent
   // fetch must not persist HTML or a paid price after the source is blocked.
   let aborted = null
@@ -61,15 +68,6 @@ export async function runRetailer(adapter, {
     // Discovery and expansion are untrusted work-item producers. Validate
     // each requested source before *either* HTTP or browser rendering; checking
     // the effective response URL afterwards cannot undo an off-source request.
-    // Old offline, zero-price fixture tests intentionally omit adapter.host
-    // and inject a standalone fake request function. Permit only that inert
-    // shape for counting requests; never permit live PoliteFetcher, browser,
-    // evidence archiving, or a configured retailer to skip origin admission.
-    // The existing post-response guard also refuses all priced records and
-    // evidence writes from those unattributed offline fixtures.
-    const inertUnattributedProbe = !adapter.host &&
-      adapter.mode === 'http' && !saveHtmlDir &&
-      !(fetcher instanceof PoliteFetcher)
     if (!inertUnattributedProbe && !isTrustedResponseSource(item?.url, adapter.host)) {
       throw new Error('retailer queued URL is outside approved HTTPS source origin')
     }
@@ -115,7 +113,23 @@ export async function runRetailer(adapter, {
 
   try {
     const queue = []
-    const discovered = adapter.discover({ fetcher, log })
+    // Discovery itself may make catalog HTTP requests before yielding its
+    // first item. Give it an origin-scoped façade rather than the raw client.
+    // Inherited methods are retained for adapter compatibility, while both
+    // request() and getText() pass through the same exact-host preflight.
+    const scopedFetcher = Object.create(
+      fetcher && (typeof fetcher === 'object' || typeof fetcher === 'function')
+        ? fetcher : null,
+    )
+    scopedFetcher.request = async (url, options) => {
+      if (!inertUnattributedProbe && !isTrustedResponseSource(url, adapter.host)) {
+        throw new Error('retailer discovery URL is outside approved HTTPS source origin')
+      }
+      if (typeof fetcher?.request !== 'function') throw new Error('retailer fetcher unavailable')
+      return fetcher.request(url, options)
+    }
+    scopedFetcher.getText = async (url, options) => (await scopedFetcher.request(url, options)).text
+    const discovered = adapter.discover({ fetcher: scopedFetcher, log })
     let exhausted = false
     let pulling = Promise.resolve()
     let started = 0
