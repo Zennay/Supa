@@ -85,11 +85,18 @@ export async function runRetailer(adapter, {
     }
     // Source authorization is scoped to the running adapter, never to parser claims.
     // Discard a foreign retailer row before saving it or counting it as ingested.
-    const records = adapter.parse(res.text, res.url || item.url)
-      .filter((record) => isValidRecord(record) && record.retailer === adapter.id)
-    // A synthetic empty-parser budget test may have no approved host, but
-    // absolutely no parsed priced rows may be archived without one.
-    if (!sourceApproved && records.length) {
+    // The response origin and retailer tag do not validate a parser's
+    // product article. Each persistable priced record must independently
+    // cite a current, exact HTTPS article URL on the approved adapter host.
+    // Never invent a source link from the requested or redirected page URL.
+    const records = sourceApproved
+      ? adapter.parse(res.text, res.url || item.url).filter((record) =>
+          isValidRecord(record) &&
+          record.retailer === adapter.id &&
+          isTrustedResponseSource(record.url, adapter.host),
+        )
+      : []
+    if (!sourceApproved) {
       throw new Error('retailer response origin is not approved for price archive')
     }
     if (!records.length) summary.empty += 1
