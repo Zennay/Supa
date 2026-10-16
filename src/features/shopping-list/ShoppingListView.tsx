@@ -193,10 +193,9 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
 
   if (basketKey === null) {
     return (
-      <section className="screen">
+      <section className="screen hifi-shopping-screen" data-figma-node="3342:4815">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">In de winkel</span>
             <h2>Boodschappenlijst</h2>
           </div>
         </div>
@@ -211,10 +210,9 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   }
 
   return (
-    <section className="screen">
+    <section className="screen hifi-shopping-screen" data-figma-node="3342:4815">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">In de winkel</span>
           <h2>Boodschappenlijst</h2>
         </div>
       </div>

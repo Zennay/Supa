@@ -96,11 +96,11 @@ export function PlannerView({
     : null
 
   return (
-    <section className="screen">
+    <section className="screen hifi-planner-screen" data-figma-node="3359:4896">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Deze week</span>
-          <h2>Plan eerst. Vergelijk daarna.</h2>
+          <h2>Planning</h2>
+          <span className="hifi-sr-only">Plan eerst. Vergelijk daarna.</span>
         </div>
         <button type="button" className="ghost-button" onClick={onReset}>Reset</button>
       </div>
@@ -110,6 +110,48 @@ export function PlannerView({
         activeDays={activeDays}
         onToggleDay={onToggleDay}
       />
+
+      <div className="day-grid" aria-label="Geplande maaltijden">
+        {plannedMeals.map((item) => {
+          const recipe = recipes.find((candidate) => candidate.id === item.recipeId)
+          if (!recipe) return null
+          const active = activeDays.includes(item.day)
+
+          return (
+            <article
+              className={active ? 'meal-card meal-config active' : 'meal-card meal-config'}
+              key={item.day}
+            >
+              <span className="day">{item.day}</span>
+              <span className="meal-copy">
+                <label htmlFor={`recipe-${item.day}`}>Recept</label>
+                <select
+                  id={`recipe-${item.day}`}
+                  value={item.recipeId}
+                  onChange={(event) => onRecipeChange(item.day, event.target.value)}
+                >
+                  {recipes.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.title}
+                    </option>
+                  ))}
+                </select>
+                <small>{recipe.minutes} min</small>
+                <RecipePriceExplanation estimatedCost={recipe.estimatedCost} />
+              </span>
+              <button
+                type="button"
+                className="plan-check"
+                aria-label={active ? `${item.day} uit planning halen` : `${item.day} aan planning toevoegen`}
+                aria-pressed={active}
+                onClick={() => onToggleDay(item.day)}
+              >
+                {active ? '✓' : '+'}
+              </button>
+            </article>
+          )
+        })}
+      </div>
 
       <section className="budget-card" aria-labelledby="weekbudget-title">
         <div className="budget-heading">
@@ -238,48 +280,6 @@ export function PlannerView({
         </p>
       </section>
 
-      <div className="day-grid" aria-label="Geplande maaltijden">
-        {plannedMeals.map((item) => {
-          const recipe = recipes.find((candidate) => candidate.id === item.recipeId)
-          if (!recipe) return null
-          const active = activeDays.includes(item.day)
-
-          return (
-            <article
-              className={active ? 'meal-card meal-config active' : 'meal-card meal-config'}
-              key={item.day}
-            >
-              <span className="day">{item.day}</span>
-              <span className="meal-copy">
-                <label htmlFor={`recipe-${item.day}`}>Recept</label>
-                <select
-                  id={`recipe-${item.day}`}
-                  value={item.recipeId}
-                  onChange={(event) => onRecipeChange(item.day, event.target.value)}
-                >
-                  {recipes.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.title}
-                    </option>
-                  ))}
-                </select>
-                <small>{recipe.minutes} min</small>
-                <RecipePriceExplanation estimatedCost={recipe.estimatedCost} />
-              </span>
-              <button
-                type="button"
-                className="plan-check"
-                aria-label={active ? `${item.day} uit planning halen` : `${item.day} aan planning toevoegen`}
-                aria-pressed={active}
-                onClick={() => onToggleDay(item.day)}
-              >
-                {active ? '✓' : '+'}
-              </button>
-            </article>
-          )
-        })}
-      </div>
-
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
       {hasIngredientData && (
         <RecipeReusePreviewPanel
@@ -291,8 +291,7 @@ export function PlannerView({
       )}
 
       <div className="insight-card">
-        <span className="eyebrow">M2 verticale slice</span>
-        <strong>Je receptkeuzes sturen nu dezelfde mand en boodschappenlijst aan.</strong>
+        <strong>Van je planning naar je boodschappenlijst</strong>
         <p>
           Onzekere productmatches worden niet ingevuld: ze blijven zichtbaar
           als controlepunt in Mand en Lijst.

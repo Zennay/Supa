@@ -86,7 +86,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     try {
       const recipe = { ...reviewRecipe(preview), id: `own-${crypto.randomUUID()}`, savedAt: new Date().toISOString() }
       const next = saveRecipeLibrary(window.localStorage, library, [recipe, ...library.recipes])
-      setLibrary(next); setFilter('own'); setQuery(''); setMessage(`${recipe.title} is op dit apparaat opgeslagen.`); closeEditor()
+      setLibrary(next); window.dispatchEvent(new Event('supa-recipes-changed')); setFilter('own'); setQuery(''); setMessage(`${recipe.title} is op dit apparaat opgeslagen. Recepten met volledige hoeveelheden staan ook in de planner.`); closeEditor()
     } catch (e) { setError(e instanceof Error ? e.message : 'Opslaan is niet gelukt. Je invoer blijft staan.') }
     finally { saving.current = false }
   }

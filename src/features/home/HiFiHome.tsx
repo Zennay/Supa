@@ -36,17 +36,19 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<typeof designRecipes[number] | null>(null)
   const [message, setMessage] = useState('')
+  const [sortByPrice, setSortByPrice] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null)
   const matches = (item: { id: string; name: string }) =>
     item.name.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) &&
     (!favoritesOnly || favorites.includes(item.id))
   const recipes = designRecipes.filter(matches)
   const products = designProducts.filter(matches)
+  if (sortByPrice) products.sort((x, y) => Number(x.price.slice(1)) - Number(y.price.slice(1)))
   const toggleFavorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
   const changeView = (next: HiFiTab) => { setQuery(''); onNavigate(next) }
 
 
-  return <div className="hifi-home" data-figma-node="3307:4224">
+  return <div className={`hifi-home${view === 'products' ? ' hifi-products' : ''}`} data-figma-node={view === 'products' ? '3064:3125' : '3307:4224'}>
     {view === 'home' ? <>
       <header className="hifi-greeting">
         <div className="hifi-person"><FigmaImage asset={a.imgImage27} alt="Demo-avatar uit het ontwerp" width="48" height="48" /><div><p>Goedemorgen</p><strong>Nick Bergen <span className="hifi-demo-label">· demo</span></strong></div></div>
@@ -57,10 +59,10 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
         <div className="hifi-days">{upcomingHomeWeek().map(({ label, date, plannerDay, fullName, month, year }) => <button key={`${year}-${month}-${date}`} onClick={() => onNavigate('planner')} aria-label={`Open weekplanning voor ${fullName} ${date}`}><span className={activeDays.includes(plannerDay) ? 'hifi-today' : ''}>{label}</span><span>{date}</span></button>)}</div>
         <button className="hifi-plan-button" onClick={() => onNavigate('planner')}><FigmaImage asset={a.imgVector} alt="" />Plan en bespaar</button>
       </section>
-    </> : <h1 className="hifi-page-title">{view === 'recipes' ? 'Recepten' : 'Producten'}</h1>}
+    </> : <header className="hifi-products-heading"><h1 className="hifi-page-title">Producten</h1><button className="hifi-icon-button" aria-label="Alleen favoriete producten" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(!favoritesOnly)}><FigmaImage asset={a.imgHeartButton} alt="" /></button></header>}
 
     <div className="hifi-search-row">
-      <label className="hifi-search"><FigmaImage asset={a.imgVector1} alt="" /><input type="search" aria-label="Zoek gerechten of producten" placeholder="Zoek gerechten of producten" value={query} onChange={e => setQuery(e.target.value)} /></label>
+      <label className="hifi-search"><FigmaImage asset={a.imgVector1} alt="" /><input type="search" aria-label="Zoek gerechten of producten" placeholder={view === 'products' ? 'Zoek producten' : 'Zoek gerechten of producten'} value={query} onChange={e => setQuery(e.target.value)} /></label>
       <button className="hifi-filter" aria-label="Filters" aria-expanded={filterOpen} aria-controls="hifi-filter-panel" onClick={() => setFilterOpen(!filterOpen)}><FigmaImage asset={a.imgVector2} alt="" /></button>
     </div>
     {filterOpen && <div id="hifi-filter-panel" className="hifi-filter-panel"><label><input type="checkbox" checked={favoritesOnly} onChange={e => setFavoritesOnly(e.target.checked)} /> Alleen favorieten</label><button onClick={() => { setQuery(''); setFavoritesOnly(false) }}>Wis filters</button></div>}
@@ -76,7 +78,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       {recipes.length === 0 && <p className="hifi-empty">Geen gerechten gevonden. Probeer een andere zoekterm of wis je filters.</p>}
     </section>}
     {view !== 'recipes' && <section className="hifi-section" aria-labelledby="hifi-products-title">
-      <div className="hifi-section-heading"><h2 id="hifi-products-title">Aanbiedingen voor jou</h2>{view === 'home' && <button onClick={() => changeView('products')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button>}</div>
+      <div className="hifi-section-heading"><div><h2 id="hifi-products-title">{view === 'products' ? query || 'Alle producten' : 'Aanbiedingen voor jou'}</h2>{view === 'products' && <p className="recipe-count">{products.length} producten</p>}</div>{view === 'home' ? <button onClick={() => changeView('products')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button> : <button className="hifi-product-sort" aria-pressed={sortByPrice} onClick={() => setSortByPrice(!sortByPrice)}>Laagste prijs <FigmaImage asset={a.recipeSort} alt="" /></button>}</div>
       <div className="hifi-product-grid">{products.map(product => <article className="hifi-product-card" key={product.id}>
         <div className="hifi-product-image"><FigmaImage className="hifi-product-photo" asset={product.image} alt={product.name} /><span className={`hifi-store-logo ${product.crop}`}><FigmaImage asset={product.logo} alt={product.store} /></span><span className="hifi-unit-price">{product.unitPrice}</span></div>
         <div className="hifi-product-copy"><h3>{product.name}</h3><div className="hifi-product-price"><span>{product.unit}</span><del>{product.old}</del><strong>{product.price}</strong></div></div>
