@@ -25,6 +25,10 @@ test('actual six historical adapters render a private, read-only HOLD dashboard'
   assert.match(html, /HOLD/)
   assert.match(html, /PLUS/)
   assert.match(html, /DekaMarkt/)
+  assert.match(html, /Historische aanbiedingen/)
+  assert.match(html, /Historische basisprijzen technisch gekoppeld/)
+  assert.match(html, /Oudere aanbiedingen niet vergeleken/)
+  assert.match(html, /géén actuele korting/)
   for (const kind of ['product', 'catalog', 'offers']) {
     assert.equal((html.match(new RegExp('<th scope="row">' + kind + '<\\/th>', 'g')) ?? []).length, 2)
   }
@@ -112,4 +116,28 @@ test('no forged publication readiness, price input, HTML, unknown action or inco
   const badRows = structuredClone(base)
   badRows.perSourceShape.push(badRows.perSourceShape[0])
   assert.throws(() => renderOfflineM3Dashboard(badRows), /dashboard refused/)
+})
+
+test('operator offer accounting cannot hide unreviewed history or misstate baselines', async () => {
+  const baseline = await reviewedReport()
+  const safeHtml = renderOfflineM3Dashboard(baseline)
+  assert.match(safeHtml, /Basisprijs niet bevestigd/)
+  assert.match(safeHtml, /Ongeldige kortingsclaims/)
+  assert.match(safeHtml, /Een echte 11×2-veldmand/)
+  assert.doesNotMatch(safeHtml, /<script|sourceProductId|snapshotSha256/i)
+  for (const [field, shift] of [
+    ['archivedOfferRows', 1],
+    ['corroboratedHistoricalOfferBaselines', 1],
+    ['olderHistoricalOfferRowsNotCompared', 1],
+    ['sourceEventsOutsideOfferReview', 1],
+    ['selectedSourceEventsForOfferReview', 1],
+  ]) {
+    const forged = structuredClone(baseline)
+    forged[field] += shift
+    assert.throws(() => renderOfflineM3Dashboard(forged),
+      /dashboard refused/, field)
+  }
+  const invalid = structuredClone(baseline)
+  invalid.unknownOfferWindows = invalid.archivedOfferRows + 1
+  assert.throws(() => renderOfflineM3Dashboard(invalid), /dashboard refused/)
 })
