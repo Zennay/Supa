@@ -1,0 +1,23 @@
+[Unit]
+Description=Supa bounded proxy candidate health (owned echo only)
+Documentation=https://github.com/Zennay/Supa/blob/main/docs/SUPA_PROXY_VPS_SERVICE.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Supa
+EnvironmentFile=%h/.config/supa-proxy-health.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/env node %h/Supa/scripts/retailer-proxy-health-service.mjs --once
+TimeoutStartSec=150
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/supa-proxy-health
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=default.target
