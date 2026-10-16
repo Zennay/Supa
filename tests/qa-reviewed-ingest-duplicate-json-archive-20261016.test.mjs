@@ -64,20 +64,20 @@ test('canonical original six-fixture historical JSON remains privately readable'
 test('raw archive rejects duplicate top-level source even if the last source is genuine', async () => {
   await runWithRawMutation(before => before.replace(
     '"version": 1,',
-    '"version": 1,\\n  "source": {"id":"fictional-other", "supermarket":"dekamarkt", "kind":"product"},',
+    '"version": 1,\n  "source": {"id":"fictional-other", "supermarket":"dekamarkt", "kind":"product"},',
   ))
 })
 
 test('raw archive rejects conflicting duplicate capturedAt before JSON.parse last-write-wins', async () => {
   await runWithRawMutation(before => before.replace(
     '"capturedAt": "2026-10-04T18:08:57.837Z",',
-    '"capturedAt": "2099-10-16T12:00:00Z",\\n    "capturedAt": "2026-10-04T18:08:57.837Z",',
+    '"capturedAt": "2099-10-16T12:00:00Z",\n    "capturedAt": "2026-10-04T18:08:57.837Z",',
   ))
 })
 
 test('raw archive rejects conflicting duplicate price values before parser can trust last value', async () => {
   await runWithRawMutation(before => before.replace(
     '"price": 0.85,',
-    '"price": 99.99,\\n          "price": 0.85,',
+    '"price": 99.99,\n          "price": 0.85,',
   ))
 })
