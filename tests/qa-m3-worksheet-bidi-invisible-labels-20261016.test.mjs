@@ -79,14 +79,22 @@ test('default-ignorable prefix cannot hide formula-like text from CSV admission'
   ]) {
     const state = requireInertOrRefused(sources, label)
     if (state === 'sanitized') {
-      // Sanitization must not transform a visually hidden spreadsheet formula
-      // into a visible but executable prefix.
-      const withoutInvisibles = label.replace(FORBIDDEN_CONTROLS, '').trimStart()
-      if (/^[=+@-]/u.test(withoutInvisibles)) {
-        // A safe serialized formula needs a leading literal apostrophe or
-        // refusal, not just quoted CSV syntax (quotes alone do not protect).
-        const masked = withoutInvisibles.replace(/"/g, '""')
-        assert.ok(!sources || typeof masked === 'string')
+      // Escaping CSV with double-quotes alone is not a spreadsheet formula
+      // defense. If the label is stripped of invisible prefixes, the decoded
+      // cell must still start with a literal apostrophe.
+      const decoded = label.replace(FORBIDDEN_CONTROLS, '').trimStart()
+      if (/^[=+@-]/u.test(decoded)) {
+        const escapedField = decoded.replace(/"/gu, '""')
+        assert.ok(escapedField.length > 0)
+        // The actual two review rows must contain a literal apostrophe
+        // before formula syntax, even when the original starts invisibly.
+        const candidate = buildPrivateSelectedWeekObservationWorksheet(sources, ['Ma'], withLabel(label))
+        for (const row of candidate.csv.split('\n').filter(line => line.includes('"chicken-thigh"'))) {
+          const cell = row.match(/^"[^"]+","[^"]+","chicken-thigh","((?:[^"]|"")*)",/u)
+          assert.ok(cell, 'expected fully quoted ingredient label')
+          const rendered = cell[1].replace(/""/gu, '"').trimStart()
+          assert.match(rendered, /^'/u, 'safe spreadsheet data needs literal formula escape')
+        }
       }
     }
   }
