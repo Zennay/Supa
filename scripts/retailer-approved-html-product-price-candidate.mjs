@@ -27,7 +27,10 @@ function activePriceValidity(blocks, capturedAt) {
   const captureMs = Date.parse(capturedAt)
   const nowMs = Date.now()
   if (!Number.isFinite(captureMs)) return false
-  const dates = [captureMs, nowMs]
+  // JS Date timestamps have only millisecond precision; retailer Offer evidence
+  // can carry up to nine digits. Compare in integer nanoseconds, never allow
+  // Date.parse to silently round a not-yet-effective price start into effect.
+  const dates = [captureMs, nowMs].map(ms => BigInt(ms) * 1_000_000n)
 
   function parseBoundary(raw, inclusiveEnd) {
     if (typeof raw !== 'string') return null
@@ -69,8 +72,20 @@ function activePriceValidity(blocks, capturedAt) {
     }
     const millis = Date.parse(value)
     if (!Number.isFinite(millis)) return null
-    return { millis: dateOnly && inclusiveEnd ? millis + 86_400_000 : millis,
-      exclusiveEnd: dateOnly && inclusiveEnd }
+    // Date.parse discards the last six digits of fractional seconds. Restore
+    // that sub-millisecond component *after* the strictly checked UTC/offset
+    // clock has been converted to epoch milliseconds.
+    const fractional = timestamp
+      ? /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/i.exec(value)
+      : null
+    const subMillisecondNs = fractional
+      ? BigInt(fractional[1].padEnd(9, '0')) % 1_000_000n
+      : 0n
+    const endOfDayOffsetMs = dateOnly && inclusiveEnd ? 86_400_000 : 0
+    return {
+      instantNs: BigInt(millis + endOfDayOffsetMs) * 1_000_000n + subMillisecondNs,
+      exclusiveEnd: dateOnly && inclusiveEnd,
+    }
   }
 
   function scan(value, withinSpecification = false) {
@@ -90,10 +105,10 @@ function activePriceValidity(blocks, capturedAt) {
         const boundary = parseBoundary(raw, !start)
         if (!boundary) return false
         if (dates.some(instant => start
-          ? instant < boundary.millis
+          ? instant < boundary.instantNs
           : boundary.exclusiveEnd
-            ? instant >= boundary.millis
-            : instant > boundary.millis)) return false
+            ? instant >= boundary.instantNs
+            : instant > boundary.instantNs)) return false
       }
     }
     return Object.entries(value).every(([key, child]) =>
