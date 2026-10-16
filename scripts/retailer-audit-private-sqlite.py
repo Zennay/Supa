@@ -206,6 +206,6 @@ def main(argv=None):
 if __name__ == "__main__":
     try:
         main()
-    except (AuditRefusal, OSError, ValueError, TypeError, sqlite3.Error):
+    except (AuditRefusal, OSError, ValueError, TypeError, OverflowError, sqlite3.Error):
         print(REFUSAL, file=sys.stderr)
         sys.exit(2)
