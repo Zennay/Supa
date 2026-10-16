@@ -7,10 +7,23 @@ import { walkSitemap } from '../lib/sitemap.mjs'
 import { parseSchemaOrgPage } from './schemaorg.mjs'
 
 export function parsePlus(html, url) {
-  const sku = /-(\d+)\/?$/.exec(new URL(url).pathname)?.[1]
-  return parseSchemaOrgPage(html, url, { retailer: 'plus' }).filter(
-    (r) => !sku || r.sourceId === sku,
-  )
+  let source
+  try { source = new URL(url) } catch { return [] }
+  // The observed article route, not arbitrary JSON-LD, establishes SKU.
+  if (source.protocol !== 'https:' || source.hostname !== plus.host ||
+      source.username || source.password || source.port) return []
+  const sku = /-(\d+)\/?$/.exec(source.pathname)?.[1]
+  if (!sku) return []
+  const articlePath = source.pathname.replace(/\/$/, '')
+  return parseSchemaOrgPage(html, url, { retailer: 'plus' }).filter((record) => {
+    if (record.sourceId !== sku || !record.url) return false
+    try {
+      const declared = new URL(record.url)
+      return declared.protocol === 'https:' && declared.hostname === source.hostname &&
+        declared.port === source.port && !declared.username && !declared.password &&
+        declared.pathname.replace(/\/$/, '') === articlePath
+    } catch { return false }
+  })
 }
 
 export const plus = {
