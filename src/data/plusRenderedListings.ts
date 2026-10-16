@@ -126,7 +126,11 @@ function validCapturedAt(value: unknown): value is string {
         (offsetHour === 14 && offsetMinute !== 0)) return false
   }
 
-  return Number.isFinite(Date.parse(value))
+  const timestamp = Date.parse(value)
+  // A valid civil timestamp is not evidence that a capture already happened.
+  // Retain a bounded 60-second operator/browser clock skew; never admit future
+  // product prices from archival fixtures into historical source provenance.
+  return Number.isFinite(timestamp) && timestamp <= Date.now() + 60_000
 }
 
 function selectorContractMatches(value: unknown): value is SelectorContract {
@@ -156,9 +160,13 @@ function validHttpsPlusUrl(
 
     const expectedRoute =
       expectedKind === 'catalog' ? '/producten' : '/aanbiedingen'
+    // Source identity for a reviewed rendered HTML snapshot is EXACT: a
+    // tracking fragment, credential-bearing query or noncanonical spelling
+    // was never part of its reviewed provenance.
     return (
-      url.pathname === expectedRoute ||
-      url.pathname.startsWith(`${expectedRoute}/`)
+      url.search === '' && url.hash === '' && url.href === value &&
+      (url.pathname === expectedRoute ||
+        url.pathname.startsWith(`${expectedRoute}/`))
     )
   } catch {
     return false
