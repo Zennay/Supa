@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
 
 await mkdir('artifacts/recipe-ui', { recursive: true })
@@ -78,6 +78,32 @@ try {
   await page.getByRole('button',{name:'Controleer recept',exact:true}).click()
   await page.getByRole('button',{name:'Opslaan in mijn recepten',exact:true}).click()
   await page.getByRole('button',{name:'Bekijk Geïmporteerde soep',exact:true}).waitFor()
+  // Real portable JSON backup from UI: explicit download, reviewed merge and no replacement.
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button',{name:'Maak back-up',exact:true}).click()
+  const download = await downloadPromise
+  assert.equal(download.suggestedFilename(), 'supa-mijn-recepten.json')
+  const backup = await readFile(await download.path(), 'utf8')
+  const exported = JSON.parse(backup)
+  assert.equal(exported.format, 'supa-private-recipes-backup')
+  assert.equal(exported.recipes.length, 2)
+  assert.equal('id' in exported.recipes[0], false)
+  await page.locator('input[aria-label="Supa receptenback-up bestand"]').setInputFiles({
+    name:'my-private-recipes.json',mimeType:'application/json',buffer:Buffer.from(backup),
+  })
+  // Native window.confirm explicitly authorizes a non-destructive merge.
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('button',{name:'Herstel back-up',exact:true}).click().catch(() => {})
+  // The file selection itself fires change; do a second fresh opt-in import if necessary.
+  await page.getByText(/2 recepten veilig toegevoegd/).waitFor()
+  assert.equal(await page.getByRole('button',{name:'Bekijk Mijn testcurry aangepast',exact:true}).count(), 2)
+  const corruptFile = '{"format":"supa-private-recipes-backup","version":99,"recipes":[]}'
+  await page.locator('input[aria-label="Supa receptenback-up bestand"]').setInputFiles({
+    name:'corrupt.json',mimeType:'application/json',buffer:Buffer.from(corruptFile),
+  })
+  await page.getByText(/Onbekend of te groot Supa-back-upformaat/).waitFor()
+  assert.equal(await page.getByRole('button',{name:'Bekijk Mijn testcurry aangepast',exact:true}).count(), 2)
+
   await page.setViewportSize({width:320,height:800})
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),true)
   await page.screenshot({path:'artifacts/recipe-ui/own-recipes-320.png',fullPage:true})
