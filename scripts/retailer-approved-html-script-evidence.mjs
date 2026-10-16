@@ -49,6 +49,44 @@ function attributes(text) {
   return result
 }
 
+// JSON.parse keeps the final occurrence of an object key, erasing source
+// contradictions (e.g. two Offer.price or Product.url values). Check decoded
+// keys at every object depth before accepting even private JSON-LD evidence.
+// This scanner only identifies tokens; JSON.parse still validates full syntax.
+function parseUniqueJson(source) {
+  const frames = []
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index]
+    if (char === '"') {
+      const first = index
+      index++
+      for (; index < source.length; index++) {
+        if (source[index] === '\\') {
+          index++ // The next UTF-16 code unit is escaped, including a quote.
+        } else if (source[index] === '"') {
+          break
+        }
+      }
+      if (index >= source.length) throw new Error('invalid JSON string')
+      let next = index + 1
+      while (/\s/u.test(source[next] ?? '')) next++
+      if (source[next] === ':' && frames.at(-1)?.kind === 'object') {
+        const decodedKey = JSON.parse(source.slice(first, index + 1))
+        const keys = frames.at(-1).keys
+        if (keys.has(decodedKey)) throw new Error('duplicate JSON object key')
+        keys.add(decodedKey)
+      }
+    } else if (char === '{') {
+      frames.push({ kind: 'object', keys: new Set() })
+    } else if (char === '[') {
+      frames.push({ kind: 'array' })
+    } else if (char === '}' || char === ']') {
+      frames.pop()
+    }
+  }
+  return JSON.parse(source)
+}
+
 export function readAuthorizedHtmlScriptEvidence(html) {
   if (typeof html !== 'string' ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
@@ -73,7 +111,7 @@ export function readAuthorizedHtmlScriptEvidence(html) {
       if (Buffer.byteLength(content, 'utf8') > MAX_SCRIPT_BYTES ||
           jsonLdBlocks.length >= MAX_JSONLD) return invalid()
       try {
-        jsonLdBlocks.push(JSON.parse(content))
+        jsonLdBlocks.push(parseUniqueJson(content))
       } catch { return invalid() }
     }
     if (id === '__NUXT_DATA__') {
@@ -82,7 +120,7 @@ export function readAuthorizedHtmlScriptEvidence(html) {
           Buffer.byteLength(content, 'utf8') > MAX_SCRIPT_BYTES) return invalid()
       nuxtSeen = true
       try {
-        const parsed = JSON.parse(content)
+        const parsed = parseUniqueJson(content)
         if (!Array.isArray(parsed) || parsed.length > 25000) return invalid()
         nuxtPayload = parsed
       } catch { return invalid() }
