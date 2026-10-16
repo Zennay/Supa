@@ -56,7 +56,7 @@ async function inspect(f) {
     query:'fictieve cacao',dbPath:f.dbPath,policyPath:f.policyPath,
     sourceGatePath:f.sourceGatePath,now:clock,write:s=>lines.push(s),
   })
-  return {result,text:lines.join('\\n')}
+  return {result,text:lines.join('\n')}
 }
 test('two fresh equal physical 500g packs remain eligible for private comparison', async t=>{
   const out=await inspect(await fixture(t))
@@ -69,19 +69,25 @@ test('stale stored canonical ID cannot equate 500g and 504g whole-pack prices', 
   const out=await inspect(await fixture(t,(db,{b})=>
     db.db.prepare('UPDATE products SET pack_amount=504,pack_text=? WHERE id=?').run('504 g',b)))
   assert.equal(out.result.displayedRows,0)
-  assert.doesNotMatch(out.text,/€\\d/)
+  assert.doesNotMatch(out.text,/€\d/)
 })
 test('stale matched 1×500g and 2×250g cannot expose fictional prices', async t=>{
   const out=await inspect(await fixture(t,(db,{b})=>
     db.db.prepare('UPDATE products SET pack_amount=250,pack_count=2,pack_text=? WHERE id=?').run('250 g',b)))
   assert.equal(out.result.matchedGroups,0)
-  assert.doesNotMatch(out.text,/€\\d/)
+  assert.doesNotMatch(out.text,/€\d/)
 })
 test('missing physical dimensions abstain before any individual price text', async t=>{
   const out=await inspect(await fixture(t,(db,{b})=>
     db.db.prepare('UPDATE products SET pack_amount=NULL WHERE id=?').run(b)))
   assert.equal(out.result.displayedRows,0)
-  assert.doesNotMatch(out.text,/€\\d/)
+  assert.doesNotMatch(out.text,/€\d/)
+})
+test('an ambiguous ranged pack label cannot be considered a known identical pack',async t=>{
+  const out=await inspect(await fixture(t,(db,{b})=>
+    db.db.prepare('UPDATE products SET pack_text=? WHERE id=?').run('500-504 g',b)))
+  assert.equal(out.result.displayedRows,0)
+  assert.doesNotMatch(out.text,/€\d/)
 })
 test('duplicate same-store canonical product rows also make comparison ambiguous',async t=>{
   const out=await inspect(await fixture(t,(db,{add,insert})=>{
@@ -89,5 +95,5 @@ test('duplicate same-store canonical product rows also make comparison ambiguous
     insert.run(duplicate,19,'gtin',1,stamp)
   }))
   assert.equal(out.result.displayedRows,0)
-  assert.doesNotMatch(out.text,/€\\d/)
+  assert.doesNotMatch(out.text,/€\d/)
 })
