@@ -39,6 +39,25 @@ try {
   await page.getByRole('button',{name:'Recepten',exact:true}).click()
   assert.equal(await page.getByRole('button',{name:'Favoriet: Mijn testcurry',exact:true}).getAttribute('aria-pressed'),'true')
 
+  // An actual second same-origin tab must update the existing recipe heart,
+  // rather than requiring a full reload or writing back a stale snapshot.
+  const otherTab = await page.context().newPage()
+  await otherTab.goto('http://127.0.0.1:4174')
+  await otherTab.evaluate(() => {
+    const key = 'supa.recipe-favorites.v1'
+    const state = JSON.parse(localStorage.getItem(key))
+    localStorage.setItem(key, JSON.stringify({ ...state, ids: [] }))
+  })
+  await page.waitForFunction(() => document.querySelector('button[aria-label="Favoriet: Mijn testcurry"]')?.getAttribute('aria-pressed') === 'false')
+  await otherTab.evaluate(() => {
+    const key = 'supa.recipe-favorites.v1'
+    const library = JSON.parse(localStorage.getItem('supa.recipe-library.v1'))
+    const own = library.recipes.find(recipe => recipe.title === 'Mijn testcurry')
+    localStorage.setItem(key, JSON.stringify({ version: 1, ids: [own.id] }))
+  })
+  await page.waitForFunction(() => document.querySelector('button[aria-label="Favoriet: Mijn testcurry"]')?.getAttribute('aria-pressed') === 'true')
+  await otherTab.close()
+
   // Edit retains the same private recipe while updating fields and planner title.
   await page.getByRole('button',{name:'Bekijk Mijn testcurry',exact:true}).click()
   await page.getByRole('button',{name:'Bewerk eigen recept',exact:true}).click()
