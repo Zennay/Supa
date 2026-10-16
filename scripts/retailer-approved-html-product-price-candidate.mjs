@@ -70,6 +70,26 @@ function conflictingCaseOfferPrices(blocks) {
   return false
 }
 
+// When BOTH lowercase price and uppercase Price are present, agreement
+// between them is not independent evidence of the actual page price. Require
+// the same-page Deka Nuxt source to corroborate before any private candidate.
+function hasDualCaseOfferPrices(blocks) {
+  const stack = [...blocks]
+  while (stack.length) {
+    const value = stack.pop()
+    if (!value || typeof value !== 'object') continue
+    if (Array.isArray(value)) {
+      stack.push(...value)
+      continue
+    }
+    if (Object.keys(value).filter(key => key.toLowerCase() === 'price').length > 1) {
+      return true
+    }
+    stack.push(...Object.values(value))
+  }
+  return false
+}
+
 /**
  * Caller supplies the exact source, permission document, reviewed one-URL
  * grant and injected fetchFn. The existing capture method checks all of
@@ -122,13 +142,25 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
   // All blocks are reviewed together: a second conflicting Product cannot be
   // ignored just because the first one offers a temptingly cheap price.
   let parsed = parseSchemaOrgProductForPage(blocks, provenance)
-  // Some Deka SSR pages publish an uppercase JSON-LD Price and put the
-  // physical pack and canonical price in Nuxt. Do not invent a generic
-  // schema.org price; accept only the independently corroborated pair.
-  if (provenance.supermarket === 'dekamarkt' &&
+  const deka = provenance.supermarket === 'dekamarkt'
+  const hasCasePair = deka && hasDualCaseOfferPrices(blocks)
+  // Even two agreeing spellings are not independent corroboration. In this
+  // case, require the strict Deka parser to compare JSON-LD with the same-page
+  // Nuxt price and pack. Never fall through a successful generic Schema.org
+  // candidate when Nuxt is missing, unparseable or disagrees.
+  if (hasCasePair) {
+    const corroborated = parseDekaNuxtFromAuthorizedHtml({
+      html: captured.html, provenance, jsonLdBlocks: blocks,
+    })
+    if (corroborated.type !== 'observation') {
+      return unavailable('contradictory_same_page_price_evidence', captured)
+    }
+    parsed = corroborated
+  } else if (deka &&
       (parsed.type !== 'observation' ||
        parsed.observation.currentPriceCents === null ||
        parsed.observation.pack.amount === null)) {
+    // Historical uppercase-only Deka pages also require independent Nuxt.
     const fallback = parseDekaNuxtFromAuthorizedHtml({
       html: captured.html, provenance, jsonLdBlocks: blocks,
     })
