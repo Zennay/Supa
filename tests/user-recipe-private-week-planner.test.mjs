@@ -130,3 +130,31 @@ test('valid own recipe ID still creates one unpriced checklist after hardened ad
   assert.equal(result.preview.savingsVerified,false)
   assert.equal(result.preview.unresolvedItemCount,1)
 })
+
+test('controlled week UI shows review-only status when parent selection is absent',()=>{
+  const good=makeRecipe()
+  for (const selection of [null, undefined]) {
+    assert.deepEqual(createPrivateRecipeWeekPreview([good],selection),
+      {status:'review_required',reason:'invalid_selection'})
+    const html=renderToStaticMarkup(createElement(PrivateRecipeWeekPlanner,{
+      recipes:[good],selection,onSelectionChange:()=>{throw new Error('no writes')},
+    }))
+    assert.match(html,/Controleer de recepten/)
+    assert.doesNotMatch(html,/Boodschappen uit mijn recepten/)
+    assert.doesNotMatch(html,/€/)
+  }
+})
+
+test('week UI must not invoke recipe ID or title accessors while refusing invalid state',()=>{
+  const good=makeRecipe()
+  let called=0
+  const hostile={...good}
+  Object.defineProperty(hostile,'id',{enumerable:true,get(){called++;return good.id}})
+  Object.defineProperty(hostile,'title',{enumerable:true,get(){called++;return good.title}})
+  const html=renderToStaticMarkup(createElement(PrivateRecipeWeekPlanner,{
+    recipes:[hostile],selection:{Ma:good.id},onSelectionChange:()=>{},
+  }))
+  assert.equal(called,0)
+  assert.match(html,/Controleer de recepten/)
+  assert.doesNotMatch(html,/Boodschappen uit mijn recepten/)
+})
