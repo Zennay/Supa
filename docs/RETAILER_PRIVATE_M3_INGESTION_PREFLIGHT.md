@@ -19,7 +19,7 @@ Er zijn **nul** netwerkverzoeken. Zonder argument geldt de auditklok van nu.
 `--at` is alleen een reproduceerbare UTC-auditklok, geen bewijs van een
 nieuwe opname of actuele prijs.
 
-De JSON-uitvoer bevat uitsluitend totalen: geaccepteerde bronsoorten,
+De JSON-uitvoer bevat uitsluitend totalen, inclusief een uitsplitsing per keten en per bronsoort (PLUS/DekaMarkt × product/catalogus/aanbiedingen) met reviewstatus en aantallen; er verlaten geen productrijen de privéomgeving. De gecontroleerde uitsplitsing telt exact op tot het totaal van de adapterobservaties. Verder toont het geaccepteerde bronsoorten,
 historische productobservaties, tegenstrijdige productfeiten, verouderde
 archieven en wel/niet onafhankelijk bevestigde historische aanbiedingen.
 Het toont **geen** productnaam, centbedrag, bron-URL, bronhash, persoonlijke
