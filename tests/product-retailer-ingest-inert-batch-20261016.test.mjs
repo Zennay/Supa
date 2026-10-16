@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import {
-  ingestReviewedEvidence, ingestReviewedBatch, RETAILER_REVIEWED_FIXTURES,
+  ingestReviewedEvidence, ingestReviewedBatch, RETAILER_REVIEWED_FIXTURES, main,
 } from '../scripts/retailer-reviewed-ingest-engine.mjs'
 
 // Uses the original six checked M1 fixture bytes only. Malicious fields are
@@ -125,4 +125,26 @@ test('malicious nested arrays and cyclic/hugely deep evidence refuse without cal
   const batch = [other,structuredClone(other)]
   assert.throws(() => ingestReviewedBatch(batch),/Duplicate reviewed capture identity/)
   assert.equal(batch.length,2)
+})
+
+test('offline ingest CLI refuses Proxy, foreign and accessor argv with no fixture reads', async () => {
+  let calls=0
+  const proxy = new Proxy([], {
+    get(t,k){calls++;return Reflect.get(t,k)},
+    ownKeys(t){calls++;return Reflect.ownKeys(t)},
+  })
+  let output=''
+  await assert.rejects(main(proxy,x=>{output+=x}),/Usage:/)
+  assert.equal(calls,0)
+  assert.equal(output,'')
+  const alien = Object.assign(Object.create(null),{length:0})
+  await assert.rejects(main(alien),/Usage:/)
+  const extra = []
+  extra[Symbol('hidden')] = 'wrong'
+  await assert.rejects(main(extra),/Usage:/)
+  const accepted = await main([],x=>{output+=x})
+  assert.equal(accepted.permissionVerified,false)
+  assert.equal(accepted.productionEnabled,false)
+  assert.equal(accepted.acceptedSources,6)
+  assert.doesNotMatch(output,/currentPriceCents|sourceProductId|https?:\/\//)
 })
