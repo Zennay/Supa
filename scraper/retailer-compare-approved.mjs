@@ -5,10 +5,51 @@
  * already reviewed product-core gates before exposing any price text.
  */
 import { DatabaseSync } from 'node:sqlite'
+import { types as utilTypes } from 'node:util'
 import { planDailyRefresh } from './daily-refresh.mjs'
 import { findFreshProducts } from './retailer-search-api.mjs'
 
 const fail = () => { throw new Error('Private matched retailer comparison refused') }
+const comparisonOptionKeys = new Set([
+  'query', 'dbPath', 'policyPath', 'sourceGatePath', 'now', 'write',
+])
+
+/**
+ * The direct exported API is a same-process trust boundary. Destructuring
+ * untrusted options invokes getters/Proxy.get before permission admission.
+ * Read only own inert data descriptors, never arbitrary caller accessors.
+ * Copy the validated Date's internal time to prevent method overrides (or
+ * later mutation) from crossing into source-rights and price checks.
+ */
+function admitInertOptions(candidate) {
+  if (candidate === null || typeof candidate !== 'object' ||
+      utilTypes.isProxy(candidate) || Array.isArray(candidate)) fail()
+  const prototype = Object.getPrototypeOf(candidate)
+  if (prototype !== Object.prototype && prototype !== null) fail()
+  const descriptors = Object.getOwnPropertyDescriptors(candidate)
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !comparisonOptionKeys.has(key) ||
+        !descriptors[key].enumerable ||
+        !Object.hasOwn(descriptors[key], 'value')) fail()
+  }
+  const value = (key, fallback) => Object.hasOwn(descriptors, key)
+    ? descriptors[key].value : fallback
+  const incomingNow = value('now', new Date())
+  if (utilTypes.isProxy(incomingNow) || !(incomingNow instanceof Date) ||
+      Object.getPrototypeOf(incomingNow) !== Date.prototype ||
+      Reflect.ownKeys(incomingNow).length !== 0) fail()
+  const millis = Date.prototype.getTime.call(incomingNow)
+  if (!Number.isFinite(millis)) fail()
+  return {
+    query: value('query'), dbPath: value('dbPath'),
+    policyPath: value('policyPath'),
+    sourceGatePath: value('sourceGatePath', 'evidence/m1/source-permission-gate.v1.json'),
+    now: new Date(millis),
+    write: value('write', text => process.stdout.write(text + '\n')),
+  }
+}
+
+
 const money = cents => '€' + (cents / 100).toFixed(2)
 const printable = value => String(value).replace(
   /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' '
@@ -19,17 +60,14 @@ const printable = value => String(value).replace(
  * the normal canonical PLUS/Deka M1 gate remains an independent deny.
  * Emit no names or individual prices before BOTH scopes are checked.
  */
-export async function compareApprovedLocalCatalog({
-  query, dbPath, policyPath,
-  sourceGatePath = 'evidence/m1/source-permission-gate.v1.json',
-  now = new Date(), write = text => process.stdout.write(text + '\n'),
-} = {}) {
+export async function compareApprovedLocalCatalog(options = {}) {
+  const { query, dbPath, policyPath, sourceGatePath, now, write } =
+    admitInertOptions(options)
   if (typeof query !== 'string' || query.trim().length < 2 ||
-      query.length > 80 || /[\u0000-\u001f\u007f]/.test(query) ||
+      query.length > 80 || /[\\u0000-\\u001f\\u007f]/.test(query) ||
       typeof dbPath !== 'string' || !dbPath.trim() ||
       typeof policyPath !== 'string' || !policyPath.trim() ||
       typeof sourceGatePath !== 'string' || !sourceGatePath.trim() ||
-      !(now instanceof Date) || !Number.isFinite(now.getTime()) ||
       typeof write !== 'function') fail()
 
   // This canonical admission is the same one as the locally gated search API.
