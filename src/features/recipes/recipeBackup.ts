@@ -30,10 +30,36 @@ function safeLink(value: unknown): string | null {
       /^(?:\d+\.){3}\d+$/.test(url.hostname)) {
     throw new Error('Back-up bevat een onveilige receptlink.')
   }
-  for (const key of url.searchParams.keys()) {
-    if (/(?:oauth|saml|token|secret|password|signature|api[_-]?key|session|authorization|(?:^|[_-])(?:code|sig|auth|state)(?:$|[_-]))/i.test(key)) {
-      throw new Error('Back-up mag geen geheime inloggegevens in receptlinks bevatten.')
+  for (const encodedKey of url.searchParams.keys()) {
+    // URLSearchParams performs ONE percent decoding pass. A further-escaped
+    // OAuth/PKCE/SAML key must never escape into a portable JSON backup.
+    // Every pass is checked; still-escaped, malformed or excessive nesting
+    // fails closed without including a source URL or any query value in errors.
+    let key = encodedKey
+    let resolved = false
+    for (let layer = 0; layer < 8; layer += 1) {
+      const normalized = key.normalize('NFKC').toLowerCase()
+      const compact = normalized.replace(/[-_\\s]/g, '')
+      if (/(?:oauth|saml|token|secret|password|signature|apikey|session|authorization|pkce|codeverifier|codechallenge|authcode)/.test(compact) ||
+          /(?:^|[_-])(?:code|sig|auth|state)(?:$|[_-])/.test(normalized)) {
+        throw new Error('Back-up mag geen geheime inloggegevens in receptlinks bevatten.')
+      }
+      if (!key.includes('%')) {
+        resolved = true
+        break
+      }
+      let decoded: string
+      try {
+        decoded = decodeURIComponent(key)
+      } catch {
+        throw new Error('Back-up bevat een onveilige receptlink.')
+      }
+      if (decoded === key) {
+        throw new Error('Back-up bevat een onveilige receptlink.')
+      }
+      key = decoded
     }
+    if (!resolved) throw new Error('Back-up bevat een onveilige receptlink.')
   }
   url.hash = ''
   return url.href
