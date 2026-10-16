@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import {
   addEditorIngredient,
+  displayMetricEditorAmount,
   canConfirmUserRecipeDraft,
   parseMetricEditorAmount,
   removeEditorIngredient,
@@ -24,7 +25,7 @@ export function UserRecipeDraftEditor({
   onConfirm: (reviewed: EditorRecipeDraft) => void
   onCancel: () => void
 }) {
-  const [rawAmounts, setRawAmounts] = useState<Record<number, string>>({})
+  const [rawAmounts, setRawAmounts] = useState<Record<string, string>>({})
   const canConfirm = canConfirmUserRecipeDraft(draft)
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -72,11 +73,11 @@ export function UserRecipeDraftEditor({
                   onChange={(event) => onChange(updateEditorIngredient(draft, index, { label: event.target.value }))} />
                 <label htmlFor={'recipe-ingredient-amount-' + index}>Hoeveelheid</label>
                 <input id={'recipe-ingredient-amount-' + index} type="text" inputMode="decimal"
-                  value={rawAmounts[index] ?? (ingredient.amount === null ? '' : String(ingredient.amount))}
+                  value={displayMetricEditorAmount(rawAmounts[ingredient.clientId], ingredient.amount)}
                   aria-describedby={ingredient.reviewReason ? 'recipe-ingredient-warning-' + index : undefined}
                   onChange={(event) => {
                     const value = event.target.value.slice(0, 24)
-                    setRawAmounts((current) => ({ ...current, [index]: value }))
+                    setRawAmounts((current) => ({ ...current, [ingredient.clientId]: value }))
                     onChange(updateEditorIngredient(draft, index, { amount: parseMetricEditorAmount(value) }))
                   }} />
                 <label htmlFor={'recipe-ingredient-unit-' + index}>Eenheid</label>
@@ -92,14 +93,13 @@ export function UserRecipeDraftEditor({
                 )}
                 <button type="button" onClick={() => {
                   onChange(removeEditorIngredient(draft, index))
-                  setRawAmounts({})
+                  setRawAmounts((current) => { const updated = { ...current }; delete updated[ingredient.clientId]; return updated })
                 }}>Verwijder ingrediënt {index + 1}</button>
               </li>
             ))}
           </ol>
           <button type="button" disabled={draft.ingredients.length >= 100} onClick={() => {
             onChange(addEditorIngredient(draft))
-            setRawAmounts({})
           }}>Ingrediënt toevoegen</button>
         </fieldset>
         <div>
