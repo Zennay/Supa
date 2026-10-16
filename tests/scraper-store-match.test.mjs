@@ -98,7 +98,7 @@ test('runner stores products, follows expand() and reports a blocked host', asyn
     id: 'shop', name: 'Shop', host: 'shop.nl', status: 'active', mode: 'http',
     async *discover() { yield { url: 'https://shop.nl/list', kind: 'listing' } },
     async *expand(html, item) { if (!item.page) yield { url: 'https://shop.nl/list?page=2', kind: 'listing', page: 2 } },
-    parse: (html) => /<p>(.*)<\/p>/.exec(html)[1].split(',').map((id) => makeRecord({ retailer: 'shop', sourceId: id, name: `P${id}`, priceCents: 100 })),
+    parse: (html) => /<p>(.*)<\/p>/.exec(html)[1].split(',').map((id) => makeRecord({ retailer: 'shop', sourceId: id, url: `https://shop.nl/product/${id}`, name: `P${id}`, priceCents: 100 })),
   }
   const ok = await runRetailer(adapter, { store, fetcher })
   assert.deepEqual([ok.status, ok.pages, ok.products], ['ok', 2, 3])
