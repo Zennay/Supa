@@ -35,11 +35,34 @@ function oneDekaProduct(jsonLdBlocks) {
  * normalizing kg->g and l->ml; refuse unclear/unsupported explicit claims.
  * Historical Deka pages with no weight claim keep their existing contract.
  */
+// Units in Schema.org QuantitativeValue are independently stated evidence.
+// A quantity string "1000 ml" together with unitText:"g" is internally
+// inconsistent even when the displayed number and price match Nuxt.
+// Unknown explicit units are unsafe to ignore; refuse the private candidate.
+function corroboratesDeclaredWeightUnits(claim, quantityUnit) {
+  if (!data(claim)) return true
+  if (Object.hasOwn(claim, 'unitText')) {
+    if (typeof claim.unitText !== 'string') return false
+    const declaredUnit = normalizePackText('1 ' + claim.unitText.trim()).unit
+    if (declaredUnit === 'unknown' || declaredUnit !== quantityUnit) return false
+  }
+  if (Object.hasOwn(claim, 'unitCode')) {
+    // Strict subset of unambiguous UN/CEFACT common-code physical units.
+    // Never guess from a free-form code, prefix or unrelated ISO currency code.
+    const unitCodes = { GRM: 'g', KGM: 'kg', MLT: 'ml', LTR: 'l', H87: 'piece' }
+    if (typeof claim.unitCode !== 'string' ||
+        !Object.hasOwn(unitCodes, claim.unitCode) ||
+        unitCodes[claim.unitCode] !== quantityUnit) return false
+  }
+  return true
+}
+
 function corroboratesDeclaredWeight(claim, nuxtPack) {
   const claimedText = typeof claim === 'string' ? claim :
     data(claim) && typeof claim.value === 'string' ? claim.value : null
   if (!claimedText) return false
   const declared = normalizePackText(claimedText)
+  if (!corroboratesDeclaredWeightUnits(claim, declared.unit)) return false
   if (declared.amount === null || declared.unit === 'unknown' ||
       nuxtPack.amount === null || nuxtPack.unit === 'unknown' ||
       declared.count !== nuxtPack.count) return false
