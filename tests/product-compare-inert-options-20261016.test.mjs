@@ -29,7 +29,7 @@ test('private comparison rejects Proxy, revoked Proxy and exotic prototypes with
   const revocable=Proxy.revocable({}, {})
   revocable.revoke()
   await assert.rejects(compareApprovedLocalCatalog(revocable.proxy),refuse)
-  const exotic=Object.create({get policyPath(){throw Error('INHERITED NEVER')}})
+  const exotic=Object.create({get inheritedTrap(){throw Error('INHERITED NEVER')}})
   Object.assign(exotic,normal())
   await assert.rejects(compareApprovedLocalCatalog(exotic),refuse)
 })
