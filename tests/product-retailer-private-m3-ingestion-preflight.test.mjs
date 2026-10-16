@@ -50,6 +50,15 @@ test('one private M3 preflight binds real six reviewed adapter shapes, catalog, 
     !Object.hasOwn(row, 'sha256') &&
     !Object.hasOwn(row, 'productName')),
   )
+  assert.equal(report.currentStockCoverageVerified, false)
+  assert.equal(report.historicalStockAvailableObservations +
+    report.historicalStockUnavailableObservations +
+    report.historicalStockUnknownObservations,
+    report.acceptedHistoricalObservations)
+  assert.ok(report.perSourceShape.every(row =>
+    row.unknownHistoricalAvailability +
+      row.unavailableHistoricalObservations +
+      row.availableHistoricalObservations === row.archivedObservations))
   assert.ok(report.acceptedHistoricalObservations > 0)
   assert.ok(report.normalizedPrivateProducts > 0)
   assert.ok(report.archivedOfferRows > 0)
@@ -69,6 +78,42 @@ test('one private M3 preflight binds real six reviewed adapter shapes, catalog, 
   // This historical evidence is allowed to be stale; no current price truth.
   assert.equal(report.livePricesAvailable, false)
   assert.equal(report.unavailableCurrentPriceCoverage, true)
+})
+
+test('canonical offline source stock is carried through per shape without promoting current availability', async () => {
+  const { rights, batch } = await realOfflineInputs()
+  const saved = structuredClone(batch)
+  const baseline = assessPrivateM3RetailerIngestion(rights, batch, {
+    referenceTime: AT,
+  })
+  const counts = baseline.perSourceShape
+  assert.equal(counts.length, 6)
+  assert.ok(baseline.historicalStockUnknownObservations > 0)
+  assert.equal(baseline.currentStockCoverageVerified, false)
+  assert.ok(baseline.operatorActions.includes(
+    'review-unknown-historical-retailer-stock'))
+  assert.deepEqual(batch, saved, 'inspection must not alter reviewed data')
+  for (const availability of ['unavailable', 'unknown', 'available']) {
+    const mutated = structuredClone(batch)
+    for (const result of mutated.results) {
+      for (const ob of result.observations) ob.availability = availability
+    }
+    const report = assessPrivateM3RetailerIngestion(rights, mutated, {
+      referenceTime: AT,
+    })
+    assert.equal(report.currentStockCoverageVerified, false)
+    assert.equal(report.releaseDecision, 'hold')
+    assert.equal(report.permissionVerified, false)
+    assert.equal(report.publicSavingsClaimEligible, false)
+    for (const row of report.perSourceShape) {
+      assert.equal(row.unknownHistoricalAvailability,
+        availability === 'unknown' ? row.archivedObservations : 0)
+      assert.equal(row.unavailableHistoricalObservations,
+        availability === 'unavailable' ? row.archivedObservations : 0)
+      assert.equal(row.availableHistoricalObservations,
+        availability === 'available' ? row.archivedObservations : 0)
+    }
+  }
 })
 
 test('tampering source permission truth is never promoted to private or public readiness', async () => {
