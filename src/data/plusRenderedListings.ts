@@ -412,7 +412,7 @@ export function parsePlusRenderedCatalogEvidence(
   const safe = snapshotInertHistoricalEvidence(evidence)
   if (!safe) return { type: 'abstain', reason: 'non-inert archived source evidence' }
   evidence = safe
-const boundaryError = validateEvidenceBoundary(
+  const boundaryError = validateEvidenceBoundary(
     evidence,
     'plus-browser-rendered-catalog',
     'catalog',
@@ -451,7 +451,7 @@ export function parsePlusRenderedOffersEvidence(
   const safe = snapshotInertHistoricalEvidence(evidence)
   if (!safe) return { type: 'abstain', reason: 'non-inert archived source evidence' }
   evidence = safe
-const boundaryError = validateEvidenceBoundary(
+  const boundaryError = validateEvidenceBoundary(
     evidence,
     'plus-browser-rendered-offers',
     'offers',
