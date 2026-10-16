@@ -20,8 +20,14 @@ function refuse() {
   throw new Error('Historical reviewed retailer import refused; no live prices or public claims generated')
 }
 async function verifyNewFileTarget(path) {
-  if (typeof path !== 'string' || !path.trim() || path.startsWith('-')) refuse()
-  const target = resolve(path)
+  // The exported JS API receives caller strings directly. Reject invalid
+  // filesystem characters before resolve/lstat: Node's native path errors
+  // can otherwise echo the attempted private destination in a TypeError.
+  // Fail closed on other OS errors too; never propagate their path detail.
+  if (typeof path !== 'string' || !path.trim() || path.startsWith('-') ||
+      path.length > 4096 || /[\u0000-\u001f\u007f]/u.test(path)) refuse()
+  let target
+  try { target = resolve(path) } catch { refuse() }
   let parent = target
   while (true) {
     try {
@@ -29,7 +35,7 @@ async function verifyNewFileTarget(path) {
       if (info.isSymbolicLink()) refuse()
       if (parent === target) refuse()
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
+      if (error?.code !== 'ENOENT') refuse()
     }
     const next = dirname(parent)
     if (next === parent) break
