@@ -1,0 +1,269 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
+import { civilCaptureInstantKey } from '../src/data/retailerCivilCaptureClock.ts'
+import {
+  isValidPrivateCivilCaptureTime,
+  ingestCivilClockCheckedReviewedBatch,
+  buildCivilClockCheckedPrivateCatalog,
+  main,
+} from '../scripts/retailer-private-civil-clock-preflight.mjs'
+import {
+  RETAILER_REVIEWED_FIXTURES,
+  readBoundedRegularReviewedFixture,
+} from '../scripts/retailer-reviewed-ingest-engine.mjs'
+
+async function fixtures() {
+  const root = new URL('../fixtures/m1/', import.meta.url)
+  return Promise.all(RETAILER_REVIEWED_FIXTURES.map(name =>
+    readBoundedRegularReviewedFixture(fileURLToPath(new URL(name, root)))))
+}
+
+function offsetAlias(iso, sign, hour, minute = 0) {
+  const offset = (sign === '+' ? 1 : -1) * (hour * 60 + minute)
+  const local = new Date(Date.parse(iso) + offset * 60000).toISOString().slice(0, 23)
+  return local + sign + String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0')
+}
+
+test('six original historical PLUS/Deka captures remain private-only and accepted', async () => {
+  const { summary } = ingestCivilClockCheckedReviewedBatch(await fixtures())
+  assert.equal(summary.sources, 6)
+  assert.equal(summary.acceptedSources, 6)
+  assert.equal(summary.rejectedSources, 0)
+  assert.equal(summary.productionEnabled, false)
+  assert.equal(summary.permissionVerified, false)
+  assert.equal(summary.publicSavingsClaimEligible, false)
+  assert.ok(summary.observations >= 6)
+})
+
+test('six shapes: impossible negative civil UTC offsets fail before ingestion; legal endpoints pass', async t => {
+  const baseline = await fixtures()
+  for (const sample of baseline) {
+    const key = sample.source.supermarket + ':' + sample.source.kind
+    await t.test(key, () => {
+      for (const [sign, hour, minute] of [['-', 12, 1], ['-', 13, 0], ['-', 14, 0], ['+', 14, 1]]) {
+        const changed = structuredClone(sample)
+        changed.source.capturedAt = offsetAlias(sample.source.capturedAt, sign, hour, minute)
+        assert.equal(Date.parse(changed.source.capturedAt), Date.parse(sample.source.capturedAt))
+        assert.equal(isValidPrivateCivilCaptureTime(changed.source.capturedAt), false)
+        assert.throws(() => ingestCivilClockCheckedReviewedBatch([changed]), /civil-clock preflight refused/)
+      }
+      for (const [sign, hour] of [['-', 12], ['+', 14]]) {
+        const changed = structuredClone(sample)
+        changed.source.capturedAt = offsetAlias(sample.source.capturedAt, sign, hour)
+        assert.equal(Date.parse(changed.source.capturedAt), Date.parse(sample.source.capturedAt))
+        assert.equal(isValidPrivateCivilCaptureTime(changed.source.capturedAt), true)
+        const { summary } = ingestCivilClockCheckedReviewedBatch([changed])
+        assert.equal(summary.acceptedSources, 1)
+        assert.equal(summary.productionEnabled, false)
+      }
+    })
+  }
+})
+
+test('an otherwise valid six-shape batch is atomic when one impossible local offset is inserted', async () => {
+  const records = await fixtures()
+  records[3].source.capturedAt = offsetAlias(records[3].source.capturedAt, '-', 13)
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch(records), /civil-clock preflight refused/)
+})
+
+test('atomic private batch denies partial adapter acceptance despite other valid reviewed sources', async () => {
+  const records = await fixtures()
+  records[2].source.url = 'https://unreviewed.example.invalid/offer'
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch(records), /civil-clock preflight refused/)
+  const { summary } = ingestCivilClockCheckedReviewedBatch((await fixtures()).slice(0, 2))
+  assert.equal(summary.acceptedSources, 2)
+  assert.equal(summary.productionEnabled, false)
+})
+
+test('strict civil Gregorian dates, source clock chronology, and missing zone fail closed', () => {
+  const fixed = Date.parse('2026-10-16T22:00:00Z')
+  const valid = [
+    '2024-02-29T00:00:00Z',
+    '2026-10-16T22:00:00.123456789+00:00',
+    '2026-10-16T10:00:00-12:00',
+    '2026-10-17T12:00:00+14:00',
+  ]
+  for (const s of valid) assert.equal(isValidPrivateCivilCaptureTime(s, fixed), true, s)
+  const invalid = [
+    '2026-02-30T00:00:00Z', '2026-04-31T00:00:00Z',
+    '1900-02-29T00:00:00Z', '2026-10-16T24:00:00Z',
+    '2026-10-16T22:60:00Z', '2026-10-16T22:00:60Z',
+    '2026-10-16T22:00:00', '2026-10-16T22:00:00-12:01',
+    '2026-10-16T22:00:00+14:01', '2026-10-16T22:00:00-13:00',
+    '2026-10-16T22:02:00Z', '2099-01-01T00:00:00Z',
+    '2026-10-16T22:00:00.1234567890Z',
+  ]
+  for (const s of invalid) assert.equal(isValidPrivateCivilCaptureTime(s, fixed), false, s)
+  assert.equal(isValidPrivateCivilCaptureTime('2026-10-16T22:01:00.000000000Z', fixed), true)
+  assert.equal(isValidPrivateCivilCaptureTime('2026-10-16T22:01:00.000000001Z', fixed), false)
+  assert.equal(isValidPrivateCivilCaptureTime('2026-10-16T22:00:59.999999999Z', fixed), true)
+})
+
+test('untrusted input/options cannot trigger getters or proxy traps before inert admission', async () => {
+  const samples = await fixtures()
+  let touched = 0
+  const poisoned = structuredClone(samples[0])
+  Object.defineProperty(poisoned.source, 'capturedAt', {
+    enumerable: true,
+    get() { touched++; throw new Error('caller getter executed') },
+  })
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch([poisoned]), /inert JSON/)
+  assert.equal(touched, 0)
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch(new Proxy(samples, {})), /inert JSON/)
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch(samples, { referenceTime: Infinity }), /civil-clock preflight refused/)
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch(samples, { referenceTime: Date.parse('2099-01-01T00:00:00Z') }), /civil-clock preflight refused/)
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch(samples, { onAccepted: true }), /civil-clock preflight refused/)
+})
+
+test('offline CLI emits only aggregate private counts and refuses arbitrary flags', async () => {
+  let output = ''
+  const result = await main([], value => { output += value })
+  const parsed = JSON.parse(output)
+  assert.equal(result.acceptedSources, 6)
+  assert.equal(parsed.civilClockPreflight, true)
+  assert.equal(parsed.physicalCaptureAliasGuard, true)
+  assert.equal(parsed.productionEnabled, false)
+  assert.equal(parsed.permissionVerified, false)
+  assert.equal(parsed.publicSavingsClaimEligible, false)
+  for (const sample of await fixtures()) {
+    assert.equal(output.includes(sample.source.url), false)
+    assert.equal(output.includes(sample.source.id), false)
+  }
+  await assert.rejects(main(['--url', 'https://www.plus.nl/']), /civil-clock preflight refused/)
+  const hostile = new Proxy([], { get() { throw new Error('hostile argv getter executed') } })
+  await assert.rejects(main(hostile), /inert JSON/)
+})
+
+test('physically identical retailer captures cannot be counted again under renamed IDs or legal UTC aliases', async t => {
+  const originals = await fixtures()
+  for (const original of originals) {
+    await t.test(original.source.supermarket + ':' + original.source.kind, () => {
+      const renamed = structuredClone(original)
+      renamed.source.id += '-duplicate'
+      // The original engine only deduplicates by source ID. An otherwise
+      // credible source with a renamed ID is not an independent observation.
+      assert.throws(
+        () => ingestCivilClockCheckedReviewedBatch([original, renamed]),
+        /civil-clock preflight refused/,
+      )
+      for (const [sign, hour] of [['-', 12], ['+', 14]]) {
+        const alias = structuredClone(renamed)
+        alias.source.capturedAt = offsetAlias(original.source.capturedAt, sign, hour)
+        assert.equal(Date.parse(alias.source.capturedAt), Date.parse(original.source.capturedAt))
+        assert.equal(
+          civilCaptureInstantKey(alias.source.capturedAt),
+          civilCaptureInstantKey(original.source.capturedAt),
+        )
+        assert.throws(
+          () => ingestCivilClockCheckedReviewedBatch([original, alias]),
+          /civil-clock preflight refused/,
+        )
+      }
+    })
+  }
+})
+
+test('duplicate physical source invalidates all-six historical private batch atomically', async () => {
+  const originals = await fixtures()
+  const duplicate = structuredClone(originals[5])
+  duplicate.source.id += '-copy'
+  duplicate.source.capturedAt = offsetAlias(duplicate.source.capturedAt, '+', 14)
+  assert.throws(
+    () => ingestCivilClockCheckedReviewedBatch([...originals, duplicate]),
+    /civil-clock preflight refused/,
+  )
+  const { summary } = ingestCivilClockCheckedReviewedBatch(originals)
+  assert.equal(summary.acceptedSources, 6)
+  assert.equal(summary.rejectedSources, 0)
+})
+
+test('capture instant identity preserves one-nanosecond physical separation', () => {
+  const referenceTime = Date.parse('2026-10-16T22:00:00Z')
+  const samples = [
+    '2026-10-16T21:00:00.123456789Z',
+    '2026-10-16T23:00:00.123456789+02:00',
+    '2026-10-16T09:00:00.123456789-12:00',
+  ]
+  const keys = samples.map(value => civilCaptureInstantKey(value, referenceTime))
+  assert.ok(keys.every(key => typeof key === 'string'))
+  assert.equal(new Set(keys).size, 1)
+  const later = civilCaptureInstantKey('2026-10-16T21:00:00.123456790Z', referenceTime)
+  const earlier = civilCaptureInstantKey('2026-10-16T21:00:00.123456788Z', referenceTime)
+  assert.equal(BigInt(later) - BigInt(keys[0]), 1n)
+  assert.equal(BigInt(keys[0]) - BigInt(earlier), 1n)
+  assert.equal(civilCaptureInstantKey('2026-10-16T09:00:00.123456789-13:00', referenceTime), null)
+  assert.equal(civilCaptureInstantKey('2026-02-30T21:00:00Z', referenceTime), null)
+  assert.equal(civilCaptureInstantKey('2099-01-01T00:00:00Z', referenceTime), null)
+})
+
+test('all six shapes deny bare query and fragment URL provenance before private ingestion', async t => {
+  const originals = await fixtures()
+  for (const source of originals) {
+    await t.test(source.source.supermarket + ':' + source.source.kind, () => {
+      for (const suffix of ['?', '#', '?#', '#reviewed', '?q=milk#fragment']) {
+        const suspect = structuredClone(source)
+        suspect.source.url += suffix
+        assert.throws(
+          () => ingestCivilClockCheckedReviewedBatch([suspect]),
+          /civil-clock preflight refused/,
+          suffix,
+        )
+      }
+    })
+  }
+  // Literal characters in percent-encoded URLs are different from raw
+  // delimiters; the preflight does not reinterpret source provenance itself.
+  const baseline = ingestCivilClockCheckedReviewedBatch(originals)
+  assert.equal(baseline.summary.acceptedSources, 6)
+  assert.equal(baseline.summary.publicSavingsClaimEligible, false)
+})
+
+test('private normalized catalog survives six archived adapters but never promotes licensed prices', async () => {
+  const originals = await fixtures()
+  const catalog = buildCivilClockCheckedPrivateCatalog(originals)
+  assert.equal(catalog.schemaVersion, 1)
+  assert.equal(catalog.model, 'universal-retailer-product-captures')
+  assert.equal(catalog.status, 'private-review-only')
+  assert.equal(catalog.sourceCount, 6)
+  assert.ok(catalog.productCount >= 2)
+  assert.ok(catalog.captureCount >= 6)
+  assert.equal(catalog.productionEnabled, false)
+  assert.equal(catalog.publicSavingsClaimEligible, false)
+  const retailerKeys = new Set(catalog.products.map(product => product.retailerId))
+  assert.deepEqual([...retailerKeys].sort(), ['dekamarkt', 'plus'])
+  for (const product of catalog.products) {
+    assert.equal(product.publishable, false)
+    assert.equal(product.sourceRightsVerified, false)
+    assert.equal(product.currentTrustedPriceCents, null)
+    assert.equal(product.selectedSnapshotSha256, null)
+    assert.ok(product.captures.length > 0)
+  }
+})
+
+test('private catalog composition cannot bypass original batch civil, alias or raw-URL gates', async () => {
+  const originals = await fixtures()
+  const alias = structuredClone(originals[0])
+  alias.source.id += '-duplicate'
+  alias.source.capturedAt = offsetAlias(alias.source.capturedAt, '+', 14)
+  assert.throws(
+    () => buildCivilClockCheckedPrivateCatalog([...originals, alias]),
+    /civil-clock preflight refused/,
+  )
+  const invalidCivil = await fixtures()
+  invalidCivil[3].source.capturedAt = offsetAlias(invalidCivil[3].source.capturedAt, '-', 13)
+  assert.throws(
+    () => buildCivilClockCheckedPrivateCatalog(invalidCivil),
+    /civil-clock preflight refused/,
+  )
+  const ambiguousUrl = await fixtures()
+  ambiguousUrl[4].source.url += '?'
+  assert.throws(
+    () => buildCivilClockCheckedPrivateCatalog(ambiguousUrl),
+    /civil-clock preflight refused/,
+  )
+  assert.throws(
+    () => buildCivilClockCheckedPrivateCatalog(originals, { publish: true }),
+    /civil-clock preflight refused/,
+  )
+})
