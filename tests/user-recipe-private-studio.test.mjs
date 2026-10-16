@@ -115,3 +115,32 @@ test('incomplete recipe visible as review required and never fake-saved',()=>{
   assert.match(html,/Controleer herkomst/)
   assert.doesNotMatch(html,/€/)
 })
+
+test('same rendered studio cannot enqueue duplicate private recipe on rapid confirmation',()=>{
+  const added=[]
+  const p=props({recipes:[],onAddReviewedRecipe:recipe=>added.push(recipe)})
+  const accept=confirmationCallback(p)
+  accept(p.draft)
+  accept(p.draft)
+  assert.equal(added.length,1)
+  assert.equal(added[0].id,'private-recipe:new-one')
+  assert.equal(added[0].estimatedCost,null)
+})
+
+test('rejected invalid draft does not reserve ID against subsequent valid confirmation',()=>{
+  const added=[]
+  const p=props({recipes:[],onAddReviewedRecipe:recipe=>added.push(recipe)})
+  const accept=confirmationCallback(p)
+  accept(draft({minutes:null}))
+  accept(p.draft)
+  accept(p.draft)
+  assert.equal(added.length,1)
+  assert.equal(added[0].priceStatus,'unknown')
+})
+
+test('same-render at-most-once delivery remains safe if parent callback throws',()=>{
+  const p=props({recipes:[],onAddReviewedRecipe:()=>{throw new Error('parent rejected')}})
+  const accept=confirmationCallback(p)
+  assert.throws(()=>accept(p.draft),/parent rejected/)
+  assert.doesNotThrow(()=>accept(p.draft))
+})
