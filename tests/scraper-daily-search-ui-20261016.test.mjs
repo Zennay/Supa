@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -18,12 +19,13 @@ const approved = (id='dirk') => ({
   evidenceUrl:'https://example.test/legal-review',
   scopeNote:'Fictional scoped legal review FOR TESTS ONLY, not real permissions.',
 })
-const defaultGate = {
-  sources:['plus','dekamarkt'].map(supermarket=>({
-    supermarket,permissionStatus:'permission_required',productionEnabled:false,
-    evidence:[{kind:'official_terms'}],
-  })),
-}
+// Use the real, versioned, still-DENIED canonical source permission document.
+// A partial fake no longer tests the intended daily authorization behavior:
+// strict version/milestone/HTTPS evidence validation correctly rejects it first.
+const defaultGate = JSON.parse(readFileSync(
+  new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url),
+  'utf8',
+))
 async function temp(t){
   const dir=await mkdtemp(join(tmpdir(),'supa-retailer-live-ui-'))
   t.after(async()=>await rm(dir,{recursive:true,force:true}))
