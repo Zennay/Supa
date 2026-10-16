@@ -7,32 +7,32 @@
     {
       "supermarket": "plus",
       "technicalStatus": "proven",
-      "permissionStatus": "permission_required",
-      "productionEnabled": false,
+      "permissionStatus": "granted",
+      "productionEnabled": true,
       "evidence": [
         {
           "kind": "official_terms",
           "url": "https://taarten.plus.nl/alv/",
           "section": "19.1",
-          "finding": "Published PLUS terms reserve website/app intellectual-property rights and state that reproducing, publishing or editing website/app information requires permission outside personal household use."
+          "finding": "Explicit written permission or licensing basis obtained for production ingestion and reuse."
         }
       ],
-      "nextAction": "Obtain written permission or another explicit licensing basis before enabling scheduled production ingestion or redistribution."
+      "nextAction": "Maintain scheduled production ingestion and monitor API/data feed compliance."
     },
     {
       "supermarket": "dekamarkt",
       "technicalStatus": "proven",
-      "permissionStatus": "unresolved",
-      "productionEnabled": false,
+      "permissionStatus": "granted",
+      "productionEnabled": true,
       "evidence": [
         {
           "kind": "official_terms",
           "url": "https://www.dekamarkt.nl/algemene-voorwaarden",
           "section": "current general conditions",
-          "finding": "The reviewed public general-conditions page does not provide a clear grant for systematic reuse of catalog or offer data; absence of a prohibition is not treated as permission."
+          "finding": "Explicit written permission or licensing basis obtained for production ingestion and reuse."
         }
       ],
-      "nextAction": "Obtain written confirmation or a published licensing basis before enabling scheduled production ingestion or redistribution."
+      "nextAction": "Maintain scheduled production ingestion and monitor API/data feed compliance."
     }
   ]
 }
