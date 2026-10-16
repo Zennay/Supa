@@ -33,8 +33,34 @@ try {
   await page.getByRole('button',{name:'Bekijk Mijn testcurry',exact:true}).click()
   assert.match(await page.locator('dialog[open]').innerText(),/Kook de rijst/)
   await page.getByRole('button',{name:'Details sluiten',exact:true}).click()
+  // Product-core acceptance: real browser refresh retains favorite selections.
+  await page.getByRole('button',{name:'Favoriet: Mijn testcurry',exact:true}).click()
+  await page.reload()
+  await page.getByRole('button',{name:'Recepten',exact:true}).click()
+  assert.equal(await page.getByRole('button',{name:'Favoriet: Mijn testcurry',exact:true}).getAttribute('aria-pressed'),'true')
+
+  // Edit retains the same private recipe while updating fields and planner title.
+  await page.getByRole('button',{name:'Bekijk Mijn testcurry',exact:true}).click()
+  await page.getByRole('button',{name:'Bewerk eigen recept',exact:true}).click()
+  await page.getByLabel('Naam van het recept').fill('Mijn testcurry aangepast')
+  await page.getByLabel('Ingrediënten',{exact:true}).fill('500 g rijst\\n250 ml kokosmelk')
+  await page.getByRole('button',{name:'Controleer recept',exact:true}).click()
+  await page.getByRole('button',{name:'Opslaan in mijn recepten',exact:true}).click()
+  await page.getByRole('button',{name:'Bekijk Mijn testcurry aangepast',exact:true}).waitFor()
+  assert.equal(await page.getByRole('button',{name:'Favoriet: Mijn testcurry aangepast',exact:true}).getAttribute('aria-pressed'),'true')
+
+  // Duplicate creates an independently selectable recipe, then delete only that copy.
+  await page.getByRole('button',{name:'Bekijk Mijn testcurry aangepast',exact:true}).click()
+  await page.getByRole('button',{name:'Dupliceer recept',exact:true}).click()
+  await page.getByRole('button',{name:'Bekijk Kopie van Mijn testcurry aangepast',exact:true}).waitFor()
+  await page.getByRole('button',{name:'Bekijk Kopie van Mijn testcurry aangepast',exact:true}).click()
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('button',{name:'Verwijder eigen recept',exact:true}).click()
+  assert.equal(await page.getByRole('button',{name:'Bekijk Kopie van Mijn testcurry aangepast',exact:true}).count(),0)
+  assert.equal(await page.getByRole('button',{name:'Bekijk Mijn testcurry aangepast',exact:true}).count(),1)
+  await page.screenshot({path:'artifacts/recipe-ui/own-recipe-edit-duplicate-delete-440.png',fullPage:true})
   await page.getByRole('button',{name:'Planner',exact:true}).click()
-  await page.locator('#recipe-Ma').selectOption({label:'Mijn testcurry'})
+  await page.locator('#recipe-Ma').selectOption({label:'Mijn testcurry aangepast'})
   assert.equal(await page.locator('#recipe-Ma').inputValue().then(x => x.startsWith('own-')),true)
   await page.screenshot({path:'artifacts/recipe-ui/planner-440.png',fullPage:true})
   await page.getByRole('button',{name:'Lijst',exact:true}).click()
@@ -56,5 +82,5 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),true)
   await page.screenshot({path:'artifacts/recipe-ui/own-recipes-320.png',fullPage:true})
   assert.deepEqual(errors,[])
-  await writeFile('artifacts/recipe-ui/result.json',JSON.stringify({status:'passed',checks:['six real, fully specified recipes with matching Figma photos','192x143 geometry','all local images loaded','manual recipe review/save','reload persistence','canonical planner recipe','URL import review/save UI with synthetic response','320px overflow','no runtime errors']},null,2))
+  await writeFile('artifacts/recipe-ui/result.json',JSON.stringify({status:'passed',checks:['six real, fully specified recipes with matching Figma photos','192x143 geometry','all local images loaded','manual recipe review/save','reload persistence and favorites','edit/duplicate/confirmed delete of private recipe','canonical planner recipe','URL import review/save UI with synthetic response','320px overflow','no runtime errors']},null,2))
 } finally { await browser.close() }
