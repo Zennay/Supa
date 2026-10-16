@@ -1,0 +1,106 @@
+name: Supa browser preview (fixture-only)
+
+on:
+  push:
+    branches:
+      - chatgpt/supa-browser-preview-20261016
+    paths:
+      - .github/workflows/supa-browser-demo.yml
+      - index.html
+      - src/**
+      - package.json
+      - package-lock.json
+      - vite.config.ts
+  workflow_dispatch:
+
+concurrency:
+  group: supa-browser-demo-isolated-publisher
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish-static-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Reproducible dependencies and safety gate
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm run m1:source-permission-gate
+      - name: Build current main-based UI for relative-path static preview
+        run: npm run build -- --base=./
+      - name: Stamp conspicuous fictional-data warning in the preview only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          page = Path('dist/index.html')
+          source = page.read_text(encoding='utf-8')
+          banner = ('<div role="note" style="position:relative;z-index:9999;'
+                    'background:#fff2c2;color:#422006;padding:12px 16px;'
+                    'font:600 14px/1.5 system-ui,sans-serif;text-align:center;">'
+                    'SUPA TESTVERSIE · Voorbeeldprijzen en fictieve supermarktgegevens '
+                    '— geen actuele aanbiedingen of bewezen besparing.</div>')
+          output, substitutions = re.subn(r'<body([^>]*)>', lambda m: m.group(0) + banner,
+                                          source, count=1, flags=re.I)
+          if substitutions != 1:
+              raise SystemExit('Cannot find body: refusing unlabelled public demo')
+          page.write_text(output, encoding='utf-8')
+          PY
+          test -d dist/assets
+          grep -q 'SUPA TESTVERSIE' dist/index.html
+          grep -q './assets/' dist/index.html
+      - name: Check local HTTP preview and assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory dist >/tmp/supa-static-preview.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/ -o /tmp/supa-preview-index; then break; fi
+            sleep 1
+          done
+          grep -q 'SUPA TESTVERSIE' /tmp/supa-preview-index
+          asset=$(find dist/assets -maxdepth 1 -name '*.js' -print -quit)
+          test -n "$asset"
+          curl -fsS "http://127.0.0.1:8765/assets/$(basename "$asset")" -o /dev/null
+      - name: Publish to isolated static preview branch (never main)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+          cd publish
+          git init -q
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name 'github-actions[bot]'
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code origin refs/heads/supa-browser-demo-site >/dev/null 2>&1; then
+            git fetch -q --depth=1 origin supa-browser-demo-site
+            git checkout -q -B supa-browser-demo-site FETCH_HEAD
+            git rm -qr . || true
+          else
+            git checkout -q --orphan supa-browser-demo-site
+          fi
+          cp -a ../dist/. ./
+          touch .nojekyll
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -qm "deploy(demo): publish main-based Supa fixture-only browser preview"
+            git push -q origin HEAD:refs/heads/supa-browser-demo-site
+          fi
+          echo "Preview: https://raw.githack.com/${GITHUB_REPOSITORY}/supa-browser-demo-site/index.html"
