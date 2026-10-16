@@ -29,6 +29,38 @@ function safeSourceUrl(raw, id) {
   } catch { return null }
 }
 
+/**
+ * Discounts must be active at the actual UTC instant, not Date.parse's
+ * rounded-millisecond approximation. Date.parse also normalizes impossible
+ * civil days in some runtimes (e.g. February 30), so validate first.
+ * An undefined result means invalid; null means the existing unknown boundary.
+ * Invalid dates cannot create discounts or public savings claims.
+ */
+function offerInstantNanos(value) {
+  if (value === null) return null
+  if (typeof value !== 'string') return undefined
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/.exec(value)
+  if (!m) return undefined
+  const year = Number(m[1]), month = Number(m[2]), day = Number(m[3])
+  const hours = Number(m[4]), minutes = Number(m[5]), seconds = Number(m[6])
+  const calendar = new Date(0)
+  calendar.setUTCFullYear(year, month - 1, day)
+  if (calendar.getUTCFullYear() !== year ||
+      calendar.getUTCMonth() !== month - 1 ||
+      calendar.getUTCDate() !== day ||
+      hours > 23 || minutes > 59 || seconds > 59) return undefined
+  if (m[8] !== 'Z') {
+    const offsetH = Number(m[8].slice(1, 3))
+    const offsetM = Number(m[8].slice(4))
+    if (offsetH > 14 || offsetM > 59 ||
+        (offsetH === 14 && offsetM !== 0)) return undefined
+  }
+  const ms = Date.parse(value)
+  if (!Number.isFinite(ms)) return undefined
+  return BigInt(ms) * 1_000_000n +
+    BigInt((m[7] ?? '').padEnd(9, '0').slice(3) || '0')
+}
+
 export function findFreshProducts(database, approvedIds, query, now = new Date()) {
   const q = queryText(query)
   if (!q || !Array.isArray(approvedIds) || approvedIds.length === 0 ||
@@ -62,15 +94,13 @@ export function findFreshProducts(database, approvedIds, query, now = new Date()
         !text(row.retailer_name,90)) continue
     // A future or reversed campaign is not a current discount, even when
     // the product row is fresh and the promotional cents are positive.
-    const parseBound = value => value === null ? null :
-      typeof value === 'string' &&
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
-        ? Date.parse(value) : NaN
-    const starts = parseBound(row.promo_valid_from)
-    const ends = parseBound(row.promo_valid_until)
+    const starts = offerInstantNanos(row.promo_valid_from)
+    const ends = offerInstantNanos(row.promo_valid_until)
+    const nowNanos = BigInt(now.getTime()) * 1_000_000n
     const hasOffer = cents(row.promo_price_cents) &&
-      (starts === null || Number.isFinite(starts) && starts <= now.getTime()) &&
-      (ends === null || Number.isFinite(ends) && ends >= now.getTime()) &&
+      starts !== undefined && ends !== undefined &&
+      (starts === null || starts <= nowNanos) &&
+      (ends === null || ends >= nowNanos) &&
       (starts === null || ends === null || starts <= ends)
     const effective = hasOffer && row.promo_price_cents<row.price_cents
       ? row.promo_price_cents : row.price_cents
