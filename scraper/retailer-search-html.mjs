@@ -52,6 +52,6 @@ export function renderRetailerSearchHtml(query, payload) {
     '<label for="q">Zoek een product</label><input id="q" type="search" name="q" '+
     'maxlength="80" minlength="2" placeholder="Bijvoorbeeld rijst, kip of melk" '+
     'value="'+escapeHtml(q)+'"><button type="submit">Zoeken</button>'+
-    '</form><p role="status" aria-live="polite">'+escapeHtml(notice)+'</p>'+
+    '</form><p><a href="/">← Terug naar SUPA</a></p><p role="status" aria-live="polite">'+escapeHtml(notice)+'</p>'+
     '<div aria-label="Actuele prijzen">'+cards+'</div></body></html>'
 }
