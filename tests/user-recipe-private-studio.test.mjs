@@ -225,3 +225,32 @@ test('revoked recipe library Proxy fails closed before any recipe is added',()=>
   })
   assert.equal(added.length,0)
 })
+
+test('invalid or missing host week selection renders review only without crash or recipe creation',()=>{
+  for(const selectedDays of [null,undefined,{Unknown:'private-recipe:saved-one'}]) {
+    const added=[]
+    const p=props({selectedDays,onAddReviewedRecipe:recipe=>added.push(recipe)})
+    const html=renderToStaticMarkup(createElement(PrivateRecipeStudio,p))
+    assert.match(html,/Dit recept is nog niet klaar voor de weekplanner/)
+    assert.doesNotMatch(html,/Boodschappen uit mijn recepten/)
+    assert.doesNotMatch(html,/€/)
+    confirmationCallback(p)(p.draft)
+    assert.equal(added.length,0)
+  }
+})
+
+test('host week selection getter is never invoked when validating studio props',()=>{
+  const valid=existing()
+  let reads=0
+  const selectedDays={}
+  Object.defineProperty(selectedDays,'Ma',{enumerable:true,
+    get(){reads++;return valid.id}})
+  const added=[]
+  const p=props({selectedDays,onAddReviewedRecipe:recipe=>added.push(recipe)})
+  const html=renderToStaticMarkup(createElement(PrivateRecipeStudio,p))
+  assert.equal(reads,0)
+  assert.match(html,/nog niet klaar voor de weekplanner/)
+  confirmationCallback(p)(p.draft)
+  assert.equal(reads,0)
+  assert.equal(added.length,0)
+})
