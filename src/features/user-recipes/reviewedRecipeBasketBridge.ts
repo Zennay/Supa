@@ -45,6 +45,15 @@ export function prepareUnpricedPrivateRecipe(
     reasons.push('invalid_ingredients')
   } else {
     for (const ingredient of draft.ingredients) {
+      // Parser #3264 and independent QA #3286 cap each metric ingredient
+      // at 1,000,000. The editor currently permits 1e9: refuse here
+      // rather than silently widening the trusted planner contract.
+      if (!ingredient || typeof ingredient.amount !== 'number' ||
+        !Number.isFinite(ingredient.amount) || ingredient.amount <= 0 ||
+        ingredient.amount > 1_000_000) {
+        reasons.push('metric_amount_exceeds_import_contract')
+        break
+      }
       if (!ingredient ||
         typeof ingredient.query !== 'string' ||
         !ingredient.query.trim() ||
