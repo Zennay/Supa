@@ -43,7 +43,7 @@ try {
   await page.getByRole('button',{name:'Bekijk Mijn testcurry',exact:true}).click()
   await page.getByRole('button',{name:'Bewerk eigen recept',exact:true}).click()
   await page.getByLabel('Naam van het recept').fill('Mijn testcurry aangepast')
-  await page.getByLabel('Ingrediënten',{exact:true}).fill('500 g rijst\\n250 ml kokosmelk')
+  await page.getByLabel('Ingrediënten',{exact:true}).fill('500 g rijst\n250 ml kokosmelk')
   await page.getByRole('button',{name:'Controleer recept',exact:true}).click()
   await page.getByRole('button',{name:'Opslaan in mijn recepten',exact:true}).click()
   await page.getByRole('button',{name:'Bekijk Mijn testcurry aangepast',exact:true}).waitFor()
