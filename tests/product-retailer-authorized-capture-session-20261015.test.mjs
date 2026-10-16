@@ -214,3 +214,54 @@ test('no implicit fetch or scheduler is available', async () => {
     /Retailer capture session refused/)
   assert.equal(session.status().stores.plus.attemptedCaptures, 0)
 })
+
+test('verified capture counter only increments after complete HTML integrity checks', async () => {
+  const session = createAuthorizedRetailerCaptureSession()
+  let calls = 0
+  const invalid = async () => {
+    calls++
+    return new Response('{"synthetic":true}', {
+      status: 200, headers: { 'content-type': 'application/json' },
+    })
+  }
+  await assert.rejects(session.captureOne({
+    ...approved(), fetchFn: invalid,
+  }), /Source did not return HTML/)
+  const refused = session.status().stores.plus
+  assert.equal(refused.successfulHttpResponses, 1)
+  assert.equal(refused.verifiedCaptures, 0)
+  assert.equal(refused.busy, false)
+  assert.equal(refused.attemptedCaptures, 1)
+  assert.equal(calls, 1)
+  assert.equal(session.status().publicPricePublicationEnabled, false)
+})
+
+test('real completed mock HTML increments verification only for that retailer', async () => {
+  const session = createAuthorizedRetailerCaptureSession()
+  const before = session.status()
+  assert.equal(before.stores.plus.verifiedCaptures, 0)
+  assert.equal(before.stores.dekamarkt.verifiedCaptures, 0)
+  const result = await session.captureOne({
+    ...approved('dekamarkt'), fetchFn: ok,
+  })
+  assert.equal(result.readyForIngestion, false)
+  assert.equal(result.published, false)
+  const after = session.status()
+  assert.equal(after.stores.dekamarkt.successfulHttpResponses, 1)
+  assert.equal(after.stores.dekamarkt.verifiedCaptures, 1)
+  assert.equal(after.stores.plus.verifiedCaptures, 0)
+  assert.equal(after.stores.plus.successfulHttpResponses, 0)
+})
+
+test('failed HTML stream does not count as verified even if headers were 200', async () => {
+  const session = createAuthorizedRetailerCaptureSession()
+  const badBody = async () => new Response(new ReadableStream({
+    start(controller) { controller.error(new Error('synthetic stream failure')) },
+  }), { status: 200, headers: { 'content-type': 'text/html' } })
+  await assert.rejects(session.captureOne({
+    ...approved(), fetchFn: badBody,
+  }))
+  assert.equal(session.status().stores.plus.successfulHttpResponses, 1)
+  assert.equal(session.status().stores.plus.verifiedCaptures, 0)
+  assert.equal(session.status().stores.plus.busy, false)
+})
