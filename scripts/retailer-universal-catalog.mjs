@@ -9,14 +9,29 @@ const CATALOG_MAX_DEPTH = 32
 const CATALOG_MAX_NODES = 50000
 const CATALOG_MAX_KEYS = 4096
 const CATALOG_MAX_ARRAY_LENGTH = 16384
+// A bounded object graph can still contain unbounded string primitives.
+// Count UTF-8 encoded bytes, including ignored own metadata, before copying.
+const CATALOG_MAX_STRING_BYTES = 64 * 1024
+const CATALOG_MAX_TOTAL_STRING_BYTES = 1024 * 1024
 
 function refuseCatalogCaller() {
   throw new Error('Refusing untrusted input: Untrusted retailer catalog caller input')
 }
 
 function pinCatalogValue(value, budget, ancestors, depth = 0) {
-  if (value === null || typeof value === 'string' ||
-      typeof value === 'boolean') return value
+  if (typeof value === 'string') {
+    // ASCII/UTF-16 length is a cheap necessary lower bound on UTF-8 size:
+    // reject oversized strings before any byte-count traversal/URL parsing.
+    if (value.length > CATALOG_MAX_STRING_BYTES) refuseCatalogCaller()
+    const utf8Bytes = Buffer.byteLength(value, 'utf8')
+    if (utf8Bytes > CATALOG_MAX_STRING_BYTES ||
+        budget.stringBytes > CATALOG_MAX_TOTAL_STRING_BYTES - utf8Bytes) {
+      refuseCatalogCaller()
+    }
+    budget.stringBytes += utf8Bytes
+    return value
+  }
+  if (value === null || typeof value === 'boolean') return value
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value !== 'object' || nodeTypes.isProxy(value) ||
       depth >= CATALOG_MAX_DEPTH || ++budget.nodes > CATALOG_MAX_NODES ||
@@ -175,7 +190,7 @@ function truthSignature(record) {
 }
 
 export function buildUniversalRetailerCatalog(callerBatch) {
-  const batch = pinCatalogValue(callerBatch, { nodes: 0 }, new WeakSet())
+  const batch = pinCatalogValue(callerBatch, { nodes: 0, stringBytes: 0 }, new WeakSet())
   if (!batch || typeof batch !== 'object' ||
       batch.summary?.mode !== 'reviewed-offline-only' ||
       !Array.isArray(batch.results) || batch.results.length > 32 ||
