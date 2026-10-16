@@ -64,6 +64,15 @@ function uniqueKnown<T>(values: T[]): T | null {
   return unique.length === 1 ? unique[0] : null
 }
 
+// JSON-LD producers sometimes provide several spellings of the same Schema.org
+// property in one object. All explicit declarations are evidence; dropping a
+// differently cased sibling can turn a contradictory retail claim into a price.
+function caseClaims(node: JsonObject, key: string): unknown[] {
+  return Object.keys(node)
+    .filter((candidate) => candidate.toLowerCase() === key.toLowerCase())
+    .map((candidate) => node[candidate])
+}
+
 function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
   const raw = offer.priceSpecification
   const values = Array.isArray(raw) ? raw : raw == null ? [] : [raw]
@@ -76,41 +85,36 @@ function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
 // into positive whole EUR cents before any private priced observation exists.
 function invalidExplicitPriceClaim(offer: JsonObject): boolean {
   const nodes = [offer, ...priceSpecificationCandidates(offer)]
-  return nodes.some((node) =>
-    ['price', 'lowPrice'].some((key) => {
-      const value = node[key]
-      if (value === undefined || value === null || value === '') {
-        return false
-      }
-      const parsed = cents(value)
-      return parsed === null || parsed <= 0
-    }),
-  )
+  return nodes.some((node) => {
+    const amounts = [...caseClaims(node, 'price'), ...caseClaims(node, 'lowPrice')]
+      .filter((value) => value !== null && value !== undefined && value !== '')
+      .map(cents)
+    // Independently valid price/lowPrice amounts are still unusable when they
+    // disagree on the same typed Offer or UnitPriceSpecification node.
+    return amounts.some((amount) => amount === null || amount <= 0) ||
+      new Set(amounts).size > 1
+  })
 }
 
 function extractPrice(offers: JsonObject[]): number | null {
   if (offers.some(invalidExplicitPriceClaim)) return null
   const prices = offers
-    .flatMap((offer) => [
-      cents(offer.price ?? offer.lowPrice),
-      ...priceSpecificationCandidates(offer).map((specification) =>
-        cents(specification.price ?? specification.lowPrice),
-      ),
-    ])
+    .flatMap((offer) => [offer, ...priceSpecificationCandidates(offer)])
+    .flatMap((node) => [...caseClaims(node, 'price'), ...caseClaims(node, 'lowPrice')])
+    .map(cents)
     .filter((value): value is number => value !== null)
   return uniqueKnown(prices)
 }
 
 function extractCurrency(offers: JsonObject[]): string | null {
   const currencies = offers
-    .flatMap((offer) => [
-      asString(offer.priceCurrency),
-      ...priceSpecificationCandidates(offer).map((specification) =>
-        asString(specification.priceCurrency),
-      ),
-    ])
+    .flatMap((offer) => [offer, ...priceSpecificationCandidates(offer)])
+    .flatMap((node) => caseClaims(node, 'priceCurrency'))
+    .map(asString)
     .filter((value): value is string => Boolean(value))
     .map((value) => value.toUpperCase())
+  // Conflicting EUR/GBP or EUR/USD declarations do not imply an absent
+  // currency; the caller must abstain instead of selecting the EUR spelling.
   return uniqueKnown(currencies)
 }
 
@@ -140,14 +144,11 @@ function extractAvailability(
   offers: JsonObject[],
 ): RawProductObservation['availability'] {
   const explicitValues = offers
-    .map((offer) => asString(offer.availability))
-    .filter((value): value is string => Boolean(value))
-
+    .flatMap((offer) => caseClaims(offer, 'availability'))
   if (explicitValues.length === 0) return 'unknown'
 
   const values = explicitValues.map(normalizeSchemaOrgAvailability)
   if (values.some((value) => value === 'unknown')) return 'unknown'
-
   const unique = [...new Set(values)]
   return unique.length === 1 ? unique[0] : 'unknown'
 }
