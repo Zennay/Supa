@@ -30,6 +30,9 @@ export function physicalCaptureNanoseconds(timestamp) {
     const offsetHours = Number(match[10])
     const offsetRemainder = Number(match[11])
     const negative = match[9] === '-'
+    // RFC 3339 reserves -00:00 to mean the local offset is unknown.
+    // A reviewed physical capture must not reinterpret it as known UTC.
+    if (negative && offsetHours === 0 && offsetRemainder === 0) return null
     const limit = negative ? 12 : 14
     if (offsetHours > limit || offsetRemainder > 59 ||
         (offsetHours === limit && offsetRemainder !== 0)) return null
