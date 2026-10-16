@@ -47,15 +47,22 @@ test('wrong HTTP weekday is not accepted as an absolute retry deadline', async (
 test('numeric zero delay remains permitted rather than replaced with fallback', async () => {
   const mocked = dateRetry('0')
   assert.equal((await mocked.fetcher.request(URL)).text, 'ok')
-  assert.deepEqual(mocked.waits, [])
-  // A zero cooldown has no sleep; both requests still occur with circuit guard intact.
+  assert.deepEqual(mocked.waits, [0])
+  // A zero cooldown permits an injected sleep(0); circuit guard remains intact.
   assert.equal(mocked.requests, 2)
 })
 
-function streamReply(payload, maxBytes) {
+function streamReply(payload, maxBytes, { keepOpen = false } = {}) {
   const state = { cancelled: false }
+  let produced = false
   const stream = new ReadableStream({
-    start(controller) { controller.enqueue(new Uint8Array(payload)) },
+    pull(controller) {
+      if (!produced) {
+        controller.enqueue(new Uint8Array(payload))
+        produced = true
+        if (!keepOpen) controller.close()
+      }
+    },
     cancel() { state.cancelled = true },
   }, { highWaterMark: 0 })
   const fetcher = new PoliteFetcher({
@@ -79,7 +86,7 @@ test('exact one-chunk raw wire limit succeeds', async () => {
 })
 
 test('first raw chunk above budget is refused and cancelled immediately', async () => {
-  const { fetcher, state } = streamReply(Buffer.alloc(129, 120), 128)
+  const { fetcher, state } = streamReply(Buffer.alloc(129, 120), 128, { keepOpen: true })
   await assert.rejects(fetcher.request(URL), /response exceeds maximum bytes/i)
   assert.equal(state.cancelled, true)
 })
