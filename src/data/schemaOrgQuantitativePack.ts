@@ -6,6 +6,8 @@
  * may convert a bounded, unambiguous {value: 500, unitCode: "GRM"} or product
  * {size: {value: 1, unitCode: "LTR"}} to that same canonical input.
  */
+import { normalizePackText } from './normalize.ts'
+
 export type StructuredPackSelection =
   | { status: 'none' }
   | { status: 'normalized'; weightText: string }
@@ -92,6 +94,26 @@ function quantitative(value: unknown, position: 'weight' | 'size'):
   return { type: 'recognized', value: amount + ' ' + unit }
 }
 
+/** A text-only weight/size pair must independently agree on full pack size. */
+function plainPhysicalQuantity(value: Record<string, unknown>):
+  { weightText: string; dimension: string; amount: number } | null {
+  const raw = ownData(value, 'value')
+  if (typeof raw !== 'string') return null
+  const pack = normalizePackText(raw)
+  // The legacy observation type does not retain an explicit multipack count.
+  // Never equate a multipack with a single physical pack.
+  if (pack.amount === null || pack.unit === 'unknown' || pack.count !== 1) {
+    return null
+  }
+  const multiplier = pack.unit === 'kg' || pack.unit === 'l' ? 1000 : 1
+  const dimension = pack.unit === 'kg' || pack.unit === 'g' ? 'mass' :
+    pack.unit === 'l' || pack.unit === 'ml' ? 'volume' :
+    pack.unit === 'piece' ? 'piece' : null
+  const amount = pack.amount * multiplier
+  if (dimension === null || !Number.isSafeInteger(amount * 1_000_000)) return null
+  return { weightText: pack.rawText ?? raw, dimension, amount }
+}
+
 /**
  * Reject contradictory simultaneous physical-size declarations rather than
  * silently preferring weight over size. Caller must preserve original product
@@ -102,6 +124,21 @@ export function structuredSchemaOrgPack(product: unknown): StructuredPackSelecti
     if (!objectValue(product)) return { status: 'unsafe' }
     const weight = ownData(product, 'weight')
     const size = ownData(product, 'size')
+    // Two plain QuantitativeValue.value strings (without unitText/unitCode)
+    // previously escaped structured validation and let the legacy parser
+    // pick weight while silently ignoring a conflicting explicit size.
+    // Only a corroborated, single physical package is trustworthy.
+    if (objectValue(weight) && objectValue(size) &&
+        ownData(weight, 'unitCode') === undefined &&
+        ownData(weight, 'unitText') === undefined &&
+        ownData(size, 'unitCode') === undefined &&
+        ownData(size, 'unitText') === undefined) {
+      const first = plainPhysicalQuantity(weight)
+      const second = plainPhysicalQuantity(size)
+      if (!first || !second || first.dimension !== second.dimension ||
+          first.amount !== second.amount) return { status: 'unsafe' }
+      return { status: 'normalized', weightText: first.weightText }
+    }
     const parsedWeight = quantitative(weight, 'weight')
     const parsedSize = quantitative(size, 'size')
     if (parsedWeight.type === 'unsafe' || parsedSize.type === 'unsafe') {
