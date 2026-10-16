@@ -5,7 +5,7 @@ import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/user
 import { readRecipeLibrary, saveRecipeLibrary, updateSavedRecipe, deleteSavedRecipe, duplicateSavedRecipe, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { exportRecipeBackup, parseRecipeBackup, restoreRecipeBackup } from './recipeBackup'
-import { readRecipeFavorites, toggleRecipeFavorite, removeRecipeFavorite } from './recipeFavorites'
+import { readRecipeFavorites, toggleRecipeFavorite, removeRecipeFavorite, RECIPE_FAVORITES_KEY } from './recipeFavorites'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import './recipes.css'
 
@@ -64,6 +64,23 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const backupInput = useRef<HTMLInputElement>(null)
   const saving = useRef(false)
   useEffect(() => () => request.current?.abort(), [])
+  // Other tabs can change locally stored favorites. Refresh the displayed
+  // hearts without writing or trusting corrupt/future-version records.
+  useEffect(() => {
+    function updateFromOtherTab(event: StorageEvent) {
+      if (event.storageArea !== window.localStorage ||
+          (event.key !== RECIPE_FAVORITES_KEY && event.key !== null)) return
+      try {
+        const latest = readRecipeFavorites(window.localStorage)
+        if (latest.error) { setMessage(latest.error); return }
+        setFavorites(latest.ids)
+      } catch {
+        setMessage('Favorieten konden niet worden gelezen. Ze worden niet overschreven.')
+      }
+    }
+    window.addEventListener('storage', updateFromOtherTab)
+    return () => window.removeEventListener('storage', updateFromOtherTab)
+  }, [])
   const matches = (r: { id: string; title: string }) => r.title.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) && (filter !== 'favorites' || favorites.includes(r.id))
   const demo = filter === 'own' ? [] : examples.filter(matches)
   const own = library.recipes.filter(matches)
