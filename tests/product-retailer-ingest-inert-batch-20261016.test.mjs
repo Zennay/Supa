@@ -173,3 +173,32 @@ test('whole-batch detects exact duplicate reviewed source before returning any r
     /Duplicate reviewed capture identity/,
   )
 })
+
+test('validated observations are editable private output copies without mutating pinned inputs', async () => {
+  const item = await evidence()
+  const before = structuredClone(item)
+  const accepted = ingestReviewedEvidence(item)
+  assert.equal(accepted.accepted,true)
+  assert.ok(accepted.observations.length > 0)
+  const observed = accepted.observations[0]
+  const originalClock = observed.provenance.capturedAt
+  const originalUrl = observed.provenance.url
+  observed.provenance.capturedAt = '2025-01-01T00:00:00.000Z'
+  observed.provenance.url = 'https://offline.example.test/fake'
+  assert.deepEqual(item,before)
+  const again = ingestReviewedEvidence(item)
+  assert.equal(again.observations[0].provenance.capturedAt, originalClock)
+  assert.equal(again.observations[0].provenance.url, originalUrl)
+  assert.equal(again.accepted,true)
+})
+
+test('batch output provenance edits cannot leak back to other offline ingestion runs', async () => {
+  const item = await evidence()
+  const first = ingestReviewedBatch([item])
+  const copy = ingestReviewedBatch([item])
+  first.results[0].observations[0].provenance.url = 'https://offline.example.test/changed'
+  assert.equal(copy.results[0].observations[0].provenance.url, item.source.url)
+  assert.equal(copy.summary.productionEnabled,false)
+  assert.equal(copy.summary.permissionVerified,false)
+  assert.equal(copy.summary.publicSavingsClaimEligible,false)
+})
