@@ -24,7 +24,12 @@ type Props = {
   activeDays?: readonly string[]
 }
 
-export function HiFiHome({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [] }: Props) {
+export function HiFiHome(props: Props) {
+  if (props.view === 'recipes') return <RecipeLibrary onBack={() => props.onNavigate('home')} />
+  return <HiFiDiscovery {...props} />
+}
+
+function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [] }: Props) {
   const [query, setQuery] = useState('')
   const [favorites, setFavorites] = useState<string[]>([])
   const [filterOpen, setFilterOpen] = useState(false)
@@ -40,7 +45,6 @@ export function HiFiHome({ view, onNavigate, addedProducts, onToggleProduct, act
   const toggleFavorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
   const changeView = (next: HiFiTab) => { setQuery(''); onNavigate(next) }
 
-  if (view === 'recipes') return <RecipeLibrary onBack={() => onNavigate('home')} />
 
   return <div className="hifi-home" data-figma-node="3307:4224">
     {view === 'home' ? <>

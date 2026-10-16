@@ -485,6 +485,21 @@ test('production source has no direct browser network access', async () => {
 
   for (const file of files) {
     const source = await readFile(file.url, 'utf8')
+    // User-authorized recipe import is a single same-origin POST. All other
+    // source/network primitives remain forbidden, including any second call.
+    if (file.relativePath === 'features/recipes/importRecipeLink.ts') {
+      const parsed = ts.createSourceFile(file.relativePath, source, ts.ScriptTarget.Latest, true)
+      const calls = []
+      const collect = node => { if (ts.isCallExpression(node) && node.expression.getText(parsed) === 'fetch') calls.push(node); ts.forEachChild(node, collect) }
+      collect(parsed)
+      assert.equal(calls.length, 1)
+      assert.equal(calls[0].arguments[0].getText(parsed), "'/api/recipes/import'")
+      assert.match(calls[0].arguments[1].getText(parsed), /method:\s*'POST'/)
+      assert.match(calls[0].arguments[1].getText(parsed), /credentials:\s*'same-origin'/)
+      const stripped = source.slice(0, calls[0].getStart(parsed)) + 'Promise.resolve({})' + source.slice(calls[0].end)
+      assert.equal(findDirectProductionNetworkAccess(stripped, file.relativePath), null)
+      continue
+    }
     const finding = findDirectProductionNetworkAccess(source, file.relativePath)
 
     assert.equal(

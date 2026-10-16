@@ -37,6 +37,7 @@ function harness() {
   }
   const modules = {
     react: { useState },
+    './HiFiPlannerWeekCard.tsx': { HiFiPlannerWeekCard: () => null },
     'react/jsx-runtime': require('react/jsx-runtime'),
     '../../domain/planner': { assessPlannerBudget, getBudgetState },
     '../../domain/ingredientReuse.ts': { buildIngredientReuseInsight },

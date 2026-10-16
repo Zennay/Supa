@@ -40,6 +40,7 @@ function harness() {
   }
   const imports = (name) => {
     if (name === 'react') return { useState }
+    if (name === './HiFiPlannerWeekCard.tsx') return { HiFiPlannerWeekCard: () => null }
     if (name === 'react/jsx-runtime') return require(name)
     if (name === '../../lib/money') return { euro }
     if (name === '../../domain/planner') return { assessPlannerBudget, getBudgetState }
