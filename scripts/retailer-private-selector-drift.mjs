@@ -144,6 +144,48 @@ export function compareOfflineSelectorProposals(before,after) {
   }
   return output
 }
+// A SHA-bearing private JSON review must have one unambiguous parse:
+// JSON.parse silently picks the last of duplicate object members. Inspect
+// the original bounded bytes (including escaped spellings) before accepting
+// any source clocks, identities, selector counts or permission flags.
+function parseUniquePrivateJson(bytes) {
+  try {
+    const raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    const scopes = []
+    for (let i = 0; i < raw.length;) {
+      const char = raw[i]
+      if (char === '{' || char === '[') {
+        if (scopes.length >= 128) fail()
+        scopes.push(char === '{' ? new Set() : null)
+        i++
+        continue
+      }
+      if (char === '}' || char === ']') {
+        if (!scopes.length) fail()
+        scopes.pop()
+        i++
+        continue
+      }
+      if (char !== '"') { i++; continue }
+      const start = i++
+      while (i < raw.length) {
+        if (raw[i] === '\\') { i += 2; continue }
+        if (raw[i++] === '"') break
+      }
+      let next = i
+      while (next < raw.length && (
+        raw[next] === ' ' || raw.charCodeAt(next) === 9 ||
+        raw.charCodeAt(next) === 10 || raw.charCodeAt(next) === 13)) next++
+      const scope = scopes.at(-1)
+      if (raw[next] === ':' && scope instanceof Set) {
+        const name = JSON.parse(raw.slice(start, i))
+        if (scope.has(name)) fail()
+        scope.add(name)
+      }
+    }
+    return JSON.parse(raw)
+  } catch { fail() }
+}
 async function readPrivate(path){
   if(typeof path!=='string'||!path||path.startsWith('-')||path.length>500||
     !/^[a-z0-9][a-z0-9_.-]*\.json$/i.test(basename(path)))fail()
@@ -161,9 +203,9 @@ async function readPrivate(path){
   try{
     const s=await handle.stat()
     if(!s.isFile()||(s.mode&0o077)||s.size>65536)fail()
-    const json=await handle.readFile('utf8')
-    if(Buffer.byteLength(json,'utf8')>65536)fail()
-    return JSON.parse(json)
+    const bytes=await handle.readFile()
+    if(bytes.length>65536)fail()
+    return parseUniquePrivateJson(bytes)
   }finally{await handle.close()}
 }
 // Direct callers may invoke this private CLI function with an array containing
