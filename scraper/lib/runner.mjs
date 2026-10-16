@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
-import { HostBlockedError, HttpStatusError, PoliteFetcher, RobotsDisallowedError } from './http.mjs'
+import { HostBlockedError, HttpStatusError, RobotsDisallowedError } from './http.mjs'
 import { isValidRecord } from './normalize.mjs'
 
 const MAX_ERROR_RATE = 0.5
@@ -54,13 +54,6 @@ export async function runRetailer(adapter, {
     return fetcher.request(url)
   }
 
-  // Hostless transports are only kept for existing deterministic,
-  // non-archiving fake-budget fixtures. A real PoliteFetcher, browser renderer
-  // or configured retailer never receives this exemption.
-  const inertUnattributedProbe = !adapter.host &&
-    adapter.mode === 'http' && !saveHtmlDir &&
-    !(fetcher instanceof PoliteFetcher)
-
   // Host blocks are terminal for this run: completion of another concurrent
   // fetch must not persist HTML or a paid price after the source is blocked.
   let aborted = null
@@ -68,7 +61,9 @@ export async function runRetailer(adapter, {
     // Discovery and expansion are untrusted work-item producers. Validate
     // each requested source before *either* HTTP or browser rendering; checking
     // the effective response URL afterwards cannot undo an off-source request.
-    if (!inertUnattributedProbe && !isTrustedResponseSource(item?.url, adapter.host)) {
+    // Never infer approval from the fetcher constructor: arbitrary wrapped
+    // clients can still perform real outbound I/O. A missing host is denied.
+    if (!isTrustedResponseSource(item?.url, adapter.host)) {
       throw new Error('retailer queued URL is outside approved HTTPS source origin')
     }
     const res = await fetchPage(item.url)
@@ -122,7 +117,7 @@ export async function runRetailer(adapter, {
         ? fetcher : null,
     )
     scopedFetcher.request = async (url, options) => {
-      if (!inertUnattributedProbe && !isTrustedResponseSource(url, adapter.host)) {
+      if (!isTrustedResponseSource(url, adapter.host)) {
         throw new Error('retailer discovery URL is outside approved HTTPS source origin')
       }
       if (typeof fetcher?.request !== 'function') throw new Error('retailer fetcher unavailable')
