@@ -13,6 +13,14 @@ node --experimental-strip-types --test tests/retailer-reviewed-ingest-engine.tes
 
 De CLI leest exact zes gecontroleerde repositoryfixtures met een limiet van 1 MiB per bestand. Hij voert **geen HTTP-aanvragen** uit en geeft uitsluitend aantallen en status terug; geen producten, individuele prijzen, bron-URL's of persoonlijke gegevens. De functie `ingestReviewedBatch(records)` geeft gestructureerde gevalideerde `RawProductObservation`-records terug voor toekomstig intern ingestwerk, maar schakelt **geen** retailerproductie in.
 
+## Veiligheid bij directe JavaScript-invoer
+
+De ingestie-engine kan ook direct worden aangeroepen met `ingestReviewedEvidence(record)` en `ingestReviewedBatch(records)`. Zulke invoer is niet noodzakelijk afkomstig uit vertrouwde JSON-bestanden. Voordat de zes werkelijke PLUS/DekaMarkt-adapters starten, maakt de engine daarom nu een **afgesloten, recursieve kopie van uitsluitend eigen JSON-data-properties**. `Proxy`-objecten, JavaScript-getters, overgeërfde waarden, symbolen, ongebruikelijke prototypes, cyclische of onbegrensde gegevens en gemanipuleerde batch-arrays worden geweigerd voordat hun onbetrouwbare code kan worden uitgevoerd. De limieten zijn 32 geneste niveaus, 50.000 JSON-nodes, maximaal 16.384 items per interne array en maximaal 4.096 velden per object; een batch blijft 1–32 onafhankelijke captures.
+
+Voor elk record worden supermarkt, capture-vorm, bron-ID, parserinvoer en duplicaatcontrole vanuit **dezelfde vastgepinde bronkopie** gelezen. Eén wisselende getter kan daardoor niet eerst een goedgekeurde bronidentiteit leveren en daarna een andere waarde aan een parser of deduplicatie aanbieden. De zes echte historische M1-fixtures en normale JSON-input blijven bruikbaar; de negatieve tests gebruiken uitsluitend kunstmatig gemanipuleerde in-memory objecten, geen actuele supermarktdata.
+
+Dit is geen bronlicentie, scheduler, live fetch of toestemming tot publicatie van prijzen en besparingen. De bestaande `permissionVerified:false` en `productionEnabled:false` zijn ongewijzigd.
+
 ## Wat er nog niet is
 
 - **Niet:** alle Nederlandse ketens. De bestaande uitvoerbare M1-adapters zijn voor PLUS en DekaMarkt. Het aparte 17-ketensonderzoeksregister is geen verzameling van 17 scrapers.
