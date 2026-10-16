@@ -14,7 +14,7 @@ import re
 import sqlite3
 import sys
 import unicodedata
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -49,6 +49,24 @@ def safe_timestamp(text):
           "impossible timezone offset")
     check(value.astimezone(timezone.utc) <= datetime.now(timezone.utc), "future source timestamp")
     return text
+
+
+def utc_instant_nanoseconds(text):
+    """Exact UTC ordering for ISO clocks with 1-9 fractional digits.
+
+    datetime validates real civil dates/offsets but stores only microseconds.
+    Retain all nine original fraction digits as an integer, never a float.
+    """
+    safe_timestamp(text)
+    match = ISO.fullmatch(text)
+    check(match is not None, "invalid timestamp")
+    fraction = re.search(r"\\.(\\d{1,9})(?:Z|[+-]\\d{2}:\\d{2})$", text)
+    frac_ns = int(fraction.group(1).ljust(9, "0")) if fraction else 0
+    parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    whole = parsed.replace(microsecond=0).astimezone(timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    delta = whole - epoch
+    return (delta.days * 86400 + delta.seconds) * 1_000_000_000 + frac_ns
 
 
 def safe_string(value, label):
@@ -124,6 +142,15 @@ def prepare(batch):
             check(parsed.scheme == "https" and parsed.hostname == HOSTS[retailer] and
                   parsed.port is None and parsed.username is None and parsed.password is None and
                   not parsed.fragment, "source host or credentials invalid")
+            # The direct Python CLI is independently callable: it must enforce
+            # the same source-query trust boundary as the guarded JS catalog.
+            # parse_qsl decodes percent escapes; casefold also rejects mixed case.
+            credential_names = {"access_token", "refresh_token", "id_token",
+                                "api_key", "apikey", "client_secret", "password",
+                                "authorization", "token", "session"}
+            check(not any(key.casefold() in credential_names or "%" in key
+                          for key, _ in parse_qsl(parsed.query, keep_blank_values=True)),
+                  "credential-bearing source URL query refused")
             captured = safe_timestamp(source.get("capturedAt"))
             digest = source.get("sha256")
             check(isinstance(digest, str) and HEX_SHA.fullmatch(digest),
@@ -139,8 +166,8 @@ def prepare(batch):
                 if start is not None: safe_timestamp(start)
                 if end is not None: safe_timestamp(end)
                 if start is not None and end is not None:
-                    check(datetime.fromisoformat(start.replace("Z", "+00:00")) <=
-                          datetime.fromisoformat(end.replace("Z", "+00:00")), "offer window reversed")
+                    check(utc_instant_nanoseconds(start) <= utc_instant_nanoseconds(end),
+                          "offer window reversed")
             else:
                 offer_label = offer_cents = original_cents = start = end = None
             records.append((
