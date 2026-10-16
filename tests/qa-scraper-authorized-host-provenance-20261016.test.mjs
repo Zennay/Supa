@@ -20,7 +20,7 @@ async function ingest(records) {
     status: 'active',
     mode: 'http',
     async *discover() {
-      yield { kind: 'product', url: 'https://shop.example.test/synthetic-page' }
+      yield { kind: 'catalog', url: 'https://shop.example.test/synthetic-page' }
     },
     parse() { return records },
   }
