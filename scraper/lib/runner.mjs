@@ -8,6 +8,18 @@ import { isValidRecord } from './normalize.mjs'
 const MAX_ERROR_RATE = 0.5
 const MIN_PAGES_FOR_ERROR_RATE = 40
 
+function isTrustedResponseSource(value, retailerHost) {
+  if (typeof value !== 'string' || typeof retailerHost !== 'string') return false
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' &&
+      url.hostname === retailerHost.toLowerCase() &&
+      !url.username && !url.password && !url.port
+  } catch {
+    return false
+  }
+}
+
 // Scrape one retailer into the store. Returns a summary; never throws for
 // per-page problems (they are counted), only aborts on a host block or a
 // sustained error rate (selector drift / outage => fail closed).
@@ -42,9 +54,21 @@ export async function runRetailer(adapter, {
     return fetcher.request(url)
   }
 
+  // Host blocks are terminal for this run: completion of another concurrent
+  // fetch must not persist HTML or a paid price after the source is blocked.
+  let aborted = null
   const handle = async (item) => {
     const res = await fetchPage(item.url)
+    if (aborted) return []
     summary.pages += 1
+    // Foreign or downgraded final response bodies must never be archived
+    // under an approved retailer ID, even when the parser would return no rows.
+    // The standard HTTP/renderer transports always report the effective URL.
+    const sourceApproved = isTrustedResponseSource(item.url, adapter.host) &&
+      isTrustedResponseSource(res.url, adapter.host)
+    if (saveHtmlDir && !sourceApproved) {
+      throw new Error('retailer response origin is not approved for HTML archive')
+    }
     if (saveHtmlDir) {
       const dir = join(saveHtmlDir, adapter.id)
       mkdirSync(dir, { recursive: true })
@@ -55,7 +79,15 @@ export async function runRetailer(adapter, {
     // Discard a foreign retailer row before saving it or counting it as ingested.
     const records = adapter.parse(res.text, res.url || item.url)
       .filter((record) => isValidRecord(record) && record.retailer === adapter.id)
+    // A synthetic empty-parser budget test may have no approved host, but
+    // absolutely no parsed priced rows may be archived without one.
+    if (!sourceApproved && records.length) {
+      throw new Error('retailer response origin is not approved for price archive')
+    }
     if (!records.length) summary.empty += 1
+    // Parsing is synchronous; check again before the synchronous transaction
+    // and before counting this observation as an accepted product.
+    if (aborted) return []
     const at = new Date().toISOString()
     store.transaction(() => {
       for (const record of records) store.saveRecord(record, { runId, at })
@@ -72,7 +104,6 @@ export async function runRetailer(adapter, {
     let exhausted = false
     let pulling = Promise.resolve()
     let started = 0
-    let aborted = null
 
     // Hands out the next work item; generator access is serialised.
     const nextItem = () => {
