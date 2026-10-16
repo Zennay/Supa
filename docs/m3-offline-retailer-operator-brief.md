@@ -17,7 +17,7 @@ De CLI accepteert **geen argumenten**. Geen URL, proxy, winkelaccount, bestandsr
 
 ## Wat de controle uitlegt
 
-- Voor **PLUS** en **DekaMarkt**: drie bronvormen (producten, catalogus, aanbiedingen), hoeveel historische bronopnamen de adapter aanvaard of afgekeurd heeft en of ze buiten het beoordelingsvenster vallen.
+- Voor **PLUS** en **DekaMarkt**: drie bronvormen (producten, catalogus, aanbiedingen), hoeveel historische bronopnamen de adapter aanvaard of afgekeurd heeft, of ze buiten het beoordelingsvenster vallen en hoeveel historische prijswaarnemingen **onbekend** zijn. Bij ontbrekende prijzen is expliciete handmatige broncontrole nodig; onbekend wordt nooit als €0 of als actuele prijs geïnterpreteerd.
 - Per keten: de huidige licentiestatus en concrete acties voor brontoestemming, ontbrekende/afgekeurde bestanden, ouderdom en afzonderlijke nieuwe capture-beoordeling.
 - Een onmiskenbare waarschuwing dat **geen** live scraping, automatische refresh, actuele retailerprijs, publieke publicatie of bewezen besparing beschikbaar is.
 
