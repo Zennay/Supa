@@ -9,6 +9,7 @@ import { euro } from '../../lib/money'
 import { RecipePriceExplanation } from './RecipePriceExplanation'
 import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts'
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
+import { HiFiPlannerWeekCard } from './HiFiPlannerWeekCard.tsx'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -103,6 +104,12 @@ export function PlannerView({
         </div>
         <button type="button" className="ghost-button" onClick={onReset}>Reset</button>
       </div>
+
+      <HiFiPlannerWeekCard
+        plannedMeals={plannedMeals}
+        activeDays={activeDays}
+        onToggleDay={onToggleDay}
+      />
 
       <section className="budget-card" aria-labelledby="weekbudget-title">
         <div className="budget-heading">
