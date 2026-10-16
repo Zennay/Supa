@@ -66,7 +66,7 @@ export function UserRecipeDraftEditor({
           <legend>Ingrediënten</legend>
           <ol>
             {draft.ingredients.map((ingredient, index) => (
-              <li key={index}>
+              <li key={ingredient.clientId}>
                 <label htmlFor={'recipe-ingredient-name-' + index}>Ingrediënt {index + 1}</label>
                 <input id={'recipe-ingredient-name-' + index} maxLength={180} value={ingredient.label}
                   onChange={(event) => onChange(updateEditorIngredient(draft, index, { label: event.target.value }))} />
@@ -109,7 +109,7 @@ export function UserRecipeDraftEditor({
         </div>
         {draft.warnings.length > 0 && (
           <div aria-live="polite"><h3>Controleer ook</h3>
-            <ul>{draft.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
+            <p>{draft.warnings.join(' · ')}</p>
           </div>
         )}
         {!canConfirm && <p role="status">Vul een naam, porties en alle metrische ingrediënthoeveelheden in voordat je bevestigt.</p>}
