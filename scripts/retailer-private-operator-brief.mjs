@@ -85,6 +85,42 @@ function snapshotReport(value, state = { seen: new WeakSet(), nodes: 0 }, depth 
   return output
 }
 
+/**
+ * A date parser must not quietly normalize impossible civil dates or discard
+ * 4–9 fractional-second digits. These timestamps identify historical M1
+ * evidence only and never make a current-price or publication claim.
+ */
+function physicalReviewInstant(iso) {
+  const parts = typeof iso === 'string'
+    ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/.exec(iso)
+    : null
+  if (!parts) fail()
+  const year = Number(parts[1])
+  const month = Number(parts[2])
+  const day = Number(parts[3])
+  const hour = Number(parts[4])
+  const minute = Number(parts[5])
+  const second = Number(parts[6])
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  if (year < 1970 || month < 1 || month > 12 ||
+      day < 1 || day > days[month - 1] ||
+      hour > 23 || minute > 59 || second > 59) fail()
+  const timezone = parts[8]
+  if (timezone !== 'Z') {
+    const offsetHour = Number(timezone.slice(1, 3))
+    const offsetMinute = Number(timezone.slice(4, 6))
+    if (offsetHour > 14 || offsetMinute > 59 ||
+        (offsetHour === 14 && offsetMinute !== 0)) fail()
+  }
+  const milliseconds = Date.parse(iso)
+  if (!Number.isFinite(milliseconds)) fail()
+  // The JS Date parser truncates beyond milliseconds; preserve all 9 digits.
+  const nanofraction = (parts[7] ?? '').padEnd(9, '0')
+  return BigInt(milliseconds) * 1_000_000n +
+    BigInt(nanofraction.slice(3) || '0')
+}
+
 function expectedShapeStatus(shape) {
   return shape.acceptedSources === 0 ? 'no-accepted-historical-capture'
     : shape.rejectedSources > 0 ? 'rejected-historical-input-needs-review'
@@ -128,15 +164,14 @@ export function renderPrivateRetailerOperatorBrief(report) {
       report.rightsGateProductionReady !== false ||
       !Number.isSafeInteger(report.maxAgeHours) ||
       report.maxAgeHours < 1 || report.maxAgeHours > 720 ||
-      typeof report.referenceTime !== 'string' ||
-      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(report.referenceTime) ||
-      !Number.isFinite(Date.parse(report.referenceTime)) ||
       !Array.isArray(report.retailers) || report.retailers.length !== 2 ||
       report.retailerCount !== 2 || report.expectedShapeCount !== 6 ||
       !safeCount(report.historicalAcceptedShapes) ||
       !safeCount(report.missingHistoricalShapeCount) ||
       !safeCount(report.staleHistoricalCaptures)) fail()
 
+  const referenceNanos = physicalReviewInstant(report.referenceTime)
+  if (referenceNanos > BigInt(Date.now()) * 1_000_000n) fail()
   const lines = [
     'SUPA — offline winkelbron-startcontrole',
     'ALLEEN HISTORISCHE BRONNEN. Geen live ophalen, geplande vernieuwing, actuele prijzen of besparingsclaims.',
@@ -183,7 +218,8 @@ export function renderPrivateRetailerOperatorBrief(report) {
           (shape.acceptedSources === 0 && shape.latestArchivedCapturedAt !== null) ||
           (shape.acceptedSources > 0 &&
             (typeof shape.latestArchivedCapturedAt !== 'string' ||
-              shape.latestArchivedCapturedAt.length > 64)) ||
+              shape.latestArchivedCapturedAt.length > 64 ||
+              physicalReviewInstant(shape.latestArchivedCapturedAt) > referenceNanos)) ||
           shape.eligibleForLiveCapture !== false ||
           shape.verifiedCurrentPriceObservations !== 0) fail()
       observedKinds.add(shape.kind)
