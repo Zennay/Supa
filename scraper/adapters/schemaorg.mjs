@@ -59,7 +59,7 @@ export function schemaOrgPrices(offers) {
   // priceSpecification. Do not select the cheapest of conflicting assertions.
   if (list.some(offer =>
     conflictingCaseEvidence(offer) ||
-    priceSpecificationCandidates(offer).some(conflictingCaseEvidence))) {
+    [pick(offer, ['priceSpecification'])].flat().filter(Boolean).some(conflictingCaseEvidence))) {
     return { priceCents: null, promoPriceCents: null }
   }
   const prices = []
