@@ -19,20 +19,44 @@ import { buildCivilClockCheckedPrivateCatalog } from './retailer-private-civil-c
 
 const refuse = () => { throw new Error('Private historical planned-week bridge refused') }
 const stores = ['plus', 'dekamarkt']
+const DUTCH_DAYS = new Set(['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'])
 
 function selectedDays(input) {
   const days = snapshotInertReviewedEvidence(input)
-  const allowed = new Set(m2DefaultActiveDays)
+  const allowed = DUTCH_DAYS
   if (!Array.isArray(days) || days.length < 1 || days.length > 7 ||
       new Set(days).size !== days.length ||
       days.some(day => typeof day !== 'string' || !allowed.has(day))) refuse()
   return days
 }
 
+/**
+ * A caller may optionally provide a real, already-curated local planner and
+ * recipe set. Detach both together with the same inert-JSON boundary as source
+ * admission; never read executable getters or caller proxies. Only this
+ * private review path accepts custom plans, not the fixture-only CLI.
+ */
+function privatePlannerInputs(options) {
+  if (options === undefined) {
+    return { plan: m2InitialPlan, recipes: m2Recipes, source: 'm2-fixture' }
+  }
+  const input = snapshotInertReviewedEvidence(options)
+  if (!input || typeof input !== 'object' || Array.isArray(input) ||
+      Object.keys(input).length !== 2 ||
+      !Object.hasOwn(input, 'plan') || !Object.hasOwn(input, 'recipes') ||
+      !Array.isArray(input.plan) || !Array.isArray(input.recipes) ||
+      input.plan.length < 1 || input.plan.length > 14 ||
+      input.recipes.length < 1 || input.recipes.length > 100 ||
+      input.recipes.some(recipe => !recipe || typeof recipe !== 'object' ||
+        !Array.isArray(recipe.ingredients) || recipe.ingredients.length > 32)) refuse()
+  return { plan: input.plan, recipes: input.recipes, source: 'custom-private' }
+}
+
 /** Strictly offline, no prices or retailer HTTP. Returns a private review only. */
-export function buildCivilClockCheckedPrivatePlannedWeek(records, days = m2DefaultActiveDays) {
-  if (arguments.length < 1 || arguments.length > 2) refuse()
+export function buildCivilClockCheckedPrivatePlannedWeek(records, days = m2DefaultActiveDays, options) {
+  if (arguments.length < 1 || arguments.length > 3) refuse()
   const activeDays = selectedDays(days)
+  const { plan, recipes, source } = privatePlannerInputs(options)
   // No direct unreviewed ingestion path: reject the entire batch first.
   const catalog = buildCivilClockCheckedPrivateCatalog(records)
   if (catalog.sourceCount !== 6 || catalog.productionEnabled !== false ||
@@ -40,7 +64,7 @@ export function buildCivilClockCheckedPrivatePlannedWeek(records, days = m2Defau
       catalog.status !== 'private-review-only' ||
       !Array.isArray(catalog.products) || catalog.products.length === 0) refuse()
   const week = buildDynamicReviewedWeek({
-    catalog, plan: m2InitialPlan, recipes: m2Recipes, activeDays,
+    catalog, plan, recipes, activeDays,
   })
   const rows = week.preview.rows
   if (!Array.isArray(rows) || rows.length !== week.uniqueIngredientNeeds * stores.length ||
@@ -70,6 +94,7 @@ export function buildCivilClockCheckedPrivatePlannedWeek(records, days = m2Defau
     summary: {
       mode: 'historical-planned-week-private-review-only',
       reviewedArchivedSources: catalog.sourceCount,
+      selectedPlanSource: source,
       historicalProductGroups: catalog.productCount,
       activeDays: week.activeDayCount,
       ingredientNeeds: week.uniqueIngredientNeeds,
@@ -91,7 +116,9 @@ function cliDays(argv) {
       (values.length !== 0 &&
         (values.length !== 2 || values[0] !== '--days' || typeof values[1] !== 'string'))) refuse()
   if (values.length === 0) return [...m2DefaultActiveDays]
-  return selectedDays(values[1].split(','))
+  const days = selectedDays(values[1].split(','))
+  if (days.some(day => !m2DefaultActiveDays.includes(day))) refuse()
+  return days
 }
 
 /** Aggregate-only CLI over six fixed sanitized historical files. */
