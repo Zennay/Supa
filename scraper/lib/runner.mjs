@@ -8,6 +8,18 @@ import { isValidRecord } from './normalize.mjs'
 const MAX_ERROR_RATE = 0.5
 const MIN_PAGES_FOR_ERROR_RATE = 40
 
+function isTrustedResponseSource(value, retailerHost) {
+  if (typeof value !== 'string' || typeof retailerHost !== 'string') return false
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' &&
+      url.hostname === retailerHost.toLowerCase() &&
+      !url.username && !url.password && !url.port
+  } catch {
+    return false
+  }
+}
+
 // Scrape one retailer into the store. Returns a summary; never throws for
 // per-page problems (they are counted), only aborts on a host block or a
 // sustained error rate (selector drift / outage => fail closed).
@@ -49,6 +61,13 @@ export async function runRetailer(adapter, {
     const res = await fetchPage(item.url)
     if (aborted) return []
     summary.pages += 1
+    // Foreign or downgraded final response bodies must never be archived
+    // under an approved retailer ID, even when the parser would return no rows.
+    // The standard HTTP/renderer transports always report the effective URL.
+    if (!isTrustedResponseSource(item.url, adapter.host) ||
+        !isTrustedResponseSource(res.url, adapter.host)) {
+      throw new Error('retailer response origin is not approved for archive')
+    }
     if (saveHtmlDir) {
       const dir = join(saveHtmlDir, adapter.id)
       mkdirSync(dir, { recursive: true })
