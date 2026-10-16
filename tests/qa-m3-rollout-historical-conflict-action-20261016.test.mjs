@@ -74,5 +74,7 @@ test('QA negative control: dishonest summary metadata is still rejected before o
   const original = await loadReviewedRepositoryFixtures()
   const batch = syntheticContradictorySnapshot(original)
   batch.summary.permissionVerified = true
-  assert.throws(() => planPrivateRetailerRollout(batch, batch, { referenceTime: clock }))
+  const gate = await rights()
+  assert.throws(() => planPrivateRetailerRollout(gate, batch, { referenceTime: clock }),
+    /Private retailer adapter health review refused/)
 })
