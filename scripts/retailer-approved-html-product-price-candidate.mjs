@@ -49,22 +49,23 @@ function conflictingCaseOfferPrices(blocks) {
     const value = stack.pop()
     if (!value || typeof value !== 'object') continue
     if (Array.isArray(value)) {
-      stack.push(...value)
+      for (const child of value) stack.push(child)
       continue
     }
     const keys = Object.keys(value)
     const explicitPrices = keys.filter(key => key.toLowerCase() === 'price')
     if (explicitPrices.length > 1) {
       const cents = explicitPrices.map(key => {
-        const amount = Number(value[key])
-        const scaled = amount * 100
+        const raw = value[key]
+        if (typeof raw !== 'number' && typeof raw !== 'string') return null
+        const scaled = Number(raw) * 100
         const rounded = Math.round(scaled)
         return Number.isFinite(scaled) && Number.isSafeInteger(rounded) &&
-          Math.abs(scaled - rounded) <= 1e-7 ? rounded : null
+          rounded > 0 && Math.abs(scaled - rounded) <= 1e-7 ? rounded : null
       })
       if (cents.some(c => c === null || c !== cents[0])) return true
     }
-    stack.push(...Object.values(value))
+    for (const child of Object.values(value)) stack.push(child)
   }
   return false
 }
