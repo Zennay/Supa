@@ -11,6 +11,8 @@ import {
 } from '../scripts/retailer-private-selected-week-observation.mjs'
 
 const FORBIDDEN_CONTROLS = /[\u061c\u200b\u200c\u200d\u200e\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/u
+// Context matters: ZWJ/ZWNJ can legitimately join emoji, Indic or Persian text.
+const BIDI_SPOOFING_CONTROLS = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u
 
 async function originals() {
   const base = new URL('../fixtures/m1/', import.meta.url)
@@ -49,6 +51,7 @@ test('legitimate Dutch accents and meaningful non-Latin ingredient letters remai
   for (const label of [
     'Crème fraîche', 'Jalapeño met citroen 🍋', 'Basmati أرز',
     '蕎麦麺', 'אורז בסמטי', 'Pão de queijo', 'Κολοκύθι',
+    '👩‍🍳 chef', 'हिन्दी क्‍ष', 'می‌روم',
   ]) {
     const worksheet = buildPrivateSelectedWeekObservationWorksheet(sources, ['Ma'], withLabel(label))
     assert.equal(worksheet.rows, 10)
@@ -56,7 +59,8 @@ test('legitimate Dutch accents and meaningful non-Latin ingredient letters remai
     assert.equal(worksheet.observedStorePrices, 0)
     assert.ok(worksheet.csv.includes('"' + label.replace(/"/g, '""') + '"'),
       'legible Unicode survives losslessly')
-    assert.doesNotMatch(worksheet.csv, FORBIDDEN_CONTROLS)
+    assert.doesNotMatch(worksheet.csv, BIDI_SPOOFING_CONTROLS,
+      'legitimate joined letters/emoji must not require direction-override characters')
   }
 })
 
