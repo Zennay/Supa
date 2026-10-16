@@ -144,3 +144,18 @@ test('all six named source snapshots must physically contain at least one observ
   edit(db, "DELETE FROM price_observations WHERE snapshot_id=(SELECT id FROM source_snapshots WHERE retailer_id='dekamarkt' AND kind='offers')")
   denied(run(['--db', db]))
 }))
+
+test('unfinished SQLite WAL and journals never count as a finished immutable import', () => scoped((_, db) => {
+  for (const suffix of ['-wal', '-shm', '-journal']) {
+    writeFileSync(db + suffix, 'synthetic pending transaction', { mode: 0o600 })
+    denied(run(['--db', db]))
+    rmSync(db + suffix)
+  }
+}))
+
+test('a symbolic-link ancestor is not a safe provenance-bearing SQLite path', () => scoped((directory, db) => {
+  const alias = join(directory, 'linked-parent')
+  symlinkSync(directory, alias, 'dir')
+  denied(run(['--db', join(alias, 'reviewed.db')]))
+  assert.ok(readFileSync(db).length > 100)
+}))
