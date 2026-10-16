@@ -113,3 +113,27 @@ test('strictly no live catalogue call or authenticated persistence exists in the
   assert.ok(!('userId' in p))
   assert.ok(!('products' in p))
 })
+
+test('a forged nonfinite or over-limit metric quantity cannot yield a plausible shopping list', () => {
+  const recipe=ready('metric')
+  for(const amount of [Number.NaN, Number.POSITIVE_INFINITY, -5, 1_000_001, null]){
+    const forged={...recipe,ingredients:[{...recipe.ingredients[0],amount}]}
+    assert.equal(prepareUnpricedShoppingPreview(
+      [{day:'Ma',recipeId:recipe.id}],[forged],['Ma']).status,'unavailable')
+  }
+})
+
+test('forged ingredient identity, unit, title and preparation cannot enter shopping copy', () => {
+  const recipe=ready('forged')
+  const broken=[
+    {...recipe,ingredients:[{...recipe.ingredients[0],unit:'bucket'}]},
+    {...recipe,ingredients:[{...recipe.ingredients[0],id:'retailer-owned-fact'}]},
+    {...recipe,title:''},
+    {...recipe,minutes:0},
+    {...recipe,servings:2000},
+  ]
+  for(const candidate of broken){
+    assert.equal(prepareUnpricedShoppingPreview(
+      [{day:'Ma',recipeId:recipe.id}],[candidate],['Ma']).status,'unavailable')
+  }
+})
