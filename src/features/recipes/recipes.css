@@ -8,6 +8,9 @@
 .recipe-note { color: #848484; font-size: 11px; line-height: 1.5; }
 .recipe-add-actions, .recipe-tabs { display: flex; gap: 8px; }
 .recipe-add-actions button, .recipe-tabs button { flex: 1; border: 0; border-radius: 24px; padding: 12px; min-height: 44px; background: white; font-size: 13px; }
+.recipe-backup-actions { margin-top: 8px; flex-wrap: wrap; }
+.recipe-backup-actions button { flex: 1 1 140px; background: #eef5f1; color: #005135; }
+.recipe-backup-actions button:disabled { cursor: not-allowed; opacity: .5; }
 .recipe-detail-actions { flex-wrap: wrap; margin-top: 16px; }
 .recipe-detail-actions button { flex: 1 1 145px; }
 .recipe-add-actions button:first-child, .recipe-tabs button[aria-pressed=true] { background: #005135; color: #76f8ca; }
