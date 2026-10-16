@@ -49,13 +49,19 @@ for (const [label, transform] of [
   ['bare query delimiter', url => url + '?'],
   ['bare fragment delimiter', url => url + '#'],
   ['HTTP downgrade', url => url.replace(/^https:/, 'http:')],
+  ['cross-retailer HTTPS source', (url, retailerIndex) => url.replace(
+    retailerIndex === 0 ? 'www.plus.nl' : 'www.dekamarkt.nl',
+    retailerIndex === 0 ? 'www.dekamarkt.nl' : 'www.plus.nl',
+  )],
+  ['untrusted HTTPS origin', url => url.replace(/^https:\/\/[^/]+/, 'https://unreviewed.invalid')],
+  ['nonstandard HTTPS port', url => url.replace(/\.nl\//, '.nl:444/')],
 ]) {
   for (const retailerIndex of [0, 1]) {
     test('direct catalog refuses ' + label + ' in ' + (retailerIndex === 0 ? 'PLUS' : 'DekaMarkt') + ' product provenance', async () => {
       const batch = structuredClone(await acceptedHistoricalBatch())
       const result = batch.results[retailerIndex]
       const original = result.observations[0].provenance.url
-      result.observations[0].provenance.url = transform(original)
+      result.observations[0].provenance.url = transform(original, retailerIndex)
       assert.notEqual(result.observations[0].provenance.url, original)
       assert.throws(
         () => buildUniversalRetailerCatalog(batch),
