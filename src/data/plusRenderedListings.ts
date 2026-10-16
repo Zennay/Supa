@@ -468,33 +468,62 @@ export function projectPlusRenderedListingCard(
   anchor: Element,
   kind: 'catalog' | 'offers',
 ): PlusRenderedListingCard | null {
-  const expectedBlock =
-    kind === 'catalog'
-      ? PLUS_RENDERED_LISTING_SELECTORS.catalogBlock
-      : PLUS_RENDERED_LISTING_SELECTORS.offersBlock
+  // This is only a BROWSER DOM projection of already reviewed rendered data.
+  // A price, name or pack belonging to a neighbouring product anchor must
+  // never be borrowed from a shared parent. One card == one physical anchor.
+  try {
+    if (!anchor.matches(PLUS_RENDERED_LISTING_SELECTORS.cardAnchor)) return null
+    const expectedBlock =
+      kind === 'catalog'
+        ? PLUS_RENDERED_LISTING_SELECTORS.catalogBlock
+        : PLUS_RENDERED_LISTING_SELECTORS.offersBlock
+    if (kind !== 'catalog' && kind !== 'offers') return null
 
-  const block = anchor.closest(`[data-block="${expectedBlock}"]`)
-  if (!block) return null
+    const block = anchor.closest(`[data-block="${expectedBlock}"]`)
+    if (!block) return null
+    const anchors = block.querySelectorAll(PLUS_RENDERED_LISTING_SELECTORS.cardAnchor)
+    if (anchors.length !== 1 || anchors.item(0) !== anchor) return null
 
-  const href = anchor.getAttribute('href') ?? ''
-  const name =
-    block.querySelector(PLUS_RENDERED_LISTING_SELECTORS.name)?.textContent ?? ''
-  const pack =
-    block.querySelector(PLUS_RENDERED_LISTING_SELECTORS.pack)?.textContent ?? ''
-  const integer =
-    block.querySelector(PLUS_RENDERED_LISTING_SELECTORS.priceInteger)?.textContent ?? ''
-  const decimals =
-    block.querySelector(PLUS_RENDERED_LISTING_SELECTORS.priceDecimals)?.textContent ?? ''
-  const previous =
-    block.querySelector(PLUS_RENDERED_LISTING_SELECTORS.previousPrice)?.textContent ?? ''
+    // Some stale selectors match an outer card and an inner recommendation or
+    // price badge. Such ambiguity cannot become one authoritative product.
+    const uniqueText = (selector: string, optional = false): string | null => {
+      const matches = block.querySelectorAll(selector)
+      if (optional && matches.length === 0) return ''
+      if (matches.length !== 1) return null
+      const value = matches.item(0)?.textContent
+      return typeof value === 'string' ? value.trim() : null
+    }
+    const href = anchor.getAttribute('href')
+    const name = uniqueText(PLUS_RENDERED_LISTING_SELECTORS.name)
+    const packText = uniqueText(PLUS_RENDERED_LISTING_SELECTORS.pack)
+    const priceInteger = uniqueText(PLUS_RENDERED_LISTING_SELECTORS.priceInteger)
+    const priceDecimals = uniqueText(PLUS_RENDERED_LISTING_SELECTORS.priceDecimals)
+    const previousPriceText = uniqueText(PLUS_RENDERED_LISTING_SELECTORS.previousPrice, true)
 
-  return {
-    block: expectedBlock,
-    href: href.trim(),
-    name: name.trim(),
-    packText: pack.trim(),
-    priceInteger: integer.trim(),
-    priceDecimals: decimals.trim(),
-    previousPriceText: previous.trim(),
+    if (typeof href !== 'string' || !productIdFromHref(href) ||
+        name === null || !name || packText === null ||
+        priceInteger === null || priceDecimals === null ||
+        previousPriceText === null) return null
+
+    const card: PlusRenderedListingCard = {
+      block: expectedBlock,
+      href: href.trim(),
+      name,
+      packText,
+      priceInteger,
+      priceDecimals,
+      previousPriceText,
+    }
+    if (!normalizedPack(card) || currentPriceCents(card) === null) return null
+    if (kind === 'catalog' && previousPriceText) return null
+    if (kind === 'offers') {
+      const original = normalizeMoneyToCents(previousPriceText)
+      const current = currentPriceCents(card)
+      if (original === null || current === null || original <= current) return null
+    }
+    return card
+  } catch {
+    // Missing/malformed DOM is NOT proof that a neighbouring card is valid.
+    return null
   }
 }
