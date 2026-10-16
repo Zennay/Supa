@@ -110,3 +110,29 @@ test('impossible civil clock still fails even if app-level capture ID was change
   assert.equal(isValidPrivateCivilCaptureTime(impossible.source.capturedAt), false)
   assert.throws(() => ingestCivilClockCheckedReviewedBatch([plus, impossible]))
 })
+
+test('truly different physical capture instants with identical page bytes remain independently reviewable', async () => {
+  const originals = await fixtures()
+  // The same retailer may legitimately capture byte-identical HTML again
+  // one second later; URL and SHA do not alone prove physical duplication.
+  for (const original of [originals[0], originals[3]]) {
+    const later = renamed(original)
+    later.source.capturedAt = new Date(
+      Date.parse(original.source.capturedAt) + 1_000,
+    ).toISOString()
+    assert.equal(later.source.url, original.source.url)
+    assert.equal(later.source.sha256, original.source.sha256)
+    assert.equal(
+      Date.parse(later.source.capturedAt) - Date.parse(original.source.capturedAt),
+      1_000,
+    )
+    assertPrivate(ingestCivilClockCheckedReviewedBatch([original, later]).summary, 2)
+  }
+  const plus = originals[0]
+  const deka = originals[3]
+  const laterPlus = renamed(plus)
+  laterPlus.source.capturedAt = new Date(
+    Date.parse(plus.source.capturedAt) + 1_000,
+  ).toISOString()
+  assertPrivate(ingestCivilClockCheckedReviewedBatch([plus, deka, laterPlus]).summary, 3)
+})
