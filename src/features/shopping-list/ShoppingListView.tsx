@@ -217,6 +217,15 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
         </div>
       </div>
 
+      <div className="hifi-shoplist-store" aria-label="Winkel van de berekende voorbeeldmand" data-figma-node="4168:17199">
+        <div className="hifi-shoplist-store-mark" aria-hidden="true">S</div>
+        <div>
+          <span>Winkel voor deze planning</span>
+          <strong>{basket.store.name}</strong>
+          <small>Voorbeeldmand · geen actuele winkelprijzen</small>
+        </div>
+      </div>
+
       {basket.unresolvedLineCount > 0 && (
         <div className="attention-card">
           <strong>{basket.unresolvedLineCount} productkeuze vraagt controle</strong>
@@ -255,6 +264,12 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
         </div>
       )}
 
+      {basket.lines.length > 0 && (
+        <div className="hifi-shoplist-category" data-figma-node="3342:4838">
+          <h3>Jouw boodschappen</h3>
+          <span>{visibleLines.length} items</span>
+        </div>
+      )}
       <div className="list-card">
         {basket.lines.length === 0 ? (
           <p className="disclaimer" role="status">
