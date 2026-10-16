@@ -24,7 +24,7 @@ test('genuine unique nested JSON-LD names and escaped strings remain valid', () 
   assert.equal(parse(sample).type, 'observation')
   assert.equal(parse(sample).observation.currentPriceCents, 245)
   assert.deepEqual(parseUniqueKeyRetailerJson(
-    String.raw`{"name":"A","n\\u0061me2":"B","offers":[{"price":1},{"price":2}]}`),
+    String.raw`{"name":"A","n\u0061me2":"B","offers":[{"price":1},{"price":2}]}`),
     { name: 'A', name2: 'B', offers: [{ price: 1 }, { price: 2 }] },
   )
 })
@@ -34,7 +34,7 @@ test('duplicate price / URL in a real synthetic PLUS product script cannot retur
   const variants = [
     valid.replace('"price":"2.45"', '"price":"999.99","price":"2.45"'),
     valid.replace('"url":"' + url + '"', '"url":"https://other.invalid/product/foreign","url":"' + url + '"'),
-    valid.replace('"price":"2.45"', String.raw`"pr\\u0069ce":"999.99","price":"2.45"`),
+    valid.replace('"price":"2.45"', String.raw`"pr\u0069ce":"999.99","price":"2.45"`),
     valid.replace('"priceCurrency":"EUR"', '"priceCurrency":"USD","priceCurrency":"EUR"'),
     valid.replace('"value":500', '"value":3,"value":500'),
   ]
@@ -51,7 +51,7 @@ test('duplicate price / URL in a real synthetic PLUS product script cannot retur
 
 test('duplicate decoded object keys at ANY nesting level fail closed, even if located in an unrelated graph entry', () => {
   for (const json of [
-    String.raw`{"url":"a","\\u0075rl":"b"}`,
+    String.raw`{"url":"a","\u0075rl":"b"}`,
     '{"a":{"b":{"c":1,"c":2}}}',
     '{"items":[{"a":1},{"b":2,"b":3}]}',
     '{"@graph":[{"@type":"WebPage","name":"A","name":"B"}, {"@type":"Product"}]}',
