@@ -93,3 +93,30 @@ test('non-string caller timestamp refuses before any transport or user coercion'
   assert.equal(calls, 0)
   assert.equal(coerced, 0)
 })
+
+test('explicit null, false and zero capture clocks cannot silently become now', async () => {
+  let calls = 0
+  for (const capturedAt of [null, false, 0, '']) {
+    await assert.rejects(captureApprovedRetailerPage({
+      ...synthetic(capturedAt),
+      fetchFn: async () => { calls++; return mockResponse() },
+    }), /Invalid source capture clock/)
+  }
+  assert.equal(calls, 0)
+})
+
+test('missing capturedAt may use the actual current time but never grants publication', async () => {
+  let calls = 0
+  const input = synthetic('2026-01-01T12:00:00.000Z')
+  delete input.capturedAt
+  const before = Date.now()
+  const result = await captureApprovedRetailerPage({
+    ...input, fetchFn: async () => { calls++; return mockResponse() },
+  })
+  const after = Date.now()
+  assert.equal(calls, 1)
+  const used = Date.parse(result.source.capturedAt)
+  assert.ok(used >= before && used <= after)
+  assert.equal(result.published, false)
+  assert.equal(result.readyForIngestion, false)
+})
