@@ -14,7 +14,10 @@ The CLI returns **aggregate counters only**: six archived sources, count of hist
 
 Pipeline: `readBoundedRegularReviewedFixture` (six allowlisted files) → `buildCivilClockCheckedPrivateCatalog` (strict inert snapshot, UTC−12/+14 civil bound, nanosecond physical duplicate, source URL, six-adapter atomic admission) → `buildDynamicReviewedWeek` (canonical M2 user-selected real recipe days and exact aggregated ingredient quantities) → **historical-only two-store review queue**.
 
-The new exported `buildCivilClockCheckedPrivatePlannedWeek(records, days)` is opt-in, not a replacement for current ingestion. For any invalid physical source, impossible civil clock, duplicate capture, bad day selection, failed adapter or malformed returned queue it **throws without producing any partial result**. Tests assert atomic refusal, copied source immutability, recipe-demand recomputation and redaction.
+The exported private API also accepts an **optional third argument** `{ plan, recipes }` for a bounded, real local user plan. Both inputs are copied through the inert JSON boundary (no Proxy/getter/prototype execution), and duplicate days, missing recipes, invalid demand and extra option keys fail closed. Valid Dutch weekdays `Ma`–`Zo` can be selected when the custom plan genuinely contains meals for them. For example, adding a Friday Tikka recipe to Monday and Thursday aggregates the three chicken demands to **900 g**, rather than recycling a fixed 11-line sample. The fixture-only CLI deliberately stays restricted to days with existing M2 example meals; it does **not** accept arbitrary external recipe files.
+
+The safe result holds a `privateReview` object for an explicitly authorized local UI/worker consumer and a redacted `summary` (including `selectedPlanSource`); only the summary is printed by the CLI. The private review is not licensed data and may not be published as a current retailer quote.
+The new exported `buildCivilClockCheckedPrivatePlannedWeek(records, days, options?)` is opt-in, not a replacement for current ingestion. For any invalid physical source, impossible civil clock, duplicate capture, bad day selection, failed adapter or malformed returned queue it **throws without producing any partial result**. Tests assert atomic refusal, copied source immutability, recipe-demand recomputation and redaction.
 
 ## Limits / activation
 
