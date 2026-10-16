@@ -26,7 +26,7 @@ async function ingested(records) {
     const adapter = {
       id: 'qa-fixture', name: 'Offline QA', host: 'example.test',
       status: 'active', mode: 'http',
-      async *discover() { yield { kind: 'product', url: 'https://example.test/inert' } },
+      async *discover() { yield { kind: 'catalog', url: 'https://example.test/inert' } },
       parse() { return records },
     }
     const summary = await runRetailer(adapter, {
