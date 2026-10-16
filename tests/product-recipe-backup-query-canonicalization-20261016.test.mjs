@@ -33,6 +33,8 @@ for (const [label, key] of [
   ['bad percent escape', '%ZZ'],
   ['raw incomplete escape', '%'],
   ['fullwidth Unicode code name', 'ｃｏｄｅ'],
+  ['unencoded SAML response', 'SAMLResponse'],
+  ['one encoded SAMLResponse letter', 'S%2541MLResponse'],
   ['API key separator spelling', 'api_key'],
   ['code verifier alias', 'code_verifier'],
   ['PKCE verifier alias', 'pkce-verifier'],
