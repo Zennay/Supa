@@ -25,7 +25,7 @@ async function verifyNewFileTarget(path) {
   // Fail with the fixed domain refusal *before* any resolve/lstat or I/O.
   if (typeof path !== 'string' || !path.trim() || path.startsWith('-') ||
       path.length > 4096 ||
-      /[\\u0000-\\u001f\\u007f]/u.test(path)) refuse()
+      /[\u0000-\u001f\u007f]/u.test(path)) refuse()
   const target = resolve(path)
   let parent = target
   while (true) {
