@@ -64,6 +64,16 @@ docs/             architecture, proof-gate and research notes
 evidence/         durable reviewed evidence only
 ```
 
+## Supermarket scrapers
+
+`scraper/` contains one polite scraper engine with an adapter per Dutch supermarket (PLUS, Dirk, DekaMarkt, SPAR, Hoogvliet, ALDI, Lidl, Poiesz, Vomar; AH/Jumbo/Jan Linders are bot-blocked) that writes products, prices, promotions and EANs to SQLite and matches identical products across retailers. See [scraper/README.md](scraper/README.md).
+
+```bash
+npm run scrape -- --retailer dirk --limit 100
+npm run scrape:stats
+npm run scrape:compare -- pindakaas
+```
+
 ## Product flow
 
 Preferences → weekly planner → smart reuse/combinations → complete basket → shopping list → compare/choose.

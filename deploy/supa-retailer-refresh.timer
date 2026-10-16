@@ -1,0 +1,11 @@
+[Unit]
+Description=SUPA reviewed retailer daily refresh at 04:15 Amsterdam
+
+[Timer]
+OnCalendar=*-*-* 04:15:00 Europe/Amsterdam
+Persistent=true
+RandomizedDelaySec=5m
+Unit=supa-retailer-refresh.service
+
+[Install]
+WantedBy=timers.target

@@ -13,3 +13,6 @@ vite.config.d.ts
 
 # Generated local/CI output. Canonical field evidence under evidence/ remains versioned.
 artifacts/
+
+# Python bytecode from scripts/*.py run by tests
+__pycache__/

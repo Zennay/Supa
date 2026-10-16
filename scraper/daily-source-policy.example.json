@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "description": "Example only. Nothing is legally approved or enabled by this file.",
+  "sources": [
+    {
+      "id": "plus",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "dekamarkt",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "dirk",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "spar",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "hoogvliet",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "aldi",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "lidl",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "poiesz",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "vomar",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "ah",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "jumbo",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    },
+    {
+      "id": "janlinders",
+      "enabled": false,
+      "publicationApproved": false,
+      "basis": null,
+      "reviewedAt": null,
+      "evidenceUrl": null,
+      "scope": "public-product-prices",
+      "scopeNote": "Review the actual source conditions and applicable rights before enabling this source."
+    }
+  ]
+}
