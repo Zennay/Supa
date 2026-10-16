@@ -68,9 +68,19 @@ function uniqueKnown<T>(values: T[]): T | null {
 // property in one object. All explicit declarations are evidence; dropping a
 // differently cased sibling can turn a contradictory retail claim into a price.
 function caseClaims(node: JsonObject, key: string): unknown[] {
-  return Object.keys(node)
-    .filter((candidate) => candidate.toLowerCase() === key.toLowerCase())
-    .map((candidate) => node[candidate])
+  return Reflect.ownKeys(node)
+    .filter((candidate): candidate is string =>
+      typeof candidate === 'string' &&
+      candidate.toLowerCase() === key.toLowerCase())
+    .map((candidate) => {
+      const descriptor = Object.getOwnPropertyDescriptor(node, candidate)
+      // Non-enumerable accessor claims must not silently disappear. Refuse
+      // unreadable evidence without invoking a getter or reflecting its value.
+      if (!descriptor || !('value' in descriptor)) {
+        throw new Error('unsafe Schema.org evidence property')
+      }
+      return descriptor.value
+    })
 }
 
 function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
@@ -100,7 +110,17 @@ function extractPrice(offers: JsonObject[]): number | null {
   if (offers.some(invalidExplicitPriceClaim)) return null
   const prices = offers
     .flatMap((offer) => [offer, ...priceSpecificationCandidates(offer)])
-    .flatMap((node) => [...caseClaims(node, 'price'), ...caseClaims(node, 'lowPrice')])
+    .flatMap((node) => {
+      const explicit = [...caseClaims(node, 'price'), ...caseClaims(node, 'lowPrice')]
+      // Uppercase-only Deka SSR Price is not enough to certify a
+      // physical pack. Preserve the strict Deka/Nuxt corroboration fallback.
+      const canonical = ['price', 'lowPrice'].some((key) => {
+        const entry = Object.getOwnPropertyDescriptor(node, key)
+        return entry && 'value' in entry &&
+          entry.value !== undefined && entry.value !== null && entry.value !== ''
+      })
+      return canonical ? explicit : []
+    })
     .map(cents)
     .filter((value): value is number => value !== null)
   return uniqueKnown(prices)
