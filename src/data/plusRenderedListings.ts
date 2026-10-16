@@ -164,6 +164,9 @@ function validHttpsPlusUrl(
     // tracking fragment, credential-bearing query or noncanonical spelling
     // was never part of its reviewed provenance.
     return (
+      // URL.search/hash are empty for a raw trailing '?' or '#'. Those bytes
+      // were never part of the reviewed source snapshot, so refuse them.
+      !/[?#]/.test(value) &&
       url.search === '' && url.hash === '' &&
       // WHATWG URL deliberately canonicalizes the explicit default :443
       // port away. Keep that historical valid HTTPS form, but still refuse
