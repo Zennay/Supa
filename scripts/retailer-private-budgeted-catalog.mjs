@@ -117,6 +117,26 @@ export function snapshotBoundedPrivateCatalogInput(root) {
  */
 export function buildBudgetedPrivateRetailerCatalog(batch) {
   const pinned = snapshotBoundedPrivateCatalogInput(batch)
+
+  // Composition safety until the separately owned direct universal catalog
+  // URL-query fix (#3209 / #3210) is integrated. URLSearchParams decodes
+  // %-escaped names but its .has('access_token') is case-sensitive: refuse
+  // every ASCII-case spelling of a credential marker before passing the
+  // immutable historical captures to the canonical catalog. Never log URLs.
+  if (Array.isArray(pinned?.results)) {
+    for (const result of pinned.results) {
+      if (!Array.isArray(result?.observations)) continue
+      for (const observation of result.observations) {
+        const sourceUrl = observation?.provenance?.url
+        if (typeof sourceUrl !== 'string') continue
+        let source
+        try { source = new URL(sourceUrl) } catch { fail() }
+        for (const name of source.searchParams.keys()) {
+          if (name.toLowerCase() === 'access_token') fail()
+        }
+      }
+    }
+  }
   const catalog = buildUniversalRetailerCatalog(pinned)
   if (catalog.status !== 'private-review-only' ||
       catalog.productionEnabled !== false ||
