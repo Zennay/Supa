@@ -115,3 +115,12 @@ test('invalid number, overlong strings and a top-level primitive fail without re
   assert.throws(() => snapshotInertReviewedEvidence({ key: 'x'.repeat(1_048_577) }), /inert JSON/)
   assert.throws(() => ingestReviewedEvidence('https://www.plus.nl/'), /structured source record/)
 })
+
+test('a batch cannot amortize many individually valid strings into an unbounded UTF-8 payload', () => {
+  // One shared input string keeps the test cheap while exercising aggregate accounting.
+  const oneMegabyte = 'a'.repeat(1_000_000)
+  const oversized = Array.from({ length: 34 }, () => oneMegabyte)
+  assert.throws(() => snapshotInertReviewedEvidence(oversized), /inert JSON/)
+  const acceptable = Array.from({ length: 2 }, () => 'gewone boodschappen')
+  assert.deepEqual(snapshotInertReviewedEvidence(acceptable), acceptable)
+})
