@@ -136,10 +136,23 @@ export class PoliteFetcher {
   async schedule(host, task) {
     const state = this.hostState(host)
     const run = state.chain.then(async () => {
+      // A queued task can outlive an earlier 401/403 response that blocks
+      // this retailer. Re-check the circuit after the host queue *and* any
+      // politeness sleep, immediately before entering the HTTP transport.
+      if (state.blocked) throw new HostBlockedError(host, state.blocked)
       const wait = state.nextAt - this.now()
       if (wait > 0) await this.sleep(wait)
+      if (state.blocked) throw new HostBlockedError(host, state.blocked)
       try {
         return await task()
+      } catch (error) {
+        // Trip the host circuit *inside* the serial scheduler. If deferred to
+        // request()'s outer catch, a queued task can enter the HTTP transport
+        // between this rejected task settling and the 401/403 block update.
+        if (error instanceof HttpStatusError && (error.status === 401 || error.status === 403)) {
+          state.blocked = `HTTP ${error.status}`
+        }
+        throw error
       } finally {
         const crawlDelay = state.robots
           ? crawlDelaySeconds(state.robots, this.userAgent)
