@@ -9,6 +9,9 @@ import { walkSitemap } from '../lib/sitemap.mjs'
 import { makeRecord, normalizeAvailability, toCents } from '../lib/normalize.mjs'
 import { schemaOrgPrices } from './schemaorg.mjs'
 
+// Compare canonical paths without depending on a regex containing '/'.
+const stripArticleSlash = path => path.endsWith('/') ? path.slice(0, -1) : path
+
 function offerLabel(offer) {
   if (!offer || typeof offer !== 'object') return null
   const raw =
@@ -92,8 +95,8 @@ export function parseDetailresultProduct(html, url, { retailer, fileBase }) {
         declared.hostname !== source.hostname ||
         declared.port !== source.port || declared.username ||
         declared.password || declared.search || declared.hash ||
-        declared.pathname.replace(/\\/$/, '') !==
-          source.pathname.replace(/\\/$/, '')) return []
+        stripArticleSlash(declared.pathname) !==
+          stripArticleSlash(source.pathname)) return []
   }
   const offers = Array.isArray(ld.offers) ? ld.offers[0] : ld.offers
   // The Nuxt-first fallback must not bypass the same EUR-only contract as
