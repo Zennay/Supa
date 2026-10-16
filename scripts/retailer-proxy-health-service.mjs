@@ -71,12 +71,24 @@ export async function boundedCandidateDownload(fetchFn = fetch) {
 // A real HTTP CONNECT followed by certificate-verified HTTPS, with a nonce echoed
 // by the operator's own endpoint. No third-party site, auth, cookies or redirects.
 export async function probeViaOwnedHttps(candidate, endpoint, { timeoutMs = 5000 } = {}) {
+  // This is a separately exported entrypoint: never trust an endpoint just
+  // because runCycle() usually validates it. Re-run the ownership preflight
+  // BEFORE touching candidates or invoking any HTTP CONNECT side effects.
+  // Calling URL's native method rejects spoofed URL-shaped plain objects.
+  let ownedEndpoint
+  try {
+    const raw = URL.prototype.toString.call(endpoint)
+    const parsedOwned = new URL(raw)
+    ownedEndpoint = validatedOwnedEndpoint(raw, parsedOwned.hostname)
+  } catch {
+    throw new Error('Owned endpoint must be exact public HTTPS hostname, port 443, no query or credentials')
+  }
   if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 10_000 ||
       parseProxyCandidates(candidate.replace(/^http:\/\//, '')).length !== 1 ||
       !candidate.startsWith('http://')) return { ok: false, ownedEndpoint: false }
   const parsed = new URL(candidate)
   const nonce = randomBytes(16).toString('hex')
-  const requestPath = endpoint.pathname + (endpoint.pathname.includes('?') ? '&' : '?') + 'supa_probe=' + nonce
+  const requestPath = ownedEndpoint.pathname + '?supa_probe=' + nonce
   const expected = Buffer.from('supa-proxy-ok:' + nonce, 'ascii')
   const started = performance.now()
   return await new Promise((resolve) => {
@@ -96,17 +108,17 @@ export async function probeViaOwnedHttps(candidate, endpoint, { timeoutMs = 5000
     }
     req = http.request({
       hostname: parsed.hostname, port: Number(parsed.port), method: 'CONNECT',
-      path: endpoint.hostname + ':443', agent: false,
-      headers: { host: endpoint.hostname + ':443' },
+      path: ownedEndpoint.hostname + ':443', agent: false,
+      headers: { host: ownedEndpoint.hostname + ':443' },
     })
     req.on('error', () => finish(false))
     req.on('response', () => finish(false))
     req.on('connect', (response, connectedSocket, head) => {
       socket = connectedSocket
       if (response.statusCode !== 200 || head.length) return finish(false)
-      secure = tls.connect({ socket, servername: endpoint.hostname, rejectUnauthorized: true }, () => {
+      secure = tls.connect({ socket, servername: ownedEndpoint.hostname, rejectUnauthorized: true }, () => {
         secure.write('GET ' + requestPath + ' HTTP/1.1\r\n' +
-          'Host: ' + endpoint.hostname + '\r\nAccept: text/plain\r\nConnection: close\r\n\r\n')
+          'Host: ' + ownedEndpoint.hostname + '\r\nAccept: text/plain\r\nConnection: close\r\n\r\n')
       })
       let raw = Buffer.alloc(0)
       secure.on('data', (chunk) => {
