@@ -10,6 +10,18 @@ import { planDailyRefresh } from './daily-refresh.mjs'
 import { findFreshProducts } from './retailer-search-api.mjs'
 
 const fail = () => { throw new Error('Private matched retailer comparison refused') }
+// Persisted product_matches may have been built before pack-safe matching.
+ // A canonical ID alone is not a trustworthy whole-pack price equivalence.
+const physicalPackKey = ({pack_amount, pack_unit, pack_count, pack_text}) => {
+  if (typeof pack_amount !== 'number' || !Number.isFinite(pack_amount) ||
+      pack_amount <= 0 || !['g', 'ml', 'piece'].includes(pack_unit) ||
+      !Number.isSafeInteger(pack_count) || pack_count <= 0 ||
+      typeof pack_text !== 'string' || !pack_text.trim() ||
+      /\\d\\s*[-–]\\s*\\d/.test(pack_text)) return null
+  const total = pack_amount * pack_count
+  if (!Number.isFinite(total) || total <= 0) return null
+  return JSON.stringify([pack_unit, pack_count, total])
+}
 const money = cents => '€' + (cents / 100).toFixed(2)
 const printable = value => String(value).replace(
   /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' '
@@ -86,20 +98,31 @@ export async function compareApprovedLocalCatalog(options = {}) {
     // timestamp, available stock and a physically ACTIVE offer price.
     const fresh = findFreshProducts(database, approved, query, now)
     const idStmt = database.prepare(
-      'SELECT m.canonical_id FROM product_matches m ' +
+      'SELECT m.canonical_id, p.pack_amount, p.pack_unit, ' +
+      'p.pack_count, p.pack_text FROM product_matches m ' +
       'JOIN products p ON p.id = m.product_id ' +
       'WHERE p.retailer_id=? AND p.url=? LIMIT 2')
     groups = new Map()
+    const invalidGroups = new Set()
     for (const row of fresh) {
       const matches = idStmt.all(row.supermarket, row.sourceUrl)
       // Do not guess when the same URL has contradictory SKU/match mappings.
       if (matches.length !== 1 ||
           !Number.isSafeInteger(matches[0].canonical_id)) continue
       const key = matches[0].canonical_id
+      const packKey = physicalPackKey(matches[0])
+      if (!packKey) { invalidGroups.add(key); continue }
       if (!groups.has(key)) groups.set(key, [])
       const rows = groups.get(key)
-      if (!rows.some(previous => previous.supermarket === row.supermarket)) {
-        rows.push({
+      // One retailer having several physical rows under one canonical ID is
+      // ambiguous even if the first candidate happens to match the other
+      // retailer. Refuse the *entire group* rather than picking arbitrarily.
+      if (rows.some(previous => previous.supermarket === row.supermarket)) {
+        invalidGroups.add(key)
+        continue
+      }
+      rows.push({
+          packKey,
           supermarket: row.supermarket,
           name: printable(row.name),
           priceCents: row.priceCents,
@@ -107,7 +130,12 @@ export async function compareApprovedLocalCatalog(options = {}) {
           offer: row.offer,
           observedAt: row.observedAt,
         })
-      }
+    }
+    // Keep the group rejection marker inside the successful read phase;
+    // later rendering must never re-admit stale canonical links.
+    for (const [key, rows] of groups) {
+      if (rows.some(row => row.packKey !== rows[0].packKey)) invalidGroups.add(key)
+      if (invalidGroups.has(key)) groups.delete(key)
     }
   } catch {
     fail()
