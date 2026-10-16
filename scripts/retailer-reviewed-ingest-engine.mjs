@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
+import { types as nodeTypes } from 'node:util'
 
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
 import { parsePlusRenderedProductEvidence } from '../src/data/plusRenderedProduct.ts'
@@ -36,15 +37,88 @@ export const RETAILER_REVIEWED_FIXTURES = Object.freeze([
   'dekamarkt-offers.v1.json',
 ])
 
+// The same reviewed engine is also a programmatic input boundary. An
+// externally supplied JS record is NOT necessarily parsed JSON: never run
+// getters/Proxy traps, accept inherited fields, or re-read a mutable caller
+// after validating its retailer/capture identity.
+const MAX_SOURCE_RECORD_DEPTH = 32
+const MAX_SOURCE_RECORD_NODES = 50000
+const MAX_SOURCE_RECORD_KEYS = 4096
+const MAX_SOURCE_ARRAY_LENGTH = 16384
+const untrusted = () => { throw new Error('Untrusted reviewed source object') }
+
+function pinInertJson(value, budget, depth = 0) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'object' || nodeTypes.isProxy(value) ||
+      depth >= MAX_SOURCE_RECORD_DEPTH || ++budget.nodes > MAX_SOURCE_RECORD_NODES) untrusted()
+  const proto = Object.getPrototypeOf(value)
+  if (Array.isArray(value)) {
+    if (proto !== Array.prototype) untrusted()
+    const descriptors = Object.getOwnPropertyDescriptors(value)
+    const length = descriptors.length?.value
+    if (!Number.isSafeInteger(length) || length > MAX_SOURCE_ARRAY_LENGTH ||
+        Reflect.ownKeys(descriptors).length !== length + 1) untrusted()
+    const result = []
+    for (let index = 0; index < length; index++) {
+      const descriptor = descriptors[index]
+      if (!descriptor || !Object.hasOwn(descriptor, 'value') ||
+          !descriptor.enumerable) untrusted()
+      result.push(pinInertJson(descriptor.value, budget, depth + 1))
+    }
+    return Object.freeze(result)
+  }
+  if (proto !== Object.prototype && proto !== null) untrusted()
+  const descriptors = Object.getOwnPropertyDescriptors(value)
+  const keys = Reflect.ownKeys(descriptors)
+  if (keys.length > MAX_SOURCE_RECORD_KEYS) untrusted()
+  const result = {}
+  for (const key of keys) {
+    if (typeof key !== 'string' || !Object.hasOwn(descriptors[key], 'value') ||
+        !descriptors[key].enumerable) untrusted()
+    Object.defineProperty(result, key, {
+      value: pinInertJson(descriptors[key].value, budget, depth + 1),
+      enumerable: true,
+    })
+  }
+  return Object.freeze(result)
+}
+
+function pinBatchEntries(records) {
+  if (nodeTypes.isProxy(records) || !Array.isArray(records) ||
+      Object.getPrototypeOf(records) !== Array.prototype) {
+    throw new Error('Reviewed batch requires 1–32 source records')
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(records)
+  const length = descriptors.length?.value
+  if (!Number.isSafeInteger(length) || length < 1 || length > 32 ||
+      Reflect.ownKeys(descriptors).length !== length + 1) {
+    throw new Error('Reviewed batch requires 1–32 source records')
+  }
+  const entries = []
+  for (let index = 0; index < length; index++) {
+    const descriptor = descriptors[index]
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') ||
+        !descriptor.enumerable) untrusted()
+    entries.push(descriptor.value)
+  }
+  return entries
+}
+
 function boundedRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function validatedInput(record) {
+function validatedInput(input) {
+  const record = pinInertJson(input, { nodes: 0 })
   if (!boundedRecord(record) || !boundedRecord(record.source)) {
     throw new Error('Reviewed ingestion requires a structured source record')
   }
-  const key = String(record.source.supermarket) + ':' + String(record.source.kind)
+  if (typeof record.source.supermarket !== 'string' ||
+      typeof record.source.kind !== 'string') {
+    throw new Error('Unapproved retailer or capture shape')
+  }
+  const key = record.source.supermarket + ':' + record.source.kind
   const adapter = Object.hasOwn(ADAPTERS, key) ? ADAPTERS[key] : null
   if (!adapter || record.evidenceType !== adapter[0] || record.version !== 1) {
     throw new Error('Unapproved retailer or capture shape')
@@ -55,7 +129,7 @@ function validatedInput(record) {
   ) {
     throw new Error('Unsafe source identity')
   }
-  return { key, parser: adapter[1] }
+  return { key, parser: adapter[1], record }
 }
 
 function provenanceMatches(source, observation) {
@@ -67,8 +141,7 @@ function provenanceMatches(source, observation) {
     actual.sha256 === source.sha256
 }
 
-export function ingestReviewedEvidence(record) {
-  const { key, parser } = validatedInput(record)
+function ingestPinnedEvidence({ key, parser, record }) {
   let parsed
   try {
     parsed = parser(record)
@@ -105,20 +178,22 @@ export function ingestReviewedEvidence(record) {
   return { key, accepted: true, reason: null, observations }
 }
 
+export function ingestReviewedEvidence(record) {
+  return ingestPinnedEvidence(validatedInput(record))
+}
+
 export function ingestReviewedBatch(records) {
-  if (!Array.isArray(records) || records.length === 0 || records.length > 32) {
-    throw new Error('Reviewed batch requires 1–32 source records')
-  }
+  const entries = pinBatchEntries(records)
   const unique = new Set()
   const results = []
-  for (const record of records) {
-    const { key } = validatedInput(record)
-    const identifier = key + ':' + record.source.id
+  for (const input of entries) {
+    const context = validatedInput(input)
+    const identifier = context.key + ':' + context.record.source.id
     if (unique.has(identifier)) {
       throw new Error('Duplicate reviewed capture identity')
     }
     unique.add(identifier)
-    results.push(ingestReviewedEvidence(record))
+    results.push(ingestPinnedEvidence(context))
   }
   const accepted = results.filter(result => result.accepted)
   const summary = {
