@@ -272,3 +272,25 @@ test('operator accepts real Gregorian leap day without implying recent live-pric
   assert.match(brief, /live-ingestie en publieke prijzen blijven UIT/)
   assert.doesNotMatch(brief, /2024-02-29|prijs: €|https?:/)
 })
+
+test('exported zero-argument operator refuses active and revoked Proxy argv inertly', async () => {
+  let trapped = 0
+  const caller = new Proxy([], {
+    get() { trapped++; throw new Error('caller get trap must not execute') },
+    getOwnPropertyDescriptor() { trapped++; throw new Error('caller descriptor trap') },
+  })
+  await assert.rejects(main(caller, () => {}), /startcontrole geweigerd/)
+  assert.equal(trapped, 0)
+  const revoked = Proxy.revocable([], {})
+  revoked.revoke()
+  await assert.rejects(main(revoked.proxy, () => {}), error =>
+    !(error instanceof TypeError) && /startcontrole geweigerd/.test(String(error)))
+  const spoofed = new Proxy(['--not-empty'], {
+    get(target, key) { trapped++; return key === 'length' ? 0 : target[key] },
+  })
+  await assert.rejects(main(spoofed, () => {}), /startcontrole geweigerd/)
+  assert.equal(trapped, 0)
+  await assert.rejects(main(['--unexpected'], () => {}), /startcontrole geweigerd/)
+  const report = await main([], () => {})
+  assert.match(report, /ALLEEN HISTORISCHE BRONNEN/)
+})
