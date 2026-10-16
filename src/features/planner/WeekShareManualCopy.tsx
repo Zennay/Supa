@@ -53,9 +53,6 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
         <button type="button" className="ghost-button" onClick={selectText}>
           Selecteer alle tekst
         </button>
-        <button type="button" className="ghost-button" onClick={saveWeekMenu}>
-          Bewaar als tekstbestand
-        </button>
       </div>
       <textarea
         ref={textareaRef}
@@ -65,6 +62,9 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
         value={text}
         onFocus={(event) => event.currentTarget.select()}
       />
+      <button type="button" className="ghost-button" onClick={saveWeekMenu}>
+        Bewaar als tekstbestand
+      </button>
       {saveFeedback?.sourceText === text && (
         <p role="status" aria-live="polite" className="disclaimer">{saveFeedback.message}</p>
       )}
