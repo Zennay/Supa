@@ -8,6 +8,7 @@ import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { adapters } from './adapters/index.mjs'
 import { planDailyRefresh } from './daily-refresh.mjs'
+import { renderRetailerSearchHtml } from './retailer-search-html.mjs'
 
 const MAX_AGE_MS = 24 * 3600_000
 const expectedHosts = Object.fromEntries(adapters.map(a => [a.id, a.host]))
@@ -99,6 +100,21 @@ export function startRetailerSearchServer({dbPath,policyPath,sourceGatePath='evi
   if(!dbPath||!policyPath||host!=='127.0.0.1'||!Number.isSafeInteger(port)||
     port<1024||port>65535)throw Error('Safe local retailer API configuration required')
   return createServer(async(req,res)=>{
+    if (req.method==='GET' && typeof req.url==='string' &&
+        new URL(req.url,'http://localhost').pathname==='/retailer-zoeken') {
+      const route=new URL(req.url,'http://localhost')
+      const raw=route.searchParams.get('q')??''
+      const q=queryText(raw)
+      const data=q ? await handleRetailerSearch('/api/retailer-products?q='+
+        encodeURIComponent(q),{dbPath,policyPath,sourceGatePath}) :
+        {status:200,body:{results:[]}}
+      res.writeHead(200,{'content-type':'text/html; charset=utf-8',
+        'cache-control':'no-store','x-content-type-options':'nosniff',
+        'x-frame-options':'SAMEORIGIN',
+        'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'"})
+      res.end(renderRetailerSearchHtml(raw,data.body))
+      return
+    }
     const result=req.method==='GET'&&typeof req.url==='string'
       ?await handleRetailerSearch(req.url,{dbPath,policyPath,sourceGatePath})
       :{status:405,body:{error:'method-not-allowed'}}
