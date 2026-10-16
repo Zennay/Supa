@@ -65,6 +65,11 @@ export class PoliteFetcher {
     this.stats = { requests: 0, bytes: 0, errors: 0 }
   }
 
+  // Per-host override of the politeness delay (never below the robots.txt Crawl-delay).
+  setHostDelay(host, ms) {
+    this.hostState(host).minDelayMs = ms
+  }
+
   hostState(host) {
     let state = this.hosts.get(host)
     if (!state) {
@@ -124,7 +129,7 @@ export class PoliteFetcher {
         const crawlDelay = state.robots
           ? crawlDelaySeconds(state.robots, this.userAgent)
           : null
-        const delay = Math.max(this.minDelayMs, (crawlDelay ?? 0) * 1000)
+        const delay = Math.max(state.minDelayMs ?? this.minDelayMs, (crawlDelay ?? 0) * 1000)
         state.nextAt = this.now() + delay
       }
     })

@@ -19,7 +19,7 @@ De database staat standaard in `artifacts/scraper/supa-products.sqlite` (niet in
 
 | Keten | Bron in de pagina | Ontdekking | EAN | Status |
 |---|---|---|---|---|
-| PLUS | JSON-LD na rendering (OutSystems-SPA, headless Chromium) | productsitemap (~17.400) | ja | actief, traag (~7 s per pagina, 3 tabs) |
+| PLUS | JSON-screenservices van de site zelf (details + actie), geen browser | productsitemap (~17.400) | ja | actief, ~0,5 s per product (4 verzoeken/s) |
 | Dirk | Nuxt 3-payload `data["product-<id>"]` (+ JSON-LD) | productsitemap (~7.400) | nee | actief |
 | DekaMarkt | zelfde Detailresult-platform, `product-information-<id>` | productsitemap (~9.900, URL herschreven naar `/producten/…`) | nee | actief |
 | SPAR | JSON-LD (`gtin13`, prijs) + `.c-offer__subtitle` voor inhoud | productsitemap (~8.800) | ja | actief |
@@ -41,7 +41,8 @@ AH, Jumbo en Jan Linders hebben een generieke JSON-LD-adapter: vanaf een netwerk
 adapter.discover()  sitemap / categorieboom → URL's
 PoliteFetcher       robots.txt + Crawl-delay, 1 verzoek/s per host, eerlijke User-Agent,
                     retry met backoff op 5xx, stopt definitief op 401/403/herhaalde 429
-(BrowserRenderer)   alleen PLUS: headless Chromium, geen afbeeldingen/fonts/third-party
+(adapter.fetch)     PLUS: twee anonieme JSON-calls per product (versietokens automatisch
+                    uit het OutSystems-manifest); BrowserRenderer blijft als fallback
 adapter.parse()     gestructureerde data uit JSON-LD / __NEXT_DATA__ / __NUXT_DATA__ /
                     Nuxt 2-IIFE (geparsed, nooit uitgevoerd) → genormaliseerd record
 ScrapeStore         SQLite: products + prices (historie, alleen nieuwe rij bij wijziging)
@@ -83,7 +84,7 @@ Fixture verversen: `npm run scrape -- --retailer spar --limit 3 --save-html /tmp
 
 ## Periodiek draaien
 
-Een volledige run kost bij 1 verzoek/s per host enkele uren per keten (parallel over ketens). PLUS duurt het langst (headless rendering). Voorbeeld voor een dagelijkse run op een server:
+Een volledige run kost bij 1 verzoek/s per host enkele uren per keten (parallel over ketens). PLUS doet ~2 producten/s (eigen tempo van 4 verzoeken/s), een volledige run ≈ 2,5 uur. Voorbeeld voor een dagelijkse run op een server:
 
 ```cron
 15 4 * * *  cd /srv/supa && npm run scrape -- --skip-fresh 20 >> artifacts/scraper/cron.log 2>&1

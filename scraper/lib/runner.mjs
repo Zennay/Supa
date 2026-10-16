@@ -34,7 +34,11 @@ export async function runRetailer(adapter, {
     )) fresh.add(row.url)
   }
 
+  if (adapter.minDelayMs && fetcher.setHostDelay) fetcher.setHostDelay(adapter.host, adapter.minDelayMs)
+
   const fetchPage = async (url) => {
+    // Adapters with their own transport (e.g. a JSON API) return { url, text }.
+    if (adapter.fetch) return adapter.fetch(url, { fetcher, log })
     if (adapter.mode === 'browser') {
       if (!renderer) throw new Error(`${adapter.id} needs a browser renderer`)
       return renderer.render(url, { readyCheck: adapter.readyCheck })

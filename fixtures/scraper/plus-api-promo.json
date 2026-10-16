@@ -1,0 +1,77 @@
+{
+ "sku": "100028",
+ "details": {
+  "ProductOut": {
+   "Overview": {
+    "Name": "Bokma Graanjenever",
+    "Subtitle": "Per Fles 1000 ml",
+    "Brand": "Bokma",
+    "Slug": "bokma-graanjenever-fles-1000-ml-100028",
+    "Image": {
+     "Label": "Bokma Graanjenever 1000 Milliliter",
+     "URL": "https://images.ctfassets.net/s0lodsnpsezb/100028_M/04acb1e50ae0035eba6dbd181a4a9054/100028.png"
+    },
+    "Meta": {
+     "Description": "Bestel Bokma Graanjenever 1000 Milliliter online op plus.nl. Laat je boodschappen makkelijk en snel thuis bezorgen of haal het op bij jouw PLUS.",
+     "Title": "Bokma Graanjenever 1000 Milliliter - PLUS"
+    },
+    "IsNIX18": true,
+    "Price": "17.49",
+    "BaseUnitPrice": "17.49",
+    "LineItem": {
+     "Id": "0",
+     "Quantity": 0
+    },
+    "IsOfflineSaleOnly": true,
+    "IsServiceItem": false,
+    "IsAvailableInStore": true,
+    "MaxOrderLimit": 199,
+    "IsNoIndex": false,
+    "IsLocalItem": false
+   },
+   "Categories": {
+    "List": [
+     {
+      "Name": "Wijn, bier, sterke drank"
+     },
+     {
+      "Name": "Sterke dranken"
+     },
+     {
+      "Name": "Jenever"
+     }
+    ]
+   },
+   "Medicine": {
+    "EAN": "8716000014313"
+   }
+  },
+  "ReferenceQuantity": {
+   "Product_Symbol": "ml",
+   "Unit_BaseUnit": "liter",
+   "Product_Size": "1000",
+   "Unit_PricePer": "17.49"
+  }
+ },
+ "promo": {
+  "Offer": {
+   "PromotionId": "4486",
+   "OfferId": "8",
+   "StartDate": "2026-10-07",
+   "EndDate": "2026-10-20",
+   "IsFreeDeliveryOffer": false,
+   "DisplayInfo_Label": "4.00 KORTING",
+   "DisplayInfo_PromotionBasedLabel": "",
+   "IsSingleProduct": false,
+   "PriceOriginal_Product": "17.49",
+   "NewPrice": "13.49",
+   "Title": "Bokma en Floryn Jenever En Parade Vieux",
+   "Example": "Bijv. Bokma Graanjenever, fles 1 liter van 17.49 voor 13.49.",
+   "Explanation": "",
+   "Variant": "Fles 1 liter",
+   "Package": "Per fles",
+   "LoyaltyInfoID": 0
+  },
+  "StampURL": ""
+ }
+}

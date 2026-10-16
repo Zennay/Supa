@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { gunzipSync } from 'node:zlib'
 import { getAdapter } from '../scraper/adapters/index.mjs'
+import { fetchPlusProduct, parsePlusApiVersions } from '../scraper/adapters/plus.mjs'
 import { poieszCategoryUrls, poieszPaging } from '../scraper/adapters/poiesz.mjs'
 import { vomarLinks } from '../scraper/adapters/vomar.mjs'
 
@@ -100,6 +101,56 @@ test('plus: rendered JSON-LD with strikethrough price, promo label and window', 
   assert.equal(r.promoLabel, '4.00 KORTING')
   assert.equal(r.promoValidFrom, '2026-10-07')
   assert.equal(r.promoValidUntil, '2026-10-20')
+})
+
+test('plus: JSON screen-service response (details + promotion) incl. EAN', () => {
+  const text = readFileSync(new URL('../fixtures/scraper/plus-api-promo.json', import.meta.url), 'utf8')
+  const [r] = getAdapter('plus').parse(text, 'https://www.plus.nl/product/bokma-graanjenever-fles-1000-ml-100028')
+  assert.equal(r.sourceId, '100028')
+  assert.equal(r.name, 'Bokma Graanjenever')
+  assert.equal(r.gtin, '8716000014313')
+  assert.equal(r.category, 'Wijn, bier, sterke drank > Sterke dranken > Jenever')
+  assert.deepEqual([r.packAmount, r.packUnit, r.packCount], [1000, 'ml', 1])
+  assert.equal(r.priceCents, 1749)
+  assert.equal(r.promoPriceCents, 1349)
+  assert.equal(r.promoLabel, '4.00 KORTING')
+  assert.equal(r.promoValidUntil, '2026-10-20')
+})
+
+test('plus: promotion price is ignored when stated against another article', () => {
+  const json = JSON.parse(readFileSync(new URL('../fixtures/scraper/plus-api-promo.json', import.meta.url), 'utf8'))
+  json.promo.Offer.PriceOriginal_Product = '19.99'
+  const [r] = getAdapter('plus').parse(JSON.stringify(json), 'https://www.plus.nl/product/x-100028')
+  assert.equal(r.promoPriceCents, null)
+  assert.equal(r.promoLabel, '4.00 KORTING')
+})
+
+test('plus: action versions are read from the OutSystems module and refreshed on change', async () => {
+  const js = 'return controller.callDataAction("DataActionGetPromotionOffer", "screenservices/x/DataActionGetPromotionOffer", "PROMO1", function (b) {}); controller.callDataAction("DataActionGetProductDetailsAndAgeInfo", "screenservices/x/D", "DET1", f)'
+  assert.deepEqual(parsePlusApiVersions(js), { DataActionGetPromotionOffer: 'PROMO1', DataActionGetProductDetailsAndAgeInfo: 'DET1' })
+  const fixture = JSON.parse(readFileSync(new URL('../fixtures/scraper/plus-api-promo.json', import.meta.url), 'utf8'))
+  let manifests = 0
+  let first = true
+  const fetcher = {
+    getText: async (url) => {
+      if (url.includes('moduleinfo')) {
+        manifests += 1
+        return JSON.stringify({ manifest: { versionToken: `M${manifests}`, urlVersions: { '/ECOP/scripts/ECP_Product_CW.ProductDetails.PDPContent.mvc.js': '?v' } } })
+      }
+      return js
+    },
+    request: async (url, { body }) => {
+      const sent = JSON.parse(body)
+      assert.equal(sent.screenData.variables.SKU, '100028')
+      const stale = first
+      first = false
+      const data = url.endsWith('PromotionOffer') ? fixture.promo : fixture.details
+      return { text: JSON.stringify({ versionInfo: { hasModuleVersionChanged: stale, hasApiVersionChanged: false }, data }) }
+    },
+  }
+  const res = await fetchPlusProduct('https://www.plus.nl/product/bokma-graanjenever-fles-1000-ml-100028', { fetcher })
+  assert.ok(manifests >= 1)
+  assert.equal(getAdapter('plus').parse(res.text, res.url)[0].promoPriceCents, 1349)
 })
 
 test('poiesz: listing page yields all products with EAN, plus tree and paging', () => {
