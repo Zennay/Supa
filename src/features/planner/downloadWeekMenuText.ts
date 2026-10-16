@@ -40,7 +40,7 @@ export function downloadPreparedWeekMenu(
     // Keep selection-by-hand available on browsers that deny local downloads.
     return false
   } finally {
-    if (objectUrl?.startsWith('blob:')) {
+    if (typeof objectUrl === 'string' && objectUrl.startsWith('blob:')) {
       try { port.scheduleRevoke(objectUrl) } catch { /* browser cleanup may fail */ }
     }
   }
