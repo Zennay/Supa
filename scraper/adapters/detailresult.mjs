@@ -7,6 +7,7 @@
 import { findAll, jsonLdProducts, nuxtData } from '../lib/extract.mjs'
 import { walkSitemap } from '../lib/sitemap.mjs'
 import { makeRecord, normalizeAvailability, toCents } from '../lib/normalize.mjs'
+import { schemaOrgPrices } from './schemaorg.mjs'
 
 function offerLabel(offer) {
   if (!offer || typeof offer !== 'object') return null
@@ -61,6 +62,9 @@ export function parseDetailresultProduct(html, url, { retailer, fileBase }) {
   const ld = jsonLdProducts(html)[0]
   if (!ld) return []
   const offers = Array.isArray(ld.offers) ? ld.offers[0] : ld.offers
+  // The Nuxt-first fallback must not bypass the same EUR-only contract as
+  // the shared Schema.org price parser used by PLUS.
+  const { priceCents } = schemaOrgPrices(offers)
   return [
     makeRecord({
       retailer,
@@ -68,7 +72,7 @@ export function parseDetailresultProduct(html, url, { retailer, fileBase }) {
       url,
       name: ld.name,
       brand: ld.brand?.name ?? ld.brand,
-      priceCents: toCents(offers?.Price ?? offers?.price),
+      priceCents,
       availability: normalizeAvailability(offers?.availability),
     }),
   ]
