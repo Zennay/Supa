@@ -143,8 +143,9 @@ test('an archived source clock regression is refused even when product IDs are d
     observation.provenance.capturedAt = newWhen
     observation.provenance.sha256 = 'a'.repeat(64)
   }
+  const gate = await rights()
   assert.throws(() => rehearsePrivateM3RetailerDrift(
-    await rights(), oldBatch, currentBatch, { referenceTime: AT }),
+    gate, oldBatch, currentBatch, { referenceTime: AT }),
   /refused/)
 })
 
@@ -157,8 +158,9 @@ test('same-clock SHA change with all disjoint SKU identities cannot masquerade a
     ob.provenance.sha256 = 'a'.repeat(64)
     // Same physical capture time + different SHA is impossible continuity.
   }
+  const gate = await rights()
   assert.throws(() => rehearsePrivateM3RetailerDrift(
-    await rights(), older, candidate, { referenceTime: AT }), /refused/)
+    gate, older, candidate, { referenceTime: AT }), /refused/)
 })
 
 test('operator CLI rejects invalid/sparse/accessor/proxy argv before reading any evidence', async () => {
