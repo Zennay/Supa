@@ -51,7 +51,10 @@ export async function runRetailer(adapter, {
       const name = createHash('sha1').update(item.url).digest('hex').slice(0, 16)
       writeFileSync(join(dir, `${name}.html.gz`), gzipSync(`<!-- ${item.url} -->\n${res.text}`))
     }
-    const records = adapter.parse(res.text, res.url || item.url).filter(isValidRecord)
+    // Source authorization is scoped to the running adapter, never to parser claims.
+    // Discard a foreign retailer row before saving it or counting it as ingested.
+    const records = adapter.parse(res.text, res.url || item.url)
+      .filter((record) => isValidRecord(record) && record.retailer === adapter.id)
     if (!records.length) summary.empty += 1
     const at = new Date().toISOString()
     store.transaction(() => {
