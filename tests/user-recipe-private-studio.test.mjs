@@ -118,7 +118,7 @@ test('incomplete recipe visible as review required and never fake-saved',()=>{
 
 test('same rendered studio cannot enqueue duplicate private recipe on rapid confirmation',()=>{
   const added=[]
-  const p=props({recipes:[],onAddReviewedRecipe:recipe=>added.push(recipe)})
+  const p=props({recipes:[],selectedDays:{},onAddReviewedRecipe:recipe=>added.push(recipe)})
   const accept=confirmationCallback(p)
   accept(p.draft)
   accept(p.draft)
@@ -129,7 +129,7 @@ test('same rendered studio cannot enqueue duplicate private recipe on rapid conf
 
 test('rejected invalid draft does not reserve ID against subsequent valid confirmation',()=>{
   const added=[]
-  const p=props({recipes:[],onAddReviewedRecipe:recipe=>added.push(recipe)})
+  const p=props({recipes:[],selectedDays:{},onAddReviewedRecipe:recipe=>added.push(recipe)})
   const accept=confirmationCallback(p)
   accept(draft({minutes:null}))
   accept(p.draft)
@@ -139,7 +139,7 @@ test('rejected invalid draft does not reserve ID against subsequent valid confir
 })
 
 test('same-render at-most-once delivery remains safe if parent callback throws',()=>{
-  const p=props({recipes:[],onAddReviewedRecipe:()=>{throw new Error('parent rejected')}})
+  const p=props({recipes:[],selectedDays:{},onAddReviewedRecipe:()=>{throw new Error('parent rejected')}})
   const accept=confirmationCallback(p)
   assert.throws(()=>accept(p.draft),/parent rejected/)
   assert.doesNotThrow(()=>accept(p.draft))
