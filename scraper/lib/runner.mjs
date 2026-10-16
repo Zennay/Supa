@@ -42,8 +42,12 @@ export async function runRetailer(adapter, {
     return fetcher.request(url)
   }
 
+  // Host blocks are terminal for this run: completion of another concurrent
+  // fetch must not persist HTML or a paid price after the source is blocked.
+  let aborted = null
   const handle = async (item) => {
     const res = await fetchPage(item.url)
+    if (aborted) return []
     summary.pages += 1
     if (saveHtmlDir) {
       const dir = join(saveHtmlDir, adapter.id)
@@ -56,6 +60,9 @@ export async function runRetailer(adapter, {
     const records = adapter.parse(res.text, res.url || item.url)
       .filter((record) => isValidRecord(record) && record.retailer === adapter.id)
     if (!records.length) summary.empty += 1
+    // Parsing is synchronous; check again before the synchronous transaction
+    // and before counting this observation as an accepted product.
+    if (aborted) return []
     const at = new Date().toISOString()
     store.transaction(() => {
       for (const record of records) store.saveRecord(record, { runId, at })
@@ -72,7 +79,6 @@ export async function runRetailer(adapter, {
     let exhausted = false
     let pulling = Promise.resolve()
     let started = 0
-    let aborted = null
 
     // Hands out the next work item; generator access is serialised.
     const nextItem = () => {
