@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { adapters } from './adapters/index.mjs'
-import { loadReviewedDailyPolicy } from './daily-source-policy.mjs'
+import { planDailyRefresh } from './daily-refresh.mjs'
 
 const MAX_AGE_MS = 24 * 3600_000
 const expectedHosts = Object.fromEntries(adapters.map(a => [a.id, a.host]))
@@ -75,14 +75,14 @@ export function findFreshProducts(database, approvedIds, query, now = new Date()
   return results
 }
 
-export async function handleRetailerSearch(requestUrl,{dbPath,policyPath,now=new Date()}) {
+export async function handleRetailerSearch(requestUrl,{dbPath,policyPath,sourceGatePath='evidence/m1/source-permission-gate.v1.json',now=new Date()}) {
   const parsed = new URL(requestUrl,'http://localhost')
   if(parsed.pathname!=='/api/retailer-products')
     return {status:404,body:{error:'not-found'}}
   const q=queryText(parsed.searchParams.get('q'))
   if(!q)return {status:400,body:{error:'enter-2-to-80-characters'}}
   let approved
-  try {approved=await loadReviewedDailyPolicy(policyPath,now)}
+  try {approved=await planDailyRefresh({policyPath,sourceGatePath,now})}
   catch {return {status:503,body:{error:'retailer-source-policy-unavailable'}}}
   if(!approved.length)
     return {status:200,body:{results:[],availability:'sources-not-approved',asOf:now.toISOString()}}
@@ -95,12 +95,12 @@ export async function handleRetailerSearch(requestUrl,{dbPath,policyPath,now=new
     return {status:503,body:{error:'retailer-database-unavailable'}}
   }finally {db?.close()}
 }
-export function startRetailerSearchServer({dbPath,policyPath,port=4317,host='127.0.0.1'}) {
+export function startRetailerSearchServer({dbPath,policyPath,sourceGatePath='evidence/m1/source-permission-gate.v1.json',port=4317,host='127.0.0.1'}) {
   if(!dbPath||!policyPath||host!=='127.0.0.1'||!Number.isSafeInteger(port)||
     port<1024||port>65535)throw Error('Safe local retailer API configuration required')
   return createServer(async(req,res)=>{
     const result=req.method==='GET'&&typeof req.url==='string'
-      ?await handleRetailerSearch(req.url,{dbPath,policyPath})
+      ?await handleRetailerSearch(req.url,{dbPath,policyPath,sourceGatePath})
       :{status:405,body:{error:'method-not-allowed'}}
     res.writeHead(result.status,{'content-type':'application/json; charset=utf-8',
       'cache-control':'no-store','x-content-type-options':'nosniff'})
@@ -111,6 +111,6 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
   const dbPath=process.env.SUPA_SCRAPER_DB
   const policyPath=process.env.SUPA_SCRAPER_POLICY
   if(!dbPath||!policyPath)throw Error('SUPA_SCRAPER_DB and SUPA_SCRAPER_POLICY required')
-  startRetailerSearchServer({dbPath,policyPath})
+  startRetailerSearchServer({dbPath,policyPath,sourceGatePath:process.env.SUPA_SOURCE_PERMISSION_GATE||'evidence/m1/source-permission-gate.v1.json'})
   console.log('SUPA retailer search listening on loopback only')
 }
