@@ -36,6 +36,9 @@ try {
   await page.getByRole('button', { name: 'Lijst', exact: true }).click()
   assert.match(await page.locator('.hifi-demo-list').innerText(), /Coca Cola Regular/)
   assert.match(await page.locator('.hifi-demo-list').innerText(), /Demolijst · geen actuele prijzen/)
+  assert.match(await page.locator('.hifi-shoplist-store').innerText(), /Voorbeeldmand · geen actuele winkelprijzen/)
+  assert.equal(await page.locator('.hifi-shoplist-category').count(), 1)
+  await page.screenshot({ path: 'artifacts/product-ui/shoplist-440.png', fullPage: true })
 
   await page.getByRole('button', { name: 'Producten', exact: true }).click()
   await page.setViewportSize({ width: 320, height: 800 })
@@ -51,6 +54,7 @@ try {
       'numeric comparable unit sort',
       'favorite-only filter + reset',
       'demo list isolation',
+      'real basket store label and Figma shoplist item count',
       '320px overflow',
       'no browser exceptions',
     ],
