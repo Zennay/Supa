@@ -23,6 +23,14 @@ De CLI accepteert **geen argumenten**. Geen URL, proxy, winkelaccount, bestandsr
 
 Een geslaagde technische test betekent alleen dat het historische offline pad reproduceerbaar is. De controle activeert nooit productie. Bij een intern onjuist rapport, ontbrekende zes-bronnenstructuur of tegenstrijdige rechten-/publicatievlag wordt de uitvoer geweigerd. Ook een bron die als *geaccepteerd* telt maar geen historische productwaarneming bevat, wordt geweigerd. De fysieke timestamp van de **nieuwste** geaccepteerde opname wordt gecontroleerd tegen het beoordelingsvenster: als zelfs die te oud is, mag het overzicht niet claimen dat alle opnamen binnen de termijn vallen; als de nieuwste nog binnen de termijn valt, mogen niet alle bronnen als verouderd zijn aangemerkt. De bronherkomst blijft privé en er wordt nooit automatisch een actuele prijs uit afgeleid.
 
+## Nieuw: concrete historische voorraad- en verpakkingsdekking
+
+Dezelfde nul-argumenten CLI toont nu aanvullend per winkel **uitsluitend uit gevalideerde historische M1-fixtures** hoeveel productwaarnemingen de adapters verwerkten, bij hoeveel de beschikbaarheid onbekend bleef, bij hoeveel verpakking/inhoud niet vaststond en hoeveel historische aanbiedingswaarnemingen zijn herkend. Een aparte actie vraagt handmatige controle vóór een winkelmandvergelijking zodra verpakkings- of voorraadinformatie ontbreekt.
+
+De nieuwe diagnostiek gebruikt de bestaande offline adapter-health evaluator en exact dezelfde referentietijd als de bronmatrix. De twee aggregaten worden wederzijds gecontroleerd op zes bronvormen, geaccepteerd/afgekeurd, historische waarnemingen, onbekende prijzen en veroudering. Bij een inconsistent of actief JavaScript-callerobject (getters/Proxy), een ontbrekende bronvorm, bronrechten-publicatieclaim of onmogelijk aantal wordt de hele uitvoer geweigerd.
+
+**Belangrijk:** *historische aanbiedingswaarnemingen* betekent nooit aanbiedingen die vandaag gelden. *Beschikbaarheid onbekend* is niet hetzelfde als uitverkocht. Verpakking onbekend wordt niet automatisch als eenheidsprijs of besparing geïnterpreteerd. Er worden geen producten, bedragen, bron-URL's, tokens, fingerprints of opnameklokken geprint. Deze cijfers vormen triage voor een medewerker, geen actuele voorraad- of besparingsindicator.
+
 ## Wat nog nodig is voor M3
 
 De [Supa-projectfase](https://app.notion.com/p/3e79e19ac955810f903be62439eef2b3) blijft **M3**. De echte uitgevoerde veldproef (#78; identieke PLUS/DekaMarkt 11×2 binnen 24 uur), schriftelijke hergebruikrechten (#74), herleidbare field-run bronversie (#205), permanent betrouwbare M3-runner (#2833) en relevante zCloud-hoofdbranchlease zijn losstaande voorwaarden. Deze tool vervangt geen ervan.
