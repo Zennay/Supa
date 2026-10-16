@@ -52,8 +52,8 @@ for (const [name, fixtureName, parse] of cases) {
       'utf8',
     ))
     fixture.source.url = fixture.source.url.replace(
-      'https://www.', 'https://www.',
-    ).replace(/^(https:\/\/[^/]+)/, '$1:443')
+      /^(https:\/\/[^/]+)/, '$1:443',
+    )
     assert.equal(parse(fixture).type, 'observations', name)
   })
 }
