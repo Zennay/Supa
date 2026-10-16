@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto'
 import { captureApprovedRetailerPage } from './retailer-approved-snapshot-capture.mjs'
 import { extractJsonLdValues } from './m1-inspect-captures.mjs'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
+import { parseDekaNuxtFromAuthorizedHtml } from './retailer-approved-deka-nuxt-product.mjs'
 
 const MAX_JSONLD_BLOCKS = 16
 const MAX_CAPTURE_AGE_MS = 24 * 60 * 60 * 1000
@@ -82,7 +83,19 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
   }
   // All blocks are reviewed together: a second conflicting Product cannot be
   // ignored just because the first one offers a temptingly cheap price.
-  const parsed = parseSchemaOrgProductForPage(blocks, provenance)
+  let parsed = parseSchemaOrgProductForPage(blocks, provenance)
+  // Some Deka SSR pages publish an uppercase JSON-LD Price and put the
+  // physical pack and canonical price in Nuxt. Do not invent a generic
+  // schema.org price; accept only the independently corroborated pair.
+  if (provenance.supermarket === 'dekamarkt' &&
+      (parsed.type !== 'observation' ||
+       parsed.observation.currentPriceCents === null ||
+       parsed.observation.pack.amount === null)) {
+    const fallback = parseDekaNuxtFromAuthorizedHtml({
+      html: captured.html, provenance, jsonLdBlocks: blocks,
+    })
+    if (fallback.type === 'observation') parsed = fallback
+  }
   if (parsed.type !== 'observation') {
     return unavailable('product_identity_or_price_unverified', captured)
   }
