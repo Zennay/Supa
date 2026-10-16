@@ -219,42 +219,48 @@ export function ingestReviewedBatch(records) {
   return { summary, results }
 }
 
+// Strict local archive reader. Exported for synthetic filesystem regression
+// tests only; the actual six-fixture loader below still fixes all its names.
+export async function readBoundedRegularReviewedFixture(filesystemPath) {
+  if (typeof filesystemPath !== 'string' || !filesystemPath ||
+      filesystemPath.length > 2048) {
+    throw new Error('Reviewed fixture must be a bounded regular file')
+  }
+  const original = await lstat(filesystemPath)
+  if (!original.isFile() || original.isSymbolicLink() ||
+      original.nlink !== 1 || original.size > 1024 * 1024) {
+    throw new Error('Reviewed fixture must be a bounded regular file')
+  }
+  const handle = await open(filesystemPath, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    const opened = await handle.stat()
+    const stable = (a, b) => a.isFile() && b.isFile() &&
+      a.dev === b.dev && a.ino === b.ino && a.nlink === 1 && b.nlink === 1 &&
+      a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs
+    if (!stable(original, opened)) {
+      throw new Error('Reviewed fixture identity changed')
+    }
+    const bytes = await handle.readFile()
+    const finalStat = await handle.stat()
+    if (bytes.length !== original.size || bytes.length > 1024 * 1024 ||
+        !stable(opened, finalStat) ||
+        !stable(finalStat, await lstat(filesystemPath))) {
+      throw new Error('Reviewed fixture identity changed')
+    }
+    const contents = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    return JSON.parse(contents)
+  } finally {
+    await handle.close()
+  }
+}
+
 export async function loadReviewedRepositoryFixtures() {
   // Only these exact bundled files. No user-defined path, URL, HTTP or proxy.
   const root = new URL('../fixtures/m1/', import.meta.url)
   const records = []
   for (const file of RETAILER_REVIEWED_FIXTURES) {
     const url = new URL(file, root)
-    const filesystemPath = fileURLToPath(url)
-    // Git-owned fixture sources must be literal regular files, not symlinks,
-    // hardlink aliases or mutable files swapped while being loaded.
-    const original = await lstat(filesystemPath)
-    if (!original.isFile() || original.isSymbolicLink() ||
-        original.nlink !== 1 || original.size > 1024 * 1024) {
-      throw new Error('Reviewed fixture must be a bounded regular file')
-    }
-    const handle = await open(filesystemPath, constants.O_RDONLY | constants.O_NOFOLLOW)
-    let contents
-    try {
-      const opened = await handle.stat()
-      const stable = (a, b) => a.isFile() && b.isFile() &&
-        a.dev === b.dev && a.ino === b.ino && a.nlink === 1 && b.nlink === 1 &&
-        a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs
-      if (!stable(original, opened)) {
-        throw new Error('Reviewed fixture identity changed')
-      }
-      const bytes = await handle.readFile()
-      const finalStat = await handle.stat()
-      if (bytes.length !== original.size || bytes.length > 1024 * 1024 ||
-          !stable(opened, finalStat) ||
-          !stable(finalStat, await lstat(filesystemPath))) {
-        throw new Error('Reviewed fixture identity changed')
-      }
-      contents = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-    } finally {
-      await handle.close()
-    }
-    records.push(JSON.parse(contents))
+    records.push(await readBoundedRegularReviewedFixture(fileURLToPath(url)))
   }
   return ingestReviewedBatch(records)
 }
