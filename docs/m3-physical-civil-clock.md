@@ -20,7 +20,7 @@ samePhysicalCaptureInstant(
 ## Contract
 
 - Accepts **only primitive strings** with explicit ISO date, time, seconds and `Z` or signed `HH:MM` offset. It never invokes user-supplied coercion methods.
-- Refuses invalid real Gregorian dates and times, positive offsets above **UTC+14:00**, and negative offsets below **UTC−12:00**, including `−12:01`, `−13:00`, `−14:00`.
+- Refuses invalid real Gregorian dates and times, positive offsets above **UTC+14:00**, and negative offsets below **UTC−12:00**, including `−12:01`, `−13:00`, `−14:00`. It also rejects RFC 3339 `-00:00` (unknown local offset), rather than treating uncertainty as a known physical clock.
 - Converts valid civil timestamps to **exact BigInt UTC nanoseconds** (no `Date.parse` millisecond truncation). Physical aliases identify one instant while real one-nanosecond recaptures remain different.
 - Returns `null` for malformed input. Consumers **must reject** a `null` source timestamp before counting a reviewed physical capture.
 - This is only chronology notation validity. The caller **still must** enforce inert own-data objects, reviewed retailer origin, archived source SHA, no token-bearing URLs, impossible future captures, deduplication, permissions and field-evidence safeguards.
