@@ -86,7 +86,7 @@ const units: Record<string, { unit: MetricUnit; factor: number }> = {
   'ounces': { unit: 'g', factor: 28.349523125 }, 'lb': { unit: 'g', factor: 453.59237 },
   'lbs': { unit: 'g', factor: 453.59237 }, 'pound': { unit: 'g', factor: 453.59237 },
 }
-const pieceNouns = /^(?:uien?|eieren?|tenen?|knoflooktenen?|tomaten?|bananen?|wortels?|courgettes?|paprika.s?|bloemkolen?|komkommers?|aardappels?|citroenen?|limoenen?)\b/i
+const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|bananen?|wortels?|courgettes?|paprika.s?|bloemkolen?|komkommers?|aardappels?|citroenen?|limoenen?)\b/i
 
 export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const original = text(raw, 400)
@@ -153,7 +153,7 @@ export function createManualRecipeDraft(input: {
 }
 
 function stepsFrom(value: unknown, depth = 0): string[] {
-  if (depth > 3) return []
+  if (depth > 8) return []
   if (typeof value === 'string') return [text(value, 5000)].filter(Boolean)
   if (Array.isArray(value)) return value.flatMap(item => stepsFrom(item, depth + 1)).slice(0, MAX_STEPS)
   if (record(value)) {
