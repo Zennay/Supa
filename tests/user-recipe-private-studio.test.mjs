@@ -5,7 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { prepareUnpricedPrivateRecipe } from '../src/features/user-recipes/reviewedRecipeBasketBridge.ts'
 import { PrivateRecipeStudio } from '../src/features/user-recipes/PrivateRecipeStudio.ts'
 
-function MockEditor() { return createElement('h3', {}, 'Mijn recept controleren') }
+function MockEditor({draft}) {
+  return createElement('div', {}, [
+    createElement('h3', {key:'header'}, 'Mijn recept controleren'),
+    createElement('p', {key:'draft-name'}, draft.title),
+  ])
+}
 
 function draft(overrides={}) {
   return {
