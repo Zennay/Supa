@@ -53,6 +53,18 @@ test('mixed PLUS and Deka with hidden third PLUS ID cannot inflate private evide
   assert.deepEqual(valid.retailerSourceCounts, { plus: 1, dekamarkt: 1 })
 })
 
+test('one physical page cannot impersonate independent product and catalog proof', async () => {
+  const product = await read(plusFile)
+  const fakeCatalog = structuredClone(product)
+  fakeCatalog.source.id = 'fictional-other-shape'
+  fakeCatalog.source.kind = 'catalog'
+  fakeCatalog.evidenceType = 'plus-browser-rendered-catalog'
+  assert.throws(
+    () => auditPhysicalRetailerCaptures([product, fakeCatalog]),
+    /Duplicate physical/,
+  )
+})
+
 test('independent captures with a distinct hash and source ID are not mistaken for an alias', async () => {
   const first = await read(plusFile)
   const second = structuredClone(first)
