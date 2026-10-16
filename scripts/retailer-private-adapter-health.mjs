@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url'
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
 import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
 import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
+import { snapshotBoundedPrivateCatalogInput } from './retailer-private-budgeted-catalog.mjs'
 
 const STORES = ['plus', 'dekamarkt']
 const KINDS = ['product', 'catalog', 'offers']
@@ -54,9 +55,23 @@ const emptyCoverage = () => ({
  * @param {object} batch result of ingestReviewedBatch (not raw retailer HTML)
  * @param {object} options referenceTime is an explicit audit clock, NOT a license
  */
-export function evaluatePrivateAdapterHealth(batch, {
-  referenceTime = new Date().toISOString(), maxAgeHours = 24,
-} = {}) {
+export function evaluatePrivateAdapterHealth(callerBatch, callerOptions = {}) {
+  // This is a direct in-process API as well as a CLI. Never inspect caller
+  // data or destructure options until the entire graph is detached using
+  // own inert descriptors; the snapshot also blocks active/revoked Proxies,
+  // getters, inherited values, sparse arrays and excessive primitive bytes.
+  // Convert even native reflection failures to the private domain refusal.
+  let pinned
+  try {
+    pinned = snapshotBoundedPrivateCatalogInput({
+      batch: callerBatch, options: callerOptions,
+    })
+  } catch { fail() }
+  const { batch, options } = pinned
+  if (!isObject(batch) || !isObject(options) ||
+      Object.keys(options).some(key =>
+        key !== 'referenceTime' && key !== 'maxAgeHours')) fail()
+  const { referenceTime = new Date().toISOString(), maxAgeHours = 24 } = options
   const now = timestamp(referenceTime)
   if (!Number.isSafeInteger(maxAgeHours) || maxAgeHours < 1 || maxAgeHours > 720 ||
       !isObject(batch) || !isObject(batch.summary) ||
