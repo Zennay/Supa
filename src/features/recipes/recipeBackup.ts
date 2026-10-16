@@ -42,26 +42,32 @@ function safeLink(value: unknown): string | null {
       // parameter if a downstream importer or link resolver decodes again.
       // Reject that ambiguity, including control characters, instead of
       // serializing a portable URL that changes meaning across applications.
-      if (/[&=?#\u0000-\u001f\u007f]/u.test(key)) {
+      const canonical = key.normalize('NFKC')
+      // Fullwidth/compatibility Unicode becomes ASCII delimiters and percent
+      // escapes AFTER normalization. Never evaluate source URL query safety on
+      // the pre-normalized text (it could gain a new OAuth query parameter).
+      if (/[&=?#\u0000-\u001f\u007f]/u.test(canonical)) {
         throw new Error('Back-up bevat een onveilige receptlink.')
       }
-      const normalized = key.normalize('NFKC').toLowerCase()
+      const normalized = canonical.toLowerCase()
       const compact = normalized.replace(/[-_\s]/g, '')
       if (/(?:oauth|saml|token|secret|password|signature|apikey|session|authorization|pkce|codeverifier|codechallenge|authcode)/.test(compact) ||
           /(?:^|[_-])(?:code|sig|auth|state)(?:$|[_-])/.test(normalized)) {
         throw new Error('Back-up mag geen geheime inloggegevens in receptlinks bevatten.')
       }
-      if (!key.includes('%')) {
+      // Decode the canonical version: NFKC can itself produce a fresh %
+      // escape from a fullwidth percent sign (U+FF05).
+      if (!canonical.includes('%')) {
         resolved = true
         break
       }
       let decoded: string
       try {
-        decoded = decodeURIComponent(key)
+        decoded = decodeURIComponent(canonical)
       } catch {
         throw new Error('Back-up bevat een onveilige receptlink.')
       }
-      if (decoded === key) {
+      if (decoded === canonical) {
         throw new Error('Back-up bevat een onveilige receptlink.')
       }
       key = decoded
