@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { selectWeekMenuText } from './selectWeekMenuText.ts'
 
 type WeekShareManualCopyProps = {
   text: string
@@ -14,9 +15,7 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
 
   const selectText = () => {
     const textarea = textareaRef.current
-    if (!textarea) return
-    textarea.focus()
-    textarea.select()
+    selectWeekMenuText(textarea, text)
   }
 
   return (

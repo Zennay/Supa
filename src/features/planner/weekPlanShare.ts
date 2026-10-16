@@ -17,6 +17,10 @@ const MAX_LABEL = 120
 // zero-width and bidi spoofing. Dutch diacritics and readable non-ASCII stay valid.
 const BAD_LABEL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u
 const HAS_VISIBLE_TEXT = /[\p{L}\p{N}]/u
+// Several Unicode filler characters are classified as Letters/Symbols even
+// though they render as empty space. Never export apparently blank/spoofed
+// day, recipe ID or meal title labels in a user-shared weekly plan.
+const VISUALLY_BLANK_FILLERS = /[\u115f\u1160\u2800\u3164\uffa0]/u
 
 function safeLabel(value: unknown): value is string {
   return typeof value === 'string' &&
@@ -24,6 +28,7 @@ function safeLabel(value: unknown): value is string {
     value.length <= MAX_LABEL &&
     value === value.trim() &&
     !BAD_LABEL.test(value) &&
+    !VISUALLY_BLANK_FILLERS.test(value) &&
     HAS_VISIBLE_TEXT.test(value)
 }
 
