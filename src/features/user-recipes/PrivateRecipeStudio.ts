@@ -36,11 +36,22 @@ export function PrivateRecipeStudio({
   // supply a stale/malformed collection; never allow that state to bypass
   // duplicate checks or trigger a recipe ID getter during render.
   const libraryIds: string[] = []
-  let validLibrary = Array.isArray(recipes) && recipes.length <= 100
-  if (validLibrary) {
-    try {
+  let validLibrary = false
+  try {
+    // A sparse array or an inherited/accessor array slot must not provide
+    // the library identity either. Include Array.isArray inside the guard:
+    // a revoked Proxy can throw before any iteration happens.
+    if (Array.isArray(recipes) && Object.getPrototypeOf(recipes) === Array.prototype &&
+        recipes.length <= 100) {
+      validLibrary = true
       const known = new Set<string>()
-      for (const recipe of recipes) {
+      for (let index = 0; index < recipes.length; index++) {
+        const slot = Object.getOwnPropertyDescriptor(recipes, index)
+        if (!slot || !Object.prototype.hasOwnProperty.call(slot, 'value')) {
+          validLibrary = false
+          break
+        }
+        const recipe = slot.value
         if (!recipe || typeof recipe !== 'object') { validLibrary = false; break }
         const descriptor = Object.getOwnPropertyDescriptor(recipe, 'id')
         const id = descriptor?.value
@@ -51,9 +62,9 @@ export function PrivateRecipeStudio({
         known.add(id)
         libraryIds.push(id)
       }
-    } catch {
-      validLibrary = false
     }
+  } catch {
+    validLibrary = false
   }
   const ids = validLibrary ? libraryIds : []
   const current = validLibrary
