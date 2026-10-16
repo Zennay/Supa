@@ -39,8 +39,11 @@ test('inherited recipe ID getter must not run during week admission [EXPECTED RE
       return safe.id
     },
   })
-  Object.assign(hostile, { ...safe })
-  delete hostile.id
+  // Copy the remaining own data facts without assigning to inherited get-only id.
+  // The original fixture never reached product code because Object.assign threw.
+  for (const [key, value] of Object.entries(safe)) {
+    if (key !== 'id') hostile[key] = value
+  }
   const result = createPrivateRecipeWeekPreview([hostile], { Ma: safe.id })
   assert.equal(getterCalls, 0,
     'caller-provided prototype getters must not execute before recipe identity validation')
