@@ -140,31 +140,50 @@ function permittedForCapture(gate, source, grant, target) {
   }
 }
 
+// On a refused response, release upstream network resources, not merely a
+// JS reader lock. Cancellation errors must never expose transport internals
+// or replace the canonical fail-closed capture result.
+async function cancelResponseBody(response) {
+  try { await response?.body?.cancel?.() } catch { /* preserve original refusal */ }
+}
+
 async function collectBoundedBody(response) {
   if (!response?.body || typeof response.body.getReader !== 'function') {
+    await cancelResponseBody(response)
     throw new Error('Missing streaming HTML body')
   }
   const contentType = response.headers?.get?.('content-type') || ''
   if (!/^text\/html(?:\s*;|$)/i.test(contentType.trim())) {
+    await cancelResponseBody(response)
     throw new Error('Source did not return HTML')
   }
   const declared = response.headers?.get?.('content-length')
   if (declared && (!/^\d+$/.test(declared) || Number(declared) > MAX_BODY_BYTES)) {
+    await cancelResponseBody(response)
     throw new Error('Declared snapshot exceeds size budget')
   }
   const reader = response.body.getReader()
   const chunks = []
   let bytes = 0
+  let fullyRead = false
   try {
     for (;;) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        fullyRead = true
+        break
+      }
       if (!(value instanceof Uint8Array)) throw new Error('Invalid HTML chunk')
       bytes += value.byteLength
       if (bytes > MAX_BODY_BYTES) throw new Error('Snapshot exceeds size budget')
       chunks.push(value)
     }
   } finally {
+    // A response can still be pulling unread chunks when its budget is
+    // exceeded. reader.releaseLock() does NOT cancel the actual source.
+    if (!fullyRead) {
+      try { await reader.cancel() } catch { /* preserve primary body failure */ }
+    }
     reader.releaseLock()
   }
   const all = Buffer.concat(chunks)
@@ -210,10 +229,12 @@ export async function captureApprovedRetailerPage(options = {}) {
     signal: AbortSignal.timeout(TIMEOUT_MS),
   })
   if (response?.status === 403 || response?.status === 429) {
+    await cancelResponseBody(response)
     throw new Error('Retailer refused or rate-limited capture; no retry/rotation')
   }
   if (response?.status !== 200 || response?.ok !== true ||
       (response.url && response.url !== target)) {
+    await cancelResponseBody(response)
     throw new Error('Retailer capture failed or redirected')
   }
   const body = await collectBoundedBody(response)
