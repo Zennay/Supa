@@ -248,6 +248,17 @@ test('operator compares archive and reference physical nanoseconds with timezone
   const { report } = await historicalReport()
   const accepted = report.retailers.flatMap(r => r.shapes).find(s => s.acceptedSources > 0)
   assert.ok(accepted)
+  // This is a fictional in-window counterfactual. Keep the derived stale
+  // flags and required actions aligned with the changed archived capture.
+  report.staleHistoricalCaptures -= accepted.staleHistoricalCaptures
+  accepted.staleHistoricalCaptures = 0
+  accepted.status = accepted.rejectedSources
+    ? 'rejected-historical-input-needs-review' : 'historical-fixture-present'
+  const store = report.retailers.find(row => row.shapes.includes(accepted))
+  if (!store.shapes.some(shape => shape.staleHistoricalCaptures > 0)) {
+    store.nextActions = store.nextActions.filter(action =>
+      action !== 'review-historical-capture-freshness')
+  }
   report.referenceTime = '2026-10-16T00:00:00.000000001Z'
   accepted.latestArchivedCapturedAt = '2026-10-15T23:59:59.999999999Z'
   assert.match(renderPrivateRetailerOperatorBrief(report), /ALLEEN HISTORISCHE BRONNEN/)
@@ -293,4 +304,37 @@ test('exported zero-argument operator refuses active and revoked Proxy argv iner
   await assert.rejects(main(['--unexpected'], () => {}), /startcontrole geweigerd/)
   const report = await main([], () => {})
   assert.match(report, /ALLEEN HISTORISCHE BRONNEN/)
+})
+
+test('operator refuses a forged all-fresh status when the newest archived capture is old', async () => {
+  const { report } = await historicalReport()
+  const forged = structuredClone(report)
+  const store = forged.retailers.find(retailer =>
+    retailer.shapes.some(shape => shape.acceptedSources > 0 &&
+      shape.staleHistoricalCaptures > 0))
+  assert.ok(store, 'real historical fixture must include a stale accepted source')
+  const shape = store.shapes.find(shape => shape.acceptedSources > 0 &&
+    shape.staleHistoricalCaptures > 0)
+  forged.staleHistoricalCaptures -= shape.staleHistoricalCaptures
+  shape.staleHistoricalCaptures = 0
+  shape.status = shape.rejectedSources > 0
+    ? 'rejected-historical-input-needs-review' : 'historical-fixture-present'
+  if (!store.shapes.some(row => row.staleHistoricalCaptures > 0)) {
+    store.nextActions = store.nextActions.filter(action =>
+      action !== 'review-historical-capture-freshness')
+  }
+  // All totals, status labels and action queues now agree with each other;
+  // only the actual archival timestamp exposes the dishonest freshness claim.
+  assert.throws(() => renderPrivateRetailerOperatorBrief(forged), /geweigerd/)
+})
+
+test('operator cannot count a reviewed source with zero product observations', async () => {
+  const { report } = await historicalReport()
+  const fabricated = structuredClone(report)
+  const accepted = fabricated.retailers.flatMap(row => row.shapes)
+    .find(shape => shape.acceptedSources > 0)
+  assert.ok(accepted)
+  accepted.historicalObservations = accepted.acceptedSources - 1
+  accepted.unknownPriceObservations = 0
+  assert.throws(() => renderPrivateRetailerOperatorBrief(fabricated), /geweigerd/)
 })
