@@ -438,7 +438,7 @@ test('direct historical coverage cannot mask forbidden retailer rights or claime
   })
   const cases = [
     changed => { changed.retailers[0].scheduledRefreshEnabled = true },
-    changed => { changed.retailers[0].permissionStatus = 'permitted' },
+    changed => { changed.retailers[0].sourceRightsReadyForProduction = true },
     changed => { changed.retailers[0].nextActions = [] },
     changed => { changed.publicSavingsClaimEligible = true },
     changed => { changed.permissionVerifiedForNewCapture = true },
