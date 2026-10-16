@@ -195,3 +195,25 @@ test('capture instant identity preserves one-nanosecond physical separation', ()
   assert.equal(civilCaptureInstantKey('2026-02-30T21:00:00Z', referenceTime), null)
   assert.equal(civilCaptureInstantKey('2099-01-01T00:00:00Z', referenceTime), null)
 })
+
+test('all six shapes deny bare query and fragment URL provenance before private ingestion', async t => {
+  const originals = await fixtures()
+  for (const source of originals) {
+    await t.test(source.source.supermarket + ':' + source.source.kind, () => {
+      for (const suffix of ['?', '#', '?#', '#reviewed', '?q=milk#fragment']) {
+        const suspect = structuredClone(source)
+        suspect.source.url += suffix
+        assert.throws(
+          () => ingestCivilClockCheckedReviewedBatch([suspect]),
+          /civil-clock preflight refused/,
+          suffix,
+        )
+      }
+    })
+  }
+  // Literal characters in percent-encoded URLs are different from raw
+  // delimiters; the preflight does not reinterpret source provenance itself.
+  const baseline = ingestCivilClockCheckedReviewedBatch(originals)
+  assert.equal(baseline.summary.acceptedSources, 6)
+  assert.equal(baseline.summary.publicSavingsClaimEligible, false)
+})
