@@ -171,3 +171,57 @@ test('JSON-LD inside HTML comments or template is inert, not an observation', as
   assert.throws(() => runWithRehashedSyntheticHtml(
     original, original.captured.html + '<!-- unclosed'), /binding refused/)
 })
+
+test('script attribute values must never impersonate actual id or type attributes', async () => {
+  const plus = syntheticReviewedHtml(await fixture('plus-rendered-product-halfvolle-melk.v1.json'))
+  for (const attribute of [
+    'data-note="type=' + "'application/ld+json'" + '"',
+    'type="text/plain" type="application/ld+json"',
+    'data-note="type=' + "'application/ld+json'" + '" type="text/plain"',
+  ]) {
+    const html = plus.captured.html.replace('type="application/ld+json"', attribute)
+    assert.throws(() => runWithRehashedSyntheticHtml(plus, html), /binding refused/)
+  }
+  const deka = syntheticReviewedHtml(await fixture('dekamarkt-product-halfvolle-melk.v1.json'))
+  for (const attribute of [
+    'data-note="id=' + "'__NUXT_DATA__'" + '"',
+    'id="fake" id="__NUXT_DATA__"',
+  ]) {
+    const html = deka.captured.html.replace('id="__NUXT_DATA__"', attribute)
+    assert.throws(() => runWithRehashedSyntheticHtml(deka, html), /binding refused/)
+  }
+})
+
+test('script-shaped text in HTML raw-text or inert containers must not prove product price', async () => {
+  const original = syntheticReviewedHtml(await fixture('plus-rendered-product-halfvolle-melk.v1.json'))
+  const script = /<script type="application\/ld\+json">[\s\S]*?<\/script>/.exec(original.captured.html)?.[0]
+  assert.ok(script)
+  for (const tag of ['textarea', 'noscript', 'style', 'title', 'iframe', 'svg', 'xmp']) {
+    const html = original.captured.html.replace(script, '<' + tag + '>' + script + '</' + tag + '>')
+    assert.throws(() => runWithRehashedSyntheticHtml(original, html), /binding refused/, tag)
+  }
+})
+
+test('HTML parser refuses script-shaped tags inside an enclosing quoted attribute', async () => {
+  const original = syntheticReviewedHtml(await fixture('plus-rendered-product-halfvolle-melk.v1.json'))
+  const script = /<script type="application\/ld\+json">[\s\S]*?<\/script>/.exec(original.captured.html)?.[0]
+  assert.ok(script)
+  const html = original.captured.html.replace(script, '<div data-demo=' + "'" + script + "'" + '></div>')
+  assert.throws(() => runWithRehashedSyntheticHtml(original, html), /binding refused/)
+})
+
+test('normal PLUS and Deka structured scripts remain accepted after bounded HTML tokenization', async () => {
+  for (const filename of [
+    'plus-rendered-product-halfvolle-melk.v1.json',
+    'dekamarkt-product-halfvolle-melk.v1.json',
+    'dekamarkt-catalog-melk.v1.json',
+    'dekamarkt-offers.v1.json',
+  ]) {
+    const input = syntheticReviewedHtml(await fixture(filename))
+    const result = bindPrivateReviewedHtmlEvidence(input.captured, input.reviewed)
+    assert.ok(result.normalizedObservationCount > 0)
+    assert.equal(result.productionEnabled, false)
+    assert.equal(result.publishable, false)
+    assert.equal(result.externalRequests, 0)
+  }
+})
