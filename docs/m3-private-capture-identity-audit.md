@@ -20,6 +20,13 @@ per-retailer counts); no product title, price, source URL, identifier, captured
 time or SHA appears in logs. A repeated capture with a different mutable
 `source.id` is rejected, not counted as independent corroboration.
 
+The opt-in `ingestPhysicallyDistinctReviewedBatch(records)` entrypoint
+runs this physical-identity guard **before** the existing private ingestion
+engine: genuinely distinct archived PLUS/Deka records keep the engine's
+private results, while aliased captures throw before producing a batch
+summary. Existing callers of the old engine are unchanged; migration must
+be reviewed and coordinated with its product owner.
+
 The standalone `auditPhysicalRetailerCaptures` is also available to
 already-authorized *private* in-memory review clients. It detaches caller input
 using the same inert-JSON boundary used by the reviewed source adapters before
