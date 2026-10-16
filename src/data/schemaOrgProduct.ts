@@ -70,7 +70,26 @@ function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
   return values.filter((value): value is JsonObject => isObject(value))
 }
 
+// An invalid explicit price is contradictory source evidence, not an absent
+// field to filter away while selecting a different valid Offer. Prices in
+// each typed Offer and its parallel PriceSpecifications must all be parseable
+// into positive whole EUR cents before any private priced observation exists.
+function invalidExplicitPriceClaim(offer: JsonObject): boolean {
+  const nodes = [offer, ...priceSpecificationCandidates(offer)]
+  return nodes.some((node) =>
+    ['price', 'lowPrice'].some((key) => {
+      const value = node[key]
+      if (value === undefined || value === null || value === '') {
+        return false
+      }
+      const parsed = cents(value)
+      return parsed === null || parsed <= 0
+    }),
+  )
+}
+
 function extractPrice(offers: JsonObject[]): number | null {
+  if (offers.some(invalidExplicitPriceClaim)) return null
   const prices = offers
     .flatMap((offer) => [
       cents(offer.price ?? offer.lowPrice),
