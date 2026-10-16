@@ -1,0 +1,85 @@
+/* Figma Planner 3359:4896 / Weekplanning card 3359:4900.
+   Adapt source's white 20px surface, 24px interior, 50px day slots,
+   8px green indicator and SF Pro typography to real interactive state. */
+.hifi-planner-week-card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  border-radius: 20px;
+  background: #fff;
+  padding: 24px;
+  color: #262527;
+  min-width: 0;
+}
+.hifi-planner-week-heading { display: grid; gap: 4px; }
+.hifi-planner-week-heading h3 {
+  margin: 0;
+  color: #262527;
+  font: 600 16px/1.2 -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif;
+}
+.hifi-planner-week-heading p {
+  color: #b2b2b2;
+  font: 500 14px/1.35 Inter, sans-serif;
+}
+.hifi-planner-week-days {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.hifi-planner-day {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: 4px;
+  padding: 12px 0 0;
+  min-height: 80px;
+  min-width: 44px;
+  border: 0;
+  background: transparent;
+  color: #3b3b3c;
+  cursor: pointer;
+  font: 500 14px/1 -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif;
+}
+.hifi-planner-day-label { display: block; }
+.hifi-planner-day-number {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f9fafb;
+  color: #3b3b3c;
+  font-weight: 600;
+  transition: background .15s ease, color .15s ease;
+}
+.hifi-planner-day.selected .hifi-planner-day-number {
+  background: #c4fdeb;
+  color: #006642;
+}
+.hifi-planner-day.selected::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  border-radius: 129px;
+  background: #68e797;
+}
+.hifi-planner-day:focus-visible {
+  outline: 3px solid #005135;
+  outline-offset: 3px;
+  border-radius: 14px;
+}
+.hifi-planner-week-count { color: #797979; font-size: 12px; }
+@media (max-width: 375px) {
+  .hifi-planner-week-card { padding: 20px 16px; }
+  .hifi-planner-week-days { gap: 3px; }
+  .hifi-planner-day-number { width: 46px; height: 46px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hifi-planner-day-number { transition: none; }
+}

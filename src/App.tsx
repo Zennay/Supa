@@ -1,3 +1,4 @@
+import { FigmaImage } from './components/FigmaImage'
 import { useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
@@ -7,6 +8,11 @@ import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
+import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
+import { readRecipeLibrary } from './features/recipes/recipeLibrary'
+import { toPlannerRecipe } from './features/recipes/plannerRecipes'
+import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
+import { figmaAssets } from './features/home/figmaAssets'
 import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
@@ -29,21 +35,28 @@ import {
   m3CandidateStore,
 } from './data/m3ComparisonFixture'
 
-type Tab = 'planner' | 'basket' | 'list' | 'observe'
+type Tab = 'home' | 'recipes' | 'products' | 'planner' | 'basket' | 'list' | 'observe'
 
-const tabs: { id: Tab; label: string }[] = [
-  { id: 'planner', label: 'Planner' },
-  { id: 'basket', label: 'Mand' },
-  { id: 'list', label: 'Lijst' },
-  { id: 'observe', label: 'Meten' },
+const tabs: { id: Tab; label: string; icon: string }[] = [
+  { id: 'home', label: 'Home', icon: figmaAssets.imgVector5 },
+  { id: 'planner', label: 'Planner', icon: figmaAssets.imgButton },
+  { id: 'recipes', label: 'Recepten', icon: figmaAssets.imgButton1 },
+  { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2 },
+  { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3 },
 ]
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
-const validRecipeIds = m2Recipes.map((recipe) => recipe.id)
+function availableRecipes() {
+  try {
+    if (typeof window === 'undefined') return [...m2Recipes, ...curatedFigmaRecipes]
+    const own = readRecipeLibrary(window.localStorage).recipes.flatMap(recipe => { const projected = toPlannerRecipe(recipe); return projected ? [projected] : [] })
+    return [...m2Recipes, ...curatedFigmaRecipes, ...own]
+  } catch { return [...m2Recipes, ...curatedFigmaRecipes] }
+}
 
 type PersistenceWarning = 'unavailable' | 'protected' | null
 
-function readPlannerPreferences(): {
+function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe => recipe.id)): {
   preferences: PlannerPreferences
   warning: PersistenceWarning
   raw: string | null
@@ -65,9 +78,22 @@ function readPlannerPreferences(): {
   }
 }
 
-export function App() {
-  const [tab, setTab] = useState<Tab>('planner')
-  const [initialLoad] = useState(readPlannerPreferences)
+export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
+  const [tab, setTab] = useState<Tab>(initialTab)
+  const [designProductIds, setDesignProductIds] = useState<string[]>([])
+  const isHiFiView = tab === 'home' || tab === 'recipes' || tab === 'products'
+  const navigate = (next: Tab) => { setTab(next); window.scrollTo?.(0, 0) }
+  const toggleDesignProduct = (id: string) => setDesignProductIds(current =>
+    current.includes(id) ? current.filter(item => item !== id) : [...current, id])
+  const [recipes, setRecipes] = useState(availableRecipes)
+  const validRecipeIds = recipes.map(recipe => recipe.id)
+  useEffect(() => {
+    const refresh = () => setRecipes(availableRecipes())
+    window.addEventListener('supa-recipes-changed', refresh)
+    window.addEventListener('storage', refresh)
+    return () => { window.removeEventListener('supa-recipes-changed', refresh); window.removeEventListener('storage', refresh) }
+  }, [])
+  const [initialLoad] = useState(() => readPlannerPreferences(validRecipeIds))
   const [preferences, setPreferences] = useState(() => initialLoad.preferences)
   const [persistenceWarning, setPersistenceWarning] = useState<PersistenceWarning>(initialLoad.warning)
   const [lastStoredRaw, setLastStoredRaw] = useState(initialLoad.raw)
@@ -102,11 +128,11 @@ export function App() {
       buildOneStoreBasket({
         store: m2Store,
         plan: plannedMeals,
-        recipes: m2Recipes,
+        recipes,
         activeDays,
         products: m2Products,
       }),
-    [activeDays, plannedMeals],
+    [activeDays, plannedMeals, recipes],
   )
 
   const comparisonBaseline = useMemo(
@@ -114,11 +140,11 @@ export function App() {
       buildOneStoreBasket({
         store: m3BaselineStore,
         plan: plannedMeals,
-        recipes: m2Recipes,
+        recipes,
         activeDays,
         products: m3BaselineProducts,
       }),
-    [activeDays, plannedMeals],
+    [activeDays, plannedMeals, recipes],
   )
 
   const comparisonCandidate = useMemo(
@@ -126,11 +152,11 @@ export function App() {
       buildOneStoreBasket({
         store: m3CandidateStore,
         plan: plannedMeals,
-        recipes: m2Recipes,
+        recipes,
         activeDays,
         products: m3CandidateProducts,
       }),
-    [activeDays, plannedMeals],
+    [activeDays, plannedMeals, recipes],
   )
 
   const basketComparison = useMemo(
@@ -179,7 +205,7 @@ export function App() {
         text: formatShareableWeek({
           plannedMeals,
           activeDays,
-          recipes: m2Recipes,
+          recipes,
           budget,
           includeBudget: includeWeekBudget,
           includeDetails: includeWeekDetails,
@@ -216,16 +242,19 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
+    <main className={`app-shell${isHiFiView ? ' hifi-shell' : ''}${tab === 'planner' || tab === 'list' ? ' hifi-working-shell' : ''}`}>
+      {!isHiFiView && <header className="topbar">
         <div>
           <span className="brand-mark">S</span>
           <strong>SUPA</strong>
         </div>
         <IdentityAvatar />
-      </header>
+      </header>}
 
       <div className="content">
+        {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
+        {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
+        {tab === 'list' && <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />}
         {persistenceWarning && (
           <p role="alert" className="disclaimer" aria-live="assertive">
             {persistenceWarning === 'protected'
@@ -238,7 +267,7 @@ export function App() {
             budget={budget}
             activeDays={activeDays}
             plannedMeals={plannedMeals}
-            recipes={m2Recipes}
+            recipes={recipes}
             basketTotalCents={basket.totalCents}
             basketUnresolvedLineCount={basket.unresolvedLineCount}
             onBudgetChange={(nextBudget) =>
@@ -305,16 +334,18 @@ export function App() {
         {tab === 'observe' && <ObservationView />}
       </div>
 
-      <nav className="bottom-nav" aria-label="Hoofdnavigatie">
+      <nav className="bottom-nav hifi-nav" aria-label="Hoofdnavigatie">
         {tabs.map((item) => (
           <button
             type="button"
             key={item.id}
+            aria-label={item.label}
             className={tab === item.id ? 'active' : ''}
             aria-current={tab === item.id ? 'page' : undefined}
-            onClick={() => setTab(item.id)}
+            onClick={() => navigate(item.id)}
           >
-            {item.label}
+            <FigmaImage asset={item.icon} alt="" />
+            <span className="hifi-sr-only">{item.label}</span>
           </button>
         ))}
       </nav>

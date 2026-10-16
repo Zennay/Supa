@@ -129,7 +129,7 @@ test('real Vite SSR App presents active reuse before optional sharing with zero 
   })
   try {
     const { App } = await vite.ssrLoadModule('/src/App.tsx')
-    const html = renderToStaticMarkup(createElement(App))
+    const html = renderToStaticMarkup(createElement(App, { initialTab: 'planner' }))
     const planner = html.indexOf('aria-label="Geplande maaltijden"')
     const reuse = html.indexOf('aria-label="Ingrediënten opnieuw gebruiken"')
     const share = html.indexOf('aria-label="Weekmenu delen"')
