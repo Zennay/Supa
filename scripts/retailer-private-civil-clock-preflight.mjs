@@ -9,6 +9,7 @@
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { snapshotInertReviewedEvidence } from './retailer-inert-json-admission.mjs'
+import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
 import { isValidCivilCaptureAt as isValidPrivateCivilCaptureTime, civilCaptureInstantKey } from '../src/data/retailerCivilCaptureClock.ts'
 export { isValidPrivateCivilCaptureTime }
 import {
@@ -64,6 +65,27 @@ export function ingestCivilClockCheckedReviewedBatch(records) {
       batch.summary.permissionVerified !== false ||
       batch.summary.publicSavingsClaimEligible !== false) fail()
   return batch
+}
+
+/**
+ * One supported, private product-core composition path: archives -> strict
+ * six-shape admission -> universal *unpublished* product-capture registry.
+ * Existing direct catalog callers remain separately owned/unmodified.
+ * This function never authorizes real-world price or savings publication.
+ */
+export function buildCivilClockCheckedPrivateCatalog(records) {
+  if (arguments.length !== 1) fail()
+  const batch = ingestCivilClockCheckedReviewedBatch(records)
+  const catalog = buildUniversalRetailerCatalog(batch)
+  if (catalog.status !== 'private-review-only' ||
+      catalog.productionEnabled !== false ||
+      catalog.publicSavingsClaimEligible !== false ||
+      catalog.sourceCount !== batch.summary.acceptedSources ||
+      !Array.isArray(catalog.products) ||
+      catalog.products.some(product => product.publishable !== false ||
+        product.sourceRightsVerified !== false ||
+        product.currentTrustedPriceCents !== null)) fail()
+  return catalog
 }
 
 /** Offline CLI: only six fixed, checked-in sanitized historical fixtures. */
