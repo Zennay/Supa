@@ -65,6 +65,15 @@ test('an otherwise valid six-shape batch is atomic when one impossible local off
   assert.throws(() => ingestCivilClockCheckedReviewedBatch(records), /civil-clock preflight refused/)
 })
 
+test('atomic private batch denies partial adapter acceptance despite other valid reviewed sources', async () => {
+  const records = await fixtures()
+  records[2].source.url = 'https://unreviewed.example.invalid/offer'
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch(records), /civil-clock preflight refused/)
+  const { summary } = ingestCivilClockCheckedReviewedBatch((await fixtures()).slice(0, 2))
+  assert.equal(summary.acceptedSources, 2)
+  assert.equal(summary.productionEnabled, false)
+})
+
 test('strict civil Gregorian dates, source clock chronology, and missing zone fail closed', () => {
   const fixed = Date.parse('2026-10-16T22:00:00Z')
   const valid = [
