@@ -9,6 +9,9 @@ import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
+import { readRecipeLibrary } from './features/recipes/recipeLibrary'
+import { toPlannerRecipe } from './features/recipes/plannerRecipes'
+import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
 import { figmaAssets } from './features/home/figmaAssets'
 import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
@@ -43,11 +46,17 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
 ]
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
-const validRecipeIds = m2Recipes.map((recipe) => recipe.id)
+function availableRecipes() {
+  try {
+    if (typeof window === 'undefined') return [...m2Recipes, ...curatedFigmaRecipes]
+    const own = readRecipeLibrary(window.localStorage).recipes.flatMap(recipe => { const projected = toPlannerRecipe(recipe); return projected ? [projected] : [] })
+    return [...m2Recipes, ...curatedFigmaRecipes, ...own]
+  } catch { return [...m2Recipes, ...curatedFigmaRecipes] }
+}
 
 type PersistenceWarning = 'unavailable' | 'protected' | null
 
-function readPlannerPreferences(): {
+function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe => recipe.id)): {
   preferences: PlannerPreferences
   warning: PersistenceWarning
   raw: string | null
@@ -76,7 +85,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const navigate = (next: Tab) => { setTab(next); window.scrollTo?.(0, 0) }
   const toggleDesignProduct = (id: string) => setDesignProductIds(current =>
     current.includes(id) ? current.filter(item => item !== id) : [...current, id])
-  const [initialLoad] = useState(readPlannerPreferences)
+  const [recipes, setRecipes] = useState(availableRecipes)
+  const validRecipeIds = recipes.map(recipe => recipe.id)
+  useEffect(() => {
+    const refresh = () => setRecipes(availableRecipes())
+    window.addEventListener('supa-recipes-changed', refresh)
+    window.addEventListener('storage', refresh)
+    return () => { window.removeEventListener('supa-recipes-changed', refresh); window.removeEventListener('storage', refresh) }
+  }, [])
+  const [initialLoad] = useState(() => readPlannerPreferences(validRecipeIds))
   const [preferences, setPreferences] = useState(() => initialLoad.preferences)
   const [persistenceWarning, setPersistenceWarning] = useState<PersistenceWarning>(initialLoad.warning)
   const [lastStoredRaw, setLastStoredRaw] = useState(initialLoad.raw)
@@ -111,11 +128,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       buildOneStoreBasket({
         store: m2Store,
         plan: plannedMeals,
-        recipes: m2Recipes,
+        recipes,
         activeDays,
         products: m2Products,
       }),
-    [activeDays, plannedMeals],
+    [activeDays, plannedMeals, recipes],
   )
 
   const comparisonBaseline = useMemo(
@@ -123,11 +140,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       buildOneStoreBasket({
         store: m3BaselineStore,
         plan: plannedMeals,
-        recipes: m2Recipes,
+        recipes,
         activeDays,
         products: m3BaselineProducts,
       }),
-    [activeDays, plannedMeals],
+    [activeDays, plannedMeals, recipes],
   )
 
   const comparisonCandidate = useMemo(
@@ -135,11 +152,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       buildOneStoreBasket({
         store: m3CandidateStore,
         plan: plannedMeals,
-        recipes: m2Recipes,
+        recipes,
         activeDays,
         products: m3CandidateProducts,
       }),
-    [activeDays, plannedMeals],
+    [activeDays, plannedMeals, recipes],
   )
 
   const basketComparison = useMemo(
@@ -188,7 +205,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         text: formatShareableWeek({
           plannedMeals,
           activeDays,
-          recipes: m2Recipes,
+          recipes,
           budget,
           includeBudget: includeWeekBudget,
           includeDetails: includeWeekDetails,
@@ -225,7 +242,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   }
 
   return (
-    <main className={`app-shell${isHiFiView ? ' hifi-shell' : ''}`}>
+    <main className={`app-shell${isHiFiView ? ' hifi-shell' : ''}${tab === 'planner' || tab === 'list' ? ' hifi-working-shell' : ''}`}>
       {!isHiFiView && <header className="topbar">
         <div>
           <span className="brand-mark">S</span>
@@ -250,7 +267,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             budget={budget}
             activeDays={activeDays}
             plannedMeals={plannedMeals}
-            recipes={m2Recipes}
+            recipes={recipes}
             basketTotalCents={basket.totalCents}
             basketUnresolvedLineCount={basket.unresolvedLineCount}
             onBudgetChange={(nextBudget) =>
