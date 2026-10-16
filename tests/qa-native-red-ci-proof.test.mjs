@@ -8,12 +8,12 @@ const B = 'qa-six-adapter-negative-utc-civil-floor-20261016.test.mjs'
 const FILES = [A, B]
 
 function githubLog({ paths = [A, A, B, B], pass = 6, skipped = 0,
-                     cancelled = 0, todo = 0, extra = [] } = {}) {
+                     cancelled = 0, todo = 0, extra = [], nestedIndices = [] } = {}) {
   const stamp = line => '2026-10-16T22:41:23.8761234Z ' + line
   const lines = ['TAP version 13']
   for (let i = 0; i < paths.length; i++) {
     lines.push('# Subtest: independent reviewed source mutation ' + i)
-    lines.push('not ok ' + (i + 1) + ' - independent reviewed source mutation ' + i)
+    lines.push((nestedIndices.includes(i) ? '    ' : '') + 'not ok ' + (i + 1) + ' - independent reviewed source mutation ' + i)
     lines.push('  ---')
     if (paths[i] !== null) lines.push("  location: '/home/runner/work/Supa/Supa/tests/" + paths[i] + ":40:9'")
     lines.push("  failureType: 'testCodeFailure'")
@@ -45,6 +45,15 @@ test('independent QA1 RED verifier counts only four exact known test failures, n
   assert.equal(report.productionReady, false)
   assert.equal(report.sourcePermissionGate, 'not-proven-by-red-node')
   assert.equal(report.productionBuild, 'not-proven-by-red-node')
+})
+
+
+test('nested downstream auditor RED failures are counted alongside their parent TAP failures', () => {
+  const report = analyzeNativeRedCi(githubLog({ nestedIndices: [0, 1, 2] }), {
+    expectedRed: 4, allowedTestFiles: FILES,
+  })
+  assert.equal(report.fail, 4)
+  assert.deepEqual(report.byFile, { [A]: 2, [B]: 2 })
 })
 
 test('hosted non-QA failures and absent file locations cannot be waved away as intended RED', () => {
