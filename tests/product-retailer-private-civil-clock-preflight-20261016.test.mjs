@@ -121,6 +121,7 @@ test('offline CLI emits only aggregate private counts and refuses arbitrary flag
   const parsed = JSON.parse(output)
   assert.equal(result.acceptedSources, 6)
   assert.equal(parsed.civilClockPreflight, true)
+  assert.equal(parsed.physicalCaptureAliasGuard, true)
   assert.equal(parsed.productionEnabled, false)
   assert.equal(parsed.permissionVerified, false)
   assert.equal(parsed.publicSavingsClaimEligible, false)
@@ -129,6 +130,8 @@ test('offline CLI emits only aggregate private counts and refuses arbitrary flag
     assert.equal(output.includes(sample.source.id), false)
   }
   await assert.rejects(main(['--url', 'https://www.plus.nl/']), /civil-clock preflight refused/)
+  const hostile = new Proxy([], { get() { throw new Error('hostile argv getter executed') } })
+  await assert.rejects(main(hostile), /inert JSON/)
 })
 
 test('physically identical retailer captures cannot be counted again under renamed IDs or legal UTC aliases', async t => {
