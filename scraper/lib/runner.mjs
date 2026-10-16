@@ -8,6 +8,24 @@ import { isValidRecord } from './normalize.mjs'
 const MAX_ERROR_RATE = 0.5
 const MIN_PAGES_FOR_ERROR_RATE = 40
 
+// The parser's retailer tag is not evidence that the price was observed at
+// the retailer's authorised host. Require a genuine absolute HTTPS URL,
+// without embedded credentials, custom ports, suffix spoofs or alternate hosts.
+function isApprovedArticleUrl(value, approvedHost) {
+  if (typeof value !== 'string' || typeof approvedHost !== 'string') return false
+  const expected = approvedHost.trim().toLowerCase()
+  if (!/^(?:[a-z0-9-]+\.)*[a-z0-9-]+$/.test(expected)) return false
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' &&
+      url.hostname.toLowerCase() === expected &&
+      url.username === '' && url.password === '' &&
+      url.port === ''
+  } catch {
+    return false
+  }
+}
+
 // Scrape one retailer into the store. Returns a summary; never throws for
 // per-page problems (they are counted), only aborts on a host block or a
 // sustained error rate (selector drift / outage => fail closed).
@@ -53,8 +71,17 @@ export async function runRetailer(adapter, {
     }
     // Source authorization is scoped to the running adapter, never to parser claims.
     // Discard a foreign retailer row before saving it or counting it as ingested.
-    const records = adapter.parse(res.text, res.url || item.url)
-      .filter((record) => isValidRecord(record) && record.retailer === adapter.id)
+    // Redirects cannot launder a foreign response into an approved record.
+    // Each record must additionally cite an article on the approved host.
+    const responseUrl = res.url || item.url
+    const sourceApproved = isApprovedArticleUrl(item.url, adapter.host) &&
+      isApprovedArticleUrl(responseUrl, adapter.host)
+    const records = sourceApproved
+      ? adapter.parse(res.text, responseUrl)
+        .filter((record) => isValidRecord(record) &&
+          record.retailer === adapter.id &&
+          isApprovedArticleUrl(record.url, adapter.host))
+      : []
     if (!records.length) summary.empty += 1
     const at = new Date().toISOString()
     store.transaction(() => {
