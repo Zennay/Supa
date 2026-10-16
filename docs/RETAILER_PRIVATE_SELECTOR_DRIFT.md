@@ -26,6 +26,12 @@ Ook wanneer een JavaScript-module de vergelijking rechtstreeks aanroept, accepte
 
 Voor de CLI gelden dezelfde garanties voor de vier argumenten (`--before`, pad, `--after`, pad). Een Proxy of een index-getter kan dus geen ander privaat bestand laten openen tijdens de argumentcontrole. Bestaande gewone private `0600` JSON-bestanden en originele bronvoorstellen blijven bruikbaar. Dit is een synthetische programma-invoerbeveiliging en betekent niet dat historische winkeltoestemming, echte bronprijzen of menselijke winkelwagenmetingen zijn bewezen.
 
+## Eenduidige historische JSON
+
+De twee lokaal opgeslagen `0600`-rapporten worden vóór gebruik als **strikt geldige UTF-8** gelezen. In elk JSON-object moeten propertynamen uniek zijn, óók wanneer ze anders zijn gespeld met JSON-Unicode-escapes (zoals `\\u0072etailerId`). Een dubbel `capturedAt`, `retailerId`, `sha256`, `permissionVerified`, selectorveld of ander genest veld wordt integraal geweigerd: gewone JSON-parsing zou anders ongemerkt de laatste waarde bewaren en de eerdere, tegenstrijdige bronclaim verbergen. Ook fout-gecodeerde UTF-8 wordt geweigerd vóór bron- of tijdstempelacceptatie. De scan heeft een bovengrens van 64 KiB per bestand en maximaal 128 JSON-niveaus, passend bij de bestaande privé-reviewlimieten.
+
+De bestandsinhoud wordt niet gelogd of gepubliceerd. Geldige, ook ingesprongen JSON uit de bestaande offline inspectietool werkt ongewijzigd, met uitsluitend aggregate tellingen voor menselijke beoordeling.
+
 **Wat drift niet bewijst:** dat een CSS selector werkelijk een artikel, prijs of beschikbaarheid in de browser oplevert. Productieadapters moeten nog per keten gevalideerd worden, alleen met expliciet geautoriseerde data en tegen de geschreven rechtenregisters. De M3-releasevoorwaarden [#74](https://github.com/Zennay/Supa/issues/74), [#78](https://github.com/Zennay/Supa/issues/78), [#205](https://github.com/Zennay/Supa/issues/205), [#2833](https://github.com/Zennay/Supa/issues/2833) blijven open.
 
 Tests: `node --experimental-strip-types --test tests/product-retailer-private-selector-drift-20261015.test.mjs`, met werkelijk geproduceerde offline proposal-objecten en lokale 0600 JSON-bestanden.
