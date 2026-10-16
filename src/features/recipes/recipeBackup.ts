@@ -46,7 +46,11 @@ function safeLink(value: unknown): string | null {
       // Fullwidth/compatibility Unicode becomes ASCII delimiters and percent
       // escapes AFTER normalization. Never evaluate source URL query safety on
       // the pre-normalized text (it could gain a new OAuth query parameter).
-      if (/[&=?#\u0000-\u001f\u007f]/u.test(canonical)) {
+      // Reject invisible formatting/bidi controls in QUERY KEYS only.
+      // Such keys can display as a harmless label while resolving to an auth
+      // field when a downstream app removes default-ignorable markers.
+      // Query VALUES (including human recipe names) are not affected.
+      if (/[&=?#\p{Cc}\p{Cf}]/u.test(canonical)) {
         throw new Error('Back-up bevat een onveilige receptlink.')
       }
       const normalized = canonical.toLowerCase()
