@@ -63,8 +63,33 @@ export function parseDetailresultProduct(html, url, { retailer, fileBase }) {
     ]
   }
 
-  const ld = jsonLdProducts(html)[0]
-  if (!ld) return []
+  // Nuxt can be absent on a rendered detail page. Its JSON-LD fallback
+  // must still bind this exact source article: a first unrelated Product or
+  // an unlabelled Product is not evidence for a private price.
+  const products = jsonLdProducts(html)
+  if (products.length !== 1 || !idFromUrl) return []
+  const ld = products[0]
+  let source
+  try { source = new URL(url) } catch { return [] }
+  const expectedHost = retailer === 'dirk' ? 'www.dirk.nl' :
+    retailer === 'dekamarkt' ? 'www.dekamarkt.nl' : null
+  if (!expectedHost || source.protocol !== 'https:' ||
+      source.hostname !== expectedHost || source.port ||
+      source.username || source.password || source.search || source.hash) return []
+  const hasMpn = Object.hasOwn(ld, 'mpn')
+  const hasArticleUrl = Object.hasOwn(ld, 'url')
+  if (!hasMpn && !hasArticleUrl) return []
+  if (hasMpn && String(ld.mpn) !== idFromUrl) return []
+  if (hasArticleUrl) {
+    let declared
+    try { declared = new URL(ld.url) } catch { return [] }
+    if (declared.protocol !== source.protocol ||
+        declared.hostname !== source.hostname ||
+        declared.port !== source.port || declared.username ||
+        declared.password || declared.search || declared.hash ||
+        declared.pathname.replace(/\\/$/, '') !==
+          source.pathname.replace(/\\/$/, '')) return []
+  }
   const offers = Array.isArray(ld.offers) ? ld.offers[0] : ld.offers
   // The Nuxt-first fallback must not bypass the same EUR-only contract as
   // the shared Schema.org price parser used by PLUS.
@@ -72,7 +97,8 @@ export function parseDetailresultProduct(html, url, { retailer, fileBase }) {
   return [
     makeRecord({
       retailer,
-      sourceId: ld.mpn ?? idFromUrl,
+      // Canonical source route is the identity, never a JSON-LD guess.
+      sourceId: idFromUrl,
       url,
       name: ld.name,
       brand: ld.brand?.name ?? ld.brand,
