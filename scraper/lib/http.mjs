@@ -265,8 +265,19 @@ export class PoliteFetcher {
         if (buffer.length > this.maxBytes) {
           throw new Error('retailer HTTP response exceeds maximum bytes')
         }
-        const bytes =
-          buffer[0] === 0x1f && buffer[1] === 0x8b ? gunzipSync(buffer) : buffer
+        let bytes = buffer
+        if (buffer[0] === 0x1f && buffer[1] === 0x8b) {
+          // Bound decompression itself, not only the wire payload. Otherwise
+          // even a tiny valid gzip can allocate a huge HTML document.
+          try {
+            bytes = gunzipSync(buffer, { maxOutputLength: this.maxBytes })
+          } catch (error) {
+            if (error?.code === 'ERR_BUFFER_TOO_LARGE') {
+              throw new Error('retailer HTTP decoded response exceeds maximum bytes')
+            }
+            throw error
+          }
+        }
         this.stats.bytes += buffer.length
         return {
           url: final.href,
