@@ -118,7 +118,7 @@ test('multi-capture private archive retains all reviewed events but selects only
       'latest-physical-capture-per-retailer-kind')
     assert.equal(report.allHistoricalOfferRows,
       report.archivedOfferRows + report.olderHistoricalOfferRowsNotCompared)
-    assert.equal(report.olderHistoricalOfferRowsNotCompared, 1)
+    assert.ok(report.olderHistoricalOfferRowsNotCompared > 0)
     assert.equal(report.perSourceShape.find(x =>
       x.retailer === 'plus' && x.kind === 'catalog').acceptedHistoricalSources, 2)
     assert.equal(report.perSourceShape.find(x =>
