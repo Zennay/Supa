@@ -125,7 +125,15 @@ function facts(value) {
  * Accepts only existing in-memory reviewed-adapter output. A successful
  * review is historical dataset consistency, not real-time price permission.
  */
-export function auditPrivateRetailerCaptureEvents(batch, { asOf = new Date().toISOString() } = {}) {
+export function auditPrivateRetailerCaptureEvents(batch, options = {}) {
+  // A direct JS caller can also attach active getters and Proxy wrappers to
+  // options. Seal that tiny input BEFORE reading the review clock.
+  const safeOptions = inertEventReviewBatch(options)
+  if (!safeOptions || typeof safeOptions !== 'object' ||
+      Array.isArray(safeOptions) ||
+      Object.keys(safeOptions).some(key => key !== 'asOf')) fail()
+  const asOf = Object.hasOwn(safeOptions, 'asOf')
+    ? safeOptions.asOf : new Date().toISOString()
   batch = inertEventReviewBatch(batch)
   const clock = instant(asOf, Date.now())
   if (!object(batch) || !object(batch.summary) ||
