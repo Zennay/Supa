@@ -56,7 +56,7 @@ export function prepareUnpricedShoppingPreview(
       !Number.isSafeInteger(recipe.minutes) || recipe.minutes <= 0 ||
       !Number.isSafeInteger(recipe.servings) || recipe.servings < 1 ||
       recipe.servings > 1000 || !Array.isArray(recipe.tags) ||
-      recipe.ingredients.some((row) => !row ||
+      recipe.ingredients.some((row: RecipeWithIngredients['ingredients'][number]) => !row ||
         typeof row.id !== 'string' || !row.id.startsWith('private-ingredient:') ||
         typeof row.label !== 'string' || !row.label.trim() ||
         typeof row.query !== 'string' || !row.query.trim() ||
@@ -76,7 +76,7 @@ export function prepareUnpricedShoppingPreview(
       // Legacy numeric-only contract: NOT a 0-euro estimate.
       estimatedCost: Number.NaN,
       tags: [...recipe.tags],
-      ingredients: recipe.ingredients.map((row) => ({ ...row })),
+      ingredients: recipe.ingredients.map((row: RecipeWithIngredients['ingredients'][number]) => ({ ...row })),
     }))
     const basket = buildOneStoreBasket({
       store: { id: 'private-offline-unpriced', name: 'Winkel nog te kiezen' },
