@@ -1,4 +1,5 @@
-import { readFile, stat } from 'node:fs/promises'
+import { lstat, open } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
@@ -225,11 +226,35 @@ export async function loadReviewedRepositoryFixtures() {
   for (const file of RETAILER_REVIEWED_FIXTURES) {
     const url = new URL(file, root)
     const filesystemPath = fileURLToPath(url)
-    const info = await stat(filesystemPath)
-    if (!info.isFile() || info.size > 1024 * 1024) {
+    // Git-owned fixture sources must be literal regular files, not symlinks,
+    // hardlink aliases or mutable files swapped while being loaded.
+    const original = await lstat(filesystemPath)
+    if (!original.isFile() || original.isSymbolicLink() ||
+        original.nlink !== 1 || original.size > 1024 * 1024) {
       throw new Error('Reviewed fixture must be a bounded regular file')
     }
-    records.push(JSON.parse(await readFile(url, 'utf8')))
+    const handle = await open(filesystemPath, constants.O_RDONLY | constants.O_NOFOLLOW)
+    let contents
+    try {
+      const opened = await handle.stat()
+      const stable = (a, b) => a.isFile() && b.isFile() &&
+        a.dev === b.dev && a.ino === b.ino && a.nlink === 1 && b.nlink === 1 &&
+        a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs
+      if (!stable(original, opened)) {
+        throw new Error('Reviewed fixture identity changed')
+      }
+      const bytes = await handle.readFile()
+      const finalStat = await handle.stat()
+      if (bytes.length !== original.size || bytes.length > 1024 * 1024 ||
+          !stable(opened, finalStat) ||
+          !stable(finalStat, await lstat(filesystemPath))) {
+        throw new Error('Reviewed fixture identity changed')
+      }
+      contents = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    } finally {
+      await handle.close()
+    }
+    records.push(JSON.parse(contents))
   }
   return ingestReviewedBatch(records)
 }
