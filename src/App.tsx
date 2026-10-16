@@ -6,7 +6,7 @@ import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
-import { RetailerSearchView } from './features/search/RetailerSearchView'
+import type { ComponentType } from 'react'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { buildOneStoreBasket } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
@@ -65,6 +65,24 @@ function readPlannerPreferences(): {
   } catch {
     return { preferences: fallback, warning: 'unavailable', raw: null }
   }
+}
+
+// Load the optional search route only when selected. This keeps the planner
+// independent from pricing infrastructure and preserves the existing test
+// harness/SSR flow when the user stays in Planner, Mand or Meten.
+function RetailerSearchRoute() {
+  const [SearchView, setSearchView] = useState<ComponentType | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+  useEffect(() => {
+    let active = true
+    import('./features/search/RetailerSearchView').then(({ RetailerSearchView }) => {
+      if (active) setSearchView(() => RetailerSearchView)
+    }).catch(() => { if (active) setLoadFailed(true) })
+    return () => { active = false }
+  }, [])
+  return SearchView ? <SearchView /> : <section className="screen"><p role="status">
+    {loadFailed ? 'Prijszoekfunctie is tijdelijk niet beschikbaar.' : 'Zoekfunctie laden…'}
+  </p></section>
 }
 
 export function App() {
@@ -305,7 +323,7 @@ export function App() {
         )}
         {tab === 'list' && <ShoppingListView basket={basket} />}
         {tab === 'observe' && <ObservationView />}
-        {tab === 'search' && <RetailerSearchView />}
+        {tab === 'search' && <RetailerSearchRoute />}
       </div>
 
       <nav className="bottom-nav" aria-label="Hoofdnavigatie">
