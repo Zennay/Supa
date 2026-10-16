@@ -93,10 +93,30 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   if (!original) throw new Error('Ingredientregel ontbreekt')
   // A single-unit match must never consume only the first part of
   // "1 kg 250 g bloem" and mistake "250 g" for a product name.
-  const amountPattern = '(?:\\d+\\s+)?\\d+\\/\\d+|\\d+(?:[.,]\\d+)?|[½¼¾]'
-  const compound = original.match(new RegExp(
-    '^(' + amountPattern + ')\\s*([a-z]+)\\s+(' + amountPattern +
-    ')\\s*([a-z]+)\\s+(.+)/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
+  // Parse two physically stated measures BEFORE falling back to the single
+  // amount pattern: keeping only the first segment would undercount shopping.
+  const compound = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+(.+)$/iu)
+  if (compound) {
+    const first = quantity(compound[1])
+    const second = quantity(compound[3])
+    const firstUnit = units[compound[2].toLowerCase()]
+    const secondUnit = units[compound[4].toLowerCase()]
+    const label = compound[5].trim()
+    if (first !== null && second !== null &&
+        Number.isFinite(first) && Number.isFinite(second) &&
+        first > 0 && second > 0 && first <= 100_000 && second <= 100_000 &&
+        firstUnit && secondUnit && firstUnit.unit === secondUnit.unit &&
+        label && !/^\d+(?:[.,]\d+)?\s+(?:g|kg|ml|l|oz|lb)\b/i.test(label)) {
+      const normalized = rounded(first * firstUnit.factor + second * secondUnit.factor)
+      if (Number.isFinite(normalized) && normalized > 0 && normalized <= 1_000_000) {
+        return { original, label, query: label.toLocaleLowerCase('nl'),
+          amount: normalized, unit: firstUnit.unit, reviewReason: null }
+      }
+    }
+    return { original, label: original, query: original.toLocaleLowerCase('nl'),
+      amount: null, unit: null, reviewReason: 'Controleer de samengestelde hoeveelheden' }
+  }
+  const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
   if (!match) return { original, label: original, query: original.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid of eenheid ontbreekt' }
   const amount = quantity(match[1])
   const tail = match[2].trim()
