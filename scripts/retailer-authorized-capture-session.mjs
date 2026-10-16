@@ -51,7 +51,7 @@ function snapshotRequest(input) {
  */
 export function createAuthorizedRetailerCaptureSession() {
   const states = new Map(Object.values(HOSTS).map(id =>
-    [id, { attempts: 0, completed: 0, blocked: false,
+    [id, { attempts: 0, completed: 0, verified: 0, blocked: false,
       inFlight: false, nextEligibleAt: 0 }]))
 
   async function captureOne(input) {
@@ -59,7 +59,7 @@ export function createAuthorizedRetailerCaptureSession() {
     const transport = request.fetchFn
     let reserved = null
     try {
-      return await captureApprovedRetailerPage({
+      const capture = await captureApprovedRetailerPage({
       ...request,
       fetchFn: async (url, init) => {
         // The canonical capture validates its permission gate and exact HTTPS
@@ -102,6 +102,11 @@ export function createAuthorizedRetailerCaptureSession() {
         return response
       },
     })
+      // Count a verified capture only after the entire bounded HTML body
+      // has passed content-type, size, stream and UTF-8 integrity checks.
+      // An HTTP 200 alone is never successful evidence.
+      if (reserved) reserved.verified++
+      return capture
     } finally {
       // Reserve the host until the source reader has also finished verifying
       // the bounded HTML body, not merely until response headers arrive.
@@ -115,6 +120,7 @@ export function createAuthorizedRetailerCaptureSession() {
         [retailer, {
           attemptedCaptures: state.attempts,
           successfulHttpResponses: state.completed,
+          verifiedCaptures: state.verified,
           hardStopped: state.blocked,
           busy: state.inFlight,
           quotaExhausted: state.attempts >= MAX_REQUESTS_PER_HOST,
