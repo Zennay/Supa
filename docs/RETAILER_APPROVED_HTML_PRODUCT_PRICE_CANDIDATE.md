@@ -50,6 +50,20 @@ const outcome = await writePrivateRetailerPriceSnapshot(
 
 Dit is een *operator-/bewijsarchief*, nog niet de voor Supa-gebruikers zichtbare prijsdatabase. Het gebruikt **geen betaalde API** en haalt geen site op zonder afzonderlijk bewezen expliciete bronrechten. `verifiedCurrentCheckoutPrices: 0` blijft altijd zo. Uiteindelijk kunnen maximaal 22 afzonderlijk toegestane producten uit dezelfde plan-/prijscontext privé worden beoordeeld; die 22 zijn nog niet automatisch live opgehaald.
 
+### Eén aanroep voor de complete privé-scraperroute
+
+`captureAndArchiveApprovedRetailerProduct(captureOptions, privateOutputFile)` in `scripts/retailer-approved-price-archive-run.mjs` voert de bestaande bronrechtentoets, exacte ene HTML-capture, PLUS Schema.org / Deka Nuxt-prijscontrole, versheid/pack/voorraad en exclusieve privé-archivering direct achter elkaar uit. De aanroeper geeft expliciet een toegestane `fetchFn`, beoordeelde bron-URL, echte bronrechten en nieuwe bestandsnaam. De functie retourneert **alleen** status/aantallen; geen prijs, URL of lokaal uitvoerpad. De huidige checked-in PLUS/Deka-rechtenregistratie weigert dit vóór netwerk én vóór file writes.
+
+```js
+import { captureAndArchiveApprovedRetailerProduct } from './scripts/retailer-approved-price-archive-run.mjs'
+
+const status = await captureAndArchiveApprovedRetailerProduct({
+  source, permissionGate, grant, fetchFn, capturedAt,
+}, '/eigen-beveiligde-map/nieuwe-review.json')
+```
+
+Dit is nu technisch een complete **één-product, toestemminggebonden capture→prijs→privé-archief**-pipeline. Er is **nog geen** automatisch dagproces, periodieke databankmigratie of betrouwbare vergelijking van 22 actuele echte productwaarnemingen.
+
 ## Onafhankelijke HTML-parserbeveiliging
 
 De nieuwe `scripts/retailer-approved-html-script-evidence.mjs` herkent exact het HTML-attribuut `type` bij JSON-LD en `id` bij `__NUXT_DATA__`. `data-type`, `data-id`, `aria-id`, neptekst *binnen andere attribuutwaarden* en dubbele echte sleutels worden **niet** als gezaghebbende bronmetadata vertrouwd. Dit is een afzonderlijke beveiliging van **deze PR's eigen prijsroute** en verandert niet de parallel ontwikkelde offline binder van een andere worker ([QA-issue #3358](https://github.com/Zennay/Supa/issues/3358)).
@@ -61,6 +75,7 @@ node --experimental-strip-types --test tests/product-retailer-approved-html-pric
 node --experimental-strip-types --test tests/product-retailer-approved-deka-nuxt-price-candidate-20261016.test.mjs
 node --experimental-strip-types --test tests/product-retailer-approved-html-script-evidence-20261016.test.mjs
 node --experimental-strip-types --test tests/product-retailer-approved-private-price-snapshot-store-20261016.test.mjs
+node --experimental-strip-types --test tests/product-retailer-approved-price-archive-run-20261016.test.mjs
 npm test
 npm run m1:source-permission-gate
 npm run build
