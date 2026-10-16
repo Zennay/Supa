@@ -68,11 +68,11 @@ function readPlannerPreferences(): {
   }
 }
 
-export function App() {
-  const [tab, setTab] = useState<Tab>('home')
+export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [designProductIds, setDesignProductIds] = useState<string[]>([])
   const isHiFiView = tab === 'home' || tab === 'recipes' || tab === 'products'
-  const navigate = (next: Tab) => { setTab(next); window.scrollTo(0, 0) }
+  const navigate = (next: Tab) => { setTab(next); window.scrollTo?.(0, 0) }
   const toggleDesignProduct = (id: string) => setDesignProductIds(current =>
     current.includes(id) ? current.filter(item => item !== id) : [...current, id])
   const [initialLoad] = useState(readPlannerPreferences)
@@ -321,6 +321,7 @@ export function App() {
           <button
             type="button"
             key={item.id}
+            aria-label={item.label}
             className={tab === item.id ? 'active' : ''}
             aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => navigate(item.id)}

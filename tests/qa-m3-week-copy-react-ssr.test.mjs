@@ -21,7 +21,7 @@ test('independent: actual M3 planner share UI defaults to private, accessible ma
 
   try {
     const { App } = await server.ssrLoadModule('/src/App.tsx')
-    const html = renderToStaticMarkup(createElement(App))
+    const html = renderToStaticMarkup(createElement(App, { initialTab: 'planner' }))
     const sharePanel = html.match(/<section\b[^>]*class="week-share-panel"[^>]*>[\s\S]*?<\/section>/)?.[0]
     assert.ok(sharePanel, 'share must be inside a discoverable planner panel')
 

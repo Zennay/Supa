@@ -110,6 +110,8 @@ function mount(disk, { denyGetter = false } = {}) {
       './features/shopping-list/ShoppingListView': { ShoppingListView },
       './features/observation/ObservationView': { ObservationView },
       './components/IdentityAvatar.tsx': { IdentityAvatar },
+      './features/home/HiFiHome': { HiFiHome: () => {}, HiFiDemoList: () => {} },
+      './features/home/figmaAssets': { figmaAssets: {} },
       './domain/basket': { buildOneStoreBasket: () => ({
         totalCents: 1500, unresolvedLineCount: 0, lines: [],
       }) },
@@ -139,7 +141,7 @@ function mount(disk, { denyGetter = false } = {}) {
   function render() {
     index = 0
     pendingEffects = []
-    const nodes = flatten(module.exports.App())
+    const nodes = flatten(module.exports.App({ initialTab: 'planner' }))
     for (const effect of pendingEffects) effect()
     return nodes
   }
@@ -153,7 +155,7 @@ function mount(disk, { denyGetter = false } = {}) {
     return String(node?.props.children ?? '')
   }
   function navigate(label) {
-    const element = render().find(x => x.type === 'button' && x.props.children === label)
+    const element = render().find(x => x.type === 'button' && (x.props.children === label || x.props['aria-label'] === label))
     assert.ok(element)
     element.props.onClick()
   }
