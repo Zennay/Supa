@@ -5,6 +5,7 @@ import { civilCaptureInstantKey } from '../src/data/retailerCivilCaptureClock.ts
 import {
   isValidPrivateCivilCaptureTime,
   ingestCivilClockCheckedReviewedBatch,
+  buildCivilClockCheckedPrivateCatalog,
   main,
 } from '../scripts/retailer-private-civil-clock-preflight.mjs'
 import {
@@ -216,4 +217,53 @@ test('all six shapes deny bare query and fragment URL provenance before private 
   const baseline = ingestCivilClockCheckedReviewedBatch(originals)
   assert.equal(baseline.summary.acceptedSources, 6)
   assert.equal(baseline.summary.publicSavingsClaimEligible, false)
+})
+
+test('private normalized catalog survives six archived adapters but never promotes licensed prices', async () => {
+  const originals = await fixtures()
+  const catalog = buildCivilClockCheckedPrivateCatalog(originals)
+  assert.equal(catalog.schemaVersion, 1)
+  assert.equal(catalog.model, 'universal-retailer-product-captures')
+  assert.equal(catalog.status, 'private-review-only')
+  assert.equal(catalog.sourceCount, 6)
+  assert.ok(catalog.productCount >= 2)
+  assert.ok(catalog.captureCount >= 6)
+  assert.equal(catalog.productionEnabled, false)
+  assert.equal(catalog.publicSavingsClaimEligible, false)
+  const retailerKeys = new Set(catalog.products.map(product => product.retailerId))
+  assert.deepEqual([...retailerKeys].sort(), ['dekamarkt', 'plus'])
+  for (const product of catalog.products) {
+    assert.equal(product.publishable, false)
+    assert.equal(product.sourceRightsVerified, false)
+    assert.equal(product.currentTrustedPriceCents, null)
+    assert.equal(product.selectedSnapshotSha256, null)
+    assert.ok(product.captures.length > 0)
+  }
+})
+
+test('private catalog composition cannot bypass original batch civil, alias or raw-URL gates', async () => {
+  const originals = await fixtures()
+  const alias = structuredClone(originals[0])
+  alias.source.id += '-duplicate'
+  alias.source.capturedAt = offsetAlias(alias.source.capturedAt, '+', 14)
+  assert.throws(
+    () => buildCivilClockCheckedPrivateCatalog([...originals, alias]),
+    /civil-clock preflight refused/,
+  )
+  const invalidCivil = await fixtures()
+  invalidCivil[3].source.capturedAt = offsetAlias(invalidCivil[3].source.capturedAt, '-', 13)
+  assert.throws(
+    () => buildCivilClockCheckedPrivateCatalog(invalidCivil),
+    /civil-clock preflight refused/,
+  )
+  const ambiguousUrl = await fixtures()
+  ambiguousUrl[4].source.url += '?'
+  assert.throws(
+    () => buildCivilClockCheckedPrivateCatalog(ambiguousUrl),
+    /civil-clock preflight refused/,
+  )
+  assert.throws(
+    () => buildCivilClockCheckedPrivateCatalog(originals, { publish: true }),
+    /civil-clock preflight refused/,
+  )
 })
