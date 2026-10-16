@@ -48,8 +48,11 @@ function canonicalCaptureNanoseconds(raw) {
   if (m[8] !== 'Z') {
     const offsetHours = Number(m[10])
     const offsetRemainder = Number(m[11])
-    if (offsetHours > 14 || offsetRemainder > 59 ||
-        (offsetHours === 14 && offsetRemainder !== 0)) fail()
+    // Real civil UTC offsets span -12:00 through +14:00. A synthetic
+    // UTC-13/UTC-14 timestamp must not become vetted retailer chronology.
+    if (offsetRemainder > 59 ||
+        (m[9] === '+' && (offsetHours > 14 || (offsetHours === 14 && offsetRemainder !== 0))) ||
+        (m[9] === '-' && (offsetHours > 12 || (offsetHours === 12 && offsetRemainder !== 0)))) fail()
     offsetMinutes = (m[9] === '+' ? 1 : -1) * (offsetHours * 60 + offsetRemainder)
   }
   const fractional = (m[7] || '').padEnd(9, '0')
