@@ -254,3 +254,68 @@ test('host week selection getter is never invoked when validating studio props',
   assert.equal(reads,0)
   assert.equal(added.length,0)
 })
+
+test('complete studio library snapshot blocks title/ingredients getter and review-list rendering',()=>{
+  for (const field of ['title','ingredients']) {
+    const valid=existing()
+    const mutated={...valid}
+    let calls=0
+    Object.defineProperty(mutated,field,{
+      enumerable:true,configurable:true,
+      get(){calls++;return valid[field]},
+    })
+    const added=[]
+    const p=props({recipes:[mutated],onAddReviewedRecipe:r=>added.push(r)})
+    const html=renderToStaticMarkup(createElement(PrivateRecipeStudio,p))
+    assert.equal(calls,0)
+    assert.doesNotMatch(html,/Boodschappen uit mijn recepten/)
+    assert.match(html,/Dit recept is nog niet klaar/)
+    confirmationCallback(p)(p.draft)
+    assert.equal(calls,0)
+    assert.equal(added.length,0)
+  }
+})
+
+test('nested ingredient accessor and sparse nested ingredient arrays fail closed',()=>{
+  const good=existing()
+  let calls=0
+  const ingredient={...good.ingredients[0]}
+  Object.defineProperty(ingredient,'amount',{enumerable:true,
+    get(){calls++;return 200}})
+  const hostile={...good,ingredients:[ingredient]}
+  for(const recipes of [[hostile],[{...good,ingredients:new Array(1)}]]) {
+    const added=[]
+    const p=props({recipes,onAddReviewedRecipe:r=>added.push(r)})
+    const html=renderToStaticMarkup(createElement(PrivateRecipeStudio,p))
+    assert.doesNotMatch(html,/Boodschappen uit mijn recepten/)
+    confirmationCallback(p)(p.draft)
+    assert.equal(added.length,0)
+  }
+  assert.equal(calls,0)
+})
+
+test('unknown or foreign selected private recipe ID is review-only, never locally added',()=>{
+  for(const id of ['private-recipe:missing','foreign:unreviewed']) {
+    const added=[]
+    const p=props({selectedDays:{Wo:id},onAddReviewedRecipe:r=>added.push(r)})
+    const html=renderToStaticMarkup(createElement(PrivateRecipeStudio,p))
+    assert.match(html,/Dit recept is nog niet klaar/)
+    assert.doesNotMatch(html,/Boodschappen uit mijn recepten/)
+    confirmationCallback(p)(p.draft)
+    assert.equal(added.length,0)
+  }
+})
+
+test('plain owned existing library and valid selected day remain confirmable once',()=>{
+  const created=[]
+  const p=props({selectedDays:{Ma:'private-recipe:saved-one'},
+    onAddReviewedRecipe:r=>created.push(r)})
+  const html=renderToStaticMarkup(createElement(PrivateRecipeStudio,p))
+  assert.match(html,/Boodschappen uit mijn recepten/)
+  const confirm=confirmationCallback(p)
+  confirm(p.draft)
+  confirm(p.draft)
+  assert.equal(created.length,1)
+  assert.equal(created[0].estimatedCost,null)
+  assert.equal(created[0].priceStatus,'unknown')
+})
