@@ -92,7 +92,13 @@ export function parsePack(text) {
     const [base, factor] = UNIT_MAP.get(multi[3].toLowerCase())
     const count = Number(multi[1])
     const amount = num(multi[2]) * factor
-    if (count > 0 && amount > 0) return { amount: round(amount), unit: base, count }
+    if (Number.isSafeInteger(count) && count > 0 && amount > 0 &&
+        (base !== 'piece' || (Number.isSafeInteger(amount) && Number.isSafeInteger(amount * count)))) {
+      return { amount: round(amount), unit: base, count }
+    }
+    // Do not silently fall back to a smaller single-pack measurement when
+    // an explicit (but invalid) multipack was present.
+    return empty
   }
   // Ranges ("350-390 g") describe several variants, not one pack.
   if (/\d\s*[-–]\s*\d+(?:[.,]\d+)?\s*[a-z]/.test(s)) return empty
@@ -101,7 +107,9 @@ export function parsePack(text) {
     const [base, factor] = UNIT_MAP.get(single[2].toLowerCase())
     const amount = num(single[1]) * factor
     if (amount > 0) {
-      if (base === 'piece') return { amount: 1, unit: 'piece', count: amount }
+      if (base === 'piece') {
+        return Number.isSafeInteger(amount) ? { amount: 1, unit: 'piece', count: amount } : empty
+      }
       return { amount: round(amount), unit: base, count: 1 }
     }
   }
@@ -114,7 +122,9 @@ export function packFromAmount(amount, unitCode) {
   const n = typeof amount === 'string' ? num(amount) : amount
   if (!unit || !Number.isFinite(n) || n <= 0) return { amount: null, unit: null, count: 1 }
   const [base, factor] = unit
-  if (base === 'piece') return { amount: 1, unit: 'piece', count: n }
+  if (base === 'piece') {
+    return Number.isSafeInteger(n) ? { amount: 1, unit: 'piece', count: n } : { amount: null, unit: null, count: 1 }
+  }
   return { amount: round(n * factor), unit: base, count: 1 }
 }
 
@@ -240,9 +250,17 @@ function isKnownCents(value) {
 
 // Build a canonical product record; adapters fill what they know.
 export function makeRecord(fields) {
-  const pack =
+  const rawPack =
     fields.pack ??
     (fields.packText ? parsePack(fields.packText) : { amount: null, unit: null, count: 1 })
+  // Even an explicitly supplied structured pack cannot turn fractional,
+  // nonfinite or imprecisely large counts into comparable physical pieces.
+  const pack = rawPack.unit === 'piece' &&
+    (!Number.isSafeInteger(rawPack.amount) || rawPack.amount <= 0 ||
+      !Number.isSafeInteger(rawPack.count ?? 1) || (rawPack.count ?? 1) <= 0 ||
+      !Number.isSafeInteger(rawPack.amount * (rawPack.count ?? 1)))
+    ? { amount: null, unit: null, count: 1 }
+    : rawPack
   const priceCents = fields.priceCents ?? null
   let promoPriceCents = fields.promoPriceCents ?? null
   if (promoPriceCents !== null && priceCents !== null && promoPriceCents >= priceCents) {
