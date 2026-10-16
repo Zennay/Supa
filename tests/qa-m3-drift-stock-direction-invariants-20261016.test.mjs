@@ -236,3 +236,51 @@ test('metamorphic matrix: every retailer/source kind independently reports unkno
     }
   }
 })
+
+test('issue #3080: 1ns OLDER catalog with completely disjoint SKU identities is refused', async () => {
+  const previous = structuredClone(await loadReviewedRepositoryFixtures())
+  const current = structuredClone(previous)
+  const catalog = current.results.find(row => row.key === 'plus:catalog')
+  assert.ok(catalog && catalog.observations.length > 0)
+  const originalClock = catalog.observations[0].provenance.capturedAt
+  assert.equal(originalClock, '2026-10-04T18:53:02.645Z')
+  for (const observation of catalog.observations) {
+    observation.sourceProductId = 'historic-regression-' + observation.sourceProductId
+    // One physical nanosecond before the true reviewed capture, NOT 1 ms.
+    observation.provenance.capturedAt = '2026-10-04T18:53:02.644999999Z'
+    observation.provenance.sha256 = 'a'.repeat(64)
+  }
+  const frozen = structuredClone(current)
+  const gate = await rights()
+  assert.throws(() => rehearsePrivateM3RetailerDrift(
+    gate, previous, current, { referenceTime: AT }), /refused/i)
+  assert.deepEqual(current, frozen, 'no source evidence may be modified on refusal')
+})
+
+test('issue #3080: 1ns LATER changed catalog with disjoint identities stays review-only', async () => {
+  const previous = structuredClone(await loadReviewedRepositoryFixtures())
+  const current = structuredClone(previous)
+  const catalog = current.results.find(row => row.key === 'plus:catalog')
+  assert.ok(catalog && catalog.observations.length > 0)
+  const originalCount = catalog.observations.length
+  for (const observation of catalog.observations) {
+    observation.sourceProductId = 'historic-regression-' + observation.sourceProductId
+    observation.provenance.capturedAt = '2026-10-04T18:53:02.645000001Z'
+    observation.provenance.sha256 = 'b'.repeat(64)
+  }
+  const report = rehearsePrivateM3RetailerDrift(
+    await rights(), previous, current, { referenceTime: AT })
+  assert.equal(report.releaseDecision, 'hold')
+  assert.equal(report.permissionVerified, false)
+  assert.equal(report.currentPriceVerified, false)
+  assert.equal(report.publicSavingsClaimEligible, false)
+  assert.equal(report.liveRequests, 0)
+  assert.equal(report.alertShapeCount, 1)
+  const row = report.perShape.find(x => x.retailer === 'plus' && x.kind === 'catalog')
+  assert.equal(row.addedArchivedProducts, originalCount)
+  assert.equal(row.missingArchivedProducts, originalCount)
+  assert.ok(row.reviewSignals.includes('review-archived-product-fact-changes'))
+  assert.equal(row.currentlyArchivedAt, '2026-10-04T18:53:02.645000001Z')
+  assert.ok(report.perShape.filter(x => x.retailer !== 'plus' || x.kind !== 'catalog')
+    .every(x => x.historicalChangedFactFields === 0 && x.reviewSignals.length === 0))
+})
