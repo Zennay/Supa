@@ -94,7 +94,7 @@ function parseUniqueJson(source) {
 // This is deliberately conservative: malformed/incomplete inert blocks
 // cannot contribute source-price evidence.
 function maskInertHtml(html) {
-  const tokens = /<!--[\\s\\S]*?(?:-->|$)|<\\/?(?:template|textarea|title|noscript)\\b[^>]*>/gi
+  const tokens = /<!--[\s\S]*?(?:-->|$)|<\/?(?:template|textarea|title|noscript)\b[^>]*>/gi
   let masked = ''
   let cursor = 0
   const contexts = []
@@ -105,8 +105,8 @@ function maskInertHtml(html) {
     masked += ' '.repeat(token.length)
     cursor = start + token.length
     if (token.startsWith('<!--')) continue
-    const close = /^<\\//u.test(token)
-    const name = /^<\\/?(template|textarea|title|noscript)\\b/iu.exec(token)?.[1]?.toLowerCase()
+    const close = /^<\//u.test(token)
+    const name = /^<\/?(template|textarea|title|noscript)\b/iu.exec(token)?.[1]?.toLowerCase()
     if (!name) continue
     const active = contexts.at(-1)
     if (!active) {
