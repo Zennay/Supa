@@ -46,6 +46,67 @@ function inertPreflightOptions(options) {
   return { referenceTime, inputMode }
 }
 
+const SHAPES = ['plus:product', 'plus:catalog', 'plus:offers',
+  'dekamarkt:product', 'dekamarkt:catalog', 'dekamarkt:offers']
+
+/**
+ * Review the latest PHYSICAL archived event in each of six channel shapes.
+ * The complete 6..32 source history still enters health and catalog drift.
+ * Older offer rows must remain counted as NOT COMPARED; no source is secretly
+ * promoted to live/current and no past evidence is discarded from the catalog.
+ */
+function chooseOneHistoricalCapturePerShape(batch) {
+  if (!batch || !Array.isArray(batch.results) ||
+      batch.results.length < 6 || batch.results.length > 32) refuse()
+  const latest = new Map()
+  let allOfferRows = 0
+  for (const result of batch.results) {
+    if (!result || !SHAPES.includes(result.key) ||
+        result.accepted !== true ||
+        !Array.isArray(result.observations) ||
+        result.observations.length === 0) refuse()
+    if (result.key.endsWith(':offers')) allOfferRows += result.observations.length
+    const time = result.observations[0]?.provenance?.capturedAt
+    if (typeof time !== 'string') refuse()
+    // The preceding canonical rollout/health pass checked the full ISO civil
+    // grammar, ±14h offsets, physical chronology and every source event.
+    const ms = Date.parse(time)
+    const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/.exec(time)?.[1] ?? ''
+    if (!Number.isFinite(ms)) refuse()
+    const nanos = BigInt(ms) * 1_000_000n +
+      BigInt(fraction.padEnd(9, '0').slice(3) || '0')
+    const old = latest.get(result.key)
+    // Never choose arbitrarily between two distinct events claiming the same
+    // physical timestamp for the same retailer and source kind.
+    if (old && old.nanos === nanos) refuse()
+    if (!old || nanos > old.nanos) latest.set(result.key, { result, nanos })
+  }
+  if (latest.size !== SHAPES.length) refuse()
+  const results = SHAPES.map(key => latest.get(key).result)
+  const observations = results.reduce((n, row) => n + row.observations.length, 0)
+  const retailerCounts = { plus: 0, dekamarkt: 0 }
+  for (const row of results) {
+    const retailer = row.key.split(':')[0]
+    retailerCounts[retailer] += row.observations.length
+  }
+  const reviewedOfferRows = results.filter(row => row.key.endsWith(':offers'))
+    .reduce((n, row) => n + row.observations.length, 0)
+  const selected = {
+    summary: {
+      mode: 'reviewed-offline-only', sources: 6,
+      acceptedSources: 6, rejectedSources: 0,
+      observations, retailerCounts,
+      productionEnabled: false, permissionVerified: false,
+      publicSavingsClaimEligible: false,
+    },
+    results,
+  }
+  return {
+    selected, reviewedOfferRows, allOfferRows,
+    historicalSourceEventsOutsideOfferReview: batch.results.length - SHAPES.length,
+  }
+}
+
 export function assessPrivateM3RetailerIngestion(permissionGate, batch, options = {}) {
   const { referenceTime, inputMode } = inertPreflightOptions(options)
   // The offer-audit clock admits UTC with at most millisecond precision;
@@ -56,7 +117,8 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
     referenceTime, maxAgeHours: 24,
   })
   const catalog = buildUniversalRetailerCatalog(batch)
-  const offers = reviewPrivateRetailerOffers(batch, {
+  const selection = chooseOneHistoricalCapturePerShape(batch)
+  const offers = reviewPrivateRetailerOffers(selection.selected, {
     asOf: referenceTime, windowHours: 24,
   })
   if (rollout.expectedShapeCount !== 6 || rollout.retailerCount !== 2 ||
@@ -68,7 +130,9 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
       !isCount(catalog.captureCount) ||
       catalog.captureCount > batch.summary.observations ||
       offers.sourceKinds !== 6 ||
-      offers.reviewedObservations !== batch.summary.observations ||
+      offers.reviewedObservations !== selection.selected.summary.observations ||
+      offers.observedOfferRows !== selection.reviewedOfferRows ||
+      selection.allOfferRows < selection.reviewedOfferRows ||
       !isCount(offers.observedOfferRows) ||
       !isCount(offers.corroboratedHistoricalBaselines) ||
       offers.corroboratedHistoricalBaselines > offers.observedOfferRows ||
@@ -92,6 +156,7 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
       archivedObservations: shape.historicalObservations,
       staleHistoricalSources: shape.staleHistoricalCaptures,
       unknownHistoricalPrices: shape.unknownPriceObservations,
+      latestArchivedCapturedAt: shape.latestArchivedCapturedAt,
       verifiedCurrentPriceObservations: 0,
     })))
   if (shapeDiagnostics.length !== 6 ||
@@ -117,6 +182,8 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
       ? ['collect-permitted-replacement-snapshots-after-review'] : []),
     ...(catalog.conflictCount > 0
       ? ['resolve-conflicting-archived-product-facts'] : []),
+    ...(selection.historicalSourceEventsOutsideOfferReview > 0
+      ? ['review-additional-archived-source-events-outside-offer-comparison'] : []),
     ...(uncorroboratedOffers > 0
       ? ['review-unverified-historical-offer-baselines'] : []),
     'obtain-written-retailer-reuse-rights',
@@ -138,6 +205,15 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, options 
     perSourceShape: shapeDiagnostics,
     normalizedPrivateProducts: catalog.productCount,
     conflictingPrivateProducts: catalog.conflictCount,
+    // The full history enters quality/drift checks. Only the latest of each
+    // of six source kinds enters one conservative offer-baseline comparison.
+    historicalSourceEvents: batch.results.length,
+    selectedSourceEventsForOfferReview: 6,
+    sourceEventsOutsideOfferReview: selection.historicalSourceEventsOutsideOfferReview,
+    offerReviewSelectionPolicy: 'latest-physical-capture-per-retailer-kind',
+    allHistoricalOfferRows: selection.allOfferRows,
+    olderHistoricalOfferRowsNotCompared:
+      selection.allOfferRows - selection.reviewedOfferRows,
     archivedOfferRows: offers.observedOfferRows,
     corroboratedHistoricalOfferBaselines: offers.corroboratedHistoricalBaselines,
     uncorroboratedHistoricalOfferRows: uncorroboratedOffers,
@@ -207,11 +283,11 @@ export async function main(argv = process.argv.slice(2),
   if (directory === null) {
     batch = await loadReviewedRepositoryFixtures()
   } else {
-    // This integrated baseline audit requires one source event for each
-    // of six shapes. Do not silently drop older or additional captures.
+    // The existing verifier admits 6–32 SHA-pinned reviewed capture events.
+    // The complete history remains in quality/drift, with only the latest
+    // per shape used for conservative *historical* offer corroboration.
     try {
       batch = await loadPrivateReviewedCaptureBatch(directory, { referenceTime })
-      if (batch.results.length !== 6 || batch.summary.sources !== 6) refuse()
     } catch { refuse() }
   }
   const report = assessPrivateM3RetailerIngestion(permissionGate, batch, {
