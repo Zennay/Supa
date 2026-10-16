@@ -13,13 +13,21 @@ try {
   await page.goto('http://127.0.0.1:4174')
   await page.getByRole('button', { name: 'Producten', exact: true }).click()
   await page.locator('[data-figma-node="3064:3125"]').waitFor()
-  assert.equal(await page.locator('.hifi-product-card').count(), 4)
-  assert.match(await page.locator('.hifi-demo-note').innerText(), /prijzen en aanbiedingen zijn niet actueel/)
+  assert.equal(await page.locator('.hifi-product-card').count(), 5)
+  assert.match(await page.locator('.hifi-historical-warning').innerText(), /Niet actueel, nog niet gelicentieerd/)
+  assert.match(await page.locator('.hifi-product-card').first().innerText(), /PLUS Bananen Fairtrade/)
+  assert.match(await page.locator('.hifi-product-card').last().innerText(), /DekaMarkt/)
+  assert.equal(await page.locator('.hifi-product-card .hifi-no-price').count(), 5)
+  assert.equal(await page.locator('.hifi-product-card del').count(), 0)
+  await page.getByRole('button', { name: 'Filters', exact: true }).click()
+  await page.getByLabel('Filter historische producten op winkel').selectOption('DekaMarkt')
+  assert.equal(await page.locator('.hifi-product-card').count(), 1)
+  await page.getByRole('button', { name: 'Figma voorbeelden', exact: true }).click()
   await page.evaluate(() => Promise.all([...document.images].map(image => image.decode().catch(() => {}))))
   assert.equal(await page.evaluate(() => [...document.images].every(image => image.complete && image.naturalWidth > 0)), true)
   await page.screenshot({ path: 'artifacts/product-ui/products-440.png', fullPage: true })
 
-  await page.getByRole('button', { name: 'Filters', exact: true }).click()
+  assert.equal(await page.locator('.hifi-product-card').count(), 4)
   const unitFilter = page.getByLabel('Filter producten op eenheid')
   await unitFilter.selectOption('l')
   assert.equal(await page.locator('.hifi-product-card').count(), 3)
@@ -48,7 +56,8 @@ try {
   await writeFile('artifacts/product-ui/result.json', JSON.stringify({
     status: 'passed',
     checks: [
-      'Figma Products route and four demo cards',
+      'five real historical product identities with withheld prices and sources',
+      'Figma original product prototype remains an explicitly separate tab',
       'all original local assets load',
       'L/kg unit filter',
       'numeric comparable unit sort',
