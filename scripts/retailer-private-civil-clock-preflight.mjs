@@ -41,6 +41,10 @@ export function ingestCivilClockCheckedReviewedBatch(records) {
         !KINDS.has(record.source.supermarket + ':' + record.source.kind) ||
         typeof record.source.url !== 'string' ||
         typeof record.source.sha256 !== 'string' ||
+        // Archived listing URLs with raw empty query/fragment delimiters
+        // must not be silently treated as the original reviewed source URL.
+        // A decoded URL object's .search/.hash drops bare '?' and '#'.
+        (record.source.url.endsWith('?') || record.source.url.includes('#')) ||
         !isValidPrivateCivilCaptureTime(record.source.capturedAt, now)) fail()
     const instant = civilCaptureInstantKey(record.source.capturedAt, now)
     if (instant === null) fail()
