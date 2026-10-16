@@ -87,21 +87,19 @@ test('all formula prefixes, tabs, newlines, quotes and control characters remain
   // Header/row delimiters remain strict, not just a regex-based pretty-print.
 })
 
-test('formula-looking ingredient IDs are quoted and cannot turn an unobserved sheet into observed data', async () => {
+test('formula-looking ingredient identities refuse before any worksheet may be exported', async () => {
   const originals = await fixtures()
-  for (const id of ['=SUM(1,2)', '+10', '-2', '@SUM(1,2)', '\n=NOW()']) {
+  const valid = buildPrivateSelectedWeekObservationWorksheet(originals, ['Ma'])
+  assert.equal(valid.rows, 10, 'unchanged known identity still succeeds')
+  for (const id of ['=SUM(1,2)', '+10', '-2', '@SUM(1,2)', '\\n=NOW()']) {
     const plan = structuredClone(m2InitialPlan)
     const recipes = structuredClone(m2Recipes)
     recipes[0].ingredients[0].id = id
-    const result = buildPrivateSelectedWeekObservationWorksheet(originals, ['Ma'], {plan, recipes})
-    const rows = csvRows(result.csv).slice(1)
-    assert.equal(rows.length, 10)
-    const serializedId = id.replace(/[\r\n\u0000-\u001f\u007f]/gu, ' ')
-    const expected = /^\s*[=+\-@]/u.test(serializedId) ? "'" + serializedId : serializedId
-    assert.equal(rows.filter(row => row[2] === expected).length, 2, `paired inert ID ${id}`)
-    assert.ok(rows.every(row => row[0] === 'UNOBSERVED_TEMPLATE_NOT_EVIDENCE'))
-    assert.ok(rows.every(row => row.slice(6).every(value => value === '')))
-    assert.equal(result.publicSavingsClaimEligible, false)
+    assert.throws(
+      () => buildPrivateSelectedWeekObservationWorksheet(originals, ['Ma'], {plan, recipes}),
+      /contract refused|worksheet refused/,
+      `untrusted planner identity denied before CSV: ${JSON.stringify(id)}`,
+    )
   }
 })
 
