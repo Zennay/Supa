@@ -85,3 +85,30 @@ test('bad first script prevents later legitimate script from becoming cheaper pr
   assert.equal(result.publicSavingsClaimEligible, false)
   assert.equal(Object.hasOwn(result, 'observation'), false)
 })
+
+test('an ambiguous non-Product script invalidates later legitimate Product on same physical page', () => {
+  const browserPage = '<script type="application/ld+json">' +
+    '{"@type":"WebPage","name":"fixture-one","name":"fixture-two"}' +
+    '</script>' + page(JSON.stringify(good))
+  const result = parseM3OfflineProductHtml({
+    source, capturedAt: time, html: browserPage,
+  })
+  assert.equal(result.type, 'abstain')
+  assert.equal(result.publicSavingsClaimEligible, false)
+  assert.equal(Object.hasOwn(result, 'observation'), false)
+})
+
+test('identical member names in distinct array objects do not cause false duplicate rejection', () => {
+  const original = JSON.stringify({
+    '@graph': [
+      { '@type': 'WebPage', name: 'Independent contextual page' },
+      good,
+      { '@type': 'Offer', price: '9.99', priceCurrency: 'EUR' },
+    ],
+  })
+  assert.deepEqual(parseUniqueKeyRetailerJson(original), JSON.parse(original))
+  const selected = parse(original)
+  assert.equal(selected.type, 'observation')
+  assert.equal(selected.observation.currentPriceCents, 245)
+  assert.equal(selected.publicSavingsClaimEligible, false)
+})
