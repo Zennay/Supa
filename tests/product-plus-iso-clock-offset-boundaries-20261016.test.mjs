@@ -50,6 +50,8 @@ for (const [label, fields] of [
   ['impossible offset +15:00', { validFrom: '2020-01-01T10:00:00+15:00' }],
   ['impossible offset +14:01', { validFrom: '2020-01-01T10:00:00+14:01' }],
   ['impossible offset -18:00', { validFrom: '2020-01-01T10:00:00-18:00' }],
+  ['nonexistent civil offset -14:00', { validFrom: '2020-01-01T10:00:00-14:00' }],
+  ['just beyond UTC-12 offset', { validFrom: '2020-01-01T10:00:00-12:01' }],
   ['unknown negative zero offset', { validFrom: '2020-01-01T10:00:00-00:00' }],
   ['nested impossible future offset', {
     priceSpecification: {
@@ -67,7 +69,7 @@ for (const [label, fields] of [
 for (const [label, fields] of [
   ['exact UTC source start', { validFrom: '2020-01-01T00:00:00Z' }],
   ['UTC plus 14 real zone limit', { validFrom: '2020-01-01T14:00:00+14:00' }],
-  ['UTC minus 14 limit', { validFrom: '2020-01-01T08:30:00-14:00' }],
+  ['UTC minus 12 real zone limit', { validFrom: '2020-01-01T08:30:00-12:00' }],
   ['Dutch +02:00 offset', { validFrom: '2020-02-29T12:00:00+02:00' }],
   ['proper positive zero offset', { validFrom: '2020-02-29T00:00:00+00:00' }],
   ['valid nested future price expiry', { priceSpecification: {
