@@ -108,22 +108,23 @@ export async function runRetailer(adapter, {
 
   try {
     const queue = []
-    // Discovery itself may make catalog HTTP requests before yielding its
-    // first item. Give it an origin-scoped façade rather than the raw client.
-    // Inherited methods are retained for adapter compatibility, while both
-    // request() and getText() pass through the same exact-host preflight.
-    const scopedFetcher = Object.create(
-      fetcher && (typeof fetcher === 'object' || typeof fetcher === 'function')
-        ? fetcher : null,
-    )
-    scopedFetcher.request = async (url, options) => {
-      if (!isTrustedResponseSource(url, adapter.host)) {
-        throw new Error('retailer discovery URL is outside approved HTTPS source origin')
-      }
-      if (typeof fetcher?.request !== 'function') throw new Error('retailer fetcher unavailable')
-      return fetcher.request(url, options)
-    }
-    scopedFetcher.getText = async (url, options) => (await scopedFetcher.request(url, options)).text
+    // Discovery itself may request catalog pages before yielding a work item.
+    // Expose ONLY these two scoped methods, never the real client's inherited
+    // once()/fetchImpl()/robotsFor() escape hatches or mutable transport state.
+    // Every discovery request must be admitted against this adapter's exact
+    // approved HTTPS origin before any underlying I/O begins.
+    const scopedFetcher = Object.freeze({
+      async request(url, options) {
+        if (!isTrustedResponseSource(url, adapter.host)) {
+          throw new Error('retailer discovery URL is outside approved HTTPS source origin')
+        }
+        if (typeof fetcher?.request !== 'function') throw new Error('retailer fetcher unavailable')
+        return fetcher.request(url, options)
+      },
+      async getText(url, options) {
+        return (await this.request(url, options)).text
+      },
+    })
     const discovered = adapter.discover({ fetcher: scopedFetcher, log })
     let exhausted = false
     let pulling = Promise.resolve()
