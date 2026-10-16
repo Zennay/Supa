@@ -43,3 +43,11 @@ De bestaande SQLite-beveiliging (nieuwe file, 0600 rechten, geen overschrijven, 
 Ook rechtstreekse JavaScript-aanroepen van de geëxporteerde SQLite-builder-CLI krijgen een inerte, begrensde kopie van `argv` vóór het lezen van `length` of de outputlocatie; een actieve/revoked Proxy of gespoofde array wordt geweigerd **vóór iedere bestandsmutatie**.
 
 Nieuwe tests gebruiken de echte zes M1-captures, bouwen daadwerkelijk een 0600-SQLite bestand, bewijzen no-overwrite en controleren zowel een echt Node-subproces als niet uitvoerbare Proxy-argumenten. Hieruit volgt nooit een toestemming om de private SQLite-bron als actuele winkelprijzendatabase te gebruiken.
+
+## Onafhankelijke exportpad-QA (#3242 / #3243), 16 oktober
+
+Oorspronkelijke onafhankelijke [QA #3242](https://github.com/Zennay/Supa/pull/3242) demonstreerde op eerdere ongerepareerde code twee directe JavaScript API-gevallen waar een fictieve databasebestemming met een ingebed NUL-teken een Node `TypeError` teruggeeft, inclusief het opgegeven private pad. De bestaande symlink- en non-overwrite controles waren al groen. In eigen product-code wordt een niet-toelaatbare bestemming nu **vóór resolve/lstat** geweigerd; een onverwachte native bestandsfout wordt niet meer met padinformatie naar de aanroeper doorgegeven. Daardoor blijft de foutmelding veilig en generiek.
+
+De twee onafhankelijke oorspronkelijke QA-bestanden zijn **byte-identiek** herhaald in de productbranch: `cedb657be9a6aa62245dac76592de5ae0aaade95` (filesystemafwijzing) en `f7cf99befda6c9a316b77fd12ef843da4096f141` (zes historische bronvormen en 11×2 planner-consistentie). Extra eigen tests weigeren daarnaast newline, carriage return, DEL en te lange bestandsnamen en controleren dat **geen database of output** achterblijft.
+
+Dit gaat om de lokale offline applicatie-API, niet om een bewezen remote aanval. Er zijn geen externe supermarktgegevens, echte tokens of gebruikersbestanden gelezen. Bronrechten en menselijke M3-studie blijven ongewijzigd HOLD.
