@@ -39,7 +39,7 @@ function safeLink(value: unknown): string | null {
     let resolved = false
     for (let layer = 0; layer < 8; layer += 1) {
       const normalized = key.normalize('NFKC').toLowerCase()
-      const compact = normalized.replace(/[-_\\s]/g, '')
+      const compact = normalized.replace(/[-_\s]/g, '')
       if (/(?:oauth|saml|token|secret|password|signature|apikey|session|authorization|pkce|codeverifier|codechallenge|authcode)/.test(compact) ||
           /(?:^|[_-])(?:code|sig|auth|state)(?:$|[_-])/.test(normalized)) {
         throw new Error('Back-up mag geen geheime inloggegevens in receptlinks bevatten.')
