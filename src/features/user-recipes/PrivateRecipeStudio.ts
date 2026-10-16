@@ -32,8 +32,69 @@ export function PrivateRecipeStudio({
   onSelectedDaysChange: (next: Record<string, string | null>) => void
   onCancelDraft: () => void
 }) {
-  const ids = Array.isArray(recipes) ? recipes.map((recipe: UnpricedPrivateRecipe) => recipe.id) : []
-  const current = prepareUnpricedPrivateRecipe(draft, draftLocalId, ids)
+  // Read library identities as *own data only*. A host can temporarily
+  // supply a stale/malformed collection; never allow that state to bypass
+  // duplicate checks or trigger a recipe ID getter during render.
+  const libraryIds: string[] = []
+  let validLibrary = false
+  try {
+    // A sparse array or an inherited/accessor array slot must not provide
+    // the library identity either. Include Array.isArray inside the guard:
+    // a revoked Proxy can throw before any iteration happens.
+    if (Array.isArray(recipes) && Object.getPrototypeOf(recipes) === Array.prototype &&
+        recipes.length <= 100) {
+      validLibrary = true
+      const known = new Set<string>()
+      for (let index = 0; index < recipes.length; index++) {
+        const slot = Object.getOwnPropertyDescriptor(recipes, index)
+        if (!slot || !Object.prototype.hasOwnProperty.call(slot, 'value')) {
+          validLibrary = false
+          break
+        }
+        const recipe = slot.value
+        if (!recipe || typeof recipe !== 'object') { validLibrary = false; break }
+        const descriptor = Object.getOwnPropertyDescriptor(recipe, 'id')
+        const id = descriptor?.value
+        if (!Object.prototype.hasOwnProperty.call(descriptor ?? {}, 'value') ||
+            typeof id !== 'string' ||
+            !/^private-recipe:[A-Za-z0-9_-]{1,64}$/.test(id) ||
+            known.has(id)) { validLibrary = false; break }
+        known.add(id)
+        libraryIds.push(id)
+      }
+    }
+  } catch {
+    validLibrary = false
+  }
+  const ids = validLibrary ? libraryIds : []
+  // Snapshot host-controlled week selection before sending it into the child
+  // planner. Missing data and accessor values are review-only, never render
+  // exceptions or secretly accepted day selections.
+  const safeDays: Record<string, string | null> = {}
+  let validSelection = false
+  try {
+    if (selectedDays && typeof selectedDays === 'object' && !Array.isArray(selectedDays) &&
+        (Object.getPrototypeOf(selectedDays) === Object.prototype ||
+         Object.getPrototypeOf(selectedDays) === null)) {
+      const descriptors = Object.getOwnPropertyDescriptors(selectedDays)
+      const weekDays = new Set(['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'])
+      validSelection = true
+      for (const [day, descriptor] of Object.entries(descriptors)) {
+        if (!weekDays.has(day) || !Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+            !(descriptor.value == null || typeof descriptor.value === 'string')) {
+          validSelection = false
+          break
+        }
+        safeDays[day] = descriptor.value ?? null
+      }
+    }
+  } catch {
+    validSelection = false
+  }
+  const validHostState = validLibrary && validSelection
+  const current = validHostState
+    ? prepareUnpricedPrivateRecipe(draft, draftLocalId, ids)
+    : { status: 'review_required' as const, reasons: ['invalid_private_recipe_host_state'] }
   // Parent updates are asynchronous: reserve this rendered ID synchronously,
   // before invoking the parent's callback, so double-clicks cannot enqueue
   // two creates from the same stale recipe-ID snapshot.
@@ -42,7 +103,7 @@ export function PrivateRecipeStudio({
   function confirm(reviewed: EditorRecipeDraft) {
     // Re-evaluate the event-time draft, not an earlier optimistic UI preview.
     // Refuse any importer/unknown amount/pending warning/ID conflict.
-    if (submitted) return
+    if (submitted || !validHostState) return
     const decision = prepareUnpricedPrivateRecipe(reviewed, draftLocalId, ids)
     if (decision.status === 'unpriced_ready') {
       submitted = true
@@ -66,8 +127,8 @@ export function PrivateRecipeStudio({
           'Dit recept kan aan je lokale lijst worden toegevoegd; prijs en winkel blijven onbekend.'),
     createElement(PrivateRecipeWeekPlanner, {
       key:'planner',
-      recipes,
-      selection:selectedDays,
+      recipes: validHostState ? recipes : [],
+      selection:safeDays,
       onSelectionChange:onSelectedDaysChange,
     }),
   ])

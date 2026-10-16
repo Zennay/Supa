@@ -144,3 +144,113 @@ test('same-render at-most-once delivery remains safe if parent callback throws',
   assert.throws(()=>accept(p.draft),/parent rejected/)
   assert.doesNotThrow(()=>accept(p.draft))
 })
+
+test('studio refuses own recipe ID getters without executing them or publishing draft',()=>{
+  const valid=existing()
+  let calls=0
+  const forged={...valid}
+  Object.defineProperty(forged,'id',{enumerable:true,get(){calls++;return valid.id}})
+  const added=[]
+  const p=props({recipes:[forged],onAddReviewedRecipe:recipe=>added.push(recipe)})
+  const view=PrivateRecipeStudio(p)
+  const editor=view.props.children.find(child=>child?.type===MockEditor)
+  editor.props.onConfirm(p.draft)
+  assert.equal(calls,0)
+  assert.deepEqual(added,[])
+  assert.equal(view.props.children.find(child=>child?.props?.role==='status')?.props.children.includes('nog niet klaar'),true)
+})
+
+test('studio refuses inherited recipe identity accessors without touching them',()=>{
+  const valid=existing()
+  let calls=0
+  const inherited=Object.create({get id(){calls++;return valid.id}})
+  const {id: omitted, ...rest}=valid
+  Object.assign(inherited,rest)
+  const added=[]
+  const p=props({recipes:[inherited],onAddReviewedRecipe:recipe=>added.push(recipe)})
+  const view=PrivateRecipeStudio(p)
+  const editor=view.props.children.find(child=>child?.type===MockEditor)
+  editor.props.onConfirm(p.draft)
+  assert.equal(calls,0)
+  assert.equal(added.length,0)
+})
+
+test('invalid or duplicated private library identities never authorize a new local recipe',()=>{
+  const valid=existing()
+  for(const invalid of [[valid,valid],[{...valid,id:'other:recipe'}],null]) {
+    const added=[]
+    const p=props({recipes:invalid,onAddReviewedRecipe:recipe=>added.push(recipe)})
+    const accept=confirmationCallback(p)
+    accept(p.draft)
+    assert.equal(added.length,0)
+  }
+})
+
+test('valid own-ID library preserves event-time confirmation and unknown-price contract',()=>{
+  const added=[]
+  const p=props({recipes:[existing()],onAddReviewedRecipe:recipe=>added.push(recipe)})
+  const accept=confirmationCallback(p)
+  accept(p.draft)
+  assert.equal(added.length,1)
+  assert.equal(added[0].id,'private-recipe:new-one')
+  assert.equal(added[0].estimatedCost,null)
+  assert.equal(added[0].priceStatus,'unknown')
+})
+
+test('sparse or accessor recipe collection slots cannot create local drafts',()=>{
+  const added=[]
+  const sparse=new Array(1)
+  const propertyReads={count:0}
+  const accessor=[]
+  Object.defineProperty(accessor,0,{enumerable:true,configurable:true,
+    get(){propertyReads.count++;return existing()}})
+  accessor.length=1
+  for (const recipes of [sparse,accessor]) {
+    const p=props({recipes,onAddReviewedRecipe:recipe=>added.push(recipe)})
+    const accept=confirmationCallback(p)
+    accept(p.draft)
+  }
+  assert.equal(propertyReads.count,0)
+  assert.equal(added.length,0)
+})
+
+test('revoked recipe library Proxy fails closed before any recipe is added',()=>{
+  const revoked=Proxy.revocable([], {})
+  revoked.revoke()
+  const added=[]
+  const p=props({recipes:revoked.proxy,onAddReviewedRecipe:recipe=>added.push(recipe)})
+  assert.doesNotThrow(()=>{
+    const accept=confirmationCallback(p)
+    accept(p.draft)
+  })
+  assert.equal(added.length,0)
+})
+
+test('invalid or missing host week selection renders review only without crash or recipe creation',()=>{
+  for(const selectedDays of [null,undefined,{Unknown:'private-recipe:saved-one'}]) {
+    const added=[]
+    const p=props({selectedDays,onAddReviewedRecipe:recipe=>added.push(recipe)})
+    const html=renderToStaticMarkup(createElement(PrivateRecipeStudio,p))
+    assert.match(html,/Dit recept is nog niet klaar voor de weekplanner/)
+    assert.doesNotMatch(html,/Boodschappen uit mijn recepten/)
+    assert.doesNotMatch(html,/€/)
+    confirmationCallback(p)(p.draft)
+    assert.equal(added.length,0)
+  }
+})
+
+test('host week selection getter is never invoked when validating studio props',()=>{
+  const valid=existing()
+  let reads=0
+  const selectedDays={}
+  Object.defineProperty(selectedDays,'Ma',{enumerable:true,
+    get(){reads++;return valid.id}})
+  const added=[]
+  const p=props({selectedDays,onAddReviewedRecipe:recipe=>added.push(recipe)})
+  const html=renderToStaticMarkup(createElement(PrivateRecipeStudio,p))
+  assert.equal(reads,0)
+  assert.match(html,/nog niet klaar voor de weekplanner/)
+  confirmationCallback(p)(p.draft)
+  assert.equal(reads,0)
+  assert.equal(added.length,0)
+})
