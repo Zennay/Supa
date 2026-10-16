@@ -265,3 +265,36 @@ test('failed HTML stream does not count as verified even if headers were 200', a
   assert.equal(session.status().stores.plus.verifiedCaptures, 0)
   assert.equal(session.status().stores.plus.busy, false)
 })
+
+test('200 body validation failures impose 60-second cooldown beyond normal 10-second interval', async t => {
+  let now = Date.parse('2026-10-15T12:00:00.000Z')
+  t.mock.method(Date, 'now', () => now)
+  const session = createAuthorizedRetailerCaptureSession()
+  let transportCalls = 0
+  const request = () => session.captureOne({
+    ...approved(),
+    fetchFn: async () => {
+      transportCalls++
+      if (transportCalls === 1) {
+        return new Response('not HTML', {
+          status: 200, headers: { 'content-type': 'text/plain' },
+        })
+      }
+      return ok()
+    },
+  })
+  await assert.rejects(request(), /Source did not return HTML/)
+  assert.equal(session.status().stores.plus.verifiedCaptures, 0)
+  now += 11_000
+  // One normal host gap has elapsed, but the failed BODY has not cooled down.
+  await assert.rejects(request(), /Retailer capture session refused/)
+  assert.equal(transportCalls, 1)
+  now += 50_000
+  const recovered = await request()
+  assert.equal(recovered.published, false)
+  assert.equal(recovered.readyForIngestion, false)
+  assert.equal(transportCalls, 2)
+  assert.equal(session.status().stores.plus.successfulHttpResponses, 2)
+  assert.equal(session.status().stores.plus.verifiedCaptures, 1)
+  assert.equal(session.status().stores.plus.attemptedCaptures, 2)
+})
