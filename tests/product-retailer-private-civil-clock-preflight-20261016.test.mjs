@@ -97,7 +97,8 @@ test('untrusted input/options cannot trigger getters or proxy traps before inert
   assert.throws(() => ingestCivilClockCheckedReviewedBatch([poisoned]), /inert JSON/)
   assert.equal(touched, 0)
   assert.throws(() => ingestCivilClockCheckedReviewedBatch(new Proxy(samples, {})), /inert JSON/)
-  assert.throws(() => ingestCivilClockCheckedReviewedBatch(samples, { referenceTime: Infinity }), /inert JSON/)
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch(samples, { referenceTime: Infinity }), /civil-clock preflight refused/)
+  assert.throws(() => ingestCivilClockCheckedReviewedBatch(samples, { referenceTime: Date.parse('2099-01-01T00:00:00Z') }), /civil-clock preflight refused/)
   assert.throws(() => ingestCivilClockCheckedReviewedBatch(samples, { onAccepted: true }), /civil-clock preflight refused/)
 })
 
