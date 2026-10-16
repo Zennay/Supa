@@ -219,3 +219,56 @@ test('direct operator copy has bounded depth and cannot silently omit extra arra
   Object.setPrototypeOf(inherited.retailers[1], { permissionStatus: 'permitted' })
   assert.throws(() => renderPrivateRetailerOperatorBrief(inherited), /geweigerd/)
 })
+
+test('operator refuses impossible civil review and source calendars before displaying status', async () => {
+  const { report } = await historicalReport()
+  for (const impossible of [
+    '2025-02-29T12:00:00Z', '2026-02-30T12:00:00Z',
+    '2026-13-01T12:00:00Z', '2026-10-16T25:00:00Z',
+    '2030-01-01T12:00:00Z',
+  ]) {
+    const altered = structuredClone(report)
+    altered.referenceTime = impossible
+    assert.throws(() => renderPrivateRetailerOperatorBrief(altered), /geweigerd/, impossible)
+  }
+  const acceptedIndex = report.retailers[0].shapes.findIndex(s => s.acceptedSources > 0)
+  assert.ok(acceptedIndex >= 0)
+  for (const impossible of [
+    'not-a-capture-clock', '2026-02-30T00:00:00Z',
+    '2025-02-29T00:00:00Z', '2026-12-01T00:00:00+14:01',
+    '2026-12-01T00:00:00-15:00', '2030-01-01T00:00:00Z',
+  ]) {
+    const altered = structuredClone(report)
+    altered.retailers[0].shapes[acceptedIndex].latestArchivedCapturedAt = impossible
+    assert.throws(() => renderPrivateRetailerOperatorBrief(altered), /geweigerd/, impossible)
+  }
+})
+
+test('operator compares archive and reference physical nanoseconds with timezone offsets', async () => {
+  const { report } = await historicalReport()
+  const accepted = report.retailers.flatMap(r => r.shapes).find(s => s.acceptedSources > 0)
+  assert.ok(accepted)
+  report.referenceTime = '2026-10-16T00:00:00.000000001Z'
+  accepted.latestArchivedCapturedAt = '2026-10-15T23:59:59.999999999Z'
+  assert.match(renderPrivateRetailerOperatorBrief(report), /ALLEEN HISTORISCHE BRONNEN/)
+  accepted.latestArchivedCapturedAt = '2026-10-16T02:00:00.000000001+02:00'
+  assert.match(renderPrivateRetailerOperatorBrief(report), /geen live ophalen/i)
+  accepted.latestArchivedCapturedAt = '2026-10-16T00:00:00.000000002Z'
+  assert.throws(() => renderPrivateRetailerOperatorBrief(report), /geweigerd/)
+  accepted.latestArchivedCapturedAt = '2026-10-15T20:00:00.000000001-04:00'
+  assert.match(renderPrivateRetailerOperatorBrief(report), /offline winkelbron-startcontrole/)
+})
+
+test('operator accepts real Gregorian leap day without implying recent live-price permission', async () => {
+  const { report } = await historicalReport()
+  report.referenceTime = '2028-02-29T00:00:00.000000001Z'
+  // The review clock cannot be later than the actual operator clock, so
+  // use a valid leap-day archived capture against today's genuine reference.
+  report.referenceTime = '2026-10-16T00:00:00Z'
+  const accepted = report.retailers.flatMap(r => r.shapes).find(s => s.acceptedSources > 0)
+  assert.ok(accepted)
+  accepted.latestArchivedCapturedAt = '2024-02-29T08:30:00.123456789Z'
+  const brief = renderPrivateRetailerOperatorBrief(report)
+  assert.match(brief, /live-ingestie en publieke prijzen blijven UIT/)
+  assert.doesNotMatch(brief, /2024-02-29|prijs: €|https?:/)
+})
