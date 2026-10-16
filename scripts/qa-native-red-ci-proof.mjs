@@ -45,8 +45,8 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
 
   for (const rawLine of log.split(/\r?\n/)) {
     const line = plainLine(rawLine)
-    const failingTap = /^not ok\s+\d+\s+-\s+(.+)$/.exec(line)
-    const passingTap = /^ok\s+\d+\s+-\s+/.test(line)
+    const failingTap = /^\s*not ok\s+\d+\s+-\s+(.+)$/.exec(line)
+    const passingTap = /^\s*ok\s+\d+\s+-\s+/.test(line)
     if (failingTap || passingTap) {
       completeFailure()
       if (failingTap) current = { file: null }
