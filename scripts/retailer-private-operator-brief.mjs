@@ -301,6 +301,10 @@ export function renderPrivateRetailerCoverageBrief(health, rollout) {
       rollout.retailers.length !== 2 ||
       Object.keys(health.byShape).length !== 6) fail()
 
+  // Direct callers cannot bypass the complete policy, action, rights,
+  // calendar and freshness validation enforced by the primary operator brief.
+  // The return text is discarded; it never contains source identities.
+  renderPrivateRetailerOperatorBrief(rollout)
   const lines = [
     'Aanvullende historische productdekking (NIET ACTUEEL):',
   ]
