@@ -11,6 +11,7 @@ import re
 import sqlite3
 import stat
 import sys
+import time
 from datetime import datetime, timezone
 from urllib.parse import parse_qsl, quote, urlsplit
 
@@ -28,6 +29,10 @@ META = {
     "requires_explicit_retailer_license": "true",
 }
 MAX_BYTES = 32 * 1024 * 1024
+ISO_TIMESTAMP = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})"
+)
+EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
 class AuditRefusal(Exception):
@@ -37,6 +42,23 @@ class AuditRefusal(Exception):
 def require(condition):
     if not condition:
         raise AuditRefusal()
+
+
+def utc_instant_nanoseconds(value):
+    """Validate real Gregorian civil time and preserve 1–9 fractional digits.
+
+    datetime truncates to microseconds; integer nanoseconds preserve actual
+    physical chronology even for instants within the same microsecond.
+    """
+    require(isinstance(value, str) and ISO_TIMESTAMP.fullmatch(value) is not None)
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    offset = parsed.utcoffset()
+    require(offset is not None and abs(offset.total_seconds()) <= 14 * 3600)
+    fraction = re.search(r"\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$", value)
+    nanos = int(fraction.group(1).ljust(9, "0")) if fraction else 0
+    whole = parsed.replace(microsecond=0).astimezone(timezone.utc)
+    delta = whole - EPOCH
+    return (delta.days * 86400 + delta.seconds) * 1_000_000_000 + nanos
 
 
 def approved_path(value):
@@ -112,16 +134,13 @@ def audit(path):
             require(parsed.scheme == "https" and parsed.hostname == HOSTS[retailer][0])
             require(parsed.username is None and parsed.password is None and
                     parsed.port is None and not parsed.fragment)
-            forbidden = {"access_token", "api_key", "apikey", "password",
+            forbidden = {"access_token", "refresh_token", "id_token",
+                         "api_key", "apikey", "client_secret", "password",
                          "token", "auth", "authorization", "session"}
-            require(not any(key.casefold() in forbidden
+            # Decoded, mixed-case and partially encoded credentials are unsafe.
+            require(not any(key.casefold() in forbidden or "%" in key
                             for key, _ in parse_qsl(parsed.query, keep_blank_values=True)))
-            require(isinstance(captured_at, str) and re.fullmatch(
-                r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})",
-                captured_at
-            ) is not None)
-            parsed_time = datetime.fromisoformat(captured_at.replace("Z", "+00:00"))
-            require(parsed_time <= datetime.now(timezone.utc))
+            require(utc_instant_nanoseconds(captured_at) <= time.time_ns())
         product_count = db.execute("SELECT COUNT(*) FROM products").fetchone()[0]
         observation_count = db.execute(
             "SELECT COUNT(*) FROM price_observations"
@@ -148,6 +167,18 @@ def audit(path):
             "SELECT 1 FROM source_snapshots WHERE length(content_sha256) <> 64 "
             "OR content_sha256 GLOB '*[^0-9a-f]*' LIMIT 1"
         ).fetchone() is None)
+        # Independent direct SQLite callers bypass importer trust: recheck
+        # offer civil timestamps and 1ns chronology before verifying integrity.
+        # Missing endpoints remain unknown, never a reason for a savings claim.
+        for start, end in db.execute(
+            "SELECT offer_valid_from, offer_valid_to FROM price_observations "
+            "WHERE offer_valid_from IS NOT NULL OR offer_valid_to IS NOT NULL"
+        ):
+            from_ns = utc_instant_nanoseconds(start) if start is not None else None
+            to_ns = utc_instant_nanoseconds(end) if end is not None else None
+            require(from_ns is None or from_ns <= time.time_ns())
+            require(to_ns is None or to_ns <= time.time_ns())
+            require(from_ns is None or to_ns is None or from_ns <= to_ns)
         return {
             "schemaVersion": 1,
             "mode": "historical-private-sqlite-readonly-audit",
