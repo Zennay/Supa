@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   emptyUserRecipeDraft, parseMetricEditorAmount,
   updateEditorIngredient, addEditorIngredient, removeEditorIngredient,
-  canConfirmUserRecipeDraft,
+  canConfirmUserRecipeDraft, prepareImportedRecipeForEditor,
 } from '../src/features/user-recipes/userRecipeDraftEditor.ts'
 
 test('empty manual draft starts in review, not as saved priced recipe', () => {
@@ -37,6 +37,8 @@ test('ingredients add/remove are bounded, immutable, and reject invalid indexes'
   const added = addEditorIngredient(draft)
   assert.equal(added.ingredients.length, 2)
   assert.equal(draft.ingredients.length, 1)
+  assert.notEqual(added.ingredients[0].clientId, added.ingredients[1].clientId)
+  assert.equal(added.ingredients[0].clientId, draft.ingredients[0].clientId)
   const removed = removeEditorIngredient(added, 1)
   assert.equal(removed.ingredients.length, 1)
   assert.equal(removeEditorIngredient(added, -1), added)
@@ -60,8 +62,18 @@ test('missing amount, invalid unit, huge grams or imported review warning cannot
 
 test('ingredient review reason can be cleared by explicitly editing to a known metric quantity', () => {
   const source = emptyUserRecipeDraft()
-  source.ingredients[0] = {original:'1 cup bloem',label:'Bloem',query:'bloem',amount:null,unit:null,reviewReason:'Cups not convertible'}
+  source.ingredients[0] = {clientId: source.ingredients[0].clientId, original:'1 cup bloem',label:'Bloem',query:'bloem',amount:null,unit:null,reviewReason:'Cups not convertible'}
   const edited = updateEditorIngredient(source, 0, { amount: 100, unit: 'g' })
   assert.equal(edited.ingredients[0].reviewReason, null)
   assert.equal(source.ingredients[0].reviewReason, 'Cups not convertible')
+})
+
+test('imported parser drafts receive stable local row IDs without modifying original source', () => {
+  const original = emptyUserRecipeDraft()
+  const imported = { ...original, ingredients: original.ingredients.map(({ clientId, ...rest }) => rest) }
+  const adapted = prepareImportedRecipeForEditor(imported)
+  assert.ok(adapted.ingredients[0].clientId.startsWith('local-ingredient-'))
+  assert.equal('clientId' in imported.ingredients[0], false)
+  const updated = updateEditorIngredient(adapted, 0, { label: 'Tomaat' })
+  assert.equal(updated.ingredients[0].clientId, adapted.ingredients[0].clientId)
 })
