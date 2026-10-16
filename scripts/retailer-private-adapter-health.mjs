@@ -6,9 +6,9 @@
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
-import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
 import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
-import { snapshotBoundedPrivateCatalogInput } from './retailer-private-budgeted-catalog.mjs'
+import { snapshotBoundedPrivateCatalogInput,
+  buildBudgetedPrivateRetailerCatalog } from './retailer-private-budgeted-catalog.mjs'
 
 const STORES = ['plus', 'dekamarkt']
 const KINDS = ['product', 'catalog', 'offers']
@@ -156,7 +156,7 @@ export function evaluatePrivateAdapterHealth(callerBatch, callerOptions = {}) {
   // The existing universal product model resolves duplicate captures and
   // identifies fact conflicts, without promoting historical prices to "current".
   const catalog = accepted.length
-    ? buildUniversalRetailerCatalog({
+    ? buildBudgetedPrivateRetailerCatalog({
       summary: { mode: 'reviewed-offline-only' }, results: accepted,
     })
     : null
