@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createManualRecipeDraft } from '../src/domain/userRecipeImport.ts'
 import {
-  readRecipeLibrary, saveRecipeLibrary, updateSavedRecipe, deleteSavedRecipe,
+  readRecipeLibrary, saveRecipeLibrary, updateSavedRecipe, deleteSavedRecipe, duplicateSavedRecipe,
 } from '../src/features/recipes/recipeLibrary.ts'
 
 function memory() {
@@ -82,4 +82,30 @@ test('invalid edited ingredients cannot erase an existing recipe', () => {
     ...draft('Onvolledig'), steps: [],
   }), /bereidingsstap/)
   assert.equal(readRecipeLibrary(storage).raw, state.raw)
+})
+
+test('duplicate creates a fresh independent own recipe with the same reviewed quantities', () => {
+  const { storage, state } = seeded()
+  const next = duplicateSavedRecipe(storage, state, 'own-1', 'own-new-uuid-123', '2026-10-16T20:00:00Z')
+  assert.deepEqual(next.recipes.map(recipe => recipe.id), ['own-new-uuid-123', 'own-1', 'own-2'])
+  assert.equal(next.recipes[0].title, 'Kopie van Rijst')
+  assert.equal(next.recipes[0].savedAt, '2026-10-16T20:00:00Z')
+  assert.equal(next.recipes[0].ingredients[0].amount, 200)
+  assert.equal(next.recipes[0].ingredients[0].unit, 'g')
+  assert.equal(Object.hasOwn(next.recipes[0], 'estimatedCost'), false)
+  const edited = updateSavedRecipe(storage, next, 'own-new-uuid-123', draft('Mijn bewerkte kopie', '500 g rijst'))
+  assert.equal(edited.recipes[0].ingredients[0].amount, 500)
+  assert.equal(edited.recipes[1].ingredients[0].amount, 200)
+  assert.equal(edited.recipes[1].title, 'Rijst')
+})
+
+test('duplicate rejects unknown source, ID collisions and stale tab revisions', () => {
+  const { storage, state } = seeded()
+  assert.throws(() => duplicateSavedRecipe(storage, state, 'supa-thai', 'own-other', '2026-10-16T20:00:00Z'), /bestaat niet/)
+  assert.throws(() => duplicateSavedRecipe(storage, state, 'own-1', 'own-2', '2026-10-16T20:00:00Z'), /recept-ID/)
+  assert.throws(() => duplicateSavedRecipe(storage, state, 'own-1', '../escape', '2026-10-16T20:00:00Z'), /recept-ID/)
+  assert.throws(() => duplicateSavedRecipe(storage, state, 'own-1', 'own-new-test', 'not-a-date'), /bewaartijd/)
+  const next = deleteSavedRecipe(storage, state, 'own-2')
+  assert.throws(() => duplicateSavedRecipe(storage, state, 'own-1', 'own-new-test', '2026-10-16T20:00:00Z'), /ander tabblad/)
+  assert.deepEqual(readRecipeLibrary(storage).recipes, next.recipes)
 })
