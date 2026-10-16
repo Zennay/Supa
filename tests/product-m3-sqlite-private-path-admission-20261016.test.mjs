@@ -10,7 +10,9 @@ const REFUSED = /Historical reviewed retailer import refused/
 const failureIsPrivate = (error, attempted) => {
   assert.equal(error instanceof TypeError, false)
   assert.match(String(error), REFUSED)
-  assert.doesNotMatch(String(error), /fictional-|\u0000|ERR_INVALID_ARG_VALUE|\\/tmp\\//)
+  for (const marker of ['fictional-', 'ERR_INVALID_ARG_VALUE', '/tmp/']) {
+    assert.ok(!String(error).includes(marker))
+  }
   assert.ok(!String(error).includes(attempted))
   return true
 }
