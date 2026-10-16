@@ -1,6 +1,7 @@
 import { FigmaImage } from '../../components/FigmaImage'
 import { useRef, useState } from 'react'
 import { figmaAssets as a } from './figmaAssets'
+import { upcomingHomeWeek } from './homeWeekDates'
 
 export type HiFiTab = 'home' | 'recipes' | 'products'
 export const designProducts = [
@@ -19,9 +20,10 @@ type Props = {
   onNavigate: (view: HiFiTab | 'planner' | 'list') => void
   addedProducts: string[]
   onToggleProduct: (id: string) => void
+  activeDays?: readonly string[]
 }
 
-export function HiFiHome({ view, onNavigate, addedProducts, onToggleProduct }: Props) {
+export function HiFiHome({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [] }: Props) {
   const [query, setQuery] = useState('')
   const [favorites, setFavorites] = useState<string[]>([])
   const [filterOpen, setFilterOpen] = useState(false)
@@ -45,7 +47,7 @@ export function HiFiHome({ view, onNavigate, addedProducts, onToggleProduct }: P
       </header>
       <section className="hifi-week" aria-labelledby="hifi-week-title" data-figma-node="3307:4186">
         <div><h1 id="hifi-week-title">Weekplanning</h1><p>Maak een planning en ontdek wat je kunt besparen met aanbiedingen en overlappende ingrediënten.</p></div>
-        <div className="hifi-days">{[{ day: 'Z', date: 19 }, { day: 'M', date: 20 }, { day: 'D', date: 21 }, { day: 'W', date: 22 }, { day: 'D', date: 23 }].map(({ day, date }) => <button key={date} onClick={() => onNavigate('planner')} aria-label="Open weekplanning"><span className={date === 19 ? 'hifi-today' : ''}>{day}</span><span>{date}</span></button>)}</div>
+        <div className="hifi-days">{upcomingHomeWeek().map(({ label, date, plannerDay, fullName, month, year }) => <button key={`${year}-${month}-${date}`} onClick={() => onNavigate('planner')} aria-label={`Open weekplanning voor ${fullName} ${date}`}><span className={activeDays.includes(plannerDay) ? 'hifi-today' : ''}>{label}</span><span>{date}</span></button>)}</div>
         <button className="hifi-plan-button" onClick={() => onNavigate('planner')}><FigmaImage asset={a.imgVector} alt="" />Plan en bespaar</button>
       </section>
     </> : <h1 className="hifi-page-title">{view === 'recipes' ? 'Recepten' : 'Producten'}</h1>}
