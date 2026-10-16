@@ -3,6 +3,7 @@
 // operator-owned HTTPS echo endpoint. No supermarket requests or proxy fallback.
 import http from 'node:http'
 import tls from 'node:tls'
+import { isIP } from 'node:net'
 import { randomBytes } from 'node:crypto'
 import { promises as fs, constants } from 'node:fs'
 import os from 'node:os'
@@ -22,11 +23,20 @@ export function validatedOwnedEndpoint(rawUrl, ownedHost) {
   }
   let url
   try { url = new URL(rawUrl) } catch { throw new Error('Invalid owned HTTPS endpoint') }
+  // The user-supplied ownership string does NOT make a numeric target a
+  // privately controlled public DNS hostname. WHATWG URL normalizes shorthand,
+  // octal and hex IPv4 forms, so validate the parsed host, never only raw text.
+  const hostname = url.hostname.toLowerCase()
+  const labels = hostname.split('.')
+  const publicDnsName = hostname.length <= 253 && labels.length >= 2 &&
+    labels.every(label => label.length >= 1 && label.length <= 63 &&
+      /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label)) &&
+    /[a-z]/.test(labels.at(-1)) && isIP(hostname) === 0
   if (url.protocol !== 'https:' || url.port || url.username || url.password || url.hash || url.search ||
-      !/^[a-z0-9.-]+$/i.test(ownedHost) || !ownedHost.includes('.') ||
-      url.hostname.toLowerCase() !== ownedHost.toLowerCase() ||
-      ['localhost', 'example.com'].includes(url.hostname.toLowerCase()) ||
-      /(?:^|\.)(?:local|localhost|internal|test)$/.test(url.hostname.toLowerCase())) {
+      !publicDnsName ||
+      hostname !== ownedHost.toLowerCase() ||
+      ['localhost', 'example.com'].includes(hostname) ||
+      /(?:^|\.)(?:local|localhost|internal|test)$/.test(hostname)) {
     throw new Error('Owned endpoint must be exact public HTTPS hostname, port 443, no query or credentials')
   }
   return url
