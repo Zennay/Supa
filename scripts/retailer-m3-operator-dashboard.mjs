@@ -107,6 +107,23 @@ export function renderOfflineM3Dashboard(input) {
   const available = readCount(report, 'historicalStockAvailableObservations')
   const accepted = readCount(report, 'acceptedSourceShapes')
   const missing = readCount(report, 'missingSourceShapes')
+  // The historical offer reviewer compares only the latest of six shapes.
+  // Never conceal older excluded offers or call a linked normal-price baseline
+  // a verified discount: these are private *source evidence counts* only.
+  const offerRows = readCount(report, 'archivedOfferRows')
+  const allOfferRows = readCount(report, 'allHistoricalOfferRows')
+  const olderOffers = readCount(report, 'olderHistoricalOfferRowsNotCompared')
+  const baselineLinked = readCount(report, 'corroboratedHistoricalOfferBaselines')
+  const baselineUnknown = readCount(report, 'uncorroboratedHistoricalOfferRows')
+  const unknownWindows = readCount(report, 'unknownOfferWindows')
+  const invalidDiscounts = readCount(report, 'invalidDiscountClaims')
+  const historicalEvents = readCount(report, 'historicalSourceEvents')
+  const selectedEvents = readCount(report, 'selectedSourceEventsForOfferReview')
+  const outsideEvents = readCount(report, 'sourceEventsOutsideOfferReview')
+  if (offerRows + olderOffers !== allOfferRows ||
+      baselineLinked + baselineUnknown !== offerRows ||
+      selectedEvents !== 6 || selectedEvents + outsideEvents !== historicalEvents ||
+      unknownWindows > offerRows || invalidDiscounts > offerRows) refuse()
   if (unknown + unavailable + available !== total ||
       accepted > 6 || missing > 6 || accepted + missing !== 6 ||
       conflicts > products) refuse()
@@ -182,6 +199,16 @@ li{margin:.7em 0;line-height:1.5}footer{margin-top:30px;color:#435b67;font-size:
 <div class="metric"><strong>${unknown}</strong><span>Historische voorraad onbekend</span></div>
 <div class="metric"><strong>${unavailable}</strong><span>Historisch niet beschikbaar</span></div></div>
 ${section('plus','PLUS')}${section('dekamarkt','DekaMarkt')}
+<section aria-labelledby="offers"><h2 id="offers">Historische aanbiedingen — géén actuele korting</h2>
+<p>Dit zijn alleen geverifieerde archiefcontroles, niet de winkelprijzen van vandaag. Een technisch gekoppelde basisprijs bewijst nog geen geldige aanbieding of werkelijke besparing.</p>
+<div class="metrics" aria-label="Historische aanbiedingcontrole">
+<div class="metric"><strong>${offerRows}</strong><span>Archiefaanbiedingen bekeken</span></div>
+<div class="metric"><strong>${baselineLinked}</strong><span>Historische basisprijzen technisch gekoppeld</span></div>
+<div class="metric"><strong>${baselineUnknown}</strong><span>Basisprijs niet bevestigd</span></div>
+<div class="metric"><strong>${unknownWindows}</strong><span>Onzeker aanbiedingsvenster</span></div>
+<div class="metric"><strong>${invalidDiscounts}</strong><span>Ongeldige kortingsclaims</span></div>
+<div class="metric"><strong>${olderOffers}</strong><span>Oudere aanbiedingen niet vergeleken</span></div></div>
+<p>Geselecteerde bronmomenten: ${selectedEvents} van ${historicalEvents}; extra historische momenten buiten deze aanbiedingcontrole: ${outsideEvents}. Een echte 11×2-veldmand en bronrechten zijn nog steeds vereist.</p></section>
 <section aria-labelledby="next"><h2 id="next">Nog te doen</h2><ol>${actions.map(a => `<li>${esc(a)}</li>`).join('')}</ol></section>
 <footer>Bron: lokale SHA-gecontroleerde M3-voorcontrole. Geen individuele SKU, winkelprijs, bron-URL, hash of klantgegevens opgenomen. Dit document is geen productie- of publicatietoestemming.</footer>
 </main></body></html>\n`
