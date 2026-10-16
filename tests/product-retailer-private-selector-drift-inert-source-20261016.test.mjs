@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { proposeOfflineRetailerSelectors } from '../scripts/retailer-offline-selector-discovery.mjs'
-import { compareOfflineSelectorProposals } from '../scripts/retailer-private-selector-drift.mjs'
+import { compareOfflineSelectorProposals, main } from '../scripts/retailer-private-selector-drift.mjs'
 
 const html = '<article class="product-card"><span class="price-value">fictional</span></article>'
 const origin = time => ({
@@ -106,4 +106,33 @@ test('plain original inputs remain unchanged, private and acceptable incl null p
   assert.deepEqual(a, frozenBefore)
   assert.deepEqual({ ...b, source: { ...b.source } }, frozenAfter)
   assert.doesNotMatch(JSON.stringify(report), /fictional|sha256|www\.plus\.nl|capturedAt/)
+})
+
+test('private selector-drift CLI refuses hostile argv before resolving any path', async () => {
+  const originalArgs = ['--before', '/not/a/real/old.json', '--after', '/not/a/real/new.json']
+  let reads = 0
+  const lazy = [...originalArgs]
+  Object.defineProperty(lazy, 1, {
+    enumerable: true, configurable: true,
+    get() { ++reads; return '/not/a/real/old.json' },
+  })
+  let printed = ''
+  await assert.rejects(main(lazy, x => { printed += x }), denied)
+  assert.equal(reads, 0)
+  assert.equal(printed, '')
+
+  const wrapped = new Proxy([...originalArgs], {
+    get(target, key) { ++reads; return Reflect.get(target, key) },
+    ownKeys(target) { ++reads; return Reflect.ownKeys(target) },
+  })
+  await assert.rejects(main(wrapped, x => { printed += x }), denied)
+  assert.equal(reads, 0)
+  assert.equal(printed, '')
+
+  const sparse = [...originalArgs]
+  delete sparse[3]
+  await assert.rejects(main(sparse), denied)
+  const symbolized = [...originalArgs]
+  symbolized[Symbol('hidden')] = 'unreviewed'
+  await assert.rejects(main(symbolized), denied)
 })
