@@ -25,6 +25,18 @@ samePhysicalCaptureInstant(
 - Returns `null` for malformed input. Consumers **must reject** a `null` source timestamp before counting a reviewed physical capture.
 - This is only chronology notation validity. The caller **still must** enforce inert own-data objects, reviewed retailer origin, archived source SHA, no token-bearing URLs, impossible future captures, deduplication, permissions and field-evidence safeguards.
 
+
+## Offline operator command (no retailer access)
+
+```sh
+node scripts/retailer-physical-civil-clock-cli.mjs --check '2026-10-04T18:08:57.837123456-13:00'
+# exits 1 with validCivilNotation:false
+node scripts/retailer-physical-civil-clock-cli.mjs --same '2026-10-04T18:08:57.837123456Z' '2026-10-04T20:08:57.837123456+02:00'
+# exits 0 with validCivilNotation:true and samePhysicalInstant:true
+```
+
+It prints only booleans (`reviewed:false`, `sourceRightsVerified:false` are always explicit), never echoes supplied timestamps, reads no files, and cannot fetch or promote retailer sources. Malformed syntax exits 2; invalid civil notation exits 1. Use `node --test tests/product-retailer-physical-civil-clock*.test.mjs` for both suites.
+
 ## Ownership and non-claims
 
 This add-only opt-in helper intentionally does **not** change the source files owned by active product [#3706](https://github.com/Zennay/Supa/pull/3706), [#3687](https://github.com/Zennay/Supa/pull/3687), or independent QA branches [#3700](https://github.com/Zennay/Supa/pull/3700) / [#3710](https://github.com/Zennay/Supa/pull/3710). In particular, it does not claim to resolve authoritative adapter P1 [#3701](https://github.com/Zennay/Supa/issues/3701), direct universal catalog P1 [#3711](https://github.com/Zennay/Supa/issues/3711), or physical duplicate source counting P2 [#3702](https://github.com/Zennay/Supa/issues/3702) until their original source owners integrate and replay immutable independent QA RED→GREEN.
