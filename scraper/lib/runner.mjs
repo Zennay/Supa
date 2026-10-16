@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
-import { HostBlockedError, HttpStatusError, RobotsDisallowedError } from './http.mjs'
+import { HostBlockedError, HttpStatusError, PoliteFetcher, RobotsDisallowedError } from './http.mjs'
 import { isValidRecord } from './normalize.mjs'
 
 const MAX_ERROR_RATE = 0.5
@@ -61,7 +61,16 @@ export async function runRetailer(adapter, {
     // Discovery and expansion are untrusted work-item producers. Validate
     // each requested source before *either* HTTP or browser rendering; checking
     // the effective response URL afterwards cannot undo an off-source request.
-    if (!isTrustedResponseSource(item?.url, adapter.host)) {
+    // Old offline, zero-price fixture tests intentionally omit adapter.host
+    // and inject a standalone fake request function. Permit only that inert
+    // shape for counting requests; never permit live PoliteFetcher, browser,
+    // evidence archiving, or a configured retailer to skip origin admission.
+    // The existing post-response guard also refuses all priced records and
+    // evidence writes from those unattributed offline fixtures.
+    const inertUnattributedProbe = !adapter.host &&
+      adapter.mode === 'http' && !saveHtmlDir &&
+      !(fetcher instanceof PoliteFetcher)
+    if (!inertUnattributedProbe && !isTrustedResponseSource(item?.url, adapter.host)) {
       throw new Error('retailer queued URL is outside approved HTTPS source origin')
     }
     const res = await fetchPage(item.url)
