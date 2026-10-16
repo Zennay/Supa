@@ -1,6 +1,8 @@
 /** Editable, local-only model. Confirmation by the user is NOT durable saving. */
 export type EditorUnit = 'g' | 'ml' | 'piece'
 export type EditorIngredient = {
+  /** UI-only stable React identity; never a database key or public recipe ID. */
+  clientId: string
   original: string
   label: string
   query: string
@@ -22,6 +24,11 @@ export type EditorRecipeDraft = {
 
 const MAX_TEXT = 180
 const MAX_INGREDIENTS = 100
+let ingredientSequence = 0
+function newClientIngredientId(): string {
+  ingredientSequence += 1
+  return 'local-ingredient-' + ingredientSequence
+}
 
 function validAmount(value: number | null): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000_000 &&
@@ -32,8 +39,15 @@ export function emptyUserRecipeDraft(): EditorRecipeDraft {
   return {
     source: 'manual', sourceUrl: null, title: '', servings: 2,
     minutes: null, steps: [], warnings: [], status: 'needs_review',
-    ingredients: [{ original: '', label: '', query: '', amount: null, unit: 'g', reviewReason: 'Vul een hoeveelheid in.' }],
+    ingredients: [{ clientId: newClientIngredientId(), original: '', label: '', query: '', amount: null, unit: 'g', reviewReason: 'Vul een hoeveelheid in.' }],
   }
+}
+
+/** Assign stable UI keys without modifying imported parsed recipe drafts. */
+export function prepareImportedRecipeForEditor(
+  draft: Omit<EditorRecipeDraft, 'ingredients'> & { ingredients: Omit<EditorIngredient, 'clientId'>[] },
+): EditorRecipeDraft {
+  return { ...draft, ingredients: draft.ingredients.map((ingredient) => ({ ...ingredient, clientId: newClientIngredientId() })) }
 }
 
 export function parseMetricEditorAmount(value: string): number | null {
@@ -70,7 +84,7 @@ export function addEditorIngredient(draft: EditorRecipeDraft): EditorRecipeDraft
   return {
     ...draft,
     ingredients: [...draft.ingredients, {
-      original: '', label: '', query: '', amount: null, unit: 'g', reviewReason: 'Vul een ingrediëntnaam en hoeveelheid in.',
+      clientId: newClientIngredientId(), original: '', label: '', query: '', amount: null, unit: 'g', reviewReason: 'Vul een ingrediëntnaam en hoeveelheid in.',
     }],
   }
 }
