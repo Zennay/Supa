@@ -13,6 +13,41 @@ node --experimental-strip-types scripts/retailer-private-m3-ingestion-preflight.
 node --experimental-strip-types --test tests/product-retailer-private-m3-ingestion-preflight.test.mjs
 ```
 
+## Bestaande privébronnen controleren
+
+Het commando kan nu ook een **bestaande, uitsluitend-lezen**
+reviewmap verwerken die eerder via
+[`retailer-private-reviewed-manifest-builder.mjs`](../scripts/retailer-private-reviewed-manifest-builder.mjs)
+is voorbereid. Vereist: precies zes afzonderlijke gecontroleerde
+product-, catalogus- en aanbiedingenrecords voor PLUS en DekaMarkt, met een
+`manifest.json` die de originele bronbestandsbytes per SHA-256 vastlegt.
+De map moet eigenaar-afgeschermd zijn (0700), de reguliere bronbestanden
+0600, zonder symlinks of hardlinks. Er worden NOOIT manifesten gemaakt,
+bronbestanden herschreven of ontbrekende captures opgevraagd.
+
+```sh
+umask 077
+node --experimental-strip-types scripts/retailer-private-m3-ingestion-preflight.mjs \
+  --dir /pad/naar/prive/beoordeelde-captures \
+  --at 2026-10-15T10:00:00.000Z
+node --experimental-strip-types --test tests/product-retailer-private-m3-archive-admission-20261016.test.mjs
+```
+
+De controle roept de bestaande integriteitsbewuste SHA-manifestreplay aan
+(inclusief lokale bestandsrechten, geverifieerde JSON, veilige bronidentiteit)
+en verwerkt pas daarna de **privé in het proces** beschikbare observaties.
+Er worden uitsluitend zes bronsoortaggregaten en overkoepelende aantallen
+uitgegeven. Bij SHA-afwijking/missende bron wordt zonder stdout generiek
+geweigerd. Meerdere opnames van één bronsoort binnen dezelfde map worden
+nog niet tot één kortings-baseline samengevoegd: deze M3-controle weigert
+daarom bewust meer dan de zes toegelaten individuele bronvormen.
+
+Geen nieuwe URL, internetverbinding, externe toestemming of huidige prijs
+volgt uit deze route. Origineel historisch bewijs kan eveneens in de operator-
+map staan; de status is daarom altijd **gereviewd offline**, niet 'nu live'.
+
+## Ingebouwde historische controle (zonder map)
+
 De bron is uitsluitend de zes historische beoordeelde M1-fixtures in de
 repository en het bestaande `evidence/m1/source-permission-gate.v1.json`.
 Er zijn **nul** netwerkverzoeken. Zonder argument geldt de auditklok van nu.
