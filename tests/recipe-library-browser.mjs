@@ -4,7 +4,8 @@ import { chromium } from 'playwright'
 
 await mkdir('artifacts/recipe-ui', { recursive: true })
 const browser = await chromium.launch({ headless: true })
-const page = await browser.newPage({ viewport: { width: 440, height: 960 } })
+const context = await browser.newContext({ viewport: { width: 440, height: 960 } })
+const page = await context.newPage()
 const errors = []; page.on('pageerror', e => errors.push(e.message))
 try {
   await page.goto('http://127.0.0.1:4174')
