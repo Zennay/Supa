@@ -120,3 +120,24 @@ test('product: real permission_required gate still refuses before any mock trans
   }), /Explicit retailer source permission required/)
   assert.equal(calls, 0)
 })
+
+for (const [status, expression] of [
+  [403, /Retailer refused or rate-limited capture/],
+  [429, /Retailer refused or rate-limited capture/],
+  [302, /Retailer capture failed or redirected/],
+]) {
+  test('product: HTTP ' + status + ' cancels unread body without retry, proxy or source reuse', async () => {
+    const stream = tracked([new Uint8Array(256).fill(65)])
+    let calls = 0
+    await assert.rejects(captureApprovedRetailerPage(request({
+      fetchFn: async () => {
+        calls++
+        return new Response(stream.body, {
+          status, headers: { 'content-type': 'text/html' },
+        })
+      },
+    })), expression)
+    assert.equal(calls, 1)
+    assert.equal(stream.canceled(), 1)
+  })
+}
