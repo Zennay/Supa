@@ -46,6 +46,16 @@ const QUANTITY_SCALE = 1000 // grams/millilitres/pieces: at most 3 decimals
  * servings, amount and reviewReason (e.g. steps, origin URL) are preserved.
  * Unknown or unsupported units cannot magically become valid quantities.
  */
+function detachedRecipeMetadata<T extends PortionDraft>(source: T): T {
+  // Generic portion drafts can carry editor-owned cooking steps and review
+  // warnings. Shallow spreading aliases those arrays, so later changes to a
+  // scaled draft could silently alter the original review/source evidence.
+  const copy: Record<string, unknown> = { ...source }
+  for (const key of ['steps', 'warnings']) {
+    if (Array.isArray(copy[key])) copy[key] = [...copy[key]]
+  }
+  return copy as T
+}
 export function scaleMetricRecipeDraft<T extends PortionDraft>(
   source: T,
   requestedServings: number,
@@ -61,7 +71,7 @@ export function scaleMetricRecipeDraft<T extends PortionDraft>(
   const oldServings = source.servings
   if (typeof oldServings !== 'number' || !Number.isFinite(oldServings) || oldServings <= 0 || oldServings > MAX_SERVINGS) {
     return {
-      draft: { ...source, ingredients: source.ingredients.map((ingredient) => ({ ...ingredient })) } as T,
+      draft: { ...detachedRecipeMetadata(source), ingredients: source.ingredients.map((ingredient) => ({ ...ingredient })) } as T,
       status: 'needs_review',
       warnings: [{ ingredientIndex: null, code: 'unknown_base_servings' }],
     }
@@ -102,7 +112,7 @@ export function scaleMetricRecipeDraft<T extends PortionDraft>(
   })
 
   return {
-    draft: { ...source, servings: requestedServings, ingredients } as T,
+    draft: { ...detachedRecipeMetadata(source), servings: requestedServings, ingredients } as T,
     status: warnings.length ? 'needs_review' : 'scaled',
     warnings,
   }
