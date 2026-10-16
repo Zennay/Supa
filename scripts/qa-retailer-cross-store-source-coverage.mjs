@@ -36,13 +36,19 @@ function inertCrossStoreReviewOptions(raw) {
   }
   return Object.freeze(snapshot)
 }
-function utcMs(value, asOf) {
+function utcNs(value, asOf) {
+  // Review capture instants physically, not via Date.parse's millisecond
+  // truncation. One extra nanosecond can change a 24-hour evidence gate.
   if (typeof value !== 'string' ||
-      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value)) fail()
+      !/^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{1,9})?Z$/.test(value)) fail()
   const ms = Date.parse(value)
-  if (!Number.isFinite(ms) || ms > asOf ||
+  if (!Number.isFinite(ms) ||
       new Date(ms).toISOString().slice(0,19) !== value.slice(0,19)) fail()
-  return ms
+  const fraction = /\\.(\\d{1,9})Z$/.exec(value)?.[1] ?? ''
+  const nanos = BigInt(ms) * 1_000_000n +
+    BigInt(fraction.padEnd(9, '0').slice(3) || '0')
+  if (nanos > asOf) fail()
+  return nanos
 }
 function captureCoverage(product, auditTime) {
   const kinds = new Set()
@@ -50,7 +56,7 @@ function captureCoverage(product, auditTime) {
   for (const capture of product.captures) {
     if (!kindAllowed.has(capture.sourceKind)) fail()
     kinds.add(capture.sourceKind)
-    times.push(utcMs(capture.capturedAt, auditTime))
+    times.push(utcNs(capture.capturedAt, auditTime))
   }
   return { kinds, times }
 }
@@ -69,7 +75,7 @@ export function auditPrivateCrossStoreEvidence(catalog, options = {}) {
     ? admitted.maxCrossStoreSkewHours : 24
   const maxAgeHours = Object.hasOwn(admitted, 'maxAgeHours')
     ? admitted.maxAgeHours : 24
-  const clock = utcMs(asOf, Date.now())
+  const clock = utcNs(asOf, BigInt(Date.now()) * 1_000_000n)
   if (!Number.isSafeInteger(maxCrossStoreSkewHours) ||
       maxCrossStoreSkewHours < 1 || maxCrossStoreSkewHours > 720 ||
       !Number.isSafeInteger(maxAgeHours) ||
@@ -120,13 +126,14 @@ export function auditPrivateCrossStoreEvidence(catalog, options = {}) {
       continue
     }
     const times = [...p.times, ...d.times]
-    const span = Math.max(...times) - Math.min(...times)
-    if (span > maxCrossStoreSkewHours * 3600 * 1000) {
+    const span = times.reduce((highest, ns) => ns > highest ? ns : highest) -
+      times.reduce((lowest, ns) => ns < lowest ? ns : lowest)
+    if (span > BigInt(maxCrossStoreSkewHours) * 3_600_000_000_000n) {
       result.misalignedCaptureWindows++
       continue
     }
     result.historicallyMultiSourceSupported++
-    if (times.some(time => clock - time > maxAgeHours * 3600 * 1000)) {
+    if (times.some(time => clock - time > BigInt(maxAgeHours) * 3_600_000_000_000n)) {
       result.staleRelativeToReviewClock++
     } else {
       result.withinHistoricalReviewClock++
