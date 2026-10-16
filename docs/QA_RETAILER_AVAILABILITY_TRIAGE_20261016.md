@@ -48,7 +48,7 @@ separate release and ownership review.
 ## Limits and separate release gates
 
 All outputs explicitly retain `historicalOnly:true`,
-`permissionsVerified:false`, `productionEnabled:false`,
+`permissionVerified:false`, `productionEnabled:false`,
 `publicSavingsClaimEligible:false`, `liveRequests:0` and
 `releaseDecision:"hold"`. This review does not verify current prices,
 product availability at checkout, packaging equivalence or total savings.
