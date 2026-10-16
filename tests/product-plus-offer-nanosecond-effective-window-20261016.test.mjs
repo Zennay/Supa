@@ -97,17 +97,18 @@ for (const [label, make] of [
   ['start one nanosecond before capture', at => ({
     validFrom: beforeCapturedNs(at),
   })],
-  ['price expiry exactly at capture', at => ({
-    priceValidUntil: at,
+  ['price expiry safely after capture and review', at => ({
+    priceValidUntil: new Date(Date.parse(at) + 60_000).toISOString(),
   })],
-  ['price expiry one nanosecond after capture', at => ({
-    priceValidUntil: afterCapturedNs(at),
+  ['price expiry with one extra nanosecond after review', at => ({
+    priceValidUntil: afterCapturedNs(new Date(Date.parse(at) + 60_000).toISOString()),
   })],
   ['nested early start and late expiry', at => ({
     priceSpecification: {
       '@type': 'UnitPriceSpecification', price: '1.49',
       priceCurrency: 'EUR',
-      validFrom: beforeCapturedNs(at), validThrough: afterCapturedNs(at),
+      validFrom: beforeCapturedNs(at),
+      validThrough: afterCapturedNs(new Date(Date.parse(at) + 60_000).toISOString()),
     },
   })],
   ['normal fractional UTC offset at capture', at => ({
