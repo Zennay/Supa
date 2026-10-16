@@ -55,3 +55,31 @@ npm run build
 ```
 
 The tests use **mock transports and fictional grants only**. Actual M1 evidence still reports PLUS `permission_required`, DekaMarkt `unresolved`, `productionReady:false`. No commercial traffic should be initiated without genuine written permission [#74](https://github.com/Zennay/Supa/issues/74). The M3 exit still requires real identical same-demand PLUS11+Deka11 human observations within 24 hours [#78](https://github.com/Zennay/Supa/issues/78), an actual field-code SHA [#205](https://github.com/Zennay/Supa/issues/205), and a trusted permanent VPS gate [#2833](https://github.com/Zennay/Supa/issues/2833). No public/current product prices or savings are established by this session.
+
+## New: bounded authorized capture → offline product preview
+
+The isolated `createAuthorizedRetailerProductPreviewSession()` in `scripts/retailer-authorized-product-preview.mjs` now **connects** the previously separate permission-gated capture session to the existing `parseM3OfflineProductHtml` parser for a **single explicitly authorized product page**. This is the first direct, executable transport-to-offline-product vertical slice, not a commercial ready scraper.
+
+```js
+import { createAuthorizedRetailerProductPreviewSession } from './scripts/retailer-authorized-product-preview.mjs'
+
+// source.kind MUST be 'product'; all inputs must be genuinely reviewed.
+// Never use the synthetic test grants for actual retailer HTTP traffic.
+const session = createAuthorizedRetailerProductPreviewSession()
+const preview = await session.previewOne({
+  source, permissionGate, grant, capturedAt, fetchFn: approvedTransport,
+})
+// preview.privateProductObservation is operator-private, not publishable.
+```
+
+Behavior: the original canonical permission / HTTPS route validator checks the entire trusted source before injected transport. A fully read and SHA-pinned HTML response then goes to the original offline JSON-LD parser; the wrapper requires product-page provenance (retailer, exact URL, timestamp, raw SHA-256) to match **on both** the capture and parsed observation. Only a single page-bound Product may appear as a private preview. A missing, contradictory or ambiguous Product yields `reviewStatus:'abstained'`, `privateProductObservation:null`; no guessed fallback price.
+
+The return value intentionally **does not contain raw HTML**, although the original operator-only `captureOne()` API remains available for authorized private capture review. It can contain a private, historical product observation with monetary fields: **never log, upload, serve, publish or treat this result as current retailer data**. Flags `currentPriceVerified:false`, `currentAvailabilityVerified:false`, `productApprovedForIngestion:false`, `readyForIngestion:false`, `productionEnabled:false`, `publicPricePublicationEnabled:false`, and `publicSavingsClaimEligible:false` cannot be elevated by this bridge. Source rights and field proof #74/#78/#205/#2833 remain independently mandatory.
+
+Offline end-to-end mock coverage:
+
+```sh
+node --experimental-strip-types --test tests/product-retailer-authorized-product-preview-20261016.test.mjs
+```
+
+The tests inject **only fictional plus/dekamarkt HTTP responses**, explicitly fictional grants and in-memory Schema.org price examples, never real access. They demonstrate positive source-bound previews, recommendation exclusion, refusal prior to networking, safe abstention and throttle hard-stop. Any later catalog/offers ingestion still needs its **own reviewed adapters and genuine rights**, not extrapolation from single-product JSON-LD.
