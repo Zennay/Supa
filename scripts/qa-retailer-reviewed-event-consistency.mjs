@@ -28,7 +28,7 @@ function inertEventReviewBatch(input) {
   const seen = new WeakMap()
   const active = new WeakSet()
   let count = 0
-  const isIndex = key => /^(?:0|[1-9]\\d*)$/.test(key)
+  const isIndex = key => /^(?:0|[1-9][0-9]*)$/.test(key)
   function copy(value, depth) {
     if (++count > 400_000 || depth > 40) fail()
     if (value === null || typeof value === 'boolean') return value
