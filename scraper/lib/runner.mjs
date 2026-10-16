@@ -76,27 +76,34 @@ export async function runRetailer(adapter, {
 
     // Hands out the next work item; generator access is serialised.
     const nextItem = () => {
+      // Reserve each request inside this serialized handout, never before an
+      // awaited discovery call in separate workers. Fresh skips cost no budget.
       const result = pulling.then(async () => {
-        while (!queue.length && !exhausted) {
-          const next = await discovered.next()
-          if (next.done) exhausted = true
-          else queue.push(next.value)
+        while (!aborted && started < limit) {
+          while (!queue.length && !exhausted) {
+            const next = await discovered.next()
+            if (next.done) exhausted = true
+            else queue.push(next.value)
+          }
+          const item = queue.shift()
+          if (!item) return null
+          if (item.kind === 'product' && fresh.has(item.url)) {
+            summary.skipped += 1
+            continue
+          }
+          started += 1
+          return item
         }
-        return queue.shift() ?? null
+        return null
       })
       pulling = result.catch(() => {})
       return result
     }
 
     const worker = async () => {
-      while (!aborted && started < limit) {
+      while (!aborted) {
         const item = await nextItem()
-        if (!item) return
-        if (item.kind === 'product' && fresh.has(item.url)) {
-          summary.skipped += 1
-          continue
-        }
-        started += 1
+        if (!item || aborted) return
         try {
           queue.unshift(...(await handle(item)))
         } catch (error) {
