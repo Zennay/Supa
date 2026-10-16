@@ -15,3 +15,5 @@ Legacy RecipeWithIngredients.estimatedCost is a required number. The internal ba
 Native tests cover actual multi-day ingredient aggregation, printable/copy integration, private identity collision, imported and priced candidate rejection, missing/duplicate days, frozen inputs, no euro/savings and no exposed basket.
 
 This remains DRAFT / HOLD, never a live store list or current price. M3 source rights #74, human PLUS11/Deka11 #78, source SHA #205, permanent VPS #2833, scoped writer lease and separate owner review still apply.
+
+Accessible pre-mount UI component: src/features/user-recipes/UnpricedPrivateShoppingPreviewView.ts, a pure React render with semantic headings, clear price/savings unknown status, ordered ingredient tasks and user-selected readonly copy text. It does not use privileged clipboard APIs or network/storage; no App.tsx route was taken from the owner. Four additional real ReactDOMServer tests validate visible labels, disclosure, safe unavailable state and script-looking strings being HTML escaped. This makes 13 new tests in this stacked PR, in addition to the 12 tests of the parent #3291.
