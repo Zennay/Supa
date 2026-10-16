@@ -81,7 +81,7 @@ test('stale tab, duplicate IDs, 100-recipe ceiling and storage quota are protect
   assert.throws(() => restoreRecipeBackup(full, fullState, portable, () => 'own-overflow', stamp), /Maximaal 100/)
   assert.equal(full.getItem(), fullState.raw)
   const blocked = { getItem: () => null, setItem: () => { throw new Error('quota') } }
-  assert.throws(() => restoreRecipeBackup(blocked, {recipes:[],raw:null,error:null}, portable, () => 'own-one', stamp), /quota/)
+  assert.throws(() => restoreRecipeBackup(blocked, {recipes:[],raw:null,error:null}, portable, () => 'own-one-test', stamp), /quota/)
 })
 
 test('future corrupt library cannot be exported or overwritten by restore', () => {
