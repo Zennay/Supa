@@ -11,7 +11,7 @@ const CATALOG_MAX_KEYS = 4096
 const CATALOG_MAX_ARRAY_LENGTH = 16384
 
 function refuseCatalogCaller() {
-  throw new Error('Untrusted retailer catalog caller input')
+  throw new Error('Refusing untrusted input: Untrusted retailer catalog caller input')
 }
 
 function pinCatalogValue(value, budget, ancestors, depth = 0) {
