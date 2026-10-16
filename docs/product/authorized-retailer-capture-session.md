@@ -83,3 +83,9 @@ node --experimental-strip-types --test tests/product-retailer-authorized-product
 ```
 
 The tests inject **only fictional plus/dekamarkt HTTP responses**, explicitly fictional grants and in-memory Schema.org price examples, never real access. They demonstrate positive source-bound previews, recommendation exclusion, refusal prior to networking, safe abstention and throttle hard-stop. Any later catalog/offers ingestion still needs its **own reviewed adapters and genuine rights**, not extrapolation from single-product JSON-LD.
+
+### Product-review outcome metrics (privacy-safe)
+
+`createAuthorizedRetailerProductPreviewSession().status()` includes all the transport counters **plus** `privateProductReviewCounts`, with isolated `plus` and `dekamarkt` rows. `accepted` increments only if the canonical offline product parser selected one SHA/URL/time-bound private observation; `abstained` increments for complete, valid HTML whose product identity or price proof could **not** safely be accepted. Refused source rights, unauthorized routes and transport/body errors never count as reviewed products.
+
+These counters distinguish **HTTP 200 → valid HTML → recognized product**, and contain only integer totals: never HTML, product identity, prices, names, captured URLs or a source-hash inventory. Even a recognized product remains historical private review only; `currentPriceVerified:false`, `productionEnabled:false`, `publicSavingsClaimEligible:false` are unchanged.
