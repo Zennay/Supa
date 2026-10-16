@@ -58,6 +58,32 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, {
       catalog.productionEnabled !== false ||
       catalog.publicSavingsClaimEligible !== false) refuse()
 
+  // Six shape-level diagnostics are explicitly public-safe aggregates. They
+  // identify the retailer/source TYPE needing offline review without revealing
+  // any captured URL, digest, SKU, product name or price.
+  const shapeDiagnostics = rollout.retailers.flatMap(retailer =>
+    retailer.shapes.map(shape => ({
+      retailer: retailer.retailerId,
+      kind: shape.kind,
+      historicalStatus: shape.status,
+      acceptedHistoricalSources: shape.acceptedSources,
+      rejectedHistoricalSources: shape.rejectedSources,
+      archivedObservations: shape.historicalObservations,
+      staleHistoricalSources: shape.staleHistoricalCaptures,
+      unknownHistoricalPrices: shape.unknownPriceObservations,
+      verifiedCurrentPriceObservations: 0,
+    })))
+  if (shapeDiagnostics.length !== 6 ||
+      new Set(shapeDiagnostics.map(row => row.retailer + ':' + row.kind)).size !== 6 ||
+      shapeDiagnostics.some(row =>
+        !isCount(row.acceptedHistoricalSources) ||
+        !isCount(row.rejectedHistoricalSources) ||
+        !isCount(row.archivedObservations) ||
+        !isCount(row.staleHistoricalSources) ||
+        !isCount(row.unknownHistoricalPrices)) ||
+      shapeDiagnostics.reduce((sum, row) => sum + row.archivedObservations, 0) !==
+        batch.summary.observations) refuse()
+
   // Unresolved is a first-class status, not a fabricated zero-price bargain.
   // An offer can have a valid reviewed baseline yet still have unknown campaign
   // timing or require retailer rights and a genuine human basket observation.
@@ -87,6 +113,7 @@ export function assessPrivateM3RetailerIngestion(permissionGate, batch, {
     missingSourceShapes: rollout.missingHistoricalShapeCount,
     staleHistoricalSources: rollout.staleHistoricalCaptures,
     acceptedHistoricalObservations: batch.summary.observations,
+    perSourceShape: shapeDiagnostics,
     normalizedPrivateProducts: catalog.productCount,
     conflictingPrivateProducts: catalog.conflictCount,
     archivedOfferRows: offers.observedOfferRows,
