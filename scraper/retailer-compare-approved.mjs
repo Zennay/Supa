@@ -5,6 +5,7 @@
  * already reviewed product-core gates before exposing any price text.
  */
 import { DatabaseSync } from 'node:sqlite'
+import { types as nodeTypes } from 'node:util'
 import { planDailyRefresh } from './daily-refresh.mjs'
 import { findFreshProducts } from './retailer-search-api.mjs'
 
@@ -14,23 +15,55 @@ const printable = value => String(value).replace(
   /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' '
 ).slice(0, 200)
 
+// Snapshot an inert, fixed options record BEFORE JavaScript destructuring can
+// run caller getters, Proxy traps or inherited field hooks. Never read fields
+// from an untrusted options object directly.
+function ownOptions(input) {
+  if (input === null || typeof input !== 'object' ||
+      Array.isArray(input) || nodeTypes.isProxy(input)) fail()
+  const proto = Object.getPrototypeOf(input)
+  if (proto !== Object.prototype && proto !== null) fail()
+  const descriptors = Object.getOwnPropertyDescriptors(input)
+  const permitted = new Set([
+    'query', 'dbPath', 'policyPath', 'sourceGatePath', 'now', 'write',
+  ])
+  const own = Object.create(null)
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !permitted.has(key) ||
+        !Object.hasOwn(descriptors[key], 'value')) fail()
+    own[key] = descriptors[key].value
+  }
+  return own
+}
+
 /**
  * An operator-supplied legal policy is not itself real retailer permission;
  * the normal canonical PLUS/Deka M1 gate remains an independent deny.
  * Emit no names or individual prices before BOTH scopes are checked.
  */
-export async function compareApprovedLocalCatalog({
-  query, dbPath, policyPath,
-  sourceGatePath = 'evidence/m1/source-permission-gate.v1.json',
-  now = new Date(), write = text => process.stdout.write(text + '\n'),
-} = {}) {
+export async function compareApprovedLocalCatalog(options = {}) {
+  const safe = ownOptions(options)
+  const query = safe.query
+  const dbPath = safe.dbPath
+  const policyPath = safe.policyPath
+  const sourceGatePath = safe.sourceGatePath === undefined
+    ? 'evidence/m1/source-permission-gate.v1.json' : safe.sourceGatePath
+  const clock = safe.now === undefined ? new Date() : safe.now
+  const write = safe.write === undefined
+    ? text => process.stdout.write(text + '\n') : safe.write
+  // Calling a custom Date#getTime() would run arbitrary caller code.
+  // Validate built-in Date brand/prototype and invoke the native method only.
+  if (nodeTypes.isProxy(clock) || !nodeTypes.isDate(clock) ||
+      Object.getPrototypeOf(clock) !== Date.prototype) fail()
+  const millis = Date.prototype.getTime.call(clock)
+  if (!Number.isFinite(millis)) fail()
+  const now = new Date(millis)
   if (typeof query !== 'string' || query.trim().length < 2 ||
       query.length > 80 || /[\u0000-\u001f\u007f]/.test(query) ||
       typeof dbPath !== 'string' || !dbPath.trim() ||
       typeof policyPath !== 'string' || !policyPath.trim() ||
       typeof sourceGatePath !== 'string' || !sourceGatePath.trim() ||
-      !(now instanceof Date) || !Number.isFinite(now.getTime()) ||
-      typeof write !== 'function') fail()
+      typeof write !== 'function' || nodeTypes.isProxy(write)) fail()
 
   // This canonical admission is the same one as the locally gated search API.
   // Default deny: if policy path / canonical rights are absent or malformed,
