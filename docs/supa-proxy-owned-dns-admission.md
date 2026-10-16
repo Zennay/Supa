@@ -12,7 +12,7 @@ The checks are **pure**. They do not resolve DNS, prove domain ownership or bloc
 node --test tests/product-proxy-owned-public-dns-only-20261016.test.mjs
 ```
 
-The tests cover positive canonical DNS names and 18 IP/numeric variants, including localhost, RFC1918, link-local/metadata, public raw addresses, IPv6, shorthand, octal, hexadecimal, decimal and trailing-dot forms. No feed, network transport, CONNECT, DNS or supermarket request occurs in the tests. Independently replay the original unchanged [QA #3275](https://github.com/Zennay/Supa/pull/3275) IP-literal RED checks against the fixed product source.
+The tests cover positive canonical DNS names and 18 IP/numeric variants, including localhost, RFC1918, link-local/metadata, public raw addresses, IPv6, shorthand, octal, hexadecimal, decimal and trailing-dot forms. An additional `runCycle` regression injects fictional candidate/probe functions and proves a metadata-IP target is rejected **before** either function or the local private state storage is touched. No feed, network transport, CONNECT, DNS or supermarket request occurs in the tests. Independently replay the original unchanged [QA #3275](https://github.com/Zennay/Supa/pull/3275) IP-literal RED checks against the fixed product source.
 
 ## Release remains disabled
 
