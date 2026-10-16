@@ -5,7 +5,10 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validatedOwnedEndpoint } from '../scripts/retailer-proxy-health-service.mjs'
+import { validatedOwnedEndpoint, runCycle } from '../scripts/retailer-proxy-health-service.mjs'
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 for (const host of [
   'probe.my-owned-domain.nl',
@@ -50,4 +53,25 @@ test('DNS-looking host does not allow secret query, downgrade or owner mismatch'
   assert.throws(() => validatedOwnedEndpoint('https://' + host + '/health?token=abc', host))
   assert.throws(() => validatedOwnedEndpoint('http://' + host + '/health', host))
   assert.throws(() => validatedOwnedEndpoint('https://' + host + '/health', 'different.example.nl'))
+})
+
+
+test('rejects metadata IP before any feed, probe or device state I/O', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'supa-owned-echo-reject-'))
+  let fetched = 0
+  let probed = 0
+  try {
+    await assert.rejects(() => runCycle({
+      stateFile: join(dir, 'private-state.json'),
+      ownedUrl: 'https://169.254.169.254/health',
+      ownedHost: '169.254.169.254',
+      fetchCandidates: async () => { fetched++; return ['http://8.8.8.8:3128'] },
+      probe: async () => { probed++; return { ok: true, ownedEndpoint: true } },
+    }), /Owned endpoint must be exact public HTTPS hostname/)
+    assert.equal(fetched, 0, 'invalid endpoint must not download even fake feed')
+    assert.equal(probed, 0, 'invalid endpoint must not attempt even fake probe')
+    assert.deepEqual(readdirSync(dir), [], 'invalid endpoint must not persist state')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
