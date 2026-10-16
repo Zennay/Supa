@@ -18,6 +18,60 @@ import { parseDekaNuxtFromAuthorizedHtml } from './retailer-approved-deka-nuxt-p
 const MAX_JSONLD_BLOCKS = 16
 const MAX_CAPTURE_AGE_MS = 24 * 60 * 60 * 1000
 
+// A quoted HTML Offer can carry its own effective window, distinct from
+// capture freshness. Check *every* explicit Offer and nested specification
+// claim at both capture and private-review time before publishing even a
+// candidate. Unknown timestamps fail closed. Date-only "until/through" means
+// the entire stated calendar date; timezone-bearing instants are exact.
+function activePriceValidity(blocks, capturedAt) {
+  const captureMs = Date.parse(capturedAt)
+  const nowMs = Date.now()
+  if (!Number.isFinite(captureMs)) return false
+  const dates = [captureMs, nowMs]
+
+  function parseBoundary(raw, inclusiveEnd) {
+    if (typeof raw !== 'string') return null
+    const value = raw.trim()
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+    if (!dateOnly && !timestamp) return null
+    const millis = Date.parse(value)
+    if (!Number.isFinite(millis)) return null
+    if (dateOnly && new Date(millis).toISOString().slice(0, 10) !== value) return null
+    return { millis: dateOnly && inclusiveEnd ? millis + 86_400_000 : millis,
+      exclusiveEnd: dateOnly && inclusiveEnd }
+  }
+
+  function scan(value, withinSpecification = false) {
+    if (Array.isArray(value)) return value.every(child => scan(child, withinSpecification))
+    if (value === null || typeof value !== 'object') return true
+    const types = [value['@type']].flat().filter(v => typeof v === 'string')
+      .map(v => v.toLowerCase())
+    const typedOffer = types.includes('offer') || types.includes('aggregateoffer')
+    const isSpecification = types.includes('unitpricespecification') ||
+      types.includes('pricespecification')
+    if (typedOffer || isSpecification || withinSpecification) {
+      for (const [key, raw] of Object.entries(value)) {
+        const field = key.toLowerCase()
+        if (field !== 'validfrom' && field !== 'pricevaliduntil' &&
+            field !== 'validthrough') continue
+        const start = field === 'validfrom'
+        const boundary = parseBoundary(raw, !start)
+        if (!boundary) return false
+        if (dates.some(instant => start
+          ? instant < boundary.millis
+          : boundary.exclusiveEnd
+            ? instant >= boundary.millis
+            : instant > boundary.millis)) return false
+      }
+    }
+    return Object.entries(value).every(([key, child]) =>
+      scan(child, key.toLowerCase() === 'pricespecification' &&
+        (typedOffer || isSpecification || withinSpecification)))
+  }
+  return scan(blocks)
+}
+
 function unavailable(reason, captured) {
   return {
     mode: 'private-authorized-html-product-candidate',
@@ -131,6 +185,9 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
   const blocks = scripts.jsonLdBlocks
   if (scripts.invalid || blocks.length === 0 || blocks.length > MAX_JSONLD_BLOCKS) {
     return unavailable('missing_or_invalid_jsonld', captured)
+  }
+  if (!activePriceValidity(blocks, provenance.capturedAt)) {
+    return unavailable('inactive_or_invalid_offer_price_window', captured)
   }
   // All approved retailers must refuse same-object price contradictions.
   // Otherwise the generic Schema.org parser can select PLUS offer.price
