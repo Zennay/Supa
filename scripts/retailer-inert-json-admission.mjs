@@ -14,15 +14,22 @@ const MAX_NODES = 100_000
 const MAX_DEPTH = 64
 const MAX_ARRAY = 65_536
 const MAX_STRING = 1_048_576
+const MAX_TOTAL_UTF8_BYTES = 32 * 1024 * 1024
 
 export function snapshotInertReviewedEvidence(value) {
   let nodes = 0
+  let utf8Bytes = 0
+  const addBytes = text => {
+    utf8Bytes += Buffer.byteLength(text, 'utf8')
+    if (utf8Bytes > MAX_TOTAL_UTF8_BYTES) refuse()
+  }
   const visiting = new WeakSet()
   function copy(node, depth) {
     if (++nodes > MAX_NODES || depth > MAX_DEPTH) refuse()
     if (node === null || typeof node === 'boolean') return node
     if (typeof node === 'string') {
       if (node.length > MAX_STRING) refuse()
+      addBytes(node)
       return node
     }
     if (typeof node === 'number') {
@@ -59,6 +66,7 @@ export function snapshotInertReviewedEvidence(value) {
       if (keys.length > MAX_NODES) refuse()
       for (const key of keys) {
         if (typeof key !== 'string') refuse()
+        addBytes(key)
         const property = descriptors[key]
         if (!property || !Object.hasOwn(property, 'value')) refuse()
         Object.defineProperty(result, key, {
