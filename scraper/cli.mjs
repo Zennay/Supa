@@ -51,6 +51,8 @@ function selectAdapters() {
 async function scrape() {
   const store = new ScrapeStore(opts.db)
   for (const u of unsupported) store.upsertRetailer(u)
+  // A run still marked running belongs to a process that died (container restart, kill).
+  store.db.exec(`UPDATE scrape_runs SET status = 'interrupted' WHERE status = 'running'`)
   const fetcher = new PoliteFetcher({ minDelayMs: Number(opts.delay) })
   const selected = selectAdapters()
   const renderer = selected.some((a) => a.mode === 'browser') ? new BrowserRenderer(fetcher) : null
