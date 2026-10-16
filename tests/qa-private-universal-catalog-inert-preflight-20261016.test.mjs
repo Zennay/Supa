@@ -50,6 +50,17 @@ test('inert snapshot detaches and freezes nested observation, provenance and pac
   assert.throws(() => { snapshot.results[0].observations[0].currentPriceCents = 1 }, TypeError)
 })
 
+test('repeated inert references detach independently, while actual cycles still refuse', () => {
+  const shared = { id: 'offline-source', value: 1 }
+  const copied = pinInertPrivateCatalogInput({ first: shared, second: shared })
+  assert.deepEqual(copied.first, copied.second)
+  assert.notEqual(copied.first, copied.second, 'shared input references must not stay shared in the pinned result')
+  assert.ok(Object.isFrozen(copied.first))
+  const cyclic = { value: 2 }
+  cyclic.self = cyclic
+  assert.throws(() => pinInertPrivateCatalogInput(cyclic), denied)
+})
+
 test('top-level caller Proxy and revoked Proxy refuse before executing any caller traps', async () => {
   const batch = await archived()
   let calls = 0
