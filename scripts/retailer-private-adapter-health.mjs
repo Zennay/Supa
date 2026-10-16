@@ -195,7 +195,12 @@ export function evaluatePrivateAdapterHealth(callerBatch, callerOptions = {}) {
 }
 
 export async function main(argv = process.argv.slice(2), write = text => process.stdout.write(text)) {
-  if (!Array.isArray(argv) || argv.length !== 0) fail()
+  // Programmatic callers can pass Proxy arrays whose .length invokes
+  // arbitrary getters. The CLI is strictly zero-argument: first pin an
+  // inert copy before checking its length or starting fixture IO.
+  let pinnedArgs
+  try { pinnedArgs = snapshotBoundedPrivateCatalogInput(argv) } catch { fail() }
+  if (!Array.isArray(pinnedArgs) || pinnedArgs.length !== 0) fail()
   const batch = await loadReviewedRepositoryFixtures()
   const report = evaluatePrivateAdapterHealth(batch)
   write(JSON.stringify(report, null, 2) + '\n')
