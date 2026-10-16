@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="29" height="29" viewBox="0 0 29 29" fill="none" xmlns="http://www.w3.org/2000/svg">
+<foreignObject x="-4.53125" y="-4.53125" width="38.0625" height="38.0625"><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(2.27px);clip-path:url(#bgblur_0_0_76_clip_path);height:100%;width:100%"></div></foreignObject><g id="Heart button" data-figma-bg-blur-radius="4.53125">
+<rect width="29" height="29" rx="14.5" fill="#090909" fill-opacity="0.6"/>
+<path id="Vector" d="M14.5 10.6126C12.8889 6.83096 7.25 7.23374 7.25 12.0671C7.25 16.9004 14.5 20.9284 14.5 20.9284C14.5 20.9284 21.75 16.9004 21.75 12.0671C21.75 7.23374 16.1111 6.83096 14.5 10.6126Z" fill="#36C693"/>
+</g>
+<defs>
+<clipPath id="bgblur_0_0_76_clip_path" transform="translate(4.53125 4.53125)"><rect width="29" height="29" rx="14.5"/>
+</clipPath></defs>
+</svg>

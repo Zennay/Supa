@@ -5,6 +5,7 @@ import test from 'node:test'
 import ts from 'typescript'
 
 import { m2InitialPlan, m2Products, m2Recipes, m2Store } from '../src/data/m2Fixture.ts'
+import { curatedFigmaRecipes } from '../src/features/recipes/curatedFigmaRecipes.ts'
 import { defaultPlannerPreferences, serializePlannerPreferences } from '../src/domain/plannerPreferences.ts'
 import { restorePlannerPreferencesWithCustomBudget } from '../src/features/planner/customWeekBudget.ts'
 import { canReplacePlannerRecord, persistPlannerRecord } from '../src/features/planner/plannerStorageGuard.ts'
@@ -67,7 +68,9 @@ function mount(disk, { denyGetter = false } = {}) {
     ? Object.defineProperty({}, 'localStorage', {
         get() { throw new Error('fictional getter denial') },
       })
-    : { localStorage: disk }
+    : { localStorage: disk, addEventListener() {}, removeEventListener() {} }
+  browser.addEventListener = () => {}
+  browser.removeEventListener = () => {}
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
   const slots = []
   let index = 0
@@ -113,6 +116,9 @@ function mount(disk, { denyGetter = false } = {}) {
       './features/home/HiFiHome': { HiFiHome: () => {}, HiFiDemoList: () => {} },
       './features/home/figmaAssets': { figmaAssets: {} },
       './components/FigmaImage': { FigmaImage: () => {} },
+      './features/recipes/recipeLibrary': { readRecipeLibrary: () => ({ recipes: [], raw: null, error: null }) },
+      './features/recipes/plannerRecipes': { toPlannerRecipe: () => null },
+      './features/recipes/curatedFigmaRecipes': { curatedFigmaRecipes },
       './domain/basket': { buildOneStoreBasket: () => ({
         totalCents: 1500, unresolvedLineCount: 0, lines: [],
       }) },

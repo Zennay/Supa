@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "start": "node --experimental-strip-types server/app.mjs",
     "dev": "vite",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "build": "tsc -b && vite build",
