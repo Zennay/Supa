@@ -12,6 +12,7 @@ import { snapshotInertReviewedEvidence } from './retailer-inert-json-admission.m
 import {
   readBoundedRegularReviewedFixture,
   RETAILER_REVIEWED_FIXTURES,
+  ingestReviewedBatch,
 } from './retailer-reviewed-ingest-engine.mjs'
 
 const APPROVED = Object.freeze({
@@ -78,6 +79,16 @@ export function auditPhysicalRetailerCaptures(input) {
     productionEnabled: false,
     publicSavingsClaimEligible: false,
   })
+}
+
+/**
+ * Opt-in safe private ingest adapter. Does not alter legacy
+ * ingestReviewedBatch; callers must explicitly use this entrypoint.
+ * Physical and logical aliases fail before engine ingestion can count them.
+ */
+export function ingestPhysicallyDistinctReviewedBatch(records) {
+  auditPhysicalRetailerCaptures(records)
+  return ingestReviewedBatch(records)
 }
 
 export async function auditBundledHistoricalRetailerCaptures() {
