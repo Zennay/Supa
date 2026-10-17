@@ -76,11 +76,20 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     const passingTap = /^\s*ok\s+\d+\s+-\s+/.test(line)
     if (failingTap || passingTap) {
       completeFailure()
-      if (failingTap) current = { file: null }
+      if (failingTap) current = { file: null, locationCount: 0 }
     }
     if (current) {
       const location = /^\s*location:\s*['"](?:[^'"]*[/\\])?([^/'"\\]+\.test\.mjs):\d+:\d+['"]/.exec(line)
-      if (location) current.file = location[1]
+      if (location) {
+        // Every failed native test has one authoritative TAP origin. A later
+        // diagnostic line may not overwrite a foreign failure with a trusted
+        // QA path (nor duplicate the same path to fabricate certainty).
+        current.locationCount++
+        if (current.locationCount !== 1) {
+          throw new Error('Ambiguous native TAP failure location')
+        }
+        current.file = location[1]
+      }
     }
     const summary = /^#\s+(tests|pass|fail|skipped|cancelled|todo)\s+(\d+)$/.exec(line)
     if (summary) {
