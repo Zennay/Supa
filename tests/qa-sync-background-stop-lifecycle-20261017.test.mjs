@@ -120,7 +120,7 @@ test('P2: disposing during an in-flight PUT may not later mutate browser sync me
     status: 200, headers: { 'Content-Type': 'application/json' },
   }))
   await flush()
-  assert.equal(b.map.get(SYNC_META_STORAGE), null,
+  assert.equal(b.map.has(SYNC_META_STORAGE), false,
     'a disposed background job must not treat an out-of-lifetime 200 as a fresh save')
   assert.deepEqual([...b.map].sort(([a], [b]) => a.localeCompare(b)), before)
   assert.equal(b.map.get(PRIVATE), privateDraft)
