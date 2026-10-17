@@ -37,7 +37,7 @@ export function OfflineReviewedWorkbench({
 
   function importSnapshots(input: string) {
     try {
-      const parsed = parseOfflinePriceSnapshots(input)
+      const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setImported(parsed)
       setMessage('Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
     } catch (error) {
