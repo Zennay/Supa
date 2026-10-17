@@ -47,6 +47,30 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
 ]
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
+const chosenProductsStorageKey = 'supa:chosen-products:v1'
+
+/** Only this version of the owner's locally selected product identity list. */
+function readChosenProducts(): { ids: string[]; raw: string | null; writable: boolean } {
+  if (typeof window === 'undefined') return { ids: [], raw: null, writable: false }
+  try {
+    const raw = window.localStorage.getItem(chosenProductsStorageKey)
+    if (raw === null) return { ids: [], raw: null, writable: true }
+    const value: unknown = JSON.parse(raw)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return { ids: [], raw, writable: false }
+    }
+    const record = value as Record<string, unknown>
+    const ids = record.ids
+    if (record.schemaVersion !== 1 || Object.keys(record).some(key => key !== 'schemaVersion' && key !== 'ids') ||
+        !Array.isArray(ids) || ids.length > 100 ||
+        !ids.every(id => typeof id === 'string' &&
+          /^(?:[a-z][a-z0-9-]{1,79}|historical:(?:plus|dekamarkt):[0-9]{1,18})$/.test(id)) ||
+        new Set(ids).size !== ids.length) {
+      return { ids: [], raw, writable: false }
+    }
+    return { ids: [...ids], raw, writable: true }
+  } catch { return { ids: [], raw: null, writable: false } }
+}
 function availableRecipes() {
   try {
     if (typeof window === 'undefined') return [...m2Recipes, ...curatedFigmaRecipes]
@@ -81,11 +105,38 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
 
 export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
-  const [designProductIds, setDesignProductIds] = useState<string[]>([])
+  const [initialProductSelection] = useState(readChosenProducts)
+  const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)
+  const [savedProductRaw, setSavedProductRaw] = useState(initialProductSelection.raw)
+  const [productSelectionTouched, setProductSelectionTouched] = useState(false)
+  const [productSelectionWarning, setProductSelectionWarning] = useState<'protected' | 'unavailable' | null>(
+    () => initialProductSelection.writable ? null : (typeof window === 'undefined' ? null : 'protected'),
+  )
   const isHiFiView = tab === 'home' || tab === 'recipes' || tab === 'products'
   const navigate = (next: Tab) => { setTab(next); window.scrollTo?.(0, 0) }
-  const toggleDesignProduct = (id: string) => setDesignProductIds(current =>
-    current.includes(id) ? current.filter(item => item !== id) : [...current, id])
+  const toggleDesignProduct = (id: string) => {
+    setDesignProductIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])
+    setProductSelectionTouched(true)
+  }
+  useEffect(() => {
+    if (!productSelectionTouched || typeof window === 'undefined') return
+    if (!initialProductSelection.writable) {
+      setProductSelectionWarning('protected')
+      return
+    }
+    try {
+      const actual = window.localStorage.getItem(chosenProductsStorageKey)
+      // Never clobber unknown/future versions, or selections saved in another tab.
+      if (actual !== savedProductRaw) {
+        setProductSelectionWarning('protected')
+        return
+      }
+      const next = JSON.stringify({ schemaVersion: 1, ids: designProductIds })
+      if (actual !== next) window.localStorage.setItem(chosenProductsStorageKey, next)
+      setSavedProductRaw(next)
+      setProductSelectionWarning(null)
+    } catch { setProductSelectionWarning('unavailable') }
+  }, [designProductIds, productSelectionTouched, savedProductRaw])
   const [recipes, setRecipes] = useState(availableRecipes)
   const validRecipeIds = recipes.map(recipe => recipe.id)
   useEffect(() => {
@@ -256,6 +307,13 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
         {tab === 'list' && <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />}
+        {productSelectionWarning && (tab === 'list' || tab === 'products') && (
+          <p role="status" className="disclaimer">
+            {productSelectionWarning === 'protected'
+              ? 'De productkeuzes zijn tijdelijk; bewaarde gegevens van een andere versie of tab blijven behouden.'
+              : 'De productkeuzes zijn tijdelijk; de browser heeft opslaan geweigerd.'}
+          </p>
+        )}
         {persistenceWarning && (
           <p role="alert" className="disclaimer" aria-live="assertive">
             {persistenceWarning === 'protected'
