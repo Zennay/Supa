@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { chmod, lstat, mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 /** Anonymous device keys are random bearer secrets created by the browser. */
@@ -66,8 +66,28 @@ export function createFileSyncStore({ dir }) {
    * user; a symlink is refused and group/other access is removed before any
    * private record is written. Returns false when it does not exist yet.
    */
+  async function checkAncestors() {
+    // Every existing component of the configured path, ancestors included,
+    // must not be a symlink: an alias could redirect or import private
+    // records. Only root-owned system links (macOS /var -> /private/var) are
+    // allowed, and only when the server itself does not run as root, since
+    // a root server could not tell those apart from links it planted itself.
+    const uid = typeof process.getuid === 'function' ? process.getuid() : -1
+    const components = []
+    for (let path = resolve(dir); ; path = dirname(path)) {
+      components.unshift(path)
+      if (dirname(path) === path) break
+    }
+    for (const path of components) {
+      let info
+      try { info = await lstat(path) } catch (error) { if (error?.code === 'ENOENT') return; throw error }
+      if (info.isSymbolicLink() && !(info.uid === 0 && uid !== 0)) throw new Error('sync directory path must not contain symlinks')
+    }
+  }
+
   async function checkDir({ create }) {
-    if (create) await mkdir(dir, { recursive: true, mode: 0o700 })
+    await checkAncestors()
+    if (create) { await mkdir(dir, { recursive: true, mode: 0o700 }); await checkAncestors() }
     let info
     try { info = await lstat(dir) } catch (error) { if (error?.code === 'ENOENT') return false; throw error }
     if (info.isSymbolicLink() || !info.isDirectory()) throw new Error('sync directory must be a real directory')
