@@ -7,6 +7,7 @@ export type OfflineCapture = Readonly<{
   retailer: OfflineRetailer
   observedAt: string
   observedMs: number
+  observedNs: bigint
   products: StoreProduct[]
 }>
 export type OfflinePriceSnapshots = Readonly<{
@@ -31,14 +32,14 @@ function validName(value: unknown, max: number): value is string {
     !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(value)
 }
 /** Only real Gregorian civil dates and explicit timezone offsets are accepted. */
-function observedMilliseconds(raw: unknown): number | null {
+function observedInstant(raw: unknown): { ms: number; ns: bigint } | null {
   if (typeof raw !== 'string') return null
-  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.\d{1,9})?([+-])(\d\d):(\d\d)$/.exec(raw)
+  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?([+-])(\d\d):(\d\d)$/.exec(raw)
   if (!match) return null
   const [year, month, day, hour, minute, second, offsetHour, offsetMinute] =
-    [match[1], match[2], match[3], match[4], match[5], match[6], match[8], match[9]].map(Number)
+    [match[1], match[2], match[3], match[4], match[5], match[6], match[9], match[10]].map(Number)
   if (year < 2000 || year > 2100 || offsetMinute > 59 ||
-      (match[7] === '+' ? offsetHour > 14 || (offsetHour === 14 && offsetMinute > 0)
+      (match[8] === '+' ? offsetHour > 14 || (offsetHour === 14 && offsetMinute > 0)
         : offsetHour > 12 || (offsetHour === 12 && offsetMinute > 0))) return null
   const civil = new Date(0)
   civil.setUTCFullYear(year, month - 1, day)
@@ -47,7 +48,12 @@ function observedMilliseconds(raw: unknown): number | null {
       civil.getUTCDate() !== day || civil.getUTCHours() !== hour ||
       civil.getUTCMinutes() !== minute || civil.getUTCSeconds() !== second) return null
   const parsed = Date.parse(raw)
-  return Number.isFinite(parsed) ? parsed : null
+  if (!Number.isFinite(parsed)) return null
+  const fraction = (match[7] ?? '').padEnd(9, '0')
+  // Date.parse retains milliseconds but drops later digits. Rebuild the exact
+  // physical UTC instant for boundaries such as 24 hours plus one nanosecond.
+  const fractionalMillis = Number(fraction.slice(0, 3))
+  return { ms: parsed, ns: BigInt(parsed - fractionalMillis) * 1_000_000n + BigInt(fraction) }
 }
 function parseProduct(raw: unknown, retailer: OfflineRetailer): StoreProduct {
   if (!isRecord(raw) || !allowedFields(raw, ['id', 'name', 'packAmount', 'packUnit', 'packCount', 'priceCents', 'available']) ||
@@ -97,23 +103,30 @@ export function parseOfflinePriceSnapshots(
       throw new Error('Elke winkel moet één opname met maximaal 1.000 producten hebben.')
     }
     const retailer = raw.retailer as OfflineRetailer
-    const observedMs = observedMilliseconds(raw.observedAt)
-    if (observedMs === null || observedMs > now + 300000) {
+    const instant = observedInstant(raw.observedAt)
+    if (instant === null || instant.ns > BigInt(Math.trunc(now + 300000)) * 1_000_000n) {
       throw new Error('Ongeldige of toekomstige waarnemingstijd; gebruik ISO 8601 met tijdzone.')
     }
     const products = raw.products.map(product => parseProduct(product, retailer))
     if (new Set(products.map(product => product.id)).size !== products.length) {
       throw new Error('Dubbele product-ID binnen dezelfde winkel.')
     }
-    captures[retailer] = { retailer, observedAt: raw.observedAt as string, observedMs, products }
+    captures[retailer] = { retailer, observedAt: raw.observedAt as string, observedMs: instant.ms, observedNs: instant.ns, products }
   }
-  const ageHours = (now - Math.max(captures.PLUS.observedMs, captures.DekaMarkt.observedMs)) / 3600000
-  const gapHours = Math.abs(captures.PLUS.observedMs - captures.DekaMarkt.observedMs) / 3600000
+  const nowNs = BigInt(Math.trunc(now)) * 1_000_000n
+  const a = captures.PLUS.observedNs
+  const b = captures.DekaMarkt.observedNs
+  const newestNs = a > b ? a : b
+  const oldestNs = a < b ? a : b
+  const gapNs = newestNs - oldestNs
+  const ageHours = Number(nowNs - newestNs) / 3_600_000_000_000
+  const gapHours = Number(gapNs) / 3_600_000_000_000
   return {
     captures, ageHours, gapHours,
-    // Deliberately an indicative local comparison, never published retailer evidence.
-    currentEnough: ageHours >= -5 / 60 && ageHours <= 168 &&
-      now - Math.min(captures.PLUS.observedMs, captures.DekaMarkt.observedMs) <= 168 * 3600000,
-    pairedWithin24h: gapHours <= 24,
+    // These are only constraints on local math; proof and permissions
+    // remain external. The 24-hour boundary is exact down to one nanosecond.
+    currentEnough: nowNs >= newestNs - 300_000_000_000n &&
+      nowNs - oldestNs <= 604_800_000_000_000n,
+    pairedWithin24h: gapNs <= 86_400_000_000_000n,
   }
 }
