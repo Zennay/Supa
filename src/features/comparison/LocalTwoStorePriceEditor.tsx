@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import type { OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
+import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 
 type Unit = 'g' | 'kg' | 'ml' | 'l' | 'piece'
 type ProductDraft = {
@@ -134,6 +134,9 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
       if (new TextEncoder().encode(json).length > 256000) {
         throw new Error('Je invoer is te groot voor de lokale import van maximaal 256 kB.')
       }
+      // The edited source file must pass the exact same admission gate as an
+      // uploaded file *before* we offer it as a prepared/exportable snapshot.
+      parseOfflinePriceSnapshots(json, Date.now())
       setPreparedFor(selectedPlanFingerprint)
       setOutput(json)
       onGenerated(json)
