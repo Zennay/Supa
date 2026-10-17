@@ -71,7 +71,9 @@ function validTimestamp(value) {
       .split(':')
       .map(Number)
     // Match the canonical +/-14:00 max timezone offset before conversion.
-    if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0)) return false
+    if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0) ||
+        (match[5].startsWith('-') && (offsetHour > 12 ||
+          (offsetHour === 12 && offsetMinute !== 0)))) return false
   }
 
   // Date.parse loses submillisecond fractional precision; nonzero hidden
