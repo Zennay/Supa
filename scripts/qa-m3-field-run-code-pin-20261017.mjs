@@ -1,7 +1,7 @@
 // Independent, offline QA gate for release issue #205. This is an OPTIONAL
 // admission check, not a product schema migration or legal retailer proof.
 // An independent checked-out current-main Git SHA must already be supplied.
-import { isDeepStrictEqual } from 'node:util'
+import { isDeepStrictEqual, types as nodeTypes } from 'node:util'
 import { buildWeeklyBasketStudyFromObservationSheet } from './m3-build-observed-study.mjs'
 import { buildObservedWeekReport } from './m3-assess-observed-week.mjs'
 
@@ -10,7 +10,8 @@ const SHA40 = /^[0-9a-f]{40}$/
 const refuse = () => { throw new Error(REFUSE) }
 
 function ownData(record, key) {
-  if (record === null || typeof record !== 'object' || Array.isArray(record)) refuse()
+  if (record === null || typeof record !== 'object' ||
+      nodeTypes.isProxy(record) || Array.isArray(record)) refuse()
   // Refuse inherited facts and own getters before reading a revision value.
   const proto = Object.getPrototypeOf(record)
   if (proto !== Object.prototype && proto !== null) refuse()
@@ -40,7 +41,10 @@ function safeSnapshot(value, state, depth = 0) {
     return value
   }
   if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value !== 'object' || state.seen.has(value)) refuse()
+  // Proxy meta-traps (getPrototypeOf/ownKeys/getOwnPropertyDescriptor) are
+  // executable code too: detect the Proxy before any such operation.
+  if (typeof value !== 'object' || nodeTypes.isProxy(value) ||
+      state.seen.has(value)) refuse()
 
   const isArray = Array.isArray(value)
   const proto = Object.getPrototypeOf(value)
