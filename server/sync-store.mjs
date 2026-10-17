@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, open, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { chmod, lstat, mkdir, open, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -29,15 +30,38 @@ export function createFileSyncStore({ dir }) {
   const queues = new Map()
   const baseFor = key => join(dir, createHash('sha256').update(key).digest('hex'))
 
+  /**
+   * The storage directory must be a real directory owned by this process
+   * user; a symlink is refused and group/other access is removed before any
+   * private record is written. Returns false when it does not exist yet.
+   */
+  async function checkDir({ create }) {
+    if (create) await mkdir(dir, { recursive: true, mode: 0o700 })
+    let info
+    try { info = await lstat(dir) } catch (error) { if (error?.code === 'ENOENT') return false; throw error }
+    if (info.isSymbolicLink() || !info.isDirectory()) throw new Error('sync directory must be a real directory')
+    if (typeof process.getuid === 'function' && info.uid !== process.getuid()) throw new Error('sync directory has a different owner')
+    if (info.mode & 0o077) await chmod(dir, 0o700)
+    return true
+  }
+
   async function read(key) {
+    if (!await checkDir({ create: false })) return empty()
+    let handle
     try {
-      const value = JSON.parse(await readFile(`${baseFor(key)}.json`, 'utf8'))
-      if (!Number.isSafeInteger(value.revision) || value.revision < 1 || !value.entries || typeof value.entries !== 'object') throw new Error('corrupt sync record')
-      return value
+      // Never follow a symlinked record, and refuse hard-linked aliases.
+      handle = await open(`${baseFor(key)}.json`, constants.O_RDONLY | constants.O_NOFOLLOW)
     } catch (error) {
       if (error?.code === 'ENOENT') return empty()
       throw error
     }
+    try {
+      const info = await handle.stat()
+      if (!info.isFile() || info.nlink !== 1) throw new Error('sync record must be a single private file')
+      const value = JSON.parse(await handle.readFile('utf8'))
+      if (!Number.isSafeInteger(value.revision) || value.revision < 1 || !value.entries || typeof value.entries !== 'object') throw new Error('corrupt sync record')
+      return value
+    } finally { await handle.close() }
   }
 
   async function withFileLock(key, task) {
@@ -74,7 +98,7 @@ export function createFileSyncStore({ dir }) {
 
   function write(key, baseRevision, entries) {
     return exclusive(key, async () => {
-      await mkdir(dir, { recursive: true, mode: 0o700 })
+      await checkDir({ create: true })
       return withFileLock(key, async () => {
         const current = await read(key)
         if (current.revision !== baseRevision) return { conflict: true, record: current }

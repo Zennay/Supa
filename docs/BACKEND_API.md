@@ -13,7 +13,7 @@ Any other `/api/*` path returns a JSON 404, not the HTML shell. Hashed files und
 
 ## Device sync
 
-- The browser creates a random 256-bit device key (`supa:device-key:v1`) and sends it as `Authorization: Bearer …`. There are no accounts yet: whoever holds the key can read that device's records, so treat it like a password. On disk the server stores one file per **hash** of the key in `SUPA_DATA_DIR` (default `.data/sync`, git-ignored), written atomically.
+- The browser creates a random 256-bit device key (`supa:device-key:v1`) and sends it as `Authorization: Bearer …`. There are no accounts yet: whoever holds the key can read that device's records, so treat it like a password. On disk the server stores one file per **hash** of the key in `SUPA_DATA_DIR` (default `.data/sync`, git-ignored), written atomically. The directory must be a real directory owned by the server user: a symlinked directory is refused, group/other permissions are removed (`0700`), and record files are opened with `O_NOFOLLOW` and refused when symlinked or hard-linked.
 - Synced records are only: `supa:planner-preferences:v2`, `supa.recipe-library.v1`, `supa:shopping-list-progress:v1`. M3 observation drafts never leave the device.
 - The server validates every record with the same rules the app uses before trusting it (`server/sync-validation.mjs`): planner envelope, day names and recipe ids (including own recipes in the same snapshot), the recipe library, and the shopping-progress shape. Snapshots are limited to 2.5 MB.
 - Writes need the page's own `Origin` and JSON content type. `baseRevision` gives optimistic concurrency, so two tabs or devices cannot silently overwrite each other.
