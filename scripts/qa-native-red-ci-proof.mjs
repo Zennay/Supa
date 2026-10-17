@@ -36,8 +36,10 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const errors = []
   let current = null
   let nativeTapHeaders = 0
+  let nativeTapHeaderLine = -1
   let nativeTapPlan = null
   let nativeTapPlanLine = -1
+  let firstSummaryLine = -1
   let lastSummaryLine = -1
   let nativeTerminalCount = 0
   let nativeTerminalLine = -1
@@ -53,7 +55,10 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     const line = plainLine(rawLine)
     // The native TAP envelope and GitHub terminal marker must belong to the
     // same *completed* job; passing fragments cannot certify hosted CI.
-    if (line === 'TAP version 13') nativeTapHeaders++
+    if (line === 'TAP version 13') {
+      nativeTapHeaders++
+      nativeTapHeaderLine = lineNumber
+    }
     const planMatch = /^1\.\.(\d+)$/.exec(line)
     if (planMatch) {
       if (nativeTapPlan !== null) throw new Error('Ambiguous duplicate native TAP plan')
@@ -79,6 +84,7 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
       completeFailure()
       if (totals.has(summary[1])) throw new Error('Ambiguous duplicate TAP summary')
       totals.set(summary[1], Number(summary[2]))
+      if (firstSummaryLine === -1) firstSummaryLine = lineNumber
       lastSummaryLine = lineNumber
     }
     if (line.startsWith('##[error]') &&
@@ -98,7 +104,8 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const cancelled = totals.get('cancelled')
   const todo = totals.get('todo')
   if (nativeTapHeaders !== 1 || nativeTapPlan === null || nativeTapPlan !== tests ||
-      nativeTapPlanLine < 0 || nativeTapPlanLine >= lastSummaryLine) {
+      nativeTapHeaderLine < 0 || nativeTapHeaderLine >= nativeTapPlanLine ||
+      nativeTapPlanLine >= firstSummaryLine || firstSummaryLine > lastSummaryLine) {
     throw new Error('Incomplete or ambiguous native TAP envelope')
   }
   if (nativeTerminalCount !== 1 || nativeTerminalLine <= lastSummaryLine) {
