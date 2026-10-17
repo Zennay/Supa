@@ -61,7 +61,7 @@ function readInIdentityModel(file, simulatedUid) {
 test('positive: guarded operator reader accepts an owner-only 0600 canonical draft under its real UID', async t => {
   if (typeof process.getuid !== 'function') return t.skip('POSIX UID model required')
   const file = await fixture(t)
-  assert.equal(readInIdentityModel(file, process.getuid()), 'ACCEPTED\\n')
+  assert.equal(readInIdentityModel(file, process.getuid()), 'ACCEPTED\n')
 })
 
 test('P1 #3785: guarded operator reader must not trust private 0600 files owned by a different UID', async t => {
@@ -69,6 +69,6 @@ test('P1 #3785: guarded operator reader must not trust private 0600 files owned 
   const file = await fixture(t)
   const foreignUid = process.getuid() === 0 ? 1 : 0
   assert.notEqual(foreignUid, process.getuid())
-  assert.equal(readInIdentityModel(file, foreignUid), 'REFUSED\\n',
+  assert.equal(readInIdentityModel(file, foreignUid), 'REFUSED\n',
     'a readable private FD and mode 0600 do not establish that this process owns the evidence')
 })
