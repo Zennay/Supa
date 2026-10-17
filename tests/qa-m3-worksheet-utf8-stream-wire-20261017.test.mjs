@@ -121,3 +121,33 @@ test('standalone stdin CLI preserves aggregate-only stdout and refuses malformed
   assert.match(bad.stderr, /^Private worksheet QA audit refused\s*$/)
   assert.doesNotMatch(bad.stderr, /Crème|plus|dekamarkt|safe-one/)
 })
+
+
+test('RFC4180 commas and doubled quotes in legitimate multilingual labels survive every wire split', async () => {
+  const humanName = 'Kersen, "zoet" — crème 🧑‍🍳 क्‍ष'
+  const payload = csv.replaceAll(cell(label), cell(humanName))
+  const bytes = Buffer.from(payload, 'utf8')
+  assert.equal(auditPrivateWorksheetCsv(payload).rows, 2)
+  await examine([bytes])
+  await examine([...bytes].map(byte => Buffer.from([byte])))
+  const quotedLabel = Buffer.from(cell(humanName), 'utf8')
+  const start = bytes.indexOf(quotedLabel)
+  assert.ok(start > 0, 'actual double-quoted human ingredient cell must be present')
+  for (let split = start; split <= start + quotedLabel.length; split++) {
+    await examine([bytes.subarray(0, split), bytes.subarray(split)])
+  }
+})
+
+test('well-formed CSV bytes with a forged human observed price must never yield a partial preflight summary', async () => {
+  const observed = Array(12).fill('')
+  observed[7] = '1.50' // observedPriceEUR: seventh zero-based human field after index 6
+  const altered = [
+    row(columns),
+    row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', 'plus', 'safe-one', label, '12.5', 'g', ...observed]),
+    row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', 'dekamarkt', 'safe-one', label, '12.5', 'g', ...Array(12).fill('')]),
+  ].join('\n') + '\n'
+  const bytes = Buffer.from(altered, 'utf8')
+  assert.throws(() => auditPrivateWorksheetCsv(altered), /Private worksheet QA audit refused/)
+  await refused([bytes])
+  await refused([...bytes].map(byte => Buffer.from([byte])))
+})
