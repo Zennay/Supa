@@ -36,6 +36,7 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const allowed = new Set(allowedTestFiles)
   const totals = new Map()
   let observedPassing = 0
+  const rootOrdinals = new Set()
   const failing = []
   const errors = []
   let current = null
@@ -79,6 +80,17 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     }
     const failingTap = /^\s*not ok\s+\d+\s+-\s+(.+)$/.exec(line)
     const passingTap = /^\s*ok\s+\d+\s+-\s+/.test(line)
+    const rootTap = /^(?:not ok|ok)\s+(\d+)\s+-\s+/.exec(line)
+    if (rootTap) {
+      // A top-level record must use a unique, positive safe ordinal.
+      // Nested test subgroups may restart their own indexes, and legacy
+      // evidence intentionally accepts nested failures beside root records.
+      const ordinal = Number(rootTap[1])
+      if (!Number.isSafeInteger(ordinal) || ordinal < 1 || rootOrdinals.has(ordinal)) {
+        throw new Error('Duplicate or invalid native root TAP ordinal')
+      }
+      rootOrdinals.add(ordinal)
+    }
     if (failingTap || passingTap) {
       // Native test records are valid only between the unique TAP header
       // and the root plan. A log line from setup, summaries, or cleanup is
@@ -154,6 +166,7 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const cancelled = totals.get('cancelled')
   const todo = totals.get('todo')
   if (nativeTapHeaders !== 1 || nativeTapPlan === null || nativeTapPlan !== tests ||
+      [...rootOrdinals].some(ordinal => ordinal > nativeTapPlan) ||
       nativeTapHeaderLine < 0 || nativeTapHeaderLine >= nativeTapPlanLine ||
       nativeTapPlanLine >= firstSummaryLine || firstSummaryLine > lastSummaryLine) {
     throw new Error('Incomplete or ambiguous native TAP envelope')
