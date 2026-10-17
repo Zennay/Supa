@@ -74,6 +74,33 @@ test('simulate full exact-path remediation on in-memory YAML only: coverage turn
   }
 })
 
+test('compact namespace-scoped owner review proposal spans missing sources without untrusted broad triggers', () => {
+  const before = staticAudit()
+  const proposals = before.ownerReviewCandidateSelectors
+  assert.ok(proposals.length >= 5 && proposals.length <= 12,
+    'focused permanent-runner remediation should not need hundreds of YAML edits')
+  assert.equal(before.ownerReviewRequiredBeforeWorkflowChange, true)
+  assert.equal(new Set(proposals).size, proposals.length)
+  for (const pattern of proposals) {
+    assert.ok(!['**', 'tests/**', 'scripts/**', 'src/**'].includes(pattern))
+    assert.ok(before.missingPaths.some(path => selectorCoversM3File(path, pattern)),
+      'every proposed selector actually repairs a current gap')
+  }
+  const simulated = workflow.replace('  workflow_dispatch:',
+    proposals.map(s => '      - "' + s + '"').join('\n') + '\n  workflow_dispatch:')
+  const outcome = auditM3TriggerClosure(simulated, inventory)
+  assert.equal(outcome.missingPathCount, 0)
+  assert.equal(outcome.pathCoverageComplete, true)
+  assert.equal(outcome.selfHostedRunnerExecutedAndAttested, false)
+  assert.equal(outcome.productionReady, false)
+  // The owner is free to choose a different secure allowlist strategy.
+  for (const selector of proposals) {
+    const mutant = simulated.replace('      - "' + selector + '"\n', '')
+    assert.ok(auditM3TriggerClosure(mutant, inventory).missingPathCount > 0,
+      'every review candidate is material in this synthetic patch: ' + selector)
+  }
+})
+
 test('scoped M3 globs cover only their own trees; broad wildcards never stand in for security review', () => {
   assert.equal(selectorCoversM3File(
     'tests/qa-m3-codepin-unknown-basket-availability-20261017.test.mjs',
