@@ -12,6 +12,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { buildPrivateM3ProductComparison } from './m3-private-product-comparison.mjs'
 import { renderPrivateM3ComparisonCsv } from './m3-private-comparison-csv.mjs'
 import { auditPrivateM3CsvLedger } from './qa-m3-private-csv-ledger-check.mjs'
+import { parsePrivateM3UniqueKeyJson } from './qa-m3-private-unique-json-keys-20261017.mjs'
 
 const REFUSAL = 'M3 private CSV/source binding refused'
 const MAX_JSON = 2 * 1024 * 1024
@@ -94,13 +95,13 @@ export function checkPrivateM3CsvReportBinding(reportJson, csv, sheetJson = null
         Buffer.byteLength(reportJson, 'utf8') > MAX_JSON ||
         Buffer.byteLength(csv, 'utf8') > MAX_CSV) refuse()
     const ledger = auditPrivateM3CsvLedger(csv)
-    const report = JSON.parse(reportJson)
+    const report = parsePrivateM3UniqueKeyJson(reportJson)
     if (sheetJson !== null) {
       if (typeof sheetJson !== 'string' ||
           Buffer.byteLength(sheetJson, 'utf8') > MAX_JSON) refuse()
       // Only compare what the canonical product converter actually projects.
       // Metadata not persisted in the report is NOT proven by this check.
-      const reconstructed = buildPrivateM3ProductComparison(JSON.parse(sheetJson))
+      const reconstructed = buildPrivateM3ProductComparison(parsePrivateM3UniqueKeyJson(sheetJson))
       if (!isDeepStrictEqual(report, reconstructed)) refuse()
     }
     const expected = renderPrivateM3ComparisonCsv(report)
