@@ -28,11 +28,23 @@ const stages = [
   '##[group]Run npm run m1:matching-benchmark',
   'Historical matching benchmark passed',
   '##[group]Run npm run m1:source-permission-gate',
+  '{',
+  '  "milestone": "M1 Data Feasibility",',
+  '  "expectedSources": ["dekamarkt", "plus"],',
   '  "productionReady": false,',
-  '  "permissionStatus": "permission_required",',
-  '  "productionEnabled": false,',
-  '  "permissionStatus": "unresolved",',
-  '  "productionEnabled": false,',
+  '  "blockers": [',
+  '    {',
+  '      "supermarket": "plus",',
+  '      "permissionStatus": "permission_required",',
+  '      "productionEnabled": false',
+  '    },',
+  '    {',
+  '      "supermarket": "dekamarkt",',
+  '      "permissionStatus": "unresolved",',
+  '      "productionEnabled": false',
+  '    }',
+  '  ]',
+  '}',
   '##[group]Run npm run build',
   '✓ built in 1.23s',
 ]
@@ -70,7 +82,7 @@ test('positive: exact fake native job identifies complete GREEN, preserves denia
     productionReady: false, publicSavingsClaimEligible: false,
     realStorePricesVerified: 0,
   })
-  assert.doesNotMatch(JSON.stringify(p), /sourceUrl|capturedAt|product|person@example|storeLocation/)
+  assert.doesNotMatch(JSON.stringify(p), /sourceUrl|capturedAt|observedProductName|person@example|storeLocation/)
 })
 
 test('reject mismatched PR head/base and inconsistent job or run identity', () => {
@@ -200,4 +212,23 @@ test('black-box CLI accepts only bounded exact-head successful JSON; bad input p
   })
   assert.equal(wrongArg.status, 2)
   assert.equal(wrongArg.stdout, '')
+})
+
+test('fail closed if a retailer has the right denial but belongs to the wrong source', () => {
+  const x = evidence()
+  x.log = x.log.replace('"supermarket": "dekamarkt"', '"supermarket": "plus"')
+  noProof(x)
+  const y = evidence()
+  y.log = y.log.replace('"permissionStatus": "permission_required"',
+    '"permissionStatus": "unresolved"')
+  noProof(y)
+})
+
+test('free-floating gate words do not replace structured rights JSON', () => {
+  const x = evidence()
+  x.log = x.log.replace(stamp('{'), stamp('  "someOtherObject": true'))
+  noProof(x)
+  const y = evidence()
+  y.log = y.log.replace(stamp('}'), stamp('  "sourceRights": true'))
+  noProof(y)
 })
