@@ -75,12 +75,25 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     const failingTap = /^\s*not ok\s+\d+\s+-\s+(.+)$/.exec(line)
     const passingTap = /^\s*ok\s+\d+\s+-\s+/.test(line)
     if (failingTap || passingTap) {
+      // Native test records are valid only between the unique TAP header
+      // and the root plan. A log line from setup, summaries, or cleanup is
+      // never allowed to backfill the completed test-job evidence.
+      if (nativeTapHeaders !== 1 || nativeTapPlan !== null ||
+          totals.size !== 0 || nativeTerminalCount !== 0) {
+        throw new Error('TAP record outside native test phase')
+      }
       completeFailure()
       if (failingTap) current = { file: null, locationCount: 0 }
     }
     if (current) {
       const location = /^\s*location:\s*['"]([^'"]*[/\\]([^/'"\\]+\.test\.mjs):(\d+):(\d+))['"]$/.exec(line)
       if (location) {
+        // A failure's source location must also occur inside its original
+        // native test phase, never after the final root TAP plan.
+        if (nativeTapHeaders !== 1 || nativeTapPlan !== null ||
+            totals.size !== 0 || nativeTerminalCount !== 0) {
+          throw new Error('Failure origin outside native TAP test phase')
+        }
         // A filename alone is not provenance: a foreign checkout or nested
         // dependency can contain an identically named test. Native SUPA TAP
         // must originate from the checked-in repository's root tests folder.
