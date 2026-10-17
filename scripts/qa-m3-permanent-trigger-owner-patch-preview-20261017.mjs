@@ -19,6 +19,10 @@ const WORKFLOW = '.github/workflows/m3-observed-week-report.yml'
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const REFUSE = 'Independent M3 trigger owner patch preview refused'
 const fail = () => { throw new Error(REFUSE) }
+const allowedExplicit = new Set([
+  'evidence/m1/source-permission-gate.v1.json',
+  'scripts/m1-check-source-permission-gate.mjs',
+])
 const allowedScoped = new Set([
   'scripts/m3-*.mjs', 'scripts/qa-m3-*.mjs',
   'tests/m3-*.test.mjs', 'tests/qa-m3-*.test.mjs',
@@ -51,9 +55,10 @@ export function buildM3TriggerOwnerPatchPreview(workflow, inventory) {
     const additions = before.ownerReviewCandidateSelectors.filter(
       selector => !original.includes(selector))
     if (new Set(additions).size !== additions.length) fail()
-    const inventoryPaths = new Set(inventory.map(x => x.path))
     for (const selector of additions) {
-      if (!allowedScoped.has(selector) && !inventoryPaths.has(selector)) fail()
+      // A caller must never expand the trust boundary by inserting an
+      // arbitrary new inventory entry and calling it an approved dependency.
+      if (!allowedScoped.has(selector) && !allowedExplicit.has(selector)) fail()
       if (!before.missingPaths.some(path => selectorCoversM3File(path, selector))) fail()
       if (['**', 'tests/**', 'scripts/**', 'src/**'].includes(selector)) fail()
     }
