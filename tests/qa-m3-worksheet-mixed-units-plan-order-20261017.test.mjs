@@ -156,3 +156,65 @@ test('P2 expected RED: equal l/ml selected need must be canonical across opposit
   assert.equal(regular.csv, reverse.csv,
     'identical 200 ml requirement must not change human worksheet bytes when plan order reverses')
 })
+
+
+test('P2 expected RED: all 15 nonempty selected-day subsets preserve exact operator bytes when source plan reverses', async () => {
+  const archives = await originalArchives
+  const unchangedArchives = structuredClone(archives)
+  const recipes = structuredClone(m2Recipes)
+  const tikkaRice = recipes.find(recipe => recipe.id === 'tikka').ingredients
+    .find(item => item.id === 'basmati-rice')
+  const teriyakiRice = recipes.find(recipe => recipe.id === 'teriyaki').ingredients
+    .find(item => item.id === 'basmati-rice')
+  tikkaRice.amount = 0.1
+  tikkaRice.unit = 'kg'
+  teriyakiRice.amount = 100
+  teriyakiRice.unit = 'g'
+  const plan = structuredClone(m2InitialPlan)
+  const original = structuredClone({ plan, recipes })
+  const days = ['Ma', 'Di', 'Wo', 'Do']
+  const differingMasks = []
+  let checked = 0
+  let fullWeekNeeds = 0
+  for (let mask = 1; mask < 1 << days.length; mask++) {
+    const selectedDays = days.filter((_, bit) => mask & (1 << bit))
+    const direct = buildPrivateSelectedWeekObservationWorksheet(archives, selectedDays, {plan, recipes})
+    const reverse = buildPrivateSelectedWeekObservationWorksheet([...archives].reverse(),
+      [...selectedDays].reverse(), {plan: [...plan].reverse(), recipes: [...recipes].reverse()})
+    for (const result of [direct, reverse]) {
+      assert.equal(result.productionReady, false)
+      assert.equal(result.publicSavingsClaimEligible, false)
+      assert.equal(result.observedStorePrices, 0)
+      const verified = auditPrivateWorksheetCsv(result.csv)
+      assert.equal(result.rows, verified.ingredientNeeds * 2)
+      assert.equal(verified.verifiedActualObservations, 0)
+      assert.equal(verified.sourceRightsVerified, false)
+      assert.equal(verified.productionReady, false)
+    }
+    const riceRows = direct.csv.split('\n').filter(row => row.includes('"basmati-rice",'))
+    const riceMeals = selectedDays.filter(day => day === 'Ma' || day === 'Di' || day === 'Do').length
+    assert.equal(riceRows.length, riceMeals ? 2 : 0)
+    for (const row of riceRows) {
+      const match = row.match(/"([0-9.]+)","(g|kg)",/)
+      assert.ok(match, 'both stores retain valid human quantity syntax')
+      assert.equal(Number(match[1]) * (match[2] === 'kg' ? 1000 : 1),
+        riceMeals * 100, 'mass demand must not drift with source array order')
+    }
+    if (selectedDays.length === 4) {
+      fullWeekNeeds = resultNeeds(direct)
+      assert.equal(direct.rows, 22, 'actual four-day 11×2 M3 blank field worksheet')
+    }
+    if (direct.csv !== reverse.csv) differingMasks.push(mask)
+    checked++
+  }
+  assert.equal(checked, 15)
+  assert.equal(fullWeekNeeds, 11)
+  assert.deepEqual({plan, recipes}, original, 'the original local planner remains unchanged')
+  assert.deepEqual(archives, unchangedArchives, 'historical reviewed source archives remain immutable')
+  assert.deepEqual(differingMasks, [],
+    'changing only ordering must never change canonical private worksheet CSV for any selected-day subset')
+})
+
+function resultNeeds(result) {
+  return auditPrivateWorksheetCsv(result.csv).ingredientNeeds
+}
