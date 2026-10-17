@@ -23,9 +23,24 @@ const UNSAFE_PREFIX = /^\s*(?:[\u200c\u200d]|[=+@-])/u
 const MAX_NEEDS = 100
 const refuse = () => { throw new Error('Private worksheet QA audit refused') }
 
+// Reject malformed UTF-16 before Buffer encoding silently replaces a lone
+// surrogate with U+FFFD. Real emoji and joined human-language glyphs are pairs.
+function wellFormedUtf16(text) {
+  for (let i = 0; i < text.length; i++) {
+    const first = text.charCodeAt(i)
+    if (first >= 0xd800 && first <= 0xdbff) {
+      const second = text.charCodeAt(++i)
+      if (!(second >= 0xdc00 && second <= 0xdfff)) return false
+    } else if (first >= 0xdc00 && first <= 0xdfff) {
+      return false
+    }
+  }
+  return true
+}
+
 function csvRows(csv) {
   if (typeof csv !== 'string' || Buffer.byteLength(csv, 'utf8') > MAX_INPUT_BYTES ||
-      !csv.endsWith('\n')) refuse()
+      !csv.endsWith('\n') || !wellFormedUtf16(csv)) refuse()
   const rows = []
   let row = []
   let index = 0
@@ -134,6 +149,9 @@ export async function main(input = process.stdin, write = text => process.stdout
   let bytes = 0
   for await (const raw of input) {
     if (!Buffer.isBuffer(raw) && typeof raw !== 'string') refuse()
+    // Each supplied text chunk must be self-contained UTF-16. Otherwise
+    // Buffer.from would silently replace an unmatched surrogate.
+    if (typeof raw === 'string' && !wellFormedUtf16(raw)) refuse()
     const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(raw, 'utf8')
     bytes += chunk.length
     if (bytes > MAX_INPUT_BYTES) refuse()
