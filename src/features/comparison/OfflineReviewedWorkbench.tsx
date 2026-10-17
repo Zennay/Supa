@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine } from '../../domain/basket.ts'
+import { buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
@@ -21,6 +21,15 @@ function pricePerUnit(line: Matched): string | null {
     (unit === 'g' || unit === 'kg' ? 'kg' : unit === 'ml' || unit === 'l' ? 'liter' : 'stuk')
 }
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
+function shoppingChecklist(basket: OneStoreBasket): string {
+  return [
+    `Supa · boodschappen voor ${basket.store.name} · privé ingevoerde prijzen, niet geverifieerd`,
+    ...basket.lines.map(line => line.status === 'matched'
+      ? `☐ ${line.ingredientLabel}: ${line.packs} × ${line.productName} (${euros.format(line.lineTotalCents / 100)})`
+      : `☐ ${line.ingredientLabel}: handmatig kiezen, hoeveelheid ${line.requirement.amount ?? '?'} ${line.requirement.unit}`),
+    'Prijzen zijn alleen indicatief op basis van lokaal aangeleverde gegevens.',
+  ].join('\n')
+}
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
@@ -159,12 +168,33 @@ export function OfflineReviewedWorkbench({
                   : 'Nog geen vergelijkbaar prijsverschil: ontbrekende producten, verouderde gegevens of ongelijke waarnemingstijden.'}
                 <small> Dit is nooit een gecontroleerde publieke besparingsclaim.</small>
               </p>
+              {canShowDifference && basketPair.comparison.lineDeltas.length > 0 && (
+                <section className="offline-price-workbench__drivers" aria-label="Prijsverschil per ingrediënt">
+                  <h4>Wat veroorzaakt het verschil?</h4>
+                  {[...basketPair.comparison.lineDeltas]
+                    .sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents))
+                    .slice(0, 5)
+                    .map(line => (
+                      <p key={line.id}><strong>{line.ingredientLabel}</strong> · PLUS {euros.format(line.baselineLineTotalCents / 100)}
+                        {' '}· DekaMarkt {euros.format(line.candidateLineTotalCents / 100)}
+                        {' '}· {line.deltaCents === 0 ? 'zelfde bedrag'
+                          : `${euros.format(Math.abs(line.deltaCents) / 100)} verschil`}</p>
+                    ))}
+                </section>
+              )}
               <div className="offline-price-workbench__stores">
                 {stores.map(store => {
                   const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
                   return (
                     <section key={store}>
                       <h4>{store} · mandregels</h4>
+                      <details className="offline-price-workbench__checklist">
+                        <summary>Kopieer boodschappenlijst voor {store}</summary>
+                        <p>Selecteer en kopieer deze lijst; de tekst blijft op je apparaat.</p>
+                        <textarea readOnly rows={Math.min(18, basket.lines.length + 4)}
+                          aria-label={`Boodschappenlijst ${store}`}
+                          value={shoppingChecklist(basket)} onFocus={event => event.currentTarget.select()} />
+                      </details>
                       {basket.lines.map(line => (
                         <article key={line.id} className="offline-price-workbench__line">
                           <div>
