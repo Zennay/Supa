@@ -73,7 +73,7 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): StoreProduct {
   }
 }
 export function parseOfflinePriceSnapshots(
-  text: string, now: number = Date.now(),
+  text: string, now: number,
 ): OfflinePriceSnapshots {
   if (typeof text !== 'string' || new TextEncoder().encode(text).length > 256000 ||
       !Number.isFinite(now)) throw new Error('Bestand ontbreekt of is groter dan 256 kB.')
