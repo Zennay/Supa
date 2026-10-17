@@ -117,7 +117,11 @@ export async function pushSyncedState(options: SyncOptions, { keepalive = false 
       body: JSON.stringify({ baseRevision: meta.revision, entries }),
     })
     if (response.status === 200) {
-      const saved = await response.json()
+      // Only a JSON acknowledgement of exactly the next revision proves this
+      // write was stored; anything else keeps the edits marked unsynced.
+      if (!/^application\/json(?:;|$)/i.test(response.headers.get('content-type') ?? '')) return 'unavailable'
+      const saved = await response.json().catch(() => null)
+      if (!saved || saved.revision !== meta.revision + 1 || !Number.isSafeInteger(saved.revision)) return 'unavailable'
       writeMeta(options.storage, { revision: saved.revision, synced: entries })
       return 'saved'
     }
