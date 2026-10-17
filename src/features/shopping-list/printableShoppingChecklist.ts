@@ -1,4 +1,5 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
+import { INCOMPLETE_SHOPPING_EXPORT, snapshotShoppingExportBasket } from './shoppingExportOwnData.ts'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation.ts'
 
 export type PrintableShoppingLine = {
@@ -102,7 +103,7 @@ function safePhysicalPacks(
  * This is a convenience view, NOT a retailer observation or M3 savings proof.
  * Never replace unresolved products with a fabricated match.
  */
-export function preparePrintableShoppingChecklist(
+function preparePrintableShoppingChecklistUnchecked(
   basket: OneStoreBasket,
 ): PrintableShoppingChecklistData {
   if (!basket || !Array.isArray(basket.lines) || basket.lines.length > 500) {
@@ -161,5 +162,42 @@ export function preparePrintableShoppingChecklist(
     lines,
     reviewCount: lines.filter((line) => line.needsReview).length,
     isDemo: basket.store?.id === 'm2-one-store',
+  }
+}
+
+/**
+ * Never invoke a getter or trust a prototype-supplied purchase fact. A broken
+ * root/array refuses the entire printout, whereas unavailable nested physical
+ * metadata remains a clearly marked manual choice in the existing renderer.
+ * No private Proxy/hostile exception text is ever exposed to the user.
+ */
+export function preparePrintableShoppingChecklist(
+  basket: OneStoreBasket,
+): PrintableShoppingChecklistData {
+  // Treat all exception objects from caller-owned descriptors as hostile.
+  // Even reading error.message can itself execute a user getter/Proxy trap.
+  // Only the internal immutable sentinel is allowed to cross this boundary.
+  let safeBasket: OneStoreBasket
+  try {
+    safeBasket = snapshotShoppingExportBasket(basket)
+  } catch (error) {
+    if (error === INCOMPLETE_SHOPPING_EXPORT) {
+      throw new Error('Onvolledige boodschappenmand')
+    }
+    throw new Error('Ongeldige boodschappenmand')
+  }
+
+  // The renderer now receives ONLY plain owned values. Its own validation
+  // errors can retain established Dutch UX labels for existing callers.
+  try {
+    return preparePrintableShoppingChecklistUnchecked(safeBasket)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    if (message === 'Onvolledige boodschappenmand' ||
+        message === 'Dubbele of ongeldige boodschappenregel' ||
+        message === 'Onbekende boodschappenstatus') {
+      throw new Error(message)
+    }
+    throw new Error('Ongeldige boodschappenmand')
   }
 }

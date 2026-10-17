@@ -22,6 +22,17 @@ npm run m3:assess-observed-week -- evidence/m3/<study>.json --output artifacts/m
 
 Better, same, worse and unknown are all valid M3 outcomes. One observed week must not be generalized into a public savings claim.
 
+### Controleer eerst de vaste meetweek (offline)
+
+De persoonlijke Planner mag recepten wisselen, maar de M3-onderzoeksmand blijft vier vaste maaltijden met elf identieke behoeften per winkel. Controleer vóór een echte PLUS- en DekaMarkt-meting of het gekozen weekmenu nog bij de onderzoeksopzet past:
+
+```sh
+node --experimental-strip-types scripts/m3-field-plan-alignment.mjs
+node --experimental-strip-types scripts/m3-field-plan-alignment.mjs --days Ma,Do
+```
+
+Status **0** betekent alleen dat het gekozen demo-weekmenu overeenkomt met de vaste onderzoeksmand; **3** betekent dat de gekozen dagen of recepten afwijken en het vaste meetformulier niet mag worden gebruikt; **2** betekent ongeldige invoer. Dit is géén prijsobservatie, bronrecht of bewezen besparing. De exacte Nederlandse operatorinstructies staan in [M3-veldplanvoorcontrole](docs/product/m3-plan-alignment-operator.md). De beveiligde lijst van bestaande `npm`-bewijsopdrachten blijft bewust ongewijzigd.
+
 ## Stack
 
 - React 19

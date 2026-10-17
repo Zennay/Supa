@@ -1,4 +1,5 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
+import { snapshotShoppingExportBasket, snapshotShoppingExportDoneIds } from './shoppingExportOwnData.ts'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation.ts'
 
 const KNOWN_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece'])
@@ -183,7 +184,10 @@ export function buildShoppingListCopyText(
   doneLineIds: readonly string[] = [],
 ): string | null {
   try {
-    return buildShoppingListCopyTextUnchecked(basket, doneLineIds)
+    return buildShoppingListCopyTextUnchecked(
+      snapshotShoppingExportBasket(basket),
+      snapshotShoppingExportDoneIds(doneLineIds),
+    )
   } catch {
     // A partial local checklist is discarded: invalid input is never copyable.
     return null

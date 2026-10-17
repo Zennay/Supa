@@ -7,6 +7,7 @@ import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
+import { m3FieldSheetMatchesPlannerWeek } from './features/observation/m3PlannerMeasurementWeek'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
 import { readRecipeLibrary } from './features/recipes/recipeLibrary'
@@ -331,7 +332,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           />
         )}
         {tab === 'list' && <ShoppingListView basket={basket} />}
-        {tab === 'observe' && <ObservationView />}
+        {tab === 'observe' && (
+          <ObservationView
+            plannerWeekMatchesTemplate={m3FieldSheetMatchesPlannerWeek(plannedMeals, activeDays)}
+          />
+        )}
       </div>
 
       <nav className="bottom-nav hifi-nav" aria-label="Hoofdnavigatie">

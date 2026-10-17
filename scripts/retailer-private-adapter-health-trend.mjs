@@ -104,7 +104,16 @@ export function comparePrivateAdapterHealth(before, after) {
   // Only controlled aggregate signal labels leave this private comparison.
   const worsened = (field) => KEYS.some(key =>
     after.byShape[key][field] > before.byShape[key][field])
+  const improvedAdmissionLoss = KEYS.some(key =>
+    after.byShape[key].accepted < before.byShape[key].accepted)
+  const worsenedRejection = KEYS.some(key =>
+    after.byShape[key].rejected > before.byShape[key].rejected)
   const shapeSignals = [
+    // A worse physical retailer source must not disappear when a different
+    // source shape improves and keeps aggregate accepted/rejected totals flat.
+    // Signals remain generic: no store, SKU, capture time or price leaves here.
+    ...(improvedAdmissionLoss ? ['fewer-accepted-sources-in-source-shape'] : []),
+    ...(worsenedRejection ? ['more-rejected-sources-in-source-shape'] : []),
     ...(worsened('staleCaptures') ? ['more-stale-captures-in-source-shape'] : []),
     ...(worsened('unknownPrices') ? ['more-unpriced-observations-in-source-shape'] : []),
     ...(worsened('unknownAvailability') ? ['more-unknown-availability-in-source-shape'] : []),

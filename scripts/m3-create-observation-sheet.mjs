@@ -1,11 +1,34 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { lstat, mkdir, writeFile } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { privateM3OutputFailure } from './m3-source-output-preservation.mjs'
 
 import { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
 
 export { buildObservationSheet } from '../src/domain/m3ObservationSheet.ts'
+
+/**
+ * Reject symbolic ancestors before and after creating private parent folders.
+ * Existing 0700/0600 and exclusive 'wx' semantics remain unchanged. This
+ * protects normal operator paths, not an atomic guarantee against hostile
+ * concurrent filesystem rewrites (handled in a separate issue).
+ */
+async function requireRealDirectoryParents(outputPath, allowMissing = false) {
+  let directory = dirname(resolve(outputPath))
+  for (;;) {
+    try {
+      const metadata = await lstat(directory)
+      if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+        throw new Error('Private M3 output directory ancestry is not a real directory')
+      }
+    } catch (error) {
+      if (!(allowMissing && error?.code === 'ENOENT')) throw error
+    }
+    const parent = dirname(directory)
+    if (directory === parent) break
+    directory = parent
+  }
+}
 
 function validOutputArg(value) {
   if (typeof value !== 'string') return false
@@ -30,8 +53,13 @@ export async function main(argv = process.argv.slice(2)) {
 
   if (output) {
     try {
-      await mkdir(dirname(output), { recursive: true, mode: 0o700 })
-      await writeFile(output, serialized, {
+      // Resolve the destination only once, and inspect every existing parent
+      // without following a symlink. Recheck after mkdir before publishing.
+      const destination = resolve(output)
+      await requireRealDirectoryParents(destination, true)
+      await mkdir(dirname(destination), { recursive: true, mode: 0o700 })
+      await requireRealDirectoryParents(destination)
+      await writeFile(destination, serialized, {
         encoding: 'utf8',
         flag: 'wx',
         mode: 0o600,

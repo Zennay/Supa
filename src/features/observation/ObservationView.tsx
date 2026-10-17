@@ -83,7 +83,12 @@ function formatLocalDateTime(value: string) {
   })
 }
 
-export function ObservationView() {
+export function ObservationView({
+  plannerWeekMatchesTemplate,
+}: {
+  /** Undefined for standalone/SSR field-form consumers. */
+  plannerWeekMatchesTemplate?: boolean
+} = {}) {
   const [sheet, setSheet] = useState<ObservationSheet>(() => {
     const fresh = buildObservationSheet()
     if (typeof window === 'undefined') return fresh
@@ -547,6 +552,24 @@ export function ObservationView() {
           <h2>Meten zonder gokken.</h2>
         </div>
       </div>
+
+      <p className="disclaimer" data-observation-fixed-week-note>
+        Deze meting gebruikt altijd de vaste onderzoeksweek: vier maaltijden en
+        elf dezelfde ingrediënten bij PLUS en DekaMarkt. Dit formulier volgt
+        wijzigingen in Planner niet automatisch en is nog geen besparingsbewijs.
+      </p>
+      {plannerWeekMatchesTemplate === false && (
+        <div className="attention-card" role="alert" data-observation-planner-week-mismatch>
+          <strong>Je Planner wijkt af van de vaste meetweek</strong>
+          <span>
+            Je gewijzigde dagen of recepten zijn niet overgenomen. De 22 regels
+            hieronder meten uitsluitend de oorspronkelijke onderzoeksweek.
+            Vergelijk dit concept niet met de boodschappenlijst van je aangepaste
+            week. Je invoer blijft intact; pas nooit winkelmetingen aan om ze
+            passend te maken bij de Planner.
+          </span>
+        </div>
+      )}
 
       <ObservationNextActionCard action={nextAction} />
 
