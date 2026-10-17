@@ -15,7 +15,7 @@ import { MAX_SNAPSHOT_BYTES } from '../server/sync-validation.mjs'
 const key = 'R'.repeat(43)
 const hashedName = createHash('sha256').update(key).digest('hex') + '.json'
 const plannerKey = 'supa:planner-preferences:v2'
-const entries = { [plannerKey]: JSON.stringify({ budget: 35, activeDays: ['Ma'], recipeByDay: { Ma: 'supa-thai' } }) }
+const entries = { [plannerKey]: JSON.stringify({ budget: 35, activeDays: ['Ma'], recipeByDay: { Ma: 'supa-thai' } }), 'supa.recipe-library.v1': null, 'supa:shopping-list-progress:v1': null }
 
 async function fixture(t, options = {}) {
   const root = await mkdtemp(join(tmpdir(), 'supa-qa-sync-record-admission-'))
@@ -92,4 +92,18 @@ test('P2: a pre-existing FIFO record must fail closed without hanging a sync rea
   assert.deepEqual(result, { code: 0, signal: null },
     'a FIFO record may never block indefinitely waiting for an external writer')
   assert.match(output, /REFUSED/, 'special file must be explicitly refused')
+})
+
+test('P2 privacy: on-disk private M3 observation drafts must never become synced device entries', async t => {
+  const privateDraftKey = 'supa:m3-observation-draft:v1'
+  const poisoned = { ...entries, [privateDraftKey]: '{"fictional":"local-only-private-draft"}' }
+  const { store } = await fixture(t, { entries: poisoned })
+  await assert.rejects(() => store.read(key),
+    'disk restores must apply the same sync allowlist as accepted API writes, never exposing M3 private drafts')
+})
+
+test('P2 data shape: stored device entries must remain a plain allowlisted key/value object', async t => {
+  const { store } = await fixture(t, { entries: [] })
+  await assert.rejects(() => store.read(key),
+    'an array is typeof object but cannot be a validated device snapshot')
 })
