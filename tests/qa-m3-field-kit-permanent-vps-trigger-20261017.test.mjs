@@ -13,6 +13,10 @@ const required = [
   'tests/qa-m3-field-kit-permanent-vps-trigger-20261017.test.mjs',
   'scripts/m3-private-pack-unit-price.mjs',
   'tests/qa-m3-unit-guidance-independent-cent-oracle-20261017.test.mjs',
+  'tests/qa-m3-private-html-untrusted-text-matrix-20261017.test.mjs',
+  'scripts/qa-m3-private-comparison-csv-audit.mjs',
+  'tests/qa-m3-private-csv-stdin-safety-audit-20261017.test.mjs',
+  'tests/qa-m3-private-csv-numeric-column-safety-20261017.test.mjs',
 ]
 
 function prPathFilters(yaml) {
@@ -59,7 +63,7 @@ for (const requiredPath of required) {
   })
 }
 
-test('M3: owner-acceptable narrow patch protects all field-kit and merged unit-guidance paths from regressions', () => {
+test('M3: owner-acceptable narrow patch protects all ten field-kit and merged QA paths from regressions', () => {
   const current = prPathFilters(workflow)
   const patched = [...current, ...required.filter(p => !current.includes(p))]
   requireCriticalPaths(patched)
