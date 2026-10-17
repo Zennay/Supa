@@ -26,3 +26,11 @@ De ingevoerde productgegevens en prijzen staan alleen in de huidige browserstatu
 - `src/App.tsx`: tab **Vergelijk** in hoofdnavigatie; geselecteerde recepten en planner-day selectie als werkelijke bron; oude fictieve vergelijkingsmand alleen in inklapbare demo.
 
 Verifieer de integratie met de bestaande TypeScript/Vite productiebuild en de volledige verplicht gestelde CI op de exacte PR-commit. Een groene CI is geen bewijs van recente externe winkelprijzen.
+
+## Neem per supermarkt een bruikbare lijst mee
+
+Op **Vergelijk** staan onder de invoertabel twee knoppen: **Toon lijst PLUS** en **Toon lijst DekaMarkt**. Zodra alle benodigde producten en de prijs/verpakkingsgrootte voor **één** supermarkt correct zijn ingevuld, wordt de knop voor die winkel actief. De andere supermarkt mag nog onvolledig zijn.
+
+De tekst bevat voor jouw actuele weekkeuzes de daadwerkelijk benodigde **hele verpakkingen**, de door jou gekozen productnamen en de door jou ingevoerde totaalprijs **voor die ene winkel**. Klik in het alleen-lezen tekstvak om de inhoud te selecteren en gebruik de kopieerfunctie van je apparaat. Niets wordt automatisch naar je klembord, cloud of server gestuurd.
+
+Aanpassingen in de huidige invoer werken onmiddellijk door in de lijst. Een wijziging van het weekplan maakt een eerder geopende lijst ongeldig en start een nieuwe lokale berekening. Dit is **geen door de winkel uitgegeven kassabon**, geauthenticeerd bewijs of bevestiging dat het product op voorraad is. Controleer producten en bedragen in de winkel. De algemene winkelprijsvergelijking blijft strengere voorwaarden hanteren: pas wanneer **beide** winkels compleet zijn, toont Supa een onderling rekenkundig prijsverschil.
