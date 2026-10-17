@@ -122,6 +122,6 @@ test('QA safe-reader refuses directories, missing sources, and invalid argv with
     assert.notEqual(child.status, 0)
     assert.equal(child.stdout, '')
     assert.match(child.stderr, REFUSAL)
-    assert.doesNotMatch(child.stderr, /secret|private|FICTIONAL_FIELD_OPERATOR_PRIVATE_PSEUDONYM_NEVER_ECHO/i === null ? /private/ : /FICTIONAL_FIELD_OPERATOR_PRIVATE_PSEUDONYM_NEVER_ECHO/)
+    assert.ok(!child.stderr.includes(CANARY), 'refusal must not echo participant identity')
   }
 })
