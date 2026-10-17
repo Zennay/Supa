@@ -15,10 +15,11 @@ const REFUSAL = 'Private M3 operator draft refused (regular, private single-link
 
 function refuse() { throw new Error(REFUSAL) }
 
-function privateRegular(stat) {
+function privateRegular(stat, operatorUid) {
   return stat.isFile() &&
     Number(stat.nlink) === 1 &&
     (Number(stat.mode) & 0o077) === 0 &&
+    BigInt(stat.uid) === operatorUid &&
     Number(stat.size) >= 1 &&
     Number(stat.size) <= MAX_BYTES
 }
@@ -34,8 +35,9 @@ async function checkPathParents(file) {
   }
 }
 
-function stable(before, after) {
-  return privateRegular(before) && privateRegular(after) &&
+function stable(before, after, operatorUid) {
+  return privateRegular(before, operatorUid) && privateRegular(after, operatorUid) &&
+    before.uid === after.uid &&
     before.dev === after.dev && before.ino === after.ino &&
     before.size === after.size && before.mode === after.mode &&
     before.nlink === after.nlink &&
@@ -52,16 +54,22 @@ export async function safePrivateM3Progress(filename, referenceNowMs = Date.now(
 
   const absolute = resolve(filename)
   try {
+    // A mode-0600 file owned by *another* UID is not this operator's
+    // evidence, even if elevated access or an ACL makes it readable.
+    const currentUid = typeof process.getuid === 'function' ? process.getuid() : null
+    if (!Number.isSafeInteger(currentUid) || currentUid < 0) refuse()
+    const operatorUid = BigInt(currentUid)
     await checkPathParents(absolute)
     const entry = await lstat(absolute)
-    if (entry.isSymbolicLink() || !privateRegular(entry)) refuse()
+    if (entry.isSymbolicLink() || !privateRegular(entry, operatorUid)) refuse()
 
     const fd = await open(absolute,
       constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     let bytes
     try {
       const before = await fd.stat({ bigint: true })
-      if (!privateRegular(before) ||
+      if (!privateRegular(before, operatorUid) ||
+          before.uid !== BigInt(entry.uid) ||
           before.dev !== BigInt(entry.dev) || before.ino !== BigInt(entry.ino) ||
           before.size !== BigInt(entry.size) ||
           before.mode !== BigInt(entry.mode) ||
@@ -78,7 +86,7 @@ export async function safePrivateM3Progress(filename, referenceNowMs = Date.now(
         chunks.push(Buffer.from(buffer.subarray(0, bytesRead)))
       }
       const after = await fd.stat({ bigint: true })
-      if (!stable(before, after) || BigInt(total) !== before.size) refuse()
+      if (!stable(before, after, operatorUid) || BigInt(total) !== before.size) refuse()
       bytes = Buffer.concat(chunks, total)
     } finally {
       await fd.close()
