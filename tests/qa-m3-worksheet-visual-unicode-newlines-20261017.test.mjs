@@ -45,7 +45,7 @@ test('human CSV still supports ordinary accented, RTL-letter and emoji ingredien
       records, ['Ma'], originalPlanWithIngredientLabel(label))
     assertPrivateWorksheet(result)
     assert.ok(result.csv.includes('"' + label + '"'), 'genuine label remains readable')
-    assert.doesNotMatch(result.csv, VISUAL_NEWLINES)
+    assert.equal(VISUAL_NEWLINES.test(result.csv), false)
   }
   assert.deepEqual(records, frozen, 'private historical captures remain untouched')
 })
@@ -71,7 +71,7 @@ for (const [name, separator] of [
       return
     }
     assertPrivateWorksheet(result)
-    assert.doesNotMatch(result.csv, VISUAL_NEWLINES,
+    assert.equal(VISUAL_NEWLINES.test(result.csv), false,
       'strict CSV quoting alone cannot prevent visual operator-line spoofing')
     assert.deepEqual(records, frozen)
   })
