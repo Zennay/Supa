@@ -82,9 +82,15 @@ function adopt(storage: StorageLike, meta: Meta, remote: Remote): { changed: Syn
   return { changed, meta: { revision: remote.revision, synced } }
 }
 
+/** Exact media type token `application/json` (case-insensitive, parameters allowed). */
+function isJsonResponse(response: Response) {
+  const type = response.headers.get('content-type')
+  return type !== null && type.split(';')[0].trim().toLowerCase() === 'application/json'
+}
+
 async function readRemote(options: SyncOptions, key: string, signal?: AbortSignal): Promise<Remote | null> {
   const response = await options.request({ headers: { Authorization: `Bearer ${key}` }, signal })
-  if (!response.ok || !/application\/json/.test(response.headers.get('content-type') ?? '')) return null
+  if (!response.ok || !isJsonResponse(response)) return null
   // Never adopt a snapshot the app itself would refuse (malformed, partial,
   // or carrying keys outside the sync contract).
   return admitRemoteSnapshot(await response.json().catch(() => null))
@@ -119,13 +125,14 @@ export async function pushSyncedState(options: SyncOptions, { keepalive = false 
     if (response.status === 200) {
       // Only a JSON acknowledgement of exactly the next revision proves this
       // write was stored; anything else keeps the edits marked unsynced.
-      if (!/^application\/json(?:;|$)/i.test(response.headers.get('content-type') ?? '')) return 'unavailable'
+      if (!isJsonResponse(response)) return 'unavailable'
       const saved = await response.json().catch(() => null)
       if (!saved || saved.revision !== meta.revision + 1 || !Number.isSafeInteger(saved.revision)) return 'unavailable'
       writeMeta(options.storage, { revision: saved.revision, synced: entries })
       return 'saved'
     }
     if (response.status === 409) {
+      if (!isJsonResponse(response)) return 'unavailable'
       const remote = admitRemoteSnapshot(await response.json().catch(() => null))
       // An invalid conflict body must not touch local data or trigger a retry.
       if (!remote) return 'unavailable'
