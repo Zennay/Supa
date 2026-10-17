@@ -90,7 +90,7 @@ function snapshotInertDocumentaryData(root) {
       if (array && key === 'length') continue
       if (typeof key !== 'string' ||
           ['__proto__', 'prototype', 'constructor'].includes(key) ||
-          (array && (!/^(?:0|[1-9]\\d*)$/.test(key) ||
+          (array && (!/^(?:0|[1-9]\d*)$/.test(key) ||
             Number(key) >= length))) throw new Error(REFUSE)
       const descriptor = descriptors[key]
       if (!Object.hasOwn(descriptor, 'value') ||
