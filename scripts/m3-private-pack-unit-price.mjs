@@ -50,6 +50,9 @@ export function privateM3PackUnitPrice(product) {
     l: { baseFactor: 1000n, displaySize: 100n, label: '100 ml' },
     piece: { baseFactor: 1n, displaySize: 1n, label: 'stuk' },
   }
+  // A non-string pack unit must not reach Object.hasOwn's ToPropertyKey:
+  // boxed objects and Symbol.toPrimitive hooks could execute caller code.
+  if (typeof pack.packUnit !== 'string') return null
   const conversion = Object.hasOwn(unitPrices, pack.packUnit)
     ? unitPrices[pack.packUnit] : null
   if (!conversion) return null
