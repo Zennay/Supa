@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
+import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
+import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -22,15 +23,6 @@ function pricePerUnit(line: Matched): string | null {
     (unit === 'g' || unit === 'kg' ? 'kg' : unit === 'ml' || unit === 'l' ? 'liter' : 'stuk')
 }
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
-function shoppingChecklist(basket: OneStoreBasket): string {
-  return [
-    `Supa · boodschappen voor ${basket.store.name} · privé ingevoerde prijzen, niet geverifieerd`,
-    ...basket.lines.map(line => line.status === 'matched'
-      ? `☐ ${line.ingredientLabel}: ${line.packs} × ${line.productName} (${euros.format(line.lineTotalCents / 100)})`
-      : `☐ ${line.ingredientLabel}: handmatig kiezen, hoeveelheid ${line.requirement.amount ?? '?'} ${line.requirement.unit}`),
-    'Prijzen zijn alleen indicatief op basis van lokaal aangeleverde gegevens.',
-  ].join('\n')
-}
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
@@ -324,13 +316,21 @@ export function OfflineReviewedWorkbench({
                   return (
                     <section key={store}>
                       <h4>{store} · mandregels</h4>
-                      <details className="offline-price-workbench__checklist">
-                        <summary>Kopieer boodschappenlijst voor {store}</summary>
-                        <p>Selecteer en kopieer deze lijst; de tekst blijft op je apparaat.</p>
-                        <textarea readOnly rows={Math.min(18, basket.lines.length + 4)}
-                          aria-label={`Boodschappenlijst ${store}`}
-                          value={shoppingChecklist(basket)} onFocus={event => event.currentTarget.select()} />
-                      </details>
+                      <PrivateStoreTripChecklist
+                        key={JSON.stringify([
+                          store,
+                          imported.captures[store].observedAt,
+                          basket.totalCents,
+                          basket.matchedLineCount,
+                          basket.unresolvedLineCount,
+                          basket.lines.map(line => line.status === 'matched'
+                            ? [line.id, line.productId, line.packs, line.pricePerPackCents]
+                            : [line.id, 'unknown']),
+                        ])}
+                        basket={basket}
+                        observedAt={imported.captures[store].observedAt}
+                        fresh={currentEnough}
+                      />
                       {basket.lines.map(line => (
                         <article key={line.id} className="offline-price-workbench__line">
                           <div>
