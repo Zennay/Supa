@@ -92,3 +92,22 @@ test('expected RED: impossible Deka -14:00 cannot create a falsely healthy 24h w
   sheet.candidate.observedAt='2026-10-06T11:00:00-14:00'
   assert.equal(observationWindowSummary(sheet,NOW).state,'single-observation')
 })
+
+test('control: real UTC-11:30 remains a valid historical physical offset',()=>{
+  assert.notEqual(validObservedAt('2026-10-06T10:00:00-11:30',NOW),null)
+})
+test('expected RED: UTC-12:01 violates the physical negative offset floor',()=>{
+  assert.equal(validObservedAt('2026-10-06T10:00:00-12:01',NOW),null)
+})
+test('expected RED: a one-minute-impossible PLUS offset must fail private M3 converter',()=>{
+  const sheet=blankPairedSheet()
+  sheet.baseline.observedAt='2026-10-06T10:00:00-12:01'
+  sheet.candidate.observedAt='2026-10-06T10:00:00-12:00'
+  assert.throws(()=>buildWeeklyBasketStudyFromObservationSheet(sheet),/observedAt|time|offset|timestamp/i)
+})
+test('expected RED: physically impossible -12:01 must fail UI readiness within a 1-minute window',()=>{
+  const sheet=blankPairedSheet()
+  sheet.baseline.observedAt='2026-10-06T10:00:00-12:01'
+  sheet.candidate.observedAt='2026-10-06T10:00:00-12:00'
+  assert.equal(observationSheetReadiness(sheet,NOW).ready,false)
+})
