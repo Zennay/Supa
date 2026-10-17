@@ -282,3 +282,50 @@ test('512 UTF-16-unit joined-emoji label is accepted without Unicode truncation;
   assert.match(rejected.stderr, /^Private worksheet QA audit refused\s*$/)
   assert.doesNotMatch(rejected.stderr, /👩|é|plus|dekamarkt/)
 })
+
+test('real six-source M3 private worksheet survives byte-stream transport for all 15 day subsets', async () => {
+  const [{m2InitialPlan, m2Recipes}, source, producer] = await Promise.all([
+    import('../src/data/m2Fixture.ts'),
+    import('../scripts/retailer-reviewed-ingest-engine.mjs'),
+    import('../scripts/retailer-private-selected-week-observation.mjs'),
+  ])
+  const records = await Promise.all(source.RETAILER_REVIEWED_FIXTURES.map(name =>
+    source.readBoundedRegularReviewedFixture(fileURLToPath(
+      new URL('../fixtures/m1/' + name, import.meta.url)))))
+  const originals = structuredClone(records)
+  const plan = structuredClone(m2InitialPlan)
+  const recipes = structuredClone(m2Recipes)
+  const inputSnapshot = structuredClone({plan, recipes})
+  const weekdays = ['Ma', 'Di', 'Wo', 'Do']
+  let validated = 0
+  for (let mask = 1; mask < 16; mask++) {
+    const days = weekdays.filter((_, i) => mask & (1 << i))
+    const sheet = producer.buildPrivateSelectedWeekObservationWorksheet(
+      records, days, {plan, recipes})
+    assert.equal(sheet.productionReady, false)
+    assert.equal(sheet.publicSavingsClaimEligible, false)
+    assert.equal(sheet.observedStorePrices, 0)
+    const audited = auditPrivateWorksheetCsv(sheet.csv)
+    assert.equal(audited.verifiedActualObservations, 0)
+    assert.equal(audited.sourceRightsVerified, false)
+    assert.equal(audited.rows, sheet.rows)
+    assert.equal(audited.pairedRetailers, 2)
+    const bytes = Buffer.from(sheet.csv, 'utf8')
+    const responses = []
+    const chunks = []
+    for (let off = 0; off < bytes.length; off += 1 + off % 43)
+      chunks.push(bytes.subarray(off, off + 1 + off % 43))
+    const streaming = await main(Readable.from(chunks), text => responses.push(text))
+    assert.deepEqual(streaming, audited)
+    assert.deepEqual(responses, [JSON.stringify(audited) + '\n'])
+    assert.doesNotMatch(responses[0], /sourceUrl|capturedAt|priceCents|Kippendij|plus|dekamarkt/)
+    if (mask === 15) {
+      assert.equal(sheet.rows, 22, 'all four days yield canonical 11×2 blank worksheet')
+      assert.equal(audited.ingredientNeeds, 11)
+    }
+    validated++
+  }
+  assert.equal(validated, 15)
+  assert.deepEqual(records, originals, 'historical source archives remain unchanged')
+  assert.deepEqual({plan, recipes}, inputSnapshot, 'caller owned recipes and planner stay immutable')
+})
