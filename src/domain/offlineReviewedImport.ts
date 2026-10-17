@@ -18,6 +18,8 @@ export type OfflinePriceSnapshots = Readonly<{
 }>
 const RETAILERS = ['PLUS', 'DekaMarkt'] as const
 const UNITS: ReadonlySet<string> = new Set(['g', 'kg', 'ml', 'l', 'piece'])
+// A missing package is represented by null rather than a fabricated size. Only
+// a positive measured package and known price may become a purchasable match.
 const hasOwn = (x: object, key: string) => Object.hasOwn(x, key)
 const isRecord = (x: unknown): x is Record<string, unknown> =>
   x !== null && typeof x === 'object' && !Array.isArray(x)
@@ -50,8 +52,9 @@ function observedMilliseconds(raw: unknown): number | null {
 function parseProduct(raw: unknown, retailer: OfflineRetailer): StoreProduct {
   if (!isRecord(raw) || !allowedFields(raw, ['id', 'name', 'packAmount', 'packUnit', 'packCount', 'priceCents', 'available']) ||
       !validName(raw.id, 100) || !validName(raw.name, 160) ||
-      typeof raw.packAmount !== 'number' || !Number.isFinite(raw.packAmount) ||
-      raw.packAmount <= 0 || raw.packAmount > 100000 ||
+      (raw.packAmount !== null && (typeof raw.packAmount !== 'number' || !Number.isFinite(raw.packAmount) ||
+        raw.packAmount <= 0 || raw.packAmount > 100000)) ||
+      (raw.available && raw.packAmount === null) ||
       !UNITS.has(raw.packUnit as string) ||
       (raw.packCount !== undefined && (!Number.isSafeInteger(raw.packCount) ||
         (raw.packCount as number) < 1 || (raw.packCount as number) > 1000)) ||
