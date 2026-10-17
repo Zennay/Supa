@@ -76,3 +76,21 @@ for (const [name, separator] of [
     assert.deepEqual(records, frozen)
   })
 }
+
+for (const [name, malformed] of [
+  ['unpaired HIGH SURROGATE (U+D800)', '\uD800'],
+  ['unpaired LOW SURROGATE (U+DC00)', '\uDC00'],
+]) {
+  test(`operator worksheet refuses lossy UTF-8 ingredient identity from ${name}`, async () => {
+    const records = await historicalSources()
+    const frozen = structuredClone(records)
+    // An unpaired UTF-16 surrogate cannot be encoded faithfully in UTF-8.
+    // Buffer/stdout otherwise silently replaces it with U+FFFD, changing
+    // the operator-visible ingredient without changing the source plan.
+    const label = `Kippendij${malformed}100g`
+    assert.throws(() => buildPrivateSelectedWeekObservationWorksheet(
+      records, ['Ma'], originalPlanWithIngredientLabel(label)),
+    Error, 'lossy surrogate labels must fail before the human sheet is emitted')
+    assert.deepEqual(records, frozen)
+  })
+}
