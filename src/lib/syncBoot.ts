@@ -11,18 +11,24 @@ function browserOptions(): SyncOptions | null {
   }
 }
 
-/** Never blocks the first render for more than `waitMs`, and never throws. */
+/**
+ * Never blocks the first render for more than `waitMs`, and never throws.
+ * The deadline is enforced here, independent of whether the transport or the
+ * response body honours the abort signal; a pull that finishes later is
+ * aborted and does not touch localStorage (see pullSyncedState).
+ */
 export async function syncBeforeRender(waitMs = 1500) {
   const options = browserOptions()
   if (!options) return
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), waitMs)
+  const pull = pullSyncedState(options, controller.signal).catch(() => [])
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise(resolve => { timer = setTimeout(resolve, waitMs) })
   try {
-    await pullSyncedState(options, controller.signal)
-  } catch {
-    // API unreachable, static hosting or timeout: keep the local copy.
+    await Promise.race([pull, deadline])
   } finally {
     clearTimeout(timer)
+    controller.abort()
   }
   startBackgroundSync(options)
 }

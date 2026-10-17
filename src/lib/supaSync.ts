@@ -117,7 +117,9 @@ async function readRemote(options: SyncOptions, key: string, signal?: AbortSigna
 export async function pullSyncedState(options: SyncOptions, signal?: AbortSignal): Promise<SyncKey[]> {
   const key = deviceKey(options)
   const remote = await readRemote(options, key, signal)
-  if (!remote) return []
+  // The caller's deadline has passed (first render already happened): a late
+  // snapshot must not change records the app has already read.
+  if (!remote || signal?.aborted) return []
   const meta = readMeta(options.storage)
   if (remote.revision === meta.revision) return []
   return adopt(options.storage, meta, remote)
