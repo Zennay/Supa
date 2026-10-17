@@ -109,3 +109,25 @@ test('expected RED: duplicated native terminal exit cannot certify one exact hos
   assert.throws(() => analyzeNativeRedCi(forged, OPTIONS),
     /duplicate|terminal|ambiguous|unverified/i)
 })
+
+test('refuse a TAP v13 signature appended after the supposed GitHub completion', () => {
+  const misplaced = hostedLog().replace(STAMP + 'TAP version 13\n', '') +
+    STAMP + 'TAP version 13\n'
+  assert.throws(() => analyzeNativeRedCi(misplaced, OPTIONS),
+    /TAP|order|incomplete|unverified/i)
+})
+
+test('refuse a TAP summary that precedes the native test plan', () => {
+  const misplaced = hostedLog().replace(STAMP + '# tests 3\n', '')
+    .replace(STAMP + '1..3\n', STAMP + '# tests 3\n' + STAMP + '1..3\n')
+  assert.throws(() => analyzeNativeRedCi(misplaced, OPTIONS),
+    /TAP|order|incomplete|unverified/i)
+})
+
+test('normal hosted post-step cleanup messages after a complete failed test remain allowed', () => {
+  const jobLog = hostedLog() + STAMP + 'Post job cleanup.\n' +
+    STAMP + 'Evaluating checkout cleanup\n'
+  const result = analyzeNativeRedCi(jobLog, OPTIONS)
+  assert.equal(result.productionReady, false)
+  assert.equal(result.fail, 1)
+})
