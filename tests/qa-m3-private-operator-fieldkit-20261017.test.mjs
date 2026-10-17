@@ -151,7 +151,6 @@ describe('M3 actionable secure private fieldkit: local operator evidence and ext
         ['--file', x.path, '--text', '--release'],
         ['--file', x.path, 'https://example.invalid'],
         ['--file', 'https://example.invalid'],
-        ['--file', x.path + '\0'],
         ['--file', x.root],
       ]) {
         const child = subprocess(args)
@@ -159,6 +158,7 @@ describe('M3 actionable secure private fieldkit: local operator evidence and ext
         assert.equal(child.stdout, '')
         assert.equal(child.stderr, 'Independent private M3 operator fieldkit refused\n')
       }
+      await assert.rejects(main(['--file', x.path + '\0']), /Independent private M3 operator fieldkit refused/)
     } finally { await cleanup(x) }
   })
   it('malicious programmatic argv getters and Proxies fail before executing traps', async () => {
