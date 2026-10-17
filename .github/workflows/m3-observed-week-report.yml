@@ -23,6 +23,8 @@ on:
       - "tests/product-m3-observation-stale-tab-*.test.mjs"
       - "tests/product-m3-unreadable-local-draft-recovery.test.mjs"
       - "tests/qa-m3-stale-draft-*.test.mjs"
+      - "tests/qa-m3-submillisecond-*.test.mjs"
+      - "tests/qa-m3-subms-*.test.mjs"
       - "src/features/observation/ObservationView.tsx"
       - "src/features/observation/observationNextStep.ts"
       - "src/features/observation/observationCollectionUi.ts"
