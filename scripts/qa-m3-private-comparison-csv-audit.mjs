@@ -86,7 +86,7 @@ async function main() {
     if (size > MAX_BYTES) invalid()
     chunks.push(part)
   }
-  const text = new TextDecoder('utf-8', { fatal: true })
+  const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
     .decode(Buffer.concat(chunks))
   const report = auditPrivateM3ComparisonCsv(text)
   process.stdout.write(JSON.stringify(report) + '\n')
