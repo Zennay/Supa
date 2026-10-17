@@ -76,11 +76,28 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     const passingTap = /^\s*ok\s+\d+\s+-\s+/.test(line)
     if (failingTap || passingTap) {
       completeFailure()
-      if (failingTap) current = { file: null }
+      if (failingTap) current = { file: null, locationCount: 0 }
     }
     if (current) {
-      const location = /^\s*location:\s*['"](?:[^'"]*[/\\])?([^/'"\\]+\.test\.mjs):\d+:\d+['"]/.exec(line)
-      if (location) current.file = location[1]
+      const location = /^\s*location:\s*['"]([^'"]*[/\\]([^/'"\\]+\.test\.mjs):(\d+):(\d+))['"]$/.exec(line)
+      if (location) {
+        // A filename alone is not provenance: a foreign checkout or nested
+        // dependency can contain an identically named test. Native SUPA TAP
+        // must originate from the checked-in repository's root tests folder.
+        const rawPath = location[1]
+        if (!/^(?:\/|[A-Za-z]:[\\/])/.test(rawPath) ||
+            !/[\\/]Supa[\\/]Supa[\\/]tests[\\/][^\\/'":]+\.test\.mjs:[1-9]\d*:[1-9]\d*$/.test(rawPath)) {
+          throw new Error('Foreign native TAP failure location')
+        }
+        // Every failed native test has one authoritative TAP origin. A later
+        // diagnostic line may not overwrite a foreign failure with a trusted
+        // QA path (nor duplicate the same path to fabricate certainty).
+        current.locationCount++
+        if (current.locationCount !== 1) {
+          throw new Error('Ambiguous native TAP failure location')
+        }
+        current.file = location[2]
+      }
     }
     const summary = /^#\s+(tests|pass|fail|skipped|cancelled|todo)\s+(\d+)$/.exec(line)
     if (summary) {
