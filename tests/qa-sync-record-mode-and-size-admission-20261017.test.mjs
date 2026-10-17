@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { spawn, spawnSync } from 'node:child_process'
+import { chmod, mkdir, mkdtemp, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -55,4 +56,40 @@ test('P2: oversized on-disk record must fail closed before trusting its JSON con
   assert.ok(Buffer.byteLength(payload, 'utf8') > MAX_SNAPSHOT_BYTES)
   await assert.rejects(() => store.read(key),
     'untrusted disk restores must use a bounded read, not an unbounded readFile')
+})
+
+test('P2: a pre-existing FIFO record must fail closed without hanging a sync read', { skip: process.platform !== 'linux' }, async t => {
+  const { file } = await fixture(t)
+  await unlink(file)
+  const created = spawnSync('mkfifo', [file], { encoding: 'utf8', timeout: 5000 })
+  assert.equal(created.status, 0, 'test runner must prepare a disposable named pipe')
+
+  // Isolate a potentially blocking open() in a child, so this regression
+  // never hangs the main suite. Correct code should open O_NONBLOCK, inspect
+  // the pinned descriptor with fstat and reject the non-regular record.
+  const moduleUrl = new URL('../server/sync-store.mjs', import.meta.url).href
+  const script = `
+    import { createFileSyncStore } from ${JSON.stringify(moduleUrl)}
+    const [dir, key] = process.argv.slice(1)
+    try {
+      await createFileSyncStore({ dir }).read(key)
+      process.exitCode = 2
+    } catch {
+      process.stdout.write('REFUSED\\n')
+    }
+  `
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script, file.slice(0, -hashedName.length), key], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL') })
+  let output = ''
+  child.stdout.on('data', chunk => { output += chunk.toString() })
+  const result = await new Promise(resolve => {
+    const timeout = setTimeout(() => { child.kill('SIGKILL'); resolve({ timedOut: true }) }, 1500)
+    child.once('exit', (code, signal) => { clearTimeout(timeout); resolve({ code, signal }) })
+    child.once('error', error => { clearTimeout(timeout); resolve({ error: error.message }) })
+  })
+  assert.deepEqual(result, { code: 0, signal: null },
+    'a FIFO record may never block indefinitely waiting for an external writer')
+  assert.match(output, /REFUSED/, 'special file must be explicitly refused')
 })
