@@ -245,5 +245,16 @@ export function validateRawProductObservation(
   validateSnapshotRef(observation.supermarket, observation.provenance)
   validateNullableMoneyCents(observation.currentPriceCents, 'Current price')
 
+  // An unconditionally stated exact Offer must agree with its checkout price.
+  // Conditional promotion mechanics have their own multi-pack semantics and
+  // must not be interpreted as a second unconditional per-pack price.
+  if (observation.offer !== null &&
+      observation.offer.mechanics === null &&
+      observation.offer.offerPriceCents !== null &&
+      observation.currentPriceCents !== null &&
+      observation.offer.offerPriceCents !== observation.currentPriceCents) {
+    throw new Error('Unconditional Offer price contradicts current checkout cents')
+  }
+
   return observation
 }
