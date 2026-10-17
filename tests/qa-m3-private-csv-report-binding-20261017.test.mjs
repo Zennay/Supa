@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { spawnSync } from 'node:child_process'
-import { chmod, link, mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, link, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+const comparisonCli = fileURLToPath(new URL('../scripts/m3-private-product-comparison.mjs', import.meta.url))
+const csvCli = fileURLToPath(new URL('../scripts/m3-private-comparison-csv.mjs', import.meta.url))
 
 import { buildFictionalPricedSheet } from '../scripts/m3-rehearse-field-run.mjs'
 import { buildPrivateM3ProductComparison } from '../scripts/m3-private-product-comparison.mjs'
@@ -175,6 +178,34 @@ test('CLI requires mode-0600 private local artifacts, emits only aggregate metad
     assert.equal(mismatched.stdout, '')
     assert.equal(mismatched.stderr, 'M3 private CSV/source binding refused\n')
     assert.doesNotMatch(mismatched.stderr, /SUPER_SECRET_SYNTHETIC_PERSON_20261017/u)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('real offline operator chain: field JSON -> private comparison JSON -> private CSV -> bound QA', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'supa-qa-operator-chain-'))
+  try {
+    await chmod(directory, 0o700)
+    const sheetPath = join(directory, 'source-sheet.json')
+    const reportPath = join(directory, 'private-report.json')
+    const csvPath = join(directory, 'private-comparison.csv')
+    const sheet = JSON.stringify(buildFictionalPricedSheet(90))
+    await writeFile(sheetPath, sheet, { mode: 0o600 })
+    const run = (entry, ...args) => spawnSync(
+      process.execPath, ['--experimental-strip-types', entry, ...args],
+      { encoding: 'utf8', timeout: 10000 },
+    )
+    const comparison = run(comparisonCli, sheetPath, '--output', reportPath)
+    assert.equal(comparison.status, 0, comparison.stderr)
+    const exporter = run(csvCli, reportPath, '--output', csvPath)
+    assert.equal(exporter.status, 0, exporter.stderr)
+    const proof = run(cli, reportPath, csvPath)
+    assert.equal(proof.status, 0, proof.stderr)
+    assert.equal(JSON.parse(proof.stdout).sourceBound, true)
+    assert.equal(JSON.parse(proof.stdout).publicSavingsClaimEligible, false)
+    assert.equal(await readFile(sheetPath, 'utf8'), sheet, 'original field evidence unchanged')
+    assert.doesNotMatch(proof.stdout, /DekaMarkt|PLUS|participant|source-sheet|private-report/iu)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
