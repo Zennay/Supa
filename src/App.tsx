@@ -5,7 +5,6 @@ import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
-import { OfflineReviewedWorkbench } from './features/comparison/OfflineReviewedWorkbench'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
@@ -36,7 +35,7 @@ import {
   m3CandidateStore,
 } from './data/m3ComparisonFixture'
 
-type Tab = 'home' | 'recipes' | 'products' | 'planner' | 'basket' | 'list' | 'observe' | 'review'
+type Tab = 'home' | 'recipes' | 'products' | 'planner' | 'basket' | 'list' | 'observe'
 
 const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: figmaAssets.imgVector5 },
@@ -45,7 +44,6 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2 },
   { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3 },
   { id: 'basket', label: 'Vergelijk', icon: figmaAssets.imgButton2 },
-  { id: 'review', label: 'Bronprijzen', icon: figmaAssets.imgButton2 },
 ]
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
@@ -337,9 +335,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           />
         )}
         {tab === 'list' && <ShoppingListView basket={basket} />}
-        {tab === 'review' && (
-          <OfflineReviewedWorkbench plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
-        )}
         {tab === 'observe' && <ObservationView />}
       </div>
 
