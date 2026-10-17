@@ -115,19 +115,29 @@ export function auditNativeGreenJob({run, job, log, expectedHead, expectedBase} 
   if (!ciSlice.some(line => /^found 0 vulnerabilities$/.test(line)) ||
       !auditSlice.some(line => /^found 0 vulnerabilities$/.test(line))) refuse()
   const gateSlice = lines.slice(starts[4], starts[5])
-  const needed = [
-    '"productionReady": false,',
-    '"permissionStatus": "permission_required",',
-    '"permissionStatus": "unresolved",',
-    '"productionEnabled": false,',
-  ]
-  for (const text of needed) {
-    if (!gateSlice.some(line => line.trim() === text)) refuse()
+  // Require the *actual complete gate JSON*, not disconnected keywords
+  // scattered in unrelated runner text. This binds retailer IDs to the exact
+  // denied permission status and production flag for each source.
+  const open = exactlyOne(gateSlice, line => line === '{')
+  const close = exactlyOne(gateSlice, line => line === '}')
+  if (close <= open) refuse()
+  let rights
+  try { rights = JSON.parse(gateSlice.slice(open, close + 1).join('\n')) }
+  catch { refuse() }
+  if (rights?.milestone !== 'M1 Data Feasibility' ||
+      rights?.productionReady !== false ||
+      !Array.isArray(rights.expectedSources) ||
+      JSON.stringify([...rights.expectedSources].sort()) !== JSON.stringify(['dekamarkt', 'plus']) ||
+      !Array.isArray(rights.blockers) || rights.blockers.length !== 2) refuse()
+  const blockers = new Map()
+  for (const item of rights.blockers) {
+    if (!item || typeof item !== 'object' ||
+        !['plus', 'dekamarkt'].includes(item.supermarket) ||
+        blockers.has(item.supermarket) || item.productionEnabled !== false) refuse()
+    blockers.set(item.supermarket, item.permissionStatus)
   }
-  if (gateSlice.some(line => /"productionReady":\s*true|"productionEnabled":\s*true/.test(line)) ||
-      gateSlice.filter(line => line.trim() === '"productionEnabled": false,').length !== 2 ||
-      gateSlice.filter(line => line.trim() === '"permissionStatus": "unresolved",').length !== 1 ||
-      gateSlice.filter(line => line.trim() === '"permissionStatus": "permission_required",').length !== 1) refuse()
+  if (blockers.get('plus') !== 'permission_required' ||
+      blockers.get('dekamarkt') !== 'unresolved') refuse()
   if (!lines.slice(starts[5]).some(line => /(?:✓|✔) built in [\d.]+(?:ms|s)$/.test(line.trim()))) refuse()
 
   return {
