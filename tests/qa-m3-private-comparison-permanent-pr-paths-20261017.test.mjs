@@ -14,6 +14,7 @@ const targets = [
   'tests/qa-m3-all-line-unavailable-fullbasket-privacy-20261017.test.mjs',
   'tests/qa-m3-available-invalid-pack-fullbasket-gate-20261017.test.mjs',
   'tests/qa-m3-multi-missing-paired-22slot-private-export-20261017.test.mjs',
+  'tests/qa-m3-private-comparison-permanent-pr-paths-20261017.test.mjs',
 ]
 function selectors(workflow) {
   // DO NOT look for quoted paths elsewhere: jobs/commands, comments and
