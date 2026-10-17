@@ -14,7 +14,7 @@ import { MAX_SNAPSHOT_BYTES } from '../server/sync-validation.mjs'
 const key = 'R'.repeat(43)
 const hashedName = createHash('sha256').update(key).digest('hex') + '.json'
 const plannerKey = 'supa:planner-preferences:v2'
-const entries = { [plannerKey]: '{"fixture":"local-synthetic-only"}' }
+const entries = { [plannerKey]: JSON.stringify({ budget: 35, activeDays: ['Ma'], recipeByDay: { Ma: 'supa-thai' } }) }
 
 async function fixture(t, options = {}) {
   const root = await mkdtemp(join(tmpdir(), 'supa-qa-sync-record-admission-'))
