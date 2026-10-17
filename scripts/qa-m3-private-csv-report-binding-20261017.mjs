@@ -84,6 +84,19 @@ async function readPrivateFile(filename, max) {
 }
 
 /**
+ * Reusable QA-only private reader for the M3 operator's original field draft.
+ * Fixed 2MiB ceiling, owner UID, single link, pinned descriptor and strict
+ * UTF-8 apply even to QA consumers that do not generate a comparison CSV.
+ */
+export async function readPrivateM3OperatorFile(filename) {
+  try {
+    return await readPrivateFile(filename, MAX_JSON)
+  } catch {
+    refuse()
+  }
+}
+
+/**
  * Compare the bytes of an already exported CSV to the canonical CSV produced
  * from the specific private comparison JSON supplied in the same local run.
  * The original JSON is NOT cryptographically signed, so this is artifact
