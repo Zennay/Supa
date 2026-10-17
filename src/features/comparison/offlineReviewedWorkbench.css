@@ -47,3 +47,40 @@
 .offline-price-workbench__checklist summary { cursor: pointer; font-weight: 700; min-height: 32px; }
 .offline-price-workbench__checklist textarea { box-sizing: border-box; width: 100%; border: 1px solid #a3b0a5; background: white; padding: .6rem; border-radius: 8px; resize: vertical; font: .86rem/1.5 ui-monospace, monospace; color: #232323; }
 .offline-price-workbench__checklist :is(summary,textarea):focus-visible { outline: 3px solid #226f52; outline-offset: 3px; }
+
+/* Direct two-store entry stays fully local and is scoped separately from M3 field evidence. */
+.offline-manual-editor { background:#fff; border:1px solid #dbe0d9; border-radius:18px;
+  padding:clamp(1rem,3vw,1.5rem); display:grid; gap:1rem; min-width:0; }
+.offline-manual-editor__header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:1rem; }
+.offline-manual-editor__header h3 { margin:.2rem 0; }
+.offline-manual-editor__header p { margin:.4rem 0; max-width:54ch; }
+.offline-manual-editor__header button { min-height:44px; }
+.offline-manual-editor__stores { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.offline-manual-editor__stores>section { display:grid; gap:1rem; align-content:start; min-width:0; }
+.offline-manual-editor__stores>section>h4 { margin:0; }
+.offline-manual-editor__time { display:grid; gap:.35rem; font-weight:650; }
+.offline-manual-editor__row { display:grid; gap:.7rem; padding:1rem;
+  border:1px solid #cbd6ca; border-radius:12px; min-width:0; background:#fafcf9; }
+.offline-manual-editor__row legend { font-weight:700; padding:0 .4rem; overflow-wrap:anywhere; }
+.offline-manual-editor__row label { display:grid; gap:.35rem; font-size:.88rem; }
+.offline-manual-editor__row input,.offline-manual-editor__row select,
+.offline-manual-editor__time input { min-width:0; max-width:100%; box-sizing:border-box;
+  border:1px solid #929d96; border-radius:9px; background:white; color:#252525;
+  padding:.55rem; font:inherit; min-height:43px; }
+.offline-manual-editor__quantities { display:grid; gap:.5rem; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.offline-manual-editor__available { display:flex !important; align-items:center; gap:.55rem !important;
+  font-weight:700; cursor:pointer; }
+.offline-manual-editor__available input { min-height:20px; width:20px; flex:0 0 20px; }
+.offline-manual-editor :is(input,select,button,textarea,summary):focus-visible {
+  outline:3px solid #236e54; outline-offset:2px; }
+.offline-manual-editor__export { padding:1rem; background:#eff5ee; border-radius:12px; }
+.offline-manual-editor__export summary { cursor:pointer; font-weight:700; }
+.offline-manual-editor__export textarea { width:100%; box-sizing:border-box; padding:.7rem;
+  border-radius:10px; border:1px solid #9aa99d; font-family:ui-monospace,monospace; }
+@media(max-width:790px) {
+  .offline-manual-editor__stores { grid-template-columns:minmax(0,1fr); }
+}
+@media(max-width:390px) {
+  .offline-manual-editor__quantities { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .offline-manual-editor__quantities label:last-child { grid-column:1 / -1; }
+}
