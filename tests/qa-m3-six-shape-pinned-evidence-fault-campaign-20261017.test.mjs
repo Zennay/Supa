@@ -254,7 +254,7 @@ describe('QA: six-shape physical retailer evidence fail-closed fault campaign', 
       await assert.rejects(runPrivateRetailerPipeline(dir))
       assert.deepEqual(await readFile(join(dir, 'manifest.json')), manifestBefore)
       for (let i = 0; i < 6; i++)
-        assert.equal(digest(await readFile(join(dir, 'capture-' + i + '.json')), digest(FIXTURES[i]))
+        assert.equal(digest(await readFile(join(dir, 'capture-' + i + '.json'))), digest(FIXTURES[i]))
       scenarios++
     } finally { await clean(dir) }
   })
