@@ -11,8 +11,8 @@ import {
 import { observationNextAction } from '../src/features/observation/observationNextStep.ts'
 
 const clock = Date.parse('2026-10-14T12:00:00Z')
-const badOffsets = ['+15:00', '-15:00', '+23:00', '+14:30', '-14:01', '+14:01']
-const goodOffsets = ['+14:00', '-14:00', '+13:45', 'Z']
+const badOffsets = ['+15:00', '-15:00', '+23:00', '+14:30', '-14:01', '+14:01', '-14:00', '-13:00', '-12:01']
+const goodOffsets = ['+14:00', '-12:00', '+13:45', 'Z']
 
 function clockedSheet(offset = 'Z') {
   const sheet = buildFictionalPricedSheet(90)
