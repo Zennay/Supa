@@ -193,3 +193,41 @@ test('one 1e21 scientific quantity must not be exported as a deceptively valid p
   assert.throws(() => produce(sources, ['Ma'], inputWithQuantity(1e21)),
     Error, '1e+21 emitted by Number.toString is uncollectable by the human scanner')
 })
+
+test('literal visible spaces preserve exact ingredient identity in the paired human CSV', async () => {
+  const source = await captures()
+  const baseline = structuredClone(source)
+  const label = 'Kip Borst'
+  const sheet = produce(source, ['Ma'], inputWithLabel(label))
+  assertNoEvidence(sheet)
+  const checked = audit(sheet.csv)
+  assert.equal(checked.rows, 10)
+  assert.equal(sheet.csv.includes('"' + label + '"'), true)
+  assert.deepEqual(source, baseline)
+})
+
+test('a hidden LF must not silently alias a different visible-spaces ingredient identity', async () => {
+  const source = await captures()
+  // Existing exporter turns this into 'Kip Borst', which is a *different*
+  // operator-entered label even though scanner then certifies its structure.
+  assert.throws(() => produce(source, ['Ma'], inputWithLabel('Kip\nBorst')),
+    Error, 'refuse lossy newline normalization rather than yielding a different human demand')
+})
+
+test('a hidden tab must not be silently merged into a real ingredient space', async () => {
+  const source = await captures()
+  assert.throws(() => produce(source, ['Ma'], inputWithLabel('Kip\tBorst')),
+    Error, 'spreadsheet-safe serialization must preserve identity or reject')
+})
+
+test('a NUL within an ingredient cannot be rewritten into visible whitespace', async () => {
+  const source = await captures()
+  assert.throws(() => produce(source, ['Ma'], inputWithLabel('Kip\u0000Borst')),
+    Error, 'remove ambiguous control before serialization by refusing demand, not aliasing')
+})
+
+test('carriage-return line fragments must never silently become an unrelated human label', async () => {
+  const source = await captures()
+  assert.throws(() => produce(source, ['Ma'], inputWithLabel('Kip\rBorst')),
+    Error, 'CR-bearing demand must fail atomically and never silently collapse identities')
+})
