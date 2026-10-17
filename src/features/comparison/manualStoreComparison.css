@@ -40,3 +40,9 @@ body .bottom-nav.hifi-nav button:last-child .hifi-sr-only {
   font-size: .6rem; font-weight: 600; line-height: 1; color: #244537;
 }
 body .bottom-nav.hifi-nav button:last-child img { max-width: 25px; max-height: 25px; }
+
+.manual-compare__store-lists { padding: 1rem; margin: .9rem 0 1.3rem; border-radius: 1rem; background: #f5f8f3; border: 1px solid #d6ddd2; }
+.manual-compare__store-lists h3 { margin: .1rem 0 .45rem; font-size: 1.15rem; }
+.manual-compare__store-lists p { margin: .4rem 0 .8rem; line-height: 1.55; }
+.manual-compare__store-lists button:disabled { opacity: .55; cursor: not-allowed; }
+.manual-compare__store-lists textarea { min-height: 12rem; white-space: pre-wrap; }
