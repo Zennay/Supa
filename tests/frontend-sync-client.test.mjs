@@ -94,3 +94,35 @@ test('without an API (static host) the app keeps its local data and stops pushin
   assert.equal(await pushSyncedState({ storage, request: missing }), 'no-api')
   assert.equal(storage.getItem(PLAN), plan(['Ma']))
 })
+
+test('background sync stops on terminal results and ignores answers that arrive after stop', async () => {
+  const { startBackgroundSync } = await import('../src/lib/supaSync.ts')
+  const saved = { setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval, document: globalThis.document }
+  const run = async (respond) => {
+    let tick; let cleared = 0; const listeners = new Map()
+    globalThis.setInterval = fn => { tick = fn; return 7 }
+    globalThis.clearInterval = () => { cleared++ }
+    globalThis.document = { visibilityState: 'visible', addEventListener: (n, f) => listeners.set(n, f), removeEventListener: (n, f) => { if (listeners.get(n) === f) listeners.delete(n) } }
+    const storage = memoryStorage({ [DEVICE_KEY_STORAGE]: 'Q'.repeat(43), [PLAN]: plan(['Ma']) })
+    let requests = 0
+    const stop = startBackgroundSync({ storage, request: init => { requests++; return respond(init) } })
+    return { tick: () => tick(), stop, storage, listeners, cleared: () => cleared, requests: () => requests }
+  }
+  const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve() }
+  const json = (status, body = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+  try {
+    for (const status of [404, 422]) {
+      const b = await run(async () => json(status))
+      b.tick(); await flush()
+      assert.equal(b.cleared(), 1); assert.equal(b.listeners.size, 0)
+      b.stop(); assert.equal(b.cleared(), 1, 'stop is idempotent')
+    }
+    let answer
+    const late = await run(() => new Promise(resolve => { answer = resolve }))
+    late.tick(); await flush()
+    late.stop()
+    answer(json(200, { revision: 1 })); await flush()
+    assert.equal(late.storage.getItem(SYNC_META_STORAGE), null, 'a late 200 after stop is not recorded as a save')
+    assert.equal(late.requests(), 1)
+  } finally { Object.assign(globalThis, saved) }
+})

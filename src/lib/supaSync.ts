@@ -128,7 +128,7 @@ export async function pullSyncedState(options: SyncOptions, signal?: AbortSignal
 export type PushResult = 'unchanged' | 'saved' | 'rejected' | 'unavailable' | 'no-api'
 
 /** Upload local edits. A newer server copy is merged once, then retried. */
-export async function pushSyncedState(options: SyncOptions, { keepalive = false } = {}): Promise<PushResult> {
+export async function pushSyncedState(options: SyncOptions, { keepalive = false, signal }: { keepalive?: boolean; signal?: AbortSignal } = {}): Promise<PushResult> {
   const key = deviceKey(options)
   for (let attempt = 0; attempt < 2; attempt++) {
     const meta = readMeta(options.storage)
@@ -139,11 +139,15 @@ export async function pushSyncedState(options: SyncOptions, { keepalive = false 
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ baseRevision: meta.revision, entries }),
     })
+    // A caller that has stopped syncing must not see late responses change
+    // local records, sync metadata or trigger another write.
+    if (signal?.aborted) return 'unavailable'
     if (response.status === 200) {
       // Only a JSON acknowledgement of exactly the next revision proves this
       // write was stored; anything else keeps the edits marked unsynced.
       if (!isJsonResponse(response)) return 'unavailable'
       const saved = await response.json().catch(() => null)
+      if (signal?.aborted) return 'unavailable'
       if (!saved || saved.revision !== meta.revision + 1 || !Number.isSafeInteger(saved.revision)) return 'unavailable'
       writeMeta(options.storage, { revision: saved.revision, synced: entries })
       return 'saved'
@@ -151,6 +155,7 @@ export async function pushSyncedState(options: SyncOptions, { keepalive = false 
     if (response.status === 409) {
       if (!isJsonResponse(response)) return 'unavailable'
       const remote = admitRemoteSnapshot(await response.json().catch(() => null))
+      if (signal?.aborted) return 'unavailable'
       // An invalid conflict body must not touch local data or trigger a retry.
       if (!remote) return 'unavailable'
       // Keep this browser's own edits as unsynced on top of the newer base.
@@ -166,21 +171,32 @@ export async function pushSyncedState(options: SyncOptions, { keepalive = false 
   return 'unavailable'
 }
 
-/** Mirror edits while the app is open; stops quietly when the API is absent. */
+/**
+ * Mirror edits while the app is open. Returns an idempotent stop function;
+ * a terminal outcome (no API, rejected records) stops by itself. After stop,
+ * the timer and listener are gone and an in-flight request's late answer is
+ * ignored.
+ */
 export function startBackgroundSync(options: SyncOptions, intervalMs = 4000) {
-  let stopped = false
+  const lifetime = new AbortController()
   let running = false
   const tick = async (keepalive = false) => {
-    if (stopped || running) return
+    if (lifetime.signal.aborted || running) return
     running = true
     try {
-      const result = await pushSyncedState(options, { keepalive })
-      if (result === 'rejected' || result === 'no-api') stopped = true
+      const result = await pushSyncedState(options, { keepalive, signal: lifetime.signal })
+      if (result === 'rejected' || result === 'no-api') stop()
     } catch { /* offline: retry on the next tick */ }
     finally { running = false }
   }
   const timer = setInterval(() => void tick(), intervalMs)
   const onHide = () => { if (document.visibilityState === 'hidden') void tick(true) }
   document.addEventListener('visibilitychange', onHide)
-  return () => { stopped = true; clearInterval(timer); document.removeEventListener('visibilitychange', onHide) }
+  function stop() {
+    if (lifetime.signal.aborted) return
+    lifetime.abort()
+    clearInterval(timer)
+    document.removeEventListener('visibilitychange', onHide)
+  }
+  return stop
 }
