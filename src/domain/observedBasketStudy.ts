@@ -95,7 +95,9 @@ function validTimestamp(value: unknown) {
       .split(':')
       .map(Number)
     // A civil UTC offset cannot exceed +/-14:00 (14:30 is also impossible).
-    if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0)) return null
+    if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0) ||
+        (match[5].startsWith('-') && (offsetHour > 12 ||
+          (offsetHour === 12 && offsetMinute !== 0)))) return null
   }
 
   // Date.parse rounds away any fractional digits after milliseconds. A
