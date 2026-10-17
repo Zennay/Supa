@@ -1,4 +1,6 @@
-import type { OneStoreBasket } from '../../domain/basket'
+import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
+import type { PlannedMeal } from '../../domain/types.ts'
+import { ManualStoreComparison } from '../comparison/ManualStoreComparison'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
@@ -24,11 +26,17 @@ export function BasketView({
   comparison,
   comparisonBaseline,
   comparisonCandidate,
+  manualPlan,
+  manualRecipes,
+  manualActiveDays,
 }: {
   basket: OneStoreBasket
   comparison: BasketComparison
   comparisonBaseline: OneStoreBasket
   comparisonCandidate: OneStoreBasket
+  manualPlan?: PlannedMeal[]
+  manualRecipes?: RecipeWithIngredients[]
+  manualActiveDays?: string[]
 }) {
   const basketCost = basketCostDisclosure(
     basket.totalCents,
@@ -73,6 +81,16 @@ export function BasketView({
 
   return (
     <section className="screen">
+      {manualPlan && manualRecipes && manualActiveDays && (
+        <ManualStoreComparison
+          key={JSON.stringify([manualPlan, manualActiveDays, manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
+          plan={manualPlan}
+          recipes={manualRecipes}
+          activeDays={manualActiveDays}
+        />
+      )}
+      <details className="demo-comparison-disclosure" open={!manualPlan}>
+        <summary>{manualPlan ? 'Toon oude voorbeeldberekening (geen actuele winkelprijzen)' : 'Voorbeeldmandje'}</summary>
       <div className="section-heading">
         <div>
           <span className="eyebrow">Eén-store mand</span>
@@ -200,6 +218,7 @@ export function BasketView({
           </div>
         ))}
       </div>
+      </details>
     </section>
   )
 }
