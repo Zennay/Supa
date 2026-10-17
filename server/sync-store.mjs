@@ -15,11 +15,18 @@ const empty = () => ({ revision: 0, updatedAt: null, entries: {} })
 // Largest record this store writes: the validated snapshot plus envelope.
 const MAX_RECORD_BYTES = MAX_SNAPSHOT_BYTES + 1024
 
+/** Exactly what `Date#toISOString` writes: a real UTC instant, millisecond precision. */
+function canonicalTimestamp(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false
+  const time = Date.parse(value)
+  return Number.isFinite(time) && new Date(time).toISOString() === value
+}
+
 /** A record read back from disk is untrusted until it has this exact shape. */
 function admitRecord(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   if (Object.keys(value).sort().join() !== 'entries,revision,updatedAt') return false
-  if (!Number.isSafeInteger(value.revision) || value.revision < 1 || typeof value.updatedAt !== 'string') return false
+  if (!Number.isSafeInteger(value.revision) || value.revision < 1 || !canonicalTimestamp(value.updatedAt)) return false
   const { entries } = value
   if (!entries || typeof entries !== 'object' || Array.isArray(entries) || Object.getPrototypeOf(entries) !== Object.prototype) return false
   return Object.entries(entries).every(([key, entry]) => SYNC_KEYS.includes(key) && (entry === null || typeof entry === 'string'))
