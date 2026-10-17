@@ -53,7 +53,8 @@ for (const [name, input, expectedHost] of [
     assert.equal(parsed.protocol, 'https:')
     assert.equal(parsed.hostname, expectedHost,
       'URL parser canonicalization proves this label denotes a nonpublic endpoint')
-    assert.throws(() => evaluateSourcePermissionGate(await fixture(input)),
+    const document = await fixture(input)
+    assert.throws(() => evaluateSourcePermissionGate(document),
       /evidence|authorization|source URL|non-public|private|origin|credential|invalid/i,
       'permission grant evidence must not trust alternate spellings of nonpublic origin')
   })
