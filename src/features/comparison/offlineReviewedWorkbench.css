@@ -40,3 +40,10 @@
 @media (max-width: 640px) {
   .offline-price-workbench__stores, .offline-price-workbench__totals { grid-template-columns: minmax(0, 1fr); }
 }
+
+.offline-price-workbench__drivers { margin: .8rem 0; border-top: 1px solid #d6ded6; padding-top: 1rem; }
+.offline-price-workbench__drivers p { border-bottom: 1px solid #e5eae4; padding: .3rem 0; margin: .3rem 0; }
+.offline-price-workbench__checklist { background: #f5f8f4; border-radius: 10px; padding: .8rem; margin-bottom: .75rem; }
+.offline-price-workbench__checklist summary { cursor: pointer; font-weight: 700; min-height: 32px; }
+.offline-price-workbench__checklist textarea { box-sizing: border-box; width: 100%; border: 1px solid #a3b0a5; background: white; padding: .6rem; border-radius: 8px; resize: vertical; font: .86rem/1.5 ui-monospace, monospace; color: #232323; }
+.offline-price-workbench__checklist :is(summary,textarea):focus-visible { outline: 3px solid #226f52; outline-offset: 3px; }
