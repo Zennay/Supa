@@ -38,7 +38,7 @@ function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): stri
   ].join('\n')
 }
 function readPastedTable(text: string, needs: readonly ManualNeed[]): ManualEntries {
-  const lines = text.trimEnd().replace(/\r\n/g, '\n').split('\n')
+  const lines = text.replace(/\r\n/g, '\n').replace(/\n$/u, '').split('\n')
   if (lines[0] !== tableHeader || lines.length !== 1 + needs.length * 2) {
     throw new Error('De tabel heeft niet alle PLUS- en DekaMarkt-regels.')
   }
