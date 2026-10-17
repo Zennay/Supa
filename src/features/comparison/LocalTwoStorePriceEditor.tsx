@@ -42,7 +42,9 @@ function eurosToCents(raw: string): number | null {
   if (!/^\d{1,5}(?:[.,]\d{1,2})?$/.test(raw)) return null
   const [whole, decimal = ''] = raw.replace(',', '.').split('.')
   const cents = Number(whole) * 100 + Number(decimal.padEnd(2, '0'))
-  return Number.isSafeInteger(cents) && cents > 0 && cents <= 1000000 ? cents : null
+  // A genuinely observed free pack costs exactly zero cents. Missing prices
+  // remain null and must never be silently interpreted as free.
+  return Number.isSafeInteger(cents) && cents >= 0 && cents <= 1000000 ? cents : null
 }
 
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
@@ -214,7 +216,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
           }
           const price = draft.priceEuros ? eurosToCents(draft.priceEuros.trim()) : null
           if (draft.priceEuros && price === null) {
-            throw new Error(`${store} · ${need.label}: bedrag moet een positief bedrag in euro's zijn.`)
+            throw new Error(`${store} · ${need.label}: gebruik het werkelijk waargenomen bedrag in euro's (ook € 0,00 kan alleen bij écht gratis artikelen).`)
           }
           if (draft.available && (packAmount === null || price === null)) {
             throw new Error(`${store} · ${need.label}: beschikbaar vereist geobserveerde verpakking en prijs.`)
@@ -332,7 +334,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
                     onChange={e => changeRow(store, need.id, { packCount: e.target.value }, need.unit)} />
                 </label>
               </div>
-              <label>Geobserveerde prijs voor één verpakking (€)
+              <label>Geobserveerde prijs voor één verpakking (€; € 0,00 alleen indien echt gratis)
                 <input type="text" inputMode="decimal" placeholder="Bijv. 2,49" value={row.priceEuros}
                   onChange={e => changeRow(store, need.id, { priceEuros: e.target.value }, need.unit)} />
               </label>
