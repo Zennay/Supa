@@ -240,6 +240,32 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   }
 }
 
+/**
+ * Strict operational proof boundary. Historical QA fixture tests use
+ * analyzeNativeRedCi() directly and deliberately tolerate partial top-level
+ * root events when a nested test supplies aggregate totals. Such fragments
+ * are NOT sufficient for a real native GitHub CI job certificate.
+ *
+ * Keep the older test-fixture analyzer for backwards compatibility, but
+ * require a full set of canonical top-level 1..N root records at the CLI.
+ * The core analyzer already enforces uniqueness, range and TAP phase.
+ */
+export function analyzeStrictNativeRedCi(log, options = {}) {
+  const evidence = analyzeNativeRedCi(log, options)
+  let rootPlan = null
+  let rootRecords = 0
+  for (const rawLine of log.split(/\r?\n/)) {
+    const line = plainLine(rawLine)
+    const plan = /^1\.\.(\d+)$/.exec(line)
+    if (plan) rootPlan = Number(plan[1])
+    if (/^(?:not ok|ok)\s+\d+\s+-\s+/.test(line)) rootRecords++
+  }
+  if (rootPlan === null || rootRecords !== rootPlan) {
+    throw new Error('Incomplete native TAP top-level root evidence')
+  }
+  return evidence
+}
+
 async function readBoundedStdin() {
   const chunks = []
   let bytes = 0
@@ -265,7 +291,7 @@ export async function main(args = process.argv.slice(2)) {
       expectedArg.length + allowedArgs.length !== args.length) {
     throw new Error('Usage: --expected-red=N --allow=qa-name.test.mjs [...], log on stdin')
   }
-  const proof = analyzeNativeRedCi(await readBoundedStdin(), {
+  const proof = analyzeStrictNativeRedCi(await readBoundedStdin(), {
     expectedRed: Number(expectedArg[0].slice('--expected-red='.length)),
     allowedTestFiles: allowedArgs.map(x => x.slice('--allow='.length)),
   })
