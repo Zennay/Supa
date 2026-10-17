@@ -8,6 +8,8 @@ const MAX_BYTES = 1024 * 1024
 const EUROS = /^(?:0|[1-9]\d*),\d{2}$/u
 const SIGNED_EUROS = /^-?(?:0|[1-9]\d*),\d{2}$/u
 const COUNT = /^(?:0|[1-9]\d*)$/u
+const CANONICAL_HEADERS = Object.freeze(["Ingrediënt","Benodigd","Eenheid","PLUS product","PLUS pakgrootte","PLUS pakeenheid","PLUS stuks per verpakking","PLUS benodigde pakken","PLUS prijs per pak (EUR)","PLUS regeltotaal (EUR)","DekaMarkt product","DekaMarkt pakgrootte","DekaMarkt pakeenheid","DekaMarkt stuks per verpakking","DekaMarkt benodigde pakken","DekaMarkt prijs per pak (EUR)","DekaMarkt regeltotaal (EUR)","Deka - PLUS (EUR)","Regelstatus"])
+const CANONICAL_ADVISORY = 'Geen actuele prijsfeed en geen publieke besparingsclaim'
 const UNKNOWN = 'Niet gemeten / niet beschikbaar'
 const LINE_KNOWN = 'Voorlopig vergelijkbaar'
 const LINE_UNKNOWN = 'Onbekend / niet volledig'
@@ -88,6 +90,9 @@ export function auditPrivateM3CsvLedger(csv) {
   // change its permissive plain-text contract or its existing callers.
   auditPrivateM3ComparisonCsv(csv)
   const rows = csv.slice(1, -2).split('\r\n').map(parseQuotedLine)
+  if (rows[0].length !== 2 || rows[0][1] !== CANONICAL_ADVISORY ||
+      rows[1].length !== CANONICAL_HEADERS.length ||
+      CANONICAL_HEADERS.some((heading, index) => heading !== rows[1][index])) invalid()
   let plusTotal = 0n
   let dekaTotal = 0n
   let comparableRows = 0
@@ -110,9 +115,11 @@ export function auditPrivateM3CsvLedger(csv) {
     if (footer[0] !== 'VOORLOPIGE VOLLEDIGE MAND' ||
         safeCents(footer[9]) !== plusTotal ||
         safeCents(footer[16]) !== dekaTotal ||
-        safeCents(footer[17], true) !== dekaTotal - plusTotal) invalid()
+        safeCents(footer[17], true) !== dekaTotal - plusTotal ||
+        footer[18] !== 'Uitsluitend lokaal, niet onafhankelijk geverifieerd') invalid()
   } else if (footer[0] !== 'VOLLEDIGE MAND ONBEKEND' ||
-             footer[9] !== '' || footer[16] !== '' || footer[17] !== '') invalid()
+             footer[9] !== '' || footer[16] !== '' || footer[17] !== '' ||
+             footer[18] !== 'Niet alle producten/evidence vergelijkbaar') invalid()
   // Do not echo price, canary, participant or supermarket provenance.
   return Object.freeze({
     privateOnly: true,
