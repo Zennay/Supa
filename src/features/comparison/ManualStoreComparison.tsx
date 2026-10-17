@@ -7,6 +7,7 @@ import {
   calculateManualComparison,
   manualCompatibleUnits,
   manualQuoteKey,
+  prepareManualStoreShoppingCopy,
   type ManualEntries,
   type ManualNeed,
   type ManualQuote,
@@ -77,6 +78,7 @@ export function ManualStoreComparison({
   const [importText, setImportText] = useState('')
   const [importMessage, setImportMessage] = useState('')
   const [showTable, setShowTable] = useState(false)
+  const [copyStore, setCopyStore] = useState<ManualRetailer | null>(null)
   const summary = useMemo(() => {
     try { return needs.length ? calculateManualComparison(needs, entries) : null }
     catch { return null }
@@ -102,6 +104,11 @@ export function ManualStoreComparison({
       setImportMessage(error instanceof Error ? error.message : 'Tabel niet herkend.')
     }
   }
+  const selectedStoreList = useMemo(() => {
+    if (!copyStore || !needs.length) return null
+    try { return prepareManualStoreShoppingCopy(needs, entries, copyStore) }
+    catch { return null }
+  }, [copyStore, needs, entries])
   const header = 'Eigen winkelprijzen vergelijken'
   return (
     <section className="manual-compare" aria-label={header}>
@@ -157,6 +164,36 @@ export function ManualStoreComparison({
               setImportMessage('Alle handmatig ingevoerde prijzen zijn gewist.')
             }}>Wis prijzen</button>
           </div>
+          <section className="manual-compare__store-lists" aria-label="Boodschappenlijst per winkel">
+            <h3>Neem je ingevulde lijst mee naar de winkel</h3>
+            <p>Elke winkel krijgt een eigen lijst met producten, verpakkingen en jouw ingevoerde prijzen. De lijst is pas kopieerbaar als alle ingrediënten voor die winkel zijn ingevuld. Je hoeft de andere winkel nog niet af te maken.</p>
+            <div className="manual-compare__actions">
+              {MANUAL_RETAILERS.map(shop => {
+                const ready = summary.rows.every(row => row.quotes[shop].state === 'complete')
+                return <button className="ghost-button" key={shop} type="button"
+                  disabled={!ready} aria-expanded={copyStore === shop && selectedStoreList !== null}
+                  onClick={() => setCopyStore(current => current === shop ? null : shop)}>
+                  {copyStore === shop && selectedStoreList ? 'Verberg' : 'Toon'} lijst {shop}
+                  {!ready ? ' · eerst volledig invullen' : ''}
+                </button>
+              })}
+            </div>
+            {copyStore && !selectedStoreList && <p role="status">
+              De lijst is niet beschikbaar. Controleer de producten en verpakkingen van {copyStore}.
+            </p>}
+            {selectedStoreList && (
+              <div className="manual-compare__table" data-manual-store-shopping-list={selectedStoreList.retailer}>
+                <label htmlFor="manual-store-copy-field">
+                  Eigen winkelboodschappenlijst {selectedStoreList.retailer}
+                </label>
+                <textarea id="manual-store-copy-field" readOnly rows={Math.min(17, selectedStoreList.lineCount + 7)}
+                  value={selectedStoreList.text}
+                  onFocus={event => event.currentTarget.select()}
+                  aria-label={`Selecteer en kopieer de volledige eigen boodschappenlijst voor ${selectedStoreList.retailer}`} />
+                <p>Dit is een kopieerbare tekst. Selecteer de tekst en gebruik Kopieer op je apparaat. De bedragen zijn jouw eigen invoer, geen geverifieerde supermarktprijzen.</p>
+              </div>
+            )}
+          </section>
           {showTable && (
             <div className="manual-compare__table">
               <p>Kopieer de eerste tabel naar Excel of een spreadsheet, vul product, verpakking en prijs in en plak de volledige tabel terug. Gebruik tabgescheiden kolommen; eenheden en ingrediënten moeten overeenkomen.</p>
