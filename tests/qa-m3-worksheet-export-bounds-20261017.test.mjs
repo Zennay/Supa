@@ -118,3 +118,42 @@ test('an extra Unicode surrogate pair must not silently widen a safe 512-unit hu
   mustRejectOrPreserveBounded(sources, label)
   assert.deepEqual(sources, before)
 })
+
+function nearMaximumPrivatePlan(firstRecipeNeeds = 25) {
+  const days = m2InitialPlan.map(meal => meal.day)
+  const plan = days.map((day, index) => ({ day, recipeId: 'qa-m3-recipe-' + index }))
+  const recipes = days.map((day, index) => ({
+    ...structuredClone(m2Recipes[0]),
+    id: 'qa-m3-recipe-' + index,
+    ingredients: Array.from({ length: index === 0 ? firstRecipeNeeds : 25 }, (_, item) => ({
+      id: 'qa-m3-need-' + index + '-' + item,
+      label: '🍋'.repeat(256), // 512 valid UTF-16 units, 1 KiB UTF-8
+      query: 'niet in historische bron', amount: 1, unit: 'g',
+    })),
+  }))
+  return { plan, recipes, days }
+}
+
+test('maximum 100-need real selected week preserves 200 private operator rows within 1MiB', async () => {
+  const sources = await offlineSources()
+  const before = structuredClone(sources)
+  const { plan, recipes, days } = nearMaximumPrivatePlan()
+  const value = buildPrivateSelectedWeekObservationWorksheet(sources, days, { plan, recipes })
+  assert.equal(value.rows, 200)
+  assert.equal(value.productionReady, false)
+  assert.equal(value.publicSavingsClaimEligible, false)
+  assert.equal(value.observedStorePrices, 0)
+  assert.equal(Buffer.byteLength(value.csv, 'utf8') <= MAX_PRIVATE_CSV_UTF8_BYTES, true)
+  assert.equal((value.csv.match(/UNOBSERVED_TEMPLATE_NOT_EVIDENCE/g) ?? []).length, 200)
+  assert.equal((value.csv.match(/"qa-m3-need-/g) ?? []).length, 200)
+  assert.deepEqual(sources, before)
+})
+
+test('101 independently required ingredients fail closed rather than truncating private selected demand', async () => {
+  const sources = await offlineSources()
+  const before = structuredClone(sources)
+  const { plan, recipes, days } = nearMaximumPrivatePlan(26)
+  assert.throws(() => buildPrivateSelectedWeekObservationWorksheet(
+    sources, days, { plan, recipes }), Error)
+  assert.deepEqual(sources, before)
+})
