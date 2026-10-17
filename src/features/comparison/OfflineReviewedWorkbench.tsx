@@ -184,8 +184,19 @@ export function OfflineReviewedWorkbench({
       </div>
       <LocalTwoStorePriceEditor
         plan={plan} recipes={recipes} activeDays={activeDays}
-        onGenerated={(json) => { setText(json); importSnapshots(json) }}
-        onEdit={() => { setImported(null); setMessage('Wijzigingen nog niet doorgerekend. Bereken opnieuw om de mandjes te zien.') }}
+        onGenerated={(json) => {
+          importVersion.current++
+          setBusy(false)
+          setText(json)
+          importSnapshots(json)
+        }}
+        onEdit={() => {
+          // A user editing the in-app wizard also invalidates a pending file read.
+          importVersion.current++
+          setBusy(false)
+          setImported(null)
+          setMessage('Wijzigingen nog niet doorgerekend. Bereken opnieuw om de mandjes te zien.')
+        }}
       />
       <details className="offline-price-workbench__schema">
         <summary>Welk importbestand werkt?</summary>
