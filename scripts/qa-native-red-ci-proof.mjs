@@ -98,8 +98,12 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
         // dependency can contain an identically named test. Native SUPA TAP
         // must originate from the checked-in repository's root tests folder.
         const rawPath = location[1]
-        if (!/^(?:\/|[A-Za-z]:[\\/])/.test(rawPath) ||
-            !/[\\/]Supa[\\/]Supa[\\/]tests[\\/][^\\/'":]+\.test\.mjs:[1-9]\d*:[1-9]\d*$/.test(rawPath)) {
+        // Exact documented checkout roots of GitHub-hosted native runners:
+        // Linux ubuntu-latest is /home/runner/work/Supa/Supa;
+        // Windows is <drive>:\a\Supa\Supa. A generic suffix allows a
+        // different checkout to shadow the same QA test filename.
+        const hostedRoot = /^(?:\/home\/runner\/work\/Supa\/Supa\/tests\/|[A-Za-z]:[\\/]a[\\/]Supa[\\/]Supa[\\/]tests[\\/])[A-Za-z0-9][A-Za-z0-9._-]*\.test\.mjs:[1-9]\d*:[1-9]\d*$/
+        if (!hostedRoot.test(rawPath)) {
           throw new Error('Foreign native TAP failure location')
         }
         // Every failed native test has one authoritative TAP origin. A later
