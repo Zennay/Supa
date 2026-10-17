@@ -80,6 +80,17 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     }
     const failingTap = /^\s*not ok\s+\d+\s+-\s+(.+)$/.exec(line)
     const passingTap = /^\s*ok\s+\d+\s+-\s+/.test(line)
+    const anyTapOrdinal = /^\s*(?:not ok|ok)\s+(\d+)\s+-\s+/.exec(line)
+    if (anyTapOrdinal) {
+      // Nested subtests restart numbering, but even their own index must be
+      // a positive, canonical, safe integer. Zero, padded and rounded indexes
+      // cannot supply real passing/failing evidence.
+      const ordinal = Number(anyTapOrdinal[1])
+      if (!Number.isSafeInteger(ordinal) || ordinal < 1 ||
+          String(ordinal) !== anyTapOrdinal[1]) {
+        throw new Error('Invalid noncanonical native TAP ordinal')
+      }
+    }
     const rootTap = /^(?:not ok|ok)\s+(\d+)\s+-\s+/.exec(line)
     if (rootTap) {
       // A top-level record must use a unique, positive safe ordinal.
