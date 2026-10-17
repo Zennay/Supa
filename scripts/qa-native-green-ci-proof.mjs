@@ -76,6 +76,18 @@ export function auditNativeGreenJob({run, job, log, expectedHead, expectedBase} 
     /^HEAD is now at [a-f0-9]{7,40} Merge [a-f0-9]{40} into [a-f0-9]{40}$/.test(line))
   if (!lines[checkout].endsWith('Merge ' + expectedHead + ' into ' + expectedBase)) refuse()
 
+  // Reconcile ALL executable GitHub log group markers with metadata, not
+  // merely the six expected commands. An omitted extra shell/npm command
+  // would make a green source-gate result falsely appear sufficient.
+  const loggedCommands = new Set()
+  const allowedCommands = new Set(steps.filter(s => s.startsWith('Run ')))
+  for (const line of lines) {
+    if (!line.startsWith('##[group]Run ')) continue
+    const command = line.slice('##[group]'.length)
+    if (!allowedCommands.has(command) || loggedCommands.has(command)) refuse()
+    loggedCommands.add(command)
+  }
+  if (CHECKS.some(name => !loggedCommands.has(name))) refuse()
   const starts = CHECKS.map(name => exactlyOne(lines, line => line === '##[group]' + name))
   if (starts.some((i, j) => j && i <= starts[j - 1]) || checkout >= starts[0]) refuse()
   const native = exactlyOne(lines, line => line === 'TAP version 13')
