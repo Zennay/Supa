@@ -131,3 +131,48 @@ test('dev proxy keeps the browser Host so same-origin API writes work in `npm ru
   assert.equal(pkg.scripts['dev:full'], 'node scripts/dev-full.mjs')
   assert.equal(pkg.scripts.start, 'node --experimental-strip-types server/app.mjs')
 })
+
+test('global CAS holds for many writers across store instances, and a crashed writer\'s lock is recovered', async () => {
+  const { utimes } = await import('node:fs/promises')
+  const { createHash } = await import('node:crypto')
+  const dir = await mkdtemp(join(tmpdir(), 'supa-sync-stress-'))
+  try {
+    const stores = [0, 1, 2].map(() => createFileSyncStore({ dir }))
+    const results = await Promise.all(Array.from({ length: 12 }, (_, i) =>
+      stores[i % 3].write(key, 0, { 'supa:planner-preferences:v2': `{"writer":${i}}` })))
+    const winners = results.filter(result => !result.conflict)
+    assert.equal(winners.length, 1)
+    assert.ok(results.filter(result => result.conflict).every(result => result.record.revision === 1))
+    assert.deepEqual((await stores[2].read(key)).entries, winners[0].record.entries)
+    assert.deepEqual((await readdir(dir)).filter(name => !name.endsWith('.json')), [], 'no lock or temp files left behind')
+
+    const lock = join(dir, `${createHash('sha256').update(key).digest('hex')}.lock`)
+    await writeFile(lock, '')
+    const old = new Date(Date.now() - 60_000)
+    await utimes(lock, old, old)
+    const after = await stores[0].write(key, 1, {})
+    assert.equal(after.conflict, false)
+    assert.equal(after.record.revision, 2)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test('split UTF-8 in recipe import bodies is decoded exactly; malformed bytes are refused', async () => {
+  const { request } = await import('node:http')
+  let seen
+  const server = createRecipeServer({ origin, syncStore: null, fetchHtml: async url => { seen = url; throw new Error('stop') } })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  const send = parts => new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port: server.address().port, method: 'POST', path: '/api/recipes/import', headers: { origin, 'content-type': 'application/json' } }, res => { res.resume(); res.on('end', () => resolve(res.statusCode)) })
+    req.on('error', reject)
+    req.write(parts[0]); setTimeout(() => req.end(parts[1]), 20)
+  })
+  try {
+    const bytes = Buffer.from(JSON.stringify({ url: 'https://example.org/crème-brûlée' }))
+    const cut = bytes.indexOf(Buffer.from('è')) + 1
+    await send([bytes.subarray(0, cut), bytes.subarray(cut)])
+    assert.equal(seen, 'https://example.org/crème-brûlée')
+    seen = undefined
+    assert.equal(await send([Buffer.from('{"url":"https://example.org/'), Buffer.from([0xff, 0x22, 0x7d])]), 422)
+    assert.equal(seen, undefined, 'malformed bodies never reach the fetcher')
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)) }
+})

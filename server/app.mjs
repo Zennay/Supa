@@ -25,14 +25,24 @@ function rateLimiter(limit) {
   }
 }
 
+/**
+ * Collect raw bytes under a byte budget, then decode once with a strict UTF-8
+ * decoder: a code point split across TCP chunks stays intact, and malformed
+ * bytes are refused instead of becoming U+FFFD in stored records.
+ */
 async function readBody(req, limit) {
   req.setTimeout(10_000, () => req.destroy())
-  let body = ''
+  const chunks = []
+  let size = 0
   for await (const chunk of req) {
-    body += chunk
-    if (body.length > limit) throw new HttpError(413, 'Het verzoek is te groot.')
+    size += chunk.length
+    if (size > limit) throw new HttpError(413, 'Het verzoek is te groot.')
+    chunks.push(chunk)
   }
-  try { return JSON.parse(body) } catch { throw new HttpError(400, 'Ongeldige JSON.') }
+  let text
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks, size)) }
+  catch { throw new HttpError(400, 'Ongeldige tekencodering.') }
+  try { return JSON.parse(text) } catch { throw new HttpError(400, 'Ongeldige JSON.') }
 }
 
 export function createRecipeServer({
