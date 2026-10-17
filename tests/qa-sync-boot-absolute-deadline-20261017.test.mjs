@@ -67,3 +67,25 @@ test('P1: an indefinitely streaming JSON body may not stall bootstrap after abor
   assert.equal(mock.intervals(), 1)
   assert.equal(mock.values.get('supa:m3-observation-draft:v1'), 'private-synthetic-not-for-sync')
 })
+
+test('P1: late GET completing after first render must not adopt an out-of-window snapshot', async t => {
+  const planKey = 'supa:planner-preferences:v2'
+  const mock = mockBrowser(t, () => new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({
+    revision: 1, updatedAt: '2026-10-17T00:00:00.000Z',
+    entries: {
+      [planKey]: '{"budget":48,"activeDays":["Ma"],"recipeByDay":{}}',
+      'supa.recipe-library.v1': null,
+      'supa:shopping-list-progress:v1': null,
+    },
+  }), { status: 200, headers: { 'content-type': 'application/json' } })), 450)))
+  const original = mock.values.get(planKey)
+  const outcome = await settleWithin(syncBeforeRender(15), 200)
+  // Let the deliberately non-cooperative request complete, regardless of
+  // first-render outcome, so the test can also observe any late writes.
+  await new Promise(resolve => setTimeout(resolve, 490))
+  assert.equal(outcome, 'settled', 'startup must finish before late transport completion')
+  assert.equal(mock.values.get(planKey), original,
+    'an expired bootstrap GET may not change a planner already rendered in the browser')
+  assert.equal(mock.intervals(), 1)
+  assert.equal(mock.values.get('supa:m3-observation-draft:v1'), 'private-synthetic-not-for-sync')
+})
