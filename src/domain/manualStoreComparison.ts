@@ -140,3 +140,53 @@ export function calculateManualComparison(
     productionEnabled: false,
   }
 }
+
+/**
+ * A real, shop-ready per-retailer checklist from THIS user's manual quotes.
+ * One store may be complete even if the comparison against the other is not.
+ * Never reuse demo fixture prices, silent zeroes or unverified retailer claims.
+ */
+export function prepareManualStoreShoppingCopy(
+  needs: readonly ManualNeed[],
+  entries: ManualEntries,
+  retailer: ManualRetailer,
+): Readonly<{ retailer: ManualRetailer; lineCount: number; totalCents: number; text: string;
+  verifiedRetailerObservations: false; publicSavingsClaimEligible: false }> | null {
+  if (!MANUAL_RETAILERS.includes(retailer)) return null
+  const comparison = calculateManualComparison(needs, entries)
+  if (!comparison.rows.length ||
+      comparison.rows.some(row => row.quotes[retailer].state !== 'complete')) return null
+  const formatter = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+  let totalCents = 0
+  const lines: string[] = []
+  for (const row of comparison.rows) {
+    const quote = entries[manualQuoteKey(retailer, row.ingredientId)]
+    const evaluated = row.quotes[retailer]
+    if (!quote || evaluated.packs === null || evaluated.lineCents === null ||
+        typeof quote.product !== 'string' || quote.product.trim().length < 2 ||
+        /[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/u.test(quote.product)) return null
+    const amount = quote.packAmount.replace('.', ',')
+    const packLabel = quote.packUnit === 'piece' ? 'stuks' : quote.packUnit
+    lines.push(`${evaluated.packs} × ${quote.product.trim()} (${amount} ${packLabel} per verpakking) — ${formatter.format(evaluated.lineCents / 100)}`)
+    totalCents += evaluated.lineCents
+    if (!Number.isSafeInteger(totalCents) || totalCents > 100000000) return null
+  }
+  const text = [
+    `SUPA · eigen boodschappenlijst voor ${retailer}`,
+    'Gebaseerd op mijn eigen ingevoerde producten en prijzen. Niet geverifieerd door de supermarkt.',
+    'Controleer product, verpakking, hoeveelheid en werkelijke prijs in de winkel.',
+    '',
+    ...lines,
+    '',
+    `Totaal volgens eigen invoer: ${formatter.format(totalCents / 100)}`,
+    'Geen live winkelprijs, gegarandeerde beschikbaarheid of bewezen besparing.',
+  ].join('\\n')
+  return Object.freeze({
+    retailer,
+    lineCount: lines.length,
+    totalCents,
+    text,
+    verifiedRetailerObservations: false,
+    publicSavingsClaimEligible: false,
+  })
+}
