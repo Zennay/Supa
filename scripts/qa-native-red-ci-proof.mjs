@@ -35,6 +35,12 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const failing = []
   const errors = []
   let current = null
+  let nativeTapHeaders = 0
+  let nativeTapPlan = null
+  let nativeTapPlanLine = -1
+  let lastSummaryLine = -1
+  let nativeTerminalCount = 0
+  let nativeTerminalLine = -1
 
   function completeFailure() {
     if (current) {
@@ -43,8 +49,21 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     }
   }
 
-  for (const rawLine of log.split(/\r?\n/)) {
+  for (const [lineNumber, rawLine] of log.split(/\r?\n/).entries()) {
     const line = plainLine(rawLine)
+    // The native TAP envelope and GitHub terminal marker must belong to the
+    // same *completed* job; passing fragments cannot certify hosted CI.
+    if (line === 'TAP version 13') nativeTapHeaders++
+    const planMatch = /^1\.\.(\d+)$/.exec(line)
+    if (planMatch) {
+      if (nativeTapPlan !== null) throw new Error('Ambiguous duplicate native TAP plan')
+      nativeTapPlan = Number(planMatch[1])
+      nativeTapPlanLine = lineNumber
+    }
+    if (line === '##[error]Process completed with exit code 1.') {
+      nativeTerminalCount++
+      nativeTerminalLine = lineNumber
+    }
     const failingTap = /^\s*not ok\s+\d+\s+-\s+(.+)$/.exec(line)
     const passingTap = /^\s*ok\s+\d+\s+-\s+/.test(line)
     if (failingTap || passingTap) {
@@ -60,6 +79,7 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
       completeFailure()
       if (totals.has(summary[1])) throw new Error('Ambiguous duplicate TAP summary')
       totals.set(summary[1], Number(summary[2]))
+      lastSummaryLine = lineNumber
     }
     if (line.startsWith('##[error]') &&
         !/^##\[error\]Process completed with exit code 1\.$/.test(line)) {
@@ -77,6 +97,13 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const skipped = totals.get('skipped')
   const cancelled = totals.get('cancelled')
   const todo = totals.get('todo')
+  if (nativeTapHeaders !== 1 || nativeTapPlan === null || nativeTapPlan !== tests ||
+      nativeTapPlanLine < 0 || nativeTapPlanLine >= lastSummaryLine) {
+    throw new Error('Incomplete or ambiguous native TAP envelope')
+  }
+  if (nativeTerminalCount !== 1 || nativeTerminalLine <= lastSummaryLine) {
+    throw new Error('Incomplete or ambiguous hosted terminal completion')
+  }
   if (tests !== pass + fail + skipped + cancelled || skipped || cancelled || todo) {
     throw new Error('TAP totals are inconsistent or include incomplete tests')
   }
