@@ -135,7 +135,9 @@ export async function pushSyncedState(options: SyncOptions, { keepalive = false,
     const entries = localEntries(options.storage)
     if (SYNC_KEYS.every(k => entries[k] === meta.synced[k])) return 'unchanged'
     const response = await options.request({
-      method: 'PUT', keepalive,
+      // The caller's signal also cancels the request itself, so stopping
+      // sync never leaves a stalled upload open.
+      method: 'PUT', keepalive, signal,
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ baseRevision: meta.revision, entries }),
     })
