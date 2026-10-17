@@ -116,6 +116,8 @@ async function readRemote(options: SyncOptions, key: string, signal?: AbortSigna
 /** Before the first render: restore this device's saved records from the server. */
 export async function pullSyncedState(options: SyncOptions, signal?: AbortSignal): Promise<SyncKey[]> {
   const key = deviceKey(options)
+  // Never start a request for a caller that has already given up.
+  if (signal?.aborted) return []
   const remote = await readRemote(options, key, signal)
   // The caller's deadline has passed (first render already happened): a late
   // snapshot must not change records the app has already read.
@@ -134,6 +136,8 @@ export async function pushSyncedState(options: SyncOptions, { keepalive = false,
     const meta = readMeta(options.storage)
     const entries = localEntries(options.storage)
     if (SYNC_KEYS.every(k => entries[k] === meta.synced[k])) return 'unchanged'
+    // Checked right before every attempt, including the retry after a 409.
+    if (signal?.aborted) return 'unavailable'
     const response = await options.request({
       // The caller's signal also cancels the request itself, so stopping
       // sync never leaves a stalled upload open.
