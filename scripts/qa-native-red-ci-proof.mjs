@@ -186,7 +186,15 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const todo = totals.get('todo')
   // A root plan cannot be certified solely from indented nested-subtest
   // events. At least one unindented TAP test must witness the root suite.
-  if (nativeTapHeaders !== 1 || nativeTapPlan === null || nativeTapPlan !== tests ||
+  // Node's root 1..N plan counts top-level TAP entries. '# tests' also
+  // includes nested test cases: genuine hosted jobs may have tests > N.
+  // Preserve legacy flat synthetic evidence only when plan === summary.
+  // For a smaller real root plan, require the complete unique 1..N root
+  // witness; nested successes cannot fill missing top-level ordinals.
+  const nestedPlanComplete = nativeTapPlan !== null &&
+    nativeTapPlan < tests && rootOrdinals.size === nativeTapPlan
+  if (nativeTapHeaders !== 1 || nativeTapPlan === null ||
+      (nativeTapPlan !== tests && !nestedPlanComplete) ||
       rootOrdinals.size === 0 ||
       [...rootOrdinals].some(ordinal => ordinal > nativeTapPlan) ||
       nativeTapHeaderLine < 0 || nativeTapHeaderLine >= nativeTapPlanLine ||
