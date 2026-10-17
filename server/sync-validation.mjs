@@ -36,7 +36,7 @@ export function validateSyncEntries(input) {
   if (keys.some(key => !SYNC_KEYS.includes(key))) return { error: 'Onbekend gegevenstype.' }
   const entries = Object.fromEntries(SYNC_KEYS.map(key => [key, Object.hasOwn(input, key) ? input[key] : null]))
   if (Object.values(entries).some(value => value !== null && typeof value !== 'string')) return { error: 'Ongeldige gegevens.' }
-  if (JSON.stringify(entries).length > MAX_SNAPSHOT_BYTES) return { error: 'Je gegevens zijn te groot om te bewaren.' }
+  if (Buffer.byteLength(JSON.stringify(entries), 'utf8') > MAX_SNAPSHOT_BYTES) return { error: 'Je gegevens zijn te groot om te bewaren.' }
 
   const libraryRaw = entries[RECIPE_LIBRARY_KEY]
   const library = readRecipeLibrary({ getItem: () => libraryRaw, setItem() {} })

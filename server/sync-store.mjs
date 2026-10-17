@@ -4,6 +4,7 @@ import { chmod, lstat, mkdir, open, readdir, readFile, rename, stat, unlink, wri
 import { hostname } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { MAX_SNAPSHOT_BYTES, SYNC_KEYS } from './sync-validation.mjs'
 
 /** Anonymous device keys are random bearer secrets created by the browser. */
 export function validDeviceKey(value) {
@@ -11,6 +12,18 @@ export function validDeviceKey(value) {
 }
 
 const empty = () => ({ revision: 0, updatedAt: null, entries: {} })
+// Largest record this store writes: the validated snapshot plus envelope.
+const MAX_RECORD_BYTES = MAX_SNAPSHOT_BYTES + 1024
+
+/** A record read back from disk is untrusted until it has this exact shape. */
+function admitRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  if (Object.keys(value).sort().join() !== 'entries,revision,updatedAt') return false
+  if (!Number.isSafeInteger(value.revision) || value.revision < 1 || typeof value.updatedAt !== 'string') return false
+  const { entries } = value
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries) || Object.getPrototypeOf(entries) !== Object.prototype) return false
+  return Object.entries(entries).every(([key, entry]) => SYNC_KEYS.includes(key) && (entry === null || typeof entry === 'string'))
+}
 const LOCK_WAIT_MS = 5_000
 // A lock is only considered for recovery once it is older than this; it is
 // then removed only if no live process still holds it (see lockHolderAlive).
@@ -100,17 +113,30 @@ export function createFileSyncStore({ dir }) {
     if (!await checkDir({ create: false })) return empty()
     let handle
     try {
-      // Never follow a symlinked record, and refuse hard-linked aliases.
-      handle = await open(`${baseFor(key)}.json`, constants.O_RDONLY | constants.O_NOFOLLOW)
+      // Never follow a symlink, and never block on a FIFO or device: the
+      // descriptor is pinned and inspected before any byte is trusted.
+      handle = await open(`${baseFor(key)}.json`, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     } catch (error) {
       if (error?.code === 'ENOENT') return empty()
       throw error
     }
     try {
       const info = await handle.stat()
-      if (!info.isFile() || info.nlink !== 1) throw new Error('sync record must be a single private file')
-      const value = JSON.parse(await handle.readFile('utf8'))
-      if (!Number.isSafeInteger(value.revision) || value.revision < 1 || !value.entries || typeof value.entries !== 'object') throw new Error('corrupt sync record')
+      if (!info.isFile() || info.nlink !== 1 || (info.mode & 0o077) ||
+          (typeof process.getuid === 'function' && info.uid !== process.getuid())) {
+        throw new Error('sync record must be a single private file')
+      }
+      if (info.size > MAX_RECORD_BYTES) throw new Error('sync record is too large')
+      const buffer = Buffer.alloc(info.size + 1)
+      let length = 0
+      for (;;) {
+        const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null)
+        if (bytesRead === 0) break
+        length += bytesRead
+        if (length > info.size) throw new Error('sync record changed while reading')
+      }
+      const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, length)))
+      if (!admitRecord(value)) throw new Error('corrupt sync record')
       return value
     } finally { await handle.close() }
   }
