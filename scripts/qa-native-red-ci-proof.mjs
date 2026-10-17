@@ -20,6 +20,9 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   if (typeof log !== 'string' || Buffer.byteLength(log, 'utf8') > MAX_LOG_BYTES) {
     throw new Error('A bounded UTF-8 GitHub job log is required')
   }
+  // A JS string can contain orphaned surrogate units; Buffer.byteLength
+  // would silently replace them. Never certify lossy operator evidence.
+  if (!log.isWellFormed()) throw new Error('Malformed UTF-16 GitHub job log')
   if (!Number.isSafeInteger(expectedRed) || expectedRed < 1 || expectedRed > 10000) {
     throw new Error('Expected RED must be a bounded positive integer')
   }
@@ -35,6 +38,14 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const failing = []
   const errors = []
   let current = null
+  let nativeTapHeaders = 0
+  let nativeTapHeaderLine = -1
+  let nativeTapPlan = null
+  let nativeTapPlanLine = -1
+  let firstSummaryLine = -1
+  let lastSummaryLine = -1
+  let nativeTerminalCount = 0
+  let nativeTerminalLine = -1
 
   function completeFailure() {
     if (current) {
@@ -43,23 +54,58 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     }
   }
 
-  for (const rawLine of log.split(/\r?\n/)) {
+  for (const [lineNumber, rawLine] of log.split(/\r?\n/).entries()) {
     const line = plainLine(rawLine)
+    // The native TAP envelope and GitHub terminal marker must belong to the
+    // same *completed* job; passing fragments cannot certify hosted CI.
+    if (line === 'TAP version 13') {
+      nativeTapHeaders++
+      nativeTapHeaderLine = lineNumber
+    }
+    const planMatch = /^1\.\.(\d+)$/.exec(line)
+    if (planMatch) {
+      if (nativeTapPlan !== null) throw new Error('Ambiguous duplicate native TAP plan')
+      nativeTapPlan = Number(planMatch[1])
+      nativeTapPlanLine = lineNumber
+    }
+    if (line === '##[error]Process completed with exit code 1.') {
+      nativeTerminalCount++
+      nativeTerminalLine = lineNumber
+    }
     const failingTap = /^\s*not ok\s+\d+\s+-\s+(.+)$/.exec(line)
     const passingTap = /^\s*ok\s+\d+\s+-\s+/.test(line)
     if (failingTap || passingTap) {
       completeFailure()
-      if (failingTap) current = { file: null }
+      if (failingTap) current = { file: null, locationCount: 0 }
     }
     if (current) {
-      const location = /^\s*location:\s*['"](?:[^'"]*[/\\])?([^/'"\\]+\.test\.mjs):\d+:\d+['"]/.exec(line)
-      if (location) current.file = location[1]
+      const location = /^\s*location:\s*['"]([^'"]*[/\\]([^/'"\\]+\.test\.mjs):(\d+):(\d+))['"]$/.exec(line)
+      if (location) {
+        // A filename alone is not provenance: a foreign checkout or nested
+        // dependency can contain an identically named test. Native SUPA TAP
+        // must originate from the checked-in repository's root tests folder.
+        const rawPath = location[1]
+        if (!/^(?:\/|[A-Za-z]:[\\/])/.test(rawPath) ||
+            !/[\\/]Supa[\\/]Supa[\\/]tests[\\/][^\\/'":]+\.test\.mjs:[1-9]\d*:[1-9]\d*$/.test(rawPath)) {
+          throw new Error('Foreign native TAP failure location')
+        }
+        // Every failed native test has one authoritative TAP origin. A later
+        // diagnostic line may not overwrite a foreign failure with a trusted
+        // QA path (nor duplicate the same path to fabricate certainty).
+        current.locationCount++
+        if (current.locationCount !== 1) {
+          throw new Error('Ambiguous native TAP failure location')
+        }
+        current.file = location[2]
+      }
     }
     const summary = /^#\s+(tests|pass|fail|skipped|cancelled|todo)\s+(\d+)$/.exec(line)
     if (summary) {
       completeFailure()
       if (totals.has(summary[1])) throw new Error('Ambiguous duplicate TAP summary')
       totals.set(summary[1], Number(summary[2]))
+      if (firstSummaryLine === -1) firstSummaryLine = lineNumber
+      lastSummaryLine = lineNumber
     }
     if (line.startsWith('##[error]') &&
         !/^##\[error\]Process completed with exit code 1\.$/.test(line)) {
@@ -77,6 +123,14 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const skipped = totals.get('skipped')
   const cancelled = totals.get('cancelled')
   const todo = totals.get('todo')
+  if (nativeTapHeaders !== 1 || nativeTapPlan === null || nativeTapPlan !== tests ||
+      nativeTapHeaderLine < 0 || nativeTapHeaderLine >= nativeTapPlanLine ||
+      nativeTapPlanLine >= firstSummaryLine || firstSummaryLine > lastSummaryLine) {
+    throw new Error('Incomplete or ambiguous native TAP envelope')
+  }
+  if (nativeTerminalCount !== 1 || nativeTerminalLine <= lastSummaryLine) {
+    throw new Error('Incomplete or ambiguous hosted terminal completion')
+  }
   if (tests !== pass + fail + skipped + cancelled || skipped || cancelled || todo) {
     throw new Error('TAP totals are inconsistent or include incomplete tests')
   }
@@ -115,7 +169,14 @@ async function readBoundedStdin() {
     if (bytes > MAX_LOG_BYTES) throw new Error('GitHub job log exceeds 12 MiB')
     chunks.push(chunk)
   }
-  return Buffer.concat(chunks).toString('utf8')
+  try {
+    // Preserve malformed wire bytes as an error instead of replacing them
+    // with U+FFFD outside TAP lines and accidentally certifying that log.
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
+      .decode(Buffer.concat(chunks))
+  } catch {
+    throw new Error('Malformed UTF-8 GitHub job log')
+  }
 }
 
 export async function main(args = process.argv.slice(2)) {
