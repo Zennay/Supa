@@ -93,3 +93,59 @@ test('the worksheet exposes only unobserved, aggregate-only public API fields', 
   assert.equal(result.csv.match(/"plus"/g)?.length, 5)
   assert.equal(result.csv.match(/"dekamarkt"/g)?.length, 5)
 })
+
+test('privately curated search terms never reach the CSV or trigger fetch-side source discovery', async () => {
+  const records = await sanitizedHistoricalSources()
+  const recipes = structuredClone(m2Recipes)
+  const plan = structuredClone(m2InitialPlan)
+  const baseline = unobserved(records, ['Ma', 'Do'], plan, structuredClone(m2Recipes))
+  const canary = 'PRIVATE_SEARCH_EMAIL_person_at_example_invalid_DO_NOT_EXPORT'
+  for (const recipe of recipes) {
+    for (const ingredient of recipe.ingredients) {
+      ingredient.query = `${canary}_${ingredient.id} signed-in basket 12,35 EUR`
+    }
+  }
+
+  const savedFetch = globalThis.fetch
+  let externalCalls = 0
+  globalThis.fetch = () => {
+    externalCalls++
+    throw new Error('Network access attempted during offline human field preparation')
+  }
+  try {
+    const result = unobserved(records, ['Ma', 'Do'], plan, recipes)
+    checkBoundary(result, 10)
+    assert.equal(result.csv, baseline.csv)
+    assert.equal(externalCalls, 0, 'no fetch while building an offline worksheet')
+    assert.ok(!result.csv.includes(canary), 'no private query or user identifier')
+    assert.doesNotMatch(result.csv, /signed-in basket|12,35 EUR/)
+  } finally {
+    globalThis.fetch = savedFetch
+  }
+})
+
+test('custom recipe getters and proxies are refused without calling untrusted JavaScript', async () => {
+  const records = await sanitizedHistoricalSources()
+  const plan = structuredClone(m2InitialPlan)
+  const recipes = structuredClone(m2Recipes)
+  let touched = 0
+  Object.defineProperty(recipes[0].ingredients[0], 'query', {
+    enumerable: true, configurable: true,
+    get() { touched++; throw new Error('private getter unexpectedly executed') },
+  })
+  assert.throws(
+    () => unobserved(records, ['Ma'], plan, recipes),
+    /inert JSON/i,
+    'untrusted query getter must refuse before creating any worksheet',
+  )
+  assert.equal(touched, 0)
+  const cleanRecipes = structuredClone(m2Recipes)
+  const guarded = new Proxy(cleanRecipes, {
+    get() { touched++; throw new Error('private recipes proxy unexpectedly executed') },
+  })
+  assert.throws(
+    () => unobserved(records, ['Ma'], plan, guarded),
+    /inert JSON/i,
+  )
+  assert.equal(touched, 0)
+})
