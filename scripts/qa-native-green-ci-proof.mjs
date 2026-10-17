@@ -6,6 +6,7 @@
  */
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
+import { types as nodeTypes } from 'node:util'
 
 const SHA = /^[a-f0-9]{40}$/
 const MAX_BYTES = 16 * 1024 * 1024
@@ -19,6 +20,47 @@ const CHECKS = [
 ]
 const PREFIX = /^\uFEFF?\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z /
 const refuse = () => { throw new Error('Unverified Supa native GREEN job evidence') }
+
+/** Detach metadata without triggering caller-controlled getters or proxies. */
+function inertJson(value) {
+  const seen = new WeakSet()
+  let properties = 0
+  function copy(input, depth) {
+    if (depth > 24) refuse()
+    if (input === null || typeof input === 'string' || typeof input === 'boolean')
+      return input
+    if (typeof input === 'number') {
+      if (!Number.isFinite(input)) refuse()
+      return input
+    }
+    if (typeof input !== 'object' || nodeTypes.isProxy(input) || seen.has(input))
+      refuse()
+    const array = Array.isArray(input)
+    const prototype = Object.getPrototypeOf(input)
+    if (array ? prototype !== Array.prototype :
+        (prototype !== Object.prototype && prototype !== null)) refuse()
+    seen.add(input)
+    const names = Reflect.ownKeys(input)
+    properties += names.length
+    if (properties > 30_000 || names.some(name => typeof name !== 'string')) refuse()
+    const out = array ? [] : Object.create(null)
+    for (const name of names) {
+      const descriptor = Object.getOwnPropertyDescriptor(input, name)
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) refuse()
+      if (array && name === 'length') {
+        if (!Number.isSafeInteger(descriptor.value) || descriptor.value > 20_000) refuse()
+        out.length = descriptor.value
+      } else {
+        Object.defineProperty(out, name, {
+          value: copy(descriptor.value, depth + 1),
+          configurable: true, enumerable: true, writable: true,
+        })
+      }
+    }
+    return out
+  }
+  return copy(value, 0)
+}
 
 function boundedText(value) {
   if (typeof value !== 'string' || !value.isWellFormed() ||
@@ -41,7 +83,8 @@ function exactlyOne(lines, predicate) {
  * Recheck remote API identity/commit and job details independently. A caller
  * can forge local JSON/log bytes; this NEVER upgrades to productionReady=true.
  */
-export function auditNativeGreenJob({run, job, log, expectedHead, expectedBase} = {}) {
+export function auditNativeGreenJob(untrusted = {}) {
+  const {run, job, log, expectedHead, expectedBase} = inertJson(untrusted)
   if (!SHA.test(expectedHead || '') || !SHA.test(expectedBase || '') ||
       expectedHead === expectedBase || !run || !job ||
       !Number.isSafeInteger(run.id) || run.id < 1 ||
