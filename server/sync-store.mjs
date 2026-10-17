@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { chmod, lstat, mkdir, open, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -11,9 +12,39 @@ export function validDeviceKey(value) {
 
 const empty = () => ({ revision: 0, updatedAt: null, entries: {} })
 const LOCK_WAIT_MS = 5_000
-// A lock older than this belongs to a crashed writer: a write holds it for
-// one read + one small file write, far below this bound.
+// A lock is only considered for recovery once it is older than this; it is
+// then removed only if no live process still holds it (see lockHolderAlive).
 const STALE_LOCK_MS = 15_000
+
+/**
+ * Is any live process still holding this lock? On Linux, a holder keeps the
+ * lock file open, so look for an open descriptor on the same inode in /proc
+ * (only this user's processes are readable, and the storage directory must
+ * belong to this user). Elsewhere, fall back to the pid/host written in the
+ * lock; a lock that cannot be attributed is treated as live (fail closed).
+ */
+async function lockHolderAlive(lock, info) {
+  let pids = null
+  try { pids = (await readdir('/proc')).filter(name => /^\d+$/.test(name)) } catch { /* not Linux */ }
+  if (pids) {
+    for (const pid of pids) {
+      let fds
+      try { fds = await readdir(`/proc/${pid}/fd`) } catch { continue }
+      for (const fd of fds) {
+        try {
+          const target = await stat(`/proc/${pid}/fd/${fd}`)
+          if (target.ino === info.ino && target.dev === info.dev) return true
+        } catch { /* fd closed meanwhile */ }
+      }
+    }
+    return false
+  }
+  try {
+    const owner = JSON.parse(await readFile(lock, 'utf8'))
+    if (owner.host !== hostname() || !Number.isSafeInteger(owner.pid)) return true
+    try { process.kill(owner.pid, 0); return true } catch (error) { return error?.code !== 'ESRCH' }
+  } catch { return true }
+}
 
 /**
  * One JSON file per device. The file name is a hash of the key, so the bearer
@@ -66,23 +97,36 @@ export function createFileSyncStore({ dir }) {
 
   async function withFileLock(key, task) {
     const lock = `${baseFor(key)}.lock`
+    const token = randomUUID()
     const deadline = Date.now() + LOCK_WAIT_MS
     let handle
     for (let attempt = 0; !handle; attempt++) {
       try {
         handle = await open(lock, 'wx', 0o600)
+        await handle.writeFile(JSON.stringify({ pid: process.pid, host: hostname(), token }))
       } catch (error) {
+        if (handle) { await handle.close().catch(() => {}); await unlink(lock).catch(() => {}); throw error }
         if (error?.code !== 'EEXIST') throw error
         try {
-          if (Date.now() - (await stat(lock)).mtimeMs > STALE_LOCK_MS) { await unlink(lock).catch(() => {}); continue }
+          const info = await lstat(lock)
+          if (Date.now() - info.mtimeMs > STALE_LOCK_MS && !await lockHolderAlive(lock, info)) {
+            // Re-check it is still the same abandoned lock before removing it.
+            const again = await lstat(lock)
+            if (again.ino === info.ino && again.dev === info.dev) await unlink(lock).catch(() => {})
+            continue
+          }
         } catch (statError) { if (statError?.code === 'ENOENT') continue; throw statError }
         if (Date.now() > deadline) throw new Error('sync record is busy')
         await sleep(Math.min(5 + attempt * 5, 50))
       }
     }
-    try { return await task() } finally {
+    // Fencing: publish only while the lock on disk is still this writer's.
+    const stillOwned = async () => {
+      try { return JSON.parse(await readFile(lock, 'utf8')).token === token } catch { return false }
+    }
+    try { return await task(stillOwned) } finally {
       await handle.close().catch(() => {})
-      await unlink(lock).catch(() => {})
+      if (await stillOwned()) await unlink(lock).catch(() => {})
     }
   }
 
@@ -99,7 +143,7 @@ export function createFileSyncStore({ dir }) {
   function write(key, baseRevision, entries) {
     return exclusive(key, async () => {
       await checkDir({ create: true })
-      return withFileLock(key, async () => {
+      return withFileLock(key, async stillOwned => {
         const current = await read(key)
         if (current.revision !== baseRevision) return { conflict: true, record: current }
         const record = { revision: current.revision + 1, updatedAt: new Date().toISOString(), entries }
@@ -107,6 +151,7 @@ export function createFileSyncStore({ dir }) {
         const temporary = `${baseFor(key)}.${randomUUID()}.tmp`
         try {
           await writeFile(temporary, JSON.stringify(record), { mode: 0o600, flag: 'wx' })
+          if (!await stillOwned()) throw new Error('sync lock was lost before publishing')
           await rename(temporary, file)
         } catch (error) {
           await unlink(temporary).catch(() => {})

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { mkdtemp, readdir, readFile, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createRecipeServer } from '../server/app.mjs'
 import { createFileSyncStore } from '../server/sync-store.mjs'
 import { SYNC_KEYS, validateSyncEntries } from '../server/sync-validation.mjs'
@@ -175,4 +175,39 @@ test('split UTF-8 in recipe import bodies is decoded exactly; malformed bytes ar
     assert.equal(await send([Buffer.from('{"url":"https://example.org/'), Buffer.from([0xff, 0x22, 0x7d])]), 422)
     assert.equal(seen, undefined, 'malformed bodies never reach the fetcher')
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)) }
+})
+
+test('an aged lock still held open by a live process is never stolen; it is recovered once that process dies', async () => {
+  const { spawn } = await import('node:child_process')
+  const { utimes, readdir: list } = await import('node:fs/promises')
+  const { createHash } = await import('node:crypto')
+  const dir = join(await mkdtemp(join(tmpdir(), 'supa-sync-live-lock-')), 'sync')
+  const lock = join(dir, `${createHash('sha256').update(key).digest('hex')}.lock`)
+  // setInterval keeps this holder genuinely alive (a bare pending top-level
+  // await would let Node exit with code 13 right after taking the lock).
+  const holder = spawn(process.execPath, ['--input-type=module', '-e', `
+    import { mkdir, open } from 'node:fs/promises'
+    const [dir, lock] = process.argv.slice(1)
+    await mkdir(dir, { recursive: true, mode: 0o700 })
+    globalThis.held = await open(lock, 'wx', 0o600)
+    setInterval(() => {}, 1000)
+    process.stdout.write('HELD\\n')`, dir, lock], { stdio: ['ignore', 'pipe', 'inherit'] })
+  try {
+    await new Promise((resolve, reject) => { holder.stdout.once('data', resolve); holder.once('exit', reject) })
+    const old = new Date(Date.now() - 60_000)
+    await utimes(lock, old, old)
+    const store = createFileSyncStore({ dir })
+    await assert.rejects(store.write(key, 0, {}), /busy/)
+    assert.equal(holder.exitCode, null, 'holder stayed alive for the whole attempt')
+    assert.equal((await store.read(key)).revision, 0)
+    assert.deepEqual(await list(dir), [lock.split('/').pop()], 'live lock untouched')
+
+    holder.kill('SIGKILL'); await once(holder, 'exit')
+    const recovered = await store.write(key, 0, {})
+    assert.equal(recovered.conflict, false)
+    assert.equal(recovered.record.revision, 1)
+  } finally {
+    if (holder.exitCode === null && holder.signalCode === null) holder.kill('SIGKILL')
+    await rm(dirname(dir), { recursive: true, force: true })
+  }
 })
