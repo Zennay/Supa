@@ -19,6 +19,7 @@ De invoer komt uitsluitend via stdin, maximaal 1 MiB UTF-8. Bewaar de CSV privé
 De checker roept **eerst** de bestaande formule-/spreadsheet-injectiepreflight aan en accepteert uitsluitend de exacte 11-regelige privé-M3-export met de originele 19 kolomkoppen, disclaimers en vaste tekstlabels. Vervolgens controleert hij bedragen als gehele eurocenten (zonder floats):
 
 - Voor iedere bekende PLUS- en DekaMarkt-regel: aantal benodigde verpakkingen × prijs per verpakking = regeltotaal.
+- Voor iedere bekende winkelregel: **exacte fysieke verpakkingsdekking** via gehele BigInt-rationale decimale hoeveelheden. Gram/kilogram, milliliter/liter en stuks worden binnen hun eigen eenheidfamilie vergeleken; een handmatig aangepaste verpakkingsmaat moet exact hetzelfde (naar boven afgeronde) aantal benodigde pakken vereisen als het CSV-aantal. Incompatibele eenheden, misleidende onderdekking, niet-canonieke positieve getallen en onveilige aantallen worden geweigerd, zonder binaire floating-point afrondingsfouten.
 - Voor iedere aan beide kanten gemeten regel: DekaMarkt-regeltotaal − PLUS-regeltotaal = voorlopig regelverschil.
 - Voor een complete mand: som van de elf PLUS-regels, som van de elf DekaMarkt-regels en hun onderlinge verschil = de drie bedragen in de laatste rij.
 - Voor een incomplete mand: géén geldige voorlopige winnaar of volledig mandbedrag, ook niet wanneer iemand de footer handmatig heeft aangepast.
