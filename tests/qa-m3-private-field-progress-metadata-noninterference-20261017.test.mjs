@@ -77,7 +77,7 @@ test('private operator status is invariant across synthetic pseudonyms, URLs, am
   const expected = report(sheet)
   const mutations = [
     (s) => { s.study.participantKey = SECRET; s.study.studyId = 'fake-different'; s.study.population = SECRET; s.study.region = SECRET },
-    (s) => { for (const side of ['baseline', 'candidate']) { s[side].evidenceId = SECRET; s[side].provenanceNote = SECRET; s[side].store.id = SECRET + '-' + side } },
+    (s) => { for (const side of ['baseline', 'candidate']) { s[side].evidenceId = SECRET + '-' + side; s[side].provenanceNote = SECRET; s[side].store.id = SECRET + '-' + side } },
     (s) => { s.baseline.store.name = 'PLUS '+SECRET; s.candidate.store.name = 'DekaMarkt '+SECRET },
     (s) => { for (const side of ['baseline', 'candidate']) for (const row of s[side].lines) { row.observedProduct.productId = SECRET; row.observedProduct.productName = SECRET; row.observedProduct.note = SECRET; row.observedProduct.sourceUrl = 'https://example.invalid/' + SECRET } },
     (s) => { for (const side of ['baseline', 'candidate']) for (const row of s[side].lines) { row.observedProduct.priceCents = 100_000_000; row.observedProduct.packAmount = 12.5; row.observedProduct.packUnit = 'kg'; row.observedProduct.packCount = 3 } },
