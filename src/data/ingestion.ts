@@ -82,6 +82,57 @@ function validIso(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
 }
 
+/**
+ * Physical offer validity clock, independent from the source capturedAt gate.
+ *
+ * Date.parse silently normalizes impossible calendar days on some platforms
+ * and discards nanoseconds 4–9. A 1ns-reversed offer must not be admitted as
+ * reviewed data. Date-only windows keep their established UTC-midnight meaning;
+ * valid future offer windows remain allowed (source capture uses a separate gate).
+ */
+function offerInstantNanoseconds(value: unknown): bigint | null {
+  if (typeof value !== 'string') return null
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2}))?$/.exec(value)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  // setUTCFullYear avoids Date.UTC's surprising 1900-based years 0–99.
+  const calendar = new Date(0)
+  calendar.setUTCFullYear(year, month - 1, day)
+  calendar.setUTCHours(0, 0, 0, 0)
+  if (
+    calendar.getUTCFullYear() !== year ||
+    calendar.getUTCMonth() !== month - 1 ||
+    calendar.getUTCDate() !== day
+  ) return null
+
+  const hour = Number(match[4] ?? 0)
+  const minute = Number(match[5] ?? 0)
+  const second = Number(match[6] ?? 0)
+  if (hour > 23 || minute > 59 || second > 59) return null
+
+  const zone = match[8] ?? 'Z'
+  let offsetMinutes = 0
+  if (zone !== 'Z') {
+    const zoneHour = Number(zone.slice(1, 3))
+    const zoneMinute = Number(zone.slice(4, 6))
+    if (zoneHour > 14 || zoneMinute > 59 ||
+        (zoneHour === 14 && zoneMinute !== 0)) return null
+    offsetMinutes = (zone[0] === '+' ? 1 : -1) *
+      (zoneHour * 60 + zoneMinute)
+  }
+
+  const milliseconds = calendar.getTime() +
+    (hour * 60 * 60 + minute * 60 + second) * 1000 -
+    offsetMinutes * 60_000
+  if (!Number.isFinite(milliseconds)) return null
+  return BigInt(milliseconds) * 1_000_000n +
+    BigInt((match[7] ?? '').padEnd(9, '0'))
+}
+
 function validateNullableMoneyCents(value: unknown, label: string) {
   if (
     value !== null &&
@@ -184,17 +235,17 @@ function validateOffer(offer: RawOffer | null) {
   validateNullableMoneyCents(offer.offerPriceCents, 'Offer price')
   validateNullableMoneyCents(offer.originalPriceCents, 'Original price')
 
-  if (offer.validFrom !== null && !validIso(offer.validFrom)) {
+  const validFrom = offer.validFrom === null
+    ? null : offerInstantNanoseconds(offer.validFrom)
+  const validTo = offer.validTo === null
+    ? null : offerInstantNanoseconds(offer.validTo)
+  if (offer.validFrom !== null && validFrom === null) {
     throw new Error('Offer validFrom must be null or a valid date/timestamp')
   }
-  if (offer.validTo !== null && !validIso(offer.validTo)) {
+  if (offer.validTo !== null && validTo === null) {
     throw new Error('Offer validTo must be null or a valid date/timestamp')
   }
-  if (
-    offer.validFrom !== null &&
-    offer.validTo !== null &&
-    Date.parse(offer.validFrom) > Date.parse(offer.validTo)
-  ) {
+  if (validFrom !== null && validTo !== null && validFrom > validTo) {
     throw new Error('Offer validity window cannot end before it starts')
   }
 }
