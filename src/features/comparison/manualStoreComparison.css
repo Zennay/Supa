@@ -1,0 +1,42 @@
+.manual-compare { margin: 0 auto 2rem; max-width: 1120px; padding: 1.5rem; color: var(--color-text, #24251f); }
+.manual-compare__heading h2 { font-size: clamp(1.4rem, 3vw, 2rem); margin: .35rem 0 .7rem; }
+.manual-compare__heading p { max-width: 72ch; line-height: 1.55; }
+.manual-compare__notice { padding: 1rem; background: #f4f3ec; border-left: 3px solid #806c43; }
+.manual-compare__summary { border: 1px solid #d6d8cf; padding: 1rem 1.2rem; border-radius: 1rem; margin: 1rem 0; }
+.manual-compare__summary p { margin: .4rem 0; }
+.manual-compare__totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; margin: 1rem 0; }
+.manual-compare__totals > div { background: #f6f7f2; padding: .85rem 1rem; border-radius: .7rem; display: flex; flex-direction: column; gap: .45rem; }
+.manual-compare__totals strong { font-size: 1.3rem; }
+.manual-compare__actions { display: flex; gap: .7rem; flex-wrap: wrap; margin: 1rem 0; }
+.manual-compare__rows { display: grid; gap: 1rem; }
+.manual-compare__row { border: 1px solid #dedfd6; padding: 1rem; border-radius: 1rem; background: #fff; }
+.manual-compare__row > header { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: baseline; gap: .5rem; margin-bottom: .8rem; }
+.manual-compare__row h3 { margin: 0; font-size: 1.05rem; }
+.manual-compare__row header span { color: #595e54; }
+.manual-compare__pair { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .8rem; }
+.manual-compare__store { border: 1px solid #e0e3d9; padding: .85rem; border-radius: .7rem; min-width: 0; }
+.manual-compare__store legend { font-weight: 700; padding: 0 .35rem; }
+.manual-compare__store label, .manual-compare__table label { display: flex; flex-direction: column; gap: .25rem; font-size: .84rem; font-weight: 600; min-width: 0; }
+.manual-compare__store input,.manual-compare__store select,.manual-compare__table textarea { width: 100%; background: #fff; min-width: 0; border: 1px solid #aaaeb0; border-radius: .45rem; padding: .62rem; color: #262a27; font: inherit; }
+.manual-compare__store input:focus-visible,.manual-compare__store select:focus-visible,.manual-compare__table textarea:focus-visible { outline: 2px solid #266a45; outline-offset: 2px; }
+.manual-compare__fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.7fr) minmax(0,1fr); gap: .6rem; margin-top: .6rem; }
+.manual-compare__row-result { min-height: 2em; font-size: .82rem; color: #50564a; line-height: 1.35; margin: .8rem 0 0; }
+.manual-compare__table { border: 1px solid #d4dccf; padding: 1rem; border-radius: .7rem; display: grid; gap: .75rem; margin: .7rem 0; }
+.manual-compare__message { min-height: 1.1em; }
+@media(max-width:740px) {
+ .manual-compare { padding: 1rem .65rem; }
+ .manual-compare__pair { grid-template-columns: 1fr; }
+ .manual-compare__fields { grid-template-columns: 1fr 1fr; }
+ .manual-compare__fields label:last-child { grid-column: 1/-1; }
+}
+
+/* Six real destinations: a sixth tab must stay on the same mobile nav row. */
+body .bottom-nav.hifi-nav { grid-template-columns: repeat(6,minmax(0,1fr)); }
+body .bottom-nav.hifi-nav button { width: min(46px, 100%); }
+body .bottom-nav.hifi-nav button:last-child { align-content: center; gap: 1px; }
+body .bottom-nav.hifi-nav button:last-child .hifi-sr-only {
+  position: static; width: auto; height: auto; padding: 0;
+  border: 0; margin: 0; overflow: visible; clip: auto; clip-path: none; white-space: normal;
+  font-size: .6rem; font-weight: 600; line-height: 1; color: #244537;
+}
+body .bottom-nav.hifi-nav button:last-child img { max-width: 25px; max-height: 25px; }

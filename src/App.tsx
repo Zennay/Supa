@@ -43,6 +43,7 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'recipes', label: 'Recepten', icon: figmaAssets.imgButton1 },
   { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2 },
   { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3 },
+  { id: 'basket', label: 'Vergelijk', icon: figmaAssets.imgButton2 },
 ]
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
@@ -328,6 +329,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             comparison={basketComparison}
             comparisonBaseline={comparisonBaseline}
             comparisonCandidate={comparisonCandidate}
+            manualPlan={plannedMeals}
+            manualRecipes={recipes}
+            manualActiveDays={activeDays}
           />
         )}
         {tab === 'list' && <ShoppingListView basket={basket} />}
