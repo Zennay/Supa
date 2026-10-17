@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import { historicalRetailerProducts } from '../products/historicalRetailerProducts.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 
@@ -182,6 +183,14 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
       <div className="offline-manual-editor__stores">
         {stores.map(store => <section key={store} aria-label={`Productprijzen bij ${store}`}>
           <h4>{store}</h4>
+          <p className="disclaimer">Suggesties voor productnamen komen alleen uit historische, prijsloze bronwaarnemingen
+            van 4 oktober 2026. Controleer zelf of het product vandaag echt bestaat; er wordt nooit een
+            prijs, verpakking of beschikbaarheid uit dit archief automatisch overgenomen.</p>
+          <datalist id={`historical-products-${store}`}>
+            {historicalRetailerProducts.filter(item => item.store === store).map(item => (
+              <option key={item.id} value={item.name} label={`Historisch: ${item.pack}`} />
+            ))}
+          </datalist>
           <label className="offline-manual-editor__time">Wanneer zijn deze producten echt waargenomen?
             <input type="datetime-local" value={capturedAt[store]} onChange={e => changeTimestamp(store, e.target.value)} />
           </label>
@@ -191,6 +200,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
               <legend>{need.label} · benodigd {need.amount ?? '?'} {need.unit}</legend>
               <label>Werkelijke productnaam (laat leeg als onbekend)
                 <input value={row.name} maxLength={160} autoComplete="off"
+                  list={`historical-products-${store}`}
                   placeholder="Naam op product of bon"
                   onChange={e => changeRow(store, need.id, { name: e.target.value }, need.unit)} />
               </label>
