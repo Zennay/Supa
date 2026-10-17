@@ -58,7 +58,7 @@ export function buildM3TriggerOwnerPatchPreview(workflow, inventory) {
       if (['**', 'tests/**', 'scripts/**', 'src/**'].includes(selector)) fail()
     }
 
-    const marker = /^  workflow_dispatch:\s*$/gm
+    const marker = /^  workflow_dispatch:[ \t]*$/gm
     if (workflow.match(marker)?.length !== 1) fail()
     const selectorLines = additions.map(p => '      - "' + p + '"')
     // Do not replace a stanza elsewhere: use an exact YAML anchor on the
