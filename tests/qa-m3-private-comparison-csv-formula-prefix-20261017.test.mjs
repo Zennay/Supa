@@ -132,3 +132,24 @@ for (const [field, column] of [
       'a hidden formula-like ' + field + ' must be refused or literal-escaped on every physical row')
   })
 }
+
+test('M3 private CSV guards all 11 required-unit labels against hidden formula prefixes', () => {
+  const unsafe = []
+  for (let row = 0; row < 11; row++) {
+    const report = comparison()
+    report.lines[row].requiredUnit = '\u2060=1+1'
+    const rendered = renderedRowCell(report, row, 2)
+    if (rendered !== null && !rendered.startsWith(String.fromCharCode(34, 39))) {
+      unsafe.push(row)
+    }
+  }
+  assert.deepEqual(unsafe, [], 'untrusted physical demand unit cells must remain literal text or be refused')
+})
+
+test('M3 private CSV guards combined invisible and compatibility formula disguises', () => {
+  for (const side of ['plus', 'dekamarkt']) {
+    for (const prefix of ['\u2060\u200f＝', '\u034f\u202e﹢', '\u200e\u180e＠']) {
+      requireSpreadsheetSafe(prefix + '1+1', side)
+    }
+  }
+})
