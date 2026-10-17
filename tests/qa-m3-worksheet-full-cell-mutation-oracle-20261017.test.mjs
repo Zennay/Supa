@@ -117,3 +117,32 @@ test('independent stdin decoding accepts UTF-8 split inside a real multilingual 
   )
   assert.equal(leaked, '', 'no partial output on invalid UTF-8')
 })
+
+test('mutation oracle: all 18 header names and all 22 paired ingredient IDs/labels are immutable', async () => {
+  const csv = await actualBlankCsv()
+  const lines = csv.trimEnd().split('\n')
+  assert.equal(lines.length, 23)
+  const header = cellsOf(lines[0])
+  for (let column = 0; column < 18; column++) {
+    const changed = [...header]
+    changed[column] = '"UNKNOWN_FIELD_' + column + '"'
+    assert.throws(() => auditPrivateWorksheetCsv(replaceRow(lines, 0, changed)),
+      /Private worksheet QA audit refused/, 'header column ' + column)
+  }
+  let changedIdentities = 0
+  for (let rowIndex = 1; rowIndex < lines.length; rowIndex++) {
+    const row = cellsOf(lines[rowIndex])
+    for (const [column, value] of [
+      [2, '"completely-unpaired-ingredient-' + rowIndex + '"'],
+      [3, '"SYNTHETIC_WRONG_LABEL_' + rowIndex + '"'],
+    ]) {
+      const changed = [...row]
+      changed[column] = value
+      assert.throws(() => auditPrivateWorksheetCsv(replaceRow(lines, rowIndex, changed)),
+        /Private worksheet QA audit refused/,
+        'row ' + rowIndex + ', identity column ' + column)
+      changedIdentities++
+    }
+  }
+  assert.equal(changedIdentities, 44)
+})
