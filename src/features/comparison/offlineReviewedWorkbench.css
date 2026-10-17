@@ -84,3 +84,10 @@
   .offline-manual-editor__quantities { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .offline-manual-editor__quantities label:last-child { grid-column:1 / -1; }
 }
+
+.offline-manual-editor__draft { display:grid; gap:.5rem; background:#f4f8f3; border:1px solid #d3dfd2;
+  padding:1rem; border-radius:12px; }
+.offline-manual-editor__draft label { display:flex; gap:.55rem; align-items:flex-start; line-height:1.45; font-weight:600; }
+.offline-manual-editor__draft input[type="checkbox"] { flex:0 0 20px; min-width:20px; min-height:20px; }
+.offline-manual-editor__draft span { font-size:.88rem; color:#536257; }
+.offline-manual-editor__draft button { justify-self:start; min-height:44px; }
