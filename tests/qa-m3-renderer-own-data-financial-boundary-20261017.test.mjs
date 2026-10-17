@@ -20,12 +20,18 @@ const renderers = [
   ['CSV', renderPrivateM3ComparisonCsv],
 ]
 function safeRender(render, report, secret) {
+  let output
+  let failure
   try {
-    const output = render(report)
+    output = render(report)
+  } catch (error) {
+    failure = error
+  }
+  if (failure !== undefined) {
+    assert.equal(String(failure).includes(secret), false, 'private error leaked through exception')
+  } else {
     assert.equal(typeof output, 'string')
     assert.equal(output.includes(secret), false, 'untrusted accessor secret surfaced in output')
-  } catch (error) {
-    assert.equal(String(error).includes(secret), false, 'private error leaked through exception')
   }
 }
 for (const [format, render] of renderers) {
