@@ -111,3 +111,22 @@ test('expected RED: physically impossible -12:01 must fail UI readiness within a
   sheet.candidate.observedAt='2026-10-06T10:00:00-12:00'
   assert.equal(observationSheetReadiness(sheet,NOW).ready,false)
 })
+
+test('expected RED: direct M3 assessor must flag a nonphysical PLUS timestamp even with 11 unresolved rows',()=>{
+  const study=buildWeeklyBasketStudyFromObservationSheet(blankPairedSheet())
+  study.baseline.observedAt='2026-10-06T10:00:00-13:00'
+  study.candidate.observedAt='2026-10-06T10:00:00-12:00'
+  const report=buildObservedWeekReport(study)
+  assert.equal(report.publicSavingsClaimEligible,false)
+  assert.ok(report.reasons.some(reason=>/baseline.*(timestamp|time|offset|observed)/i.test(reason)),
+    'assessment must identify the invalid PLUS observation time, not only missing prices')
+})
+test('expected RED: direct M3 assessor must flag a nonphysical Deka timestamp within 2h',()=>{
+  const study=buildWeeklyBasketStudyFromObservationSheet(blankPairedSheet())
+  study.baseline.observedAt='2026-10-06T11:00:00-12:00'
+  study.candidate.observedAt='2026-10-06T11:00:00-14:00'
+  const report=buildObservedWeekReport(study)
+  assert.equal(report.publicSavingsClaimEligible,false)
+  assert.ok(report.reasons.some(reason=>/candidate.*(timestamp|time|offset|observed)/i.test(reason)),
+    'assessment must identify the invalid Deka observation time, not only missing prices')
+})
