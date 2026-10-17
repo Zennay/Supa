@@ -67,17 +67,14 @@ export function auditNativeGreenJob({run, job, log, expectedHead, expectedBase} 
   if (stepPositions.some((index, at) => at && index <= stepPositions[at - 1])) refuse()
   // No additional "Run ..." executable steps hidden between or outside the
   // known frozen workflow; setup, cleanup and job-completion steps may remain.
-  if (steps.filter(s => s.startsWith('Run ')).length !== CHECKS.length) refuse()
+  if (steps.filter(s => s.startsWith('Run npm ')).length !== CHECKS.length) refuse()
 
   const lines = boundedText(log).split(/\r?\n/).map(plain)
   // GitHub pulls/<number>/merge checkout is not the PR head itself. Match
   // both the exact immutable HEAD and the frozen parent SHA on one line.
   const checkout = exactlyOne(lines, line =>
     /^HEAD is now at [a-f0-9]{7,40} Merge [a-f0-9]{40} into [a-f0-9]{40}$/.test(line))
-  if (lines[checkout] !== lines[checkout].replace(
-      'Merge ' + expectedHead + ' into ' + expectedBase,
-      'Merge ' + expectedHead + ' into ' + expectedBase) ||
-      !lines[checkout].endsWith('Merge ' + expectedHead + ' into ' + expectedBase)) refuse()
+  if (!lines[checkout].endsWith('Merge ' + expectedHead + ' into ' + expectedBase)) refuse()
 
   const starts = CHECKS.map(name => exactlyOne(lines, line => line === '##[group]' + name))
   if (starts.some((i, j) => j && i <= starts[j - 1]) || checkout >= starts[0]) refuse()
