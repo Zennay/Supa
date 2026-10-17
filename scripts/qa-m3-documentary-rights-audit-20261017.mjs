@@ -1,0 +1,118 @@
+/**
+ * QA-only, conservative, OFFLINE documentary rights inspection for SUPA M3.
+ *
+ * This DOES NOT repair/replace the product source-permission gate or assert
+ * ownership of a licence. It provides an independent, non-publishing operator
+ * audit until #3782 is repaired by the exclusive source owner.
+ *
+ * No DNS, network, retailer HTML, source fixture prices or external API calls.
+ * No URLs, credential values, or human records are emitted in the report.
+ */
+import { readFile } from 'node:fs/promises'
+import { isIP } from 'node:net'
+import { pathToFileURL } from 'node:url'
+import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
+
+const REFUSE = 'Independent M3 documentary rights audit refused'
+const suspiciousQueryName = /(?:^|[_-])(?:token|access|refresh|password|passwd|secret|api[_-]?key|authorization|auth|code|client[_-]?secret)(?:$|[_-])/i
+
+/**
+ * This checks static documentary reference SHAPES, not legal entitlement.
+ * Literal IP addresses are deliberately disallowed even when globally
+ * routable: independent licence evidence should use a named public host.
+ * Domain resolution and redirect safety still require human review.
+ */
+export function isPublicDocumentaryEvidenceUrl(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return false
+  try {
+    const u = new URL(value)
+    const host = u.hostname.toLowerCase()
+    if (u.protocol !== 'https:' || !host ||
+        u.username || u.password || u.hash || (u.port && u.port !== '443') ||
+        host.endsWith('.') || host === 'localhost' ||
+        host.endsWith('.localhost') || host.endsWith('.local') ||
+        host.endsWith('.internal') || !host.includes('.') ||
+        isIP(host.replace(/^\[|\]$/g, '')) !== 0) return false
+    for (const name of u.searchParams.keys()) {
+      // Even a safe-looking domain is not a licence reference if its link
+      // embeds a credential-shaped parameter. Do not echo values anywhere.
+      if (suspiciousQueryName.test(name)) return false
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Public-safe aggregates only. A syntactically acceptable HTTPS link is
+ * NEVER proof of a licence. In particular this independent audit is
+ * intentionally NOT a mechanism for turning productionReady true.
+ */
+export function auditM3DocumentaryRights(document) {
+  const canonical = evaluateSourcePermissionGate(document)
+  let unsafeDocumentaryUrls = 0
+  let referencedDocuments = 0
+  let declaredAuthorizationDocuments = 0
+  for (const source of document.sources) {
+    for (const evidence of source.evidence) {
+      referencedDocuments++
+      if (!isPublicDocumentaryEvidenceUrl(evidence.url)) unsafeDocumentaryUrls++
+      if (evidence.kind === 'written_permission' ||
+          evidence.kind === 'official_license') declaredAuthorizationDocuments++
+    }
+  }
+  const outcome = unsafeDocumentaryUrls > 0
+    ? 'untrusted-documentary-url'
+    : canonical.productionReady
+      ? 'requires-independent-licence-review'
+      : 'retailer-permission-not-yet-established'
+
+  return {
+    schemaVersion: 1,
+    mode: 'qa-private-documentary-rights-review',
+    projectMilestone: 'M3',
+    outcome,
+    reviewedSourceCount: canonical.expectedSources.length,
+    referencedDocuments,
+    unsafeDocumentaryUrls,
+    declaredAuthorizationDocuments,
+    underlyingGateClaimsReady: canonical.productionReady,
+    independentlyVerifiedLegalRights: false,
+    // A source-controlled JSON row alone cannot independently establish
+    // authentic contractual authorization. Never emit a release token.
+    productionReady: false,
+    liveRequests: 0,
+    publicSavingsClaimEligible: false,
+    requiresHumanLegalReview: true,
+    releaseDecision: 'hold',
+  }
+}
+
+export async function main(argv = process.argv.slice(2),
+  write = line => process.stdout.write(line)) {
+  // Deliberately no arbitrary --file, URL or network option. This executable
+  // audits only the currently version-controlled canonical rights document.
+  if (!Array.isArray(argv) ||
+      (argv.length !== 0 &&
+        (argv.length !== 1 || argv[0] !== '--require-release'))) {
+    throw new Error(REFUSE)
+  }
+  const source = new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url)
+  const document = JSON.parse(await readFile(source, 'utf8'))
+  const report = auditM3DocumentaryRights(document)
+  write(JSON.stringify(report, null, 2) + '\n')
+  // A hold is a SUCCESSFUL QA inspection but never a release. A strict
+  // production gate deliberately fails closed regardless of documentary
+  // status; it cannot become "green" by editing a permission JSON file.
+  if (argv[0] === '--require-release' || report.unsafeDocumentaryUrls > 0 ||
+      report.underlyingGateClaimsReady) process.exitCode = 2
+  return report
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(() => {
+    console.error(REFUSE)
+    process.exitCode = 2
+  })
+}
