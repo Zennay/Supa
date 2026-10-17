@@ -489,6 +489,7 @@ function ownDataArray(value: unknown): unknown[] | null {
   try {
     const length = Object.getOwnPropertyDescriptor(value, 'length')
     if (!length || !('value' in length) ||
+        typeof length.value !== 'number' ||
         !Number.isSafeInteger(length.value) || length.value > 4096) return null
     const snapshot: unknown[] = []
     for (let index = 0; index < length.value; index++) {
@@ -529,7 +530,7 @@ function snapshotFinancialInputs(input: unknown): {
   comparison.lineDeltas = safeRows
 
   if (!Array.isArray(args.evidence)) {
-    return { comparison: comparison as BasketComparison, evidence: args.evidence }
+    return { comparison: comparison as unknown as BasketComparison, evidence: args.evidence }
   }
   const items = ownDataArray(args.evidence)
   if (!items) return null
@@ -541,7 +542,7 @@ function snapshotFinancialInputs(input: unknown): {
     if (!record) return null
     safeItems.push(record)
   }
-  return { comparison: comparison as BasketComparison, evidence: safeItems }
+  return { comparison: comparison as unknown as BasketComparison, evidence: safeItems }
 }
 
 export function attributeSavingsEffects(input: {
