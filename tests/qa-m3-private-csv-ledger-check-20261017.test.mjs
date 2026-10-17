@@ -20,7 +20,7 @@ function changeCell(csv, rowIndex, columnIndex, value) {
   assert.equal(/[;"\r\n]/u.test(value), false, 'synthetic fixture cell must be atomic')
   const lines = csv.slice(1, -2).split('\r\n')
   const cells = lines[rowIndex].slice(1, -1).split('";"')
-  assert.equal(cells.length, 19)
+  assert.equal(cells.length, rowIndex === 0 ? 2 : 19)
   cells[columnIndex] = value
   lines[rowIndex] = cells.map(x => '"' + x.replace(/"/gu, '""') + '"').join(';')
   return '\ufeff' + lines.join('\r\n') + '\r\n'
@@ -103,4 +103,27 @@ test('private ledger CLI is opt-in, stdout metadata only, redacted stderr on mal
   assert.equal(declined.stdout, '')
   assert.equal(declined.stderr, 'M3 private CSV financial consistency failed\n')
   assert.doesNotMatch(declined.stderr, /SECRET|participant/iu)
+})
+
+test('private CSV financial preflight blocks 19 header aliases, misleading footer and missing rights disclaimer', () => {
+  const complete = sample()
+  const incomplete = sample(90, true)
+  const falseStatements = [
+    [complete, 0, 1, 'Echte supermarktprijzen onafhankelijk gecontroleerd'],
+    [complete, 13, 18, 'Geverifieerd, besparing bewezen'],
+    [incomplete, 13, 18, 'Volledige mand bekend'],
+  ]
+  let cases = 0
+  for (let column = 1; column < 19; column++) {
+    falseStatements.push([complete, 1, column, 'GEVERIFIEERDE PRIJZEN'])
+  }
+  for (const [csv, row, column, replacement] of falseStatements) {
+    assert.throws(
+      () => auditPrivateM3CsvLedger(changeCell(csv, row, column, replacement)),
+      /financial consistency failed/u,
+      'label must never imply authentic retailer price evidence',
+    )
+    cases++
+  }
+  assert.equal(cases, 21)
 })
