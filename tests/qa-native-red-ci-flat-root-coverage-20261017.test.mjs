@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { analyzeNativeRedCi } from '../scripts/qa-native-red-ci-proof.mjs'
+import { analyzeStrictNativeRedCi } from '../scripts/qa-native-red-ci-proof.mjs'
 
 const FILE='qa-native-red-ci-flat-root-coverage-20261017.test.mjs'
 const OPTIONS={expectedRed:1,allowedTestFiles:[FILE]}
@@ -22,7 +22,7 @@ function job(rows,{plan=2,tests=2,pass=1,fail=1}={}){
   '##[error]Process completed with exit code 1.'
  ].map(x=>stamp+x).join('\n')+'\n'
 }
-const assess=(rows,opts)=>analyzeNativeRedCi(job(rows,opts),OPTIONS)
+const assess=(rows,opts)=>analyzeStrictNativeRedCi(job(rows,opts),OPTIONS)
 test('control: complete native flat root 1,2 remains expected-RED only',()=>{
  const result=assess([...rootBad,'ok 2 - root pass'])
  assert.deepEqual([result.tests,result.pass,result.fail],[2,1,1])
