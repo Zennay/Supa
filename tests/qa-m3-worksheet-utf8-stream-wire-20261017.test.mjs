@@ -329,3 +329,33 @@ test('real six-source M3 private worksheet survives byte-stream transport for al
   assert.deepEqual(records, originals, 'historical source archives remain unchanged')
   assert.deepEqual({plan, recipes}, inputSnapshot, 'caller owned recipes and planner stay immutable')
 })
+
+test('real four-day private producer CLI workflow feeds complete blank 11×2 CSV to operator CLI', async () => {
+  const producer = await import('../scripts/retailer-private-selected-week-observation.mjs')
+  const captured = []
+  const state = await producer.main(['--days', 'Ma,Di,Wo,Do'],
+    chunk => captured.push(chunk))
+  assert.deepEqual(state, {
+    evidenceStatus: 'collection-template-not-evidence',
+    rows: 22, productionReady: false,
+  })
+  assert.equal(captured.length, 1, 'producer emits one complete blank CSV, no partial rows')
+  const csv = captured[0]
+  const audit = auditPrivateWorksheetCsv(csv)
+  assert.equal(audit.rows, 22)
+  assert.equal(audit.ingredientNeeds, 11)
+  assert.equal(audit.verifiedActualObservations, 0)
+  assert.equal(audit.sourceRightsVerified, false)
+  assert.equal(audit.productionReady, false)
+  assert.equal(audit.publicSavingsClaimEligible, false)
+  assert.doesNotMatch(csv, /capturedAt|sourceUrl|priceCents|consented-export/)
+  const cli = fileURLToPath(new URL('../scripts/qa-m3-private-worksheet-preflight.mjs',
+    import.meta.url))
+  const result = spawnSync(process.execPath, [cli], {
+    input: Buffer.from(csv, 'utf8'), encoding: 'utf8', timeout: 20000,
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stderr, '')
+  assert.deepEqual(JSON.parse(result.stdout), audit)
+  assert.doesNotMatch(result.stdout, /Kippendij|Basmati|plus|dekamarkt|observedProductName|sourceUrl/)
+})
