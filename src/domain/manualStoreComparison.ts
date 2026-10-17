@@ -88,7 +88,7 @@ function evaluatedQuote(need: ManualNeed, quote: ManualQuote | undefined) {
     state: 'complete' as const,
     packs,
     lineCents: packs * cents,
-    unitPriceCents: Number.isSafeInteger(unitPriceCents) && unitPriceCents >= 0
+    unitPriceCents: unitPriceCents !== null && Number.isSafeInteger(unitPriceCents) && unitPriceCents >= 0
       ? unitPriceCents : null,
   }
 }
