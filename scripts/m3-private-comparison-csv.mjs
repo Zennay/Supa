@@ -26,7 +26,7 @@ function cell(value, { untrustedText = false } = {}) {
   // Unicode default-ignorable, bidi, combining and variation marks can hide
   // leading formula operators from a spreadsheet's visual presentation.
   // NFKC covers fullwidth/small compatibility operators (e.g. ＝ and ﹢).
-  const formulaShaped = /^[\\p{White_Space}\\p{Default_Ignorable_Code_Point}\\p{Mark}]*[=+\\-@\\u2212]/u
+  const formulaShaped = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+\-@\u2212]/u
     .test(clean.normalize('NFKC'))
   const safe = untrustedText && formulaShaped ? "'" + clean : clean
   return '"' + safe.replace(/"/g, '""') + '"'
