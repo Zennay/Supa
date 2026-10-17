@@ -55,9 +55,9 @@ test('QA M3 private CSV audit: structured quoted semicolons and doubled quotes s
   assertPrivatePass(csv(report))
 })
 
-test('QA M3 private CSV audit: all four 11-row text sinks refuse invisible Unicode formula disguises', () => {
+test('QA M3 private CSV audit: 264 text cells are safely exported and tampering is rejected', () => {
   let checked = 0
-  for (const prefix of ['\u2060=', '\u200f=', '\u034f=', '\u180e=', '\ufe0f=', '\u2060＝']) {
+  for (const prefix of ['\\u2060=', '\\u200f=', '\\u034f=', '\\u180e=', '\\ufe0f=', '\\u2060＝']) {
     for (const field of ['ingredientLabel', 'requiredUnit', 'plusProduct', 'dekaProduct']) {
       for (let row = 0; row < 11; row++) {
         const report = comparison()
@@ -67,9 +67,20 @@ test('QA M3 private CSV audit: all four 11-row text sinks refuse invisible Unico
         if (field === 'requiredUnit') report.lines[row].requiredUnit = value
         if (field === 'plusProduct') report.lines[row].plus.productName = value
         if (field === 'dekaProduct') report.lines[row].dekamarkt.productName = value
+        const original = JSON.stringify(report)
         const output = csv(report)
-        assert.throws(() => auditPrivateM3ComparisonCsv(output), /preflight failed/u,
-          'a generated Unicode formula text cell must be refused: ' + field + '/' + row)
+        const guardedCell = JSON.stringify("'" + value)
+        // The normal exporter now creates a literal-text cell; the offline
+        // audit must accept it without changing the private report.
+        assert.ok(output.includes(guardedCell),
+          'source must guard formula text before any spreadsheet is opened: ' + field + '/' + row)
+        assertPrivatePass(output)
+        assert.equal(JSON.stringify(report), original)
+        // Simulate a manual edit that strips the protection, and prove the
+        // independent pre-open audit still refuses the raw disguised formula.
+        const tampered = output.replace(guardedCell, JSON.stringify(value))
+        assert.notEqual(tampered, output)
+        assert.throws(() => auditPrivateM3ComparisonCsv(tampered), /preflight failed/u)
         checked++
       }
     }
@@ -100,8 +111,18 @@ test('QA M3 private CSV audit CLI: stdin-only, never echoes private values or pa
   const report = comparison()
   const secret = 'QA_PRIVATE_CUSTOMER_TOKEN_DO_NOT_PRINT_7199'
   report.lines[0].plus.productName = '\u2060=' + secret
+  const guarded = csv(report)
+  const goodGuarded = spawnSync(process.execPath, [CLI], {
+    input: guarded, encoding: 'utf8', timeout: 10_000,
+  })
+  assert.equal(goodGuarded.status, 0, goodGuarded.stderr)
+  const unsafe = guarded.replace(
+    JSON.stringify("'" + '\\u2060=' + secret),
+    JSON.stringify('\\u2060=' + secret),
+  )
+  assert.notEqual(unsafe, guarded)
   const bad = spawnSync(process.execPath, [CLI], {
-    input: csv(report), encoding: 'utf8', timeout: 10_000,
+    input: unsafe, encoding: 'utf8', timeout: 10_000,
   })
   assert.equal(bad.status, 1)
   assert.equal(bad.stdout, '')
