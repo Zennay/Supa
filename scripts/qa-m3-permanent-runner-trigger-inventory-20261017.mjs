@@ -16,6 +16,14 @@ import { types as nodeTypes } from 'node:util'
 const REFUSE = 'Independent M3 permanent trigger inventory refused'
 const WORKFLOW = '.github/workflows/m3-observed-week-report.yml'
 const REFUSE_RELEASE = 'hold-permanent-m3-vps-trigger-coverage'
+// Advisory only: tightly scoped M3 namespaces, NEVER arbitrary tests/**.
+const scopedOwnerReviewCandidates = Object.freeze([
+  'scripts/m3-*.mjs',
+  'scripts/qa-m3-*.mjs',
+  'tests/m3-*.test.mjs',
+  'tests/qa-m3-*.test.mjs',
+  'tests/product-m3-*.test.mjs',
+])
 const refusal = () => { throw new Error(REFUSE) }
 
 const inventoryGroups = Object.freeze([
@@ -139,6 +147,15 @@ export function auditM3TriggerClosure(workflow, inventory) {
   })
   const invalidBroadSelectors = selectors.filter(
     selector => selector.includes('*') && safeScopedGlobPattern(selector) === null)
+  // This is a *human-review candidate*, NOT an automatic workflow fix.
+  // Namespace-scoped patterns can replace hundreds of individual paths
+  // without allowing an unrelated PR to start the persistent VPS runner.
+  const candidateScopedSelectors = scopedOwnerReviewCandidates.filter(selector =>
+    uncovered.some(item => selectorCoversM3File(item.path, selector)))
+  const stillMissingAfterScoped = uncovered.filter(item =>
+    !candidateScopedSelectors.some(selector => selectorCoversM3File(item.path, selector)))
+  const ownerReviewCandidates = [...candidateScopedSelectors,
+    ...stillMissingAfterScoped.map(item => item.path)]
   return Object.freeze({
     schemaVersion: 1,
     mode: 'independent-static-m3-permanent-vps-trigger-inventory',
@@ -148,6 +165,8 @@ export function auditM3TriggerClosure(workflow, inventory) {
     missingPathCount: uncovered.length,
     missingPaths: uncovered.map(x => x.path),
     groups,
+    ownerReviewCandidateSelectors: ownerReviewCandidates,
+    ownerReviewRequiredBeforeWorkflowChange: true,
     broadOrUnreviewedWildcardSelectors: invalidBroadSelectors,
     pathCoverageComplete: uncovered.length === 0 &&
       invalidBroadSelectors.length === 0,
