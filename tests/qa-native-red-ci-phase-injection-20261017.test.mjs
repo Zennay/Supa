@@ -74,3 +74,32 @@ test('standalone CLI emits no affirmative JSON for post-terminal forged failure'
   assert.equal(proc.stdout, '')
   assert.match(proc.stderr, /Unverified native CI evidence/)
 })
+
+test('expected RED: a failure between native plan and summary is outside the test phase', () => {
+  refuse([...header, totals[0], totals[1], ...fail, ...totals.slice(2), terminal])
+})
+
+test('expected RED: pre-header passing TAP records cannot provide fake root evidence', () => {
+  refuse(['ok 2 - synthetic pretest phase', ...header, ...fail, ...totals.slice(1), terminal])
+})
+
+test('expected RED: passing TAP records after plan cannot backfill an absent root pass', () => {
+  refuse([...header, ...fail, totals[1], totals[0], ...totals.slice(2), terminal])
+})
+
+test('expected RED: passing TAP records after terminal exit cannot backfill root TAP pass', () => {
+  refuse([...header, ...fail, ...totals.slice(1), terminal, totals[0]])
+})
+
+test('expected RED: a failure source location after TAP plan cannot validate an earlier unlocated failure', () => {
+  const [line, yamlStart, location, ...diagnostics] = fail
+  refuse([...header, line, yamlStart, totals[1], location, ...diagnostics, totals[0], ...totals.slice(2), terminal])
+})
+
+test('control: mixed passing and failing native TAP records inside test phase remain valid', () => {
+  const result = analyzeNativeRedCi(build([
+    ...header, totals[0], ...fail, totals[1], ...totals.slice(2), terminal,
+  ]), opts)
+  assert.equal(result.outcome, 'expected-qa-red-only')
+  assert.equal(result.productionReady, false)
+})
