@@ -23,6 +23,14 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   // A JS string can contain orphaned surrogate units; Buffer.byteLength
   // would silently replace them. Never certify lossy operator evidence.
   if (!log.isWellFormed()) throw new Error('Malformed UTF-16 GitHub job log')
+  // Permit GitHub-native CRLF and ANSI SGR colors, but reject other
+  // display-mutating terminal or directional controls. Otherwise raw
+  // evidence can differ from the human-visible job-log representation.
+  const withoutSgr = log.replace(/\x1b\[[0-9;]*m/g, '')
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u202a-\u202e\u2066-\u2069]/u.test(withoutSgr) ||
+      /\r(?!\n)/.test(withoutSgr)) {
+    throw new Error('Unsafe native CI display or transport control')
+  }
   if (!Number.isSafeInteger(expectedRed) || expectedRed < 1 || expectedRed > 10000) {
     throw new Error('Expected RED must be a bounded positive integer')
   }
