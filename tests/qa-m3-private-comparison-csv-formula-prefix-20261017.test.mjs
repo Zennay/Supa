@@ -93,3 +93,42 @@ test('M3 CSV guard: compatibility formula-width aliases cannot appear unguarded'
     }
   }
 })
+
+function renderedRowCell(report, rowIndex, columnIndex) {
+  const original = JSON.stringify(report)
+  let csv
+  try {
+    csv = renderPrivateM3ComparisonCsv(report)
+  } catch (error) {
+    assert.doesNotMatch(String(error), /QA_SECRET_CANARY/u)
+    assert.equal(JSON.stringify(report), original)
+    return null // Generic refusal is valid.
+  }
+  const lines = csv.replace(/^\ufeff/u, '').split('\r\n')
+  const cells = lines[rowIndex + 2]?.split(';')
+  assert.equal(cells?.length, 19)
+  assert.equal(JSON.stringify(report), original)
+  assert.equal(report.publicSavingsClaimEligible, false)
+  return cells[columnIndex]
+}
+
+for (const [field, column] of [
+  ['ingredient label', 0],
+  ['PLUS pack unit', 5],
+  ['DekaMarkt pack unit', 12],
+]) {
+  test('M3 private CSV formula guard protects all 11 ' + field + ' columns', () => {
+    const offenders = []
+    for (let i = 0; i < 11; i++) {
+      const report = comparison()
+      const marked = '\u2060=1+1'
+      if (column === 0) report.lines[i].ingredientLabel = marked
+      else if (column === 5) report.lines[i].plus.packUnit = marked
+      else report.lines[i].dekamarkt.packUnit = marked
+      const cell = renderedRowCell(report, i, column)
+      if (cell !== null && !cell.startsWith(String.fromCharCode(34, 39))) offenders.push(i)
+    }
+    assert.deepEqual(offenders, [],
+      'a hidden formula-like ' + field + ' must be refused or literal-escaped on every physical row')
+  })
+}
