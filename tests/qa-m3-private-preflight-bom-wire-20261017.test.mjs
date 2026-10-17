@@ -70,3 +70,23 @@ test('P2 expected RED: BOM stdin CLI refuses with no stdout and no human label l
   assert.match(got.stderr, /^Private worksheet QA audit refused\s*$/)
   assert.doesNotMatch(got.stderr, /Zuurdesem|dekamarkt|plus/)
 })
+
+test('control: interior and repeated BOM bytes already fail closed; only the single leading mark is mishandled', async () => {
+  for (const invalid of [
+    Buffer.concat([bytes.subarray(0, 10), bom, bytes.subarray(10)]),
+    Buffer.concat([bom, bom, bytes]),
+    Buffer.concat([bytes, bom]),
+  ]) {
+    const writes = []
+    await assert.rejects(main(Readable.from([invalid]), fragment => writes.push(fragment)),
+      /Private worksheet QA audit refused/)
+    assert.deepEqual(writes, [], 'partial private results are forbidden')
+  }
+})
+
+test('control: a BOM-preserving fatal UTF-8 decode is sufficient for strict parser refusal', () => {
+  const preserved = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(prefixed)
+  assert.equal(preserved, '\ufeff' + csv)
+  assert.throws(() => auditPrivateWorksheetCsv(preserved), /Private worksheet QA audit refused/)
+  assert.equal(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes), csv)
+})
