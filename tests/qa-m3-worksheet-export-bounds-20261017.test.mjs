@@ -96,3 +96,25 @@ test('producer prevents duplicate 524KiB labels expanding one selected need beyo
   mustRejectOrPreserveBounded(sources, label)
   assert.deepEqual(sources, before)
 })
+
+test('exactly 512 UTF-16 units of surrogate-pair emoji remain valid rather than counted as bytes', async () => {
+  const sources = await offlineSources()
+  const before = structuredClone(sources)
+  const label = '🍋'.repeat(256)
+  assert.equal(label.length, MAX_HUMAN_LABEL_CODE_UNITS)
+  assert.equal(Buffer.byteLength(label, 'utf8'), 1024)
+  const value = buildPrivateSelectedWeekObservationWorksheet(
+    sources, ['Ma'], customLabel(label))
+  provePrivate(value)
+  assert.equal(value.csv.includes('"' + label + '"'), true)
+  assert.deepEqual(sources, before)
+})
+
+test('an extra Unicode surrogate pair must not silently widen a safe 512-unit human label', async () => {
+  const sources = await offlineSources()
+  const before = structuredClone(sources)
+  const label = '🍋'.repeat(256) + '🍋'
+  assert.equal(label.length, MAX_HUMAN_LABEL_CODE_UNITS + 2)
+  mustRejectOrPreserveBounded(sources, label)
+  assert.deepEqual(sources, before)
+})
