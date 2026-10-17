@@ -35,6 +35,7 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
 
   const allowed = new Set(allowedTestFiles)
   const totals = new Map()
+  let observedPassing = 0
   const failing = []
   const errors = []
   let current = null
@@ -66,6 +67,10 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     if (planMatch) {
       if (nativeTapPlan !== null) throw new Error('Ambiguous duplicate native TAP plan')
       nativeTapPlan = Number(planMatch[1])
+      if (!Number.isSafeInteger(nativeTapPlan) || nativeTapPlan < 1 ||
+          nativeTapPlan > Buffer.byteLength(log, 'utf8')) {
+        throw new Error('Unsafe or unsupported native TAP plan count')
+      }
       nativeTapPlanLine = lineNumber
     }
     if (line === '##[error]Process completed with exit code 1.') {
@@ -83,6 +88,7 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
         throw new Error('TAP record outside native test phase')
       }
       completeFailure()
+      if (passingTap) observedPassing++
       if (failingTap) current = { file: null, locationCount: 0 }
     }
     if (current) {
@@ -120,7 +126,14 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
     if (summary) {
       completeFailure()
       if (totals.has(summary[1])) throw new Error('Ambiguous duplicate TAP summary')
-      totals.set(summary[1], Number(summary[2]))
+      const count = Number(summary[2])
+      // A native log cannot prove more test events than there are bytes,
+      // and floating point summary counts must never round a real failure
+      // away or serialize non-finite values to JSON null.
+      if (!Number.isSafeInteger(count) || count > Buffer.byteLength(log, 'utf8')) {
+        throw new Error('Unsafe or unsupported TAP summary count')
+      }
+      totals.set(summary[1], count)
       if (firstSummaryLine === -1) firstSummaryLine = lineNumber
       lastSummaryLine = lineNumber
     }
@@ -150,6 +163,12 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   }
   if (tests !== pass + fail + skipped + cancelled || skipped || cancelled || todo) {
     throw new Error('TAP totals are inconsistent or include incomplete tests')
+  }
+  // Node TAP can repeat a parent's successful record for nested subtests,
+  // so observed native passes may exceed '# pass'; they must not be fewer.
+  // Unseen success records are not evidence, even when summary math works.
+  if (pass > observedPassing || tests > observedPassing + failing.length) {
+    throw new Error('TAP summary claims tests absent from native records')
   }
   if (fail !== expectedRed || failing.length !== expectedRed) {
     throw new Error('Unexpected RED count or TAP failures do not match summary')
