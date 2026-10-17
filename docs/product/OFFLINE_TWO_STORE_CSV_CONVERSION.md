@@ -2,6 +2,12 @@
 
 Supa kan bestaande, **zelf rechtmatig verkregen** productwaarnemingen van PLUS en DekaMarkt lokaal vergelijken. Als die in een spreadsheet staan, zet deze offline converter ze om naar het bestaande `supa-offline-prices-v1` JSON-contract dat **Vergelijk** in [product-PR #3899](https://github.com/Zennay/Supa/pull/3899) leest.
 
+## Zonder terminal: browserconverter
+
+Open op een Supa-deployment **[/offline-two-store-import.html](/offline-two-store-import.html)**. Deze zelfstandige pagina is onderdeel van dezelfde Vite-static-site: selecteer een UTF-8 CSV of plak CSV-tekst, kies **Controleer en maak JSON**, en gebruik **Download JSON voor Supa**. De conversie en controle gebeuren volledig lokaal in het tabblad. De pagina uploadt niets, bewaart geen waarden en geeft alleen na een geslaagde conversie een downloadknop vrij. Als invoer verandert wordt een eerder gemaakt downloadresultaat ongeldig.
+
+Deze browserpagina werkt zelfstandig en kan worden uitgerold voordat de vernieuwde **Vergelijk**-interface uit [#3899](https://github.com/Zennay/Supa/pull/3899) klaar is. Het gegenereerde bestand kan daarna in die interface worden ingelezen; totdat #3899 is geïntegreerd betekent conversie nog **geen live mandjesvergelijking**.
+
 ## Gebruik
 
 1. Maak een UTF-8 CSV met **exact deze negen kolommen, in deze volgorde**:
