@@ -165,7 +165,10 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   const skipped = totals.get('skipped')
   const cancelled = totals.get('cancelled')
   const todo = totals.get('todo')
+  // A root plan cannot be certified solely from indented nested-subtest
+  // events. At least one unindented TAP test must witness the root suite.
   if (nativeTapHeaders !== 1 || nativeTapPlan === null || nativeTapPlan !== tests ||
+      rootOrdinals.size === 0 ||
       [...rootOrdinals].some(ordinal => ordinal > nativeTapPlan) ||
       nativeTapHeaderLine < 0 || nativeTapHeaderLine >= nativeTapPlanLine ||
       nativeTapPlanLine >= firstSummaryLine || firstSummaryLine > lastSummaryLine) {
