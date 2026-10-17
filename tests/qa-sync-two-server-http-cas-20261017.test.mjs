@@ -13,11 +13,11 @@ const ORIGIN = 'https://supa-sync-qa.invalid'
 const KEY = 'W'.repeat(43)
 const PLANNER = 'supa:planner-preferences:v2'
 
-function options(label) {
+function options(budget) {
   return {
     baseRevision: 0,
     entries: { [PLANNER]: JSON.stringify({
-      budget: 35, activeDays: ['Ma'], recipeByDay: { Ma: label },
+      budget, activeDays: ['Ma'], recipeByDay: {},
     }) },
   }
 }
@@ -57,8 +57,8 @@ test('P1 sync API: two independently mounted servers must return 200/409 for com
   try {
     Date.now = () => frozenMs
     outcomes = await Promise.all([
-      put(first, options('supa-thai')),
-      put(second, options('supa-bolognese')),
+      put(first, options(35)),
+      put(second, options(36)),
     ])
   } finally {
     Date.now = realNow
