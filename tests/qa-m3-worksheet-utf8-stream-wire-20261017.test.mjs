@@ -213,3 +213,39 @@ test('late stream failures and unsupported object chunks cannot commit an appare
     /Private worksheet QA audit refused/,
     'non-function writer must be refused before reading a valid private worksheet')
 })
+
+test('exact 100×2 private capacity preserves max 170-unit IDs and 512-unit Unicode labels', async () => {
+  const entries = []
+  const distinct = new Set()
+  for (let index = 0; index < 100; index++) {
+    const id = 'need-' + String(index).padStart(3, '0') + 'a'.repeat(162)
+    const title = 'औ'.repeat(512)
+    assert.equal(id.length, 170)
+    assert.equal(title.length, 512)
+    distinct.add(id)
+    for (const store of ['plus', 'dekamarkt']) {
+      entries.push(row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', store, id,
+        title, index % 2 ? '0.000001' : '1000000', index % 2 ? 'ml' : 'piece',
+        ...Array(12).fill('')]))
+    }
+  }
+  assert.equal(distinct.size, 100)
+  const exact = [row(columns), ...entries].join('\n') + '\n'
+  const bytes = Buffer.from(exact, 'utf8')
+  assert.ok(bytes.length > 300_000, 'exercise a real large multibyte payload')
+  assert.ok(bytes.length <= 1_048_576)
+  const sum = {...expected, rows: 200, ingredientNeeds: 100}
+  assert.deepEqual(auditPrivateWorksheetCsv(exact), sum)
+  const writes = []
+  assert.deepEqual(await main(Readable.from([
+    ...Array.from({length: Math.ceil(bytes.length / 113)},
+      (_, index) => bytes.subarray(index * 113, index * 113 + 113)),
+  ]), chunk => writes.push(chunk)), sum)
+  assert.deepEqual(writes, [JSON.stringify(sum) + '\n'])
+  assert.doesNotMatch(writes[0], /need-|औ|observedPriceEUR|dekamarkt|plus/)
+  const lastStore = entries.at(-1)
+  const altered = [row(columns), ...entries.slice(0, -1),
+    lastStore.replace('"0.000001","ml"', '"0.000002","ml"')].join('\n') + '\n'
+  assert.notEqual(altered, exact)
+  await refused([Buffer.from(altered, 'utf8')])
+})
