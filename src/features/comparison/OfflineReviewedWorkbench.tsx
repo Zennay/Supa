@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
+import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
@@ -40,6 +40,43 @@ export function OfflineReviewedWorkbench({
   recipes: RecipeWithIngredients[]
   activeDays: string[]
 }) {
+  const ingredientNeeds = useMemo(() => {
+    try {
+      return aggregatePlanIngredients(plan, recipes, activeDays)
+        .filter(need => need.id.trim() && need.label.trim() &&
+          ['g', 'kg', 'ml', 'l', 'piece'].includes(need.unit))
+    } catch { return [] }
+  }, [plan, recipes, activeDays])
+
+  /** A deliberately incomplete field sheet, never price/source evidence. */
+  function downloadBlankObservationSheet() {
+    if (!ingredientNeeds.length || ingredientNeeds.length > 1000) return
+    const header = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
+    const rows = stores.flatMap(store =>
+      ingredientNeeds.map((need, index) => {
+        const slug = need.label.normalize('NFKD').toLowerCase()
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 54)
+        const id = `own-${store === 'PLUS' ? 'plus' : 'deka'}-${index + 1}-${slug || 'ingredient'}`
+        // Deliberately blank physical observation, product name, pack and price.
+        // The downstream importer refuses these rows until completed honestly.
+        return [store, '', id, '', '', need.unit, '', '', 'false'].join(',')
+      }),
+    )
+    const csv = [header, ...rows].join('\r\n') + '\r\n'
+    const objectUrl = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = 'supa-weekmenu-lege-prijswaarnemingen.csv'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+    }
+  }
+
   const [text, setText] = useState('')
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [message, setMessage] = useState('')
@@ -162,6 +199,18 @@ export function OfflineReviewedWorkbench({
             lokale CSV-converter (opent in een nieuw tabblad)
           </a>.
           Er wordt niets naar een server verstuurd; ontbrekende prijzen blijven onbekend.</p>
+        <div>
+          <button type="button" className="ghost-button"
+            disabled={ingredientNeeds.length === 0 || ingredientNeeds.length > 1000}
+            onClick={downloadBlankObservationSheet}>
+            Download leeg CSV-invulblad voor jouw weekmenu
+          </button>
+          <p className="disclaimer">Het invulblad bevat alleen de ingrediënten uit Planner, tweemaal (PLUS en DekaMarkt).
+            De productnaam, werkelijke waarnemingstijd, verpakking en prijs zijn expres leeg:
+            pas na je eigen rechtmatige observaties, met een echte tijd per winkel en correcte beschikbaarheid,
+            kan dit blad worden geïmporteerd. De product-ID vermeldt welk ingrediënt je moet zoeken;
+            die ID is geen geverifieerd winkelartikel.</p>
+        </div>
         <label>Importeer JSON of CSV vanaf dit apparaat
           <input type="file" accept=".json,.csv,application/json,text/csv" disabled={busy}
             onChange={event => { void loadFile(event.currentTarget.files?.[0]) }} />
