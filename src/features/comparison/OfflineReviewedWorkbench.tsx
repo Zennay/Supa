@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -44,10 +44,25 @@ export function OfflineReviewedWorkbench({
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  // Prevent stale imports from appearing comparable after an open browser tab
+  // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
+  const [clockMs, setClockMs] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => setClockMs(Date.now())
+    const interval = window.setInterval(refresh, 60000)
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
 
   function importSnapshots(input: string) {
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
+      setClockMs(Date.now())
       setImported(parsed)
       setMessage('Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
     } catch (error) {
@@ -84,7 +99,16 @@ export function OfflineReviewedWorkbench({
       return { plus, deka, comparison: compareFullBaskets({ baseline: plus, candidate: deka }) }
     } catch { return null }
   }, [imported, plan, recipes, activeDays])
-  const canShowDifference = !!imported && imported.currentEnough && imported.pairedWithin24h &&
+  const currentEnough = useMemo(() => {
+    if (!imported) return false
+    const nowNs = BigInt(Math.trunc(clockMs)) * 1000000n
+    const first = imported.captures.PLUS.observedNs
+    const second = imported.captures.DekaMarkt.observedNs
+    const oldest = first < second ? first : second
+    const newest = first > second ? first : second
+    return nowNs >= newest - 300000000000n && nowNs - oldest <= 604800000000000n
+  }, [imported, clockMs])
+  const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
     !!basketPair?.comparison.claimable
 
   return (
@@ -144,7 +168,7 @@ export function OfflineReviewedWorkbench({
                 {' '}· {imported.captures[store].products.length} bronproducten</p>
             ))}
           </div>
-          {!imported.currentEnough && <p role="alert" className="attention-card">
+          {!currentEnough && <p role="alert" className="attention-card">
             Oude prijsdata (ouder dan 7 dagen). Er wordt geen actueel prijsverschil getoond.
           </p>}
           {!imported.pairedWithin24h && <p role="alert" className="attention-card">
