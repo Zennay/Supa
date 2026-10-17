@@ -61,25 +61,42 @@ const remoteEntry = (remote: Remote, key: SyncKey) => typeof remote.entries[key]
 
 /**
  * Take the server's value for every record this browser has not changed since
- * the last sync; keep local edits (they are pushed next). Returns the keys
+ * the last sync; keep local edits (they are pushed next). The record writes
+ * and the new sync metadata are applied all-or-nothing: if storage throws
+ * (quota, private mode), every touched key is restored and the error is
+ * rethrown, so local bytes and metadata never disagree. Returns the keys
  * whose stored bytes changed.
  */
-function adopt(storage: StorageLike, meta: Meta, remote: Remote): { changed: SyncKey[]; meta: Meta } {
-  // An older server copy (restored backup, wiped data dir) must never delete
-  // local records: forget the sync base so everything local is uploaded again.
-  if (remote.revision < meta.revision) return { changed: [], meta: { revision: remote.revision, synced: emptyEntries() } }
+function adopt(storage: StorageLike, meta: Meta, remote: Remote): SyncKey[] {
+  let next: Meta
+  const writes = new Map<string, string | null>()
   const changed: SyncKey[] = []
-  const synced = { ...meta.synced }
-  for (const key of SYNC_KEYS) {
-    const local = storage.getItem(key)
-    const server = remoteEntry(remote, key)
-    if (local === meta.synced[key] && local !== server) {
-      if (server === null) storage.removeItem(key); else storage.setItem(key, server)
-      changed.push(key)
+  if (remote.revision < meta.revision) {
+    // An older server copy (restored backup, wiped data dir) must never delete
+    // local records: forget the sync base so everything local is uploaded again.
+    next = { revision: remote.revision, synced: emptyEntries() }
+  } else {
+    const synced = { ...meta.synced }
+    for (const key of SYNC_KEYS) {
+      const local = storage.getItem(key)
+      const server = remoteEntry(remote, key)
+      if (local === meta.synced[key] && local !== server) { writes.set(key, server); changed.push(key) }
+      synced[key] = server
     }
-    synced[key] = server
+    next = { revision: remote.revision, synced }
   }
-  return { changed, meta: { revision: remote.revision, synced } }
+  writes.set(SYNC_META_STORAGE, JSON.stringify(next))
+
+  const originals = new Map([...writes.keys()].map(key => [key, storage.getItem(key)]))
+  const applied: string[] = []
+  const put = (key: string, value: string | null) => value === null ? storage.removeItem(key) : storage.setItem(key, value)
+  try {
+    for (const [key, value] of writes) { applied.push(key); put(key, value) }
+  } catch (error) {
+    for (const key of applied.reverse()) { try { put(key, originals.get(key) ?? null) } catch { /* best effort */ } }
+    throw error
+  }
+  return changed
 }
 
 /** Exact media type token `application/json` (case-insensitive, parameters allowed). */
@@ -103,9 +120,7 @@ export async function pullSyncedState(options: SyncOptions, signal?: AbortSignal
   if (!remote) return []
   const meta = readMeta(options.storage)
   if (remote.revision === meta.revision) return []
-  const result = adopt(options.storage, meta, remote)
-  writeMeta(options.storage, result.meta)
-  return result.changed
+  return adopt(options.storage, meta, remote)
 }
 
 export type PushResult = 'unchanged' | 'saved' | 'rejected' | 'unavailable' | 'no-api'
@@ -136,10 +151,9 @@ export async function pushSyncedState(options: SyncOptions, { keepalive = false 
       const remote = admitRemoteSnapshot(await response.json().catch(() => null))
       // An invalid conflict body must not touch local data or trigger a retry.
       if (!remote) return 'unavailable'
-      const merged = adopt(options.storage, meta, remote)
       // Keep this browser's own edits as unsynced on top of the newer base.
-      writeMeta(options.storage, merged.meta)
-      if (merged.changed.length && typeof window !== 'undefined') window.dispatchEvent(new Event('supa-recipes-changed'))
+      const changed = adopt(options.storage, meta, remote)
+      if (changed.length && typeof window !== 'undefined') window.dispatchEvent(new Event('supa-recipes-changed'))
       continue
     }
     if (response.status === 422) return 'rejected'
