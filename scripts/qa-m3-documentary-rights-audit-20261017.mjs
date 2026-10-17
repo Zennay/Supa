@@ -50,7 +50,65 @@ export function isPublicDocumentaryEvidenceUrl(value) {
  * NEVER proof of a licence. In particular this independent audit is
  * intentionally NOT a mechanism for turning productionReady true.
  */
+/**
+ * In-process callers may pass active JS objects even though the CLI reads
+ * JSON. Snapshot ONLY own, enumerable plain-data descriptors before any
+ * canonical permission code or URLs can access the submitted graph.
+ * Reject shared/cyclic identities, exotic prototypes, sparse arrays, hidden
+ * fields, symbols, accessors and proxies without invoking attacker getters.
+ */
+function snapshotInertDocumentaryData(root) {
+  const seen = new WeakSet()
+  let nodes = 0
+  function copy(value, depth) {
+    if (++nodes > 16000 || depth > 32) throw new Error(REFUSE)
+    if (value === null || typeof value === 'boolean') return value
+    if (typeof value === 'string') {
+      if (value.length > 100000) throw new Error(REFUSE)
+      return value
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) throw new Error(REFUSE)
+      return value
+    }
+    if (typeof value !== 'object' || nodeTypes.isProxy(value) ||
+        seen.has(value)) throw new Error(REFUSE)
+    const array = Array.isArray(value)
+    const prototype = Object.getPrototypeOf(value)
+    if (array ? prototype !== Array.prototype :
+      prototype !== Object.prototype && prototype !== null) throw new Error(REFUSE)
+    const length = array ? Object.getOwnPropertyDescriptor(value, 'length')?.value : null
+    if (array && (!Number.isSafeInteger(length) || length < 0 ||
+        length > 8192)) throw new Error(REFUSE)
+    const descriptors = Object.getOwnPropertyDescriptors(value)
+    const keys = Reflect.ownKeys(descriptors)
+    if (keys.length > 8193 ||
+        (array && keys.length !== length + 1)) throw new Error(REFUSE)
+    seen.add(value)
+    const result = array ? new Array(length) : Object.create(null)
+    for (const key of keys) {
+      if (array && key === 'length') continue
+      if (typeof key !== 'string' ||
+          ['__proto__', 'prototype', 'constructor'].includes(key) ||
+          (array && (!/^(?:0|[1-9]\\d*)$/.test(key) ||
+            Number(key) >= length))) throw new Error(REFUSE)
+      const descriptor = descriptors[key]
+      if (!Object.hasOwn(descriptor, 'value') ||
+          descriptor.enumerable !== true) throw new Error(REFUSE)
+      Object.defineProperty(result, key, {
+        enumerable: true, configurable: true, writable: true,
+        value: copy(descriptor.value, depth + 1),
+      })
+    }
+    if (array && [...Array(length).keys()].some(i =>
+      !Object.hasOwn(result, String(i)))) throw new Error(REFUSE)
+    return result
+  }
+  return copy(root, 0)
+}
+
 export function auditM3DocumentaryRights(document) {
+  document = snapshotInertDocumentaryData(document)
   const canonical = evaluateSourcePermissionGate(document)
   let unsafeDocumentaryUrls = 0
   let referencedDocuments = 0
