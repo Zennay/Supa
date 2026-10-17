@@ -130,3 +130,44 @@ test('expected RED: direct M3 assessor must flag a nonphysical Deka timestamp wi
   assert.ok(report.reasons.some(reason=>/candidate.*(timestamp|time|offset|observed)/i.test(reason)),
     'assessment must identify the invalid Deka observation time, not only missing prices')
 })
+
+/** Fictional full basket control: numbers are not prices observed in shops. */
+function fullyPricedSyntheticPair() {
+  const sheet=blankPairedSheet()
+  sheet.baseline.observedAt='2026-10-06T10:00:00-12:00'
+  sheet.candidate.observedAt='2026-10-06T10:00:00-12:00'
+  for (const side of ['baseline','candidate']) {
+    sheet[side].lines.forEach((line,index)=>{
+      const item=sheet.requirements[index]
+      line.observedProduct={
+        available:true,
+        productId:'fictional-'+side+'-'+index,
+        productName:item.query,
+        packAmount:item.amount,
+        packUnit:item.unit,
+        packCount:1,
+        priceCents:side==='baseline'?200+index:190+index,
+        sourceUrl:'',
+        note:'NOT A REAL RETAILER PRICE. QA-only fictional synthetic value'
+      }
+    })
+  }
+  return sheet
+}
+test('control: valid physical clocks allow a fictional complete private basket comparison but no public claim',()=>{
+  const study=buildWeeklyBasketStudyFromObservationSheet(fullyPricedSyntheticPair())
+  const report=buildObservedWeekReport(study)
+  assert.equal(report.claimable,true)
+  assert.equal(report.outcome,'better')
+  assert.equal(report.publicSavingsClaimEligible,false)
+})
+test('expected RED: fake fully priced -14:00 Deka clock must not produce claimable savings',()=>{
+  const study=buildWeeklyBasketStudyFromObservationSheet(fullyPricedSyntheticPair())
+  study.candidate.observedAt='2026-10-06T10:00:00-14:00'
+  const report=buildObservedWeekReport(study)
+  assert.equal(report.claimable,false,'physically impossible clock must block even a fully priced fictional basket')
+  assert.equal(report.outcome,'unknown')
+  assert.equal(report.savingsCents,null)
+  assert.equal(report.publicSavingsClaimEligible,false)
+  assert.ok(report.reasons.some(reason=>/candidate.*(timestamp|time|offset|observed)/i.test(reason)))
+})
