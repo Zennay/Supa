@@ -107,3 +107,16 @@ test('P2 data shape: stored device entries must remain a plain allowlisted key/v
   await assert.rejects(() => store.read(key),
     'an array is typeof object but cannot be a validated device snapshot')
 })
+
+test('P2: invalid UTF-8 bytes in a private on-disk JSON record must never be silently replaced', async t => {
+  const { store, file, payload } = await fixture(t)
+  const bytes = Buffer.from(payload, 'utf8')
+  const occurrence = bytes.indexOf(Buffer.from('supa-thai', 'utf8'))
+  assert.ok(occurrence >= 0, 'valid planner positive fixture must contain a known ASCII recipe ID')
+  bytes[occurrence + 5] = 0xff // malformed UTF-8 inside a quoted JSON string
+  await writeFile(file, bytes)
+  // Node readFile('utf8') silently substitutes U+FFFD; JSON.parse succeeds,
+  // but the returned record no longer matches the original planner bytes.
+  await assert.rejects(() => store.read(key),
+    'private disk restore must decode bytes with fatal UTF-8 rather than storing mangled shopping labels')
+})
