@@ -92,3 +92,43 @@ test('different admitted IDs cannot be collapsed into one operator row pair', as
   assert.equal(result.productionReady, false)
   assert.equal(result.publicSavingsClaimEligible, false)
 })
+
+test('170-character ASCII structural ID is admitted, while 171 is refused', async () => {
+  const records = await archives
+  const limit = 'a'.repeat(170)
+  const accepted = sheetWithId(records, limit)
+  assert.equal(accepted.rows, 10)
+  assert.equal(accepted.csv.includes('"plus","' + limit + '",'), true)
+  assert.equal(accepted.csv.includes('"dekamarkt","' + limit + '",'), true)
+  assert.throws(() => sheetWithId(records, limit + 'a'))
+})
+
+test('prototype-shaped ID strings stay plain data, never inherited object keys', async () => {
+  const records = await archives
+  const before = Object.getOwnPropertyNames(Object.prototype)
+  for (const id of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) {
+    const result = sheetWithId(records, id)
+    assert.equal(result.rows, 10)
+    assert.equal(result.productionReady, false)
+    assert.ok(result.csv.includes('"plus","' + id + '",'))
+    assert.ok(result.csv.includes('"dekamarkt","' + id + '",'))
+    assert.deepEqual(Object.getOwnPropertyNames(Object.prototype), before)
+  }
+})
+
+test('two case-distinct admitted IDs remain distinct in both human retailer rows', async () => {
+  const records = await archives
+  const recipes = structuredClone(m2Recipes)
+  recipes[0].ingredients[0].id = 'CaseSensitive'
+  recipes[0].ingredients[1].id = 'casesensitive'
+  const result = buildPrivateSelectedWeekObservationWorksheet(records, ['Ma'], {
+    plan: structuredClone(m2InitialPlan), recipes,
+  })
+  assert.equal(result.rows, 10)
+  for (const store of ['plus', 'dekamarkt']) {
+    const rows = result.csv.split('\n').filter(line => line.includes('"' + store + '",'))
+    assert.equal(rows.filter(line => line.includes('"CaseSensitive",')).length, 1)
+    assert.equal(rows.filter(line => line.includes('"casesensitive",')).length, 1)
+  }
+  assert.equal(result.productionReady, false)
+})
