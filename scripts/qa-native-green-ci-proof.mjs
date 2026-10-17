@@ -102,8 +102,18 @@ export function auditNativeGreenJob({run, job, log, expectedHead, expectedBase} 
   for (const line of lines) {
     if (/^\s*not ok\s+\d+\s+-/.test(line) || line.startsWith('##[error]')) refuse()
   }
+  // A duplicate TAP summary outside the native Node block, or another plan,
+  // cannot be excused as harmless post-job cleanup.
+  for (let i = 0; i < lines.length; i++) {
+    if (i >= native && i < starts[3]) continue
+    if (lines[i] === 'TAP version 13' ||
+        /^1\.\.[0-9]+$/.test(lines[i]) ||
+        /^# (tests|pass|fail|skipped|cancelled|todo) [0-9]+$/.test(lines[i])) refuse()
+  }
+  const ciSlice = lines.slice(starts[0], starts[1])
   const auditSlice = lines.slice(starts[1], starts[2])
-  if (!auditSlice.some(line => /^found 0 vulnerabilities$/.test(line))) refuse()
+  if (!ciSlice.some(line => /^found 0 vulnerabilities$/.test(line)) ||
+      !auditSlice.some(line => /^found 0 vulnerabilities$/.test(line))) refuse()
   const gateSlice = lines.slice(starts[4], starts[5])
   const needed = [
     '"productionReady": false,',
@@ -114,7 +124,10 @@ export function auditNativeGreenJob({run, job, log, expectedHead, expectedBase} 
   for (const text of needed) {
     if (!gateSlice.some(line => line.trim() === text)) refuse()
   }
-  if (gateSlice.some(line => /"productionReady":\s*true/.test(line))) refuse()
+  if (gateSlice.some(line => /"productionReady":\s*true|"productionEnabled":\s*true/.test(line)) ||
+      gateSlice.filter(line => line.trim() === '"productionEnabled": false,').length !== 2 ||
+      gateSlice.filter(line => line.trim() === '"permissionStatus": "unresolved",').length !== 1 ||
+      gateSlice.filter(line => line.trim() === '"permissionStatus": "permission_required",').length !== 1) refuse()
   if (!lines.slice(starts[5]).some(line => /(?:✓|✔) built in [\d.]+(?:ms|s)$/.test(line.trim()))) refuse()
 
   return {
