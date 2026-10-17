@@ -89,3 +89,18 @@ test('P1: late GET completing after first render must not adopt an out-of-window
   assert.equal(mock.intervals(), 1)
   assert.equal(mock.values.get('supa:m3-observation-draft:v1'), 'private-synthetic-not-for-sync')
 })
+
+test('positive: timely complete JSON sync restores an empty browser before first render', async t => {
+  const planKey = 'supa:planner-preferences:v2'
+  const incoming = '{"budget":48,"activeDays":["Ma"],"recipeByDay":{}}'
+  const mock = mockBrowser(t, async () => new Response(JSON.stringify({
+    revision: 1, updatedAt: '2026-10-17T00:00:00.000Z',
+    entries: { [planKey]: incoming, 'supa.recipe-library.v1': null, 'supa:shopping-list-progress:v1': null },
+  }), { status: 200, headers: { 'content-type': 'application/json; charset=utf-8' } }))
+  mock.values.delete(planKey)
+  assert.equal(await settleWithin(syncBeforeRender(150)), 'settled')
+  assert.equal(mock.values.get(planKey), incoming, 'valid server snapshot should still restore a fresh browser')
+  assert.equal(JSON.parse(mock.values.get('supa:sync-meta:v1')).revision, 1)
+  assert.equal(mock.intervals(), 1)
+  assert.equal(mock.values.get('supa:m3-observation-draft:v1'), 'private-synthetic-not-for-sync')
+})
