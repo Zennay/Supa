@@ -20,6 +20,9 @@ export function analyzeNativeRedCi(log, { expectedRed, allowedTestFiles } = {}) 
   if (typeof log !== 'string' || Buffer.byteLength(log, 'utf8') > MAX_LOG_BYTES) {
     throw new Error('A bounded UTF-8 GitHub job log is required')
   }
+  // A JS string can contain orphaned surrogate units; Buffer.byteLength
+  // would silently replace them. Never certify lossy operator evidence.
+  if (!log.isWellFormed()) throw new Error('Malformed UTF-16 GitHub job log')
   if (!Number.isSafeInteger(expectedRed) || expectedRed < 1 || expectedRed > 10000) {
     throw new Error('Expected RED must be a bounded positive integer')
   }
@@ -149,7 +152,14 @@ async function readBoundedStdin() {
     if (bytes > MAX_LOG_BYTES) throw new Error('GitHub job log exceeds 12 MiB')
     chunks.push(chunk)
   }
-  return Buffer.concat(chunks).toString('utf8')
+  try {
+    // Preserve malformed wire bytes as an error instead of replacing them
+    // with U+FFFD outside TAP lines and accidentally certifying that log.
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
+      .decode(Buffer.concat(chunks))
+  } catch {
+    throw new Error('Malformed UTF-8 GitHub job log')
+  }
 }
 
 export async function main(args = process.argv.slice(2)) {
