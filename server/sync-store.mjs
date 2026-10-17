@@ -192,6 +192,8 @@ export function createFileSyncStore({ dir }) {
       return withFileLock(key, async stillOwned => {
         const current = await read(key)
         if (current.revision !== baseRevision) return { conflict: true, record: current }
+        // Never publish a revision this store could not read back.
+        if (!Number.isSafeInteger(current.revision + 1)) throw new Error('sync revision limit reached')
         const record = { revision: current.revision + 1, updatedAt: new Date().toISOString(), entries }
         const file = `${baseFor(key)}.json`
         const temporary = `${baseFor(key)}.${randomUUID()}.tmp`
