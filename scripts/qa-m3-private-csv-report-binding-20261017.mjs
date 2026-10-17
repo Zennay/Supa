@@ -7,7 +7,9 @@ import { lstat, open } from 'node:fs/promises'
 import { dirname, parse, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { timingSafeEqual } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 
+import { buildPrivateM3ProductComparison } from './m3-private-product-comparison.mjs'
 import { renderPrivateM3ComparisonCsv } from './m3-private-comparison-csv.mjs'
 import { auditPrivateM3CsvLedger } from './qa-m3-private-csv-ledger-check.mjs'
 
@@ -86,18 +88,27 @@ async function readPrivateFile(filename, max) {
  * The original JSON is NOT cryptographically signed, so this is artifact
  * consistency only, not observation provenance or licensing verification.
  */
-export function checkPrivateM3CsvReportBinding(reportJson, csv) {
+export function checkPrivateM3CsvReportBinding(reportJson, csv, sheetJson = null) {
   try {
     if (typeof reportJson !== 'string' || typeof csv !== 'string' ||
         Buffer.byteLength(reportJson, 'utf8') > MAX_JSON ||
         Buffer.byteLength(csv, 'utf8') > MAX_CSV) refuse()
     const ledger = auditPrivateM3CsvLedger(csv)
     const report = JSON.parse(reportJson)
+    if (sheetJson !== null) {
+      if (typeof sheetJson !== 'string' ||
+          Buffer.byteLength(sheetJson, 'utf8') > MAX_JSON) refuse()
+      // Only compare what the canonical product converter actually projects.
+      // Metadata not persisted in the report is NOT proven by this check.
+      const reconstructed = buildPrivateM3ProductComparison(JSON.parse(sheetJson))
+      if (!isDeepStrictEqual(report, reconstructed)) refuse()
+    }
     const expected = renderPrivateM3ComparisonCsv(report)
     const left = Buffer.from(csv, 'utf8')
     const right = Buffer.from(expected, 'utf8')
     if (left.length !== right.length || !timingSafeEqual(left, right)) refuse()
     return Object.freeze({
+      ...(sheetJson === null ? {} : { sheetProjectionConsistent: true }),
       sourceBound: true,
       privateOnly: true,
       ledgerConsistent: ledger.ledgerConsistent,
@@ -113,17 +124,22 @@ export function checkPrivateM3CsvReportBinding(reportJson, csv) {
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  if (!Array.isArray(argv) || argv.length !== 2 ||
+  const withSheet = Array.isArray(argv) && argv.length === 4 && argv[2] === '--sheet'
+  if (!Array.isArray(argv) || (argv.length !== 2 && !withSheet) ||
       argv.some(value => typeof value !== 'string')) refuse()
   try {
     const reportPath = validateName(argv[0])
     const csvPath = validateName(argv[1])
     if (reportPath === csvPath) refuse()
+    const sheetPath = withSheet ? validateName(argv[3]) : null
+    if (sheetPath !== null &&
+        (sheetPath === csvPath || sheetPath === reportPath)) refuse()
     // Before accepting JSON, require both artifacts to be private regular
     // owner-owned single-link files; never follow symlinked parents or leaves.
     const reportJson = await readPrivateFile(reportPath, MAX_JSON)
     const csv = await readPrivateFile(csvPath, MAX_CSV)
-    const proof = checkPrivateM3CsvReportBinding(reportJson, csv)
+    const sheetJson = sheetPath === null ? null : await readPrivateFile(sheetPath, MAX_JSON)
+    const proof = checkPrivateM3CsvReportBinding(reportJson, csv, sheetJson)
     process.stdout.write(JSON.stringify(proof) + '\n')
     return proof
   } catch {
