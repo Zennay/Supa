@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -81,6 +81,7 @@ export function OfflineReviewedWorkbench({
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const importVersion = useRef(0)
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
   const [clockMs, setClockMs] = useState(() => Date.now())
@@ -110,6 +111,7 @@ export function OfflineReviewedWorkbench({
   }
   async function loadFile(file?: File) {
     if (!file) return
+    const version = ++importVersion.current
     // Never leave an older basket, price difference or claim on screen while
     // a second local import is being read, converted or rejected.
     setImported(null)
@@ -129,13 +131,17 @@ export function OfflineReviewedWorkbench({
           await import(/* @vite-ignore */ moduleUrl)
         json = converter.convertTwoStoreCsv(content)
       }
+      if (version !== importVersion.current) return
       setText(json)
       importSnapshots(json)
     } catch (error) {
+      if (version !== importVersion.current) return
       setText('')
       setImported(null)
       setMessage(error instanceof Error ? error.message : 'Kon dit bestand niet lezen.')
-    } finally { setBusy(false) }
+    } finally {
+      if (version === importVersion.current) setBusy(false)
+    }
   }
 
   const basketPair = useMemo(() => {
@@ -219,6 +225,9 @@ export function OfflineReviewedWorkbench({
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
+              // A pending file read is no longer authoritative after manual edits.
+              importVersion.current++
+              setBusy(false)
               setText(event.target.value)
               setImported(null)
               setMessage('Invoer gewijzigd. Bereken opnieuw voordat mandjes en prijsverschillen zichtbaar zijn.')
@@ -229,6 +238,8 @@ export function OfflineReviewedWorkbench({
             Bereken mandjes
           </button>
           <button type="button" className="ghost-button" onClick={() => {
+            importVersion.current++
+            setBusy(false)
             setImported(null); setText(''); setMessage('Geïmporteerde prijsdata uit dit scherm gewist.')
           }}>Wis lokaal geladen data</button>
         </div>
