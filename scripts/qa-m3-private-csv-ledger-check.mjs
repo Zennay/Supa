@@ -62,7 +62,50 @@ function safeCount(value) {
   return count
 }
 
-function packTotal(cells, start) {
+
+const UNIT_BASE = Object.freeze({
+  g: ['mass', 1n], kg: ['mass', 1000n],
+  ml: ['volume', 1n], l: ['volume', 1000n],
+  piece: ['piece', 1n],
+})
+
+// Quantities are converted to exact decimal rationals; IEEE-754 rounding
+// must never add a fictitious second pack at an integer boundary.
+function positiveDecimal(raw) {
+  if (typeof raw !== 'string') invalid()
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0 || String(n) !== raw) invalid()
+  const match = /^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/iu.exec(raw)
+  if (!match) invalid()
+  const fractional = match[2] ?? ''
+  const exponent = Number(match[3] ?? 0)
+  const shift = exponent - fractional.length
+  if (!Number.isSafeInteger(shift) || Math.abs(shift) > 400) invalid()
+  const digits = BigInt(match[1] + fractional)
+  if (digits <= 0n) invalid()
+  return shift < 0
+    ? { num: digits, den: 10n ** BigInt(-shift) }
+    : { num: digits * 10n ** BigInt(shift), den: 1n }
+}
+
+export function exactPrivateM3CsvPackCount(
+  requiredAmount, requiredUnit, packAmount, packUnit, itemsPerPackage,
+) {
+  const requirement = positiveDecimal(requiredAmount)
+  const pack = positiveDecimal(packAmount)
+  const count = safeCount(itemsPerPackage)
+  const rUnit = UNIT_BASE[requiredUnit]
+  const pUnit = UNIT_BASE[packUnit]
+  if (!rUnit || !pUnit || rUnit[0] !== pUnit[0]) invalid()
+  const numerator = requirement.num * rUnit[1] * pack.den
+  const denominator = pack.num * pUnit[1] * count * requirement.den
+  if (denominator <= 0n) invalid()
+  const packages = (numerator + denominator - 1n) / denominator
+  if (packages <= 0n || packages > MAX_SAFE) invalid()
+  return packages
+}
+
+function packTotal(cells, start, requiredAmount, requiredUnit) {
   // The seven-cell schema is name, pack size, unit, pieces, packs,
   // price/pack and total. Unknown never means a fabricated zero-price pack.
   const [name, amount, unit, pieces, packages, price, total] =
@@ -73,12 +116,12 @@ function packTotal(cells, start) {
   }
   if (!name || !amount || !unit || !pieces || !packages ||
       !price || !total) invalid()
-  // Quantity is advisory here; the upstream exporter validates physical units.
-  // No money is recomputed from the display quantity.
-  const quantity = Number(amount)
-  if (!Number.isFinite(quantity) || quantity <= 0) invalid()
-  safeCount(pieces)
+  // Physical pack count has its own integer-rational oracle, independent
+  // of the whole-pack money. A hand-edited CSV must not silently undersupply.
   const count = safeCount(packages)
+  if (count !== exactPrivateM3CsvPackCount(
+    requiredAmount, requiredUnit, amount, unit, pieces,
+  )) invalid()
   const packCents = safeCents(price)
   const lineCents = safeCents(total)
   if (count * packCents !== lineCents) invalid()
@@ -98,10 +141,10 @@ export function auditPrivateM3CsvLedger(csv) {
   let comparableRows = 0
   for (const row of rows.slice(2, 13)) {
     if (row.length !== 19 || !row[0] || !row[2]) invalid()
-    const required = Number(row[1])
-    if (!Number.isFinite(required) || required <= 0) invalid()
-    const plus = packTotal(row, 3)
-    const deka = packTotal(row, 10)
+    positiveDecimal(row[1])
+    if (row[2] !== 'unknown' && !Object.hasOwn(UNIT_BASE, row[2])) invalid()
+    const plus = packTotal(row, 3, row[1], row[2])
+    const deka = packTotal(row, 10, row[1], row[2])
     if (plus !== null) plusTotal += plus
     if (deka !== null) dekaTotal += deka
     if (plus !== null && deka !== null) {
@@ -124,6 +167,7 @@ export function auditPrivateM3CsvLedger(csv) {
   return Object.freeze({
     privateOnly: true,
     ledgerConsistent: true,
+    physicalPackConsistent: true,
     canonicalShoppingRows: 11,
     comparableRows,
     fullBasketComparable: comparableRows === 11,
