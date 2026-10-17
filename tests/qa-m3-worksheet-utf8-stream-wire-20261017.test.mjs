@@ -1,0 +1,361 @@
+/**
+ * Independent M3 human worksheet byte-transport regression. Exercises the real
+ * offline operator scanner with a synthetic UNOBSERVED sheet, not the producer.
+ * Neither a positive scan nor this test is retailer field/savings evidence.
+ */
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { Readable } from 'node:stream'
+import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { auditPrivateWorksheetCsv, main } from '../scripts/qa-m3-private-worksheet-preflight.mjs'
+
+const columns = [
+  'evidenceStatus', 'retailerId', 'ingredientId', 'ingredientLabel',
+  'requiredAmount', 'requiredUnit', 'observedAt', 'storeLocation',
+  'priceContext', 'observedProductName', 'observedPackAmount',
+  'observedPackUnit', 'observedPackCount', 'observedPriceEUR',
+  'observedAvailability', 'collectionMethod', 'evidenceReference', 'notes',
+]
+const label = 'Crème 👩‍🍳 क्‍ष'
+const cell = value => '"' + value.replaceAll('"', '""') + '"'
+const row = cells => cells.map(cell).join(',')
+const csv = [
+  row(columns),
+  ...['plus', 'dekamarkt'].map(store => row([
+    'UNOBSERVED_TEMPLATE_NOT_EVIDENCE', store, 'safe-one',
+    label, '12.5', 'g', ...Array(12).fill(''),
+  ])),
+].join('\n') + '\n'
+const canonical = Buffer.from(csv, 'utf8')
+const expected = {
+  mode: 'm3-blank-worksheet-qa-only',
+  rows: 2, ingredientNeeds: 1, pairedRetailers: 2,
+  verifiedActualObservations: 0, sourceRightsVerified: false,
+  productionReady: false, publicSavingsClaimEligible: false,
+}
+
+async function examine(parts) {
+  const writes = []
+  const outcome = await main(Readable.from(parts), part => { writes.push(part) })
+  assert.deepEqual(outcome, expected)
+  assert.deepEqual(writes, [JSON.stringify(expected) + '\n'])
+  assert.doesNotMatch(writes[0], /Crème|👩|plus|dekamarkt|safe-one|observedPriceEUR/)
+}
+
+async function refused(parts) {
+  const writes = []
+  await assert.rejects(main(Readable.from(parts), part => { writes.push(part) }),
+    /Private worksheet QA audit refused/)
+  assert.deepEqual(writes, [], 'invalid input cannot emit even partial operator summary')
+}
+
+test('real scanner accepts each valid multibyte UTF-8 sequence split across buffer chunks', async () => {
+  assert.deepEqual(auditPrivateWorksheetCsv(csv), expected)
+  await examine([canonical])
+  await examine([csv])
+  await examine([...canonical].map(byte => Buffer.from([byte])))
+  const emoji = canonical.indexOf(Buffer.from('👩‍🍳', 'utf8'))
+  assert.ok(emoji > 0)
+  for (let split = emoji; split < emoji + Buffer.byteLength('👩‍🍳') + 1; split++) {
+    await examine([canonical.subarray(0, split), canonical.subarray(split)])
+  }
+})
+
+test('fatal UTF-8 rejects malformed transport encodings without lossy replacement or output', async () => {
+  const emoji = Buffer.from('👩‍🍳', 'utf8')
+  const start = canonical.indexOf(emoji)
+  assert.ok(start > 0)
+  const first = canonical.subarray(0, start)
+  const last = canonical.subarray(start + emoji.length)
+  const illegals = [
+    [0xc0, 0xaf],               // overlong encoding
+    [0xed, 0xa0, 0x80],         // encoded UTF-16 lone surrogate
+    [0xf4, 0x90, 0x80, 0x80],   // beyond Unicode scalar range
+    [0x80],                     // continuation without leading byte
+    [0xff],                     // invalid lead
+    [0xf0, 0x9f, 0x91],         // truncated four-byte emoji
+    [0xe2, 0x28, 0xa1],         // invalid continuation
+  ]
+  for (const bytes of illegals) {
+    const invalid = Buffer.concat([first, Buffer.from(bytes), last])
+    await refused([invalid])
+    await refused([invalid.subarray(0, start + 1), invalid.subarray(start + 1)])
+  }
+})
+
+test('text chunks may not split a UTF-16 surrogate pair or smuggle a lone surrogate', async () => {
+  const emoji = csv.indexOf('👩')
+  assert.ok(emoji > 0)
+  const left = csv.slice(0, emoji + 1)
+  const right = csv.slice(emoji + 1)
+  assert.equal(left.charCodeAt(left.length - 1), 0xd83d)
+  await examine([csv])
+  await refused([left, right])
+  await refused([csv.replace('👩', '\ud83d')])
+  await refused([csv.replace('👩', '\udc69')])
+})
+
+test('mixed well-formed text and byte chunks decode identically, but poison data never becomes a result', async () => {
+  const idx = csv.indexOf(label)
+  assert.ok(idx > 0)
+  const start = csv.slice(0, idx)
+  const tail = csv.slice(idx)
+  await examine([start, Buffer.from(tail)])
+  await refused([start, Buffer.from([0xff]), Buffer.from(tail)])
+  await refused([Buffer.alloc(1_048_577, 65)])
+})
+
+test('standalone stdin CLI preserves aggregate-only stdout and refuses malformed wire bytes', () => {
+  const cli = fileURLToPath(new URL('../scripts/qa-m3-private-worksheet-preflight.mjs', import.meta.url))
+  const run = input => spawnSync(process.execPath, [cli], {
+    input, encoding: 'utf8', timeout: 15000, maxBuffer: 64 * 1024,
+  })
+  const good = run(canonical)
+  assert.equal(good.status, 0, good.stderr)
+  assert.deepEqual(JSON.parse(good.stdout), expected)
+  assert.equal(good.stderr, '')
+  const bad = run(Buffer.concat([canonical.subarray(0, 12), Buffer.from([0xff]), canonical.subarray(12)]))
+  assert.equal(bad.status, 2)
+  assert.equal(bad.stdout, '')
+  assert.match(bad.stderr, /^Private worksheet QA audit refused\s*$/)
+  assert.doesNotMatch(bad.stderr, /Crème|plus|dekamarkt|safe-one/)
+})
+
+
+test('RFC4180 commas and doubled quotes in legitimate multilingual labels survive every wire split', async () => {
+  const humanName = 'Kersen, "zoet" — crème 🧑‍🍳 क्‍ष'
+  const payload = csv.replaceAll(cell(label), cell(humanName))
+  const bytes = Buffer.from(payload, 'utf8')
+  assert.equal(auditPrivateWorksheetCsv(payload).rows, 2)
+  await examine([bytes])
+  await examine([...bytes].map(byte => Buffer.from([byte])))
+  const quotedLabel = Buffer.from(cell(humanName), 'utf8')
+  const start = bytes.indexOf(quotedLabel)
+  assert.ok(start > 0, 'actual double-quoted human ingredient cell must be present')
+  for (let split = start; split <= start + quotedLabel.length; split++) {
+    await examine([bytes.subarray(0, split), bytes.subarray(split)])
+  }
+})
+
+test('well-formed CSV bytes with a forged human observed price must never yield a partial preflight summary', async () => {
+  const observed = Array(12).fill('')
+  observed[7] = '1.50' // observedPriceEUR: seventh zero-based human field after index 6
+  const altered = [
+    row(columns),
+    row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', 'plus', 'safe-one', label, '12.5', 'g', ...observed]),
+    row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', 'dekamarkt', 'safe-one', label, '12.5', 'g', ...Array(12).fill('')]),
+  ].join('\n') + '\n'
+  const bytes = Buffer.from(altered, 'utf8')
+  assert.throws(() => auditPrivateWorksheetCsv(altered), /Private worksheet QA audit refused/)
+  await refused([bytes])
+  await refused([...bytes].map(byte => Buffer.from([byte])))
+})
+
+
+test('100 distinct private needs × 2 stores accept the exact operator limit independent of paired row ordering', async () => {
+  const entries = []
+  for (let index = 0; index < 100; index++) {
+    const id = index === 0 ? "'-signed-ingredient" : 'safe-' + index
+    const ingredient = index === 0 ? 'Zuurdesem "vóórraad" 👩‍🍳' : 'Crème ' + index + ' क्‍ष'
+    const amount = (index + 1) / 10
+    for (const store of ['dekamarkt', 'plus']) {
+      entries.push(row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', store,
+        id, ingredient, String(amount), 'g', ...Array(12).fill('')]))
+    }
+  }
+  const asCsv = rows => [row(columns), ...rows].join('\n') + '\n'
+  const canonicalCsv = asCsv(entries)
+  const reference = {...expected, rows: 200, ingredientNeeds: 100}
+  assert.deepEqual(auditPrivateWorksheetCsv(canonicalCsv), reference)
+  assert.deepEqual(await main(Readable.from([Buffer.from(canonicalCsv)]), () => {}), reference)
+  const reversedCsv = asCsv([...entries].reverse())
+  assert.deepEqual(auditPrivateWorksheetCsv(reversedCsv), reference)
+  const chunks = Buffer.from(reversedCsv, 'utf8')
+  const outputs = []
+  const byteChunks = [...chunks].map(byte => Buffer.from([byte]))
+  assert.deepEqual(await main(Readable.from(byteChunks), line => outputs.push(line)), reference)
+  assert.deepEqual(outputs, [JSON.stringify(reference) + '\n'])
+  assert.doesNotMatch(outputs[0], /Crème|Zuurdesem|signed-ingredient|dekamarkt|plus/)
+  const missing = asCsv(entries.slice(0, -1))
+  await refused([Buffer.from(missing)])
+  const repeated = asCsv([...entries, entries[0]])
+  await refused([Buffer.from(repeated)])
+  const extra = asCsv([...entries,
+    row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', 'dekamarkt', 'need-101',
+      'Valid extra need', '2', 'g', ...Array(12).fill('')]),
+    row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', 'plus', 'need-101',
+      'Valid extra need', '2', 'g', ...Array(12).fill('')])])
+  await refused([Buffer.from(extra)])
+  assert.ok(Buffer.byteLength(canonicalCsv) < 1_048_576,
+    'normal 100x2 bounded worksheet stays below the transport byte ceiling')
+})
+
+
+test('late stream failures and unsupported object chunks cannot commit an apparently valid preflight', async () => {
+  await examine([canonical])
+  await refused([])
+  await refused([canonical, Buffer.from('PRIVATE_TAIL_SHOULD_NOT_BE_ACCEPTED')])
+  await refused([canonical, '\n'])
+  await refused([canonical, { toString: () => csv }])
+  await refused([canonical, Uint8Array.from([65])])
+  await refused([new String(csv)])
+  const leaked = []
+  async function* lateError() {
+    yield canonical
+    yield Buffer.alloc(0)
+    throw new Error('synthetic late upstream stream error; not verified')
+  }
+  await assert.rejects(main(lateError(), fragment => leaked.push(fragment)),
+    /synthetic late upstream stream error/)
+  assert.deepEqual(leaked, [], 'a successful-looking prefix must not produce any operator summary')
+  await assert.rejects(main(Readable.from([canonical]), null),
+    /Private worksheet QA audit refused/,
+    'non-function writer must be refused before reading a valid private worksheet')
+})
+
+test('exact 100×2 private capacity preserves max 170-unit IDs and 512-unit Unicode labels', async () => {
+  const entries = []
+  const distinct = new Set()
+  for (let index = 0; index < 100; index++) {
+    const id = 'need-' + String(index).padStart(3, '0') + 'a'.repeat(162)
+    const title = 'औ'.repeat(512)
+    assert.equal(id.length, 170)
+    assert.equal(title.length, 512)
+    distinct.add(id)
+    for (const store of ['plus', 'dekamarkt']) {
+      entries.push(row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', store, id,
+        title, index % 2 ? '0.000001' : '1000000', index % 2 ? 'ml' : 'piece',
+        ...Array(12).fill('')]))
+    }
+  }
+  assert.equal(distinct.size, 100)
+  const exact = [row(columns), ...entries].join('\n') + '\n'
+  const bytes = Buffer.from(exact, 'utf8')
+  assert.ok(bytes.length > 300_000, 'exercise a real large multibyte payload')
+  assert.ok(bytes.length <= 1_048_576)
+  const sum = {...expected, rows: 200, ingredientNeeds: 100}
+  assert.deepEqual(auditPrivateWorksheetCsv(exact), sum)
+  const writes = []
+  assert.deepEqual(await main(Readable.from([
+    ...Array.from({length: Math.ceil(bytes.length / 113)},
+      (_, index) => bytes.subarray(index * 113, index * 113 + 113)),
+  ]), chunk => writes.push(chunk)), sum)
+  assert.deepEqual(writes, [JSON.stringify(sum) + '\n'])
+  assert.doesNotMatch(writes[0], /need-|औ|observedPriceEUR|dekamarkt|plus/)
+  const lastStore = entries.at(-1)
+  const altered = [row(columns), ...entries.slice(0, -1),
+    lastStore.replace('"0.000001","ml"', '"0.000002","ml"')].join('\n') + '\n'
+  assert.notEqual(altered, exact)
+  await refused([Buffer.from(altered, 'utf8')])
+})
+
+test('512 UTF-16-unit joined-emoji label is accepted without Unicode truncation; 513 is refused', async () => {
+  const human = '👩‍🍳'.repeat(102) + 'éé'
+  assert.equal(human.length, 512)
+  const valid = csv.replaceAll(cell(label), cell(human))
+  const encoded = Buffer.from(valid, 'utf8')
+  assert.deepEqual(auditPrivateWorksheetCsv(valid), expected)
+  await examine([encoded])
+  await examine([valid])
+  const split = encoded.indexOf(Buffer.from('👩‍🍳'))
+  assert.ok(split > 0)
+  for (let i = split; i < split + 11; i++) {
+    await examine([encoded.subarray(0, i), encoded.subarray(i)])
+  }
+  const tooLong = valid.replaceAll(cell(human), cell(human + 'é'))
+  assert.equal((human + 'é').length, 513)
+  assert.throws(() => auditPrivateWorksheetCsv(tooLong),
+    /Private worksheet QA audit refused/)
+  await refused([Buffer.from(tooLong, 'utf8')])
+  const cli = fileURLToPath(new URL('../scripts/qa-m3-private-worksheet-preflight.mjs', import.meta.url))
+  const run = body => spawnSync(process.execPath, [cli], {
+    input: body, encoding: 'utf8', timeout: 15000,
+  })
+  const accepted = run(valid)
+  assert.equal(accepted.status, 0, accepted.stderr)
+  assert.deepEqual(JSON.parse(accepted.stdout), expected)
+  assert.equal(accepted.stderr, '')
+  const rejected = run(tooLong)
+  assert.equal(rejected.status, 2)
+  assert.equal(rejected.stdout, '')
+  assert.match(rejected.stderr, /^Private worksheet QA audit refused\s*$/)
+  assert.doesNotMatch(rejected.stderr, /👩|é|plus|dekamarkt/)
+})
+
+test('real six-source M3 private worksheet survives byte-stream transport for all 15 day subsets', async () => {
+  const [{m2InitialPlan, m2Recipes}, source, producer] = await Promise.all([
+    import('../src/data/m2Fixture.ts'),
+    import('../scripts/retailer-reviewed-ingest-engine.mjs'),
+    import('../scripts/retailer-private-selected-week-observation.mjs'),
+  ])
+  const records = await Promise.all(source.RETAILER_REVIEWED_FIXTURES.map(name =>
+    source.readBoundedRegularReviewedFixture(fileURLToPath(
+      new URL('../fixtures/m1/' + name, import.meta.url)))))
+  const originals = structuredClone(records)
+  const plan = structuredClone(m2InitialPlan)
+  const recipes = structuredClone(m2Recipes)
+  const inputSnapshot = structuredClone({plan, recipes})
+  const weekdays = ['Ma', 'Di', 'Wo', 'Do']
+  let validated = 0
+  for (let mask = 1; mask < 16; mask++) {
+    const days = weekdays.filter((_, i) => mask & (1 << i))
+    const sheet = producer.buildPrivateSelectedWeekObservationWorksheet(
+      records, days, {plan, recipes})
+    assert.equal(sheet.productionReady, false)
+    assert.equal(sheet.publicSavingsClaimEligible, false)
+    assert.equal(sheet.observedStorePrices, 0)
+    const audited = auditPrivateWorksheetCsv(sheet.csv)
+    assert.equal(audited.verifiedActualObservations, 0)
+    assert.equal(audited.sourceRightsVerified, false)
+    assert.equal(audited.rows, sheet.rows)
+    assert.equal(audited.pairedRetailers, 2)
+    const bytes = Buffer.from(sheet.csv, 'utf8')
+    const responses = []
+    const chunks = []
+    for (let off = 0; off < bytes.length; off += 1 + off % 43)
+      chunks.push(bytes.subarray(off, off + 1 + off % 43))
+    const streaming = await main(Readable.from(chunks), text => responses.push(text))
+    assert.deepEqual(streaming, audited)
+    assert.deepEqual(responses, [JSON.stringify(audited) + '\n'])
+    assert.doesNotMatch(responses[0], /sourceUrl|capturedAt|priceCents|Kippendij|plus|dekamarkt/)
+    if (mask === 15) {
+      assert.equal(sheet.rows, 22, 'all four days yield canonical 11×2 blank worksheet')
+      assert.equal(audited.ingredientNeeds, 11)
+    }
+    validated++
+  }
+  assert.equal(validated, 15)
+  assert.deepEqual(records, originals, 'historical source archives remain unchanged')
+  assert.deepEqual({plan, recipes}, inputSnapshot, 'caller owned recipes and planner stay immutable')
+})
+
+test('real four-day private producer CLI workflow feeds complete blank 11×2 CSV to operator CLI', async () => {
+  const producer = await import('../scripts/retailer-private-selected-week-observation.mjs')
+  const captured = []
+  const state = await producer.main(['--days', 'Ma,Di,Wo,Do'],
+    chunk => captured.push(chunk))
+  assert.deepEqual(state, {
+    evidenceStatus: 'collection-template-not-evidence',
+    rows: 22, productionReady: false,
+  })
+  assert.equal(captured.length, 1, 'producer emits one complete blank CSV, no partial rows')
+  const csv = captured[0]
+  const audit = auditPrivateWorksheetCsv(csv)
+  assert.equal(audit.rows, 22)
+  assert.equal(audit.ingredientNeeds, 11)
+  assert.equal(audit.verifiedActualObservations, 0)
+  assert.equal(audit.sourceRightsVerified, false)
+  assert.equal(audit.productionReady, false)
+  assert.equal(audit.publicSavingsClaimEligible, false)
+  assert.doesNotMatch(csv, /capturedAt|sourceUrl|priceCents|consented-export/)
+  const cli = fileURLToPath(new URL('../scripts/qa-m3-private-worksheet-preflight.mjs',
+    import.meta.url))
+  const result = spawnSync(process.execPath, [cli], {
+    input: Buffer.from(csv, 'utf8'), encoding: 'utf8', timeout: 20000,
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stderr, '')
+  assert.deepEqual(JSON.parse(result.stdout), audit)
+  assert.doesNotMatch(result.stdout, /Kippendij|Basmati|plus|dekamarkt|observedProductName|sourceUrl/)
+})
