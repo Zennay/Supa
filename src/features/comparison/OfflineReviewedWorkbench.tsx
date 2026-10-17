@@ -5,6 +5,7 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
+import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -296,6 +297,13 @@ export function OfflineReviewedWorkbench({
                   : 'Nog geen vergelijkbaar prijsverschil: ontbrekende producten, verouderde gegevens of ongelijke waarnemingstijden.'}
                 <small> Dit is nooit een gecontroleerde publieke besparingsclaim.</small>
               </p>
+              <PrivateBasketComparisonExport
+                plus={basketPair.plus}
+                deka={basketPair.deka}
+                plusObservedAt={imported.captures.PLUS.observedAt}
+                dekaObservedAt={imported.captures.DekaMarkt.observedAt}
+                comparable={canShowDifference}
+              />
               {canShowDifference && basketPair.comparison.lineDeltas.length > 0 && (
                 <section className="offline-price-workbench__drivers" aria-label="Prijsverschil per ingrediënt">
                   <h4>Wat veroorzaakt het verschil?</h4>
