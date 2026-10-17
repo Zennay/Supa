@@ -87,7 +87,7 @@ test('positive: poisoned device GET fails privately while unrelated healthy devi
   const saved = await write(x.url, KEY_GOOD)
   assert.equal(saved.status, 200)
   assert.equal((await saved.json()).revision, 2)
-  assert.equal((await JSON.parse(await readFile(x.good, 'utf8'))).revision, 2)
+  assert.equal(JSON.parse(await readFile(x.good, 'utf8')).revision, 2)
   assert.equal(await readFile(x.bad, 'utf8'), x.originalBad,
     'the healthy neighbor must never alter or echo poisoned device evidence')
 })
@@ -110,7 +110,7 @@ test('P2 #3809: simultaneous poisoned and healthy PUTs must isolate bad predeces
   assert.deepEqual(healthy.entries, updated)
 })
 
-test('P2 #3809: existing invalid revision must also refuse a zero-base CAS without leaking private state', async t => {
+test('positive: zero-base CAS conflict never leaks an invalid persisted revision', async t => {
   const x = await setup(t)
   const resp = await write(x.url, KEY_BAD, 0)
   assert.equal(resp.status, 500)
