@@ -15,7 +15,28 @@ import { pathToFileURL } from 'node:url'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 
 const REFUSE = 'Independent M3 documentary rights audit refused'
-const suspiciousQueryName = /(?:^|[_-])(?:token|access|refresh|password|passwd|secret|api[_-]?key|authorization|auth|code|client[_-]?secret)(?:$|[_-])/i
+// Offline documentary references must never carry credential-shaped *keys*.
+// WHATWG URLSearchParams decodes one percent-encoding layer; re-encoded
+// OAuth/PKCE/SAML keys otherwise masquerade as ordinary query parameters.
+const suspiciousQueryName = /^(?:access(?:token|code|key)?|refresh(?:token)?|auth(?:token|entication|orization|code|key)?|authorization|clientsecret|apikey|session(?:id|key|token)?|jwt|bearer|password|passwd|secret|token|code(?:verifier|challenge)?|saml(?:response|assertion)?|oauth(?:token|code)?|pkce(?:verifier)?|credential(?:s)?|privatekey)$/u
+
+function isCredentialShapedQueryKey(key) {
+  if (typeof key !== 'string' || key.length > 512) return true
+  let decoded = key
+  // URLSearchParams has already done the initial percent-decoding.
+  // Allow up to three additional layers, but refuse unresolved escapes:
+  // a documentary permission reference must be unambiguous.
+  for (let depth = 0; depth < 4 && decoded.includes('%'); depth++) {
+    try { decoded = decodeURIComponent(decoded) } catch { return true }
+  }
+  if (decoded.includes('%')) return true
+  // NFKC catches fullwidth/compatibility aliases, and invisible Unicode
+  // marks cannot disguise a leading or interior sensitive name.
+  const compact = decoded.normalize('NFKC')
+    .replace(/[\p{Default_Ignorable_Code_Point}\p{Mark}]/gu, '')
+    .toLowerCase().replace(/[^a-z0-9]/gu, '')
+  return suspiciousQueryName.test(compact)
+}
 
 /**
  * This checks static documentary reference SHAPES, not legal entitlement.
@@ -24,7 +45,9 @@ const suspiciousQueryName = /(?:^|[_-])(?:token|access|refresh|password|passwd|s
  * Domain resolution and redirect safety still require human review.
  */
 export function isPublicDocumentaryEvidenceUrl(value) {
-  if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return false
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2048 ||
+      /[\u0000-\u001f\u007f]/u.test(value) ||
+      /[?#]$/u.test(value)) return false
   try {
     const u = new URL(value)
     const host = u.hostname.toLowerCase()
@@ -37,7 +60,7 @@ export function isPublicDocumentaryEvidenceUrl(value) {
     for (const name of u.searchParams.keys()) {
       // Even a safe-looking domain is not a licence reference if its link
       // embeds a credential-shaped parameter. Do not echo values anywhere.
-      if (suspiciousQueryName.test(name)) return false
+      if (isCredentialShapedQueryKey(name)) return false
     }
     return true
   } catch {
