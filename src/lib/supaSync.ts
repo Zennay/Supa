@@ -1,4 +1,5 @@
 import type { SyncRequestInit } from './syncTransport'
+import { admitRemoteSnapshot } from './syncRecords.ts'
 
 /**
  * Browser half of /api/sync. localStorage stays the source the app reads, so
@@ -84,8 +85,9 @@ function adopt(storage: StorageLike, meta: Meta, remote: Remote): { changed: Syn
 async function readRemote(options: SyncOptions, key: string, signal?: AbortSignal): Promise<Remote | null> {
   const response = await options.request({ headers: { Authorization: `Bearer ${key}` }, signal })
   if (!response.ok || !/application\/json/.test(response.headers.get('content-type') ?? '')) return null
-  const remote = await response.json()
-  return Number.isSafeInteger(remote?.revision) && remote.entries && typeof remote.entries === 'object' ? remote : null
+  // Never adopt a snapshot the app itself would refuse (malformed, partial,
+  // or carrying keys outside the sync contract).
+  return admitRemoteSnapshot(await response.json().catch(() => null))
 }
 
 /** Before the first render: restore this device's saved records from the server. */
@@ -120,7 +122,9 @@ export async function pushSyncedState(options: SyncOptions, { keepalive = false 
       return 'saved'
     }
     if (response.status === 409) {
-      const remote = await response.json()
+      const remote = admitRemoteSnapshot(await response.json().catch(() => null))
+      // An invalid conflict body must not touch local data or trigger a retry.
+      if (!remote) return 'unavailable'
       const merged = adopt(options.storage, meta, remote)
       // Keep this browser's own edits as unsynced on top of the newer base.
       writeMeta(options.storage, merged.meta)

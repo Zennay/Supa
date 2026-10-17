@@ -5,6 +5,16 @@ import { pathToFileURL } from 'node:url'
 import { fetchRecipeHtml } from './recipe-fetch.mjs'
 import { createFileSyncStore, validDeviceKey } from './sync-store.mjs'
 import { MAX_SNAPSHOT_BYTES, validateSyncEntries } from './sync-validation.mjs'
+
+/**
+ * The API only ever serves an app-valid snapshot: the empty device at
+ * revision 0, or a complete record that passes the same rules as a PUT.
+ * The store checks file safety and shape; this is the semantic gate.
+ */
+function servable(record) {
+  if (record.revision === 0) return Object.keys(record.entries).length === 0
+  return !validateSyncEntries(record.entries, { complete: true }).error
+}
 import { importRecipeFromHtml } from '../src/domain/userRecipeImport.ts'
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.json': 'application/json', '.txt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2' }
@@ -97,6 +107,7 @@ export function createRecipeServer({
       try {
         if (req.method === 'GET') {
           const record = await syncStore.read(deviceKey)
+          if (!servable(record)) throw new Error('stored sync record is not servable')
           return json(200, record)
         }
         const body = await readBody(req, MAX_SNAPSHOT_BYTES + 4096)
@@ -104,7 +115,10 @@ export function createRecipeServer({
         const checked = validateSyncEntries(body.entries)
         if (checked.error) return json(422, { error: checked.error })
         const result = await syncStore.write(deviceKey, body.baseRevision, checked.entries)
-        if (result.conflict) return json(409, result.record)
+        if (result.conflict) {
+          if (!servable(result.record)) throw new Error('stored sync record is not servable')
+          return json(409, result.record)
+        }
         return json(200, { revision: result.record.revision, updatedAt: result.record.updatedAt })
       } catch (error) {
         if (error instanceof HttpError) return json(error.status, { error: error.message })

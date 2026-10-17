@@ -211,3 +211,26 @@ test('an aged lock still held open by a live process is never stolen; it is reco
     await rm(dirname(dir), { recursive: true, force: true })
   }
 })
+
+test('the API serves only app-valid, complete stored snapshots on GET and 409', async () => {
+  const { createHash } = await import('node:crypto')
+  const plannerOk = JSON.stringify({ budget: 35, activeDays: ['Ma'], recipeByDay: {} })
+  const cases = [
+    { 'supa:planner-preferences:v2': '{"budget":', 'supa.recipe-library.v1': null, 'supa:shopping-list-progress:v1': null },
+    { 'supa:planner-preferences:v2': plannerOk, 'supa.recipe-library.v1': '{"version":999,"recipes":[]}', 'supa:shopping-list-progress:v1': null },
+    { 'supa:planner-preferences:v2': plannerOk, 'supa.recipe-library.v1': null },
+    {},
+  ]
+  for (const entries of cases) {
+    await withServer(async (base, dir) => {
+      const syncDir = join(dir, 'sync')
+      await mkdir(syncDir, { recursive: true, mode: 0o700 })
+      await writeFile(join(syncDir, `${createHash('sha256').update(key).digest('hex')}.json`), JSON.stringify({ revision: 1, updatedAt: '2026-10-17T00:00:00.000Z', entries }), { mode: 0o600 })
+      const get = await fetch(`${base}/api/sync`, { headers: { authorization: `Bearer ${key}` } })
+      assert.equal(get.status, 500)
+      assert.deepEqual(await get.json(), { error: 'Je gegevens konden niet worden bewaard.' })
+      const stale = await put(base, { baseRevision: 0, entries: {} })
+      assert.equal(stale.status, 500, 'a 409 body never carries an unservable record')
+    })
+  }
+})
