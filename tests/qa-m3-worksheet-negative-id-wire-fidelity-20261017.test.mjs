@@ -118,3 +118,17 @@ test('P2 expected RED: changing only Deka raw ID to unescaped in true 5×2 works
   assert.notEqual(modified, sheet.csv, 'mutate exactly one retailer row from genuine offline exporter')
   await refusesWithoutLeaks(modified)
 })
+
+test('control: original source-safe negative IDs remain legitimate through exact 170-character boundary', async () => {
+  const safe = ['-x', '-X', '-a_b.1:2', '-'+ 'a'.repeat(169)]
+  for (const sourceId of safe) {
+    const visible = "'" + sourceId
+    const csv = pairedCsv(visible, visible)
+    assert.deepEqual(auditPrivateWorksheetCsv(csv), blankPrivate)
+    const output = []
+    assert.deepEqual(await main(Readable.from([Buffer.from(csv)]), fragment => output.push(fragment)), blankPrivate)
+    assert.deepEqual(output, [JSON.stringify(blankPrivate) + '\n'])
+    assert.doesNotMatch(output[0], /dekamarkt|plus|Kaas/)
+  }
+  await refusesWithoutLeaks(pairedCsv("'-" + 'a'.repeat(170), "'-" + 'a'.repeat(170)))
+})
