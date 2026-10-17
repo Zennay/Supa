@@ -249,3 +249,36 @@ test('exact 100×2 private capacity preserves max 170-unit IDs and 512-unit Unic
   assert.notEqual(altered, exact)
   await refused([Buffer.from(altered, 'utf8')])
 })
+
+test('512 UTF-16-unit joined-emoji label is accepted without Unicode truncation; 513 is refused', async () => {
+  const human = '👩‍🍳'.repeat(102) + 'éé'
+  assert.equal(human.length, 512)
+  const valid = csv.replaceAll(cell(label), cell(human))
+  const encoded = Buffer.from(valid, 'utf8')
+  assert.deepEqual(auditPrivateWorksheetCsv(valid), expected)
+  await examine([encoded])
+  await examine([valid])
+  const split = encoded.indexOf(Buffer.from('👩‍🍳'))
+  assert.ok(split > 0)
+  for (let i = split; i < split + 11; i++) {
+    await examine([encoded.subarray(0, i), encoded.subarray(i)])
+  }
+  const tooLong = valid.replaceAll(cell(human), cell(human + 'é'))
+  assert.equal((human + 'é').length, 513)
+  assert.throws(() => auditPrivateWorksheetCsv(tooLong),
+    /Private worksheet QA audit refused/)
+  await refused([Buffer.from(tooLong, 'utf8')])
+  const cli = fileURLToPath(new URL('../scripts/qa-m3-private-worksheet-preflight.mjs', import.meta.url))
+  const run = body => spawnSync(process.execPath, [cli], {
+    input: body, encoding: 'utf8', timeout: 15000,
+  })
+  const accepted = run(valid)
+  assert.equal(accepted.status, 0, accepted.stderr)
+  assert.deepEqual(JSON.parse(accepted.stdout), expected)
+  assert.equal(accepted.stderr, '')
+  const rejected = run(tooLong)
+  assert.equal(rejected.status, 2)
+  assert.equal(rejected.stdout, '')
+  assert.match(rejected.stderr, /^Private worksheet QA audit refused\s*$/)
+  assert.doesNotMatch(rejected.stderr, /👩|é|plus|dekamarkt/)
+})
