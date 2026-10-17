@@ -578,7 +578,9 @@ export function validObservedAt(value: string, referenceNowMs = Number.POSITIVE_
     Number(match[6] ?? '0') > 59 ||
     (match[7] !== 'Z' && (
       Number(match[8]) > 14 || Number(match[9]) > 59 ||
-      (Number(match[8]) === 14 && Number(match[9]) !== 0)
+      (Number(match[8]) === 14 && Number(match[9]) !== 0) ||
+      (match[7].startsWith('-') && (Number(match[8]) > 12 ||
+        (Number(match[8]) === 12 && Number(match[9]) !== 0)))
     ))
   ) {
     return null
