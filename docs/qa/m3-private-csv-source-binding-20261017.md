@@ -30,6 +30,30 @@ node --experimental-strip-types scripts/qa-m3-private-csv-report-binding-2026101
 
 Ook het veldformulier moet een owner-owned, regulier, single-link 0600-bestand van maximaal 2 MiB zijn, zonder symlinkouders. Bij een positieve uitkomst verschijnt aanvullend `sheetProjectionConsistent:true`; de 11 fysieke vereisten en de PLUS/Deka-product- en prijsgegevens zijn dan consistent met wat **de huidige converter** uit dat formulier projecteert. Eén ontbrekende prijs of gewijzigde productnaam in een veldregel wordt geweigerd.
 
+## Optioneel: exacte originele veldbytes koppelen aan een eerdere SHA-256
+
+De drie-bestandencontrole toetst alleen de gegevens die de productvergelijking werkelijk projecteert. Een gewijzigd `participantKey`, notitie of opmaak zou daarom ongemerkt de vorige controle kunnen doorstaan. Voor operatoren die het **oorspronkelijke privé-veldformulier eerder hebben gefingerprint** bestaat nu een aanvullende, alleen-lezen SHA-256-controle.
+
+Maak de fingerprint eerst van het oorspronkelijke 0600-veldformulier en bewaar het resultaat privé, apart van de lokale bestandspaden:
+
+```sh
+node scripts/m3-private-evidence-fingerprint.mjs /prive/map/m3-original-field-sheet.json
+```
+
+Stel zelf vooraf de omgevingsvariabele `M3_SHEET_SHA256` in op de **eerder genoteerde** lowercase 64-hex `sha256` en gebruik deze in de extra CLI-modus:
+
+```sh
+node --experimental-strip-types scripts/qa-m3-private-csv-report-binding-20261017.mjs \
+  /prive/map/m3-private-product-comparison.json \
+  /prive/map/m3-private-product-comparison.csv \
+  --sheet /prive/map/m3-original-field-sheet.json \
+  --sheet-sha256 "$M3_SHEET_SHA256"
+```
+
+Alle drie bestanden moeten aan de bestaande 0600/owner/regular/single-link-eisen voldoen. Een geldige combinatie levert aanvullend `sheetByteFingerprintMatched:true`; iedere verandering in *ook niet-geprojecteerde velden* of enkel whitespace/opmaak wijzigt de SHA en wordt zonder data-lek geweigerd. De bestaande twee- en drie-bestandenmodi blijven exact bruikbaar en geven **geen** fingerprint-bevestiging. De fingerprint zelf wordt niet in CLI-uitvoer van deze QA-controle getoond.
+
+**Grenzen:** de operator moet de oorspronkelijke SHA al betrouwbaar en onafhankelijk hebben opgeslagen. Het herberekenen van zowel fingerprint als gewijzigd formulier bewijst niets over de oorspronkelijke inhoud. Een SHA-256 match bevestigt alleen byte-identiteit met de opgegeven fingerprint, **geen** retailerbron, echte prijs, toestemming, onaantastbare tijdstempel of applicatiecodeversie. Dit implementeert niet de vereiste M3 veldcode-SHA/attestatie uit issue #205.
+
 **Essentiële beperking:** niet alle oorspronkelijke velden (zoals participantKey, studieschema of administratieve notities) worden door de M3 productvergelijking bewaard. Deze extra check kan dus **niet** bewijzen dat die niet-geprojecteerde metadata ongewijzigd is, geen fysieke prijswaarneming bevestigen en geen originele code-SHA van veldwerk vastpinnen. [#205](https://github.com/Zennay/Supa/issues/205) blijft OPEN. De standaard 2-artefactmodus blijft compatibel.
 
 ## Beveiligingsgrenzen
@@ -46,6 +70,7 @@ Ook het veldformulier moet een owner-owned, regulier, single-link 0600-bestand v
 
 ```sh
 node --experimental-strip-types --test tests/qa-m3-private-csv-report-binding-20261017.test.mjs
+node --experimental-strip-types --test tests/qa-m3-private-csv-fingerprint-binding-20261017.test.mjs
 ```
 
 Alle tests gebruiken fictieve prijzen, namen en lokaal gegenereerde bestanden; geen retailer HTTP of echte persoonsgegevens.
