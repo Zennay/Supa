@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { ManualLine } from '../../domain/manualStoreComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import {
@@ -25,7 +26,7 @@ function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): stri
   return [
     tableHeader,
     ...needs.flatMap(need => MANUAL_RETAILERS.map(store => {
-      const quote = entries[manualQuoteKey(store, need.id)]
+      const quote = entries[manualQuoteKey(store, need.ingredientId)]
       return [
         safeTableCell(need.id), store,
         safeTableCell(quote?.product ?? ''),
@@ -81,11 +82,11 @@ export function ManualStoreComparison({
     catch { return null }
   }, [needs, entries])
 
-  function setQuote(need: ManualNeed, store: ManualRetailer, field: keyof ManualQuote, value: string) {
+  function setQuote(need: ManualLine, store: ManualRetailer, field: keyof ManualQuote, value: string) {
     const key = manualQuoteKey(store, need.id)
     setEntries(previous => {
       const quote = previous[key] ?? {
-        product: '', packAmount: '', packUnit: need.unit, price: '',
+        product: '', packAmount: '', packUnit: need.requiredUnit, price: '',
       }
       return { ...previous, [key]: { ...quote, [field]: value } }
     })
