@@ -121,6 +121,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
   const [preparedFor, setPreparedFor] = useState('')
   const [savedDraftRaw, setSavedDraftRaw] = useState<string | null>(null)
   const [draftOptIn, setDraftOptIn] = useState(false)
+  const [draftFingerprint, setDraftFingerprint] = useState('')
   const [draftProtected, setDraftProtected] = useState(false)
   const [draftStatus, setDraftStatus] = useState('')
 
@@ -131,6 +132,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
     setRows(old.rows)
     setCapturedAt(old.capturedAt)
     setDraftOptIn(old.saved)
+    setDraftFingerprint(selectedPlanFingerprint)
     setDraftProtected(old.protected)
     setSavedDraftRaw(old.raw)
     if (old.saved) setDraftStatus('Je vorige privéconcept voor deze week is hersteld in deze browsertab.')
@@ -139,7 +141,8 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
   }, [selectedPlanFingerprint])
 
   useEffect(() => {
-    if (!draftOptIn || draftProtected || typeof window === 'undefined') return
+    if (!draftOptIn || draftProtected || draftFingerprint !== selectedPlanFingerprint ||
+        typeof window === 'undefined') return
     try {
       const actual = window.sessionStorage.getItem(privateDraftStorageKey)
       if (actual !== savedDraftRaw) {
@@ -156,7 +159,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
       setDraftOptIn(false)
       setDraftStatus('Kon dit privéconcept niet bewaren. Gebruik desgewenst de lokale JSON-download.')
     }
-  }, [draftOptIn, draftProtected, rows, capturedAt, selectedPlanFingerprint])
+  }, [draftOptIn, draftProtected, draftFingerprint, rows, capturedAt, selectedPlanFingerprint])
 
   function clearDraft() {
     if (typeof window !== 'undefined') {
