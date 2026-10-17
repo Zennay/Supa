@@ -37,7 +37,7 @@ test('hypothetical code-pinned private M3 artifacts admit matching exact current
       const frozen = JSON.stringify(f)
       const result = audit(f)
       assert.equal(result.codePinMatched, true)
-      assert.equal(result.sourceSheetStudyAssessmentBound, true)
+      assert.equal(result.canonicalPhysicalProjectionBound, true)
       assert.equal(result.publicSavingsClaimEligible, false)
       assert.equal(result.verifiedRetailerObservations, false)
       assert.equal(result.m3ExitProven, false)
@@ -131,4 +131,32 @@ test('release/claim flags, planning window and canonical M2 fixture cannot be by
     checks++
   }
   assert.equal(checks, 6)
+})
+
+test('same copied SHA and study key cannot hide mismatched physical source, study or assessment money', () => {
+  let checked = 0
+  for (const mutate of [
+    f => { f.sheet.candidate.lines[0].observedProduct.priceCents += 1 },
+    f => { f.study.candidate.basket.lines[0].pricePerPackCents += 1 },
+    f => { f.assessment.candidate.totalCents += 1 },
+    f => { f.assessment.deltaCents += 1 },
+  ]) {
+    const f = fixture()
+    mutate(f)
+    assert.throws(() => audit(f), failure,
+      'revision metadata alone is insufficient to bind 11x2 physical data')
+    checked++
+  }
+  assert.equal(checked, 4)
+})
+
+test('deep financial accessor in assessment must not execute during canonical proof', () => {
+  const f = fixture()
+  let invoked = 0
+  Object.defineProperty(f.assessment.candidate, 'totalCents', {
+    enumerable: true, configurable: true,
+    get() { invoked++; throw new Error('FICTIONAL_DO_NOT_LEAK') },
+  })
+  assert.throws(() => audit(f), failure)
+  assert.equal(invoked, 0)
 })
