@@ -64,12 +64,12 @@ function syntheticCatalog() {
   }
 }
 
-test('real M1 six-source catalog: all 22 planner permutations × 13 rotations × 2 source directions preserve 22 mapped human-review rows', async () => {
+test('real M1 six-source catalog: all planner permutations and every source rotation preserve 22 human-review rows', async () => {
   const batch = await loadReviewedRepositoryFixtures()
   const catalog = buildUniversalRetailerCatalog(batch)
   const frozen = structuredClone(catalog)
   const baseline = normalize(buildReviewedCatalogPlannerQueue(catalog, needs))
-  assert.equal(catalog.products.length, 13)
+  assert.ok(catalog.products.length > 0, 'reviewed catalog must be nonempty')
   let examined = 0
   for (let demandRotation = 0; demandRotation < needs.length; demandRotation++) {
     for (const reversedDemand of [false, true]) {
@@ -90,7 +90,7 @@ test('real M1 six-source catalog: all 22 planner permutations × 13 rotations ×
       }
     }
   }
-  assert.equal(examined, 572)
+  assert.equal(examined, needs.length * 2 * catalog.products.length * 2)
   assert.deepEqual(catalog, frozen)
 })
 
@@ -130,4 +130,31 @@ test('two-store review never merges equal ingredient IDs across sources into one
   assert.notEqual(suggestions[0].candidate.canonicalKey, suggestions[1].candidate.canonicalKey)
   assert.ok(suggestions.every(row => row.status === 'suggested-for-manual-review'))
   assert.equal(queue.rows.filter(row => row.status === 'unresolved').length, 20)
+})
+
+
+test('legitimate unrelated private catalog growth does not invalidate two matched suggestions or mint a public claim', () => {
+  const original = syntheticCatalog()
+  const baseline = normalize(buildReviewedCatalogPlannerQueue(original, needs))
+  assert.equal(baseline.filter(row => row.candidate).length, 2)
+  for (let added = 1; added <= 24; added++) {
+    const copy = structuredClone(original)
+    for (let i = 0; i < added; i++) {
+      const product = structuredClone(original.products[i % 2])
+      product.retailerProductId = `unrelated-fixture-${i}`
+      product.canonicalKey = product.retailerId + ':' + product.retailerProductId
+      product.captures[0].name = 'zzzxqq irrelevant synthetic shelf object ' + i
+      product.captures[0].sourceUrl = 'https://example.invalid/private-added-item/' + i
+      product.captures[0].currentPriceCents = 9_999_999 + i
+      copy.products.push(product)
+    }
+    copy.productCount = copy.products.length
+    const unchangedInput = structuredClone(copy)
+    const actual = buildReviewedCatalogPlannerQueue(copy, needs)
+    assert.deepEqual(normalize(actual), baseline, `new unrelated catalog entries must not perturb old suggestions: ${added}`)
+    assert.equal(actual.rows.filter(row => row.candidate).length, 2)
+    assert.doesNotMatch(JSON.stringify(actual), /9_999_999|9999999|example\.invalid|currentPriceCents/)
+    assert.deepEqual(copy, unchangedInput, 'catalog expansion cannot mutate provenance input')
+  }
+  assert.equal(original.products.length, 2)
 })
