@@ -4,6 +4,7 @@
 // itself, prove retailer rights, verify shop prices, or enable public savings.
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { types as nodeTypes } from 'node:util'
 import { readPrivateM3OperatorFile } from './qa-m3-private-csv-report-binding-20261017.mjs'
 import { parsePrivateM3UniqueKeyJson } from './qa-m3-private-unique-json-keys-20261017.mjs'
 import { auditPrivateM3FieldRunCodePin } from './qa-m3-field-run-code-pin-20261017.mjs'
@@ -11,13 +12,32 @@ import { auditPrivateM3FieldRunCodePin } from './qa-m3-field-run-code-pin-202610
 const REFUSE = 'M3 private field-run pin proof refused'
 const refuse = () => { throw new Error(REFUSE) }
 
+function readInertCliArguments(argv) {
+  // In-process callers can supply arrays with own getters, nonstandard
+  // prototypes or Proxy traps. Check the 8 original data descriptors once;
+  // never inspect argv.length, argv.some, or indexed properties directly.
+  if (nodeTypes.isProxy(argv) || !Array.isArray(argv) ||
+      Object.getPrototypeOf(argv) !== Array.prototype) refuse()
+  const descriptors = Object.getOwnPropertyDescriptors(argv)
+  if (descriptors.length?.value !== 8 ||
+      Reflect.ownKeys(descriptors).length !== 9) refuse()
+  const values = []
+  for (let index = 0; index < 8; index++) {
+    const descriptor = descriptors[index]
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') ||
+        descriptor.enumerable !== true ||
+        typeof descriptor.value !== 'string') refuse()
+    values.push(descriptor.value)
+  }
+  return values
+}
+
 export async function main(argv = process.argv.slice(2)) {
   try {
-    if (!Array.isArray(argv) || argv.length !== 8 ||
-        argv.some(x => typeof x !== 'string') ||
-        argv[0] !== '--sheet' || argv[2] !== '--study' ||
-        argv[4] !== '--assessment' || argv[6] !== '--expected-main-sha') refuse()
-    const paths = [argv[1], argv[3], argv[5]]
+    const args = readInertCliArguments(argv)
+    if (args[0] !== '--sheet' || args[2] !== '--study' ||
+        args[4] !== '--assessment' || args[6] !== '--expected-main-sha') refuse()
+    const paths = [args[1], args[3], args[5]]
     if (paths.some(p => !p || p !== p.trim() || p.startsWith('-') ||
         p.includes('\0')) || new Set(paths.map(p => resolve(p))).size !== 3) refuse()
     // Shared existing QA reader checks owner UID, 0600, one link, pinned FD,
@@ -28,7 +48,7 @@ export async function main(argv = process.argv.slice(2)) {
     const study = parsePrivateM3UniqueKeyJson(studyText)
     const assessment = parsePrivateM3UniqueKeyJson(assessmentText)
     const proof = auditPrivateM3FieldRunCodePin(
-      sheet, study, assessment, argv[7])
+      sheet, study, assessment, args[7])
     process.stdout.write(JSON.stringify(proof) + '\n')
     return proof
   } catch {
