@@ -164,7 +164,7 @@ export function prepareManualStoreShoppingCopy(
     const evaluated = row.quotes[retailer]
     if (!quote || evaluated.packs === null || evaluated.lineCents === null ||
         typeof quote.product !== 'string' || quote.product.trim().length < 2 ||
-        /[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/u.test(quote.product)) return null
+        /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(quote.product)) return null
     const amount = quote.packAmount.replace('.', ',')
     const packLabel = quote.packUnit === 'piece' ? 'stuks' : quote.packUnit
     lines.push(`${evaluated.packs} × ${quote.product.trim()} (${amount} ${packLabel} per verpakking) — ${formatter.format(evaluated.lineCents / 100)}`)
@@ -180,7 +180,7 @@ export function prepareManualStoreShoppingCopy(
     '',
     `Totaal volgens eigen invoer: ${formatter.format(totalCents / 100)}`,
     'Geen live winkelprijs, gegarandeerde beschikbaarheid of bewezen besparing.',
-  ].join('\\n')
+  ].join('\n')
   return Object.freeze({
     retailer,
     lineCount: lines.length,
