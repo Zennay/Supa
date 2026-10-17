@@ -185,11 +185,20 @@ export function OfflineReviewedWorkbench({
                     <section key={store}>
                       <h4>{store}</h4>
                       <strong>{complete ? euros.format(basket.totalCents / 100) : 'Geen volledig totaal'}</strong>
+                      {!complete && basket.matchedLineCount > 0 && (
+                        <span>Bekende regels samen: {euros.format(basket.totalCents / 100)} (geen mandtotaal)</span>
+                      )}
                       <span>{basket.matchedLineCount} gekoppeld, {basket.unresolvedLineCount} onbekend</span>
                     </section>
                   )
                 })}
               </div>
+              {(basketPair.plus.unresolvedLineCount > 0 || basketPair.deka.unresolvedLineCount > 0) && (
+                <p className="offline-price-workbench__missing" role="status">
+                  Deze vergelijking is nog niet volledig. Vul onbekende artikelen in beide winkels in.
+                  Bekende deelbedragen zijn geen complete winkelmandprijs en worden niet als besparing vergeleken.
+                </p>
+              )}
               <p className="offline-price-workbench__difference" role="status">
                 {canShowDifference && basketPair.comparison.deltaCents !== null
                   ? basketPair.comparison.deltaCents === 0
