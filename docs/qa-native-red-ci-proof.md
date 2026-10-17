@@ -116,3 +116,33 @@ nested evidence, the CLI and incomplete-root negative controls.
 observation. Official exact-head CI and original GitHub run/SHA attestation
 remain separate obligations. This classifier cannot certify source rights,
 field prices, savings, build or deployment: `productionReady:false`.
+
+## Operational strict root evidence vs synthetic legacy fixture compatibility (17 October 2026)
+
+[Issue #3775](https://github.com/Zennay/Supa/issues/3775) discovered a
+second missing-root proof problem that only affects *flat* TAP summaries:
+`1..2` and `# tests 2` can be fabricated from root `not ok 1` and an
+indented nested `ok 1`, despite there being **no root test 2**. The older
+programmatic `analyzeNativeRedCi()` deliberately permits some such fixtures
+to retain historical QA test compatibility; its direct return value is **not**
+a complete operational root attestation.
+
+**Run the CLI for operational evidence.** The command-line `main()` invokes
+`analyzeStrictNativeRedCi()`, which first performs all existing provenance,
+bounded-input, canonical ordinal, source allowlist, summary and completed-job
+checks, and then requires **exactly N unique validated unindented root test
+records for the single native top-level `1..N` TAP plan**. This applies
+whether `# tests=N` (flat) or `# tests>N` (legitimate Node nested suites).
+The programmatic legacy analyzer remains available to older synthetic unit
+fixtures only; do not use that compatibility API to certify a hosted job.
+
+The direct strict API and the CLI both refuse a missing root when nested
+success or failure events pad the reported totals. The independently
+green-tested real-scale synthetic fixture from [PR #3772](https://github.com/Zennay/Supa/pull/3772)
+(3,070 roots, 300 nested lines, 3,363 aggregate tests, 67 owned RED)
+continues to succeed without changing Node TAP semantics. Even strict
+expected-RED classification cannot prove a real GitHub run ID, original
+checkout SHA, completed build, a signed retailer license, private human
+observations or savings; independently check official GitHub API/job logs
+and keep `productionReady:false` until genuine source rights and M3 field
+evidence are obtained.
