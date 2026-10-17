@@ -5,6 +5,7 @@ import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
+import { ManualStoreComparison } from './features/comparison/ManualStoreComparison'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
@@ -43,6 +44,7 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'recipes', label: 'Recepten', icon: figmaAssets.imgButton1 },
   { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2 },
   { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3 },
+  { id: 'basket', label: 'Vergelijk', icon: figmaAssets.imgButton2 },
 ]
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
@@ -323,12 +325,23 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           </section>
         )}
         {tab === 'basket' && (
-          <BasketView
-            basket={basket}
-            comparison={basketComparison}
-            comparisonBaseline={comparisonBaseline}
-            comparisonCandidate={comparisonCandidate}
-          />
+          <>
+            <ManualStoreComparison
+              key={JSON.stringify([plannedMeals, activeDays, recipes.map(recipe => [recipe.id, recipe.ingredients])])}
+              plan={plannedMeals}
+              recipes={recipes}
+              activeDays={activeDays}
+            />
+            <details className="demo-comparison-disclosure">
+              <summary>Bekijk oude voorbeeldberekening (geen actuele winkelprijzen)</summary>
+              <BasketView
+                basket={basket}
+                comparison={basketComparison}
+                comparisonBaseline={comparisonBaseline}
+                comparisonCandidate={comparisonCandidate}
+              />
+            </details>
+          </>
         )}
         {tab === 'list' && <ShoppingListView basket={basket} />}
         {tab === 'observe' && <ObservationView />}
