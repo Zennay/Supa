@@ -57,7 +57,7 @@ test('QA M3 private CSV audit: structured quoted semicolons and doubled quotes s
 
 test('QA M3 private CSV audit: 264 text cells are safely exported and tampering is rejected', () => {
   let checked = 0
-  for (const prefix of ['\\u2060=', '\\u200f=', '\\u034f=', '\\u180e=', '\\ufe0f=', '\\u2060＝']) {
+  for (const prefix of ['\u2060=', '\u200f=', '\u034f=', '\u180e=', '\ufe0f=', '\u2060＝']) {
     for (const field of ['ingredientLabel', 'requiredUnit', 'plusProduct', 'dekaProduct']) {
       for (let row = 0; row < 11; row++) {
         const report = comparison()
@@ -117,8 +117,8 @@ test('QA M3 private CSV audit CLI: stdin-only, never echoes private values or pa
   })
   assert.equal(goodGuarded.status, 0, goodGuarded.stderr)
   const unsafe = guarded.replace(
-    JSON.stringify("'" + '\\u2060=' + secret),
-    JSON.stringify('\\u2060=' + secret),
+    JSON.stringify("'" + '\u2060=' + secret),
+    JSON.stringify('\u2060=' + secret),
   )
   assert.notEqual(unsafe, guarded)
   const bad = spawnSync(process.execPath, [CLI], {
