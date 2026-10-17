@@ -153,3 +153,43 @@ test('producer output must be accepted by independent auditor or atomically refu
   assert.doesNotThrow(() => audit(sheet.csv),
     'never hand a customer a human worksheet that its independently reviewed scanner refuses')
 })
+
+function inputWithQuantity(quantity) {
+  const plan = structuredClone(m2InitialPlan)
+  const recipes = structuredClone(m2Recipes)
+  recipes[0].ingredients[0].amount = quantity
+  return { plan, recipes }
+}
+
+test('operator-collectable decimal quantity minimum and maximum survive producer→auditor exactly', async () => {
+  const sources = await captures()
+  const original = structuredClone(sources)
+  for (const quantity of [0.000001, 0.00001, 1, 1_000_000]) {
+    const sheet = produce(sources, ['Ma'], inputWithQuantity(quantity))
+    assertNoEvidence(sheet)
+    const checked = audit(sheet.csv)
+    assert.equal(checked.rows, sheet.rows)
+    assert.equal(checked.productionReady, false)
+    assert.equal(checked.publicSavingsClaimEligible, false)
+    assert.equal(sheet.csv.includes('"' + String(quantity) + '"'), true)
+  }
+  assert.deepEqual(sources, original)
+})
+
+test('one 1e-7 ingredient must not create a worksheet that operator audit refuses', async () => {
+  const sources = await captures()
+  assert.throws(() => produce(sources, ['Ma'], inputWithQuantity(0.0000001)),
+    Error, '1e-7 needs an explicitly supported 7-decimal measurement; CSV scanner permits only 6')
+})
+
+test('one excessive integer 100 million must be refused upstream, not handed to the operator', async () => {
+  const sources = await captures()
+  assert.throws(() => produce(sources, ['Ma'], inputWithQuantity(100_000_000)),
+    Error, 'the independent human scanner caps independently collectable positive quantities')
+})
+
+test('one 1e21 scientific quantity must not be exported as a deceptively valid private observation', async () => {
+  const sources = await captures()
+  assert.throws(() => produce(sources, ['Ma'], inputWithQuantity(1e21)),
+    Error, '1e+21 emitted by Number.toString is uncollectable by the human scanner')
+})
