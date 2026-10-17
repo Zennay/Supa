@@ -3,6 +3,7 @@ import { buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, 
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
+import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -91,13 +92,18 @@ export function OfflineReviewedWorkbench({
       <div className="offline-price-workbench__intro">
         <span className="eyebrow">Jouw planner → brongegevens → winkelmandjes</span>
         <h2>Vergelijk twee winkels met eigen prijsdata</h2>
-        <p>Laad lokaal een eerder rechtmatig verkregen, zelf gecontroleerde JSON-export.
+        <p>Vul producten en prijzen direct per winkel in, of laad een eerder rechtmatig verkregen JSON-export.
           Supa koppelt producten aan jouw huidige weekmenu, rondt verpakkingen naar boven af
           en berekent eenheidsprijzen en volledige mandtotalen. De import start geen scraper of netwerkverzoek.</p>
         <p className="disclaimer">Privé rekenhulp: een aangeleverd bestand bewijst geen toestemming, productidentiteit,
           actuele winkelprijs of besparing. Onbekende producten krijgen nooit een verzonnen prijs.
           PLUS en DekaMarkt zijn hier uitsluitend vergelijkingslabels.</p>
       </div>
+      <LocalTwoStorePriceEditor
+        plan={plan} recipes={recipes} activeDays={activeDays}
+        onGenerated={(json) => { setText(json); importSnapshots(json) }}
+        onEdit={() => { setImported(null); setMessage('Wijzigingen nog niet doorgerekend. Bereken opnieuw om de mandjes te zien.') }}
+      />
       <details className="offline-price-workbench__schema">
         <summary>Welk importbestand werkt?</summary>
         <p>UTF-8 JSON met <code>schema: "supa-offline-prices-v1"</code> en precies twee
