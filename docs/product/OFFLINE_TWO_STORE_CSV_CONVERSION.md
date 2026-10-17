@@ -56,6 +56,10 @@ Het programma doet **geen HTTP-verzoek**, logt geen productnamen of prijzen, en 
 
 Een ontbrekend artikel blijft onbekend in de app en maakt een volledig mandje onmogelijk. De converter maakt bewust **geen** artikelmatch, berekening of verouderingsclaim: daarvoor gebruikt Supa de bestaande eenheidsprijs-, ingredientmatching- en volledigheidsregels. De applicatie laat een onderlinge privésom alleen toe wanneer alle regels matchen en beide opnames jonger dan zeven dagen en maximaal 24 uur uiteen liggen. Deze CSV is **geen M3-veldonderzoeksbewijs** en verleent geen retailerlicentie.
 
+### Ontbrekend product blijft écht ontbrekend
+
+Een rij uit het lege planner-invulblad mag **helemaal onbekend blijven**: laat `name`, `packAmount`, `packCount`, `priceCents` en desgewenst `observedAt` leeg en laat `available=false`. De converter **slaat uitsluitend deze volledig lege, onbewezen rij over**. Supa's daadwerkelijke ingredientmatching ziet daarna geen bronproduct en toont de benodigde maaltijdregel als **niet gekoppeld**, zonder nulprijs of compleet mandtotaal. Een deels ingevulde productregel wordt nooit stilzwijgend overgeslagen; die vereist een geldige echte productnaam/tijd/verpakking volgens de bronstatus. Je moet wel minstens één echt opgenomen product van **beide** winkels hebben om de twee-opname-JSON te maken. Lege regels hebben geen fake tijdstempel nodig.
+
 ## Grenzen en bronintegriteit
 
 - Per winkel 1–1.000 records; maximaal 256 kB voor CSV en JSON.
