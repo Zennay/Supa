@@ -60,7 +60,7 @@ function checkMoneyOracle(context, seed, direction) {
   assert.equal(report.fullBasket.plusTotalCents, sumPlus)
   assert.equal(report.fullBasket.dekamarktTotalCents, sumDeka)
   assert.equal(report.fullBasket.deltaCents, delta)
-  assert.equal(report.fullBasket.provisionalSavingsCents, -delta)
+  assert.equal(report.fullBasket.provisionalSavingsCents, delta === 0 ? 0 : -delta)
   const reportBeforeRender = JSON.stringify(report)
   const html = renderPrivateM3ProductComparisonHtml(report)
   const csv = renderPrivateM3ComparisonCsv(report)
