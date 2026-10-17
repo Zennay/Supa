@@ -151,3 +151,42 @@ test('well-formed CSV bytes with a forged human observed price must never yield 
   await refused([bytes])
   await refused([...bytes].map(byte => Buffer.from([byte])))
 })
+
+
+test('100 distinct private needs × 2 stores accept the exact operator limit independent of paired row ordering', async () => {
+  const entries = []
+  for (let index = 0; index < 100; index++) {
+    const id = index === 0 ? "'-signed-ingredient" : 'safe-' + index
+    const ingredient = index === 0 ? 'Zuurdesem "vóórraad" 👩‍🍳' : 'Crème ' + index + ' क्‍ष'
+    const amount = (index + 1) / 10
+    for (const store of ['dekamarkt', 'plus']) {
+      entries.push(row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', store,
+        id, ingredient, String(amount), 'g', ...Array(12).fill('')]))
+    }
+  }
+  const asCsv = rows => [row(columns), ...rows].join('\n') + '\n'
+  const canonicalCsv = asCsv(entries)
+  const reference = {...expected, rows: 200, ingredientNeeds: 100}
+  assert.deepEqual(auditPrivateWorksheetCsv(canonicalCsv), reference)
+  assert.deepEqual(await main(Readable.from([Buffer.from(canonicalCsv)]), () => {}), reference)
+  const reversedCsv = asCsv([...entries].reverse())
+  assert.deepEqual(auditPrivateWorksheetCsv(reversedCsv), reference)
+  const chunks = Buffer.from(reversedCsv, 'utf8')
+  const outputs = []
+  const byteChunks = [...chunks].map(byte => Buffer.from([byte]))
+  assert.deepEqual(await main(Readable.from(byteChunks), line => outputs.push(line)), reference)
+  assert.deepEqual(outputs, [JSON.stringify(reference) + '\n'])
+  assert.doesNotMatch(outputs[0], /Crème|Zuurdesem|signed-ingredient|dekamarkt|plus/)
+  const missing = asCsv(entries.slice(0, -1))
+  await refused([Buffer.from(missing)])
+  const repeated = asCsv([...entries, entries[0]])
+  await refused([Buffer.from(repeated)])
+  const extra = asCsv([...entries,
+    row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', 'dekamarkt', 'need-101',
+      'Valid extra need', '2', 'g', ...Array(12).fill('')]),
+    row(['UNOBSERVED_TEMPLATE_NOT_EVIDENCE', 'plus', 'need-101',
+      'Valid extra need', '2', 'g', ...Array(12).fill('')])])
+  await refused([Buffer.from(extra)])
+  assert.ok(Buffer.byteLength(canonicalCsv) < 1_048_576,
+    'normal 100x2 bounded worksheet stays below the transport byte ceiling')
+})
