@@ -110,7 +110,16 @@ export function auditNativeGreenJob(untrusted = {}) {
   if (stepPositions.some((index, at) => at && index <= stepPositions[at - 1])) refuse()
   // No additional "Run ..." executable steps hidden between or outside the
   // known frozen workflow; setup, cleanup and job-completion steps may remain.
-  if (steps.filter(s => s.startsWith('Run npm ')).length !== CHECKS.length) refuse()
+  const executableAllowlist = new Set([
+    'Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+    'Run actions/setup-node@820762786026740c76f36085b0efc47a31fe5020',
+    ...CHECKS,
+  ])
+  const executableSteps = steps.filter(s => s.startsWith('Run '))
+  if (executableSteps.length !== executableAllowlist.size ||
+      executableSteps.some(name => !executableAllowlist.has(name)) ||
+      steps.indexOf('Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1') >= stepPositions[0] ||
+      steps.indexOf('Run actions/setup-node@820762786026740c76f36085b0efc47a31fe5020') >= stepPositions[0]) refuse()
 
   const lines = boundedText(log).split(/\r?\n/).map(plain)
   // GitHub pulls/<number>/merge checkout is not the PR head itself. Match
