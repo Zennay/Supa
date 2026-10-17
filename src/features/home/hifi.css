@@ -208,3 +208,9 @@ body { background: #e9eeec; }
   .hifi-picked-history-row { flex-wrap: wrap; }
   .hifi-picked-history-row .ghost-button { margin-left: auto; min-height: 44px; }
 }
+
+.hifi-go-to-list { min-height: 44px; border-radius: 12px; padding: .5rem .85rem;
+  border: 1px solid #78967f; background: #e8f1e7; font: inherit;
+  color: #254e38; font-weight: 750; cursor: pointer; margin-left: auto; }
+.hifi-go-to-list:focus-visible { outline: 3px solid #226f52; outline-offset: 3px; }
+@media(max-width:420px) { .hifi-go-to-list { font-size: .82rem; padding: .5rem .6rem; } }
