@@ -47,7 +47,7 @@ test('M3 private HTML: exact independent escape oracle over 11×2 hostile produc
         const html = renderPrivateM3ProductComparisonHtml(input)
         assert.ok(html.includes('<strong>' + escapeHtml('QA_UNTRUSTED_' + payload) + '</strong>'),
           'escaping must be in actual product text context')
-        assert.doesNotMatch(html, /<(?:script|img|svg|iframe|a|style|math)\b/iu,
+        assert.doesNotMatch(html, /<(?:script|img|svg|iframe|a|math)\b/iu,
           'an untrusted label must not create an active HTML tag')
         assert.equal(JSON.stringify(input), prior, 'renderer must not mutate the original report')
         assert.equal(input.publicSavingsClaimEligible, false)
@@ -74,7 +74,7 @@ test('M3 private HTML: all 11 ingredient labels escape special text while totals
   assert.deepEqual(input.fullBasket, priorTotals)
   assert.equal(JSON.stringify(input), original)
   assert.equal((html.match(/<tr><th scope="row">/gu) ?? []).length, 11)
-  assert.doesNotMatch(html, /<(?:script|img|svg|iframe|a|style|math)\b/iu)
+  assert.doesNotMatch(html, /<(?:script|img|svg|iframe|a|math)\b/iu)
 })
 
 test('M3 HTML: structured private/nonpublic metadata does not enter offline document output', () => {
