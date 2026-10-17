@@ -5,6 +5,21 @@ import { pathToFileURL } from 'node:url'
 // retailer fetching, price publication or savings claims.
 const MAX_BYTES = 1024 * 1024
 const TEXT_COLUMNS = Object.freeze([0, 2, 3, 5, 10, 12, 18])
+const TEXT_SET = new Set(TEXT_COLUMNS)
+const PHYSICAL_DECIMAL = /^(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?$/iu
+const WHOLE_COUNT = /^(?:0|[1-9]\d*)$/u
+const EUROS = /^(?:0|[1-9]\d*),\d{2}$/u
+const SIGNED_EUROS = /^-?(?:0|[1-9]\d*),\d{2}$/u
+
+function isCanonicalNumericCell(value, index) {
+  // Missing cells are allowed for unresolved private pack evidence.
+  if (value === '') return true
+  if ([1, 4, 11].includes(index)) return PHYSICAL_DECIMAL.test(value)
+  if ([6, 7, 13, 14].includes(index)) return WHOLE_COUNT.test(value)
+  if ([8, 9, 15, 16].includes(index)) return EUROS.test(value)
+  if (index === 17) return SIGNED_EUROS.test(value)
+  return false
+}
 
 function invalid() {
   throw new Error('M3 private CSV safety preflight failed')
@@ -62,10 +77,28 @@ export function auditPrivateM3ComparisonCsv(csv) {
   if (rows[1].length !== 19 || rows[1][0] !== 'Ingrediënt') invalid()
   if (!['VOORLOPIGE VOLLEDIGE MAND', 'VOLLEDIGE MAND ONBEKEND']
     .includes(rows[13][0])) invalid()
-  for (const cells of rows.slice(2)) {
+  // Advisory/header labels are also text cells; never assume manually
+  // modified CSV headers are inert just because the producer normally owns them.
+  for (const cells of rows.slice(0, 2)) {
+    for (const value of cells) if (hasUnguardedFormulaText(value)) invalid()
+  }
+  for (let rowIndex = 2; rowIndex < rows.length; rowIndex++) {
+    const cells = rows[rowIndex]
     if (cells.length !== 19) invalid()
-    for (const index of TEXT_COLUMNS) {
-      if (hasUnguardedFormulaText(cells[index])) invalid()
+    const footer = rowIndex === 13
+    for (let index = 0; index < 19; index++) {
+      const value = cells[index]
+      if (footer) {
+        if ([9, 16, 17].includes(index)) {
+          if (!isCanonicalNumericCell(value, index)) invalid()
+        } else if (hasUnguardedFormulaText(value)) invalid()
+      } else if (TEXT_SET.has(index)) {
+        if (hasUnguardedFormulaText(value)) invalid()
+      } else if (!isCanonicalNumericCell(value, index)) {
+        // Covers all numeric positions; signed basket deltas are permitted
+        // only in canonical exact-EUR representation, not formula expressions.
+        invalid()
+      }
     }
   }
   return Object.freeze({
