@@ -232,3 +232,49 @@ test('free-floating gate words do not replace structured rights JSON', () => {
   y.log = y.log.replace(stamp('}'), stamp('  "sourceRights": true'))
   noProof(y)
 })
+
+
+test('GREEN proof rejects any additional executable workflow step even when metadata claims success', () => {
+  for (const name of ['Run bash -c unreviewed-network-action',
+    'Run npm publish', 'Run python3 unreviewed-script.py',
+    'Run actions/cache@deadbeef']) {
+    const x = evidence()
+    x.job.steps.push({name, status:'completed', conclusion:'success'})
+    x.log += stamp('##[group]' + name) + '\n'
+    noProof(x)
+  }
+})
+
+test('green metadata must retain immutable pinned checkout and Node setup actions', () => {
+  for (const [original, replacement] of [
+    ['Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+      'Run actions/checkout@' + 'f'.repeat(40)],
+    ['Run actions/setup-node@820762786026740c76f36085b0efc47a31fe5020',
+      'Run actions/setup-node@' + 'f'.repeat(40)],
+  ]) {
+    const x = evidence()
+    const step = x.job.steps.find(s => s.name === original)
+    assert.ok(step)
+    step.name = replacement
+    noProof(x)
+  }
+})
+
+test('checkout and Node toolchain steps cannot be reordered after tests', () => {
+  for (const name of NAMES.slice(1, 3)) {
+    const x = evidence()
+    x.job.steps = x.job.steps.filter(s => s.name !== name)
+    x.job.steps.splice(8, 0, {
+      name, status:'completed', conclusion:'success',
+    })
+    noProof(x)
+  }
+})
+
+test('standard pinned setup actions and expected npm steps stay accepted with no source-rights release', () => {
+  const x = evidence()
+  const report = auditNativeGreenJob(x)
+  assert.equal(report.tests, 2)
+  assert.equal(report.productionReady, false)
+  assert.equal(report.realStorePricesVerified, 0)
+})
