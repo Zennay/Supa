@@ -31,17 +31,17 @@ function selected(recipes, plan, archived) {
   })
 }
 
-function privateSummary(output) {
+function privateSummary(output, needs = 8) {
   assert.equal(output.productionReady, false)
   assert.equal(output.publicSavingsClaimEligible, false)
   assert.equal(output.observedStorePrices, 0)
-  assert.equal(output.rows, 16)
+  assert.equal(output.rows, needs * 2)
   const audited = auditPrivateWorksheetCsv(output.csv)
   assert.deepEqual([
     audited.rows, audited.ingredientNeeds, audited.pairedRetailers,
     audited.verifiedActualObservations, audited.sourceRightsVerified,
     audited.productionReady, audited.publicSavingsClaimEligible,
-  ], [16, 8, 2, 0, false, false, false])
+  ], [needs * 2, needs, 2, 0, false, false, false])
   assert.doesNotMatch(output.csv, /sourceUrl|capturedAt|priceCents|publicSavingsClaimEligible/i)
 }
 
@@ -123,4 +123,36 @@ test('P2 expected RED: equivalent selected demand has canonical unit and identic
   assert.equal(createHash('sha256').update(forward.csv).digest('hex'),
     createHash('sha256').update(reverse.csv).digest('hex'),
     'same source plan demand must not change operator-file SHA')
+})
+
+
+test('P2 expected RED: equal l/ml selected need must be canonical across opposite meal orders', async () => {
+  const archives = await originalArchives
+  const recipes = structuredClone(m2Recipes)
+  const first = recipes.find(recipe => recipe.id === 'tikka').ingredients
+    .find(ingredient => ingredient.id === 'coconut-milk')
+  const second = recipes.find(recipe => recipe.id === 'teriyaki').ingredients
+    .find(ingredient => ingredient.id === 'teriyaki-sauce')
+  first.amount = 0.1
+  first.unit = 'l'
+  second.id = first.id
+  second.label = first.label
+  second.query = first.query
+  second.amount = 100
+  second.unit = 'ml'
+  const plan = structuredClone(m2InitialPlan)
+  const regular = selected(recipes, plan, archives)
+  const reverse = selected(recipes, [...plan].reverse(), archives)
+  privateSummary(regular, 7)
+  privateSummary(reverse, 7)
+  for (const sheet of [regular, reverse]) {
+    const matching = sheet.csv.split('\n').filter(row => row.includes('"coconut-milk",'))
+    assert.equal(matching.length, 2, 'one complete requirement per store')
+    const matches = matching.map(row => row.match(/"([0-9.]+)","(l|ml)",/))
+    assert.ok(matches.every(Boolean), 'readable valid volume requirement')
+    assert.ok(matches.every(([, amount, unit]) =>
+      Number(amount) * (unit === 'l' ? 1000 : 1) === 200), 'both mean exactly 200 ml')
+  }
+  assert.equal(regular.csv, reverse.csv,
+    'identical 200 ml requirement must not change human worksheet bytes when plan order reverses')
 })
