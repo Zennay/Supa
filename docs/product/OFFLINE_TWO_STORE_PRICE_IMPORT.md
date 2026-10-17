@@ -3,6 +3,19 @@
 **Beschikbaar in de bestaande navigatie: Vergelijk → Vergelijk twee winkels met eigen prijsdata.**
 De import gebruikt de bestaande ingredientenaggregatie, productmatching, gehele-verpakking-berekening en mandjesvergelijking. Er wordt geen live supermarkt geraadpleegd.
 
+## Zonder bestand: rechtstreeks twee winkels invullen
+
+1. Plan je echte maaltijden in **Planner**. Ga naar **Vergelijk** → **Geen JSON? Vul de winkels hier in**.
+2. Klik op **Open invulscherm**. SUPA toont per winkel dezelfde benodigde ingrediënten en hoeveelheden uit de actuele weekplanner.
+3. Vul voor iedere winkel **zelf** de werkelijk waargenomen datum/tijd in. Geef per bekend product de naam op verpakking of bon, inhoud, eenheid (g/kg/ml/l/stuk), multipack en de werkelijk waargenomen prijs per verpakking in euro's op. Vink **Beschikbaar en prijs zelf gecontroleerd** alleen aan als dit daadwerkelijk waar is.
+4. Lege productregels blijven onbekend. Onbekende of niet-beschikbare artikelen krijgen geen berekende winkelprijs; ontbrekende stukken voorkomen een volledig totaal. Onjuist ingevulde prijzen of verpakkingen worden afgewezen met een fout bij het betreffende ingrediënt.
+5. Klik op **Bereken met mijn ingevoerde prijzen**. Dit gebruikt dezelfde conservatieve productmatching, mandberekening en versheidsgates als de bestaande JSON-import. Na een wijziging moet je opnieuw berekenen.
+6. Open **Maak een lokale kopie van jouw prijsinvoer**, en gebruik **Bewaar mijn invoer als JSON** om een vrijwillige, lokale back-up te downloaden; niets wordt automatisch opgeslagen of naar een server verstuurd. Je kunt die later weer importeren met de bestaande JSON-import.
+
+Supa vult **nooit** productnamen, winkelspecifieke verpakkingsmaten, prijzen of waarnemingstijden zelf aan. De invulregels zijn alleen suggesties voor welke *ingrediënten* je mogelijk moet kopen; ze zijn geen bewijs dat die supermarkt het artikel op voorraad heeft. De lokaal opgeslagen JSON is **geen officieel winkelbewijs** en bevat geen auteurs-, auteursrecht-, licentie- of fysieke-veldvalidatieattest. Voor deze gegevens geldt je eigen rechtmatige gebruik.
+
+Als het Vergelijk-scherm langer open blijft staan, ververst de UI de vervaltermijn periodiek en bij terugkeer naar het tabblad. Een verlopen zeven-dagenvergelijking verliest direct zijn prijsverschil zonder dat de gebruiker opnieuw hoeft te importeren. De opgeslagen fysieke waarnemingstijd verandert niet.
+
 ## Importeren
 
 1. Maak lokaal een JSON-bestand met **één** PLUS- en **één** DekaMarkt-opname. Beide opnames beschrijven de daadwerkelijk waargenomen prijscontext, met een ISO-tijd en een expliciete UTC-offset.
