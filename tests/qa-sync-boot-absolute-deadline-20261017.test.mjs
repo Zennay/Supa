@@ -1,22 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFile } from 'node:fs/promises'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { transpileModule, ModuleKind, ScriptTarget } from 'typescript'
+import { build } from 'esbuild'
 
-// The native Node suite uses strip-types, while syncBoot's normal Vite imports
-// are extensionless. Transpile just this one original module and resolve its two
-// imports to exact files; do not copy/reimplement its boot algorithm.
-const sourceUrl = new URL('../src/lib/syncBoot.ts', import.meta.url)
-const original = await readFile(sourceUrl, 'utf8')
-const transpiled = transpileModule(original, {
-  fileName: fileURLToPath(sourceUrl),
-  compilerOptions: { module: ModuleKind.ESNext, target: ScriptTarget.ES2022 },
-}).outputText
-const code = transpiled
-  .replace(/(['"])\.\/supaSync\1/g, JSON.stringify(new URL('../src/lib/supaSync.ts', import.meta.url).href))
-  .replace(/(['"])\.\/syncTransport\1/g, JSON.stringify(new URL('../src/lib/syncTransport.ts', import.meta.url).href))
-const { syncBeforeRender } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'))
+// Bundle the actual TypeScript entrypoint in memory using the installed Vite
+// toolchain. This runs the product implementation, not a shadow copy, and also
+// works on Node installations compiled without native TypeScript stripping.
+const { outputFiles } = await build({
+  entryPoints: [new URL('../src/lib/syncBoot.ts', import.meta.url).pathname],
+  bundle: true, platform: 'node', format: 'esm', target: 'node22',
+  write: false, logLevel: 'silent',
+})
+const { syncBeforeRender } = await import('data:text/javascript;base64,' + Buffer.from(outputFiles[0].text).toString('base64'))
 
 function mockBrowser(t, request) {
   const originals = Object.fromEntries(['window', 'document', 'fetch', 'setInterval', 'clearInterval'].map(k => [k, globalThis[k]]))
