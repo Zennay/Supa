@@ -144,6 +144,23 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
   }
   const validOutput = output && selectedPlanFingerprint === preparedFor
 
+  function downloadPreparedSource() {
+    if (!validOutput || typeof window === 'undefined') return
+    const bytes = new Blob([output], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(bytes)
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-prijzen-eigen-invoer.json'
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+  }
+
   return <section className="offline-manual-editor" aria-label="Productprijzen zelf invoeren">
     <div className="offline-manual-editor__header">
       <div><h3>Geen JSON? Vul de winkels hier in</h3>
@@ -211,7 +228,10 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
       {error && <p role="alert" className="attention-card">{error}</p>}
       {validOutput && <details className="offline-manual-editor__export">
         <summary>Maak een lokale kopie van jouw prijsinvoer</summary>
-        <p>Kopieer de JSON naar een bestand op je eigen apparaat. Bewaar dit alleen als je dat zelf wilt.</p>
+        <p>Je gegevens blijven uitsluitend op dit apparaat. Download de JSON zodat je je invoer later opnieuw kunt importeren.</p>
+        <button type="button" className="ghost-button" onClick={downloadPreparedSource}>
+          Bewaar mijn invoer als JSON
+        </button>
         <textarea readOnly rows={6} value={output} aria-label="Zelf ingevoerde prijsdata als JSON"
           onFocus={e => e.currentTarget.select()} />
       </details>}
