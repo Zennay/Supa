@@ -26,7 +26,7 @@ function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): stri
   return [
     tableHeader,
     ...needs.flatMap(need => MANUAL_RETAILERS.map(store => {
-      const quote = entries[manualQuoteKey(store, need.ingredientId)]
+      const quote = entries[manualQuoteKey(store, need.id)]
       return [
         safeTableCell(need.id), store,
         safeTableCell(quote?.product ?? ''),
