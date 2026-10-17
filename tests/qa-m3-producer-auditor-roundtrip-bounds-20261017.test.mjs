@@ -117,3 +117,39 @@ test('100 independently selected needs remain 200 private audited rows, not trun
   assert.equal(Buffer.byteLength(sheet.csv, 'utf8') <= MAX_BYTES, true)
   assert.deepEqual(sources, immutable)
 })
+
+test('all 15 nonempty real planner day subsets round-trip to independent private scanner', async () => {
+  const sources = await captures()
+  const unchanged = structuredClone(sources)
+  const days = m2InitialPlan.map(meal => meal.day)
+  for (let mask = 1; mask < (1 << days.length); mask++) {
+    const selectedDays = days.filter((_, index) => Boolean(mask & (1 << index)))
+    const generated = produce(sources, selectedDays)
+    assert.equal(generated.productionReady, false)
+    assert.equal(generated.publicSavingsClaimEligible, false)
+    assert.equal(generated.observedStorePrices, 0)
+    assert.equal((generated.csv.match(/UNOBSERVED_TEMPLATE_NOT_EVIDENCE/g) ?? []).length,
+      generated.rows)
+    const scanned = audit(generated.csv)
+    assert.equal(scanned.rows, generated.rows)
+    assert.equal(scanned.productionReady, false)
+    assert.equal(scanned.publicSavingsClaimEligible, false)
+    assert.ok(Buffer.byteLength(generated.csv, 'utf8') <= MAX_BYTES)
+  }
+  assert.deepEqual(sources, unchanged, 'offline archived retail evidence stays immutable')
+})
+
+test('producer output must be accepted by independent auditor or atomically refused upstream', async () => {
+  const sources = await captures()
+  const input = inputWithLabel('Kippendij ' + 'a'.repeat(503))
+  let sheet
+  try {
+    sheet = produce(sources, ['Ma'], input)
+  } catch (error) {
+    assert.ok(error instanceof Error)
+    return
+  }
+  assertNoEvidence(sheet)
+  assert.doesNotThrow(() => audit(sheet.csv),
+    'never hand a customer a human worksheet that its independently reviewed scanner refuses')
+})
