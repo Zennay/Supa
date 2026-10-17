@@ -12,6 +12,7 @@ const SHOP = 'supa:shopping-list-progress:v1'
 const PRIVATE = 'supa:m3-observation-draft:v1'
 const plan = n => JSON.stringify({ budget: n, activeDays: ['Ma'], recipeByDay: {} })
 const checked = JSON.stringify({ schemaVersion: 1, basketKey: 'fictional-week', doneLineIds: ['fictional-a'] })
+const updatedShopping = JSON.stringify({ schemaVersion: 1, basketKey: 'fictional-week-new', doneLineIds: ['fictional-b'] })
 const normalized = (p, shop) => ({ [PLAN]: p === null ? null : plan(p), [LIB]: null, [SHOP]: shop })
 const response = (status, revision, e) => new Response(JSON.stringify({ revision, entries: e }), {
   status, headers: { 'content-type': 'application/json' },
@@ -57,7 +58,7 @@ test('P1 #3821: failed second GET write cannot leave original planner deleted', 
   const { storage, snapshot } = storageFixture({ failAt: SHOP })
   const before = snapshot()
   try {
-    await pullSyncedState({ storage, request: async () => response(200, 2, normalized(null, 'new-remote-value')) })
+    await pullSyncedState({ storage, request: async () => response(200, 2, normalized(null, updatedShopping)) })
   } catch { /* storage refusal may throw, but must be failure atomic */ }
   assert.deepEqual(snapshot(), before,
     'planner deletion must roll back when subsequent checklist write fails')
