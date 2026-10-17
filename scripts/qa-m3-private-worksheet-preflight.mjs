@@ -18,8 +18,12 @@ const UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece'])
 const MAX_INPUT_BYTES = 1_048_576
 const ID = /^[A-Za-z0-9._:-]{1,170}$/
 const QUANTITY = /^(?:0|[1-9][0-9]{0,8})(?:\.[0-9]{1,6})?$/
-const UNSAFE_TEXT = /[\u0000-\u001f\u007f\u061c\u200b\u200e\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/u
-const UNSAFE_PREFIX = /^\s*(?:[\u200c\u200d]|[=+@-])/u
+// Format/invisible controls that can mislead an operator about the actual
+// ingredient name. Preserve legitimate contextual ZWJ/ZWNJ and emoji variants.
+const UNSAFE_TEXT = /[\u0000-\u001f\u007f\u00ad\u034f\u061c\u115f-\u1160\u180b-\u180f\u200b\u200e\u200f\u202a-\u202e\u2060-\u206f\ufeff]/u
+// Any default-ignorable prefix can conceal a formula-like first character;
+// contextual joins *inside* scripts and emoji remain allowed.
+const UNSAFE_PREFIX = /^\s*(?:\p{Default_Ignorable_Code_Point}|[=+@-])/u
 const MAX_NEEDS = 100
 const refuse = () => { throw new Error('Private worksheet QA audit refused') }
 
