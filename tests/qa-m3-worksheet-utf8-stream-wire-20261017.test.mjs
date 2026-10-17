@@ -190,3 +190,26 @@ test('100 distinct private needs × 2 stores accept the exact operator limit ind
   assert.ok(Buffer.byteLength(canonicalCsv) < 1_048_576,
     'normal 100x2 bounded worksheet stays below the transport byte ceiling')
 })
+
+
+test('late stream failures and unsupported object chunks cannot commit an apparently valid preflight', async () => {
+  await examine([canonical])
+  await refused([])
+  await refused([canonical, Buffer.from('PRIVATE_TAIL_SHOULD_NOT_BE_ACCEPTED')])
+  await refused([canonical, '\n'])
+  await refused([canonical, { toString: () => csv }])
+  await refused([canonical, Uint8Array.from([65])])
+  await refused([new String(csv)])
+  const leaked = []
+  async function* lateError() {
+    yield canonical
+    yield Buffer.alloc(0)
+    throw new Error('synthetic late upstream stream error; not verified')
+  }
+  await assert.rejects(main(lateError(), fragment => leaked.push(fragment)),
+    /synthetic late upstream stream error/)
+  assert.deepEqual(leaked, [], 'a successful-looking prefix must not produce any operator summary')
+  await assert.rejects(main(Readable.from([canonical]), null),
+    /Private worksheet QA audit refused/,
+    'non-function writer must be refused before reading a valid private worksheet')
+})
