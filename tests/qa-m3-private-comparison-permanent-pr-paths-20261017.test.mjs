@@ -54,18 +54,19 @@ test('positive: mandatory existing M3 main controls and source selectors are sco
 })
 test('positive: independent parser supports narrow wildcard or exact owner edits but rejects wrong blocks', () => {
   const path = targets[0]
+  const probe = 'scripts/m3-private-future-sentinel-never-committed.mjs'
   assert.equal(pathPattern('scripts/m3-private-*.mjs').test(path), true)
   assert.equal(pathPattern('scripts/m3-other-*.mjs').test(path), false)
   const amended = source.replace(
     '  workflow_dispatch:',
-    '      - "' + path + '"\n  workflow_dispatch:',
+    '      - "' + probe + '"\n  workflow_dispatch:',
   )
-  assert.equal(covered(path, amended), true, 'legitimate exact selector must pass owner patch')
+  assert.equal(covered(probe, amended), true, 'legitimate exact selector must pass owner patch')
   const disguised = source.replace(
     '  workflow_dispatch:',
-    '  # field gate path ' + path + '\n  workflow_dispatch:',
+    '  # field gate path ' + probe + '\n  workflow_dispatch:',
   )
-  assert.equal(covered(path, disguised), false, 'a comment cannot substitute for PR admission')
+  assert.equal(covered(probe, disguised), false, 'a comment cannot substitute for PR admission')
   assert.equal(covered('scripts/other/not-an-m3-comparison.mjs'), false)
 })
 for (const path of targets) {
