@@ -83,7 +83,7 @@ export function ManualStoreComparison({
   }, [needs, entries])
 
   function setQuote(need: ManualLine, store: ManualRetailer, field: keyof ManualQuote, value: string) {
-    const key = manualQuoteKey(store, need.id)
+    const key = manualQuoteKey(store, need.ingredientId)
     setEntries(previous => {
       const quote = previous[key] ?? {
         product: '', packAmount: '', packUnit: need.requiredUnit, price: '',
