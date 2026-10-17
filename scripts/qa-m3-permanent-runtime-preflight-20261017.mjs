@@ -31,14 +31,22 @@ const PROBES = Object.freeze([
  * actual permanent self-hosted GitHub job, retailer rights or field evidence.
  */
 export function classifyM3RuntimeProbes(probes, nodeVersion) {
-  if (!Array.isArray(probes) || nodeTypes.isProxy(probes) ||
-      probes.length !== PROBES.length ||
+  if (nodeTypes.isProxy(probes) || !Array.isArray(probes) ||
+      Object.getPrototypeOf(probes) !== Array.prototype ||
       typeof nodeVersion !== 'string' ||
       !/^v\d+\.\d+\.\d+$/u.test(nodeVersion)) REFUSE()
+  // Programmatic callers may supply an accessor-backed or sparse Array.
+  // Copy only its exact own enumerable data descriptors, like the CLI gate.
+  const descriptors = Object.getOwnPropertyDescriptors(probes)
+  if (descriptors.length?.value !== PROBES.length ||
+      Reflect.ownKeys(descriptors).length !== PROBES.length + 1) REFUSE()
   const expectedNames = PROBES.map(p => p.label)
   const observations = []
   for (let i = 0; i < PROBES.length; i++) {
-    const item = probes[i]
+    const descriptor = descriptors[i]
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') ||
+        descriptor.enumerable !== true) REFUSE()
+    const item = descriptor.value
     if (item === null || typeof item !== 'object' || Array.isArray(item) ||
         nodeTypes.isProxy(item) ||
         Object.getPrototypeOf(item) !== Object.prototype) REFUSE()
