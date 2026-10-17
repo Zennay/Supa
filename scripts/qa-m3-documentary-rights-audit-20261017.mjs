@@ -10,6 +10,7 @@
  */
 import { readFile } from 'node:fs/promises'
 import { isIP } from 'node:net'
+import { types as nodeTypes } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 
@@ -89,15 +90,28 @@ export function auditM3DocumentaryRights(document) {
   }
 }
 
+/**
+ * Reject untrusted programmatic argv before getters, symbols, exotic Array
+ * prototypes or Proxy traps can execute. The data descriptor of Array.length
+ * is read without evaluating user JS. Only [] and ['--require-release'] pass.
+ */
+function checkedCliArgs(argv) {
+  if (!Array.isArray(argv) || nodeTypes.isProxy(argv) ||
+      Object.getPrototypeOf(argv) !== Array.prototype) throw new Error(REFUSE)
+  const descriptors = Object.getOwnPropertyDescriptors(argv)
+  const length = descriptors.length?.value
+  if ((length !== 0 && length !== 1) ||
+      Reflect.ownKeys(descriptors).length !== length + 1) throw new Error(REFUSE)
+  if (length === 1 &&
+      (!Object.hasOwn(descriptors[0] ?? {}, 'value') ||
+        descriptors[0].value !== '--require-release')) throw new Error(REFUSE)
+  return length === 1
+}
+
 export async function main(argv = process.argv.slice(2),
   write = line => process.stdout.write(line)) {
-  // Deliberately no arbitrary --file, URL or network option. This executable
-  // audits only the currently version-controlled canonical rights document.
-  if (!Array.isArray(argv) ||
-      (argv.length !== 0 &&
-        (argv.length !== 1 || argv[0] !== '--require-release'))) {
-    throw new Error(REFUSE)
-  }
+  // No arbitrary --file, --url, network, or inherited programmatic arguments.
+  const strictRelease = checkedCliArgs(argv)
   const source = new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url)
   const document = JSON.parse(await readFile(source, 'utf8'))
   const report = auditM3DocumentaryRights(document)
@@ -105,7 +119,7 @@ export async function main(argv = process.argv.slice(2),
   // A hold is a SUCCESSFUL QA inspection but never a release. A strict
   // production gate deliberately fails closed regardless of documentary
   // status; it cannot become "green" by editing a permission JSON file.
-  if (argv[0] === '--require-release' || report.unsafeDocumentaryUrls > 0 ||
+  if (strictRelease || report.unsafeDocumentaryUrls > 0 ||
       report.underlyingGateClaimsReady) process.exitCode = 2
   return report
 }
