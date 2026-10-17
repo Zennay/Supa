@@ -73,13 +73,29 @@ export function OfflineReviewedWorkbench({
   }
   async function loadFile(file?: File) {
     if (!file) return
+    // Never leave an older basket, price difference or claim on screen while
+    // a second local import is being read, converted or rejected.
+    setImported(null)
     setBusy(true)
+    setMessage('Bestand wordt alleen in deze browser verwerkt.')
     try {
       if (file.size > 256000) throw new Error('Bestand is te groot (maximaal 256 kB).')
-      const content = await file.text()
-      setText(content)
-      importSnapshots(content)
+      const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const isCsv = /\.csv$/i.test(file.name) || file.type === 'text/csv'
+      let json = content
+      if (isCsv) {
+        // Vite copies public assets unchanged. Resolve within the deployed base,
+        // not the site root, so preview and subpath deployments both work.
+        const moduleUrl = new URL('offline-two-store-csv.mjs',
+          new URL(import.meta.env.BASE_URL, window.location.origin)).href
+        const converter: { convertTwoStoreCsv: (input: string) => string } =
+          await import(/* @vite-ignore */ moduleUrl)
+        json = converter.convertTwoStoreCsv(content)
+      }
+      setText(json)
+      importSnapshots(json)
     } catch (error) {
+      setText('')
       setImported(null)
       setMessage(error instanceof Error ? error.message : 'Kon dit bestand niet lezen.')
     } finally { setBusy(false) }
@@ -116,7 +132,7 @@ export function OfflineReviewedWorkbench({
       <div className="offline-price-workbench__intro">
         <span className="eyebrow">Jouw planner → brongegevens → winkelmandjes</span>
         <h2>Vergelijk twee winkels met eigen prijsdata</h2>
-        <p>Vul producten en prijzen direct per winkel in, of laad een eerder rechtmatig verkregen JSON-export.
+        <p>Vul producten en prijzen direct per winkel in, of laad eigen geobserveerde winkelprijzen uit JSON of CSV.
           Supa koppelt producten aan jouw huidige weekmenu, rondt verpakkingen naar boven af
           en berekent eenheidsprijzen en volledige mandtotalen. De import start geen scraper of netwerkverzoek.</p>
         <p className="disclaimer">Privé rekenhulp: een aangeleverd bestand bewijst geen toestemming, productidentiteit,
@@ -140,14 +156,24 @@ export function OfflineReviewedWorkbench({
           Ontbrekende prijzen: zet <code>priceCents: null</code> en <code>available: false</code>.</p>
       </details>
       <div className="offline-price-workbench__input">
-        <label>Importeer JSON vanaf dit apparaat
-          <input type="file" accept=".json,application/json" disabled={busy}
+        <p>Heb je een spreadsheet met geobserveerde PLUS- en DekaMarkt-prijzen? Importeer hier rechtstreeks
+          een CSV met de negen vereiste kolommen, of maak deze eerst in de{' '}
+          <a href={`${import.meta.env.BASE_URL}offline-two-store-import.html`} target="_blank" rel="noopener noreferrer">
+            lokale CSV-converter (opent in een nieuw tabblad)
+          </a>.
+          Er wordt niets naar een server verstuurd; ontbrekende prijzen blijven onbekend.</p>
+        <label>Importeer JSON of CSV vanaf dit apparaat
+          <input type="file" accept=".json,.csv,application/json,text/csv" disabled={busy}
             onChange={event => { void loadFile(event.currentTarget.files?.[0]) }} />
         </label>
         <label>Of plak de twee winkelopnames als JSON
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
-            onChange={event => setText(event.target.value)} />
+            onChange={event => {
+              setText(event.target.value)
+              setImported(null)
+              setMessage('Invoer gewijzigd. Bereken opnieuw voordat mandjes en prijsverschillen zichtbaar zijn.')
+            }} />
         </label>
         <div className="offline-price-workbench__actions">
           <button type="button" disabled={busy || !text.trim()} onClick={() => importSnapshots(text)}>
