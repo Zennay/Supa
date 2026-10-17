@@ -138,3 +138,43 @@ test('nonprojected private notes stay nonrelease, canonical physical evidence re
   }
   assert.equal(controls, 8)
 })
+
+test('all 11x2 original pack fields reject accessor functions without executing them', () => {
+  const trapFields = ['available', 'priceCents', 'packAmount', 'packCount', 'productName']
+  let checked = 0
+  for (const side of SIDES) for (let i = 0; i < COUNT; i++) {
+    for (const field of trapFields) {
+      const f = fixture('in-store', 90)
+      const target = f.sheet[side].lines[i].observedProduct
+      let reads = 0
+      Object.defineProperty(target, field, {
+        configurable: true, enumerable: true,
+        get() { reads++; throw new Error('FICTIONAL_PRIVATE_GETTER_NEVER_CALL') },
+      })
+      refuses(f, side + ':' + i + ':' + field + ':getter')
+      assert.equal(reads, 0, 'private source getters are not invoked')
+      checked++
+    }
+  }
+  assert.equal(checked, 110)
+})
+
+test('all 11x2 converted-money accessors reject without being invoked', () => {
+  const trapFields = ['pricePerPackCents', 'lineTotalCents', 'packs']
+  let checked = 0
+  for (const side of SIDES) for (let i = 0; i < COUNT; i++) {
+    for (const field of trapFields) {
+      const f = fixture('online-order', 110)
+      const target = f.study[side].basket.lines[i]
+      let reads = 0
+      Object.defineProperty(target, field, {
+        configurable: true, enumerable: true,
+        get() { reads++; throw new Error('FICTIONAL_STUDY_TRAP') },
+      })
+      refuses(f, side + ':' + i + ':' + field + ':getter')
+      assert.equal(reads, 0, 'converted line getters are not invoked')
+      checked++
+    }
+  }
+  assert.equal(checked, 66)
+})
