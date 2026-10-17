@@ -11,12 +11,12 @@ type ShoppingListProgress = {
 const matchUnits = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
 // A visible retailer ID and name are necessary even when a basket has rows.
 // Never stamp checkmark identity for Unicode filler or direction-control text.
-const hiddenStoreCharacters = /[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}\\u115F\\u1160\\u3164\\uFFA0\\u2800]/u
+const hiddenStoreCharacters = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\u115F\u1160\u3164\uFFA0\u2800]/u
 function visibleStoreText(value: unknown): value is string {
   return typeof value === 'string' &&
     value === value.trim() &&
     !hiddenStoreCharacters.test(value) &&
-    /[\\p{L}\\p{N}]/u.test(value)
+    /[\p{L}\p{N}]/u.test(value)
 }
 
 type ShoppingListBasketState = {
