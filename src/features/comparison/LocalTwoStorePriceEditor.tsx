@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { historicalRetailerProducts } from '../products/historicalRetailerProducts.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -45,6 +45,56 @@ function eurosToCents(raw: string): number | null {
   return Number.isSafeInteger(cents) && cents > 0 && cents <= 1000000 ? cents : null
 }
 
+const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
+
+type StoredDraft = {
+  saved: boolean
+  rows: Record<string, ProductDraft>
+  capturedAt: Record<OfflineRetailer, string>
+  raw: string | null
+  protected: boolean
+}
+function readPrivateDraft(fingerprint: string): StoredDraft {
+  const empty: StoredDraft = { saved: false, rows: {}, capturedAt: { PLUS: '', DekaMarkt: '' }, raw: null, protected: false }
+  if (typeof window === 'undefined') return empty
+  let raw: string | null
+  try { raw = window.sessionStorage.getItem(privateDraftStorageKey) }
+  catch { return { ...empty, protected: true } }
+  if (raw === null) return empty
+  if (raw.length > 256000) return { ...empty, raw, protected: true }
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('shape')
+    const r = value as Record<string, unknown>
+    if (r.schemaVersion !== 1 || typeof r.fingerprint !== 'string' ||
+        Object.keys(r).some(k => !['schemaVersion', 'fingerprint', 'rows', 'capturedAt'].includes(k)) ||
+        !r.rows || typeof r.rows !== 'object' || Array.isArray(r.rows) ||
+        !r.capturedAt || typeof r.capturedAt !== 'object' || Array.isArray(r.capturedAt)) throw Error('shape')
+    if (r.fingerprint !== fingerprint) return { ...empty, raw, protected: true }
+    const dates = r.capturedAt as Record<string, unknown>
+    if (Object.keys(dates).some(k => !['PLUS', 'DekaMarkt'].includes(k)) ||
+        typeof dates.PLUS !== 'string' || dates.PLUS.length > 16 ||
+        typeof dates.DekaMarkt !== 'string' || dates.DekaMarkt.length > 16) throw Error('times')
+    const rows = r.rows as Record<string, unknown>
+    if (Object.keys(rows).length > 2000 || !Object.entries(rows).every(([k, rawRow]) => {
+      if (k.length > 500 || !Array.isArray(JSON.parse(k)) ||
+          !rawRow || typeof rawRow !== 'object' || Array.isArray(rawRow)) return false
+      const row = rawRow as Record<string, unknown>
+      return Object.keys(row).every(field => ['name', 'packAmount', 'packUnit', 'packCount', 'priceEuros', 'available'].includes(field)) &&
+        typeof row.name === 'string' && row.name.length <= 160 &&
+        typeof row.packAmount === 'string' && row.packAmount.length <= 24 &&
+        typeof row.packUnit === 'string' && supportedUnits.includes(row.packUnit as Unit) &&
+        typeof row.packCount === 'string' && row.packCount.length <= 8 &&
+        typeof row.priceEuros === 'string' && row.priceEuros.length <= 24 &&
+        typeof row.available === 'boolean'
+    })) throw Error('rows')
+    return { saved: true, rows: rows as Record<string, ProductDraft>,
+      capturedAt: { PLUS: dates.PLUS, DekaMarkt: dates.DekaMarkt }, raw, protected: false }
+  } catch {
+    return { ...empty, raw, protected: true }
+  }
+}
+
 type Props = {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
@@ -69,6 +119,56 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
   const selectedPlanFingerprint = JSON.stringify([plan, activeDays, needs.map(item => [item.id, item.amount, item.unit])])
   const [preparedFor, setPreparedFor] = useState('')
+  const [savedDraftRaw, setSavedDraftRaw] = useState<string | null>(null)
+  const [draftOptIn, setDraftOptIn] = useState(false)
+  const [draftProtected, setDraftProtected] = useState(false)
+  const [draftStatus, setDraftStatus] = useState('')
+
+  // Explicitly opt-in to *session-only* recovery. A different planner or
+  // unknown/future record can never silently be reinterpreted or replaced.
+  useEffect(() => {
+    const old = readPrivateDraft(selectedPlanFingerprint)
+    setRows(old.rows)
+    setCapturedAt(old.capturedAt)
+    setDraftOptIn(old.saved)
+    setDraftProtected(old.protected)
+    setSavedDraftRaw(old.raw)
+    if (old.saved) setDraftStatus('Je vorige privéconcept voor deze week is hersteld in deze browsertab.')
+    else if (old.protected) setDraftStatus('Een eerder concept voor een andere week of versie is beschermd tegen overschrijven.')
+    else setDraftStatus('')
+  }, [selectedPlanFingerprint])
+
+  useEffect(() => {
+    if (!draftOptIn || draftProtected || typeof window === 'undefined') return
+    try {
+      const actual = window.sessionStorage.getItem(privateDraftStorageKey)
+      if (actual !== savedDraftRaw) {
+        setDraftProtected(true)
+        setDraftStatus('Een ander of onbekend concept is bewaard; SUPA overschrijft dit niet.')
+        return
+      }
+      const next = JSON.stringify({ schemaVersion: 1, fingerprint: selectedPlanFingerprint, rows, capturedAt })
+      if (new TextEncoder().encode(next).length > 256000) throw Error('oversized')
+      if (next !== actual) window.sessionStorage.setItem(privateDraftStorageKey, next)
+      setSavedDraftRaw(next)
+      setDraftStatus('Dit concept blijft alleen in deze browsertab bewaard tot je het wist of de tab sluit.')
+    } catch {
+      setDraftOptIn(false)
+      setDraftStatus('Kon dit privéconcept niet bewaren. Gebruik desgewenst de lokale JSON-download.')
+    }
+  }, [draftOptIn, draftProtected, rows, capturedAt, selectedPlanFingerprint])
+
+  function clearDraft() {
+    if (typeof window !== 'undefined') {
+      try {
+        const actual = window.sessionStorage.getItem(privateDraftStorageKey)
+        if (!draftProtected && actual === savedDraftRaw) window.sessionStorage.removeItem(privateDraftStorageKey)
+      } catch { /* keep protected bytes */ }
+    }
+    setDraftOptIn(false)
+    setDraftStatus('Concept niet langer automatisch bewaard in deze browsertab.')
+    setSavedDraftRaw(null)
+  }
 
   function changeRow(store: OfflineRetailer, id: string, patch: Partial<ProductDraft>, unit: string) {
     const idKey = key(store, id)
@@ -180,6 +280,16 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
         <p role="status">{activeNeeds.length} verschillende ingrediënten uit je huidige weekmenu.
           Lege of onbekende producten blijven niet gekoppeld en krijgen nooit een nulprijs.</p>
       )}
+      <div className="offline-manual-editor__draft">
+        <label><input type="checkbox" checked={draftOptIn} disabled={draftProtected}
+          onChange={e => { setDraftOptIn(e.target.checked); if (!e.target.checked) clearDraft() }} />
+          Onvoltooide invoer bewaren in deze browsertab (optioneel, niet naar een server)
+        </label>
+        <span role="status">{draftStatus}</span>
+        {draftOptIn && <button type="button" className="ghost-button" onClick={clearDraft}>
+          Stop automatisch bewaren en wis concept
+        </button>}
+      </div>
       <div className="offline-manual-editor__stores">
         {stores.map(store => <section key={store} aria-label={`Productprijzen bij ${store}`}>
           <h4>{store}</h4>
