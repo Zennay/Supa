@@ -82,3 +82,30 @@ test('expected RED: standalone proof CLI must not print verified-looking JSON fo
   assert.equal(processResult.stdout, '', 'no positive-looking evidence on stdout')
   assert.match(processResult.stderr, /Unverified native CI evidence/)
 })
+
+test('expected RED: missing native TAP v13 signature must refuse a detached synthetic fragment', () => {
+  const forged = hostedLog().replace(STAMP + 'TAP version 13\n', '')
+  assert.notEqual(forged, hostedLog())
+  assert.throws(() => analyzeNativeRedCi(forged, OPTIONS), /TAP|incomplete|unverified/i)
+})
+
+test('expected RED: multiple top-level TAP plans cannot certify one native test run', () => {
+  const forged = hostedLog().replace(STAMP + '1..3\n',
+    STAMP + '1..3\n' + STAMP + '1..3\n')
+  assert.notEqual(forged, hostedLog())
+  assert.throws(() => analyzeNativeRedCi(forged, OPTIONS), /TAP|plan|ambiguous|unverified/i)
+})
+
+test('expected RED: terminal GitHub marker before TAP summary cannot certify completed execution', () => {
+  const forged = hostedLog().replace(STAMP + END + '\n', '')
+    .replace(STAMP + '# tests 3\n', STAMP + END + '\n' + STAMP + '# tests 3\n')
+  assert.notEqual(forged, hostedLog())
+  assert.throws(() => analyzeNativeRedCi(forged, OPTIONS),
+    /terminal|completion|TAP|unverified|incomplete/i)
+})
+
+test('expected RED: duplicated native terminal exit cannot certify one exact hosted job', () => {
+  const forged = hostedLog() + STAMP + END + '\n'
+  assert.throws(() => analyzeNativeRedCi(forged, OPTIONS),
+    /duplicate|terminal|ambiguous|unverified/i)
+})
