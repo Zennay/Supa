@@ -908,7 +908,7 @@ downloadUnpriced.addEventListener('click', () => {
       '',
       ...data.ingredients.map(item =>
         (unpricedChecked.has(item.id) && !unpricedTrip.hidden ? '[x] ' : '[ ] ') + item.label + ' · ' +
-        (item.amount === null ? 'hoeveelheid nog controleren' :
+        (item.amount === null ? 'hoeveelheid nog controleren (' + item.unit + ')' :
           String(item.amount).replace('.', ',') + ' ' +
             (item.unit === 'piece' ? 'stuk(s)' : item.unit))),
       '',
