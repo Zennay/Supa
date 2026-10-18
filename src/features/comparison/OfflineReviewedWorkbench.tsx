@@ -652,6 +652,9 @@ export function OfflineReviewedWorkbench({
                         basket={basket}
                         observedAt={imported.captures[store].observedAt}
                         fresh={currentEnough}
+                        memoryProgress={session.tripMemory[store]}
+                        onMemoryChange={(basketIdentity, done) => session.setTripMemory(previous =>
+                          ({ ...previous, [store]: { identity: basketIdentity, done } }))}
                       />
                     </section>
                   )

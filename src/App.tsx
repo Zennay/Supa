@@ -121,6 +121,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     }
   }, [])
   const offlinePriceSession = useOfflineComparisonSession()
+  // An explicit discard/new invalid import also discards volatile ticks.
+  // Reusing a different source cannot resurrect checkmarks from an old basket.
+  useEffect(() => {
+    if (!offlinePriceSession.imported) offlinePriceSession.setTripMemory({})
+  }, [offlinePriceSession.imported])
   const [initialProductSelection] = useState(readChosenProducts)
   const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)
   const [savedProductRaw, setSavedProductRaw] = useState(initialProductSelection.raw)

@@ -135,14 +135,26 @@ function readSavedTrip(basket: OneStoreBasket, observedAt: string): SavedState {
 
 /** In-memory checklist, with optional per-tab recovery for the SAME basket. */
 export function PrivateStoreTripChecklist({
-  basket, observedAt, fresh,
+  basket, observedAt, fresh, memoryProgress, onMemoryChange,
 }: {
   basket: OneStoreBasket
   observedAt: string
   fresh: boolean
+  memoryProgress?: { identity: string; done: string[] }
+  onMemoryChange?: (identity: string, done: string[]) => void
 }) {
   const [initial] = useState(() => readSavedTrip(basket, observedAt))
-  const [done, setDone] = useState<ReadonlySet<string>>(() => new Set(initial.done))
+  const [localDone, setLocalDone] = useState<ReadonlySet<string>>(() => new Set(initial.done))
+  const identity = progressIdentity(basket, observedAt)
+  const memoryDone = memoryProgress?.identity === identity ? memoryProgress.done : null
+  const done = useMemo<ReadonlySet<string>>(
+    () => memoryDone === null ? localDone : new Set(memoryDone),
+    [memoryDone, localDone],
+  )
+  function updateDone(next: ReadonlySet<string>) {
+    setLocalDone(next)
+    onMemoryChange?.(identity, [...next])
+  }
   const [saveEnabled, setSaveEnabled] = useState(initial.enabled)
   const [storageProtected, setStorageProtected] = useState(initial.protected)
   const [savedRaw, setSavedRaw] = useState(initial.raw)
@@ -224,12 +236,10 @@ export function PrivateStoreTripChecklist({
   }
 
   function toggle(id: string) {
-    setDone(previous => {
-      const next = new Set(previous)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    const next = new Set(done)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    updateDone(next)
     setMessage('')
   }
 
@@ -299,7 +309,7 @@ export function PrivateStoreTripChecklist({
         {copyVisible ? 'Verberg kopieerbare tekst' : 'Toon kopieerbare tekst'}
       </button>
       <button type="button" className="ghost-button" disabled={!completed}
-        onClick={() => { setDone(new Set()); setMessage('Alle vinkjes in dit scherm gewist.') }}>
+        onClick={() => { updateDone(new Set()); setMessage('Alle vinkjes in dit scherm gewist.') }}>
         Wis vinkjes
       </button>
     </div>
@@ -318,7 +328,7 @@ export function PrivateStoreTripChecklist({
         }}>Selecteer alle tekst</button>
     </div>}
     <p className="private-store-trip__notice">
-      Zonder jouw toestemming blijven vinkjes alleen in dit scherm. Met opt-in worden uitsluitend
+      Zonder jouw toestemming blijven vinkjes alleen in het geheugen van dit browsertabblad. Met opt-in worden uitsluitend
       de vinkjes en een mandgebonden sleutel lokaal in de sessieopslag van dit tabblad bewaard;
       een andere bronopname of week krijgt nooit automatisch jouw oude vinkjes.
       Deze privéopname wordt niet vermengd met demo-/algemene lijsten en gaat niet naar de server.

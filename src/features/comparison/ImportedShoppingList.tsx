@@ -82,7 +82,10 @@ export function ImportedShoppingList({
     {comparable && <p className="disclaimer">Privé rekenkundig vergelijkbaar,
       niet onafhankelijk geverifieerd en geen officiële besparingsclaim.</p>}
     <PrivateStoreTripChecklist key={identity} basket={basket}
-      observedAt={imported.captures[store].observedAt} fresh={fresh} />
+      observedAt={imported.captures[store].observedAt} fresh={fresh}
+      memoryProgress={session.tripMemory[store]}
+      onMemoryChange={(basketIdentity, done) => session.setTripMemory(previous =>
+        ({ ...previous, [store]: { identity: basketIdentity, done } }))} />
     <p className="disclaimer">Afvinken blijft standaard tijdelijk.
       Alleen na jouw toestemming worden vinkjes in dit browsertabblad bewaard.</p>
   </section>
