@@ -462,11 +462,12 @@ export function OfflineReviewedWorkbench({
     const version = ++importVersion.current
     const previousImported = imported
     const previousText = text
-    // Never leave an older basket, price difference or claim on screen while
-    // a second local import is being read, converted or rejected.
-    setImported(null)
+    // Keep the PREVIOUSLY admitted sources visible until the entire incoming
+    // capture is admitted atomically. It remains the old labelled comparison,
+    // not an assertion that partially read bytes are an updated price source.
+    // Cancelling the pending file read must not erase valid user work.
     setBusy(true)
-    setMessage('Bestand wordt alleen in deze browser verwerkt.')
+    setMessage('Nieuw bestand wordt privé gelezen. Tot acceptatie blijft de oude vergelijking ongewijzigd.')
     try {
       if (file.size > 256000) throw new Error('Bestand is te groot (maximaal 256 kB).')
       const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
@@ -542,7 +543,8 @@ export function OfflineReviewedWorkbench({
     const version = ++importVersion.current
     const previousImported = imported
     const previousText = text
-    setImported(null)
+    // Never clear an admitted pair just because an asynchronous two-file
+    // read began; a later manual edit may invalidate the unfinished read.
     if (files.length !== 2) {
       setImported(previousImported)
       setMessage('Selecteer één gecombineerd bestand of precies twee afzonderlijke winkelbestanden.')
