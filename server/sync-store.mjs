@@ -4,7 +4,7 @@ import { chmod, lstat, mkdir, open, readdir, readFile, rename, stat, unlink, wri
 import { hostname } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { MAX_SNAPSHOT_BYTES, SYNC_KEYS } from './sync-validation.mjs'
+import { MAX_SNAPSHOT_BYTES, validateSyncEntries } from './sync-validation.mjs'
 
 /** Anonymous device keys are random bearer secrets created by the browser. */
 export function validDeviceKey(value) {
@@ -29,7 +29,9 @@ function admitRecord(value) {
   if (!Number.isSafeInteger(value.revision) || value.revision < 1 || !canonicalTimestamp(value.updatedAt)) return false
   const { entries } = value
   if (!entries || typeof entries !== 'object' || Array.isArray(entries) || Object.getPrototypeOf(entries) !== Object.prototype) return false
-  return Object.entries(entries).every(([key, entry]) => SYNC_KEYS.includes(key) && (entry === null || typeof entry === 'string'))
+  // Disk bytes are not safer than incoming HTTP: apply the complete shared
+  // planner, own-recipe and checklist validation before returning or CAS-ing.
+  return !validateSyncEntries(entries, { complete: true }).error
 }
 const LOCK_WAIT_MS = 5_000
 // A lock is only considered for recovery once it is older than this; it is
@@ -195,13 +197,17 @@ export function createFileSyncStore({ dir }) {
 
   function write(key, baseRevision, entries) {
     return exclusive(key, async () => {
+      // Direct callers must never persist something a later read will reject.
+      // Normalize optional omitted keys through the same public PUT contract.
+      const admitted = validateSyncEntries(entries)
+      if (admitted.error) throw new Error('invalid sync entries')
       await checkDir({ create: true })
       return withFileLock(key, async stillOwned => {
         const current = await read(key)
         if (current.revision !== baseRevision) return { conflict: true, record: current }
         // Never publish a revision this store could not read back.
         if (!Number.isSafeInteger(current.revision + 1)) throw new Error('sync revision limit reached')
-        const record = { revision: current.revision + 1, updatedAt: new Date().toISOString(), entries }
+        const record = { revision: current.revision + 1, updatedAt: new Date().toISOString(), entries: admitted.entries }
         const file = `${baseFor(key)}.json`
         const temporary = `${baseFor(key)}.${randomUUID()}.tmp`
         try {
