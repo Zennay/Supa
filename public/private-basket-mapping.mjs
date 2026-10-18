@@ -824,6 +824,12 @@ restoreSession.addEventListener('change', async () => {
         const sku = root.demand.ingredients[index].productIds[store]
         if (sku === null || sku === undefined) continue
         const select = row.querySelector('[data-store="' + store + '"]')
+        // The picker shows at most 80 products. Restore an exact admitted SKU
+        // even when it lies outside that initial visible result window.
+        if (!Array.from(select.options).some(option => option.value === sku)) {
+          const product = verified[store].products.find(p => p.id === sku)
+          select.add(new Option(product.name + ' · eigen bron-ID ' + sku, sku))
+        }
         select.value = sku
         updateSelect(select, store, saved.items[index].unit)
       }
