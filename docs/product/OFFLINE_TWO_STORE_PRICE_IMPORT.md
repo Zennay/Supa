@@ -644,3 +644,26 @@ fysieke vraag niet verandert. Een nieuwe vergelijking kan alleen
 na onafhankelijke persoonlijke review van nieuwe artikelen en
 bestaande versheids- en volledige-mandgates. Geen scrapers,
 winkelrechten of prijzen worden toegevoegd of gepromoot.
+
+### Afdrukbaar privéoverzicht voor twee echte winkelbronopnames
+
+Het bestaande uitvoerbestand van [product-PR #3916](https://github.com/Zennay/Supa/pull/3916)
+is nu ook verbonden met de gewone **Vergelijk**-tab. Zodra de eigen
+PLUS- én DekaMarkt-opname aanwezig zijn en beide basketvormen kunnen
+worden gemaakt, verschijnt **Download afdrukbaar privéoverzicht
+(HTML)**. In dit offline document staan dezelfde geselecteerde
+fysieke Planner-ingrediënten, originele bronmomenten, beide
+aangeleverde winkelproducten, gehele verpakkingen, eenheidsprijzen
+en de afzonderlijk berekende bedragen naast elkaar.
+
+Een **totaalverschil of winnaar** wordt alleen getoond wanneer de
+bestaande complete mand-, verse bron-, minder-dan-24-uur-paring en
+expliciete menselijke bronreviewgates samen zijn voldaan. Op het
+moment van downloaden worden de actuele tijd/bronmomenten en
+compleetheid opnieuw nagekeken: een inmiddels verlopen opname
+wordt geen nieuwe winstclaim. Bij ontbrekende of verlopen bronnen
+blijft het printbare bestand informatief zonder vergelijkbaar
+prijsverschil. Geen extern script, afbeelding, analytics of
+retailerverbinding; een strikte offline HTML Content Security Policy
+en veilige tekstescaping gelden. De al bestaande CSV-download
+blijft ongewijzigd, er is daarom geen tweede CSV-knop toegevoegd.

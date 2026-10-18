@@ -7,6 +7,7 @@ import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
+import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
@@ -1051,6 +1052,31 @@ export function OfflineReviewedWorkbench({
                   <small>Originele PLUS- en Deka-productcodes, geobserveerde pakprijzen, indicatieve eenheidsprijzen en per-ingrediënt verschil. Uitsluitend jouw geaccepteerde lokale opname; geen publieke besparingsclaim.</small>
                 </div>
               )}
+              {imported?.captures.PLUS && imported.captures.DekaMarkt &&
+                basketPair.plus && basketPair.deka && (
+                  <section aria-label="Afdrukbaar privéoverzicht van je originele winkelbronnen">
+                    <h4>Bewaar of print beide mandjes, ook als een prijs nog ontbreekt</h4>
+                    <PrivateBasketComparisonExport
+                      plus={basketPair.plus}
+                      deka={basketPair.deka}
+                      plusObservedAt={imported.captures.PLUS.observedAt}
+                      dekaObservedAt={imported.captures.DekaMarkt.observedAt}
+                      comparable={canShowDifference}
+                      showCsv={false}
+                      eligibleNow={() => {
+                        const nowNs = BigInt(Date.now()) * 1_000_000n
+                        return !!basketPair.comparison?.claimable &&
+                          imported.pairedWithin24h &&
+                          perStoreReview.every(item => item.complete) &&
+                          stores.every(store => {
+                            const ns = imported.captures[store]!.observedNs
+                            return nowNs >= ns - 300_000_000_000n &&
+                              nowNs - ns <= 604_800_000_000_000n
+                          })
+                      }}
+                    />
+                  </section>
+                )}
               {readableReport && (
                 <details className="offline-price-workbench__full-breakdown">
                   <summary>Kopieer of bewaar een leesbaar privéoverzicht van beide mandjes</summary>
