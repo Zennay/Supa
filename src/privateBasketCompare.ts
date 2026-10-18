@@ -50,6 +50,12 @@ const rows = document.querySelector<HTMLTableSectionElement>('#rows')!
 const nextActions = document.querySelector<HTMLElement>('#next-actions')!
 const missingItems = document.querySelector<HTMLUListElement>('#missing-items')!
 let missingTasks: string[] = []
+const trip = document.querySelector<HTMLElement>('#trip')!
+const tripStore = document.querySelector<HTMLSelectElement>('#trip-store')!
+const tripItems = document.querySelector<HTMLElement>('#trip-items')!
+const tripSummary = document.querySelector<HTMLElement>('#trip-summary')!
+let tripBaskets: Record<StoreName, OneStoreBasket> | null = null
+const ticked = new Set<string>()
 let inputRevision = 0
 
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -305,6 +311,120 @@ function lineCell(line: BasketTraceLine): HTMLTableCellElement {
   cell.append(title, pack, price)
   return cell
 }
+type TripLine = Extract<BasketTraceLine, { status: 'matched' }>
+
+function shoppingTripLines(): TripLine[] {
+  const basket = tripBaskets?.[tripStore.value as StoreName]
+  if (!basket || basket.unresolvedLineCount !== 0 ||
+      basket.matchedLineCount !== basket.lines.length ||
+      basket.lines.some(line => line.status !== 'matched')) return []
+  return basket.lines.filter((line): line is TripLine => line.status === 'matched')
+}
+
+function tripProgress(): void {
+  const lines = shoppingTripLines()
+  const count = lines.filter(line => ticked.has(line.id)).length
+  const remaining = lines.length - count
+  const total = tripBaskets?.[tripStore.value as StoreName]?.totalCents
+  tripSummary.textContent = String(count) + ' van ' + lines.length +
+    ' producten afgevinkt · nog ' + remaining + ' artikel(en).' +
+    (typeof total === 'number' && Number.isSafeInteger(total)
+      ? ' Oorspronkelijke volledige opnameprijs: ' + euro.format(total / 100) + '.' : '') +
+    ' Prijzen zijn historische privéwaarnemingen, geen kassagarantie.'
+}
+
+function renderTrip(): void {
+  tripItems.replaceChildren()
+  const lines = shoppingTripLines()
+  if (!tripBaskets || lines.length === 0) {
+    trip.hidden = true
+    return
+  }
+  trip.hidden = false
+  for (const line of lines) {
+    const item = document.createElement('label')
+    item.className = 'trip-line'
+    const check = document.createElement('input')
+    check.type = 'checkbox'
+    check.checked = ticked.has(line.id)
+    check.setAttribute('aria-label', line.packs + ' hele verpakkingen ' + line.productName + ' afvinken')
+    check.addEventListener('change', () => {
+      if (check.checked) ticked.add(line.id)
+      else ticked.delete(line.id)
+      tripProgress()
+    })
+    const description = document.createElement('span')
+    description.textContent = String(line.packs) + ' × ' + line.productName +
+      ' · ' + String(line.pack.amount).replace('.', ',') + ' ' + line.pack.unit +
+      (line.pack.count > 1 ? ' × ' + line.pack.count + ' per verpakking' : '') +
+      ' · ' + euro.format(line.lineTotalCents / 100) + ' bij opname' +
+      ' · SKU ' + line.productId
+    item.append(check, description)
+    tripItems.append(item)
+  }
+  tripProgress()
+}
+
+function loadTrip(left: OneStoreBasket, right: OneStoreBasket, complete: boolean): void {
+  ticked.clear()
+  tripBaskets = complete ? { PLUS: left, DekaMarkt: right } : null
+  tripStore.value = 'PLUS'
+  renderTrip()
+}
+
+function clearTrip(): void {
+  ticked.clear()
+  tripBaskets = null
+  trip.hidden = true
+  tripItems.replaceChildren()
+}
+
+tripStore.addEventListener('change', () => {
+  ticked.clear()
+  renderTrip()
+})
+document.querySelector<HTMLButtonElement>('#trip-reset')!.addEventListener('click', () => {
+  ticked.clear()
+  renderTrip()
+})
+document.querySelector<HTMLButtonElement>('#trip-export')!.addEventListener('click', () => {
+  if (result.hidden || trip.hidden || !tripBaskets) return
+  const lines = shoppingTripLines()
+  if (!lines.length) return
+  const store = tripStore.value as StoreName
+  const basket = tripBaskets[store]
+  const content = [
+    'SUPA · eigen afvinkbare boodschappenlijst · ' + store,
+    'Aangemaakt op ' + new Date().toISOString(),
+    'Eigen oorspronkelijke bronprijzen, geen gegarandeerde kassaprijs.',
+    'Mandje: ' + euro.format(basket.totalCents / 100),
+    '',
+    ...lines.map(line =>
+      (ticked.has(line.id) ? '[x] ' : '[ ] ') +
+      line.packs + ' × ' + line.productName + ' (' +
+      line.pack.amount + ' ' + line.pack.unit +
+      (line.pack.count > 1 ? ', multipack ' + line.pack.count : '') + ')' +
+      ' | SKU ' + line.productId + ' | ' +
+      euro.format(line.lineTotalCents / 100)),
+    '',
+    'Gebaseerd op uitsluitend eigen winkelopnames; niet automatisch geprijsd.',
+    '',
+  ].join('\n')
+  if (new TextEncoder().encode(content).length > 256000) {
+    setStatus('Boodschappenlijst overschrijdt de veilige lokale exportgrootte.', true)
+    return
+  }
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = store === 'PLUS' ? 'supa-boodschappen-plus.txt' : 'supa-boodschappen-dekamarkt.txt'
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+})
+
 function show(source: Source, demand: Demand): void {
   const captures = Object.fromEntries(source.captures.map(c => [c.retailer, c])) as Record<StoreName,Capture>
   const left = storeBasket('PLUS', captures.PLUS, demand)
@@ -321,6 +441,7 @@ function show(source: Source, demand: Demand): void {
   const complete = fresh && comparison.claimable && comparison.deltaCents !== null &&
     Number.isSafeInteger(comparison.deltaCents)
   result.hidden = false
+  loadTrip(left, right, complete)
   rows.replaceChildren()
   const deltasByIngredient = new Map(comparison.lineDeltas.map(line => [line.id, line]))
   for (let i = 0; i < demand.ingredients.length; i++) {
@@ -388,6 +509,7 @@ for (const el of [combined, plus, deka, demandFile]) {
   el.addEventListener('change', () => {
     inputRevision++
     result.hidden = true
+    clearTrip()
     setStatus('Bronbestanden gewijzigd. Klik opnieuw op Vergelijk; eerdere prijsuitkomst is niet meer geldig.')
     if (el === combined) {
       plus.value = ''
@@ -401,6 +523,7 @@ compare?.addEventListener('click', async () => {
   const snapshotRevision = inputRevision
   compare.disabled = true
   result.hidden = true
+  clearTrip()
   setStatus('Lokale eigen bestanden worden verwerkt…')
   try {
     const file = demandFile.files?.[0]
@@ -451,6 +574,7 @@ document.querySelector<HTMLButtonElement>('#print')!.addEventListener('click', (
  */
 document.addEventListener('supa:compare-private-basket', (event: Event) => {
   result.hidden = true
+  clearTrip()
   try {
     const payload = (event as CustomEvent<{ source: unknown; demand: unknown }>).detail
     if (!payload) throw Error('Private inputs missing')
