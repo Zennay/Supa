@@ -18,6 +18,19 @@ function csvSourceText(value: string): string {
   return value
 }
 
+function decimalPackAmount(value: number | null): string {
+  if (value === null) return ''
+  const text = String(value)
+  // The existing canonical nine-column CSV importer supports exact ordinary
+  // decimals to six places. Do not silently round an original quantity or
+  // export scientific notation that a user cannot reimport.
+  if (!Number.isFinite(value) || value <= 0 || value > 100000 ||
+      !/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(text)) {
+    throw new Error('Een originele verpakking is niet zonder precisieverlies als CSV in te vullen. Corrigeer die bronwaarde expliciet.')
+  }
+  return text
+}
+
 function cell(value: string | number): string {
   return '"' + String(value).replaceAll('"', '""') + '"'
 }
@@ -50,7 +63,7 @@ export function makePrivateRecaptureCsv(
       '', // no implied fresh capture timestamp
       csvSourceText(product.id),
       csvSourceText(product.name),
-      product.packAmount === null ? '' : String(product.packAmount),
+      decimalPackAmount(product.packAmount),
       product.packUnit,
       String(packCount),
       '', // NEVER reuse observed prices or silently replace null with 0

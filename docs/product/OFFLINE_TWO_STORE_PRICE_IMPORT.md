@@ -610,3 +610,10 @@ een automatisch matchbaar bedrag en worden niet als EUR 0 gezien.
 Met het eerder toegevoegde herobservatie-CSV-blad kan de gebruiker
 die ontbrekende feiten opnieuw rechtmatig opnemen; alle andere
 broncontroles blijven ongewijzigd.
+
+Het herobservatieblad bewaakt bovendien de exacte fysieke
+verpakkingsprecisie: gewone decimale getallen tot zes cijfers na
+de komma worden exact meegenomen. Zeer kleine/exponentiële of
+numeriek instabiele hoeveelheden uit een oorspronkelijke JSON-opname
+die de canonieke CSV-import niet verliesloos accepteert, worden
+met een begrijpelijke melding geweigerd in plaats van afgerond.
