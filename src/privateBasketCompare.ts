@@ -928,7 +928,13 @@ function show(source: Source, demand: Demand): void {
     privateComparisonCsv = null
     privateCsvFreshUntilNs = null
   }
-  shownPriceExpiryNs = privateCsvFreshUntilNs
+  // Expiry must continue protecting the visible page even if a report
+  // exceeds the optional CSV limit or the export could not be generated.
+  const visibleDeadlines = [start, end].filter((value): value is bigint =>
+    value !== null && value <= nowNs && value + weekNs >= nowNs)
+    .map(value => value + weekNs)
+  shownPriceExpiryNs = visibleDeadlines.length
+    ? visibleDeadlines.reduce((a, b) => a < b ? a : b) : null
   scheduleFreshnessRepaint(source, demand, [start, end], nowNs)
 }
 
