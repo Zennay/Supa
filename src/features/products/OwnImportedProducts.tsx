@@ -131,9 +131,14 @@ export function OwnImportedProducts({
     {selectedExtras > 0 && <div className="own-products__list-pulse" role="status">
       <span>{selectedExtras} zelf gekozen losse {selectedExtras === 1 ? 'artikel' : 'artikelen'}
         {' '}staan buiten de berekende maaltijdmand, klaar in Lijst.</span>
-      <button type="button" className="own-products__primary" onClick={onOpenList}>
-        Open mijn boodschappenlijst
-      </button>
+      {stores.filter(store => session.extraProductIds[store].length > 0).map(store => (
+        <button key={store} type="button" className="own-products__primary" onClick={() => {
+          session.setSelectedStore(store)
+          onOpenList()
+        }}>
+          Open {store}-lijst ({session.extraProductIds[store].length})
+        </button>
+      ))}
     </div>}
     <div className="own-products__filters">
       <label>Winkel <select value={storeFilter}
@@ -229,7 +234,7 @@ export function OwnImportedProducts({
       Toon meer producten ({Math.min(rows.length - limit, 48)})
     </button>}
     <button type="button" className="own-products__primary" onClick={onCompare}>
-      Bekijk mijn twee winkelmandjes
+      {imported ? 'Bekijk mijn twee winkelmandjes' : `Bekijk mijn ${availableStores.join(' en ')}-winkelmand`}
     </button>
   </section>
 }
