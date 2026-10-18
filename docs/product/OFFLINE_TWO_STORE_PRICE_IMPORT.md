@@ -757,3 +757,24 @@ Bewust handmatig wijzigen van de eigen JSON-tekst blijft een
 nieuwe inhoudelijke invoer: de oude berekening wordt dan
 zoals voorheen direct ingetrokken. Geen retailerrechten
 of zelfstandige prijswaarneming worden hiermee toegekend.
+
+### Geen verlopen prijsverschil bij het downloaden
+
+De gewone app ververst zijn leesbare scherm periodiek, maar een
+gebruiker kan precies aan het eind van die minuut downloaden
+terwijl een waarneming net ouder dan zeven dagen werd.
+De **volledige privévergelijking (CSV)**, het **leesbare
+prijsverschil (TXT)** en het **afdrukbare privéoverzicht (HTML)**
+gebruiken nu alle drie één gedeelde, actuele controle **op het
+moment van klikken**: beide originele nanoseconde-bronmomenten
+moeten binnen zeven dagen van de werkelijke apparaatklok
+vallen, maximaal vijf minuten vooruit liggen, onderling
+binnen 24 uur vallen én dezelfde volledige fysiek vergeleken
+en afzonderlijk bevestigde winkelmandjes opleveren.
+
+Als de browser-UI nog een oud verschil toont op basis van
+de laatste minuutverversing, kan dat verschil niet als
+actueel CSV/TXT worden gedownload. Het offline HTML-overzicht
+kan nog steeds als **onvolledig/onactueel** werkdocument
+worden bewaard, maar laat dan geen winnaar of totaaldelta
+zien. Er wordt niets uit externe retailercatalogi aangevuld.

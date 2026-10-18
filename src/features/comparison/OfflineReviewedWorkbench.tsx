@@ -681,7 +681,7 @@ export function OfflineReviewedWorkbench({
   }, [imported, plan, recipes, activeDays, manualSku])
   function downloadConfirmedComparisonCsv() {
     try {
-      if (!canShowDifference || !basketPair?.plus || !basketPair.deka ||
+      if (!canShowDifference || !eligibleComparisonRightNow() || !basketPair?.plus || !basketPair.deka ||
           !basketPair.comparison || !imported?.captures.PLUS || !imported.captures.DekaMarkt) {
         throw new Error('Vergelijking nog niet bevestigd.')
       }
@@ -781,6 +781,21 @@ export function OfflineReviewedWorkbench({
   }
   const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
     allReviewed && !!basketPair?.comparison?.claimable
+  /** Exact click-time gate; a 60-second render clock must never authorize
+   * exporting a stale price delta when it just crossed its expiry boundary. */
+  function eligibleComparisonRightNow(): boolean {
+    if (!imported?.captures.PLUS || !imported.captures.DekaMarkt ||
+        !imported.pairedWithin24h || !allReviewed ||
+        !basketPair?.plus || !basketPair.deka ||
+        basketPair.comparison?.claimable !== true) return false
+    const nowNs = BigInt(Date.now()) * 1_000_000n
+    return stores.every(store => {
+      const observed = imported.captures[store]!.observedNs
+      return nowNs >= observed - 300_000_000_000n &&
+        nowNs - observed <= 604_800_000_000_000n
+    })
+  }
+
   const fullDifferenceRows = canShowDifference && basketPair?.plus && basketPair.deka &&
     basketPair.comparison ? [...basketPair.comparison.lineDeltas]
       .sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents))
@@ -854,7 +869,10 @@ export function OfflineReviewedWorkbench({
     : null
 
   function downloadReadableReport() {
-    if (!readableReport) return
+    if (!readableReport || !eligibleComparisonRightNow()) {
+      setTripExportMessage('Het bronmoment of een productbevestiging is inmiddels verlopen: geen privéverschil meer te downloaden. Neem nieuwe geldige prijzen op.')
+      return
+    }
     const url = URL.createObjectURL(new Blob([readableReport], { type: 'text/plain;charset=utf-8' }))
     try {
       const link = document.createElement('a')
@@ -1208,17 +1226,7 @@ export function OfflineReviewedWorkbench({
                       dekaObservedAt={imported.captures.DekaMarkt.observedAt}
                       comparable={canShowDifference}
                       showCsv={false}
-                      eligibleNow={() => {
-                        const nowNs = BigInt(Date.now()) * 1_000_000n
-                        return !!basketPair.comparison?.claimable &&
-                          imported.pairedWithin24h &&
-                          perStoreReview.every(item => item.complete) &&
-                          stores.every(store => {
-                            const ns = imported.captures[store]!.observedNs
-                            return nowNs >= ns - 300_000_000_000n &&
-                              nowNs - ns <= 604_800_000_000_000n
-                          })
-                      }}
+                      eligibleNow={eligibleComparisonRightNow}
                     />
                   </section>
                 )}
