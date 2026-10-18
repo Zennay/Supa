@@ -178,6 +178,28 @@ function updateCoverage() {
     'Alleen een complete, opnieuw berekende privévergelijking stelt de winkelbedragen vast. Onbekende of verlopen prijzen zijn nooit €0.'
 }
 
+function suggestHumanReviewedSku(row, unit, candidates) {
+  const label = row.querySelector('.label').value.trim()
+  if (!validText(label)) return null
+  const tokens = label.toLocaleLowerCase('nl').split(/[^\p{L}\p{N}]+/u)
+    .filter(word => word.length > 2).slice(0, 8)
+  if (!tokens.length) return null
+  // Suggestions are explicitly nonbinding; cap local scoring on older phones.
+  const scoped = candidates.filter(product =>
+    tokens.some(word => product.name.toLocaleLowerCase('nl').includes(word))).slice(0, 150)
+  if (!scoped.length) return null
+  const rawAmount = row.querySelector('.amount').value.trim()
+  const amount = rawAmount === '' ? null : numeric(rawAmount)
+  if (rawAmount && amount === null) return null
+  const hint = {
+    requirement: { id: row.dataset.id, query: label, amount, unit },
+    candidates: scoped,
+    decision: null,
+  }
+  document.dispatchEvent(new CustomEvent('supa:private-match-hint', { detail: hint }))
+  return hint.decision?.type === 'match' ? hint.decision : null
+}
+
 function updateSelect(select, store, unit) {
   const row = select.closest('.ingredient')
   const search = row.querySelector('[data-search-store="' + store + '"]')
@@ -188,7 +210,16 @@ function updateSelect(select, store, unit) {
   const filtered = all.filter(product => !query ||
     product.name.toLocaleLowerCase('nl').includes(query) ||
     product.id.toLocaleLowerCase('nl').includes(query))
+  const advice = query ? null : suggestHumanReviewedSku(row, unit, availableProducts(store, unit))
   const shown = filtered.slice(0, 80)
+  if (!query && advice) {
+    const suggested = filtered.find(product => product.id === advice.productId)
+    if (suggested) {
+      const index = shown.findIndex(product => product.id === suggested.id)
+      if (index >= 0) shown.splice(index, 1)
+      shown.unshift(suggested)
+    }
+  }
   if (kept && !shown.some(product => product.id === kept.id)) shown.unshift(kept)
   select.replaceChildren(new Option('Niet gekoppeld · onbekend', ''))
   for (const product of shown) {
@@ -205,6 +236,9 @@ function updateSelect(select, store, unit) {
   row.querySelector('[data-matches-store="' + store + '"]').textContent =
     String(filtered.length) + ' waargenomen eigen bronartikelen met compatibele eenheidsfamilie; ' +
     (filtered.length > 80 ? 'maximaal 80 zichtbaar, verfijn jouw zoekterm. ' : '') +
+    (advice ? 'Suggestie van Supa op basis van naam en verpakking: SKU ' +
+      advice.productId + ' (score ' + advice.score +
+      '), bewust niet automatisch gekozen. ' : '') +
     (chosenProduct
       ? 'Gekozen SKU ' + chosenProduct.id + ': ' +
         (!chosenProduct.available ? 'niet leverbaar; niet in winkelmandprijs' :
