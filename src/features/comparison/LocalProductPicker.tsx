@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { StoreProduct } from '../../domain/basket.ts'
 import type { MatchUnit } from '../../domain/matching.ts'
 import { privatePackUnitRate } from './privateUnitPrice.ts'
+import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const collator = new Intl.Collator('nl-NL', { sensitivity: 'base', numeric: true })
@@ -33,17 +34,18 @@ function labelRelevance(ingredient: string, productName: string): number {
  * a price or convert an incompatible package into a valid ingredient match.
  */
 export function LocalProductPicker({
-  store, ingredient, requirementUnit, products, selected, onSelect,
+  store, ingredient, requirementUnit, requirementAmount = null, products, selected, onSelect,
 }: {
   store: 'PLUS' | 'DekaMarkt'
   ingredient: string
   requirementUnit: MatchUnit
+  requirementAmount?: number | null
   products: StoreProduct[]
   selected: string
   onSelect: (productId: string) => void
 }) {
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<'relevance' | 'unit' | 'pack'>('relevance')
+  const [sort, setSort] = useState<'relevance' | 'unit' | 'pack' | 'need'>('relevance')
   function unitRate(product: StoreProduct) {
     return privatePackUnitRate({
       amount: product.packAmount, unit: product.packUnit,
@@ -54,6 +56,23 @@ export function LocalProductPicker({
     const rate = unitRate(product)
     return rate ? euros.format(rate.centsPerUnit / 100) + ' / ' + rate.unit
       : 'eenheidsprijs onbekend'
+  }
+  function ingredientCost(product: StoreProduct) {
+    if (requirementAmount === null || !Number.isFinite(requirementAmount) ||
+        requirementAmount <= 0 || product.packAmount === null ||
+        !product.available || !Number.isSafeInteger(product.priceCents)) return null
+    const packs = calculateDecimalPackCount(
+      [{ amount: requirementAmount, unit: requirementUnit }],
+      { amount: product.packAmount, unit: product.packUnit, count: product.packCount ?? 1 },
+    )
+    const totalCents = packs === null ? null : packs * product.priceCents
+    return packs !== null && totalCents !== null && Number.isSafeInteger(totalCents)
+      ? { packs, totalCents } : null
+  }
+  function ingredientCostLabel(product: StoreProduct) {
+    const cost = ingredientCost(product)
+    return cost ? cost.packs + ' verpakkingen: ' + euros.format(cost.totalCents / 100)
+      : 'ingrediëntkosten onbekend'
   }
   const compatible = useMemo(() => products.filter(product =>
     product.available && product.packAmount !== null && product.packAmount > 0 &&
@@ -71,8 +90,10 @@ export function LocalProductPicker({
       .normalize('NFKD').toLocaleLowerCase('nl-NL').includes(search))
   if (sort !== 'relevance') matching.sort((a, b) => {
     // Physical unit prices are display-only; no automatic retailer choice.
-    const aCost = sort === 'unit' ? unitRate(a)?.centsPerUnit : a.priceCents
-    const bCost = sort === 'unit' ? unitRate(b)?.centsPerUnit : b.priceCents
+    const aCost = sort === 'unit' ? unitRate(a)?.centsPerUnit :
+      sort === 'need' ? ingredientCost(a)?.totalCents : a.priceCents
+    const bCost = sort === 'unit' ? unitRate(b)?.centsPerUnit :
+      sort === 'need' ? ingredientCost(b)?.totalCents : b.priceCents
     return (aCost ?? Number.POSITIVE_INFINITY) -
       (bCost ?? Number.POSITIVE_INFINITY) ||
       collator.compare(a.name, b.name) || collator.compare(a.id, b.id)
@@ -97,6 +118,7 @@ export function LocalProductPicker({
           <option value="relevance">Beste overeenkomst met ingrediënt</option>
           <option value="unit">Laagste eenheidsprijs (kg, liter of stuk)</option>
           <option value="pack">Laagste prijs per verpakking</option>
+          <option value="need" disabled={requirementAmount === null || requirementAmount <= 0}>Laagste kosten voor benodigde hoeveelheid</option>
         </select>
       </label>
       <small>Eenheidsprijzen gebruiken jouw gemeten verpakking, multipack en centprijs.
@@ -110,10 +132,14 @@ export function LocalProductPicker({
           <option value="!">Geen passend product — laat onbekend</option>
           {visible.map(product =>
             <option key={product.id} value={product.id}>
-              {`${product.name} · ${product.packAmount} ${product.packUnit} × ${product.packCount ?? 1} · ${euros.format(product.priceCents / 100)} · ${unitRateLabel(product)}`}
+              {`${product.name} · ${product.packAmount} ${product.packUnit} × ${product.packCount ?? 1} · ${euros.format(product.priceCents / 100)} · ${unitRateLabel(product)} · ${ingredientCostLabel(product)}`}
             </option>)}
         </select>
       </label>
+      {chosen && <p role="status">
+        Zelf gekozen: {chosen.name} · {ingredientCostLabel(chosen)} uit jouw
+        eigen winkelopname. Pas na de productkeuze herberekent Supa het weekmandje.
+      </p>}
       <small role="status" aria-live="polite">
         {matching.length === 0
           ? 'Geen passende beschikbare verpakking in deze lokale opname.'

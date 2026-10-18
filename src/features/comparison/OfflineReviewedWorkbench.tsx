@@ -1066,6 +1066,7 @@ export function OfflineReviewedWorkbench({
                               store={store}
                               ingredient={line.ingredientLabel}
                               requirementUnit={line.requirement.unit}
+                              requirementAmount={line.requirement.amount}
                               products={imported.captures[store].products}
                               selected={choices[manualKey(store, line.id)] ?? ''}
                               onSelect={productId => chooseProduct(store, line.id, productId)}

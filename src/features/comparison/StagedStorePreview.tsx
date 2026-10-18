@@ -208,6 +208,7 @@ export function StagedStorePreview({
           <LocalProductPicker key={fingerprint + ':' + line.id}
             store={store} ingredient={line.ingredientLabel}
             requirementUnit={line.requirement.unit}
+                              requirementAmount={line.requirement.amount}
             products={source.products} selected={choices[line.id] ?? ''}
             onSelect={productId => choose(line.id, productId)}
           />
