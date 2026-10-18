@@ -22,6 +22,12 @@ export function useOfflineComparisonSession() {
     fingerprint: string
     products: Record<string, string>
   }>({ fingerprint: '', products: {} })
+  const [stagedManual, setStagedManual] = useState<Record<
+    OfflineRetailer, { fingerprint: string; products: Record<string, string> }
+  >>({
+    PLUS: { fingerprint: '', products: {} },
+    DekaMarkt: { fingerprint: '', products: {} },
+  })
   // Volatile user-picked extra products, explicitly excluded from priced meal baskets.
   const [extraProductIds, setExtraProductIds] = useState<Record<OfflineRetailer, string[]>>({
     PLUS: [], DekaMarkt: [],
@@ -44,7 +50,7 @@ export function useOfflineComparisonSession() {
     selectedStore, setSelectedStore, reviewTarget, setReviewTarget,
     text, setText, imported, setImported,
     stagedCaptures, setStagedCaptures,
-    manualSelections, setManualSelections,
+    manualSelections, setManualSelections, stagedManual, setStagedManual,
     importEpoch, setImportEpoch, tripMemory, setTripMemory,
     extraProductIds, setExtraProductIds, extraDoneIds, setExtraDoneIds,
     extraQuantities, setExtraQuantities,
