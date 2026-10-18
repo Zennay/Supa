@@ -45,16 +45,28 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
   const visible = items.filter(item => !openOnly || !checked[itemKey(item)])
   const copy = prepared?.key === JSON.stringify([demandIdentity, checked]) ? prepared.text : null
 
+  const shoppingText = () => [
+    'Supa · mijn weekboodschappen · zonder winkelprijzen',
+    ...items.map(item =>
+      (checked[itemKey(item)] ? '☑ ' : '☐ ') + item.label + ' · ' + quantity(item)),
+    'Geen supermarktproduct of actuele prijs gekoppeld.',
+  ].join('\n')
+
   function prepareCopy() {
-    setPrepared({
-      key: JSON.stringify([demandIdentity, checked]),
-      text: [
-        'Supa · mijn weekboodschappen · zonder winkelprijzen',
-        ...items.map(item =>
-          (checked[itemKey(item)] ? '☑ ' : '☐ ') + item.label + ' · ' + quantity(item)),
-        'Geen supermarktproduct of actuele prijs gekoppeld.',
-      ].join('\n'),
-    })
+    setPrepared({ key: JSON.stringify([demandIdentity, checked]), text: shoppingText() })
+  }
+  function downloadUnpricedList() {
+    if (error || !items.length) return
+    const url = URL.createObjectURL(new Blob([shoppingText()], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-planner-weekboodschappen-zonder-prijzen.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
   }
 
   return (
@@ -80,6 +92,9 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
             }}>Wis vinkjes</button>
             <button type="button" className="ghost-button" onClick={prepareCopy}>
               Toon kopieerbare weeklijst
+            </button>
+            <button type="button" className="ghost-button" onClick={downloadUnpricedList}>
+              Download weekboodschappen (TXT)
             </button>
           </div>
           <div className="unpriced-planner-checklist__rows">

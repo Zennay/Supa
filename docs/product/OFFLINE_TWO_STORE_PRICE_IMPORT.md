@@ -406,3 +406,12 @@ of op een server bewaard. Bij het beschikbaar komen van een volledig
 bevestigde privébron maakt de app plaats voor de gekoppelde, afzonderlijk
 brongebonden winkelchecklist. De oude demonstratiecomponenten
 worden niet buiten hun expliciet geopende uitklapper gemount.
+
+### Ongeprijsde Planner-weeklijst ook offline als TXT
+
+De al bestaande Planner-lijst kan nu naast handmatig kopiëren ook
+expliciet als lokaal TXT-bestand worden gedownload, inclusief
+actuele fysieke receptenbehoefte en de op dit moment afgevinkte regels.
+De tekst bevat geen gekozen winkel, geclaimd artikelnummer,
+fictief prijsverschil, netwerkactie of serveropslag. De knop
+verschijnt alleen wanneer een geldig niet-leeg weekmenu aanwezig is.
