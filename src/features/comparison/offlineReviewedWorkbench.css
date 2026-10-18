@@ -329,3 +329,17 @@
 .offline-price-workbench__replace-preview :is(button):focus-visible {
   outline: 3px solid #226f52; outline-offset: 3px;
 }
+
+/* Actionable, private collection list for genuinely missing basket matches. */
+.offline-missing-checklist {
+  display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap;
+  gap: .85rem; padding: 1rem; border: 1px solid #b5cbb7;
+  background: #f5faf4; border-radius: 13px;
+}
+.offline-missing-checklist > div { flex: 1 1 320px; min-width: 0; }
+.offline-missing-checklist h4 { margin: 0 0 .35rem; }
+.offline-missing-checklist p { margin: .35rem 0; }
+.offline-missing-checklist button { min-height: 44px; max-width: 100%; }
+.offline-missing-checklist button:focus-visible {
+  outline: 3px solid #226f52; outline-offset: 2px;
+}
