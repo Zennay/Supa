@@ -4,6 +4,8 @@ import { buildOneStoreBasket, type RecipeWithIngredients } from '../../domain/ba
 import { parseSingleOfflineCapture, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import type { OfflineComparisonSession } from './offlineComparisonSession.ts'
+import { LocalProductPicker } from './LocalProductPicker.tsx'
+import { stagedStoreFingerprint } from './stagedStoreFingerprint.ts'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const dates = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -24,6 +26,19 @@ export function StagedStorePreview({
   clockMs: number
   session: OfflineComparisonSession
 }) {
+  const fingerprint = useMemo(() => stagedStoreFingerprint(capture, plan, recipes, activeDays),
+    [capture, plan, recipes, activeDays])
+  const manual = session.stagedManual[store]
+  const choices = manual.fingerprint === fingerprint ? manual.products : {}
+  function choose(id: string, productId: string) {
+    session.setStagedManual(previous => {
+      const values = previous[store].fingerprint === fingerprint
+        ? { ...previous[store].products } : {}
+      if (productId) values[id] = productId
+      else delete values[id]
+      return { ...previous, [store]: { fingerprint, products: values } }
+    })
+  }
   const result = useMemo(() => {
     try {
       const text = JSON.stringify({ schema: 'supa-offline-store-capture-v1', capture })
@@ -32,10 +47,11 @@ export function StagedStorePreview({
       const basket = buildOneStoreBasket({
         store: { id: store, name: store },
         plan, recipes, activeDays, products: source.products,
+        manualProductIds: choices,
       })
       return { source, basket }
     } catch { return null }
-  }, [capture, store, plan, recipes, activeDays, clockMs])
+  }, [capture, store, plan, recipes, activeDays, clockMs, manual])
 
   if (!result) return <p role="alert" className="attention-card">
     De losse opname of Planner-inhoud kan niet veilig als winkelmandje worden getoond.
@@ -77,10 +93,27 @@ export function StagedStorePreview({
       {' '}{basket.matchedLineCount > 0 || complete
         ? euros.format(basket.totalCents / 100) : 'onbekend'}</strong>
       {!complete && ' · dit is geen volledig mandtotaal.'}</p>
-    <p className="disclaimer">De koppeling is uitsluitend een technisch voorstel binnen
+    <p className="disclaimer">De koppeling is uitsluitend een technisch voorstel uit
       jouw lokale opname. Controleer verpakkingen, identiteit, hoeveelheden en prijzen
-      zelf. Je kunt definitieve handmatige keuzes maken zodra beide winkelopnames
-      samen in Vergelijk zijn geladen.</p>
+      zelf. Handmatige keuzes zijn tijdelijk en brongebonden; ze worden pas door de
+      normale twee-winkeltoelating overgenomen als de originele opname en je weekmenu gelijk blijven.</p>
+    <details className="offline-staged-preview__matches">
+      <summary>Controleer / koppel mijn {basket.lines.length} weekmenu-ingrediënten</summary>
+      {basket.lines.map(line => <div key={line.id} className="offline-price-workbench__line">
+        <div><strong>{line.ingredientLabel}</strong>
+          <small>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</small>
+          {line.status === 'matched' ?
+            <small>{line.packs} × {line.productName} · {euros.format(line.lineTotalCents / 100)}</small> :
+            <small>Nog geen geschikte koppeling of eigen prijs.</small>}
+          <LocalProductPicker key={fingerprint + ':' + line.id}
+            store={store} ingredient={line.ingredientLabel}
+            requirementUnit={line.requirement.unit}
+            products={source.products} selected={choices[line.id] ?? ''}
+            onSelect={productId => choose(line.id, productId)}
+          />
+        </div>
+      </div>)}
+    </details>
     {extras.length > 0 && <section className="offline-own-extras" aria-label={'Losse privéproducten bij ' + store}>
       <h4>Zelf toegevoegde artikelen ({extras.length})</h4>
       <p className="disclaimer">Je hebt deze producten vanuit Producten aan deze winkel toegevoegd.
@@ -133,7 +166,9 @@ export function StagedStorePreview({
       </li>)}</ul>
     </section>}
     <PrivateStoreTripChecklist
-      key={store + ':' + source.observedAt}
+      key={JSON.stringify([store, source.observedAt, basket.lines.map(line =>
+        line.status === 'matched' ? [line.id, line.productId, line.packs, line.pricePerPackCents]
+          : [line.id, 'onbekend'])])}
       basket={basket} observedAt={source.observedAt} fresh={fresh}
       extraLines={extraLines}
     />
