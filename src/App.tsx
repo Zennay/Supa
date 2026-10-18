@@ -128,6 +128,10 @@ function useOfflineComparisonSession(): OfflineComparisonSession {
   const [extraDoneIds, setExtraDoneIds] = useState<Record<OfflineRetailer, string[]>>({
     PLUS: [], DekaMarkt: [],
   })
+  // Private loose-product pack counts, separate from matched meal baskets.
+  const [extraQuantities, setExtraQuantities] = useState<
+    Record<OfflineRetailer, Record<string, number>>
+  >({ PLUS: {}, DekaMarkt: {} })
   const [tripMemory, setTripMemory] = useState<
     Partial<Record<OfflineRetailer, { identity: string; done: string[] }>>
   >({})
@@ -137,7 +141,8 @@ function useOfflineComparisonSession(): OfflineComparisonSession {
     text, setText, imported, setImported,
     stagedCaptures, setStagedCaptures, manualSelections, setManualSelections,
     tripMemory, setTripMemory, extraProductIds, setExtraProductIds,
-    extraDoneIds, setExtraDoneIds, importEpoch, setImportEpoch,
+    extraDoneIds, setExtraDoneIds, extraQuantities, setExtraQuantities,
+    importEpoch, setImportEpoch,
   }
 }
 
