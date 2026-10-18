@@ -96,6 +96,24 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setBackupError(cause instanceof Error ? cause.message : 'Downloaden is niet gelukt.')
     }
   }
+  function downloadOwnRecipeChecklist() {
+    if (!ownShopping?.canCopy) return
+    try {
+      const uri = URL.createObjectURL(new Blob([ownShopping.copyText], { type: 'text/plain;charset=utf-8' }))
+      const link = document.createElement('a')
+      try {
+        link.href = uri
+        link.download = 'supa-recept-boodschappen.txt'
+        document.body.append(link)
+        link.click()
+        link.remove()
+        setMessage('Je ongeprijsde receptboodschappen zijn als TXT opgeslagen.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch {
+      setMessage('Downloaden lukte niet. Selecteer de tekst van je lijst om die zelf op te slaan.')
+      setShowShoppingCopy(true)
+    }
+  }
   async function loadOwnRecipeBackup(file?: File) {
     if (!file) return
     const version = ++backupReadVersion.current
@@ -340,6 +358,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
               aria-label="Kopieer mijn ongeprijsde boodschappenlijst"
               value={ownShopping.copyText} onFocus={event => event.currentTarget.select()} />}
             {showShoppingCopy && <button type="button" onClick={() => shoppingCopy.current?.select()}>Selecteer alle tekst</button>}
+            <button type="button" onClick={downloadOwnRecipeChecklist}>Download ongeprijsde lijst (TXT)</button>
           </> : <p role="status">Vul 1 tot 100 hele porties in en controleer de oorspronkelijke hoeveelheid per recept.</p>}
         </section></>}</> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}</>}</dialog>
   </div>
