@@ -91,31 +91,6 @@ const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|banan
 export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const original = text(raw, 400)
   if (!original) throw new Error('Ingredientregel ontbreekt')
-  // A single-unit match must never consume only the first part of
-  // "1 kg 250 g bloem" and mistake "250 g" for a product name.
-  // Parse two physically stated measures BEFORE falling back to the single
-  // amount pattern: keeping only the first segment would undercount shopping.
-  const compound = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+(.+)$/iu)
-  if (compound) {
-    const first = quantity(compound[1])
-    const second = quantity(compound[3])
-    const firstUnit = units[compound[2].toLowerCase()]
-    const secondUnit = units[compound[4].toLowerCase()]
-    const label = compound[5].trim()
-    if (first !== null && second !== null &&
-        Number.isFinite(first) && Number.isFinite(second) &&
-        first > 0 && second > 0 && first <= 100_000 && second <= 100_000 &&
-        firstUnit && secondUnit && firstUnit.unit === secondUnit.unit &&
-        label && !/^\d+(?:[.,]\d+)?\s+(?:g|kg|ml|l|oz|lb)\b/i.test(label)) {
-      const normalized = rounded(first * firstUnit.factor + second * secondUnit.factor)
-      if (Number.isFinite(normalized) && normalized > 0 && normalized <= 1_000_000) {
-        return { original, label, query: label.toLocaleLowerCase('nl'),
-          amount: normalized, unit: firstUnit.unit, reviewReason: null }
-      }
-    }
-    return { original, label: original, query: original.toLocaleLowerCase('nl'),
-      amount: null, unit: null, reviewReason: 'Controleer de samengestelde hoeveelheden' }
-  }
   const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
   if (!match) return { original, label: original, query: original.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid of eenheid ontbreekt' }
   const amount = quantity(match[1])
@@ -123,7 +98,33 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const wordMatch = tail.match(/^([^\s,]+)(?:\s+|,\s*)(.*)$/u)
   const word = (wordMatch ? wordMatch[1] : tail).toLowerCase()
   const metric = units[word]
-  const label = metric ? (wordMatch?.[2] || '').trim() : tail
+  let label = metric ? (wordMatch?.[2] || '').trim() : tail
+  let compoundAmount = 0
+  let componentCount = 0
+  // Each additional unit must belong to the same physical family. Never
+  // silently turn "1 kg 250 g 100 g" into a label or underbuy ingredients.
+  if (metric) {
+    const additional = /^(?:(?:en|\\+)\\s*)?((?:\\d+\\s+)?\\d+\\/\\d+|\\d+(?:[.,]\\d+)?|[½¼¾])\\s*([^\\s,]+)(?:\\s+|,\\s*)(.*)$/u
+    for (; componentCount < 8; componentCount++) {
+      const next = additional.exec(label)
+      if (!next) break
+      const quantityValue = quantity(next[1])
+      const extraUnit = units[next[2].toLowerCase()]
+      if (quantityValue === null || !Number.isFinite(quantityValue) ||
+          quantityValue <= 0 || quantityValue > 100_000 ||
+          !extraUnit || extraUnit.unit !== metric.unit) {
+        return { original, label: original, query: original.toLocaleLowerCase('nl'),
+          amount: null, unit: null,
+          reviewReason: 'Controleer samengestelde hoeveelheden en voer het metrische totaal in' }
+      }
+      compoundAmount += quantityValue * extraUnit.factor
+      label = next[3].trim()
+    }
+    if (componentCount === 8 && additional.test(label)) {
+      return { original, label: original, query: original.toLocaleLowerCase('nl'),
+        amount: null, unit: null, reviewReason: 'Te veel samengestelde hoeveelheden: controleer handmatig' }
+    }
+  }
   const inferredPiece = !metric && pieceNouns.test(tail)
   if (!amount || !Number.isFinite(amount) || amount > 100_000 || !label) {
     return { original, label: label || original, query: (label || original).toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Controleer de hoeveelheid en het ingrediënt' }
@@ -132,7 +133,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Onbekende maat: voer een metrische hoeveelheid in' }
   }
   const unit = metric?.unit || 'piece'
-  const normalized = rounded(amount * (metric?.factor || 1))
+  const normalized = rounded(amount * (metric?.factor || 1) + compoundAmount)
   if (!Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid is buiten bereik' }
   }
