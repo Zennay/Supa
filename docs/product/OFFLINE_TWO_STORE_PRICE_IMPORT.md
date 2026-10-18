@@ -513,3 +513,21 @@ hele verpakkingen, indicatieve eenheidsprijs en regelbedragen.
 Bij ontbrekende, ongeldige, stale of incomplete input ontbreekt
 deze uitvoer geheel; de reeds bestaande strikte CSV blijft een
 afzonderlijke gebruikersoptie. Geen netwerk- of rechtenclaim.
+
+### Integratie bestaande P1-bronfix: consistente shopping-root-ledger
+
+De al eerder afzonderlijk gebouwde product-source fix van
+`product/shopping-root-ledger-fail-closed-20261017-q1`
+is zonder wijziging van de oorspronkelijke eigenaarbranch samengevoegd
+in deze bestaande productintegratie. Voor een geldig basketKey,
+Lijst-vinkje, kopie of print moeten voortaan de **eigen** root-tellers
+(selectedMealCount, matched/unresolved count), het hele aantal centen
+en de zichtbaar geldige winkelnaam/identiteit exact overeenkomen met
+de werkelijke bronregels. Ongeldige gehele mandjes worden niet als
+een nieuw leeg mandje of een geloofwaardige print getoond.
+
+Reeds bestaande correcte v1-progress-sleutels behouden **dezelfde**
+serialisatie; de bronfix wijzigt geen productprijs of retailerrecht.
+De onafhankelijke verplichte officiële CI en review moeten dit op de
+gecombineerde producthead nog beoordelen. Geen QA-suite gemaakt of
+handmatig uitgevoerd.
