@@ -456,11 +456,10 @@ document.querySelector<HTMLButtonElement>('#trip-reset')!.addEventListener('clic
   ticked.clear()
   renderTrip()
 })
-document.querySelector<HTMLButtonElement>('#trip-export')!.addEventListener('click', () => {
-  if (invalidateAgedComparison()) return
-  if (result.hidden || trip.hidden || !tripBaskets) return
+function shoppingTripText(): string | null {
+  if (result.hidden || trip.hidden || !tripBaskets) return null
   const lines = shoppingTripLines()
-  if (!lines.length) return
+  if (!lines.length) return null
   const store = tripStore.value as StoreName
   const basket = tripBaskets[store]
   const content = [
@@ -481,10 +480,18 @@ document.querySelector<HTMLButtonElement>('#trip-export')!.addEventListener('cli
     'Gebaseerd op uitsluitend eigen winkelopnames; niet automatisch geprijsd.',
     '',
   ].join('\n')
-  if (new TextEncoder().encode(content).length > 256000) {
-    setStatus('Boodschappenlijst overschrijdt de veilige lokale exportgrootte.', true)
+  if (new TextEncoder().encode(content).length > 256000) return null
+  return content
+}
+
+document.querySelector<HTMLButtonElement>('#trip-export')!.addEventListener('click', () => {
+  if (invalidateAgedComparison()) return
+  const content = shoppingTripText()
+  if (content === null) {
+    setStatus('Geen volledig en recent winkelmandje om veilig te bewaren.', true)
     return
   }
+  const store = tripStore.value as StoreName
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -494,6 +501,25 @@ document.querySelector<HTMLButtonElement>('#trip-export')!.addEventListener('cli
   link.click()
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+})
+
+document.querySelector<HTMLButtonElement>('#trip-copy')!.addEventListener('click', async () => {
+  if (invalidateAgedComparison()) return
+  const content = shoppingTripText()
+  if (content === null) {
+    setStatus('Geen volledig en recent winkelmandje om te kopiëren.', true)
+    return
+  }
+  try {
+    if (!navigator.clipboard?.writeText) {
+      setStatus('Kopiëren is in deze browser niet beschikbaar. Download jouw lokale TXT-boodschappenlijst.', true)
+      return
+    }
+    await navigator.clipboard.writeText(content)
+    setStatus('Jouw eigen lokale boodschappenlijst is naar het klembord gekopieerd; prijzen blijven oorspronkelijke waarnemingen.')
+  } catch {
+    setStatus('Browser gaf geen klembordrechten. Download jouw lokale TXT-boodschappenlijst.', true)
+  }
 })
 
 function show(source: Source, demand: Demand): void {
