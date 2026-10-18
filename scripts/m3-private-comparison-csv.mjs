@@ -22,9 +22,12 @@ function cell(value, { untrustedText = false } = {}) {
   // remain literal text, not execute formula or DDE/URL side effects.
   // Control characters can masquerade as cell/row separators.
   const clean = raw.replace(/[\u0000-\u001f\u007f-\u009f\ufeff]/g, ' ')
-  const safe = untrustedText && /^[\s\u200b-\u200d]*[=+\-@]/u.test(clean)
-    ? "'" + clean
-    : clean
+  // Detect formulas after Unicode compatibility normalization and leading
+  // default-ignorable/combining marks, while retaining the original label.
+  // Reuse the existing production fix from #3862 without importing QA files.
+  const formulaShaped = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+\-@\u2212]/u
+    .test(clean.normalize('NFKC'))
+  const safe = untrustedText && formulaShaped ? "'" + clean : clean
   return '"' + safe.replace(/"/g, '""') + '"'
 }
 
