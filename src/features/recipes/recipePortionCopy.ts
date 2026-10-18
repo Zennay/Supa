@@ -4,7 +4,7 @@ import type { SavedRecipe } from './recipeLibrary.ts'
  * Metrically safe amounts scale, uncertain pieces remain review-required.
  * No prices, product matches or retailer observations are inferred. */
 export function preparePortionCopy(recipe: SavedRecipe, targetServings: number): {
-  lines: string[]; reviews: { original: string; reason: string }[]
+  lines: string[]; reviews: { original: string; reason: string; index: number }[]
 } {
   if (recipe.servings === null || !Number.isSafeInteger(recipe.servings) ||
       recipe.servings < 1 || recipe.servings > 1000 ||
@@ -12,7 +12,7 @@ export function preparePortionCopy(recipe: SavedRecipe, targetServings: number):
     throw new Error('Kies 1 tot 1.000 hele porties voor een recept met een bekend aantal porties.')
   }
   const lines: string[] = []
-  const reviews: { original: string; reason: string }[] = []
+  const reviews: { original: string; reason: string; index: number }[] = []
   for (const ingredient of recipe.ingredients) {
     let line = ingredient.original
     let review = ingredient.reviewReason
@@ -32,7 +32,7 @@ export function preparePortionCopy(recipe: SavedRecipe, targetServings: number):
     }
     if (line.length > 400) throw new Error('Een geschaalde ingrediëntregel is te lang.')
     lines.push(line)
-    if (review) reviews.push({ original: line, reason: review })
+    if (review) reviews.push({ original: line, reason: review, index: lines.length - 1 })
   }
   return { lines, reviews }
 }

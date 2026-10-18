@@ -8,6 +8,7 @@ import { preparePortionCopy } from './recipePortionCopy.ts'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
+import { ImportedIngredientReview } from './ImportedIngredientReview.tsx'
 import './recipes.css'
 
 function keyed<T>(items: readonly T[], identity: (item: T) => string) {
@@ -152,7 +153,7 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
       setForm({ title: recipe.title + ` (${value} porties)`,
         servings: String(value), minutes: recipe.minutes?.toString() ?? '',
         ingredients: prepared.lines.join('\n'), steps: recipe.steps.join('\n') })
-      setSourceReviews(prepared.reviews.map(review => ({ ...review, index: prepared.lines.indexOf(review.original) })))
+      setSourceReviews(prepared.reviews)
       setMessage(prepared.reviews.length > 0
         ? 'Kopie voorbereid. Onzekere of gedeeltelijke stuks moeten handmatig worden aangepast; er zijn geen hoeveelheden geraden.'
         : 'Metrische ingrediënten zijn evenredig omgerekend. Controleer de kopie en sla zelf op.')
@@ -285,6 +286,25 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Kon de geplakte receptgegevens niet verwerken.')
     }
+  }
+  /** Human-edited source line only. Preserve original review provenance so
+   * a label-only edit cannot remove the measurement-warning requirement. */
+  function correctImportedIngredient(index: number, replacement: string) {
+    const physicalLines = form.ingredients.split('\n')
+    const position = physicalLines.reduce((result, raw, offset) => {
+      if (raw.trim() && result.seen++ === index) result.position = offset
+      return result
+    }, { seen: 0, position: -1 }).position
+    if (position < 0) {
+      setError('Ingrediëntregel niet gevonden. Controleer de lijst handmatig.')
+      return
+    }
+    physicalLines[position] = replacement
+    setForm(previous => ({ ...previous, ingredients: physicalLines.join('\n') }))
+    setPreview(null)
+    setError('')
+    setMessage('Ingrediënt ' + (index + 1) +
+      ' aangepast. Controleer het volledige recept opnieuw voordat je het opslaat.')
   }
   function check(event: FormEvent) {
     event.preventDefault(); setError('')
@@ -425,7 +445,10 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
             Handmatig invoeren
           </button>
         </form>
-        : <form className="recipe-form" onSubmit={check} onChange={() => setPreview(null)}><label>Naam van het recept<input required maxLength={160} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label><div className="recipe-form-row"><label>Porties<input required type="number" min="1" max="1000" value={form.servings} onChange={e => setForm({ ...form, servings: e.target.value })} /></label><label>Minuten<input required type="number" min="1" max="1440" value={form.minutes} onChange={e => setForm({ ...form, minutes: e.target.value })} /></label></div><label>Ingrediënten<textarea required rows={5} placeholder={'200 g rijst\n1 paprika\n250 ml kokosmelk'} value={form.ingredients} onChange={e => setForm({ ...form, ingredients: e.target.value })} /></label><small>Eén ingrediënt per regel, met hoeveelheid en eenheid.</small><label>Bereiding<textarea required rows={5} placeholder="Eén stap per regel" value={form.steps} onChange={e => setForm({ ...form, steps: e.target.value })} /></label>{source && <p>Bron: <a href={source} target="_blank" rel="noopener noreferrer">Bekijk het oorspronkelijke recept</a></p>}<button className="recipe-primary">Controleer recept</button></form>}
+        : <form className="recipe-form" onSubmit={check} onChange={() => setPreview(null)}><label>Naam van het recept<input required maxLength={160} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label><div className="recipe-form-row"><label>Porties<input required type="number" min="1" max="1000" value={form.servings} onChange={e => setForm({ ...form, servings: e.target.value })} /></label><label>Minuten<input required type="number" min="1" max="1440" value={form.minutes} onChange={e => setForm({ ...form, minutes: e.target.value })} /></label></div><label>Ingrediënten<textarea required rows={5} placeholder={'200 g rijst\n1 paprika\n250 ml kokosmelk'} value={form.ingredients} onChange={e => setForm({ ...form, ingredients: e.target.value })} /></label><small>Eén ingrediënt per regel, met hoeveelheid en eenheid.</small><label>Bereiding<textarea required rows={5} placeholder="Eén stap per regel" value={form.steps} onChange={e => setForm({ ...form, steps: e.target.value })} /></label>{source && <p>Bron: <a href={source} target="_blank" rel="noopener noreferrer">Bekijk het oorspronkelijke recept</a></p>}{sourceReviews.length > 0 && <ImportedIngredientReview
+          sourceReviews={sourceReviews} ingredients={form.ingredients}
+          onCorrect={correctImportedIngredient} />}
+          <button className="recipe-primary">Controleer recept</button></form>}
       {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <div className="recipe-review__pending" role="status">
         <strong>Controleer deze velden zelf voordat ze in Planner kunnen worden berekend:</strong>
         <ul>{[...new Set(preview.warnings)].map(warning => <li key={warning}>{warning}</li>)}</ul>
