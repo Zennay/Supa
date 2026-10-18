@@ -234,3 +234,30 @@ in; een ander geselecteerd artikel erft dus nooit een oude goedkeuring.
 Ingevoerde SKU-keuzes leven alleen in de huidige browsercomponent en
 worden gewist bij een nieuwe bronimport of het opnieuw opbouwen van
 het bronbestand. Dit is geen productgelijkheidsbewijs of bronrecht.
+
+## Eén bestand voor bronopnames, weekvraag en SKU-keuzes naar privéwizard
+
+In de normale Supa Vergelijk-tab is **Bewaar mijn winkelmand + gekozen
+producten (privésessie)** beschikbaar na een eigen bronimport en geldig
+weekmenu. De download gebruikt exact het al ondersteunde
+`supa-private-basket-session-v1` formaat van
+`/private-basket-mapping.html` en de bestaande
+`/private-basket-compare.html`-importer. Hetzelfde bestand bevat de
+originele geaccepteerde één- of twee-winkelopname, de fysieke behoefte
+uit geselecteerde Planner-dagen en expliciet gekozen of per bronregel
+door de gebruiker bevestigde SKU's. Een nog nooit gekozen of bevestigde
+automatische match wordt **niet** heimelijk als menselijke SKU-keuze
+meegestuurd. Dubbele productcodes voor fysiek verschillende
+ingrediënten worden niet afzonderlijk als twee aankopen toegekend:
+die koppelingen blijven onbekend tot een mens de behoefte combineert.
+
+De export valideert eerst het bestaande Planner-weekformaat, aggregeert
+de canonieke ingrediënten en valideert de originele opname opnieuw.
+Gekozen SKU's moeten uniek aanwezig, beschikbaar en fysiek compatibel
+zijn binnen precies die eigen winkelopname. Het bestand is maximaal
+256 kB. Na downloaden kun je het op de uitgebreide privéwerkbank
+via **Herstel privésessie** openen. De bestaande import vraagt opnieuw
+toestemming vóór het overschrijven van die eigen lokale werkbank en
+rekent niet automatisch. Het bestand bewaart geen toestemming,
+controle-checkboxes, onafhankelijk veldbewijs of actuele
+besparingsclaim en is niet naar een server verzonden.

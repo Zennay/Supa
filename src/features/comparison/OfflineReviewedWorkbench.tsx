@@ -5,6 +5,7 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
+import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
@@ -122,6 +123,40 @@ export function OfflineReviewedWorkbench({
       setWeekExportMessage('Je geselecteerde weekmenu is lokaal gedownload. Open het bestand in de privévergelijker onder stap 2. Geen winkelprijzen of winkelproduct-ID’s meegestuurd.')
     } catch {
       setWeekExportMessage('Weekmenu niet exporteerbaar. Controleer geselecteerde dagen, eigen recepten en metrische hoeveelheden in Planner.')
+    }
+  }
+
+  function downloadPortableSession() {
+    if (!imported || !basketPair) return
+    try {
+      const selected = { PLUS: {} as Record<string, string>, DekaMarkt: {} as Record<string, string> }
+      for (const store of stores) {
+        const capture = imported.captures[store]
+        const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+        if (!basket || !capture) continue
+        for (const line of basket.lines) {
+          if (line.status !== 'matched') continue
+          // A consciously chosen SKU can travel, but the independent
+          // wizard must still ask the user to inspect source/matches.
+          const explicit = manualSku[store][line.id] === line.productId
+          const reviewed = reviewedLines[reviewedLineKey(store, capture.observedAt, line)]
+          if (explicit || reviewed) selected[store][line.id] = line.productId
+        }
+      }
+      const session = exportPrivateBasketSession({
+        plan, recipes, activeDays, rawSource: text, selected,
+      })
+      const url = URL.createObjectURL(new Blob([session], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-prive-mand-sessie.json'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('Privésessie lokaal bewaard. Open hem in de uitgebreide privévergelijker onder Herstel privésessie. De bronmomenten en productkeuzes moeten opnieuw worden gecontroleerd.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Kan deze privémand-sessie niet maken.')
     }
   }
 
@@ -481,6 +516,10 @@ export function OfflineReviewedWorkbench({
           </button>
           <button type="button" className="ghost-button" disabled={!imported || busy} onClick={downloadOwnSources}>
             Download mijn originele bronopnames (JSON)
+          </button>
+          <button type="button" className="ghost-button" disabled={!imported || !basketPair || busy}
+            onClick={downloadPortableSession}>
+            Bewaar mijn winkelmand + gekozen producten (privésessie)
           </button>
           <button type="button" className="ghost-button" onClick={() => {
             importRevision.current += 1
