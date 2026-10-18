@@ -505,7 +505,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             displayStagedOnly onOpenComparison={() => navigate('basket')}
           />
         )}
-        {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && <ShoppingListView basket={basket} />}
         {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && (
           <p className="disclaimer" role="status">
             Nog geen privéwinkelopnames geladen. Open Vergelijk om je eigen
@@ -617,13 +616,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <summary>Oude voorbeeldboodschappenlijst (niet de geïmporteerde mand)</summary>
           <ShoppingListView basket={basket} />
         </details>}
-        {tab === 'list' && !offlinePriceSession.imported && (
-          stagedRetailers.length > 0
-            ? <details className="demo-comparison-disclosure">
-                <summary>Oude voorbeeldboodschappenlijst (geen eigen prijsdata)</summary>
-                <ShoppingListView basket={basket} />
-              </details>
-            : <ShoppingListView basket={basket} />
+        {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && <ShoppingListView basket={basket} />}
+        {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length > 0 && (
+          <details className="demo-comparison-disclosure">
+            <summary>Oude voorbeeldboodschappenlijst (geen eigen prijsdata)</summary>
+            <ShoppingListView basket={basket} />
+          </details>
         )}
         {tab === 'observe' && <ObservationView />}
       </div>
