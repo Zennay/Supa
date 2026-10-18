@@ -36,6 +36,7 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 <script type="module" src="/private-basket-mapping.mjs"></script>
 <script type="module" src="/private-basket-manual-observations.mjs"></script>
 <script type="module" src="/src/privateBasketCompare.ts"></script>
+<script type="module" src="/src/privatePlannerDemandImport.ts"></script>
 </head>
 <body><main>
 <header><p><strong>SUPA · PRIVÉ · LOKAAL</strong></p>
@@ -82,6 +83,10 @@ Tijdstippen en artikel-ID's worden niet automatisch bedacht of ingevuld.</p>
 <h2 id="demand-title">2 · Vul de fysieke behoefte in</h2>
 <p>Gebruik exact dezelfde hoeveelheid voor beide winkels. Een onbekende hoeveelheid mag leeg blijven;
 dan kan er geen volledig prijsverschil worden berekend. Pas na eigen controle kies je een product-ID per winkel.</p>
+<label for="week-import">Of: importeer een lokaal geselecteerd Planner-weekmenu</label>
+<input id="week-import" type="file" accept=".json,application/json">
+<small>Accepteert alleen supa-private-planner-week-v1 met echte gekozen dagen, recepten en metrische hoeveelheden. Supa gebruikt dezelfde canonieke aggregatie als de bestaande offline Planner-converter. Winkelprijzen en artikel-ID's blijven onbekend.</small>
+<div id="week-status" class="notice" role="status" aria-live="polite">Nog geen eigen Planner-weekmenu geopend.</div>
 <label for="demand-import">Optioneel: eerder gemaakte privé mandvraag opnieuw openen</label>
 <input id="demand-import" type="file" accept=".json,application/json">
 <small>Dezelfde ingrediënten en hoeveelheden worden hersteld, maar eerder gekozen winkelproduct-ID's worden bewust opnieuw ter controle vrijgegeven.</small>
