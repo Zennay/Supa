@@ -57,6 +57,7 @@ const tripSummary = document.querySelector<HTMLElement>('#trip-summary')!
 let tripBaskets: Record<StoreName, OneStoreBasket> | null = null
 let tripEligible: Record<StoreName, boolean> = { PLUS: false, DekaMarkt: false }
 let tripValidUntilNs: Record<StoreName, bigint> | null = null
+let tripCapturedAt: Record<StoreName, string> | null = null
 let comparisonValidThroughNs: bigint | null = null
 const ticked = new Set<string>()
 let inputRevision = 0
@@ -440,6 +441,7 @@ function clearTrip(): void {
   ticked.clear()
   tripBaskets = null
   tripValidUntilNs = null
+  tripCapturedAt = null
   tripEligible = { PLUS: false, DekaMarkt: false }
   trip.hidden = true
   tripItems.replaceChildren()
@@ -465,6 +467,7 @@ document.querySelector<HTMLButtonElement>('#trip-export')!.addEventListener('cli
     'SUPA · eigen afvinkbare boodschappenlijst · ' + store,
     'Aangemaakt op ' + new Date().toISOString(),
     'Eigen oorspronkelijke bronprijzen, geen gegarandeerde kassaprijs.',
+    'Oorspronkelijke opname: ' + (tripCapturedAt?.[store] ?? 'Onbekend'),
     'Mandje: ' + euro.format(basket.totalCents / 100),
     '',
     ...lines.map(line =>
@@ -508,6 +511,7 @@ function show(source: Source, demand: Demand): void {
     firstAge <= weekNs && secondAge <= weekNs && gap <= dayNs
   const complete = fresh && comparison.claimable && comparison.deltaCents !== null &&
     Number.isSafeInteger(comparison.deltaCents)
+  tripCapturedAt = { PLUS: captures.PLUS.observedAt, DekaMarkt: captures.DekaMarkt.observedAt }
   comparisonValidThroughNs = complete ? (start <= end ? start : end) + weekNs : null
   result.hidden = false
   loadTrip(left, right, demand,
