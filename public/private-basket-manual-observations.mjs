@@ -4,9 +4,11 @@
  * no fixtures, retailer calls, inferred IDs, or implicit price timestamps.
  * The existing shared strict CSV admission remains the source of truth.
  */
-import { convertTwoStoreCsv } from './offline-two-store-csv.mjs'
+import { convertOwnStoreCsv } from './offline-two-store-csv.mjs'
 
 const stores = ['PLUS', 'DekaMarkt']
+const mode = document.querySelector('#manual-store-mode')
+const selectedStores = () => mode.value === 'both' ? stores : [mode.value]
 const csvHeader = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 const areas = Object.fromEntries(stores.map(store => [
   store, document.querySelector('[data-observations="' + store + '"]'),
@@ -48,7 +50,7 @@ const setStatus = (message, kind = '') => {
 const removeReview = () => {
   acceptedCsv = null
   save.disabled = true
-  setStatus('Invoer gewijzigd: neem na controle je twee echte winkelopnames opnieuw over voordat je prijzen vergelijkt.', 'warning')
+  setStatus('Invoer gewijzigd: neem na controle de werkelijk gekozen winkelopname(s) opnieuw over voordat je prijzen vergelijkt.', 'warning')
   document.dispatchEvent(new Event('supa:manual-source-edited'))
 }
 const quote = value => /[",\r\n]/.test(value) ? '"' + value.replace(/"/g, '""') + '"' : value
@@ -103,9 +105,9 @@ function addRow(store, notify = true) {
 }
 function readRows() {
   const rows = []
-  for (const store of stores) {
+  for (const store of selectedStores()) {
     const when = document.querySelector('[data-capture="' + store + '"]').value.trim()
-    if (!when) throw Error('Voer voor elke winkel het werkelijke opname-moment inclusief UTC-offset in.')
+    if (!when) throw Error('Voer voor elke gekozen winkel het werkelijke opname-moment inclusief UTC-offset in.')
     const entries = Array.from(areas[store].querySelectorAll('.observed-product'))
     if (!entries.length) throw Error('Vul minimaal één werkelijke productregel per winkel in.')
     for (const row of entries) {
@@ -130,13 +132,13 @@ function submit() {
     if (new TextEncoder().encode(csv).length > ceiling) {
       throw Error('De handmatige brongegevens zijn te groot (maximum 256 kB).')
     }
-    const canonical = JSON.parse(convertTwoStoreCsv(csv))
+    const canonical = JSON.parse(convertOwnStoreCsv(csv))
     acceptedCsv = csv
     save.disabled = false
     document.dispatchEvent(new CustomEvent('supa:manual-source-admitted', {
       detail: { source: canonical },
     }))
-    setStatus('Beide handmatige winkelopnames zijn lokaal geaccepteerd. Kies hieronder zelf welke werkelijke producten bij jouw ingrediënten passen. Er is geen retailerlicentie of onafhankelijk veldbewijs aangenomen.')
+    setStatus('De daadwerkelijk ingevoerde eigen winkelopname(s) zijn lokaal geaccepteerd. Kies hieronder zelf welke werkelijke producten bij jouw ingrediënten passen. Er is geen retailerlicentie of onafhankelijk veldbewijs aangenomen.')
   } catch (error) {
     acceptedCsv = null
     save.disabled = true
@@ -203,14 +205,24 @@ document.addEventListener('supa:manual-prefill-own-source', event => {
         set('available', product.available ? 'true' : 'false')
       }
     }
+    mode.value = 'both'
+    updateMode()
     removeReview()
-    setStatus('Bestaande eigen opnames geladen voor menselijke correctie. Oorspronkelijke opnametijden zijn ongewijzigd. Pas een prijs of datum alleen aan na werkelijke hercontrole van het artikel/de opname. Kies daarna Neem mijn twee winkelopnames over; oude artikelkoppelingen blijven ingetrokken.')
+    setStatus('Bestaande eigen opnames geladen voor menselijke correctie. Oorspronkelijke opnametijden zijn ongewijzigd. Pas een prijs of datum alleen aan na werkelijke hercontrole van het artikel/de opname. Kies daarna Neem mijn echte winkelopname(s) over; oude artikelkoppelingen blijven ingetrokken.')
     document.querySelector('#manual-observations').scrollIntoView({ block: 'start', behavior: 'smooth' })
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Geen veilig bronconcept gemaakt.', 'warning')
   }
 })
 
+function updateMode() {
+  for (const store of stores) {
+    const panel = document.querySelector('[data-manual-store="' + store + '"]')
+    panel.hidden = !selectedStores().includes(store)
+  }
+}
+mode.addEventListener('change', () => { updateMode(); removeReview() })
+updateMode()
 for (const store of stores) {
   document.querySelector('[data-add-product="' + store + '"]').addEventListener('click', () => addRow(store))
   addRow(store, false)

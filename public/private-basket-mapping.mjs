@@ -521,20 +521,23 @@ document.addEventListener('supa:manual-source-admitted', event => {
     const now = Date.now()
     const labels = stores.map(store => {
       const capture = captures[store]
+      if (!capture) return store + ': geen echte opname; onbekende artikelen en prijzen'
       const age = now - Date.parse(capture.observedAt)
       return store + ': ' + capture.products.length + ' zelf ingevoerde product(en), ' +
         capture.observedAt + (age < 0 ? ' · toekomstig' :
           age > 7 * 86400000 ? ' · ouder dan 7 dagen' : '')
     })
-    const gap = Math.abs(Date.parse(captures.PLUS.observedAt) -
-      Date.parse(captures.DekaMarkt.observedAt))
-    if (gap > 86400000) labels.push('Opnames meer dan 24 uur uiteen: geen volledig betrouwbaar prijsverschil.')
+    const gap = captures.PLUS && captures.DekaMarkt
+      ? Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt)) : null
+    if (gap === null) labels.push('De tweede winkel is niet waargenomen; geen volledig prijsverschil.')
+    else if (gap > 86400000) labels.push('Opnames meer dan 24 uur uiteen: geen volledig betrouwbaar prijsverschil.')
     labels.push('Kies per ingrediënt opnieuw handmatig gecontroleerde artikel-ID’s uit deze nieuwe bron.')
     const expired = stores.some(store => {
+      if (!captures[store]) return false
       const age = now - Date.parse(captures[store].observedAt)
       return age < 0 || age > 7 * 86400000
     })
-    notice(sourceStatus, labels.join('\n'), gap > 86400000 || expired ? 'warning' : '')
+    notice(sourceStatus, labels.join('\n'), gap === null || gap > 86400000 || expired ? 'warning' : '')
   } catch {
     captures = null
     refresh()

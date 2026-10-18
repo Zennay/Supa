@@ -331,3 +331,23 @@ andere winkel blijft unknown totdat de gebruiker een echt tweede bestand
 inlaadt. De 7-dagen-herkomstgrens voor de ene winkel blijft gelden; de
 bestaande 24-uursgrens voor volledige winkelpaarvergelijking wordt
 nooit verwijderd of versoepeld.
+
+## Eén winkel handmatig invoeren, zonder CSV-voorbereiding
+
+Dezelfde browserwizard laat de gebruiker bij **Of: voeg je eigen
+prijswaarnemingen direct in** nu expliciet `PLUS en DekaMarkt`, `Alleen PLUS`
+of `Alleen DekaMarkt` kiezen. Alleen de werkelijk gekozen winkels worden
+gebruikt: de andere invoervelden worden verborgen, een ontbrekende
+waarnemingstijd wordt **nooit** door Supa aangevuld. Het bestaande
+menselijke invoerformulier vraagt nog steeds de werkelijke SKU, naam,
+verpakking, hele eurocenten of expliciet onbekende prijs, beschikbaarheid
+en originele geldige ISO-UTC-offset voor elke geselecteerde winkel.
+
+Het resultaat doorloopt dezelfde strikte lokale bronconversie en wordt
+zichtbaar in de *reeds aanwezige* productkiezer en volledige-mandberekening.
+Een geprijsde eigen winkel kan de eigen fysieke boodschappenlijst en
+budgetruimte tonen; de niet-geobserveerde winkel blijft onbekend. Bij
+wisselen van winkelkeuze of handmatige invoer vervallen eerdere prijsuitkomst
+en SKU-koppelingen tot de gebruiker deze echte bron expliciet opnieuw
+accepteert. Het formulier verstrekt geen retailerrechten of openbaar
+veldonderzoeksbewijs en haalt niets van winkelwebsites op.

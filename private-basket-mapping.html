@@ -100,19 +100,22 @@ Productnamen en prijzen komen uitsluitend uit jouw eigen bestanden.</p>
 <p>Geen CSV klaar? Vul zelf producten in die je <strong>daadwerkelijk</strong> bij PLUS en DekaMarkt hebt waargenomen.
 Dit is een lokale invoerhulp, geen scraper. Laat onbekende prijzen leeg en bevestig alleen werkelijk gecontroleerde beschikbaarheid.
 Tijdstippen en artikel-ID's worden niet automatisch bedacht of ingevuld.</p>
+<label for="manual-store-mode">Van welke winkel(s) heb je werkelijk producten waargenomen?</label>
+<select id="manual-store-mode"><option value="both">PLUS en DekaMarkt</option><option value="PLUS">Alleen PLUS</option><option value="DekaMarkt">Alleen DekaMarkt</option></select>
+<small>Met één winkel kun je al een eigen mand en budget maken. De andere winkel blijft volledig onbekend, zonder fictieve opname.</small>
 <div class="stores">
-<div><label for="manual-plus-time">PLUS · werkelijke opnametijd met UTC-offset</label>
+<div data-manual-store="PLUS"><label for="manual-plus-time">PLUS · werkelijke opnametijd met UTC-offset</label>
 <input id="manual-plus-time" data-capture="PLUS" type="text" placeholder="JJJJ-MM-DDTUU:MM:SS+02:00" maxlength="35" autocomplete="off">
 <small>Vul de oorspronkelijke waarnemingstijd in; één moment voor deze PLUS-opname.</small>
 <div data-observations="PLUS"></div>
 <button type="button" class="secondary" data-add-product="PLUS">+ Waargenomen PLUS-artikel</button></div>
-<div><label for="manual-deka-time">DekaMarkt · werkelijke opnametijd met UTC-offset</label>
+<div data-manual-store="DekaMarkt"><label for="manual-deka-time">DekaMarkt · werkelijke opnametijd met UTC-offset</label>
 <input id="manual-deka-time" data-capture="DekaMarkt" type="text" placeholder="JJJJ-MM-DDTUU:MM:SS+02:00" maxlength="35" autocomplete="off">
 <small>Vul de oorspronkelijke waarnemingstijd in; één moment voor deze DekaMarkt-opname.</small>
 <div data-observations="DekaMarkt"></div>
 <button type="button" class="secondary" data-add-product="DekaMarkt">+ Waargenomen DekaMarkt-artikel</button></div>
 </div>
-<div class="row-actions"><button type="button" id="manual-apply">Neem mijn twee winkelopnames over</button>
+<div class="row-actions"><button type="button" id="manual-apply">Neem mijn echte winkelopname(s) over</button>
 <button type="button" id="manual-export" class="secondary" disabled>Bewaar eigen bron-CSV lokaal</button></div>
 <div class="notice" id="manual-status" role="status" aria-live="polite">Nog geen handmatige waarnemingen ingevoerd. Begin met een werkelijk waargenomen artikel per winkel.</div>
 </section>
