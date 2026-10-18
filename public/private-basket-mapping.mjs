@@ -15,6 +15,7 @@ let sourceRevision = 0
 const sourceStatus = document.querySelector('#source-status')
 const status = document.querySelector('#status')
 const lines = document.querySelector('#lines')
+const coverage = document.querySelector('#match-coverage')
 const mealCount = document.querySelector('#meal-count')
 const demandImport = document.querySelector('#demand-import')
 const maxLines = 200
@@ -113,6 +114,45 @@ function availableProducts(store, unit) {
     classify(product.packUnit) === classify(unit))
 }
 
+function updateCoverage() {
+  const rows = Array.from(lines.querySelectorAll('.ingredient'))
+  if (!rows.length) {
+    coverage.textContent = 'Nog geen ingrediënten in de fysieke mandvraag.'
+    return
+  }
+  if (!captures) {
+    coverage.textContent = rows.length + ' fysieke ingrediëntregels zonder toegelaten eigen winkelopnames. ' +
+      'De ongeprijsde lijst blijft beschikbaar; geen supermarktbedragen bekend.'
+    coverage.className = 'notice warning'
+    return
+  }
+  const messages = stores.map(store => {
+    const countBySku = new Map()
+    for (const row of rows) {
+      const id = row.querySelector('[data-store="' + store + '"]').value
+      if (id) countBySku.set(id, (countBySku.get(id) ?? 0) + 1)
+    }
+    let ready = 0
+    let duplicated = 0
+    for (const row of rows) {
+      const sku = row.querySelector('[data-store="' + store + '"]').value
+      if (!sku) continue
+      if (countBySku.get(sku) > 1) { duplicated++; continue }
+      const input = row.querySelector('.amount').value.trim()
+      const amount = input === '' ? null : numeric(input)
+      const unit = row.querySelector('.unit').value
+      if (amount !== null && validText(row.querySelector('.label').value.trim()) &&
+          availableProducts(store, unit).some(p => p.id === sku)) ready++
+    }
+    return store + ': ' + ready + ' van ' + rows.length +
+      ' fysieke regels met uniek gekozen, prijsbaar eigen product' +
+      (duplicated ? ' (' + duplicated + ' regels met dubbel gekozen SKU)' : '')
+  })
+  coverage.className = 'notice' + (messages.some(value => !value.includes(' ' + rows.length + ' van ' + rows.length)) ? ' warning' : '')
+  coverage.textContent = messages.join(' · ') +
+    '. Alleen een verse, volledige mandvergelijking kan winkelbedragen en prijsverschillen vaststellen; onbekende prijzen blijven onbekend.'
+}
+
 function updateSelect(select, store, unit) {
   const row = select.closest('.ingredient')
   const search = row.querySelector('[data-search-store="' + store + '"]')
@@ -168,6 +208,7 @@ function refresh() {
   downloadUnpriced.disabled = save.disabled
   showUnpriced.disabled = save.disabled
   compareNow.disabled = !captures || save.disabled
+  updateCoverage()
 }
 function addIngredient(restored = null) {
   if (lines.children.length >= maxLines) return
@@ -217,7 +258,10 @@ function addIngredient(restored = null) {
     box.append(count)
     storesGrid.append(box)
     filter.addEventListener('input', () => updateSelect(select, store, unit.value))
-    select.addEventListener('change', () => updateSelect(select, store, unit.value))
+    select.addEventListener('change', () => {
+      updateSelect(select, store, unit.value)
+      updateCoverage()
+    })
   }
   const actions = node('div', { className: 'row-actions' })
   const remove = node('button', { type: 'button', className: 'secondary' }, 'Verwijder ingrediënt')
@@ -232,6 +276,7 @@ function addIngredient(restored = null) {
   compareNow.disabled = !captures
   invalidateUnpricedDemand()
   invalidatePrice()
+  updateCoverage()
 }
 
 function acceptJson(json) {
@@ -630,6 +675,7 @@ for (const kind of ['input', 'change']) {
     if (!(target instanceof Element)) return
     if (target.matches('.label, .amount, .unit') && target.closest('#lines') ||
         target.closest('#meal-count')) invalidateUnpricedDemand()
+    if (target.closest('#lines') || target.closest('#meal-count')) updateCoverage()
     if (target.closest('#lines') || target.closest('#meal-count') ||
         target.closest('#source') || target.closest('#plus-source') ||
         target.closest('#deka-source')) invalidatePrice()

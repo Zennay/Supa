@@ -114,3 +114,7 @@ Zodra de gebruiker in zijn **eigen** PLUS-/Deka-opname een artikel selecteert, t
 ## Kleine schermen en privé printuitvoer
 
 Het gekoppelde twee-winkelmandjesoverzicht heeft nu een eigen horizontaal scrollgebied voor de vier fysieke/prijsverschilkolommen. De pagina zelf schuift niet langer mee met de brede tabel op telefoons. Bij **Print deze privévergelijking** worden bronkeuzeschermen, eigen invoervelden, lokale bestandsselecties, andere bedieningsknoppen en de aparte afvinklijst bewust buiten de afdruk gehouden. Alleen het werkelijk geopende prijsresultaat, originele opnametijden, bekende regels en noodzakelijke ontbrekende-productenwaarschuwingen gaan mee. Een onzichtbare/ongeldige prijsvergelijking wordt niet via print alsnog als resultaat getoond.
+
+## Live bronmatch-dekking voor beide winkels
+
+Onder de fysieke ingrediënten toont de wizard nu direct per winkel hoeveel regels werkelijk een handmatig gekozen, uniek bronartikel met bruikbare eigen prijs en bekende metrische hoeveelheid hebben. Regels die hetzelfde winkelartikel-ID dubbel selecteren worden zichtbaar meegeteld als **niet klaar**, zodat de gebruiker de nieuwe samenvoegactie kan gebruiken. Het paneel werkt mee bij andere hoeveelheden, bronbestanden en SKU-keuzes, maar telt alleen bronmatchdekking; dit is **geen volledige prijsclaim**. Pas de bestaande expliciete vergelijking beoordeelt de zeven-dagen-/24-uurvoorwaarden en beide volledige hele-verpakkingsmanden.
