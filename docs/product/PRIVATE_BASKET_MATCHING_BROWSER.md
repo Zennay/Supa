@@ -439,3 +439,12 @@ Een tweede **werkelijk zelf vastgelegde** winkel kan nu later via dezelfde handm
 5. Met **Annuleer bronconcept · behoud eerdere opname** maak je de oude geldige eerste winkel opnieuw beschikbaar, zonder het niet-geaccepteerde concept tot een bronprijs te promoveren.
 
 Een geannuleerde of ongeldige broninvoer overschrijft de eerder geaccepteerde bron nooit. Tijdregels blijven onafhankelijk: een verschil van meer dan 24 uur of een toekomstig/meer dan zeven dagen oud bronmoment geeft geen volledige twee-winkelwinnaar, ook al bestaan beide echte opnames. De handmatige bron-CSV bevat uitsluitend daadwerkelijk door jou ingevoerde opnames, niet automatisch eerder ingelezen andere winkels. Geen actieve supermarktquery, nieuwe toestemming of geclaimd veldbewijs.
+
+
+## Eigen Supa-TXT-boodschappenlijst weer als mandvraag openen
+
+Naast een eigen getypte ingrediëntenlijst accepteert dezelfde lokale plakwerkbank nu ook het **eigen eerder geëxporteerde ongeprijsde Supa-TXT-overzicht**. Kies optioneel het bestaande TXT-bestand met de lokale bestandskiezer. Het bestand wordt met strikte UTF-8-decodering uitsluitend in het tekstvak geladen. Pas na de aparte knop **Maak van deze lijst een privémandje** en de bevestiging bij bestaande ingrediënten wordt de huidige mandvraag vervangen. Een ongeldig bestand verandert noch mand, noch prijsbron, noch geselecteerde SKU's.
+
+Het oorspronkelijke Supa-tekstoverzicht heeft eigen header, moment, werkelijk geselecteerd maaltijdaantal, niet-financiële herkomstwaarschuwing, regels `[ ] rijst · 450 g` en eventueel `[x] ...`, gevolgd door een slotwaarschuwing. De parser herkent dit oorspronkelijke formaat uitsluitend met alle verwachte kop- en slotvelden, gebruikt het oorspronkelijke werkelijk opgeslagen maaltijdaantal, negeert oude afvinkstatus voor nieuwe productmatching en zet de fysieke hoeveelheden via dezelfde canonieke metrische import om. De oorspronkelijke onbekende hoeveelheden (`hoeveelheid nog controleren`) worden niet naar prijzen of 0 geconverteerd: de import stopt totdat die door een mens zijn aangevuld. Geen automatische aanname van geobserveerde winkels of winkelrechten.
+
+Direct ingetypte tekstregels blijven ondersteund; maximaal 200 ingrediënten en 40.000 teksttekens. Een optionele TXT-upload heeft een bovengrens van 128 KB en is alleen een **lokaal concept**. Hiermee sluit de bestaande Supa-keten *ongeprijsde Planner-boodschappenlijst → later eigen werkelijk waargenomen winkels → handmatige SKU-match → private volledige vergelijking* zonder verplichte JSON-export.
