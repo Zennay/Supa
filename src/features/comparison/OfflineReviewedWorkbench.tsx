@@ -7,6 +7,7 @@ import { parseOfflinePriceSnapshots, parseSingleOfflineCapture, type OfflinePric
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
+import { TwoStoreIngredientLedger } from './TwoStoreIngredientLedger.tsx'
 import { LocalProductPicker } from './LocalProductPicker.tsx'
 import './offlineReviewedWorkbench.css'
 
@@ -647,6 +648,21 @@ export function OfflineReviewedWorkbench({
                   : 'Nog geen vergelijkbaar prijsverschil: ontbrekende producten, verouderde gegevens of ongelijke waarnemingstijden.'}
                 <small> Dit is nooit een gecontroleerde publieke besparingsclaim.</small>
               </p>
+              <TwoStoreIngredientLedger
+                plus={basketPair.plus}
+                deka={basketPair.deka}
+                comparison={basketPair.comparison}
+                comparable={canShowDifference}
+                onReview={(store, ingredientId) => {
+                  setOnlyUnresolved(previous => ({ ...previous, [store]: false }))
+                  window.setTimeout(() => {
+                    document.getElementById('offline-match-' + store + '-' +
+                      encodeURIComponent(ingredientId))?.scrollIntoView({
+                      behavior: 'smooth', block: 'center',
+                    })
+                  }, 0)
+                }}
+              />
               <PrivateBasketComparisonExport
                 plus={basketPair.plus}
                 deka={basketPair.deka}
@@ -698,7 +714,9 @@ export function OfflineReviewedWorkbench({
                         geïmporteerde producten, met bestaande verpakkings- en prijscontroles.
                         Een handmatige keuze is geen onafhankelijk supermarktbewijs.</p>
                       {basket.lines.filter(line => !onlyUnresolved[store] || line.status === 'unresolved').map(line => (
-                        <article key={line.id} className="offline-price-workbench__line">
+                        <article key={line.id}
+                          id={'offline-match-' + store + '-' + encodeURIComponent(line.id)}
+                          className="offline-price-workbench__line">
                           <div>
                             <strong>{line.ingredientLabel}</strong>
                             <span>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</span>
