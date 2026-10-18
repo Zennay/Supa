@@ -48,6 +48,7 @@ const setStatus = (message, kind = '') => {
 const removeReview = () => {
   acceptedCsv = null
   save.disabled = true
+  setStatus('Invoer gewijzigd: neem na controle je twee echte winkelopnames opnieuw over voordat je prijzen vergelijkt.', 'warning')
   document.dispatchEvent(new Event('supa:manual-source-edited'))
 }
 const quote = value => /[",\r\n]/.test(value) ? '"' + value.replace(/"/g, '""') + '"' : value
@@ -62,7 +63,7 @@ function euroToCents(raw) {
   if (cents > 1000000n) throw Error('De gemeten winkelprijs ligt buiten het ondersteunde bereik.')
   return String(cents)
 }
-function addRow(store) {
+function addRow(store, notify = true) {
   const panel = areas[store]
   if (panel.querySelectorAll('.observed-product').length >= 100) {
     setStatus('Maximaal 100 handmatige productregels per winkel. Gebruik anders een eigen CSV-import.', 'warning')
@@ -98,7 +99,7 @@ function addRow(store) {
   })
   row.append(remove)
   panel.append(row)
-  removeReview()
+  if (notify) removeReview()
 }
 function readRows() {
   const rows = []
@@ -157,6 +158,7 @@ save.addEventListener('click', () => {
 })
 for (const store of stores) {
   document.querySelector('[data-add-product="' + store + '"]').addEventListener('click', () => addRow(store))
+  addRow(store, false)
 }
 document.querySelector('#manual-observations').addEventListener('input', removeReview)
 document.querySelector('#manual-observations').addEventListener('change', removeReview)
