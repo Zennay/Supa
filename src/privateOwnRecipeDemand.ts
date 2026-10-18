@@ -40,8 +40,9 @@ loadButton.addEventListener('click', () => {
     libraryRaw = snapshot.raw
     for (const recipe of ready.slice(0, 100)) {
       const card = document.createElement('label')
+      card.className = 'own-recipe-pick-card'
       card.style.display = 'grid'
-      card.style.gridTemplateColumns = 'auto minmax(0,1fr) 92px 92px'
+      card.style.gridTemplateColumns = 'auto minmax(0,1fr) auto'
       card.style.padding = '10px 0'
       card.style.borderBottom = '1px solid #d8e5d9'
       card.style.maxWidth = '100%'
@@ -76,7 +77,17 @@ loadButton.addEventListener('click', () => {
         field.style.minWidth = '0'
         field.style.width = '100%'
       }
-      card.append(selected, caption, repeats, portions)
+      const controls = document.createElement('span')
+      controls.className = 'own-recipe-pick-controls'
+      for (const [name, field] of [['Bereidingen', repeats], ['Porties', portions]] as const) {
+        const wrapper = document.createElement('span')
+        const title = document.createElement('span')
+        title.textContent = name
+        title.className = 'own-recipe-pick-caption'
+        wrapper.append(title, field)
+        controls.append(wrapper)
+      }
+      card.append(selected, caption, controls)
       choices.append(card)
     }
     convertButton.disabled = ready.length === 0
