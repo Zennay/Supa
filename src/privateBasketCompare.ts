@@ -322,6 +322,7 @@ function show(source: Source, demand: Demand): void {
     Number.isSafeInteger(comparison.deltaCents)
   result.hidden = false
   rows.replaceChildren()
+  const deltasByIngredient = new Map(comparison.lineDeltas.map(line => [line.id, line]))
   for (let i = 0; i < demand.ingredients.length; i++) {
     const item = demand.ingredients[i]
     const row = document.createElement('tr')
@@ -329,7 +330,13 @@ function show(source: Source, demand: Demand): void {
     need.scope = 'row'
     need.textContent = item.label + ' · ' +
       (item.amount === null ? 'hoeveelheid onbekend' : String(item.amount).replace('.', ',') + ' ' + item.unit)
-    row.append(need, lineCell(left.lines[i]), lineCell(right.lines[i]))
+    const difference = document.createElement('td')
+    const delta = complete ? deltasByIngredient.get(item.id)?.deltaCents : undefined
+    difference.textContent = delta === undefined ? 'Onbekend: eerst beide mandjes compleet maken' :
+      delta === 0 ? 'Gelijke kosten' :
+        (delta < 0 ? 'DekaMarkt' : 'PLUS') + ' ' +
+        euro.format(Math.abs(delta) / 100) + ' goedkoper voor dit ingrediënt'
+    row.append(need, lineCell(left.lines[i]), lineCell(right.lines[i]), difference)
     rows.append(row)
   }
   capturesLabel.textContent = 'Eigen opnames: PLUS ' + captures.PLUS.observedAt +
