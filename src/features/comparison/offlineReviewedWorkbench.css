@@ -161,3 +161,61 @@
 .offline-price-workbench__replace-preview h4,.offline-price-workbench__replace-preview p{margin:0}
 .offline-price-workbench__replace-preview li{margin:.3rem 0;overflow-wrap:anywhere}
 .offline-price-workbench__replace-preview button:focus-visible{outline:3px solid #226f52;outline-offset:3px}
+
+/* Reviewed, self-supplied mixed-store route: touch-sized and readable even
+   when an ingredient or original retailer product name is very long. */
+.mixed-store-route { display:grid; gap:1rem; min-width:0; overflow-wrap:anywhere; }
+.mixed-store-route .offline-price-workbench__totals {
+  grid-template-columns: repeat(3,minmax(0,1fr));
+}
+.mixed-store-route .offline-price-workbench__totals>div {
+  border:1px solid #d5e2d7; border-radius:12px;
+  background:#fff; padding:.85rem; min-width:0;
+}
+.mixed-store-route .offline-price-workbench__totals>div p {
+  font-weight:750; font-size:clamp(1.05rem,3vw,1.4rem); margin:.45rem 0 0;
+}
+.mixed-store-route .offline-price-workbench__actions { align-items:flex-end; }
+.mixed-store-route .offline-price-workbench__actions>label {
+  display:grid; gap:.35rem; min-width:min(100%,240px); flex:1 1 240px;
+}
+.mixed-store-route .offline-price-workbench__actions select,
+.mixed-store-route .offline-price-workbench__actions input[type=text],
+.mixed-store-route__choices select {
+  width:100%; min-width:0; max-width:100%; min-height:44px; padding:.6rem;
+  box-sizing:border-box; border:1px solid #9aa99d; border-radius:9px;
+  background:#fff; color:#203328; font:inherit;
+}
+.mixed-store-route .offline-price-workbench__actions label:has(input[type=checkbox]) {
+  display:flex; gap:.5rem; align-items:center; min-height:44px;
+}
+.mixed-store-route :is(input[type=checkbox]) {
+  width:21px; height:21px; flex:0 0 21px; accent-color:#236d4d;
+}
+.mixed-store-route :is(input,select,button,textarea,summary):focus-visible {
+  outline:3px solid #226f52; outline-offset:3px;
+}
+.mixed-store-route__preferences { background:#fff; }
+.mixed-store-route__choices { display:grid; gap:.6rem; margin-top:.7rem; }
+.mixed-store-route__choices>label { display:grid; gap:.3rem; }
+.mixed-store-route__shops {
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem;
+}
+.mixed-store-route__shops>section {
+  min-width:0; background:#fff; border:1px solid #d7e2d8;
+  border-radius:12px; padding:.85rem;
+}
+.mixed-store-route__shops ul { list-style:none; margin:.7rem 0 0; padding:0; }
+.mixed-store-route__shops li { padding:.7rem 0; border-top:1px solid #e6ebe5; }
+.mixed-store-route__shops li label {
+  display:flex; gap:.65rem; align-items:flex-start; line-height:1.55; cursor:pointer;
+}
+.mixed-store-route textarea {
+  display:block; width:100%; max-width:100%; min-width:0; box-sizing:border-box;
+  padding:.75rem; border:1px solid #9aa99d; border-radius:9px;
+  font: .88rem/1.45 ui-monospace,monospace;
+}
+@media (max-width:740px) {
+  .mixed-store-route .offline-price-workbench__totals,
+  .mixed-store-route__shops { grid-template-columns:minmax(0,1fr); }
+}

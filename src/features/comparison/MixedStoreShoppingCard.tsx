@@ -88,7 +88,7 @@ export function MixedStoreShoppingCard({
     berekend. Kies opnieuw een winkel per ingrediënt; er wordt geen nieuw bedrag getoond.
   </p>
 
-  return <section className="offline-price-workbench__full-breakdown"
+  return <section className="offline-price-workbench__full-breakdown mixed-store-route"
     aria-label="Boodschappenroute met persoonlijke PLUS- en DekaMarkt-prijzen">
     <h4>Mijn boodschappenroute: goedkoopste artikelen of één winkel</h4>
     <p>Dezelfde fysieke Planner-vraag en uitsluitend jouw bevestigde producten,
@@ -125,7 +125,7 @@ export function MixedStoreShoppingCard({
         {' '}Supa heeft daarom de boodschappenlijst op één winkel gezet. Kies expliciet de gemengde
         route als je toch beide winkels wilt bezoeken.</p>}
     </div>
-    <details className="offline-price-workbench__full-breakdown">
+    <details className="offline-price-workbench__full-breakdown mixed-store-route__preferences">
       <summary>Kies zelf een winkel per ingrediënt (optioneel)</summary>
       <p>De standaard is het goedkoopste hele-verpakkingenbedrag per ingrediënt.
         Je mag een andere winkel kiezen op basis van je eigen voorkeur;
@@ -133,7 +133,7 @@ export function MixedStoreShoppingCard({
       <button type="button" className="ghost-button" onClick={() => {
         setPreferred({}); setShowText(false)
       }}>Zet alle keuzes terug op goedkoopste artikelen</button>
-      <div className="offline-price-workbench__dates">
+      <div className="offline-price-workbench__dates mixed-store-route__choices">
         {mixed.lines.map(line => {
           const plusLine = plus.lines.find(item => item.id === line.id)
           const dekaLine = deka.lines.find(item => item.id === line.id)
@@ -195,7 +195,7 @@ export function MixedStoreShoppingCard({
         setShowText(value => !value)
       }}>{showText ? 'Verberg kopieerbare lijst' : 'Toon kopieerbare lijst'}</button>
     </div>
-    <div className="offline-price-workbench__dates">
+    <div className="offline-price-workbench__dates mixed-store-route__shops">
       {stores.map(store => {
         const all = plan.lines.filter(item => item.store === store)
         const visible = all.filter(item => !onlyOpen || !done(item.key))

@@ -912,3 +912,13 @@ de gemengde route duurder maken. Expliciet een gemengde route kiezen
 blijft mogelijk als de gebruiker zelf een bepaald artikel wil.
 Alle keuzes en vinkjes zijn tijdelijk lokaal in de open app en de
 TXT-export volgt de daadwerkelijk gekozen winkels.
+
+#### Mobiel leesbare route
+
+De nieuwe route gebruikt op kleine schermen één kolom voor de drie
+bedragkaarten en de twee winkellijsten. Keuzemenu's, checkboxes en
+exportknoppen zijn op aanraakschermen te bedienen; lange originele
+bronnamen blijven binnen de kaarten en kunnen niet meer horizontaal
+buiten het scherm vallen. De afzonderlijke winkelafdelingen blijven
+duidelijk te onderscheiden en het volledige tekstoverzicht is lokaal
+te selecteren.
