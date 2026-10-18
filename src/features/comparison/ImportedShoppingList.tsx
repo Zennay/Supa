@@ -213,6 +213,14 @@ export function ImportedShoppingList({
         open app-tabblad. Bij een geldige vervanging blijft de ongewijzigde winkel behouden.</small>
     </section>}
     <PrivateStoreTripChecklist key={identity} basket={basket}
+      extraLines={extras.map(product => ({
+        id: product.id,
+        name: product.name,
+        packs: session.extraQuantities[store][product.id] ?? 1,
+        priceCents: product.available && Number.isSafeInteger(product.priceCents) &&
+          product.priceCents >= 0 ? product.priceCents : null,
+        done: extraDone.includes(product.id),
+      }))}
       observedAt={imported.captures[store].observedAt} fresh={fresh}
       memoryProgress={session.tripMemory[store]}
       onMemoryChange={(basketIdentity, done) => session.setTripMemory(previous =>
