@@ -24,6 +24,9 @@ export type EditorRecipeDraft = {
 
 const MAX_TEXT = 180
 const MAX_INGREDIENTS = 100
+// The normalized importer accepts at most one million g, ml or pieces.
+// The editor must never confirm a value its source parser would reject.
+const MAX_CANONICAL_METRIC_AMOUNT = 1_000_000
 let ingredientSequence = 0
 function newClientIngredientId(): string {
   ingredientSequence += 1
@@ -31,7 +34,7 @@ function newClientIngredientId(): string {
 }
 
 function validAmount(value: number | null): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000_000 &&
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= MAX_CANONICAL_METRIC_AMOUNT &&
     Math.abs(value * 1000 - Math.round(value * 1000)) <= 1e-7
 }
 
@@ -53,7 +56,7 @@ export function prepareImportedRecipeForEditor(
 export function parseMetricEditorAmount(value: string): number | null {
   if (!/^(?:\d{1,9})(?:[.,]\d{1,3})?$/.test(value.trim())) return null
   const amount = Number(value.trim().replace(',', '.'))
-  return Number.isFinite(amount) && amount > 0 && amount <= 1_000_000_000 ? amount : null
+  return Number.isFinite(amount) && amount > 0 && amount <= MAX_CANONICAL_METRIC_AMOUNT ? amount : null
 }
 
 /**
@@ -80,7 +83,7 @@ export function updateEditorIngredient(
     next.reviewReason = !next.label.trim()
       ? 'Vul een ingrediëntnaam in.'
       : !validAmount(next.amount)
-        ? 'Vul een geldige hoeveelheid in.'
+        ? 'Vul een geldige hoeveelheid in (maximaal 1.000.000 g, ml of stuks).'
         : !['g', 'ml', 'piece'].includes(next.unit ?? '')
           ? 'Kies gram, milliliter of stuks.'
           : null
