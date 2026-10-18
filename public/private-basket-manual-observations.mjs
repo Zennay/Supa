@@ -1,0 +1,164 @@
+/**
+ * Supa private manual observation capture.
+ * User enters observed products, timestamps and monetary prices explicitly;
+ * no fixtures, retailer calls, inferred IDs, or implicit price timestamps.
+ * The existing shared strict CSV admission remains the source of truth.
+ */
+import { convertTwoStoreCsv } from './offline-two-store-csv.mjs'
+
+const stores = ['PLUS', 'DekaMarkt']
+const csvHeader = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
+const areas = Object.fromEntries(stores.map(store => [
+  store, document.querySelector('[data-observations="' + store + '"]'),
+]))
+const notice = document.querySelector('#manual-status')
+const save = document.querySelector('#manual-export')
+const apply = document.querySelector('#manual-apply')
+const ceiling = 256000
+let acceptedCsv = null
+
+const make = (tag, text) => {
+  const element = tag === 'div' ? document.createElement('div') :
+    tag === 'label' ? document.createElement('label') :
+      tag === 'input' ? document.createElement('input') :
+        tag === 'select' ? document.createElement('select') :
+          tag === 'button' ? document.createElement('button') :
+            tag === 'strong' ? document.createElement('strong') :
+              document.createElement('small')
+  if (text !== undefined) element.textContent = text
+  return element
+}
+const field = (parent, caption, kind, key, placeholder) => {
+  const label = make('label', caption)
+  const input = make(kind)
+  input.dataset.field = key
+  if (kind === 'input') {
+    input.type = 'text'
+    input.placeholder = placeholder || ''
+    input.autocomplete = 'off'
+  }
+  label.append(input)
+  parent.append(label)
+  return input
+}
+const setStatus = (message, kind = '') => {
+  notice.textContent = message
+  notice.className = 'notice' + (kind ? ' ' + kind : '')
+}
+const removeReview = () => {
+  acceptedCsv = null
+  save.disabled = true
+  document.dispatchEvent(new Event('supa:manual-source-edited'))
+}
+const quote = value => /[",\r\n]/.test(value) ? '"' + value.replace(/"/g, '""') + '"' : value
+
+// Supports Dutch comma or period, produces exact whole cents as a decimal
+// string: float-based multiplication is never used for actual pack money.
+function euroToCents(raw) {
+  if (raw === '') return ''
+  const match = /^(0|[1-9]\d{0,4})(?:[.,](\d{1,2}))?$/.exec(raw)
+  if (!match) throw Error('Voer een gemeten eurobedrag in, bijvoorbeeld 1,49 of 0,99.')
+  const cents = BigInt(match[1]) * 100n + BigInt((match[2] || '').padEnd(2, '0'))
+  if (cents > 1000000n) throw Error('De gemeten winkelprijs ligt buiten het ondersteunde bereik.')
+  return String(cents)
+}
+function addRow(store) {
+  const panel = areas[store]
+  if (panel.querySelectorAll('.observed-product').length >= 100) {
+    setStatus('Maximaal 100 handmatige productregels per winkel. Gebruik anders een eigen CSV-import.', 'warning')
+    return
+  }
+  const row = make('div')
+  row.className = 'observed-product'
+  const title = make('strong', 'Eigen productwaarneming · ' + store)
+  const grid = make('div')
+  grid.className = 'observation-grid'
+  const id = field(grid, 'Werkelijke product-ID', 'input', 'id', 'Artikelnummer op jouw opname')
+  id.maxLength = 100
+  const name = field(grid, 'Werkelijke productnaam', 'input', 'name', 'Artikelnaam zoals afgelezen')
+  name.maxLength = 160
+  const amount = field(grid, 'Inhoud per verpakking', 'input', 'packAmount', 'bijv. 500')
+  amount.maxLength = 20
+  const unit = field(grid, 'Eenheid van verpakking', 'select', 'packUnit')
+  for (const value of ['g', 'kg', 'ml', 'l', 'piece']) unit.add(new Option(value, value))
+  const count = field(grid, 'Aantal eenheden per multipack', 'input', 'packCount', 'bijv. 1')
+  count.maxLength = 5
+  const price = field(grid, 'Echt afgelezen prijs (€; leeg = onbekend)', 'input', 'priceEuro', 'bijv. 2,49')
+  price.maxLength = 12
+  const available = field(grid, 'Beschikbaarheid en prijs bevestigd?', 'select', 'available')
+  available.add(new Option('Nee / prijs niet bevestigd', 'false'))
+  available.add(new Option('Ja, zelf gecontroleerd', 'true'))
+  row.append(title, grid)
+  const remove = make('button', 'Verwijder productregel')
+  remove.type = 'button'
+  remove.className = 'secondary'
+  remove.addEventListener('click', () => {
+    row.remove()
+    removeReview()
+  })
+  row.append(remove)
+  panel.append(row)
+  removeReview()
+}
+function readRows() {
+  const rows = []
+  for (const store of stores) {
+    const when = document.querySelector('[data-capture="' + store + '"]').value.trim()
+    if (!when) throw Error('Voer voor elke winkel het werkelijke opname-moment inclusief UTC-offset in.')
+    const entries = Array.from(areas[store].querySelectorAll('.observed-product'))
+    if (!entries.length) throw Error('Vul minimaal één werkelijke productregel per winkel in.')
+    for (const row of entries) {
+      const value = field => row.querySelector('[data-field="' + field + '"]').value.trim()
+      const cents = euroToCents(value('priceEuro'))
+      const record = [
+        store, when, value('id'), value('name'),
+        value('packAmount').replace(',', '.'), value('packUnit'),
+        value('packCount'), cents, value('available'),
+      ]
+      // The canonical reader validates every mandatory value, including the
+      // actual ISO offset, product ID uniqueness, pack count, cent money,
+      // availability and one capture instant per retailer.
+      rows.push(record.map(quote).join(','))
+    }
+  }
+  return csvHeader + '\n' + rows.join('\n') + '\n'
+}
+function submit() {
+  try {
+    const csv = readRows()
+    if (new TextEncoder().encode(csv).length > ceiling) {
+      throw Error('De handmatige brongegevens zijn te groot (maximum 256 kB).')
+    }
+    const canonical = JSON.parse(convertTwoStoreCsv(csv))
+    acceptedCsv = csv
+    save.disabled = false
+    document.dispatchEvent(new CustomEvent('supa:manual-source-admitted', {
+      detail: { source: canonical },
+    }))
+    setStatus('Beide handmatige winkelopnames zijn lokaal geaccepteerd. Kies hieronder zelf welke werkelijke producten bij jouw ingrediënten passen. Er is geen retailerlicentie of onafhankelijk veldbewijs aangenomen.')
+  } catch (error) {
+    acceptedCsv = null
+    save.disabled = true
+    setStatus(error instanceof Error ? error.message : 'Ongeldige handmatige bronwaarneming.', 'error')
+  }
+}
+apply.addEventListener('click', submit)
+save.addEventListener('click', () => {
+  if (acceptedCsv === null) return
+  const file = new Blob([acceptedCsv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(file)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'supa-eigen-winkelwaarnemingen.csv'
+  document.body.append(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+})
+for (const store of stores) {
+  document.querySelector('[data-add-product="' + store + '"]').addEventListener('click', () => addRow(store))
+}
+document.querySelector('#manual-observations').addEventListener('input', removeReview)
+document.querySelector('#manual-observations').addEventListener('change', removeReview)
+// Blank rows only, no sample IDs, generated prices, implied user observations,
+// or timestamp defaults.
