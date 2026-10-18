@@ -24,7 +24,7 @@ const designRecipes = curatedFigmaRecipes.filter(recipe =>
 
 type Props = {
   view: HiFiTab
-  onNavigate: (view: HiFiTab | 'planner' | 'list') => void
+  onNavigate: (view: HiFiTab | 'planner' | 'list' | 'basket') => void
   addedProducts: string[]
   onToggleProduct: (id: string) => void
   activeDays?: readonly string[]
@@ -80,6 +80,14 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
     </div>
     {filterOpen && <div id="hifi-filter-panel" className="hifi-filter-panel"><label><input type="checkbox" checked={favoritesOnly} onChange={e => setFavoritesOnly(e.target.checked)} /> Alleen favorieten</label>{view === 'products' && productSource === 'history' && <label>Winkel <select aria-label="Filter historische producten op winkel" value={storeFilter} onChange={e => setStoreFilter(e.target.value as 'all' | 'PLUS' | 'DekaMarkt')}><option value="all">Alle winkels</option><option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option></select></label>}{view === 'products' && productSource === 'figma' && <label>Eenheid <select aria-label="Filter producten op eenheid" value={unitFilter} onChange={e => setUnitFilter(e.target.value as DemoUnitFilter)}><option value="all">Alle eenheden</option><option value="l">Per liter</option><option value="kg">Per kilogram</option></select></label>}<button onClick={() => { setQuery(''); setFavoritesOnly(false); setUnitFilter('all'); setStoreFilter('all'); setSortByPrice(false) }}>Wis filters</button></div>}
     {view === 'home' && <p className="hifi-demo-note">Recepten uit de SUPA-planner · voorbeeldproductprijzen en aanbiedingen zijn niet actueel.</p>}
+    {view === 'home' && <section className="hifi-section" aria-label="Mijn eigen winkelmand vergelijken">
+      <h2>Jouw recepten, jouw winkelmand</h2>
+      <p className="hifi-demo-note">Gebruik de actuele Planner-ingrediënten met je eigen PLUS/DekaMarkt-bronbestand.
+        De berekening is privé en geeft ontbrekende winkelprijzen eerlijk als onbekend weer.</p>
+      <button type="button" className="hifi-plan-button" onClick={() => onNavigate('basket')}>
+        Vergelijk mijn winkelmand
+      </button>
+    </section>}
     {view !== 'products' && <section className="hifi-section" aria-labelledby="hifi-recipes-title">
       <div className="hifi-section-heading"><h2 id="hifi-recipes-title">Recepten uit je planner</h2>{view === 'home' && <button onClick={() => changeView('recipes')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button>}</div>
       <div className={view === 'recipes' ? 'hifi-recipe-grid' : 'hifi-recipe-row'}>{recipes.map(recipe => <article key={recipe.id} className="hifi-recipe-card">
@@ -91,6 +99,16 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       {recipes.length === 0 && <p className="hifi-empty">Geen gerechten gevonden. Probeer een andere zoekterm of wis je filters.</p>}
     </section>}
     {view === 'products' && <div className="hifi-product-source-tabs" aria-label="Productbron"><button type="button" aria-pressed={productSource === 'history'} onClick={() => { setProductSource('history'); setUnitFilter('all'); setSortByPrice(false) }}>Bronwaarnemingen</button><button type="button" aria-pressed={productSource === 'figma'} onClick={() => { setProductSource('figma'); setStoreFilter('all') }}>Figma voorbeelden</button></div>}
+    {view === 'products' && <section className="hifi-section" aria-label="Vergelijk met je eigen werkelijke winkelbron">
+      <div className="hifi-section-heading"><h2>Vergelijk jouw eigen winkelprijzen</h2></div>
+      <p className="hifi-demo-note">De historische productvoorbeelden hierboven hebben geen vrijgegeven actuele prijzen.
+        Met jouw eigen rechtmatig verkregen PLUS- of DekaMarkt-opname koppelt Supa echte
+        bronartikelen aan het geselecteerde weekmenu. Zonder volledige broncontrole wordt er
+        geen winkelprijs of besparing verzonnen.</p>
+      <button type="button" className="hifi-plan-button" onClick={() => onNavigate('basket')}>
+        Open Vergelijk · eigen prijzen invoeren
+      </button>
+    </section>}
     {view === 'products' && productSource === 'history' && <section className="hifi-section" aria-label="Historisch vastgelegde supermarktproducten">
       <div className="hifi-section-heading"><div><h2>Producten uit brononderzoek</h2><p className="recipe-count">{historical.length} producten · PLUS en DekaMarkt</p></div></div>
       <p className="hifi-demo-note hifi-historical-warning">Alleen historische bronwaarnemingen van 4 oktober 2026. Niet actueel, nog niet gelicentieerd voor productie. Geen prijzen, aanbiedingen, besparingen of beschikbaarheidsclaims.</p>

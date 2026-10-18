@@ -461,6 +461,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore} />
           </div>
         )}
+        {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
+          <section className="screen" aria-label="Extra zelf gekozen producten buiten het prijsmandje">
+            <h3>Extra producten · niet meegerekend in jouw supermarktmand</h3>
+            <p className="disclaimer">Jouw losse Producten-selectie is apart bewaard.
+              Historische artikelen en Figma-voorbeelden zijn geen nieuwe bronprijzen,
+              volledige verpakkingsmatches of besparingsbewijs.</p>
+            <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+          </section>
+        )}
         {tab === 'observe' && <ObservationView />}
       </div>
 

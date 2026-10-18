@@ -460,3 +460,16 @@ systemctl is-active actions.runner.Zennay-Supa.vps-bb300bba-supa.service
 Tot de runner opnieuw online is mogen verplichte jobs veilig in de
 self-hosted-queue wachten; geen main-merge of productie-deploy zonder
 de nieuwe exacte-head checks/review. Gevraagde hosted-billing: €0.
+
+### Van Home/Producten rechtstreeks naar rechtmatige eigen prijsvergelijking
+
+Home en de Producten-tab hebben nu een duidelijke ingang naar de
+normale **Vergelijk**-tab voor eigen, rechtmatig aangeleverde bronnen.
+Dit pad gebruikt het bestaande geselecteerde Planner-weekmenu en de
+bestaande lokale import/matching: er start geen nieuwe scraper.
+Historische niet-vrijgegeven productprijzen en ontwerpvoorbeelden
+blijven buiten de berekening. Door gebruikers apart gekozen
+historische of voorbeeldartikelen verdwijnen niet wanneer er een
+eigen winkelbron geladen wordt: de Lijst-tab toont ze dan in
+een expliciet afzonderlijk blok **niet meegerekend in jouw mand**,
+zonder het echte prijsverschil of boodschappenmandtotaal te wijzigen.
