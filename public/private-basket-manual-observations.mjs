@@ -161,9 +161,9 @@ save.addEventListener('click', () => {
 document.addEventListener('supa:manual-prefill-own-source', event => {
   try {
     const incoming = event.detail?.captures
-    if (!Array.isArray(incoming) || incoming.length !== 2 ||
-        new Set(incoming.map(item => item?.retailer)).size !== 2) {
-      throw Error('Kies eerst twee geldige eigen winkelopnames.')
+    if (!Array.isArray(incoming) || incoming.length < 1 || incoming.length > 2 ||
+        new Set(incoming.map(item => item?.retailer)).size !== incoming.length) {
+      throw Error('Kies eerst één of twee geldige eigen winkelopnames.')
     }
     const checked = Object.create(null)
     for (const capture of incoming) {
@@ -183,11 +183,12 @@ document.addEventListener('supa:manual-prefill-own-source', event => {
       }
       checked[capture.retailer] = capture
     }
-    if (!stores.every(store => checked[store])) throw Error('Beide winkels ontbreken.')
+    if (Object.keys(checked).length !== incoming.length) throw Error('Gekozen echte winkelopname ontbreekt.')
     // All records checked before the first visible field is replaced.
     for (const store of stores) {
       areas[store].replaceChildren()
-      document.querySelector('[data-capture="' + store + '"]').value = checked[store].observedAt
+      document.querySelector('[data-capture="' + store + '"]').value = checked[store]?.observedAt ?? ''
+      if (!checked[store]) { addRow(store, false); continue }
       for (const product of checked[store].products) {
         addRow(store, false)
         const row = areas[store].lastElementChild
@@ -205,10 +206,10 @@ document.addEventListener('supa:manual-prefill-own-source', event => {
         set('available', product.available ? 'true' : 'false')
       }
     }
-    mode.value = 'both'
+    mode.value = incoming.length === 2 ? 'both' : incoming[0].retailer
     updateMode()
     removeReview()
-    setStatus('Bestaande eigen opnames geladen voor menselijke correctie. Oorspronkelijke opnametijden zijn ongewijzigd. Pas een prijs of datum alleen aan na werkelijke hercontrole van het artikel/de opname. Kies daarna Neem mijn echte winkelopname(s) over; oude artikelkoppelingen blijven ingetrokken.')
+    setStatus('Bestaande eigen werkelijke opname(n) geladen voor menselijke correctie. Oorspronkelijke opnametijden zijn ongewijzigd. Pas een prijs of datum alleen aan na werkelijke hercontrole van het artikel/de opname. Kies daarna Neem mijn echte winkelopname(s) over; oude artikelkoppelingen blijven ingetrokken.')
     document.querySelector('#manual-observations').scrollIntoView({ block: 'start', behavior: 'smooth' })
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Geen veilig bronconcept gemaakt.', 'warning')

@@ -281,7 +281,7 @@ function refresh() {
   saveSession.disabled = save.disabled || !captures
   showUnpriced.disabled = save.disabled
   compareNow.disabled = !captures || save.disabled
-  editSource.disabled = !captures || stores.some(store => !captures[store])
+  editSource.disabled = !captures
   updateCoverage()
 }
 function addIngredient(restored = null) {
@@ -362,10 +362,10 @@ function addIngredient(restored = null) {
 }
 
 editSource.addEventListener('click', () => {
-  if (!captures || stores.some(store => !captures[store])) return
+  if (!captures) return
   if (!window.confirm('Bewerk je al geopende eigen PLUS/Deka-opnames? Bestaande handmatige conceptregels worden vervangen en huidige productmatches gewist. Opnametijden blijven de originele tijdstippen: vul uitsluitend na echte hercontrole nieuwe prijs of opnametijd in.')) return
   document.dispatchEvent(new CustomEvent('supa:manual-prefill-own-source', {
-    detail: { captures: stores.map(store => captures[store]) },
+    detail: { captures: stores.filter(store => captures[store]).map(store => captures[store]) },
   }))
 })
 

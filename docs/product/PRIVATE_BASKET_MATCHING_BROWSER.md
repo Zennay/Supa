@@ -382,3 +382,18 @@ Er worden geen ontbrekende tijden, producten of bedragen bedacht en de
 volledige prijsvergelijking blijft onbekend bij onvolledige matches, te oude
 bronnen of opnames die meer dan 24 uur uiteen liggen. Bij annulering houdt
 de gebruiker zijn eerdere echte winkelgegevens.
+
+## Echte enkele winkelopname bewerken vanuit de browser
+
+Ook wanneer nog maar **één** PLUS- of DekaMarkt-bron is geaccepteerd, kan de
+gebruiker nu **Bewerk mijn geopende eigen winkelopnames** kiezen. De bestaande
+lokale menselijke correctie-editor vult uitsluitend de daadwerkelijk
+waargenomen winkel, originele datum/tijd, product-ID, verpakking,
+beschikbaarheid en eventueel de eerdere prijs voor. De andere winkel
+krijgt géén verzonnen gegevens; die blijft verborgen en onbekend.
+Pas na een daadwerkelijk opnieuw geverifieerde correctie gebruikt de gebruiker
+**Neem mijn echte winkelopname(s) over**. Bewerkingen trekken vóór
+heraanvaarding oudere SKU-koppelingen en eerdere berekende prijzen in; een
+nieuwe tijd of prijs wordt nooit automatisch ingevuld. De bestaande limiet
+van 100 artikelen per handmatig bewerkbare winkel en strikte CSV-parser
+blijven van kracht.
