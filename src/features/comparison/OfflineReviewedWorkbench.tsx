@@ -632,7 +632,7 @@ export function OfflineReviewedWorkbench({
           }}>Wis losse opnames</button>
         </div>}
         {!imported && stagedStores.map(store => (
-          <StagedStorePreview key={store} store={store}
+          <StagedStorePreview key={store} store={store} session={session}
             capture={storedStages[store]!}
             plan={plan} recipes={recipes} activeDays={activeDays} clockMs={clockMs}
           />
