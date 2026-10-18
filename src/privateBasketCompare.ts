@@ -219,19 +219,26 @@ function unresolved(d: DemandLine, reason: string): BasketTraceLine {
 }
 function storeBasket(store: StoreName, capture: Capture, demand: Demand): OneStoreBasket {
   const products = new Map(capture.products.map(p => [p.id, p]))
-  const chosenIds = new Set<string>()
+  // A single selected SKU across two ingredient identities is not two
+  // separately purchased packages. Both lines remain unknown until the user
+  // combines the physical demand; never show a misleading partial pack cost.
+  const selectedCounts = new Map<string, number>()
+  for (const ingredient of demand.ingredients) {
+    const id = ingredient.productIds[store]
+    if (id !== null) selectedCounts.set(id, (selectedCounts.get(id) ?? 0) + 1)
+  }
   const lines: BasketTraceLine[] = []
   let totalCents = 0
   let matchedLineCount = 0
   let unresolvedLineCount = 0
   for (const d of demand.ingredients) {
     const choice = d.productIds[store]
-    if (choice !== null && chosenIds.has(choice)) {
-      lines.push(unresolved(d, 'Hetzelfde winkelartikel is dubbel gekozen: combineer de fysieke behoefte in één ingrediëntregel.'))
+    if (choice !== null && (selectedCounts.get(choice) ?? 0) > 1) {
+      lines.push(unresolved(d,
+        'Hetzelfde winkelartikel is voor meerdere ingrediënten gekozen: voeg de fysieke hoeveelheden samen en koppel opnieuw.'))
       unresolvedLineCount++
       continue
     }
-    if (choice !== null) chosenIds.add(choice)
     const p = choice === null ? undefined : products.get(choice)
     if (!p || !p.available || p.priceCents === null ||
         p.packAmount === null || d.amount === null) {
