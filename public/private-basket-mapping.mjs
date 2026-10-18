@@ -85,6 +85,7 @@ function refresh() {
     for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit)
   }
   save.disabled = !captures || !lines.children.length
+  compareNow.disabled = save.disabled
 }
 function addIngredient(restored = null) {
   if (lines.children.length >= maxLines) return
@@ -133,6 +134,7 @@ function addIngredient(restored = null) {
   lines.append(row)
   for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit.value)
   save.disabled = !captures
+  compareNow.disabled = save.disabled
 }
 
 function acceptJson(json) {
