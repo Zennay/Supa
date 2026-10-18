@@ -90,7 +90,7 @@ export function createPrivateBasketComparisonCsv(input: {
       baskets.DekaMarkt.lines.length !== ingredients.length) {
     throw new Error('Onvolledig privémandje')
   }
-  const comparable = paired && storeNames.every(store => completeOwnStore(baskets[store], fresh))
+  const comparable = paired && storeNames.every(store => completeOwnStore(baskets[store], fresh[store]))
   const rows: string[][] = [header]
   for (let i = 0; i < ingredients.length; i++) {
     const item = ingredients[i]
