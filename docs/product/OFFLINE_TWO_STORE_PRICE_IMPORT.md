@@ -395,3 +395,14 @@ de normale Lijst-tab: er ontstaan geen twee verschillende
 'gekozen winkels' in twee schermen. Wanneer slechts één winkel
 bevestigd is ontbreekt de kiezer en blijft het andere bedrag onbekend.
 Brondata, review- en rechtenstatus blijven onveranderd.
+
+### De ongeprijsde lijst behoudt vinkjes bij gewone tabnavigatie
+
+De bestaande `UnpricedPlannerChecklist` blijft na het eerste bezoek
+aan Lijst in de open React-sessie gemount wanneer je tussendoor Planner,
+Recepten of Vergelijk opent. De huidige fysieke itemidentiteit houdt
+afvinkingen bij tijdens die navigatie; ze worden niet in localStorage
+of op een server bewaard. Bij het beschikbaar komen van een volledig
+bevestigde privébron maakt de app plaats voor de gekoppelde, afzonderlijk
+brongebonden winkelchecklist. De oude demonstratiecomponenten
+worden niet buiten hun expliciet geopende uitklapper gemount.

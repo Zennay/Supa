@@ -64,7 +64,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
         <h3>Mijn weekboodschappen zonder winkelprijzen</h3>
         <p>Dezelfde samengestelde hoeveelheden als in de mandvergelijking,
           zonder een winkel of prijs te verzinnen. Ook bruikbaar zolang echte winkeldata ontbreken.
-          Bewaar je vinkjes voor jezelf: bij het verlaten van dit scherm vervallen ze.</p>
+          Vinkjes blijven lokaal beschikbaar zolang dit browsertabblad open is,
+          ook als je tussen Planner en Lijst wisselt. Er wordt niets verstuurd of opgeslagen.</p>
       </div>
       {error ? <p role="status" className="unpriced-planner-checklist__note">{error}</p> : (
         <>

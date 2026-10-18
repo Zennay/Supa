@@ -109,6 +109,7 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
 export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [visitedBasket, setVisitedBasket] = useState(initialTab === 'basket')
+  const [visitedList, setVisitedList] = useState(initialTab === 'list')
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [preferredOwnStore, setPreferredOwnStore] = useState<OwnStore>('PLUS')
   const onReviewedBaskets = useCallback((next: PrivateReviewedBaskets | null) => {
@@ -125,6 +126,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const isHiFiView = tab === 'home' || tab === 'recipes' || tab === 'products'
   const navigate = (next: Tab) => {
     if (next === 'basket') setVisitedBasket(true)
+    if (next === 'list') setVisitedList(true)
     setTab(next); window.scrollTo?.(0, 0)
   }
   const toggleDesignProduct = (id: string) => {
@@ -432,15 +434,17 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           />
           </div>
         )}
-        {tab === 'list' && !livePrivateReviewed && (
-          <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
-            <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
-            <details className="demo-comparison-disclosure">
-              <summary>Toon losse productselectie en oude voorbeeldboodschappen (geen winkelprijzen)</summary>
-              <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-              <ShoppingListView basket={basket} />
-            </details>
-          </section>
+        {visitedList && !livePrivateReviewed && (
+          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
+              <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
+              {tab === 'list' && <details className="demo-comparison-disclosure">
+                <summary>Toon losse productselectie en oude voorbeeldboodschappen (geen winkelprijzen)</summary>
+                <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+                <ShoppingListView basket={basket} />
+              </details>}
+            </section>
+          </div>
         )}
         {livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
