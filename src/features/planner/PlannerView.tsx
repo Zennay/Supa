@@ -298,16 +298,16 @@ export function PlannerView({
           ))}
           {priceSource === 'private' && (
             <> De bedragen zijn afkomstig uit jouw eigen lokale {priceStore}-opname,
-              niet onafhankelijk geverifieerd en geen officiële prijs- of besparingsclaim.</>
+              niet onafhankelijk geverifieerd en geen officieel prijsbewijs.</>
           )}
           {priceSource === 'example' && (
             <> Dit zijn uitsluitend voorbeeldproducten en voorbeeldprijzen, geen actuele winkelwaarnemingen.</>
           )}
         </p>
-        {onOpenComparison && <button type="button" className="ghost-button"
-          onClick={onOpenComparison}>
+        {onOpenComparison && <a href="#vergelijk" className="ghost-button"
+          onClick={event => { event.preventDefault(); onOpenComparison() }}>
           {priceSource === 'expired' ? 'Nieuwe prijsopnames importeren' : 'Bekijk winkels in Vergelijk'}
-        </button>}
+        </a>}
       </section>
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}

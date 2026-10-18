@@ -5,9 +5,6 @@ import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
-import { useOfflineComparisonSession } from './features/comparison/offlineComparisonSession.ts'
-import { ImportedShoppingList } from './features/comparison/ImportedShoppingList.tsx'
-import { offlineSessionBaskets, offlineSessionFresh } from './features/comparison/offlineSessionBaskets.ts'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
@@ -17,6 +14,8 @@ import { toPlannerRecipe } from './features/recipes/plannerRecipes'
 import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
 import { figmaAssets } from './features/home/figmaAssets'
 import { buildOneStoreBasket } from './domain/basket'
+import type { OfflinePriceSnapshots, OfflineRetailer } from './domain/offlineReviewedImport.ts'
+import type { OfflineComparisonSession } from './features/comparison/offlineComparisonSession.ts'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
   defaultPlannerPreferences,
@@ -106,10 +105,35 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
   }
 }
 
+/** Private local data lives in the App, not in tabs that unmount on navigation.
+ * These are React-memory-only hooks; no automatic storage or network upload. */
+function useOfflineComparisonSession(): OfflineComparisonSession {
+  const [selectedStore, setSelectedStore] = useState<OfflineRetailer>('PLUS')
+  const [text, setText] = useState('')
+  const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
+  const [stagedCaptures, setStagedCaptures] = useState<
+    Partial<Record<OfflineRetailer, Record<string, unknown>>>
+  >({})
+  const [manualSelections, setManualSelections] = useState<{
+    fingerprint: string
+    products: Record<string, string>
+  }>({ fingerprint: '', products: {} })
+  const [tripMemory, setTripMemory] = useState<
+    Partial<Record<OfflineRetailer, { identity: string; done: string[] }>>
+  >({})
+  const [importEpoch, setImportEpoch] = useState(0)
+  return {
+    selectedStore, setSelectedStore, text, setText, imported, setImported,
+    stagedCaptures, setStagedCaptures, manualSelections, setManualSelections,
+    tripMemory, setTripMemory, importEpoch, setImportEpoch,
+  }
+}
+
 export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [sourceClock, setSourceClock] = useState(() => Date.now())
   useEffect(() => {
+    if (typeof document === 'undefined' || typeof window.setInterval !== 'function') return
     const refresh = () => setSourceClock(Date.now())
     const timer = window.setInterval(refresh, 60000)
     window.addEventListener('focus', refresh)
@@ -232,12 +256,47 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     [activeDays, plannedMeals, recipes],
   )
 
-  const importedPair = useMemo(
-    () => offlineSessionBaskets(offlinePriceSession, plannedMeals, recipes, activeDays),
-    [offlinePriceSession.imported, offlinePriceSession.manualSelections, plannedMeals, recipes, activeDays],
-  )
-  const importedSourceFresh = offlinePriceSession.imported !== null &&
-    offlineSessionFresh(offlinePriceSession.imported, sourceClock)
+  const importedPair = useMemo(() => {
+    const imported = offlinePriceSession.imported
+    if (!imported) return null
+    try {
+      // Keep the exact comparison identity used by the imported product picker.
+      const identity = JSON.stringify([
+        plannedMeals, activeDays,
+        recipes.map(recipe => [recipe.id, recipe.ingredients]),
+        ...(['PLUS', 'DekaMarkt'] as const).map(store => [
+          imported.captures[store].observedAt, imported.captures[store].products,
+        ]),
+      ])
+      const choices = offlinePriceSession.manualSelections.fingerprint === identity
+        ? offlinePriceSession.manualSelections.products : {}
+      const basketFor = (store: 'PLUS' | 'DekaMarkt') => {
+        const prefix = store + '\u0000'
+        const manualProductIds = Object.fromEntries(
+          Object.entries(choices).filter(([id]) => id.startsWith(prefix))
+            .map(([id, productId]) => [id.slice(prefix.length), productId]),
+        )
+        return buildOneStoreBasket({
+          store: { id: store, name: store }, plan: plannedMeals, recipes, activeDays,
+          products: imported.captures[store].products, manualProductIds,
+        })
+      }
+      return { plus: basketFor('PLUS'), deka: basketFor('DekaMarkt') }
+    } catch { return null }
+  }, [offlinePriceSession.imported, offlinePriceSession.manualSelections, plannedMeals, recipes, activeDays])
+  const importedSourceFresh = useMemo(() => {
+    const imported = offlinePriceSession.imported
+    if (!imported) return false
+    try {
+      const plus = imported.captures.PLUS.observedNs
+      const deka = imported.captures.DekaMarkt.observedNs
+      const oldest = plus < deka ? plus : deka
+      const newest = plus > deka ? plus : deka
+      const now = BigInt(Math.trunc(sourceClock)) * 1_000_000n
+      return now >= newest - 300_000_000_000n &&
+        now - oldest <= 604_800_000_000_000n
+    } catch { return false }
+  }, [offlinePriceSession.imported, sourceClock])
   const currentStoreBasket = importedPair
     ? offlinePriceSession.selectedStore === 'PLUS' ? importedPair.plus : importedPair.deka
     : null
@@ -342,10 +401,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
         {tab === 'list' && offlinePriceSession.imported && (
-          <ImportedShoppingList
-            session={offlinePriceSession}
-            plan={plannedMeals} recipes={recipes} activeDays={activeDays}
-            onOpenComparison={() => navigate('basket')}
+          <BasketView basket={basket} comparison={basketComparison}
+            comparisonBaseline={comparisonBaseline} comparisonCandidate={comparisonCandidate}
+            manualPlan={plannedMeals} manualRecipes={recipes} manualActiveDays={activeDays}
+            manualWeekBudgetEuros={budget} offlinePriceSession={offlinePriceSession}
+            displayLocalList onOpenComparison={() => navigate('basket')}
           />
         )}
         {tab === 'list' && !offlinePriceSession.imported && (
@@ -453,12 +513,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             offlinePriceSession={offlinePriceSession}
           />
         )}
-        {tab === 'list' && (offlinePriceSession.imported
-          ? <details className="demo-comparison-disclosure">
-              <summary>Oude voorbeeldboodschappenlijst (niet de geïmporteerde mand)</summary>
-              <ShoppingListView basket={basket} />
-            </details>
-          : <ShoppingListView basket={basket} />)}
+        {tab === 'list' && offlinePriceSession.imported && <details className="demo-comparison-disclosure">
+          <summary>Oude voorbeeldboodschappenlijst (niet de geïmporteerde mand)</summary>
+          <ShoppingListView basket={basket} />
+        </details>}
+        {tab === 'list' && !offlinePriceSession.imported && <ShoppingListView basket={basket} />}
         {tab === 'observe' && <ObservationView />}
       </div>
 

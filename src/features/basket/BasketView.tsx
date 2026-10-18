@@ -2,6 +2,7 @@ import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { ManualStoreComparison } from '../comparison/ManualStoreComparison'
 import { OfflineReviewedWorkbench } from '../comparison/OfflineReviewedWorkbench'
+import { ImportedShoppingList } from '../comparison/ImportedShoppingList.tsx'
 import type { OfflineComparisonSession } from '../comparison/offlineComparisonSession.ts'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
@@ -33,6 +34,8 @@ export function BasketView({
   manualActiveDays,
   manualWeekBudgetEuros,
   offlinePriceSession,
+  displayLocalList,
+  onOpenComparison,
 }: {
   basket: OneStoreBasket
   comparison: BasketComparison
@@ -43,7 +46,16 @@ export function BasketView({
   manualActiveDays?: string[]
   manualWeekBudgetEuros?: number
   offlinePriceSession: OfflineComparisonSession
+  displayLocalList?: boolean
+  onOpenComparison?: () => void
 }) {
+  if (displayLocalList && manualPlan && manualRecipes && manualActiveDays) {
+    return <ImportedShoppingList
+      session={offlinePriceSession}
+      plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
+      onOpenComparison={onOpenComparison ?? (() => {})}
+    />
+  }
   const basketCost = basketCostDisclosure(
     basket.totalCents,
     basket.unresolvedLineCount,
