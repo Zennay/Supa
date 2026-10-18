@@ -123,7 +123,7 @@ convertButton.addEventListener('click', () => {
       }
       const portionsInput = card?.querySelector<HTMLInputElement>('input[data-recipe-portions]')
       const portions = Number(portionsInput?.value)
-      if (!portionsInput || !/^(?:[1-9]|[1-9]\\d|100)$/.test(portionsInput.value) ||
+      if (!portionsInput || !/^(?:[1-9]|[1-9]\d|100)$/.test(portionsInput.value) ||
           !Number.isSafeInteger(portions)) {
         throw Error('Kies tussen 1 en 100 hele porties per bereiding.')
       }
