@@ -91,3 +91,8 @@
 .offline-manual-editor__draft input[type="checkbox"] { flex:0 0 20px; min-width:20px; min-height:20px; }
 .offline-manual-editor__draft span { font-size:.88rem; color:#536257; }
 .offline-manual-editor__draft button { justify-self:start; min-height:44px; }
+
+/* A human must confirm the exact source/SKU before price totals are accepted. */
+.offline-price-workbench__review { display:flex; gap:.65rem; align-items:flex-start; cursor:pointer; padding:.6rem .35rem; background:#f2f7f1; border-radius:9px; line-height:1.35; }
+.offline-price-workbench__review input[type=checkbox] { flex:0 0 20px; width:20px; height:20px; margin-top:.1rem; accent-color:#246b50; }
+.offline-price-workbench__review input:focus-visible { outline:3px solid #226f52; outline-offset:3px; }
