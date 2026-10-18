@@ -48,6 +48,20 @@ export function ImportedShoppingList({
   const extras = imported.captures[store].products.filter(product =>
     session.extraProductIds[store].includes(product.id))
   const extraDone = session.extraDoneIds[store]
+  // Loose user-selected packs never change the equal-demand meal-basket oracle.
+  // A missing or unavailable price means only a known subtotal, not a full price.
+  const extraSummary = extras.reduce((summary, product) => {
+    const packs = session.extraQuantities[store][product.id] ?? 1
+    const validPacks = Number.isSafeInteger(packs) && packs >= 1 && packs <= 99
+    const validPrice = product.available && Number.isSafeInteger(product.priceCents) &&
+      product.priceCents >= 0
+    const amount = validPacks && validPrice ? packs * product.priceCents : null
+    if (amount === null || !Number.isSafeInteger(amount) ||
+        !Number.isSafeInteger(summary.knownCents + amount)) {
+      return { knownCents: summary.knownCents, unknownCount: summary.unknownCount + 1 }
+    }
+    return { knownCents: summary.knownCents + amount, unknownCount: summary.unknownCount }
+  }, { knownCents: 0, unknownCount: 0 })
   const fresh = offlineSessionFresh(imported, now)
   const complete = basket.selectedMealCount > 0 && basket.lines.length > 0 &&
     basket.unresolvedLineCount === 0
@@ -123,6 +137,7 @@ export function ImportedShoppingList({
             session.setTripMemory({})
             session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
             session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
+            session.setExtraQuantities({ PLUS: {}, DekaMarkt: {} })
             session.setImportEpoch(current => current + 1)
             setConfirmDiscard(false)
           }}>Ja, wis deze privégegevens</button>
@@ -137,6 +152,15 @@ export function ImportedShoppingList({
       <p className="disclaimer">Zelf gekozen via Producten. Deze losse artikelen
         staan buiten de Planner-ingrediënten: hun prijzen zijn niet meegenomen
         in het berekende mandtotaal, weekbudget of prijsverschil met de andere winkel.</p>
+      <p className="offline-own-extras__subtotal" role="status">
+        <strong>{extraSummary.unknownCount === 0 ? 'Subtotaal losse artikelen' :
+          'Bekend deelbedrag losse artikelen'}: {euro.format(extraSummary.knownCents / 100)}</strong>
+        {extraSummary.unknownCount > 0 && <small>
+          {' '}{extraSummary.unknownCount} onbekende of niet-beschikbare prijzen; geen volledig subtotaal.
+        </small>}
+        {!fresh && <small> Oude waarnemingen: dit bedrag is niet actueel.</small>}
+        <small>Niet inbegrepen in de weekmandjes of hun prijsverschil.</small>
+      </p>
       <ul>
         {extras.map(product => <li key={product.id}>
           <label>
@@ -155,8 +179,27 @@ export function ImportedShoppingList({
               </small>
             </span>
           </label>
+          <label className="offline-own-extras__quantity">Verpakkingen
+            <select aria-label={'Aantal verpakkingen voor ' + product.name + ' bij ' + store}
+              value={session.extraQuantities[store][product.id] ?? 1}
+              onChange={event => {
+                const packs = Number(event.target.value)
+                if (!Number.isSafeInteger(packs) || packs < 1 || packs > 99) return
+                session.setExtraQuantities(previous => ({
+                  ...previous, [store]: { ...previous[store], [product.id]: packs },
+                }))
+              }}>
+              {Array.from({ length: 99 }, (_, index) => index + 1)
+                .map(packs => <option key={packs} value={packs}>{packs}</option>)}
+            </select>
+          </label>
           <button type="button" className="ghost-button"
             onClick={() => {
+              session.setExtraQuantities(previous => {
+                const remaining = { ...previous[store] }
+                delete remaining[product.id]
+                return { ...previous, [store]: remaining }
+              })
               session.setExtraProductIds(previous => ({
                 ...previous, [store]: previous[store].filter(id => id !== product.id),
               }))
@@ -166,8 +209,8 @@ export function ImportedShoppingList({
             }}>Verwijder</button>
         </li>)}
       </ul>
-      <small>Extra artikelen en hun vinkjes blijven alleen in het geheugen van dit
-        open app-tabblad. Nieuwe of gewiste bronopnames wissen deze selectie.</small>
+      <small>Extra artikelen, hoeveelheden en vinkjes blijven alleen in het geheugen van dit
+        open app-tabblad. Bij een geldige vervanging blijft de ongewijzigde winkel behouden.</small>
     </section>}
     <PrivateStoreTripChecklist key={identity} basket={basket}
       observedAt={imported.captures[store].observedAt} fresh={fresh}
