@@ -351,3 +351,18 @@ wisselen van winkelkeuze of handmatige invoer vervallen eerdere prijsuitkomst
 en SKU-koppelingen tot de gebruiker deze echte bron expliciet opnieuw
 accepteert. Het formulier verstrekt geen retailerrechten of openbaar
 veldonderzoeksbewijs en haalt niets van winkelwebsites op.
+
+## Tweede echte winkelopname toevoegen zonder bestaand matchwerk te verliezen
+
+Wanneer de gebruiker eerst alleen PLUS- of DekaMarkt-brongegevens invoert,
+later de eigen **tweede** winkel-CSV selecteert en de wijziging bevestigt,
+blijft een eerder menselijk bevestigde SKU van de eerste winkel bewaard
+**uitsluitend wanneer de gehele oorspronkelijke bronopname van die winkel
+ongewijzigd is**, inclusief werkelijke opnametijd, productnamen, verpakking,
+beschikbaarheid en prijzen. Supa vergelijkt alle daadwerkelijk ingeladen
+bronvelden en behoudt geen enkele selectie voor nieuwe of gewijzigde
+retailercaptures. Bij gewijzigde prijs of tijd moeten de keuzes opnieuw
+worden beoordeeld. Het vorige vergelijkingresultaat wordt direct ingetrokken;
+een nieuw prijsverschil vereist nog steeds zelf op Vergelijk klikken en de
+volledige canonieke twee-winkelsvoorwaarden. Voor een winkel die niet door
+de nieuwe bron is geleverd blijft alles onbekend.

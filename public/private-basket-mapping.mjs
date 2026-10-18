@@ -457,8 +457,9 @@ async function loadSources() {
       refresh()
       return
     }
-    if (captures && !window.confirm('Vervang de vorige eigen winkelopnames door deze nieuwe gevalideerde bron? ' +
-        'Alle eerder gekozen SKU-koppelingen moeten daarna opnieuw handmatig worden gecontroleerd.')) {
+    if (captures && !window.confirm('Vervang de vorige winkelbronnen door deze nieuwe gevalideerde opname(n)? ' +
+        'Alleen SKU-keuzes uit letterlijk ongewijzigde bestaande winkelopnames blijven bewaard. ' +
+        'Nieuwe of gewijzigde winkels moeten opnieuw handmatig gekoppeld worden.')) {
       sourceInput.value = ''
       plusInput.value = ''
       dekaInput.value = ''
@@ -466,8 +467,22 @@ async function loadSources() {
       refresh()
       return
     }
+    // Preserve previously human-confirmed SKU IDs only when their entire
+    // original retailer capture (products AND observedAt) is byte-for-byte
+    // equivalent after strict admission. Never carry over a selection against
+    // an updated name, package, time, price or different store.
+    const unchanged = stores.filter(store => captures?.[store] && verified[store] &&
+      JSON.stringify(captures[store]) === JSON.stringify(verified[store]))
+    const kept = Array.from(lines.querySelectorAll('.ingredient')).map(row => ({
+      row, selected: Object.fromEntries(unchanged.map(store => [store,
+        row.querySelector('[data-store="' + store + '"]').value])),
+    }))
     clearSourceMatches()
     captures = verified
+    for (const item of kept) for (const store of unchanged) {
+      const sku = item.selected[store]
+      if (sku) item.row.querySelector('[data-store="' + store + '"]').value = sku
+    }
     const now = Date.now()
     const descriptions = stores.map(store => {
       const capture = captures[store]
@@ -482,6 +497,7 @@ async function loadSources() {
       ? Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt)) : null
     if (gap === null) descriptions.push('Voor een volledig winkelprijsverschil is nog een echte tweede winkelopname nodig.')
     else if (gap > 86400000) descriptions.push('Opnames >24 uur uiteen. Opnieuw meten voor een volledige vergelijking.')
+    descriptions.push(unchanged.length ? 'Eerder handmatig gekoppelde SKU’s zijn uitsluitend bij ongewijzigde originele winkelopname(n) behouden.' : 'Alle productkeuzes moeten opnieuw bevestigd worden.')
     descriptions.push('Selecteer uitsluitend door jou gecontroleerde matches. Geen automatische bronrechten of besparing.')
     const expired = stores.some(store => {
       if (!captures[store]) return false
