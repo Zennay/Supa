@@ -428,6 +428,56 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function acceptManualSource(input: string) {
+    ++importRevision.current
+    setPendingReplacement(null)
+    setBusy(false)
+    try {
+      const next = parseOfflinePriceSnapshots(input, Date.now())
+      const shops = Object.keys(next.captures) as (typeof stores[number])[]
+      if (imported && shops.length === 1) {
+        const store = shops[0]
+        if (imported.captures[store]) {
+          const preview = describePrivateStoreCaptureChange(text, input, store, Date.now())
+          setPendingReplacement({ sourceText: text, newText: input, store,
+            version: importRevision.current, preview })
+          setMessage(store + ': bekijk eerst de bronverschillen en bevestig de vervanging. De andere winkel blijft behouden.')
+          return
+        }
+        const previous = JSON.parse(text) as { captures: unknown[] }
+        const added = JSON.parse(input) as { captures: unknown[] }
+        const combined = JSON.stringify({ schema: 'supa-offline-prices-v1',
+          captures: [...previous.captures, ...added.captures] })
+        const admitted = parseOfflinePriceSnapshots(combined, Date.now())
+        const isNew = (key: string) => key.startsWith('[' + JSON.stringify(store) + ',')
+        setText(combined)
+        setImported(admitted)
+        setManualSku(previous => ({ ...previous, [store]: {} }))
+        setSkuFilter(previous => Object.fromEntries(
+          Object.entries(previous).filter(([key]) => !isNew(key))))
+        setReviewedLines(previous => Object.fromEntries(
+          Object.entries(previous).filter(([key]) => !isNew(key))))
+        setDoneTripItems(previous => Object.fromEntries(
+          Object.entries(previous).filter(([key]) => !isNew(key))))
+        setClockMs(Date.now())
+        setTripExportMessage('')
+        setTripProgressMessage('')
+        setMessage(store + ': tweede echte privéopname toegevoegd; de andere winkel en zijn controles blijven intact. Controleer de nieuwe SKU’s.')
+        return
+      }
+      if (imported && !window.confirm(
+        'Beide vorige winkelopnames en controles vervangen door deze nieuwe invoer?')) {
+        setMessage('Nieuwe invoer niet toegepast; vorige winkelopnames behouden.')
+        return
+      }
+      setText(input)
+      importSnapshots(input)
+    } catch (error) {
+      setMessage((error instanceof Error ? error.message : 'Ongeldige bron.') +
+        ' Bestaande winkelopnames en controles zijn behouden.')
+    }
+  }
+
   function importSnapshots(input: string) {
     // A new import, even identical bytes, requires explicit source review.
     setReviewedLines({})
@@ -952,14 +1002,14 @@ export function OfflineReviewedWorkbench({
       </div>
       <LocalTwoStorePriceEditor
         plan={plan} recipes={recipes} activeDays={activeDays}
-        onGenerated={(json) => {
-          importRevision.current += 1
-          setBusy(false); setText(json); importSnapshots(json)
-        }}
+        onGenerated={acceptManualSource}
         onEdit={() => {
-          importRevision.current += 1
-          setBusy(false); setImported(null); setReviewedLines({}); setDoneTripItems({}); setText('')
-          setMessage('Het vorige prijsbestand is ingetrokken omdat je de invoer bewerkt. Bereken de gewijzigde winkelopname opnieuw.')
+          // Cancel in-flight file admission or stale preview; editing a draft
+          // does not revoke a separately accepted and reviewed source.
+          ++importRevision.current
+          setPendingReplacement(null)
+          setBusy(false)
+          setMessage('Je bewerkt alleen het invoerconcept. Bestaande winkelopnames blijven actief totdat je een nieuwe opname bevestigt.')
         }}
       />
       <details className="offline-price-workbench__schema">
