@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -58,6 +58,7 @@ export function OfflineReviewedWorkbench({
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const importRevision = useRef(0)
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   // Prevent stale imports from appearing comparable after an open browser tab
@@ -111,17 +112,43 @@ export function OfflineReviewedWorkbench({
   }
   async function loadFile(file?: File) {
     if (!file) return
+    const version = ++importRevision.current
+    setImported(null)
+    setReviewedLines({})
     setBusy(true)
     try {
-      if (file.size > 256000) throw new Error('Bestand is te groot (maximaal 256 kB).')
-      const content = await file.text()
+      if (!file.size || file.size > 256000) {
+        throw new Error('Bronbestand is leeg of groter dan 256 kB.')
+      }
+      // The same canonical local CSV converter is already used by the
+      // independent browser mapping wizard. It does not request retailer data.
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      let content = raw
+      if (isCsv) {
+        // Vite copies the existing public module without changing its parser.
+        const converterUrl = '/offline-two-store-csv.mjs'
+        const module: unknown = await import(/* @vite-ignore */ converterUrl)
+        if (!module || typeof module !== 'object' ||
+          !('convertTwoStoreCsv' in module) ||
+          typeof module.convertTwoStoreCsv !== 'function') {
+          throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
+        }
+        content = (module.convertTwoStoreCsv as (input: string) => string)(raw)
+      }
+      if (version !== importRevision.current) return
       setText(content)
       importSnapshots(content)
+      if (isCsv) setMessage('Jouw twee-winkel CSV is lokaal omgezet met dezelfde strikte Supa-converter. Controleer alle productmatches afzonderlijk.')
     } catch (error) {
-      setReviewedLines({})
+      if (version !== importRevision.current) return
       setImported(null)
-      setMessage(error instanceof Error ? error.message : 'Kon dit bestand niet lezen.')
-    } finally { setBusy(false) }
+      setReviewedLines({})
+      setText('')
+      setMessage(error instanceof Error ? error.message : 'Kon dit bronbestand niet lezen.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
+    }
   }
 
   const basketPair = useMemo(() => {
@@ -195,8 +222,15 @@ export function OfflineReviewedWorkbench({
       </div>
       <LocalTwoStorePriceEditor
         plan={plan} recipes={recipes} activeDays={activeDays}
-        onGenerated={(json) => { setText(json); importSnapshots(json) }}
-        onEdit={() => { setImported(null); setReviewedLines({}); setMessage('Wijzigingen nog niet doorgerekend. Bereken opnieuw om de mandjes te zien.') }}
+        onGenerated={(json) => {
+          importRevision.current += 1
+          setBusy(false); setText(json); importSnapshots(json)
+        }}
+        onEdit={() => {
+          importRevision.current += 1
+          setBusy(false); setImported(null); setReviewedLines({}); setText('')
+          setMessage('Het vorige prijsbestand is ingetrokken omdat je de invoer bewerkt. Bereken de gewijzigde winkelopname opnieuw.')
+        }}
       />
       <details className="offline-price-workbench__schema">
         <summary>Welk importbestand werkt?</summary>
@@ -210,14 +244,16 @@ export function OfflineReviewedWorkbench({
           Ontbrekende prijzen: zet <code>priceCents: null</code> en <code>available: false</code>.</p>
       </details>
       <div className="offline-price-workbench__input">
-        <label>Importeer JSON vanaf dit apparaat
-          <input type="file" accept=".json,application/json" disabled={busy}
+        <label>Open je eigen twee-winkel CSV of JSON vanaf dit apparaat
+          <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
             onChange={event => { void loadFile(event.currentTarget.files?.[0]) }} />
         </label>
-        <label>Of plak de twee winkelopnames als JSON
+        <label>Of plak je eigen twee winkelopnames als JSON (een CSV wordt lokaal geconverteerd)
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
+              importRevision.current += 1
+              setBusy(false)
               setText(event.target.value)
               setImported(null)
               setReviewedLines({})
@@ -225,10 +261,15 @@ export function OfflineReviewedWorkbench({
             }} />
         </label>
         <div className="offline-price-workbench__actions">
-          <button type="button" disabled={busy || !text.trim()} onClick={() => importSnapshots(text)}>
+          <button type="button" disabled={busy || !text.trim()} onClick={() => {
+            importRevision.current += 1
+            importSnapshots(text)
+          }}>
             Bereken mandjes
           </button>
           <button type="button" className="ghost-button" onClick={() => {
+            importRevision.current += 1
+            setBusy(false)
             setImported(null); setReviewedLines({}); setText(''); setMessage('Geïmporteerde prijsdata uit dit scherm gewist.')
           }}>Wis lokaal geladen data</button>
         </div>
