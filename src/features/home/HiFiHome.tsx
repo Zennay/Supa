@@ -41,13 +41,14 @@ type Props = {
   onNavigate: (view: HiFiTab | 'planner' | 'list' | 'basket') => void
   addedProducts: string[]
   onToggleProduct: (id: string) => void
+  onPlanRecipe?: (recipeId: string, day: string) => void
   activeDays?: readonly string[]
   priceSession?: OfflineComparisonSession
   privateSummary?: PrivateHomeSummary
 }
 
 export function HiFiHome(props: Props) {
-  if (props.view === 'recipes') return <RecipeLibrary onBack={() => props.onNavigate('home')} />
+  if (props.view === 'recipes') return <RecipeLibrary onBack={() => props.onNavigate('home')} onPlanRecipe={props.onPlanRecipe} />
   return <HiFiDiscovery {...props} />
 }
 

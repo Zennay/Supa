@@ -5,6 +5,7 @@ import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } f
 import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { preparePortionCopy } from './recipePortionCopy.ts'
+import { toPlannerRecipe } from './plannerRecipes.ts'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import './recipes.css'
@@ -38,7 +39,7 @@ function initialLibrary(): LibraryState {
   catch { return { recipes: [], raw: null, error: 'Browseropslag is niet beschikbaar. Je kunt recepten bekijken, maar nog niet bewaren.' } }
 }
 
-export function RecipeLibrary({ onBack }: { onBack: () => void }) {
+export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; onPlanRecipe?: (recipeId: string, day: string) => void }) {
   const [library, setLibrary] = useState(initialLibrary)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'own' | 'favorites'>('all')
@@ -58,6 +59,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [sourceReviews, setSourceReviews] = useState<{ original: string; reason: string }[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [copyServings, setCopyServings] = useState('')
+  const [planDay, setPlanDay] = useState('Ma')
   const [preview, setPreview] = useState<UserRecipeDraft | null>(null)
   const [backupPreview, setBackupPreview] = useState<RecipeBackupPreview | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
@@ -330,7 +332,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     <section className="hifi-section"><div className="hifi-section-heading"><div><h2>Recepten</h2><p className="recipe-count">{demo.length + own.length} recepten</p></div><button aria-label="Sorteer recepten op naam" aria-pressed={sort} onClick={() => setSort(!sort)}><FigmaImage asset={a.recipeSort} alt="" /></button></div>
       <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe && recipe.image ? '' : ' own-recipe-card'}`} key={recipe.id}>
         {'image' in recipe && recipe.image && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
-        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setDeleteConfirm(false); setError(''); setCopyServings(String(recipe.servings ?? '')); detail.current?.showModal() }} />
+        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setDeleteConfirm(false); setError(''); setCopyServings(String(recipe.servings ?? '')); setPlanDay('Ma'); detail.current?.showModal() }} />
         <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
         <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p></div>
       </article>)}</div>
@@ -431,6 +433,23 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <button type="button" aria-expanded={deleteConfirm}
             onClick={() => setDeleteConfirm(true)}>Verwijder recept</button>
         </div>
+        {onPlanRecipe && <div className="recipe-own-actions__portions">
+          <h4>Zet dit eigen recept in je weekplanning</h4>
+          {toPlannerRecipe(selected) ? <>
+            <label>Kies een dag
+              <select value={planDay} onChange={event => setPlanDay(event.target.value)}>
+                {([['Ma', 'Maandag'], ['Di', 'Dinsdag'], ['Wo', 'Woensdag'],
+                  ['Do', 'Donderdag'], ['Vr', 'Vrijdag'], ['Za', 'Zaterdag'],
+                  ['Zo', 'Zondag']] as const).map(([id, label]) =>
+                  <option key={id} value={id}>{label}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={() => { detail.current?.close(); onPlanRecipe(selected.id, planDay) }}>
+              Plan dit recept op {planDay}
+            </button>
+          </> : <p role="status">Dit recept heeft nog onzekere hoeveelheden, porties of
+            stuks. Bewerk de ingrediënten eerst; SUPA berekent niets op basis van een gok.</p>}
+        </div>}
         <div className="recipe-own-actions__portions">
           <label>Maak een nieuwe kopie voor een ander aantal porties
             <input type="number" inputMode="numeric" min="1" max="1000" step="1"

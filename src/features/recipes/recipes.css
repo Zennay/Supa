@@ -111,3 +111,6 @@
 .recipe-own-actions__portions button { min-height:44px; border:0; border-radius:11px;
   background:#005135; color:white; font:inherit; padding:10px; }
 .recipe-own-actions__portions small { line-height:1.5; }
+
+.recipe-own-actions__portions select { width:100%; max-width:240px; min-height:44px;
+  border-radius:9px; border:1px solid #97b4a1; background:white; padding:8px; font:inherit; }

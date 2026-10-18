@@ -462,6 +462,18 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     }))
   }
 
+  const planOwnRecipe = (recipeId: string, day: string) => {
+    // Selection is always explicit: it chooses one existing day and an already
+    // reviewed recipe; neither retailer observations nor prices are changed.
+    if (!recipes.some(recipe => recipe.id === recipeId) ||
+        !m2InitialPlan.some(meal => meal.day === day)) return
+    setPreferences(current => ({ ...current,
+      activeDays: current.activeDays.includes(day) ? current.activeDays : [...current.activeDays, day],
+      recipeByDay: { ...current.recipeByDay, [day]: recipeId },
+    }))
+    navigate('planner')
+  }
+
   const changeRecipe = (day: string, recipeId: string) => {
     setPreferences((current) => ({
       ...current,
@@ -487,7 +499,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       </header>}
 
       <div className="content">
-        {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} priceSession={offlinePriceSession}
+        {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} onPlanRecipe={planOwnRecipe} priceSession={offlinePriceSession}
           privateSummary={privateHomeSummary ?? undefined} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
         {tab === 'list' && offlinePriceSession.imported && (
