@@ -22,6 +22,17 @@ const stores = ['PLUS', 'DekaMarkt'] as const
 const EMPTY_MANUAL_CHOICES: Readonly<Record<string, string>> = Object.freeze({})
 const manualKey = (store: string, ingredientId: string) => store + '\u0000' + ingredientId
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
+function blankSheetProductId(store: OfflineRetailer, label: string, index: number): string {
+  // Only an ingredient locator, never a claimed store SKU.
+  const slug = label.normalize('NFKD').toLowerCase()
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 54)
+  return `own-${store === 'PLUS' ? 'plus' : 'deka'}-${index + 1}-${slug || 'ingredient'}`
+}
+function safeReferenceLabel(label: string): string {
+  return label.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
+    .replace(/\s+/gu, ' ').trim().slice(0, 160)
+}
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
@@ -49,10 +60,7 @@ export function OfflineReviewedWorkbench({
     const header = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
     const rows = (selectedStore ? [selectedStore] : stores).flatMap(store =>
       ingredientNeeds.map((need, index) => {
-        const slug = need.label.normalize('NFKD').toLowerCase()
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 54)
-        const id = `own-${store === 'PLUS' ? 'plus' : 'deka'}-${index + 1}-${slug || 'ingredient'}`
+        const id = blankSheetProductId(store, need.label, index)
         // Deliberately blank physical observation, product name, pack and price.
         // The downstream importer refuses these rows until completed honestly.
         return [store, '', id, '', '', need.unit, '', '', 'false'].join(',')
@@ -72,6 +80,43 @@ export function OfflineReviewedWorkbench({
     } finally {
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
     }
+  }
+
+  /** A human-readable crosswalk for the deliberately blank CSV sheet. */
+  function downloadIngredientReference(selectedStore?: OfflineRetailer) {
+    if (!ingredientNeeds.length || ingredientNeeds.length > 1000) return
+    const targets = selectedStore ? [selectedStore] : stores
+    const lines = [
+      'SUPA - REFERENTIE BIJ HET LEGE PRIJSINVULBLAD',
+      'Huidig gekozen weekmenu: echte ingredientbehoefte uit Planner.',
+      'De ID in CSV is slechts een lokaal invulplaatsnummer, GEEN retailerartikel.',
+      'Vul productnaam, echte observatietijd, fysieke verpakking, beschikbaarheid',
+      'en prijs alleen in na jouw eigen rechtmatige bronwaarneming.',
+      'Onbekende prijs blijft leeg; available=false. Geen publieke besparingsclaim.',
+      '',
+      ...ingredientNeeds.flatMap((need, index) =>
+        targets.map(store => {
+          const amount = need.amount === null ? 'onbekend' : String(need.amount)
+          return `${index + 1}. ${store} | ${blankSheetProductId(store, need.label, index)} | ${safeReferenceLabel(need.label)} | nodig: ${amount} ${need.unit}`
+        })),
+      '',
+      'Het ingevulde CSV-bestand en deze referentie zijn geen licentie of veldbewijs.',
+    ]
+    const text = lines.join('\n') + '\n'
+    if (new TextEncoder().encode(text).length > 512000) {
+      setMessage('Het referentieblad is te groot. Maak je weekplanning kleiner.')
+      return
+    }
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = selectedStore === 'PLUS' ? 'supa-plus-ingredientreferentie.txt'
+        : selectedStore === 'DekaMarkt' ? 'supa-deka-ingredientreferentie.txt'
+          : 'supa-beide-winkels-ingredientreferentie.txt'
+      document.body.append(link); link.click(); link.remove()
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    setMessage('Ingrediëntreferentie lokaal gedownload; productprijzen en waarnemingstijden blijven leeg.')
   }
 
   const {
@@ -788,6 +833,15 @@ export function OfflineReviewedWorkbench({
             onClick={() => downloadBlankObservationSheet(store)}>
             Download leeg {store}-prijsblad
           </button>)}
+          <button type="button" className="ghost-button"
+            disabled={ingredientNeeds.length === 0 || ingredientNeeds.length > 1000}
+            onClick={() => downloadIngredientReference()}>
+            Download bijbehorende ingrediënten en benodigde hoeveelheden (TXT)
+          </button>
+          <p className="disclaimer">Dit referentiebestand noemt voor iedere regel exact dezelfde
+            lokale CSV-ID, het bedoelde Planner-ingrediënt en de benodigde hoeveelheid.
+            De werkelijke supermarktproduct-ID, prijs, verpakking, opnametijd en
+            licentie zijn onbekend tot je ze zelf rechtsgeldig vastlegt.</p>
           <p className="disclaimer">Het invulblad bevat alleen de ingrediënten uit Planner, tweemaal (PLUS en DekaMarkt).
             Kies één winkel of beide winkels in één blad. De productnaam, werkelijke waarnemingstijd,
             verpakking en prijs zijn expres leeg:
