@@ -71,6 +71,7 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 <script type="module" src="/src/privateBasketCompare.ts"></script>
 <script type="module" src="/src/privatePlannerDemandImport.ts"></script>
 <script type="module" src="/src/privateOwnRecipeDemand.ts"></script>
+<script type="module" src="/src/privateBasketQuickDemand.ts"></script>
 <script type="module" src="/src/privateBasketDemandMerge.ts"></script>
 <script type="module" src="/private-basket-merge-ui.mjs"></script>
 </head>
@@ -134,6 +135,15 @@ boodschappenbehoefte als een Planner-weekmenu.</p>
 <div id="own-recipe-status" class="notice" role="status" aria-live="polite">Nog geen toegang tot jouw lokale recepten gevraagd.</div>
 <div id="own-recipe-choices" role="group" aria-label="Kies eigen recepten" style="display:grid;gap:8px"></div>
 <button id="own-recipes-to-demand" type="button" disabled>Gebruik geselecteerde recepten als mandvraag</button>
+</div>
+<div id="quick-demand" class="ingredient" style="margin-bottom:16px">
+<h3>Of: plak direct je eigen boodschappenlijst</h3>
+<p>Geen JSON of receptbestand nodig. Zet ieder ingrediënt op een eigen regel met een echte metrische hoeveelheid. Supa voegt alleen exact gelijk genoemde ingrediënten samen, rekent g/kg en ml/l zonder afronden en laat alle winkel-SKU's en prijzen onbekend totdat jij ze bevestigt.</p>
+<label for="quick-demand-text">Je eigen fysieke ingrediënten (maximaal 200 regels)</label>
+<textarea id="quick-demand-text" rows="7" maxlength="16000" spellcheck="false" placeholder="450 g basmati rijst&#10;400 ml kokosmelk&#10;2 stuks bloemkool&#10;basmati rijst: 50 g" style="width:100%;max-width:100%;padding:12px;border:1px solid #acbeb1;border-radius:9px;font:inherit;resize:vertical"></textarea>
+<small>Gebruik: "450 g basmati rijst" of "basmati rijst: 450 g". Ondersteund: g, kg, ml, l, stuk(s). Een regel met onduidelijke maat of halve stuks wordt geweigerd. Geef bovenin het echte aantal maaltijden op; prijzen worden niet opgehaald.</small>
+<button id="quick-demand-import" type="button" class="secondary">Maak van deze lijst een privémandje</button>
+<div id="quick-demand-status" role="status" aria-live="polite" class="notice">Nog geen tekst ingelezen. Bestaande ingrediënten worden uitsluitend na jouw bevestiging vervangen.</div>
 </div>
 <label for="week-import">Of: importeer een lokaal geselecteerd Planner-weekmenu</label>
 <input id="week-import" type="file" accept=".json,application/json">
