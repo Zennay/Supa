@@ -27,8 +27,14 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 .row-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
 #status{white-space:pre-line}#source-status{white-space:pre-line}
 @media(max-width:650px){.grid,.stores{grid-template-columns:1fr}section{padding:15px}.row-actions button{flex:1}}
+.observation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.observed-product{padding:16px;border:1px solid #d6e0d4;border-radius:12px;margin:12px 0;background:#fcfefd}
+.observed-product button{margin-top:10px}
+#manual-status{white-space:pre-line}
+@media(max-width:650px){.observation-grid{grid-template-columns:1fr}}
 </style>
 <script type="module" src="/private-basket-mapping.mjs"></script>
+<script type="module" src="/private-basket-manual-observations.mjs"></script>
 <script type="module" src="/src/privateBasketCompare.ts"></script>
 </head>
 <body><main>
@@ -50,6 +56,27 @@ Elk afzonderlijk bestand moet de negen kolommen met de volledige CSV-kop bevatte
 Beide bronnen worden alleen lokaal samengevoegd en door de bestaande strikte Supa-converter gevalideerd.
 Productnamen en prijzen komen uitsluitend uit jouw eigen bestanden.</p>
 <div id="source-status" class="notice" role="status" aria-live="polite">Nog geen bronbestand gekozen.</div>
+</section>
+<section aria-labelledby="manual-title" id="manual-observations">
+<h2 id="manual-title">Of: voeg je eigen prijswaarnemingen direct in</h2>
+<p>Geen CSV klaar? Vul zelf producten in die je <strong>daadwerkelijk</strong> bij PLUS en DekaMarkt hebt waargenomen.
+Dit is een lokale invoerhulp, geen scraper. Laat onbekende prijzen leeg en bevestig alleen werkelijk gecontroleerde beschikbaarheid.
+Tijdstippen en artikel-ID's worden niet automatisch bedacht of ingevuld.</p>
+<div class="stores">
+<div><label for="manual-plus-time">PLUS · werkelijke opnametijd met UTC-offset</label>
+<input id="manual-plus-time" data-capture="PLUS" type="text" placeholder="JJJJ-MM-DDTUU:MM:SS+02:00" maxlength="35" autocomplete="off">
+<small>Vul de oorspronkelijke waarnemingstijd in; één moment voor deze PLUS-opname.</small>
+<div data-observations="PLUS"></div>
+<button type="button" class="secondary" data-add-product="PLUS">+ Waargenomen PLUS-artikel</button></div>
+<div><label for="manual-deka-time">DekaMarkt · werkelijke opnametijd met UTC-offset</label>
+<input id="manual-deka-time" data-capture="DekaMarkt" type="text" placeholder="JJJJ-MM-DDTUU:MM:SS+02:00" maxlength="35" autocomplete="off">
+<small>Vul de oorspronkelijke waarnemingstijd in; één moment voor deze DekaMarkt-opname.</small>
+<div data-observations="DekaMarkt"></div>
+<button type="button" class="secondary" data-add-product="DekaMarkt">+ Waargenomen DekaMarkt-artikel</button></div>
+</div>
+<div class="row-actions"><button type="button" id="manual-apply">Neem mijn twee winkelopnames over</button>
+<button type="button" id="manual-export" class="secondary" disabled>Bewaar eigen bron-CSV lokaal</button></div>
+<div class="notice" id="manual-status" role="status" aria-live="polite">Nog geen handmatige waarnemingen ingevoerd. Begin met een werkelijk waargenomen artikel per winkel.</div>
 </section>
 <section aria-labelledby="demand-title">
 <h2 id="demand-title">2 · Vul de fysieke behoefte in</h2>
