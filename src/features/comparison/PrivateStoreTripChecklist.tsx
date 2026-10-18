@@ -47,7 +47,9 @@ function formatLine(line: BasketTraceLine, checked: boolean): string {
   const box = checked ? '☑ ' : '☐ '
   if (line.status === 'matched') {
     return box + line.ingredientLabel + ': ' + line.packs + ' × ' +
-      line.productName + ' · ' + euro.format(line.lineTotalCents / 100)
+      line.productName +
+      (line.reasons.includes('explicit local user selection; not an automatic or verified retailer match') ?
+        ' (zelf gekoppeld)' : '') + ' · ' + euro.format(line.lineTotalCents / 100)
   }
   return box + line.ingredientLabel + ': handmatig kiezen; nodig ' +
     (line.requirement.amount ?? '?') + ' ' + line.requirement.unit + ' · geen prijs'
