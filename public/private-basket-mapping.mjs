@@ -362,3 +362,12 @@ save.addEventListener('click', () => {
 })
 add.addEventListener('click', () => addIngredient())
 addIngredient()
+
+compareNow.addEventListener('click', () => {
+  try {
+    const source = { schema: 'supa-offline-prices-v1', captures: stores.map(store => captures[store]) }
+    document.dispatchEvent(new CustomEvent('supa:compare-private-basket', { detail: { source, demand: demand() } }))
+  } catch (error) {
+    notice(status, error instanceof Error ? error.message : 'Mandvraag is ongeldig', 'error')
+  }
+})
