@@ -12,7 +12,33 @@ retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available
 
 Schrijf alleen werkelijk vastgestelde productgegevens, met oorspronkelijke ISO 8601-tijd inclusief UTC-offset, werkelijke product-ID, inhoud, verpakking en prijs in **hele eurocenten**. Voor onbekende prijzen: laat de prijs leeg en gebruik `available=false`. Eén winkelopname heeft één opnametijd. Het bestand wordt door de **bestaande** strikte `public/offline-two-store-csv.mjs`-converter verwerkt; de nieuwe rapportage creëert geen fictieve winkelprijzen.
 
-## Stap 2 — maak de eigen vraag `vraag.json`
+## Stap 2 — vanuit een gekozen Planner-week (zonder handmatig optellen)
+
+Als je al een privé-weekplan met recepten hebt, kan Supa de **bestaande canonieke ingrediëntenaggregatie** gebruiken in plaats van hoeveelheden overtypen. Maak een lokaal bestand `week.json` met exact deze structuur (onderstaande waarden zijn uitsluitend een onbeprijsd sjabloon):
+
+```json
+{
+  "schema": "supa-private-planner-week-v1",
+  "plan": [{ "day": "Ma", "recipeId": "eigen-recept-1" }],
+  "activeDays": ["Ma"],
+  "recipes": [{
+    "id": "eigen-recept-1",
+    "ingredients": [
+      { "id": "eigen-ingredient-1", "label": "Eigen ingrediënt", "query": "Eigen ingrediënt", "amount": 500, "unit": "g" }
+    ]
+  }]
+}
+```
+
+Vervang dit door **de werkelijk door jou geselecteerde dagen, recepten en ingrediënten**, niet door het voorbeeld. Hergebruik een ingrediënt-ID alleen bij dezelfde betekenis en fysieke eenheidsfamilie; Supa weigert strijdige definities. De parser houdt de week lokaal, laat ontbrekende hoeveelheden als `null` bestaan en genereert nooit winkelproducten of prijzen.
+
+```sh
+node --experimental-strip-types scripts/offline-planner-demand-to-json.mjs week.json vraag.json
+```
+
+Dit levert het onderstaande `supa-private-basket-demand-v1`-formaat met nauwkeurig samengevoegde behoeften, maar beide winkelproduct-ID’s bewust nog `null`. Kijk de vraag na, vul in `productIds` per winkel alleen werkelijk geobserveerde artikel-ID’s in, en ga daarna naar stap 3. Voor complexe hoeveelheden zoals dezelfde rijst in twee recepten gebruikt dit hulpmiddel `aggregatePlanIngredients` en dus Supa’s bestaande decimale maatconversie in plaats van eigen afgeronde rekensommen.
+
+## Stap 2 alternatief — maak de eigen vraag `vraag.json`
 
 Kopieer onderstaande structuur, vervang de inhoud door ingrediënten van het werkelijk gekozen weekmenu en neem de juiste `selectedMealCount` over. Koppel alleen handmatig gecontroleerde winkelproduct-ID's. Een onbekende koppeling blijft `null`.
 
