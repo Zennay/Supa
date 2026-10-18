@@ -8,6 +8,7 @@ import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
+import { privatePackUnitRate } from './privateUnitPrice.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
@@ -62,6 +63,44 @@ function compatibleSourceUnit(demand: BasketTraceLine['requirement']['unit'],
   if (demand === source) return true
   return (['g', 'kg'].includes(demand) && ['g', 'kg'].includes(source)) ||
     (['ml', 'l'].includes(demand) && ['ml', 'l'].includes(source))
+}
+function humanMatchReason(reason: string): string {
+  const reasons: Record<string, string> = {
+    'own-source SKU explicitly selected by user, not independently verified':
+      'Dit originele bronartikel is door jou gekozen en nog niet onafhankelijk gecontroleerd.',
+    'query phrase present': 'De ingrediëntnaam komt als herkenbare tekst voor in de productnaam.',
+    'pack closely covers requirement': 'De inhoud van het pak sluit goed aan op de benodigde hoeveelheid.',
+    'pack covers requirement': 'De verpakking dekt de benodigde hoeveelheid.',
+    'pack covers requirement with high oversupply':
+      'De verpakking is veel groter dan de benodigde hoeveelheid. Controleer het aantal pakken.',
+    'single pack underfills requirement': 'Eén pak is niet genoeg; Supa rondt het aantal benodigde pakken omhoog af.',
+    'unit family mismatch': 'De fysieke eenheid past niet bij het ingrediënt.',
+    'selected product is absent, duplicated or unavailable in this store capture':
+      'Je eerder gekozen broncode ontbreekt of is niet meer prijsklaar in de huidige winkelopname.',
+    'score below trust threshold':
+      'De automatische overeenkomst is te onzeker. Kies zelf een geobserveerde broncode.',
+    'top candidates too close':
+      'Meer bronartikelen lijken even goed te passen. Kies en controleer zelf het juiste product.',
+    'no candidates': 'Geen geschikte geprijsde bronartikelen gevonden.',
+    'ingredient amount unknown or invalid': 'De fysieke ingrediënthoeveelheid ontbreekt of is ongeldig.',
+    'basket quantity or price is not trusted': 'De productinhoud of prijs kan niet veilig tot hele verpakkingen worden omgerekend.',
+    'basket quantity or pack count is not trusted': 'Het aantal benodigde verpakkingen kan niet veilig worden vastgesteld.',
+  }
+  if (reasons[reason]) return reasons[reason]
+  const overlap = /^(\d+)\/(\d+) query tokens present$/.exec(reason)
+  if (overlap) return overlap[1] + ' van ' + overlap[2] + ' zoekwoorden komen overeen met de originele productnaam.'
+  const multi = /^multipack count (\d+) applied$/.exec(reason)
+  if (multi) return 'Multipack met ' + multi[1] + ' losse verpakkingen is meegenomen in de berekening.'
+  return 'Voor dit artikel is nog een handmatige controle van originele naam, code en verpakking nodig.'
+}
+function sourcePackRate(product: import('../../domain/basket.ts').StoreProduct): string {
+  const rate = privatePackUnitRate({
+    amount: product.packAmount,
+    unit: product.packUnit,
+    count: product.packCount ?? 1,
+    priceCents: product.available ? product.priceCents : null,
+  })
+  return rate ? ' · ' + euros.format(rate.centsPerUnit / 100) + ' per ' + rate.unit : ''
 }
 function searchableSourceText(value: string): string {
   // Discoverability only: never change an original source name/SKU/price.
@@ -1219,7 +1258,7 @@ export function OfflineReviewedWorkbench({
                                       <option value="">Automatisch voorstellen (of onbekend)</option>
                                       {choices.shown.map(product => (
                                         <option key={product.id} value={product.id}>
-                                          {product.name} · {product.id} · {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)}
+                                          {product.name} · {product.id} · {(product.packCount ?? 1)} × {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)} per pak{sourcePackRate(product)}
                                         </option>
                                       ))}
                                     </select>
@@ -1245,6 +1284,18 @@ export function OfflineReviewedWorkbench({
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
                             {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
                             {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {euros.format(line.pricePerPackCents / 100)} per verpakking</span>}
+                            {line.reasons.length > 0 && (
+                              <details className="offline-price-workbench__match-explanation">
+                                <summary>Waarom is dit {line.status === 'matched' ? 'bronartikel voorgesteld' : 'ingrediënt nog niet gekoppeld'}?</summary>
+                                <p>De productmatch is een rekenvoorstel, geen bewijs dat het oorspronkelijke
+                                  artikel bij je ingrediënt hoort. Controleer de originele code, hoeveelheid en prijs.</p>
+                                <ul>{line.reasons.map((reason, index) => (
+                                  <li key={index}>{humanMatchReason(reason)}</li>
+                                ))}</ul>
+                                {line.matchScore !== null && <small>Interne zoekrangschikking: {line.matchScore} punten.
+                                  Dit is geen kans op correctheid of externe productvalidatie.</small>}
+                              </details>
+                            )}
                             {line.status === 'matched' && <label className="offline-price-workbench__review">
                               <input type="checkbox"
                                 checked={Boolean(reviewedLines[reviewedLineKey(store, capture.observedAt, line)])}

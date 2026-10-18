@@ -667,3 +667,23 @@ prijsverschil. Geen extern script, afbeelding, analytics of
 retailerverbinding; een strikte offline HTML Content Security Policy
 en veilige tekstescaping gelden. De al bestaande CSV-download
 blijft ongewijzigd, er is daarom geen tweede CSV-knop toegevoegd.
+
+### Waarom matcht dit artikel? Vergelijk echte verpakkingen en eenheidsprijzen
+
+Bij de lokale productkeuze in de gewone Vergelijk-tab staan naast
+de **originele naam en productcode** nu de daadwerkelijk ingevoerde
+multipack-inhoud, totale pakprijs én een indicatieve eenheidsprijs
+(per kg, liter of stuk). Die weergave hergebruikt de bestaande
+`privatePackUnitRate` van de afdrukbare product-PR; geen aparte
+prijsformule, aangenomen korting of winkelcatalogus.
+
+Bij iedere berekende of afgewezen ingredientmatch laat
+**Waarom is dit artikel voorgesteld/nog niet gekoppeld?** de bestaande
+canonieke matchingredenen in begrijpelijk Nederlands zien:
+zoekwoorden, fysieke verpakking/overschot, multipacks, te veel
+gelijkwaardige kandidaten, ontbrekende inhoud of onbekende prijs.
+Een interne zoekscoresom is uitsluitend een zoekrangschikking,
+**geen** geverifieerde gelijkheid, betrouwbaarheid in procenten of
+recht op een prijs- of besparingsclaim. De gebruiker bevestigt
+nog steeds ieder oorspronkelijk bronartikel en zijn werkelijk
+waargenomen verpakking en prijs afzonderlijk.
