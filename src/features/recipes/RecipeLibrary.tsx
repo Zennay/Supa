@@ -4,6 +4,7 @@ import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
+import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import './recipes.css'
 
@@ -52,6 +53,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [message, setMessage] = useState('')
   const [selected, setSelected] = useState<SavedRecipe | typeof examples[number] | null>(null)
   const [preview, setPreview] = useState<UserRecipeDraft | null>(null)
+  const [backupPreview, setBackupPreview] = useState<RecipeBackupPreview | null>(null)
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [backupError, setBackupError] = useState('')
+  const backupReadVersion = useRef(0)
   const editor = useRef<HTMLDialogElement>(null)
   const detail = useRef<HTMLDialogElement>(null)
   const request = useRef<AbortController | null>(null)
@@ -62,8 +67,69 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const own = library.recipes.filter(matches)
   if (sort) { demo.sort((x, y) => x.title.localeCompare(y.title, 'nl')); own.sort((x, y) => x.title.localeCompare(y.title, 'nl')) }
   const favorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
+
+  function downloadOwnRecipes() {
+    setBackupError('')
+    try {
+      if (library.error) throw new Error(library.error)
+      if (!library.recipes.length) throw new Error('Je hebt nog geen eigen recepten om te exporteren.')
+      const output = serializeRecipeBackup(library.recipes)
+      const link = document.createElement('a')
+      const uri = URL.createObjectURL(new Blob([output], { type: 'application/json;charset=utf-8' }))
+      try {
+        link.href = uri
+        link.download = 'supa-mijn-recepten.json'
+        document.body.append(link)
+        link.click()
+        link.remove()
+        setMessage('Eigen recepten lokaal opgeslagen als JSON-backup. Je hebt zelf de controle over dit bestand.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch (cause) {
+      setBackupError(cause instanceof Error ? cause.message : 'Downloaden is niet gelukt.')
+    }
+  }
+  async function loadOwnRecipeBackup(file?: File) {
+    if (!file) return
+    const version = ++backupReadVersion.current
+    setBackupPreview(null)
+    setBackupError('')
+    setBackupBusy(true)
+    try {
+      if (library.error) throw new Error(library.error)
+      if (file.size > RECIPE_BACKUP_MAX_BYTES) throw new Error('Backup is groter dan 2 MB.')
+      const data = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const result = prepareRecipeBackupImport(data, library.recipes)
+      if (version !== backupReadVersion.current) return
+      setBackupPreview(result)
+      setMessage('Backup lokaal gelezen. Controleer eerst de aantallen en bevestig zelf de import.')
+    } catch (cause) {
+      if (version !== backupReadVersion.current) return
+      setBackupError(cause instanceof Error ? cause.message : 'Kon deze backup niet lezen.')
+    } finally {
+      if (version === backupReadVersion.current) setBackupBusy(false)
+    }
+  }
+  function confirmOwnRecipeBackup() {
+    if (!backupPreview || !backupPreview.additions.length) return
+    setBackupError('')
+    try {
+      if (library.error) throw new Error(library.error)
+      const next = saveRecipeLibrary(
+        window.localStorage, library, [...backupPreview.additions, ...library.recipes],
+      )
+      setLibrary(next)
+      setBackupPreview(null)
+      setFilter('own')
+      setQuery('')
+      window.dispatchEvent(new Event('supa-recipes-changed'))
+      setMessage('Je eigen recepten zijn geïmporteerd en beschikbaar in Recepten en, met metrische hoeveelheden, Planner.')
+    } catch (cause) {
+      setBackupError(cause instanceof Error ? cause.message : 'Importeren is niet gelukt. Je bestaande recepten blijven staan.')
+    }
+  }
   function openEditor(next: 'manual' | 'url') {
     request.current?.abort(); setBusy(false); setMode(next); setForm(blank); setSource(null); setUrl(''); setPreview(null); setError(''); saving.current = false
+    setBackupPreview(null)
     editor.current?.showModal()
   }
   function closeEditor() { request.current?.abort(); setBusy(false); editor.current?.close() }
@@ -92,7 +158,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     try {
       const recipe = { ...reviewRecipe(preview), id: `own-${crypto.randomUUID()}`, savedAt: new Date().toISOString() }
       const next = saveRecipeLibrary(window.localStorage, library, [recipe, ...library.recipes])
-      setLibrary(next); window.dispatchEvent(new Event('supa-recipes-changed')); setFilter('own'); setQuery(''); setMessage(`${recipe.title} is op dit apparaat opgeslagen. Recepten met volledige hoeveelheden staan ook in de planner.`); closeEditor()
+      setLibrary(next); setBackupPreview(null); window.dispatchEvent(new Event('supa-recipes-changed')); setFilter('own'); setQuery(''); setMessage(`${recipe.title} is op dit apparaat opgeslagen. Recepten met volledige hoeveelheden staan ook in de planner.`); closeEditor()
     } catch (e) { setError(e instanceof Error ? e.message : 'Opslaan is niet gelukt. Je invoer blijft staan.') }
     finally { saving.current = false }
   }
@@ -110,6 +176,49 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {!demo.length && !own.length && <p className="hifi-empty">{query ? 'Geen recepten gevonden. Probeer een andere zoekterm.' : 'Voeg je eerste eigen recept toe of importeer een receptlink.'}</p>}
     </section>
     <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button></div>
+    <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
+      <h2>Mijn recepten meenemen</h2>
+      <p>Maak een privé-backup van je eigen recepten, of herstel een eerdere SUPA-receptenbackup.
+        Dit gebruikt alleen je browser, geen upload en geen winkelprijzen. Eigen recepten met
+        volledige metrische hoeveelheden verschijnen ook in Planner.</p>
+      <div className="recipe-backup-panel__actions">
+        <button type="button" onClick={downloadOwnRecipes}
+          disabled={!!library.error || !library.recipes.length}>
+          Download mijn recepten (JSON)
+        </button>
+        <label>
+          Importeer eigen receptenbackup (max. 2 MB)
+          <input type="file" accept=".json,application/json"
+            disabled={!!library.error || backupBusy}
+            onChange={event => {
+              void loadOwnRecipeBackup(event.currentTarget.files?.[0])
+              event.currentTarget.value = ''
+            }} />
+        </label>
+      </div>
+      {backupBusy && <p role="status">Backup wordt lokaal gelezen…</p>}
+      {backupPreview && <div className="recipe-backup-panel__review" aria-live="polite">
+        <strong>Controleer je import</strong>
+        <p>{backupPreview.sourceCount} recepten in het bestand;
+          {' '}{backupPreview.alreadyPresent} al exact aanwezig;
+          {' '}{backupPreview.additions.length} nieuwe recepten.</p>
+        {backupPreview.additions.length > 0 && <ul>
+          {backupPreview.additions.map(recipe => <li key={recipe.id}>{recipe.title}</li>)}
+        </ul>}
+        <div className="recipe-backup-panel__actions">
+          <button type="button" onClick={confirmOwnRecipeBackup}
+            disabled={!backupPreview.additions.length || !!library.error}>
+            Importeer {backupPreview.additions.length} nieuwe recepten
+          </button>
+          <button type="button" onClick={() => { backupReadVersion.current++; setBackupPreview(null); setBackupError('') }}>
+            Annuleren
+          </button>
+        </div>
+      </div>}
+      {backupError && <p role="alert" className="recipe-error">{backupError}</p>}
+      <small>Onbekende versies, dubbele IDs met andere inhoud en te grote bestanden worden geweigerd.
+        Bestaande recepten worden niet automatisch overschreven; je bevestigt elke import zelf.</small>
+    </section>
     {!!demo.length && <p className="recipe-note">Zes uitgewerkte SUPA-recepten met ingrediënten en bereidingsstappen, ook beschikbaar in Planner. Dit zijn geen supermarktaanbiedingen; prijzen en besparingen zijn niet geverifieerd.</p>}
     {library.error && <p role="alert">{library.error}</p>}<p role="status" className="hifi-feedback">{message}</p>
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
