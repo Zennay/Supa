@@ -583,3 +583,15 @@ en status per winkel voor een offline inkoop-/waarnemingsbezoek.
 De TXT is geen bewijs dat de producten daadwerkelijk zijn gezien of
 de retailer datarechten heeft verstrekt. Een volledige vergelijking
 kan pas na de ongewijzigde bestaande strengere source- en reviewgates.
+
+### Bronartikel bij elke open controle terugvinden
+
+De dekkingsmatrix en gedownloade veldchecklist bevatten bij een al
+aan een Planner-ingrediënt gekoppelde winkelregel ook de exact
+originele productnaam, winkelproductcode en bestaande
+verpakkingsinhoud/eenheid/multipack. De status **persoonlijk
+bevestigd** blijft onafhankelijk: een voorgestelde SKU is **geen
+gecontroleerde actuele prijs**. De veldchecklist transporteert geen
+bedrag en kan niet als bronopname worden geïmporteerd. Bij ontbrekende
+SKU blijft het bronartikelveld leeg; er wordt geen fictieve match
+ingevoerd.

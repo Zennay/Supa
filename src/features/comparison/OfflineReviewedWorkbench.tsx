@@ -657,14 +657,16 @@ export function OfflineReviewedWorkbench({
       const capture = imported?.captures[store]
       const basket = store === 'PLUS' ? basketPair?.plus : basketPair?.deka
       const line = basket?.lines.find(item => item.id === need.id)
-      if (!capture) return { status: 'Geen bron', canReview: false }
-      if (!line) return { status: 'Planning niet koppelbaar', canReview: false }
-      if (line.status !== 'matched') return { status: 'SKU/verpakking ontbreekt', canReview: true }
+      if (!capture) return { status: 'Geen bron', canReview: false, product: '' }
+      if (!line) return { status: 'Planning niet koppelbaar', canReview: false, product: '' }
+      if (line.status !== 'matched') return { status: 'SKU/verpakking ontbreekt', canReview: true, product: '' }
+      const product = line.productName + ' · broncode ' + line.productId +
+        ' · ' + line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count
       if (!perStoreReview.find(item => item.store === store)?.fresh)
-        return { status: 'Opname verlopen of toekomstig', canReview: true }
+        return { status: 'Opname verlopen of toekomstig', canReview: true, product }
       if (!reviewedLines[reviewedLineKey(store, capture.observedAt, line)])
-        return { status: 'Product, verpakking en prijs controleren', canReview: true }
-      return { status: 'Persoonlijk bevestigd', canReview: true }
+        return { status: 'Product, verpakking en prijs controleren', canReview: true, product }
+      return { status: 'Persoonlijk bevestigd', canReview: true, product }
     }
     return {
       id: need.id, label: need.ingredientLabel,
@@ -683,8 +685,8 @@ export function OfflineReviewedWorkbench({
       ...coverageRows.flatMap(row => [
         row.label.replace(/[\r\n\u0000-\u001f\u007f-\u009f]/gu, ' ') +
           ' · ' + (row.amount ?? '?') + ' ' + row.unit,
-        '  PLUS: ' + row.PLUS.status,
-        '  DekaMarkt: ' + row.DekaMarkt.status,
+        '  PLUS: ' + row.PLUS.status + (row.PLUS.product ? ' · voorgesteld bronartikel ' + row.PLUS.product.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ') : ''),
+        '  DekaMarkt: ' + row.DekaMarkt.status + (row.DekaMarkt.product ? ' · voorgesteld bronartikel ' + row.DekaMarkt.product.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ') : ''),
       ]),
       'Controleer iedere SKU, verpakking en prijs tegen je eigen bron. Geen publieke besparingsclaim.',
     ].join('\n')
@@ -895,6 +897,7 @@ export function OfflineReviewedWorkbench({
                             const item = row[store]
                             return <td key={store}>
                               <strong>{item.status}</strong>
+                              {item.product && <small>{item.product}</small>}
                               {item.canReview && item.status !== 'Persoonlijk bevestigd' &&
                                 <a href={'#' + reviewRowId(store, row.id)}
                                   onClick={() => setOpenTripOnly(false)}>Open productkeuze en controle</a>}
