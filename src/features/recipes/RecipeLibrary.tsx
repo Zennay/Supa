@@ -60,6 +60,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [backupBusy, setBackupBusy] = useState(false)
   const [backupError, setBackupError] = useState('')
   const backupReadVersion = useRef(0)
+  const sourceReadVersion = useRef(0)
   const editor = useRef<HTMLDialogElement>(null)
   const detail = useRef<HTMLDialogElement>(null)
   const request = useRef<AbortController | null>(null)
@@ -131,11 +132,12 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     }
   }
   function openEditor(next: 'manual' | 'url' | 'paste') {
+    sourceReadVersion.current++
     request.current?.abort(); setBusy(false); setEditingId(null); setMode(next); setForm(blank); setSource(null); setUrl(''); setPastedSource(''); setPreview(null); setError(''); saving.current = false
     setBackupPreview(null)
     editor.current?.showModal()
   }
-  function closeEditor() { request.current?.abort(); setBusy(false); editor.current?.close() }
+  function closeEditor() { sourceReadVersion.current++; request.current?.abort(); setBusy(false); editor.current?.close() }
   function prepareExistingRecipe(recipe: SavedRecipe, duplicate: boolean) {
     request.current?.abort()
     setBusy(false)
@@ -215,6 +217,27 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     setPastedSource('')
     setPreview(null)
     setMessage(messageText)
+  }
+  async function loadPastedRecipeSource(file?: File) {
+    if (!file) return
+    const version = ++sourceReadVersion.current
+    setBusy(true)
+    setError('')
+    setPreview(null)
+    try {
+      if (file.size > 500_000) throw new Error('Kies maximaal 500 kB aan eigen HTML of JSON-LD.')
+      const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (version !== sourceReadVersion.current) return
+      if (!source.trim()) throw new Error('Het bestand bevat geen receptgegevens.')
+      setPastedSource(source)
+      setMode('paste')
+      setMessage('Bestand uitsluitend in deze browser ingelezen. Vul de oorspronkelijke HTTPS-bronlink in en controleer het recept.')
+    } catch (cause) {
+      if (version === sourceReadVersion.current) setError(
+        cause instanceof Error ? cause.message : 'Kon het lokale receptbestand niet lezen.')
+    } finally {
+      if (version === sourceReadVersion.current) setBusy(false)
+    }
   }
   function importPastedRecipe(event: FormEvent) {
     event.preventDefault()
@@ -336,6 +359,15 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <p>Plak JSON-LD met schema.org/Recipe of de HTML-broncode van een receptpagina
             die je zelf rechtmatig hebt ontvangen. Supa leest alleen lokaal: er wordt geen link
             geopend, geen website opgevraagd en geen code uitgevoerd.</p>
+          <label>Of kies een eigen .html-, .json- of .jsonld-bestand (maximaal 500 kB)
+            <input type="file" accept=".html,.htm,.json,.jsonld,text/html,application/json,application/ld+json"
+              disabled={busy} onChange={event => {
+                const file = event.currentTarget.files?.[0]
+                void loadPastedRecipeSource(file)
+                event.currentTarget.value = ''
+              }} />
+          </label>
+          {busy && <small role="status">Receptbron wordt lokaal gelezen…</small>}
           <label>Oorspronkelijke openbare HTTPS-receptlink (alleen als bronvermelding)
             <input required type="url" placeholder="https://…" value={url}
               onChange={event => setUrl(event.target.value)} />
@@ -346,7 +378,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
               value={pastedSource}
               onChange={event => setPastedSource(event.target.value)} />
           </label>
-          <button className="recipe-primary" type="submit">Lees lokale receptgegevens</button>
+          <button className="recipe-primary" type="submit" disabled={busy}>Lees lokale receptgegevens</button>
           <button type="button" onClick={() => { setMode('manual'); setError('') }}>
             Handmatig invoeren
           </button>
