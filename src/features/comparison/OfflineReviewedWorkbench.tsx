@@ -100,6 +100,14 @@ export function OfflineReviewedWorkbench({
   }
   function importOneStore(content: string) {
     const { retailer, capture } = parseSingleOfflineCapture(content, Date.now())
+    const previousCapture = stagedCaptures.current[retailer]
+    // Each staged selection belongs to the exact original source bytes. A new
+    // capture never inherits stale prices, checkmarks or loose pack quantities.
+    if (!previousCapture || JSON.stringify(previousCapture) !== JSON.stringify(capture)) {
+      session.setExtraProductIds(previous => ({ ...previous, [retailer]: [] }))
+      session.setExtraDoneIds(previous => ({ ...previous, [retailer]: [] }))
+      session.setExtraQuantities(previous => ({ ...previous, [retailer]: {} }))
+    }
     const next = { ...stagedCaptures.current, [retailer]: capture }
     stagedCaptures.current = next
     setStagedCaptures(next)
@@ -115,7 +123,7 @@ export function OfflineReviewedWorkbench({
     // Reuse the complete canonical gate, including 256 kB, timestamps,
     // package fields, duplicate IDs and incomplete / stale price handling.
     setText(joined)
-    importSnapshots(joined)
+    importSnapshots(joined, true)
   }
 
   // Prevent stale imports from appearing comparable after an open browser tab
@@ -199,7 +207,7 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  function importSnapshots(input: string) {
+  function importSnapshots(input: string, retainStagedExtras = false) {
     setImportEpoch(epoch => epoch + 1)
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
@@ -213,14 +221,40 @@ export function OfflineReviewedWorkbench({
       if (!sameSource) {
         setManualSelections({ fingerprint: '', products: {} })
         session.setTripMemory({})
-        session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
-        session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
-        session.setExtraQuantities({ PLUS: {}, DekaMarkt: {} })
+        if (retainStagedExtras) {
+          // Both staged captures were canonical-admitted from the same files
+          // we are now joining. Carry only still-present selected product IDs.
+          const retainedIds = { PLUS: [] as string[], DekaMarkt: [] as string[] }
+          const retainedDone = { PLUS: [] as string[], DekaMarkt: [] as string[] }
+          const retainedPacks = {
+            PLUS: {} as Record<string, number>,
+            DekaMarkt: {} as Record<string, number>,
+          }
+          for (const store of stores) {
+            const sourceIds = new Set(parsed.captures[store].products.map(item => item.id))
+            retainedIds[store] = session.extraProductIds[store].filter(id => sourceIds.has(id))
+            retainedDone[store] = session.extraDoneIds[store].filter(id => retainedIds[store].includes(id))
+            for (const id of retainedIds[store]) {
+              const packs = session.extraQuantities[store][id]
+              retainedPacks[store][id] = Number.isSafeInteger(packs) && packs >= 1 && packs <= 99
+                ? packs : 1
+            }
+          }
+          session.setExtraProductIds(retainedIds)
+          session.setExtraDoneIds(retainedDone)
+          session.setExtraQuantities(retainedPacks)
+        } else {
+          session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
+          session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
+          session.setExtraQuantities({ PLUS: {}, DekaMarkt: {} })
+        }
       }
       setImported(parsed)
       setMessage(sameSource
         ? 'Dezelfde geldige privéopnames opnieuw berekend; je productkeuzes en losse artikelen zijn behouden.'
-        : 'Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
+        : retainStagedExtras
+          ? 'Beide toegestane privéopnames geladen. Je al gekozen losse winkelproducten zijn behouden; handmatige ingrediëntenmatches vragen controle.'
+          : 'Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
     } catch (error) {
       // Never retain/display a previous basket after an invalid new import.
       setImported(null)
