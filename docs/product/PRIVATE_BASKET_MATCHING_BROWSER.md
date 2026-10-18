@@ -249,3 +249,18 @@ opnieuw bewust door de gebruiker worden gekozen. Nooit fictieve winkelprijzen,
 bronlicenties of automatische productmatching. Het oorspronkelijke aantal
 porties per bereiding wordt als apart, zichtbaar label getoond; dit scherm
 schaalt nog niet per persoon, maar telt gekozen volledige bereidingen op.
+
+## Mobiele tekstexport van eigen mandvergelijking
+
+Zowel het gecombineerde koppelscherm als de losse vergelijkpagina bieden nu
+**Download actuele privévergelijking als TXT** en **Selecteer tekst om zelf te
+kopiëren**. Het rapport gebruikt uitsluitend de op dat moment werkelijk
+zichtbare eigen manduitkomst: oorspronkelijke opname-UTC-tijden, eigen
+verpakkingen, bronprijzen, bekende/onbekende verschillen, optioneel eigen
+budget en nog te controleren artikelen. Er is geen automatische prijsophaling,
+publicatie of klembordtoegang. De gebruiker kiest zelf of hij lokaal TXT
+bewaart of de selecteerbare tekst handmatig kopieert. De report-omvang is
+maximaal 256 kB. Zodra de echte prijsbron, fysieke mand of optionele
+budgetinvoer verandert of een waarneming vervalt, wordt eerder geselecteerde
+vergelijktekst ingetrokken. Ook volledige eigen cijfers blijven nadrukkelijk
+historische privéopnames, geen gegarandeerde actuele kassaprijzen.

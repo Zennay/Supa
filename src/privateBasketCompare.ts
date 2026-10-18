@@ -377,6 +377,7 @@ function renderBudget(): void {
   budgetStatus.className = eligible ? 'notice' : 'notice warning'
 }
 budgetInput.addEventListener('input', () => {
+  clearComparisonTextPreview()
   // Editing an optional budget is still a user action: invalidate an elapsed
   // seven-day price observation before publishing any new financial context.
   if (invalidateAgedComparison()) return
@@ -445,6 +446,7 @@ function invalidateAgedComparison(): boolean {
   // original observation ages past the seventh day.
   if (comparisonValidThroughNs !== null && nowNs > comparisonValidThroughNs) {
     result.hidden = true
+    clearComparisonTextPreview()
     clearTrip()
     setStatus('Een van de oorspronkelijke winkelopnames is inmiddels ouder dan zeven dagen. Het eerder getoonde volledige prijsverschil is niet meer geldig. Open nieuwe echte winkelopnames en vergelijk opnieuw.', true)
     return true
@@ -463,6 +465,7 @@ function invalidateAgedComparison(): boolean {
     } else {
       clearTrip()
     }
+    clearComparisonTextPreview()
     setStatus('De winkelopname voor ' + expired + ' is inmiddels ouder dan zeven dagen. Deze privéboodschappenlijst is vervallen; ververs de eigen prijsbron voor die winkel.', true)
     return true
   }
@@ -687,6 +690,7 @@ restoreTrip.addEventListener('change', async () => {
 })
 
 function show(source: Source, demand: Demand): void {
+  clearComparisonTextPreview()
   const captures = Object.fromEntries(source.captures.map(c => [c.retailer, c])) as Record<StoreName,Capture>
   const left = storeBasket('PLUS', captures.PLUS, demand)
   const right = storeBasket('DekaMarkt', captures.DekaMarkt, demand)
@@ -782,6 +786,7 @@ for (const el of [sessionFile, combined, plus, deka, demandFile]) {
   el.addEventListener('change', () => {
     inputRevision++
     result.hidden = true
+    clearComparisonTextPreview()
     budgetTotals = null
     budgetValidThroughNs = null
     renderBudget()
@@ -807,6 +812,7 @@ compare?.addEventListener('click', async () => {
   const snapshotRevision = inputRevision
   compare.disabled = true
   result.hidden = true
+  clearComparisonTextPreview()
   budgetTotals = null
   budgetValidThroughNs = null
   renderBudget()
@@ -847,6 +853,76 @@ document.querySelector<HTMLButtonElement>('#download-missing')!.addEventListener
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 60000)
 })
+// Mobile-friendly, opt-in text version of only the currently visible private
+// result. No clipboard permission, data upload, public price or savings claim.
+const comparisonTextPreview = document.querySelector<HTMLTextAreaElement>('#comparison-text-preview')!
+function clearComparisonTextPreview(): void {
+  comparisonTextPreview.value = ''
+  comparisonTextPreview.hidden = true
+}
+function privateComparisonText(): string | null {
+  if (result.hidden) return null
+  const tableLines = Array.from(rows.querySelectorAll('tr')).map(row => {
+    const cells = Array.from(row.cells, cell => cell.textContent?.trim() ?? '')
+    if (cells.length !== 4) throw Error('Onvolledige privéregel')
+    return cells.join(' | ')
+  })
+  if (!tableLines.length || tableLines.length > 1000) return null
+  renderBudget()
+  const budget = budgetInCents(budgetInput.value.trim()) === null ? [] : [
+    'Optioneel eigen budget: ' + (budgetStatus.textContent ?? 'Onbekend'),
+  ]
+  const content = [
+    'SUPA · uitsluitend eigen lokale prijsopnames · PRIVÉ',
+    'Moment van maken: ' + new Date().toISOString(),
+    'Historische privévergelijking; geen actuele kassagarantie of publieke besparingsclaim.',
+    '',
+    summary.textContent ?? 'Geen volledig prijsverschil bekend.',
+    capturesLabel.textContent ?? 'Bronmomenten onbekend.',
+    ...budget,
+    '',
+    'Ingrediënt en fysieke behoefte | PLUS | DekaMarkt | Verschil',
+    ...tableLines,
+    ...(nextActions.hidden ? [] : ['', 'Nog zelf te controleren:',
+      ...missingTasks.map(task => '- ' + task)]),
+    '',
+    'Alleen daadwerkelijk eigen ingevoerde bronprijzen; onbekend is nooit €0.',
+    '',
+  ].join('\n')
+  return new TextEncoder().encode(content).length <= 256000 ? content : null
+}
+document.querySelector<HTMLButtonElement>('#download-txt')!.addEventListener('click', () => {
+  if (invalidateAgedComparison()) return
+  const text = privateComparisonText()
+  if (!text) {
+    setStatus('Geen geldig zichtbaar privéoverzicht om als tekst te bewaren.', true)
+    return
+  }
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'supa-eigen-winkelvergelijking-prive.txt'
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+  setStatus('Jouw historische privéoverzicht is lokaal als TXT aangeboden; voor nieuwe prijzen moet je opnieuw waarnemen.')
+})
+document.querySelector<HTMLButtonElement>('#select-txt')!.addEventListener('click', () => {
+  if (invalidateAgedComparison()) return
+  const text = privateComparisonText()
+  if (!text) {
+    clearComparisonTextPreview()
+    setStatus('Geen geldig zichtbaar privéoverzicht om veilig te selecteren.', true)
+    return
+  }
+  comparisonTextPreview.value = text
+  comparisonTextPreview.hidden = false
+  comparisonTextPreview.focus()
+  comparisonTextPreview.select()
+  setStatus('Je eigen privéoverzicht is geselecteerd. Kopieer het zelf met Ctrl+C, Cmd+C of de kopieeractie op je telefoon. Geen klembordtoegang voor Supa.')
+})
+
 document.querySelector<HTMLButtonElement>('#download-html')!.addEventListener('click', () => {
   if (invalidateAgedComparison() || result.hidden) {
     setStatus('Maak eerst een actuele privévergelijking voor je een momentopname bewaart.', true)
@@ -892,6 +968,7 @@ document.querySelector<HTMLButtonElement>('#print')!.addEventListener('click', (
  */
 document.addEventListener('supa:compare-private-basket', (event: Event) => {
   result.hidden = true
+  clearComparisonTextPreview()
   budgetTotals = null
   budgetValidThroughNs = null
   renderBudget()
