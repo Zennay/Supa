@@ -22,3 +22,11 @@ Open in de Supa-site of lokale Vite-app: **/private-basket-mapping.html**. Deze 
 ## Implementatie
 
 Nieuwe bestanden: public/private-basket-mapping.html en public/private-basket-mapping.mjs; hergebruikt public/offline-two-store-csv.mjs. Vite neemt het statische HTML/JS-bestand bij de normale productiebuild op. Voor daadwerkelijke prijzen en hele-verpakkingbedragen wordt de bestaande lokale rapportageroute uit #3918 hergebruikt zodra die is gemerged.
+
+## Direct vergelijken in de browser (geen CLI nodig)
+
+Dezelfde PR levert nu ook /private-basket-compare.html als afzonderlijke Vite-pagina. Na het kiezen/downloaden van de eigen mandvraag open je de vergelijking via de knop op het koppelscherm. Kies opnieuw je eigen PLUS- en DekaMarkt-opnames (gecombineerde CSV, aparte winkel-CSV of bestaande supa-offline-prices-v1 JSON) en de gedownloade mandvraag.
+
+De pagina verwerkt alles lokaal en roept de bestaande TypeScript-domeinfuncties calculateDecimalPackCount en compareFullBaskets aan. Per ingrediënt zie je echte eigen SKU, benodigde hele verpakkingen, centbedrag en indicatieve €/kg/liter/stuk. Alleen twee volledige fysieke mandjes met controleerbare bronmomenten (niet toekomstig, niet ouder dan 7 dagen, maximaal 24 uur uiteen, vergeleken op originele nanoseconde-instanten) tonen de winkelbedragen en het volledige verschil. Bij ontbreken of veroudering blijft winnaar/totaal onbekend. Printen kan rechtstreeks vanuit de browser, zonder automatische upload.
+
+Dezelfde lokale gegevens kunnen na #3918 integratie ook nog via de zelfstandige HTML-CLI worden verwerkt. Browser en CLI hergebruiken dezelfde bestaande verpakkings- en mandjesdomeinlogica; de nieuwe browserprijskaart is een privéproductfunctie, niet de vrijgave van echte retailerrechten of empirisch 11×2 veldbewijs.
