@@ -15,6 +15,7 @@ import { LocalProductPicker } from './LocalProductPicker.tsx'
 import { unresolvedProductGuidance } from './unresolvedProductGuidance.ts'
 import { privateUnitPrice } from './privateUnitPrice.ts'
 import { createPrivateMatchBackup, readPrivateMatchBackup } from './privateMatchChoicesBackup.ts'
+import { createPrivateComparisonArchive, readPrivateComparisonArchive } from './privateComparisonArchive.ts'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -136,6 +137,11 @@ export function OfflineReviewedWorkbench({
   const [matchBackupError, setMatchBackupError] = useState('')
   const [matchBackupBusy, setMatchBackupBusy] = useState(false)
   const matchBackupVersion = useRef(0)
+  const [archivePreview, setArchivePreview] = useState<
+    Awaited<ReturnType<typeof readPrivateComparisonArchive>> | null>(null)
+  const [archiveError, setArchiveError] = useState('')
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const archiveVersion = useRef(0)
   const importVersion = useRef(0)
   // User-supplied single-store observations stay in private App memory only.
   // The ref makes consecutive uploads synchronous; App owns state across tabs.
@@ -151,6 +157,8 @@ export function OfflineReviewedWorkbench({
     })
   }
   function clearPrivateSession() {
+    archiveVersion.current++
+    setArchivePreview(null)
     matchBackupVersion.current++
     setMatchBackupPreview(null)
     importVersion.current++
@@ -224,6 +232,8 @@ export function OfflineReviewedWorkbench({
     matchBackupVersion.current++
     setMatchBackupPreview(null)
     setMatchBackupError('')
+    archiveVersion.current++
+    setArchivePreview(null)
   }, [importFingerprint])
   function chooseProduct(store: 'PLUS' | 'DekaMarkt', ingredientId: string, productId: string) {
     if (!imported || !importFingerprint) return
@@ -742,6 +752,78 @@ export function OfflineReviewedWorkbench({
     setMessage('Productkeuzes voor precies dit winkelpaar en weekmenu hersteld en opnieuw berekend.')
   }
 
+  async function downloadPrivateSession() {
+    setArchiveError('')
+    try {
+      if (!imported || !text || !matchBaskets || !matchCatalogs || !importFingerprint) {
+        throw new Error('Laad eerst een geldig PLUS- en DekaMarkt-winkelpaar.')
+      }
+      const savedChoices = await createPrivateMatchBackup(
+        importFingerprint, choices, matchBaskets, matchCatalogs)
+      const content = createPrivateComparisonArchive(text, savedChoices)
+      const uri = URL.createObjectURL(new Blob([content], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-prive-vergelijking-en-keuzes.json'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+      setMessage('Privévergelijking inclusief eigen bronprijzen en gekoppelde keuzes lokaal gedownload.')
+    } catch (error) {
+      setArchiveError(error instanceof Error ? error.message : 'Het archief kon niet worden gemaakt.')
+    }
+  }
+  async function previewPrivateSession(file?: File) {
+    if (!file) return
+    const version = ++archiveVersion.current
+    setArchivePreview(null)
+    setArchiveError('')
+    setArchiveBusy(true)
+    try {
+      if (file.size > 512000) throw new Error('Het archief is groter dan 512 kB.')
+      const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const result = await readPrivateComparisonArchive(content, plan, recipes, activeDays,
+        parsed => {
+          const provisional = offlineSessionBaskets({
+            ...session, imported: parsed,
+            manualSelections: { fingerprint: '', products: {} },
+          }, plan, recipes, activeDays)
+          return provisional ? { PLUS: provisional.plus, DekaMarkt: provisional.deka } : null
+        })
+      if (version !== archiveVersion.current) return
+      setArchivePreview(result)
+    } catch (error) {
+      if (version === archiveVersion.current) setArchiveError(
+        error instanceof Error ? error.message : 'Het privéarchief kon niet worden gelezen.')
+    } finally { if (version === archiveVersion.current) setArchiveBusy(false) }
+  }
+  function applyPrivateSession() {
+    const next = archivePreview
+    if (!next || next.fingerprint !== offlineSessionFingerprint(next.parsed, plan, recipes, activeDays)) {
+      setArchiveError('Je Planner is veranderd. Controleer het archief opnieuw.')
+      setArchivePreview(null)
+      return
+    }
+    // Atomic, user-confirmed replacement of the in-memory price + matching
+    // session. Invalid archives never change the original active comparison.
+    importVersion.current++
+    matchBackupVersion.current++
+    clearStaged()
+    setImported(next.parsed)
+    setText(next.source)
+    setDraftText(next.source)
+    setManualSelections({ fingerprint: next.fingerprint, products: next.choices })
+    setImportEpoch(epoch => epoch + 1)
+    session.setTripMemory({})
+    session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
+    session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
+    session.setExtraQuantities({ PLUS: {}, DekaMarkt: {} })
+    setMatchBackupPreview(null)
+    setArchivePreview(null)
+    setArchiveError('')
+    setMessage('Privébronnen en productkeuzes voor deze week hersteld. Oude vinkjes en losse producten zijn niet overgenomen.')
+  }
+
   function downloadMissingItems(store: OfflineRetailer) {
     if (!imported || !basketPair) return
     const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
@@ -992,6 +1074,41 @@ export function OfflineReviewedWorkbench({
             setMessage('Alle tijdelijke prijsopnames, productkeuzes, aantallen en vinkjes uit dit tabblad gewist.')
           }}>Wis lokaal geladen data</button>
         </div>
+        <details className="offline-match-backup">
+          <summary>Mijn volledige privévergelijking bewaren of herstellen</summary>
+          <p>Één bestand bevat je eigen ingevoerde PLUS- en DekaMarkt-prijzen, de echte
+            opnametijden en je handmatige productkoppelingen. Dit is gevoelige,
+            uitsluitend lokale informatie, geen retailerautorisatie of publieke besparingsclaim.
+            Herstel vereist dezelfde Planner-week en expliciete bevestiging.</p>
+          <div className="offline-price-workbench__actions">
+            <button type="button" className="ghost-button" disabled={!imported || busy || archiveBusy}
+              onClick={() => { void downloadPrivateSession() }}>
+              Download prijsopnames + keuzes (één JSON)
+            </button>
+            <label>Herstel volledige privévergelijking uit JSON
+              <input type="file" accept=".json,application/json" disabled={busy || archiveBusy}
+                onChange={event => {
+                  void previewPrivateSession(event.currentTarget.files?.[0])
+                  event.currentTarget.value = ''
+                }} />
+            </label>
+          </div>
+          {archiveBusy && <p role="status">Het archief wordt alleen op dit apparaat gelezen…</p>}
+          {archiveError && <p role="alert">{archiveError}</p>}
+          {archivePreview && <div className="offline-match-backup__confirm">
+            <p role="status">Archief gecontroleerd: {archivePreview.parsed.captures.PLUS.products.length}
+              {' '}PLUS-producten, {archivePreview.parsed.captures.DekaMarkt.products.length}
+              {' '}DekaMarkt-producten en {Object.keys(archivePreview.choices).length} handmatige keuzes.
+              De oorspronkelijke prijzen vervangen na bevestiging je huidige privévergelijking.
+              Oude vinkjes en losse producten worden niet overgenomen.</p>
+            {!offlineSessionFresh(archivePreview.parsed, clockMs) &&
+              <p role="alert">Deze opnames zijn verouderd. Er wordt na herstel geen actueel
+                prijsverschil getoond totdat je geldige recente prijzen importeert.</p>}
+            <button type="button" onClick={applyPrivateSession}>Bevestig volledig privéherstel</button>
+            <button type="button" className="ghost-button"
+              onClick={() => setArchivePreview(null)}>Annuleer</button>
+          </div>}
+        </details>
         <p role="status" aria-live="polite">{message}</p>
       </div>
       {imported && (
