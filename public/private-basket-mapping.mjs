@@ -368,6 +368,21 @@ function parsePrivateDemand(text) {
   })
   return { meals: root.selectedMealCount, items }
 }
+document.addEventListener('supa:private-planner-demand', event => {
+  try {
+    // Planner conversion uses Supa's existing canonical ingredient aggregator.
+    // Re-validate the cross-module envelope exactly like a restored local demand.
+    const saved = parsePrivateDemand(JSON.stringify(event.detail))
+    mealCount.value = String(saved.meals)
+    lines.replaceChildren()
+    for (const item of saved.items) addIngredient(item)
+    refresh()
+    notice(status, saved.items.length + ' fysieke ingrediënten uit jouw gekozen weekmenu klaar om te koppelen. Kies voor beide winkels opnieuw de daadwerkelijk geobserveerde SKU’s; er zijn nog geen prijzen of matches aangenomen.')
+  } catch {
+    notice(status, 'De geselecteerde plannerweek is niet geschikt voor de veilige privé-mandvraag.', 'error')
+  }
+})
+
 demandImport.addEventListener('change', async () => {
   const file = demandImport.files?.[0]
   if (!file) return
