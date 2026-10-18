@@ -495,3 +495,21 @@ of verouderde winkel kan geen volledig prijsverschil opleveren.
 Voor controle van de bron blijft de bestaande **één winkel toevoegen**
 route beschikbaar. Het importeren is volledig offline; het levert geen
 retailerrechten of onafhankelijk 11×2 bewijs.
+
+### Leesbaar privéoverzicht naast exacte CSV
+
+Zodra **beide** volledige winkelmandjes in de gewone Vergelijk-tab
+met originele, onderling maximaal 24 uur verschillende en maximaal
+zeven dagen oude waarnemingen zijn geladen, én **iedere** exacte
+bronmatch, verpakkingsgrootte en prijs door de gebruiker is bevestigd,
+verschijnt een extra optioneel **leesbaar privéoverzicht**. De gebruiker
+kan de volledige vergelijking in één lokaal TXT-bestand downloaden
+of zonder klembordtoestemming selecteren/kopiëren in het scherm.
+Daarin staan beide originele bronmomenten, hele-mandbedragen,
+het getekende verschil (DekaMarkt minus PLUS), en per oorspronkelijk
+Planner-ingrediënt de hoeveelheid, eigen broncode, productnaam,
+hele verpakkingen, indicatieve eenheidsprijs en regelbedragen.
+
+Bij ontbrekende, ongeldige, stale of incomplete input ontbreekt
+deze uitvoer geheel; de reeds bestaande strikte CSV blijft een
+afzonderlijke gebruikersoptie. Geen netwerk- of rechtenclaim.

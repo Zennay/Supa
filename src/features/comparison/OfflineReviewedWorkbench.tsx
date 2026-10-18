@@ -75,6 +75,49 @@ function sourceOptions(products: import('../../domain/basket.ts').StoreProduct[]
   return { shown, total: filtered.length, availableCount: available.length }
 }
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
+/** Human-readable, strictly private companion to the existing canonical CSV.
+ * Called only after every original SKU/pack/price has been personally reviewed
+ * for both complete, timely captures and the identical physical Planner demand.
+ */
+function readablePrivateComparison(
+  plus: OneStoreBasket, deka: OneStoreBasket,
+  captured: { PLUS: string; DekaMarkt: string },
+  deltaCents: number,
+  rows: { delta: { ingredientLabel: string; deltaCents: number }; plus: Matched; deka: Matched }[],
+): string {
+  const plain = (s: string) => s.replace(/[\r\n\u2028\u2029\u0000-\u001f\u007f-\u009f]/gu, ' ')
+  const money = (cents: number) => euros.format(cents / 100)
+  return [
+    'SUPA · persoonlijke vergelijking van twee zelf bevestigde winkelopnames',
+    'Geen live winkelprijzen, retailerautorisatie of onafhankelijk besparingsbewijs.',
+    'Weekmenu: exact dezelfde fysiek geplande ingrediënten voor beide winkels.',
+    'PLUS bronmoment: ' + plain(captured.PLUS),
+    'DekaMarkt bronmoment: ' + plain(captured.DekaMarkt),
+    '',
+    'PLUS hele mand: ' + money(plus.totalCents),
+    'DekaMarkt hele mand: ' + money(deka.totalCents),
+    'Verschil (DekaMarkt minus PLUS): ' + (deltaCents >= 0 ? '+' : '−') + money(Math.abs(deltaCents)),
+    '',
+    ...rows.flatMap(({ delta, plus: p, deka: d }, index) => [
+      (index + 1) + '. ' + plain(delta.ingredientLabel) +
+        ' · gevraagd ' + p.requirement.amount + ' ' + p.requirement.unit,
+      '  PLUS: ' + plain(p.productName) + ' [broncode ' + plain(p.productId) + ']' +
+        ' · ' + p.packs + ' × (' + p.pack.amount + ' ' + p.pack.unit +
+        ' × ' + p.pack.count + ') · ' + (pricePerUnit(p) ?? 'eenheidsprijs onbekend') +
+        ' · ' + money(p.lineTotalCents),
+      '  DekaMarkt: ' + plain(d.productName) + ' [broncode ' + plain(d.productId) + ']' +
+        ' · ' + d.packs + ' × (' + d.pack.amount + ' ' + d.pack.unit +
+        ' × ' + d.pack.count + ') · ' + (pricePerUnit(d) ?? 'eenheidsprijs onbekend') +
+        ' · ' + money(d.lineTotalCents),
+      '  Verschil (DekaMarkt minus PLUS): ' +
+        (delta.deltaCents >= 0 ? '+' : '−') + money(Math.abs(delta.deltaCents)),
+      '',
+    ]),
+    'Dit overzicht is uitsluitend lokaal samengesteld uit jouw bevestigde gegevens.',
+    'Niet verspreiden als onafhankelijk geverifieerde prijs- of besparingsclaim.',
+  ].join('\n')
+}
+
 function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number], done: Record<string, boolean>): string {
   return [
     `Supa · boodschappen voor ${basket.store.name} · privé ingevoerde prijzen, niet geverifieerd`,
@@ -580,6 +623,29 @@ export function OfflineReviewedWorkbench({
           ? [{ delta, plus, deka }] : []
       }) : []
 
+  const readableReport = canShowDifference && basketPair?.plus && basketPair.deka &&
+    basketPair.comparison && basketPair.comparison.deltaCents !== null &&
+    imported?.captures.PLUS && imported.captures.DekaMarkt &&
+    fullDifferenceRows && fullDifferenceRows.length === basketPair.plus.lines.length &&
+    fullDifferenceRows.length === basketPair.deka.lines.length
+    ? readablePrivateComparison(basketPair.plus, basketPair.deka,
+        { PLUS: imported.captures.PLUS.observedAt, DekaMarkt: imported.captures.DekaMarkt.observedAt },
+        basketPair.comparison.deltaCents!, fullDifferenceRows)
+    : null
+
+  function downloadReadableReport() {
+    if (!readableReport) return
+    const url = URL.createObjectURL(new Blob([readableReport], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-prive-vergelijking-leesbaar.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+      setTripExportMessage('Jouw leesbare privévergelijking lokaal opgeslagen, met alle bronartikelen, verpakkingen en bedragen.')
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
+
   return (
     <section className="offline-price-workbench" aria-label="Geïmporteerde winkelprijzen vergelijken">
       <div className="offline-price-workbench__intro">
@@ -777,6 +843,20 @@ export function OfflineReviewedWorkbench({
                   </button>
                   <small>Originele PLUS- en Deka-productcodes, geobserveerde pakprijzen, indicatieve eenheidsprijzen en per-ingrediënt verschil. Uitsluitend jouw geaccepteerde lokale opname; geen publieke besparingsclaim.</small>
                 </div>
+              )}
+              {readableReport && (
+                <details className="offline-price-workbench__full-breakdown">
+                  <summary>Kopieer of bewaar een leesbaar privéoverzicht van beide mandjes</summary>
+                  <p>Alle oorspronkelijke bronartikelen, benodigde hele verpakkingen, indicatieve eenheidsprijzen en bedragen per ingrediënt. Dit is jouw eigen invoer, geen geverifieerde supermarktprijs.</p>
+                  <button type="button" className="ghost-button" onClick={downloadReadableReport}>
+                    Download leesbare vergelijking (TXT)
+                  </button>
+                  <label>Zelf kopiëren, zonder klembordtoestemming
+                    <textarea readOnly rows={12} spellCheck={false}
+                      aria-label="Leesbare privévergelijking"
+                      value={readableReport} onFocus={event => event.currentTarget.select()} />
+                  </label>
+                </details>
               )}
               {canShowDifference && fullDifferenceRows.length > 0 && (
                 <details className="offline-price-workbench__full-breakdown">
