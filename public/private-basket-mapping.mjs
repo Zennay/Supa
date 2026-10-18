@@ -284,6 +284,13 @@ function addIngredient(restored = null) {
     })
   }
   const actions = node('div', { className: 'row-actions' })
+  const markLabel = node('label', {}, 'Selecteer om handmatig samen te voegen')
+  const mark = node('input', { type: 'checkbox' })
+  mark.dataset.mergeSelected = '1'
+  mark.style.width = 'auto'
+  mark.style.marginInlineEnd = '8px'
+  markLabel.prepend(mark)
+  actions.append(markLabel)
   const remove = node('button', { type: 'button', className: 'secondary' }, 'Verwijder ingrediënt')
   remove.addEventListener('click', () => { row.remove(); invalidateUnpricedDemand(); refresh() })
   actions.append(remove)
