@@ -104,7 +104,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   // Each additional unit must belong to the same physical family. Never
   // silently turn "1 kg 250 g 100 g" into a label or underbuy ingredients.
   if (metric) {
-    const additional = /^(?:(?:en|\\+)\\s*)?((?:\\d+\\s+)?\\d+\\/\\d+|\\d+(?:[.,]\\d+)?|[½¼¾])\\s*([^\\s,]+)(?:\\s+|,\\s*)(.*)$/u
+    const additional = /^(?:(?:en|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([^\s,]+)(?:\s+|,\s*)(.*)$/u
     for (; componentCount < 8; componentCount++) {
       const next = additional.exec(label)
       if (!next) break
