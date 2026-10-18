@@ -357,5 +357,5 @@ save.addEventListener('click', () => {
     notice(status, error instanceof Error ? error.message : 'Kan mandvraag niet maken.', 'error')
   }
 })
-add.addEventListener('click', addIngredient)
+add.addEventListener('click', () => addIngredient())
 addIngredient()
