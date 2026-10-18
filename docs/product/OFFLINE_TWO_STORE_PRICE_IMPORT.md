@@ -531,3 +531,34 @@ serialisatie; de bronfix wijzigt geen productprijs of retailerrecht.
 De onafhankelijke verplichte officiële CI en review moeten dit op de
 gecombineerde producthead nog beoordelen. Geen QA-suite gemaakt of
 handmatig uitgevoerd.
+
+### Van een oude bronopname naar een nieuwe winkelprijsopname
+
+Wanneer een eigen PLUS- of DekaMarkt-opname lokaal in de normale
+**Vergelijk**-tab staat, verschijnt per beschikbare winkel de knop
+**Maak nieuw prijsinvulblad (CSV)**. Die bouwt uit uitsluitend de
+daadwerkelijk door de gebruiker eerder geïmporteerde bronproducten
+een nieuw negen-koloms CSV-blad; originele broncodes, productnamen,
+fysieke verpakkingsinhoud, verpakkingseenheid en multipack blijven
+herkenbaar. **Geen enkele oude geobserveerde prijs, waarnemingstijd
+of beschikbaarheidsstatus** reist mee: observedAt en priceCents zijn
+leeg, available is expliciet false. Daarmee kan het oningevulde blad
+niet als een actuele winkelprijs worden geïmporteerd.
+
+De gebruiker vult voor iedere echte opname de nieuwe werkelijke
+`observedAt` (bijvoorbeeld `2026-10-18T17:30:00+02:00`) in
+met de **daadwerkelijke lokale tijdzone**, vult verse prijs in
+hele eurocenten in, en zet `available` uitsluitend voor werkelijk
+geobserveerde verkrijgbare artikelen op `true`. Onbekend blijft
+leeg/false. Verander de artikelcode als het in werkelijkheid een
+ander artikel betreft. Voor elke winkel moeten alle regels één
+geobserveerd bronmoment delen. Importeer één ingevulde CSV
+of selecteer de twee verschillende winkelbladen tegelijk. Alle
+producten moeten in de gewone Vergelijk-tab **opnieuw** expliciet
+bevestigd worden voor een volledig bedrag.
+
+Het invulblad zelf beweert geen retailertoestemming of onafhankelijke
+veldopname; onveilige spreadsheet-formuleprefixen in originele
+bronproductnamen of codes geven **geen export** in plaats van
+onzichtbaar gewijzigde productidentiteit. Maximaal 256 kB,
+alles offline en alleen expliciete lokale download.

@@ -6,6 +6,7 @@ import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../do
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
+import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
 import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
@@ -251,6 +252,24 @@ export function OfflineReviewedWorkbench({
         setMessage(error instanceof Error ? error.message : 'Privésessie niet geldig; bestaande invoer behouden.')
     } finally {
       if (version === importRevision.current) setBusy(false)
+    }
+  }
+
+  function downloadPrivateRecaptureCsv(store: typeof stores[number]) {
+    if (!imported?.captures[store]) return
+    try {
+      const csv = makePrivateRecaptureCsv(imported, store)
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'supa-' + store.toLowerCase() + '-nieuwe-prijsopname.csv'
+        document.body.append(a)
+        try { a.click() } finally { a.remove() }
+        setMessage(store + ': nieuw CSV-invulblad gedownload. Originele artikelcodes en verpakkingen zijn overgenomen, maar oude opnametijd, prijzen en beschikbaarheid zijn expres LEEG/onbevestigd. Vul echte nieuwe feiten in en importeer het blad opnieuw.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Kan geen veilig herobservatieblad maken.')
     }
   }
 
@@ -761,11 +780,24 @@ export function OfflineReviewedWorkbench({
             {stores.map(store => {
               const capture = imported.captures[store]
               return capture
-                ? <p key={store}><strong>{store}</strong> · waargenomen {captureDate(capture.observedMs)}
-                    {' '}· {capture.products.length} eigen bronproducten</p>
+                ? <div key={store}>
+                    <p><strong>{store}</strong> · waargenomen {captureDate(capture.observedMs)}
+                      {' '}· {capture.products.length} eigen bronproducten</p>
+                    <button className="ghost-button" type="button" onClick={() => downloadPrivateRecaptureCsv(store)}>
+                      Maak nieuw prijsinvulblad voor {store} (CSV)
+                    </button>
+                  </div>
                 : <p key={store}><strong>{store}</strong> · geen bronopname; prijs onbekend.</p>
             })}
           </div>
+          <p className="disclaimer">
+            Nieuwe winkelopname nodig? Download per winkel het invulblad met je eerder gekozen
+            echte productcodes en verpakkingen. Oude prijzen, opnametijd en beschikbaarheid
+            gaan <strong>niet</strong> mee. Vul de werkelijke nieuwe observatietijd
+            met UTC-offset, geobserveerde eurocenten en <code>available=true</code> per
+            beschikbaar product in. Daarna laad je één of beide CSV’s hierboven opnieuw.
+            Een oningevuld blad levert nooit een geprijsd mandje.
+          </p>
           {!currentEnough && <p role="alert" className="attention-card">
             Oude prijsdata (ouder dan 7 dagen). Er wordt geen actueel prijsverschil getoond.
           </p>}
