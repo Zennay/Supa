@@ -363,22 +363,11 @@ export function OfflineReviewedWorkbench({
                   const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
                   return (
                     <section key={store}>
-                      <h4>{store} · mandregels</h4>
-                      <PrivateStoreTripChecklist
-                        key={JSON.stringify([
-                          store,
-                          imported.captures[store].observedAt,
-                          basket.totalCents,
-                          basket.matchedLineCount,
-                          basket.unresolvedLineCount,
-                          basket.lines.map(line => line.status === 'matched'
-                            ? [line.id, line.productId, line.packs, line.pricePerPackCents]
-                            : [line.id, 'unknown']),
-                        ])}
-                        basket={basket}
-                        observedAt={imported.captures[store].observedAt}
-                        fresh={currentEnough}
-                      />
+                      <h4>{store} · controleer productkoppelingen</h4>
+                      <p className="disclaimer">Kies een product alleen als je zelf hebt gecontroleerd
+                        dat het werkelijk bij dit ingrediënt past. Supa gebruikt uitsluitend jouw
+                        geïmporteerde producten, met bestaande verpakkings- en prijscontroles.
+                        Een handmatige keuze is geen onafhankelijk supermarktbewijs.</p>
                       {basket.lines.map(line => (
                         <article key={line.id} className="offline-price-workbench__line">
                           <div>
@@ -412,6 +401,21 @@ export function OfflineReviewedWorkbench({
                           <strong>{line.status === 'matched' ? euros.format(line.lineTotalCents / 100) : '—'}</strong>
                         </article>
                       ))}
+                      <PrivateStoreTripChecklist
+                        key={JSON.stringify([
+                          store,
+                          imported.captures[store].observedAt,
+                          basket.totalCents,
+                          basket.matchedLineCount,
+                          basket.unresolvedLineCount,
+                          basket.lines.map(line => line.status === 'matched'
+                            ? [line.id, line.productId, line.packs, line.pricePerPackCents]
+                            : [line.id, 'unknown']),
+                        ])}
+                        basket={basket}
+                        observedAt={imported.captures[store].observedAt}
+                        fresh={currentEnough}
+                      />
                     </section>
                   )
                 })}
