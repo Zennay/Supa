@@ -91,31 +91,9 @@ const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|banan
 export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const original = text(raw, 400)
   if (!original) throw new Error('Ingredientregel ontbreekt')
-  // A single-unit match must never consume only the first part of
-  // "1 kg 250 g bloem" and mistake "250 g" for a product name.
-  // Parse two physically stated measures BEFORE falling back to the single
-  // amount pattern: keeping only the first segment would undercount shopping.
-  const compound = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+(.+)$/iu)
-  if (compound) {
-    const first = quantity(compound[1])
-    const second = quantity(compound[3])
-    const firstUnit = units[compound[2].toLowerCase()]
-    const secondUnit = units[compound[4].toLowerCase()]
-    const label = compound[5].trim()
-    if (first !== null && second !== null &&
-        Number.isFinite(first) && Number.isFinite(second) &&
-        first > 0 && second > 0 && first <= 100_000 && second <= 100_000 &&
-        firstUnit && secondUnit && firstUnit.unit === secondUnit.unit &&
-        label && !/^\d+(?:[.,]\d+)?\s+(?:g|kg|ml|l|oz|lb)\b/i.test(label)) {
-      const normalized = rounded(first * firstUnit.factor + second * secondUnit.factor)
-      if (Number.isFinite(normalized) && normalized > 0 && normalized <= 1_000_000) {
-        return { original, label, query: label.toLocaleLowerCase('nl'),
-          amount: normalized, unit: firstUnit.unit, reviewReason: null }
-      }
-    }
-    return { original, label: original, query: original.toLocaleLowerCase('nl'),
-      amount: null, unit: null, reviewReason: 'Controleer de samengestelde hoeveelheden' }
-  }
+  // One canonical parser handles one or several physical measures. A separate
+  // two-measure shortcut used to reject valid third measures as a product name.
+  // Never consume just the first amount when the remainder is another measure.
   const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
   if (!match) return { original, label: original, query: original.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid of eenheid ontbreekt' }
   const amount = quantity(match[1])
@@ -126,11 +104,12 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   let label = metric ? (wordMatch?.[2] || '').trim() : tail
   let compoundAmount = 0
   let compoundFound = false
+  // Accept at most eight compatible physical components, including the first.
   // Parse consecutive measurable additions instead of trusting only the first
   // quantity (which would silently underbuy 1 kg 250 g as 1000 g).
   if (metric) {
-    const additional = /^(?:(?:en|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([^\s,]+)(?:\s+|,\s*)(.*)$/u
-    for (let index = 0; index < 8; index++) {
+    const additional = /^(?:(?:en|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([^\s,]+)(?:\s+|,\s*|$)(.*)$/u
+    for (let index = 0; index < 7; index++) {
       const second = additional.exec(label)
       if (!second) break
       const extraUnit = units[second[2].toLowerCase()]
