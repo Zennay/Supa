@@ -40,3 +40,16 @@ In de receptdetailweergave kun je elke fysieke regel afvinken, **Alleen nog te k
 Open daarna de privévergelijker en kies onder **Of: plak direct je eigen boodschappenlijst** het eerder gedownloade TXT-bestand. De bestaande lokale snelle import herkent nu ook het receptformaat met `Mijn recept: ... — N porties`, de twee vaste waarschuwingregels en `[ ]`/`[x]`-regels; de aangevinkte regels blijven onderdeel van dezelfde fysieke behoefte en worden dus niet uit de prijsvergelijking weggelaten. Dit is één geplande bereiding, niet automatisch `N` geselecteerde maaltijden. De gebruiker bevestigt het vervangen van bestaande mandgegevens voordat productmatches vervallen. `[?]`-ingrediënten worden **geweigerd** tot de ontbrekende hoeveelheid is gecorrigeerd; er volgt geen schatting of verborgen SKU-toekenning.
 
 De reeds bestaande private wizard kan daarnaast eigen recepten rechtstreeks vanuit de lokale browserbibliotheek laden. Deze ondersteunde route heeft nu twee aparte velden: maximaal zeven **bereidingen** in totaal en per recept 1–100 **porties per bereiding**. Supa schaalt de bekende metrische hoeveelheden per recept, weigert fractionele stuks en maakt vervolgens een identieke totale vraag voor PLUS en DekaMarkt. De velden hebben zichtbare labels, ook op mobiel.
+
+### Favorieten ook na het heropenen van Supa
+
+De hartjes op de receptkaarten en de filter **Favorieten** bewaren
+uitsluitend de recept-ID's lokaal in de browser met een strikt versie-
+formaat. Na herladen verschijnen de eerder gekozen recepten opnieuw in
+het favorietenfilter; nieuwe en verwijderde eigen recepten worden niet
+als inhoud gekopieerd. Bij wijzigingen in een andere browser-tab leest
+Supa de nieuwe toestand. Onbekende of beschadigde bestaande favorieten
+worden niet overschreven; bij een wijzigingsrace weigert de opslag
+het oude tabblad totdat de actuele favorieten zijn ingelezen.
+Recepttekst, bronlinks, ingrediënten, prijzen en bronrechten worden
+niet door de favorietenopslag vervoerd.

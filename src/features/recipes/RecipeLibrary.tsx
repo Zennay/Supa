@@ -8,6 +8,7 @@ import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPrev
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
 import { exportOwnRecipePrivateWeek } from './exportOwnRecipePrivateWeek'
+import { RECIPE_FAVORITES_KEY, readRecipeFavorites, toggleRecipeFavorite, type RecipeFavorites } from './recipeFavorites'
 import './recipes.css'
 
 function keyed<T>(items: readonly T[], identity: (item: T) => string) {
@@ -39,13 +40,21 @@ function initialLibrary(): LibraryState {
   catch { return { recipes: [], raw: null, error: 'Browseropslag is niet beschikbaar. Je kunt recepten bekijken, maar nog niet bewaren.' } }
 }
 
+function initialFavorites(): RecipeFavorites {
+  if (typeof window === 'undefined') return { ids: [], raw: null, error: null }
+  try { return readRecipeFavorites(window.localStorage) }
+  catch { return { ids: [], raw: null, error: 'Favorieten kunnen niet worden geopend in deze browser.' } }
+}
+
 export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [library, setLibrary] = useState(initialLibrary)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'own' | 'favorites'>('all')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [sort, setSort] = useState(false)
-  const [favorites, setFavorites] = useState<string[]>([])
+  const [favoriteState, setFavoriteState] = useState(initialFavorites)
+  const favoriteRef = useRef(favoriteState)
+  const favorites = favoriteState.ids
   const [mode, setMode] = useState<'manual' | 'url' | 'paste'>('manual')
   const [form, setForm] = useState(blank)
   const [url, setUrl] = useState('')
@@ -75,6 +84,17 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const request = useRef<AbortController | null>(null)
   const saving = useRef(false)
   useEffect(() => () => request.current?.abort(), [])
+  useEffect(() => {
+    const refresh = (event: StorageEvent) => {
+      if (event.key !== RECIPE_FAVORITES_KEY && event.key !== null) return
+      const next = initialFavorites()
+      favoriteRef.current = next
+      setFavoriteState(next)
+      if (next.error) setMessage(next.error)
+    }
+    window.addEventListener('storage', refresh)
+    return () => window.removeEventListener('storage', refresh)
+  }, [])
   const matches = (r: { id: string; title: string }) => r.title.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) && (filter !== 'favorites' || favorites.includes(r.id))
   const demo = filter === 'own' ? [] : examples.filter(matches)
   const own = library.recipes.filter(matches)
@@ -83,7 +103,16 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const selectedRecipeShoppingText = ownShopping ? formatOwnRecipeChecklist(ownShopping, shoppingChecks) : ''
   const shoppingCompleted = ownShopping?.lines.filter(line => shoppingChecks[line.key]).length ?? 0
   const shoppingVisible = ownShopping?.lines.filter(line => !shoppingOpenOnly || !shoppingChecks[line.key]) ?? []
-  const favorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
+  const favorite = (id: string) => {
+    try {
+      const next = toggleRecipeFavorite(window.localStorage, favoriteRef.current, id)
+      favoriteRef.current = next
+      setFavoriteState(next)
+      setMessage('Favorieten zijn uitsluitend op dit apparaat bewaard.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Favorieten konden niet worden opgeslagen.')
+    }
+  }
 
   function downloadOwnRecipes() {
     setBackupError('')
@@ -305,10 +334,14 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe && recipe.image ? '' : ' own-recipe-card'}`} key={recipe.id}>
         {'image' in recipe && recipe.image && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
         <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setShoppingPortions(String(recipe.servings ?? 2)); setShowShoppingCopy(false); setPrivateWeekMessage(''); setShoppingChecks({}); setShoppingOpenOnly(false); detail.current?.showModal() }} />
-        <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
+        <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`}
+          aria-pressed={favorites.includes(recipe.id)} disabled={!!favoriteState.error}
+          onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
         <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p></div>
       </article>)}</div>
       {!demo.length && !own.length && <p className="hifi-empty">{query ? 'Geen recepten gevonden. Probeer een andere zoekterm.' : 'Voeg je eerste eigen recept toe of importeer een receptlink.'}</p>}
+      <small>Favorieten blijven lokaal bewaard in deze browser; receptgegevens en links worden niet meegestuurd.</small>
+      {favoriteState.error && <p role="alert" className="recipe-error">{favoriteState.error}</p>}
     </section>
     <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button><button onClick={() => openEditor('paste')}>Plak receptgegevens (JSON-LD)</button></div>
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
