@@ -87,3 +87,16 @@
   .recipe-backup-panel__actions { flex-direction: column; align-items: stretch; }
   .recipe-backup-panel__actions input[type=file] { max-width: 100%; }
 }
+
+
+/* Local, unpriced requirements remain separate from retailer comparisons. */
+.recipe-detail-actions { display: flex; gap: 10px; margin: 14px 0; flex-wrap: wrap; }
+.recipe-detail-actions button, .recipe-shopping-panel button { border: 1px solid #92b7a2; border-radius: 13px; padding: 12px 16px; min-height: 44px; background: #e4f1e9; color: #005135; font: inherit; font-weight: 650; cursor: pointer; }
+.recipe-shopping-panel { margin-top: 18px; padding: 16px; border-radius: 16px; background: #f2f7f3; display: grid; gap: 10px; }
+.recipe-shopping-panel h3, .recipe-shopping-panel p { margin: 0; }
+.recipe-shopping-panel p { font-size: 13px; line-height: 1.5; color: #41544a; }
+.recipe-shopping-panel label { display: grid; gap: 8px; font-weight: 650; }
+.recipe-shopping-panel input { width: 140px; padding: 10px; border: 1px solid #8ba999; border-radius: 12px; background: white; font: inherit; }
+.recipe-shopping-panel textarea { width: 100%; min-width: 0; resize: vertical; border: 1px solid #9db5a8; background: white; padding: 12px; border-radius: 12px; font: inherit; font-size: 13px; }
+.recipe-shopping-panel button:focus-visible, .recipe-detail-actions button:focus-visible { outline: 3px solid #006641; outline-offset: 3px; }
+@media (max-width: 460px) { .recipe-detail-actions { flex-direction: column; } .recipe-shopping-panel { padding: 12px; } }
