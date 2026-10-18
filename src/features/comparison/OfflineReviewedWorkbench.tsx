@@ -399,12 +399,12 @@ export function OfflineReviewedWorkbench({
       return
     }
     setOnlyUnresolved(previous => ({ ...previous, [target.store]: false }))
-    session.setReviewTarget(null)
     const timer = window.setTimeout(() => {
       document.getElementById('offline-match-' + target.store + '-' +
         encodeURIComponent(target.ingredientId))?.scrollIntoView({
         behavior: 'smooth', block: 'center',
       })
+      session.setReviewTarget(null)
     }, 0)
     return () => window.clearTimeout(timer)
   }, [session.reviewTarget, session.setReviewTarget, basketPair, imported])
