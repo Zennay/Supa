@@ -185,3 +185,19 @@ winkelopname, prijsbedragen, bronmoment, SKU, verpakkingen en hoeveelheden.
 Een verouderd of vreemd bestand doet niets; de andere winkel blijft
 onaangeroerd. Vinkjes vormen nooit bewijs voor de betrouwbaarheid van
 winkelprijzen. Er is geen automatische synchronisatie of netwerkrequest.
+
+### Bevestigde volledige vergelijking downloaden
+
+Zodra beide werkelijk aanwezige winkelopnames recent, minder dan 24 uur
+uit elkaar, fysiek volledig gekoppeld en door de gebruiker op alle
+bronartikelen expliciet bevestigd zijn, biedt de gewone Vergelijk-tab
+**Download volledige privévergelijking (CSV)**. Dit hergebruikt de
+bestaande `createPrivateBasketComparisonCsv` voor een 29-koloms lokaal
+overzicht met fysieke behoefte, originele SKU's, gehele verpakkingen,
+oorspronkelijke centprijzen, indicatieve eenheidsprijzen, afzonderlijke
+hele-mandtotalen en rekenkundig prijsverschil per ingrediënt. Bij
+ontbrekende of verlopen bron, niet-volledige matching of ontbrekende
+menselijke bevestiging is deze knop afwezig. Zonder brondata zijn er
+geen prijzen of winkelwinnaar te exporteren. De afgeleide CSV is een
+particuliere rekentabel, **geen invoerformaat voor nieuwe bronnen** en
+geen retailerautorisatie of onafhankelijk besparingsbewijs.

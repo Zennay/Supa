@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
+import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
+import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import './offlineReviewedWorkbench.css'
 
@@ -307,6 +308,39 @@ export function OfflineReviewedWorkbench({
         ? compareFullBaskets({ baseline: plus, candidate: deka }) : null }
     } catch { return null }
   }, [imported, plan, recipes, activeDays])
+  function downloadConfirmedComparisonCsv() {
+    try {
+      if (!canShowDifference || !basketPair?.plus || !basketPair.deka ||
+          !basketPair.comparison || !imported?.captures.PLUS || !imported.captures.DekaMarkt) {
+        throw new Error('Vergelijking nog niet bevestigd.')
+      }
+      const source = createPrivateBasketComparisonCsv({
+        ingredients: aggregatePlanIngredients(plan, recipes, activeDays).map(
+          ({ id, label, amount, unit }) => ({ id, label, amount, unit }),
+        ),
+        captures: {
+          PLUS: { observedAt: imported.captures.PLUS.observedAt },
+          DekaMarkt: { observedAt: imported.captures.DekaMarkt.observedAt },
+        },
+        baskets: { PLUS: basketPair.plus, DekaMarkt: basketPair.deka },
+        fresh: { PLUS: true, DekaMarkt: true },
+        paired: imported.pairedWithin24h,
+        deltas: new Map(basketPair.comparison.lineDeltas.map(line => [line.id, line.deltaCents])),
+      })
+      const url = URL.createObjectURL(new Blob([source], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-prive-twee-winkelvergelijking.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setTripExportMessage('De volledig door jou bevestigde privévergelijking is als CSV gedownload. Dit is geen onafhankelijk retailer- of besparingsbewijs.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch {
+      setTripExportMessage('CSV niet beschikbaar: bevestig de exacte producten in beide actuele winkelopnames.')
+    }
+  }
+
   const currentEnough = useMemo(() => {
     if (!imported) return false
     const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
@@ -502,6 +536,14 @@ export function OfflineReviewedWorkbench({
                           : `${euros.format(Math.abs(line.deltaCents) / 100)} verschil`}</p>
                     ))}
                 </section>
+              )}
+              {canShowDifference && (
+                <div className="offline-price-workbench__actions">
+                  <button type="button" onClick={downloadConfirmedComparisonCsv}>
+                    Download volledige privévergelijking (CSV)
+                  </button>
+                  <small>Originele PLUS- en Deka-productcodes, geobserveerde pakprijzen, indicatieve eenheidsprijzen en per-ingrediënt verschil. Uitsluitend jouw geaccepteerde lokale opname; geen publieke besparingsclaim.</small>
+                </div>
               )}
               <div className="offline-price-workbench__trip-actions">
                 <label><input type="checkbox" checked={openTripOnly}
