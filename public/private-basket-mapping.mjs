@@ -106,6 +106,13 @@ function observedPackDescription(product) {
       ' · indicatief ' + ownEuro.format(advisory) + '/' + family : '')
 }
 
+// Selection records a human-confirmed product identity, not its purchasability.
+function observedProducts(store, unit) {
+  const capture = captures?.[store]
+  if (!capture) return []
+  return capture.products.filter(product => classify(product.packUnit) === classify(unit))
+}
+
 function availableProducts(store, unit) {
   const capture = captures?.[store]
   if (!capture) return []
@@ -134,6 +141,7 @@ function updateCoverage() {
     }
     let ready = 0
     let duplicated = 0
+    let knownButUnpriced = 0
     for (const row of rows) {
       const sku = row.querySelector('[data-store="' + store + '"]').value
       if (!sku) continue
@@ -141,12 +149,16 @@ function updateCoverage() {
       const input = row.querySelector('.amount').value.trim()
       const amount = input === '' ? null : numeric(input)
       const unit = row.querySelector('.unit').value
-      if (amount !== null && validText(row.querySelector('.label').value.trim()) &&
-          availableProducts(store, unit).some(p => p.id === sku)) ready++
+      if (amount !== null && validText(row.querySelector('.label').value.trim())) {
+        if (availableProducts(store, unit).some(p => p.id === sku)) ready++
+        else if (observedProducts(store, unit).some(p => p.id === sku)) knownButUnpriced++
+      }
     }
     return store + ': ' + ready + ' van ' + rows.length +
       ' fysieke regels met uniek gekozen, prijsbaar eigen product' +
-      (duplicated ? ' (' + duplicated + ' regels met dubbel gekozen SKU)' : '')
+      (knownButUnpriced ? ' · ' + knownButUnpriced +
+        ' gekoppeld maar niet prijsbaar/beschikbaar' : '') +
+      (duplicated ? ' · ' + duplicated + ' regels met dubbel gekozen SKU' : '')
   })
   coverage.className = 'notice' + (messages.some(value => !value.includes(' ' + rows.length + ' van ' + rows.length)) ? ' warning' : '')
   coverage.textContent = messages.join(' · ') +
@@ -158,7 +170,7 @@ function updateSelect(select, store, unit) {
   const search = row.querySelector('[data-search-store="' + store + '"]')
   const query = search.value.trim().toLocaleLowerCase('nl')
   const chosen = select.value
-  const all = availableProducts(store, unit)
+  const all = observedProducts(store, unit)
   const kept = all.find(product => product.id === chosen)
   const filtered = all.filter(product => !query ||
     product.name.toLocaleLowerCase('nl').includes(query) ||
@@ -167,18 +179,26 @@ function updateSelect(select, store, unit) {
   if (kept && !shown.some(product => product.id === kept.id)) shown.unshift(kept)
   select.replaceChildren(new Option('Niet gekoppeld · onbekend', ''))
   for (const product of shown) {
-    const pack = String(product.packAmount).replace('.', ',') + ' ' + product.packUnit
-    const option = new Option(product.name + ' · ' + pack + ' · ID ' + product.id, product.id)
+    const pack = product.packAmount === null ? 'verpakking onbekend'
+      : String(product.packAmount).replace('.', ',') + ' ' + product.packUnit
+    const state = !product.available ? ' · niet leverbaar'
+      : product.priceCents === null || product.packAmount === null
+        ? ' · prijs/verpakking onbekend' : ''
+    const option = new Option(product.name + ' · ' + pack + ' · ID ' + product.id + state, product.id)
     select.add(option)
   }
   select.value = kept ? kept.id : ''
   const chosenProduct = all.find(product => product.id === select.value)
   row.querySelector('[data-matches-store="' + store + '"]').textContent =
-    String(filtered.length) + ' fysiek passende eigen bronartikelen; ' +
+    String(filtered.length) + ' waargenomen eigen bronartikelen met compatibele eenheidsfamilie; ' +
     (filtered.length > 80 ? 'maximaal 80 zichtbaar, verfijn jouw zoekterm. ' : '') +
     (chosenProduct
-      ? 'Gekozen SKU ' + chosenProduct.id + ': ' + observedPackDescription(chosenProduct) +
-        '. Vergelijk altijd de echte productnaam en verpakking.'
+      ? 'Gekozen SKU ' + chosenProduct.id + ': ' +
+        (!chosenProduct.available ? 'niet leverbaar; niet in winkelmandprijs' :
+          chosenProduct.priceCents === null || chosenProduct.packAmount === null
+            ? 'prijs of verpakking ontbreekt; blijft onbekend'
+            : observedPackDescription(chosenProduct)) +
+        '. Controleer zelf de echte productnaam, voorraad en verpakking.'
       : 'Kies expliciet de juiste winkel-SKU; geen automatische productmatch.')
 }
 function invalidateUnpricedDemand() {
@@ -523,7 +543,7 @@ function demand() {
     const productIds = {}
     for (const store of stores) {
       const value = selected(row.querySelector('[data-store="' + store + '"]'))
-      if (value !== null && !availableProducts(store, unit).some(p => p.id === value)) {
+      if (value !== null && !observedProducts(store, unit).some(p => p.id === value)) {
         throw Error('Productkeuze van ' + store + ' past niet bij ' + label + '.')
       }
       productIds[store] = value
