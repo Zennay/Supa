@@ -35,6 +35,15 @@ export function ComparisonReadiness({
             : (ageMs / (24 * 60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' dagen oud'
     return { store, at: observation.observedAt, olderThanWeek, inFuture, readableAge }
   })
+  // The imported pair is already canonical-admitted with nanosecond timestamps.
+  // Show which source is older without altering its evidence timestamp.
+  const plusInstant = captures.PLUS.observedNs
+  const dekaInstant = captures.DekaMarkt.observedNs
+  const refreshStore = plusInstant <= dekaInstant ? 'PLUS' : 'DekaMarkt'
+  const observationGapHours = Number(plusInstant >= dekaInstant
+    ? plusInstant - dekaInstant : dekaInstant - plusInstant) / 3_600_000_000_000
+  const gapText = observationGapHours.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
+
   const hasDemand = plus.selectedMealCount > 0 && deka.selectedMealCount > 0 &&
     plus.lines.length > 0 && deka.lines.length > 0
   const incomplete = (['PLUS', 'DekaMarkt'] as const).flatMap(store => {
@@ -72,7 +81,9 @@ export function ComparisonReadiness({
   if (!pairedWithin24h) steps.push({
     id: 'gap',
     heading: 'PLUS en DekaMarkt binnen 24 uur observeren',
-    detail: 'De ingeladen brontijden liggen te ver uiteen voor een tijdsvergelijkbaar winkelmandje.',
+    detail: 'De bronmomenten verschillen ' + gapText + ' uur. ' + refreshStore +
+      ' heeft het oudere bronmoment. Vernieuw die opname met eigen toegestane gegevens; ' +
+      'alleen een echt binnen 24 uur geobserveerd paar mag een volledig verschil tonen.',
     action: 'Vervang de verouderde winkelopname', onClick: onOpenImport,
   })
   if (hasDemand) steps.push(...incomplete)
