@@ -16,6 +16,7 @@ import { figmaAssets } from './features/home/figmaAssets'
 import { buildOneStoreBasket } from './domain/basket'
 import type { OfflinePriceSnapshots, OfflineRetailer } from './domain/offlineReviewedImport.ts'
 import type { OfflineComparisonSession } from './features/comparison/offlineComparisonSession.ts'
+import { StagedStorePreview } from './features/comparison/StagedStorePreview.tsx'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
   defaultPlannerPreferences,
@@ -326,6 +327,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       : currentStoreBasket && currentStoreBasket.selectedMealCount > 0 &&
         currentStoreBasket.lines.length > 0 ? 'private' : 'empty'
 
+  // One-store captures can be used for a private list without a fabricated
+  // second retailer. No comparison outcome exists before paired admission.
+  const stagedRetailers = (['PLUS', 'DekaMarkt'] as const).filter(
+    store => !!offlinePriceSession.stagedCaptures[store],
+  )
+
   const privateHomeSummary = useMemo(() => {
     const source = offlinePriceSession.imported
     if (!source || !importedPair || !currentStoreBasket) return null
@@ -454,16 +461,34 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             displayLocalList onOpenComparison={() => navigate('basket')}
           />
         )}
-        {tab === 'list' && !offlinePriceSession.imported && (
+        {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length > 0 && (
+          <section className="offline-price-workbench__results" aria-label="Losse eigen winkelopnames">
+            <h2>Mijn tijdelijke winkelboodschappen</h2>
+            <p role="status">Er is nog geen geldige vergelijking tussen PLUS en DekaMarkt.
+              Je kunt de huidige lokale winkelopname al afzonderlijk bekijken en afvinken.
+              Geen prijsverschil zonder twee valide gekoppelde mandjes.</p>
+            {stagedRetailers.map(store => (
+              <StagedStorePreview key={store} store={store}
+                capture={offlinePriceSession.stagedCaptures[store]!}
+                plan={plannedMeals} recipes={recipes}
+                activeDays={activeDays} clockMs={sourceClock}
+              />
+            ))}
+            <button type="button" className="ghost-button" onClick={() => navigate('basket')}>
+              Open Vergelijk om tweede winkel te importeren
+            </button>
+          </section>
+        )}
+        {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && (
           <p className="disclaimer" role="status">
-            Nog geen privéwinkelopnames geladen. Open Vergelijk om je werkelijke
-            ingevoerde PLUS- en DekaMarkt-boodschappenlijst te bekijken.
+            Nog geen privéwinkelopnames geladen. Open Vergelijk om je eigen
+            PLUS- en DekaMarkt-producten in je boodschappenlijst te gebruiken.
             <button type="button" className="ghost-button" onClick={() => navigate('basket')}>
               Naar Vergelijk
             </button>
           </p>
         )}
-        {tab === 'list' && (offlinePriceSession.imported
+        {tab === 'list' && (offlinePriceSession.imported || stagedRetailers.length > 0
           ? <details className="demo-comparison-disclosure">
               <summary>Voorbeeldproducten uit het oorspronkelijke ontwerp</summary>
               <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
@@ -564,7 +589,14 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <summary>Oude voorbeeldboodschappenlijst (niet de geïmporteerde mand)</summary>
           <ShoppingListView basket={basket} />
         </details>}
-        {tab === 'list' && !offlinePriceSession.imported && <ShoppingListView basket={basket} />}
+        {tab === 'list' && !offlinePriceSession.imported && (
+          stagedRetailers.length > 0
+            ? <details className="demo-comparison-disclosure">
+                <summary>Oude voorbeeldboodschappenlijst (geen eigen prijsdata)</summary>
+                <ShoppingListView basket={basket} />
+              </details>
+            : <ShoppingListView basket={basket} />
+        )}
         {tab === 'observe' && <ObservationView />}
       </div>
 
