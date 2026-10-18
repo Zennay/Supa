@@ -546,12 +546,38 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             </button>
           </p>
         )}
-        {tab === 'list' && (offlinePriceSession.imported || stagedRetailers.length > 0
-          ? <details className="demo-comparison-disclosure">
-              <summary>Voorbeeldproducten uit het oorspronkelijke ontwerp</summary>
-              <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-            </details>
-          : <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />)}
+        {tab === 'list' && (privateNotesView
+          ? (() => {
+              const PrivateNotes = privateNotesView
+              const store = plannerStore ?? offlinePriceSession.selectedStore
+              const capture = offlinePriceSession.imported?.captures[store]
+              const extras = capture ? capture.products
+                .filter(product => offlinePriceSession.extraProductIds[store].includes(product.id))
+                .map(product => ({
+                  name: product.name,
+                  packs: offlinePriceSession.extraQuantities[store][product.id] ?? 1,
+                  done: offlinePriceSession.extraDoneIds[store].includes(product.id),
+                })) : []
+              return <PrivateNotes notes={unpricedNotes} setNotes={setUnpricedNotes}
+                storeBasket={plannerBasket} activeStore={store}
+                sourceFresh={plannerSource === 'private'} ownExtras={extras}
+                observedAt={capture?.observedAt ??
+                  (typeof offlinePriceSession.stagedCaptures[store]?.observedAt === 'string'
+                    ? offlinePriceSession.stagedCaptures[store].observedAt as string : null)}
+                tripProgress={offlinePriceSession.tripMemory[store]} />
+            })()
+          : <p role="status">{privateNotesLoadError
+              ? 'Eigen ongeprijsde lijst kon niet worden geopend; je bestaande mandjes zijn behouden.'
+              : 'Eigen ongeprijsde lijst openen…'}</p>)}
+        {tab === 'list' && <p className="disclaimer">
+          Eigen boodschappen staan bovenaan. De oorspronkelijke Figma-demoproducten
+          en voorbeeldprijzen zijn apart verborgen; ze worden nooit als huidige
+          winkelprijs of geverifieerde besparing gebruikt.
+        </p>}
+        {tab === 'list' && <details className="demo-comparison-disclosure">
+          <summary>Open alleen de oorspronkelijke ontwerpvoorbeelden (geen winkelprijzen)</summary>
+          <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+        </details>}
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
           <p role="status" className="disclaimer">
             {productSelectionWarning === 'protected'
@@ -648,36 +674,18 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <summary>Oude voorbeeldboodschappenlijst (niet de geïmporteerde mand)</summary>
           <ShoppingListView basket={basket} />
         </details>}
-        {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && <ShoppingListView basket={basket} />}
+        {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && (
+          <details className="demo-comparison-disclosure">
+            <summary>Open de oude voorbeeldboodschappenlijst (geen actuele bronprijzen)</summary>
+            <ShoppingListView basket={basket} />
+          </details>
+        )}
         {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length > 0 && (
           <details className="demo-comparison-disclosure">
             <summary>Oude voorbeeldboodschappenlijst (geen eigen prijsdata)</summary>
             <ShoppingListView basket={basket} />
           </details>
         )}
-        {tab === 'list' && (privateNotesView
-          ? (() => {
-              const PrivateNotes = privateNotesView
-              const store = plannerStore ?? offlinePriceSession.selectedStore
-              const capture = offlinePriceSession.imported?.captures[store]
-              const extras = capture ? capture.products
-                .filter(product => offlinePriceSession.extraProductIds[store].includes(product.id))
-                .map(product => ({
-                  name: product.name,
-                  packs: offlinePriceSession.extraQuantities[store][product.id] ?? 1,
-                  done: offlinePriceSession.extraDoneIds[store].includes(product.id),
-                })) : []
-              return <PrivateNotes notes={unpricedNotes} setNotes={setUnpricedNotes}
-                storeBasket={plannerBasket} activeStore={store}
-                sourceFresh={plannerSource === 'private'} ownExtras={extras}
-                observedAt={capture?.observedAt ??
-                  (typeof offlinePriceSession.stagedCaptures[store]?.observedAt === 'string'
-                    ? offlinePriceSession.stagedCaptures[store].observedAt as string : null)}
-                tripProgress={offlinePriceSession.tripMemory[store]} />
-            })()
-          : <p role="status">{privateNotesLoadError
-              ? 'Eigen ongeprijsde lijst kon niet worden geopend; je bestaande mandjes zijn behouden.'
-              : 'Eigen ongeprijsde lijst openen…'}</p>)}
         {tab === 'observe' && <ObservationView />}
       </div>
 
