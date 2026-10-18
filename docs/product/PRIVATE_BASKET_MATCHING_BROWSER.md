@@ -40,3 +40,9 @@ Het prijsresultaat wordt meteen onzichtbaar zodra de gebruiker de bron, ingredi�
 Voor onvolledige mandjes verschijnt nu ook een actiegerichte **ontbrekende-winkelgegevens-lijst**. Per echt niet-geprijsd ingrediënt en per winkel wordt de ontbrekende koppeling of hoeveelheid getoond; bij te oude, toekomstige of meer dan 24 uur uiteenliggende bronopnames staat welke winkel opnieuw bezocht/gecontroleerd moet worden. Alleen deze ontbrekende punten kunnen lokaal worden gedownload als `supa-ontbrekende-winkelgegevens.txt`. Hierin staan geen verzonnen bedragen of publicatieclaims. De brondata worden nergens heen gestuurd.
 
 De implementatie bevat geen automatische retailerscraper, QA-suites of nieuwe toestemmingstoekenning; verplichte CI, onafhankelijke review en geautoriseerde mainwriter-claim blijven releasevereisten. Geen CLI, React-app of peer-productbranches zijn overschreven.
+
+## Prijsverschil per ingrediënt en exacte bronidentiteit
+
+Bij twee volledig toegelaten eigen opnames wordt niet alleen het totale winkelverschil, maar ook de **goedkopere winkel per ingrediënt** weergegeven. Deze bedragen worden rechtstreeks overgenomen uit de bestaande canonieke `compareFullBaskets().lineDeltas`; bij incomplete/onbetrouwbare mandjes blijft elke rijverschilkolom onbekend. Eenzelfde winkel-SKU in twee ingrediëntregels wordt niet als twee losse aankopen gepresenteerd: de tweede keuze blijft onopgelost totdat de fysieke behoeften samengevoegd zijn.
+
+Alle lokale CSV-/JSON-bronnen en het opgeslagen demandbestand worden nu met strikte UTF-8-decodering verwerkt: ongeldig gecodeerde bytes worden geweigerd, niet stilzwijgend in vervangtekens veranderd. De bestaande CSV- en productvalidatie blijft de bron van waarheid.
