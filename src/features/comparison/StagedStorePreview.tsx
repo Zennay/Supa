@@ -99,6 +99,8 @@ export function StagedStorePreview({
   </p>
 
   const { source, basket } = result
+  const partner: OfflineRetailer = store === 'PLUS' ? 'DekaMarkt' : 'PLUS'
+  const partnerPresent = !!session.stagedCaptures[partner]
   const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
   const fresh = nowNs >= source.observedNs - 300_000_000_000n &&
     nowNs - source.observedNs <= 604_800_000_000_000n
@@ -122,7 +124,10 @@ export function StagedStorePreview({
     <h3>{store}: alvast je boodschappen bekijken</h3>
     <p>Een eigen opname, waargenomen {dates.format(new Date(source.observedMs))},
       met {source.products.length} ingelezen producten.
-      De tweede winkel ontbreekt nog; er is <strong>geen prijsverschil</strong> berekend.</p>
+      {partnerPresent
+        ? ' Beide winkelbestanden zijn afzonderlijk beschikbaar, maar nog niet samen toegelaten als geldig vergelijkingspaar.'
+        : ' De andere winkel ontbreekt nog.'}
+      Er is <strong>geen prijsverschil</strong> berekend.</p>
     {!fresh && <p role="alert" className="attention-card">
       De bronopname is ouder dan 7 dagen. Onderstaande bedragen zijn geen actuele prijzen.
     </p>}
