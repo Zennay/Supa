@@ -1399,6 +1399,8 @@ export function OfflineReviewedWorkbench({
                 plusObservedAt={imported.captures.PLUS.observedAt}
                 dekaObservedAt={imported.captures.DekaMarkt.observedAt}
                 comparable={canShowDifference}
+                eligibleNow={() => !!imported && imported.pairedWithin24h &&
+                  offlineSessionFresh(imported, Date.now()) && basketPair.comparison.claimable}
               />
               {canShowDifference && basketPair.comparison.lineDeltas.length > 0 && (
                 <section className="offline-price-workbench__drivers" aria-label="Prijsverschil per ingrediënt">
