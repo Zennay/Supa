@@ -206,7 +206,24 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [recipes, setRecipes] = useState(availableRecipes)
   const validRecipeIds = recipes.map(recipe => recipe.id)
   useEffect(() => {
-    const refresh = () => setRecipes(availableRecipes())
+    const refresh = (event: Event) => {
+      setRecipes(availableRecipes())
+      // Explicit own-recipe deletion also removes orphaned Planner references.
+      // A foreign storage change never silently rewrites planner preferences.
+      const deleted = event instanceof CustomEvent ? event.detail?.deletedRecipeId : null
+      if (event.type === 'supa-recipes-changed' && typeof deleted === 'string') {
+        setPreferences(previous => {
+          let changed = false
+          const updated = { ...previous.recipeByDay }
+          for (const day of m2InitialPlan) {
+            if (updated[day.day] !== deleted) continue
+            updated[day.day] = day.recipeId
+            changed = true
+          }
+          return changed ? { ...previous, recipeByDay: updated } : previous
+        })
+      }
+    }
     window.addEventListener('supa-recipes-changed', refresh)
     window.addEventListener('storage', refresh)
     return () => { window.removeEventListener('supa-recipes-changed', refresh); window.removeEventListener('storage', refresh) }
@@ -221,14 +238,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [weekCopyMessage, setWeekCopyMessage] = useState('')
   const { budget, activeDays, recipeByDay } = preferences
 
-  const plannedMeals = useMemo(
-    () =>
-      m2InitialPlan.map((meal) => ({
-        ...meal,
-        recipeId: recipeByDay[meal.day] ?? meal.recipeId,
-      })),
-    [recipeByDay],
-  )
+  const plannedMeals = useMemo(() => {
+    const available = new Set(recipes.map(recipe => recipe.id))
+    return m2InitialPlan.map(meal => {
+      const chosen = recipeByDay[meal.day] ?? meal.recipeId
+      // A deleted or no-longer-reviewable own recipe is not a phantom meal.
+      // Use the real built-in default without pricing missing ingredients.
+      return { ...meal, recipeId: available.has(chosen) ? chosen : meal.recipeId }
+    })
+  }, [recipeByDay, recipes])
 
   // Bind prepared copy to the exact user-visible plan state. Clearing it in
   // an effect alone happens after render and briefly exposes stale personal text.

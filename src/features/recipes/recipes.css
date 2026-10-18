@@ -87,3 +87,15 @@
   .recipe-backup-panel__actions { flex-direction: column; align-items: stretch; }
   .recipe-backup-panel__actions input[type=file] { max-width: 100%; }
 }
+
+/* Device-local recipe management; touch targets and confirmation stay visible. */
+.recipe-own-actions { margin-top: 20px; border-top: 1px solid #dce7e0; padding-top: 14px; }
+.recipe-own-actions__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.recipe-own-actions__buttons button, .recipe-own-actions__confirm button {
+  min-height: 44px; padding: 10px 14px; border-radius: 12px;
+  border: 1px solid #749a83; background: white; font: inherit;
+}
+.recipe-own-actions__confirm { margin-top: 12px; padding: 14px; border: 1px solid #c68c81; border-radius: 12px; }
+.recipe-own-actions__confirm p { margin: 0 0 12px; }
+.recipe-own-actions :is(button):focus-visible { outline: 3px solid #276644; outline-offset: 2px; }
+@media (max-width: 600px) { .recipe-own-actions__buttons { flex-direction: column; } }

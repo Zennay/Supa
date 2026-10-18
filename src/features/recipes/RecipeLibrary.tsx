@@ -53,6 +53,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [selected, setSelected] = useState<SavedRecipe | typeof examples[number] | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [preview, setPreview] = useState<UserRecipeDraft | null>(null)
   const [backupPreview, setBackupPreview] = useState<RecipeBackupPreview | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
@@ -129,11 +131,48 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     }
   }
   function openEditor(next: 'manual' | 'url' | 'paste') {
-    request.current?.abort(); setBusy(false); setMode(next); setForm(blank); setSource(null); setUrl(''); setPastedSource(''); setPreview(null); setError(''); saving.current = false
+    request.current?.abort(); setBusy(false); setEditingId(null); setMode(next); setForm(blank); setSource(null); setUrl(''); setPastedSource(''); setPreview(null); setError(''); saving.current = false
     setBackupPreview(null)
     editor.current?.showModal()
   }
   function closeEditor() { request.current?.abort(); setBusy(false); editor.current?.close() }
+  function prepareExistingRecipe(recipe: SavedRecipe, duplicate: boolean) {
+    request.current?.abort()
+    setBusy(false)
+    setEditingId(duplicate ? null : recipe.id)
+    setForm({ title: duplicate ? recipe.title + ' (kopie)' : recipe.title,
+      servings: recipe.servings?.toString() ?? '', minutes: recipe.minutes?.toString() ?? '',
+      ingredients: recipe.ingredients.map(item => item.original).join('\n'),
+      steps: recipe.steps.join('\n') })
+    setSource(recipe.sourceUrl)
+    setMode('manual')
+    setPreview(null)
+    setError('')
+    setDeleteConfirm(false)
+    detail.current?.close()
+    editor.current?.showModal()
+  }
+  function deleteOwnRecipe(recipe: SavedRecipe) {
+    setError('')
+    try {
+      if (library.error) throw new Error(library.error)
+      if (!library.recipes.some(item => item.id === recipe.id)) {
+        throw new Error('Dit recept bestaat niet meer in je lokale bibliotheek.')
+      }
+      const next = saveRecipeLibrary(window.localStorage, library,
+        library.recipes.filter(item => item.id !== recipe.id))
+      setLibrary(next)
+      setFavorites(current => current.filter(id => id !== recipe.id))
+      setSelected(null)
+      setDeleteConfirm(false)
+      detail.current?.close()
+      window.dispatchEvent(new CustomEvent('supa-recipes-changed', { detail: { deletedRecipeId: recipe.id } }))
+      setMessage('Recept verwijderd. Een eventuele Planner-keuze valt terug op het standaardrecept; bestaande winkelprijzen blijven ongewijzigd.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Recept verwijderen is niet gelukt.')
+    }
+  }
+
   async function importLink(event: FormEvent) {
     event.preventDefault(); request.current?.abort()
     const controller = new AbortController(); request.current = controller
@@ -190,9 +229,26 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     if (!preview || saving.current) return
     saving.current = true
     try {
-      const recipe = { ...reviewRecipe(preview), id: `own-${crypto.randomUUID()}`, savedAt: new Date().toISOString() }
-      const next = saveRecipeLibrary(window.localStorage, library, [recipe, ...library.recipes])
-      setLibrary(next); setBackupPreview(null); window.dispatchEvent(new Event('supa-recipes-changed')); setFilter('own'); setQuery(''); setMessage(`${recipe.title} is op dit apparaat opgeslagen. Recepten met volledige hoeveelheden staan ook in de planner.`); closeEditor()
+      if (library.error) throw new Error(library.error)
+      const existing = editingId ? library.recipes.find(item => item.id === editingId) : null
+      if (editingId && !existing) throw new Error('Dit recept is ondertussen verwijderd. Er is niets overschreven.')
+      const recipe = { ...reviewRecipe(preview),
+        id: existing?.id ?? `own-${crypto.randomUUID()}`,
+        savedAt: existing?.savedAt ?? new Date().toISOString() }
+      const updated = existing
+        ? library.recipes.map(item => item.id === existing.id ? recipe : item)
+        : [recipe, ...library.recipes]
+      const next = saveRecipeLibrary(window.localStorage, library, updated)
+      setLibrary(next)
+      setBackupPreview(null)
+      window.dispatchEvent(new Event('supa-recipes-changed'))
+      setFilter('own')
+      setQuery('')
+      setMessage(existing
+        ? `${recipe.title} bijgewerkt. De bestaande Planner-koppeling blijft behouden; winkelmandjes worden opnieuw berekend.`
+        : `${recipe.title} is op dit apparaat opgeslagen. Recepten met volledige hoeveelheden staan ook in de planner.`)
+      setEditingId(null)
+      closeEditor()
     } catch (e) { setError(e instanceof Error ? e.message : 'Opslaan is niet gelukt. Je invoer blijft staan.') }
     finally { saving.current = false }
   }
@@ -203,7 +259,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     <section className="hifi-section"><div className="hifi-section-heading"><div><h2>Recepten</h2><p className="recipe-count">{demo.length + own.length} recepten</p></div><button aria-label="Sorteer recepten op naam" aria-pressed={sort} onClick={() => setSort(!sort)}><FigmaImage asset={a.recipeSort} alt="" /></button></div>
       <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe && recipe.image ? '' : ' own-recipe-card'}`} key={recipe.id}>
         {'image' in recipe && recipe.image && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
-        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); detail.current?.showModal() }} />
+        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setDeleteConfirm(false); detail.current?.showModal() }} />
         <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
         <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p></div>
       </article>)}</div>
@@ -256,7 +312,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     {!!demo.length && <p className="recipe-note">Zes uitgewerkte SUPA-recepten met ingrediënten en bereidingsstappen, ook beschikbaar in Planner. Dit zijn geen supermarktaanbiedingen; prijzen en besparingen zijn niet geverifieerd.</p>}
     {library.error && <p role="alert">{library.error}</p>}<p role="status" className="hifi-feedback">{message}</p>
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
-      <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : mode === 'paste' ? 'Receptgegevens lokaal plakken' : 'Eigen recept toevoegen'}</h2>
+      <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{editingId ? 'Eigen recept bewerken' : mode === 'url' ? 'Recept importeren' : mode === 'paste' ? 'Receptgegevens lokaal plakken' : 'Eigen recept toevoegen'}</h2>
       {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
         : mode === 'paste' ? <form className="recipe-form" onSubmit={importPastedRecipe}>
           <p>Plak JSON-LD met schema.org/Recipe of de HTML-broncode van een receptpagina
@@ -278,9 +334,25 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           </button>
         </form>
         : <form className="recipe-form" onSubmit={check} onChange={() => setPreview(null)}><label>Naam van het recept<input required maxLength={160} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label><div className="recipe-form-row"><label>Porties<input required type="number" min="1" max="1000" value={form.servings} onChange={e => setForm({ ...form, servings: e.target.value })} /></label><label>Minuten<input required type="number" min="1" max="1440" value={form.minutes} onChange={e => setForm({ ...form, minutes: e.target.value })} /></label></div><label>Ingrediënten<textarea required rows={5} placeholder={'200 g rijst\n1 paprika\n250 ml kokosmelk'} value={form.ingredients} onChange={e => setForm({ ...form, ingredients: e.target.value })} /></label><small>Eén ingrediënt per regel, met hoeveelheid en eenheid.</small><label>Bereiding<textarea required rows={5} placeholder="Eén stap per regel" value={form.steps} onChange={e => setForm({ ...form, steps: e.target.value })} /></label>{source && <p>Bron: <a href={source} target="_blank" rel="noopener noreferrer">Bekijk het oorspronkelijke recept</a></p>}<button className="recipe-primary">Controleer recept</button></form>}
-      {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <p>Onbekende hoeveelheden blijven als tekst bewaard. Vul ze aan voordat je een boodschappenberekening maakt.</p>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>Opslaan in mijn recepten</button></section>}
+      {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <p>Onbekende hoeveelheden blijven als tekst bewaard. Vul ze aan voordat je een boodschappenberekening maakt.</p>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>{editingId ? 'Wijzigingen opslaan' : 'Opslaan in mijn recepten'}</button></section>}
       {error && <p role="alert" className="recipe-error">{error}</p>}
     </dialog>
-    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p></> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}</>}</dialog>
+    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p></> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}
+      {'savedAt' in selected && <section className="recipe-own-actions" aria-label="Eigen recept beheren">
+        <h3>Mijn recept beheren</h3>
+        <div className="recipe-own-actions__buttons">
+          <button type="button" onClick={() => prepareExistingRecipe(selected, false)}>Bewerk recept</button>
+          <button type="button" onClick={() => prepareExistingRecipe(selected, true)}>Maak een kopie</button>
+          <button type="button" aria-expanded={deleteConfirm}
+            onClick={() => setDeleteConfirm(true)}>Verwijder recept</button>
+        </div>
+        {deleteConfirm && <div className="recipe-own-actions__confirm" role="group"
+          aria-label="Bevestig recept verwijderen">
+          <p>Dit verwijdert alleen dit eigen recept van dit apparaat. Je Planner valt zo nodig terug
+            op het standaardrecept. De bestaande winkelprijsopnames blijven onaangeroerd.</p>
+          <button type="button" onClick={() => deleteOwnRecipe(selected)}>Ja, verwijder dit recept</button>
+          <button type="button" onClick={() => setDeleteConfirm(false)}>Annuleren</button>
+        </div>}
+      </section>}</>}</dialog>
   </div>
 }
