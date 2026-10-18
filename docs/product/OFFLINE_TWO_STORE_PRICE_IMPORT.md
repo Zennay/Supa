@@ -415,3 +415,16 @@ actuele fysieke receptenbehoefte en de op dit moment afgevinkte regels.
 De tekst bevat geen gekozen winkel, geclaimd artikelnummer,
 fictief prijsverschil, netwerkactie of serveropslag. De knop
 verschijnt alleen wanneer een geldig niet-leeg weekmenu aanwezig is.
+
+### Extra handmatig gekozen producten blijven bereikbaar
+
+De nieuwe ongeprijsde Planner-lijst vervangt niet meer de eerder door de
+gebruiker in **Producten** geselecteerde losse productcollectie. Heeft
+de gebruiker daar daadwerkelijk artikelen toegevoegd, dan toont Lijst
+die selectie meteen als **aparte, expliciet als demonstratie of
+historisch gemarkeerde** verzameling onder de fysieke receptboodschappen.
+Een nieuwe bezoeker zonder losse productkeuzes ziet de oude voorbeelden
+alleen in een optioneel details-paneel. De losse artikelen tellen nooit
+mee in de eigen bronprijzen of het echte twee-winkelmandje.
+Dit behoudt de Producten → Lijst gebruikersflow zonder de nieuwe
+Planner-first lijst terug te veranderen in een fictieve winkelmand.

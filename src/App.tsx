@@ -438,11 +438,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
               <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
-              {tab === 'list' && <details className="demo-comparison-disclosure">
-                <summary>Toon losse productselectie en oude voorbeeldboodschappen (geen winkelprijzen)</summary>
-                <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                <ShoppingListView basket={basket} />
-              </details>}
+              {tab === 'list' && (designProductIds.length > 0
+                ? <section aria-label="Mijn expliciet toegevoegde producten">
+                    <h3>Mijn toegevoegde producten · apart van receptboodschappen</h3>
+                    <p className="disclaimer">Deze selectie is door jou gemaakt in Producten.
+                      Historische gegevens en Figma-voorbeelden zijn geen geverifieerde prijzen
+                      en doen niet mee in een eigen winkelmandvergelijking.</p>
+                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+                    <ShoppingListView basket={basket} />
+                  </section>
+                : <details className="demo-comparison-disclosure">
+                    <summary>Toon oude voorbeeldboodschappen (geen actuele winkelprijzen)</summary>
+                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+                    <ShoppingListView basket={basket} />
+                  </details>)}
             </section>
           </div>
         )}
