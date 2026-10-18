@@ -20,6 +20,8 @@ const demandImport = document.querySelector('#demand-import')
 const maxLines = 200
 const save = document.querySelector('#save')
 const compareNow = document.querySelector('#compare-now')
+const priceResult = document.querySelector('#result')
+const priceStatus = document.querySelector('#price-status')
 const add = document.querySelector('#add')
 let captures = null
 let nextId = 1
@@ -79,7 +81,15 @@ function updateSelect(select, store, unit) {
   }
   if (Array.from(select.options).some(opt => opt.value === chosen)) select.value = chosen
 }
+function invalidatePrice() {
+  if (priceResult) priceResult.hidden = true
+  if (priceStatus) {
+    priceStatus.textContent = 'De bron of mandvraag is veranderd. Vergelijk opnieuw voor een betrouwbaar privéresultaat.'
+    priceStatus.className = 'notice'
+  }
+}
 function refresh() {
+  invalidatePrice()
   for (const row of lines.querySelectorAll('.ingredient')) {
     const unit = row.querySelector('.unit').value
     for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit)
@@ -135,6 +145,7 @@ function addIngredient(restored = null) {
   for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit.value)
   save.disabled = !captures
   compareNow.disabled = save.disabled
+  invalidatePrice()
 }
 
 function acceptJson(json) {
