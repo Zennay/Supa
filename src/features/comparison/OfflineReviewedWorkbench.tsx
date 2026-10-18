@@ -502,8 +502,76 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  /** Replace one original private capture, not a merged/synthetic observation.
-   * Keep the previously admitted pair intact if the replacement is invalid. */
+  /** A manually entered or uploaded replacement uses the SAME exact original
+   * capture admission, peer-source preservation, and reviewed-match rebinding. */
+  function applyStoreReplacement(json: string) {
+    if (!imported || !text) throw new Error('Er is geen bestaand twee-winkelpaar om bij te werken.')
+    const { retailer, capture } = parseSingleOfflineCapture(json, Date.now())
+    // Validate the prior raw source bytes again: never reconstruct them
+    // from a normalized StoreProduct with unknown price mapped to zero.
+    parseOfflinePriceSnapshots(text, Date.now())
+    const previous: unknown = JSON.parse(text)
+    if (!previous || typeof previous !== 'object' || Array.isArray(previous)) {
+      throw new Error('Bestaande bronopname is niet meer beschikbaar.')
+    }
+    const captures = (previous as { captures?: unknown }).captures
+    if (!Array.isArray(captures) || captures.length !== 2) {
+      throw new Error('Bestaande twee-winkelopname is ongeldig.')
+    }
+    const next = JSON.stringify({ schema: 'supa-offline-prices-v1',
+      captures: captures.map(raw => raw && typeof raw === 'object' &&
+        (raw as { retailer?: unknown }).retailer === retailer ? capture : raw) })
+    const parsed = parseOfflinePriceSnapshots(next, Date.now())
+    // A replacement invalidates only that retailer. Rebind surviving,
+    // manually reviewed selections to the freshly validated pair fingerprint
+    // when the OTHER source and the exact selected week are unchanged.
+    // Never carry choices from an earlier week or from a modified retailer.
+    const other: OfflineRetailer = retailer === 'PLUS' ? 'DekaMarkt' : 'PLUS'
+    const oldFingerprint = offlineSessionFingerprint(imported, plan, recipes, activeDays)
+    const nextFingerprint = offlineSessionFingerprint(parsed, plan, recipes, activeDays)
+    const otherAvailable = new Set(parsed.captures[other].products
+      .filter(product => product.available).map(product => product.id))
+    const retainedSelections: Record<string, string> = {}
+    if (session.manualSelections.fingerprint === oldFingerprint) {
+      const prefix = other + '\u0000'
+      for (const [key, productId] of Object.entries(session.manualSelections.products)) {
+        if (key.startsWith(prefix) && otherAvailable.has(productId)) {
+          retainedSelections[key] = productId
+        }
+      }
+    }
+    const otherCatalogIds = new Set(parsed.captures[other].products.map(product => product.id))
+    const remainingExtras = session.extraProductIds[other].filter(id => otherCatalogIds.has(id))
+    const remainingDone = session.extraDoneIds[other].filter(id => remainingExtras.includes(id))
+    const remainingQuantities = Object.fromEntries(remainingExtras.map(id => {
+      const packs = session.extraQuantities[other][id]
+      return [id, Number.isSafeInteger(packs) && packs >= 1 && packs <= 99 ? packs : 1]
+    }))
+    clearStaged()
+    setManualSelections({ fingerprint: nextFingerprint, products: retainedSelections })
+    session.setTripMemory(previous => ({ [other]: previous[other] }))
+    session.setExtraProductIds({
+      PLUS: other === 'PLUS' ? remainingExtras : [],
+      DekaMarkt: other === 'DekaMarkt' ? remainingExtras : [],
+    })
+    session.setExtraDoneIds({
+      PLUS: other === 'PLUS' ? remainingDone : [],
+      DekaMarkt: other === 'DekaMarkt' ? remainingDone : [],
+    })
+    session.setExtraQuantities({
+      PLUS: other === 'PLUS' ? remainingQuantities : {},
+      DekaMarkt: other === 'DekaMarkt' ? remainingQuantities : {},
+    })
+    setText(next)
+    setClockMs(Date.now())
+    setImportEpoch(epoch => epoch + 1)
+    setImported(parsed)
+    setMessage(retailer + ' is vervangen. De andere originele winkelopname is onveranderd. ' +
+      'Bestaande geldige koppelingen en extra artikelen van ' + other +
+      ' zijn bewaard; beoordeel alleen de vernieuwde ' + retailer + '-producten opnieuw.' +
+      (parsed.pairedWithin24h ? '' : ' De opnames liggen meer dan 24 uur uiteen: geen vergelijkbaar verschil.'))
+  }
+
   async function replaceOneStoreFile(file?: File) {
     if (!file || !imported || !text) return
     const version = ++importVersion.current
@@ -521,71 +589,7 @@ export function OfflineReviewedWorkbench({
         if (version !== importVersion.current) return
         json = converter.convertSingleStoreCsv(json)
       }
-      const { retailer, capture } = parseSingleOfflineCapture(json, Date.now())
-      // Validate the prior raw source bytes again: never reconstruct them
-      // from a normalized StoreProduct with unknown price mapped to zero.
-      parseOfflinePriceSnapshots(text, Date.now())
-      const previous: unknown = JSON.parse(text)
-      if (!previous || typeof previous !== 'object' || Array.isArray(previous)) {
-        throw new Error('Bestaande bronopname is niet meer beschikbaar.')
-      }
-      const captures = (previous as { captures?: unknown }).captures
-      if (!Array.isArray(captures) || captures.length !== 2) {
-        throw new Error('Bestaande twee-winkelopname is ongeldig.')
-      }
-      const next = JSON.stringify({ schema: 'supa-offline-prices-v1',
-        captures: captures.map(raw => raw && typeof raw === 'object' &&
-          (raw as { retailer?: unknown }).retailer === retailer ? capture : raw) })
-      const parsed = parseOfflinePriceSnapshots(next, Date.now())
-      if (version !== importVersion.current) return
-      // A replacement invalidates only that retailer. Rebind surviving,
-      // manually reviewed selections to the freshly validated pair fingerprint
-      // when the OTHER source and the exact selected week are unchanged.
-      // Never carry choices from an earlier week or from a modified retailer.
-      const other: OfflineRetailer = retailer === 'PLUS' ? 'DekaMarkt' : 'PLUS'
-      const oldFingerprint = offlineSessionFingerprint(imported, plan, recipes, activeDays)
-      const nextFingerprint = offlineSessionFingerprint(parsed, plan, recipes, activeDays)
-      const otherAvailable = new Set(parsed.captures[other].products
-        .filter(product => product.available).map(product => product.id))
-      const retainedSelections: Record<string, string> = {}
-      if (session.manualSelections.fingerprint === oldFingerprint) {
-        const prefix = other + '\u0000'
-        for (const [key, productId] of Object.entries(session.manualSelections.products)) {
-          if (key.startsWith(prefix) && otherAvailable.has(productId)) {
-            retainedSelections[key] = productId
-          }
-        }
-      }
-      const otherCatalogIds = new Set(parsed.captures[other].products.map(product => product.id))
-      const remainingExtras = session.extraProductIds[other].filter(id => otherCatalogIds.has(id))
-      const remainingDone = session.extraDoneIds[other].filter(id => remainingExtras.includes(id))
-      const remainingQuantities = Object.fromEntries(remainingExtras.map(id => {
-        const packs = session.extraQuantities[other][id]
-        return [id, Number.isSafeInteger(packs) && packs >= 1 && packs <= 99 ? packs : 1]
-      }))
-      clearStaged()
-      setManualSelections({ fingerprint: nextFingerprint, products: retainedSelections })
-      session.setTripMemory(previous => ({ [other]: previous[other] }))
-      session.setExtraProductIds({
-        PLUS: other === 'PLUS' ? remainingExtras : [],
-        DekaMarkt: other === 'DekaMarkt' ? remainingExtras : [],
-      })
-      session.setExtraDoneIds({
-        PLUS: other === 'PLUS' ? remainingDone : [],
-        DekaMarkt: other === 'DekaMarkt' ? remainingDone : [],
-      })
-      session.setExtraQuantities({
-        PLUS: other === 'PLUS' ? remainingQuantities : {},
-        DekaMarkt: other === 'DekaMarkt' ? remainingQuantities : {},
-      })
-      setText(next)
-      setClockMs(Date.now())
-      setImportEpoch(epoch => epoch + 1)
-      setImported(parsed)
-      setMessage(retailer + ' is vervangen. De andere originele winkelopname is onveranderd. ' +
-        'Bestaande geldige koppelingen en extra artikelen van ' + other +
-        ' zijn bewaard; beoordeel alleen de vernieuwde ' + retailer + '-producten opnieuw.' +
-        (parsed.pairedWithin24h ? '' : ' De opnames liggen meer dan 24 uur uiteen: geen vergelijkbaar verschil.'))
+      applyStoreReplacement(json)
     } catch (error) {
       if (version === importVersion.current) setMessage(
         (error instanceof Error ? error.message : 'Kon de vervanging niet inlezen.') +
@@ -722,11 +726,27 @@ export function OfflineReviewedWorkbench({
           const root: unknown = JSON.parse(json)
           if (root && typeof root === 'object' && !Array.isArray(root) &&
               (root as { schema?: unknown }).schema === 'supa-offline-store-capture-v1') {
-            importOneStore(json)
+            if (imported && text) {
+              // Editing only PLUS or Deka in the form is the same scoped
+              // replacement as uploading an individual new original capture.
+              // Preserve the untouched store's source/reviews and fail closed.
+              try { applyStoreReplacement(json) }
+              catch (error) {
+                setMessage((error instanceof Error ? error.message : 'Kon deze winkel niet bijwerken.') +
+                  ' Je eerder toegelaten winkelpaar is behouden.')
+              }
+            } else importOneStore(json)
           } else {
-            clearStaged()
+            // A new full pair is admitted atomically; a malformed update
+            // leaves the current in-memory reviews and captures in place.
+            const previousText = text
+            const previousImported = imported
             setText(json)
-            importSnapshots(json)
+            if (importSnapshots(json)) clearStaged()
+            else {
+              setText(previousText)
+              setImported(previousImported)
+            }
           }
         }}
         onEdit={() => {
