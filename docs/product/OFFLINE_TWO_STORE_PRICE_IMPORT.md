@@ -883,3 +883,17 @@ zegt de app uitdrukkelijk dat één winkel goedkoper uitkomt. Zonder
 ingevuld bedrag claimt Supa geen netto besparing. Dit extra bedrag
 komt uitsluitend van de gebruiker, nooit uit een verzonnen prijsbron,
 en verschijnt desgewenst in de lokale TXT-download.
+
+#### De route verandert mee met je werkelijke extra kosten
+
+De lijst heeft drie expliciete keuzes: automatisch, de goedkoopste
+producten per winkel of alle artikelen bij de goedkoopste volledige
+winkel. In automatische modus blijft het gemengde mandje zichtbaar
+zolang extra kosten onbekend zijn of onder het berekende maximale
+verschil blijven. Zodra de door de gebruiker ingevoerde extra
+bezoekkosten gelijk of hoger zijn dan dat verschil, schakelt de
+lijst over naar de goedkoopste **volledige** winkel. Ook de per-winkel
+artikelen, totale bedragen, vinkjesweergave en TXT-export volgen de
+werkelijk geselecteerde route; niet een oude gemengde winkelroute.
+Expliciet een andere strategie kiezen blijft mogelijk. Er is nooit
+een fictieve schatting voor omrijden of parkeren.

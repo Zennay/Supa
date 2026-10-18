@@ -37,6 +37,7 @@ export type MixedStoreShoppingPlan = {
 export function createMixedStoreShoppingPlan(
   plus: OneStoreBasket,
   deka: OneStoreBasket,
+  mode: 'mixed' | 'single' = 'mixed',
 ): MixedStoreShoppingPlan | null {
   if (plus.store.id !== 'PLUS' || deka.store.id !== 'DekaMarkt') return null
   const comparison = compareFullBaskets({ baseline: plus, candidate: deka })
@@ -57,7 +58,9 @@ export function createMixedStoreShoppingPlan(
         b.lineTotalCents !== delta.candidateLineTotalCents) return null
     // Deterministic tie -> PLUS; a mixed itinerary never needs a second shop
     // when every ingredient can be bought for the same total at one shop.
-    const store: MixedStore = b.lineTotalCents < a.lineTotalCents ? 'DekaMarkt' : 'PLUS'
+    const store: MixedStore = mode === 'single'
+      ? (deka.totalCents < plus.totalCents ? 'DekaMarkt' : 'PLUS')
+      : (b.lineTotalCents < a.lineTotalCents ? 'DekaMarkt' : 'PLUS')
     const picked = store === 'PLUS' ? a : b
     const other = store === 'PLUS' ? b : a
     const next = totals[store] + picked.lineTotalCents
@@ -110,7 +113,7 @@ export function formatMixedStoreShoppingPlan(
     'PLUS hele mand: ' + money.format(plan.plusWholeCents / 100),
     'DekaMarkt hele mand: ' + money.format(plan.dekaWholeCents / 100),
     'Goedkoopste volledige winkel: ' + money.format(plan.cheapestWholeStoreCents / 100),
-    'Twee-winkelroute, uitsluitend artikelen: ' + money.format(plan.totalCents / 100),
+    'Gekozen boodschappenroute, uitsluitend artikelen: ' + money.format(plan.totalCents / 100),
     'Rekenkundig verschil t.o.v. goedkoopste enkele winkel, zonder extra ritkosten: ' +
       money.format(plan.additionalDifferenceCents / 100),
     ...((plan.lines.some(line => line.store === 'PLUS') && plan.lines.some(line => line.store === 'DekaMarkt'))

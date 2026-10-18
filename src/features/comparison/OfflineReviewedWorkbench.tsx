@@ -927,9 +927,12 @@ export function OfflineReviewedWorkbench({
     })
   }
 
-  const mixedStorePlan = useMemo(() =>
+  const mixedStorePlans = useMemo(() =>
     canShowDifference && basketPair?.plus && basketPair.deka
-      ? createMixedStoreShoppingPlan(basketPair.plus, basketPair.deka)
+      ? {
+          mixed: createMixedStoreShoppingPlan(basketPair.plus, basketPair.deka),
+          single: createMixedStoreShoppingPlan(basketPair.plus, basketPair.deka, 'single'),
+        }
       : null,
   [canShowDifference, basketPair])
 
@@ -1407,10 +1410,11 @@ export function OfflineReviewedWorkbench({
                     ))}
                 </section>
               )}
-              {canShowDifference && mixedStorePlan && imported.captures.PLUS &&
-                imported.captures.DekaMarkt && (
+              {canShowDifference && mixedStorePlans?.mixed && mixedStorePlans.single &&
+                imported.captures.PLUS && imported.captures.DekaMarkt && (
                   <MixedStoreShoppingCard
-                    plan={mixedStorePlan}
+                    mixed={mixedStorePlans.mixed}
+                    single={mixedStorePlans.single}
                     captured={{
                       PLUS: imported.captures.PLUS.observedAt,
                       DekaMarkt: imported.captures.DekaMarkt.observedAt,
