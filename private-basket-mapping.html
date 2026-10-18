@@ -60,6 +60,16 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 #trip .trip-line:has(input:checked) span{text-decoration:line-through;color:#698376}
 #trip select{max-width:100%;width:100%;border:1px solid #afc4b6;border-radius:9px;padding:11px;background:white;color:#183b2d}
 #trip .row-actions{display:flex;gap:12px;flex-wrap:wrap}
+/* Saved recipes become first-class physical inputs on desktop and narrow phones. */
+.own-recipe-pick-card{min-width:0}
+.own-recipe-pick-controls{display:grid;grid-template-columns:repeat(2,minmax(75px,95px));gap:10px}
+.own-recipe-pick-controls>span{display:grid;gap:3px;min-width:0}
+.own-recipe-pick-caption{font-weight:600;color:#496a55;font-size:.72rem}
+.own-recipe-pick-controls input{min-width:0;width:100%}
+@media(max-width:530px){
+ .own-recipe-pick-card{grid-template-columns:auto minmax(0,1fr)!important}
+ .own-recipe-pick-controls{grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+}
 #unpriced-items{display:grid;gap:9px;margin:14px 0}
 #unpriced-items .unpriced-line{display:flex;align-items:flex-start;gap:12px;border:1px solid #d6e0d4;border-radius:11px;background:#fafdfa;padding:13px;font-weight:500}
 #unpriced-items input[type=checkbox]{width:1.35rem;height:1.35rem;min-width:1.35rem;margin:3px 0 0;accent-color:#17643e}
