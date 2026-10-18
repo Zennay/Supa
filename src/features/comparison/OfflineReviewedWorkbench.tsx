@@ -314,6 +314,28 @@ export function OfflineReviewedWorkbench({
       return false
     }
   }
+  /** Paste supports the exact same canonical single/paired JSON as file import.
+   * No fallback parser, synthetic other retailer or automatic storage. */
+  function importPastedJson() {
+    if (!text.trim()) return
+    importVersion.current++
+    setBusy(false)
+    try {
+      const root: unknown = JSON.parse(text)
+      if (root && typeof root === 'object' && !Array.isArray(root) &&
+        (root as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
+        importOneStore(text)
+      } else {
+        const accepted = importSnapshots(text)
+        if (accepted) clearStaged()
+      }
+    } catch (error) {
+      setImported(null)
+      setMessage((error instanceof Error ? error.message : 'Deze JSON-opname is ongeldig.') +
+        ' Je gegevens worden niet als een vergelijkbare winkelprijs gebruikt.')
+    }
+  }
+
   async function loadFile(file?: File) {
     if (!file) return
     const version = ++importVersion.current
@@ -657,6 +679,8 @@ export function OfflineReviewedWorkbench({
           <code>packUnit</code> (g/kg/ml/l/piece), <code>priceCents</code> (geheel aantal centen of
           null), en <code>available</code> (true/false). Optioneel <code>packCount</code>.
           Gebruik uitsluitend gegevens die je mag bewaren en verwerken.
+          Je mag een afzonderlijke JSON-opname ook hieronder in het tekstveld plakken
+          en direct als voorlopige winkelboodschappenlijst openen, zonder prijsverschil.
           Je mag ook twee aparte JSON-bestanden aanleveren. Gebruik dan per bestand
           <code>schema: "supa-offline-store-capture-v1"</code> en één <code>capture</code>
           met dezelfde velden als hierboven. Laad eerst de ene winkel en daarna de andere;
@@ -721,7 +745,7 @@ export function OfflineReviewedWorkbench({
             plan={plan} recipes={recipes} activeDays={activeDays} clockMs={clockMs}
           />
         ))}
-        <label>Of plak de twee winkelopnames als JSON
+        <label>Of plak één losse of twee gecombineerde winkelopnames als JSON
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
@@ -735,8 +759,8 @@ export function OfflineReviewedWorkbench({
             }} />
         </label>
         <div className="offline-price-workbench__actions">
-          <button type="button" disabled={busy || !text.trim()} onClick={() => importSnapshots(text)}>
-            Bereken mandjes
+          <button type="button" disabled={busy || !text.trim()} onClick={importPastedJson}>
+            {imported ? 'Herbereken mandjes' : 'Importeer en bereken'}
           </button>
           <button type="button" className="ghost-button" disabled={!imported || busy}
             onClick={downloadOwnObservationJson}>
