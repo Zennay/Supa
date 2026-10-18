@@ -801,3 +801,29 @@ persoonlijk waren bevestigd. Er worden nooit prijzen of
 nieuwe winkelproducten in het werkblad gefabriceerd.
 De lijst blijft een privé werkinstructie, geen bewijs
 voor daadwerkelijke veldvalidatie of retailerrechten.
+
+### Eén winkel opnieuw opnemen vanuit de gewone invoer
+
+De knop **Hergebruik mijn gecontroleerde bronartikelen (zonder prijzen)**
+in het gewone handmatige invulscherm verschijnt uitsluitend als er al
+persoonlijk gecontroleerde bronregels zijn. Pas na toestemming neemt hij
+alleen de oorspronkelijke artikelcode, naam, fysieke pakinhoud,
+eenheid en multipack over in een **nieuw concept**. De oude prijs,
+beschikbaarheid en opnametijd worden nooit overgenomen: vul de nieuwe
+werkelijk geobserveerde feiten en de tijd zelf in.
+
+Bij één nieuwe winkel blijft een eerdere opname van de andere winkel
+behouden, inclusief haar ongewijzigde productbeoordelingen en afvinkingen.
+Is die winkel al ingelezen, dan toont Supa eerst het verschil tussen
+oude en nieuwe oorspronkelijke bron en vraagt een aparte expliciete
+vervangingsbevestiging. Ook een wijziging in het handmatige concept is
+nog geen nieuwe winkelopname en trekt een oudere, afzonderlijk
+geaccepteerde opname niet stilzwijgend in. Een volledige twee-winkel-
+vervanging vraagt vooraf toestemming. Ongeldige invoer vervangt niets.
+
+Als een bronartikel voor één winkel verandert, worden alleen de
+beoordelingen en afvinkingen van die betreffende winkel ingetrokken.
+De andere winkel blijft bruikbaar. Iedere nieuwe prijs moet opnieuw
+met de oorspronkelijke, zelf verkregen bron worden bevestigd; ook
+daarna geldt de bestaande zeven-dagen- en 24-uursvergelijkingsgrens.
+Geen prijs, retailertoestemming of onafhankelijk veldbewijs afgeleid.

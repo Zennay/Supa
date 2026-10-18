@@ -5,6 +5,13 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 
 type Unit = 'g' | 'kg' | 'ml' | 'l' | 'piece'
+export type ReviewedRecaptureSeed = {
+  sourceId: string
+  name: string
+  packAmount: string
+  packUnit: 'g' | 'kg' | 'ml' | 'l' | 'piece'
+  packCount: string
+}
 type ProductDraft = {
   sourceId?: string
   name: string
@@ -103,12 +110,15 @@ type Props = {
   activeDays: string[]
   onGenerated: (json: string) => void
   onEdit: () => void
+  reviewedRecaptureSeeds?: Record<string, ReviewedRecaptureSeed>
 }
 /**
  * UI-only source authoring: a real user's *own* entry, never an auto-captured
  * licensed catalog, attestation, retailer permission, or independent evidence.
  */
-export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerated, onEdit }: Props) {
+export function LocalTwoStorePriceEditor({
+  plan, recipes, activeDays, onGenerated, onEdit, reviewedRecaptureSeeds = {},
+}: Props) {
   const [open, setOpen] = useState(false)
   const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
   const selectedStores = sourceSelection === 'both' ? stores : [sourceSelection]
@@ -175,6 +185,29 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
     setDraftOptIn(false)
     setDraftStatus('Concept niet langer automatisch bewaard in deze browsertab.')
     setSavedDraftRaw(null)
+  }
+
+  function prefillReviewedSources() {
+    const seeds = Object.entries(reviewedRecaptureSeeds)
+    if (!seeds.length || !window.confirm(
+      'Neem alleen eerder door jou gecontroleerde bronartikelen, codes en verpakkingen over? Het huidige invoerconcept wordt vervangen. Prijzen, beschikbaarheid en nieuwe opnametijden blijven leeg.')) return
+    const replacements: Record<string, ProductDraft> = {}
+    const included = new Set<OfflineRetailer>()
+    for (const [rowKey, item] of seeds) {
+      const pair: unknown = JSON.parse(rowKey)
+      if (!Array.isArray(pair) || (pair[0] !== 'PLUS' && pair[0] !== 'DekaMarkt')) continue
+      const store = pair[0] as OfflineRetailer
+      included.add(store)
+      replacements[rowKey] = { ...item, priceEuros: '', available: false }
+    }
+    if (!included.size) return
+    setRows(replacements)
+    setCapturedAt({ PLUS: '', DekaMarkt: '' })
+    setSourceSelection(included.size === 2 ? 'both' : [...included][0])
+    setOpen(true)
+    setOutput(''); setError(''); setPreparedFor('')
+    setDraftStatus('Bronidentiteiten overgenomen als nieuw concept. Vul echte actuele prijzen en opnametijd opnieuw in.')
+    onEdit()
   }
 
   function changeRow(store: OfflineRetailer, id: string, patch: Partial<ProductDraft>, unit: string) {
@@ -297,6 +330,14 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
         onClick={() => setOpen(value => !value)}>{open ? 'Sluit invoer' : 'Open invulscherm'}</button>
     </div>
     {open && <>
+      {Object.keys(reviewedRecaptureSeeds).length > 0 && (
+        <div className="offline-manual-editor__draft">
+          <button type="button" className="ghost-button" onClick={prefillReviewedSources}>
+            Hergebruik mijn gecontroleerde bronartikelen (zonder prijzen)
+          </button>
+          <small>Alleen eerder persoonlijk gecontroleerde codes en verpakkingen; nieuwe prijzen, beschikbaarheid en opnametijden moet je zelf opnieuw invullen.</small>
+        </div>
+      )}
       <p className="disclaimer">Dit is een particuliere invoerhulp. Een zelf ingevulde tijd of prijs is geen onafhankelijk veldbewijs,
         geen bewijs van bronrechten en geen actuele publiceerbare supermarktprijs. Niets wordt naar een server gestuurd.</p>
       {activeNeeds.length === 0 ? <p role="status">Selecteer in Planner minimaal één maaltijd met ingrediënten.</p> : (

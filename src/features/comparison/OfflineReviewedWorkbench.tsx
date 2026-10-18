@@ -3,7 +3,7 @@ import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredien
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
-import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
+import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
@@ -730,6 +730,27 @@ export function OfflineReviewedWorkbench({
         ? compareFullBaskets({ baseline: plus, candidate: deka }) : null }
     } catch { return null }
   }, [imported, plan, recipes, activeDays, manualSku])
+  const reviewedRecaptureSeeds = useMemo(() => {
+    const seeds: Record<string, ReviewedRecaptureSeed> = {}
+    if (!imported || !basketPair) return seeds
+    for (const store of stores) {
+      const capture = imported.captures[store]
+      const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+      if (!capture || !basket) continue
+      for (const line of basket.lines) {
+        if (line.status !== 'matched' || line.pack.unit === 'unknown' ||
+            !reviewedLines[reviewedLineKey(store, capture.observedAt, line)])
+          continue
+        seeds[JSON.stringify([store, line.id])] = {
+          sourceId: line.productId, name: line.productName,
+          packAmount: String(line.pack.amount), packUnit: line.pack.unit,
+          packCount: String(line.pack.count),
+        }
+      }
+    }
+    return seeds
+  }, [imported, basketPair, reviewedLines])
+
   function downloadConfirmedComparisonCsv() {
     try {
       if (!canShowDifference || !eligibleComparisonRightNow() || !basketPair?.plus || !basketPair.deka ||
@@ -1002,6 +1023,7 @@ export function OfflineReviewedWorkbench({
       </div>
       <LocalTwoStorePriceEditor
         plan={plan} recipes={recipes} activeDays={activeDays}
+        reviewedRecaptureSeeds={reviewedRecaptureSeeds}
         onGenerated={acceptManualSource}
         onEdit={() => {
           // Cancel in-flight file admission or stale preview; editing a draft
