@@ -15,7 +15,7 @@ const MAX_BYTES = 256_000
 const error = (message) => { throw new Error(message) }
 
 /** Read the opened inode, not a pathname that can become a symlink after lstat. */
-async function readPrivateCsv(path) {
+export async function readPrivateCsv(path) {
   // SUPA's offline CLI runs on the supported POSIX/Node environment; reject
   // platforms where we cannot promise a no-follow open for private input.
   if (!Number.isInteger(constants.O_NOFOLLOW)) {
@@ -45,7 +45,7 @@ async function readPrivateCsv(path) {
  * The header is intentionally fixed, so quoted multiline product names stay
  * untouched and are interpreted only by convertTwoStoreCsv.
  */
-function joinPrivateStoreCsv(first, second) {
+export function joinPrivateStoreCsv(first, second) {
   const body = (source) => {
     const input = source.startsWith('\uFEFF') ? source.slice(1) : source
     const end = input.indexOf('\n')
