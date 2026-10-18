@@ -405,7 +405,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             {showShoppingCopy && <button type="button" onClick={() => shoppingCopy.current?.select()}>Selecteer alle tekst</button>}
             <button type="button" onClick={downloadOwnRecipeChecklist}>Download ongeprijsde lijst (TXT)</button>
             <button type="button" onClick={downloadForPrivateComparison}>Gebruik dit recept in winkelvergelijker (JSON)</button>
-            <a href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">Open privéwinkelvergelijker</a>
+            <a href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">Open privéwinkelvergelijker met dit JSON-bestand</a>
+            <a href="/private-basket-mapping.html#own-recipe-import" target="_blank" rel="noopener noreferrer">Of kies mijn lokaal opgeslagen recepten rechtstreeks in de vergelijker</a>
             {privateWeekMessage && <p role="status">{privateWeekMessage}</p>}
           </> : <p role="status">Vul 1 tot 100 hele porties in en controleer de oorspronkelijke hoeveelheid per recept.</p>}
         </section></>}</> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}</>}</dialog>
