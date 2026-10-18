@@ -63,6 +63,36 @@ function joinPrivateStoreCsv(first, second) {
   return combined
 }
 
+/**
+ * Product-facing, non-sensitive facts for the operator, not proof of
+ * authorised access, published prices or matching with a selected week.
+ */
+function localCaptureGuidance(captures) {
+  const now = Date.now()
+  const instants = captures.map(item => Date.parse(item.observedAt))
+  const details = captures.map(item => {
+    const usable = item.products.filter(product =>
+      product.available === true && Number.isSafeInteger(product.priceCents) &&
+      product.priceCents >= 0 && product.packAmount !== null &&
+      (product.packCount ?? 1) > 0).length
+    return item.retailer + ': ' + usable + ' van ' + item.products.length +
+      ' producten met bruikbare eigen prijs; ' + (item.products.length - usable) +
+      ' niet prijsbaar'
+  })
+  const warnings = []
+  if (instants.some(time => !Number.isFinite(time) || time > now)) {
+    warnings.push('Een opnametijd ligt in de toekomst; controleer datum en UTC-offset.')
+  }
+  if (instants.some(time => Number.isFinite(time) && now - time > 7 * 24 * 60 * 60 * 1000)) {
+    warnings.push('Een winkelopname is ouder dan 7 dagen; ververs de echte brondata.')
+  }
+  if (instants.length === 2 && instants.every(Number.isFinite) &&
+      Math.abs(instants[0] - instants[1]) > 24 * 60 * 60 * 1000) {
+    warnings.push('De twee winkeltijden liggen meer dan 24 uur uiteen.')
+  }
+  return [...details, ...warnings]
+}
+
 async function main() {
   const args = process.argv.slice(2)
   const pairing = args[0] === '--pair'
@@ -87,7 +117,9 @@ async function main() {
   // prices, source URLs, participant identities or an implied license.
   const counts = captures.map(capture => capture.retailer + ': ' + capture.products.length)
   await writeFile(target, json, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-  process.stdout.write('Privé CSV omgezet (' + counts.join(', ') + '). Importeer JSON in Supa → Vergelijk. Geen openbare prijsclaim.\n')
+  process.stdout.write('Privé CSV omgezet (' + counts.join(', ') + '). Importeer JSON in Supa → Vergelijk. Geen openbare prijsclaim.\n' +
+    localCaptureGuidance(captures).join('\n') + '\n' +
+    'Prijsverschil en ontbrekende productmatches zijn pas in de gekozen Supa-week te beoordelen.\n')
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
