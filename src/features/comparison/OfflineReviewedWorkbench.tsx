@@ -389,6 +389,26 @@ export function OfflineReviewedWorkbench({
   const basketPair = useMemo(() =>
     offlineSessionBaskets(session, plan, recipes, activeDays),
     [session.imported, session.manualSelections, plan, recipes, activeDays])
+  // Follow an explicit incomplete-line action from Lijst only after the
+  // canonical baskets and matching articles for this imported week exist.
+  useEffect(() => {
+    const target = session.reviewTarget
+    if (!target || !basketPair || !imported) return
+    if (!basketPair[target.store].lines.some(line => line.id === target.ingredientId)) {
+      session.setReviewTarget(null)
+      return
+    }
+    setOnlyUnresolved(previous => ({ ...previous, [target.store]: false }))
+    session.setReviewTarget(null)
+    const timer = window.setTimeout(() => {
+      document.getElementById('offline-match-' + target.store + '-' +
+        encodeURIComponent(target.ingredientId))?.scrollIntoView({
+        behavior: 'smooth', block: 'center',
+      })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [session.reviewTarget, session.setReviewTarget, basketPair, imported])
+
   const currentEnough = useMemo(() =>
     imported !== null && offlineSessionFresh(imported, clockMs),
     [imported, clockMs])
