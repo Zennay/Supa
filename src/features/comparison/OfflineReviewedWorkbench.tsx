@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
+import { parseOfflinePriceSnapshots, parseSingleOfflineCapture, type OfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
@@ -78,6 +78,34 @@ export function OfflineReviewedWorkbench({
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const importVersion = useRef(0)
+  // User-supplied single-store observations stay in memory; a half-pair never
+  // reaches matching, totals, clipboard or persistent browser storage.
+  const stagedCaptures = useRef<Partial<Record<OfflineRetailer, Record<string, unknown>>>>({})
+  const [stagedStores, setStagedStores] = useState<OfflineRetailer[]>([])
+  function clearStaged() {
+    stagedCaptures.current = {}
+    setStagedStores([])
+  }
+  function importOneStore(content: string) {
+    const { retailer, capture } = parseSingleOfflineCapture(content, Date.now())
+    const next = { ...stagedCaptures.current, [retailer]: capture }
+    stagedCaptures.current = next
+    setStagedStores(stores.filter(store => !!next[store]))
+    // First store never becomes an apparently valid comparison.
+    setImported(null)
+    setText('')
+    if (!next.PLUS || !next.DekaMarkt) {
+      setMessage(`${retailer} lokaal geladen. Importeer nu de andere winkel; er zijn nog geen vergelijkbare mandjes.`)
+      return
+    }
+    const joined = JSON.stringify({ schema: 'supa-offline-prices-v1',
+      captures: [next.PLUS, next.DekaMarkt] })
+    // Reuse the complete canonical gate, including 256 kB, timestamps,
+    // package fields, duplicate IDs and incomplete / stale price handling.
+    setText(joined)
+    importSnapshots(joined)
+  }
+
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
   const [manualSelections, setManualSelections] = useState<{
@@ -137,6 +165,37 @@ export function OfflineReviewedWorkbench({
     } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
   }
 
+  function downloadIndividualObservation(store: OfflineRetailer) {
+    if (!imported || !text.trim()) return
+    try {
+      // Export exactly the admitted, user-provided observation, not the
+      // normalized in-memory price model where null is not distinguishable
+      // from unavailable zero. No invented fields or inferred timestamps.
+      const original: unknown = JSON.parse(text)
+      if (!original || typeof original !== 'object' || Array.isArray(original)) return
+      const captures = (original as { captures?: unknown }).captures
+      if (!Array.isArray(captures) || captures.length !== 2) return
+      const capture = captures.find(item => item && typeof item === 'object' &&
+        (item as { retailer?: unknown }).retailer === store)
+      if (!capture) return
+      const single = JSON.stringify({ schema: 'supa-offline-store-capture-v1', capture }) + '\n'
+      // Re-admit the generated single file before making it exportable.
+      parseSingleOfflineCapture(single, Date.now())
+      const url = URL.createObjectURL(new Blob([single], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = store === 'PLUS' ? 'supa-mijn-plus-opname.json' : 'supa-mijn-dekamarkt-opname.json'
+        document.body.append(link)
+        link.click()
+        link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage(`Jouw oorspronkelijke ${store}-opname gedownload als afzonderlijk JSON-bestand.`)
+    } catch {
+      setMessage('Deze bronopname kan niet veilig afzonderlijk worden geëxporteerd.')
+    }
+  }
+
   function importSnapshots(input: string) {
     setImportEpoch(epoch => epoch + 1)
     try {
@@ -163,6 +222,15 @@ export function OfflineReviewedWorkbench({
       const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
       const isCsv = /\.csv$/i.test(file.name) || file.type === 'text/csv'
       let json = content
+      if (!isCsv && content.includes('supa-offline-store-capture-v1')) {
+        const root: unknown = JSON.parse(content)
+        if (root && typeof root === 'object' && !Array.isArray(root) &&
+          (root as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
+          if (version !== importVersion.current) return
+          importOneStore(content)
+          return
+        }
+      }
       if (isCsv) {
         // Vite copies public assets unchanged. Resolve within the deployed base,
         // not the site root, so preview and subpath deployments both work.
@@ -173,6 +241,7 @@ export function OfflineReviewedWorkbench({
         json = converter.convertTwoStoreCsv(content)
       }
       if (version !== importVersion.current) return
+      clearStaged()
       setText(json)
       importSnapshots(json)
     } catch (error) {
@@ -234,6 +303,7 @@ export function OfflineReviewedWorkbench({
         onGenerated={(json) => {
           importVersion.current++
           setBusy(false)
+          clearStaged()
           setText(json)
           importSnapshots(json)
         }}
@@ -241,6 +311,7 @@ export function OfflineReviewedWorkbench({
           // A user editing the in-app wizard also invalidates a pending file read.
           importVersion.current++
           setBusy(false)
+          clearStaged()
           setImported(null)
           setMessage('Wijzigingen nog niet doorgerekend. Bereken opnieuw om de mandjes te zien.')
         }}
@@ -254,6 +325,10 @@ export function OfflineReviewedWorkbench({
           <code>packUnit</code> (g/kg/ml/l/piece), <code>priceCents</code> (geheel aantal centen of
           null), en <code>available</code> (true/false). Optioneel <code>packCount</code>.
           Gebruik uitsluitend gegevens die je mag bewaren en verwerken.
+          Je mag ook twee aparte JSON-bestanden aanleveren. Gebruik dan per bestand
+          <code>schema: "supa-offline-store-capture-v1"</code> en één <code>capture</code>
+          met dezelfde velden als hierboven. Laad eerst de ene winkel en daarna de andere;
+          beide opnames blijven alleen in het geheugen van deze pagina.
           Ontbrekende prijzen: zet <code>priceCents: null</code> en <code>available: false</code>.</p>
       </details>
       <div className="offline-price-workbench__input">
@@ -275,10 +350,23 @@ export function OfflineReviewedWorkbench({
             kan dit blad worden geïmporteerd. De product-ID vermeldt welk ingrediënt je moet zoeken;
             die ID is geen geverifieerd winkelartikel.</p>
         </div>
-        <label>Importeer JSON of CSV vanaf dit apparaat
+        <label>Importeer een gecombineerd bestand of twee losse winkelopnames vanaf dit apparaat
           <input type="file" accept=".json,.csv,application/json,text/csv" disabled={busy}
-            onChange={event => { void loadFile(event.currentTarget.files?.[0]) }} />
+            onChange={event => { void loadFile(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
         </label>
+        {stagedStores.length > 0 && <div className="offline-price-workbench__staged" role="status">
+          <strong>Losse winkelopnames in geheugen:</strong> {stagedStores.join(' + ')}.
+          {stagedStores.length === 1
+            ? ' Upload nu de tweede winkel als JSON. Tot die tijd is geen totaal of verschil beschikbaar.'
+            : ' Beide bestanden geladen; de bestaande regels bepalen of de prijzen vergelijkbaar zijn.'}
+          <button type="button" className="ghost-button" onClick={() => {
+            importVersion.current++
+            clearStaged()
+            setImported(null)
+            setText('')
+            setMessage('Beide losse winkelopnames uit dit scherm verwijderd.')
+          }}>Wis losse opnames</button>
+        </div>}
         <label>Of plak de twee winkelopnames als JSON
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
@@ -286,6 +374,7 @@ export function OfflineReviewedWorkbench({
               // A pending file read is no longer authoritative after manual edits.
               importVersion.current++
               setBusy(false)
+              clearStaged()
               setText(event.target.value)
               setImported(null)
               setMessage('Invoer gewijzigd. Bereken opnieuw voordat mandjes en prijsverschillen zichtbaar zijn.')
@@ -299,9 +388,14 @@ export function OfflineReviewedWorkbench({
             onClick={downloadOwnObservationJson}>
             Bewaar mijn privéprijsopnames als JSON
           </button>
+          {stores.map(store => <button type="button" key={store} className="ghost-button"
+            disabled={!imported || busy} onClick={() => downloadIndividualObservation(store)}>
+            Download mijn {store}-opname apart
+          </button>)}
           <button type="button" className="ghost-button" onClick={() => {
             importVersion.current++
             setBusy(false)
+            clearStaged()
             setImported(null); setText(''); setMessage('Geïmporteerde prijsdata uit dit scherm gewist.')
           }}>Wis lokaal geladen data</button>
         </div>

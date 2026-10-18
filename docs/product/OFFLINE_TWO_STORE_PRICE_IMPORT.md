@@ -95,3 +95,38 @@ prijs van nul euro. Importeer dit JSON-bestand later opnieuw via **Vergelijk**.
 Bewaar het veilig: bronprijzen en je eigen keuzes zijn privé en niet gecontroleerd.
 Een oud bestand kan opnieuw worden ingelezen maar wordt niet als actueel
 prijsverschil vergeleken na de bestaande versheids-/24-uursgrenzen.
+
+## Twee losse winkelopnames lokaal samenvoegen
+
+Dezelfde **Vergelijk**-interface kan nu ook twee afzonderlijke JSON-opnames
+één voor één laden, zonder een server, browseropslag of extern prijsverzoek.
+Elke losse opname gebruikt dit contract (de productvelden volgen exact het
+hierboven beschreven `captures[].products`-contract):
+
+```json
+{
+  "schema": "supa-offline-store-capture-v1",
+  "capture": {
+    "retailer": "PLUS",
+    "observedAt": "VUL_DE_WERKELIJK_GEOBSERVEERDE_ISO_TIJD_MET_OFFSET_IN",
+    "products": []
+  }
+}
+```
+
+Dit is een **niet-importeerbaar structureel voorbeeld**: vul alleen echte,
+rechtmatig verkrijgbare observaties in; de tijd en producten zijn opzettelijk
+niet ingevuld. Importeer eerst één echte PLUS- of DekaMarkt-opname, daarna de
+andere. Tot beide aanwezig én geldig zijn wordt geen mandje getoond. Een
+gewijzigde opname voor dezelfde winkel vervangt de eerdere geheugenopname.
+De exacte oorspronkelijke velden worden lokaal samengevoegd en gaan opnieuw
+langs de bestaande paarvalidator: 256 kB, unieke retailers/product-ID's,
+verpakkingen, fysieke tijden, 24-uurverschil en zeven-dagen-actualiteit.
+Een import kan succesvol zijn maar **onvergelijkbaar** blijven wegens
+ontbrekende, verouderde of meer dan 24 uur uiteenliggende gegevens.
+
+Na een geldige dubbele opname kun je elk van de twee originele winkelrecords
+apart als JSON downloaden en later herimporteren. Een ontbrekende prijs blijft
+`null`, niet €0; deze export bewijst geen bronrechten of onafhankelijke
+M3-veldwaarnemingen. **Wis losse opnames** wist de tijdelijke records uit het
+scherm; bij navigatie of herladen verdwijnen ze eveneens.

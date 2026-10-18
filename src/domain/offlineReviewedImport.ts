@@ -81,6 +81,44 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): StoreProduct {
     priceCents: (raw.priceCents as number | null) ?? 0,
   }
 }
+/** Validate an individual owned observation with the same rules as pair import. */
+function parseCapture(raw: unknown, now: number): OfflineCapture {
+    if (!isRecord(raw) || !allowedFields(raw, ['retailer', 'observedAt', 'products']) ||
+        !RETAILERS.includes(raw.retailer as OfflineRetailer) ||
+        !Array.isArray(raw.products) ||
+        raw.products.length < 1 || raw.products.length > 1000) {
+      throw new Error('Elke winkel moet één opname met maximaal 1.000 producten hebben.')
+    }
+    const retailer = raw.retailer as OfflineRetailer
+    const instant = observedInstant(raw.observedAt)
+    if (instant === null || instant.ns > BigInt(Math.trunc(now + 300000)) * 1_000_000n) {
+      throw new Error('Ongeldige of toekomstige waarnemingstijd; gebruik ISO 8601 met tijdzone.')
+    }
+    const products = raw.products.map(product => parseProduct(product, retailer))
+    if (new Set(products.map(product => product.id)).size !== products.length) {
+      throw new Error('Dubbele product-ID binnen dezelfde winkel.')
+    }
+    return { retailer, observedAt: raw.observedAt as string, observedMs: instant.ms, observedNs: instant.ns, products }
+}
+
+/** Stage a single, explicitly provided capture. No prices become comparable
+ * until the two unmodified source captures pass the canonical paired gate. */
+export function parseSingleOfflineCapture(text: string, now: number): {
+  retailer: OfflineRetailer
+  capture: Record<string, unknown>
+} {
+  if (typeof text !== 'string' || new TextEncoder().encode(text).length > 256000 ||
+      !Number.isFinite(now)) throw new Error('Winkelopname ontbreekt of is te groot (256 kB).')
+  let root: unknown
+  try { root = JSON.parse(text) } catch { throw new Error('Ongeldige JSON-winkelopname.') }
+  if (!isRecord(root) || !allowedFields(root, ['schema', 'capture']) ||
+      root.schema !== 'supa-offline-store-capture-v1') {
+    throw new Error('Verwacht schema supa-offline-store-capture-v1 met één capture.')
+  }
+  const valid = parseCapture(root.capture, now)
+  return { retailer: valid.retailer, capture: root.capture as Record<string, unknown> }
+}
+
 export function parseOfflinePriceSnapshots(
   text: string, now: number,
 ): OfflinePriceSnapshots {
@@ -96,22 +134,9 @@ export function parseOfflinePriceSnapshots(
   }
   const captures = {} as Record<OfflineRetailer, OfflineCapture>
   for (const raw of root.captures) {
-    if (!isRecord(raw) || !allowedFields(raw, ['retailer', 'observedAt', 'products']) ||
-        !RETAILERS.includes(raw.retailer as OfflineRetailer) ||
-        hasOwn(captures, raw.retailer as string) || !Array.isArray(raw.products) ||
-        raw.products.length < 1 || raw.products.length > 1000) {
-      throw new Error('Elke winkel moet één opname met maximaal 1.000 producten hebben.')
-    }
-    const retailer = raw.retailer as OfflineRetailer
-    const instant = observedInstant(raw.observedAt)
-    if (instant === null || instant.ns > BigInt(Math.trunc(now + 300000)) * 1_000_000n) {
-      throw new Error('Ongeldige of toekomstige waarnemingstijd; gebruik ISO 8601 met tijdzone.')
-    }
-    const products = raw.products.map(product => parseProduct(product, retailer))
-    if (new Set(products.map(product => product.id)).size !== products.length) {
-      throw new Error('Dubbele product-ID binnen dezelfde winkel.')
-    }
-    captures[retailer] = { retailer, observedAt: raw.observedAt as string, observedMs: instant.ms, observedNs: instant.ns, products }
+    const capture = parseCapture(raw, now)
+    if (hasOwn(captures, capture.retailer)) throw new Error('Dubbele winkelopname.')
+    captures[capture.retailer] = capture
   }
   const nowNs = BigInt(Math.trunc(now)) * 1_000_000n
   const a = captures.PLUS.observedNs
