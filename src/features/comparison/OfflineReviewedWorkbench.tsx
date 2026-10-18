@@ -14,6 +14,7 @@ import { stagedStoreFingerprint } from './stagedStoreFingerprint.ts'
 import { LocalProductPicker } from './LocalProductPicker.tsx'
 import { unresolvedProductGuidance } from './unresolvedProductGuidance.ts'
 import { privateUnitPrice } from './privateUnitPrice.ts'
+import { createPrivateMatchBackup, readPrivateMatchBackup } from './privateMatchChoicesBackup.ts'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -129,6 +130,12 @@ export function OfflineReviewedWorkbench({
   const [message, setMessage] = useState('')
   const [onlyUnresolved, setOnlyUnresolved] = useState<Record<OfflineRetailer, boolean>>({ PLUS: false, DekaMarkt: false })
   const [busy, setBusy] = useState(false)
+  const [matchBackupPreview, setMatchBackupPreview] = useState<{
+    fingerprint: string; choices: Record<string, string>
+  } | null>(null)
+  const [matchBackupError, setMatchBackupError] = useState('')
+  const [matchBackupBusy, setMatchBackupBusy] = useState(false)
+  const matchBackupVersion = useRef(0)
   const importVersion = useRef(0)
   // User-supplied single-store observations stay in private App memory only.
   // The ref makes consecutive uploads synchronous; App owns state across tabs.
@@ -144,6 +151,8 @@ export function OfflineReviewedWorkbench({
     })
   }
   function clearPrivateSession() {
+    matchBackupVersion.current++
+    setMatchBackupPreview(null)
     importVersion.current++
     setBusy(false)
     clearStaged()
@@ -211,6 +220,11 @@ export function OfflineReviewedWorkbench({
   const choices: Readonly<Record<string, string>> =
     manualSelections.fingerprint === importFingerprint
       ? manualSelections.products : EMPTY_MANUAL_CHOICES
+  useEffect(() => {
+    matchBackupVersion.current++
+    setMatchBackupPreview(null)
+    setMatchBackupError('')
+  }, [importFingerprint])
   function chooseProduct(store: 'PLUS' | 'DekaMarkt', ingredientId: string, productId: string) {
     if (!imported || !importFingerprint) return
     setManualSelections(previous => {
@@ -673,6 +687,61 @@ export function OfflineReviewedWorkbench({
   const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
     !!basketPair?.comparison.claimable
 
+  // Optional portable match decisions, bound to the exact imported pair and
+  // Planner. Never reimports prices, chooses products automatically or uploads.
+  const matchCatalogs = imported ? {
+    PLUS: imported.captures.PLUS.products, DekaMarkt: imported.captures.DekaMarkt.products,
+  } : null
+  const matchBaskets = basketPair ? { PLUS: basketPair.plus, DekaMarkt: basketPair.deka } : null
+  async function downloadMatchChoices() {
+    setMatchBackupError('')
+    try {
+      if (!matchCatalogs || !matchBaskets || !importFingerprint) return
+      const data = await createPrivateMatchBackup(importFingerprint, choices, matchBaskets, matchCatalogs)
+      const uri = URL.createObjectURL(new Blob([data], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-prive-productkeuzes.json'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+      setMessage('Productkeuzes lokaal geëxporteerd. Bewaar ook je oorspronkelijke twee winkelopnames apart.')
+    } catch (error) {
+      setMatchBackupError(error instanceof Error ? error.message : 'Productkeuzes konden niet worden geëxporteerd.')
+    }
+  }
+  async function previewMatchChoices(file?: File) {
+    if (!file) return
+    const version = ++matchBackupVersion.current
+    setMatchBackupPreview(null)
+    setMatchBackupError('')
+    setMatchBackupBusy(true)
+    try {
+      if (!matchCatalogs || !matchBaskets || !importFingerprint || file.size > 128000) {
+        throw new Error('Laad eerst dezelfde twee winkels en kies een JSON-backup van maximaal 128 kB.')
+      }
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const selections = await readPrivateMatchBackup(raw, importFingerprint, matchBaskets, matchCatalogs)
+      if (version !== matchBackupVersion.current) return
+      setMatchBackupPreview({ fingerprint: importFingerprint, choices: selections })
+    } catch (error) {
+      if (version === matchBackupVersion.current) setMatchBackupError(
+        error instanceof Error ? error.message : 'Kon productkeuzes niet herstellen.')
+    } finally {
+      if (version === matchBackupVersion.current) setMatchBackupBusy(false)
+    }
+  }
+  function applyMatchChoices() {
+    if (!imported || !basketPair || !matchBackupPreview ||
+        matchBackupPreview.fingerprint !== importFingerprint) {
+      setMatchBackupError('Je weekplanning of winkelopnames zijn veranderd; laad de juiste backup opnieuw.')
+      return
+    }
+    setManualSelections({ fingerprint: importFingerprint, products: matchBackupPreview.choices })
+    setMatchBackupPreview(null)
+    setMessage('Productkeuzes voor precies dit winkelpaar en weekmenu hersteld en opnieuw berekend.')
+  }
+
   function downloadMissingItems(store: OfflineRetailer) {
     if (!imported || !basketPair) return
     const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
@@ -934,6 +1003,35 @@ export function OfflineReviewedWorkbench({
                 {' '}· {imported.captures[store].products.length} bronproducten</p>
             ))}
           </div>
+          <details className="offline-match-backup">
+            <summary>Mijn gecontroleerde productkoppelingen bewaren of herstellen</summary>
+            <p>Je handmatige PLUS- en Deka-keuzes worden als aparte lokale JSON-backup bewaard,
+              zonder prijzen of winkelbrondata. Laad later eerst exact dezelfde twee prijsopnames
+              en dezelfde Planner-week. Een andere bron of planning weigert herstel.</p>
+            <div className="offline-price-workbench__actions">
+              <button type="button" className="ghost-button" disabled={Object.keys(choices).length === 0}
+                onClick={() => { void downloadMatchChoices() }}>
+                Download mijn {Object.keys(choices).length} productkeuzes
+              </button>
+              <label>Herstel productkeuzes uit eigen JSON-backup
+                <input type="file" accept=".json,application/json" disabled={matchBackupBusy}
+                  onChange={event => {
+                    void previewMatchChoices(event.currentTarget.files?.[0])
+                    event.currentTarget.value = ''
+                  }} />
+              </label>
+            </div>
+            {matchBackupBusy && <p role="status">Productkeuzes worden lokaal gecontroleerd…</p>}
+            {matchBackupError && <p role="alert">{matchBackupError}</p>}
+            {matchBackupPreview && <div className="offline-match-backup__confirm">
+              <p role="status">{Object.keys(matchBackupPreview.choices).length} keuzes passen bij
+                precies deze winkels, prijzen en Planner-week. Bestaande handmatige productkeuzes
+                worden pas na jouw bevestiging vervangen; losse producten en vinkjes blijven intact.</p>
+              <button type="button" onClick={applyMatchChoices}>Bevestig herstel productkeuzes</button>
+              <button type="button" className="ghost-button"
+                onClick={() => setMatchBackupPreview(null)}>Annuleer herstel</button>
+            </div>}
+          </details>
           {!currentEnough && <p role="alert" className="attention-card">
             Oude prijsdata (ouder dan 7 dagen). Er wordt geen actueel prijsverschil getoond.
           </p>}

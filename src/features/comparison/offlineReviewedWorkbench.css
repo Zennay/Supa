@@ -302,3 +302,14 @@
   color:#194b2a; cursor:pointer; font-weight:650; }
 .offline-ingredient-ledger__controls > button:focus-visible {
   outline:3px solid #226f52; outline-offset:3px; }
+
+.offline-match-backup { border:1px solid #cbd9ca; border-radius:12px; padding:.8rem 1rem;
+  background:#f6faf4; display:grid; gap:.7rem; }
+.offline-match-backup summary { font-weight:650; cursor:pointer; }
+.offline-match-backup p { line-height:1.5; }
+.offline-match-backup input[type=file] { max-width:100%; }
+.offline-match-backup__confirm { display:flex; gap:.6rem; flex-wrap:wrap;
+  align-items:center; border-top:1px solid #cbd9ca; padding-top:.6rem; }
+.offline-match-backup__confirm p { flex-basis:100%; margin:0; }
+.offline-match-backup__confirm button { min-height:44px; }
+.offline-match-backup :is(summary,button,input):focus-visible { outline:3px solid #267452; outline-offset:3px; }
