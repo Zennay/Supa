@@ -60,6 +60,13 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [sortByPrice, setSortByPrice] = useState(false)
   const [unitFilter, setUnitFilter] = useState<DemoUnitFilter>('all')
   const [productSource, setProductSource] = useState<'own' | 'history' | 'figma'>(priceSession?.imported ? 'own' : 'history')
+  const privateExtraCount = priceSession?.imported
+    ? priceSession.extraProductIds.PLUS.length + priceSession.extraProductIds.DekaMarkt.length
+    : 0
+  const selectedListCount = addedProducts.length + privateExtraCount
+  const stagedStoreNames = !priceSession?.imported
+    ? (['PLUS', 'DekaMarkt'] as const).filter(store => !!priceSession?.stagedCaptures[store])
+    : []
   const [storeFilter, setStoreFilter] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
   const dialog = useRef<HTMLDialogElement>(null)
   const matches = (item: { id: string; name: string }) =>
@@ -88,8 +95,12 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
         <span className="eyebrow">Mijn eigen prijsgegevens</span>
         <h2 id="hifi-private-summary-title">Van weekmenu naar winkelmand</h2>
         {!privateSummary ? (
-          <p>Er zijn nog geen eigen winkelopnames geladen. Importeer toegestane PLUS-
-            en DekaMarkt-prijsgegevens om je huidige weekmenu privé te vergelijken.</p>
+          stagedStoreNames.length > 0
+            ? <p role="status">Je hebt {stagedStoreNames.join(' en ')} als eigen winkelopname geladen.
+                Open Lijst om deze winkel alvast zonder verzonnen tweede prijs te gebruiken.
+                Voor een vergelijkbaar verschil heb je nog twee geldige winkelopnames nodig.</p>
+            : <p>Er zijn nog geen eigen winkelopnames geladen. Importeer toegestane PLUS-
+                en DekaMarkt-prijsgegevens om je huidige weekmenu privé te vergelijken.</p>
         ) : <>
           <p><strong>{privateSummary.selectedStore}</strong> · {privateSummary.matched} producten
             gekoppeld · {privateSummary.unresolved} nog te beoordelen.</p>
@@ -117,16 +128,17 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
         </>}
         <div className="hifi-private-summary__actions">
           <button type="button" onClick={() => onNavigate('basket')}>
-            {privateSummary ? 'Vergelijk mijn winkels' : 'Eigen prijsdata importeren'}
+            {privateSummary ? 'Vergelijk mijn winkels' : stagedStoreNames.length > 0
+              ? 'Tweede winkel importeren' : 'Eigen prijsdata importeren'}
           </button>
-          {privateSummary && <button type="button" onClick={() => onNavigate('list')}>
+          {(privateSummary || stagedStoreNames.length > 0) && <button type="button" onClick={() => onNavigate('list')}>
             Open boodschappenlijst
           </button>}
         </div>
       </section>
     </> : <header className="hifi-products-heading"><h1 className="hifi-page-title">Producten</h1><button type="button" className="hifi-go-to-list" onClick={() => onNavigate('list')}
-      aria-label={`Bekijk mijn lijst met ${addedProducts.length} gekozen producten`}>
-      Mijn lijst <span aria-hidden="true">(${addedProducts.length})</span> →
+      aria-label={`Bekijk mijn lijst met ${selectedListCount} gekozen producten`}>
+      Mijn lijst <span aria-hidden="true">(${selectedListCount})</span> →
     </button> {productSource !== 'own' && <button className="hifi-icon-button" aria-label="Alleen favoriete producten" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(!favoritesOnly)}><FigmaImage asset={a.imgHeartButton} alt="" /></button>}</header>}
 
     <div className="hifi-search-row">
