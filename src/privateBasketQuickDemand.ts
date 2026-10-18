@@ -1,0 +1,126 @@
+/**
+ * Human-entered metric shopping list -> canonical, UNPRICED private basket.
+ * No source URL, retailer calls, automatic SKU assignment or storage writes.
+ * A complete invalid paste is rejected atomically before notifying the wizard.
+ */
+import { sumDecimalDemandUnits } from './domain/decimalPackArithmetic.ts'
+import type { MatchUnit } from './domain/matching.ts'
+
+type MetricUnit = MatchUnit
+type ParsedRow = { label: string; amount: number; unit: MetricUnit }
+type DemandLine = ParsedRow & {
+  id: string
+  productIds: { PLUS: null; DekaMarkt: null }
+}
+
+const textArea = document.querySelector<HTMLTextAreaElement>('#quick-demand-text')!
+const importButton = document.querySelector<HTMLButtonElement>('#quick-demand-import')!
+const status = document.querySelector<HTMLElement>('#quick-demand-status')!
+const mealsInput = document.querySelector<HTMLInputElement>('#meal-count')!
+const existingLines = document.querySelector<HTMLElement>('#lines')!
+const maxChars = 16000
+const maxRows = 200
+const units: Record<string, MetricUnit> = {
+  g: 'g', gram: 'g', kg: 'kg', ml: 'ml', l: 'l',
+  stuk: 'piece', stuks: 'piece', stukken: 'piece',
+}
+const quantity = '(\\d{1,7}(?:[.,]\\d{1,6})?)'
+const unit = '(kg|gram|g|ml|l|stukken|stuks|stuk)'
+const leading = new RegExp('^' + quantity + '\\s*' + unit + '\\s+(.+)$', 'iu')
+const trailing = new RegExp('^(.+?)\\s*[:;–—-]\\s*' + quantity + '\\s*' + unit + '$', 'iu')
+const allowedLabel = (label: string) => label.length > 0 && label.length <= 160 &&
+  label === label.trim() && /[\\p{L}\\p{N}]/u.test(label) &&
+  !/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/u.test(label) &&
+  !/^[=+@-]/u.test(label)
+const family = (value: MetricUnit) => value === 'g' || value === 'kg'
+  ? 'mass' : value === 'ml' || value === 'l' ? 'volume' : 'piece'
+
+function parseLine(rawLine: string, lineNumber: number): ParsedRow {
+  const value = rawLine.trim().replace(/^[•*]\\s+/, '')
+  const first = leading.exec(value)
+  const last = first ? null : trailing.exec(value)
+  if (!first && !last) {
+    throw Error('Regel ' + lineNumber + ': schrijf bijvoorbeeld "450 g basmati rijst" of "basmati rijst: 450 g".')
+  }
+  const rawAmount = first ? first[1] : last![2]
+  const rawUnit = (first ? first[2] : last![3]).toLocaleLowerCase('nl-NL')
+  const label = (first ? first[3] : last![1]).trim()
+  if (!allowedLabel(label)) throw Error('Regel ' + lineNumber + ': ongeldige of onveilige ingrediëntnaam.')
+  const amount = Number(rawAmount.replace(',', '.'))
+  const parsedUnit = units[rawUnit]
+  if (!parsedUnit || !Number.isFinite(amount) || amount <= 0 || amount > 100000 ||
+    (parsedUnit === 'piece' && !Number.isSafeInteger(amount))) {
+    throw Error('Regel ' + lineNumber + ': hoeveelheid of fysieke stuks moeten worden gecontroleerd.')
+  }
+  return { label, amount, unit: parsedUnit }
+}
+
+/** Combine only human-identical ingredient labels, never infer equivalent products. */
+export function readQuickMetricDemand(text: string, selectedMealCount: number) {
+  if (text.length > maxChars) throw Error('Je plaklijst is te lang; maximaal 16.000 tekens.')
+  if (!Number.isSafeInteger(selectedMealCount) || selectedMealCount < 1 ||
+      selectedMealCount > 1000) throw Error('Kies eerst een geldig aantal maaltijden van 1 tot 1000.')
+  const rawLines = text.replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(line => line.trim())
+  if (!rawLines.length || rawLines.length > maxRows) {
+    throw Error('Plak 1 tot 200 ingredientregels met een metrische hoeveelheid.')
+  }
+  const rows: ParsedRow[] = []
+  const keys = new Map<string, number>()
+  for (let i = 0; i < rawLines.length; i++) {
+    const item = parseLine(rawLines[i], i + 1)
+    const key = item.label.normalize('NFC').toLocaleLowerCase('nl-NL')
+    const position = keys.get(key)
+    if (position === undefined) {
+      keys.set(key, rows.length)
+      rows.push(item)
+      continue
+    }
+    const previous = rows[position]
+    if (family(previous.unit) !== family(item.unit)) {
+      throw Error('Regel ' + (i + 1) + ': dezelfde naam heeft verschillende maateenheden; controleer de ingrediënten.')
+    }
+    const baseUnit: MetricUnit = family(previous.unit) === 'mass' ? 'g'
+      : family(previous.unit) === 'volume' ? 'ml' : 'piece'
+    const sum = sumDecimalDemandUnits(
+      [{ amount: previous.amount, unit: previous.unit }, { amount: item.amount, unit: item.unit }],
+      baseUnit,
+    )
+    if (sum === null || sum <= 0 || sum > 100000 ||
+        (baseUnit === 'piece' && !Number.isSafeInteger(sum))) {
+      throw Error('Regel ' + (i + 1) + ': hoeveelheid kan niet zonder afronding worden samengevoegd.')
+    }
+    rows[position] = { label: previous.label, amount: sum, unit: baseUnit }
+  }
+  if (rows.length > maxRows) throw Error('Meer dan 200 verschillende ingrediënten.')
+  const ingredients: DemandLine[] = rows.map((item, index) => ({
+    ...item, id: 'plaklijst-' + (index + 1),
+    productIds: { PLUS: null, DekaMarkt: null },
+  }))
+  return { schema: 'supa-private-basket-demand-v1' as const, selectedMealCount, ingredients }
+}
+
+importButton.addEventListener('click', () => {
+  try {
+    const count = Number(mealsInput.value)
+    if (!/^[1-9]\\d*$/.test(mealsInput.value)) {
+      throw Error('Vul eerst bij het aantal maaltijden een geheel getal van 1 tot 1000 in.')
+    }
+    // Parse the entire text BEFORE replacing any existing physical demand or
+    // discarding SKU choices, shopping checks and previous financial output.
+    const demand = readQuickMetricDemand(textArea.value, count)
+    if (existingLines.children.length && !window.confirm(
+      'Vervang je huidige ingrediëntbehoefte door ' + demand.ingredients.length +
+      ' regels uit de plaklijst? Alle eerder handmatig gekozen winkel-SKU’s en afvinkstatus ' +
+      'voor dat mandje moeten opnieuw worden bevestigd. Eigen winkelbronprijzen blijven onaangeroerd.'
+    )) return
+    document.dispatchEvent(new CustomEvent('supa:private-planner-demand', { detail: demand }))
+    status.textContent = demand.ingredients.length + ' fysieke, metrische ingrediënten ingevoerd voor ' +
+      count + ' maaltijd(en). Gelijke namen zijn exact samengevoegd; winkelproducten en prijzen ' +
+      'blijven onbekend totdat je jouw echt waargenomen SKU’s zelf koppelt.'
+    status.className = 'notice'
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message :
+      'De ingrediënten konden niet veilig worden ingelezen. De vorige mand blijft ongewijzigd.'
+    status.className = 'notice error'
+  }
+})
