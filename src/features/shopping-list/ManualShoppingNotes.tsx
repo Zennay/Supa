@@ -1,6 +1,8 @@
-import { useRef, useState, type FormEvent, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type Dispatch, type SetStateAction } from 'react'
 import './manualShoppingNotes.css'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
+import type { OneStoreBasket } from '../../domain/basket.ts'
+import { combinedPrivateTripText, type PrivateLooseProduct } from './combinedPrivateTrip.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
 type SetNotes = Dispatch<SetStateAction<UnpricedShoppingNote[]>>
@@ -9,7 +11,16 @@ const safeLabel = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\
   .replace(/\s+/g, ' ').trim()
 
 /** Private volatile notes; no product match, price or retailer-source authority. */
-export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppingNote[]; setNotes: SetNotes }) {
+export function ManualShoppingNotes({ notes, setNotes, storeBasket = null,
+  activeStore = 'PLUS', sourceFresh = false, ownExtras = [],
+}: {
+  notes: UnpricedShoppingNote[]
+  setNotes: SetNotes
+  storeBasket?: OneStoreBasket | null
+  activeStore?: 'PLUS' | 'DekaMarkt'
+  sourceFresh?: boolean
+  ownExtras?: readonly PrivateLooseProduct[]
+}) {
   const [name, setName] = useState('')
   const [bulkDraft, setBulkDraft] = useState('')
   const [store, setStore] = useState<UnpricedShoppingNote['store']>('Algemeen')
@@ -17,6 +28,26 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
+  const [combinedCopyVisible, setCombinedCopyVisible] = useState(false)
+  const [combinedStore, setCombinedStore] = useState<'PLUS' | 'DekaMarkt'>(activeStore)
+  useEffect(() => { setCombinedStore(activeStore); setCombinedCopyVisible(false) }, [activeStore])
+  const combinedText = combinedPrivateTripText({
+    basket: combinedStore === activeStore ? storeBasket : null,
+    store: combinedStore, sourceFresh: combinedStore === activeStore && sourceFresh,
+    notes, extras: combinedStore === activeStore ? ownExtras : [],
+  })
+  function downloadCombinedTrip() {
+    if (!combinedText) return
+    const url = URL.createObjectURL(new Blob([combinedText], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-mijn-complete-' + combinedStore.toLowerCase() + '-lijst.txt'
+      document.body.append(link); link.click(); link.remove()
+      setMessage('Je complete privéwinkeltrip voor ' + combinedStore + ' is lokaal gedownload.')
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
+
   const [backupPreview, setBackupPreview] = useState<UnpricedShoppingNote[] | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
   const readVersion = useRef(0)
@@ -183,6 +214,39 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
         Annuleer import
       </button>
     </div>}
+    <section className="manual-shopping-notes__combined" aria-label="Complete winkeltrip exporteren">
+      <h3>Eén complete lijst per winkel</h3>
+      <label>Winkel voor download
+        <select value={combinedStore} onChange={event => {
+          setCombinedStore(event.target.value as 'PLUS' | 'DekaMarkt')
+          setCombinedCopyVisible(false)
+        }}>
+          <option value="PLUS">PLUS</option>
+          <option value="DekaMarkt">DekaMarkt</option>
+        </select>
+      </label>
+      {combinedStore !== activeStore && storeBasket && <p role="status">
+        Het ingeladen mandje hoort bij {activeStore}. Schakel de gekozen winkel in
+        Lijst om voor {combinedStore} ook het eigen geprijsde mandje te exporteren.
+      </p>}
+      <p>Weekmenu, zelf gekozen losse winkelproducten en eigen algemene/{combinedStore}-notities
+        in één bestand. Prijzen van extra artikelen blijven buiten weekbudget en
+        PLUS/DekaMarkt-vergelijking. Bij verouderde invoer wordt dat vermeld.</p>
+      <div className="manual-shopping-notes__actions">
+        <button type="button" disabled={!combinedText} onClick={downloadCombinedTrip}>
+          Download complete {combinedStore}-lijst (TXT)
+        </button>
+        <button type="button" disabled={!combinedText}
+          onClick={() => setCombinedCopyVisible(value => !value)}>
+          {combinedCopyVisible ? 'Verberg complete lijst' : 'Toon complete kopieertekst'}
+        </button>
+      </div>
+      {!combinedText && <p role="status">Nog geen betrouwbare lijstregels voor deze winkel.
+        Voeg eigen boodschappen toe of open Vergelijk voor je weekmand.</p>}
+      {combinedCopyVisible && combinedText && <label>Kopieer complete {combinedStore}-lijst
+        <textarea readOnly rows={12} value={combinedText}
+          onFocus={event => event.currentTarget.select()} /></label>}
+    </section>
     {exportVisible && <label>Kopieer mijn ongeprijsde boodschappen
       <textarea rows={Math.min(selected.length + 6, 15)} readOnly value={exportText}
         onFocus={event => event.currentTarget.select()} /></label>}

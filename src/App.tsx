@@ -658,7 +658,18 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {tab === 'list' && (privateNotesView
           ? (() => {
               const PrivateNotes = privateNotesView
-              return <PrivateNotes notes={unpricedNotes} setNotes={setUnpricedNotes} />
+              const store = plannerStore ?? offlinePriceSession.selectedStore
+              const capture = offlinePriceSession.imported?.captures[store]
+              const extras = capture ? capture.products
+                .filter(product => offlinePriceSession.extraProductIds[store].includes(product.id))
+                .map(product => ({
+                  name: product.name,
+                  packs: offlinePriceSession.extraQuantities[store][product.id] ?? 1,
+                  done: offlinePriceSession.extraDoneIds[store].includes(product.id),
+                })) : []
+              return <PrivateNotes notes={unpricedNotes} setNotes={setUnpricedNotes}
+                storeBasket={plannerBasket} activeStore={store}
+                sourceFresh={plannerSource === 'private'} ownExtras={extras} />
             })()
           : <p role="status">{privateNotesLoadError
               ? 'Eigen ongeprijsde lijst kon niet worden geopend; je bestaande mandjes zijn behouden.'
