@@ -474,7 +474,15 @@ function ownDataRecord(
   try {
     for (const field of fields) {
       const property = Object.getOwnPropertyDescriptor(value, field)
-      if (!property || !('value' in property)) return null
+      // Missing fields are copied as own undefined data, never inherited:
+      // the existing financial validator can then give the right refusal
+      // reason. Accessor properties remain unsafe even if they return
+      // undefined, so never evaluate them.
+      if (!property) {
+        snapshot[field] = undefined
+        continue
+      }
+      if (!('value' in property)) return null
       snapshot[field] = property.value
     }
   } catch {
@@ -503,12 +511,26 @@ function ownDataArray(value: unknown): unknown[] | null {
   }
 }
 
+const ROOT_CLAIM_ACCESSOR = Symbol('M3 root claim accessor')
+
 function snapshotFinancialInputs(input: unknown): {
   comparison: BasketComparison
   evidence: unknown
-} | null {
+} | typeof ROOT_CLAIM_ACCESSOR | null {
   const args = ownDataRecord(input, ['comparison', 'evidence'])
   if (!args) return null
+  // An accessor-backed outcome or savings field is an invalid financial
+  // assertion. Preserve the established customer-facing mismatch reason,
+  // without accessing either property or any prototype.
+  if (args.comparison && typeof args.comparison === 'object' &&
+      !Array.isArray(args.comparison)) {
+    try {
+      for (const field of ['outcome', 'savingsCents']) {
+        const fact = Object.getOwnPropertyDescriptor(args.comparison, field)
+        if (fact && !('value' in fact)) return ROOT_CLAIM_ACCESSOR
+      }
+    } catch { return null }
+  }
   const comparison = ownDataRecord(args.comparison, [
     'claimable', 'reasons', 'deltaCents', 'lineDeltas',
     'baselineTotalCents', 'candidateTotalCents', 'outcome', 'savingsCents',
@@ -530,19 +552,25 @@ function snapshotFinancialInputs(input: unknown): {
   comparison.lineDeltas = safeRows
 
   if (!Array.isArray(args.evidence)) {
-    return { comparison: comparison as unknown as BasketComparison, evidence: args.evidence }
+    return { comparison: comparison as BasketComparison, evidence: args.evidence }
   }
   const items = ownDataArray(args.evidence)
   if (!items) return null
-  const safeItems: Record<string, unknown>[] = []
+  const safeItems: unknown[] = []
   for (const item of items) {
+    // Preserve ordinary malformed JSON records for the existing detailed
+    // error reporting. Invalid primitives cannot contain executable accessors.
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      safeItems.push(null)
+      continue
+    }
     const record = ownDataRecord(item, [
       'lineId', 'effect', 'deltaCents', 'evidenceRef',
     ])
     if (!record) return null
     safeItems.push(record)
   }
-  return { comparison: comparison as unknown as BasketComparison, evidence: safeItems }
+  return { comparison: comparison as BasketComparison, evidence: safeItems }
 }
 
 export function attributeSavingsEffects(input: {
@@ -550,6 +578,15 @@ export function attributeSavingsEffects(input: {
   evidence: unknown
 }): SavingsAttribution {
   const snapshot = snapshotFinancialInputs(input)
+  if (snapshot === ROOT_CLAIM_ACCESSOR) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: null,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison outcome or savings disagrees with physical cents'],
+    }
+  }
   if (!snapshot) {
     return {
       status: 'unknown',
