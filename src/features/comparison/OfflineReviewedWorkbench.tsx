@@ -79,6 +79,8 @@ export function OfflineReviewedWorkbench({
     stagedCaptures: storedStages, setStagedCaptures,
     manualSelections, setManualSelections,
   } = session
+  // The textarea is a draft; the shared session text contains only admitted source bytes.
+  const [draftText, setDraftText] = useState(() => text)
   const [message, setMessage] = useState('')
   const [onlyUnresolved, setOnlyUnresolved] = useState<Record<OfflineRetailer, boolean>>({ PLUS: false, DekaMarkt: false })
   const [busy, setBusy] = useState(false)
@@ -102,6 +104,7 @@ export function OfflineReviewedWorkbench({
     clearStaged()
     setImported(null)
     setText('')
+    setDraftText('')
     setManualSelections({ fingerprint: '', products: {} })
     session.setReviewTarget(null)
     session.setTripMemory({})
@@ -235,7 +238,6 @@ export function OfflineReviewedWorkbench({
   }
 
   function importSnapshots(input: string, retainStagedStores: readonly OfflineRetailer[] = []): boolean {
-    setImportEpoch(epoch => epoch + 1)
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setClockMs(Date.now())
@@ -246,6 +248,7 @@ export function OfflineReviewedWorkbench({
         offlineSessionFingerprint(imported, plan, recipes, activeDays) ===
           offlineSessionFingerprint(parsed, plan, recipes, activeDays)
       if (!sameSource) {
+        setImportEpoch(epoch => epoch + 1)
         const preservedMatches: Record<string, string> = {}
         const currentProducts: Record<OfflineRetailer, Set<string>> = {
           PLUS: new Set(parsed.captures.PLUS.products.filter(p => p.available).map(p => p.id)),
@@ -310,16 +313,16 @@ export function OfflineReviewedWorkbench({
           : 'Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
       return true
     } catch (error) {
-      // Never retain/display a previous basket after an invalid new import.
-      setImported(null)
-      setMessage(error instanceof Error ? error.message : 'Ongeldige import.')
+      // An invalid draft never revokes an already admitted original capture.
+      setMessage((error instanceof Error ? error.message : 'Ongeldige import.') +
+        ' Het eerder toegelaten winkelmandje blijft behouden.')
       return false
     }
   }
   /** Paste is admitted through exactly the same local JSON/CSV adapters as
    * file upload, and never creates a missing retailer or relaxed price rule. */
   async function importPastedData() {
-    const supplied = text
+    const supplied = draftText
     if (!supplied.trim()) return
     const version = ++importVersion.current
     setBusy(true)
@@ -346,18 +349,19 @@ export function OfflineReviewedWorkbench({
       const root: unknown = JSON.parse(json)
       if (root && typeof root === 'object' && !Array.isArray(root) &&
         (root as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
-        importOneStore(json)
+        if (imported && text) applyStoreReplacement(json)
+        else importOneStore(json)
+        setDraftText(json)
       } else if (importSnapshots(json)) {
-        // Keep the original parsed captures as JSON, including null prices;
-        // the raw pasted CSV is never confused with canonical JSON here.
+        // Only canonical original bytes become the App-owned price source.
         setText(json)
+        setDraftText(json)
         clearStaged()
       }
     } catch (error) {
       if (version !== importVersion.current) return
-      setImported(null)
       setMessage((error instanceof Error ? error.message : 'Deze brongegevens zijn ongeldig.') +
-        ' Er wordt geen winkelprijs of prijsverschil uit dit concept afgeleid.')
+        ' Je eerdere geldige prijsopnames blijven behouden; dit concept telt niet mee.')
     } finally {
       if (version === importVersion.current) setBusy(false)
     }
@@ -383,7 +387,9 @@ export function OfflineReviewedWorkbench({
         if (root && typeof root === 'object' && !Array.isArray(root) &&
           (root as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
           if (version !== importVersion.current) return
-          importOneStore(content)
+          if (previousImported && previousText) applyStoreReplacement(content)
+          else importOneStore(content)
+          setDraftText(content)
           return
         }
       }
@@ -408,17 +414,18 @@ export function OfflineReviewedWorkbench({
       const converted: unknown = JSON.parse(json)
       if (converted && typeof converted === 'object' && !Array.isArray(converted) &&
         (converted as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
-        importOneStore(json)
+        if (previousImported && previousText) applyStoreReplacement(json)
+        else importOneStore(json)
+        setDraftText(json)
         return
       }
       // A rejected replacement must not erase a previously accepted capture.
       // Defer stage clearing until the strict pair admission succeeds.
-      setText(json)
-      if (importSnapshots(json)) clearStaged()
-      else {
-        setText(previousText)
-        setImported(previousImported)
-      }
+      if (importSnapshots(json)) {
+        setText(json)
+        setDraftText(json)
+        clearStaged()
+      } else setImported(previousImported)
     } catch (error) {
       if (version !== importVersion.current) return
       setText(previousText)
@@ -474,12 +481,12 @@ export function OfflineReviewedWorkbench({
       // The canonical pair gate remains authoritative for size, age, exact
       // observation timestamps, duplicate IDs, packages and missing prices.
       parseOfflinePriceSnapshots(combined, Date.now())
-      setText(combined)
       if (!importSnapshots(combined)) {
-        setText(previousText)
         setImported(previousImported)
         return
       }
+      setText(combined)
+      setDraftText(combined)
       clearStaged()
       setMessage('PLUS en DekaMarkt zijn samen lokaal geïmporteerd. Controleer nu de productkoppelingen.')
     } catch (error) {
@@ -554,6 +561,7 @@ export function OfflineReviewedWorkbench({
       DekaMarkt: other === 'DekaMarkt' ? remainingQuantities : {},
     })
     setText(next)
+    setDraftText(next)
     setClockMs(Date.now())
     setImportEpoch(epoch => epoch + 1)
     setImported(parsed)
@@ -728,17 +736,10 @@ export function OfflineReviewedWorkbench({
                   ' Je eerder toegelaten winkelpaar is behouden.')
               }
             } else importOneStore(json)
-          } else {
-            // A new full pair is admitted atomically; a malformed update
-            // leaves the current in-memory reviews and captures in place.
-            const previousText = text
-            const previousImported = imported
+          } else if (importSnapshots(json)) {
             setText(json)
-            if (importSnapshots(json)) clearStaged()
-            else {
-              setText(previousText)
-              setImported(previousImported)
-            }
+            setDraftText(json)
+            clearStaged()
           }
         }}
         onEdit={() => {
@@ -832,25 +833,18 @@ export function OfflineReviewedWorkbench({
           />
         ))}
         <label>Of plak een losse of gecombineerde winkelopname als JSON of CSV
-          <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
+          <textarea rows={5} value={draftText} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
               // A pending file read is no longer authoritative after manual edits.
               importVersion.current++
               setBusy(false)
-              // Keep a previously admitted standalone store while the user
-              // pastes its partner. Only a successfully admitted replacement
-              // changes that source; invalid draft text has no price authority.
-              if (imported) clearStaged()
-              setText(event.target.value)
-              setImported(null)
-              setMessage(stagedStores.length > 0
-                ? 'JSON-concept gewijzigd. Reeds ingelezen losse winkelopnames blijven bewaard; klik Importeer en bereken om een tweede opname toe te voegen.'
-                : 'Invoer gewijzigd. Bereken opnieuw voordat mandjes en prijsverschillen zichtbaar zijn.')
+              setDraftText(event.target.value)
+              setMessage('Concept gewijzigd. Bestaande geldige bronnen blijven intact tot de nieuwe gegevens zijn toegelaten.')
             }} />
         </label>
         <div className="offline-price-workbench__actions">
-          <button type="button" disabled={busy || !text.trim()} onClick={() => { void importPastedData() }}>
+          <button type="button" disabled={busy || !draftText.trim()} onClick={() => { void importPastedData() }}>
             {imported ? 'Herbereken mandjes' : 'Importeer en bereken'}
           </button>
           <button type="button" className="ghost-button" disabled={!imported || busy}
