@@ -3,6 +3,7 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import { buildOneStoreBasket, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { parseSingleOfflineCapture, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
+import type { OfflineComparisonSession } from './offlineComparisonSession.ts'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const dates = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -13,7 +14,7 @@ const dates = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle:
  * invented matching partner, quote comparison, scraper or public claim exists.
  */
 export function StagedStorePreview({
-  store, capture, plan, recipes, activeDays, clockMs,
+  store, capture, plan, recipes, activeDays, clockMs, session,
 }: {
   store: OfflineRetailer
   capture: Record<string, unknown>
@@ -21,6 +22,7 @@ export function StagedStorePreview({
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   clockMs: number
+  session: OfflineComparisonSession
 }) {
   const result = useMemo(() => {
     try {
@@ -46,6 +48,19 @@ export function StagedStorePreview({
     nowNs - source.observedNs <= 604_800_000_000_000n
   const complete = basket.lines.length > 0 && basket.selectedMealCount > 0 &&
     basket.unresolvedLineCount === 0
+  const selected = new Set(session.extraProductIds[store])
+  const extras = source.products.filter(product => selected.has(product.id))
+  const extraLines = extras.map(product => ({
+    id: product.id, name: product.name,
+    packs: session.extraQuantities[store][product.id] ?? 1,
+    priceCents: product.available && Number.isSafeInteger(product.priceCents) &&
+      product.priceCents >= 0 ? product.priceCents : null,
+    done: session.extraDoneIds[store].includes(product.id),
+  }))
+  const known = extraLines.reduce((sum, line) =>
+    line.priceCents === null ? sum : sum + line.packs * line.priceCents, 0)
+  const knownCents = Number.isSafeInteger(known) ? known : null
+  const unknown = extraLines.filter(line => line.priceCents === null).length
   return <section className="offline-staged-preview"
     aria-label={'Voorlopige privéboodschappenlijst voor ' + store}>
     <h3>{store}: alvast je boodschappen bekijken</h3>
@@ -66,9 +81,61 @@ export function StagedStorePreview({
       jouw lokale opname. Controleer verpakkingen, identiteit, hoeveelheden en prijzen
       zelf. Je kunt definitieve handmatige keuzes maken zodra beide winkelopnames
       samen in Vergelijk zijn geladen.</p>
+    {extras.length > 0 && <section className="offline-own-extras" aria-label={'Losse privéproducten bij ' + store}>
+      <h4>Zelf toegevoegde artikelen ({extras.length})</h4>
+      <p className="disclaimer">Je hebt deze producten vanuit Producten aan deze winkel toegevoegd.
+        Ze tellen niet mee in de rekenkundige prijs van het geplande maaltijdmandje.</p>
+      <p className="offline-own-extras__subtotal" role="status">
+        <strong>{knownCents === null ? 'Subtotaal niet berekenbaar' :
+          (unknown ? 'Bekend deelbedrag' : 'Subtotaal') + ': ' + euros.format(knownCents / 100)}</strong>
+        {unknown > 0 && <small>{unknown} prijzen ontbreken. Dit is geen volledig subtotaal.</small>}
+      </p>
+      <ul>{extras.map(product => <li key={product.id}>
+        <label>
+          <input type="checkbox" checked={session.extraDoneIds[store].includes(product.id)}
+            onChange={() => session.setExtraDoneIds(previous => ({
+              ...previous, [store]: previous[store].includes(product.id)
+                ? previous[store].filter(id => id !== product.id)
+                : [...previous[store], product.id],
+            }))} />
+          <span><strong>{product.name}</strong>
+            <small>{product.available ? euros.format(product.priceCents / 100) :
+              'Prijs niet beschikbaar'} per verpakking</small>
+          </span>
+        </label>
+        <label className="offline-own-extras__quantity">Verpakkingen
+          <select aria-label={'Aantal verpakkingen ' + product.name}
+            value={session.extraQuantities[store][product.id] ?? 1}
+            onChange={event => {
+              const packs = Number(event.target.value)
+              if (!Number.isSafeInteger(packs) || packs < 1 || packs > 99) return
+              session.setExtraQuantities(previous => ({
+                ...previous, [store]: { ...previous[store], [product.id]: packs },
+              }))
+            }}>
+            {Array.from({ length: 99 }, (_, index) => index + 1)
+              .map(packs => <option key={packs} value={packs}>{packs}</option>)}
+          </select>
+        </label>
+        <button type="button" className="ghost-button" onClick={() => {
+          session.setExtraProductIds(previous => ({
+            ...previous, [store]: previous[store].filter(id => id !== product.id),
+          }))
+          session.setExtraDoneIds(previous => ({
+            ...previous, [store]: previous[store].filter(id => id !== product.id),
+          }))
+          session.setExtraQuantities(previous => {
+            const quantities = { ...previous[store] }
+            delete quantities[product.id]
+            return { ...previous, [store]: quantities }
+          })
+        }}>Verwijder</button>
+      </li>)}</ul>
+    </section>}
     <PrivateStoreTripChecklist
       key={store + ':' + source.observedAt}
       basket={basket} observedAt={source.observedAt} fresh={fresh}
+      extraLines={extraLines}
     />
   </section>
 }
