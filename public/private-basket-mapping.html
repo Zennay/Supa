@@ -40,9 +40,14 @@ Onbekende productmatches blijven onbekend.</p></header>
 <h2 id="source-title">1 · Open je eigen winkelopnames</h2>
 <label for="source">Gecombineerde eigen CSV, of supa-offline-prices-v1 JSON</label>
 <input id="source" type="file" accept=".csv,.json,text/csv,application/json">
-<p class="muted">Voor twee aparte CSV-bestanden: gebruik eerst de bestaande lokale CLI
-<code>node scripts/offline-two-store-csv-to-json.mjs --pair plus.csv deka.csv prijzen.json</code>.
-Dit scherm gebruikt de bestaande strikte CSV-converter. Productnamen en prijzen komen alleen uit jouw bestand.</p>
+<div class="stores">
+<div><label for="plus-source">Of: PLUS CSV afzonderlijk</label><input id="plus-source" type="file" accept=".csv,text/csv"></div>
+<div><label for="deka-source">En: DekaMarkt CSV afzonderlijk</label><input id="deka-source" type="file" accept=".csv,text/csv"></div>
+</div>
+<p class="muted">Kies één gecombineerd CSV-/JSON-bestand <strong>of</strong> twee afzonderlijke CSV-opnames.
+Elk afzonderlijk bestand moet de negen kolommen met de volledige CSV-kop bevatten.
+Beide bronnen worden alleen lokaal samengevoegd en door de bestaande strikte Supa-converter gevalideerd.
+Productnamen en prijzen komen uitsluitend uit jouw eigen bestanden.</p>
 <div id="source-status" class="notice" role="status" aria-live="polite">Nog geen bronbestand gekozen.</div>
 </section>
 <section aria-labelledby="demand-title">
