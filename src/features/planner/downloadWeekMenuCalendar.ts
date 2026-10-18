@@ -103,8 +103,10 @@ export function downloadPreparedWeekCalendar(
     if (!field?.readOnly || field.value !== expectedText) return false
     const ics = preparedWeekCalendar(expectedText, monday)
     if (!ics) return false
-    objectUrl = port.createObjectURL(ics)
-    if (!objectUrl.startsWith('blob:') || !field.readOnly || field.value !== expectedText) return false
+    const createdUrl = port.createObjectURL(ics)
+    if (typeof createdUrl !== 'string' || !createdUrl.startsWith('blob:')) return false
+    objectUrl = createdUrl
+    if (!field.readOnly || field.value !== expectedText) return false
     port.triggerDownload(objectUrl, 'supa-weekmenu-' + monday + '.ics')
     return true
   } catch {
