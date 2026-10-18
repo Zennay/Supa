@@ -27,15 +27,18 @@ export function ComparisonReadiness({
     return first ? [{
       id: store, heading: store + ': ' + basket.unresolvedLineCount + ' ingrediënt(en) nog niet gekoppeld',
       detail: basket.matchedLineCount + ' van ' + basket.lines.length +
-        ' zijn berekenbaar. De ontbrekende artikelen krijgen geen verzonnen prijs.',
+        ' zijn berekenbaar. Controleer de bronproducten of voer een eigen geldige opname met de ontbrekende artikelen in.',
       onClick: () => onReviewMissing(store, first.id),
       action: 'Koppel het eerste ontbrekende product',
+      secondaryAction: 'Bronproducten aanvullen',
+      onSecondaryClick: onOpenImport,
     }] : []
   })
   const needsSource = !sourceFresh || !pairedWithin24h
   const isReady = comparable && hasDemand && !needsSource && incomplete.length === 0
   const steps: Array<{ id: string; heading: string; detail: string;
-    action?: string; onClick?: () => void }> = []
+    action?: string; onClick?: () => void;
+    secondaryAction?: string; onSecondaryClick?: () => void }> = []
   if (!hasDemand) steps.push({
     id: 'plan',
     heading: 'Kies je weekmenu',
@@ -82,9 +85,13 @@ export function ComparisonReadiness({
       : <ol className="offline-readiness__steps">
           {steps.map(step => <li key={step.id}>
             <div><strong>{step.heading}</strong><p>{step.detail}</p></div>
-            {step.onClick && step.action && <button type="button" onClick={step.onClick}>
-              {step.action}
-            </button>}
+            <div className="offline-readiness__step-actions">
+              {step.onClick && step.action && <button type="button" onClick={step.onClick}>
+                {step.action}
+              </button>}
+              {step.onSecondaryClick && step.secondaryAction && <button type="button"
+                onClick={step.onSecondaryClick}>{step.secondaryAction}</button>}
+            </div>
           </li>)}
         </ol>}
   </section>
