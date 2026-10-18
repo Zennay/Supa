@@ -615,6 +615,16 @@ export function OfflineReviewedWorkbench({
     if (!Array.isArray(sourceCaptures) || sourceCaptures.length !== 2) {
       throw new Error('Bestaand bronpaar is ongeldig.')
     }
+    const currentStoreCapture = sourceCaptures.find(source =>
+      source && typeof source === 'object' &&
+      (source as { retailer?: unknown }).retailer === retailer)
+    // Re-importing the same canonical observation is a no-op, not permission
+    // to discard existing private checkmarks, manual matches or extra items.
+    if (currentStoreCapture && JSON.stringify(currentStoreCapture) === JSON.stringify(capture)) {
+      setPendingReplacement(null)
+      setMessage('Deze ' + retailer + '-opname is gelijk aan de huidige. Alle productkeuzes en afvinkingen blijven behouden.')
+      return
+    }
     const candidate = JSON.stringify({
       schema: 'supa-offline-prices-v1',
       captures: sourceCaptures.map(source => source && typeof source === 'object' &&
