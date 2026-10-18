@@ -109,6 +109,9 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
  * These are React-memory-only hooks; no automatic storage or network upload. */
 function useOfflineComparisonSession(): OfflineComparisonSession {
   const [selectedStore, setSelectedStore] = useState<OfflineRetailer>('PLUS')
+  const [reviewTarget, setReviewTarget] = useState<{
+    store: OfflineRetailer; ingredientId: string
+  } | null>(null)
   const [text, setText] = useState('')
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [stagedCaptures, setStagedCaptures] = useState<
@@ -130,7 +133,8 @@ function useOfflineComparisonSession(): OfflineComparisonSession {
   >({})
   const [importEpoch, setImportEpoch] = useState(0)
   return {
-    selectedStore, setSelectedStore, text, setText, imported, setImported,
+    selectedStore, setSelectedStore, reviewTarget, setReviewTarget,
+    text, setText, imported, setImported,
     stagedCaptures, setStagedCaptures, manualSelections, setManualSelections,
     tripMemory, setTripMemory, extraProductIds, setExtraProductIds,
     extraDoneIds, setExtraDoneIds, importEpoch, setImportEpoch,
