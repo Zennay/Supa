@@ -114,7 +114,7 @@ export function formatMixedStoreShoppingPlan(
     'SUPA · mijn persoonlijke twee-winkel-boodschappenroute',
     'Alleen zelf ingevoerde, persoonlijk bevestigde prijsopnames.',
     'Geen actuele live winkelprijzen, bronrechten of onafhankelijk besparingsbewijs.',
-    'Reiskosten, tijd en eventuele winkelkortingen zijn NIET meegenomen.',
+    'Niet-opgegeven reistijd, bezoekkosten en eventuele winkelkortingen zijn NIET meegenomen.',
     'PLUS opname: ' + clean(captured.PLUS),
     'DekaMarkt opname: ' + clean(captured.DekaMarkt),
     '',

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import type { MixedStoreShoppingPlan, MixedStore } from './mixedStoreShoppingPlan.ts'
 import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
+import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
@@ -231,6 +232,22 @@ export function MixedStoreShoppingCard({
           else { setShowText(false); setMessage('Deze bron is niet meer actueel.') }
         }} />
     </label>}
+    <MixedTripBackupControls
+      context={{ plus, deka, captured }}
+      settings={{ mode, preferred, extraVisitCost }}
+      plan={plan}
+      checked={new Set(plan.lines.filter(line => done(line.key)).map(line => line.key))}
+      eligibleNow={eligibleNow}
+      onRestore={restored => {
+        setMode(restored.mode)
+        setPreferred(restored.preferred)
+        setExtraVisitCost(restored.extraVisitCost)
+        setChecked(Object.fromEntries(restored.checked.map(item => [key(item), true])))
+        setShowText(false)
+        setOnlyOpen(false)
+        setMessage('Winkelvoorkeuren en afvinkingen teruggezet zonder prijsgoedkeuringen over te nemen.')
+      }}
+    />
     <p role="status" aria-live="polite">{message}</p>
     <small>Alleen volledige en persoonlijk gecontroleerde winkelopnames van maximaal
       zeven dagen oud met bronmomenten binnen 24 uur. Wijziging van een product

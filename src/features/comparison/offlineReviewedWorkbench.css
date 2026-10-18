@@ -219,3 +219,10 @@
   .mixed-store-route .offline-price-workbench__totals,
   .mixed-store-route__shops { grid-template-columns:minmax(0,1fr); }
 }
+
+.mixed-store-route__backup {
+  display:grid; gap:.5rem; background:#eef5ec;
+  padding:clamp(.75rem,2vw,1rem); border-radius:12px; border:1px solid #d4dfd2;
+}
+.mixed-store-route__backup h4,.mixed-store-route__backup p { margin:.2rem 0; }
+.mixed-store-route__backup input[type=file] { width:100%; max-width:100%; min-width:0; }

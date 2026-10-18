@@ -933,3 +933,23 @@ twee-winkelbedrag uit de handmatig gekozen route. De maximale
 theoretische voordelige ruimte zonder voorkeuren blijft afzonderlijk
 herkenbaar; er worden nooit niet-gekozen productprijzen als jouw
 persoonlijke route uitgegeven.
+
+#### Behoud je gecombineerde boodschappenroute (lokaal JSON)
+
+De samengestelde route kan nu apart als lokale JSON worden bewaard:
+geselecteerde winkelstrategie, expliciete artikelvoorkeuren, optionele
+eigen omrijkosten en aangekruiste artikelen. Via **Herstel mijn
+winkelroute** wordt het bestand uitsluitend op jouw apparaat geopend.
+Een strikt geverifieerde exacte vingerafdruk omvat de beide originele
+bronmomenten, winkelidentiteiten, geselecteerde maaltijden,
+fysieke ingrediënten, originele artikelcodes, pakinhouden én
+pakprijzen. Ook de gekozen winkelroute zelf moet identiek zijn.
+Nieuwe of afwijkende opnames weigeren het herstel en laten de huidige
+lijst staan; anders vraagt Supa eerst expliciete vervangingstoestemming.
+
+Het bestand maakt géén nieuwe winkelprijs, bronrechten, artikelmatch
+of productgoedkeuring. Je moet de huidige originele productmatches
+nog altijd individueel bevestigen voordat de route of het herstel
+beschikbaar komt. Oude winkelvoorkeuren van verdwenen
+Planner-ingrediënten worden bij het bewaren genegeerd. Er is geen
+automatische cloud- of achtergrondsynchronisatie.
