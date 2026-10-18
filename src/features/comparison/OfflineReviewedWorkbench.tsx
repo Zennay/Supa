@@ -76,6 +76,7 @@ export function OfflineReviewedWorkbench({
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
   const [openTripOnly, setOpenTripOnly] = useState(false)
+  const [tripExportMessage, setTripExportMessage] = useState('')
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
   const [clockMs, setClockMs] = useState(() => Date.now())
@@ -111,6 +112,23 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function downloadShoppingTrip(basket: OneStoreBasket, store: typeof stores[number]) {
+    try {
+      const content = shoppingChecklist(basket, store, doneTripItems)
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-boodschappen-prive.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setTripExportMessage(store + ': boodschappenlijst lokaal gedownload, inclusief je huidige vinkjes. Ongecontroleerde prijzen zijn geen winkelbewijs.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch {
+      setTripExportMessage('Download mislukt. Open de kopieerbare lijst en selecteer de tekst.')
+    }
+  }
+
   function importSnapshots(input: string) {
     // A new import, even identical bytes, requires explicit source review.
     setReviewedLines({})
@@ -119,19 +137,23 @@ export function OfflineReviewedWorkbench({
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setClockMs(Date.now())
       setImported(parsed)
-      setMessage('Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
+      setMessage(Object.keys(parsed.captures).length === 1
+        ? 'Eén eigen winkelopname lokaal geladen. Een tweede winkel blijft onbekend tot je die werkelijk invoert.'
+        : 'Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
     } catch (error) {
       // Never retain/display a previous basket after an invalid new import.
       setImported(null)
       setMessage(error instanceof Error ? error.message : 'Ongeldige import.')
     }
   }
-  async function loadFile(file?: File) {
+  async function loadFile(file?: File, addSecond = false) {
     if (!file) return
     const version = ++importRevision.current
-    setImported(null)
-    setReviewedLines({})
-    setDoneTripItems({})
+    if (!addSecond) {
+      setImported(null)
+      setReviewedLines({})
+      setDoneTripItems({})
+    }
     setBusy(true)
     try {
       if (!file.size || file.size > 256000) {
@@ -151,17 +173,48 @@ export function OfflineReviewedWorkbench({
           typeof module.convertTwoStoreCsv !== 'function') {
           throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
         }
-        content = (module.convertTwoStoreCsv as (input: string) => string)(raw)
+        if (!('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function') {
+          throw new Error('De lokale één-winkel CSV-converter is niet beschikbaar.')
+        }
+        content = (module.convertOwnStoreCsv as (input: string) => string)(raw)
       }
       if (version !== importRevision.current) return
-      setText(content)
-      importSnapshots(content)
-      if (isCsv) setMessage('Jouw twee-winkel CSV is lokaal omgezet met dezelfde strikte Supa-converter. Controleer alle productmatches afzonderlijk.')
+      if (addSecond) {
+        if (!imported || Object.keys(imported.captures).length !== 1)
+          throw new Error('Voeg alleen bij precies één bestaande eigen winkelopname een tweede winkel toe.')
+        const next = parseOfflinePriceSnapshots(content, Date.now())
+        const existingShop = Object.keys(imported.captures)[0]
+        const addedShop = Object.keys(next.captures)
+        if (addedShop.length !== 1 || addedShop[0] === existingShop)
+          throw new Error('Selecteer één opname van de andere winkel. Bestaande brondata zijn niet gewijzigd.')
+        // Preserve the original source products, timestamp and unknown prices
+        // byte-for-byte in value; never reconstruct unknowns as zero-priced packs.
+        const previousRaw = JSON.parse(text) as { captures: unknown[] }
+        const addedRaw = JSON.parse(content) as { captures: unknown[] }
+        const combined = JSON.stringify({
+          schema: 'supa-offline-prices-v1',
+          captures: [...previousRaw.captures, ...addedRaw.captures],
+        })
+        const result = parseOfflinePriceSnapshots(combined, Date.now())
+        setText(combined)
+        setImported(result)
+        setClockMs(Date.now())
+        // The prior store's reviewedLineKeys are preserved only if that
+        // physical input was unchanged; the added retailer starts unreviewed.
+        setMessage('De tweede werkelijk ingevoerde winkel is gekoppeld. Controleer de nieuwe producten; de oorspronkelijke opname is behouden.')
+      } else {
+        setText(content)
+        importSnapshots(content)
+        if (isCsv) setMessage('Eigen winkel-CSV lokaal gelezen. Alleen geobserveerde winkels zijn geladen; controleer iedere productmatch.')
+      }
     } catch (error) {
       if (version !== importRevision.current) return
-      setImported(null)
-      setReviewedLines({})
-      setText('')
+      if (!addSecond) {
+        setImported(null)
+        setReviewedLines({})
+        setDoneTripItems({})
+        setText('')
+      }
       setMessage(error instanceof Error ? error.message : 'Kon dit bronbestand niet lezen.')
     } finally {
       if (version === importRevision.current) setBusy(false)
@@ -171,25 +224,27 @@ export function OfflineReviewedWorkbench({
   const basketPair = useMemo(() => {
     if (!imported) return null
     try {
-      const plus = buildOneStoreBasket({
-        store: { id: 'PLUS', name: 'PLUS' }, plan, recipes, activeDays,
-        products: imported.captures.PLUS.products,
-      })
-      const deka = buildOneStoreBasket({
-        store: { id: 'DekaMarkt', name: 'DekaMarkt' }, plan, recipes, activeDays,
-        products: imported.captures.DekaMarkt.products,
-      })
-      return { plus, deka, comparison: compareFullBaskets({ baseline: plus, candidate: deka }) }
+      const plus = imported.captures.PLUS
+        ? buildOneStoreBasket({
+            store: { id: 'PLUS', name: 'PLUS' }, plan, recipes, activeDays,
+            products: imported.captures.PLUS.products,
+          }) : null
+      const deka = imported.captures.DekaMarkt
+        ? buildOneStoreBasket({
+            store: { id: 'DekaMarkt', name: 'DekaMarkt' }, plan, recipes, activeDays,
+            products: imported.captures.DekaMarkt.products,
+          }) : null
+      return { plus, deka, comparison: plus && deka
+        ? compareFullBaskets({ baseline: plus, candidate: deka }) : null }
     } catch { return null }
   }, [imported, plan, recipes, activeDays])
   const currentEnough = useMemo(() => {
     if (!imported) return false
-    const nowNs = BigInt(Math.trunc(clockMs)) * 1000000n
-    const first = imported.captures.PLUS.observedNs
-    const second = imported.captures.DekaMarkt.observedNs
-    const oldest = first < second ? first : second
-    const newest = first > second ? first : second
-    return nowNs >= newest - 300000000000n && nowNs - oldest <= 604800000000000n
+    const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
+    const instants = Object.values(imported.captures).map(capture => capture.observedNs)
+    const oldest = instants.reduce((a, b) => a < b ? a : b)
+    const newest = instants.reduce((a, b) => a > b ? a : b)
+    return nowNs >= newest - 300_000_000_000n && nowNs - oldest <= 604_800_000_000_000n
   }, [imported, clockMs])
   const perStoreReview = stores.map(store => {
     const basket = store === 'PLUS' ? basketPair?.plus : basketPair?.deka
@@ -207,7 +262,7 @@ export function OfflineReviewedWorkbench({
   })
   const allReviewed = perStoreReview.every(item => item.complete)
   const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
-    allReviewed && !!basketPair?.comparison.claimable
+    allReviewed && !!basketPair?.comparison?.claimable
 
   return (
     <section className="offline-price-workbench" aria-label="Geïmporteerde winkelprijzen vergelijken">
@@ -253,7 +308,7 @@ export function OfflineReviewedWorkbench({
       <details className="offline-price-workbench__schema">
         <summary>Welk importbestand werkt?</summary>
         <p>UTF-8 JSON met <code>schema: "supa-offline-prices-v1"</code> en precies twee
-          <code> captures</code>, elk met <code>retailer</code> (PLUS / DekaMarkt),
+          <code> captures</code>, of <code>supa-private-single-store-prices-v1</code> met één opname; elk met <code>retailer</code> (PLUS / DekaMarkt),
           <code>observedAt</code> (ISO-tijd met tijdzone) en een <code>products</code>-lijst.
           Elk product bevat <code>id</code>, <code>name</code>, <code>packAmount</code>,
           <code>packUnit</code> (g/kg/ml/l/piece), <code>priceCents</code> (geheel aantal centen of
@@ -262,11 +317,18 @@ export function OfflineReviewedWorkbench({
           Ontbrekende prijzen: zet <code>priceCents: null</code> en <code>available: false</code>.</p>
       </details>
       <div className="offline-price-workbench__input">
-        <label>Open je eigen twee-winkel CSV of JSON vanaf dit apparaat
+        <label>Open je eigen één- of twee-winkel CSV of JSON vanaf dit apparaat
           <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
             onChange={event => { void loadFile(event.currentTarget.files?.[0]) }} />
         </label>
-        <label>Of plak je eigen twee winkelopnames als JSON (een CSV wordt lokaal geconverteerd)
+        {imported && Object.keys(imported.captures).length === 1 && (
+          <label>Voeg de echte opname van de andere winkel toe (CSV of JSON)
+            <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
+              onChange={event => { void loadFile(event.currentTarget.files?.[0], true) }} />
+            <small>De al gecontroleerde oorspronkelijke winkel blijft bewaard. Nieuwe producten moet je zelf bevestigen; er wordt geen tweede winkel verzonnen.</small>
+          </label>
+        )}
+        <label>Of plak je eigen winkelopname(s) als JSON
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
@@ -298,22 +360,28 @@ export function OfflineReviewedWorkbench({
         <div className="offline-price-workbench__results">
           <h3>Winkelvergelijking voor jouw huidige weekmenu</h3>
           <div className="offline-price-workbench__dates">
-            {stores.map(store => (
-              <p key={store}><strong>{store}</strong> · waargenomen {captureDate(imported.captures[store].observedMs)}
-                {' '}· {imported.captures[store].products.length} bronproducten</p>
-            ))}
+            {stores.map(store => {
+              const capture = imported.captures[store]
+              return capture
+                ? <p key={store}><strong>{store}</strong> · waargenomen {captureDate(capture.observedMs)}
+                    {' '}· {capture.products.length} eigen bronproducten</p>
+                : <p key={store}><strong>{store}</strong> · geen bronopname; prijs onbekend.</p>
+            })}
           </div>
           {!currentEnough && <p role="alert" className="attention-card">
             Oude prijsdata (ouder dan 7 dagen). Er wordt geen actueel prijsverschil getoond.
           </p>}
-          {!imported.pairedWithin24h && <p role="alert" className="attention-card">
-            Waarnemingen liggen meer dan 24 uur uiteen. Het prijsverschil is niet vergelijkbaar.
-          </p>}
+          {Object.keys(imported.captures).length === 1
+            ? <p role="status" className="attention-card">De tweede winkel is nog onbekend. Het eigen complete winkelmandje kan na broncontrole worden getoond; er is geen prijsverschil te berekenen.</p>
+            : !imported.pairedWithin24h && <p role="alert" className="attention-card">
+              Waarnemingen liggen meer dan 24 uur uiteen. Het prijsverschil is niet vergelijkbaar.
+            </p>}
           {!basketPair ? <p role="alert">Deze planning kon niet veilig aan de import worden gekoppeld.</p> : (
             <>
               <div className="offline-price-workbench__totals">
                 {stores.map(store => {
                   const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+                  if (!basket) return null
                   const reviewedStore = perStoreReview.find(item => item.store === store)!
                   const complete = reviewedStore.complete && reviewedStore.fresh
                   return (
@@ -330,7 +398,7 @@ export function OfflineReviewedWorkbench({
                   )
                 })}
               </div>
-              {(basketPair.plus.unresolvedLineCount > 0 || basketPair.deka.unresolvedLineCount > 0) && (
+              {((basketPair.plus?.unresolvedLineCount ?? 0) > 0 || (basketPair.deka?.unresolvedLineCount ?? 0) > 0) && (
                 <p className="offline-price-workbench__missing" role="status">
                   Deze vergelijking is nog niet volledig. Vul onbekende artikelen in beide winkels in.
                   Bekende deelbedragen zijn geen complete winkelmandprijs en worden niet als besparing vergeleken.
@@ -342,14 +410,14 @@ export function OfflineReviewedWorkbench({
                 geaccepteerd volledig mandtotaal of winkelwinnaar.
               </p>}
               <p className="offline-price-workbench__difference" role="status">
-                {canShowDifference && basketPair.comparison.deltaCents !== null
+                {canShowDifference && basketPair.comparison && basketPair.comparison.deltaCents !== null
                   ? basketPair.comparison.deltaCents === 0
                     ? 'Deze twee ingevoerde volledige mandjes hebben hetzelfde rekenkundige totaal.'
                     : `${basketPair.comparison.deltaCents > 0 ? 'PLUS' : 'DekaMarkt'} is op basis van deze eigen invoer ${euros.format(Math.abs(basketPair.comparison.deltaCents) / 100)} goedkoper.`
                   : 'Nog geen vergelijkbaar prijsverschil: controleer productmatches of vul ontbrekende / actuele bronnen aan.'}
                 <small> Dit is nooit een gecontroleerde publieke besparingsclaim.</small>
               </p>
-              {canShowDifference && basketPair.comparison.lineDeltas.length > 0 && (
+              {canShowDifference && basketPair.comparison && basketPair.comparison.lineDeltas.length > 0 && (
                 <section className="offline-price-workbench__drivers" aria-label="Prijsverschil per ingrediënt">
                   <h4>Wat veroorzaakt het verschil?</h4>
                   {[...basketPair.comparison.lineDeltas]
@@ -371,9 +439,12 @@ export function OfflineReviewedWorkbench({
                   Alle afvinkingen wissen
                 </button>
               </div>
+              <p role="status" aria-live="polite">{tripExportMessage}</p>
               <div className="offline-price-workbench__stores">
                 {stores.map(store => {
                   const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+                  const capture = imported.captures[store]
+                  if (!basket || !capture) return null
                   const purchased = basket.lines.filter(line => doneTripItems[shoppingTaskKey(store, line)]).length
                   const visible = basket.lines.filter(line =>
                     !openTripOnly || !doneTripItems[shoppingTaskKey(store, line)])
@@ -383,6 +454,9 @@ export function OfflineReviewedWorkbench({
                       <p className="offline-price-workbench__trip-progress" role="status">
                         {purchased} van {basket.lines.length} afgevinkt · alleen privé op dit apparaat
                       </p>
+                      <button type="button" className="ghost-button" onClick={() => downloadShoppingTrip(basket, store)}>
+                        Download boodschappenlijst (TXT)
+                      </button>
                       <details className="offline-price-workbench__checklist">
                         <summary>Kopieer boodschappenlijst voor {store}</summary>
                         <p>Selecteer en kopieer deze lijst; de tekst blijft op je apparaat.</p>
@@ -413,9 +487,9 @@ export function OfflineReviewedWorkbench({
                             {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {euros.format(line.pricePerPackCents / 100)} per verpakking</span>}
                             {line.status === 'matched' && <label className="offline-price-workbench__review">
                               <input type="checkbox"
-                                checked={Boolean(reviewedLines[reviewedLineKey(store, imported.captures[store].observedAt, line)])}
+                                checked={Boolean(reviewedLines[reviewedLineKey(store, capture.observedAt, line)])}
                                 onChange={event => {
-                                  const key = reviewedLineKey(store, imported.captures[store].observedAt, line)
+                                  const key = reviewedLineKey(store, capture.observedAt, line)
                                   const checked = event.currentTarget.checked
                                   setReviewedLines(previous => ({ ...previous, [key]: checked }))
                                 }} />

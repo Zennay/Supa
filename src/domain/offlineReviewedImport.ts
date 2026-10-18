@@ -11,7 +11,7 @@ export type OfflineCapture = Readonly<{
   products: StoreProduct[]
 }>
 export type OfflinePriceSnapshots = Readonly<{
-  captures: Readonly<Record<OfflineRetailer, OfflineCapture>>
+  captures: Readonly<Partial<Record<OfflineRetailer, OfflineCapture>>>
   ageHours: number
   gapHours: number
   currentEnough: boolean
@@ -90,11 +90,13 @@ export function parseOfflinePriceSnapshots(
   try { root = JSON.parse(text) }
   catch { throw new Error('Importeer geldige UTF-8 JSON, geen HTML of CSV.') }
   if (!isRecord(root) || !allowedFields(root, ['schema', 'captures']) ||
-      root.schema !== 'supa-offline-prices-v1' || !Array.isArray(root.captures) ||
-      root.captures.length !== 2) {
-    throw new Error('Verwacht schema supa-offline-prices-v1 met precies twee winkelopnames.')
+      !Array.isArray(root.captures) || !(
+        (root.schema === 'supa-offline-prices-v1' && root.captures.length === 2) ||
+        (root.schema === 'supa-private-single-store-prices-v1' && root.captures.length === 1)
+      )) {
+    throw new Error('Gebruik één eigen winkelopname (supa-private-single-store-prices-v1) of twee (supa-offline-prices-v1).')
   }
-  const captures = {} as Record<OfflineRetailer, OfflineCapture>
+  const captures: Partial<Record<OfflineRetailer, OfflineCapture>> = {}
   for (const raw of root.captures) {
     if (!isRecord(raw) || !allowedFields(raw, ['retailer', 'observedAt', 'products']) ||
         !RETAILERS.includes(raw.retailer as OfflineRetailer) ||
@@ -114,19 +116,18 @@ export function parseOfflinePriceSnapshots(
     captures[retailer] = { retailer, observedAt: raw.observedAt as string, observedMs: instant.ms, observedNs: instant.ns, products }
   }
   const nowNs = BigInt(Math.trunc(now)) * 1_000_000n
-  const a = captures.PLUS.observedNs
-  const b = captures.DekaMarkt.observedNs
-  const newestNs = a > b ? a : b
-  const oldestNs = a < b ? a : b
+  const observations = Object.values(captures)
+  const instants = observations.map(item => item.observedNs)
+  const newestNs = instants.reduce((a, b) => a > b ? a : b)
+  const oldestNs = instants.reduce((a, b) => a < b ? a : b)
   const gapNs = newestNs - oldestNs
   const ageHours = Number(nowNs - newestNs) / 3_600_000_000_000
   const gapHours = Number(gapNs) / 3_600_000_000_000
   return {
     captures, ageHours, gapHours,
-    // These are only constraints on local math; proof and permissions
-    // remain external. The 24-hour boundary is exact down to one nanosecond.
     currentEnough: nowNs >= newestNs - 300_000_000_000n &&
       nowNs - oldestNs <= 604_800_000_000_000n,
-    pairedWithin24h: gapNs <= 86_400_000_000_000n,
+    // A single source is never evidence of a second retailer or a price winner.
+    pairedWithin24h: observations.length === 2 && gapNs <= 86_400_000_000_000n,
   }
 }

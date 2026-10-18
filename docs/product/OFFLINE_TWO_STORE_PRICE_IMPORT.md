@@ -91,3 +91,39 @@ Alleen `g`, `kg`, `ml`, `l`, `piece` zijn ondersteund. Maximaal twee opnames, 1.
 Dit is een **lokale particuliere rekenhulp, geen licentiecontrole of gegarandeerde actuele supermarktvergelijker**. Alleen gegevens gebruiken die je werkelijk rechtmatig bezit en mag verwerken. JSON, een geslaagde import, namen van PLUS/DekaMarkt of een ingevuld tijdstip bewijzen op zichzelf **nooit** toestemming van een retailer of dat een medewerker fysiek 11×2 prijzen geobserveerd heeft. De bestaande M1-bronrechten en M3-bewijspoorten blijven op HOLD en er is geen automatische live netwerkverbinding. Geen publieke besparingsclaim zolang bronrechten, echte veldobservatie en releasegates ontbreken.
 
 Gegevens gaan niet naar een server. Ze blijven alleen in de componentgeheugenruimte, verdwijnen bij het verlaten/herladen van de pagina en kunnen met **Wis lokaal geladen data** worden verwijderd. De kopieerbare lijst is een expliciete gebruikersactie en blijft lokaal in de browser totdat je zelf kopieert.
+
+## Gewone Vergelijk-tab: begin met één winkel en vul de tweede later aan
+
+In de normale Supa-app onder **Vergelijk** kun je nu een echte bestaande
+privéopname van **alleen PLUS of alleen DekaMarkt** uit JSON of de canonieke
+negenkoloms-CSV openen. Voor één winkel heet het JSON-schema
+`supa-private-single-store-prices-v1` en bevat `captures` precies
+één opname. Twee werkelijk aanwezige winkels gebruiken onveranderd
+`supa-offline-prices-v1` met twee opnames. De bestaande
+`convertOwnStoreCsv` uit `public/offline-two-store-csv.mjs` verzorgt
+dezelfde strikte lokale CSV-conversie als de uitgebreide privéwerkbank.
+
+Na één import verschijnt alleen de waargenomen winkel met originele
+artikel-ID's, verpakking, waarnemingstijd, eenheidsprijs en de hele
+verpakkingsberekening. De tweede winkel toont expliciet **geen bronopname**.
+Je moet elke bronmatch handmatig bevestigen; alleen dan kan een volledig
+én recent winkelmandtotaal worden getoond. Een besparingsverschil of
+winkelwinnaar blijft onbekend totdat beide originele bronnen binnen
+de 24-uurscontext en zeven dagen vallen en alle regels zijn bevestigd.
+
+Met **Voeg de echte opname van de andere winkel toe** laad je een aparte
+één-winkel CSV of JSON in. Supa weigert een dubbele winkel of bestand met
+twee bronnen. De oorspronkelijke opname, ook onbekende `null`-prijzen,
+wordt niet uit de eerdere genormaliseerde rekensommen gereconstrueerd
+maar uit de originele geaccepteerde JSON samengevoegd. De gecombineerde
+bron doorloopt opnieuw de bestaande canonieke validatie. Eerder
+bevestigde regels uit de ongewijzigde eerste bron behouden hun controle;
+nieuwe bronproducten beginnen onbevestigd. Een afgebroken of ongeldige
+toevoeging overschrijft de bestaande import niet.
+
+Per werkelijk ingeladen winkel kun je de huidige boodschappenlijst met
+afvinkingen expliciet als **TXT** downloaden of zelf uit het selecteerbare
+tekstveld kopiëren. Dit is geen automatische synchronisatie, netwerkverzoek
+of officiële actuele winkelprijs. Ontbrekende/verlopen/ongecontroleerde
+gegevens blijven zichtbaar onzeker. Geen retailerrechten of fysiek
+PLUS/Deka-veldbezoek worden uit deze software afgeleid.
