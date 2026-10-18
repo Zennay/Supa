@@ -3,6 +3,7 @@ import type { OneStoreBasket } from '../../domain/basket.ts'
 import type { MixedStoreShoppingPlan, MixedStore } from './mixedStoreShoppingPlan.ts'
 import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
+import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
@@ -163,6 +164,7 @@ export function MixedStoreShoppingCard({
         })}
       </div>
     </details>
+    <MixedStoreUnitBreakdown plus={plus} deka={deka} route={plan} />
     {mixedUsesBoth && <div className="offline-price-workbench__actions">
       <label>Extra kosten van de tweede stop (€)
         <input type="text" inputMode="decimal" value={extraVisitCost} maxLength={9}

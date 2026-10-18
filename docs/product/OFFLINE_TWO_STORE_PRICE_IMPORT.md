@@ -953,3 +953,18 @@ nog altijd individueel bevestigen voordat de route of het herstel
 beschikbaar komt. Oude winkelvoorkeuren van verdwenen
 Planner-ingrediënten worden bij het bewaren genegeerd. Er is geen
 automatische cloud- of achtergrondsynchronisatie.
+
+#### Originele winkelartikelen met eenheidsprijzen naast elkaar
+
+Binnen de gekozen route kun je per fysiek identiek ingrediënt nu PLUS
+en DekaMarkt direct naast elkaar bekijken. Elke winkelkolom toont het
+oorspronkelijke product en de broncode, de complete pakinhoud,
+de eigen prijs per pak, de indicatieve prijs per kilogram/liter/stuk
+en het bedrag voor alle benodigde hele verpakkingen. Het gekozen
+product is duidelijk gemarkeerd. Supa vermeldt hoeveel het andere
+winkelartikel voor exact diezelfde weekvraag duurder of goedkoper is.
+
+Eenheidsprijzen zijn uitleghulp uit de al bestaande
+privateUnitPrice-berekening: uitsluitend de werkelijk benodigde hele
+verpakkingen bepalen de goedkoopste route. Geen ongeprijsd artikel,
+fictieve hoeveelheidsmatch of onafhankelijke marktclaim toegevoegd.
