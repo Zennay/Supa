@@ -47,6 +47,7 @@ const result = document.querySelector<HTMLElement>('#result')!
 const summary = document.querySelector<HTMLDivElement>('#summary')!
 const capturesLabel = document.querySelector<HTMLParagraphElement>('#captures')!
 const rows = document.querySelector<HTMLTableSectionElement>('#rows')!
+let inputRevision = 0
 
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -60,9 +61,21 @@ const validText = (value: unknown, max = 160): value is string =>
   !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(value) && !/^[=+@-]/u.test(value)
 
 function safeTime(value: unknown): value is string {
-  return typeof value === 'string' &&
-    /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?[+-]\d\d:\d\d$/.test(value) &&
-    Number.isFinite(Date.parse(value))
+  if (typeof value !== 'string') return false
+  const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.\d{1,9})?([+-])(\d\d):(\d\d)$/.exec(value)
+  if (!m) return false
+  const [year, month, day, hour, minute, second, zoneHour, zoneMinute] =
+    [m[1],m[2],m[3],m[4],m[5],m[6],m[8],m[9]].map(Number)
+  if (year < 2000 || year > 2100 || zoneMinute > 59 ||
+      (m[7] === '+' ? zoneHour > 14 || (zoneHour === 14 && zoneMinute !== 0)
+        : zoneHour > 12 || (zoneHour === 12 && zoneMinute !== 0))) return false
+  const civil = new Date(0)
+  civil.setUTCFullYear(year, month - 1, day)
+  civil.setUTCHours(hour, minute, second, 0)
+  return civil.getUTCFullYear() === year &&
+    civil.getUTCMonth() === month - 1 && civil.getUTCDate() === day &&
+    civil.getUTCHours() === hour && civil.getUTCMinutes() === minute &&
+    civil.getUTCSeconds() === second && Number.isFinite(Date.parse(value))
 }
 
 function sourceFrom(value: unknown): Source {
@@ -253,6 +266,17 @@ function setStatus(message: string, isError = false): void {
   status.textContent = message
   status.className = 'notice' + (isError ? ' error' : '')
 }
+function advisoryUnitPrice(line: Extract<BasketTraceLine,{status:'matched'}>): string {
+  const pack = line.pack
+  const family = pack.unit === 'g' || pack.unit === 'kg' ? 'kg' :
+    pack.unit === 'ml' || pack.unit === 'l' ? 'liter' : 'stuk'
+  const size = pack.amount * pack.count *
+    (pack.unit === 'kg' || pack.unit === 'l' ? 1000 : 1)
+  const rate = family === 'stuk' ? 1 : 1000
+  const euros = (line.pricePerPackCents / 100) * rate / size
+  return size > 0 && Number.isFinite(euros) && euros >= 0
+    ? euro.format(euros) + '/' + family + ' (indicatief)' : 'Eenheidsprijs onbekend'
+}
 function lineCell(line: BasketTraceLine): HTMLTableCellElement {
   const cell = document.createElement('td')
   if (line.status === 'unresolved') {
@@ -264,7 +288,8 @@ function lineCell(line: BasketTraceLine): HTMLTableCellElement {
     String(line.pack.amount).replace('.', ',') + ' ' + line.pack.unit +
     (line.pack.count > 1 ? ' (× ' + line.pack.count + ')' : ''))
   const price = create('small', euro.format(line.pricePerPackCents / 100) +
-    ' per verpakking · ' + euro.format(line.lineTotalCents / 100) + ' bekende privéregel')
+    ' per verpakking · ' + advisoryUnitPrice(line) + ' · ' +
+    euro.format(line.lineTotalCents / 100) + ' bekende privéregel')
   cell.append(title, pack, price)
   return cell
 }
@@ -323,6 +348,7 @@ function show(source: Source, demand: Demand): void {
 
 for (const el of [combined, plus, deka, demandFile]) {
   el.addEventListener('change', () => {
+    inputRevision++
     result.hidden = true
     setStatus('Bronbestanden gewijzigd. Klik opnieuw op Vergelijk; eerdere prijsuitkomst is niet meer geldig.')
     if (el === combined) {
@@ -334,6 +360,7 @@ for (const el of [combined, plus, deka, demandFile]) {
   })
 }
 compare.addEventListener('click', async () => {
+  const snapshotRevision = inputRevision
   compare.disabled = true
   result.hidden = true
   setStatus('Lokale eigen bestanden worden verwerkt…')
@@ -343,8 +370,10 @@ compare.addEventListener('click', async () => {
     const [source, demand] = await Promise.all([
       parseSource(), file.text().then(data => demandFrom(JSON.parse(data))),
     ])
+    if (snapshotRevision !== inputRevision) return
     show(source, demand)
   } catch {
+    if (snapshotRevision !== inputRevision) return
     setStatus('Geen veilige volledige vergelijking mogelijk. Controleer jouw eigen CSV/JSON, productkoppelingen en benodigde hoeveelheden. Er wordt geen bedrag als volledig getoond.', true)
   } finally {
     compare.disabled = false
