@@ -41,7 +41,7 @@ function effectKey(effect: SavingsEffect): keyof Omit<SavingsEffectTotals, 'unkn
   return 'planningCents'
 }
 
-export function attributeSavingsEffects({
+function attributeSavingsEffectsTrusted({
   comparison,
   evidence,
 }: {
@@ -457,4 +457,107 @@ export function attributeSavingsEffects({
       ? ['one or more line deltas remain unattributed']
       : [],
   }
+}
+
+
+// Direct runtime and persisted-JSON callers are not constrained by TypeScript.
+// Snapshot *own data descriptors* before processing financial records: an
+// accessor must never run while determining a claimable saving. Arrays are
+// copied through indexed descriptors for the same reason. This is deliberately
+// not a generic JS object serializer (which would invoke getters).
+function ownDataRecord(
+  value: unknown,
+  fields: readonly string[],
+): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const snapshot = Object.create(null) as Record<string, unknown>
+  try {
+    for (const field of fields) {
+      const property = Object.getOwnPropertyDescriptor(value, field)
+      if (!property || !('value' in property)) return null
+      snapshot[field] = property.value
+    }
+  } catch {
+    // Exotic object descriptor traps may throw; never trust their data.
+    return null
+  }
+  return snapshot
+}
+
+function ownDataArray(value: unknown): unknown[] | null {
+  if (!Array.isArray(value)) return null
+  try {
+    const length = Object.getOwnPropertyDescriptor(value, 'length')
+    if (!length || !('value' in length) ||
+        typeof length.value !== 'number' ||
+        !Number.isSafeInteger(length.value) || length.value > 4096) return null
+    const snapshot: unknown[] = []
+    for (let index = 0; index < length.value; index++) {
+      const entry = Object.getOwnPropertyDescriptor(value, String(index))
+      if (!entry || !('value' in entry)) return null
+      snapshot.push(entry.value)
+    }
+    return snapshot
+  } catch {
+    return null
+  }
+}
+
+function snapshotFinancialInputs(input: unknown): {
+  comparison: BasketComparison
+  evidence: unknown
+} | null {
+  const args = ownDataRecord(input, ['comparison', 'evidence'])
+  if (!args) return null
+  const comparison = ownDataRecord(args.comparison, [
+    'claimable', 'reasons', 'deltaCents', 'lineDeltas',
+    'baselineTotalCents', 'candidateTotalCents', 'outcome', 'savingsCents',
+  ])
+  if (!comparison) return null
+  const reasons = ownDataArray(comparison.reasons)
+  const rows = ownDataArray(comparison.lineDeltas)
+  if (!reasons || !rows) return null
+  const safeRows: Record<string, unknown>[] = []
+  for (const row of rows) {
+    const record = ownDataRecord(row, [
+      'id', 'deltaCents', 'baselineLineTotalCents',
+      'candidateLineTotalCents',
+    ])
+    if (!record) return null
+    safeRows.push(record)
+  }
+  comparison.reasons = reasons
+  comparison.lineDeltas = safeRows
+
+  if (!Array.isArray(args.evidence)) {
+    return { comparison: comparison as unknown as BasketComparison, evidence: args.evidence }
+  }
+  const items = ownDataArray(args.evidence)
+  if (!items) return null
+  const safeItems: Record<string, unknown>[] = []
+  for (const item of items) {
+    const record = ownDataRecord(item, [
+      'lineId', 'effect', 'deltaCents', 'evidenceRef',
+    ])
+    if (!record) return null
+    safeItems.push(record)
+  }
+  return { comparison: comparison as unknown as BasketComparison, evidence: safeItems }
+}
+
+export function attributeSavingsEffects(input: {
+  comparison: BasketComparison
+  evidence: unknown
+}): SavingsAttribution {
+  const snapshot = snapshotFinancialInputs(input)
+  if (!snapshot) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: null,
+      effectTotals: emptyTotals(),
+      reasons: ['attribution data must contain own, non-accessor financial fields'],
+    }
+  }
+  return attributeSavingsEffectsTrusted(snapshot)
 }
