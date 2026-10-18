@@ -104,6 +104,19 @@ export function updateEditorIngredient(
           : preserveImportedReview ? ingredient.reviewReason : null
     return next
   })
+  // Only retire the exact parser-generated warning for THIS ingredient after
+  // a real, valid measurement correction. Source-wide and unrelated warnings
+  // remain pending; label-only edits never erase import provenance.
+  const previous = draft.ingredients[index]
+  const reviewed = ingredients[index]
+  const correctedMeasurement =
+    (Object.hasOwn(patch, 'amount') && patch.amount !== previous.amount) ||
+    (Object.hasOwn(patch, 'unit') && patch.unit !== previous.unit)
+  if (correctedMeasurement && previous.reviewReason && reviewed.reviewReason === null) {
+    const resolvedWarning = `Ingrediënt ${index + 1}: ${previous.reviewReason}`
+    return { ...draft, ingredients,
+      warnings: draft.warnings.filter(warning => warning !== resolvedWarning) }
+  }
   return { ...draft, ingredients }
 }
 
