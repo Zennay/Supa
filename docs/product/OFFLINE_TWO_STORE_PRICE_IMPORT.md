@@ -992,3 +992,17 @@ berekende totaal inclusief die kosten. Onbekende extra bezoekkosten
 blijven een lege cel, nooit impliciet nul. Een een-winkelroute heeft
 geen extra tweede winkelbezoek. De expliciet geselecteerde
 automatische, gemengde of een-winkelstrategie wordt eveneens vermeld.
+
+#### Papier / lokaal afdrukbare route
+
+De daadwerkelijk gekozen route (ook handmatige winkelvoorkeuren,
+per-winkel afvinkstatus en optionele extra tweede-stopkosten) kan nu
+als statisch HTML-document worden opgeslagen om in de browser te
+printen. Beide eigen winkelopnametijden staan boven de twee
+boodschappenafdelingen. Het document heeft geen scripts, netwerk-
+resources of interactieve gegevensinvoer en ontsmet alle dynamische
+teksten voordat zij in HTML terechtkomen. Het hergebruikt voor elke
+afdruk exact dezelfde fysieke vergelijking en gekozene-route
+integriteitscheck als de nieuwe CSV-uitvoer. Een verouderde bron
+of onvolledige persoonlijke productreview krijgt nooit een
+vergelijkbaar printdocument via deze actie.

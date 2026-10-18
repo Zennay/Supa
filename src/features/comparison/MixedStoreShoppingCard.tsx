@@ -5,6 +5,7 @@ import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mi
 import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
 import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
+import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
@@ -112,6 +113,31 @@ export function MixedStoreShoppingCard({
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Deze privéwinkelroute kan niet worden geëxporteerd.')
+    }
+  }
+
+  function downloadPrintHtml() {
+    if (block || !eligibleNow()) {
+      setMessage('Controleer je huidige originele winkelprijzen en extra bezoekkosten voordat je een afdruk bewaart.')
+      return
+    }
+    try {
+      const page = printMixedStoreRouteHtml({
+        plus, deka, route: plan, captured,
+        checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
+        extraVisitCostCents: appliedCostCents, strategy: mode,
+      })
+      const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-winkelroute-prive.html'
+        document.body.appendChild(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('Afdrukbaar privéoverzicht opgeslagen. Open het HTML-bestand lokaal en kies Afdrukken in je browser.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Deze route kan nu niet veilig worden afgedrukt.')
     }
   }
 
@@ -225,6 +251,9 @@ export function MixedStoreShoppingCard({
       <button type="button" className="ghost-button" onClick={download}>Download gekozen route (TXT)</button>
       <button type="button" className="ghost-button" onClick={downloadRouteCsv}>
         Download dezelfde route met beide winkelprijzen (CSV)
+      </button>
+      <button type="button" className="ghost-button" onClick={downloadPrintHtml}>
+        Bewaar / print mijn gekozen route (HTML)
       </button>
       <button type="button" className="ghost-button" onClick={() => {
         if (block) { setMessage('Corrigeer eerst je extra kosten.'); return }
