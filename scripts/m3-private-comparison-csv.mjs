@@ -22,9 +22,17 @@ function cell(value, { untrustedText = false } = {}) {
   // remain literal text, not execute formula or DDE/URL side effects.
   // Control characters can masquerade as cell/row separators.
   const clean = raw.replace(/[\u0000-\u001f\u007f-\u009f\ufeff]/g, ' ')
-  const safe = untrustedText && /^[\s\u200b-\u200d]*[=+\-@]/u.test(clean)
-    ? "'" + clean
-    : clean
+  // Preserve the existing ASCII/whitespace literal-text contract. For other
+  // visually disguised formulas, refuse the private export rather than emit
+  // text that an independent spreadsheet preflight cannot safely interpret.
+  // NFKC is inspection-only: the original operator label remains unchanged.
+  const asciiFormula = /^[\s\u200b-\u200d]*[=+\-@]/u.test(clean)
+  const disguisedFormula = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+\-@\u2212]/u
+    .test(clean.normalize('NFKC'))
+  if (untrustedText && disguisedFormula && !asciiFormula) {
+    throw new Error('M3 private CSV untrusted formula-like text refused')
+  }
+  const safe = untrustedText && asciiFormula ? "'" + clean : clean
   return '"' + safe.replace(/"/g, '""') + '"'
 }
 
