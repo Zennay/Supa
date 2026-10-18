@@ -140,3 +140,19 @@ de niet-geselecteerde winkel blijft als eigen formulierinformatie staan,
 maar wordt **niet** als waarneming, artikel of prijs uitgegeven.
 Wijzigingen in winkelkeuze of invoer trekken eerder getoond bronresultaat
 in; voor een nieuwe vergelijking moet de gebruiker opnieuw berekenen.
+
+### Geen verzonnen bronartikel-ID in handmatige invoer
+
+De handmatige invoer vraagt nu voor elk daadwerkelijk ingevuld artikel een
+door de gebruiker geobserveerde **originele productcode** (EAN of ander
+artikelnummer uit eigen bron), naast naam, verpakking, prijs en echte
+opnametijd. De oude automatisch verzonnen `own-plus-N`/`own-deka-N`
+product-ID's worden niet meer voor nieuwe imports gegenereerd. Als twee
+ingrediënten dezelfde originele code en identieke bronfeiten hebben,
+behoudt de import één werkelijk opgegeven bronproduct. Tegenstrijdige
+gegevens onder dezelfde code worden expliciet geweigerd. Oude
+sessionStorage-concepten zonder dit veld blijven leesbaar zodat hun
+gegevens niet verloren gaan, maar vereisen menselijke aanvulling van de
+echte code voordat ze tot een nieuw bronbestand worden verheven.
+Een door de gebruiker getypte code blijft een privébronvermelding en
+bewijst zonder onafhankelijke verificatie geen retailerautorisatie.

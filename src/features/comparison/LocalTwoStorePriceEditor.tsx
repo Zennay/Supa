@@ -6,6 +6,7 @@ import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/o
 
 type Unit = 'g' | 'kg' | 'ml' | 'l' | 'piece'
 type ProductDraft = {
+  sourceId?: string
   name: string
   packAmount: string
   packUnit: Unit
@@ -16,7 +17,7 @@ type ProductDraft = {
 const stores: OfflineRetailer[] = ['PLUS', 'DekaMarkt']
 const supportedUnits: Unit[] = ['g', 'kg', 'ml', 'l', 'piece']
 const emptyDraft = (unit: string): ProductDraft => ({
-  name: '', packAmount: '', packUnit: supportedUnits.includes(unit as Unit) ? unit as Unit : 'g',
+  sourceId: '', name: '', packAmount: '', packUnit: supportedUnits.includes(unit as Unit) ? unit as Unit : 'g',
   packCount: '1', priceEuros: '', available: false,
 })
 const key = (store: OfflineRetailer, ingredientId: string) => JSON.stringify([store, ingredientId])
@@ -80,7 +81,8 @@ function readPrivateDraft(fingerprint: string): StoredDraft {
       if (k.length > 500 || !Array.isArray(JSON.parse(k)) ||
           !rawRow || typeof rawRow !== 'object' || Array.isArray(rawRow)) return false
       const row = rawRow as Record<string, unknown>
-      return Object.keys(row).every(field => ['name', 'packAmount', 'packUnit', 'packCount', 'priceEuros', 'available'].includes(field)) &&
+      return (row.sourceId === undefined || (typeof row.sourceId === 'string' && row.sourceId.length <= 100)) &&
+        Object.keys(row).every(field => ['sourceId', 'name', 'packAmount', 'packUnit', 'packCount', 'priceEuros', 'available'].includes(field)) &&
         typeof row.name === 'string' && row.name.length <= 160 &&
         typeof row.packAmount === 'string' && row.packAmount.length <= 24 &&
         typeof row.packUnit === 'string' && supportedUnits.includes(row.packUnit as Unit) &&
@@ -198,13 +200,19 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
         throw new Error('Een waarnemingstijd ligt in de toekomst.')
       }
       const captures = selectedStores.map((store, storeIndex) => {
-        const products = activeNeeds.flatMap((need, index) => {
+        const products = activeNeeds.flatMap((need) => {
           const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
-          const entered = draft.name.trim() || draft.packAmount.trim() ||
+          const entered = draft.sourceId?.trim() || draft.name.trim() || draft.packAmount.trim() ||
             draft.priceEuros.trim() || draft.available
           if (!entered) return []
           if (draft.name !== draft.name.trim() || !draft.name.trim()) {
             throw new Error(`${store} · ${need.label}: vul een werkelijke, complete productnaam in.`)
+          }
+          const originalId = draft.sourceId ?? ''
+          if (!originalId || originalId !== originalId.trim() || originalId.length > 100 ||
+              !/[\p{L}\p{N}]/u.test(originalId) ||
+              /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(originalId)) {
+            throw new Error(`${store} · ${need.label}: vul de echte productcode uit je eigen bron in, geen verzonnen winkel-SKU.`)
           }
           const packAmount = draft.packAmount ? amountOrNull(draft.packAmount.trim()) : null
           if (draft.packAmount && packAmount === null) {
@@ -225,7 +233,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
             throw new Error(`${store} · ${need.label}: prijs ingevuld maar beschikbaarheid niet bevestigd.`)
           }
           return [{
-            id: `own-${store === 'PLUS' ? 'plus' : 'deka'}-${index + 1}`,
+            id: originalId,
             name: draft.name, packAmount, packUnit: draft.packUnit,
             packCount: count, available: draft.available,
             priceCents: draft.available ? price : null,
@@ -234,7 +242,15 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
         if (products.length === 0) {
           throw new Error(`Vul bij ${store} minimaal één echt product in. Andere ingrediënten mogen onbekend blijven.`)
         }
-        return { retailer: store, observedAt: times[storeIndex], products }
+        const unique = new Map<string, (typeof products)[number]>()
+        for (const product of products) {
+          const earlier = unique.get(product.id)
+          if (earlier && JSON.stringify(earlier) !== JSON.stringify(product)) {
+            throw new Error(`${store}: dezelfde originele productcode heeft conflicterende naam, verpakking, prijs of voorraad. Corrigeer de bronregels.`)
+          }
+          unique.set(product.id, product)
+        }
+        return { retailer: store, observedAt: times[storeIndex], products: [...unique.values()] }
       })
       const schema = captures.length === 1
         ? 'supa-private-single-store-prices-v1' : 'supa-offline-prices-v1'
@@ -326,6 +342,11 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
             const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
             return <fieldset key={need.id} className="offline-manual-editor__row">
               <legend>{need.label} · benodigd {need.amount ?? '?'} {need.unit}</legend>
+              <label>Originele productcode uit jouw waarneming (EAN of artikelnummer)
+                <input value={row.sourceId ?? ''} maxLength={100} autoComplete="off"
+                  placeholder="Code op verpakking, bon of bronartikel"
+                  onChange={e => changeRow(store, need.id, { sourceId: e.target.value }, need.unit)} />
+              </label>
               <label>Werkelijke productnaam (laat leeg als onbekend)
                 <input value={row.name} maxLength={160} autoComplete="off"
                   list={`historical-products-${store}`}
