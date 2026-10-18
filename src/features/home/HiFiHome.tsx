@@ -59,7 +59,10 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [message, setMessage] = useState('')
   const [sortByPrice, setSortByPrice] = useState(false)
   const [unitFilter, setUnitFilter] = useState<DemoUnitFilter>('all')
-  const [productSource, setProductSource] = useState<'own' | 'history' | 'figma'>(priceSession?.imported ? 'own' : 'history')
+  const [productSource, setProductSource] = useState<'own' | 'history' | 'figma'>(
+    priceSession?.imported || priceSession?.stagedCaptures.PLUS || priceSession?.stagedCaptures.DekaMarkt
+      ? 'own' : 'history',
+  )
   const privateExtraCount = (['PLUS', 'DekaMarkt'] as const).reduce((sum, store) =>
     sum + (priceSession?.imported || priceSession?.stagedCaptures[store]
       ? priceSession?.extraProductIds[store].length ?? 0 : 0), 0)
