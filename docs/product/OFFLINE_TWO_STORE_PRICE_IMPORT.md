@@ -33,8 +33,9 @@ Het weekbestand gebruikt schema supa-private-planner-week-v1 (UTF-8, maximaal 25
 
 1. Maak lokaal een JSON-bestand met **één** PLUS- en **één** DekaMarkt-opname. Beide opnames beschrijven de daadwerkelijk waargenomen prijscontext, met een ISO-tijd en een expliciete UTC-offset.
 2. Kies de gewenste maaltijden/dagen in **Planner**. Open **Vergelijk** en importeer het bestand of plak de inhoud.
-3. Controleer per winkel **gekoppeld / onbekend**, de teruggegeven productidentiteiten, verpakkingsaantallen en eenheidsprijzen.
-4. Een rekenkundig prijsverschil wordt alleen getoond als alle ingrediënten gekoppeld zijn, beide tijden maximaal 24 uur uiteen liggen en geen van beide opnames ouder is dan zeven dagen. Kopieer desgewenst per winkel de private boodschappenlijst.
+3. Controleer per winkel de automatisch voorgestelde **product-ID, naam, verpakking, aantal hele verpakkingen en de werkelijk aangeleverde prijs per pak** met jouw oorspronkelijke bronopname. Bevestig elke winkelregel apart met **Product, inhoud en prijs met mijn bronopname gecontroleerd**. Onbekende regels kunnen niet worden bevestigd.
+4. Een volledig winkeltotaal verschijnt uitsluitend bij een volledig matched, menselijk bevestigd en actueel mandje voor die winkel. Een rekenkundig prijsverschil verschijnt alleen als alle regels voor **beide** winkels zijn bevestigd, beide tijden maximaal 24 uur uiteen liggen en geen van beide opnames ouder is dan zeven dagen. Als de bron, het weekmenu, de oorspronkelijke opnametijd, de match of de prijs verandert, geldt de oude bevestiging niet meer; de invoer opnieuw importeren wist alle bevestigingen.
+5. Kopieer desgewenst de private boodschappenlijst. Ook na handmatige controle zijn deze observaties **niet onafhankelijk geverifieerd** en is dit geen publiek besparingsbewijs.
 
 Schema:
 
