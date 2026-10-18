@@ -81,11 +81,13 @@
   const clear = document.getElementById('clear')
   const status = document.getElementById('status')
   let readyJson = null
+  let generation = 0
   const setStatus = (message, state = 'normal') => {
     status.textContent = message
     status.dataset.state = state
   }
   const invalidate = () => {
+    generation++
     readyJson = null
     download.disabled = true
   }
@@ -100,6 +102,7 @@
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     invalidate()
+    const ownGeneration = generation
     const selected = file.files?.[0]
     try {
       if (selected && selected.size > 256000) throw new Error('CSV is groter dan 256 kB.')
@@ -107,13 +110,17 @@
         ? new TextDecoder('utf-8', { fatal: true }).decode(await selected.arrayBuffer())
         : paste.value
       if (new TextEncoder().encode(source).length > 256000) throw new Error('CSV is groter dan 256 kB.')
+      // A clear/new file/paste action wins over any asynchronous file read.
+      if (ownGeneration !== generation) return
       const json = convertTwoStoreCsv(source)
       const captures = JSON.parse(json).captures
+      if (ownGeneration !== generation) return
       readyJson = json
       download.disabled = false
       const counts = captures.map(item => item.retailer + ': ' + item.products.length + ' productregels').join('; ')
       setStatus('Lokale conversie klaar. ' + counts + '. Controleer de echte waarnemingen in Supa; dit is geen gecontroleerde besparingsclaim.')
     } catch (error) {
+      if (ownGeneration !== generation) return
       setStatus(error instanceof Error ? error.message : 'CSV kon niet worden verwerkt.', 'error')
     }
   })

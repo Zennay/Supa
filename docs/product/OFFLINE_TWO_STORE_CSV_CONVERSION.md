@@ -8,6 +8,18 @@ Open op een Supa-deployment **[/offline-two-store-import.html](/offline-two-stor
 
 Deze browserpagina werkt zelfstandig en kan worden uitgerold voordat de vernieuwde **Vergelijk**-interface uit [#3899](https://github.com/Zennay/Supa/pull/3899) klaar is. Het gegenereerde bestand kan daarna in die interface worden ingelezen; totdat #3899 is geïntegreerd betekent conversie nog **geen live mandjesvergelijking**.
 
+## Rechtstreeks vanuit Vergelijk: eigen weekmenu → leeg veldblad → eigen prijzen → twee mandjes
+
+In de geïntegreerde [Supa Vergelijk-flow (PR #3901)](https://github.com/Zennay/Supa/pull/3901) zijn de extra conversiestappen niet meer nodig:
+
+1. Selecteer echte maaltijden en dagen in **Planner** en open **Vergelijk**.
+2. Kies **Download leeg CSV-invulblad voor jouw weekmenu**. Supa maakt precies de ingrediëntenbehoeften uit die planning, voor **PLUS en DekaMarkt**, als dubbele *lege* productwaarnemingen. De `id`-kolom bevat een herkenbare slug van het benodigde ingrediënt, maar **geen product-ID uit een winkelbron**.
+3. Controleer bij beide winkels zelf welke echte producten en hele verpakkingen beschikbaar zijn. Vul pas daarna per product een werkelijke naam, verpakking, unit, multipack-aantal en prijs in **hele centen** in; kies de werkelijk waargenomen tijd met correcte tijdzone voor alle rijen van die winkel. Zet `available=true` uitsluitend bij gecontroleerde beschikbaarheid. Laat ontbrekende prijzen leeg met `available=false`.
+4. Importeer je volledige `.csv` **rechtstreeks in Vergelijk**. Dezelfde conservatieve converter maakt eerst lokale JSON; de bestaande Supa import-, matching- en mandjesengine bepaalt daarna welke regels kloppen. Een incomplete invoer blijft onvergelijkbaar als volledig mandje.
+5. Verander je de geplakte JSON of kies je een nieuw bestand, dan verdwijnt elk eerder getoond financieel resultaat direct. Je moet de nieuwe import opnieuw laten berekenen.
+
+**Belangrijk:** het lege blad is opzettelijk **niet direct importeerbaar**. De kolommen `observedAt` en `name` zijn leeg totdat jij een echte opname maakt. Het is een werkblad, geen supermarkt- of onderzoeksbewijs. Een ingevulde sheet bewijst op zichzelf evenmin winkeltoestemming of onafhankelijke fysieke M3-waarneming.
+
 ## Gebruik
 
 1. Maak een UTF-8 CSV met **exact deze negen kolommen, in deze volgorde**:
