@@ -16,8 +16,8 @@ const MAX_BYTES = 256_000
 const UNITS = ['g', 'kg', 'ml', 'l', 'piece']
 const validText = (value, max = 160) =>
   typeof value === 'string' && value.length > 0 && value.length <= max &&
-  value === value.trim() && /[\\p{L}\\p{N}]/u.test(value) &&
-  !/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/u.test(value) &&
+  value === value.trim() && /[\p{L}\p{N}]/u.test(value) &&
+  !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(value) &&
   !/^[=+@-]/u.test(value)
 
 async function readPrivateFile(path) {
@@ -73,7 +73,11 @@ function validateWeek(text) {
 
 function toBasketDemand(week) {
   const ingredients = aggregatePlanIngredients(week.plan, week.recipes, week.activeDays)
-  if (!ingredients.length || ingredients.length > 1000) throw Error('No usable demand')
+  if (!ingredients.length || ingredients.length > 1000 ||
+      ingredients.some(item => item.amount !== null &&
+        (!Number.isFinite(item.amount) || item.amount <= 0 || item.amount > 100_000))) {
+    throw Error('Canonical demand exceeds local report bounds')
+  }
   const result = {
     schema: 'supa-private-basket-demand-v1',
     selectedMealCount: week.activeDays.length,
