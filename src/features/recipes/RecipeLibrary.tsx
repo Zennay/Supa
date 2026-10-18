@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a } from '../home/figmaAssets'
-import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport'
+import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
@@ -44,9 +44,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [sort, setSort] = useState(false)
   const [favorites, setFavorites] = useState<string[]>([])
-  const [mode, setMode] = useState<'manual' | 'url'>('manual')
+  const [mode, setMode] = useState<'manual' | 'url' | 'paste'>('manual')
   const [form, setForm] = useState(blank)
   const [url, setUrl] = useState('')
+  const [pastedSource, setPastedSource] = useState('')
   const [source, setSource] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -127,8 +128,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setBackupError(cause instanceof Error ? cause.message : 'Importeren is niet gelukt. Je bestaande recepten blijven staan.')
     }
   }
-  function openEditor(next: 'manual' | 'url') {
-    request.current?.abort(); setBusy(false); setMode(next); setForm(blank); setSource(null); setUrl(''); setPreview(null); setError(''); saving.current = false
+  function openEditor(next: 'manual' | 'url' | 'paste') {
+    request.current?.abort(); setBusy(false); setMode(next); setForm(blank); setSource(null); setUrl(''); setPastedSource(''); setPreview(null); setError(''); saving.current = false
     setBackupPreview(null)
     editor.current?.showModal()
   }
@@ -140,10 +141,43 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     try {
       const draft = await importRecipeLink(url, controller.signal)
       if (controller.signal.aborted) return
-      setForm({ title: draft.title, servings: draft.servings?.toString() ?? '', minutes: draft.minutes?.toString() ?? '', ingredients: draft.ingredients.map(i => i.original).join('\n'), steps: draft.steps.join('\n') })
-      setSource(draft.sourceUrl); setMode('manual'); setMessage('Recept opgehaald. Controleer de gegevens en sla het daarna op.')
+      adoptImportedRecipe(draft, 'Recept opgehaald. Controleer de gegevens en sla het daarna op.')
     } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Importeren is niet gelukt.') }
     finally { if (!controller.signal.aborted) setBusy(false) }
+  }
+  function adoptImportedRecipe(draft: UserRecipeDraft, messageText: string) {
+    setForm({
+      title: draft.title,
+      servings: draft.servings?.toString() ?? '',
+      minutes: draft.minutes?.toString() ?? '',
+      ingredients: draft.ingredients.map(item => item.original).join('\n'),
+      steps: draft.steps.join('\n'),
+    })
+    setSource(draft.sourceUrl)
+    setMode('manual')
+    setPastedSource('')
+    setPreview(null)
+    setMessage(messageText)
+  }
+  function importPastedRecipe(event: FormEvent) {
+    event.preventDefault()
+    setError('')
+    setPreview(null)
+    try {
+      const sourceText = pastedSource.trim()
+      if (!sourceText || new TextEncoder().encode(sourceText).length > 500_000) {
+        throw new Error('Plak maximaal 500 kB aan zelf verkregen HTML of JSON-LD.')
+      }
+      // Reuse the existing offline schema.org/Recipe normalizer; this does NOT
+      // fetch the URL, navigate a site or execute any pasted HTML/JavaScript.
+      const html = sourceText.startsWith('{') || sourceText.startsWith('[')
+        ? '<script type="application/ld+json">' + sourceText + '</script>'
+        : sourceText
+      const draft = importRecipeFromHtml(html, url)
+      adoptImportedRecipe(draft, 'Receptgegevens lokaal herkend. Controleer alle hoeveelheden vóór opslaan.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Kon de geplakte receptgegevens niet verwerken.')
+    }
   }
   function check(event: FormEvent) {
     event.preventDefault(); setError('')
@@ -175,7 +209,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       </article>)}</div>
       {!demo.length && !own.length && <p className="hifi-empty">{query ? 'Geen recepten gevonden. Probeer een andere zoekterm.' : 'Voeg je eerste eigen recept toe of importeer een receptlink.'}</p>}
     </section>
-    <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button></div>
+    <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button><button onClick={() => openEditor('paste')}>Plak receptgegevens (JSON-LD)</button></div>
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
       <h2>Mijn recepten meenemen</h2>
       <p>Maak een privé-backup van je eigen recepten, of herstel een eerdere SUPA-receptenbackup.
@@ -222,8 +256,27 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     {!!demo.length && <p className="recipe-note">Zes uitgewerkte SUPA-recepten met ingrediënten en bereidingsstappen, ook beschikbaar in Planner. Dit zijn geen supermarktaanbiedingen; prijzen en besparingen zijn niet geverifieerd.</p>}
     {library.error && <p role="alert">{library.error}</p>}<p role="status" className="hifi-feedback">{message}</p>
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
-      <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : 'Eigen recept toevoegen'}</h2>
-      {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
+      <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : mode === 'paste' ? 'Receptgegevens lokaal plakken' : 'Eigen recept toevoegen'}</h2>
+      {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
+        : mode === 'paste' ? <form className="recipe-form" onSubmit={importPastedRecipe}>
+          <p>Plak JSON-LD met schema.org/Recipe of de HTML-broncode van een receptpagina
+            die je zelf rechtmatig hebt ontvangen. Supa leest alleen lokaal: er wordt geen link
+            geopend, geen website opgevraagd en geen code uitgevoerd.</p>
+          <label>Oorspronkelijke openbare HTTPS-receptlink (alleen als bronvermelding)
+            <input required type="url" placeholder="https://…" value={url}
+              onChange={event => setUrl(event.target.value)} />
+          </label>
+          <label>JSON-LD of HTML-broncode (maximaal 500 kB)
+            <textarea required rows={9} maxLength={500000} spellCheck={false}
+              placeholder={'{"@type":"Recipe","name":"...","recipeIngredient":[...],"recipeInstructions":[...]}'} 
+              value={pastedSource}
+              onChange={event => setPastedSource(event.target.value)} />
+          </label>
+          <button className="recipe-primary" type="submit">Lees lokale receptgegevens</button>
+          <button type="button" onClick={() => { setMode('manual'); setError('') }}>
+            Handmatig invoeren
+          </button>
+        </form>
         : <form className="recipe-form" onSubmit={check} onChange={() => setPreview(null)}><label>Naam van het recept<input required maxLength={160} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label><div className="recipe-form-row"><label>Porties<input required type="number" min="1" max="1000" value={form.servings} onChange={e => setForm({ ...form, servings: e.target.value })} /></label><label>Minuten<input required type="number" min="1" max="1440" value={form.minutes} onChange={e => setForm({ ...form, minutes: e.target.value })} /></label></div><label>Ingrediënten<textarea required rows={5} placeholder={'200 g rijst\n1 paprika\n250 ml kokosmelk'} value={form.ingredients} onChange={e => setForm({ ...form, ingredients: e.target.value })} /></label><small>Eén ingrediënt per regel, met hoeveelheid en eenheid.</small><label>Bereiding<textarea required rows={5} placeholder="Eén stap per regel" value={form.steps} onChange={e => setForm({ ...form, steps: e.target.value })} /></label>{source && <p>Bron: <a href={source} target="_blank" rel="noopener noreferrer">Bekijk het oorspronkelijke recept</a></p>}<button className="recipe-primary">Controleer recept</button></form>}
       {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <p>Onbekende hoeveelheden blijven als tekst bewaard. Vul ze aan voordat je een boodschappenberekening maakt.</p>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>Opslaan in mijn recepten</button></section>}
       {error && <p role="alert" className="recipe-error">{error}</p>}
