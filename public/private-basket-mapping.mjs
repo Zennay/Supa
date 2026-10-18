@@ -2,7 +2,7 @@
  * Source admission delegates to the existing canonical offline CSV converter.
  * No storage, remote requests, inferred product equivalence or monetary computation.
  */
-import { convertTwoStoreCsv } from './offline-two-store-csv.mjs'
+import { convertTwoStoreCsv, convertOwnStoreCsv } from './offline-two-store-csv.mjs'
 
 const stores = ['PLUS', 'DekaMarkt']
 const units = ['g', 'kg', 'ml', 'l', 'piece']
@@ -164,13 +164,16 @@ function updateCoverage() {
       (duplicated ? ' · ' + duplicated + ' regels met dubbel gekozen SKU' : '')
   })
   const now = Date.now()
-  const observed = stores.map(store => Date.parse(captures[store].observedAt))
-  const ages = observed.map(time => now - time)
-  const fresh = ages.every(age => Number.isFinite(age) && age >= 0 && age <= 7 * 86400000)
-  const paired = Math.abs(observed[0] - observed[1]) <= 86400000
+  const observed = stores.map(store => captures[store] ? Date.parse(captures[store].observedAt) : null)
+  const ages = observed.map(time => time === null ? null : now - time)
+  const fresh = ages.every(age => age !== null && Number.isFinite(age) && age >= 0 && age <= 7 * 86400000)
+  const paired = observed.every(time => time !== null) &&
+    Math.abs(observed[0] - observed[1]) <= 86400000
   const complete = messages.every(value => value.includes(' ' + rows.length + ' van ' + rows.length))
-  const expiry = Math.min(...observed) + 7 * 86400000
-  const timeStatus = !fresh ? 'Eén of beide bronopnames zijn toekomstig of ouder dan zeven dagen. ' :
+  const expiry = Math.min(...observed.filter(time => time !== null)) + 7 * 86400000
+  const timeStatus = observed.some(time => time === null) ?
+    'Voor één winkel ontbreekt een echte bronopname. Die winkel blijft onbekend; geen volledige twee-winkelvergelijking. ' :
+    !fresh ? 'Eén of beide bronopnames zijn toekomstig of ouder dan zeven dagen. ' :
     !paired ? 'De twee bronmomenten liggen meer dan 24 uur uit elkaar. ' :
       'Beide bronmomenten zijn binnen zeven dagen en maximaal 24 uur uiteen. '
   coverage.className = 'notice' + (!complete || !fresh || !paired ? ' warning' : '')
@@ -278,7 +281,7 @@ function refresh() {
   saveSession.disabled = save.disabled || !captures
   showUnpriced.disabled = save.disabled
   compareNow.disabled = !captures || save.disabled
-  editSource.disabled = !captures
+  editSource.disabled = !captures || stores.some(store => !captures[store])
   updateCoverage()
 }
 function addIngredient(restored = null) {
@@ -359,7 +362,7 @@ function addIngredient(restored = null) {
 }
 
 editSource.addEventListener('click', () => {
-  if (!captures) return
+  if (!captures || stores.some(store => !captures[store])) return
   if (!window.confirm('Bewerk je al geopende eigen PLUS/Deka-opnames? Bestaande handmatige conceptregels worden vervangen en huidige productmatches gewist. Opnametijden blijven de originele tijdstippen: vul uitsluitend na echte hercontrole nieuwe prijs of opnametijd in.')) return
   document.dispatchEvent(new CustomEvent('supa:manual-prefill-own-source', {
     detail: { captures: stores.map(store => captures[store]) },
@@ -367,15 +370,16 @@ editSource.addEventListener('click', () => {
 })
 
 function acceptJson(json) {
-  if (!json || Array.isArray(json) || json.schema !== 'supa-offline-prices-v1' ||
-      !Array.isArray(json.captures) || json.captures.length !== 2) {
+  if (!json || Array.isArray(json) || !Array.isArray(json.captures) ||
+      !(json.schema === 'supa-offline-prices-v1' && json.captures.length === 2 ||
+        json.schema === 'supa-private-single-store-prices-v1' && json.captures.length === 1)) {
     throw Error('Bestand heeft niet het bestaande Supa-prijsbronformaat.')
   }
   const result = Object.create(null)
   for (const capture of json.captures) {
     if (!capture || typeof capture !== 'object' ||
         !stores.includes(capture.retailer) || result[capture.retailer] ||
-        !Array.isArray(capture.products) || capture.products.length > 1000 ||
+        !Array.isArray(capture.products) || !capture.products.length || capture.products.length > 1000 ||
         !validSourceInstant(capture.observedAt)) {
       throw Error('Ongeldige winkelopname; controleer winkel en tijd.')
     }
@@ -394,7 +398,7 @@ function acceptJson(json) {
     }
     result[capture.retailer] = capture
   }
-  if (stores.some(store => !result[store])) throw Error('Beide winkelopnames zijn vereist.')
+  if (Object.keys(result).length !== json.captures.length) throw Error('Dubbele of ontbrekende winkelopnames.')
   return result
 }
 
@@ -430,24 +434,21 @@ async function loadSources() {
     refresh()
     return
   }
-  if (!combined && (!plus || !deka)) {
-    notice(sourceStatus, 'Selecteer zowel de PLUS- als de DekaMarkt-CSV; eerdere bron en productkeuzes blijven bewaard.', 'warning')
-    refresh()
-    return
-  }
   try {
     let parsed
     if (combined) {
       const content = await readLocalFile(combined)
       parsed = combined.name.toLowerCase().endsWith('.json')
-        ? JSON.parse(content) : JSON.parse(convertTwoStoreCsv(content))
-    } else {
+        ? JSON.parse(content) : JSON.parse(convertOwnStoreCsv(content))
+    } else if (plus && deka) {
       const [plusText, dekaText] = await Promise.all([readLocalFile(plus), readLocalFile(deka)])
       const joined = csvHeader + '\n' + removeCsvHeader(plusText) + removeCsvHeader(dekaText)
       if (new TextEncoder().encode(joined).length > maxBytes) {
         throw Error('Twee samengevoegde CSV-bronnen zijn groter dan 256 kB.')
       }
       parsed = JSON.parse(convertTwoStoreCsv(joined))
+    } else {
+      parsed = JSON.parse(convertOwnStoreCsv(await readLocalFile(plus ?? deka)))
     }
     const verified = acceptJson(parsed)
     if (revision !== sourceRevision) return
@@ -470,21 +471,24 @@ async function loadSources() {
     const now = Date.now()
     const descriptions = stores.map(store => {
       const capture = captures[store]
+      if (!capture) return store + ': nog geen bronopname; alle prijzen onbekend'
       const ageMs = now - Date.parse(capture.observedAt)
       const stale = ageMs < 0 ? ' · toekomstig' :
         ageMs > 7 * 86400000 ? ' · ouder dan 7 dagen' : ''
       return store + ': ' + capture.products.length + ' producten, vastgelegd ' +
         capture.observedAt + stale
     })
-    const gap = Math.abs(Date.parse(captures.PLUS.observedAt) -
-      Date.parse(captures.DekaMarkt.observedAt))
-    if (gap > 86400000) descriptions.push('Opnames >24 uur uiteen. Opnieuw meten voor een volledige vergelijking.')
+    const gap = captures.PLUS && captures.DekaMarkt
+      ? Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt)) : null
+    if (gap === null) descriptions.push('Voor een volledig winkelprijsverschil is nog een echte tweede winkelopname nodig.')
+    else if (gap > 86400000) descriptions.push('Opnames >24 uur uiteen. Opnieuw meten voor een volledige vergelijking.')
     descriptions.push('Selecteer uitsluitend door jou gecontroleerde matches. Geen automatische bronrechten of besparing.')
     const expired = stores.some(store => {
+      if (!captures[store]) return false
       const age = now - Date.parse(captures[store].observedAt)
       return age < 0 || age > 7 * 86400000
     })
-    notice(sourceStatus, descriptions.join('\n'), gap > 86400000 || expired ? 'warning' : '')
+    notice(sourceStatus, descriptions.join('\n'), gap === null || gap > 86400000 || expired ? 'warning' : '')
   } catch {
     if (revision !== sourceRevision) return
     sourceInput.value = ''
@@ -835,13 +839,23 @@ save.addEventListener('click', () => {
     notice(status, error instanceof Error ? error.message : 'Kan mandvraag niet maken.', 'error')
   }
 })
+function ownSourceEnvelope() {
+  if (!captures) throw Error('Open eerst een eigen echte winkelopname.')
+  const present = stores.filter(store => captures[store]).map(store => captures[store])
+  if (!present.length) throw Error('Geen toegelaten winkelopname.')
+  return {
+    schema: present.length === 2 ? 'supa-offline-prices-v1' : 'supa-private-single-store-prices-v1',
+    captures: present,
+  }
+}
+
 // Explicit portable private session: the whole source and original observations travel
 // only in an opt-in local file. Neither browser storage nor any network is involved.
 function savePrivateSession() {
-  if (!captures) throw Error('Open eerst je echte PLUS- en DekaMarkt-opnames.')
+  if (!captures) throw Error('Open eerst je eigen echte winkelopname.')
   const snapshot = {
     schema: 'supa-private-basket-session-v1',
-    source: { schema: 'supa-offline-prices-v1', captures: stores.map(store => captures[store]) },
+    source: ownSourceEnvelope(),
     demand: demand(),
   }
   const content = JSON.stringify(snapshot, null, 2) + '\n'
@@ -888,7 +902,7 @@ restoreSession.addEventListener('change', async () => {
       for (const store of stores) {
         const sku = raw.productIds[store]
         if (sku !== null && sku !== undefined &&
-            !verified[store].products.some(p => p.id === sku &&
+            !verified[store]?.products.some(p => p.id === sku &&
               classify(p.packUnit) === classify(unit))) {
           throw Error('Een opgeslagen SKU past niet bij de echte winkelbron en fysieke eenheid.')
         }
@@ -924,12 +938,17 @@ restoreSession.addEventListener('change', async () => {
     }
     invalidateUnpricedDemand()
     refresh()
-    const ages = stores.map(store => Date.now() - Date.parse(captures[store].observedAt))
-    const gap = Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt))
-    const stale = ages.some(age => age < 0 || age > 7 * 86400000) || gap > 86400000
-    notice(sourceStatus, stores.map(store => store + ': ' + captures[store].products.length +
-      ' eigen bronartikelen, oorspronkelijke opname ' + captures[store].observedAt).join('\n') +
-      (stale ? '\nEen of beide bronmomenten zijn verlopen, toekomstig of liggen >24 uur uiteen.' :
+    const ages = stores.map(store => captures[store]
+      ? Date.now() - Date.parse(captures[store].observedAt) : null)
+    const gap = captures.PLUS && captures.DekaMarkt
+      ? Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt)) : null
+    const stale = ages.some(age => age !== null && (age < 0 || age > 7 * 86400000)) ||
+      gap === null || gap > 86400000
+    notice(sourceStatus, stores.map(store => captures[store]
+      ? store + ': ' + captures[store].products.length +
+        ' eigen bronartikelen, oorspronkelijke opname ' + captures[store].observedAt
+      : store + ': geen echte bronopname, onbekende prijzen').join('\n') +
+      (stale ? '\nGeen geldig volledig bronpaar; per complete recente winkel blijft een boodschappenlijst mogelijk.' :
         '\nControleer de oorspronkelijke SKU-keuzes opnieuw.'), stale ? 'warning' : '')
     notice(status, saved.items.length + ' ingrediënten en SKU-keuzes lokaal hersteld. ' +
       'Controleer zelf de oorspronkelijke producten, hoeveelheden en bronmomenten vóór vergelijking. ' +
@@ -949,7 +968,7 @@ addIngredient()
 
 compareNow.addEventListener('click', () => {
   try {
-    const source = { schema: 'supa-offline-prices-v1', captures: stores.map(store => captures[store]) }
+    const source = ownSourceEnvelope()
     document.dispatchEvent(new CustomEvent('supa:compare-private-basket', { detail: { source, demand: demand() } }))
     if (priceResult && !priceResult.hidden) priceResult.scrollIntoView({ block: 'start', behavior: 'smooth' })
   } catch (error) {

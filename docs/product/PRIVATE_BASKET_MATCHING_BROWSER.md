@@ -308,3 +308,26 @@ geen twee-winkelwinnaar of prijsverschil wordt berekend. Alleen bij twee
 werkelijke opnames worden de canonieke 7-dagen én 24-uurs-paarvoorwaarden
 voor de volledige vergelijking toegepast. Onbevestigde/ontbrekende producten
 blijven onbekend, niet nul euro.
+
+## Eén echte winkelopname rechtstreeks in de koppelwizard
+
+De gecombineerde `/private-basket-mapping.html` accepteert dezelfde nieuwe
+expliciete `supa-private-single-store-prices-v1` bron uit de strikte
+`convertOwnStoreCsv` parser. Je kunt nu alleen een eigen PLUS-CSV,
+alleen DekaMarkt-CSV, of één bestaande eigen JSON/CSV-opname openen.
+Er worden **geen** bronmomenten, winkels, SKU's of prijzen gefabriceerd voor
+het ontbrekende tweede filiaal. De keuzelijst voor die winkel blijft leeg en
+het dekkingsscherm toont de ontbrekende bron als onbekend. De bestaande
+handmatige dual-store correctie-editor blijft uitsluitend beschikbaar voor
+*werkelijk twee* aanwezige winkelopnames, om het ontbrekende veldbewijs niet
+als een bewerkbare fictieve opname voor te vullen.
+
+De ingeladen echte ene opname kan direct bij ingrediënten worden gematcht,
+vergeleken als uitsluitend eigen winkelmand, en lokaal worden meegenomen
+in één expliciet `supa-private-basket-session-v1` sessiebestand. Herstel
+gebruikt opnieuw de bestaande lokale strikte bron- en SKU-validatie; een
+winkel-SKU voor een winkel zonder aangeleverde opname wordt geweigerd. De
+andere winkel blijft unknown totdat de gebruiker een echt tweede bestand
+inlaadt. De 7-dagen-herkomstgrens voor de ene winkel blijft gelden; de
+bestaande 24-uursgrens voor volledige winkelpaarvergelijking wordt
+nooit verwijderd of versoepeld.

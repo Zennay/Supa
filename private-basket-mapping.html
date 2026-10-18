@@ -77,7 +77,7 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 <body><main>
 <header><p><strong>SUPA · PRIVÉ · LOKAAL</strong></p>
 <h1>Hetzelfde mandje bij twee winkels samenstellen</h1>
-<p>Selecteer uitsluitend producten die je herkent in je <strong>eigen</strong> PLUS- en DekaMarkt-opnames.
+<p>Selecteer uitsluitend producten die je herkent in je <strong>eigen</strong> PLUS- en/of DekaMarkt-opnames. Eén echte winkelopname is voldoende om een lokale winkelmand te maken; een prijsverschil tussen winkels vereist beide echte bronnen.
 Deze pagina leest bestanden alleen in je browser. Ze haalt geen prijzen op, verzint geen koppelingen en verzendt niets.
 Onbekende productmatches blijven onbekend. Bekende artikelen zonder prijs of beschikbaarheid kun je wel vastleggen, maar ze tellen nooit mee als geprijsde winkelmandregel.</p></header>
 <section aria-labelledby="source-title">
@@ -85,12 +85,12 @@ Onbekende productmatches blijven onbekend. Bekende artikelen zonder prijs of bes
 <label for="source">Gecombineerde eigen CSV, of supa-offline-prices-v1 JSON</label>
 <input id="source" type="file" accept=".csv,.json,text/csv,application/json">
 <div class="stores">
-<div><label for="plus-source">Of: PLUS CSV afzonderlijk</label><input id="plus-source" type="file" accept=".csv,text/csv"></div>
-<div><label for="deka-source">En: DekaMarkt CSV afzonderlijk</label><input id="deka-source" type="file" accept=".csv,text/csv"></div>
+<div><label for="plus-source">Of: jouw PLUS CSV (ook zonder DekaMarkt)</label><input id="plus-source" type="file" accept=".csv,text/csv"></div>
+<div><label for="deka-source">En/of: jouw DekaMarkt CSV (ook zonder PLUS)</label><input id="deka-source" type="file" accept=".csv,text/csv"></div>
 </div>
-<p class="muted">Kies één gecombineerd CSV-/JSON-bestand <strong>of</strong> twee afzonderlijke CSV-opnames.
+<p class="muted">Kies één eigen CSV-/JSON-bestand met één of twee werkelijke winkelopnames, of aparte CSV-bestanden per winkel.
 Elk afzonderlijk bestand moet de negen kolommen met de volledige CSV-kop bevatten.
-Beide bronnen worden alleen lokaal samengevoegd en door de bestaande strikte Supa-converter gevalideerd.
+Aangeleverde bronnen worden alleen lokaal verwerkt door de bestaande strikte Supa-converter. Een ontbrekende tweede winkel wordt niet automatisch ingevuld.
 Productnamen en prijzen komen uitsluitend uit jouw eigen bestanden.</p>
 <div class="row-actions"><button id="edit-owned-source" type="button" class="secondary" disabled>Bewerk mijn geopende eigen winkelopnames</button></div>
 <div id="source-status" class="notice" role="status" aria-live="polite">Nog geen bronbestand gekozen.</div>
@@ -149,7 +149,7 @@ boodschappenbehoefte als een Planner-weekmenu.</p>
 </section>
 <section aria-labelledby="save-title">
 <h2 id="save-title">3 · Vergelijk direct of bewaar jouw mandje</h2>
-<p>Maak en bewaar jouw echte ingrediëntenlijst ook <strong>zonder</strong> winkelprijzen, bijvoorbeeld rechtstreeks uit het Planner-weekmenu. Een volledige winkelvergelijking kan pas wanneer je geldige eigen winkelopnames hebt gekoppeld. Zodra je echte prijzen hebt: bereken de twee fysieke winkelmandjes op deze pagina; de gegevens blijven in je browsergeheugen.
+<p>Maak en bewaar jouw echte ingrediëntenlijst ook <strong>zonder</strong> winkelprijzen, bijvoorbeeld rechtstreeks uit het Planner-weekmenu. Een volledige twee-winkelvergelijking kan pas als je twee geldige eigen winkelopnames hebt gekoppeld. Een compleet mandje bij één winkel kan afzonderlijk wel worden berekend. Zodra je echte prijzen hebt: bereken de twee fysieke winkelmandjes op deze pagina; de gegevens blijven in je browsergeheugen.
 Of download een lokaal JSON-vraagbestand met alleen ingrediënten en expliciete product-ID's (zonder prijzen), bruikbaar in de bestaande privé-rapportage.
 Een volledig prijsverschil verschijnt alleen met complete, geldige eigen winkelopnames.
 Bewaar desgewenst je <strong>lokale bron- en mandinvoersessie</strong> inclusief werkelijk zelf aangeleverde winkelopnames en handmatig gekozen SKU's in één privé JSON-bestand. Dat bestand bevat eigen prijzen en productnamen; bewaar het vertrouwelijk. Bij openen worden de bronmomenten en alle koppelingen opnieuw gecontroleerd. Supa rekent nooit automatisch een nieuwe besparing uit.</p>
