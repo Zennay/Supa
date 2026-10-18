@@ -72,14 +72,28 @@ function availableProducts(store, unit) {
 }
 
 function updateSelect(select, store, unit) {
+  const row = select.closest('.ingredient')
+  const search = row.querySelector('[data-search-store="' + store + '"]')
+  const query = search.value.trim().toLocaleLowerCase('nl')
   const chosen = select.value
+  const all = availableProducts(store, unit)
+  const kept = all.find(product => product.id === chosen)
+  const filtered = all.filter(product => !query ||
+    product.name.toLocaleLowerCase('nl').includes(query) ||
+    product.id.toLocaleLowerCase('nl').includes(query))
+  const shown = filtered.slice(0, 80)
+  if (kept && !shown.some(product => product.id === kept.id)) shown.unshift(kept)
   select.replaceChildren(new Option('Niet gekoppeld · onbekend', ''))
-  for (const product of availableProducts(store, unit)) {
+  for (const product of shown) {
     const pack = String(product.packAmount).replace('.', ',') + ' ' + product.packUnit
     const option = new Option(product.name + ' · ' + pack + ' · ID ' + product.id, product.id)
     select.add(option)
   }
-  if (Array.from(select.options).some(opt => opt.value === chosen)) select.value = chosen
+  select.value = kept ? kept.id : ''
+  row.querySelector('[data-matches-store="' + store + '"]').textContent =
+    String(filtered.length) + ' passend(e) artikel(en) in jouw eigen bron; ' +
+    (filtered.length > 80 ? 'toon maximaal 80, verfijn je zoekterm. ' : '') +
+    'Kies zelf de juiste SKU.'
 }
 function invalidatePrice() {
   if (priceResult) priceResult.hidden = true
@@ -136,10 +150,20 @@ function addIngredient(restored = null) {
   field(grid, 'Eenheid', unit)
   const storesGrid = node('div', { className: 'stores' })
   for (const store of stores) {
+    const box = node('div')
+    const filter = node('input', { type: 'search', placeholder: 'Zoek productnaam of artikel-ID' })
+    filter.dataset.searchStore = store
+    filter.maxLength = 160
+    field(box, 'Zoek in eigen ' + store + '-producten', filter)
     const select = node('select')
     select.dataset.store = store
     select.setAttribute('aria-label', 'Gekozen ' + store + '-product voor ' + id)
-    field(storesGrid, store + ' · expliciete productkeuze', select)
+    field(box, store + ' · expliciete productkeuze', select)
+    const count = node('small')
+    count.dataset.matchesStore = store
+    box.append(count)
+    storesGrid.append(box)
+    filter.addEventListener('input', () => updateSelect(select, store, unit.value))
   }
   const actions = node('div', { className: 'row-actions' })
   const remove = node('button', { type: 'button', className: 'secondary' }, 'Verwijder ingrediënt')
