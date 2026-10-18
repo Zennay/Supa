@@ -15,6 +15,7 @@ let sourceRevision = 0
 let pendingManualEdit = false
 const sourceStatus = document.querySelector('#source-status')
 const editSource = document.querySelector('#edit-owned-source')
+const downloadAdmittedSources = document.querySelector('#download-admitted-sources')
 const status = document.querySelector('#status')
 const lines = document.querySelector('#lines')
 const coverage = document.querySelector('#match-coverage')
@@ -283,6 +284,7 @@ function refresh() {
   showUnpriced.disabled = save.disabled
   compareNow.disabled = !captures || save.disabled || pendingManualEdit
   editSource.disabled = !captures
+  downloadAdmittedSources.disabled = !captures || pendingManualEdit
   updateCoverage()
 }
 function addIngredient(restored = null) {
@@ -361,6 +363,45 @@ function addIngredient(restored = null) {
   invalidatePrice()
   updateCoverage()
 }
+
+downloadAdmittedSources.addEventListener('click', () => {
+  if (!captures || pendingManualEdit) {
+    notice(sourceStatus, 'Bevestig of annuleer eerst het handmatige concept; alleen toegelaten echte winkelopnames zijn exporteerbaar.', 'warning')
+    return
+  }
+  try {
+    const originalCaptures = stores.filter(store => captures[store]).map(store => captures[store])
+    const admitted = {
+      schema: originalCaptures.length === 2
+        ? 'supa-offline-prices-v1' : 'supa-private-single-store-prices-v1',
+      captures: originalCaptures,
+    }
+    // Run the same strict local source boundary used on import, not a
+    // permissive serialization of draft rows or invented extra retailers.
+    const verified = acceptJson(admitted)
+    if (Object.keys(verified).length !== originalCaptures.length) {
+      throw Error('Niet alle originele eigen winkelopnames zijn controleerbaar.')
+    }
+    const content = JSON.stringify(admitted, null, 2) + '\n'
+    if (new TextEncoder().encode(content).length > maxBytes) {
+      throw Error('Deze lokale bronbackup overschrijdt de 256 KB-limiet; bewaar je eigen originele CSV-bestanden.')
+    }
+    const url = URL.createObjectURL(new Blob([content], { type: 'application/json;charset=utf-8' }))
+    const link = node('a')
+    link.href = url
+    link.download = 'supa-alle-eigen-winkelopnames.json'
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+    notice(sourceStatus, originalCaptures.map(item => item.retailer).join(' + ') +
+      ': alle werkelijk geaccepteerde eigen bronopnames lokaal aangeboden als één JSON. ' +
+      'Inclusief originele SKU’s, centprijzen en UTC-tijdstippen; geen publiek retailerrecht of kassagarantie.')
+  } catch (error) {
+    notice(sourceStatus, error instanceof Error ? error.message :
+      'De lokale originele winkelbronnen konden niet veilig worden bewaard.', 'error')
+  }
+})
 
 editSource.addEventListener('click', () => {
   if (!captures) return
