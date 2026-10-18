@@ -15,6 +15,7 @@ type LooseExportLine = {
 function safeLooseLines(lines: readonly LooseExportLine[]): boolean {
   if (!Array.isArray(lines) || lines.length > 1000) return false
   const ids = new Set<string>()
+  let total = 0
   for (const line of lines) {
     if (!line || typeof line.id !== 'string' || !line.id.trim() ||
         typeof line.name !== 'string' || !line.name.trim() ||
@@ -24,6 +25,10 @@ function safeLooseLines(lines: readonly LooseExportLine[]): boolean {
           line.priceCents < 0 || !Number.isSafeInteger(line.priceCents * line.packs))) ||
         ids.has(line.id)) return false
     ids.add(line.id)
+    if (line.priceCents !== null) {
+      total += line.priceCents * line.packs
+      if (!Number.isSafeInteger(total)) return false
+    }
   }
   return true
 }
