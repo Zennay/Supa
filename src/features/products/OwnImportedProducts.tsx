@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { StoreProduct } from '../../domain/basket.ts'
 import { parseSingleOfflineCapture, type OfflineCapture, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
-import { offlineSessionFresh } from '../comparison/offlineSessionBaskets.ts'
 import { privatePackUnitRate } from '../comparison/privateUnitPrice.ts'
 import type { OfflineComparisonSession } from '../comparison/offlineComparisonSession.ts'
 import './ownImportedProducts.css'
@@ -75,6 +74,17 @@ export function OwnImportedProducts({
   }, [imported, session?.stagedCaptures, clock])
   const availableCaptures = imported?.captures ?? staged
   const availableStores = stores.filter(store => !!availableCaptures[store])
+  // Each source has its own age. One expired capture must not falsely mark a
+  // different retailer's admitted observation as stale (or vice versa).
+  const freshByStore = useMemo(() => {
+    const nowNs = BigInt(Math.trunc(clock)) * 1_000_000n
+    return Object.fromEntries(stores.map(store => {
+      const observedNs = availableCaptures[store]?.observedNs
+      return [store, observedNs !== undefined &&
+        nowNs >= observedNs - 300_000_000_000n &&
+        nowNs - observedNs <= 604_800_000_000_000n]
+    })) as Record<OfflineRetailer, boolean>
+  }, [availableCaptures, clock])
   const selectedExtras = session ? stores.reduce((total, store) =>
     total + session.extraProductIds[store].length, 0) : 0
   const rows = useMemo(() => {
@@ -89,12 +99,17 @@ export function OwnImportedProducts({
       const rank: Record<Group, number> = { kg: 0, liter: 1, stuk: 2 }
       filtered.sort((a, b) => {
         const groupOrder = (a.group ? rank[a.group] : 3) - (b.group ? rank[b.group] : 3)
-        return groupOrder || (a.unitCents ?? Infinity) - (b.unitCents ?? Infinity) ||
+        // Older prices remain inspectable, but must not outrank recent
+        // source entries within a physically compatible comparison group.
+        const knownPriceOrder = Number(b.unitCents === null) - Number(a.unitCents === null)
+        const freshnessOrder = Number(freshByStore[b.store]) - Number(freshByStore[a.store])
+        return groupOrder || knownPriceOrder || freshnessOrder ||
+          (a.unitCents ?? Infinity) - (b.unitCents ?? Infinity) ||
           a.product.name.localeCompare(b.product.name, 'nl-NL')
       })
     }
     return filtered
-  }, [availableCaptures, query, storeFilter, unitFilter, sortByUnitPrice])
+  }, [availableCaptures, query, storeFilter, unitFilter, sortByUnitPrice, freshByStore])
 
   if (availableStores.length === 0 || !session) return <section className="hifi-section own-products" aria-label="Eigen prijsopnames">
     <h2>Mijn eigen winkelprijzen</h2>
@@ -107,27 +122,35 @@ export function OwnImportedProducts({
       Zij leveren nooit automatisch actuele winkelprijzen aan je mand.</p>
   </section>
 
-  const fresh = imported ? offlineSessionFresh(imported, clock) :
-    availableStores.every(store => {
-      const source = availableCaptures[store]
-      if (!source) return false
-      const nowNs = BigInt(Math.trunc(clock)) * 1_000_000n
-      return nowNs >= source.observedNs - 300_000_000_000n &&
-        nowNs - source.observedNs <= 604_800_000_000_000n
-    })
+  const allStoresFresh = availableStores.every(store => freshByStore[store])
   return <section className="hifi-section own-products" aria-label="Mijn eigen prijsopnames">
     <div className="hifi-section-heading"><div>
       <h2>Mijn privéproducten</h2>
       <p className="recipe-count">{rows.length} producten uit eigen {availableStores.join(' en ')}-invoer</p>
     </div></div>
     <p className="disclaimer" role="status">
-      {fresh ? 'Opnames vallen binnen de lokale 7-dagenlimiet.' : 'Verlopen opnames: dit zijn geen actuele winkelprijzen.'}
+      {allStoresFresh ? 'Alle ingeladen opnames vallen binnen de lokale 7-dagenlimiet.' :
+        'Ten minste één opname is verlopen. De andere winkel kan nog wel een recente eigen opname hebben.'}
       {' '}{availableStores.map(store =>
-        store + ': ' + dates.format(new Date(availableCaptures[store]!.observedMs))).join('; ')}.
+        store + ': ' + dates.format(new Date(availableCaptures[store]!.observedMs)) +
+        (freshByStore[store] ? ' (recent)' : ' (verlopen)')).join('; ')}.
       {' '}Alleen jouw eigen invoer, niet onafhankelijk geverifieerd of gepubliceerd.
       {!imported && ' De andere winkel ontbreekt: geen twee-winkel prijsverschil.'}
       {imported && !imported.pairedWithin24h && ' De twee opnames liggen meer dan 24 uur uiteen.'}
     </p>
+    {availableStores.some(store => !freshByStore[store]) && (
+      <div className="own-products__list-pulse" role="group"
+        aria-label="Verouderde winkelopnames vervangen">
+        <span>Vervang alleen de verouderde winkelopname. Je andere eigen producten
+          en hun brongegevens blijven behouden zolang die geldig zijn.</span>
+        {availableStores.filter(store => !freshByStore[store]).map(store => (
+          <button key={store} type="button" className="own-products__primary"
+            onClick={() => { session.setSelectedStore(store); onCompare() }}>
+            Nieuwe {store}-opname importeren
+          </button>
+        ))}
+      </div>
+    )}
     {selectedExtras > 0 && <div className="own-products__list-pulse" role="status">
       <span>{selectedExtras} zelf gekozen losse {selectedExtras === 1 ? 'artikel' : 'artikelen'}
         {' '}staan buiten de berekende maaltijdmand, klaar in Lijst.</span>
@@ -185,7 +208,7 @@ export function OwnImportedProducts({
                   euros.format(unitCents / 100) + ' per ' + group}
               </span>
             </> : <p className="hifi-no-price">Prijs onbekend of product niet beschikbaar</p>}
-            {!fresh && <small>Verouderd · geen actuele winkelprijs</small>}
+            {!freshByStore[store] && <small role="note">Verouderde {store}-waarneming · geen actuele winkelprijs</small>}
           </div>
           <button type="button" className="own-products__extra"
             aria-pressed={session.extraProductIds[store].includes(product.id)}
