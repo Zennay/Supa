@@ -644,6 +644,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             manualWeekBudgetEuros={budget}
             offlinePriceSession={offlinePriceSession}
             onOpenList={() => navigate('list')}
+            onOpenPlanner={() => navigate('planner')}
           />
         )}
         {tab === 'list' && offlinePriceSession.imported && <details className="demo-comparison-disclosure">
