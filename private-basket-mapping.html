@@ -120,6 +120,18 @@ Een volledig prijsverschil verschijnt alleen met complete, geldige eigen winkelo
 <button type="button" id="download-missing">Download ontbrekende punten als privé TXT</button>
 </div>
 <p><small>De prijs per kg/liter/stuk is slechts indicatief. Alleen hele verpakkingen en echte eigen prijsopnames worden meegerekend. Er is geen openbare besparingsclaim of bewijs van bronrechten.</small></p>
+<section id="trip" hidden aria-label="Eigen boodschappenlijst">
+<h3>4 · Ga boodschappen doen met jouw gekozen winkel</h3>
+<p>Deze afvinklijst gebruikt uitsluitend het <strong>volledige</strong> mandje uit jouw lokale winkelopname. Een prijs is geen garantie voor de actuele kassaprijs. Er wordt niets naar een server verzonden of automatisch bewaard.</p>
+<label for="trip-store">Kies zelf de winkel waar je gaat winkelen</label>
+<select id="trip-store"><option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option></select>
+<div id="trip-summary" class="notice" role="status" aria-live="polite"></div>
+<div id="trip-items" role="group" aria-label="Boodschappen afvinken"></div>
+<div class="row-actions">
+<button id="trip-export" type="button">Download mijn boodschappenlijst als TXT</button>
+<button id="trip-reset" class="secondary" type="button">Begin lijst opnieuw</button>
+</div>
+</section>
 <button id="print" type="button">Print deze privévergelijking</button>
 </section>
 </main></body></html>
