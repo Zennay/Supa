@@ -131,6 +131,9 @@ export function OfflineReviewedWorkbench({
       session.setExtraProductIds(previous => ({ ...previous, [retailer]: [] }))
       session.setExtraDoneIds(previous => ({ ...previous, [retailer]: [] }))
       session.setExtraQuantities(previous => ({ ...previous, [retailer]: {} }))
+      // Progress is bound to one exact source and basket. An altered capture
+      // must not inherit checkmarks, even when its product IDs look identical.
+      session.setTripMemory(previous => ({ ...previous, [retailer]: undefined }))
     }
     const next = { ...stagedCaptures.current, [retailer]: capture }
     stagedCaptures.current = next
@@ -270,7 +273,13 @@ export function OfflineReviewedWorkbench({
           fingerprint: offlineSessionFingerprint(parsed, plan, recipes, activeDays),
           products: preservedMatches,
         })
-        session.setTripMemory({})
+        // Keep only checkbox progress from the untouched original captures.
+        // PrivateStoreTripChecklist independently binds it to the *entire*
+        // recalculated basket, so altered prices/demand never inherit ticks.
+        session.setTripMemory(previous => ({
+          PLUS: retainStagedStores.includes('PLUS') ? previous.PLUS : undefined,
+          DekaMarkt: retainStagedStores.includes('DekaMarkt') ? previous.DekaMarkt : undefined,
+        }))
         if (retainStagedStores.length > 0) {
           // Both staged captures were canonical-admitted from the same files
           // we are now joining. Carry only still-present selected product IDs.
