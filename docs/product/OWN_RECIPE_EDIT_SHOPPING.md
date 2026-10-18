@@ -17,3 +17,18 @@ Dit is een **lokale privéfunctie** van de Supa-tab **Recepten**. Er is geen sup
 4. Kies **Boodschappenlijst selecteren** om de tekst handmatig te kopiëren, of **Download ongeprijsde lijst (TXT)** om het lokale tekstbestand te bewaren. Er is geen clipboard-permissie, upload, automatisch fetch-verzoek of cloud-opslag nodig.
 
 Receptvarianten en handmatige hoeveelheden zijn geen bewijs van supermarktvoorraad of besparing. Gebruik voor een echte winkeltotaalvergelijking daarnaast uitsluitend eigen werkelijk waargenomen en toegestane brongegevens in de bestaande `/private-basket-mapping.html` of de Supa-tab Vergelijk. Ontbrekende/verlopen peer-winkelprijzen blijven onbekend, nooit `€0`. Externe PLUS/Deka-rechten, de echte 11×2-opname en veldcodepin blijven onafhankelijk van deze lokale receptenfunctie.
+
+
+## Eén eigen recept naar de bestaande PLUS/Deka-vergelijker
+
+1. Open **Recepten** → jouw eigen recept en kies **Gewenste porties** (1–100).
+2. Kies **Gebruik dit recept in winkelvergelijker (JSON)**. Supa maakt uitsluitend de oorspronkelijke, door jou bevestigde metrische fysieke behoefte voor die porties, zonder winkelnamen, SKU's, tijdstippen of prijs.
+3. Kies **Open privéwinkelvergelijker** (of ga zelf naar `/private-basket-mapping.html`). Importeer het zojuist lokaal gedownloade JSON-bestand bij **weekmenu**. Dit bestand gebruikt exact dezelfde `supa-private-planner-week-v1`-normalisatie als de geselecteerde Supa Planner-week.
+4. Importeer alleen eigen werkelijk waargenomen en toegestane PLUS- en/of DekaMarkt-brongegevens, controleer de productidentiteit, inhoud én hele-verpakkingsprijs per winkel afzonderlijk en keur de voorgestelde SKU-matching handmatig goed.
+5. Een volledige prijskolom/winkeltotaal ontstaat uitsluitend bij complete, recente, handmatig bevestigde oorspronkelijke brongegevens. Een echt prijsverschil voor dezelfde mand verschijnt pas als beide afzonderlijke waarnemingen ook aan de bestaande paartijdvoorwaarden voldoen. Zonder tweede winkel of bij verlopen opname blijft het prijsverschil **onbekend**, nooit nul.
+
+Een recept met ontbrekende hoeveelheden, niet-gehele stuks of onveilige waarden kan wel een ongeprijsde checklist met waarschuwingen opleveren, maar **niet** automatisch een prijsvergelijkbaar JSON-bestand. Corrigeer het oorspronkelijke recept eerst; er is geen verborgen afronding of winkelproductgok.
+
+## Rechtmatig verkregen receptenbestand lokaal importeren
+
+Open **Plak receptgegevens (JSON-LD)**. Je kunt daar behalve tekst plakken ook een eigen reeds gedownload `.html`, `.htm`, `.json` of `.jsonld`-bestand (maximaal 500 kB) kiezen. Het bestand wordt als UTF-8 lokaal gelezen, zonder websitecontact of HTML/JavaScript-uitvoering. Vul zelf de oorspronkelijke openbare HTTPS-bronlink in; deze link dient uitsluitend als bronvermelding en wordt voor de lokale plak-/bestandsimport niet opgevraagd. Controleer daarna alle ingrediënten en bereidingsstappen vóór je opslaat. Ongeldig UTF-8, een onherkenbaar recept, een ontbrekende bronlink of een bestand boven de grens wordt afgewezen; eerder opgeslagen recepten blijven staan.
