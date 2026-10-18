@@ -378,7 +378,15 @@ compareNow.addEventListener('click', () => {
   try {
     const source = { schema: 'supa-offline-prices-v1', captures: stores.map(store => captures[store]) }
     document.dispatchEvent(new CustomEvent('supa:compare-private-basket', { detail: { source, demand: demand() } }))
+    if (priceResult && !priceResult.hidden) priceResult.scrollIntoView({ block: 'start', behavior: 'smooth' })
   } catch (error) {
     notice(status, error instanceof Error ? error.message : 'Mandvraag is ongeldig', 'error')
   }
 })
+
+for (const kind of ['input', 'change']) {
+  document.addEventListener(kind, event => {
+    const target = event.target
+    if (target instanceof Element && (target.closest('#lines') || target.closest('#meal-count') || target.closest('#source') || target.closest('#plus-source') || target.closest('#deka-source'))) invalidatePrice()
+  })
+}
