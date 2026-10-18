@@ -1,0 +1,25 @@
+.private-source-shopping {display:grid;gap:1rem;max-width:980px;margin:0 auto}
+.private-source-shopping__choose {display:grid;gap:.4rem;font-weight:650}
+.private-source-shopping select,.private-source-shopping button {
+  border:1px solid #879d8b;background:white;border-radius:9px;padding:.7rem;min-height:44px;
+  font:inherit;color:#203f2b
+}
+.private-source-shopping__summary,.private-source-shopping__comparison {
+  background:#f3f8f3;border:1px solid #cbdccb;border-radius:14px;padding:1rem;
+}
+.private-source-shopping__summary>strong {font-size:clamp(1.4rem,4vw,2rem)}
+.private-source-shopping__summary p {margin:.4rem 0}
+.private-source-shopping__comparison small {display:block;margin-top:.4rem}
+.private-source-shopping__actions {display:flex;flex-wrap:wrap;gap:1rem;align-items:center}
+.private-source-shopping__actions label {display:flex;gap:.6rem;align-items:center}
+.private-source-shopping input[type=checkbox] {width:21px;height:21px;flex-shrink:0}
+.private-source-shopping__items {display:grid;gap:.6rem}
+.private-source-shopping__item {display:flex;gap:.75rem;align-items:start;border:1px solid #d7e3d8;
+  border-radius:12px;padding:.8rem;overflow-wrap:anywhere}
+.private-source-shopping__item span {flex:1;min-width:0}
+.private-source-shopping__item small {display:block;margin-top:.3rem}
+.private-source-shopping textarea {width:100%;box-sizing:border-box;resize:vertical;
+  border-radius:8px;padding:.7rem;font:inherit}
+.private-source-shopping :is(button,select,input,summary,textarea):focus-visible {outline:3px solid #226f52;outline-offset:3px}
+@media(max-width:520px){.private-source-shopping__item {flex-wrap:wrap}
+  .private-source-shopping__item>strong:last-child {margin-left:2rem}}

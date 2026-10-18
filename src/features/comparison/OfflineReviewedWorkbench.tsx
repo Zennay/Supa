@@ -10,6 +10,7 @@ import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
+import type { PrivateReviewedBaskets } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -86,11 +87,13 @@ function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number],
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays,
+  plan, recipes, activeDays, planKey, onReviewedBaskets,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
+  planKey?: string
+  onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
 }) {
   const [text, setText] = useState('')
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
@@ -460,6 +463,30 @@ export function OfflineReviewedWorkbench({
       nowNs - capture.observedNs <= 604_800_000_000_000n
     return { store, accepted, required: keys.length, complete, fresh }
   })
+  const reviewedBridge = useMemo((): PrivateReviewedBaskets | null => {
+    if (!imported || !basketPair || !planKey) return null
+    const verified: PrivateReviewedBaskets['stores'] = {}
+    for (const store of stores) {
+      const capture = imported.captures[store]
+      const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+      if (!capture || !basket) continue
+      const complete = basket.selectedMealCount > 0 && basket.lines.length > 0 &&
+        basket.unresolvedLineCount === 0 &&
+        basket.matchedLineCount === basket.lines.length &&
+        basket.lines.every(line => line.status === 'matched' &&
+          reviewedLines[reviewedLineKey(store, capture.observedAt, line)] === true)
+      const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
+      const fresh = nowNs >= capture.observedNs - 300_000_000_000n &&
+        nowNs - capture.observedNs <= 604_800_000_000_000n
+      if (complete && fresh) verified[store] = {
+        basket, observedAt: capture.observedAt, capturedMs: capture.observedMs,
+      }
+    }
+    return Object.keys(verified).length > 0 ? { planKey, stores: verified } : null
+  }, [imported, basketPair, reviewedLines, clockMs, planKey])
+  useEffect(() => {
+    onReviewedBaskets?.(reviewedBridge)
+  }, [onReviewedBaskets, reviewedBridge])
   const allReviewed = perStoreReview.every(item => item.complete)
   const comparisonNextSteps = perStoreReview.flatMap(item => {
     const capture = imported?.captures[item.store]
@@ -806,7 +833,7 @@ export function OfflineReviewedWorkbench({
                                   <option value="">Automatisch voorstellen (of onbekend)</option>
                                   {choices.shown.map(product => (
                                       <option key={product.id} value={product.id}>
-                                        {product.name} · {product.id} · {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)}
+                                        {product.name} · {product.id} · {product.packAmount} {product.packUnit} · {product.priceCents === null ? 'Prijs onbekend' : euros.format(product.priceCents / 100)}
                                       </option>
                                     ))}
                                 </select>

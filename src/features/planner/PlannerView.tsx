@@ -21,6 +21,7 @@ type PlannerViewProps = {
   recipes: Recipe[]
   basketTotalCents: number
   basketUnresolvedLineCount: number
+  ownSource?: { store: string; observedAt: string }
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
@@ -34,6 +35,7 @@ export function PlannerView({
   recipes,
   basketTotalCents,
   basketUnresolvedLineCount,
+  ownSource,
   onBudgetChange,
   onToggleDay,
   onRecipeChange,
@@ -257,6 +259,15 @@ export function PlannerView({
               : `min. ${euro.format(plannedCost)}`}
           </strong>
         </div>
+        {ownSource && <p className="disclaimer" role="status">
+          Privécontrole: {ownSource.store} · eigen winkelopname {ownSource.observedAt}.
+          Het getoonde budgetbedrag gebruikt jouw volledige, persoonlijk bevestigde winkelmand
+          in plaats van de Supa-voorbeeldprijzen. Geen kassagarantie of publieke besparingsclaim.
+        </p>}
+        {!ownSource && <p className="disclaimer">
+          Dit budget gebruikt voorlopig de Supa-voorbeeldcatalogus.
+          Controleer je eigen bronartikelen in Vergelijk voor een persoonlijk mandbedrag.
+        </p>}
         <p className="disclaimer">
           {budgetKnown ? (
             <>

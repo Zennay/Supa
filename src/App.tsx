@@ -1,11 +1,13 @@
 import { FigmaImage } from './components/FigmaImage'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
+import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
+import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
@@ -105,6 +107,13 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
 
 export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
+  const [visitedBasket, setVisitedBasket] = useState(initialTab === 'basket')
+  const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
+  const [preferredOwnStore, setPreferredOwnStore] = useState<OwnStore>('PLUS')
+  const onReviewedBaskets = useCallback((next: PrivateReviewedBaskets | null) => {
+    setPrivateReviewed(previous => JSON.stringify(previous) === JSON.stringify(next)
+      ? previous : next)
+  }, [])
   const [initialProductSelection] = useState(readChosenProducts)
   const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)
   const [savedProductRaw, setSavedProductRaw] = useState(initialProductSelection.raw)
@@ -113,7 +122,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     () => initialProductSelection.writable ? null : (typeof window === 'undefined' ? null : 'protected'),
   )
   const isHiFiView = tab === 'home' || tab === 'recipes' || tab === 'products'
-  const navigate = (next: Tab) => { setTab(next); window.scrollTo?.(0, 0) }
+  const navigate = (next: Tab) => {
+    if (next === 'basket') setVisitedBasket(true)
+    setTab(next); window.scrollTo?.(0, 0)
+  }
   const toggleDesignProduct = (id: string) => {
     setDesignProductIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])
     setProductSelectionTouched(true)
@@ -163,6 +175,17 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       })),
     [recipeByDay],
   )
+
+  // Prices never leave React memory. A changed recipe, day or physical demand
+  // immediately invalidates private source receipts in every other tab.
+  const privatePlanKey = JSON.stringify([
+    plannedMeals, activeDays,
+    recipes.map(recipe => [recipe.id, recipe.ingredients]),
+  ])
+  const livePrivateReviewed = freshReviewedBaskets(privateReviewed, privatePlanKey, Date.now())
+  const preferredPrivateBasket = livePrivateReviewed?.stores[preferredOwnStore] ??
+    livePrivateReviewed?.stores.PLUS ?? livePrivateReviewed?.stores.DekaMarkt
+
 
   // Bind prepared copy to the exact user-visible plan state. Clearing it in
   // an effect alone happens after render and briefly exposes stale personal text.
@@ -306,7 +329,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       <div className="content">
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
-        {tab === 'list' && <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />}
+        {tab === 'list' && !livePrivateReviewed &&
+          <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />}
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
           <p role="status" className="disclaimer">
             {productSelectionWarning === 'protected'
@@ -327,8 +351,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             activeDays={activeDays}
             plannedMeals={plannedMeals}
             recipes={recipes}
-            basketTotalCents={basket.totalCents}
-            basketUnresolvedLineCount={basket.unresolvedLineCount}
+            basketTotalCents={preferredPrivateBasket?.basket.totalCents ?? basket.totalCents}
+            basketUnresolvedLineCount={preferredPrivateBasket?.basket.unresolvedLineCount ?? basket.unresolvedLineCount}
+            ownSource={preferredPrivateBasket ? {
+              store: preferredPrivateBasket.basket.store.name,
+              observedAt: preferredPrivateBasket.observedAt,
+            } : undefined}
             onBudgetChange={(nextBudget) =>
               setPreferences((current) => ({
                 ...current,
@@ -381,7 +409,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             )}
           </section>
         )}
-        {tab === 'basket' && (
+        {visitedBasket && (
+          <div hidden={tab !== 'basket'} aria-hidden={tab !== 'basket'}>
           <BasketView
             basket={basket}
             comparison={basketComparison}
@@ -390,9 +419,18 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             manualPlan={plannedMeals}
             manualRecipes={recipes}
             manualActiveDays={activeDays}
+            privatePlanKey={privatePlanKey}
+            onReviewedBaskets={onReviewedBaskets}
           />
+          </div>
         )}
-        {tab === 'list' && <ShoppingListView basket={basket} />}
+        {tab === 'list' && !livePrivateReviewed && <ShoppingListView basket={basket} />}
+        {livePrivateReviewed && (
+          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
+              preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore} />
+          </div>
+        )}
         {tab === 'observe' && <ObservationView />}
       </div>
 

@@ -331,3 +331,39 @@ De regels worden op absolute bijdrage gesorteerd; een horizontaal
 scrollbare tabel blijft bruikbaar op smalle telefoons. Zonder twee
 volledig door de gebruiker gecontroleerde winkelbronnen bestaat dit
 overzicht niet en wordt er geen fictief prijsverschil getoond.
+
+## Eén echte, bevestigde bron door Vergelijk → Lijst → Planner
+
+De bestaande React Vergelijk-tab publiceert vanaf nu alleen **daadwerkelijk
+per bronartikel bevestigde, complete en nog geldige** eigen mandjes in een
+kortlevende React-geheugenbrug. De oude voorbeelddata blijven strikt apart.
+Zodra de gebruiker naar Lijst of Planner navigeert, blijft de eigen
+Vergelijk-invoer gemount, zodat geïmporteerde bronprijzen en controles niet
+verdwijnen door alleen van tab te wisselen. Vervangen van bron, productmatch
+of fysieke weekbehoefte trekt gekoppelde mandjes onmiddellijk opnieuw in;
+de bronvergelijker herberekent bij wijzigingen en veroudering.
+
+**Lijst** toont na minstens één complete privé-opname geen
+fictieve voorbeeldproducten meer, maar de daadwerkelijk geselecteerde
+winkel met originele SKU, benodigde hele verpakkingen en eigen berekend
+regelbedrag. Bij twee menselijke bronbevestigingen kan tussen PLUS en
+DekaMarkt worden gewisseld. Een winkelprijsverschil verschijnt alleen als
+beide opnamecontexten maximaal 24 uur uit elkaar liggen en de canonieke
+mandvergelijking het daadwerkelijk toestaat. De lijst ondersteunt tijdelijk
+afvinken, alleen nog te kopen, lokale TXT-download en kopieertekst. Geen
+eigen prijzen of vinkjes worden op de server of in browseropslag bewaard.
+
+**Planner** gebruikt voor het weekbudget hetzelfde bevestigde mandbedrag
+van de gekozen winkel in Lijst, niet een eerder berekend demobedrag.
+De Planner vermeldt expliciet eigen bron/winkel/tijdstip en dat dit geen
+actuele kassagarantie is. Zonder volledig geverifieerde privébron wordt
+de bestaande voorbeeldberekening gebruikt en duidelijk als voorbeeld
+aangeduid.
+
+Elk gepubliceerd mandje is aan de exacte Planner-vraag, receptingrediënten,
+bronopnametijd en complete product- en prijsidentiteit gebonden. Wisselen
+naar een ander recept, andere hoeveelheden of een niet meer geldige
+bron laat in één render geen oud privébedrag opnieuw als geldig zien.
+Private bedrag-/mandkeuze blijft alleen in lokaal React-geheugen;
+een paginavernieuwing wist het als gebruiker geen expliciete portable
+eigen bronsessie heeft gedownload.
