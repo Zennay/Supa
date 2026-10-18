@@ -1,4 +1,5 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
+import type { OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 
 type StoreId = 'PLUS' | 'DekaMarkt'
 
@@ -8,17 +9,32 @@ type StoreId = 'PLUS' | 'DekaMarkt'
  */
 export function ComparisonReadiness({
   plus, deka, sourceFresh, pairedWithin24h, comparable,
-  onOpenPlanner, onReviewMissing, onOpenImport,
+  captures, nowMs, onOpenPlanner, onReviewMissing, onOpenImport,
 }: {
   plus: OneStoreBasket
   deka: OneStoreBasket
   sourceFresh: boolean
   pairedWithin24h: boolean
   comparable: boolean
+  captures: OfflinePriceSnapshots['captures']
+  nowMs: number
   onOpenPlanner?: () => void
   onReviewMissing: (store: StoreId, ingredientId: string) => void
   onOpenImport: () => void
 }) {
+  const sources = (['PLUS', 'DekaMarkt'] as const).map(store => {
+    const observation = captures[store]
+    const ageMs = nowMs - observation.observedMs
+    const olderThanWeek = ageMs > 7 * 24 * 60 * 60 * 1000
+    const inFuture = ageMs < -5 * 60 * 1000
+    const readableAge = inFuture ? 'in de toekomst'
+      : ageMs < 0 ? 'zojuist (kleine klokafwijking)'
+        : ageMs < 60 * 60 * 1000 ? Math.max(0, Math.floor(ageMs / 60000)) + ' minuten oud'
+          : ageMs < 24 * 60 * 60 * 1000
+            ? (ageMs / (60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' uur oud'
+            : (ageMs / (24 * 60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' dagen oud'
+    return { store, at: observation.observedAt, olderThanWeek, inFuture, readableAge }
+  })
   const hasDemand = plus.selectedMealCount > 0 && deka.selectedMealCount > 0 &&
     plus.lines.length > 0 && deka.lines.length > 0
   const incomplete = (['PLUS', 'DekaMarkt'] as const).flatMap(store => {
@@ -48,8 +64,9 @@ export function ComparisonReadiness({
   if (!sourceFresh) steps.push({
     id: 'fresh',
     heading: 'Laad recente prijsopnames',
-    detail: 'Een of beide privébronopnames zijn ouder dan de toegestane 7 dagen, ' +
-      'of hun tijdstempel ligt te ver in de toekomst.',
+    detail: sources.filter(item => item.olderThanWeek || item.inFuture)
+      .map(item => item.store + ': ' + (item.olderThanWeek ? 'ouder dan 7 dagen' : 'tijdstip in de toekomst'))
+      .join('; ') || 'Een of beide bronmomenten vallen buiten het toegestane zeven-dagenvenster.',
     action: 'Naar bronimport', onClick: onOpenImport,
   })
   if (!pairedWithin24h) steps.push({
@@ -77,6 +94,20 @@ export function ComparisonReadiness({
             'zichtbaar, maar is geen volledige besparing.'}
       </p>
     </div>
+    <div className="offline-readiness__source-times" aria-label="Ouderdom van privébronnen">
+      {sources.map(item => <div key={item.store}>
+        <strong>{item.store}</strong>
+        <time dateTime={item.at}>{item.at}</time>
+        <span>{item.readableAge}</span>
+        <small>{item.olderThanWeek ? 'Verouderd: eigen prijswaarneming vernieuwen' :
+          item.inFuture ? 'Bronmoment ligt te ver in de toekomst' :
+          'Lokale leeftijd binnen 7 dagen; geen externe prijsverificatie'}</small>
+      </div>)}
+    </div>
+    {!pairedWithin24h && <p className="disclaimer">
+      De twee eigen bronmomenten liggen meer dan 24 uur uiteen.
+      Er wordt geen volledig prijsverschil berekend totdat ze tijdsvergelijkbaar zijn.
+    </p>}
     {isReady
       ? <p className="offline-readiness__complete">
           Alle verplichte lokale berekeningsvoorwaarden zijn gehaald.
