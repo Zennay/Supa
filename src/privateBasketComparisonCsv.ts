@@ -17,9 +17,12 @@ const storeNames: Store[] = ['PLUS', 'DekaMarkt']
 const header = [
   'soort', 'ingredient_id', 'ingredient', 'behoefte', 'eenheid',
   'PLUS_opnametijd', 'PLUS_product_id', 'PLUS_product', 'PLUS_hele_verpakkingen',
+  'PLUS_pakinhoud', 'PLUS_pakeenheid', 'PLUS_stuks_per_verpakking',
   'PLUS_pakprijs_cent', 'PLUS_regel_cent', 'PLUS_indicatief_euro_per_eenheid', 'PLUS_status',
   'DekaMarkt_opnametijd', 'DekaMarkt_product_id', 'DekaMarkt_product',
-  'DekaMarkt_hele_verpakkingen', 'DekaMarkt_pakprijs_cent', 'DekaMarkt_regel_cent',
+  'DekaMarkt_hele_verpakkingen', 'DekaMarkt_pakinhoud',
+  'DekaMarkt_pakeenheid', 'DekaMarkt_stuks_per_verpakking',
+  'DekaMarkt_pakprijs_cent', 'DekaMarkt_regel_cent',
   'DekaMarkt_indicatief_euro_per_eenheid', 'DekaMarkt_status',
   'verschil_cent_DekaMarkt_minus_PLUS', 'vergelijking',
 ]
@@ -53,14 +56,16 @@ function storeColumns(
   fresh: boolean,
   line: BasketTraceLine,
 ): string[] {
-  if (!capture) return ['', '', '', '', '', '', '', 'Geen eigen bronopname']
-  if (!fresh) return [capture.observedAt, '', '', '', '', '', '', 'Opname toekomstig of ouder dan 7 dagen']
+  if (!capture) return [...new Array<string>(10).fill(''), 'Geen eigen bronopname']
+  if (!fresh) return [capture.observedAt, ...new Array<string>(9).fill(''), 'Opname toekomstig of ouder dan 7 dagen']
   if (line.status !== 'matched') {
-    return [capture.observedAt, '', '', '', '', '', '', 'Onbekend: ' + line.reasons.join('; ')]
+    return [capture.observedAt, ...new Array<string>(9).fill(''), 'Onbekend: ' + line.reasons.join('; ')]
   }
   return [
     capture.observedAt, line.productId, line.productName, String(line.packs),
-    String(line.pricePerPackCents), String(line.lineTotalCents), advisory(line), 'Eigen bronregel',
+    String(line.pack.amount), line.pack.unit, String(line.pack.count),
+    String(line.pricePerPackCents), String(line.lineTotalCents), advisory(line),
+    'Eigen bronregel',
   ]
 }
 
@@ -107,24 +112,24 @@ export function createPrivateBasketComparisonCsv(input: {
   const totalRow = new Array<string>(header.length).fill('')
   totalRow[0] = 'mandje_totaal'
   totalRow[5] = captures.PLUS?.observedAt ?? ''
-  totalRow[10] = plusTotal === null ? '' : String(plusTotal)
-  totalRow[12] = plusTotal === null ? 'Totaal onbekend' : 'Compleet eigen winkelmandje'
-  totalRow[13] = captures.DekaMarkt?.observedAt ?? ''
-  totalRow[18] = dekaTotal === null ? '' : String(dekaTotal)
-  totalRow[20] = dekaTotal === null ? 'Totaal onbekend' : 'Compleet eigen winkelmandje'
-  totalRow[21] = totalDelta === null ? '' : String(totalDelta)
-  totalRow[22] = totalDelta === null
+  totalRow[13] = plusTotal === null ? '' : String(plusTotal)
+  totalRow[15] = plusTotal === null ? 'Totaal onbekend' : 'Compleet eigen winkelmandje'
+  totalRow[16] = captures.DekaMarkt?.observedAt ?? ''
+  totalRow[24] = dekaTotal === null ? '' : String(dekaTotal)
+  totalRow[26] = dekaTotal === null ? 'Totaal onbekend' : 'Compleet eigen winkelmandje'
+  totalRow[27] = totalDelta === null ? '' : String(totalDelta)
+  totalRow[28] = totalDelta === null
     ? 'Geen volledige twee-winkelvergelijking' : 'Volledige private bronvergelijking'
   rows.push(totalRow)
   const note = new Array<string>(header.length).fill('')
   note[0] = 'toelichting'
   note[2] = 'Uitsluitend eigen bronopnames. Geen actuele kassagarantie, bronrecht of openbare besparingsclaim.'
-  note[22] = 'Leeg bedrag betekent onbekend, niet nul.'
+  note[28] = 'Leeg bedrag betekent onbekend, niet nul.'
   rows.push(note)
   if (rows.some(row => row.length !== header.length)) {
     throw new Error('Ongeldig privé CSV-overzicht')
   }
-  const csv = rows.map(row => row.map((cell, column) => literalCsv(cell, column === 21)).join(',')).join('\r\n') + '\r\n'
+  const csv = rows.map(row => row.map((cell, column) => literalCsv(cell, column === 27)).join(',')).join('\r\n') + '\r\n'
   if (new TextEncoder().encode(csv).length > 256000) {
     throw new Error('Privé CSV-overzicht te groot')
   }
