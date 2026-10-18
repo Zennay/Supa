@@ -26,7 +26,9 @@ function physicalCaptureNanoseconds(capturedAt) {
   const timezone = parts[8]
   if (timezone !== 'Z') {
     const [hours, minutes] = timezone.slice(1).split(':').map(Number)
-    if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) {
+    const maximum = timezone[0] === '-' ? 12 : 14
+    if (hours > maximum || minutes > 59 ||
+        (hours === maximum && minutes !== 0)) {
       throw new Error('Invalid retailer capture UTC offset')
     }
   }
@@ -45,16 +47,46 @@ function safeId(value) {
   return typeof value === 'string' && /^[a-zA-Z0-9._-]{1,160}$/.test(value)
 }
 
+// Direct catalog callers must obey the same retailer and shape source
+// identity boundary as reviewed offline adapters. Parsed URL normalization
+// alone is insufficient: it can silently discard query/fragment delimiters.
+function safeDirectRetailerSourceUrl(raw, retailer, kind) {
+  if (typeof raw !== 'string' || raw.length < 24 || raw.length > 2048 ||
+      !['plus', 'dekamarkt'].includes(retailer) ||
+      !['product', 'catalog', 'offers'].includes(kind) ||
+      /[\u0000-\u0020\u007f\u005c]/u.test(raw) || raw.includes('?') || raw.includes('#')) {
+    throw new Error('Untrusted retailer capture source URL')
+  }
+  let url
+  try { url = new URL(raw) }
+  catch { throw new Error('Untrusted retailer capture source URL') }
+  const host = retailer === 'plus' ? 'www.plus.nl' : 'www.dekamarkt.nl'
+  const path = url.pathname
+  // Keep raw path identity unambiguous: never decode encoded separators,
+  // dot segments or invisible URL encodings into a reviewed retailer source.
+  const canonicalPath = /^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\/?$/u.test(path)
+  const validPath = canonicalPath && (kind === 'offers'
+    ? (path === '/aanbiedingen' || path.startsWith('/aanbiedingen/'))
+    : kind === 'catalog'
+      ? (path === '/producten' || path.startsWith('/producten/'))
+      : retailer === 'plus'
+        ? path.startsWith('/product/') && path.length > '/product/'.length
+        : path.startsWith('/producten/') && path.length > '/producten/'.length)
+  if (url.href !== raw || url.protocol !== 'https:' || url.hostname !== host ||
+      url.port !== '' || url.username !== '' || url.password !== '' ||
+      url.search !== '' || url.hash !== '' || !validPath) {
+    throw new Error('Untrusted retailer capture source URL')
+  }
+}
+
 function normalizedObservation(value) {
   validateRawProductObservation(value)
   if (!safeId(value.sourceProductId)) throw new Error('Unsafe/missing retail product identity')
   // A direct caller must not bypass source trust by providing a structurally
   // valid yet credential-bearing URL, impossible clock or unsafe money value.
-  const origin = new URL(value.provenance.url)
-  if (origin.username || origin.password || origin.hash ||
-      origin.port || origin.searchParams.has('access_token')) {
-    throw new Error('Untrusted retailer capture source URL')
-  }
+  safeDirectRetailerSourceUrl(
+    value.provenance.url, value.supermarket, value.provenance.kind,
+  )
   // Strict direct API admission: Date.parse alone normalizes impossible
   // days such as February 30 and drops submillisecond source chronology.
   physicalCaptureNanoseconds(value.provenance.capturedAt)
