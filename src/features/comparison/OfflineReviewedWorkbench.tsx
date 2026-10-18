@@ -365,17 +365,45 @@ export function OfflineReviewedWorkbench({
           (raw as { retailer?: unknown }).retailer === retailer ? capture : raw) })
       const parsed = parseOfflinePriceSnapshots(next, Date.now())
       if (version !== importVersion.current) return
+      // A replacement invalidates only that retailer. Rebind surviving,
+      // manually reviewed selections to the freshly validated pair fingerprint
+      // when the OTHER source and the exact selected week are unchanged.
+      // Never carry choices from an earlier week or from a modified retailer.
+      const other: OfflineRetailer = retailer === 'PLUS' ? 'DekaMarkt' : 'PLUS'
+      const oldFingerprint = offlineSessionFingerprint(imported, plan, recipes, activeDays)
+      const nextFingerprint = offlineSessionFingerprint(parsed, plan, recipes, activeDays)
+      const otherAvailable = new Set(parsed.captures[other].products
+        .filter(product => product.available).map(product => product.id))
+      const retainedSelections: Record<string, string> = {}
+      if (session.manualSelections.fingerprint === oldFingerprint) {
+        const prefix = other + '\\u0000'
+        for (const [key, productId] of Object.entries(session.manualSelections.products)) {
+          if (key.startsWith(prefix) && otherAvailable.has(productId)) {
+            retainedSelections[key] = productId
+          }
+        }
+      }
+      const otherCatalogIds = new Set(parsed.captures[other].products.map(product => product.id))
+      const remainingExtras = session.extraProductIds[other].filter(id => otherCatalogIds.has(id))
+      const remainingDone = session.extraDoneIds[other].filter(id => remainingExtras.includes(id))
       clearStaged()
-      setManualSelections({ fingerprint: '', products: {} })
-      session.setTripMemory({})
-      session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
-      session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
+      setManualSelections({ fingerprint: nextFingerprint, products: retainedSelections })
+      session.setTripMemory(previous => ({ [other]: previous[other] }))
+      session.setExtraProductIds({
+        PLUS: other === 'PLUS' ? remainingExtras : [],
+        DekaMarkt: other === 'DekaMarkt' ? remainingExtras : [],
+      })
+      session.setExtraDoneIds({
+        PLUS: other === 'PLUS' ? remainingDone : [],
+        DekaMarkt: other === 'DekaMarkt' ? remainingDone : [],
+      })
       setText(next)
       setClockMs(Date.now())
       setImportEpoch(epoch => epoch + 1)
       setImported(parsed)
       setMessage(retailer + ' is vervangen. De andere originele winkelopname is onveranderd. ' +
-        'Controleer je productkoppelingen opnieuw.' +
+        'Bestaande geldige koppelingen en extra artikelen van ' + other +
+        ' zijn bewaard; beoordeel alleen de vernieuwde ' + retailer + '-producten opnieuw.' +
         (parsed.pairedWithin24h ? '' : ' De opnames liggen meer dan 24 uur uiteen: geen vergelijkbaar verschil.'))
     } catch (error) {
       if (version === importVersion.current) setMessage(
