@@ -141,3 +141,27 @@ De twee bruikbare paden (browserknop en volledig offline CLI-HTML) gebruiken nu 
 
 ## Niet-bindende productsuggestie met bestaande Supa-matcher
 Het privékoppelscherm benut nu opnieuw de al bestaande domeinengine matchIngredient uit src/domain/matching.ts, niet een eigen tweede matchingalgoritme. Per ingrediënt vergelijkt de wizard uitsluitend een begrensde selectie van reeds lokaal geopende en werkelijk prijsbare winkelartikelen met overeenkomende fysieke eenheidsfamilie. Alleen als die canonieke engine zelf een match met voldoende score en marge teruggeeft, verschijnt de SKU vooraan in de keuzelijst met een duidelijk gemarkeerde suggestiescore. De standaardkeuze blijft altijd 'Niet gekoppeld'; het script vult nooit zelfstandig een SKU in, en een menselijke wijziging van de zoekterm heeft voorrang op de suggestie. De gebruiker moet de SKU en verpakking nog expliciet aanklikken en controleren. Afgekeurde, te ambigue, niet-beschikbare of ongeprijsde kandidaten leveren geen betrouwbaar prijsvoorstel; onprijsbare producten blijven desgewenst wel handmatig zichtbaar. Geen retailer-opvraag, merklicentie of besparingsclaim.
+
+## Complete lokale privésessie bewaren en heropenen
+
+Vanuit **3 · Vergelijk direct of bewaar jouw mandje** kun je nu bewust een
+`supa-private-basket-session-v1` JSON downloaden. Die bevat de bestaande,
+handmatig aangeleverde `supa-offline-prices-v1` PLUS- en Deka-opnames plus de
+`supa-private-basket-demand-v1` ingrediënten en per winkel handmatig gekozen
+product-ID's. Het bestand bevat echte **privé winkel- en prijsgegevens**: bewaar
+het zelf vertrouwelijk, deel het niet gedachteloos. Er is geen browseropslag,
+netwerkaanroep, bronfetch of automatische account-sync.
+
+Via **Open eerder opgeslagen privésessie** wordt de complete file op maximaal
+256.000 bytes en strikt UTF-8 gecontroleerd, iedere opname opnieuw via dezelfde
+lokale prijs-JSON-admissie geverifieerd, de mandvraag door de bestaande strikte
+vraag-parser gehaald en iedere SKU op oorspronkelijke bron en fysieke maateenheid
+gecontroleerd. Alleen na expliciete bevestiging wordt de huidige invoer
+vervangen; bij ongeldige data of annulering blijft de huidige sessie ongewijzigd.
+Oorspronkelijke observatiemomenten blijven behouden, inclusief waarschuwingen
+voor ouder dan 7 dagen, toekomstige tijden en winkelopnames >24 uur uiteen.
+De gebruiker moet zelf opnieuw op **Vergelijk mijn twee mandjes** klikken;
+een heropend bestand is geen nieuwe waarneming, geen geldige bronlicentie,
+geen bewezen actuele kassaprijs en geen hergebruik van een oude savings-claim.
+Dit is een extra privéopslagmogelijkheid; zonder bronbestand blijven de
+bestaande ongeprijsde Planner- en boodschappenlijstfuncties bruikbaar.

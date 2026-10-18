@@ -21,6 +21,8 @@ const mealCount = document.querySelector('#meal-count')
 const demandImport = document.querySelector('#demand-import')
 const maxLines = 200
 const save = document.querySelector('#save')
+const saveSession = document.querySelector('#save-session')
+const restoreSession = document.querySelector('#restore-session')
 const downloadUnpriced = document.querySelector('#download-unpriced')
 const showUnpriced = document.querySelector('#show-unpriced')
 const unpricedTrip = document.querySelector('#unpriced-trip')
@@ -273,6 +275,7 @@ function refresh() {
   }
   save.disabled = !lines.children.length
   downloadUnpriced.disabled = save.disabled
+  saveSession.disabled = save.disabled || !captures
   showUnpriced.disabled = save.disabled
   compareNow.disabled = !captures || save.disabled
   editSource.disabled = !captures
@@ -347,6 +350,7 @@ function addIngredient(restored = null) {
   for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit.value)
   save.disabled = false
   downloadUnpriced.disabled = false
+  saveSession.disabled = !captures
   showUnpriced.disabled = false
   compareNow.disabled = !captures
   invalidateUnpricedDemand()
@@ -743,6 +747,105 @@ save.addEventListener('click', () => {
     notice(status, error instanceof Error ? error.message : 'Kan mandvraag niet maken.', 'error')
   }
 })
+// Explicit portable private session: the whole source and original observations travel
+// only in an opt-in local file. Neither browser storage nor any network is involved.
+function savePrivateSession() {
+  if (!captures) throw Error('Open eerst je echte PLUS- en DekaMarkt-opnames.')
+  const snapshot = {
+    schema: 'supa-private-basket-session-v1',
+    source: { schema: 'supa-offline-prices-v1', captures: stores.map(store => captures[store]) },
+    demand: demand(),
+  }
+  const content = JSON.stringify(snapshot, null, 2) + '\n'
+  if (new TextEncoder().encode(content).length > maxBytes) {
+    throw Error('De sessie is groter dan 256 kB. Bewaar bronbestanden en vraag afzonderlijk.')
+  }
+  const url = URL.createObjectURL(new Blob([content], { type: 'application/json;charset=utf-8' }))
+  const link = node('a')
+  link.href = url
+  link.download = 'supa-prive-mand-sessie.json'
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+  notice(status, 'Jouw privésessie met echte eigen bronopnames en gekozen product-ID’s is lokaal aangeboden. ' +
+    'Bescherm dit bestand: het bevat privé product- en prijsgegevens. Geen besparingsclaim of automatische herberekening.')
+}
+saveSession.addEventListener('click', () => {
+  try { savePrivateSession() }
+  catch (error) { notice(status, error instanceof Error ? error.message : 'Kan privésessie niet bewaren.', 'error') }
+})
+
+let sessionImportRevision = 0
+restoreSession.addEventListener('change', async () => {
+  const file = restoreSession.files?.[0]
+  if (!file) return
+  const attempt = ++sessionImportRevision
+  const originalSourceRevision = sourceRevision
+  try {
+    const text = await readLocalFile(file)
+    if (attempt !== sessionImportRevision || originalSourceRevision !== sourceRevision) return
+    const root = JSON.parse(text)
+    if (!root || typeof root !== 'object' || Array.isArray(root) ||
+        Object.keys(root).sort().join(',') !== 'demand,schema,source' ||
+        root.schema !== 'supa-private-basket-session-v1') {
+      throw Error('Dit is geen ondersteunde Supa privésessie.')
+    }
+    // Same strict local source admission as a regular JSON import.
+    const verified = acceptJson(root.source)
+    const saved = parsePrivateDemand(JSON.stringify(root.demand))
+    for (let index = 0; index < saved.items.length; index++) {
+      const raw = root.demand.ingredients[index]
+      const unit = saved.items[index].unit
+      for (const store of stores) {
+        const sku = raw.productIds[store]
+        if (sku !== null && sku !== undefined &&
+            !verified[store].products.some(p => p.id === sku &&
+              classify(p.packUnit) === classify(unit))) {
+          throw Error('Een opgeslagen SKU past niet bij de echte winkelbron en fysieke eenheid.')
+        }
+      }
+    }
+    if (!window.confirm('Deze privésessie bevat eigen bronprijzen en handmatig gekozen producten. ' +
+        'Vervang de huidige winkelopnames en ingrediënten? Oude opnameprijzen blijven oud. ' +
+        'Supa vergelijkt niet automatisch.')) return
+    if (attempt !== sessionImportRevision || originalSourceRevision !== sourceRevision) return
+    ++sourceRevision
+    captures = verified
+    sourceInput.value = ''
+    plusInput.value = ''
+    dekaInput.value = ''
+    mealCount.value = String(saved.meals)
+    lines.replaceChildren()
+    for (const item of saved.items) addIngredient(item)
+    for (let index = 0; index < saved.items.length; index++) {
+      const row = lines.children[index]
+      for (const store of stores) {
+        const sku = root.demand.ingredients[index].productIds[store]
+        if (sku === null || sku === undefined) continue
+        const select = row.querySelector('[data-store="' + store + '"]')
+        select.value = sku
+        updateSelect(select, store, saved.items[index].unit)
+      }
+    }
+    invalidateUnpricedDemand()
+    refresh()
+    const ages = stores.map(store => Date.now() - Date.parse(captures[store].observedAt))
+    const gap = Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt))
+    const stale = ages.some(age => age < 0 || age > 7 * 86400000) || gap > 86400000
+    notice(sourceStatus, stores.map(store => store + ': ' + captures[store].products.length +
+      ' eigen bronartikelen, oorspronkelijke opname ' + captures[store].observedAt).join('\n') +
+      (stale ? '\nEen of beide bronmomenten zijn verlopen, toekomstig of liggen >24 uur uiteen.' :
+        '\nControleer de oorspronkelijke SKU-keuzes opnieuw.'), stale ? 'warning' : '')
+    notice(status, saved.items.length + ' ingrediënten en SKU-keuzes lokaal hersteld. ' +
+      'Controleer zelf de oorspronkelijke producten, hoeveelheden en bronmomenten vóór vergelijking. ' +
+      'Dit bewijst geen bronrechten of kassaprijzen.', stale ? 'warning' : '')
+  } catch (error) {
+    if (attempt === sessionImportRevision) notice(status, error instanceof Error ? error.message :
+      'Kan privésessie niet veilig openen.', 'error')
+  } finally { if (attempt === sessionImportRevision) restoreSession.value = '' }
+})
+
 document.addEventListener('supa:private-ingredient-merged', () => {
   invalidateUnpricedDemand()
   refresh()
