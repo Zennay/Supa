@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { StoreProduct } from '../../domain/basket.ts'
-import type { OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
+import { parseSingleOfflineCapture, type OfflineCapture, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 import { offlineSessionFresh } from '../comparison/offlineSessionBaskets.ts'
 import type { OfflineComparisonSession } from '../comparison/offlineComparisonSession.ts'
 import './ownImportedProducts.css'
@@ -58,10 +58,29 @@ export function OwnImportedProducts({
     }
   }, [])
   const imported = session?.imported ?? null
+  // A canonically admitted single-store source is useful on its own, but
+  // never becomes a paired/comparable retailer quote.
+  const staged = useMemo(() => {
+    const captures: Partial<Record<OfflineRetailer, OfflineCapture>> = {}
+    if (imported || !session) return captures
+    for (const store of stores) {
+      const capture = session.stagedCaptures[store]
+      if (!capture) continue
+      try {
+        const admitted = parseSingleOfflineCapture(JSON.stringify({
+          schema: 'supa-offline-store-capture-v1', capture,
+        }), clock).normalized
+        if (admitted.retailer === store) captures[store] = admitted
+      } catch { /* A rejected local capture must not create a catalog. */ }
+    }
+    return captures
+  }, [imported, session?.stagedCaptures, clock])
+  const availableCaptures = imported?.captures ?? staged
+  const availableStores = stores.filter(store => !!availableCaptures[store])
   const rows = useMemo(() => {
-    if (!imported) return []
     const words = query.trim().toLocaleLowerCase('nl-NL')
-    const all = stores.flatMap(store => imported.captures[store].products.map(product => detail(store, product)))
+    const all = stores.flatMap(store => availableCaptures[store]?.products.map(
+      product => detail(store, product)) ?? [])
     const filtered = all.filter(row =>
       (storeFilter === 'all' || row.store === storeFilter) &&
       (unitFilter === 'all' || row.group === unitFilter) &&
@@ -75,9 +94,9 @@ export function OwnImportedProducts({
       })
     }
     return filtered
-  }, [imported, query, storeFilter, unitFilter, sortByUnitPrice])
+  }, [availableCaptures, query, storeFilter, unitFilter, sortByUnitPrice])
 
-  if (!imported || !session) return <section className="hifi-section own-products" aria-label="Eigen prijsopnames">
+  if (availableStores.length === 0 || !session) return <section className="hifi-section own-products" aria-label="Eigen prijsopnames">
     <h2>Mijn eigen winkelprijzen</h2>
     <p>Je hebt nog geen PLUS- en DekaMarkt-prijsbestanden geladen. Gebruik je eigen
       geautoriseerde waarnemingen om producten, verpakkingen en eenheidsprijzen te bekijken.</p>
@@ -88,18 +107,26 @@ export function OwnImportedProducts({
       Zij leveren nooit automatisch actuele winkelprijzen aan je mand.</p>
   </section>
 
-  const fresh = offlineSessionFresh(imported, clock)
+  const fresh = imported ? offlineSessionFresh(imported, clock) :
+    availableStores.every(store => {
+      const source = availableCaptures[store]
+      if (!source) return false
+      const nowNs = BigInt(Math.trunc(clock)) * 1_000_000n
+      return nowNs >= source.observedNs - 300_000_000_000n &&
+        nowNs - source.observedNs <= 604_800_000_000_000n
+    })
   return <section className="hifi-section own-products" aria-label="Mijn eigen prijsopnames">
     <div className="hifi-section-heading"><div>
       <h2>Mijn privéproducten</h2>
-      <p className="recipe-count">{rows.length} producten uit eigen PLUS- en DekaMarkt-invoer</p>
+      <p className="recipe-count">{rows.length} producten uit eigen {availableStores.join(' en ')}-invoer</p>
     </div></div>
     <p className="disclaimer" role="status">
       {fresh ? 'Opnames vallen binnen de lokale 7-dagenlimiet.' : 'Verlopen opnames: dit zijn geen actuele winkelprijzen.'}
-      {' '}PLUS: {dates.format(new Date(imported.captures.PLUS.observedMs))};
-      {' '}DekaMarkt: {dates.format(new Date(imported.captures.DekaMarkt.observedMs))}.
+      {' '}{availableStores.map(store =>
+        store + ': ' + dates.format(new Date(availableCaptures[store]!.observedMs))).join('; ')}.
       {' '}Alleen jouw eigen invoer, niet onafhankelijk geverifieerd of gepubliceerd.
-      {!imported.pairedWithin24h && ' De twee opnames liggen meer dan 24 uur uiteen.'}
+      {!imported && ' De andere winkel ontbreekt: geen twee-winkel prijsverschil.'}
+      {imported && !imported.pairedWithin24h && ' De twee opnames liggen meer dan 24 uur uiteen.'}
     </p>
     <div className="own-products__filters">
       <label>Winkel <select value={storeFilter}
@@ -123,6 +150,7 @@ export function OwnImportedProducts({
     <p className="disclaimer">Sortering vergelijkt uitsluitend prijzen binnen dezelfde
       eenheid (kg, liter of stuk). Onbekende en niet-beschikbare producten komen achteraan.
       Het zijn geen gecontroleerde winkelprijzen of aanbiedingen.
+      {imported ? '' : ' Met één winkelopname kun je al losse producten selecteren; er bestaat nog geen twee-winkelvergelijking.'}
       Los toegevoegde artikelen staan apart op Lijst, buiten het berekende
       weekmandtotaal en het prijsverschil.</p>
     <div className="hifi-product-grid">
