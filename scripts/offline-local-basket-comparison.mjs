@@ -15,6 +15,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readPrivateCsv, joinPrivateStoreCsv } from './offline-two-store-csv-to-json.mjs'
 import { convertTwoStoreCsv } from '../public/offline-two-store-csv.mjs'
+import { offlinePriceJsonToCsv } from './offline-private-prices-json-to-csv.mjs'
 import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
 import { matchIngredient } from '../src/domain/matching.ts'
 import { compareFullBaskets } from '../src/domain/basketComparison.ts'
@@ -309,7 +310,8 @@ function renderHtml(data, demand, left, right, comparison, observed, ages, gap, 
 async function main() {
   const argv = process.argv.slice(2)
   const paired = argv[0] === '--pair'
-  const args = paired ? argv.slice(1) : argv
+  const pricesJson = argv[0] === '--prices-json'
+  const args = paired || pricesJson ? argv.slice(1) : argv
   if (args.length !== (paired ? 4 : 3) || args.some(arg => !arg || arg.startsWith('-'))) {
     throw Error('Expected inputs')
   }
@@ -323,7 +325,8 @@ async function main() {
     readPrivateDemand(demandPath),
   ])
   const normalizedJson = convertTwoStoreCsv(paired
-    ? joinPrivateStoreCsv(csvFiles[0], csvFiles[1]) : csvFiles[0])
+    ? joinPrivateStoreCsv(csvFiles[0], csvFiles[1])
+    : pricesJson ? offlinePriceJsonToCsv(csvFiles[0]) : csvFiles[0])
   const source = JSON.parse(normalizedJson)
   const demand = parseDemand(demandText)
   const captures = Object.fromEntries(source.captures.map(c => [c.retailer, c]))

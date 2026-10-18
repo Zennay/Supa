@@ -68,6 +68,14 @@ Node 24+ aanbevolen; Node 22.22+ kan TypeScript-strip-imports ondersteunen.
 node --experimental-strip-types scripts/offline-local-basket-comparison.mjs --pair plus.csv deka.csv vraag.json mand.html
 ```
 
+Je kunt ook een eerder door Supa gegenereerd **eigen `supa-offline-prices-v1` JSON** rechtstreeks opnieuw gebruiken in dezelfde offline rapportage. De bestaande strikte negen-koloms CSV-converter blijft de autoriteit voor beide winkels, originele opnametijden, SKU-uniciteit, hele eurocenten en verpakkingen. Onbekende JSON-prijzen blijven onbekend, nooit €0:
+
+```sh
+node --experimental-strip-types scripts/offline-local-basket-comparison.mjs --prices-json eigen-prijzen.json vraag.json mand.html
+```
+
+Een ongeldig of verrijkt JSON-bronbestand wordt afgewezen. Er wordt niets automatisch opgevraagd, genormaliseerd naar fictieve prijzen of geüpload.
+
 Als de eigen opname al in één CSV met beide winkels staat:
 
 ```sh
