@@ -752,10 +752,15 @@ export function OfflineReviewedWorkbench({
               // A pending file read is no longer authoritative after manual edits.
               importVersion.current++
               setBusy(false)
-              clearStaged()
+              // Keep a previously admitted standalone store while the user
+              // pastes its partner. Only a successfully admitted replacement
+              // changes that source; invalid draft text has no price authority.
+              if (imported) clearStaged()
               setText(event.target.value)
               setImported(null)
-              setMessage('Invoer gewijzigd. Bereken opnieuw voordat mandjes en prijsverschillen zichtbaar zijn.')
+              setMessage(stagedStores.length > 0
+                ? 'JSON-concept gewijzigd. Reeds ingelezen losse winkelopnames blijven bewaard; klik Importeer en bereken om een tweede opname toe te voegen.'
+                : 'Invoer gewijzigd. Bereken opnieuw voordat mandjes en prijsverschillen zichtbaar zijn.')
             }} />
         </label>
         <div className="offline-price-workbench__actions">
