@@ -52,11 +52,23 @@ export function preparedWeekCalendar(
       !preview.endsWith('Receptschattingen en echte winkelprijzen zijn niet inbegrepen.')) return null
   const start = mondayDate(monday)
   if (!start) return null
+  // Consume exactly the canonical weekmenu body. Scanning arbitrary lines
+  // previously dropped a valid custom weekday while exporting the remaining
+  // days, incorrectly presenting an incomplete calendar as successful.
+  const lines = preview.split('\n')
+  if (lines[0] !== 'SUPA · Weekmenu' ||
+      lines.at(-3) !== '' ||
+      lines.at(-2) !== 'Dit is een planning, geen prijsopgave.' ||
+      lines.at(-1) !== 'Receptschattingen en echte winkelprijzen zijn niet inbegrepen.') return null
+  const startsAt = lines[1]?.startsWith('Weekbudget (eigen voorkeur): ') ? 3 : 2
+  if (lines[startsAt - 1] !== '') return null
+  const dayLines = lines.slice(startsAt, -3)
+  if (!dayLines.length || dayLines.length > 7) return null
   const entries: Array<{ offset: number; title: string }> = []
   const used = new Set<string>()
-  for (const line of preview.split('\n')) {
+  for (const line of dayLines) {
     const match = /^(Ma|Di|Wo|Do|Vr|Za|Zo): (.+)$/.exec(line)
-    if (!match) continue
+    if (!match) return null
     const [, day, title] = match
     // Do not import invisible direction controls or multiline content into a
     // person's calendar. The canonical preview generator already checks this.
