@@ -511,12 +511,26 @@ function ownDataArray(value: unknown): unknown[] | null {
   }
 }
 
+const ROOT_CLAIM_ACCESSOR = Symbol('M3 root claim accessor')
+
 function snapshotFinancialInputs(input: unknown): {
   comparison: BasketComparison
   evidence: unknown
-} | null {
+} | typeof ROOT_CLAIM_ACCESSOR | null {
   const args = ownDataRecord(input, ['comparison', 'evidence'])
   if (!args) return null
+  // An accessor-backed outcome or savings field is an invalid financial
+  // assertion. Preserve the established customer-facing mismatch reason,
+  // without accessing either property or any prototype.
+  if (args.comparison && typeof args.comparison === 'object' &&
+      !Array.isArray(args.comparison)) {
+    try {
+      for (const field of ['outcome', 'savingsCents']) {
+        const fact = Object.getOwnPropertyDescriptor(args.comparison, field)
+        if (fact && !('value' in fact)) return ROOT_CLAIM_ACCESSOR
+      }
+    } catch { return null }
+  }
   const comparison = ownDataRecord(args.comparison, [
     'claimable', 'reasons', 'deltaCents', 'lineDeltas',
     'baselineTotalCents', 'candidateTotalCents', 'outcome', 'savingsCents',
@@ -564,6 +578,15 @@ export function attributeSavingsEffects(input: {
   evidence: unknown
 }): SavingsAttribution {
   const snapshot = snapshotFinancialInputs(input)
+  if (snapshot === ROOT_CLAIM_ACCESSOR) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: null,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison outcome or savings disagrees with physical cents'],
+    }
+  }
   if (!snapshot) {
     return {
       status: 'unknown',
