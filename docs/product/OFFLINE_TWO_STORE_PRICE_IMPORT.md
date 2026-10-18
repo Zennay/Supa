@@ -733,3 +733,27 @@ SKU-review, lokale productkeuzes en boodschappenafvinkingen. De
 andere winkel wordt niet opnieuw uit een genormaliseerde
 nulprijsprojectie opgebouwd. Dit is een preview van eigen lokale
 bronverschillen, geen extern gevalideerde retailer-prijsmutatie.
+
+### Ongeldige nieuwe bestandsimport mag je bestaande vergelijking niet wissen
+
+Zowel de gewone **één-bestandsimport** (eigen PLUS, Deka of gecombineerd
+bestand) als het **gelijktijdig openen van twee aparte winkelbestanden**
+lezen en valideren hun brondata nu volledig in tijdelijke lokale waarden.
+Pas na een succesvolle canonieke CSV-omzetting, per-winkel- en
+combinatiecontrole, formaat-/limietcontrole en tijdcontrole worden
+de nieuwe brondata tegelijk in de Vergelijk-tab toegelaten. Dan zijn
+nieuwe oorspronkelijke productmatches altijd opnieuw te beoordelen
+en verliezen alle oude winkelchecks hun oude bronbetekenis.
+
+Een ongeldige, dubbele, verkeerde of oversize winkelopname **wist
+niet meer** de vorige geaccepteerde bron, de oorspronkelijke
+nul-/onbekende-prijssemantiek, de zorgvuldig bevestigde
+productkeuzes of de boodschappenafvinkingen. De foutmelding
+vermeldt dat de vorige lokale gegevens zijn behouden. Ook de
+al bestaande actie om een tweede winkel bij één bron te voegen
+blijft behoudend; het gerichte **vervang één winkel**-scherm
+biedt daarnaast zijn expliciete bronverschillenpreview.
+Bewust handmatig wijzigen van de eigen JSON-tekst blijft een
+nieuwe inhoudelijke invoer: de oude berekening wordt dan
+zoals voorheen direct ingetrokken. Geen retailerrechten
+of zelfstandige prijswaarneming worden hiermee toegekend.

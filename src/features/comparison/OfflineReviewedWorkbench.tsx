@@ -451,16 +451,12 @@ export function OfflineReviewedWorkbench({
       await loadFile(files[0])
       return
     }
-    // Both independent files are admitted atomically. A rejected pair never
-    // leaves one shop looking like a valid comparison or a confirmed basket.
+    // Keep current admitted sources and human checks intact until BOTH
+    // new files pass canonical admission. An invalid attempt is not a source
+    // revocation, and must not erase the user's previous complete basket.
     const version = ++importRevision.current
+    setPendingReplacement(null)
     setBusy(true)
-    setImported(null)
-    setText('')
-    setReviewedLines({})
-    setDoneTripItems({})
-    setManualSku({ PLUS: {}, DekaMarkt: {} })
-    setSkuFilter({})
     try {
       if (files.length !== 2) throw new Error('Selecteer maximaal twee originele winkelbestanden.')
       const sources: unknown[] = []
@@ -499,13 +495,17 @@ export function OfflineReviewedWorkbench({
       if (version !== importRevision.current) return
       setText(combined)
       setImported(admitted)
+      setReviewedLines({})
+      setDoneTripItems({})
+      setManualSku({ PLUS: {}, DekaMarkt: {} })
+      setSkuFilter({})
       setClockMs(Date.now())
       setMessage('Twee originele winkelbestanden samen geladen, elk met eigen bronmoment en productcodes. Controleer alle fysieke matches en prijzen opnieuw voordat een prijsverschil verschijnt.')
     } catch (error) {
       if (version !== importRevision.current) return
-      setImported(null)
-      setText('')
-      setMessage(error instanceof Error ? error.message : 'Twee winkelbestanden niet geldig; geen prijzen overgenomen.')
+      setMessage((error instanceof Error ? error.message :
+        'Twee winkelbestanden niet geldig.') +
+        ' Eerder ingelezen originele bronopnames, reviews en afvinkingen zijn behouden.')
     } finally {
       if (version === importRevision.current) setBusy(false)
     }
@@ -585,12 +585,7 @@ export function OfflineReviewedWorkbench({
   async function loadFile(file?: File, addSecond = false) {
     if (!file) return
     const version = ++importRevision.current
-    if (!addSecond) {
-      setImported(null)
-      setReviewedLines({})
-      setDoneTripItems({})
-      setManualSku({ PLUS: {}, DekaMarkt: {} }); setSkuFilter({})
-    }
+    setPendingReplacement(null)
     setBusy(true)
     try {
       if (!file.size || file.size > 256000) {
@@ -640,19 +635,26 @@ export function OfflineReviewedWorkbench({
         // physical input was unchanged; the added retailer starts unreviewed.
         setMessage('De tweede werkelijk ingevoerde winkel is gekoppeld. Controleer de nieuwe producten; de oorspronkelijke opname is behouden.')
       } else {
+        // A single new file can itself contain one or two captured shops.
+        // Only after canonical admission may it revoke previous human
+        // selections. Invalid files leave the prior exact data untouched.
+        const admitted = parseOfflinePriceSnapshots(content, Date.now())
         setText(content)
-        importSnapshots(content)
-        if (isCsv) setMessage('Eigen winkel-CSV lokaal gelezen. Alleen geobserveerde winkels zijn geladen; controleer iedere productmatch.')
+        setImported(admitted)
+        setReviewedLines({})
+        setDoneTripItems({})
+        setManualSku({ PLUS: {}, DekaMarkt: {} })
+        setSkuFilter({})
+        setClockMs(Date.now())
+        setTripExportMessage('')
+        setTripProgressMessage('')
+        setMessage('Eigen originele ' + (isCsv ? 'winkel-CSV' : 'winkel-JSON') +
+          ' geldig geladen; alle nieuwe fysieke artikelmatches en prijzen opnieuw controleren.')
       }
     } catch (error) {
       if (version !== importRevision.current) return
-      if (!addSecond) {
-        setImported(null)
-        setReviewedLines({})
-        setDoneTripItems({})
-        setText('')
-      }
-      setMessage(error instanceof Error ? error.message : 'Kon dit bronbestand niet lezen.')
+      setMessage((error instanceof Error ? error.message : 'Kon dit bronbestand niet lezen.') +
+        ' De vorige originele bronopname en winkelbevestigingen zijn behouden.')
     } finally {
       if (version === importRevision.current) setBusy(false)
     }
