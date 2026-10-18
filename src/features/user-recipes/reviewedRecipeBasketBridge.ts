@@ -54,6 +54,13 @@ export function prepareUnpricedPrivateRecipe(
         reasons.push('metric_amount_exceeds_import_contract')
         break
       }
+      // A portion of an indivisible shopping item cannot be assumed to be
+      // a purchasable whole item without a separate explicit review contract.
+      // Grams and millilitres may still contain legitimate metric decimals.
+      if (ingredient.unit === 'piece' && !Number.isInteger(ingredient.amount)) {
+        reasons.push('fractional_piece_requires_human_review')
+        break
+      }
       if (!ingredient ||
         typeof ingredient.query !== 'string' ||
         !ingredient.query.trim() ||
