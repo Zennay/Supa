@@ -88,6 +88,11 @@ function invalidatePrice() {
     priceStatus.className = 'notice'
   }
 }
+function clearSourceMatches() {
+  // An equal SKU string from a new capture does not guarantee the same
+  // product identity, contents, availability or price. Explicitly re-review.
+  for (const select of lines.querySelectorAll('[data-store]')) select.value = ''
+}
 function refresh() {
   invalidatePrice()
   for (const row of lines.querySelectorAll('.ingredient')) {
@@ -229,6 +234,7 @@ async function loadSources() {
     }
     const verified = acceptJson(parsed)
     if (revision !== sourceRevision) return
+    clearSourceMatches()
     captures = verified
     const now = Date.now()
     const descriptions = stores.map(store => {
@@ -251,6 +257,45 @@ async function loadSources() {
   }
   refresh()
 }
+document.addEventListener('supa:manual-source-edited', () => {
+  ++sourceRevision
+  captures = null
+  clearSourceMatches()
+  refresh()
+  notice(sourceStatus, 'Handmatige brongegevens gewijzigd. Neem de twee echte winkelopnames opnieuw over, en bevestig daarna alle winkelproductkeuzes opnieuw.', 'warning')
+})
+document.addEventListener('supa:manual-source-admitted', event => {
+  ++sourceRevision
+  captures = null
+  try {
+    const parsed = event.detail?.source
+    const verified = acceptJson(parsed)
+    clearSourceMatches()
+    captures = verified
+    sourceInput.value = ''
+    plusInput.value = ''
+    dekaInput.value = ''
+    refresh()
+    const now = Date.now()
+    const labels = stores.map(store => {
+      const capture = captures[store]
+      const age = now - Date.parse(capture.observedAt)
+      return store + ': ' + capture.products.length + ' zelf ingevoerde product(en), ' +
+        capture.observedAt + (age < 0 ? ' · toekomstig' :
+          age > 7 * 86400000 ? ' · ouder dan 7 dagen' : '')
+    })
+    const gap = Math.abs(Date.parse(captures.PLUS.observedAt) -
+      Date.parse(captures.DekaMarkt.observedAt))
+    if (gap > 86400000) labels.push('Opnames meer dan 24 uur uiteen: geen volledig betrouwbaar prijsverschil.')
+    labels.push('Kies per ingrediënt opnieuw handmatig gecontroleerde artikel-ID’s uit deze nieuwe bron.')
+    notice(sourceStatus, labels.join('\n'), gap > 86400000 ? 'warning' : '')
+  } catch {
+    captures = null
+    refresh()
+    notice(sourceStatus, 'Handmatig ingevoerde bron voldoet niet aan het Supa-formaat.', 'error')
+  }
+})
+
 sourceInput.addEventListener('change', () => {
   plusInput.value = ''
   dekaInput.value = ''
