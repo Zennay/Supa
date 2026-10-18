@@ -449,7 +449,16 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
           sourceReviews={sourceReviews} ingredients={form.ingredients}
           onCorrect={correctImportedIngredient} />}
           <button className="recipe-primary">Controleer recept</button></form>}
-      {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <div className="recipe-review__pending" role="status">
+      {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3>
+        <p className={preview.warnings.length === 0 && toPlannerRecipe({
+          ...preview, id: 'own-draft-preview', savedAt: new Date(0).toISOString(),
+        }) ? 'recipe-review__planner-ready' : 'recipe-review__planner-blocked'} role="status">
+          {preview.warnings.length === 0 && toPlannerRecipe({
+            ...preview, id: 'own-draft-preview', savedAt: new Date(0).toISOString(),
+          })
+            ? '✓ Geschikt voor Planner en de bijbehorende boodschappenbehoeften. Winkelprijzen blijven onbekend tot je zelf een geldige opname importeert.'
+            : 'Nog niet geschikt voor een berekenbare weekplanning: controleer porties, bereidingstijd, onzekere maten en hele stuksaantallen. Je kunt het recept wel privé bewaren.'}
+        </p><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <div className="recipe-review__pending" role="status">
         <strong>Controleer deze velden zelf voordat ze in Planner kunnen worden berekend:</strong>
         <ul>{[...new Set(preview.warnings)].map(warning => <li key={warning}>{warning}</li>)}</ul>
         <p>Alleen een werkelijk gecorrigeerde ingrediëntenregel maakt een bestaande importwaarschuwing vrij.

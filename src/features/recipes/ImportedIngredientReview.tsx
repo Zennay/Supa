@@ -9,7 +9,7 @@ function MetricCorrection({
   onCorrect: (index: number, replacement: string) => void }) {
   const original = normalizeIngredientLine(raw)
   const [amount, setAmount] = useState(original.amount === null ? '' : String(original.amount).replace('.', ','))
-  const [unit, setUnit] = useState<'g' | 'ml' | 'piece'>(
+  const [unit, setUnit] = useState<'g' | 'kg' | 'ml' | 'l' | 'piece'>(
     original.unit === 'g' || original.unit === 'ml' || original.unit === 'piece' ? original.unit : 'g')
   const [label, setLabel] = useState(original.label || '')
   const [error, setError] = useState('')
@@ -21,11 +21,12 @@ function MetricCorrection({
       return
     }
     const value = Number(trimmed.replace(',', '.'))
-    if (!Number.isFinite(value) || value <= 0 || value > 1_000_000 ||
+    const factor = unit === 'kg' || unit === 'l' ? 1000 : 1
+    if (!Number.isFinite(value) || value <= 0 || value * factor > 1_000_000 ||
         (unit === 'piece' && !Number.isSafeInteger(value))) {
       setError(unit === 'piece'
         ? 'Stuks moeten hele aantallen zijn (maximaal 1.000.000).'
-        : 'De hoeveelheid moet tussen 0 en 1.000.000 liggen.')
+        : 'De hoeveelheid mag omgerekend niet boven 1.000.000 gram of milliliter uitkomen.')
       return
     }
     const name = label.replace(/\s+/g, ' ').trim()
@@ -35,6 +36,12 @@ function MetricCorrection({
     }
     const line = String(value).replace('.', ',') + ' ' +
       (unit === 'piece' ? 'stuks' : unit) + ' ' + name
+    const normalized = normalizeIngredientLine(line)
+    if (normalized.amount === null || normalized.unit === null ||
+        normalized.reviewReason || normalized.amount <= 0) {
+      setError('Deze maat kan niet exact in hele stuks of metrische grammen/milliliters worden omgerekend.')
+      return
+    }
     if (line.length > 400) {
       setError('Deze ingrediëntregel is te lang.')
       return
@@ -53,7 +60,9 @@ function MetricCorrection({
       <label>Eenheid
         <select value={unit} onChange={event => setUnit(event.target.value as typeof unit)}>
           <option value="g">gram</option>
+          <option value="kg">kilogram</option>
           <option value="ml">milliliter</option>
+          <option value="l">liter</option>
           <option value="piece">stuks (heel)</option>
         </select>
       </label>

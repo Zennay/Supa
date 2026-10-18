@@ -137,3 +137,9 @@
 .recipe-import-metric-review :is(button,select,input):focus-visible { outline:3px solid #227956; outline-offset:2px; }
 @media (max-width:420px) { .recipe-metric-fix__form { grid-template-columns:1fr; }
   .recipe-metric-fix__form label:nth-child(3), .recipe-metric-fix__form button { grid-column:auto; } }
+
+.recipe-review__planner-ready, .recipe-review__planner-blocked {
+  margin: 10px 0; padding:12px; border:1px solid #8faf9b;
+  background:#eff9f1; color:#244d33; border-radius:10px; font-size:.86rem; line-height:1.5;
+}
+.recipe-review__planner-blocked { border-color:#c4ad83; background:#fff9ed; color:#775225; }
