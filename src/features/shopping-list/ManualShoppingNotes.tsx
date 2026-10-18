@@ -12,6 +12,7 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
   const [name, setName] = useState('')
   const [store, setStore] = useState<UnpricedShoppingNote['store']>('Algemeen')
   const [onlyOpen, setOnlyOpen] = useState(false)
+  const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
   function add(event: FormEvent) {
@@ -26,11 +27,13 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
     setName('')
     setMessage(`${label} toegevoegd zonder prijs. Dit verandert de supermarktvergelijking niet.`)
   }
-  const visible = onlyOpen ? notes.filter(note => !note.done) : notes
+  const selected = notes.filter(note => filterStore === 'Alle winkels' ||
+    note.store === filterStore || note.store === 'Algemeen')
+  const visible = onlyOpen ? selected.filter(note => !note.done) : selected
   const exportText = [
-    'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN',
+    'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ' + filterStore,
     'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.', '',
-    ...notes.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
+    ...selected.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
     '', 'Geen winkelprijs, bronrecht of besparingsclaim.',
   ].join('\n') + '\n'
   function download() {
@@ -56,6 +59,12 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
     </form>
     <div className="manual-shopping-notes__top">
       <strong>{notes.length} eigen {notes.length === 1 ? 'artikel' : 'artikelen'} · {notes.filter(n => n.done).length} afgevinkt</strong>
+      <label>Toon winkellijst
+        <select value={filterStore} onChange={event => setFilterStore(event.target.value as typeof filterStore)}>
+          <option value="Alle winkels">Alle winkels</option>
+          {stores.map(item => <option key={item} value={item}>{item}</option>)}
+        </select>
+      </label>
       <label><input type="checkbox" checked={onlyOpen} onChange={event => setOnlyOpen(event.target.checked)} /> Alleen open</label>
     </div>
     <ul>{visible.map(note => <li key={note.id}>
@@ -66,14 +75,14 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
       <button type="button" onClick={() => setNotes(current => current.filter(item => item.id !== note.id))}
         aria-label={`Verwijder ${note.label}`}>Verwijder</button>
     </li>)}</ul>
-    {notes.length === 0 && <p role="status">Nog geen losse boodschappen. Deze lijst werkt zonder winkelprijzen.</p>}
+    {selected.length === 0 && <p role="status">Nog geen boodschappen in deze selectie. De lijst werkt zonder winkelprijzen.</p>}
     <div className="manual-shopping-notes__actions">
-      <button type="button" disabled={!notes.length} onClick={() => setExportVisible(value => !value)}>
+      <button type="button" disabled={!selected.length} onClick={() => setExportVisible(value => !value)}>
         {exportVisible ? 'Verberg kopieertekst' : 'Toon kopieertekst'}</button>
-      <button type="button" disabled={!notes.length} onClick={download}>Download lijst (TXT)</button>
+      <button type="button" disabled={!selected.length} onClick={download}>Download lijst (TXT)</button>
     </div>
     {exportVisible && <label>Kopieer mijn ongeprijsde boodschappen
-      <textarea rows={Math.min(notes.length + 6, 15)} readOnly value={exportText}
+      <textarea rows={Math.min(selected.length + 6, 15)} readOnly value={exportText}
         onFocus={event => event.currentTarget.select()} /></label>}
     <p role="status" aria-live="polite">{message}</p>
   </section>
