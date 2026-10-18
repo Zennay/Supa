@@ -847,6 +847,15 @@ export function OfflineReviewedWorkbench({
           <button type="button" disabled={busy || !draftText.trim()} onClick={() => { void importPastedData() }}>
             {imported ? 'Herbereken mandjes' : 'Importeer en bereken'}
           </button>
+          {draftText !== text && <button type="button" className="ghost-button" disabled={busy}
+            onClick={() => {
+              setDraftText(imported ? text : '')
+              setMessage(imported
+                ? 'Concept teruggezet naar je laatst toegelaten winkelpaar. Productkeuzes en lijst zijn behouden.'
+                : 'Geplakte concepttekst gewist. Los geïmporteerde winkelopnames blijven bewaard.')
+            }}>
+            {imported ? 'Herstel vorige geldige broninvoer' : 'Wis alleen geplakt concept'}
+          </button>}
           <button type="button" className="ghost-button" disabled={!imported || busy}
             onClick={downloadOwnObservationJson}>
             Bewaar mijn privéprijsopnames als JSON
