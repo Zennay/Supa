@@ -710,3 +710,26 @@ geïmporteerde eigen brondata, geen crawler, waarneming of
 winkelrechtenverificatie. De bestaande volledige
 bron-/review-/fysieke-mandvoorwaarden blijven vereist voor
 een echte rekenkundige privévergelijking.
+
+### Bekijk de bronverschillen voordat één winkel wordt vervangen
+
+De op [PR #3916](https://github.com/Zennay/Supa/pull/3916)
+bestaande vervangpreview is nu gekoppeld aan de gewone Supa-tab.
+Na een nieuwe eigen CSV/JSON-opname blijft de reeds geaccepteerde
+winkelvergelijking **onveranderd** totdat je vanuit het previewpaneel
+zelf op **Bevestig en vervang alleen [winkel]** klikt. Het paneel
+toont de twee werkelijk aangeleverde opnamemomenten, oorspronkelijke
+en nieuwe aantallen, per originele product-ID toegevoegde, verdwenen
+of gewijzigde bronregels, plus maximaal acht daadwerkelijke
+wijzigingen in prijs en beschikbaarheid. Onbekende oorspronkelijke
+prijzen blijven in dit overzicht **onbekend**, nooit EUR 0.
+
+**Annuleer** behoudt beide bronnen en alle vinkjes. Het daadwerkelijke
+bevestigingsmoment controleert opnieuw de beide bestanden en hun
+originele bronmomenten; de vervanging wordt geweigerd wanneer er
+intussen een andere import of te oude/ongeldige bron tussenkwam.
+Uitsluitend het aangewezen winkelgedeelte verliest zijn menselijke
+SKU-review, lokale productkeuzes en boodschappenafvinkingen. De
+andere winkel wordt niet opnieuw uit een genormaliseerde
+nulprijsprojectie opgebouwd. Dit is een preview van eigen lokale
+bronverschillen, geen extern gevalideerde retailer-prijsmutatie.

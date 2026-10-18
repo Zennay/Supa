@@ -11,6 +11,7 @@ import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.t
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { privatePackUnitRate } from './privateUnitPrice.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
+import { describePrivateStoreCaptureChange } from './privateStoreCaptureDiff.ts'
 import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
@@ -207,6 +208,12 @@ export function OfflineReviewedWorkbench({
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const importRevision = useRef(0)
+  const [pendingReplacement, setPendingReplacement] = useState<{
+    sourceText: string; newText: string
+    version: number; store: typeof stores[number]
+    preview: ReturnType<typeof describePrivateStoreCaptureChange>
+  } | null>(null)
+
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   const [manualSku, setManualSku] = useState<Record<typeof stores[number], Record<string, string>>>({
@@ -506,6 +513,7 @@ export function OfflineReviewedWorkbench({
 
   async function replaceStoreFile(store: typeof stores[number], file?: File) {
     if (!file || !imported?.captures[store]) return
+    setPendingReplacement(null)
     const version = ++importRevision.current
     setBusy(true)
     try {
@@ -523,34 +531,12 @@ export function OfflineReviewedWorkbench({
         json = (module.convertOwnStoreCsv as (input: string) => string)(raw)
       }
       if (version !== importRevision.current) return
-      // Revalidate both original captures before replacing either one.
-      // This preserves the other retailer's actual null prices, source ID and
-      // observation instant instead of recovering normalized 0-cent fallbacks.
-      const result = replacePrivateStoreCapture(text, json, store, Date.now())
-      const otherShop = stores.find(item => item !== store)
-      const confirmed = window.confirm(
-        'Vervang alleen de originele ' + store + '-opname? De ' + otherShop +
-        '-opname blijft behouden. Alle eerder bevestigde productmatches en afvinkingen van ' +
-        store + ' worden ingetrokken; controleer de nieuwe bronprijzen opnieuw.',
-      )
-      if (!confirmed || version !== importRevision.current) return
-      const belongsToReplaced = (key: string) =>
-        key.startsWith('[' + JSON.stringify(store) + ',')
-      setText(result.source)
-      setImported(result.captured)
-      setClockMs(Date.now())
-      setManualSku(previous => ({ ...previous, [store]: {} }))
-      setSkuFilter(previous => Object.fromEntries(
-        Object.entries(previous).filter(([key]) => !belongsToReplaced(key))))
-      setReviewedLines(previous => Object.fromEntries(
-        Object.entries(previous).filter(([key]) => !belongsToReplaced(key))))
-      setDoneTripItems(previous => Object.fromEntries(
-        Object.entries(previous).filter(([key]) => !belongsToReplaced(key))))
-      setTripExportMessage('')
-      setTripProgressMessage('')
-      setMessage('Nieuwe originele ' + store + '-opname ingelezen, inclusief het echte bronmoment. ' +
-        otherShop + ' is ongewijzigd; controleer iedere nieuwe SKU, pakprijs en verpakking van ' +
-        store + ' voordat een volledig prijsverschil beschikbaar wordt.')
+      // Stage ONLY: do not touch admitted source or previous checkmarks.
+      // The original-price-null-sensitive comparison is purely informational.
+      const preview = describePrivateStoreCaptureChange(text, json, store, Date.now())
+      if (version !== importRevision.current) return
+      setPendingReplacement({ sourceText: text, newText: json, store, version, preview })
+      setMessage(store + ': nieuw bronbestand geldig gelezen. Bekijk eerst welke originele producten en prijzen wijzigen. De twee bestaande winkelopnames zijn nog niet vervangen.')
     } catch (error) {
       if (version === importRevision.current)
         setMessage(error instanceof Error ? error.message :
@@ -560,6 +546,42 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+
+  function confirmPrivateStoreReplacement() {
+    const proposed = pendingReplacement
+    if (!proposed) return
+    setPendingReplacement(null)
+    if (!imported || importRevision.current !== proposed.version ||
+        text !== proposed.sourceText) {
+      setMessage('Je oorspronkelijke winkeldata zijn ondertussen gewijzigd. Importeer de gewenste vervanging opnieuw.')
+      return
+    }
+    try {
+      // Revalidate the exact original and new sources at the moment of click:
+      // a stale/too-far-future capture never travels through a preview.
+      const result = replacePrivateStoreCapture(text, proposed.newText, proposed.store, Date.now())
+      const store = proposed.store
+      const otherStore = stores.find(item => item !== store)!
+      const fromReplaced = (key: string) => key.startsWith('[' + JSON.stringify(store) + ',')
+      importRevision.current += 1
+      setText(result.source)
+      setImported(result.captured)
+      setClockMs(Date.now())
+      setManualSku(previous => ({ ...previous, [store]: {} }))
+      setSkuFilter(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !fromReplaced(key))))
+      setReviewedLines(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !fromReplaced(key))))
+      setDoneTripItems(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !fromReplaced(key))))
+      setTripExportMessage('')
+      setTripProgressMessage('')
+      setMessage(store + ': nieuwe originele opname toegepast. ' + otherStore +
+        ' en zijn bestaande fysieke reviewregels zijn behouden. Controleer de gewijzigde winkel en prijs opnieuw.')
+    } catch {
+      setMessage('Vervanging niet toegepast: een oorspronkelijk of nieuw bronmoment is ongeldig. De oude bronnen zijn behouden.')
+    }
+  }
   async function loadFile(file?: File, addSecond = false) {
     if (!file) return
     const version = ++importRevision.current
@@ -977,6 +999,52 @@ export function OfflineReviewedWorkbench({
                 : <p key={store}><strong>{store}</strong> · geen bronopname; prijs onbekend.</p>
             })}
           </div>
+          {pendingReplacement && pendingReplacement.version === importRevision.current &&
+            pendingReplacement.sourceText === text && (
+              <section className="offline-price-workbench__replace-preview"
+                aria-label="Vergelijk oorspronkelijke en nieuwe winkelopname vóór vervangen">
+                <h4>{pendingReplacement.store} vervangen? Bekijk eerst de echte bronverschillen</h4>
+                <p><strong>Oud bronmoment:</strong> {pendingReplacement.preview.previousObservedAt}
+                  <br /><strong>Nieuw bronmoment:</strong> {pendingReplacement.preview.nextObservedAt}</p>
+                <p>{pendingReplacement.preview.previousCount} bestaande bronartikelen →{' '}
+                  {pendingReplacement.preview.nextCount} nieuwe;
+                  {' '}{pendingReplacement.preview.added} toegevoegd,
+                  {' '}{pendingReplacement.preview.removed} verdwenen,
+                  {' '}{pendingReplacement.preview.changed} met gewijzigde product-/prijsgegevens.</p>
+                {pendingReplacement.preview.priceExamples.length > 0 && (
+                  <div>
+                    <strong>Prijs- of beschikbaarheidswijzigingen (maximaal 8)</strong>
+                    <ul>{pendingReplacement.preview.priceExamples.map((item, index) => (
+                      <li key={index}>{item.name} · broncode {item.sourceId}:
+                        {' '}{item.before} → {item.after}</li>
+                    ))}</ul>
+                  </div>
+                )}
+                <p>Alle eerder bevestigde productkeuzes en afvinkingen van <strong>{pendingReplacement.store}</strong>
+                  {' '}worden ingetrokken bij bevestigen.
+                  {' '}{pendingReplacement.preview.otherStore} blijft met oorspronkelijke
+                  productcodes, onbekende prijzen en eigen controles behouden.</p>
+                <p className="disclaimer">
+                  {pendingReplacement.preview.currentEnough
+                    ? 'Bronmomenten vallen binnen het zeven-dagenvenster.'
+                    : 'Een bronmoment is verlopen of te ver in de toekomst: geen actueel verschil.'}
+                  {' '}{pendingReplacement.preview.pairedWithin24h
+                    ? 'Opnames liggen binnen 24 uur; controleer nog alle nieuwe producten zelf.'
+                    : 'Opnames liggen meer dan 24 uur uiteen of er ontbreekt een tweede winkel; geen vergelijkbaar verschil.'}
+                  {' '}Dit zijn verschillen tussen eigen bestanden, geen bewijs van retailerrechten of actuele winkelprijzen.
+                </p>
+                <div className="offline-price-workbench__actions">
+                  <button type="button" disabled={busy} onClick={confirmPrivateStoreReplacement}>
+                    Bevestig en vervang alleen {pendingReplacement.store}
+                  </button>
+                  <button type="button" className="ghost-button" disabled={busy}
+                    onClick={() => {
+                      setPendingReplacement(null)
+                      setMessage('Winkelvervanging geannuleerd; alle originele bronnen en controles blijven behouden.')
+                    }}>Annuleer, behoud beide winkelopnames</button>
+                </div>
+              </section>
+            )}
           <p className="disclaimer">
             Nieuwe winkelopname nodig? Download per winkel het invulblad met je eerder gekozen
             echte productcodes en verpakkingen. Oude prijzen, opnametijd en beschikbaarheid

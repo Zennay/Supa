@@ -155,3 +155,9 @@
 .offline-readiness__steps button:focus-visible{outline:3px solid #1e8b5c;outline-offset:3px}
 .offline-readiness__complete{font-weight:650}
 @media(max-width:640px){.offline-readiness__source-times{grid-template-columns:1fr}.offline-readiness__steps li{display:grid}.offline-readiness__step-actions{width:100%}}
+
+.offline-price-workbench__replace-preview { display:grid;gap:.8rem;padding:1rem;
+  margin:.8rem 0;border:2px solid #52745a;border-radius:13px;background:#f6faf5; }
+.offline-price-workbench__replace-preview h4,.offline-price-workbench__replace-preview p{margin:0}
+.offline-price-workbench__replace-preview li{margin:.3rem 0;overflow-wrap:anywhere}
+.offline-price-workbench__replace-preview button:focus-visible{outline:3px solid #226f52;outline-offset:3px}
