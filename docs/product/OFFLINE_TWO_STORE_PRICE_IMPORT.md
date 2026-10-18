@@ -132,3 +132,16 @@ apart als JSON downloaden en later herimporteren. Een ontbrekende prijs blijft
 `null`, niet €0; deze export bewijst geen bronrechten of onafhankelijke
 M3-veldwaarnemingen. **Wis losse opnames** wist de tijdelijke records uit het
 scherm; bij navigatie of herladen verdwijnen ze eveneens.
+
+## Per winkel een leeg veldblad uit Planner maken
+
+Onder **Vergelijk → Download leeg CSV-invulblad** kun je nu kiezen:
+- beide winkels in één CSV;
+- alleen PLUS;
+- alleen DekaMarkt.
+
+De drie varianten bevatten dezelfde daadwerkelijk geplande ingredientbehoeften,
+met **lege** productnamen, prijzen, verpakkingen en echte waarnemingstijden.
+Vul elk winkelblad uitsluitend met je eigen toegestane fysieke waarnemingen,
+en importeer de ingevulde bestanden afzonderlijk via dezelfde bestandskiezer.
+Dat levert pas twee vergeleken mandjes op als beide opnames apart geldig zijn.

@@ -44,10 +44,10 @@ export function OfflineReviewedWorkbench({
   }, [plan, recipes, activeDays])
 
   /** A deliberately incomplete field sheet, never price/source evidence. */
-  function downloadBlankObservationSheet() {
+  function downloadBlankObservationSheet(selectedStore?: OfflineRetailer) {
     if (!ingredientNeeds.length || ingredientNeeds.length > 1000) return
     const header = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
-    const rows = stores.flatMap(store =>
+    const rows = (selectedStore ? [selectedStore] : stores).flatMap(store =>
       ingredientNeeds.map((need, index) => {
         const slug = need.label.normalize('NFKD').toLowerCase()
           .replace(/[\u0300-\u036f]/g, '')
@@ -63,7 +63,9 @@ export function OfflineReviewedWorkbench({
     try {
       const link = document.createElement('a')
       link.href = objectUrl
-      link.download = 'supa-weekmenu-lege-prijswaarnemingen.csv'
+      link.download = selectedStore === 'PLUS' ? 'supa-plus-leeg-prijsblad.csv'
+        : selectedStore === 'DekaMarkt' ? 'supa-dekamarkt-leeg-prijsblad.csv'
+          : 'supa-weekmenu-lege-prijswaarnemingen.csv'
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -355,11 +357,17 @@ export function OfflineReviewedWorkbench({
         <div>
           <button type="button" className="ghost-button"
             disabled={ingredientNeeds.length === 0 || ingredientNeeds.length > 1000}
-            onClick={downloadBlankObservationSheet}>
-            Download leeg CSV-invulblad voor jouw weekmenu
+            onClick={() => downloadBlankObservationSheet()}>
+            Download leeg CSV-invulblad voor beide winkels
           </button>
+          {stores.map(store => <button type="button" key={store} className="ghost-button"
+            disabled={ingredientNeeds.length === 0 || ingredientNeeds.length > 1000}
+            onClick={() => downloadBlankObservationSheet(store)}>
+            Download leeg {store}-prijsblad
+          </button>)}
           <p className="disclaimer">Het invulblad bevat alleen de ingrediënten uit Planner, tweemaal (PLUS en DekaMarkt).
-            De productnaam, werkelijke waarnemingstijd, verpakking en prijs zijn expres leeg:
+            Kies één winkel of beide winkels in één blad. De productnaam, werkelijke waarnemingstijd,
+            verpakking en prijs zijn expres leeg:
             pas na je eigen rechtmatige observaties, met een echte tijd per winkel en correcte beschikbaarheid,
             kan dit blad worden geïmporteerd. De product-ID vermeldt welk ingrediënt je moet zoeken;
             die ID is geen geverifieerd winkelartikel.</p>
