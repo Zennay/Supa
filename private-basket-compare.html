@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Supa · Hetzelfde mandje vergelijken</title>
+<style>
+:root{font:16px/1.5 system-ui,sans-serif;color:#183b2d;background:#f3f7f1}*{box-sizing:border-box}body{margin:0}
+main{max-width:1120px;margin:auto;padding:28px 16px 70px}h1{font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.15}
+section{padding:20px;border:1px solid #d2e0d5;border-radius:16px;background:white;margin:18px 0}
+h2{font-size:1.2rem}label{display:block;font-weight:650;margin-top:12px}
+input,button{font:inherit}input[type=file]{display:block;margin-top:5px;padding:10px;border:1px solid #b4c9b9;border-radius:9px;width:100%}
+button,.nav{display:inline-block;border:0;background:#17643e;color:white;padding:11px 16px;border-radius:10px;text-decoration:none;cursor:pointer;margin-top:12px}
+button:disabled{opacity:.5;cursor:not-allowed}.nav{background:#e2eee6;color:#174a31}.hint{color:#476e57}.notice{padding:12px;border-left:4px solid #498562;background:#f3f8f2}
+.warning{background:#fff4df;border-color:#b57820}.error{background:#fff0eb;border-color:#b14c30}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;min-width:660px;width:100%}td,th{text-align:left;vertical-align:top;padding:11px;border-bottom:1px solid #d7e4dc}
+small{color:#587566}strong{color:#164d33}
+@media(max-width:650px){.grid{grid-template-columns:1fr}section{padding:14px}}
+@media print{body{background:white}.inputs,.nav,button{display:none!important}section{border:0;break-inside:avoid}}
+</style>
+<script type="module" src="/src/privateBasketCompare.ts"></script>
+</head>
+<body><main>
+<header><p><strong>SUPA · EIGEN OPNAMES · PRIVÉ</strong></p>
+<h1>Hetzelfde mandje, twee echte winkelopnames</h1>
+<p>Alle bedragen komen uitsluitend uit jouw eigen geüploade prijsbestanden. De vergelijking gebruikt de
+bestaande Supa-berekening voor hele verpakkingen in hele centen.
+Ontbrekende matches, prijzen en verouderde opnames blokkeren altijd een volledig prijsverschil.</p>
+<a class="nav" href="/private-basket-mapping.html">Eerst ingrediënten en winkelproducten koppelen →</a></header>
+<section class="inputs" aria-labelledby="inputs-title">
+<h2 id="inputs-title">1 · Kies de lokale prijsbronnen</h2>
+<label for="combined">Gecombineerde PLUS/Deka CSV of bestaande Supa-bron JSON</label>
+<input id="combined" type="file" accept=".csv,.json,text/csv,application/json">
+<div class="grid">
+<div><label for="plus">Of: aparte PLUS CSV</label><input id="plus" type="file" accept=".csv,text/csv"></div>
+<div><label for="deka">En: aparte DekaMarkt CSV</label><input id="deka" type="file" accept=".csv,text/csv"></div>
+</div>
+<label for="demand">2 · Jouw mandvraag JSON uit het koppelscherm</label>
+<input id="demand" type="file" accept=".json,application/json">
+<button type="button" id="compare">Vergelijk mijn twee mandjes</button>
+<p class="hint">Geen netwerkverzoeken naar retailers; geen automatische matches, gesimuleerde prijzen of
+publieke besparingsclaim. Datumvoorwaarden worden pas bij het klikken opnieuw beoordeeld.</p>
+</section>
+<div id="status" class="notice" role="status" aria-live="polite">Kies eigen prijsbronnen en een gekoppelde mandvraag.</div>
+<section id="result" hidden aria-label="Privé vergelijking">
+<h2>Mandjes naast elkaar</h2>
+<div id="summary" class="notice" role="status"></div>
+<p id="captures"></p>
+<div class="tablewrap"><table>
+<thead><tr><th scope="col">Ingrediënt en fysieke behoefte</th><th scope="col">PLUS</th><th scope="col">DekaMarkt</th></tr></thead>
+<tbody id="rows"></tbody>
+</table></div>
+<p><small>Genoemde stuks-/kg-/literprijzen zijn uitsluitend indicatief. De vergelijking gebruikt de
+hele benodigde verpakkingen en de oorspronkelijk opgegeven centen; onvolledige mandjes hebben geen totaal/winnaar.</small></p>
+<button id="print" type="button">Print dit privéoverzicht</button>
+</section>
+</main></body></html>
