@@ -809,10 +809,23 @@ function show(source: Source, demand: Demand): void {
     summary.className = 'notice'
     setStatus('Beide fysieke mandjes volledig met tijdige eigen prijsbronnen berekend. Privévergelijking; geen gevalideerd publiek onderzoek.')
   } else {
-    summary.textContent = 'Geen volledig betrouwbaar prijsverschil. PLUS mist ' +
-      left.unresolvedLineCount + ' regel(s); DekaMarkt mist ' + right.unresolvedLineCount +
-      ' regel(s).' + (fresh ? '' : ' Eén of beide opnames voldoet niet aan de tijdvoorwaarden.') +
-      ' Bekende regelprijzen zijn geen volledige winkelprijs. Controleer ontbrekende SKU’s, aantallen en bronmomenten.'
+    // A complete OWN one-store basket is a useful shopping price, even if
+    // its peer is absent, incomplete or more than 24 hours apart. Never turn
+    // those independent totals into a claim of a two-store price difference.
+    const knownStores = stores.map(store => {
+      const cents = budgetTotals?.[store]
+      const capture = captures[store]
+      return cents === null || cents === undefined || !capture
+        ? store + ': volledig recent mandje onbekend'
+        : store + ': ' + euro.format(cents / 100) +
+          ' voor het volledige eigen mandje (opname ' + capture.observedAt + ')'
+    })
+    summary.textContent = 'Geen volledig betrouwbaar prijsverschil of goedkoopste winkel. ' +
+      knownStores.join(' · ') + '. PLUS mist ' +
+      left.unresolvedLineCount + ' fysieke regel(s); DekaMarkt mist ' +
+      right.unresolvedLineCount + ' regel(s).' +
+      (fresh ? '' : ' De twee originele bronmomenten voldoen niet samen aan de zeven-dagen- en 24-uursvoorwaarden.') +
+      ' Alleen onafhankelijke complete eigen winkelmandbedragen zijn getoond; geen kassagarantie.'
     summary.className = 'notice warning'
     setStatus('Onvolledige of verouderde vergelijking; geen winnaar of volledige winkelbedragen gepubliceerd.')
   }
