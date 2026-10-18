@@ -14,7 +14,7 @@ const safeLabel = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\
 /** Private volatile notes; no product match, price or retailer-source authority. */
 export function ManualShoppingNotes({ notes, setNotes, storeBasket = null,
   activeStore = 'PLUS', sourceFresh = false, ownExtras = [],
-  observedAt = null, tripProgress,
+  observedAt = null, tripProgress, onSelectCombinedStore,
 }: {
   notes: UnpricedShoppingNote[]
   setNotes: SetNotes
@@ -24,6 +24,7 @@ export function ManualShoppingNotes({ notes, setNotes, storeBasket = null,
   ownExtras?: readonly PrivateLooseProduct[]
   observedAt?: string | null
   tripProgress?: Readonly<{ identity: string; done: string[] }>
+  onSelectCombinedStore?: (store: 'PLUS' | 'DekaMarkt') => void
 }) {
   const [name, setName] = useState('')
   const [bulkDraft, setBulkDraft] = useState('')
@@ -33,8 +34,11 @@ export function ManualShoppingNotes({ notes, setNotes, storeBasket = null,
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
   const [combinedCopyVisible, setCombinedCopyVisible] = useState(false)
-  const [combinedStore, setCombinedStore] = useState<'PLUS' | 'DekaMarkt'>(activeStore)
-  useEffect(() => { setCombinedStore(activeStore); setCombinedCopyVisible(false) }, [activeStore])
+  // The routed app controls the selected retailer for ALL its lists.
+  // Standalone list consumers can still change their unpriced export locally.
+  const [requestedStore, setRequestedStore] = useState<'PLUS' | 'DekaMarkt'>(activeStore)
+  const combinedStore = onSelectCombinedStore ? activeStore : requestedStore
+  useEffect(() => { setRequestedStore(activeStore); setCombinedCopyVisible(false) }, [activeStore])
   const combinedText = combinedPrivateTripText({
     basket: combinedStore === activeStore ? storeBasket : null,
     store: combinedStore, sourceFresh: combinedStore === activeStore && sourceFresh,
@@ -298,17 +302,18 @@ export function ManualShoppingNotes({ notes, setNotes, storeBasket = null,
       <h3>Eén complete lijst per winkel</h3>
       <label>Winkel voor download
         <select value={combinedStore} onChange={event => {
-          setCombinedStore(event.target.value as 'PLUS' | 'DekaMarkt')
+          const next = event.target.value as 'PLUS' | 'DekaMarkt'
+          if (onSelectCombinedStore) onSelectCombinedStore(next)
+          else setRequestedStore(next)
           setCombinedCopyVisible(false)
         }}>
           <option value="PLUS">PLUS</option>
           <option value="DekaMarkt">DekaMarkt</option>
         </select>
       </label>
-      {combinedStore !== activeStore && storeBasket && <p role="status">
-        Het ingeladen mandje hoort bij {activeStore}. Schakel de gekozen winkel in
-        Lijst om voor {combinedStore} ook het eigen geprijsde mandje te exporteren.
-      </p>}
+      {!storeBasket && <p role="status">Voor {combinedStore} is nog geen toegelaten
+        privéprijsopname geladen. Eigen ongeprijsde boodschappen blijven beschikbaar;
+        voeg een eigen opname toe onder Vergelijk om productmatches te tonen.</p>}
       <p>Weekmenu, zelf gekozen losse winkelproducten en eigen algemene/{combinedStore}-notities
         in één bestand. Prijzen van extra artikelen blijven buiten weekbudget en
         PLUS/DekaMarkt-vergelijking. Bij verouderde invoer wordt dat vermeld.</p>

@@ -549,8 +549,18 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {tab === 'list' && (privateNotesView
           ? (() => {
               const PrivateNotes = privateNotesView
-              const store = plannerStore ?? offlinePriceSession.selectedStore
+              const store = offlinePriceSession.selectedStore
               const capture = offlinePriceSession.imported?.captures[store]
+              // Never export the other retailer's planner fallback as a priced
+              // basket when the user chooses a shop without an imported source.
+              const ownBasket = capture
+                ? (store === 'PLUS' ? importedPair?.plus : importedPair?.deka) ?? null
+                : stagedForPlanner?.store === store ? stagedForPlanner.basket : null
+              const nowNs = BigInt(Math.trunc(sourceClock)) * 1_000_000n
+              const storeFresh = capture
+                ? nowNs >= capture.observedNs - 300_000_000_000n &&
+                  nowNs - capture.observedNs <= 604_800_000_000_000n
+                : stagedForPlanner?.store === store && stagedForPlanner.fresh === true
               const extras = capture ? capture.products
                 .filter(product => offlinePriceSession.extraProductIds[store].includes(product.id))
                 .map(product => ({
@@ -559,8 +569,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                   done: offlinePriceSession.extraDoneIds[store].includes(product.id),
                 })) : []
               return <PrivateNotes notes={unpricedNotes} setNotes={setUnpricedNotes}
-                storeBasket={plannerBasket} activeStore={store}
-                sourceFresh={plannerSource === 'private'} ownExtras={extras}
+                storeBasket={ownBasket} activeStore={store}
+                onSelectCombinedStore={offlinePriceSession.setSelectedStore}
+                sourceFresh={storeFresh} ownExtras={extras}
                 observedAt={capture?.observedAt ??
                   (typeof offlinePriceSession.stagedCaptures[store]?.observedAt === 'string'
                     ? offlinePriceSession.stagedCaptures[store].observedAt as string : null)}
