@@ -366,3 +366,19 @@ worden beoordeeld. Het vorige vergelijkingresultaat wordt direct ingetrokken;
 een nieuw prijsverschil vereist nog steeds zelf op Vergelijk klikken en de
 volledige canonieke twee-winkelsvoorwaarden. Voor een winkel die niet door
 de nieuwe bron is geleverd blijft alles onbekend.
+
+## Oorspronkelijk losse winkelopnames samenvoegen zonder fictieve prijzen
+
+Een bestaand in de wizard toegelaten **echte ene** PLUS- of DekaMarkt-opname
+kan nu met een later geselecteerd lokaal bronbestand van **uitsluitend de
+andere winkel** worden gecombineerd, ook als de eerste bron een JSON,
+handmatig formulier of een andere CSV was. Beide afzonderlijke bronnen zijn
+al volledig door de strikte bestaande importvalidator gegaan; het gecombineerde
+bronpaar wordt opnieuw met het volledige bestaande twee-winkelschema
+gevalideerd. De gebruiker bevestigt expliciet het samenvoegen voordat enige
+ingelezen bron wordt vervangen. Alleen als de originele eerste opname
+letterlijk onveranderd is blijven de daarbij handmatig gekozen SKU's bewaard.
+Er worden geen ontbrekende tijden, producten of bedragen bedacht en de
+volledige prijsvergelijking blijft onbekend bij onvolledige matches, te oude
+bronnen of opnames die meer dan 24 uur uiteen liggen. Bij annulering houdt
+de gebruiker zijn eerdere echte winkelgegevens.

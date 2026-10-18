@@ -450,14 +450,26 @@ async function loadSources() {
     } else {
       parsed = JSON.parse(convertOwnStoreCsv(await readLocalFile(plus ?? deka)))
     }
-    const verified = acceptJson(parsed)
+    let verified = acceptJson(parsed)
     if (revision !== sourceRevision) return
+    // A second *real* one-shop file can be explicitly joined to the first
+    // previously admitted one-shop capture, without fabricating provenance.
+    // This is only possible for disjoint shops; overlapping input replaces.
+    const append = captures && stores.filter(store => captures[store]).length === 1 &&
+      stores.filter(store => verified[store]).length === 1 &&
+      stores.every(store => !captures[store] || !verified[store])
+    if (append) verified = acceptJson({
+      schema: 'supa-offline-prices-v1',
+      captures: stores.map(store => verified[store] ?? captures[store]),
+    })
     if (captures && JSON.stringify(verified) === JSON.stringify(captures)) {
       notice(sourceStatus, 'Exact dezelfde eigen bron opnieuw geopend. Productkeuzes blijven behouden; vergelijk zelf opnieuw.')
       refresh()
       return
     }
-    if (captures && !window.confirm('Vervang de vorige winkelbronnen door deze nieuwe gevalideerde opname(n)? ' +
+    if (captures && !window.confirm((append
+      ? 'Voeg deze tweede echt ingelezen winkelopname samen met je eerdere originele bron? '
+      : 'Vervang de vorige winkelbronnen door deze nieuwe gevalideerde opname(n)? ') +
         'Alleen SKU-keuzes uit letterlijk ongewijzigde bestaande winkelopnames blijven bewaard. ' +
         'Nieuwe of gewijzigde winkels moeten opnieuw handmatig gekoppeld worden.')) {
       sourceInput.value = ''
@@ -497,6 +509,7 @@ async function loadSources() {
       ? Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt)) : null
     if (gap === null) descriptions.push('Voor een volledig winkelprijsverschil is nog een echte tweede winkelopname nodig.')
     else if (gap > 86400000) descriptions.push('Opnames >24 uur uiteen. Opnieuw meten voor een volledige vergelijking.')
+    if (append) descriptions.push('De twee afzonderlijk echt ingelezen winkelopnames zijn na jouw bevestiging lokaal gecombineerd.')
     descriptions.push(unchanged.length ? 'Eerder handmatig gekoppelde SKU’s zijn uitsluitend bij ongewijzigde originele winkelopname(n) behouden.' : 'Alle productkeuzes moeten opnieuw bevestigd worden.')
     descriptions.push('Selecteer uitsluitend door jou gecontroleerde matches. Geen automatische bronrechten of besparing.')
     const expired = stores.some(store => {
