@@ -95,6 +95,7 @@ export function formatMixedStoreShoppingPlan(
   plan: MixedStoreShoppingPlan,
   captured: Record<MixedStore, string>,
   done: Readonly<Record<string, boolean>> = {},
+  extraVisitCostCents: number | null = null,
 ): string {
   const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
   const clean = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, ' ')
@@ -109,9 +110,20 @@ export function formatMixedStoreShoppingPlan(
     'PLUS hele mand: ' + money.format(plan.plusWholeCents / 100),
     'DekaMarkt hele mand: ' + money.format(plan.dekaWholeCents / 100),
     'Goedkoopste volledige winkel: ' + money.format(plan.cheapestWholeStoreCents / 100),
-    'Twee-winkelroute: ' + money.format(plan.totalCents / 100),
-    'Rekenkundig verschil t.o.v. goedkoopste enkele winkel: ' +
+    'Twee-winkelroute, uitsluitend artikelen: ' + money.format(plan.totalCents / 100),
+    'Rekenkundig verschil t.o.v. goedkoopste enkele winkel, zonder extra ritkosten: ' +
       money.format(plan.additionalDifferenceCents / 100),
+    ...((plan.lines.some(line => line.store === 'PLUS') && plan.lines.some(line => line.store === 'DekaMarkt'))
+      ? [extraVisitCostCents === null
+        ? 'Extra bezoekkosten: niet opgegeven; werkelijk financieel voordeel onbekend.'
+        : 'Zelf opgegeven extra bezoekkosten: ' + money.format(extraVisitCostCents / 100),
+        ...(extraVisitCostCents === null ? [] : [
+          'Twee-winkelroute inclusief zelf opgegeven extra kosten: ' +
+            money.format((plan.totalCents + extraVisitCostCents) / 100),
+          'Verschil t.o.v. goedkoopste enkele winkel na deze extra kosten: ' +
+            money.format((plan.additionalDifferenceCents - extraVisitCostCents) / 100),
+        ])]
+      : ['Deze gekozen route bezoekt maar één winkel; geen extra tweede bezoek.']),
     ...(['PLUS','DekaMarkt'] as const).flatMap(store => [
       '',
       store + ' · ' + money.format(plan.totals[store] / 100),

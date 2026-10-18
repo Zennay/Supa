@@ -870,3 +870,16 @@ productreviews opnieuw gecontroleerd. Ontbrekende of verlopen prijzen
 zijn geen nulprijs en geven dus geen gecombineerde route.
 Reiskosten, tijd en actievoorwaarden zijn niet in de bedragen
 meegenomen; de uitkomst is geen garantie of openbare besparingsclaim.
+
+#### Eigen extra kosten voor een tweede winkel
+
+Als het berekende goedkoopste artikelmandje daadwerkelijk artikelen
+uit twee winkels bevat, kun je de **extra** kosten van die tweede stop
+zelf invullen (nul tot duizend euro, maximaal twee decimalen).
+Supa toont dan het gecombineerde bedrag inclusief die persoonlijke
+extra kosten naast de goedkoopste volledige enkele winkel. Als de
+extra omrij-/parkeerkosten het theoretische verschil overschrijden,
+zegt de app uitdrukkelijk dat één winkel goedkoper uitkomt. Zonder
+ingevuld bedrag claimt Supa geen netto besparing. Dit extra bedrag
+komt uitsluitend van de gebruiker, nooit uit een verzonnen prijsbron,
+en verschijnt desgewenst in de lokale TXT-download.

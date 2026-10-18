@@ -20,15 +20,28 @@ export function MixedStoreShoppingCard({
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [showText, setShowText] = useState(false)
   const [message, setMessage] = useState('')
+  const [extraVisitCost, setExtraVisitCost] = useState('')
+  const visitsBoth = stores.every(store => plan.lines.some(line => line.store === store))
+  const validCost = extraVisitCost.trim() === '' || /^\d{1,4}(?:[,.]\d{1,2})?$/.test(extraVisitCost.trim())
+  const parsedCost = extraVisitCost.trim() === '' || !validCost ? null :
+    Math.round(Number(extraVisitCost.trim().replace(',', '.')) * 100)
+  const extraCents = visitsBoth && parsedCost !== null && Number.isSafeInteger(parsedCost) &&
+    parsedCost >= 0 && parsedCost <= 100_000 ? parsedCost : null
+  const costInvalid = extraVisitCost.trim() !== '' && (extraCents === null || !validCost)
+  const netAdvantage = extraCents === null ? null : plan.additionalDifferenceCents - extraCents
   const id = (key: string) => JSON.stringify([captured.PLUS, captured.DekaMarkt, key])
   const isDone = (key: string) => !!checked[id(key)]
   const current: Record<string, boolean> = Object.fromEntries(
     plan.lines.map(line => [line.key, isDone(line.key)]),
   )
   const complete = plan.lines.filter(line => current[line.key]).length
-  const list = formatMixedStoreShoppingPlan(plan, captured, current)
+  const list = formatMixedStoreShoppingPlan(plan, captured, current, extraCents)
 
   function download() {
+    if (costInvalid) {
+      setMessage('Corrigeer eerst de zelf ingevulde extra reiskosten (0 tot 1.000 euro).')
+      return
+    }
     if (!eligibleNow()) {
       setShowText(false)
       setMessage('Deze bronopnames zijn intussen verlopen of gewijzigd. Controleer de echte producten opnieuw voordat je een lijst bewaart.')
@@ -66,6 +79,31 @@ export function MixedStoreShoppingCard({
       {' '}lager dan het goedkoopste volledige mandje bij één winkel.
       Dit is geen gegarandeerde besparing: reistijd, vervoerskosten, tijdelijke winkelacties
       en eventuele andere voorwaarden zijn niet meegerekend.</p>
+    {visitsBoth && <div className="offline-price-workbench__actions">
+      <label>Extra kosten voor het bezoeken van de tweede winkel (€)
+        <input type="text" inputMode="decimal" maxLength={9} value={extraVisitCost}
+          placeholder="Bijv. 2,50"
+          onChange={event => { setExtraVisitCost(event.currentTarget.value); setMessage('') }} />
+      </label>
+      <p>Voer zelf je extra omrijden, parkeren of andere kosten in. Leeg betekent
+        onbekend; Supa veronderstelt nooit gratis reizen.
+        {' '}De mogelijke bruto ruimte voor extra kosten is maximaal{' '}
+        <strong>{money.format(plan.additionalDifferenceCents / 100)}</strong>.</p>
+      {costInvalid && <p role="alert">Gebruik een bedrag tussen € 0,00 en € 1.000,00,
+        maximaal twee decimalen. Een ongeldige kosteninvoer wordt niet meegerekend.</p>}
+      {!costInvalid && netAdvantage !== null && <p role="status">
+        Twee-winkelroute inclusief jouw extra kosten:{' '}
+        <strong>{money.format((plan.totalCents + extraCents!) / 100)}</strong>.
+        {' '}{netAdvantage > 0
+          ? 'Dit is ' + money.format(netAdvantage / 100) + ' lager dan de goedkoopste enkele winkel.'
+          : netAdvantage === 0
+            ? 'Dat is gelijk aan de goedkoopste enkele winkel.'
+            : 'Een volledige mand bij de goedkoopste enkele winkel is ' +
+              money.format(-netAdvantage / 100) + ' goedkoper inclusief jouw extra tweede-stopkosten.'}
+      </p>}
+    </div>}
+    {!visitsBoth && <p>Voor deze selectie is maar één winkel nodig; er is
+      geen extra tweede winkelbezoek.</p>}
     <p><strong>{complete} van {plan.lines.length}</strong> artikelen afgevinkt ·
       vinkjes blijven alleen in deze open pagina.</p>
     <div className="offline-price-workbench__actions">
@@ -75,6 +113,7 @@ export function MixedStoreShoppingCard({
       <button className="ghost-button" type="button" onClick={() => setChecked({})}>Wis vinkjes</button>
       <button className="ghost-button" type="button" onClick={download}>Download route met vinkjes (TXT)</button>
       <button className="ghost-button" type="button" onClick={() => {
+        if (costInvalid) { setMessage('Corrigeer eerst je extra reiskosten.'); return }
         if (!eligibleNow()) { setShowText(false); setMessage('Bronnen verlopen: voer een nieuwe broncontrole uit.'); return }
         setShowText(previous => !previous)
       }}>{showText ? 'Verberg kopieerbare lijst' : 'Toon kopieerbare lijst'}</button>
