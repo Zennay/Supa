@@ -474,7 +474,15 @@ function ownDataRecord(
   try {
     for (const field of fields) {
       const property = Object.getOwnPropertyDescriptor(value, field)
-      if (!property || !('value' in property)) return null
+      // Missing fields are copied as own undefined data, never inherited:
+      // the existing financial validator can then give the right refusal
+      // reason. Accessor properties remain unsafe even if they return
+      // undefined, so never evaluate them.
+      if (!property) {
+        snapshot[field] = undefined
+        continue
+      }
+      if (!('value' in property)) return null
       snapshot[field] = property.value
     }
   } catch {
@@ -530,19 +538,25 @@ function snapshotFinancialInputs(input: unknown): {
   comparison.lineDeltas = safeRows
 
   if (!Array.isArray(args.evidence)) {
-    return { comparison: comparison as unknown as BasketComparison, evidence: args.evidence }
+    return { comparison: comparison as BasketComparison, evidence: args.evidence }
   }
   const items = ownDataArray(args.evidence)
   if (!items) return null
-  const safeItems: Record<string, unknown>[] = []
+  const safeItems: unknown[] = []
   for (const item of items) {
+    // Preserve ordinary malformed JSON records for the existing detailed
+    // error reporting. Invalid primitives cannot contain executable accessors.
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      safeItems.push(null)
+      continue
+    }
     const record = ownDataRecord(item, [
       'lineId', 'effect', 'deltaCents', 'evidenceRef',
     ])
     if (!record) return null
     safeItems.push(record)
   }
-  return { comparison: comparison as unknown as BasketComparison, evidence: safeItems }
+  return { comparison: comparison as BasketComparison, evidence: safeItems }
 }
 
 export function attributeSavingsEffects(input: {
