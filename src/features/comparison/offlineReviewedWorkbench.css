@@ -130,3 +130,11 @@
 .offline-price-workbench__product-picker input,
 .offline-price-workbench__product-picker select { width: 100%; max-width: 100%; min-width: 0; }
 .offline-price-workbench__product-picker small { color: var(--text-muted, #5d666e); }
+
+/* Explicit per-store matching coverage; partial totals remain non-claimable. */
+.offline-price-workbench__coverage { display:grid; gap:.55rem; margin:.7rem 0 1rem; }
+.offline-price-workbench__coverage strong { color:#33483a; }
+.offline-price-workbench__coverage progress { width:100%; height:1rem; accent-color:#357454; }
+.offline-price-workbench__coverage button { min-height:44px; padding:.65rem; justify-self:start;
+  border-radius:9px; border:1px solid #597461; background:white; color:#234a30; cursor:pointer; }
+.offline-price-workbench__coverage button:focus-visible { outline:3px solid #226f52; outline-offset:2px; }

@@ -359,6 +359,41 @@ export function OfflineReviewedWorkbench({
   const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
     !!basketPair?.comparison.claimable
 
+  function downloadMissingItems(store: OfflineRetailer) {
+    if (!imported || !basketPair) return
+    const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+    const unresolved = basket.lines.filter(line => line.status === 'unresolved')
+    if (!unresolved.length) return
+    const safeLabel = (label: string) => label
+      .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
+      .replace(/\s+/g, ' ').trim().slice(0, 160)
+    const lines = [
+      'SUPA - nog op te zoeken bij ' + store,
+      'Huidig weekmenu - ' + unresolved.length + ' niet-gekoppelde ingrediënten',
+      'Bronopname: ' + captureDate(imported.captures[store].observedMs),
+      'Deze lijst bevat GEEN geverifieerde winkelprijzen of productmatches.',
+      '',
+      ...unresolved.map((line, index) => {
+        const amount = line.requirement.amount
+        const needed = amount !== null && Number.isFinite(amount) && amount > 0
+          ? String(amount) + ' ' + line.requirement.unit : 'hoeveelheid onbekend'
+        return (index + 1) + '. ' + safeLabel(line.ingredientLabel) +
+          ' - benodigd: ' + needed
+      }),
+    ]
+    const url = URL.createObjectURL(new Blob([lines.join('\n') + '\n'],
+      { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = store === 'PLUS' ? 'supa-plus-nog-opzoeken.txt' : 'supa-dekamarkt-nog-opzoeken.txt'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    setMessage('Je lijst met ontbrekende ingrediënten voor ' + store + ' is lokaal gedownload.')
+  }
+
   return (
     <section className="offline-price-workbench" aria-label="Geïmporteerde winkelprijzen vergelijken">
       <div className="offline-price-workbench__intro">
@@ -555,6 +590,15 @@ export function OfflineReviewedWorkbench({
                   return (
                     <section key={store}>
                       <h4>{store} · controleer productkoppelingen</h4>
+                      <div className="offline-price-workbench__coverage">
+                        <strong>{basket.matchedLineCount} van {basket.lines.length} ingrediënten gekoppeld</strong>
+                        <progress aria-label={store + ' gekoppelde ingrediënten'}
+                          max={basket.lines.length || 1} value={basket.matchedLineCount} />
+                        {basket.unresolvedLineCount > 0 && <button type="button" className="ghost-button"
+                          onClick={() => downloadMissingItems(store)}>
+                          Download {basket.unresolvedLineCount} ontbrekende ingrediënten als TXT
+                        </button>}
+                      </div>
                       <p className="disclaimer">Kies een product alleen als je zelf hebt gecontroleerd
                         dat het werkelijk bij dit ingrediënt past. Supa gebruikt uitsluitend jouw
                         geïmporteerde producten, met bestaande verpakkings- en prijscontroles.
