@@ -225,3 +225,13 @@
 .offline-list-missing button { min-height:44px; border:1px solid #477657;
   background:white; color:#204f31; border-radius:9px; cursor:pointer; padding:.5rem .85rem; }
 .offline-list-missing button:focus-visible { outline:3px solid #226f52; outline-offset:3px; }
+
+
+.offline-own-extras__subtotal { display:grid; gap:.25rem; margin:0; padding:.75rem;
+  border:1px solid #bfcebc; background:#fff; border-radius:9px; }
+.offline-own-extras__subtotal strong { font-size:1.05rem; color:#235039; }
+.offline-own-extras__subtotal small { color:#57665a; }
+.offline-own-extras__quantity { display:grid; gap:.3rem; font-size:.85rem; font-weight:650; }
+.offline-own-extras__quantity select { min-width:75px; min-height:44px;
+  background:#fff; border:1px solid #829c8c; border-radius:8px;
+  padding:.45rem; font:inherit; color:#243f2e; }
