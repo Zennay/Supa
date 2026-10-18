@@ -84,3 +84,14 @@ het scherm mobiel bruikbaar blijft. Zoek gerichter voor andere treffers.
 Een al geselecteerd product blijft zichtbaar als je de zoekterm verandert.
 Bij het inladen van een nieuwe opname wordt de zoekterm teruggezet.
 Deze zoekfunctie verandert geen bronwaarden en suggereert geen geverifieerde match.
+
+## Privéprijsopnames terughalen op een ander apparaat
+
+Na een geslaagde lokale import kun je **Bewaar mijn privéprijsopnames als JSON** kiezen.
+Dat bewaart uitsluitend de oorspronkelijke gevalideerde eigen JSON-invoer (of de
+lokaal geconverteerde CSV), niet een getransformeerd productobject. Zo blijft
+`null` voor ontbrekende prijzen behouden; onbekend wordt nooit een verzonnen
+prijs van nul euro. Importeer dit JSON-bestand later opnieuw via **Vergelijk**.
+Bewaar het veilig: bronprijzen en je eigen keuzes zijn privé en niet gecontroleerd.
+Een oud bestand kan opnieuw worden ingelezen maar wordt niet als actueel
+prijsverschil vergeleken na de bestaande versheids-/24-uursgrenzen.

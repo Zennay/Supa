@@ -14,7 +14,13 @@ const COLUMNS = [
 function cell(value: string | number): string {
   const input = String(value)
   // Protect spreadsheet importers from formula-like product/ingredient names.
-  const text = /^[\s\u200b-\u200f\u2060\ufeff]*[=+\-@]/u.test(input) ? "'" + input : input
+  // NFKC detects width/compatibility aliases. Strip invisible format marks,
+  // combining marks and Unicode whitespace only for the safety check, not
+  // from the exported original label. This also covers bidi overrides and
+  // word joiners before a spreadsheet formula prefix.
+  const leading = input.normalize('NFKC')
+    .replace(/^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*/gu, '')
+  const text = /^[=+\-@]/u.test(leading) ? "'" + input : input
   return '"' + text.replace(/"/g, '""') + '"'
 }
 

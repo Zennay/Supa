@@ -121,6 +121,22 @@ export function OfflineReviewedWorkbench({
     }
   }, [])
 
+  function downloadOwnObservationJson() {
+    // The textarea is exactly the user-provided, successfully admitted JSON
+    // (or locally converted CSV). Do not serialize the internal StoreProduct:
+    // unresolved/null prices must never be re-exported as fabricated zeroes.
+    if (!imported || !text.trim()) return
+    const url = URL.createObjectURL(new Blob([text + '\n'], { type: 'application/json;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-mijn-prive-winkelopnames.json'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
+
   function importSnapshots(input: string) {
     setImportEpoch(epoch => epoch + 1)
     try {
@@ -278,6 +294,10 @@ export function OfflineReviewedWorkbench({
         <div className="offline-price-workbench__actions">
           <button type="button" disabled={busy || !text.trim()} onClick={() => importSnapshots(text)}>
             Bereken mandjes
+          </button>
+          <button type="button" className="ghost-button" disabled={!imported || busy}
+            onClick={downloadOwnObservationJson}>
+            Bewaar mijn privéprijsopnames als JSON
           </button>
           <button type="button" className="ghost-button" onClick={() => {
             importVersion.current++
