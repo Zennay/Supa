@@ -37,7 +37,8 @@ Dezelfde bestaande, strikte negenkoloms-CSV-converter is nu ook rechtstreeks via
 2. Kies de gewenste maaltijden/dagen in **Planner**. Open **Vergelijk** en importeer het bestand of plak de inhoud.
 3. Controleer per winkel de automatisch voorgestelde **product-ID, naam, verpakking, aantal hele verpakkingen en de werkelijk aangeleverde prijs per pak** met jouw oorspronkelijke bronopname. Bevestig elke winkelregel apart met **Product, inhoud en prijs met mijn bronopname gecontroleerd**. Onbekende regels kunnen niet worden bevestigd.
 4. Een volledig winkeltotaal verschijnt uitsluitend bij een volledig matched, menselijk bevestigd en actueel mandje voor die winkel. Een rekenkundig prijsverschil verschijnt alleen als alle regels voor **beide** winkels zijn bevestigd, beide tijden maximaal 24 uur uiteen liggen en geen van beide opnames ouder is dan zeven dagen. Als de bron, het weekmenu, de oorspronkelijke opnametijd, de match of de prijs verandert, geldt de oude bevestiging niet meer; de invoer opnieuw importeren wist alle bevestigingen.
-5. Kopieer desgewenst de private boodschappenlijst. Ook na handmatige controle zijn deze observaties **niet onafhankelijk geverifieerd** en is dit geen publiek besparingsbewijs.
+5. In **Vergelijk → boodschappen** zie je per winkel de daadwerkelijk gekoppelde hele verpakkingen plus openstaande, ongeprijsde regels. Vink gekochte producten per winkel af. Kies **Toon alleen nog te kopen** of **Alle afvinkingen wissen**; de twee winkels delen geen afvinkingen. De kopieerbare lijst laat eigen vinkjes als aangevinkt zien. Afvinkingen blijven uitsluitend tijdens deze browsesessie in het scherm en verdwijnen bij een nieuwe of gewijzigde broninvoer. Het gaat nadrukkelijk **niet** om een bevestiging van bronherkomst of prijsvaliditeit; dat is de aparte matchbevestiging.
+6. Ook na handmatige controle zijn deze observaties **niet onafhankelijk geverifieerd** en is dit geen publiek besparingsbewijs.
 
 Schema:
 
