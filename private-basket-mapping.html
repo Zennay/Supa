@@ -70,6 +70,7 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 <script type="module" src="/private-basket-manual-observations.mjs"></script>
 <script type="module" src="/src/privateBasketCompare.ts"></script>
 <script type="module" src="/src/privatePlannerDemandImport.ts"></script>
+<script type="module" src="/src/privateOwnRecipeDemand.ts"></script>
 <script type="module" src="/src/privateBasketDemandMerge.ts"></script>
 <script type="module" src="/private-basket-merge-ui.mjs"></script>
 </head>
@@ -119,6 +120,18 @@ Tijdstippen en artikel-ID's worden niet automatisch bedacht of ingevuld.</p>
 <h2 id="demand-title">2 · Vul de fysieke behoefte in</h2>
 <p>Gebruik exact dezelfde hoeveelheid voor beide winkels. Een onbekende hoeveelheid mag leeg blijven;
 dan kan er geen volledig prijsverschil worden berekend. Pas na eigen controle kies je een product-ID per winkel.</p>
+<div id="own-recipe-import" class="ingredient" style="margin-bottom:16px">
+<h3>Of: gebruik je opgeslagen eigen Supa-recepten</h3>
+<p>Laad bewust jouw eigen recepten van dit apparaat. Alleen volledig gecontroleerde
+metrische hoeveelheden zijn geschikt; recepten met open reviewpunten blijven
+in Mijn recepten totdat je ze daar corrigeert. Selecteer maximaal zeven
+maaltijden, kies desgewenst herhalingen en maak dezelfde ongeprijsde fysieke
+boodschappenbehoefte als een Planner-weekmenu.</p>
+<button id="load-own-recipes" type="button" class="secondary">Laad mijn eigen recepten op dit apparaat</button>
+<div id="own-recipe-status" class="notice" role="status" aria-live="polite">Nog geen toegang tot jouw lokale recepten gevraagd.</div>
+<div id="own-recipe-choices" role="group" aria-label="Kies eigen recepten" style="display:grid;gap:8px"></div>
+<button id="own-recipes-to-demand" type="button" disabled>Gebruik geselecteerde recepten als mandvraag</button>
+</div>
 <label for="week-import">Of: importeer een lokaal geselecteerd Planner-weekmenu</label>
 <input id="week-import" type="file" accept=".json,application/json">
 <small>Accepteert alleen supa-private-planner-week-v1 met echte gekozen dagen, recepten en metrische hoeveelheden. Supa gebruikt dezelfde canonieke aggregatie als de bestaande offline Planner-converter. Winkelprijzen en artikel-ID's blijven onbekend.</small>

@@ -224,3 +224,28 @@ Originele bronmomenten blijven onveranderd: een oud sessiebestand mag dus nooit
 automatisch een nieuwe complete prijsvergelijking suggereren. Wanneer slechts
 één winkel compleet is, blijft de eigen afvinklijst/budget van die winkel
 mogelijk, maar de volledige winkelwinnaar blijft onbekend.
+
+## Eigen Supa-recepten → dezelfde fysieke winkelmandvraag
+
+Het koppelscherm heeft een nieuwe optie **Laad mijn eigen recepten op dit
+apparaat**. Alleen na de expliciete knop leest de werkbank read-only dezelfde
+bestaande `supa.recipe-library.v1` opslag als de eigen receptenbibliotheek van
+Supa; er is geen API, website-fetch, server of opslagmutatie. Recepten met
+onbekende porties, onvolledige metrische eenheden/hoeveelheden of actieve
+reviewwaarschuwingen zijn **niet** selecteerbaar; de gebruiker corrigeert deze
+eerst in `Mijn recepten`. Alle aanwezige eigen recepten worden via de bestaande
+`readRecipeLibrary` en `toPlannerRecipe` grenzen genormaliseerd.
+
+Kies één of meer volledig gecontroleerde recepten, eventueel 1–7 bereidingen
+per recept, met maximaal zeven gekozen bereidingen in totaal. De bestaande
+`aggregatePlanIngredients` voegt exact dezelfde ingrediënten over de gekozen
+maaltijden samen als bij een Planner-weekmenu, inclusief veilige g/kg en ml/l
+conversies. Bij strijdige ingrediënten, te grote fysieke aantallen, te veel
+regels of tussentijds gewijzigde recepten weigert het scherm de hele selectie
+zonder de huidige winkelmandvraag te vervangen. Succes verzendt alleen een
+lokale `supa-private-basket-demand-v1` naar de reeds bestaande wizard met
+alle retailerproduct-ID's `null`. Iedere concrete bron-SKU moet vervolgens
+opnieuw bewust door de gebruiker worden gekozen. Nooit fictieve winkelprijzen,
+bronlicenties of automatische productmatching. Het oorspronkelijke aantal
+porties per bereiding wordt als apart, zichtbaar label getoond; dit scherm
+schaalt nog niet per persoon, maar telt gekozen volledige bereidingen op.
