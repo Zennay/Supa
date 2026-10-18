@@ -12,7 +12,7 @@ export function safeRecipeSourceUrl(value: unknown): string | null {
   if (url.protocol !== 'https:' || url.username || url.password || !url.hostname.includes('.') ||
       /(?:^|\.)(?:localhost|local|internal|test|invalid)$/i.test(url.hostname) ||
       /^(?:\d+\.){3}\d+$/.test(url.hostname)) {
-    throw new Error('Receptbronlink bevat onveilige tekens.')
+    throw new Error('Alleen publieke HTTPS-receptlinks zijn toegestaan.')
   }
   for (const encodedKey of url.searchParams.keys()) {
     // URLSearchParams performs ONE percent decoding pass. A further-escaped
