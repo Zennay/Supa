@@ -473,3 +473,25 @@ historische of voorbeeldartikelen verdwijnen niet wanneer er een
 eigen winkelbron geladen wordt: de Lijst-tab toont ze dan in
 een expliciet afzonderlijk blok **niet meegerekend in jouw mand**,
 zonder het echte prijsverschil of boodschappenmandtotaal te wijzigen.
+
+### Twee originele losse winkelbestanden tegelijk openen
+
+Open de gewone **Vergelijk**-tab met een actief Planner-weekmenu.
+Bij **Open één bronbestand, of selecteer tegelijk ...** kun je nu in
+één selectie een PLUS- en een DekaMarkt-CSV/JSON kiezen. Dit is ook
+geschikt voor twee afzonderlijke reeds bestaande exportbestanden.
+Dezelfde reeds gebruikte UTF-8 converter en canonical reader
+controleren **ieder** bestand; elk moet exact één echt geobserveerde
+winkel bevatten. Twee bestanden voor dezelfde winkel, een reeds
+twee-winkelbestand plus een tweede bestand, meer dan twee bestanden
+en elk onleesbaar of te groot bronbestand worden **in hun geheel**
+geweigerd. Eerdere beoordelingen en afvinkingen zijn bij nieuwe
+import ongeldig. Er wordt pas een nieuw mandje getoond nadat beide
+originele bestanden volledig en gezamenlijk zijn toegelaten.
+
+Product-ID's, de geobserveerde tijd, verpakking, originele nulprijzen
+en expliciete onbekende null-prijzen blijven behouden; één ontbrekende
+of verouderde winkel kan geen volledig prijsverschil opleveren.
+Voor controle van de bron blijft de bestaande **één winkel toevoegen**
+route beschikbaar. Het importeren is volledig offline; het levert geen
+retailerrechten of onafhankelijk 11×2 bewijs.

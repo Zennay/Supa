@@ -313,6 +313,72 @@ export function OfflineReviewedWorkbench({
       setMessage(error instanceof Error ? error.message : 'Ongeldige import.')
     }
   }
+  async function loadSelectedSources(files: File[]) {
+    if (files.length === 0) return
+    if (files.length === 1) {
+      await loadFile(files[0])
+      return
+    }
+    // Both independent files are admitted atomically. A rejected pair never
+    // leaves one shop looking like a valid comparison or a confirmed basket.
+    const version = ++importRevision.current
+    setBusy(true)
+    setImported(null)
+    setText('')
+    setReviewedLines({})
+    setDoneTripItems({})
+    setManualSku({ PLUS: {}, DekaMarkt: {} })
+    setSkuFilter({})
+    try {
+      if (files.length !== 2) throw new Error('Selecteer maximaal twee originele winkelbestanden.')
+      const sources: unknown[] = []
+      const seen = new Set<string>()
+      for (const file of files) {
+        if (!file.size || file.size > 256000)
+          throw new Error('Elk origineel winkelbestand moet gevuld zijn en maximaal 256 kB bevatten.')
+        const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+        const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+        let json = raw
+        if (isCsv) {
+          const converterUrl = '/offline-two-store-csv.mjs'
+          const module: unknown = await import(/* @vite-ignore */ converterUrl)
+          if (!module || typeof module !== 'object' ||
+              !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
+            throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
+          json = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+        }
+        const parsed = parseOfflinePriceSnapshots(json, Date.now())
+        const shops = Object.keys(parsed.captures)
+        if (shops.length !== 1)
+          throw new Error('Gebruik voor deze import twee afzonderlijke bestanden met elk precies één werkelijk waargenomen winkel.')
+        if (seen.has(shops[0]))
+          throw new Error('Beide bronbestanden zijn van dezelfde winkel. Selecteer één PLUS- en één DekaMarkt-opname.')
+        seen.add(shops[0])
+        const original: unknown = JSON.parse(json)
+        if (!original || typeof original !== 'object' || !('captures' in original) ||
+            !Array.isArray(original.captures) || original.captures.length !== 1)
+          throw new Error('Origineel winkelbestand ongeldig.')
+        sources.push(original.captures[0])
+      }
+      // Preserve original SKUs, null prices and observation timestamps. The
+      // canonical parser is the final authority for this composed capture.
+      const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures: sources })
+      const admitted = parseOfflinePriceSnapshots(combined, Date.now())
+      if (version !== importRevision.current) return
+      setText(combined)
+      setImported(admitted)
+      setClockMs(Date.now())
+      setMessage('Twee originele winkelbestanden samen geladen, elk met eigen bronmoment en productcodes. Controleer alle fysieke matches en prijzen opnieuw voordat een prijsverschil verschijnt.')
+    } catch (error) {
+      if (version !== importRevision.current) return
+      setImported(null)
+      setText('')
+      setMessage(error instanceof Error ? error.message : 'Twee winkelbestanden niet geldig; geen prijzen overgenomen.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
+    }
+  }
+
   async function loadFile(file?: File, addSecond = false) {
     if (!file) return
     const version = ++importRevision.current
@@ -571,9 +637,14 @@ export function OfflineReviewedWorkbench({
           <input type="file" accept=".json,application/json" disabled={busy}
             onChange={event => { void restorePortableSession(event.currentTarget.files?.[0]) }} />
         </label>
-        <label>Open je eigen één- of twee-winkel CSV of JSON vanaf dit apparaat
-          <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
-            onChange={event => { void loadFile(event.currentTarget.files?.[0]) }} />
+        <label>Open één bronbestand, of selecteer tegelijk je aparte PLUS- en DekaMarkt-bestanden (CSV/JSON)
+          <input type="file" accept=".csv,.json,text/csv,application/json" multiple disabled={busy}
+            onChange={event => {
+              const files = Array.from(event.currentTarget.files ?? [])
+              event.currentTarget.value = ''
+              void loadSelectedSources(files)
+            }} />
+          <small>Twee bestanden moeten ieder precies één verschillende winkel bevatten. Ongeldige of dubbele opnames worden samen geweigerd; onbekende prijzen blijven onbekend.</small>
         </label>
         {imported && Object.keys(imported.captures).length === 1 && (
           <label>Voeg de echte opname van de andere winkel toe (CSV of JSON)
