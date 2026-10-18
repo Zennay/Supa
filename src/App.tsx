@@ -7,6 +7,7 @@ import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
+import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
@@ -329,8 +330,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       <div className="content">
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
-        {tab === 'list' && !livePrivateReviewed &&
-          <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />}
+
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
           <p role="status" className="disclaimer">
             {productSelectionWarning === 'protected'
@@ -424,7 +424,16 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           />
           </div>
         )}
-        {tab === 'list' && !livePrivateReviewed && <ShoppingListView basket={basket} />}
+        {tab === 'list' && !livePrivateReviewed && (
+          <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
+            <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
+            <details className="demo-comparison-disclosure">
+              <summary>Toon losse productselectie en oude voorbeeldboodschappen (geen winkelprijzen)</summary>
+              <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+              <ShoppingListView basket={basket} />
+            </details>
+          </section>
+        )}
         {livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}

@@ -367,3 +367,19 @@ bron laat in één render geen oud privébedrag opnieuw als geldig zien.
 Private bedrag-/mandkeuze blijft alleen in lokaal React-geheugen;
 een paginavernieuwing wist het als gebruiker geen expliciete portable
 eigen bronsessie heeft gedownload.
+
+### Lijst zonder enige winkelbron is nu volledig Planner-first
+
+Zonder bevestigde bron toont Lijst standaard de **reeds bestaande**
+`UnpricedPlannerChecklist` met uitsluitend de echte, canoniek
+geaggregeerde ingrediënten uit de geselecteerde Planner-recepten en
+hun fysieke hoeveelheden. Afvinken, alleen nog te kopen en een
+kopieerbare tekstlijst werken zonder retailer- of prijsdata. Er wordt
+geen fictief winkelartikel, EAN, totaal of prijsberekening gebruikt.
+
+De oude Figma-productselectie en winkelvoorbeeldmand zijn voor
+bestaande gebruikers bereikbaar achter een duidelijk benoemde
+uitklapper **oude voorbeelden**. Zodra een eigen complete winkelbron
+beschikbaar is, vervangt de eigen fysieke productenlijst die
+ongeprijsde Planner-lijst. Recepten, Planner en boodschappenlijst
+blijven daardoor bruikbaar zonder PLUS/Deka-veldvalidatie.
