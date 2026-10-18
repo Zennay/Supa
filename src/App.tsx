@@ -338,6 +338,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         now - oldest <= 604_800_000_000_000n
     } catch { return false }
   }, [offlinePriceSession.imported, sourceClock])
+  // A valid recent single-store meal basket stays usable even if the OTHER
+  // capture expired. Never extend the freshness of the two-store comparison.
+  const selectedImportedStoreFresh = useMemo(() => {
+    const source = offlinePriceSession.imported?.captures[offlinePriceSession.selectedStore]
+    if (!source) return false
+    const now = BigInt(Math.trunc(sourceClock)) * 1_000_000n
+    return now >= source.observedNs - 300_000_000_000n &&
+      now - source.observedNs <= 604_800_000_000_000n
+  }, [offlinePriceSession.imported, offlinePriceSession.selectedStore, sourceClock])
   const currentStoreBasket = importedPair
     ? offlinePriceSession.selectedStore === 'PLUS' ? importedPair.plus : importedPair.deka
     : null
@@ -362,7 +371,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     plannedMeals, recipes, activeDays, sourceClock])
   const plannerBasket = currentStoreBasket ?? stagedForPlanner?.basket ?? null
   const plannerSource = offlinePriceSession.imported
-    ? !importedSourceFresh ? 'expired'
+    ? !selectedImportedStoreFresh ? 'expired'
       : currentStoreBasket && currentStoreBasket.selectedMealCount > 0 &&
         currentStoreBasket.lines.length > 0 ? 'private' : 'empty'
     : stagedForPlanner
@@ -386,6 +395,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         complete: lone.selectedMealCount > 0 && lone.lines.length > 0 &&
           lone.unresolvedLineCount === 0,
         fresh: stagedForPlanner.fresh,
+        pairFresh: false,
+        pairedWithin24h: false,
         totalCents: lone.totalCents,
         deltaCents: null,
         paired: false,
@@ -405,13 +416,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       unresolved: currentStoreBasket.unresolvedLineCount,
       hasDemand: currentStoreBasket.selectedMealCount > 0 && currentStoreBasket.lines.length > 0,
       complete: complete(currentStoreBasket),
-      fresh: importedSourceFresh,
+      fresh: selectedImportedStoreFresh,
+      pairFresh: importedSourceFresh,
+      pairedWithin24h: source.pairedWithin24h,
       totalCents: currentStoreBasket.totalCents,
       deltaCents: comparable ? ownComparison.deltaCents : null,
       paired: true,
     }
   }, [offlinePriceSession.imported, offlinePriceSession.selectedStore, importedPair,
-    importedSourceFresh, currentStoreBasket, stagedForPlanner])
+    importedSourceFresh, selectedImportedStoreFresh, currentStoreBasket, stagedForPlanner])
 
   const basketComparison = useMemo(
     () =>

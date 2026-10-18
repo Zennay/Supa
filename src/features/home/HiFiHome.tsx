@@ -17,6 +17,9 @@ export type PrivateHomeSummary = {
   hasDemand: boolean
   complete: boolean
   fresh: boolean
+  /** Comparison freshness is stricter than the selected retailer's freshness. */
+  pairFresh?: boolean
+  pairedWithin24h?: boolean
   totalCents: number
   deltaCents: number | null
   paired: boolean
@@ -121,6 +124,14 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
               ownEuros.format(privateSummary.totalCents / 100) + '. ' : ''}
               Geen volledig mandtotaal: de ontbrekende producten hebben nog geen betrouwbare prijs.</p>
           )}
+          {privateSummary.paired && privateSummary.fresh && !privateSummary.pairFresh &&
+            <p role="status">Jouw geselecteerde {privateSummary.selectedStore}-opname is recent,
+              maar de andere winkelopname is verlopen. Je eigen winkelmand blijft
+              bruikbaar; een actueel prijsverschil vereist twee recente opnames.</p>}
+          {privateSummary.paired && privateSummary.pairedWithin24h === false &&
+            <p role="status">De PLUS- en DekaMarkt-opnames liggen meer dan 24 uur
+              uiteen. Vul een nieuwe rechtmatig verkregen opname in om ze
+              rekenkundig te kunnen vergelijken.</p>}
           {!privateSummary.paired && <p role="status">
             Dit is uitsluitend je eigen {privateSummary.selectedStore}-mandje.
             Voeg de andere winkel toe in Vergelijk om een eventueel prijsverschil te kunnen berekenen.
