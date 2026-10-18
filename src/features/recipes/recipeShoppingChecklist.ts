@@ -35,7 +35,12 @@ export function formatOwnRecipeChecklist(
 }
 
 function compactAmount(amount: number): string {
-  return Number(amount.toFixed(3)).toLocaleString('nl-NL', { maximumFractionDigits: 3 })
+  // The existing private paste importer deliberately refuses ambiguous
+  // Dutch dotted thousands (1.250 g can be misread as 1.25 g).
+  // Therefore owner-exported TXT must never insert grouping separators.
+  return Number(amount.toFixed(3)).toLocaleString('nl-NL', {
+    useGrouping: false, maximumFractionDigits: 3,
+  })
 }
 
 /**
