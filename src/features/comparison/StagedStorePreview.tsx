@@ -236,6 +236,10 @@ export function StagedStorePreview({
           : [line.id, 'onbekend'])])}
       basket={basket} observedAt={source.observedAt} fresh={fresh}
       extraLines={extraLines}
+      memoryProgress={session.tripMemory[store]}
+      onMemoryChange={(basketIdentity, done) => session.setTripMemory(previous => ({
+        ...previous, [store]: { identity: basketIdentity, done },
+      }))}
     />
   </section>
 }
