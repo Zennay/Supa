@@ -127,3 +127,16 @@ tekstveld kopiëren. Dit is geen automatische synchronisatie, netwerkverzoek
 of officiële actuele winkelprijs. Ontbrekende/verlopen/ongecontroleerde
 gegevens blijven zichtbaar onzeker. Geen retailerrechten of fysiek
 PLUS/Deka-veldbezoek worden uit deze software afgeleid.
+
+### Direct invoeren in het hoofdscherm
+
+Het bestaande onderdeel **Geen JSON? Vul de winkels hier in** heeft nu een
+expliciete keuze **Alleen PLUS**, **Alleen DekaMarkt** of **PLUS en DekaMarkt**.
+Alleen geselecteerde winkelvelden en opnametijden zijn verplicht. Na
+**Bereken met mijn ingevoerde prijzen** wordt exact het bijpassende
+bestaande één- of twee-winkelschema gegenereerd, vervolgens vóór gebruik
+langs dezelfde strenge lokale importer geleid. Het private concept met
+de niet-geselecteerde winkel blijft als eigen formulierinformatie staan,
+maar wordt **niet** als waarneming, artikel of prijs uitgegeven.
+Wijzigingen in winkelkeuze of invoer trekken eerder getoond bronresultaat
+in; voor een nieuwe vergelijking moet de gebruiker opnieuw berekenen.

@@ -108,6 +108,8 @@ type Props = {
  */
 export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerated, onEdit }: Props) {
   const [open, setOpen] = useState(false)
+  const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
+  const selectedStores = sourceSelection === 'both' ? stores : [sourceSelection]
   const [rows, setRows] = useState<Record<string, ProductDraft>>({})
   const [capturedAt, setCapturedAt] = useState<Record<OfflineRetailer, string>>({ PLUS: '', DekaMarkt: '' })
   const [error, setError] = useState('')
@@ -188,14 +190,14 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
       if (!activeNeeds.length || activeNeeds.length > 1000) {
         throw new Error('Kies eerst een weekmenu met ondersteunde ingrediënten (maximaal 1.000).')
       }
-      const times = stores.map(store => timestampWithOffset(capturedAt[store]))
+      const times = selectedStores.map(store => timestampWithOffset(capturedAt[store]))
       if (times.some(time => time === null)) {
-        throw new Error('Vul voor beide winkels de echte, lokaal genoteerde datum en tijd in.')
+        throw new Error('Vul voor elke gekozen winkel de echte, lokaal genoteerde datum en tijd in.')
       }
       if (times.some(time => Date.parse(time!) > Date.now() + 300000)) {
         throw new Error('Een waarnemingstijd ligt in de toekomst.')
       }
-      const captures = stores.map((store, storeIndex) => {
+      const captures = selectedStores.map((store, storeIndex) => {
         const products = activeNeeds.flatMap((need, index) => {
           const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
           const entered = draft.name.trim() || draft.packAmount.trim() ||
@@ -234,7 +236,9 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
         }
         return { retailer: store, observedAt: times[storeIndex], products }
       })
-      const json = JSON.stringify({ schema: 'supa-offline-prices-v1', captures }, null, 2)
+      const schema = captures.length === 1
+        ? 'supa-private-single-store-prices-v1' : 'supa-offline-prices-v1'
+      const json = JSON.stringify({ schema, captures }, null, 2)
       if (new TextEncoder().encode(json).length > 256000) {
         throw new Error('Je invoer is te groot voor de lokale import van maximaal 256 kB.')
       }
@@ -293,8 +297,19 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
           Stop automatisch bewaren en wis concept
         </button>}
       </div>
+      <label>Welke winkel(s) heb je daadwerkelijk geobserveerd?
+        <select value={sourceSelection} onChange={event => {
+          setSourceSelection(event.currentTarget.value as 'both' | OfflineRetailer)
+          setOutput(''); setError(''); setPreparedFor(''); onEdit()
+        }}>
+          <option value="PLUS">Alleen PLUS</option>
+          <option value="DekaMarkt">Alleen DekaMarkt</option>
+          <option value="both">PLUS en DekaMarkt (twee echte opnames)</option>
+        </select>
+      </label>
+      <p className="disclaimer">Voer alleen winkels in die je werkelijk hebt waargenomen. De andere winkel blijft onbekend; je kunt zijn aparte bronopname later toevoegen.</p>
       <div className="offline-manual-editor__stores">
-        {stores.map(store => <section key={store} aria-label={`Productprijzen bij ${store}`}>
+        {selectedStores.map(store => <section key={store} aria-label={`Productprijzen bij ${store}`}>
           <h4>{store}</h4>
           <p className="disclaimer">Suggesties voor productnamen komen alleen uit historische, prijsloze bronwaarnemingen
             van 4 oktober 2026. Controleer zelf of het product vandaag echt bestaat; er wordt nooit een
