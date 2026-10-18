@@ -408,3 +408,21 @@ De CSV bevat per oorspronkelijke fysieke ingrediëntbehoefte afzonderlijk de wer
 De export heeft één vaste 29-koloms CSV-layout en beschermt tekstvelden conservatief tegen spreadsheetformule-interpretatie, inclusief voorvoegsels met onzichtbare Unicode of compatibiliteitsvormen. Een eigen echt negatieve centverschilwaarde blijft numeriek negatief. De CSV is maximaal 256 KB en wordt alleen aangeboden zolang de oorspronkelijke winkelopnames niet verlopen zijn; maak anders opnieuw de private berekening. Net als alle lokale exports is dit een privé-werkdocument, **geen** bewijs van winkelautorisatie, werkelijk PLUS/Deka 11×2-veldonderzoek, geverifieerde besparing of actuele prijs bij de kassa.
 
 De implementatie hergebruikt bestaande domeinmanden in `src/privateBasketCompare.ts` met de gerichte, privacybewuste helper `src/privateBasketComparisonCsv.ts`; geen nieuwe scraper, tests, retailer-HTTP of automatische bronopslag.
+
+
+## Boodschappenlijst plakken zonder bestanden of prijzen
+
+Open de bestaande werkbank `/private-basket-mapping.html` en gebruik **Of: plak direct je eigen boodschappenlijst**. Voer het echte aantal geselecteerde maaltijden in en plak maximaal 200 metrische regels in één tekstveld, bijvoorbeeld:
+
+```text
+450 g basmati rijst
+400 ml kokosmelk
+2 stuks bloemkool
+basmati rijst: 50 g
+```
+
+Druk **Maak van deze lijst een privémandje**. De parser ondersteunt zowel `hoeveelheid eenheid naam` als `naam: hoeveelheid eenheid`, met g/kg, ml/l en hele stuks. Alleen precies gelijk geschreven ingrediëntnamen (hoofdletterongevoelig) worden samengevoegd met de bestaande exacte `sumDecimalDemandUnits`; `450 g` + `50 g` levert één fysiek `500 g`-ingrediënt op. De parser raadt géén andere productnamen aan als gelijkwaardige ingrediënten, rondt geen onmogelijke sommen af en weigert ontbrekende/onduidelijke maten, meer dan 200 regels of fracties van fysieke stuks.
+
+**Privacy en behoud:** ongeldige invoer verandert de huidige mand nooit. Wanneer reeds bestaande ingrediënten of bewust gekozen winkel-SKU's zouden worden vervangen, vraagt de werkbank eerst expliciete bevestiging. Eerdere handmatig gecontroleerde SKU-koppelingen worden niet overgenomen naar de nieuw ingelezen fysieke vraag. Echte reeds geopende eigen winkelopnames blijven ongemoeid, zodat de gebruiker de aanwezige winkelproducten daarna opnieuw aan de canonieke fysieke mand kan koppelen. Een onprijsbare winkel blijft eerlijk onbekend. De bestaande directe vergelijking en lokale TXT/HTML/CSV-rapporten blijven daarna beschikbaar. Er wordt niets opgehaald, opgeslagen of verstuurd door deze plakfunctie; zij is geen prijs- of winkelautorisatiebewijs.
+
+Implementatie: `src/privateBasketQuickDemand.ts` plus de bestaande HTML-werkbank, **geen nieuwe tests, QA-rondes, scraper, API of infrastructuur**.
