@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { readPrivateCsv, joinPrivateStoreCsv } from './offline-two-store-csv-to-json.mjs'
 import { convertTwoStoreCsv } from '../public/offline-two-store-csv.mjs'
 import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
+import { matchIngredient } from '../src/domain/matching.ts'
 import { compareFullBaskets } from '../src/domain/basketComparison.ts'
 
 const STORES = ['PLUS', 'DekaMarkt']
@@ -230,12 +231,33 @@ function renderHtml(data, demand, left, right, comparison, observed, ages, gap, 
     '</small></th>' + rowCell(left.lines[index]) + rowCell(right.lines[index]) + '</tr>').join('\n')
   const dates = STORES.map((store, index) =>
     store + ': ' + escapeHtml(observed[index])).join(' · ')
+  const sourceCaptures = new Map(data.captures.map(capture => [capture.retailer, capture]))
+  const matchSuggestion = (store, ingredient) => {
+    const capture = sourceCaptures.get(store)
+    if (!capture) return ''
+    // Never auto-commit a fuzzy suggestion as a real manual match. It can
+    // guide an operator to the real source ID, but comparison stays UNKNOWN.
+    const decision = matchIngredient(
+      { id: ingredient.id, query: ingredient.label, amount: ingredient.amount,
+        unit: ingredient.unit },
+      capture.products.filter(product =>
+        product.available && product.priceCents !== null &&
+        product.packAmount !== null),
+    )
+    if (decision.type !== 'match') return ''
+    const product = capture.products.find(item => item.id === decision.productId)
+    return product ? '<br><small>Mogelijke koppeling (niet geselecteerd): ' +
+      escapeHtml(product.name) + ' · bron-ID ' +
+      escapeHtml(product.id) + '. Controleer zelf en vul productIds in vraag.json in.</small>' : ''
+  }
   const missingTasks = STORES.flatMap((store, index) => {
     const basket = index === 0 ? left : right
     return basket.lines.flatMap(line => line.status === 'unresolved'
       ? ['<li><b>' + escapeHtml(store) + ' · ' +
           escapeHtml(line.ingredientLabel) + '</b>: ' +
-          escapeHtml(line.reasons.join('; ')) + '</li>']
+          escapeHtml(line.reasons.join('; ')) +
+          matchSuggestion(store, demand.ingredients.find(item => item.id === line.id)) +
+          '</li>']
       : [])
   })
   const actions = missingTasks.length
