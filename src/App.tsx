@@ -468,7 +468,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               Je kunt de huidige lokale winkelopname al afzonderlijk bekijken en afvinken.
               Geen prijsverschil zonder twee valide gekoppelde mandjes.</p>
             {stagedRetailers.map(store => (
-              <StagedStorePreview key={store} store={store}
+              <StagedStorePreview key={store} store={store} session={offlinePriceSession}
                 capture={offlinePriceSession.stagedCaptures[store]!}
                 plan={plannedMeals} recipes={recipes}
                 activeDays={activeDays} clockMs={sourceClock}
