@@ -401,6 +401,30 @@ compare?.addEventListener('click', async () => {
     compare.disabled = false
   }
 })
+document.querySelector<HTMLButtonElement>('#download-missing')!.addEventListener('click', () => {
+  if (result.hidden || nextActions.hidden || missingTasks.length === 0) return
+  const content = [
+    'SUPA · privé ontbrekende winkelgegevens',
+    'Genereerd: ' + new Date().toISOString(),
+    'Geen veronderstelde prijzen of aankoopclaims.',
+    '',
+    ...missingTasks.map(item => '- ' + item),
+    '',
+  ].join('\n')
+  if (new TextEncoder().encode(content).length > 256000) {
+    setStatus('De privé checklist is te groot om te downloaden. Gebruik de getoonde lijst.', true)
+    return
+  }
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'supa-ontbrekende-winkelgegevens.txt'
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+})
 document.querySelector<HTMLButtonElement>('#print')!.addEventListener('click', () => {
   if (!result.hidden) window.print()
 })
