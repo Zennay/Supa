@@ -156,6 +156,24 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     setError('')
     try {
       if (library.error) throw new Error(library.error)
+      // The guarded Planner record is a separate localStorage key. Deleting
+      // an in-use recipe first would orphan that choice and the strict CAS
+      // guard must not be bypassed to rewrite it after the fact.
+      const plannerRaw = window.localStorage.getItem('supa:planner-preferences:v2')
+      if (plannerRaw !== null) {
+        let planner: unknown
+        try { planner = JSON.parse(plannerRaw) } catch { throw new Error('Plannergegevens zijn onleesbaar; verwijder het recept niet voordat deze zijn hersteld.') }
+        if (!planner || typeof planner !== 'object' || Array.isArray(planner) ||
+            !Object.hasOwn(planner, 'recipeByDay') ||
+            !(planner as { recipeByDay?: unknown }).recipeByDay ||
+            typeof (planner as { recipeByDay: unknown }).recipeByDay !== 'object') {
+          throw new Error('Onbekende Plannergegevens zijn beschermd. Controleer eerst je Planner.')
+        }
+        const choices = (planner as { recipeByDay: Record<string, unknown> }).recipeByDay
+        if (Object.values(choices).includes(recipe.id)) {
+          throw new Error('Dit recept staat nog in je weekplanning. Kies daar eerst een ander recept voordat je het verwijdert.')
+        }
+      }
       if (!library.recipes.some(item => item.id === recipe.id)) {
         throw new Error('Dit recept bestaat niet meer in je lokale bibliotheek.')
       }
@@ -166,10 +184,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setSelected(null)
       setDeleteConfirm(false)
       detail.current?.close()
-      window.dispatchEvent(new CustomEvent('supa-recipes-changed', { detail: { deletedRecipeId: recipe.id } }))
-      setMessage('Recept verwijderd. Een eventuele Planner-keuze valt terug op het standaardrecept; bestaande winkelprijzen blijven ongewijzigd.')
+      window.dispatchEvent(new Event('supa-recipes-changed'))
+      setMessage('Eigen recept verwijderd. Je geplande maaltijden en winkelprijsopnames blijven intact.')
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : 'Recept verwijderen is niet gelukt.')
+      setError(cause instanceof Error ? cause.message : 'Recept verwijderen is niet gelukt.')
     }
   }
 
@@ -346,6 +364,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <button type="button" aria-expanded={deleteConfirm}
             onClick={() => setDeleteConfirm(true)}>Verwijder recept</button>
         </div>
+        {error && <p role="alert" className="recipe-error">{error}</p>}
         {deleteConfirm && <div className="recipe-own-actions__confirm" role="group"
           aria-label="Bevestig recept verwijderen">
           <p>Dit verwijdert alleen dit eigen recept van dit apparaat. Je Planner valt zo nodig terug

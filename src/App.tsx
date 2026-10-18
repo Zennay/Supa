@@ -206,24 +206,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [recipes, setRecipes] = useState(availableRecipes)
   const validRecipeIds = recipes.map(recipe => recipe.id)
   useEffect(() => {
-    const refresh = (event: Event) => {
-      setRecipes(availableRecipes())
-      // Explicit own-recipe deletion also removes orphaned Planner references.
-      // A foreign storage change never silently rewrites planner preferences.
-      const deleted = event instanceof CustomEvent ? event.detail?.deletedRecipeId : null
-      if (event.type === 'supa-recipes-changed' && typeof deleted === 'string') {
-        setPreferences(previous => {
-          let changed = false
-          const updated = { ...previous.recipeByDay }
-          for (const day of m2InitialPlan) {
-            if (updated[day.day] !== deleted) continue
-            updated[day.day] = day.recipeId
-            changed = true
-          }
-          return changed ? { ...previous, recipeByDay: updated } : previous
-        })
-      }
-    }
+    const refresh = () => setRecipes(availableRecipes())
     window.addEventListener('supa-recipes-changed', refresh)
     window.addEventListener('storage', refresh)
     return () => { window.removeEventListener('supa-recipes-changed', refresh); window.removeEventListener('storage', refresh) }
