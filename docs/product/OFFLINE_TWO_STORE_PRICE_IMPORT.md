@@ -172,3 +172,16 @@ beschikbaarheid en echte verpakking bevestigt). Een leeg prijsveld blijft
 `null`, onbekend of onbeschikbaar en wordt nooit automatisch tot €0,00
 gemaakt. Een prijs van nul is op zichzelf geen bewijs van promotie,
 bronrechten of publieke besparing.
+
+### Afvinkstatus tussen eigen apparaten of browsers meenemen
+
+Voor iedere daadwerkelijk aanwezige winkel kan de gebruiker de afvinkstatus
+expliciet als privé JSON downloaden en later met de lokale bestandskiezer
+herstellen. De gewone Vergelijk-tab hergebruikt hiervoor de bestaande
+`currentTripKey`, `saveTripProgress` en `loadTripProgress` uit
+`src/privateShoppingProgress.ts`. Herstel kan alleen bij een volledig
+fysiek gekoppelde winkelmand met exact dezelfde oorspronkelijke
+winkelopname, prijsbedragen, bronmoment, SKU, verpakkingen en hoeveelheden.
+Een verouderd of vreemd bestand doet niets; de andere winkel blijft
+onaangeroerd. Vinkjes vormen nooit bewijs voor de betrouwbaarheid van
+winkelprijzen. Er is geen automatische synchronisatie of netwerkrequest.

@@ -5,6 +5,7 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
+import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import './offlineReviewedWorkbench.css'
 
@@ -77,6 +78,7 @@ export function OfflineReviewedWorkbench({
   const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
   const [openTripOnly, setOpenTripOnly] = useState(false)
   const [tripExportMessage, setTripExportMessage] = useState('')
+  const [tripProgressMessage, setTripProgressMessage] = useState('')
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
   const [clockMs, setClockMs] = useState(() => Date.now())
@@ -129,6 +131,53 @@ export function OfflineReviewedWorkbench({
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch {
       setMessage('De bronopname is niet meer geldig om te bewaren. Importeer je originele bronbestand opnieuw.')
+    }
+  }
+
+  function downloadTripProgress(basket: OneStoreBasket, store: typeof stores[number], observedAt: string) {
+    try {
+      const key = currentTripKey(basket, observedAt)
+      if (!key) throw new Error('Nog geen fysiek volledig gekoppeld mandje.')
+      const checked = new Set(basket.lines.filter(line =>
+        doneTripItems[shoppingTaskKey(store, line)]).map(line => line.id))
+      const content = saveTripProgress(key, checked, basket)
+      const url = URL.createObjectURL(new Blob([content], { type: 'application/json;charset=utf-8' }))
+      try {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'supa-' + store.toLowerCase() + '-afvinkstatus-prive.json'
+        document.body.append(a)
+        try { a.click() } finally { a.remove() }
+        setTripProgressMessage(store + ': afvinkingen lokaal opgeslagen. Het bestand bevat geen nieuwe prijsbron.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch {
+      setTripProgressMessage(store + ': afvinkstatus kan pas bij een volledig gekoppelde fysieke lijst worden bewaard.')
+    }
+  }
+  async function restoreTripProgress(file: File | undefined, basket: OneStoreBasket,
+    store: typeof stores[number], observedAt: string) {
+    if (!file) return
+    const version = importRevision.current
+    try {
+      if (!file.size || file.size > 256000) throw new Error('Bestand is leeg of te groot.')
+      const key = currentTripKey(basket, observedAt)
+      if (!key) throw new Error('Nog geen volledig gekoppelde winkelmand.')
+      const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (version !== importRevision.current) return
+      const restored = loadTripProgress(content, key, basket)
+      setDoneTripItems(previous => {
+        const next = { ...previous }
+        for (const line of basket.lines) {
+          const task = shoppingTaskKey(store, line)
+          delete next[task]
+          if (restored.has(line.id)) next[task] = true
+        }
+        return next
+      })
+      setTripProgressMessage(store + ': afvinkingen uitsluitend voor dezelfde originele winkelbron en fysieke mand hersteld.')
+    } catch {
+      if (version === importRevision.current)
+        setTripProgressMessage(store + ': afvinkbestand ongeldig of behoort bij andere prijzen, artikelen of bronopname. Niets hersteld.')
     }
   }
 
@@ -463,6 +512,7 @@ export function OfflineReviewedWorkbench({
                 </button>
               </div>
               <p role="status" aria-live="polite">{tripExportMessage}</p>
+              <p role="status" aria-live="polite">{tripProgressMessage}</p>
               <div className="offline-price-workbench__stores">
                 {stores.map(store => {
                   const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
@@ -480,6 +530,14 @@ export function OfflineReviewedWorkbench({
                       <button type="button" className="ghost-button" onClick={() => downloadShoppingTrip(basket, store)}>
                         Download boodschappenlijst (TXT)
                       </button>
+                      <button type="button" className="ghost-button"
+                        onClick={() => downloadTripProgress(basket, store, capture.observedAt)}>
+                        Download afvinkingen van deze exacte winkelmand (JSON)
+                      </button>
+                      <label>Herstel afvinkingen van precies deze bron en winkelmand
+                        <input type="file" accept=".json,application/json"
+                          onChange={event => { void restoreTripProgress(event.currentTarget.files?.[0], basket, store, capture.observedAt) }} />
+                      </label>
                       <details className="offline-price-workbench__checklist">
                         <summary>Kopieer boodschappenlijst voor {store}</summary>
                         <p>Selecteer en kopieer deze lijst; de tekst blijft op je apparaat.</p>
