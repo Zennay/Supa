@@ -22,6 +22,7 @@ import './offlineReviewedWorkbench.css'
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores = ['PLUS', 'DekaMarkt'] as const
+const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 function pricePerUnit(line: Matched): string | null {
@@ -260,10 +261,9 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  function downloadPortableSession() {
-    if (!imported || !basketPair) return
-    try {
-      const selected = { PLUS: {} as Record<string, string>, DekaMarkt: {} as Record<string, string> }
+  function portableSessionText(): string {
+    if (!imported || !basketPair) throw Error('Maak eerst een geldige lokale winkelmand.')
+    const selected = { PLUS: {} as Record<string, string>, DekaMarkt: {} as Record<string, string> }
       for (const store of stores) {
         const capture = imported.captures[store]
         const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
@@ -277,9 +277,15 @@ export function OfflineReviewedWorkbench({
           if (explicit || reviewed) selected[store][line.id] = line.productId
         }
       }
-      const session = exportPrivateBasketSession({
-        plan, recipes, activeDays, rawSource: text, selected,
-      })
+    return exportPrivateBasketSession({
+      plan, recipes, activeDays, rawSource: text, selected,
+    })
+  }
+
+  function downloadPortableSession() {
+    if (!imported || !basketPair) return
+    try {
+      const session = portableSessionText()
       const url = URL.createObjectURL(new Blob([session], { type: 'application/json;charset=utf-8' }))
       try {
         const link = document.createElement('a')
@@ -291,6 +297,57 @@ export function OfflineReviewedWorkbench({
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Kan deze privémand-sessie niet maken.')
+    }
+  }
+
+  function saveTabCheckpoint() {
+    try {
+      const session = portableSessionText()
+      const existing = window.sessionStorage.getItem(privateTabCheckpointKey)
+      if (existing !== null && !window.confirm(
+        'Er bestaat al een privéherstelpunt voor deze browsertab. Vervang het bewust door de huidige bron en artikelkeuzes?')) return
+      window.sessionStorage.setItem(privateTabCheckpointKey, session)
+      setMessage('Privéherstelpunt bewaard in deze browsertab. Bij herladen kun je de bron en SKU-keuzes terughalen; alle beoordelingen moet je opnieuw doen. Download een JSON-kopie voor langer bewaren.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message :
+        'Opslaan van het privéherstelpunt is niet gelukt. Gebruik de JSON-download.')
+    }
+  }
+
+  function restoreTabCheckpoint() {
+    ++importRevision.current
+    setPendingReplacement(null)
+    setBusy(false)
+    try {
+      const saved = window.sessionStorage.getItem(privateTabCheckpointKey)
+      if (saved === null) throw Error('Geen privéherstelpunt in deze browsertab gevonden.')
+      const result = importPrivateBasketSession({
+        text: saved, plan, recipes, activeDays, now: Date.now(),
+      })
+      if (!window.confirm(
+        'Dit herstelpunt hoort bij je huidige fysieke weekmenu. Vervang de huidige winkelbron en SKU-keuzes? Alle productbevestigingen en afvinkingen worden opnieuw gestart.')) return
+      setText(result.rawSource)
+      setImported(result.captured)
+      setManualSku(result.selected)
+      setSkuFilter({})
+      setReviewedLines({})
+      setDoneTripItems({})
+      setClockMs(Date.now())
+      setTripExportMessage('')
+      setTripProgressMessage('')
+      setMessage('De originele privébron en keuzes zijn lokaal hersteld. Controleer alle producten, prijzen en originele opnametijden opnieuw; herstel is nooit een prijsvalidatie.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Herstelpunt niet bruikbaar; vorige invoer bewaard.')
+    }
+  }
+
+  function deleteTabCheckpoint() {
+    try {
+      if (!window.confirm('Wis het privéherstelpunt van deze browsertab definitief? Huidig geopende winkeldata blijven staan.')) return
+      window.sessionStorage.removeItem(privateTabCheckpointKey)
+      setMessage('Privéherstelpunt uit deze browsertab gewist. Geopende winkeldata zijn niet veranderd.')
+    } catch {
+      setMessage('De browseropslag kon niet worden gewist. Gebruik de privacyinstellingen van je browser.')
     }
   }
 
@@ -1093,10 +1150,25 @@ export function OfflineReviewedWorkbench({
             onClick={downloadPortableSession}>
             Bewaar mijn winkelmand + gekozen producten (privésessie)
           </button>
+          <button type="button" className="ghost-button" disabled={!imported || !basketPair || busy}
+            onClick={saveTabCheckpoint}>
+            Bewaar privéherstelpunt voor deze browsertab
+          </button>
+          <button type="button" className="ghost-button" disabled={busy}
+            onClick={restoreTabCheckpoint}>
+            Herstel privéherstelpunt na herladen
+          </button>
+          <button type="button" className="ghost-button" onClick={deleteTabCheckpoint}>
+            Wis privéherstelpunt
+          </button>
+          <small>Een herstelpunt bevat je originele eigen bron en gekozen artikelcodes, uitsluitend na jouw klik in sessionStorage. Het kan een herladen pagina herstellen, maar niet alle browsersessies overleven. Productreviews worden nooit als akkoord hersteld. Maak voor langer bewaren een JSON-download.</small>
           <button type="button" className="ghost-button" onClick={() => {
             importRevision.current += 1
+            setPendingReplacement(null)
             setBusy(false)
-            setImported(null); setReviewedLines({}); setDoneTripItems({}); setText(''); setMessage('Geïmporteerde prijsdata uit dit scherm gewist.')
+            setImported(null); setReviewedLines({}); setDoneTripItems({})
+            setManualSku({ PLUS: {}, DekaMarkt: {} }); setSkuFilter({})
+            setText(''); setMessage('Lokaal geladen winkeldata gewist. Een eventueel apart privéherstelpunt kun je hierboven afzonderlijk wissen.')
           }}>Wis lokaal geladen data</button>
         </div>
         <p role="status" aria-live="polite">{message}</p>

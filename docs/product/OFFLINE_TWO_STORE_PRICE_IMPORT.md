@@ -827,3 +827,24 @@ De andere winkel blijft bruikbaar. Iedere nieuwe prijs moet opnieuw
 met de oorspronkelijke, zelf verkregen bron worden bevestigd; ook
 daarna geldt de bestaande zeven-dagen- en 24-uursvergelijkingsgrens.
 Geen prijs, retailertoestemming of onafhankelijk veldbewijs afgeleid.
+
+### Optioneel herstelpunt in de huidige browsertab
+
+De gewone Vergelijk-tab heeft naast de downloadbare privésessie een
+expliciet **Bewaar privéherstelpunt voor deze browsertab**. Alleen een
+bewuste klik schrijft de bestaande beperkte en gevalideerde
+private-basket-session-v1 (eigen originele bronopnames, dezelfde
+fysieke Planner-vraag en bewust gekozen SKU-codes) in sessionStorage.
+Er vindt geen serverupload of automatisch bewaren van prijsdata plaats.
+Een ouder herstelpunt kan alleen na expliciete toestemming worden
+vervangen.
+
+Na herladen opent **Herstel privéherstelpunt na herladen**
+opnieuw de canonieke privésessie-import voor het **huidige weekmenu**,
+met dezelfde 256kB- en bronmomentcontrole. Vóór vervanging moet je weer
+bevestigen. Alle oude productreviews, prijsgoedkeuringen en
+boodschappenafvinkingen beginnen bewust leeg; noch een brontijd noch
+een eerdere winkelmatch wordt zelfstandig opnieuw geverifieerd.
+**Wis privéherstelpunt** verwijdert het opgeslagen bestand uit de
+huidige tab, los van de nog open vergelijking. Gebruik JSON-download
+om een herstelpunt langer dan de browsersessie zelf te bewaren.
