@@ -407,10 +407,24 @@ function advisoryUnitPrice(line: Extract<BasketTraceLine,{status:'matched'}>): s
   return size > 0 && Number.isFinite(euros) && euros >= 0
     ? euro.format(euros) + '/' + family + ' (indicatief)' : 'Eenheidsprijs onbekend'
 }
-function lineCell(line: BasketTraceLine): HTMLTableCellElement {
+function lineCell(
+  line: BasketTraceLine,
+  observedAt: string | null,
+  validCapture: boolean,
+): HTMLTableCellElement {
   const cell = document.createElement('td')
   if (line.status === 'unresolved') {
     cell.textContent = 'Onbekend — ' + line.reasons.join('; ')
+    return cell
+  }
+  // Same rule as the downloadable provenance CSV: a historical or future
+  // capture must NEVER display a usable live price for this ingredient.
+  // Product identity remains visible for deliberate human recollection.
+  if (!validCapture) {
+    cell.textContent = 'Prijs onbekend voor huidig mandje — originele ' +
+      (observedAt === null ? 'winkelopname ontbreekt' :
+        'opname ' + observedAt + ' is toekomstig of ouder dan zeven dagen') +
+      '. Opnieuw zelf controleren: ' + line.productName + ' · SKU ' + line.productId
     return cell
   }
   const title = create('strong', line.productName)
@@ -752,7 +766,10 @@ function show(source: Source, demand: Demand): void {
       delta === 0 ? 'Gelijke kosten' :
         (delta < 0 ? 'DekaMarkt' : 'PLUS') + ' ' +
         euro.format(Math.abs(delta) / 100) + ' goedkoper voor dit ingrediënt'
-    row.append(need, lineCell(left.lines[i]), lineCell(right.lines[i]), difference)
+    row.append(need,
+      lineCell(left.lines[i], captures.PLUS?.observedAt ?? null, firstAge >= 0n && firstAge <= weekNs),
+      lineCell(right.lines[i], captures.DekaMarkt?.observedAt ?? null, secondAge >= 0n && secondAge <= weekNs),
+      difference)
     rows.append(row)
   }
   capturesLabel.textContent = 'Eigen opnames: PLUS ' +
