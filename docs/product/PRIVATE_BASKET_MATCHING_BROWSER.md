@@ -426,3 +426,16 @@ Druk **Maak van deze lijst een privémandje**. De parser ondersteunt zowel `hoev
 **Privacy en behoud:** ongeldige invoer verandert de huidige mand nooit. Wanneer reeds bestaande ingrediënten of bewust gekozen winkel-SKU's zouden worden vervangen, vraagt de werkbank eerst expliciete bevestiging. Eerdere handmatig gecontroleerde SKU-koppelingen worden niet overgenomen naar de nieuw ingelezen fysieke vraag. Echte reeds geopende eigen winkelopnames blijven ongemoeid, zodat de gebruiker de aanwezige winkelproducten daarna opnieuw aan de canonieke fysieke mand kan koppelen. Een onprijsbare winkel blijft eerlijk onbekend. De bestaande directe vergelijking en lokale TXT/HTML/CSV-rapporten blijven daarna beschikbaar. Er wordt niets opgehaald, opgeslagen of verstuurd door deze plakfunctie; zij is geen prijs- of winkelautorisatiebewijs.
 
 Implementatie: `src/privateBasketQuickDemand.ts` plus de bestaande HTML-werkbank, **geen nieuwe tests, QA-rondes, scraper, API of infrastructuur**.
+
+
+## Handmatige tweede winkelopname toevoegen zonder eerste winkel kwijt te raken
+
+Een tweede **werkelijk zelf vastgelegde** winkel kan nu later via dezelfde handmatige invoer worden toegevoegd, ook als de eerste winkel uit het handmatige formulier, een eigen CSV of een Supa-prijs-JSON kwam. Dit hergebruikt de bestaande canonieke `convertOwnStoreCsv`-opname en bestaande gecombineerde `supa-offline-prices-v1`-schema; er is geen aanvullende fictieve winkel, prijs of tijdstempel.
+
+1. Open eerst je eigen bron voor bijvoorbeeld PLUS en kies bewust bekende SKU's.
+2. Kies bij het handmatige formulier **Alleen DekaMarkt**, vul originele product-ID's, volledige inhoud, werkelijke centprijzen, beschikbaarheid en oorspronkelijke ISO-waarnemingstijd in.
+3. Tijdens het typen wordt de getoonde prijsuitkomst direct verborgen en de vergelijkknop uitgeschakeld. **De vorige goedgekeurde PLUS-bron en bijbehorende productkeuzes blijven intern intact**, totdat je het concept bevestigt of annuleert.
+4. Druk **Neem mijn echte winkelopname(s) over** en bevestig bewust de wijziging. De nieuwe werkelijk ingevoerde winkel vervangt alleen haar eigen eventuele oude opname; een eerdere opname van de andere winkel blijft letterlijk identiek behouden. Alleen SKU-keuzes bij zo'n geheel ongewijzigde opname blijven geselecteerd. De nieuwe/gewijzigde winkel vereist menselijke productmatching.
+5. Met **Annuleer bronconcept · behoud eerdere opname** maak je de oude geldige eerste winkel opnieuw beschikbaar, zonder het niet-geaccepteerde concept tot een bronprijs te promoveren.
+
+Een geannuleerde of ongeldige broninvoer overschrijft de eerder geaccepteerde bron nooit. Tijdregels blijven onafhankelijk: een verschil van meer dan 24 uur of een toekomstig/meer dan zeven dagen oud bronmoment geeft geen volledige twee-winkelwinnaar, ook al bestaan beide echte opnames. De handmatige bron-CSV bevat uitsluitend daadwerkelijk door jou ingevoerde opnames, niet automatisch eerder ingelezen andere winkels. Geen actieve supermarktquery, nieuwe toestemming of geclaimd veldbewijs.
