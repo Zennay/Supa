@@ -167,7 +167,8 @@ function advisoryUnitPrice(line) {
 }
 
 function rowCell(line) {
-  if (line.status !== 'matched') return '<td class="missing">Onbekend · handmatig controleren</td>'
+  if (line.status !== 'matched') return '<td class="missing"><strong>Onbekend</strong><br>' +
+    escapeHtml(line.reasons.join('; ')) + '<br><small>Controleer of vul jouw eigen bronwaarneming aan.</small></td>'
   const pack = line.pack
   return '<td><strong>' + escapeHtml(line.productName) + '</strong><br>' +
     escapeHtml(String(line.packs) + ' × ' + amountLabel(pack.amount) + ' ' +
@@ -229,6 +230,18 @@ function renderHtml(data, demand, left, right, comparison, observed, ages, gap, 
     '</small></th>' + rowCell(left.lines[index]) + rowCell(right.lines[index]) + '</tr>').join('\n')
   const dates = STORES.map((store, index) =>
     store + ': ' + escapeHtml(observed[index])).join(' · ')
+  const missingTasks = STORES.flatMap((store, index) => {
+    const basket = index === 0 ? left : right
+    return basket.lines.flatMap(line => line.status === 'unresolved'
+      ? ['<li><b>' + escapeHtml(store) + ' · ' +
+          escapeHtml(line.ingredientLabel) + '</b>: ' +
+          escapeHtml(line.reasons.join('; ')) + '</li>']
+      : [])
+  })
+  const actions = missingTasks.length
+    ? '<section class="panel"><h2>Welke producten moet je nog nalopen?</h2>' +
+        '<p>Controleer de echte winkelbron en kies pas daarna de bijbehorende product-ID opnieuw.</p>' +
+        '<ul>' + missingTasks.join('') + '</ul></section>' : ''
   return '<!doctype html>\n<html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">' +
@@ -250,6 +263,7 @@ function renderHtml(data, demand, left, right, comparison, observed, ages, gap, 
     '<section class="panel"><h2>Mandje per product</h2><div class="table-wrap"><table>' +
     '<thead><tr><th>Ingredient en benodigde hoeveelheid</th><th>PLUS</th><th>DekaMarkt</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
+    actions +
     '<p><small>Eenheidsprijzen zijn indicatief; kosten zijn berekend per volledige verpakking in hele eurocenten. ' +
     'Dit document verlaat het apparaat niet automatisch en bevat geen geautoriseerde publieke besparingsclaim.</small></p>' +
     '</main></body></html>\n'
