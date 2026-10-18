@@ -66,6 +66,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [backupBusy, setBackupBusy] = useState(false)
   const [backupError, setBackupError] = useState('')
   const backupReadVersion = useRef(0)
+  const pasteReadVersion = useRef(0)
+  const [pasteFileMessage, setPasteFileMessage] = useState('')
   const editor = useRef<HTMLDialogElement>(null)
   const detail = useRef<HTMLDialogElement>(null)
   const request = useRef<AbortController | null>(null)
@@ -176,11 +178,12 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     }
   }
   function openEditor(next: 'manual' | 'url' | 'paste') {
+    pasteReadVersion.current++; setPasteFileMessage('')
     request.current?.abort(); setBusy(false); setMode(next); setForm(blank); setSource(null); setUrl(''); setPastedSource(''); setPreview(null); setError(''); setEditingId(null); setIsVariant(false); saving.current = false
     setBackupPreview(null)
     editor.current?.showModal()
   }
-  function closeEditor() { request.current?.abort(); setBusy(false); editor.current?.close(); setEditingId(null); setIsVariant(false) }
+  function closeEditor() { pasteReadVersion.current++; request.current?.abort(); setBusy(false); editor.current?.close(); setEditingId(null); setIsVariant(false) }
   function openSavedRecipeEditor(recipe: SavedRecipe, duplicate = false) {
     if (library.error) { setMessage(library.error); return }
     request.current?.abort()
@@ -223,6 +226,21 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     setPastedSource('')
     setPreview(null)
     setMessage(messageText)
+  }
+  async function loadLocalRecipeSource(file?: File) {
+    if (!file) return
+    const revision = ++pasteReadVersion.current
+    setPasteFileMessage(''); setError('')
+    try {
+      if (!file.size || file.size > 500_000) throw new Error('Selecteer een HTML- of JSON-LD-bestand van maximaal 500 kB.')
+      const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (revision !== pasteReadVersion.current) return
+      setPastedSource(content)
+      setPreview(null)
+      setPasteFileMessage('Bestand lokaal gelezen. Controleer de gegevens en vul de oorspronkelijke openbare HTTPS-bronlink in.')
+    } catch (cause) {
+      if (revision === pasteReadVersion.current) setError(cause instanceof Error ? cause.message : 'Het bestand kan niet lokaal worden gelezen.')
+    }
   }
   function importPastedRecipe(event: FormEvent) {
     event.preventDefault()
@@ -344,11 +362,16 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <input required type="url" placeholder="https://…" value={url}
               onChange={event => setUrl(event.target.value)} />
           </label>
+          <label>Lokaal receptbestand (HTML of JSON-LD, maximaal 500 kB)
+            <input type="file" accept=".html,.htm,.json,.jsonld,text/html,application/json"
+              onChange={event => { void loadLocalRecipeSource(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
+          </label>
+          {pasteFileMessage && <p role="status">{pasteFileMessage}</p>}
           <label>JSON-LD of HTML-broncode (maximaal 500 kB)
             <textarea required rows={9} maxLength={500000} spellCheck={false}
               placeholder={'{"@type":"Recipe","name":"...","recipeIngredient":[...],"recipeInstructions":[...]}'} 
               value={pastedSource}
-              onChange={event => setPastedSource(event.target.value)} />
+              onChange={event => { pasteReadVersion.current++; setPastedSource(event.target.value) }} />
           </label>
           <button className="recipe-primary" type="submit">Lees lokale receptgegevens</button>
           <button type="button" onClick={() => { setMode('manual'); setError('') }}>
