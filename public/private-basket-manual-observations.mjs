@@ -133,12 +133,22 @@ function submit() {
       throw Error('De handmatige brongegevens zijn te groot (maximum 256 kB).')
     }
     const canonical = JSON.parse(convertOwnStoreCsv(csv))
+    // The browser mapping owner can reject an already admitted candidate,
+    // or the user can cancel before overwriting earlier first-store capture.
+    // Only enable download/claim admission after that synchronous decision.
+    const proposal = { source: canonical, accepted: false }
+    document.dispatchEvent(new CustomEvent('supa:manual-source-admitted', {
+      detail: proposal,
+    }))
+    if (!proposal.accepted) {
+      acceptedCsv = null
+      save.disabled = true
+      setStatus('De nieuwe handmatige bron is niet overgenomen. De eerder geaccepteerde winkelopname blijft bestaan; pas je concept aan of annuleer.', 'warning')
+      return
+    }
     acceptedCsv = csv
     save.disabled = false
-    document.dispatchEvent(new CustomEvent('supa:manual-source-admitted', {
-      detail: { source: canonical },
-    }))
-    setStatus('De daadwerkelijk ingevoerde eigen winkelopname(s) zijn lokaal geaccepteerd. Kies hieronder zelf welke werkelijke producten bij jouw ingrediënten passen. Er is geen retailerlicentie of onafhankelijk veldbewijs aangenomen.')
+    setStatus('De daadwerkelijk ingevoerde winkelopname(s) zijn lokaal geaccepteerd; eerdere ongewijzigde echte winkelopnames blijven behouden. Bevestig voor gewijzigde winkels opnieuw de juiste producten. Geen retailerlicentie of onafhankelijk veldbewijs aangenomen.')
   } catch (error) {
     acceptedCsv = null
     save.disabled = true
@@ -146,6 +156,12 @@ function submit() {
   }
 }
 apply.addEventListener('click', submit)
+document.querySelector('#manual-cancel').addEventListener('click', () => {
+  acceptedCsv = null
+  save.disabled = true
+  document.dispatchEvent(new Event('supa:manual-source-cancelled'))
+  setStatus('Concept geannuleerd. Je eerder toegelaten oorspronkelijke winkelbron is behouden. Een nieuw concept invoeren is nog steeds mogelijk; de vorige bron wordt niet stilzwijgend vervangen.')
+})
 save.addEventListener('click', () => {
   if (acceptedCsv === null) return
   const file = new Blob([acceptedCsv], { type: 'text/csv;charset=utf-8' })
