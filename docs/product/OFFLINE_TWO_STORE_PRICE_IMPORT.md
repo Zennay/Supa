@@ -562,3 +562,24 @@ veldopname; onveilige spreadsheet-formuleprefixen in originele
 bronproductnamen of codes geven **geen export** in plaats van
 onzichtbaar gewijzigde productidentiteit. Maximaal 256 kB,
 alles offline en alleen expliciete lokale download.
+
+### Fysieke 2-winkel-dekkingsmatrix voordat prijzen compleet zijn
+
+De gewone Vergelijk-tab toont bij één of twee ingeladen echte
+eigen winkelopnames altijd het complete **zelfde fysieke Planner-mandje**
+als matrix: elke vereiste hoeveelheid één keer, met PLUS- en
+DekaMarkt-kolommen voor de feitelijke bronstatus. De status is
+onderscheiden in geen bron, geen passende SKU/verpakking, verlopen of
+toekomstige observatie, nog persoonlijk te controleren product/pak/prijs
+en volledig bevestigd. De matrix toont géén fictieve winkelprijs of
+winnaar wanneer één van die stappen ontbreekt.
+
+Voor ingeladen winkels leidt **Open productkeuze en controle**
+rechtstreeks naar de werkelijke reviewregel, óók wanneer de gewone
+boodschappenlijst gefilterd was tot alleen nog te kopen artikelen;
+de filter wordt daarvoor uitgezet. **Download ontbrekende
+winkelcontroles (TXT)** geeft dezelfde actuele fysieke vraag, bronmomenten
+en status per winkel voor een offline inkoop-/waarnemingsbezoek.
+De TXT is geen bewijs dat de producten daadwerkelijk zijn gezien of
+de retailer datarechten heeft verstrekt. Een volledige vergelijking
+kan pas na de ongewijzigde bestaande strengere source- en reviewgates.

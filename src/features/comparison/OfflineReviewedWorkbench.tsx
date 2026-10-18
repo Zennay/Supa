@@ -76,6 +76,13 @@ function sourceOptions(products: import('../../domain/basket.ts').StoreProduct[]
   return { shown, total: filtered.length, availableCount: available.length }
 }
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
+function reviewRowId(store: string, ingredientId: string): string {
+  // Codepoints also support malformed user-supplied surrogate sequences without
+  // URIError from encodeURIComponent; identifiers never become executable HTML.
+  const suffix = Array.from(ingredientId, char => char.codePointAt(0)!.toString(16)).join('-')
+  return 'supa-own-review-' + store.toLowerCase() + '-' + suffix
+}
+
 /** Human-readable, strictly private companion to the existing canonical CSV.
  * Called only after every original SKU/pack/price has been personally reviewed
  * for both complete, timely captures and the identical physical Planner demand.
@@ -642,6 +649,56 @@ export function OfflineReviewedWorkbench({
           ? [{ delta, plus, deka }] : []
       }) : []
 
+  // Always show the physical 2-shop coverage, even if the second capture,
+  // one SKU, a price review or a recent observation is missing. Do not show
+  // any unreviewed partial amounts as a complete financial comparison.
+  const coverageRows = (basketPair?.plus?.lines ?? basketPair?.deka?.lines ?? []).map(need => {
+    const review = (store: typeof stores[number]) => {
+      const capture = imported?.captures[store]
+      const basket = store === 'PLUS' ? basketPair?.plus : basketPair?.deka
+      const line = basket?.lines.find(item => item.id === need.id)
+      if (!capture) return { status: 'Geen bron', canReview: false }
+      if (!line) return { status: 'Planning niet koppelbaar', canReview: false }
+      if (line.status !== 'matched') return { status: 'SKU/verpakking ontbreekt', canReview: true }
+      if (!perStoreReview.find(item => item.store === store)?.fresh)
+        return { status: 'Opname verlopen of toekomstig', canReview: true }
+      if (!reviewedLines[reviewedLineKey(store, capture.observedAt, line)])
+        return { status: 'Product, verpakking en prijs controleren', canReview: true }
+      return { status: 'Persoonlijk bevestigd', canReview: true }
+    }
+    return {
+      id: need.id, label: need.ingredientLabel,
+      amount: need.requirement.amount, unit: need.requirement.unit,
+      PLUS: review('PLUS'), DekaMarkt: review('DekaMarkt'),
+    }
+  })
+  function downloadCoverageChecklist() {
+    if (!imported || coverageRows.length === 0) return
+    const content = [
+      'SUPA · privé veld- en productcontrole voor exact dezelfde Planner-vraag',
+      'Geen prijs- of bronrechtenbewijs. Ontbrekend/verlopen is onbekend, niet EUR 0.',
+      ...stores.map(store => store + ' · eigen waarneming: ' +
+        (imported.captures[store]?.observedAt ?? 'ONTBREEKT')),
+      '',
+      ...coverageRows.flatMap(row => [
+        row.label.replace(/[\r\n\u0000-\u001f\u007f-\u009f]/gu, ' ') +
+          ' · ' + (row.amount ?? '?') + ' ' + row.unit,
+        '  PLUS: ' + row.PLUS.status,
+        '  DekaMarkt: ' + row.DekaMarkt.status,
+      ]),
+      'Controleer iedere SKU, verpakking en prijs tegen je eigen bron. Geen publieke besparingsclaim.',
+    ].join('\n')
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-prive-dekking-en-ontbrekende-producten.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+      setTripExportMessage('Alle Planner-ingrediënten en ontbrekende winkelcontroles zijn als privé TXT bewaard. Geen prijzen of nieuwe bronnen toegevoegd.')
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
+
   const readableReport = canShowDifference && basketPair?.plus && basketPair.deka &&
     basketPair.comparison && basketPair.comparison.deltaCents !== null &&
     imported?.captures.PLUS && imported.captures.DekaMarkt &&
@@ -815,6 +872,40 @@ export function OfflineReviewedWorkbench({
           )}
           {!basketPair ? <p role="alert">Deze planning kon niet veilig aan de import worden gekoppeld.</p> : (
             <>
+              {coverageRows.length > 0 && (
+                <section className="offline-price-workbench__full-breakdown" aria-label="Dekking van hetzelfde mandje bij beide winkels">
+                  <h4>Hetzelfde mandje: {coverageRows.length} ingrediënten × twee winkels</h4>
+                  <p>Bekijk welke originele bronregels en eigen controles ontbreken. Dit is de fysieke
+                    Planner-vraag voor beide winkels; onvolledige of oude prijzen leveren geen winnaar.</p>
+                  <button className="ghost-button" type="button" onClick={downloadCoverageChecklist}>
+                    Download ontbrekende winkelcontroles (TXT)
+                  </button>
+                  <div className="offline-price-workbench__breakdown-scroll">
+                    <table>
+                      <caption>Bron- en reviewstatus per ingrediënt, zonder fictieve prijs.</caption>
+                      <thead><tr>
+                        <th scope="col">Hetzelfde ingrediënt</th>
+                        <th scope="col">PLUS</th>
+                        <th scope="col">DekaMarkt</th>
+                      </tr></thead>
+                      <tbody>{coverageRows.map(row => (
+                        <tr key={row.id}>
+                          <th scope="row">{row.label}<small>{row.amount ?? '?'} {row.unit} nodig</small></th>
+                          {stores.map(store => {
+                            const item = row[store]
+                            return <td key={store}>
+                              <strong>{item.status}</strong>
+                              {item.canReview && item.status !== 'Persoonlijk bevestigd' &&
+                                <a href={'#' + reviewRowId(store, row.id)}
+                                  onClick={() => setOpenTripOnly(false)}>Open productkeuze en controle</a>}
+                            </td>
+                          })}
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
               <div className="offline-price-workbench__totals">
                 {stores.map(store => {
                   const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
@@ -979,7 +1070,7 @@ export function OfflineReviewedWorkbench({
                         const choices = sourceOptions(capture.products, line.requirement.unit,
                           skuFilter[searchKey] ?? '', manualSku[store][line.id] ?? '')
                         return (
-                        <article key={line.id} className="offline-price-workbench__line">
+                        <article key={line.id} id={reviewRowId(store, line.id)} className="offline-price-workbench__line">
                           <div>
                             <label className="offline-price-workbench__trip-tick">
                               <input type="checkbox" checked={Boolean(doneTripItems[shoppingTaskKey(store, line)])}
