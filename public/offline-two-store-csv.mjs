@@ -101,7 +101,7 @@ function validObservedAt(raw) {
  * Convert only caller-supplied observations. Unknown package/price stays null,
  * and is NEVER promoted to purchasable inventory or savings evidence.
  */
-export function convertTwoStoreCsv(text) {
+function convertStoreCsv(text, allowOne) {
   const rows = parseCsv(text)
   if (!rows.length || HEADER.some((h, i) => rows[0][i] !== h) ||
       rows[0].length !== HEADER.length) {
@@ -152,12 +152,21 @@ export function convertTwoStoreCsv(text) {
     if (packCount !== null) product.packCount = packCount
     capture.products.push(product)
   }
-  if (captures.size !== 2 || !RETAILERS.every(store => captures.has(store))) {
-    error('CSV vereist minimaal één expliciete rij voor elk van de twee winkels.')
+  if (!captures.size || (!allowOne && (captures.size !== 2 || !RETAILERS.every(store => captures.has(store))))) {
+    error('CSV vereist expliciet de echte waarnemingen van de geselecteerde winkel(s).')
   }
-  const value = { schema: 'supa-offline-prices-v1', captures: RETAILERS.map(store => captures.get(store)) }
+  const value = {
+    schema: captures.size === 1 ? 'supa-private-single-store-prices-v1' : 'supa-offline-prices-v1',
+    captures: RETAILERS.filter(store => captures.has(store)).map(store => captures.get(store)),
+  }
   const json = JSON.stringify(value, null, 2) + '\n'
   if (new TextEncoder().encode(json).length > MAX_BYTES) error('Gegenereerde JSON is groter dan 256 kB.')
   return json
 }
 
+
+// The canonical two-store importer remains strict and unchanged in what it admits.
+// This explicit single-store path keeps the absent retailer absent (no fake time,
+// product, zero-price row or invented second observation).
+export const convertTwoStoreCsv = text => convertStoreCsv(text, false)
+export const convertOwnStoreCsv = text => convertStoreCsv(text, true)

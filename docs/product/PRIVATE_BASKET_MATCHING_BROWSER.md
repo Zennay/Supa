@@ -288,3 +288,23 @@ verlengde opnametijd. Bereken opnieuw op verzoek na afloop. Bestaande
 handmatige bronbewerking houdt zijn eigen strengere grens: na expliciete
 wijziging zijn vroegere bronkeuzes ongeldig totdat beide echte opnames
 opnieuw zijn toegelaten.
+
+## Eerlijke één-winkelinvoer zonder fictieve tweede opname
+
+De afzonderlijke `/private-basket-compare.html` accepteert nu ook alleen een
+**eigen PLUS CSV** of alleen een **eigen DekaMarkt CSV** met de canonieke
+negenkoloms kop en uitsluitend de werkelijk ingevulde winkelwaarneming.
+Een bestaande gecombineerde bron met beide winkels blijft via dezelfde
+bestaande strikte twee-winkel CSV converter verwerkt. Voor één winkel gebruikt
+Supa de nieuwe `convertOwnStoreCsv` variant van de *bestaande* offline parser,
+met onveranderde cel-, bedrag-, hoeveelheid-, beschikbaarheid-, UTC-offset-
+en product-ID-controles. Het expliciete `supa-private-single-store-prices-v1`
+contract bevat exact één werkelijke opname en nooit een verzonnen tweede
+product, prijs, opname-UTC of winkelrecht. De andere winkel krijgt uitsluitend
+zichtbare onopgeloste regels. Echte volledige winkelmandkosten, budgetruimte
+en afvinklijst kunnen voor de ene winkel wel verschijnen als de opnametijd
+maximaal zeven dagen oud is en alle eigen fysieke regels prijsbaar zijn;
+geen twee-winkelwinnaar of prijsverschil wordt berekend. Alleen bij twee
+werkelijke opnames worden de canonieke 7-dagen én 24-uurs-paarvoorwaarden
+voor de volledige vergelijking toegepast. Onbevestigde/ontbrekende producten
+blijven onbekend, niet nul euro.

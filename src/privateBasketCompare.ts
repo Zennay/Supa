@@ -22,7 +22,7 @@ type ObservedProduct = {
   available: boolean
 }
 type Capture = { retailer: StoreName; observedAt: string; products: ObservedProduct[] }
-type Source = { schema: 'supa-offline-prices-v1'; captures: [Capture, Capture] }
+type Source = { schema: 'supa-offline-prices-v1' | 'supa-private-single-store-prices-v1'; captures: Capture[] }
 type DemandLine = {
   id: string
   label: string
@@ -100,15 +100,16 @@ function safeTime(value: unknown): value is string {
 }
 
 function sourceFrom(value: unknown): Source {
-  if (!record(value) || own(value, 'schema') !== 'supa-offline-prices-v1' ||
-      !Array.isArray(value.captures) || value.captures.length !== 2) {
+  if (!record(value) || !Array.isArray(value.captures) ||
+      !(value.schema === 'supa-offline-prices-v1' && value.captures.length === 2 ||
+        value.schema === 'supa-private-single-store-prices-v1' && value.captures.length === 1)) {
     throw Error('Onbekend prijsbronformaat')
   }
   const known = new Set<StoreName>()
   const captures = value.captures.map((item: unknown): Capture => {
     if (!record(item) || !stores.includes(item.retailer as StoreName) ||
         known.has(item.retailer as StoreName) || !safeTime(item.observedAt) ||
-        !Array.isArray(item.products) || item.products.length > 1000) {
+        !Array.isArray(item.products) || !item.products.length || item.products.length > 1000) {
       throw Error('Ongeldige winkelopname')
     }
     const retailer = item.retailer as StoreName
@@ -137,8 +138,8 @@ function sourceFrom(value: unknown): Source {
     })
     return { retailer, observedAt: item.observedAt as string, products }
   })
-  if (known.size !== 2) throw Error('Twee winkelbronnen vereist')
-  return { schema: 'supa-offline-prices-v1', captures: captures as [Capture, Capture] }
+  if (known.size !== captures.length) throw Error('Dubbele winkelbron')
+  return { schema: value.schema as Source['schema'], captures }
 }
 
 function demandFrom(value: unknown): Demand {
@@ -199,23 +200,25 @@ async function parseSource(): Promise<Source> {
   const file = combined.files?.[0]
   const left = plus.files?.[0]
   const right = deka.files?.[0]
-  if ((file && (left || right)) || (!file && (!left || !right))) {
-    throw Error('Kies één gecombineerd bestand of twee aparte winkel-CSV’s')
+  if ((file && (left || right)) || (!file && !left && !right)) {
+    throw Error('Kies één gecombineerd bestand of eigen winkel-CSV’s')
   }
   if (file && file.name.toLowerCase().endsWith('.json')) {
     return sourceFrom(JSON.parse(await readSource(file)))
   }
   let csv: string
   if (file) csv = await readSource(file)
-  else {
-    const [a, b] = await Promise.all([readSource(left!), readSource(right!)])
+  else if (left && right) {
+    const [a, b] = await Promise.all([readSource(left), readSource(right)])
     csv = csvHeader + '\n' + withoutCsvHeader(a) + withoutCsvHeader(b)
+  } else {
+    csv = await readSource((left ?? right)!)
   }
   if (new TextEncoder().encode(csv).length > limit) throw Error('Samengevoegde bron overschrijdt 256 KB')
   // Existing strict canonical reader is intentionally served unchanged from public.
   const canonicalUrl = '/offline-two-store-csv.mjs'
-  const { convertTwoStoreCsv } = await import(/* @vite-ignore */ canonicalUrl)
-  return sourceFrom(JSON.parse(convertTwoStoreCsv(csv)))
+  const { convertOwnStoreCsv } = await import(/* @vite-ignore */ canonicalUrl)
+  return sourceFrom(JSON.parse(convertOwnStoreCsv(csv)))
 }
 
 async function readOwnBasketInputs(): Promise<{ source: Source; demand: Demand }> {
@@ -234,8 +237,8 @@ async function readOwnBasketInputs(): Promise<{ source: Source; demand: Demand }
       for (const store of stores) {
         const id = ingredient.productIds[store]
         if (id === null) continue
-        const capture = source.captures.find(item => item.retailer === store)!
-        const product = capture.products.find(item => item.id === id)
+        const capture = source.captures.find(item => item.retailer === store)
+        const product = capture?.products.find(item => item.id === id)
         const family = (unit: MatchUnit) => unit === 'g' || unit === 'kg' ? 'weight'
           : unit === 'ml' || unit === 'l' ? 'volume' : 'piece'
         if (!product || family(product.packUnit) !== family(ingredient.unit)) {
@@ -258,7 +261,13 @@ function unresolved(d: DemandLine, reason: string): BasketTraceLine {
     status: 'unresolved', reasons: [reason], matchScore: null,
   }
 }
-function storeBasket(store: StoreName, capture: Capture, demand: Demand): OneStoreBasket {
+function storeBasket(store: StoreName, capture: Capture | undefined, demand: Demand): OneStoreBasket {
+  if (!capture) return {
+    store: { id: store, name: store }, selectedMealCount: demand.selectedMealCount,
+    lines: demand.ingredients.map(item => unresolved(item,
+      'Voor deze winkel is geen echte bronopname ingelezen. Prijs en beschikbaarheid onbekend.')),
+    totalCents: 0, matchedLineCount: 0, unresolvedLineCount: demand.ingredients.length,
+  }
   const products = new Map(capture.products.map(p => [p.id, p]))
   // A single selected SKU across two ingredient identities is not two
   // separately purchased packages. Both lines remain unknown until the user
@@ -691,17 +700,18 @@ restoreTrip.addEventListener('change', async () => {
 
 function show(source: Source, demand: Demand): void {
   clearComparisonTextPreview()
-  const captures = Object.fromEntries(source.captures.map(c => [c.retailer, c])) as Record<StoreName,Capture>
+  const captures = Object.fromEntries(source.captures.map(c => [c.retailer, c])) as Partial<Record<StoreName,Capture>>
   const left = storeBasket('PLUS', captures.PLUS, demand)
   const right = storeBasket('DekaMarkt', captures.DekaMarkt, demand)
   const comparison = compareFullBaskets({ baseline: left, candidate: right })
   const nowNs = BigInt(Date.now()) * 1000000n
-  const start = nanoseconds(captures.PLUS.observedAt)
-  const end = nanoseconds(captures.DekaMarkt.observedAt)
-  const firstAge = nowNs - start
-  const secondAge = nowNs - end
-  const gap = abs(start - end)
-  const fresh = firstAge >= 0n && secondAge >= 0n &&
+  const start = captures.PLUS ? nanoseconds(captures.PLUS.observedAt) : null
+  const end = captures.DekaMarkt ? nanoseconds(captures.DekaMarkt.observedAt) : null
+  const firstAge = start === null ? -1n : nowNs - start
+  const secondAge = end === null ? -1n : nowNs - end
+  const gap = start !== null && end !== null ? abs(start - end) : null
+  const fresh = start !== null && end !== null && gap !== null &&
+    firstAge >= 0n && secondAge >= 0n &&
     firstAge <= weekNs && secondAge <= weekNs && gap <= dayNs
   const complete = fresh && comparison.claimable && comparison.deltaCents !== null &&
     Number.isSafeInteger(comparison.deltaCents)
@@ -711,14 +721,17 @@ function show(source: Source, demand: Demand): void {
     PLUS: validOneStoreTrip(left, demand, firstAge) ? left.totalCents : null,
     DekaMarkt: validOneStoreTrip(right, demand, secondAge) ? right.totalCents : null,
   }
-  budgetValidThroughNs = { PLUS: start + weekNs, DekaMarkt: end + weekNs }
-  tripCapturedAt = { PLUS: captures.PLUS.observedAt, DekaMarkt: captures.DekaMarkt.observedAt }
-  comparisonValidThroughNs = complete ? (start <= end ? start : end) + weekNs : null
+  budgetValidThroughNs = { PLUS: start === null ? 0n : start + weekNs,
+    DekaMarkt: end === null ? 0n : end + weekNs }
+  tripCapturedAt = { PLUS: captures.PLUS?.observedAt ?? 'Geen opname',
+    DekaMarkt: captures.DekaMarkt?.observedAt ?? 'Geen opname' }
+  comparisonValidThroughNs = complete && start !== null && end !== null
+    ? (start <= end ? start : end) + weekNs : null
   result.hidden = false
   renderBudget()
   loadTrip(left, right, demand,
     { PLUS: firstAge, DekaMarkt: secondAge },
-    { PLUS: start, DekaMarkt: end })
+    { PLUS: start ?? 0n, DekaMarkt: end ?? 0n })
   rows.replaceChildren()
   const deltasByIngredient = new Map(comparison.lineDeltas.map(line => [line.id, line]))
   for (let i = 0; i < demand.ingredients.length; i++) {
@@ -737,11 +750,13 @@ function show(source: Source, demand: Demand): void {
     row.append(need, lineCell(left.lines[i]), lineCell(right.lines[i]), difference)
     rows.append(row)
   }
-  capturesLabel.textContent = 'Eigen opnames: PLUS ' + captures.PLUS.observedAt +
-    ' · DekaMarkt ' + captures.DekaMarkt.observedAt +
-    '. Onderling verschil: ' + String(gap / 3600000000000n) + ' hele uren.' +
-    (fresh ? ' Beide binnen zeven dagen en maximaal 24 uur uiteen.' :
-      ' Verouderd, toekomstig of meer dan 24 uur uiteen: hercontroleer beide bronnen.')
+  capturesLabel.textContent = 'Eigen opnames: PLUS ' +
+    (captures.PLUS?.observedAt ?? 'niet ingelezen') + ' · DekaMarkt ' +
+    (captures.DekaMarkt?.observedAt ?? 'niet ingelezen') + '.' +
+    (gap === null ? ' Eén winkel heeft nog geen bron: geen volledige vergelijking mogelijk.' :
+      ' Onderling verschil: ' + String(gap / 3600000000000n) + ' hele uren.' +
+      (fresh ? ' Beide binnen zeven dagen en maximaal 24 uur uiteen.' :
+        ' Opname verouderd, toekomstig of meer dan 24 uur uiteen.'))
   missingTasks = []
   for (const [store, basket] of [['PLUS', left], ['DekaMarkt', right]] as const) {
     for (const line of basket.lines) {
@@ -750,9 +765,9 @@ function show(source: Source, demand: Demand): void {
       }
     }
   }
-  if (firstAge < 0n || firstAge > weekNs) missingTasks.push('PLUS · maak een nieuwe echte winkelopname; deze tijd is toekomstig of ouder dan 7 dagen.')
-  if (secondAge < 0n || secondAge > weekNs) missingTasks.push('DekaMarkt · maak een nieuwe echte winkelopname; deze tijd is toekomstig of ouder dan 7 dagen.')
-  if (gap > dayNs) missingTasks.push((start < end ? 'PLUS' : 'DekaMarkt') +
+  if (start !== null && (firstAge < 0n || firstAge > weekNs)) missingTasks.push('PLUS · maak een nieuwe echte winkelopname; deze tijd is toekomstig of ouder dan 7 dagen.')
+  if (end !== null && (secondAge < 0n || secondAge > weekNs)) missingTasks.push('DekaMarkt · maak een nieuwe echte winkelopname; deze tijd is toekomstig of ouder dan 7 dagen.')
+  if (gap !== null && gap > dayNs && start !== null && end !== null) missingTasks.push((start < end ? 'PLUS' : 'DekaMarkt') +
     ' · oudere winkelopname opnieuw vastleggen; het paar ligt meer dan 24 uur uit elkaar.')
   if (!complete && missingTasks.length === 0) {
     missingTasks.push('Controleer alle fysieke aantallen, gekozen productidentiteiten en mandbedragen voordat je een volledige vergelijking maakt.')
