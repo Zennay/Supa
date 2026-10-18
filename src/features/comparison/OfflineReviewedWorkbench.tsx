@@ -364,6 +364,20 @@ export function OfflineReviewedWorkbench({
     return { store, accepted, required: keys.length, complete, fresh }
   })
   const allReviewed = perStoreReview.every(item => item.complete)
+  const comparisonNextSteps = perStoreReview.flatMap(item => {
+    const capture = imported?.captures[item.store]
+    const basket = item.store === 'PLUS' ? basketPair?.plus : basketPair?.deka
+    if (!capture) return [`${item.store}: voeg je werkelijk geobserveerde eigen winkelbron toe.`]
+    if (!item.fresh) return [`${item.store}: vervang je toekomstige of meer dan zeven dagen oude bronopname door een actuele eigen opname.`]
+    if (!basket) return [`${item.store}: controleer de geselecteerde Planner-dagen en fysieke ingrediëntbehoefte.`]
+    const missing = basket.lines.filter(line => line.status === 'unresolved')
+    if (missing.length) return [`${item.store}: ${missing.length} ingrediënten nog onbekend, waaronder ${missing[0].ingredientLabel}. Voeg de werkelijk bijbehorende bronproducten toe of corrigeer de verpakking.`]
+    if (item.accepted < item.required) return [`${item.store}: bevestig de oorspronkelijke SKU, verpakking en prijs bij nog ${item.required - item.accepted} voorgestelde productmatches.`]
+    return []
+  })
+  if (imported && Object.keys(imported.captures).length === 2 && !imported.pairedWithin24h) {
+    comparisonNextSteps.push('De twee eigen winkelopnames liggen meer dan 24 uur uiteen. Neem beide prijzen opnieuw op binnen één tijdcontext.')
+  }
   const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
     allReviewed && !!basketPair?.comparison?.claimable
 
@@ -482,6 +496,13 @@ export function OfflineReviewedWorkbench({
             : !imported.pairedWithin24h && <p role="alert" className="attention-card">
               Waarnemingen liggen meer dan 24 uur uiteen. Het prijsverschil is niet vergelijkbaar.
             </p>}
+          {comparisonNextSteps.length > 0 && (
+            <section className="offline-price-workbench__missing" aria-label="Volgende stappen voor prijsvergelijking">
+              <h4>Wat ontbreekt nog voor hetzelfde winkelmandje?</h4>
+              <ul>{comparisonNextSteps.map(step => <li key={step}>{step}</li>)}</ul>
+              <p>Werk de ontbrekende feiten in je eigen bron of Planner bij. De vergelijking rekent niets bij op basis van aannames.</p>
+            </section>
+          )}
           {!basketPair ? <p role="alert">Deze planning kon niet veilig aan de import worden gekoppeld.</p> : (
             <>
               <div className="offline-price-workbench__totals">

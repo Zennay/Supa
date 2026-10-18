@@ -201,3 +201,16 @@ menselijke bevestiging is deze knop afwezig. Zonder brondata zijn er
 geen prijzen of winkelwinnaar te exporteren. De afgeleide CSV is een
 particuliere rekentabel, **geen invoerformaat voor nieuwe bronnen** en
 geen retailerautorisatie of onafhankelijk besparingsbewijs.
+
+### Concreet vervolgstap-overzicht in de gewone Vergelijk-tab
+
+Zodra je een bronopname laadt toont het scherm nu per winkel de eerst
+uitvoerbare broncorrectie: een ontbrekende PLUS/Deka-opname, een
+verouderde/toekomstige waarneming, een ongeldige Planner-vraag,
+het aantal niet-koppelbare ingrediënten met één concreet voorbeeld of
+het aantal nog door jou te bevestigen SKU-/verpakkings-/prijsregels.
+Bij twee volledige maar meer dan 24 uur uiteenliggende waarnemingen
+vraagt het scherm om twee oorspronkelijke opnames in één tijdcontext.
+Bij voltooide broncontrole verdwijnt dit actieoverzicht automatisch en
+verschijnt de eigen volledige mandvergelijking/CSV-export. Er worden geen
+prijzen, matchingclaims of bronrechten door de instructietekst toegevoegd.
