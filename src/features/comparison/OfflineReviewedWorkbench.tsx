@@ -394,7 +394,8 @@ export function OfflineReviewedWorkbench({
   useEffect(() => {
     const target = session.reviewTarget
     if (!target || !basketPair || !imported) return
-    if (!basketPair[target.store].lines.some(line => line.id === target.ingredientId)) {
+    if (!(target.store === 'PLUS' ? basketPair.plus : basketPair.deka).lines
+      .some(line => line.id === target.ingredientId)) {
       session.setReviewTarget(null)
       return
     }
