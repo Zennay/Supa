@@ -140,6 +140,10 @@ export function OfflineReviewedWorkbench({
     added: number
     removed: number
     changed: number
+    resetManualMatches: number
+    resetExtraProducts: number
+    resetTripTicks: number
+    currentEnough: boolean
     pairedWithin24h: boolean
   } | null>(null)
   const [onlyUnresolved, setOnlyUnresolved] = useState<Record<OfflineRetailer, boolean>>({ PLUS: false, DekaMarkt: false })
@@ -622,12 +626,22 @@ export function OfflineReviewedWorkbench({
       const old = before.get(id)
       return old && JSON.stringify(old) !== JSON.stringify(product)
     }).length
+    const resetManualMatches = session.manualSelections.fingerprint ===
+      offlineSessionFingerprint(imported, plan, recipes, activeDays)
+      ? Object.keys(session.manualSelections.products)
+        .filter(key => key.startsWith(retailer + String.fromCharCode(0))).length
+      : 0
     setPendingReplacement({
       sourceText: text, json, retailer,
       previousObservedAt: previous.captures[retailer].observedAt,
       nextObservedAt: next.captures[retailer].observedAt,
       previousCount: before.size, nextCount: after.size,
-      added, removed, changed, pairedWithin24h: next.pairedWithin24h,
+      added, removed, changed,
+      resetManualMatches,
+      resetExtraProducts: session.extraProductIds[retailer].length,
+      resetTripTicks: session.tripMemory[retailer]?.done.length ?? 0,
+      currentEnough: next.currentEnough,
+      pairedWithin24h: next.pairedWithin24h,
     })
     setMessage('Nieuwe ' + retailer + '-opname gecontroleerd maar NIET toegepast. Bekijk de wijzigingen en bevestig bewust.')
   }
@@ -1105,10 +1119,17 @@ export function OfflineReviewedWorkbench({
           <p>{pendingReplacement.previousCount} bestaande producten → {pendingReplacement.nextCount} nieuwe producten.
             Toegevoegd: {pendingReplacement.added}; verdwenen: {pendingReplacement.removed};
             gewijzigde productgegevens: {pendingReplacement.changed}.</p>
+          <p><strong>Wat wordt opnieuw beoordeeld bij deze winkel?</strong><br />
+            {pendingReplacement.resetManualMatches} handmatige productkoppelingen,
+            {' '}{pendingReplacement.resetExtraProducts} losse productkeuzes en
+            {' '}{pendingReplacement.resetTripTicks} afgevinkte winkelregels.
+            Deze aantallen worden pas bij bevestigen teruggezet; de andere winkel blijft ongewijzigd.</p>
           <p className="disclaimer">
             Alleen {pendingReplacement.retailer} wordt na bevestiging vervangen.
             Handmatige keuzes, afvinkstatus en extra artikelen van die winkel worden opnieuw beoordeeld.
             De andere winkel behoudt haar eigen oorspronkelijke bron en gekoppelde keuzes.
+            {!pendingReplacement.currentEnough &&
+              ' De nieuwe opnames zijn te oud of buiten het toegestane tijdvenster: geen actuele prijsvergelijking.'}
             {pendingReplacement.pairedWithin24h
               ? ' De opnametijden vallen binnen 24 uur, maar prijzen en rechten zijn niet onafhankelijk geverifieerd.'
               : ' De opnametijden liggen meer dan 24 uur uiteen: geen vergelijkbare volledige mandprijs.'}
