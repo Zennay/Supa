@@ -20,6 +20,12 @@ const demandImport = document.querySelector('#demand-import')
 const maxLines = 200
 const save = document.querySelector('#save')
 const downloadUnpriced = document.querySelector('#download-unpriced')
+const showUnpriced = document.querySelector('#show-unpriced')
+const unpricedTrip = document.querySelector('#unpriced-trip')
+const unpricedItems = document.querySelector('#unpriced-items')
+const unpricedProgress = document.querySelector('#unpriced-progress')
+const unpricedChecked = new Set()
+let unpricedSnapshot = null
 const compareNow = document.querySelector('#compare-now')
 const priceResult = document.querySelector('#result')
 const priceStatus = document.querySelector('#price-status')
@@ -115,6 +121,9 @@ function updateSelect(select, store, unit) {
     'Kies zelf de juiste SKU.'
 }
 function invalidatePrice() {
+  unpricedTrip.hidden = true
+  unpricedChecked.clear()
+  unpricedSnapshot = null
   if (priceResult) priceResult.hidden = true
   if (priceStatus) {
     priceStatus.textContent = 'De bron of mandvraag is veranderd. Vergelijk opnieuw voor een betrouwbaar privéresultaat.'
@@ -134,6 +143,7 @@ function refresh() {
   }
   save.disabled = !lines.children.length
   downloadUnpriced.disabled = save.disabled
+  showUnpriced.disabled = save.disabled
   compareNow.disabled = !captures || save.disabled
 }
 function addIngredient(restored = null) {
@@ -194,6 +204,7 @@ function addIngredient(restored = null) {
   for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit.value)
   save.disabled = false
   downloadUnpriced.disabled = false
+  showUnpriced.disabled = false
   compareNow.disabled = !captures
   invalidatePrice()
 }
@@ -452,6 +463,61 @@ function demand() {
   return { schema: 'supa-private-basket-demand-v1', selectedMealCount: meals, ingredients }
 }
 
+function updateUnpricedProgress() {
+  if (!unpricedSnapshot) return
+  const total = unpricedSnapshot.ingredients.length
+  const done = unpricedSnapshot.ingredients.filter(item => unpricedChecked.has(item.id)).length
+  unpricedProgress.textContent = done + ' van ' + total +
+    ' ingrediënten afgevinkt · ' + (total - done) + ' resterend. ' +
+    'Geen winkelprijs of kassagarantie.'
+}
+
+function openUnpricedList() {
+  const data = demand()
+  unpricedSnapshot = data
+  unpricedChecked.clear()
+  unpricedItems.replaceChildren()
+  for (const item of data.ingredients) {
+    const label = document.createElement('label')
+    label.className = 'unpriced-line'
+    const check = document.createElement('input')
+    check.type = 'checkbox'
+    check.setAttribute('aria-label', 'Afvinken: ' + item.label)
+    check.addEventListener('change', () => {
+      if (check.checked) unpricedChecked.add(item.id)
+      else unpricedChecked.delete(item.id)
+      updateUnpricedProgress()
+    })
+    const text = document.createElement('span')
+    text.textContent = item.label + ' · ' +
+      (item.amount === null ? 'hoeveelheid nog controleren' :
+        String(item.amount).replace('.', ',') + ' ' +
+          (item.unit === 'piece' ? 'stuk(s)' : item.unit))
+    label.append(check, text)
+    unpricedItems.append(label)
+  }
+  updateUnpricedProgress()
+  unpricedTrip.hidden = false
+  unpricedTrip.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+
+showUnpriced.addEventListener('click', () => {
+  try {
+    openUnpricedList()
+  } catch (error) {
+    unpricedTrip.hidden = true
+    notice(status, error instanceof Error ? error.message :
+      'Kan eigen ongeprijsde lijst niet veilig maken.', 'error')
+  }
+})
+
+document.querySelector('#unpriced-reset').addEventListener('click', () => {
+  if (unpricedTrip.hidden || !unpricedSnapshot) return
+  unpricedChecked.clear()
+  for (const input of unpricedItems.querySelectorAll('input[type="checkbox"]')) input.checked = false
+  updateUnpricedProgress()
+})
+
 downloadUnpriced.addEventListener('click', () => {
   try {
     const data = demand()
@@ -462,7 +528,7 @@ downloadUnpriced.addEventListener('click', () => {
       'Geen winkelprijzen, automatische productmatching of besparingsclaim.',
       '',
       ...data.ingredients.map(item =>
-        '[ ] ' + item.label + ' · ' +
+        (unpricedChecked.has(item.id) && !unpricedTrip.hidden ? '[x] ' : '[ ] ') + item.label + ' · ' +
         (item.amount === null ? 'hoeveelheid nog controleren' :
           String(item.amount).replace('.', ',') + ' ' +
             (item.unit === 'piece' ? 'stuk(s)' : item.unit))),
