@@ -313,3 +313,19 @@
 .offline-match-backup__confirm p { flex-basis:100%; margin:0; }
 .offline-match-backup__confirm button { min-height:44px; }
 .offline-match-backup :is(summary,button,input):focus-visible { outline:3px solid #267452; outline-offset:3px; }
+
+/* Private source-change confirmation is a deliberate user action. A pending
+   upload never silently replaces admitted captures or stored checkmarks. */
+.offline-price-workbench__replace-preview {
+  display: grid; gap: .6rem; padding: clamp(1rem, 3vw, 1.5rem);
+  border: 2px solid #54745e; border-radius: 15px; background: #f6faf5;
+}
+.offline-price-workbench__replace-preview h4,
+.offline-price-workbench__replace-preview p { margin: 0; }
+.offline-price-workbench__replace-preview .offline-price-workbench__actions {
+  display: flex; flex-wrap: wrap; gap: .65rem;
+}
+.offline-price-workbench__replace-preview button { min-height: 44px; }
+.offline-price-workbench__replace-preview :is(button):focus-visible {
+  outline: 3px solid #226f52; outline-offset: 3px;
+}
