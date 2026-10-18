@@ -383,6 +383,9 @@ function invalidateAgedComparison(): boolean {
 }
 
 function renderTrip(): void {
+  const preview = document.querySelector<HTMLTextAreaElement>('#trip-copy-preview')!
+  preview.hidden = true
+  preview.value = ''
   tripItems.replaceChildren()
   const lines = shoppingTripLines()
   if (!tripBaskets || lines.length === 0) {
@@ -401,6 +404,9 @@ function renderTrip(): void {
     check.checked = ticked.has(line.id)
     check.setAttribute('aria-label', line.packs + ' hele verpakkingen ' + line.productName + ' afvinken')
     check.addEventListener('change', () => {
+      const preview = document.querySelector<HTMLTextAreaElement>('#trip-copy-preview')!
+      preview.hidden = true
+      preview.value = ''
       if (invalidateAgedComparison()) return
       if (check.checked) ticked.add(line.id)
       else ticked.delete(line.id)
@@ -446,6 +452,9 @@ function loadTrip(
 }
 
 function clearTrip(): void {
+  const preview = document.querySelector<HTMLTextAreaElement>('#trip-copy-preview')!
+  preview.hidden = true
+  preview.value = ''
   ticked.clear()
   tripBaskets = null
   tripValidUntilNs = null
@@ -511,23 +520,21 @@ document.querySelector<HTMLButtonElement>('#trip-export')!.addEventListener('cli
   window.setTimeout(() => URL.revokeObjectURL(url), 60000)
 })
 
-document.querySelector<HTMLButtonElement>('#trip-copy')!.addEventListener('click', async () => {
+const copyPreview = document.querySelector<HTMLTextAreaElement>('#trip-copy-preview')!
+document.querySelector<HTMLButtonElement>('#trip-copy')!.addEventListener('click', () => {
   if (invalidateAgedComparison()) return
   const content = shoppingTripText()
   if (content === null) {
-    setStatus('Geen volledig en recent winkelmandje om te kopiëren.', true)
+    copyPreview.hidden = true
+    copyPreview.value = ''
+    setStatus('Geen volledig en recent winkelmandje om te selecteren.', true)
     return
   }
-  try {
-    if (!navigator.clipboard?.writeText) {
-      setStatus('Kopiëren is in deze browser niet beschikbaar. Download jouw lokale TXT-boodschappenlijst.', true)
-      return
-    }
-    await navigator.clipboard.writeText(content)
-    setStatus('Jouw eigen lokale boodschappenlijst is naar het klembord gekopieerd; prijzen blijven oorspronkelijke waarnemingen.')
-  } catch {
-    setStatus('Browser gaf geen klembordrechten. Download jouw lokale TXT-boodschappenlijst.', true)
-  }
+  copyPreview.value = content
+  copyPreview.hidden = false
+  copyPreview.focus()
+  copyPreview.select()
+  setStatus('De volledige privéboodschappenlijst is geselecteerd. Kopieer zelf via Ctrl+C, Cmd+C of de kopieeractie op je telefoon. Supa heeft geen klembordrechten nodig.')
 })
 
 function show(source: Source, demand: Demand): void {
