@@ -165,7 +165,7 @@ function demandFrom(value: unknown): Demand {
 
 async function readSource(file: File): Promise<string> {
   if (!file.size || file.size > limit) throw Error('Bronbestand is te groot of leeg')
-  return file.text()
+  return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
 }
 function withoutCsvHeader(value: string): string {
   const source = value.startsWith('\uFEFF') ? value.slice(1) : value
@@ -399,7 +399,7 @@ compare?.addEventListener('click', async () => {
     const file = demandFile.files?.[0]
     if (!file || !file.size || file.size > limit) throw Error('Mandvraag ontbreekt')
     const [source, demand] = await Promise.all([
-      parseSource(), file.text().then(data => demandFrom(JSON.parse(data))),
+      parseSource(), file.arrayBuffer().then(bytes => demandFrom(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)))),
     ])
     if (snapshotRevision !== inputRevision) return
     show(source, demand)
