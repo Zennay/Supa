@@ -336,7 +336,12 @@ function renderBudget(): void {
   }).join(' · ') + '. Alleen eigen oorspronkelijke waarnemingen; geen kassagarantie.'
   budgetStatus.className = 'notice'
 }
-budgetInput.addEventListener('input', renderBudget)
+budgetInput.addEventListener('input', () => {
+  // Editing an optional budget is still a user action: invalidate an elapsed
+  // seven-day price observation before publishing any new financial context.
+  if (invalidateAgedComparison()) return
+  renderBudget()
+})
 
 function advisoryUnitPrice(line: Extract<BasketTraceLine,{status:'matched'}>): string {
   const pack = line.pack
