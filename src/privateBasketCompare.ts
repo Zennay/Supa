@@ -4,6 +4,7 @@
  * Own source observations are NOT written retailer rights or field-study proof.
  */
 import { renderPrivateBasketSnapshot } from './privateBasketSnapshotExport.ts'
+import { currentTripKey, saveTripProgress, loadTripProgress } from './privateShoppingProgress.ts'
 import { compareFullBaskets } from './domain/basketComparison.ts'
 import { calculateDecimalPackCount } from './domain/decimalPackArithmetic.ts'
 import type { BasketTraceLine, OneStoreBasket } from './domain/basket.ts'
@@ -473,6 +474,15 @@ document.querySelector<HTMLButtonElement>('#trip-reset')!.addEventListener('clic
   ticked.clear()
   renderTrip()
 })
+function currentTripProgress() {
+  const store = tripStore.value as StoreName
+  if (result.hidden || trip.hidden || !tripBaskets || !tripCapturedAt ||
+      !shoppingTripLines().length) return null
+  const basket = tripBaskets[store]
+  const key = currentTripKey(basket, tripCapturedAt[store])
+  return key ? { key, basket } : null
+}
+
 function shoppingTripText(): string | null {
   if (result.hidden || trip.hidden || !tripBaskets) return null
   const lines = shoppingTripLines()
@@ -535,6 +545,53 @@ document.querySelector<HTMLButtonElement>('#trip-copy')!.addEventListener('click
   copyPreview.focus()
   copyPreview.select()
   setStatus('De volledige privéboodschappenlijst is geselecteerd. Kopieer zelf via Ctrl+C, Cmd+C of de kopieeractie op je telefoon. Supa heeft geen klembordrechten nodig.')
+})
+
+document.querySelector<HTMLButtonElement>('#trip-backup')!.addEventListener('click', () => {
+  if (invalidateAgedComparison()) return
+  const trip = currentTripProgress()
+  if (!trip) {
+    setStatus('Geen complete, recente eigen winkelmand om afvinkstatus te bewaren.', true)
+    return
+  }
+  try {
+    const text = saveTripProgress(trip.key, ticked, trip.basket)
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'supa-prive-afvinkstatus-' + trip.key.store.toLowerCase() + '.json'
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+    setStatus('Afvinkstatus lokaal opgeslagen. Het JSON-bestand hoort uitsluitend bij deze winkel, bronopname en fysieke mand. Er is niets automatisch opgeslagen of gedeeld.')
+  } catch {
+    setStatus('Afvinkstatus kon niet veilig worden opgeslagen.', true)
+  }
+})
+
+const restoreTrip = document.querySelector<HTMLInputElement>('#trip-restore')!
+restoreTrip.addEventListener('change', async () => {
+  const file = restoreTrip.files?.[0]
+  if (!file) return
+  try {
+    if (!file.size || file.size > 256000) throw Error('Ongeldig afvinkbestand')
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+    if (invalidateAgedComparison()) return
+    const trip = currentTripProgress()
+    if (!trip) throw Error('Geen huidige volledige winkelmand')
+    // The saved file never replaces prices, products, quantities or timestamps.
+    // Admit every line against the current physical basket before modifying ticks.
+    const restored = loadTripProgress(text, trip.key, trip.basket)
+    ticked.clear()
+    for (const id of restored) ticked.add(id)
+    renderTrip()
+    setStatus('Afvinkingen voor exact deze winkelmand hersteld. Oorspronkelijke eigen opnameprijzen blijven historische bedragen.')
+  } catch {
+    setStatus('Afvinkstatus geweigerd. Open eerst dezelfde winkel, opname en ongewijzigde mand; huidige vinkjes blijven bewaard.', true)
+  } finally {
+    restoreTrip.value = ''
+  }
 })
 
 function show(source: Source, demand: Demand): void {
