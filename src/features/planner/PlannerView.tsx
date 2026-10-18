@@ -22,6 +22,8 @@ type PlannerViewProps = {
   basketTotalCents: number
   basketUnresolvedLineCount: number
   ownSource?: { store: string; observedAt: string }
+  ownSourceChoices?: { store: string; observedAt: string }[]
+  onOwnSourceChange?: (store: string) => void
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
@@ -36,6 +38,8 @@ export function PlannerView({
   basketTotalCents,
   basketUnresolvedLineCount,
   ownSource,
+  ownSourceChoices,
+  onOwnSourceChange,
   onBudgetChange,
   onToggleDay,
   onRecipeChange,
@@ -155,6 +159,20 @@ export function PlannerView({
         })}
       </div>
 
+      {ownSource && ownSourceChoices && ownSourceChoices.length > 1 &&
+        onOwnSourceChange && (
+        <div className="budget-card" aria-label="Kies welke echte winkelbron jouw weekbudget gebruikt">
+          <label htmlFor="own-source-budget-store"><strong>Winkel voor jouw eigen bronbudget</strong></label>
+          <select id="own-source-budget-store" value={ownSource.store}
+            onChange={event => onOwnSourceChange(event.currentTarget.value)}
+            style={{ display: 'block', width: '100%', minHeight: 44, marginTop: 8 }}>
+            {ownSourceChoices.map(choice =>
+              <option key={choice.store} value={choice.store}>{choice.store} · eigen opname {choice.observedAt}</option>)}
+          </select>
+          <p className="disclaimer">Alleen jouw afzonderlijk bevestigde winkelmandjes.
+            Een prijsverschil mag pas worden getoond wanneer beide bronmomenten vergelijkbaar zijn.</p>
+        </div>
+      )}
       <section className="budget-card" aria-labelledby="weekbudget-title">
         <div className="budget-heading">
           <div>

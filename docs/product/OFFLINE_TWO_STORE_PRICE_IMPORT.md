@@ -383,3 +383,15 @@ uitklapper **oude voorbeelden**. Zodra een eigen complete winkelbron
 beschikbaar is, vervangt de eigen fysieke productenlijst die
 ongeprijsde Planner-lijst. Recepten, Planner en boodschappenlijst
 blijven daardoor bruikbaar zonder PLUS/Deka-veldvalidatie.
+
+### Eigen winkel voor het Planner-weekbudget kiezen
+
+Wanneer de gebruiker zowel een volledig bevestigde PLUS- als
+DekaMarkt-opname heeft, toont Planner nu een winkelkiezer boven
+het budget. Wisselen naar de andere werkelijk bevestigde bron
+herberekent het getoonde volledige weekbudget direct met die
+winkel, zonder een prijs te verzinnen. Dezelfde keuze geldt voor
+de normale Lijst-tab: er ontstaan geen twee verschillende
+'gekozen winkels' in twee schermen. Wanneer slechts één winkel
+bevestigd is ontbreekt de kiezer en blijft het andere bedrag onbekend.
+Brondata, review- en rechtenstatus blijven onveranderd.

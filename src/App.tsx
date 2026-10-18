@@ -357,6 +357,14 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               store: preferredPrivateBasket.basket.store.name,
               observedAt: preferredPrivateBasket.observedAt,
             } : undefined}
+            ownSourceChoices={livePrivateReviewed
+              ? (['PLUS', 'DekaMarkt'] as const).flatMap(store => {
+                  const capture = livePrivateReviewed.stores[store]
+                  return capture ? [{ store, observedAt: capture.observedAt }] : []
+                }) : []}
+            onOwnSourceChange={(store) => {
+              if (store === 'PLUS' || store === 'DekaMarkt') setPreferredOwnStore(store)
+            }}
             onBudgetChange={(nextBudget) =>
               setPreferences((current) => ({
                 ...current,
