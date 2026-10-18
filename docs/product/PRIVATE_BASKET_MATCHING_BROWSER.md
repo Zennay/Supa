@@ -58,3 +58,17 @@ Alle lokale CSV-/JSON-bronnen en het opgeslagen demandbestand worden nu met stri
 **Eigen bronintegriteit.** Ook de prijsbron die rechtstreeks uit Supa-JSON wordt geïmporteerd moet een fysiek geldig ISO 8601 tijdstip hebben, met een legale positieve/negatieve UTC-offset en geldige Gregoriaanse kalenderdatum. Dezelfde canonieke CSV-converter blijft leidend voor tekst- en productbeperkingen. Geen bronrechten of onafhankelijk veldbewijs wordt uit deze vrijwillige eigen invoer afgeleid.
 
 Alle drie de uitbreidingen horen bij de bestaande eigen product-PR #3919, en veranderen geen actieve React-/CLI-ownerbranches of QA-suites. Merge/deploy blijft afhangen van de bestaande exacte-head CI, onafhankelijke review en geautoriseerde mainwriter-lease.
+
+## Bruikbare lijst als slechts één winkel een echte bron heeft
+
+De werkbank maakt nu na het berekenen een **afzonderlijke, afvinkbare winkelboodschappenlijst** met de exact benodigde hele verpakkingen, originele SKU-identiteiten en bekende centprijzen. De gebruiker kiest expliciet PLUS of DekaMarkt, kan afvinken, resetten en lokaal TXT downloaden of via de expliciete knop kopiëren. De persoonlijke gegevens worden niet opgeslagen in Supa of automatisch geüpload.
+
+Een winkel die volledig en recent lokaal is geprijsd, mag een eigen boodschappenlijst aanbieden **zelfs wanneer de andere winkel ontbrekende of verouderde producten heeft**. De tweede winkel wordt dan niet stilzwijgend aangevuld: er is geen volledige vergelijking, winnaar of beweerde besparing. De lijst van de afzonderlijke winkel toont wel de volledige eigen waarnemingsprijs. De opname-UTC-tijd staat expliciet bij TXT-export. De prijs is niet gegarandeerd bij de kassa.
+
+Wanneer een origineel opnamemoment ouder dan zeven dagen wordt terwijl een browser openstaat, vervalt de afhankelijke getoonde prijsuitkomst bij hernieuwde focus/zichtbaarheid of export. Voor een volledige twee-winkelsvergelijking vervalt het totaal zodra de oudste opname verloopt; voor afzonderlijke winkelboodschappen vervalt alleen de betreffende eigen winkelbron.
+
+## Ongeprijsd weekmenu → boodschappenlijst zonder winkelonderzoek
+
+Het Supa-weekmenu is **niet afhankelijk van PLUS/Deka-veldopnames**: importeer een eigen bestaand `supa-private-planner-week-v1` bestand, of voer rechtstreeks eigen metrische ingrediënten in. Daarna kun je zonder winkelbestanden zowel de `supa-private-basket-demand-v1` JSON als een leesbare **ongeprijsde ingrediëntenlijst** downloaden. Beide bestanden bewaren de echte fysieke behoefte; zonder waargenomen prijzen bevatten de twee winkel-ID-velden `null` en verzinnen ze geen verpakkingen of besparingen. Ook ingrediënten met een onbekende hoeveelheid blijven zichtbaar als *hoeveelheid nog controleren*. Later kunnen de daadwerkelijke winkelbronnen worden gekoppeld, maar het Planner-productwerk is zonder die data al bruikbaar.
+
+De knop voor volledige twee-winkelsberekening blijft wél uitgeschakeld totdat de werkbank beide eigen bronopnames heeft geaccepteerd. Deze scheiding voorkomt dat veldonderzoek of winkelautorisatie de normale lokale Planner en ongeprijsde boodschappenlijst onnodig blokkeren. Er is geen impliciete lokale opslag of geautomatiseerde bronophaling.
