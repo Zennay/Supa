@@ -86,3 +86,7 @@ Anders geeft de rapportage zichtbaar **geen betrouwbaar volledig prijsverschil**
 ## Integratiepositie
 
 Deze lokale zelfstandige route biedt alvast een **bruikbaar zichtbaar HTML-productresultaat** terwijl de bestaande React-vergelijkings-PR #3904, aanvullende UI #3916 en rechten/evidence-gates onafhankelijk worden afgerond. Het is géén claim dat deze losse tool al in de live Supa-app is geïntegreerd; de toekomstige app blijft dezelfde eigen JSON/CSV-bron en bestaande prijs-/manddomeinlogica hergebruiken.
+
+## Eén winkelartikel voor meerdere ingrediënten
+
+Wanneer twee verschillende ingrediëntregels naar hetzelfde daadwerkelijke winkelproduct-ID binnen één winkel verwijzen, kan de hoeveelheid niet veilig per rij als een eigen aankoop worden opgeteld: hetzelfde pak kan immers meerdere recepten bedienen. De offline vergelijker markeert **beide regels voor die winkel als onbekend** en vermeldt dit onder ontbrekende koppelingen. Voeg de fysieke hoeveelheden eerst samen in één ingrediëntbehoefte (met consistente eenheden) en kies het bestaande artikel vervolgens opnieuw. Er wordt nooit automatisch dubbel afgerekend of zonder menselijke bevestiging een product samengevoegd; de andere winkel blijft onafhankelijk beoordeeld.

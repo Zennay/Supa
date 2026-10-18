@@ -99,6 +99,16 @@ function unresolved(ingredient, reason) {
 
 function makeStoreBasket(store, capture, demand) {
   const products = new Map(capture.products.map(product => [product.id, product]))
+  // One physical store SKU is not two separate purchases. Until requirements
+  // for a shared SKU are explicitly aggregated into a single ingredient row,
+  // neither duplicate is a trustworthy whole-pack basket line.
+  const selectedProductCounts = new Map()
+  for (const ingredient of demand.ingredients) {
+    const productId = ingredient.productIds[store]
+    if (productId !== null && productId !== undefined) {
+      selectedProductCounts.set(productId, (selectedProductCounts.get(productId) ?? 0) + 1)
+    }
+  }
   let totalCents = 0
   let matchedLineCount = 0
   let unresolvedLineCount = 0
@@ -107,6 +117,11 @@ function makeStoreBasket(store, capture, demand) {
     if (productId === null || productId === undefined) {
       unresolvedLineCount++
       return unresolved(ingredient, 'Product niet expliciet gekozen voor deze winkel')
+    }
+    if (selectedProductCounts.get(productId) > 1) {
+      unresolvedLineCount++
+      return unresolved(ingredient,
+        'Hetzelfde winkelproduct is meermaals gekoppeld; voeg de fysieke behoeften samen en kies daarna opnieuw')
     }
     const product = products.get(productId)
     if (!product || !product.available || product.priceCents === null ||
