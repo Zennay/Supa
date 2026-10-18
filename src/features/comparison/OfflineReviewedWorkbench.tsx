@@ -8,6 +8,7 @@ import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { TwoStoreIngredientLedger } from './TwoStoreIngredientLedger.tsx'
+import { StagedStorePreview } from './StagedStorePreview.tsx'
 import { LocalProductPicker } from './LocalProductPicker.tsx'
 import './offlineReviewedWorkbench.css'
 
@@ -620,7 +621,7 @@ export function OfflineReviewedWorkbench({
         {stagedStores.length > 0 && <div className="offline-price-workbench__staged" role="status">
           <strong>Losse winkelopnames in geheugen:</strong> {stagedStores.join(' + ')}.
           {stagedStores.length === 1
-            ? ' Upload nu de tweede winkel als JSON. Tot die tijd is geen totaal of verschil beschikbaar.'
+            ? ' Laad de andere winkel als JSON of CSV. Tot die tijd is alleen deze winkel afzonderlijk beschikbaar, zonder prijsverschil.'
             : ' Beide bestanden geladen; de bestaande regels bepalen of de prijzen vergelijkbaar zijn.'}
           <button type="button" className="ghost-button" onClick={() => {
             importVersion.current++
@@ -630,6 +631,12 @@ export function OfflineReviewedWorkbench({
             setMessage('Beide losse winkelopnames uit dit scherm verwijderd.')
           }}>Wis losse opnames</button>
         </div>}
+        {!imported && stagedStores.map(store => (
+          <StagedStorePreview key={store} store={store}
+            capture={storedStages[store]!}
+            plan={plan} recipes={recipes} activeDays={activeDays} clockMs={clockMs}
+          />
+        ))}
         <label>Of plak de twee winkelopnames als JSON
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
