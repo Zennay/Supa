@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { buildOneStoreBasket, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { parseSingleOfflineCapture, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
@@ -9,6 +9,37 @@ import { stagedStoreFingerprint } from './stagedStoreFingerprint.ts'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const dates = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
+
+/** User-initiated downloads only: no automatic persistence, network or retailer requests. */
+function downloadPrivateFile(name: string, content: string, mime: string) {
+  const uri = URL.createObjectURL(new Blob([content], { type: mime }))
+  try {
+    const link = document.createElement('a')
+    link.href = uri
+    link.download = name
+    document.body.append(link)
+    link.click()
+    link.remove()
+  } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+}
+
+function privateUnknownList(store: OfflineRetailer, lines: ReturnType<typeof buildOneStoreBasket>['lines']) {
+  const unresolved = lines.filter(line => line.status === 'unresolved')
+  const clean = (text: string) => text
+    .replace(/[\\u0000-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\u2066-\\u2069]/gu, ' ')
+    .replace(/\\s+/g, ' ').trim().slice(0, 160)
+  return [
+    'SUPA · ONTBREKENDE PRODUCTEN · ' + store,
+    'Voor het actuele privéweekmenu, zonder winkelprijsbewijs.',
+    '',
+    ...unresolved.map(line => '☐ ' + clean(line.ingredientLabel) + ' · nodig: ' +
+      (line.requirement.amount ?? '?') + ' ' + line.requirement.unit +
+      ' · product of prijs onbekend'),
+    '',
+    'Geen geverifieerde winkelprijs, rechtenverklaring of besparingsclaim.',
+  ].join('\\n') + '\\n'
+}
+
 
 /**
  * This view is intentionally restricted to exactly one locally staged capture.
@@ -26,6 +57,7 @@ export function StagedStorePreview({
   clockMs: number
   session: OfflineComparisonSession
 }) {
+  const [fileMessage, setFileMessage] = useState('')
   const fingerprint = useMemo(() => stagedStoreFingerprint(capture, plan, recipes, activeDays),
     [capture, plan, recipes, activeDays])
   const manual = session.stagedManual[store]
@@ -93,6 +125,39 @@ export function StagedStorePreview({
       {' '}{basket.matchedLineCount > 0 || complete
         ? euros.format(basket.totalCents / 100) : 'onbekend'}</strong>
       {!complete && ' · dit is geen volledig mandtotaal.'}</p>
+    <div className="offline-price-workbench__actions" role="group"
+      aria-label={'Privébestanden voor ' + store}>
+      <button type="button" className="ghost-button" onClick={() => {
+        try {
+          // Use the original admitted capture rather than the normalized
+          // StoreProduct where an absent price is represented internally as 0.
+          const raw = JSON.stringify({ schema: 'supa-offline-store-capture-v1', capture })
+          const admitted = parseSingleOfflineCapture(raw, Date.now())
+          if (admitted.retailer !== store) throw Error('store mismatch')
+          downloadPrivateFile(
+            store === 'PLUS' ? 'supa-mijn-plus-opname.json' : 'supa-mijn-dekamarkt-opname.json',
+            raw + '\\n', 'application/json;charset=utf-8',
+          )
+          setFileMessage('Je eigen originele winkelopname is lokaal gedownload. Herimporteer dit bestand in Vergelijk.')
+        } catch {
+          setFileMessage('Deze winkelopname kan niet veilig worden geëxporteerd.')
+        }
+      }}>Bewaar mijn {store}-opname (JSON)</button>
+      <button type="button" className="ghost-button"
+        disabled={basket.unresolvedLineCount === 0}
+        onClick={() => {
+          try {
+            downloadPrivateFile(
+              store === 'PLUS' ? 'supa-plus-nog-opzoeken.txt' : 'supa-dekamarkt-nog-opzoeken.txt',
+              privateUnknownList(store, basket.lines), 'text/plain;charset=utf-8',
+            )
+            setFileMessage('De ontbrekende ingrediënten staan in een lokale tekstlijst, zonder verzonnen prijs.')
+          } catch {
+            setFileMessage('De lijst met ontbrekende ingrediënten kan niet worden gedownload.')
+          }
+        }}>Download ontbrekende producten ({basket.unresolvedLineCount})</button>
+    </div>
+    {fileMessage && <p role="status" aria-live="polite">{fileMessage}</p>}
     <p className="disclaimer">De koppeling is uitsluitend een technisch voorstel uit
       jouw lokale opname. Controleer verpakkingen, identiteit, hoeveelheden en prijzen
       zelf. Handmatige keuzes zijn tijdelijk en brongebonden; ze worden pas door de
