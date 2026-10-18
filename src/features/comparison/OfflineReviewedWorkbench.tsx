@@ -376,7 +376,7 @@ export function OfflineReviewedWorkbench({
         .filter(product => product.available).map(product => product.id))
       const retainedSelections: Record<string, string> = {}
       if (session.manualSelections.fingerprint === oldFingerprint) {
-        const prefix = other + '\\u0000'
+        const prefix = other + '\u0000'
         for (const [key, productId] of Object.entries(session.manualSelections.products)) {
           if (key.startsWith(prefix) && otherAvailable.has(productId)) {
             retainedSelections[key] = productId
