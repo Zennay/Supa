@@ -44,7 +44,10 @@ export function previewLocalRecipePortions(
     draft: scaled.draft,
     portionWarnings: scaled.warnings,
     sourceAssessment,
+    // A valid metric amount does not resolve outstanding source provenance,
+    // imported measurement warnings or unknown original servings.
     needsReview: sourceNotReviewed ||
+      !Array.isArray(source.warnings) || source.warnings.length > 0 ||
       scaled.status === 'needs_review' ||
       !canConfirmUserRecipeDraft(scaled.draft),
     fetchAuthorized: false,
