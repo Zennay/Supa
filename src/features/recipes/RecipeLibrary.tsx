@@ -7,6 +7,7 @@ import { importRecipeLink } from './importRecipeLink'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { ownRecipeShoppingChecklist } from './recipeShoppingChecklist'
+import { exportOwnRecipePrivateWeek } from './exportOwnRecipePrivateWeek'
 import './recipes.css'
 
 function keyed<T>(items: readonly T[], identity: (item: T) => string) {
@@ -59,6 +60,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [isVariant, setIsVariant] = useState(false)
   const [shoppingPortions, setShoppingPortions] = useState('2')
   const [showShoppingCopy, setShowShoppingCopy] = useState(false)
+  const [privateWeekMessage, setPrivateWeekMessage] = useState('')
   const shoppingCopy = useRef<HTMLTextAreaElement>(null)
   const [backupPreview, setBackupPreview] = useState<RecipeBackupPreview | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
@@ -114,6 +116,26 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setShowShoppingCopy(true)
     }
   }
+  function downloadForPrivateComparison() {
+    setPrivateWeekMessage('')
+    try {
+      if (!selected || !('savedAt' in selected)) throw new Error('Open eerst een eigen recept.')
+      const json = exportOwnRecipePrivateWeek(selected, Number(shoppingPortions))
+      const uri = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }))
+      const link = document.createElement('a')
+      try {
+        link.href = uri
+        link.download = 'supa-recept-voor-privevergelijker.json'
+        document.body.append(link)
+        link.click()
+        link.remove()
+        setPrivateWeekMessage('Ingrediënten veilig geëxporteerd. Open de privévergelijker, importeer dit JSON-bestand als weekmenu en koppel daarna je eigen waargenomen winkelproducten.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch (cause) {
+      setPrivateWeekMessage(cause instanceof Error ? cause.message : 'Dit recept kan niet veilig worden geëxporteerd.')
+    }
+  }
+
   async function loadOwnRecipeBackup(file?: File) {
     if (!file) return
     const version = ++backupReadVersion.current
@@ -259,7 +281,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     <section className="hifi-section"><div className="hifi-section-heading"><div><h2>Recepten</h2><p className="recipe-count">{demo.length + own.length} recepten</p></div><button aria-label="Sorteer recepten op naam" aria-pressed={sort} onClick={() => setSort(!sort)}><FigmaImage asset={a.recipeSort} alt="" /></button></div>
       <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe && recipe.image ? '' : ' own-recipe-card'}`} key={recipe.id}>
         {'image' in recipe && recipe.image && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
-        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setShoppingPortions(String(recipe.servings ?? 2)); setShowShoppingCopy(false); detail.current?.showModal() }} />
+        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setShoppingPortions(String(recipe.servings ?? 2)); setShowShoppingCopy(false); setPrivateWeekMessage(''); detail.current?.showModal() }} />
         <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
         <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p></div>
       </article>)}</div>
@@ -343,7 +365,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <p>Maak een ongeprijsde lijst voor het gewenste aantal porties. Stuks die niet heel uitkomen, moet je zelf beoordelen.</p>
           <label>Gewenste porties
             <input type="number" min="1" max="100" step="1" value={shoppingPortions}
-              onChange={event => { setShoppingPortions(event.target.value); setShowShoppingCopy(false) }} />
+              onChange={event => { setShoppingPortions(event.target.value); setShowShoppingCopy(false); setPrivateWeekMessage('') }} />
           </label>
           {ownShopping && ownShopping.canCopy ? <>
             <ul>{ownShopping.lines.map(line => <li key={line.key}>
@@ -359,6 +381,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
               value={ownShopping.copyText} onFocus={event => event.currentTarget.select()} />}
             {showShoppingCopy && <button type="button" onClick={() => shoppingCopy.current?.select()}>Selecteer alle tekst</button>}
             <button type="button" onClick={downloadOwnRecipeChecklist}>Download ongeprijsde lijst (TXT)</button>
+            <button type="button" onClick={downloadForPrivateComparison}>Gebruik dit recept in winkelvergelijker (JSON)</button>
+            <a href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">Open privéwinkelvergelijker</a>
+            {privateWeekMessage && <p role="status">{privateWeekMessage}</p>}
           </> : <p role="status">Vul 1 tot 100 hele porties in en controleer de oorspronkelijke hoeveelheid per recept.</p>}
         </section></>}</> : <p>Dit is een kaart uit het oorspronkelijke ontwerp. Ingrediënten en bereiding zijn nog niet beschikbaar.</p>}</>}</dialog>
   </div>
