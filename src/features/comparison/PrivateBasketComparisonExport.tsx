@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
+import { compareFullBaskets } from '../../domain/basketComparison.ts'
 
 const COLUMNS = [
   'plusObservedAt', 'dekaObservedAt', 'comparisonStatus',
@@ -81,7 +82,11 @@ function buildCsv(plus: OneStoreBasket, deka: OneStoreBasket,
     throw new Error('De twee mandjes bevatten verschillende ingrediëntbehoeften.')
   }
   const complete = plus.unresolvedLineCount === 0 && deka.unresolvedLineCount === 0
-  const showMoneyDifference = comparable && complete
+  // Never trust an optimistic UI flag alone for private monetary deltas.
+  // The existing canonical comparator checks physical demand, whole-pack
+  // arithmetic, exact store identity and complete matched coverage.
+  const showMoneyDifference = comparable && complete &&
+    compareFullBaskets({ baseline: plus, candidate: deka }).claimable
   const state = showMoneyDifference ? 'privé rekenkundig vergelijkbaar' :
     'geen volledig of actueel vergelijkbaar prijsverschil'
   const rows = plus.lines.map(plusLine => {
@@ -119,7 +124,8 @@ function privateComparisonHtml(
   // independently of the paired comparison. Never print a forged winner.
   buildCsv(plus, deka, plusObservedAt, dekaObservedAt, comparable)
   const complete = plus.unresolvedLineCount === 0 && deka.unresolvedLineCount === 0
-  const showDifference = comparable && complete
+  const showDifference = comparable && complete &&
+    compareFullBaskets({ baseline: plus, candidate: deka }).claimable
   const clean = (value: string | number | null) => String(value ?? '')
     .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
