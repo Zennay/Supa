@@ -120,10 +120,12 @@ function updateSelect(select, store, unit) {
     (filtered.length > 80 ? 'toon maximaal 80, verfijn je zoekterm. ' : '') +
     'Kies zelf de juiste SKU.'
 }
-function invalidatePrice() {
+function invalidateUnpricedDemand() {
   unpricedTrip.hidden = true
   unpricedChecked.clear()
   unpricedSnapshot = null
+}
+function invalidatePrice() {
   if (priceResult) priceResult.hidden = true
   if (priceStatus) {
     priceStatus.textContent = 'De bron of mandvraag is veranderd. Vergelijk opnieuw voor een betrouwbaar privéresultaat.'
@@ -197,7 +199,7 @@ function addIngredient(restored = null) {
   }
   const actions = node('div', { className: 'row-actions' })
   const remove = node('button', { type: 'button', className: 'secondary' }, 'Verwijder ingrediënt')
-  remove.addEventListener('click', () => { row.remove(); refresh() })
+  remove.addEventListener('click', () => { row.remove(); invalidateUnpricedDemand(); refresh() })
   actions.append(remove)
   row.append(heading, grid, storesGrid, actions)
   lines.append(row)
@@ -206,6 +208,7 @@ function addIngredient(restored = null) {
   downloadUnpriced.disabled = false
   showUnpriced.disabled = false
   compareNow.disabled = !captures
+  invalidateUnpricedDemand()
   invalidatePrice()
 }
 
@@ -598,6 +601,11 @@ compareNow.addEventListener('click', () => {
 for (const kind of ['input', 'change']) {
   document.addEventListener(kind, event => {
     const target = event.target
-    if (target instanceof Element && (target.closest('#lines') || target.closest('#meal-count') || target.closest('#source') || target.closest('#plus-source') || target.closest('#deka-source'))) invalidatePrice()
+    if (!(target instanceof Element)) return
+    if (target.matches('.label, .amount, .unit') && target.closest('#lines') ||
+        target.closest('#meal-count')) invalidateUnpricedDemand()
+    if (target.closest('#lines') || target.closest('#meal-count') ||
+        target.closest('#source') || target.closest('#plus-source') ||
+        target.closest('#deka-source')) invalidatePrice()
   })
 }
