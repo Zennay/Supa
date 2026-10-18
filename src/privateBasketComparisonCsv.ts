@@ -24,12 +24,15 @@ const header = [
   'verschil_cent_DekaMarkt_minus_PLUS', 'vergelijking',
 ]
 
-function literalCsv(value: unknown): string {
+function literalCsv(value: unknown, signedMoneyDelta = false): string {
   const raw = String(value ?? '')
   // NFKC discovers compatibility characters (e.g. full-width equals);
   // invisible marks may precede spreadsheet formula operators.
   const prefix = /^[\p{White_Space}\p{Cf}\p{Mn}\p{Mc}\p{Me}]*[=+@-]/u
-  const text = prefix.test(raw.normalize('NFKC')) ? "'" + raw : raw
+  // A negative difference is canonical arithmetic, not untrusted formula text.
+  // All other user-supplied text still receives conservative formula escaping.
+  const text = signedMoneyDelta && /^-\\d+$/.test(raw)
+    ? raw : prefix.test(raw.normalize('NFKC')) ? "'" + raw : raw
   return '"' + text.replaceAll('"', '""') + '"'
 }
 
@@ -116,7 +119,7 @@ export function createPrivateBasketComparisonCsv(input: {
   if (rows.some(row => row.length !== header.length)) {
     throw new Error('Ongeldig privé CSV-overzicht')
   }
-  const csv = rows.map(row => row.map(literalCsv).join(',')).join('\r\n') + '\r\n'
+  const csv = rows.map(row => row.map((cell, column) => literalCsv(cell, column === 21)).join(',')).join('\r\n') + '\r\n'
   if (new TextEncoder().encode(csv).length > 256000) {
     throw new Error('Privé CSV-overzicht te groot')
   }
