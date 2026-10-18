@@ -140,6 +140,7 @@ export function OfflineReviewedWorkbench({
     added: number
     removed: number
     changed: number
+    priceExamples: Array<{ name: string; before: string; after: string }>
     resetManualMatches: number
     resetExtraProducts: number
     resetTripTicks: number
@@ -626,6 +627,21 @@ export function OfflineReviewedWorkbench({
       const old = before.get(id)
       return old && JSON.stringify(old) !== JSON.stringify(product)
     }).length
+    // Display only product prices explicitly present in these admitted LOCAL
+    // sources. An unavailable pack has no known price, not a zero-cent price.
+    const priceLabel = (product: typeof next.captures.PLUS.products[number]) =>
+      product.available && Number.isSafeInteger(product.priceCents)
+        ? euros.format(product.priceCents / 100) + ' per verpakking (' +
+          (product.packAmount ?? '?') + ' ' + product.packUnit + ')'
+        : 'prijs onbekend / niet beschikbaar'
+    const priceExamples = [...after].flatMap(([id, product]) => {
+      const old = before.get(id)
+      return old && (old.available !== product.available ||
+        (old.available && product.available && old.priceCents !== product.priceCents))
+        ? [{ name: safeReferenceLabel(product.name).slice(0, 95),
+            before: priceLabel(old), after: priceLabel(product) }]
+        : []
+    }).slice(0, 8)
     const resetManualMatches = session.manualSelections.fingerprint ===
       offlineSessionFingerprint(imported, plan, recipes, activeDays)
       ? Object.keys(session.manualSelections.products)
@@ -636,7 +652,7 @@ export function OfflineReviewedWorkbench({
       previousObservedAt: previous.captures[retailer].observedAt,
       nextObservedAt: next.captures[retailer].observedAt,
       previousCount: before.size, nextCount: after.size,
-      added, removed, changed,
+      added, removed, changed, priceExamples,
       resetManualMatches,
       resetExtraProducts: session.extraProductIds[retailer].length,
       resetTripTicks: session.tripMemory[retailer]?.done.length ?? 0,
@@ -1119,6 +1135,14 @@ export function OfflineReviewedWorkbench({
           <p>{pendingReplacement.previousCount} bestaande producten → {pendingReplacement.nextCount} nieuwe producten.
             Toegevoegd: {pendingReplacement.added}; verdwenen: {pendingReplacement.removed};
             gewijzigde productgegevens: {pendingReplacement.changed}.</p>
+          {pendingReplacement.priceExamples.length > 0 && <div>
+            <strong>Prijsveranderingen in jouw eigen opgenomen producten (max. 8)</strong>
+            <ul>{pendingReplacement.priceExamples.map((item, index) =>
+              <li key={index}>
+                <strong>{item.name}</strong>: {item.before} → {item.after}
+              </li>)}</ul>
+            <small>Dit zijn alleen verschillen tussen jouw lokale bestanden, geen actuele of onafhankelijk geverifieerde winkelprijzen.</small>
+          </div>}
           <p><strong>Wat wordt opnieuw beoordeeld bij deze winkel?</strong><br />
             {pendingReplacement.resetManualMatches} handmatige productkoppelingen,
             {' '}{pendingReplacement.resetExtraProducts} losse productkeuzes en
