@@ -47,6 +47,9 @@ const result = document.querySelector<HTMLElement>('#result')!
 const summary = document.querySelector<HTMLDivElement>('#summary')!
 const capturesLabel = document.querySelector<HTMLParagraphElement>('#captures')!
 const rows = document.querySelector<HTMLTableSectionElement>('#rows')!
+const nextActions = document.querySelector<HTMLElement>('#next-actions')!
+const missingItems = document.querySelector<HTMLUListElement>('#missing-items')!
+let missingTasks: string[] = []
 let inputRevision = 0
 
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -325,6 +328,24 @@ function show(source: Source, demand: Demand): void {
     '. Onderling verschil: ' + String(gap / 3600000000000n) + ' hele uren.' +
     (fresh ? ' Beide binnen zeven dagen en maximaal 24 uur uiteen.' :
       ' Verouderd, toekomstig of meer dan 24 uur uiteen: hercontroleer beide bronnen.')
+  missingTasks = []
+  for (const [store, basket] of [['PLUS', left], ['DekaMarkt', right]] as const) {
+    for (const line of basket.lines) {
+      if (line.status === 'unresolved') {
+        missingTasks.push(store + ' · ' + line.ingredientLabel + ': ' + line.reasons.join('; '))
+      }
+    }
+  }
+  if (firstAge < 0n || firstAge > weekNs) missingTasks.push('PLUS · maak een nieuwe echte winkelopname; deze tijd is toekomstig of ouder dan 7 dagen.')
+  if (secondAge < 0n || secondAge > weekNs) missingTasks.push('DekaMarkt · maak een nieuwe echte winkelopname; deze tijd is toekomstig of ouder dan 7 dagen.')
+  if (gap > dayNs) missingTasks.push((start < end ? 'PLUS' : 'DekaMarkt') +
+    ' · oudere winkelopname opnieuw vastleggen; het paar ligt meer dan 24 uur uit elkaar.')
+  if (!complete && missingTasks.length === 0) {
+    missingTasks.push('Controleer alle fysieke aantallen, gekozen productidentiteiten en mandbedragen voordat je een volledige vergelijking maakt.')
+  }
+  missingItems.replaceChildren()
+  for (const task of missingTasks) missingItems.append(create('li', task))
+  nextActions.hidden = missingTasks.length === 0
   if (complete) {
     const delta = comparison.deltaCents!
     summary.textContent = 'Volledige privévergelijking uit je eigen waarnemingen: PLUS ' +
