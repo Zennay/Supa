@@ -135,12 +135,17 @@ export function ingestReviewedBatch(records) {
       record.source.url, record.source.capturedAt, record.source.sha256,
       record.evidenceType,
     ])
-    if (physicalCaptures.has(physical)) {
+    // A rejected variant is not another admitted physical observation. Keep
+    // it visible for human review without letting it block a genuine valid
+    // capture or falsely inflate accepted-source coverage. Two accepted
+    // aliases of one physical capture remain an integrity error.
+    const result = ingestSafeReviewedEvidence(record)
+    if (result.accepted && physicalCaptures.has(physical)) {
       throw new Error('Duplicate physical reviewed capture')
     }
     unique.add(identifier)
-    physicalCaptures.add(physical)
-    results.push(ingestSafeReviewedEvidence(record))
+    if (result.accepted) physicalCaptures.add(physical)
+    results.push(result)
   }
   const accepted = results.filter(result => result.accepted)
   const summary = {
