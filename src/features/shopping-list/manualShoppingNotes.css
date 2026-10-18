@@ -12,3 +12,8 @@
 .manual-shopping-notes input[type=checkbox] { min-width:20px; min-height:20px; }
 .manual-shopping-notes textarea { width:100%; min-height:100px; }
 .manual-shopping-notes :is(button,input,select,textarea):focus-visible { outline:3px solid #005135; outline-offset:2px; }
+
+.manual-shopping-notes__backup { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px; border:1px solid #98b6a0; border-radius:12px; background:white; }
+.manual-shopping-notes__backup p { flex-basis:100%; }
+.manual-shopping-notes__actions label { min-width:220px; font-size:.92rem; }
+.manual-shopping-notes__actions input[type=file] { display:block; min-height:44px; padding:8px; }

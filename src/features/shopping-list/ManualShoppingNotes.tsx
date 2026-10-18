@@ -1,5 +1,6 @@
-import { useState, type FormEvent, type Dispatch, type SetStateAction } from 'react'
+import { useRef, useState, type FormEvent, type Dispatch, type SetStateAction } from 'react'
 import './manualShoppingNotes.css'
+import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
 type SetNotes = Dispatch<SetStateAction<UnpricedShoppingNote[]>>
@@ -15,6 +16,56 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
+  const [backupPreview, setBackupPreview] = useState<UnpricedShoppingNote[] | null>(null)
+  const [backupBusy, setBackupBusy] = useState(false)
+  const readVersion = useRef(0)
+  function backupDownload() {
+    try {
+      const json = serializePrivateNotes(notes)
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-eigen-ongeprijsde-lijst-backup.json'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Je hele ongeprijsde lijst is lokaal als JSON-backup opgeslagen.')
+    } catch { setMessage('Kon deze privéboodschappen niet als backup opslaan.') }
+  }
+  async function backupRead(file?: File) {
+    const version = ++readVersion.current
+    setBackupPreview(null)
+    if (!file) return
+    setBackupBusy(true)
+    try {
+      if (file.size > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw new Error('Backup is groter dan 64 kB.')
+      const bytes = await file.arrayBuffer()
+      if (version !== readVersion.current) return
+      if (bytes.byteLength > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw new Error('Backup is te groot.')
+      const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+      const parsed = normalizePrivateNotes(JSON.parse(source))
+      const merged = mergePrivateNotes(notes, parsed)
+      setBackupPreview(parsed)
+      setMessage(merged.added + ' nieuwe boodschappen gevonden. Controleer en bevestig de import.')
+    } catch (error) {
+      if (version === readVersion.current) setMessage(error instanceof Error ? error.message : 'Kon backup niet inlezen.')
+    } finally { if (version === readVersion.current) setBackupBusy(false) }
+  }
+  function backupConfirm() {
+    if (!backupPreview) return
+    try {
+      const merged = mergePrivateNotes(notes, backupPreview)
+      setNotes(current => {
+        try { return mergePrivateNotes(current, backupPreview).notes }
+        catch { return current }
+      })
+      setBackupPreview(null)
+      setMessage(merged.added + ' boodschappen toegevoegd; bestaande items en vinkjes behouden.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Import geweigerd.')
+    }
+  }
+
   function add(event: FormEvent) {
     event.preventDefault()
     const label = safeLabel(name)
@@ -80,7 +131,22 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
       <button type="button" disabled={!selected.length} onClick={() => setExportVisible(value => !value)}>
         {exportVisible ? 'Verberg kopieertekst' : 'Toon kopieertekst'}</button>
       <button type="button" disabled={!selected.length} onClick={download}>Download lijst (TXT)</button>
+      <button type="button" disabled={!notes.length} onClick={backupDownload}>Backup hele lijst (JSON)</button>
+      <label>Herstel lijst uit JSON-backup (max. 64 kB)
+        <input type="file" accept=".json,application/json" disabled={backupBusy}
+          onChange={event => { void backupRead(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
+      </label>
     </div>
+    {backupPreview && <div className="manual-shopping-notes__backup" role="group"
+      aria-label="Voorbeeld van de boodschappenbackup">
+      <strong>Privébackup klaar: {backupPreview.length} artikelen</strong>
+      <p>Bestaande artikelen worden niet overschreven. Conflicterende IDs en meer
+        dan 100 artikelen worden geweigerd. Niets wordt geüpload of geprijsd.</p>
+      <button type="button" onClick={backupConfirm}>Bevestig toevoegen aan mijn lijst</button>
+      <button type="button" onClick={() => { readVersion.current++; setBackupPreview(null) }}>
+        Annuleer import
+      </button>
+    </div>}
     {exportVisible && <label>Kopieer mijn ongeprijsde boodschappen
       <textarea rows={Math.min(selected.length + 6, 15)} readOnly value={exportText}
         onFocus={event => event.currentTarget.select()} /></label>}
