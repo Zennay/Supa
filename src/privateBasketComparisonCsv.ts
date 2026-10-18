@@ -102,20 +102,25 @@ export function createPrivateBasketComparisonCsv(input: {
   const dekaTotal = completeOwnStore(baskets.DekaMarkt, fresh.DekaMarkt) ? baskets.DekaMarkt.totalCents : null
   const totalDelta = comparable && plusTotal !== null && dekaTotal !== null
     ? dekaTotal - plusTotal : null
-  rows.push([
-    'mandje_totaal', '', '', '', '',
-    captures.PLUS?.observedAt ?? '', '', '', '', '',
-    plusTotal === null ? '' : String(plusTotal), '', plusTotal === null ? 'Totaal onbekend' : 'Compleet eigen winkelmandje',
-    captures.DekaMarkt?.observedAt ?? '', '', '', '', '',
-    dekaTotal === null ? '' : String(dekaTotal), '', dekaTotal === null ? 'Totaal onbekend' : 'Compleet eigen winkelmandje',
-    totalDelta === null ? '' : String(totalDelta),
-    totalDelta === null ? 'Geen volledige twee-winkelvergelijking' : 'Volledige private bronvergelijking',
-  ])
-  rows.push([
-    'toelichting', '', 'Uitsluitend eigen bronopnames. Geen actuele kassagarantie, bronrecht of openbare besparingsclaim.',
-    '', '', '', '', '', '', '', '', '', '',
-    '', '', '', '', '', '', '', '', '', 'Leeg bedrag betekent onbekend, niet nul.',
-  ])
+  // Construct summary rows using the same fixed schema as every ingredient.
+  // All unknown financial cells remain empty, including incomplete totals.
+  const totalRow = new Array<string>(header.length).fill('')
+  totalRow[0] = 'mandje_totaal'
+  totalRow[5] = captures.PLUS?.observedAt ?? ''
+  totalRow[10] = plusTotal === null ? '' : String(plusTotal)
+  totalRow[12] = plusTotal === null ? 'Totaal onbekend' : 'Compleet eigen winkelmandje'
+  totalRow[13] = captures.DekaMarkt?.observedAt ?? ''
+  totalRow[18] = dekaTotal === null ? '' : String(dekaTotal)
+  totalRow[20] = dekaTotal === null ? 'Totaal onbekend' : 'Compleet eigen winkelmandje'
+  totalRow[21] = totalDelta === null ? '' : String(totalDelta)
+  totalRow[22] = totalDelta === null
+    ? 'Geen volledige twee-winkelvergelijking' : 'Volledige private bronvergelijking'
+  rows.push(totalRow)
+  const note = new Array<string>(header.length).fill('')
+  note[0] = 'toelichting'
+  note[2] = 'Uitsluitend eigen bronopnames. Geen actuele kassagarantie, bronrecht of openbare besparingsclaim.'
+  note[22] = 'Leeg bedrag betekent onbekend, niet nul.'
+  rows.push(note)
   if (rows.some(row => row.length !== header.length)) {
     throw new Error('Ongeldig privé CSV-overzicht')
   }
