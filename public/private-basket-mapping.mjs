@@ -19,6 +19,7 @@ const mealCount = document.querySelector('#meal-count')
 const demandImport = document.querySelector('#demand-import')
 const maxLines = 200
 const save = document.querySelector('#save')
+const downloadUnpriced = document.querySelector('#download-unpriced')
 const compareNow = document.querySelector('#compare-now')
 const priceResult = document.querySelector('#result')
 const priceStatus = document.querySelector('#price-status')
@@ -131,8 +132,9 @@ function refresh() {
     const unit = row.querySelector('.unit').value
     for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit)
   }
-  save.disabled = !captures || !lines.children.length
-  compareNow.disabled = save.disabled
+  save.disabled = !lines.children.length
+  downloadUnpriced.disabled = save.disabled
+  compareNow.disabled = !captures || save.disabled
 }
 function addIngredient(restored = null) {
   if (lines.children.length >= maxLines) return
@@ -190,8 +192,9 @@ function addIngredient(restored = null) {
   row.append(heading, grid, storesGrid, actions)
   lines.append(row)
   for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit.value)
-  save.disabled = !captures
-  compareNow.disabled = save.disabled
+  save.disabled = false
+  downloadUnpriced.disabled = false
+  compareNow.disabled = !captures
   invalidatePrice()
 }
 
@@ -419,7 +422,8 @@ demandImport.addEventListener('change', async () => {
 })
 
 function demand() {
-  if (!captures) throw Error('Open eerst een geldige eigen winkelbron.')
+  // An unpriced shopping demand is valid without any retailer observation.
+  // The comparison button separately requires admitted real store sources.
   const meals = Number(mealCount.value)
   if (!/^[1-9]\d*$/.test(mealCount.value) || !Number.isSafeInteger(meals) || meals > 1000) {
     throw Error('Vul een geldig aantal geselecteerde maaltijden van 1 tot 1000 in.')
@@ -447,6 +451,45 @@ function demand() {
   }
   return { schema: 'supa-private-basket-demand-v1', selectedMealCount: meals, ingredients }
 }
+
+downloadUnpriced.addEventListener('click', () => {
+  try {
+    const data = demand()
+    const lines = [
+      'SUPA · eigen ongeprijsde ingrediëntenlijst',
+      'Aangemaakt op: ' + new Date().toISOString(),
+      'Geselecteerde maaltijden: ' + data.selectedMealCount,
+      'Geen winkelprijzen, automatische productmatching of besparingsclaim.',
+      '',
+      ...data.ingredients.map(item =>
+        '[ ] ' + item.label + ' · ' +
+        (item.amount === null ? 'hoeveelheid nog controleren' :
+          String(item.amount).replace('.', ',') + ' ' +
+            (item.unit === 'piece' ? 'stuk(s)' : item.unit))),
+      '',
+      'Gebruik jouw eigen feitelijke verpakkingsinformatie bij het winkelen.',
+      '',
+    ]
+    const content = lines.join('\n')
+    if (new TextEncoder().encode(content).length > maxBytes) {
+      throw Error('De ongeprijsde ingrediëntenlijst is te groot.')
+    }
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'supa-eigen-ingredienten-ongeprijsd.txt'
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+    notice(status, 'Jouw eigen ongeprijsde ingrediëntenlijst is lokaal aangeboden. ' +
+      data.ingredients.length + ' ingrediënten, zonder fictieve winkelprijzen. Je kunt later alsnog echte bronproducten koppelen.')
+  } catch (error) {
+    notice(status, error instanceof Error ? error.message :
+      'Kan ongeprijsde ingrediëntenlijst niet veilig bewaren.', 'error')
+  }
+})
 
 save.addEventListener('click', () => {
   try {
