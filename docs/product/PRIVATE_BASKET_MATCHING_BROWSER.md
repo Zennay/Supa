@@ -479,3 +479,16 @@ Vrij getypte lijsten accepteren ook bewust het formaat `broccoli: ? g`; deze vra
 Nederlandse duizendtallen met punt zoals `1.000 g` worden uitdrukkelijk **geweigerd als dubbelzinnig** in plaats van door JavaScript stilzwijgend als `1 g` te worden verwerkt. Gebruik `1000 g`, `1 kg` of, bij een echte fractie, een decimale komma. De bestaande exacte metrische optelling en de originele bronprijzen blijven de enige rechters voor pakketaantallen en centbedragen.
 
 Deze wijzigingen zijn softwarefuncties en blokkeren **geen** ongeprijsde planner/recept/boodschappenlijst op ontbrekend PLUS/Deka-veldonderzoek; de afzonderlijke 7-dagen/24-uursprijsvergelijking blijft uiteraard afhankelijk van echte recente opnames.
+
+
+## Private sessie herstellen terwijl een handmatig bronconcept openstaat
+
+Een eigen, werkelijk opgeslagen `supa-private-basket-session-v1`-bestand kan ook bewust worden geopend wanneer eerder een handmatig PLUS- of DekaMarkt-concept werd gewijzigd maar nooit geaccepteerd. Na de bestaande volledige source-, fysieke demand- en SKU-checks **en de gebruikersbevestiging** wordt dit nieuwe sessiebestand de actieve lokale bron. De oude ongeaccepteerde conceptvergrendeling wordt gewist, zodat de gebruiker de herstelde originele bron kan vergelijken, zijn echte opnames kan bewaren en zo nodig SKU's opnieuw kan bevestigen.
+
+Bij een ongeldige, geannuleerde of niet-bevestigde sessie blijven de al toegelaten winkelbronnen en de bestaande conceptstatus intact. Deze reparatie bevat geen extra prijsbron, automatisch toestemmingsbesluit, veldmeting, retailer-call of nieuw runnerproces.
+
+## Grenzen van reeds bestaande historische retaileradapters
+
+De bestaande universele SQLite-operatoradapter is alleen voor **offline historische bronreview**. De bron `scripts/retailer-private-sqlite-planner-reader.py` eist `production_enabled=false`, `sourceRightsVerified=false`, `publishable=false` en laat daadwerkelijk **geen historische prijs in de JS/frontend-handoff** toe (`currentTrustedPriceCents=null`). Die data mogen dus **niet** rechtstreeks worden herverpakt als recente privé-winkelopnames in `supa-offline-prices-v1`; dat zou het oorspronkelijke tijdstip, winkelrechten en prijsstatus onterecht verheffen. De reeds bestaande lokaal aangeleverde, werkelijk gedateerde negenkoloms-CSV of direct ingevoerde eigen observatie blijft de eerlijke geprijsde bron tot een apart geautoriseerd en origineel gedateerd adapterresultaat beschikbaar komt.
+
+De historische scanner/scraper-implementaties zijn daarom niet gedupliceerd of geactiveerd om gebrek aan veldbewijs te omzeilen. Receptimport, Planner, ongeprijsde checklist, historische onderzoeksinspectie en privébronmatching kunnen wel onafhankelijk functioneren.
