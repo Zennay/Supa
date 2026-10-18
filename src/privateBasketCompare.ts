@@ -344,19 +344,33 @@ function nowForTripExpired(store: StoreName): boolean {
 }
 function invalidateAgedComparison(): boolean {
   if (result.hidden) return false
-  if (tripBaskets && tripValidUntilNs &&
-      nowForTripExpired(tripStore.value as StoreName)) {
+  const nowNs = BigInt(Date.now()) * 1000000n
+  // A complete two-store financial outcome must be hidden as soon as either
+  // original observation ages past the seventh day.
+  if (comparisonValidThroughNs !== null && nowNs > comparisonValidThroughNs) {
+    result.hidden = true
     clearTrip()
-    setStatus('De winkelopname voor deze privéboodschappenlijst is ouder dan zeven dagen. Maak een nieuwe eigen opname voordat je opnieuw afvinkt of exporteert.', true)
+    setStatus('Een van de oorspronkelijke winkelopnames is inmiddels ouder dan zeven dagen. Het eerder getoonde volledige prijsverschil is niet meer geldig. Open nieuwe echte winkelopnames en vergelijk opnieuw.', true)
     return true
   }
-  if (comparisonValidThroughNs === null) return false
-  const nowNs = BigInt(Date.now()) * 1000000n
-  if (nowNs <= comparisonValidThroughNs) return false
-  result.hidden = true
-  clearTrip()
-  setStatus('Een van de oorspronkelijke winkelopnames is inmiddels ouder dan zeven dagen. Open recente werkelijke opnames en vergelijk opnieuw; het oude volledige prijsverschil is niet meer geldig.', true)
-  return true
+  // A single valid retailer can supply a shopping list even when the other
+  // source is incomplete; expire only that retailer's list in that case.
+  if (tripBaskets && tripValidUntilNs &&
+      nowForTripExpired(tripStore.value as StoreName)) {
+    const expired = tripStore.value as StoreName
+    tripEligible[expired] = false
+    const other: StoreName = expired === 'PLUS' ? 'DekaMarkt' : 'PLUS'
+    if (tripEligible[other] && !nowForTripExpired(other)) {
+      tripStore.value = other
+      ticked.clear()
+      renderTrip()
+    } else {
+      clearTrip()
+    }
+    setStatus('De winkelopname voor ' + expired + ' is inmiddels ouder dan zeven dagen. Deze privéboodschappenlijst is vervallen; ververs de eigen prijsbron voor die winkel.', true)
+    return true
+  }
+  return false
 }
 
 function renderTrip(): void {
