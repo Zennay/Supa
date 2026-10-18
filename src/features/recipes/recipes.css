@@ -143,3 +143,7 @@
   background:#eff9f1; color:#244d33; border-radius:10px; font-size:.86rem; line-height:1.5;
 }
 .recipe-review__planner-blocked { border-color:#c4ad83; background:#fff9ed; color:#775225; }
+
+.recipe-own-actions__portions .recipe-own-actions__unpriced-list {
+  background:#fff; color:#005135; border:1px solid #5b9778;
+}

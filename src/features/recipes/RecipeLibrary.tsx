@@ -9,6 +9,7 @@ import { toPlannerRecipe } from './plannerRecipes.ts'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { ImportedIngredientReview } from './ImportedIngredientReview.tsx'
+import { privateRecipeShoppingText } from './privateRecipeShoppingList.ts'
 import './recipes.css'
 
 function keyed<T>(items: readonly T[], identity: (item: T) => string) {
@@ -144,6 +145,25 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
     editor.current?.showModal()
   }
   function closeEditor() { sourceReadVersion.current++; request.current?.abort(); setBusy(false); editor.current?.close() }
+  /** Useful before a retailer license/capture is available: a local, unpriced
+   * ingredient checklist from the exact existing human-review and scaler flow. */
+  function downloadUnpricedRecipeChecklist(recipe: SavedRecipe) {
+    setError('')
+    try {
+      const target = Number(copyServings)
+      const content = privateRecipeShoppingText(recipe, target)
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-eigen-recept-boodschappen.txt'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('De ongeprijsde boodschappenlijst van dit recept is lokaal gedownload.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Kon de ongeprijsde lijst niet maken.')
+    }
+  }
   function prepareScaledRecipe(recipe: SavedRecipe) {
     setError('')
     try {
@@ -504,6 +524,10 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
           </label>
           <button type="button" onClick={() => prepareScaledRecipe(selected)}>
             Schaal ingrediënten en maak kopie
+          </button>
+          <button type="button" className="recipe-own-actions__unpriced-list"
+            onClick={() => downloadUnpricedRecipeChecklist(selected)}>
+            Download ongeprijsde boodschappenlijst voor {copyServings || '?'} porties (TXT)
           </button>
           <small>Alleen exact berekenbare hoeveelheden worden automatisch geschaald.
             Controleer stuksaantallen en onbekende maten; het oorspronkelijke recept blijft intact.</small>
