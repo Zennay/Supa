@@ -1039,6 +1039,10 @@ restoreSession.addEventListener('change', async () => {
     if (attempt !== sessionImportRevision || originalSourceRevision !== sourceRevision) return
     ++sourceRevision
     captures = verified
+    // An explicitly confirmed portable session replaces any unsaved manual
+    // draft; otherwise a stale draft lock would hide its real source and
+    // permanently disable the restored comparison and source backup.
+    pendingManualEdit = false
     sourceInput.value = ''
     plusInput.value = ''
     dekaInput.value = ''
