@@ -4,7 +4,7 @@ import { PlannerView } from './features/planner/PlannerView'
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
-import { BasketView } from './features/basket/BasketView'
+import { BasketView, resolveStagedBasket } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
@@ -14,10 +14,8 @@ import { toPlannerRecipe } from './features/recipes/plannerRecipes'
 import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
 import { figmaAssets } from './features/home/figmaAssets'
 import { buildOneStoreBasket } from './domain/basket'
-import { parseSingleOfflineCapture, type OfflinePriceSnapshots, type OfflineRetailer } from './domain/offlineReviewedImport.ts'
-import { stagedStoreFingerprint } from './features/comparison/stagedStoreFingerprint.ts'
+import type { OfflinePriceSnapshots, OfflineRetailer } from './domain/offlineReviewedImport.ts'
 import type { OfflineComparisonSession } from './features/comparison/offlineComparisonSession.ts'
-import { StagedStorePreview } from './features/comparison/StagedStorePreview.tsx'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
   defaultPlannerPreferences,
@@ -339,29 +337,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const stagedForPlanner = useMemo(() => {
     if (offlinePriceSession.imported) return null
     const store = offlinePriceSession.stagedCaptures[offlinePriceSession.selectedStore]
-      ? offlinePriceSession.selectedStore
-      : stagedRetailers[0]
-    if (!store) return null
-    const capture = offlinePriceSession.stagedCaptures[store]
-    if (!capture) return null
-    try {
-      const source = parseSingleOfflineCapture(JSON.stringify({
-        schema: 'supa-offline-store-capture-v1', capture,
-      }), sourceClock).normalized
-      if (source.retailer !== store) return null
-      const fingerprint = stagedStoreFingerprint(capture, plannedMeals, recipes, activeDays)
-      const manual = offlinePriceSession.stagedManual[store]
-      const selections = manual.fingerprint === fingerprint ? manual.products : {}
-      const stagedBasket = buildOneStoreBasket({
-        store: { id: store, name: store },
-        plan: plannedMeals, recipes, activeDays, products: source.products,
-        manualProductIds: selections,
-      })
-      const nowNs = BigInt(Math.trunc(sourceClock)) * 1_000_000n
-      const fresh = nowNs >= source.observedNs - 300_000_000_000n &&
-        nowNs - source.observedNs <= 604_800_000_000_000n
-      return { store, basket: stagedBasket, fresh }
-    } catch { return null }
+      ? offlinePriceSession.selectedStore : stagedRetailers[0]
+    if (!store || typeof resolveStagedBasket !== 'function') return null
+    // Resolve through the existing BasketView-owned canonical local importer,
+    // not through an additional eager App runtime dependency.
+    return resolveStagedBasket(offlinePriceSession, store, plannedMeals,
+      recipes, activeDays, sourceClock)
   }, [offlinePriceSession.imported, offlinePriceSession.stagedCaptures,
     offlinePriceSession.selectedStore, offlinePriceSession.stagedManual,
     plannedMeals, recipes, activeDays, sourceClock])
@@ -523,23 +504,14 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           />
         )}
         {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length > 0 && (
-          <section className="offline-price-workbench__results" aria-label="Losse eigen winkelopnames">
-            <h2>Mijn tijdelijke winkelboodschappen</h2>
-            <p role="status">Er is nog geen geldige vergelijking tussen PLUS en DekaMarkt.
-              Je kunt de huidige lokale winkelopname al afzonderlijk bekijken en afvinken.
-              Geen prijsverschil zonder twee valide gekoppelde mandjes.</p>
-            {stagedRetailers.map(store => (
-              <StagedStorePreview key={store} store={store} session={offlinePriceSession}
-                capture={offlinePriceSession.stagedCaptures[store]!}
-                plan={plannedMeals} recipes={recipes}
-                activeDays={activeDays} clockMs={sourceClock}
-              />
-            ))}
-            <button type="button" className="ghost-button" onClick={() => navigate('basket')}>
-              Open Vergelijk om tweede winkel te importeren
-            </button>
-          </section>
+          <BasketView basket={basket} comparison={basketComparison}
+            comparisonBaseline={comparisonBaseline} comparisonCandidate={comparisonCandidate}
+            manualPlan={plannedMeals} manualRecipes={recipes} manualActiveDays={activeDays}
+            manualWeekBudgetEuros={budget} offlinePriceSession={offlinePriceSession}
+            displayStagedOnly onOpenComparison={() => navigate('basket')}
+          />
         )}
+        {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && <ShoppingListView basket={basket} />}
         {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && (
           <p className="disclaimer" role="status">
             Nog geen privéwinkelopnames geladen. Open Vergelijk om je eigen

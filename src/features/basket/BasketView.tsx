@@ -3,6 +3,8 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import { ManualStoreComparison } from '../comparison/ManualStoreComparison'
 import { OfflineReviewedWorkbench } from '../comparison/OfflineReviewedWorkbench'
 import { ImportedShoppingList } from '../comparison/ImportedShoppingList.tsx'
+import { StagedStorePreview } from '../comparison/StagedStorePreview.tsx'
+export { resolveStagedBasket } from '../comparison/stagedSessionBasket.ts'
 import type { OfflineComparisonSession } from '../comparison/offlineComparisonSession.ts'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
@@ -35,6 +37,7 @@ export function BasketView({
   manualWeekBudgetEuros,
   offlinePriceSession,
   displayLocalList,
+  displayStagedOnly,
   onOpenComparison,
   onOpenList,
   onOpenPlanner,
@@ -49,10 +52,27 @@ export function BasketView({
   manualWeekBudgetEuros?: number
   offlinePriceSession: OfflineComparisonSession
   displayLocalList?: boolean
+  displayStagedOnly?: boolean
   onOpenComparison?: () => void
   onOpenList?: () => void
   onOpenPlanner?: () => void
 }) {
+  if (displayStagedOnly && manualPlan && manualRecipes && manualActiveDays) {
+    const stores = (['PLUS', 'DekaMarkt'] as const).filter(
+      store => !!offlinePriceSession.stagedCaptures[store])
+    return <section className="offline-price-workbench__results" aria-label="Losse eigen winkelopnames">
+      <h2>Mijn tijdelijke winkelboodschappen</h2>
+      <p role="status">Zonder geldig winkelpaar is er geen prijsverschil. Een enkele
+        toegelaten winkelopname is wel bruikbaar als eigen lijst, zonder prijsclaim.</p>
+      {stores.map(store => <StagedStorePreview key={store} store={store}
+        session={offlinePriceSession} capture={offlinePriceSession.stagedCaptures[store]!}
+        plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
+        clockMs={Date.now()} />)}
+      <button type="button" className="ghost-button" onClick={onOpenComparison}>
+        Open Vergelijk om de tweede winkel te importeren
+      </button>
+    </section>
+  }
   if (displayLocalList && manualPlan && manualRecipes && manualActiveDays) {
     return <ImportedShoppingList
       session={offlinePriceSession}
