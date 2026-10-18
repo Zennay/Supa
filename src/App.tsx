@@ -374,7 +374,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       ? !stagedForPlanner.fresh ? 'expired'
         : stagedForPlanner.basket.selectedMealCount > 0 &&
           stagedForPlanner.basket.lines.length > 0 ? 'private' : 'empty'
-      : 'example'
+      : stagedRetailers.length > 0 ? 'empty' : 'example'
   const plannerStore = offlinePriceSession.imported
     ? offlinePriceSession.selectedStore : stagedForPlanner?.store
 
