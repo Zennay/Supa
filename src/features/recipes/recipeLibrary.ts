@@ -53,3 +53,40 @@ export function saveRecipeLibrary(storage: Storage, previous: LibraryState, reci
   storage.setItem(RECIPE_LIBRARY_KEY, raw)
   return { recipes: checked.recipes, raw, error: null }
 }
+
+/**
+ * Update an existing user recipe without changing its stable identity or
+ * creation timestamp. The underlying CAS prevents stale tabs losing edits.
+ */
+export function updateSavedRecipe(
+  storage: Storage, previous: LibraryState, id: string, draft: UserRecipeDraft,
+): LibraryState {
+  if (!previous.recipes.some(recipe => recipe.id === id)) throw new Error('Dit recept bestaat niet meer. Herlaad de pagina.')
+  const reviewed = reviewRecipe(draft)
+  return saveRecipeLibrary(storage, previous, previous.recipes.map(recipe =>
+    recipe.id === id ? { ...reviewed, id: recipe.id, savedAt: recipe.savedAt } : recipe,
+  ))
+}
+
+/** Delete only a known own-recipe ID; never delete unknown or demo recipes. */
+export function deleteSavedRecipe(storage: Storage, previous: LibraryState, id: string): LibraryState {
+  if (!previous.recipes.some(recipe => recipe.id === id)) throw new Error('Dit recept bestaat niet meer. Herlaad de pagina.')
+  return saveRecipeLibrary(storage, previous, previous.recipes.filter(recipe => recipe.id !== id))
+}
+
+/**
+ * Duplicate an owned recipe as a new reviewed draft. Keep the original untouched
+ * and do not invent a price or a product match for its ingredient quantities.
+ */
+export function duplicateSavedRecipe(
+  storage: Storage, previous: LibraryState, sourceId: string, nextId: string, savedAt: string,
+): LibraryState {
+  const source = previous.recipes.find(recipe => recipe.id === sourceId)
+  if (!source) throw new Error('Dit recept bestaat niet meer. Herlaad de pagina.')
+  if (!/^own-[a-zA-Z0-9-]{4,80}$/.test(nextId) || previous.recipes.some(recipe => recipe.id === nextId)) {
+    throw new Error('Nieuw recept-ID is ongeldig of bestaat al.')
+  }
+  if (!Number.isFinite(Date.parse(savedAt))) throw new Error('Ongeldige bewaartijd.')
+  const copy = reviewRecipe({ ...source, title: ('Kopie van ' + source.title).slice(0, 160) })
+  return saveRecipeLibrary(storage, previous, [{ ...copy, id: nextId, savedAt }, ...previous.recipes])
+}
