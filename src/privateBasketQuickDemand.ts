@@ -106,6 +106,28 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
       return pending ? label + ': ? ' + pending[1] : label + ': ' + amount
     })
   }
+  // Portable own-recipe TXT from the Recepten detail uses exactly one
+  // preparation. The embedded portion count is physical servings, NOT a
+  // number of selected meals. Checked boxes never imply a retailer purchase
+  // and are deliberately not omitted from full same-demand comparisons.
+  if (rawLines[0]?.startsWith('Mijn recept: ')) {
+    const heading = /^Mijn recept: (.+) — ([1-9]\\d?|100) porties$/u.exec(rawLines[0])
+    if (!heading || rawLines.length < 4 ||
+        rawLines[1] !== 'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.' ||
+        rawLines.at(-1) !== 'Prijzen, winkelvoorraad en besparingen zijn onbekend.') {
+      throw Error('Deze eigen receptenlijst is incompleet of heeft onbekende velden.')
+    }
+    meals = 1
+    rawLines = rawLines.slice(2, -1).map((line, index) => {
+      if (/^\\[\\?\\] /u.test(line)) {
+        throw Error('Receptregel ' + (index + 1) + ': onzekere hoeveelheid. Corrigeer die in Recepten voordat je vergelijkt.')
+      }
+      if (!/^\\[[ x]\\] /u.test(line)) {
+        throw Error('Receptregel ' + (index + 1) + ': verwacht een eigen [ ] of [x] ingrediëntregel.')
+      }
+      return line.slice(4)
+    })
+  }
   if (!rawLines.length || rawLines.length > maxRows) {
     throw Error('Plak 1 tot 200 ingrediëntregels met een metrische hoeveelheid.')
   }
