@@ -69,6 +69,9 @@ let tripValidUntilNs: Record<StoreName, bigint> | null = null
 let tripCapturedAt: Record<StoreName, string> | null = null
 let comparisonValidThroughNs: bigint | null = null
 let freshnessRepaintTimer: number | null = null
+let shownPriceExpiryNs: bigint | null = null
+let lastPrivateSource: Source | null = null
+let lastPrivateDemand: Demand | null = null
 let privateComparisonCsv: string | null = null
 let privateCsvFreshUntilNs: bigint | null = null
 const ticked = new Set<string>()
@@ -471,6 +474,14 @@ function invalidateAgedComparison(): boolean {
   const nowNs = BigInt(Date.now()) * 1000000n
   // A complete two-store financial outcome must be hidden as soon as either
   // original observation ages past the seventh day.
+  if (shownPriceExpiryNs !== null && nowNs > shownPriceExpiryNs &&
+      lastPrivateSource && lastPrivateDemand) {
+    // A backgrounded tab may not have fired the wall-clock timer. Recompute
+    // using only the previously accepted original facts and keep the still
+    // valid shop available rather than hiding all results.
+    repaintPrivateEvidence(lastPrivateSource, lastPrivateDemand)
+    return true
+  }
   if (comparisonValidThroughNs !== null && nowNs > comparisonValidThroughNs) {
     result.hidden = true
     clearComparisonTextPreview()
@@ -716,6 +727,33 @@ restoreTrip.addEventListener('change', async () => {
   }
 })
 
+function repaintPrivateEvidence(source: Source, demand: Demand): void {
+  if (result.hidden) return
+  const oldStore = tripStore.value as StoreName
+  let saved: string | null = null
+  const current = currentTripProgress()
+  if (current) {
+    try { saved = saveTripProgress(current.key, ticked, current.basket) }
+    catch { saved = null }
+  }
+  show(source, demand)
+  if (saved && tripEligible[oldStore]) {
+    tripStore.value = oldStore
+    const stillValid = currentTripProgress()
+    if (stillValid) {
+      try {
+        const restored = loadTripProgress(saved, stillValid.key, stillValid.basket)
+        ticked.clear()
+        for (const id of restored) ticked.add(id)
+        renderTrip()
+      } catch { /* Changed product identity: never restore stale ticks. */ }
+    }
+  }
+  setStatus('Originele bronmomenten opnieuw beoordeeld. Verlopen prijsregels zijn onbekend; ' +
+    'een ander nog compleet en recent eigen winkelmandje blijft afzonderlijk bruikbaar. ' +
+    'Er is geen nieuwe winkelprijs opgehaald.')
+}
+
 /**
  * Re-evaluate ORIGINAL local evidence when one retailer ages out while the
  * browser stays open. Do not refresh capture timestamps or synthesize prices.
@@ -736,36 +774,14 @@ function scheduleFreshnessRepaint(
   const durationMs = Number((deadline - nowNs) / 1000000n) + 50
   freshnessRepaintTimer = window.setTimeout(() => {
     freshnessRepaintTimer = null
-    if (result.hidden) return // An edited source/demand has already revoked the result.
-    const oldStore = tripStore.value as StoreName
-    let saved: string | null = null
-    const current = currentTripProgress()
-    if (current) {
-      try { saved = saveTripProgress(current.key, ticked, current.basket) }
-      catch { saved = null }
-    }
-    // Runs the same canonical source, physical-matching and original-time
-    // gates again; an expired store becomes unknown, never a fresh quote.
-    show(source, demand)
-    if (saved && tripEligible[oldStore]) {
-      tripStore.value = oldStore
-      const stillValid = currentTripProgress()
-      if (stillValid) {
-        try {
-          const restored = loadTripProgress(saved, stillValid.key, stillValid.basket)
-          ticked.clear()
-          for (const id of restored) ticked.add(id)
-          renderTrip()
-        } catch { /* Changed identity: do not restore a stale tick. */ }
-      }
-    }
-    setStatus('De oorspronkelijke prijsopnames zijn opnieuw op ouderdom beoordeeld. ' +
-      'Verlopen bedragen zijn niet meer bruikbaar; een nog complete recente winkel blijft afzonderlijk zichtbaar. ' +
-      'Er zijn geen winkelprijzen opnieuw opgehaald of opgefrist.')
+    if (result.hidden) return // Source/demand edits have revoked this result.
+    repaintPrivateEvidence(source, demand)
   }, Math.max(1, durationMs))
 }
 
 function show(source: Source, demand: Demand): void {
+  lastPrivateSource = source
+  lastPrivateDemand = demand
   clearComparisonTextPreview()
   privateComparisonCsv = null
   privateCsvFreshUntilNs = null
@@ -901,14 +917,18 @@ function show(source: Source, demand: Demand): void {
       paired: complete,
       deltas: new Map(comparison.lineDeltas.map(line => [line.id, line.deltaCents] as const)),
     })
-    const expiry = [start, end].filter((value): value is bigint => value !== null)
+    // An already expired peer cannot block exporting the still-usable
+    // one-store private basket with unknown fields on the missing side.
+    const expiry = [start, end].filter((value): value is bigint =>
+      value !== null && value <= nowNs && value + weekNs >= nowNs)
       .map(value => value + weekNs)
-    privateCsvFreshUntilNs = expiry.reduce((earliest, value) =>
-      value < earliest ? value : earliest)
+    privateCsvFreshUntilNs = expiry.length ? expiry.reduce((earliest, value) =>
+      value < earliest ? value : earliest) : null
   } catch {
     privateComparisonCsv = null
     privateCsvFreshUntilNs = null
   }
+  shownPriceExpiryNs = privateCsvFreshUntilNs
   scheduleFreshnessRepaint(source, demand, [start, end], nowNs)
 }
 
