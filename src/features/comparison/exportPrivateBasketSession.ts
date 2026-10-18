@@ -28,6 +28,19 @@ export function exportPrivateBasketSession(input: {
   exportPrivatePlannerWeek(input.plan, input.recipes, input.activeDays)
   const source = JSON.parse(input.rawSource) as unknown
   const accepted = parseOfflinePriceSnapshots(input.rawSource, Date.now())
+  // The existing independent browser workbench has a stricter text contract
+  // than some local-only source drafts. Refuse an unusable portable file
+  // rather than silently rewrite or mask original retailer identities.
+  const portableText = (v: string, limit: number) => v.length > 0 &&
+    v.length <= limit && v === v.trim() && /[\p{L}\p{N}]/u.test(v) &&
+    !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(v) && !/^[=+@-]/u.test(v)
+  for (const capture of Object.values(accepted.captures)) {
+    for (const product of capture.products) {
+      if (!portableText(product.id, 100) || !portableText(product.name, 160)) {
+        throw new Error('Deze originele artikelcode of productnaam is niet toegelaten door de bestaande privéwizard. Bewaar je eigen bron apart; vervorm de bronidentiteit niet.')
+      }
+    }
+  }
   const needs = aggregatePlanIngredients(input.plan, input.recipes, input.activeDays)
   if (!needs.length || needs.length > 200) {
     throw new Error('Privémandvraag moet 1–200 fysieke ingrediënten bevatten.')

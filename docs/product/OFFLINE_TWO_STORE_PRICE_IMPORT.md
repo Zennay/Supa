@@ -305,3 +305,14 @@ eenheid kunnen worden geselecteerd. Het filter is volledig lokaal en
 wordt bij een nieuwe bronimport opnieuw leeg gemaakt. Iedere gewijzigde
 bronkeuze trekt bronreviews en afvinkingen in, zodat een andere
 productcode nooit een oudere goedkeuring erft.
+
+### Afwijkende brontekst bij export naar de bestaande privéwizard
+
+De portable sessie-export controleert bovendien het bestaande
+strengere tekstcontract van de onafhankelijke privéwizard voor
+oorspronkelijke artikelcodes en productnamen. Niet-toegelaten
+onzichtbare control-/formattekens of formuleachtige voorlooptekens
+worden niet stil aangepast en niet als een later onbruikbaar
+sessiebestand geëxporteerd. De oorspronkelijke lokale winkeldata
+blijven onaangetast en zijn nog afzonderlijk op te slaan; de
+app toont welk contract de overdracht tegenhoudt.
