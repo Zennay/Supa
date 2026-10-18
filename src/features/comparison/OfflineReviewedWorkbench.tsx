@@ -5,6 +5,7 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
+import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -220,6 +221,7 @@ export function OfflineReviewedWorkbench({
           actuele winkelprijs of besparing. Onbekende producten krijgen nooit een verzonnen prijs.
           PLUS en DekaMarkt zijn hier uitsluitend vergelijkingslabels.</p>
       </div>
+      <UnpricedPlannerChecklist plan={plan} recipes={recipes} activeDays={activeDays} />
       <div className="offline-price-workbench__input" aria-label="Weekmenu naar eigen-bronvergelijker">
         <h3>Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden</h3>
         <p>Exporteer alleen de werkelijk geselecteerde maaltijden en fysieke ingrediënten naar de
