@@ -264,3 +264,11 @@ maximaal 256 kB. Zodra de echte prijsbron, fysieke mand of optionele
 budgetinvoer verandert of een waarneming vervalt, wordt eerder geselecteerde
 vergelijktekst ingetrokken. Ook volledige eigen cijfers blijven nadrukkelijk
 historische privéopnames, geen gegarandeerde actuele kassaprijzen.
+
+**Fractionele stuks zijn reviewplichtig.** Een eigen recept met bijvoorbeeld
+`0,5 piece` ei, ui of andere fysieke stuks wordt niet als automatisch
+mandklaar geaccepteerd, ook als de gewone recepteneditor de decimale maat
+heeft bewaard. De importknop respecteert daarmee de bestaande menselijke
+reviewgrens voor fractionele stuks. Een recept kan na expliciete menselijke
+herziening bijvoorbeeld in een geschikte gehele stuksaankoop worden omgezet;
+Supa maakt dat besluit niet zelf en claimt geen fictieve afgeronde behoefte.

@@ -1,7 +1,7 @@
 /** Explicit, read-only local saved-recipe -> canonical offline private demand.
  * No recipe URL fetch, no retailer lookup, no storage writes or inferred prices.
  */
-import { aggregatePlanIngredients } from './domain/basket.ts'
+import { aggregatePlanIngredients, type RecipeWithIngredients } from './domain/basket.ts'
 import { readRecipeLibrary, type SavedRecipe } from './features/recipes/recipeLibrary.ts'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes.ts'
 
@@ -10,6 +10,14 @@ const convertButton = document.querySelector<HTMLButtonElement>('#own-recipes-to
 const status = document.querySelector<HTMLElement>('#own-recipe-status')!
 const choices = document.querySelector<HTMLElement>('#own-recipe-choices')!
 const units = ['g', 'kg', 'ml', 'l', 'piece']
+// Physical fractional pieces (e.g. half an egg) need explicit human review in
+// the existing recipe/scaler workflow; never silently mark them basket-ready.
+function reviewedForBasket(recipe: SavedRecipe): RecipeWithIngredients | null {
+  const reviewed = toPlannerRecipe(recipe)
+  if (!reviewed || reviewed.ingredients.some(item =>
+    item.unit === 'piece' && item.amount !== null && !Number.isInteger(item.amount))) return null
+  return reviewed
+}
 let loaded: SavedRecipe[] = []
 let libraryRaw: string | null = null
 const setStatus = (message: string, warning = false) => {
@@ -27,7 +35,7 @@ loadButton.addEventListener('click', () => {
     const snapshot = readRecipeLibrary(window.localStorage)
     if (snapshot.error) throw Error('Jouw receptbibliotheek kan niet veilig worden gelezen. Herstel die eerst in Mijn recepten.')
     const ready = snapshot.recipes.filter(recipe =>
-      recipe.warnings.length === 0 && toPlannerRecipe(recipe) !== null)
+      recipe.warnings.length === 0 && reviewedForBasket(recipe) !== null)
     loaded = ready
     libraryRaw = snapshot.raw
     for (const recipe of ready.slice(0, 100)) {
@@ -56,7 +64,7 @@ loadButton.addEventListener('click', () => {
     }
     convertButton.disabled = ready.length === 0
     setStatus(ready.length + ' eigen recepten met volledig beoordeelde metrische ingrediënten beschikbaar. ' +
-      (snapshot.recipes.length - ready.length) + ' recepten hebben nog onopgeloste hoeveelheden, porties of reviewwaarschuwingen. ' +
+      (snapshot.recipes.length - ready.length) + ' recepten vereisen nog metrische hoeveelheden, hele fysieke stuks, porties of menselijke review. ' +
       'Vink maximaal zeven bereidingen aan; herhalingen tellen mee voor het echte aantal maaltijden.',
     ready.length === 0)
   } catch (error) {
@@ -84,7 +92,7 @@ convertButton.addEventListener('click', () => {
       if (!repeatsInput || !/^[1-7]$/.test(repeatsInput.value) || !Number.isSafeInteger(times)) {
         throw Error('Gebruik een volledig aantal bereidingen van 1 tot 7.')
       }
-      const reviewed = toPlannerRecipe(recipe)
+      const reviewed = reviewedForBasket(recipe)
       if (!reviewed || recipe.warnings.length || reviewed.ingredients.some(item =>
           item.amount === null || !units.includes(item.unit) ||
           !Number.isFinite(item.amount) || item.amount <= 0 || item.amount > 100000)) {
