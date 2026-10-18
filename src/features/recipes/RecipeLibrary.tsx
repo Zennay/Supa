@@ -205,6 +205,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     finally { if (!controller.signal.aborted) setBusy(false) }
   }
   function adoptImportedRecipe(draft: UserRecipeDraft, messageText: string) {
+    sourceReadVersion.current++
     setForm({
       title: draft.title,
       servings: draft.servings?.toString() ?? '',
@@ -354,7 +355,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     {library.error && <p role="alert">{library.error}</p>}<p role="status" className="hifi-feedback">{message}</p>
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
       <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{editingId ? 'Eigen recept bewerken' : mode === 'url' ? 'Recept importeren' : mode === 'paste' ? 'Receptgegevens lokaal plakken' : 'Eigen recept toevoegen'}</h2>
-      {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
+      {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); sourceReadVersion.current++; setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); sourceReadVersion.current++; setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
         : mode === 'paste' ? <form className="recipe-form" onSubmit={importPastedRecipe}>
           <p>Plak JSON-LD met schema.org/Recipe of de HTML-broncode van een receptpagina
             die je zelf rechtmatig hebt ontvangen. Supa leest alleen lokaal: er wordt geen link
@@ -376,10 +377,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <textarea required rows={9} maxLength={500000} spellCheck={false}
               placeholder={'{"@type":"Recipe","name":"...","recipeIngredient":[...],"recipeInstructions":[...]}'} 
               value={pastedSource}
-              onChange={event => setPastedSource(event.target.value)} />
+              onChange={event => { sourceReadVersion.current++; setPastedSource(event.target.value) }} />
           </label>
           <button className="recipe-primary" type="submit" disabled={busy}>Lees lokale receptgegevens</button>
-          <button type="button" onClick={() => { setMode('manual'); setError('') }}>
+          <button type="button" onClick={() => { sourceReadVersion.current++; setMode('manual'); setError('') }}>
             Handmatig invoeren
           </button>
         </form>
