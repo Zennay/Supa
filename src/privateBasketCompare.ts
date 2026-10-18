@@ -179,8 +179,8 @@ async function parseSource(): Promise<Source> {
   }
   if (new TextEncoder().encode(csv).length > limit) throw Error('Samengevoegde bron overschrijdt 256 KB')
   // Existing strict canonical reader is intentionally served unchanged from public.
-  // @ts-expect-error Public runtime module is intentionally not bundled by Vite.
-  const { convertTwoStoreCsv } = await import(/* @vite-ignore */ '/offline-two-store-csv.mjs')
+  const canonicalUrl = '/offline-two-store-csv.mjs'
+  const { convertTwoStoreCsv } = await import(/* @vite-ignore */ canonicalUrl)
   return sourceFrom(JSON.parse(convertTwoStoreCsv(csv)))
 }
 
