@@ -7,6 +7,7 @@ import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
+import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
@@ -462,6 +463,62 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  async function replaceStoreFile(store: typeof stores[number], file?: File) {
+    if (!file || !imported?.captures[store]) return
+    const version = ++importRevision.current
+    setBusy(true)
+    try {
+      if (!file.size || file.size > 256000)
+        throw new Error('Nieuwe winkelopname is leeg of groter dan 256 kB.')
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      let json = raw
+      if (isCsv) {
+        const converterUrl = '/offline-two-store-csv.mjs'
+        const module: unknown = await import(/* @vite-ignore */ converterUrl)
+        if (!module || typeof module !== 'object' ||
+            !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
+          throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
+        json = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      }
+      if (version !== importRevision.current) return
+      // Revalidate both original captures before replacing either one.
+      // This preserves the other retailer's actual null prices, source ID and
+      // observation instant instead of recovering normalized 0-cent fallbacks.
+      const result = replacePrivateStoreCapture(text, json, store, Date.now())
+      const otherShop = stores.find(item => item !== store)
+      const confirmed = window.confirm(
+        'Vervang alleen de originele ' + store + '-opname? De ' + otherShop +
+        '-opname blijft behouden. Alle eerder bevestigde productmatches en afvinkingen van ' +
+        store + ' worden ingetrokken; controleer de nieuwe bronprijzen opnieuw.',
+      )
+      if (!confirmed || version !== importRevision.current) return
+      const belongsToReplaced = (key: string) =>
+        key.startsWith('[' + JSON.stringify(store) + ',')
+      setText(result.source)
+      setImported(result.captured)
+      setClockMs(Date.now())
+      setManualSku(previous => ({ ...previous, [store]: {} }))
+      setSkuFilter(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !belongsToReplaced(key))))
+      setReviewedLines(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !belongsToReplaced(key))))
+      setDoneTripItems(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !belongsToReplaced(key))))
+      setTripExportMessage('')
+      setTripProgressMessage('')
+      setMessage('Nieuwe originele ' + store + '-opname ingelezen, inclusief het echte bronmoment. ' +
+        otherShop + ' is ongewijzigd; controleer iedere nieuwe SKU, pakprijs en verpakking van ' +
+        store + ' voordat een volledig prijsverschil beschikbaar wordt.')
+    } catch (error) {
+      if (version === importRevision.current)
+        setMessage(error instanceof Error ? error.message :
+          'Deze vervanging is geweigerd. Bestaande winkelopnames en bevestigingen zijn bewaard.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
+    }
+  }
+
   async function loadFile(file?: File, addSecond = false) {
     if (!file) return
     const version = ++importRevision.current
@@ -859,6 +916,16 @@ export function OfflineReviewedWorkbench({
                     <button className="ghost-button" type="button" onClick={() => downloadPrivateRecaptureCsv(store)}>
                       Maak nieuw prijsinvulblad voor {store} (CSV)
                     </button>
+                    <label>Vervang uitsluitend de {store}-opname met je nieuwe echte bron (CSV of JSON)
+                      <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
+                        onChange={event => {
+                          const file = event.currentTarget.files?.[0]
+                          event.currentTarget.value = ''
+                          void replaceStoreFile(store, file)
+                        }} />
+                      <small>Andere winkelbron blijft exact behouden. Productcontrole en afvinkingen van {store}
+                        worden pas na jouw bevestiging ingetrokken. Een onjuist bestand vervangt niets.</small>
+                    </label>
                   </div>
                 : <p key={store}><strong>{store}</strong> · geen bronopname; prijs onbekend.</p>
             })}

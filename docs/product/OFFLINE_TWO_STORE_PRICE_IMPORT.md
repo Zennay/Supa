@@ -617,3 +617,30 @@ de komma worden exact meegenomen. Zeer kleine/exponentiële of
 numeriek instabiele hoeveelheden uit een oorspronkelijke JSON-opname
 die de canonieke CSV-import niet verliesloos accepteert, worden
 met een begrijpelijke melding geweigerd in plaats van afgerond.
+
+### Alleen één winkel vervangen, zonder het andere mandje opnieuw te importeren
+
+Onder **Vergelijk → Winkelvergelijking voor jouw huidige weekmenu**
+heeft iedere werkelijk ingeladen winkel een extra bestandskeuze:
+**Vervang uitsluitend de PLUS-/DekaMarkt-opname**. Laad daar een
+actuele, eigen opname van **precies diezelfde winkel** als bestaand
+negen-koloms CSV-bestand of de originele winkel-JSON in.
+
+De bestaande canonieke offline CSV-converter en
+`parseOfflinePriceSnapshots` beoordelen eerst het complete
+vervangende bestand en de hele samengevoegde bron. Twee winkels in
+een vervangbestand, een andere winkel, een ontbrekende SKU-context
+of een groter/ongeldig bestand worden geweigerd; bestaande originele
+bron en checks blijven dan onaangetast. Na expliciete bevestiging
+wordt uitsluitend de gekozen winkelopname vervangen, inclusief zijn
+echte bronmoment, prijswaarden en originele onbekende `null`-prijzen.
+De oorspronkelijke opname van de andere winkel (ook zijn `null`
+en tijdzone) wordt **zonder reconstructie van geldbedragen** behouden.
+
+Alle expliciete SKU-keuzes, zoektermen, menselijke productcontroles
+en winkel-afvinkingen van de **vervangen** winkel vervallen. De andere
+winkel behoudt zijn eigen controlekeuzes, zolang diens oorspronkelijke
+fysieke vraag niet verandert. Een nieuwe vergelijking kan alleen
+na onafhankelijke persoonlijke review van nieuwe artikelen en
+bestaande versheids- en volledige-mandgates. Geen scrapers,
+winkelrechten of prijzen worden toegevoegd of gepromoot.
