@@ -72,6 +72,13 @@ let freshnessRepaintTimer: number | null = null
 let shownPriceExpiryNs: bigint | null = null
 let lastPrivateSource: Source | null = null
 let lastPrivateDemand: Demand | null = null
+function forgetPrivateComparison(): void {
+  lastPrivateSource = null
+  lastPrivateDemand = null
+  shownPriceExpiryNs = null
+  if (freshnessRepaintTimer !== null) window.clearTimeout(freshnessRepaintTimer)
+  freshnessRepaintTimer = null
+}
 let privateComparisonCsv: string | null = null
 let privateCsvFreshUntilNs: bigint | null = null
 const ticked = new Set<string>()
@@ -942,6 +949,7 @@ for (const el of [sessionFile, combined, plus, deka, demandFile]) {
   if (!el) continue
   el.addEventListener('change', () => {
     inputRevision++
+    forgetPrivateComparison()
     result.hidden = true
     clearComparisonTextPreview()
     budgetTotals = null
@@ -966,6 +974,7 @@ for (const el of [sessionFile, combined, plus, deka, demandFile]) {
   })
 }
 compare?.addEventListener('click', async () => {
+  forgetPrivateComparison()
   const snapshotRevision = inputRevision
   compare.disabled = true
   result.hidden = true
@@ -1159,6 +1168,15 @@ document.addEventListener('supa:compare-private-basket', (event: Event) => {
   } catch {
     setStatus('Geen veilige volledige vergelijking mogelijk. Controleer beide lokale bronopnames, expliciete producten en fysieke hoeveelheden.', true)
   }
+})
+
+// The mapping wizard notifies us before replacing source/demand: do not
+// retain former private product/price data in a dormant expiry callback.
+document.addEventListener('supa:private-basket-invalidated', () => {
+  forgetPrivateComparison()
+  result.hidden = true
+  clearComparisonTextPreview()
+  clearTrip()
 })
 
 // A private source can become too old while the app is open in a background tab.

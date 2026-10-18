@@ -261,6 +261,9 @@ function invalidateUnpricedDemand() {
   unpricedSnapshot = null
 }
 function invalidatePrice() {
+  // Revoke old same-tab source/price snapshots as soon as physical demand or
+  // human SKU selection changes; an old expiry timer must not revive them.
+  document.dispatchEvent(new Event('supa:private-basket-invalidated'))
   if (priceResult) priceResult.hidden = true
   if (priceStatus) {
     priceStatus.textContent = 'De bron of mandvraag is veranderd. Vergelijk opnieuw voor een betrouwbaar privéresultaat.'
@@ -1036,6 +1039,10 @@ restoreSession.addEventListener('change', async () => {
     if (attempt !== sessionImportRevision || originalSourceRevision !== sourceRevision) return
     ++sourceRevision
     captures = verified
+    // An explicitly confirmed portable session replaces any unsaved manual
+    // draft; otherwise a stale draft lock would hide its real source and
+    // permanently disable the restored comparison and source backup.
+    pendingManualEdit = false
     sourceInput.value = ''
     plusInput.value = ''
     dekaInput.value = ''
