@@ -26,8 +26,8 @@ function downloadPrivateFile(name: string, content: string, mime: string) {
 function privateUnknownList(store: OfflineRetailer, lines: ReturnType<typeof buildOneStoreBasket>['lines']) {
   const unresolved = lines.filter(line => line.status === 'unresolved')
   const clean = (text: string) => text
-    .replace(/[\\u0000-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\u2066-\\u2069]/gu, ' ')
-    .replace(/\\s+/g, ' ').trim().slice(0, 160)
+    .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
+    .replace(/\s+/g, ' ').trim().slice(0, 160)
   return [
     'SUPA · ONTBREKENDE PRODUCTEN · ' + store,
     'Voor het actuele privéweekmenu, zonder winkelprijsbewijs.',
@@ -37,7 +37,7 @@ function privateUnknownList(store: OfflineRetailer, lines: ReturnType<typeof bui
       ' · product of prijs onbekend'),
     '',
     'Geen geverifieerde winkelprijs, rechtenverklaring of besparingsclaim.',
-  ].join('\\n') + '\\n'
+  ].join('\n') + '\n'
 }
 
 
@@ -136,7 +136,7 @@ export function StagedStorePreview({
           if (admitted.retailer !== store) throw Error('store mismatch')
           downloadPrivateFile(
             store === 'PLUS' ? 'supa-mijn-plus-opname.json' : 'supa-mijn-dekamarkt-opname.json',
-            raw + '\\n', 'application/json;charset=utf-8',
+            raw + '\n', 'application/json;charset=utf-8',
           )
           setFileMessage('Je eigen originele winkelopname is lokaal gedownload. Herimporteer dit bestand in Vergelijk.')
         } catch {
