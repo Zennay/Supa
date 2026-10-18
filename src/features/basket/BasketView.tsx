@@ -89,12 +89,20 @@ export function BasketView({
           budgetEuros={manualWeekBudgetEuros} />
       )}
       {manualPlan && manualRecipes && manualActiveDays && (
-        <ManualStoreComparison
-          key={JSON.stringify([manualPlan, manualActiveDays, manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
-          plan={manualPlan}
-          recipes={manualRecipes}
-          activeDays={manualActiveDays}
-        />
+        <details className="demo-comparison-disclosure">
+          <summary>Oudere losse winkelvergelijker (optioneel)</summary>
+          <p className="disclaimer">
+            Deze oudere invoer staat los van de nieuwe PLUS/DekaMarkt-prijsimport,
+            Planner-budgetkoppeling en privé winkeltour hierboven.
+            Gebruik voor jouw actuele weekmenu bij voorkeur de nieuwe vergelijking.
+          </p>
+          <ManualStoreComparison
+            key={JSON.stringify([manualPlan, manualActiveDays, manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
+            plan={manualPlan}
+            recipes={manualRecipes}
+            activeDays={manualActiveDays}
+          />
+        </details>
       )}
       <details className="demo-comparison-disclosure" open={!manualPlan}>
         <summary>{manualPlan ? 'Toon oude voorbeeldberekening (geen actuele winkelprijzen)' : 'Voorbeeldmandje'}</summary>
