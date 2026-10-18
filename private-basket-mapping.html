@@ -141,8 +141,11 @@ boodschappenbehoefte als een Planner-weekmenu.</p>
 <h3>Of: plak direct je eigen boodschappenlijst</h3>
 <p>Geen JSON of receptbestand nodig. Zet ieder ingrediënt op een eigen regel met een echte metrische hoeveelheid. Supa voegt alleen exact gelijk genoemde ingrediënten samen, rekent g/kg en ml/l zonder afronden en laat alle winkel-SKU's en prijzen onbekend totdat jij ze bevestigt.</p>
 <label for="quick-demand-text">Je eigen fysieke ingrediënten (maximaal 200 regels)</label>
-<textarea id="quick-demand-text" rows="7" maxlength="16000" spellcheck="false" placeholder="450 g basmati rijst&#10;400 ml kokosmelk&#10;2 stuks bloemkool&#10;basmati rijst: 50 g" style="width:100%;max-width:100%;padding:12px;border:1px solid #acbeb1;border-radius:9px;font:inherit;resize:vertical"></textarea>
-<small>Gebruik: "450 g basmati rijst" of "basmati rijst: 450 g". Ondersteund: g, kg, ml, l, stuk(s). Een regel met onduidelijke maat of halve stuks wordt geweigerd. Geef bovenin het echte aantal maaltijden op; prijzen worden niet opgehaald.</small>
+<textarea id="quick-demand-text" rows="7" maxlength="40000" spellcheck="false" placeholder="450 g basmati rijst&#10;400 ml kokosmelk&#10;2 stuks bloemkool&#10;basmati rijst: 50 g" style="width:100%;max-width:100%;padding:12px;border:1px solid #acbeb1;border-radius:9px;font:inherit;resize:vertical"></textarea>
+<small>Gebruik: "450 g basmati rijst" of "basmati rijst: 450 g". Ondersteund: g, kg, ml, l, stuk(s). Ook eigen Supa-ongeprijsde TXT-checklists zijn herkenbaar; ontbrekende hoeveelheden vereisen menselijke controle. Kies je echte aantal maaltijden in het veld hieronder. Prijzen worden niet opgehaald.</small>
+<label for="quick-demand-file">Of: open je eigen eerdere Supa-TXT-boodschappenlijst om te bewerken</label>
+<input id="quick-demand-file" type="file" accept=".txt,text/plain">
+<small>Het bestand wordt alleen in dit tekstvak geladen, zonder je huidige mand te vervangen. Controleer het en klik daarna zelf op de importknop.</small>
 <button id="quick-demand-import" type="button" class="secondary">Maak van deze lijst een privémandje</button>
 <div id="quick-demand-status" role="status" aria-live="polite" class="notice">Nog geen tekst ingelezen. Bestaande ingrediënten worden uitsluitend na jouw bevestiging vervangen.</div>
 </div>
