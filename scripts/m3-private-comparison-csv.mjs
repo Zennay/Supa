@@ -29,10 +29,12 @@ function cell(value, { untrustedText = false } = {}) {
   const asciiFormula = /^[\s\u200b-\u200d]*[=+\-@]/u.test(clean)
   const disguisedFormula = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+\-@\u2212]/u
     .test(clean.normalize('NFKC'))
-  if (untrustedText && disguisedFormula && !asciiFormula) {
-    throw new Error('M3 private CSV untrusted formula-like text refused')
-  }
-  const safe = untrustedText && asciiFormula ? "'" + clean : clean
+  // Escape formula-like text as an explicit literal even with compatibility
+  // or invisible prefixes. The separate pre-open gate will still require
+  // operator review for ambiguous Unicode, rather than silently approving it.
+  const safe = untrustedText && (asciiFormula || disguisedFormula)
+    ? "'" + clean
+    : clean
   return '"' + safe.replace(/"/g, '""') + '"'
 }
 
