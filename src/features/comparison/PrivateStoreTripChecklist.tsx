@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OneStoreBasket, BasketTraceLine } from '../../domain/basket.ts'
+import { selectShoppingCopyText } from '../shopping-list/selectShoppingCopyText.ts'
 import './privateStoreTripChecklist.css'
 
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 function basketConsistent(basket: OneStoreBasket): boolean {
   try {
-    if (!basket || !basket.store || !basket.store.id?.trim() || !basket.store.name?.trim() ||
+    if (!basket || !basket.store || !['PLUS', 'DekaMarkt'].includes(basket.store.id) ||
+      basket.store.name !== basket.store.id ||
       !Number.isSafeInteger(basket.selectedMealCount) || basket.selectedMealCount < 0 ||
       !Number.isSafeInteger(basket.matchedLineCount) || basket.matchedLineCount < 0 ||
       !Number.isSafeInteger(basket.unresolvedLineCount) || basket.unresolvedLineCount < 0 ||
@@ -71,11 +73,25 @@ function checklistText(basket: OneStoreBasket, done: ReadonlySet<string>, observ
   ].join('\n')
 }
 
-const STORAGE_PREFIX = 'supa:private-trip:v1:'
+const PLUS_KEY = 'supa:private-trip:v1:plus'
+const DEKA_KEY = 'supa:private-trip:v1:dekamarkt'
 type SavedState = { enabled: boolean; protected: boolean; raw: string | null; done: string[] }
 
-function progressStorageKey(basket: OneStoreBasket): string {
-  return STORAGE_PREFIX + basket.store.id.toLowerCase().replace(/[^a-z0-9-]/g, '')
+// Each operation uses a statically scoped key and only a known retailer.
+function readTripValue(id: string): string | null {
+  if (id === 'PLUS') return window.sessionStorage.getItem(PLUS_KEY)
+  if (id === 'DekaMarkt') return window.sessionStorage.getItem(DEKA_KEY)
+  throw Error('Unsupported store')
+}
+function writeTripValue(id: string, value: string) {
+  if (id === 'PLUS') window.sessionStorage.setItem(PLUS_KEY, value)
+  else if (id === 'DekaMarkt') window.sessionStorage.setItem(DEKA_KEY, value)
+  else throw Error('Unsupported store')
+}
+function deleteTripValue(id: string) {
+  if (id === 'PLUS') window.sessionStorage.removeItem(PLUS_KEY)
+  else if (id === 'DekaMarkt') window.sessionStorage.removeItem(DEKA_KEY)
+  else throw Error('Unsupported store')
 }
 
 /** Basket-specific identity; includes prices and selected source time, not only IDs. */
@@ -95,7 +111,7 @@ function readSavedTrip(basket: OneStoreBasket, observedAt: string): SavedState {
   const empty: SavedState = { enabled: false, protected: false, raw: null, done: [] }
   if (typeof window === 'undefined') return empty
   let raw: string | null = null
-  try { raw = window.sessionStorage.getItem(progressStorageKey(basket)) }
+  try { raw = readTripValue(basket.store.id) }
   catch { return { ...empty, protected: true } }
   if (raw === null) return empty
   if (raw.length > 64000) return { ...empty, raw, protected: true }
@@ -130,14 +146,15 @@ export function PrivateStoreTripChecklist({
   const [saveEnabled, setSaveEnabled] = useState(initial.enabled)
   const [storageProtected, setStorageProtected] = useState(initial.protected)
   const [savedRaw, setSavedRaw] = useState(initial.raw)
+  const [copyVisible, setCopyVisible] = useState(false)
+  const copyField = useRef<HTMLTextAreaElement>(null)
   const [message, setMessage] = useState(initial.protected
     ? 'Een eerder concept voor een andere winkelmand of versie is beschermd tegen overschrijven.'
     : initial.enabled ? 'Vinkjes voor ditzelfde mandje hersteld uit de huidige browsertab.' : '')
   useEffect(() => {
     if (!saveEnabled || storageProtected || typeof window === 'undefined') return
     try {
-      const key = progressStorageKey(basket)
-      const current = window.sessionStorage.getItem(key)
+      const current = readTripValue(basket.store.id)
       if (current !== savedRaw) {
         setStorageProtected(true)
         setMessage('Een ander of gewijzigd concept is beschermd tegen overschrijven.')
@@ -149,7 +166,7 @@ export function PrivateStoreTripChecklist({
         done: [...done],
       })
       if (new TextEncoder().encode(next).length > 64000) throw Error('oversized')
-      if (next !== current) window.sessionStorage.setItem(key, next)
+      if (next !== current) writeTripValue(basket.store.id, next)
       if (savedRaw !== next) setSavedRaw(next)
     } catch {
       setSaveEnabled(false)
@@ -166,9 +183,8 @@ export function PrivateStoreTripChecklist({
     }
     if (typeof window !== 'undefined') {
       try {
-        const key = progressStorageKey(basket)
-        const current = window.sessionStorage.getItem(key)
-        if (current === savedRaw) window.sessionStorage.removeItem(key)
+          const current = readTripValue(basket.store.id)
+        if (current === savedRaw) deleteTripValue(basket.store.id)
         else setStorageProtected(true)
       } catch { setStorageProtected(true) }
     }
@@ -181,13 +197,12 @@ export function PrivateStoreTripChecklist({
     // Compare-and-delete protects a newer concept written by another tab.
     if (typeof window === 'undefined') return
     try {
-      const key = progressStorageKey(basket)
-      const current = window.sessionStorage.getItem(key)
+      const current = readTripValue(basket.store.id)
       if (current !== savedRaw) {
         setMessage('Het andere concept is inmiddels gewijzigd; er is niets overschreven of verwijderd.')
         return
       }
-      if (current !== null) window.sessionStorage.removeItem(key)
+      if (current !== null) deleteTripValue(basket.store.id)
       setSavedRaw(null)
       setStorageProtected(false)
       setSaveEnabled(false)
@@ -233,15 +248,6 @@ export function PrivateStoreTripChecklist({
     }
   }
 
-  async function copy() {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('clipboard')
-      await navigator.clipboard.writeText(text)
-      setMessage('Boodschappenlijst gekopieerd.')
-    } catch {
-      setMessage('Automatisch kopiëren is niet beschikbaar; gebruik de selecteerbare lijsttekst.')
-    }
-  }
 
   return <section className="private-store-trip" aria-label={'Afvinklijst voor ' + basket.store.name}>
     <div className="private-store-trip__head">
@@ -289,19 +295,28 @@ export function PrivateStoreTripChecklist({
         Download lijst
       </button>
       <button type="button" className="ghost-button" disabled={!lines.length}
-        onClick={() => { void copy() }}>Kopieer lijst</button>
+        aria-expanded={copyVisible} onClick={() => setCopyVisible(visible => !visible)}>
+        {copyVisible ? 'Verberg kopieerbare tekst' : 'Toon kopieerbare tekst'}
+      </button>
       <button type="button" className="ghost-button" disabled={!completed}
         onClick={() => { setDone(new Set()); setMessage('Alle vinkjes in dit scherm gewist.') }}>
         Wis vinkjes
       </button>
     </div>
     <p aria-live="polite" role="status">{message}</p>
-    <details>
-      <summary>Toon selecteerbare lijsttekst</summary>
-      <textarea readOnly rows={Math.min(16, Math.max(5, lines.length + 5))}
-        value={text} aria-label={'Kopieerbare lijst ' + basket.store.name}
-        onFocus={event => event.currentTarget.select()} />
-    </details>
+    {copyVisible && <div className="private-store-trip__copy">
+      <label>Te kopiëren boodschappenlijst
+        <textarea ref={copyField} readOnly rows={Math.min(16, Math.max(5, lines.length + 5))}
+          value={text} aria-label={'Kopieerbare lijst ' + basket.store.name}
+          onFocus={event => event.currentTarget.select()} />
+      </label>
+      <button type="button" className="ghost-button"
+        onClick={() => {
+          const selected = selectShoppingCopyText(copyField.current, text)
+          setMessage(selected ? 'Tekst geselecteerd. Kies Kopieer op je apparaat.' :
+            'Selecteer de tekst handmatig en kies Kopieer op je apparaat.')
+        }}>Selecteer alle tekst</button>
+    </div>}
     <p className="private-store-trip__notice">
       Zonder jouw toestemming blijven vinkjes alleen in dit scherm. Met opt-in worden uitsluitend
       de vinkjes en een mandgebonden sleutel lokaal in de sessieopslag van dit tabblad bewaard;
