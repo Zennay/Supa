@@ -718,6 +718,7 @@ export function OfflineReviewedWorkbench({
       </div>
       <LocalTwoStorePriceEditor
         plan={plan} recipes={recipes} activeDays={activeDays}
+        hasAdmittedPair={!!imported}
         onGenerated={(json) => {
           importVersion.current++
           setBusy(false)

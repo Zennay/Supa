@@ -103,12 +103,13 @@ type Props = {
   activeDays: string[]
   onGenerated: (json: string) => void
   onEdit: () => void
+  hasAdmittedPair?: boolean
 }
 /**
  * UI-only source authoring: a real user's *own* entry, never an auto-captured
  * licensed catalog, attestation, retailer permission, or independent evidence.
  */
-export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerated, onEdit }: Props) {
+export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerated, onEdit, hasAdmittedPair = false }: Props) {
   const [open, setOpen] = useState(false)
   const [activeStore, setActiveStore] = useState<OfflineRetailer>('PLUS')
   const [rows, setRows] = useState<Record<string, ProductDraft>>({})
@@ -313,6 +314,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
       </div>
       <p className="disclaimer">Wissel gerust tussen winkels: ingevoerde velden blijven staan.
         Vul eerst één winkel in en gebruik die direct, of bereken beide winkels zodra beide opnames klaar zijn.
+        {hasAdmittedPair && ' Bij één winkel bijwerken blijft de andere toegelaten winkelopname behouden.'}
         De aantallen tonen eigen ingevulde beschikbaarheid, niet onafhankelijk geverifieerde producten.</p>
       <div className="offline-manual-editor__stores">
         {stores.filter(store => store === activeStore).map(store => <section key={store} aria-label={`Productprijzen bij ${store}`}>
@@ -368,7 +370,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
       <div className="offline-price-workbench__actions">
         {stores.map(store => <button key={store} type="button"
           onClick={() => createSourceFile([store])}>
-          Gebruik alleen mijn {store}-prijzen
+          {hasAdmittedPair ? `Werk alleen ${store} bij` : `Gebruik alleen mijn ${store}-prijzen`}
         </button>)}
         <button type="button" onClick={() => createSourceFile(stores)}>
           Vergelijk beide winkels met mijn prijzen
