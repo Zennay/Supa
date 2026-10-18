@@ -122,6 +122,12 @@ function useOfflineComparisonSession(): OfflineComparisonSession {
     fingerprint: string
     products: Record<string, string>
   }>({ fingerprint: '', products: {} })
+  const [stagedManual, setStagedManual] = useState<Record<
+    OfflineRetailer, { fingerprint: string; products: Record<string, string> }
+  >>({
+    PLUS: { fingerprint: '', products: {} },
+    DekaMarkt: { fingerprint: '', products: {} },
+  })
   // Explicit user-selected extras are outside the calculated same-demand basket.
   const [extraProductIds, setExtraProductIds] = useState<Record<OfflineRetailer, string[]>>({
     PLUS: [], DekaMarkt: [],
@@ -140,7 +146,7 @@ function useOfflineComparisonSession(): OfflineComparisonSession {
   return {
     selectedStore, setSelectedStore, reviewTarget, setReviewTarget,
     text, setText, imported, setImported,
-    stagedCaptures, setStagedCaptures, manualSelections, setManualSelections,
+    stagedCaptures, setStagedCaptures, manualSelections, setManualSelections, stagedManual, setStagedManual,
     tripMemory, setTripMemory, extraProductIds, setExtraProductIds,
     extraDoneIds, setExtraDoneIds, extraQuantities, setExtraQuantities,
     importEpoch, setImportEpoch,
