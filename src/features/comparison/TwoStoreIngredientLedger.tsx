@@ -71,6 +71,8 @@ export function TwoStoreIngredientLedger({
     return records
   }, [plus, deka, comparison, comparable, sortImpact])
   const missing = rows.filter(row => row.plus?.status !== 'matched' || row.deka?.status !== 'matched')
+  const pairedCount = rows.length - missing.length
+  const nextMissing = missing.find(row => row.id !== editingId) ?? missing[0]
   const visible = onlyMissing ? missing : rows
   return <section className="offline-ingredient-ledger" aria-label="Alle ingrediënten naast elkaar">
     <div className="offline-ingredient-ledger__header">
@@ -78,8 +80,19 @@ export function TwoStoreIngredientLedger({
         <h4>Alle ingrediënten: PLUS naast DekaMarkt</h4>
         <p>{rows.length} geplande ingrediënten, {missing.length} met een ontbrekende winkelkoppeling.
           Per winkel zie je het gekozen product, het aantal volledige verpakkingen en de eenheidsprijs.</p>
+        <label className="offline-ingredient-ledger__progress">
+          <span>{pairedCount} van {rows.length} ingrediënten bij beide winkels gekoppeld</span>
+          <progress max={rows.length || 1} value={pairedCount} />
+        </label>
       </div>
       <div className="offline-ingredient-ledger__controls">
+        {nextMissing && <button type="button" onClick={() => {
+          setOnlyMissing(false)
+          setEditingId(nextMissing.id)
+          window.requestAnimationFrame(() =>
+            document.getElementById('offline-ledger-item-' + encodeURIComponent(nextMissing.id))
+              ?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+        }}>Volgend ontbrekend ingrediënt koppelen</button>}
         <label><input type="checkbox" checked={onlyMissing}
           onChange={event => setOnlyMissing(event.target.checked)} /> Alleen ontbrekende koppelingen</label>
         <label><input type="checkbox" checked={sortImpact} disabled={!comparable}
@@ -98,12 +111,14 @@ export function TwoStoreIngredientLedger({
         <strong role="columnheader">DekaMarkt</strong>
         <strong role="columnheader">Verschil</strong>
       </div>
-      {visible.map(row => <Fragment key={row.id}><div className="offline-ingredient-ledger__row" role="row">
+      {visible.map(row => <Fragment key={row.id}><div className="offline-ingredient-ledger__row" role="row"
+        id={'offline-ledger-item-' + encodeURIComponent(row.id)}>
         <div className="offline-ingredient-ledger__need" role="cell">
           <strong>{row.label}</strong>
           <small>Benodigd: {row.plus?.requirement.amount ?? row.deka?.requirement.amount ?? '?'}
             {' '}{row.plus?.requirement.unit ?? row.deka?.requirement.unit ?? ''}</small>
           <button type="button" aria-expanded={editingId === row.id}
+            aria-controls={'offline-ledger-pickers-' + encodeURIComponent(row.id)}
             onClick={() => { setOnlyMissing(false); setEditingId(id => id === row.id ? null : row.id) }}>
             {editingId === row.id ? 'Sluit productkeuze' : 'Kies bij beide winkels'}
           </button>
@@ -119,7 +134,8 @@ export function TwoStoreIngredientLedger({
         </div>
       </div>
       {editingId === row.id && <div className="offline-ingredient-ledger__row offline-ingredient-ledger__edit" role="row">
-        <div className="offline-ingredient-ledger__editor" role="cell" aria-colspan={4}>
+        <div className="offline-ingredient-ledger__editor" role="cell" aria-colspan={4}
+          id={'offline-ledger-pickers-' + encodeURIComponent(row.id)}>
           <p>Controleer per winkel hetzelfde benodigde ingrediënt. Alleen producten uit je
             eigen toegelaten lokale opname zijn te kiezen; onbekende prijzen blijven onbekend.</p>
           <div className="offline-ingredient-ledger__edit-stores">
