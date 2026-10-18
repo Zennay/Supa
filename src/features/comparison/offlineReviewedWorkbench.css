@@ -257,6 +257,7 @@
   background:white; border:1px solid #d4e2d6; counter-increment:readiness; }
 .offline-readiness__steps li strong::before { content:counter(readiness) ". "; color:#256247; }
 .offline-readiness__steps li p { margin:.3rem 0 0; font-size:.83rem; color:#536058; }
+.offline-readiness__step-actions { display:grid; gap:.45rem; justify-items:stretch; min-width:min(220px,100%); }
 .offline-readiness__steps li button { flex:0 0 auto; max-width:100%; min-height:44px;
   padding:.6rem .8rem; border:1px solid #256247; background:#fff; color:#17452d;
   border-radius:9px; cursor:pointer; font-weight:600; }
