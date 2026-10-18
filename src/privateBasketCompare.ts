@@ -4,6 +4,7 @@
  * Own source observations are NOT written retailer rights or field-study proof.
  */
 import { renderPrivateBasketSnapshot } from './privateBasketSnapshotExport.ts'
+import { createPrivateBasketComparisonCsv } from './privateBasketComparisonCsv.ts'
 import { currentTripKey, saveTripProgress, loadTripProgress } from './privateShoppingProgress.ts'
 import { compareFullBaskets } from './domain/basketComparison.ts'
 import { calculateDecimalPackCount } from './domain/decimalPackArithmetic.ts'
@@ -67,6 +68,8 @@ let tripEligible: Record<StoreName, boolean> = { PLUS: false, DekaMarkt: false }
 let tripValidUntilNs: Record<StoreName, bigint> | null = null
 let tripCapturedAt: Record<StoreName, string> | null = null
 let comparisonValidThroughNs: bigint | null = null
+let privateComparisonCsv: string | null = null
+let privateCsvFreshUntilNs: bigint | null = null
 const ticked = new Set<string>()
 let inputRevision = 0
 
@@ -700,6 +703,8 @@ restoreTrip.addEventListener('change', async () => {
 
 function show(source: Source, demand: Demand): void {
   clearComparisonTextPreview()
+  privateComparisonCsv = null
+  privateCsvFreshUntilNs = null
   const captures = Object.fromEntries(source.captures.map(c => [c.retailer, c])) as Partial<Record<StoreName,Capture>>
   const left = storeBasket('PLUS', captures.PLUS, demand)
   const right = storeBasket('DekaMarkt', captures.DekaMarkt, demand)
@@ -793,6 +798,29 @@ function show(source: Source, demand: Demand): void {
       ' Bekende regelprijzen zijn geen volledige winkelprijs. Controleer ontbrekende SKU’s, aantallen en bronmomenten.'
     summary.className = 'notice warning'
     setStatus('Onvolledige of verouderde vergelijking; geen winnaar of volledige winkelbedragen gepubliceerd.')
+  }
+  // Export the same canonical whole-pack facts already shown on the screen.
+  // Do not export prices from expired/future captures, or any paired savings
+  // figure when even one physical line/time condition is unknown.
+  try {
+    privateComparisonCsv = createPrivateBasketComparisonCsv({
+      ingredients: demand.ingredients,
+      captures,
+      baskets: { PLUS: left, DekaMarkt: right },
+      fresh: {
+        PLUS: firstAge >= 0n && firstAge <= weekNs,
+        DekaMarkt: secondAge >= 0n && secondAge <= weekNs,
+      },
+      paired: complete,
+      deltas: new Map(comparison.lineDeltas.map(line => [line.id, line.deltaCents] as const)),
+    })
+    const expiry = [start, end].filter((value): value is bigint => value !== null)
+      .map(value => value + weekNs)
+    privateCsvFreshUntilNs = expiry.reduce((earliest, value) =>
+      value < earliest ? value : earliest)
+  } catch {
+    privateComparisonCsv = null
+    privateCsvFreshUntilNs = null
   }
 }
 
@@ -936,6 +964,26 @@ document.querySelector<HTMLButtonElement>('#select-txt')!.addEventListener('clic
   comparisonTextPreview.focus()
   comparisonTextPreview.select()
   setStatus('Je eigen privéoverzicht is geselecteerd. Kopieer het zelf met Ctrl+C, Cmd+C of de kopieeractie op je telefoon. Geen klembordtoegang voor Supa.')
+})
+
+document.querySelector<HTMLButtonElement>('#download-csv')!.addEventListener('click', () => {
+  if (invalidateAgedComparison()) return
+  if (result.hidden || !privateComparisonCsv || privateCsvFreshUntilNs === null ||
+      BigInt(Date.now()) * 1000000n > privateCsvFreshUntilNs) {
+    setStatus('Maak opnieuw een privévergelijking met je huidige eigen bronopnames voordat je CSV exporteert. Onbekende bedragen worden nooit als nul opgeslagen.', true)
+    return
+  }
+  const url = URL.createObjectURL(new Blob([privateComparisonCsv], {
+    type: 'text/csv;charset=utf-8',
+  }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'supa-prive-winkelmand-prijzen.csv'
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+  setStatus('Gespecificeerde privé CSV lokaal opgeslagen: echte originele SKU’s, bronmomenten, hele centen en ontbrekende regels. Een leeg bedrag is onbekend, niet €0. Gebruik dit rapport niet als bronrechten- of besparingsbewijs.')
 })
 
 document.querySelector<HTMLButtonElement>('#download-html')!.addEventListener('click', () => {
