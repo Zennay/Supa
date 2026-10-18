@@ -11,6 +11,7 @@ const safeLabel = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\
 /** Private volatile notes; no product match, price or retailer-source authority. */
 export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppingNote[]; setNotes: SetNotes }) {
   const [name, setName] = useState('')
+  const [bulkDraft, setBulkDraft] = useState('')
   const [store, setStore] = useState<UnpricedShoppingNote['store']>('Algemeen')
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
@@ -66,6 +67,25 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
     }
   }
 
+  function addBulk(event: FormEvent) {
+    event.preventDefault()
+    // Human-authored lines, not supermarket product identities or price data.
+    const parsed = bulkDraft.split(/\r?\n/u)
+      .map(line => safeLabel(line.replace(/^(?:[-*•]\s+|☐\s+|\d{1,3}[.)]\s+)/u, '')))
+      .filter(Boolean)
+    if (!parsed.length || parsed.some(line => line.length > 140) ||
+        parsed.length > 100 || notes.length + parsed.length > 100) {
+      setMessage('Controleer de geplakte lijst: maximaal 100 artikelen totaal en 140 tekens per regel.')
+      return
+    }
+    const appended = parsed.map(label => ({
+      id: 'own-note-' + crypto.randomUUID(), label, store, done: false,
+    }))
+    setNotes(current => current.length + appended.length > 100 ? current : [...current, ...appended])
+    setBulkDraft('')
+    setMessage(parsed.length + ' eigen artikelen toegevoegd aan ' + store +
+      ', zonder prijzen of invloed op je winkelvergelijking.')
+  }
   function add(event: FormEvent) {
     event.preventDefault()
     const label = safeLabel(name)
@@ -108,6 +128,22 @@ export function ManualShoppingNotes({ notes, setNotes }: { notes: UnpricedShoppi
         {stores.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
       <button type="submit" disabled={notes.length >= 100}>+ Voeg toe</button>
     </form>
+    <details className="manual-shopping-notes__bulk">
+      <summary>Plak meerdere boodschappen tegelijk</summary>
+      <form onSubmit={addBulk}>
+        <p>Eén eigen artikel per regel, eventueel voorafgegaan door een opsommingsteken.
+          Alle regels gaan naar de hierboven gekozen winkellijst ({store}).
+          Geen productmatching of automatische prijzen.</p>
+        <label>Je ongeprijsde boodschappen
+          <textarea rows={5} maxLength={15000} value={bulkDraft}
+            placeholder={'Vuilniszakken\nAfwasmiddel\nToiletpapier'}
+            onChange={event => setBulkDraft(event.target.value)} />
+        </label>
+        <button type="submit" disabled={!bulkDraft.trim() || notes.length >= 100}>
+          Voeg regels toe aan mijn lijst
+        </button>
+      </form>
+    </details>
     <div className="manual-shopping-notes__top">
       <strong>{notes.length} eigen {notes.length === 1 ? 'artikel' : 'artikelen'} · {notes.filter(n => n.done).length} afgevinkt</strong>
       <label>Toon winkellijst
