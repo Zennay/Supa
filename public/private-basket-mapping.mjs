@@ -88,6 +88,23 @@ const notice = (element, message, kind = '') => {
 }
 const selected = (select) => select.value === '' ? null : select.value
 
+const ownEuro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+function observedPackDescription(product) {
+  if (!product || product.priceCents === null || !Number.isSafeInteger(product.priceCents) ||
+      !Number.isFinite(product.packAmount) || product.packAmount <= 0 ||
+      !Number.isSafeInteger(product.packCount) || product.packCount < 1) return ''
+  const count = product.packCount
+  const baseAmount = product.packAmount * count *
+    (product.packUnit === 'kg' || product.packUnit === 'l' ? 1000 : 1)
+  const family = ['g', 'kg'].includes(product.packUnit) ? 'kg'
+    : ['ml', 'l'].includes(product.packUnit) ? 'liter' : 'stuk'
+  const multiplier = family === 'stuk' ? 1 : 1000
+  const advisory = product.priceCents / 100 * multiplier / baseAmount
+  return ownEuro.format(product.priceCents / 100) + ' per verpakking' +
+    (Number.isFinite(advisory) && advisory >= 0 ?
+      ' · indicatief ' + ownEuro.format(advisory) + '/' + family : '')
+}
+
 function availableProducts(store, unit) {
   const capture = captures?.[store]
   if (!capture) return []
@@ -115,10 +132,14 @@ function updateSelect(select, store, unit) {
     select.add(option)
   }
   select.value = kept ? kept.id : ''
+  const chosenProduct = all.find(product => product.id === select.value)
   row.querySelector('[data-matches-store="' + store + '"]').textContent =
-    String(filtered.length) + ' passend(e) artikel(en) in jouw eigen bron; ' +
-    (filtered.length > 80 ? 'toon maximaal 80, verfijn je zoekterm. ' : '') +
-    'Kies zelf de juiste SKU.'
+    String(filtered.length) + ' fysiek passende eigen bronartikelen; ' +
+    (filtered.length > 80 ? 'maximaal 80 zichtbaar, verfijn jouw zoekterm. ' : '') +
+    (chosenProduct
+      ? 'Gekozen SKU ' + chosenProduct.id + ': ' + observedPackDescription(chosenProduct) +
+        '. Vergelijk altijd de echte productnaam en verpakking.'
+      : 'Kies expliciet de juiste winkel-SKU; geen automatische productmatch.')
 }
 function invalidateUnpricedDemand() {
   unpricedTrip.hidden = true
@@ -196,6 +217,7 @@ function addIngredient(restored = null) {
     box.append(count)
     storesGrid.append(box)
     filter.addEventListener('input', () => updateSelect(select, store, unit.value))
+    select.addEventListener('change', () => updateSelect(select, store, unit.value))
   }
   const actions = node('div', { className: 'row-actions' })
   const remove = node('button', { type: 'button', className: 'secondary' }, 'Verwijder ingrediënt')
