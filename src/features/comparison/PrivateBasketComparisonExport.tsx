@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import { privateUnitPrice } from './privateUnitPrice.ts'
 
 const COLUMNS = [
   'plusObservedAt', 'dekaObservedAt', 'comparisonStatus',
@@ -139,7 +140,8 @@ function privateComparisonHtml(
     return '<strong>' + clean(line.productName) + '</strong><br>' +
       clean(line.packs) + ' × ' + clean(money(line.pricePerPackCents)) +
       ' · ' + clean(line.pack.count) + ' × ' + clean(line.pack.amount) + ' ' +
-      clean(line.pack.unit) + ' per verpakking<br><b>' +
+      clean(line.pack.unit) + ' per verpakking<br><small>' +
+      clean(privateUnitPrice(line) ?? 'Eenheidsprijs onbekend') + '</small><br><b>' +
       clean(money(line.lineTotalCents)) + '</b>'
   }
   const rows = plus.lines.map(line => {
