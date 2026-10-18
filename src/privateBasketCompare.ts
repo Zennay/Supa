@@ -3,6 +3,7 @@
  * reusing canonical domain money/pack functions; no remote data collection.
  * Own source observations are NOT written retailer rights or field-study proof.
  */
+import { renderPrivateBasketSnapshot } from './privateBasketSnapshotExport.ts'
 import { compareFullBaskets } from './domain/basketComparison.ts'
 import { calculateDecimalPackCount } from './domain/decimalPackArithmetic.ts'
 import type { BasketTraceLine, OneStoreBasket } from './domain/basket.ts'
@@ -672,6 +673,38 @@ document.querySelector<HTMLButtonElement>('#download-missing')!.addEventListener
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 60000)
 })
+document.querySelector<HTMLButtonElement>('#download-html')!.addEventListener('click', () => {
+  if (invalidateAgedComparison() || result.hidden) {
+    setStatus('Maak eerst een actuele privévergelijking voor je een momentopname bewaart.', true)
+    return
+  }
+  try {
+    const reportRows = Array.from(rows.querySelectorAll('tr')).map(row => {
+      const cells = Array.from(row.cells, cell => cell.innerText || cell.textContent || '')
+      if (cells.length !== 4) throw Error('Onvolledige zichtbare tabel')
+      return cells as [string, string, string, string]
+    })
+    const html = renderPrivateBasketSnapshot({
+      capturedAt: new Date().toISOString(),
+      summary: summary.textContent ?? '',
+      sourceMoments: capturesLabel.textContent ?? '',
+      rows: reportRows,
+      nextActions: nextActions.hidden ? [] : [...missingTasks],
+    })
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'supa-prive-winkelvergelijking.html'
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+    setStatus('Historische privévergelijking lokaal opgeslagen als scriptvrije HTML. Voor actuele winkelprijzen moet je opnieuw waarnemen.')
+  } catch {
+    setStatus('Privé HTML kon niet veilig worden gemaakt. Gebruik printen of open de vergelijking opnieuw.', true)
+  }
+})
+
 document.querySelector<HTMLButtonElement>('#print')!.addEventListener('click', () => {
   if (invalidateAgedComparison()) return
   if (!result.hidden) window.print()

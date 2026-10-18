@@ -84,3 +84,9 @@ Voor echte fysieke ingrediënten uit de Planner is zelfs geen geprijsd winkelman
 ## Dezelfde winkel-SKU bij verschillende ingrediënten
 
 Wanneer één daadwerkelijk winkelartikel-ID aan meerdere ingrediëntregels voor dezelfde winkel is gekoppeld, markeert de browservergelijker **alle betrokken regels voor die winkel als onopgelost**. Een eerdere rij wordt dus niet als een aparte pakketprijs in het privédeeloverzicht opgenomen. Voeg de fysieke hoeveelheden eerst samen tot één ingrediëntbehoefte en bevestig de winkel-SKU daarna opnieuw. Dit is per winkel onafhankelijk; de andere supermarkt wordt niet automatisch gelijkgesteld.
+
+## Privéprijsvergelijking bewaren zonder terminal
+
+Op zowel `/private-basket-mapping.html` als `/private-basket-compare.html` kun je nu **Download dit privéoverzicht als HTML** kiezen, zodra een eigen bronmand zichtbaar is. Supa neemt de op dat moment getoonde fysieke ingrediënten, volledige verpakkingen, bedragen, bronmomenten en ontbrekende-productenlijst over in één lokaal te openen **statisch en scriptvrij** HTML-bestand. Er is geen account, backend of netwerkupload nodig. Bij een inmiddels verlopen volledige vergelijking blokkeert dezelfde bestaande vervalcontrole de export.
+
+Het bestand is nadrukkelijk een **historische momentopname**: het doet later geen nieuwe prijs- of winkelrights-check en is geen garantie voor actuele kassaprijzen, een openbare besparingsclaim of veldbewijs. Alle tekst wordt HTML-geëscapet; een strikte Content Security Policy verbiedt scripts en netwerkbronnen. De bestaande TXT-boodschappenlijst, missende-prijzenlijst en printfunctie blijven onafhankelijk beschikbaar.
