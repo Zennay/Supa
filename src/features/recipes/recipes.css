@@ -102,3 +102,12 @@
 
 .recipe-review__pending { margin: 14px 0; padding: 12px; border: 1px solid #bd9b6d; border-radius: 12px; background: #fffaf1; }
 .recipe-review__pending ul { margin: 8px 0; }
+
+.recipe-own-actions__portions { display:grid; gap:10px; margin-top:16px; padding:13px;
+  background:#eff6f0; border-radius:14px; }
+.recipe-own-actions__portions label { display:grid; gap:6px; font-size:13px; }
+.recipe-own-actions__portions input { width:100%; max-width:160px; min-height:44px;
+  border-radius:9px; padding:8px; border:1px solid #97b4a1; font:inherit; }
+.recipe-own-actions__portions button { min-height:44px; border:0; border-radius:11px;
+  background:#005135; color:white; font:inherit; padding:10px; }
+.recipe-own-actions__portions small { line-height:1.5; }

@@ -4,6 +4,7 @@ import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
+import { preparePortionCopy } from './recipePortionCopy.ts'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import './recipes.css'
@@ -56,6 +57,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [sourceReviews, setSourceReviews] = useState<{ original: string; reason: string }[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [copyServings, setCopyServings] = useState('')
   const [preview, setPreview] = useState<UserRecipeDraft | null>(null)
   const [backupPreview, setBackupPreview] = useState<RecipeBackupPreview | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
@@ -139,6 +141,23 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     editor.current?.showModal()
   }
   function closeEditor() { sourceReadVersion.current++; request.current?.abort(); setBusy(false); editor.current?.close() }
+  function prepareScaledRecipe(recipe: SavedRecipe) {
+    setError('')
+    try {
+      const value = Number(copyServings)
+      const prepared = preparePortionCopy(recipe, value)
+      prepareExistingRecipe(recipe, true)
+      setForm({ title: recipe.title + ` (${value} porties)`,
+        servings: String(value), minutes: recipe.minutes?.toString() ?? '',
+        ingredients: prepared.lines.join('\n'), steps: recipe.steps.join('\n') })
+      setSourceReviews(prepared.reviews)
+      setMessage(prepared.reviews.length > 0
+        ? 'Kopie voorbereid. Onzekere of gedeeltelijke stuks moeten handmatig worden aangepast; er zijn geen hoeveelheden geraden.'
+        : 'Metrische ingrediënten zijn evenredig omgerekend. Controleer de kopie en sla zelf op.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Kon dit recept niet veilig schalen.')
+    }
+  }
   function prepareExistingRecipe(recipe: SavedRecipe, duplicate: boolean) {
     request.current?.abort()
     setBusy(false)
@@ -311,7 +330,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     <section className="hifi-section"><div className="hifi-section-heading"><div><h2>Recepten</h2><p className="recipe-count">{demo.length + own.length} recepten</p></div><button aria-label="Sorteer recepten op naam" aria-pressed={sort} onClick={() => setSort(!sort)}><FigmaImage asset={a.recipeSort} alt="" /></button></div>
       <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe && recipe.image ? '' : ' own-recipe-card'}`} key={recipe.id}>
         {'image' in recipe && recipe.image && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
-        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setDeleteConfirm(false); detail.current?.showModal() }} />
+        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setDeleteConfirm(false); setError(''); setCopyServings(String(recipe.servings ?? '')); detail.current?.showModal() }} />
         <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
         <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p></div>
       </article>)}</div>
@@ -411,6 +430,17 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <button type="button" onClick={() => prepareExistingRecipe(selected, true)}>Maak een kopie</button>
           <button type="button" aria-expanded={deleteConfirm}
             onClick={() => setDeleteConfirm(true)}>Verwijder recept</button>
+        </div>
+        <div className="recipe-own-actions__portions">
+          <label>Maak een nieuwe kopie voor een ander aantal porties
+            <input type="number" inputMode="numeric" min="1" max="1000" step="1"
+              value={copyServings} onChange={event => setCopyServings(event.target.value)} />
+          </label>
+          <button type="button" onClick={() => prepareScaledRecipe(selected)}>
+            Schaal ingrediënten en maak kopie
+          </button>
+          <small>Alleen exact berekenbare hoeveelheden worden automatisch geschaald.
+            Controleer stuksaantallen en onbekende maten; het oorspronkelijke recept blijft intact.</small>
         </div>
         {error && <p role="alert" className="recipe-error">{error}</p>}
         {deleteConfirm && <div className="recipe-own-actions__confirm" role="group"
