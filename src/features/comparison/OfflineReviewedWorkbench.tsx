@@ -8,6 +8,7 @@ import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
+import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { privatePackUnitRate } from './privateUnitPrice.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
@@ -733,6 +734,12 @@ export function OfflineReviewedWorkbench({
   useEffect(() => {
     onReviewedBaskets?.(reviewedBridge)
   }, [onReviewedBaskets, reviewedBridge])
+  function goToReviewRow(store: typeof stores[number], id: string) {
+    setOpenTripOnly(false)
+    window.setTimeout(() => document.getElementById(reviewRowId(store, id))?.scrollIntoView({
+      behavior: 'smooth', block: 'center',
+    }), 0)
+  }
   const allReviewed = perStoreReview.every(item => item.complete)
   const comparisonNextSteps = perStoreReview.flatMap(item => {
     const capture = imported?.captures[item.store]
@@ -887,7 +894,7 @@ export function OfflineReviewedWorkbench({
           Gebruik uitsluitend gegevens die je mag bewaren en verwerken.
           Ontbrekende prijzen: zet <code>priceCents: null</code> en <code>available: false</code>.</p>
       </details>
-      <div className="offline-price-workbench__input">
+      <div id="supa-own-price-import" className="offline-price-workbench__input">
         <label>Herstel eerdere privémand-sessie van ditzelfde weekmenu (zonder oude bevestigingen)
           <input type="file" accept=".json,application/json" disabled={busy}
             onChange={event => { void restorePortableSession(event.currentTarget.files?.[0]) }} />
@@ -986,7 +993,7 @@ export function OfflineReviewedWorkbench({
             : !imported.pairedWithin24h && <p role="alert" className="attention-card">
               Waarnemingen liggen meer dan 24 uur uiteen. Het prijsverschil is niet vergelijkbaar.
             </p>}
-          {comparisonNextSteps.length > 0 && (
+          {(Object.keys(imported.captures).length < 2 || !basketPair?.plus || !basketPair?.deka) && comparisonNextSteps.length > 0 && (
             <section className="offline-price-workbench__missing" aria-label="Volgende stappen voor prijsvergelijking">
               <h4>Wat ontbreekt nog voor hetzelfde winkelmandje?</h4>
               <ul>{comparisonNextSteps.map(step => <li key={step}>{step}</li>)}</ul>
@@ -995,6 +1002,35 @@ export function OfflineReviewedWorkbench({
           )}
           {!basketPair ? <p role="alert">Deze planning kon niet veilig aan de import worden gekoppeld.</p> : (
             <>
+              {basketPair.plus && basketPair.deka && imported.captures.PLUS &&
+                imported.captures.DekaMarkt && (
+                  <ComparisonReadiness
+                    plus={basketPair.plus}
+                    deka={basketPair.deka}
+                    captures={{ PLUS: imported.captures.PLUS, DekaMarkt: imported.captures.DekaMarkt }}
+                    sourceFresh={currentEnough}
+                    pairedWithin24h={imported.pairedWithin24h}
+                    comparable={canShowDifference}
+                    nowMs={clockMs}
+                    pendingHumanReview={perStoreReview.reduce((sum, item) =>
+                      sum + item.required - item.accepted, 0)}
+                    onReviewFirstPending={() => {
+                      const pending = stores.flatMap(store => {
+                        const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+                        const capture = imported.captures[store]
+                        return basket && capture ? basket.lines.filter(line =>
+                          line.status === 'matched' &&
+                          !reviewedLines[reviewedLineKey(store, capture.observedAt, line)]
+                        ).map(line => ({ store, id: line.id })) : []
+                      })[0]
+                      if (pending) goToReviewRow(pending.store, pending.id)
+                    }}
+                    onReviewMissing={goToReviewRow}
+                    onOpenImport={() => document.getElementById('supa-own-price-import')?.scrollIntoView({
+                      behavior: 'smooth', block: 'start',
+                    })}
+                  />
+                )}
               {coverageRows.length > 0 && (
                 <section className="offline-price-workbench__full-breakdown" aria-label="Dekking van hetzelfde mandje bij beide winkels">
                   <h4>Hetzelfde mandje: {coverageRows.length} ingrediënten × twee winkels</h4>

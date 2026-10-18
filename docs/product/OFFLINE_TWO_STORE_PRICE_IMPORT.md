@@ -687,3 +687,26 @@ Een interne zoekscoresom is uitsluitend een zoekrangschikking,
 recht op een prijs- of besparingsclaim. De gebruiker bevestigt
 nog steeds ieder oorspronkelijk bronartikel en zijn werkelijk
 waargenomen verpakking en prijs afzonderlijk.
+
+### Doorloop ontbrekende bronnen en matches rechtstreeks in Vergelijk
+
+Bestaande productbron uit [PR #3916](https://github.com/Zennay/Supa/pull/3916)
+is aangesloten op de gewone Vergelijk-tab zodra twee echte
+eigen winkelopnames beschikbaar zijn. Het interactieve
+**Maak je winkelvergelijking compleet**-overzicht noemt beide
+originele tijdstippen en de waarnemingsleeftijd, en wijst aan
+welke opname ouder dan zeven dagen, in de toekomst of meer dan
+24 uur verwijderd van de andere is. Knoppen springen naar de
+echte bronimport of de concrete ontbrekende Planner-SKU-regel.
+Niet alleen onvolledige automatische matches maar ook nog
+niet persoonlijk bevestigde originele prijzen verschijnen
+als uit te voeren productcontrole met een directe link naar
+de eerste onafgevinkte bronregel.
+
+Bij één winkel blijft de bestaande één-winkel-hulp zichtbaar;
+bij twee winkels vervangt dit overzicht de generieke dubbele
+meldingen. Dit is uitsluitend een begeleide UI bij al
+geïmporteerde eigen brondata, geen crawler, waarneming of
+winkelrechtenverificatie. De bestaande volledige
+bron-/review-/fysieke-mandvoorwaarden blijven vereist voor
+een echte rekenkundige privévergelijking.
