@@ -15,6 +15,7 @@ type DemandLine = ParsedRow & {
 
 const textArea = document.querySelector<HTMLTextAreaElement>('#quick-demand-text')!
 const importButton = document.querySelector<HTMLButtonElement>('#quick-demand-import')!
+const fileInput = document.querySelector<HTMLInputElement>('#quick-demand-file')!
 const status = document.querySelector<HTMLElement>('#quick-demand-status')!
 const mealsInput = document.querySelector<HTMLInputElement>('#meal-count')!
 const existingLines = document.querySelector<HTMLElement>('#lines')!
@@ -126,6 +127,33 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
   }))
   return { schema: 'supa-private-basket-demand-v1' as const, selectedMealCount: meals, ingredients }
 }
+
+// Optional opt-in source from Supa's own exported TXT (or an ordinary
+// plaintext list). Reading the file NEVER changes the admitted basket.
+// Conversion happens only after a second explicit import button press.
+let fileRevision = 0
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files?.[0]
+  const attempt = ++fileRevision
+  if (!file) return
+  try {
+    if (!file.size || file.size > 128000) {
+      throw Error('Kies een eigen UTF-8 tekstlijst van maximaal 128 KB.')
+    }
+    const input = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+    if (attempt !== fileRevision) return
+    if (input.length > maxChars) throw Error('De tekst bevat meer dan 40.000 tekens.')
+    textArea.value = input
+    status.textContent = 'Eigen lokale tekstlijst ingelezen als concept. Controleer de regels en kies Maak van deze lijst een privémandje; je huidige geaccepteerde mand en winkelprijzen zijn nog ongewijzigd.'
+    status.className = 'notice'
+  } catch (error) {
+    if (attempt !== fileRevision) return
+    status.textContent = error instanceof Error ? error.message : 'Ongeldig tekstbestand. Huidige mand is bewaard.'
+    status.className = 'notice error'
+  } finally {
+    if (attempt === fileRevision) fileInput.value = ''
+  }
+})
 
 importButton.addEventListener('click', () => {
   try {
