@@ -848,3 +848,25 @@ een eerdere winkelmatch wordt zelfstandig opnieuw geverifieerd.
 **Wis privéherstelpunt** verwijdert het opgeslagen bestand uit de
 huidige tab, los van de nog open vergelijking. Gebruik JSON-download
 om een herstelpunt langer dan de browsersessie zelf te bewaren.
+
+### Per ingrediënt de goedkoopste eigen winkel kiezen
+
+Na twee volledig geprijsde en persoonlijk gecontroleerde winkelmandjes
+toont de Vergelijk-tab ook Mijn voordeligste route. Hiervoor wordt
+de bestaande basketComparison gebruikt om af te dwingen dat beide
+winkels exact dezelfde fysieke Planner-vraag, geldige hele verpakkingen
+en consistente centbedragen vergelijken. Per ingrediënt wordt de winkel
+met het kleinste benodigde regelbedrag gekozen; bij gelijk bedrag
+wordt PLUS gekozen. De interface toont het gecombineerde bedrag naast
+de twee volledige winkelbedragen, en de puur rekenkundige mogelijke
+aanvullende besparing ten opzichte van de goedkoopste enkele winkel.
+
+De route bevat per winkel aparte bronartikelcodes, productnamen,
+benodigde hele verpakkingen, eenheidsprijzen, afvinkbare boodschappen
+en een lokale kopieerbare/downloadbare TXT-lijst. Vinkjes worden niet
+automatisch bewaard. Bij elke TXT-download worden de bestaande
+bronleeftijd, onderlinge tijdcontext en oorspronkelijke persoonlijke
+productreviews opnieuw gecontroleerd. Ontbrekende of verlopen prijzen
+zijn geen nulprijs en geven dus geen gecombineerde route.
+Reiskosten, tijd en actievoorwaarden zijn niet in de bedragen
+meegenomen; de uitkomst is geen garantie of openbare besparingsclaim.

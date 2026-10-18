@@ -9,6 +9,8 @@ import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
+import { createMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
+import { MixedStoreShoppingCard } from './MixedStoreShoppingCard.tsx'
 import { privatePackUnitRate } from './privateUnitPrice.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 import { describePrivateStoreCaptureChange } from './privateStoreCaptureDiff.ts'
@@ -925,6 +927,12 @@ export function OfflineReviewedWorkbench({
     })
   }
 
+  const mixedStorePlan = useMemo(() =>
+    canShowDifference && basketPair?.plus && basketPair.deka
+      ? createMixedStoreShoppingPlan(basketPair.plus, basketPair.deka)
+      : null,
+  [canShowDifference, basketPair])
+
   const fullDifferenceRows = canShowDifference && basketPair?.plus && basketPair.deka &&
     basketPair.comparison ? [...basketPair.comparison.lineDeltas]
       .sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents))
@@ -1399,6 +1407,17 @@ export function OfflineReviewedWorkbench({
                     ))}
                 </section>
               )}
+              {canShowDifference && mixedStorePlan && imported.captures.PLUS &&
+                imported.captures.DekaMarkt && (
+                  <MixedStoreShoppingCard
+                    plan={mixedStorePlan}
+                    captured={{
+                      PLUS: imported.captures.PLUS.observedAt,
+                      DekaMarkt: imported.captures.DekaMarkt.observedAt,
+                    }}
+                    eligibleNow={eligibleComparisonRightNow}
+                  />
+                )}
               {canShowDifference && (
                 <div className="offline-price-workbench__actions">
                   <button type="button" onClick={downloadConfirmedComparisonCsv}>
