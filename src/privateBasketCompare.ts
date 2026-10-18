@@ -55,6 +55,8 @@ const tripStore = document.querySelector<HTMLSelectElement>('#trip-store')!
 const tripItems = document.querySelector<HTMLElement>('#trip-items')!
 const tripSummary = document.querySelector<HTMLElement>('#trip-summary')!
 let tripBaskets: Record<StoreName, OneStoreBasket> | null = null
+let tripEligible: Record<StoreName, boolean> = { PLUS: false, DekaMarkt: false }
+let tripValidUntilNs: Record<StoreName, bigint> | null = null
 let comparisonValidThroughNs: bigint | null = null
 const ticked = new Set<string>()
 let inputRevision = 0
@@ -315,8 +317,10 @@ function lineCell(line: BasketTraceLine): HTMLTableCellElement {
 type TripLine = Extract<BasketTraceLine, { status: 'matched' }>
 
 function shoppingTripLines(): TripLine[] {
-  const basket = tripBaskets?.[tripStore.value as StoreName]
-  if (!basket || basket.unresolvedLineCount !== 0 ||
+  const store = tripStore.value as StoreName
+  const basket = tripBaskets?.[store]
+  if (!tripEligible[store] || !tripValidUntilNs ||
+      BigInt(Date.now()) * 1000000n > tripValidUntilNs[store] || !basket || basket.unresolvedLineCount !== 0 ||
       basket.matchedLineCount !== basket.lines.length ||
       basket.lines.some(line => line.status !== 'matched')) return []
   return basket.lines.filter((line): line is TripLine => line.status === 'matched')
@@ -334,8 +338,19 @@ function tripProgress(): void {
     ' Prijzen zijn historische privéwaarnemingen, geen kassagarantie.'
 }
 
+function nowForTripExpired(store: StoreName): boolean {
+  return tripEligible[store] && !!tripValidUntilNs &&
+    BigInt(Date.now()) * 1000000n > tripValidUntilNs[store]
+}
 function invalidateAgedComparison(): boolean {
-  if (result.hidden || comparisonValidThroughNs === null) return false
+  if (result.hidden) return false
+  if (tripBaskets && tripValidUntilNs &&
+      nowForTripExpired(tripStore.value as StoreName)) {
+    clearTrip()
+    setStatus('De winkelopname voor deze privéboodschappenlijst is ouder dan zeven dagen. Maak een nieuwe eigen opname voordat je opnieuw afvinkt of exporteert.', true)
+    return true
+  }
+  if (comparisonValidThroughNs === null) return false
   const nowNs = BigInt(Date.now()) * 1000000n
   if (nowNs <= comparisonValidThroughNs) return false
   result.hidden = true
@@ -352,6 +367,9 @@ function renderTrip(): void {
     return
   }
   trip.hidden = false
+  for (const option of Array.from(tripStore.options)) {
+    option.disabled = !tripEligible[option.value as StoreName]
+  }
   for (const line of lines) {
     const item = document.createElement('label')
     item.className = 'trip-line'
@@ -377,16 +395,38 @@ function renderTrip(): void {
   tripProgress()
 }
 
-function loadTrip(left: OneStoreBasket, right: OneStoreBasket, complete: boolean): void {
+function validOneStoreTrip(basket: OneStoreBasket, demand: Demand, ageNs: bigint): boolean {
+  return ageNs >= 0n && ageNs <= weekNs &&
+    demand.ingredients.length > 0 && basket.lines.length === demand.ingredients.length &&
+    basket.matchedLineCount === basket.lines.length &&
+    basket.unresolvedLineCount === 0 && Number.isSafeInteger(basket.totalCents) &&
+    basket.lines.every(line => line.status === 'matched')
+}
+function loadTrip(
+  left: OneStoreBasket, right: OneStoreBasket, demand: Demand,
+  ages: { PLUS: bigint; DekaMarkt: bigint },
+  observed: { PLUS: bigint; DekaMarkt: bigint },
+): void {
   ticked.clear()
-  tripBaskets = complete ? { PLUS: left, DekaMarkt: right } : null
-  tripStore.value = 'PLUS'
+  tripEligible = {
+    PLUS: validOneStoreTrip(left, demand, ages.PLUS),
+    DekaMarkt: validOneStoreTrip(right, demand, ages.DekaMarkt),
+  }
+  tripBaskets = tripEligible.PLUS || tripEligible.DekaMarkt
+    ? { PLUS: left, DekaMarkt: right } : null
+  tripValidUntilNs = {
+    PLUS: observed.PLUS + weekNs,
+    DekaMarkt: observed.DekaMarkt + weekNs,
+  }
+  tripStore.value = tripEligible.PLUS ? 'PLUS' : 'DekaMarkt'
   renderTrip()
 }
 
 function clearTrip(): void {
   ticked.clear()
   tripBaskets = null
+  tripValidUntilNs = null
+  tripEligible = { PLUS: false, DekaMarkt: false }
   trip.hidden = true
   tripItems.replaceChildren()
 }
@@ -450,13 +490,15 @@ function show(source: Source, demand: Demand): void {
   const firstAge = nowNs - start
   const secondAge = nowNs - end
   const gap = abs(start - end)
-  comparisonValidThroughNs = (start <= end ? start : end) + weekNs
   const fresh = firstAge >= 0n && secondAge >= 0n &&
     firstAge <= weekNs && secondAge <= weekNs && gap <= dayNs
   const complete = fresh && comparison.claimable && comparison.deltaCents !== null &&
     Number.isSafeInteger(comparison.deltaCents)
+  comparisonValidThroughNs = complete ? (start <= end ? start : end) + weekNs : null
   result.hidden = false
-  loadTrip(left, right, complete)
+  loadTrip(left, right, demand,
+    { PLUS: firstAge, DekaMarkt: secondAge },
+    { PLUS: start, DekaMarkt: end })
   rows.replaceChildren()
   const deltasByIngredient = new Map(comparison.lineDeltas.map(line => [line.id, line]))
   for (let i = 0; i < demand.ingredients.length; i++) {
