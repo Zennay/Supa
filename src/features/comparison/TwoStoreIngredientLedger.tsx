@@ -2,26 +2,15 @@ import { useMemo, useState } from 'react'
 import type { BasketComparison } from '../../domain/basketComparison.ts'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { unresolvedProductGuidance } from './unresolvedProductGuidance.ts'
+import { privateUnitPrice } from './privateUnitPrice.ts'
 
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
-type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 type Row = {
   id: string
   label: string
   plus?: BasketTraceLine
   deka?: BasketTraceLine
   deltaCents: number | null
-}
-
-function packUnitPrice(line: Matched): string {
-  const total = line.pack.amount * line.pack.count
-  const basis = line.pack.unit === 'g' || line.pack.unit === 'ml' ? total / 1000 : total
-  if (!Number.isFinite(basis) || basis <= 0) return 'eenheidsprijs onbekend'
-  const cents = line.pricePerPackCents / basis
-  if (!Number.isFinite(cents) || cents < 0) return 'eenheidsprijs onbekend'
-  const unit = line.pack.unit === 'g' || line.pack.unit === 'kg' ? 'kg'
-    : line.pack.unit === 'ml' || line.pack.unit === 'l' ? 'liter' : 'stuk'
-  return euro.format(cents / 100) + ' / ' + unit
 }
 
 function StoreCell({ line, store, onReview }: {
@@ -41,7 +30,7 @@ function StoreCell({ line, store, onReview }: {
     <span>{line.productName}</span>
     <small>{line.packs} × {euro.format(line.pricePerPackCents / 100)} per verpakking</small>
     <small>{line.pack.count > 1 ? line.pack.count + ' × ' : ''}
-      {line.pack.amount} {line.pack.unit} per verpakking · {packUnitPrice(line)}</small>
+      {line.pack.amount} {line.pack.unit} per verpakking · {privateUnitPrice(line) ?? 'eenheidsprijs onbekend'}</small>
     <button type="button" onClick={() => onReview(store, line.id)}>Wijzig koppeling</button>
   </div>
 }

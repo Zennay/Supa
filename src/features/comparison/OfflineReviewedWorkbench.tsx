@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OfflineComparisonSession } from './offlineComparisonSession.ts'
 import { offlineSessionBaskets, offlineSessionFingerprint, offlineSessionFresh } from './offlineSessionBaskets.ts'
-import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine } from '../../domain/basket.ts'
+import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, parseSingleOfflineCapture, type OfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
@@ -13,24 +13,14 @@ import { StagedStorePreview } from './StagedStorePreview.tsx'
 import { stagedStoreFingerprint } from './stagedStoreFingerprint.ts'
 import { LocalProductPicker } from './LocalProductPicker.tsx'
 import { unresolvedProductGuidance } from './unresolvedProductGuidance.ts'
+import { privateUnitPrice } from './privateUnitPrice.ts'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores = ['PLUS', 'DekaMarkt'] as const
-type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 const EMPTY_MANUAL_CHOICES: Readonly<Record<string, string>> = Object.freeze({})
 const manualKey = (store: string, ingredientId: string) => store + '\u0000' + ingredientId
-function pricePerUnit(line: Matched): string | null {
-  const { unit, amount, count } = line.pack
-  const physical = amount * count
-  const basis = unit === 'g' || unit === 'ml' ? physical / 1000 : physical
-  if (!Number.isFinite(basis) || basis <= 0) return null
-  const cents = line.pricePerPackCents / basis
-  if (!Number.isFinite(cents) || cents < 0) return null
-  return euros.format(cents / 100) + ' per ' +
-    (unit === 'g' || unit === 'kg' ? 'kg' : unit === 'ml' || unit === 'l' ? 'liter' : 'stuk')
-}
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
@@ -1009,7 +999,7 @@ export function OfflineReviewedWorkbench({
                             <strong>{line.ingredientLabel}</strong>
                             <span>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</span>
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
-                            {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
+                            {line.status === 'matched' && <span>Eenheidsprijs: {privateUnitPrice(line) ?? 'onbekend'}</span>}
                             {line.status === 'unresolved' && <span>{unresolvedProductGuidance(line)}</span>}
                             {line.status === 'matched' &&
                               line.reasons.includes('explicit local user selection; not an automatic or verified retailer match') &&
