@@ -314,7 +314,12 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
         // A renamed ingredient is not a corrected measurement. Keep provenance
         // review until the user meaningfully fixes its amount or physical unit.
         // Prefer exact source-text identity when lines have been reordered.
-        const carried = sourceReviews.find(item => item.original === ingredient.original)
+        // Prefer the exact original occurrence, not merely its raw text.
+        // Two identical ingredient lines can carry different provenance
+        // warnings after a portion-copy or URL import.
+        const carried = sourceReviews.find(item =>
+          item.index === index && item.original === ingredient.original)
+          ?? sourceReviews.find(item => item.original === ingredient.original)
           ?? sourceReviews.find(item => item.index === index)
         if (!carried) return ingredient
         const originalMeasure = normalizeIngredientLine(carried.original)
