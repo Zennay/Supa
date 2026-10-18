@@ -17,6 +17,23 @@ export type OwnRecipeChecklist = {
   copyText: string
 }
 
+/** Human-readable private grocery checklist; checked state exists only in the
+ * user's current detail view. Never infer a retailer price or a purchased pack.
+ */
+export function formatOwnRecipeChecklist(
+  checklist: OwnRecipeChecklist,
+  checked: Readonly<Record<string, boolean>>,
+): string {
+  return [
+    `Mijn recept: ${checklist.title} — ${checklist.portions} porties`,
+    'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
+    ...checklist.lines.map(line => line.needsReview
+      ? `[?] ${line.original} — hoeveelheid handmatig controleren`
+      : `${checked[line.key] ? '[x]' : '[ ]'} ${compactAmount(line.amount!)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`),
+    'Prijzen, winkelvoorraad en besparingen zijn onbekend.',
+  ].join('\n')
+}
+
 function compactAmount(amount: number): string {
   return Number(amount.toFixed(3)).toLocaleString('nl-NL', { maximumFractionDigits: 3 })
 }
@@ -67,14 +84,6 @@ export function ownRecipeShoppingChecklist(recipe: SavedRecipe, portions: number
     if (groupKey && verified && !previous) grouped.set(groupKey, line)
   }
 
-  const copyText = [
-    `Mijn recept: ${recipe.title} — ${portions} porties`,
-    'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
-    ...lines.map(line => line.needsReview
-      ? `[?] ${line.original} — hoeveelheid handmatig controleren`
-      : `[ ] ${compactAmount(line.amount!)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`),
-    'Prijzen, winkelvoorraad en besparingen zijn onbekend.',
-  ].join('\n')
-
-  return { title: recipe.title, portions, lines, canCopy: lines.length > 0, copyText }
+  const partial: OwnRecipeChecklist = { title: recipe.title, portions, lines, canCopy: lines.length > 0, copyText: '' }
+  return { ...partial, copyText: formatOwnRecipeChecklist(partial, {}) }
 }
