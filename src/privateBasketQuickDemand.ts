@@ -54,6 +54,14 @@ function parseLine(rawLine: string, lineNumber: number): ParsedRow {
   const rawUnit = (first ? first[2] : last![3]).toLocaleLowerCase('nl-NL')
   const label = (first ? first[3] : last![1]).trim()
   if (!allowedLabel(label)) throw Error('Regel ' + lineNumber + ': ongeldige of onveilige ingrediëntnaam.')
+  // In a Dutch shopping list "1.000 g" often means one thousand grams,
+  // while JS would silently interpret it as ONE gram. Abstain on that
+  // ambiguous punctuation; require "1000 g", "1 kg" or an explicit
+  // decimal comma instead of silently underbuying.
+  if (/^[1-9]\d{0,2}\.\d{3}$/.test(rawAmount)) {
+    throw Error('Regel ' + lineNumber + ': punt als duizendtalseparator is dubbelzinnig. ' +
+      'Gebruik 1000 g, 1 kg of een decimale komma, zodat de hoeveelheid niet verkeerd wordt gelezen.')
+  }
   const amount = Number(rawAmount.replace(',', '.'))
   const parsedUnit = units[rawUnit]
   if (!parsedUnit || !Number.isFinite(amount) || amount <= 0 || amount > 100000 ||
