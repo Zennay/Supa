@@ -21,7 +21,8 @@ import { compareFullBaskets } from '../src/domain/basketComparison.ts'
 const STORES = ['PLUS', 'DekaMarkt']
 const UNITS = ['g', 'kg', 'ml', 'l', 'piece']
 const MAX_BYTES = 256_000
-const DAY = 86_400_000
+const DAY_NS = 86_400_000_000_000n
+const WEEK_NS = 7n * DAY_NS
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const validText = (value, max = 160) =>
   typeof value === 'string' && value.length > 0 && value.length <= max &&
@@ -177,7 +178,23 @@ function rowCell(line) {
     escapeHtml(euro.format(line.lineTotalCents / 100)) + '</b></td>'
 }
 
-function renderHtml(data, demand, left, right, comparison, observed, fresh) {
+// Date.parse discards the sub-millisecond fraction. Source timestamps may
+// legitimately carry nanoseconds; a 24h + 1ns gap must NEVER pass as paired.
+function observedNanoseconds(raw) {
+  const match = /\\.(\\d{1,9})[+-]\\d\\d:\\d\\d$/.exec(raw)
+  const fraction = (match?.[1] ?? '').padEnd(9, '0')
+  const milliseconds = Date.parse(raw)
+  if (!Number.isFinite(milliseconds)) throw Error('Invalid observation time')
+  return BigInt(milliseconds - Number(fraction.slice(0, 3))) * 1_000_000n +
+    BigInt(fraction || '0')
+}
+function ageDescription(age) {
+  if (age < 0n) return 'in de toekomst'
+  if (age < 3_600_000_000_000n) return String(age / 60_000_000_000n) + ' minuten oud'
+  if (age < DAY_NS) return String(age / 3_600_000_000_000n) + ' uur oud'
+  return String(age / DAY_NS) + ' dagen oud'
+}
+function renderHtml(data, demand, left, right, comparison, observed, ages, gap, fresh) {
   const complete = fresh && comparison.claimable &&
     Number.isSafeInteger(comparison.deltaCents)
   const summary = complete
@@ -194,6 +211,12 @@ function renderHtml(data, demand, left, right, comparison, observed, fresh) {
   const notes = [
     'De opnames komen uitsluitend uit eigen aangeleverde lokale bestanden.',
     'Geen licentie, onafhankelijk winkelveldonderzoek of actuele publieke prijsclaim bewezen.',
+    ...STORES.map((store, index) =>
+      store + ': ' + ageDescription(ages[index]) + (ages[index] > WEEK_NS
+        ? ' · ouder dan zeven dagen' : '')),
+    'Verschil tussen beide opname-instanten: ' +
+      String(gap / 3_600_000_000_000n) + ' hele uren' +
+      (gap > DAY_NS ? ' · opnieuw waarnemen bij de oudste winkel' : ''),
     !fresh ? 'Opnames zijn te oud, toekomstig of meer dan 24 uur uiteen: prijsvergelijking geblokkeerd.' : '',
     left.unresolvedLineCount + right.unresolvedLineCount > 0
       ? 'Ontbrekende producten: ' + left.unresolvedLineCount + ' bij PLUS, ' +
@@ -256,12 +279,14 @@ async function main() {
   const left = makeStoreBasket('PLUS', captures.PLUS, demand)
   const right = makeStoreBasket('DekaMarkt', captures.DekaMarkt, demand)
   const comparison = compareFullBaskets({ baseline: left, candidate: right })
-  const now = Date.now()
+  const nowNs = BigInt(Date.now()) * 1_000_000n
   const dates = STORES.map(store => captures[store].observedAt)
-  const ages = dates.map(date => now - Date.parse(date))
-  const fresh = ages.every(age => Number.isFinite(age) && age >= 0 && age <= 7 * DAY) &&
-    Math.abs(ages[0] - ages[1]) <= DAY
-  const html = renderHtml(source, demand, left, right, comparison, dates, fresh)
+  const instants = dates.map(observedNanoseconds)
+  const ages = instants.map(instant => nowNs - instant)
+  const gap = instants[0] >= instants[1]
+    ? instants[0] - instants[1] : instants[1] - instants[0]
+  const fresh = ages.every(age => age >= 0n && age <= WEEK_NS) && gap <= DAY_NS
+  const html = renderHtml(source, demand, left, right, comparison, dates, ages, gap, fresh)
   await writeFile(outputPath, html, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
   process.stdout.write('Privé HTML-mandrapport opgeslagen; ' +
     (fresh && comparison.claimable ? 'volledige vergelijking aanwezig' : 'vergelijking onvolledig/onbekend') +
