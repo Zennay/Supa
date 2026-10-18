@@ -62,6 +62,9 @@ function recipeMinutes(value: unknown): number | null {
 function quantity(raw: string): number | null {
   const vulgar: Record<string, number> = { '½': 0.5, '¼': 0.25, '¾': 0.75 }
   if (Object.hasOwn(vulgar, raw)) return vulgar[raw]
+  // A dotted three-digit group (1.000 g) is ambiguous in Dutch recipes:
+  // it may mean 1000 g, so never silently treat it as 1 g.
+  if (/^[1-9]\d{0,2}\.\d{3}$/.test(raw)) return null
   if (raw.includes('/')) {
     const bits = raw.split(/\s+/)
     const fraction = bits.pop()!.split('/').map(Number)
