@@ -8,6 +8,11 @@ import type { OfflinePriceSnapshots, OfflineRetailer } from '../../domain/offlin
  */
 export function useOfflineComparisonSession() {
   const [selectedStore, setSelectedStore] = useState<OfflineRetailer>('PLUS')
+  // One-use navigation intent from a missing Lijst line to its matching editor.
+  // Contains IDs only; no price, source observation or persisted customer data.
+  const [reviewTarget, setReviewTarget] = useState<{
+    store: OfflineRetailer; ingredientId: string
+  } | null>(null)
   const [text, setText] = useState('')
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [stagedCaptures, setStagedCaptures] = useState<
@@ -31,7 +36,8 @@ export function useOfflineComparisonSession() {
   >({})
   const [importEpoch, setImportEpoch] = useState(0)
   return {
-    selectedStore, setSelectedStore, text, setText, imported, setImported,
+    selectedStore, setSelectedStore, reviewTarget, setReviewTarget,
+    text, setText, imported, setImported,
     stagedCaptures, setStagedCaptures,
     manualSelections, setManualSelections,
     importEpoch, setImportEpoch, tripMemory, setTripMemory,
