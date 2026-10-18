@@ -81,3 +81,19 @@
 @media (max-width: 520px) {
   .private-store-trip__actions { display: grid; grid-template-columns: 1fr; }
 }
+
+.private-store-trip__save {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  margin: 6px 0 12px;
+  font-size: .87rem;
+  font-weight: 620;
+  cursor: pointer;
+}
+.private-store-trip__save input {
+  width: 19px;
+  height: 19px;
+  accent-color: #26764f;
+}
+.private-store-trip__save input:disabled { cursor: not-allowed; }
