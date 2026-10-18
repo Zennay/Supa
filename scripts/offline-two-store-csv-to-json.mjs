@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 import { convertTwoStoreCsv } from '../public/offline-two-store-csv.mjs'
 
+const CSV_HEADER = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 const MAX_BYTES = 256_000
 const error = (message) => { throw new Error(message) }
 
@@ -38,14 +39,48 @@ async function readPrivateCsv(path) {
   }
 }
 
-async function main() {
-  if (process.argv.length !== 4 || process.argv[2].startsWith('-') || process.argv[3].startsWith('-')) {
-    error('Gebruik: node scripts/offline-two-store-csv-to-json.mjs waarnemingen.csv uitvoer.json')
+/**
+ * Combine two independently supplied supermarket worksheets without
+ * implementing another CSV parser or weakening the shared strict importer.
+ * The header is intentionally fixed, so quoted multiline product names stay
+ * untouched and are interpreted only by convertTwoStoreCsv.
+ */
+function joinPrivateStoreCsv(first, second) {
+  const body = (source) => {
+    const input = source.startsWith('\uFEFF') ? source.slice(1) : source
+    const end = input.indexOf('\n')
+    if (end < 0 || input.slice(0, end).replace(/\r$/, '') !== CSV_HEADER) {
+      error('Beide winkelbestanden moeten dezelfde negen Supa CSV-kolommen bevatten.')
+    }
+    const records = input.slice(end + 1).replace(/\r?\n$/, '')
+    if (!records.trim()) error('Elke winkelopname moet productregels bevatten.')
+    return records
   }
-  const source = resolve(process.argv[2])
-  const target = resolve(process.argv[3])
-  if (source === target) error('Invoer en uitvoer moeten verschillende bestanden zijn.')
-  const csv = await readPrivateCsv(source)
+  const combined = CSV_HEADER + '\n' + body(first) + '\n' + body(second) + '\n'
+  if (new TextEncoder().encode(combined).length > MAX_BYTES) {
+    error('Samengevoegde winkelopnames zijn groter dan 256 kB.')
+  }
+  return combined
+}
+
+async function main() {
+  const args = process.argv.slice(2)
+  const pairing = args[0] === '--pair'
+  const names = pairing ? args.slice(1) : args
+  if ((!pairing && names.length !== 2) || (pairing && names.length !== 3) ||
+      names.some(name => !name || name.startsWith('-'))) {
+    error('Gebruik: node scripts/offline-two-store-csv-to-json.mjs samen.csv uitvoer.json ' +
+      'of --pair plus.csv deka.csv uitvoer.json')
+  }
+  const sources = names.slice(0, -1).map(resolve)
+  const target = resolve(names.at(-1))
+  if (new Set([...sources, target]).size !== sources.length + 1) {
+    error('Invoerbestanden en uitvoerbestand moeten verschillende paden zijn.')
+  }
+  const texts = await Promise.all(sources.map(readPrivateCsv))
+  const csv = pairing ? joinPrivateStoreCsv(texts[0], texts[1]) : texts[0]
+  // Keep the one existing converter as the only authority for captured-at
+  // timestamps, two retail identities, SKU uniqueness and physical prices.
   const json = convertTwoStoreCsv(csv)
   const captures = JSON.parse(json).captures
   // The operator receives only row counts, never private names, amounts,
