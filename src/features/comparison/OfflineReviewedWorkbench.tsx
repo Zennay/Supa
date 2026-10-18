@@ -59,6 +59,20 @@ function compatibleSourceUnit(demand: BasketTraceLine['requirement']['unit'],
   return (['g', 'kg'].includes(demand) && ['g', 'kg'].includes(source)) ||
     (['ml', 'l'].includes(demand) && ['ml', 'l'].includes(source))
 }
+function sourceOptions(products: import('../../domain/basket.ts').StoreProduct[],
+  unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string) {
+  const query = text.trim().toLocaleLowerCase('nl')
+  const available = products.filter(p => p.available && p.packAmount !== null &&
+    compatibleSourceUnit(unit, p.packUnit))
+  const filtered = query
+    ? available.filter(p => p.name.toLocaleLowerCase('nl').includes(query) ||
+        p.id.toLocaleLowerCase('nl').includes(query))
+    : available
+  const shown = filtered.slice(0, 40)
+  const current = available.find(p => p.id === keepId)
+  if (current && !shown.some(p => p.id === keepId)) shown.unshift(current)
+  return { shown, total: filtered.length, availableCount: available.length }
+}
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number], done: Record<string, boolean>): string {
   return [
@@ -88,6 +102,7 @@ export function OfflineReviewedWorkbench({
   const [manualSku, setManualSku] = useState<Record<typeof stores[number], Record<string, string>>>({
     PLUS: {}, DekaMarkt: {},
   })
+  const [skuFilter, setSkuFilter] = useState<Record<string, string>>({})
   const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
   const [openTripOnly, setOpenTripOnly] = useState(false)
   const [tripExportMessage, setTripExportMessage] = useState('')
@@ -178,6 +193,7 @@ export function OfflineReviewedWorkbench({
       setText(result.rawSource)
       setImported(result.captured)
       setManualSku(result.selected)
+      setSkuFilter({})
       setReviewedLines({})
       setDoneTripItems({})
       setClockMs(Date.now())
@@ -280,7 +296,7 @@ export function OfflineReviewedWorkbench({
     // A new import, even identical bytes, requires explicit source review.
     setReviewedLines({})
     setDoneTripItems({})
-    setManualSku({ PLUS: {}, DekaMarkt: {} })
+    setManualSku({ PLUS: {}, DekaMarkt: {} }); setSkuFilter({})
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setClockMs(Date.now())
@@ -301,7 +317,7 @@ export function OfflineReviewedWorkbench({
       setImported(null)
       setReviewedLines({})
       setDoneTripItems({})
-      setManualSku({ PLUS: {}, DekaMarkt: {} })
+      setManualSku({ PLUS: {}, DekaMarkt: {} }); setSkuFilter({})
     }
     setBusy(true)
     try {
@@ -701,7 +717,11 @@ export function OfflineReviewedWorkbench({
                         <p className="offline-price-workbench__trip-complete" role="status">
                           Alles afgevinkt voor {store}.
                         </p>}
-                      {visible.map(line => (
+                      {visible.map(line => {
+                        const searchKey = JSON.stringify([store, line.id])
+                        const choices = sourceOptions(capture.products, line.requirement.unit,
+                          skuFilter[searchKey] ?? '', manualSku[store][line.id] ?? '')
+                        return (
                         <article key={line.id} className="offline-price-workbench__line">
                           <div>
                             <label className="offline-price-workbench__trip-tick">
@@ -715,10 +735,14 @@ export function OfflineReviewedWorkbench({
                               <span>Afvinken als gekocht</span>
                             </label>
                             <span>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</span>
-                            {capture.products.some(product => product.available &&
-                              product.packAmount !== null &&
-                              compatibleSourceUnit(line.requirement.unit, product.packUnit)) && (
+                            {choices.availableCount > 0 && (
                               <label>Eigen bronartikel voor dit ingrediënt
+                                <span>Zoek binnen je originele geobserveerde winkelartikelen (naam of code)</span>
+                                <input type="search" value={skuFilter[searchKey] ?? ''}
+                                  maxLength={120} placeholder="Zoek product of artikelcode"
+                                  onChange={event => setSkuFilter(current =>
+                                    ({ ...current, [searchKey]: event.currentTarget.value }))} />
+                                <small>{choices.total} passende bronartikelen · maximaal 40 zichtbaar, verfijn je zoekterm.</small>
                                 <select value={manualSku[store][line.id] ?? ''}
                                   onChange={event => {
                                     const id = event.currentTarget.value
@@ -733,10 +757,7 @@ export function OfflineReviewedWorkbench({
                                     setTripProgressMessage('')
                                   }}>
                                   <option value="">Automatisch voorstellen (of onbekend)</option>
-                                  {capture.products.filter(product => product.available &&
-                                    product.packAmount !== null &&
-                                    compatibleSourceUnit(line.requirement.unit, product.packUnit))
-                                    .map(product => (
+                                  {choices.shown.map(product => (
                                       <option key={product.id} value={product.id}>
                                         {product.name} · {product.id} · {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)}
                                       </option>
@@ -758,11 +779,13 @@ export function OfflineReviewedWorkbench({
                                 }} />
                               <span>Product, inhoud en prijs met mijn bronopname gecontroleerd</span>
                             </label>}
-                            {line.status === 'unresolved' && <span>Niet gekoppeld · controleer bronproduct, beschikbaarheid of verpakking.</span>}
+                            {line.status === 'unresolved' && <span>{line.reasons.some(reason => reason.includes('same source SKU'))
+                              ? 'Dezelfde winkel-SKU is aan meerdere ingrediënten gekoppeld. Combineer de fysieke hoeveelheden in Planner of kies andere echte artikelen; zonder die keuze geen volledige prijs.'
+                              : 'Niet gekoppeld · controleer bronproduct, beschikbaarheid of verpakking.'}</span>}
                           </div>
                           <strong>{line.status === 'matched' ? euros.format(line.lineTotalCents / 100) : '—'}</strong>
                         </article>
-                      ))}
+                      )})}
                     </section>
                   )
                 })}

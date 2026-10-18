@@ -282,3 +282,26 @@ brondata en eerder gekozen SKU's gaan mee. **Alle product-/prijsreview
 checkboxes, afvinkingen en eventuele financiële uitspraken beginnen opnieuw
 onbevestigd**. Een oude sessie wordt niet automatisch ververst,
 automatisch gepubliceerd of door het netwerk verstuurd.
+
+### Geen dubbeltelling van één fysieke winkel-SKU
+
+De gewone mandberekening weigert vanaf nu dezelfde echte SKU als twee
+losse gekochte artikelen voor verschillende ingrediëntidentiteiten te
+tellen. De getroffen regels blijven expliciet onbekend: combineer eerst
+hun metrische fysieke behoefte in Planner of kies een ander werkelijk
+beschikbaar artikel uit je eigen bron. Een gedeeltelijke bekende som
+wordt niet als volledig mandtotaal of besparing gepresenteerd.
+De volledige vergelijking blijft hierdoor eerlijk bij overlappende
+ingrediënten en hergebruik van producten.
+
+### Snel bronartikelen zoeken, ook bij grotere eigen exports
+
+De bronkeuze heeft nu per ingrediënt en winkel een naam-/artikelcodezoeker
+met maximaal veertig direct getoonde passende artikelen. De gebruiker
+ziet het aantal gevonden resultaten; een eerder gekozen originele SKU
+blijft zichtbaar, zelfs als de zoekterm deze verbergt. Alleen ingelezen
+beschikbare producten met gemeten verpakking en fysiek compatibele
+eenheid kunnen worden geselecteerd. Het filter is volledig lokaal en
+wordt bij een nieuwe bronimport opnieuw leeg gemaakt. Iedere gewijzigde
+bronkeuze trekt bronreviews en afvinkingen in, zodat een andere
+productcode nooit een oudere goedkeuring erft.

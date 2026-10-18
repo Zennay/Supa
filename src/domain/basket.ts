@@ -352,8 +352,25 @@ export function buildOneStoreBasket({
     }
   })
 
+  // One physical supermarket SKU cannot be charged as one independent
+  // purchase for multiple different ingredient identities. Those demands
+  // must first be combined or assigned distinct actual source products.
+  // Until then, do not show an inflated complete basket or a false winner.
+  const skuCounts = new Map<string, number>()
+  for (const line of lines) {
+    if (line.status === 'matched')
+      skuCounts.set(line.productId, (skuCounts.get(line.productId) ?? 0) + 1)
+  }
+  const uniquePhysicalLines: BasketTraceLine[] = lines.map(line =>
+    line.status === 'matched' && (skuCounts.get(line.productId) ?? 0) > 1
+      ? {
+          id: line.id, ingredientLabel: line.ingredientLabel,
+          requirement: line.requirement, status: 'unresolved',
+          reasons: [...line.reasons, 'same source SKU would be purchased twice for different ingredient identities; combine physical demand first'],
+          matchScore: line.matchScore,
+        } : line)
   let totalCents = 0
-  const guardedLines: BasketTraceLine[] = lines.map((line) => {
+  const guardedLines: BasketTraceLine[] = uniquePhysicalLines.map((line) => {
     if (line.status === 'unresolved') return line
 
     const nextTotalCents = totalCents + line.lineTotalCents
