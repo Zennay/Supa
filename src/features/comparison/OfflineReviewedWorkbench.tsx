@@ -8,6 +8,7 @@ import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { TwoStoreIngredientLedger } from './TwoStoreIngredientLedger.tsx'
+import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { StagedStorePreview } from './StagedStorePreview.tsx'
 import { stagedStoreFingerprint } from './stagedStoreFingerprint.ts'
 import { LocalProductPicker } from './LocalProductPicker.tsx'
@@ -33,7 +34,7 @@ function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays, budgetEuros, session, onOpenList,
+  plan, recipes, activeDays, budgetEuros, session, onOpenList, onOpenPlanner,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
@@ -41,6 +42,7 @@ export function OfflineReviewedWorkbench({
   budgetEuros?: number
   session: OfflineComparisonSession
   onOpenList?: () => void
+  onOpenPlanner?: () => void
 }) {
   const ingredientNeeds = useMemo(() => {
     try {
@@ -674,6 +676,16 @@ export function OfflineReviewedWorkbench({
         ' productprijzen. Bekende bedragen zijn geen volledig totaal.'
   }
 
+  function focusPairMatch(store: OfflineRetailer, ingredientId: string) {
+    setOnlyUnresolved(previous => ({ ...previous, [store]: false }))
+    window.requestAnimationFrame(() => {
+      document.getElementById('offline-match-' + store + '-' +
+        encodeURIComponent(ingredientId))?.scrollIntoView({
+        behavior: 'smooth', block: 'center',
+      })
+    })
+  }
+
   return (
     <section className="offline-price-workbench" aria-label="Geïmporteerde winkelprijzen vergelijken">
       <div className="offline-price-workbench__intro">
@@ -721,7 +733,7 @@ export function OfflineReviewedWorkbench({
           beide opnames blijven alleen in het geheugen van deze pagina.
           Ontbrekende prijzen: zet <code>priceCents: null</code> en <code>available: false</code>.</p>
       </details>
-      <div className="offline-price-workbench__input">
+      <div id="supa-private-price-import" className="offline-price-workbench__input">
         <p>Heb je een spreadsheet met geobserveerde PLUS- en DekaMarkt-prijzen? Importeer hier rechtstreeks
           een CSV met de negen vereiste kolommen, of maak deze eerst in de{' '}
           <a href={`${import.meta.env.BASE_URL}offline-two-store-import.html`} target="_blank" rel="noopener noreferrer">
@@ -871,20 +883,23 @@ export function OfflineReviewedWorkbench({
                   : 'Nog geen vergelijkbaar prijsverschil: ontbrekende producten, verouderde gegevens of ongelijke waarnemingstijden.'}
                 <small> Dit is nooit een gecontroleerde publieke besparingsclaim.</small>
               </p>
+              <ComparisonReadiness
+                plus={basketPair.plus}
+                deka={basketPair.deka}
+                sourceFresh={currentEnough}
+                pairedWithin24h={imported.pairedWithin24h}
+                comparable={canShowDifference}
+                onOpenPlanner={onOpenPlanner}
+                onReviewMissing={focusPairMatch}
+                onOpenImport={() => document.getElementById('supa-private-price-import')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              />
               <TwoStoreIngredientLedger
                 plus={basketPair.plus}
                 deka={basketPair.deka}
                 comparison={basketPair.comparison}
                 comparable={canShowDifference}
-                onReview={(store, ingredientId) => {
-                  setOnlyUnresolved(previous => ({ ...previous, [store]: false }))
-                  window.setTimeout(() => {
-                    document.getElementById('offline-match-' + store + '-' +
-                      encodeURIComponent(ingredientId))?.scrollIntoView({
-                      behavior: 'smooth', block: 'center',
-                    })
-                  }, 0)
-                }}
+                onReview={focusPairMatch}
               />
               <PrivateBasketComparisonExport
                 plus={basketPair.plus}
