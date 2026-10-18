@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a } from '../home/figmaAssets'
-import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
+import { createManualRecipeDraft, importRecipeFromHtml, normalizeIngredientLine, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { preparePortionCopy } from './recipePortionCopy.ts'
@@ -56,7 +56,7 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
   const [message, setMessage] = useState('')
   const [selected, setSelected] = useState<SavedRecipe | typeof examples[number] | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [sourceReviews, setSourceReviews] = useState<{ original: string; reason: string }[]>([])
+  const [sourceReviews, setSourceReviews] = useState<{ original: string; reason: string; index: number }[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [copyServings, setCopyServings] = useState('')
   const [planDay, setPlanDay] = useState('Ma')
@@ -152,7 +152,7 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
       setForm({ title: recipe.title + ` (${value} porties)`,
         servings: String(value), minutes: recipe.minutes?.toString() ?? '',
         ingredients: prepared.lines.join('\n'), steps: recipe.steps.join('\n') })
-      setSourceReviews(prepared.reviews)
+      setSourceReviews(prepared.reviews.map(review => ({ ...review, index: prepared.lines.indexOf(review.original) })))
       setMessage(prepared.reviews.length > 0
         ? 'Kopie voorbereid. Onzekere of gedeeltelijke stuks moeten handmatig worden aangepast; er zijn geen hoeveelheden geraden.'
         : 'Metrische ingrediënten zijn evenredig omgerekend. Controleer de kopie en sla zelf op.')
@@ -164,8 +164,8 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
     request.current?.abort()
     setBusy(false)
     setEditingId(duplicate ? null : recipe.id)
-    setSourceReviews(recipe.ingredients.flatMap(i => i.reviewReason
-      ? [{ original: i.original, reason: i.reviewReason }] : []))
+    setSourceReviews(recipe.ingredients.flatMap((i, index) => i.reviewReason
+      ? [{ original: i.original, reason: i.reviewReason, index }] : []))
     setForm({ title: duplicate ? recipe.title + ' (kopie)' : recipe.title,
       servings: recipe.servings?.toString() ?? '', minutes: recipe.minutes?.toString() ?? '',
       ingredients: recipe.ingredients.map(item => item.original).join('\n'),
@@ -230,8 +230,8 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
   }
   function adoptImportedRecipe(draft: UserRecipeDraft, messageText: string) {
     sourceReadVersion.current++
-    setSourceReviews(draft.ingredients.flatMap(i => i.reviewReason
-      ? [{ original: i.original, reason: i.reviewReason }] : []))
+    setSourceReviews(draft.ingredients.flatMap((i, index) => i.reviewReason
+      ? [{ original: i.original, reason: i.reviewReason, index }] : []))
     setForm({
       title: draft.title,
       servings: draft.servings?.toString() ?? '',
@@ -290,9 +290,19 @@ export function RecipeLibrary({ onBack, onPlanRecipe }: { onBack: () => void; on
     event.preventDefault(); setError('')
     try {
       const draft = createManualRecipeDraft({ title: form.title, servings: Number(form.servings), minutes: Number(form.minutes), ingredients: form.ingredients.split('\n').map(x => x.trim()).filter(Boolean), steps: form.steps.split('\n').map(x => x.trim()).filter(Boolean) })
-      const reviewedIngredients = draft.ingredients.map(ingredient => {
+      const reviewedIngredients = draft.ingredients.map((ingredient, index) => {
+        // A renamed ingredient is not a corrected measurement. Keep provenance
+        // review until the user meaningfully fixes its amount or physical unit.
+        // Prefer exact source-text identity when lines have been reordered.
         const carried = sourceReviews.find(item => item.original === ingredient.original)
-        return carried ? { ...ingredient, reviewReason: ingredient.reviewReason ?? carried.reason } : ingredient
+          ?? sourceReviews.find(item => item.index === index)
+        if (!carried) return ingredient
+        const originalMeasure = normalizeIngredientLine(carried.original)
+        const unchangedMeasure = originalMeasure.amount === ingredient.amount &&
+          originalMeasure.unit === ingredient.unit
+        return carried.original === ingredient.original || unchangedMeasure
+          ? { ...ingredient, reviewReason: ingredient.reviewReason ?? carried.reason }
+          : ingredient
       })
       setPreview(reviewRecipe({ ...draft, ingredients: reviewedIngredients,
         source: source ? 'url' : 'manual', sourceUrl: source }))
