@@ -5,12 +5,18 @@ import './unpricedPlannerShoppingList.css'
 
 type Progress = { identity: string; done: string[] }
 type Need = ReturnType<typeof aggregatePlanIngredients>[number]
-const amounts = new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 3 })
+// Use the source number's exact decimal spelling: never round a shopping
+// quantity just to make an attractive human-readable TXT or checklist label.
+const exactDecimal = (value: number): string | null => {
+  const raw = String(value)
+  return /^\d{1,15}(?:\.\d{1,12})?$/.test(raw) ? raw.replace('.', ',') : null
+}
 const validPhysicalAmount = (item: Need) =>
   typeof item.amount === 'number' && Number.isFinite(item.amount) && item.amount > 0 &&
+  exactDecimal(item.amount) !== null &&
   (item.unit !== 'piece' || Number.isSafeInteger(item.amount))
 const measurement = (item: Need): string =>
-  validPhysicalAmount(item) ? amounts.format(item.amount!) + ' ' +
+  validPhysicalAmount(item) ? exactDecimal(item.amount!) + ' ' +
     (item.unit === 'piece' ? 'stuks' : item.unit) : 'hoeveelheid controleren'
 const clean = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
   .replace(/\s+/gu, ' ').trim().slice(0, 160)
