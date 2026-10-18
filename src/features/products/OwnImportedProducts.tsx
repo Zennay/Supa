@@ -162,6 +162,15 @@ export function OwnImportedProducts({
               session.setExtraDoneIds(previous => ({
                 ...previous, [store]: previous[store].filter(id => id !== product.id),
               }))
+              session.setExtraQuantities(previous => {
+                const quantities = { ...previous[store] }
+                if (session.extraProductIds[store].includes(product.id)) {
+                  delete quantities[product.id]
+                } else {
+                  quantities[product.id] = 1
+                }
+                return { ...previous, [store]: quantities }
+              })
             }}>
             {session.extraProductIds[store].includes(product.id)
               ? '✓ Extra op mijn lijst' : '+ Los artikel aan lijst toevoegen'}
