@@ -22,6 +22,7 @@ export function ImportedShoppingList({
 }) {
   const store = session.selectedStore
   const [now, setNow] = useState(() => Date.now())
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   useEffect(() => {
     const refresh = () => setNow(Date.now())
     const timer = window.setInterval(refresh, 60000)
@@ -81,6 +82,30 @@ export function ImportedShoppingList({
     </p>}
     {comparable && <p className="disclaimer">Privé rekenkundig vergelijkbaar,
       niet onafhankelijk geverifieerd en geen officiële besparingsclaim.</p>}
+    <div className="offline-price-workbench__actions">
+      {!confirmDiscard ? (
+        <button type="button" className="ghost-button" onClick={() => setConfirmDiscard(true)}>
+          Wis deze lokale winkelopnames
+        </button>
+      ) : (
+        <div role="group" aria-label="Bevestig wissen prijsopnames">
+          <p role="status">Wis beide winkelopnames, productkeuzes en tijdelijke vinkjes
+            uit dit open app-tabblad? Gedownloade bestanden en apart met jouw
+            toestemming opgeslagen concepten blijven onaangeroerd.</p>
+          <button type="button" onClick={() => {
+            session.setImported(null)
+            session.setText('')
+            session.setStagedCaptures({})
+            session.setManualSelections({ fingerprint: '', products: {} })
+            session.setTripMemory({})
+            session.setImportEpoch(current => current + 1)
+            setConfirmDiscard(false)
+          }}>Ja, wis deze privégegevens</button>
+          <button type="button" className="ghost-button"
+            onClick={() => setConfirmDiscard(false)}>Annuleer</button>
+        </div>
+      )}
+    </div>
     <PrivateStoreTripChecklist key={identity} basket={basket}
       observedAt={imported.captures[store].observedAt} fresh={fresh}
       memoryProgress={session.tripMemory[store]}
