@@ -35,11 +35,12 @@ function detail(store: OfflineRetailer, product: StoreProduct): Result {
 
 /** Only explicit local imports. Never uses historical/Figma prices in real baskets. */
 export function OwnImportedProducts({
-  session, query, onCompare,
+  session, query, onCompare, onOpenList,
 }: {
   session?: OfflineComparisonSession
   query: string
   onCompare: () => void
+  onOpenList: () => void
 }) {
   const [storeFilter, setStoreFilter] = useState<'all' | OfflineRetailer>('all')
   const [unitFilter, setUnitFilter] = useState<'all' | Group>('all')
@@ -77,6 +78,8 @@ export function OwnImportedProducts({
   }, [imported, session?.stagedCaptures, clock])
   const availableCaptures = imported?.captures ?? staged
   const availableStores = stores.filter(store => !!availableCaptures[store])
+  const selectedExtras = session ? stores.reduce((total, store) =>
+    total + session.extraProductIds[store].length, 0) : 0
   const rows = useMemo(() => {
     const words = query.trim().toLocaleLowerCase('nl-NL')
     const all = stores.flatMap(store => availableCaptures[store]?.products.map(
@@ -128,6 +131,13 @@ export function OwnImportedProducts({
       {!imported && ' De andere winkel ontbreekt: geen twee-winkel prijsverschil.'}
       {imported && !imported.pairedWithin24h && ' De twee opnames liggen meer dan 24 uur uiteen.'}
     </p>
+    {selectedExtras > 0 && <div className="own-products__list-pulse" role="status">
+      <span>{selectedExtras} zelf gekozen losse {selectedExtras === 1 ? 'artikel' : 'artikelen'}
+        {' '}staan buiten de berekende maaltijdmand, klaar in Lijst.</span>
+      <button type="button" className="own-products__primary" onClick={onOpenList}>
+        Open mijn boodschappenlijst
+      </button>
+    </div>}
     <div className="own-products__filters">
       <label>Winkel <select value={storeFilter}
         onChange={event => { setStoreFilter(event.target.value as typeof storeFilter); setLimit(48) }}>
@@ -203,6 +213,11 @@ export function OwnImportedProducts({
             {session.extraProductIds[store].includes(product.id)
               ? '✓ Extra op mijn lijst' : '+ Los artikel aan lijst toevoegen'}
           </button>
+          {session.extraProductIds[store].includes(product.id) && <button type="button"
+            className="own-products__choose" onClick={() => {
+              session.setSelectedStore(store)
+              onOpenList()
+            }}>Bekijk dit extra artikel op Lijst</button>}
           <button type="button" className="own-products__choose"
             onClick={() => { session.setSelectedStore(store); onCompare() }}>
             Controleer match in Vergelijk

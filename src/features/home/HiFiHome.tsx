@@ -168,7 +168,8 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
     </section>}
     {view === 'products' && <div className="hifi-product-source-tabs" aria-label="Productbron"><button type="button" aria-pressed={productSource === 'own'} onClick={() => setProductSource('own')}>Mijn prijsdata</button><button type="button" aria-pressed={productSource === 'history'} onClick={() => { setProductSource('history'); setUnitFilter('all'); setSortByPrice(false) }}>Bronwaarnemingen</button><button type="button" aria-pressed={productSource === 'figma'} onClick={() => { setProductSource('figma'); setStoreFilter('all') }}>Figma voorbeelden</button></div>}
     {view === 'products' && productSource === 'own' && <OwnImportedProducts
-      session={priceSession} query={query} onCompare={() => onNavigate('basket')} />}
+      session={priceSession} query={query} onCompare={() => onNavigate('basket')}
+      onOpenList={() => onNavigate('list')} />}
     {view === 'products' && productSource === 'history' && <section className="hifi-section" aria-label="Historisch vastgelegde supermarktproducten">
       <div className="hifi-section-heading"><div><h2>Producten uit brononderzoek</h2><p className="recipe-count">{historical.length} producten · PLUS en DekaMarkt</p></div></div>
       <p className="hifi-demo-note hifi-historical-warning">Alleen historische bronwaarnemingen van 4 oktober 2026. Niet actueel, nog niet gelicentieerd voor productie. Geen prijzen, aanbiedingen, besparingen of beschikbaarheidsclaims.</p>

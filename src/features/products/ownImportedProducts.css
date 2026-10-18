@@ -17,3 +17,9 @@
 .own-products__extra { min-height:44px; border:1px solid #0a704e; border-radius:11px;
   background:#fff; color:#005135; font-size:12px; font-weight:650; padding:8px; }
 .own-products__extra[aria-pressed=true] { background:#d1f5e0; border-color:#268963; }
+
+.own-products__list-pulse { display:flex; flex-wrap:wrap; align-items:center;
+  justify-content:space-between; gap:12px; padding:14px;
+  border:1px solid #b9d3c3; border-radius:14px; background:#eff8f1; }
+.own-products__list-pulse span { flex:1; min-width:200px; font-size:13px; }
+@media (max-width:600px) { .own-products__list-pulse .own-products__primary { width:100%; } }
