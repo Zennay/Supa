@@ -110,6 +110,7 @@ type Props = {
  */
 export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerated, onEdit }: Props) {
   const [open, setOpen] = useState(false)
+  const [activeStore, setActiveStore] = useState<OfflineRetailer>('PLUS')
   const [rows, setRows] = useState<Record<string, ProductDraft>>({})
   const [capturedAt, setCapturedAt] = useState<Record<OfflineRetailer, string>>({ PLUS: '', DekaMarkt: '' })
   const [error, setError] = useState('')
@@ -301,8 +302,20 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
           Stop automatisch bewaren en wis concept
         </button>}
       </div>
+      <div className="offline-price-workbench__actions" role="group" aria-label="Kies winkel om prijzen in te voeren">
+        {stores.map(store => {
+          const marked = activeNeeds.filter(need => rows[key(store, need.id)]?.available).length
+          return <button key={store} type="button" className="ghost-button"
+            aria-pressed={activeStore === store} onClick={() => setActiveStore(store)}>
+            {store} · {marked}/{activeNeeds.length} beschikbaar ingevuld
+          </button>
+        })}
+      </div>
+      <p className="disclaimer">Wissel gerust tussen winkels: ingevoerde velden blijven staan.
+        Vul eerst één winkel in en gebruik die direct, of bereken beide winkels zodra beide opnames klaar zijn.
+        De aantallen tonen eigen ingevulde beschikbaarheid, niet onafhankelijk geverifieerde producten.</p>
       <div className="offline-manual-editor__stores">
-        {stores.map(store => <section key={store} aria-label={`Productprijzen bij ${store}`}>
+        {stores.filter(store => store === activeStore).map(store => <section key={store} aria-label={`Productprijzen bij ${store}`}>
           <h4>{store}</h4>
           <p className="disclaimer">Suggesties voor productnamen komen alleen uit historische, prijsloze bronwaarnemingen
             van 4 oktober 2026. Controleer zelf of het product vandaag echt bestaat; er wordt nooit een
