@@ -8,6 +8,10 @@ const stores = ['PLUS', 'DekaMarkt']
 const units = ['g', 'kg', 'ml', 'l', 'piece']
 const maxBytes = 256000
 const sourceInput = document.querySelector('#source')
+const plusInput = document.querySelector('#plus-source')
+const dekaInput = document.querySelector('#deka-source')
+const csvHeader = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
+let sourceRevision = 0
 const sourceStatus = document.querySelector('#source-status')
 const status = document.querySelector('#status')
 const lines = document.querySelector('#lines')
@@ -150,21 +154,56 @@ function acceptJson(json) {
   return result
 }
 
-sourceInput.addEventListener('change', async () => {
+async function readLocalFile(file) {
+  if (!file || !file.size || file.size > maxBytes) {
+    throw Error('Ieder bronbestand moet tussen 1 en 256.000 bytes groot zijn.')
+  }
+  return file.text()
+}
+
+function removeCsvHeader(source) {
+  const normalized = source.startsWith('\uFEFF') ? source.slice(1) : source
+  const firstEnd = normalized.indexOf('\n')
+  if (firstEnd < 0 || normalized.slice(0, firstEnd).replace(/\r$/, '') !== csvHeader) {
+    throw Error('Ieder CSV-bestand moet de bestaande negenkoloms-kop bevatten.')
+  }
+  const body = normalized.slice(firstEnd + 1)
+  if (!body) throw Error('Een van de winkelbestanden bevat geen opnameregels.')
+  return body.endsWith('\n') ? body : body + '\n'
+}
+
+async function loadSources() {
+  const revision = ++sourceRevision
   captures = null
   refresh()
-  const file = sourceInput.files?.[0]
-  if (!file) { notice(sourceStatus, 'Geen bronbestand gekozen.'); return }
-  if (!file.size || file.size > maxBytes) {
-    notice(sourceStatus, 'Bronbestand moet tussen 1 en 256.000 bytes groot zijn.', 'error'); return
+  const combined = sourceInput.files?.[0]
+  const plus = plusInput.files?.[0]
+  const deka = dekaInput.files?.[0]
+  if (!combined && !plus && !deka) {
+    notice(sourceStatus, 'Nog geen bronbestand gekozen.')
+    return
+  }
+  if (!combined && (!plus || !deka)) {
+    notice(sourceStatus, 'Selecteer zowel de PLUS- als de DekaMarkt-CSV.', 'warning')
+    return
   }
   try {
-    const text = await file.text()
-    // Using one shared source of truth: CSV is parsed/validated by the same
-    // converter used by the CLI and the existing Supa comparison importer.
-    const parsed = file.name.toLowerCase().endsWith('.json')
-      ? JSON.parse(text) : JSON.parse(convertTwoStoreCsv(text))
-    captures = acceptJson(parsed)
+    let parsed
+    if (combined) {
+      const content = await readLocalFile(combined)
+      parsed = combined.name.toLowerCase().endsWith('.json')
+        ? JSON.parse(content) : JSON.parse(convertTwoStoreCsv(content))
+    } else {
+      const [plusText, dekaText] = await Promise.all([readLocalFile(plus), readLocalFile(deka)])
+      const joined = csvHeader + '\n' + removeCsvHeader(plusText) + removeCsvHeader(dekaText)
+      if (new TextEncoder().encode(joined).length > maxBytes) {
+        throw Error('Twee samengevoegde CSV-bronnen zijn groter dan 256 kB.')
+      }
+      parsed = JSON.parse(convertTwoStoreCsv(joined))
+    }
+    const verified = acceptJson(parsed)
+    if (revision !== sourceRevision) return
+    captures = verified
     const now = Date.now()
     const descriptions = stores.map(store => {
       const capture = captures[store]
@@ -180,11 +219,23 @@ sourceInput.addEventListener('change', async () => {
     descriptions.push('Selecteer uitsluitend door jou gecontroleerde matches. Geen automatische bronrechten of besparing.')
     notice(sourceStatus, descriptions.join('\n'), gap > 86400000 ? 'warning' : '')
   } catch {
+    if (revision !== sourceRevision) return
     captures = null
-    notice(sourceStatus, 'Kan eigen bron niet veilig verwerken. Gebruik het strikte negenkoloms-CSV of de officiële CLI-JSON.', 'error')
+    notice(sourceStatus, 'Kan eigen bronnen niet veilig verwerken. Controleer de strikte CSV-koppen, winkelopnames en bronbestanden.', 'error')
   }
   refresh()
+}
+sourceInput.addEventListener('change', () => {
+  plusInput.value = ''
+  dekaInput.value = ''
+  void loadSources()
 })
+for (const input of [plusInput, dekaInput]) {
+  input.addEventListener('change', () => {
+    sourceInput.value = ''
+    void loadSources()
+  })
+}
 
 function demand() {
   if (!captures) throw Error('Open eerst een geldige eigen winkelbron.')
