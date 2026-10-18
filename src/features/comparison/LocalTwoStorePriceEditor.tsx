@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { historicalRetailerProducts } from '../products/historicalRetailerProducts.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
+import { parseOfflinePriceSnapshots, parseSingleOfflineCapture, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 
 type Unit = 'g' | 'kg' | 'ml' | 'l' | 'piece'
 type ProductDraft = {
@@ -114,6 +114,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
   const [capturedAt, setCapturedAt] = useState<Record<OfflineRetailer, string>>({ PLUS: '', DekaMarkt: '' })
   const [error, setError] = useState('')
   const [output, setOutput] = useState('')
+  const [outputScope, setOutputScope] = useState<'pair' | OfflineRetailer>('pair')
   const needs = useMemo(() => {
     try { return aggregatePlanIngredients(plan, recipes, activeDays) }
     catch { return [] }
@@ -184,20 +185,20 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
     setCapturedAt(prev => ({ ...prev, [store]: value }))
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
   }
-  function createSourceFile() {
+  function createSourceFile(selectedStores: readonly OfflineRetailer[] = stores) {
     setError(''); setOutput('')
     try {
       if (!activeNeeds.length || activeNeeds.length > 1000) {
         throw new Error('Kies eerst een weekmenu met ondersteunde ingrediënten (maximaal 1.000).')
       }
-      const times = stores.map(store => timestampWithOffset(capturedAt[store]))
+      const times = selectedStores.map(store => timestampWithOffset(capturedAt[store]))
       if (times.some(time => time === null)) {
-        throw new Error('Vul voor beide winkels de echte, lokaal genoteerde datum en tijd in.')
+        throw new Error('Vul voor de gekozen winkel(s) de echte, lokaal genoteerde datum en tijd in.')
       }
       if (times.some(time => Date.parse(time!) > Date.now() + 300000)) {
         throw new Error('Een waarnemingstijd ligt in de toekomst.')
       }
-      const captures = stores.map((store, storeIndex) => {
+      const captures = selectedStores.map((store, storeIndex) => {
         const products = activeNeeds.flatMap((need, index) => {
           const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
           const entered = draft.name.trim() || draft.packAmount.trim() ||
@@ -236,14 +237,18 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
         }
         return { retailer: store, observedAt: times[storeIndex], products }
       })
-      const json = JSON.stringify({ schema: 'supa-offline-prices-v1', captures }, null, 2)
+      const json = selectedStores.length === 1
+        ? JSON.stringify({ schema: 'supa-offline-store-capture-v1', capture: captures[0] }, null, 2)
+        : JSON.stringify({ schema: 'supa-offline-prices-v1', captures }, null, 2)
       if (new TextEncoder().encode(json).length > 256000) {
         throw new Error('Je invoer is te groot voor de lokale import van maximaal 256 kB.')
       }
       // The edited source file must pass the exact same admission gate as an
       // uploaded file *before* we offer it as a prepared/exportable snapshot.
-      parseOfflinePriceSnapshots(json, Date.now())
+      if (selectedStores.length === 1) parseSingleOfflineCapture(json, Date.now())
+      else parseOfflinePriceSnapshots(json, Date.now())
       setPreparedFor(selectedPlanFingerprint)
+      setOutputScope(selectedStores.length === 1 ? selectedStores[0] : 'pair')
       setOutput(json)
       onGenerated(json)
     } catch (exception) {
@@ -260,7 +265,8 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
     try {
       const link = document.createElement('a')
       link.href = url
-      link.download = 'supa-prijzen-eigen-invoer.json'
+      link.download = outputScope === 'pair' ? 'supa-prijzen-eigen-invoer.json'
+        : outputScope === 'PLUS' ? 'supa-mijn-plus-opname.json' : 'supa-mijn-dekamarkt-opname.json'
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -347,7 +353,13 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
         </section>)}
       </div>
       <div className="offline-price-workbench__actions">
-        <button type="button" onClick={createSourceFile}>Bereken met mijn ingevoerde prijzen</button>
+        {stores.map(store => <button key={store} type="button"
+          onClick={() => createSourceFile([store])}>
+          Gebruik alleen mijn {store}-prijzen
+        </button>)}
+        <button type="button" onClick={() => createSourceFile(stores)}>
+          Vergelijk beide winkels met mijn prijzen
+        </button>
         <button type="button" className="ghost-button" onClick={() => {
           setRows({}); setCapturedAt({ PLUS: '', DekaMarkt: '' })
           setOutput(''); setError(''); setPreparedFor(''); onEdit()
@@ -356,7 +368,10 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
       {error && <p role="alert" className="attention-card">{error}</p>}
       {validOutput && <details className="offline-manual-editor__export">
         <summary>Maak een lokale kopie van jouw prijsinvoer</summary>
-        <p>Je gegevens blijven uitsluitend op dit apparaat. Download de JSON zodat je je invoer later opnieuw kunt importeren.</p>
+        <p>{outputScope === 'pair' ? 'Beide winkels zijn lokaal doorgerekend.' :
+          `${outputScope} is als zelfstandige winkelopname verwerkt; er is nog geen prijsverschil berekend.`}
+          {' '}Download de JSON om de oorspronkelijke invoer later terug te laden.
+          Voor een tweede winkel kun je doorgaan in dit scherm zonder de eerste opname opnieuw in te voeren.</p>
         <button type="button" className="ghost-button" onClick={downloadPreparedSource}>
           Bewaar mijn invoer als JSON
         </button>

@@ -703,17 +703,27 @@ export function OfflineReviewedWorkbench({
         onGenerated={(json) => {
           importVersion.current++
           setBusy(false)
-          clearStaged()
-          setText(json)
-          importSnapshots(json)
+          // One actual store is a usable private basket now, not a fabricated
+          // paired observation. Keep the other staged capture and its reviews.
+          const root: unknown = JSON.parse(json)
+          if (root && typeof root === 'object' && !Array.isArray(root) &&
+              (root as { schema?: unknown }).schema === 'supa-offline-store-capture-v1') {
+            importOneStore(json)
+          } else {
+            clearStaged()
+            setText(json)
+            importSnapshots(json)
+          }
         }}
         onEdit={() => {
           // A user editing the in-app wizard also invalidates a pending file read.
           importVersion.current++
           setBusy(false)
-          clearStaged()
+          // Do not destroy a previously admitted one-store capture simply
+          // because the user starts entering the other store in this editor.
+          // Only canonical admission of new source bytes replaces its state.
           setImported(null)
-          setMessage('Wijzigingen nog niet doorgerekend. Bereken opnieuw om de mandjes te zien.')
+          setMessage('Invoer gewijzigd. Bestaande losse winkelopnames blijven beschikbaar; bereken de nieuwe gegevens wanneer je klaar bent.')
         }}
       />
       <details className="offline-price-workbench__schema">
