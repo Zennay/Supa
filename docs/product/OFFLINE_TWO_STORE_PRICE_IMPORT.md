@@ -73,3 +73,14 @@ Alleen `g`, `kg`, `ml`, `l`, `piece` zijn ondersteund. Maximaal twee opnames, 1.
 Dit is een **lokale particuliere rekenhulp, geen licentiecontrole of gegarandeerde actuele supermarktvergelijker**. Alleen gegevens gebruiken die je werkelijk rechtmatig bezit en mag verwerken. JSON, een geslaagde import, namen van PLUS/DekaMarkt of een ingevuld tijdstip bewijzen op zichzelf **nooit** toestemming van een retailer of dat een medewerker fysiek 11×2 prijzen geobserveerd heeft. De bestaande M1-bronrechten en M3-bewijspoorten blijven op HOLD en er is geen automatische live netwerkverbinding. Geen publieke besparingsclaim zolang bronrechten, echte veldobservatie en releasegates ontbreken.
 
 Gegevens gaan niet naar een server. Ze blijven alleen in de componentgeheugenruimte, verdwijnen bij het verlaten/herladen van de pagina en kunnen met **Wis lokaal geladen data** worden verwijderd. De kopieerbare lijst is een expliciete gebruikersactie en blijft lokaal in de browser totdat je zelf kopieert.
+
+## Snel geschikte producten vinden
+
+Bij een grote eigen opname staat boven elke handmatige productkeuze een zoekveld.
+Zoek op productnaam of artikel-ID; Supa filtert op **beschikbaar**, een bekende
+niet-negatieve prijs en de passende fysieke familie (g/kg, ml/l of stuks).
+Per ingrediënt staan maximaal 60 zoekresultaten tegelijk in de lijst, zodat
+het scherm mobiel bruikbaar blijft. Zoek gerichter voor andere treffers.
+Een al geselecteerd product blijft zichtbaar als je de zoekterm verandert.
+Bij het inladen van een nieuwe opname wordt de zoekterm teruggezet.
+Deze zoekfunctie verandert geen bronwaarden en suggereert geen geverifieerde match.

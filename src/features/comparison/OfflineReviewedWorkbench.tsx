@@ -6,6 +6,7 @@ import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../do
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
+import { LocalProductPicker } from './LocalProductPicker.tsx'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -14,11 +15,6 @@ const stores = ['PLUS', 'DekaMarkt'] as const
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 const EMPTY_MANUAL_CHOICES: Readonly<Record<string, string>> = Object.freeze({})
 const manualKey = (store: string, ingredientId: string) => store + '\u0000' + ingredientId
-function unitFamily(unit: string): string {
-  return unit === 'g' || unit === 'kg' ? 'massa' :
-    unit === 'ml' || unit === 'l' ? 'volume' : unit === 'piece' ? 'stuks' : 'onbekend'
-}
-
 function pricePerUnit(line: Matched): string | null {
   const { unit, amount, count } = line.pack
   const physical = amount * count
@@ -78,6 +74,7 @@ export function OfflineReviewedWorkbench({
 
   const [text, setText] = useState('')
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
+  const [importEpoch, setImportEpoch] = useState(0)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const importVersion = useRef(0)
@@ -125,6 +122,7 @@ export function OfflineReviewedWorkbench({
   }, [])
 
   function importSnapshots(input: string) {
+    setImportEpoch(epoch => epoch + 1)
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setClockMs(Date.now())
@@ -379,24 +377,15 @@ export function OfflineReviewedWorkbench({
                             {line.status === 'matched' &&
                               line.reasons.includes('explicit local user selection; not an automatic or verified retailer match') &&
                               <span>Door jou handmatig gekoppeld; dit is geen geverifieerde winkelmatch.</span>}
-                            <label className="offline-price-workbench__manual-match">
-                              <span>Product handmatig beoordelen (alleen jouw geïmporteerde voorraad)</span>
-                              <select aria-label={`Handmatige productkeuze ${store} voor ${line.ingredientLabel}`}
-                                value={choices[manualKey(store, line.id)] ?? ''}
-                                onChange={event => chooseProduct(store, line.id, event.target.value)}>
-                                <option value="">Automatische match / onbekend</option>
-                                <option value="!">Geen passend product — laat onbekend</option>
-                                {imported.captures[store].products
-                                  .filter(product => product.available && product.packAmount !== null &&
-                                    product.packAmount > 0 && Number.isSafeInteger(product.priceCents) &&
-                                    product.priceCents >= 0 && product.packCount !== 0 &&
-                                    unitFamily(product.packUnit) === unitFamily(line.requirement.unit))
-                                  .map(product =>
-                                    <option key={product.id} value={product.id}>
-                                      {`${product.name} · ${product.packAmount} ${product.packUnit} × ${product.packCount ?? 1} · ${euros.format(product.priceCents / 100)}`}
-                                    </option>)}
-                              </select>
-                            </label>
+                            <LocalProductPicker
+                              key={`${importEpoch}:${store}:${line.id}`}
+                              store={store}
+                              ingredient={line.ingredientLabel}
+                              requirementUnit={line.requirement.unit}
+                              products={imported.captures[store].products}
+                              selected={choices[manualKey(store, line.id)] ?? ''}
+                              onSelect={productId => chooseProduct(store, line.id, productId)}
+                            />
                           </div>
                           <strong>{line.status === 'matched' ? euros.format(line.lineTotalCents / 100) : '—'}</strong>
                         </article>

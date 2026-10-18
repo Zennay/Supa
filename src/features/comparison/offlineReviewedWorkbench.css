@@ -123,3 +123,10 @@
   outline: 3px solid #236e54;
   outline-offset: 2px;
 }
+
+/* Large user-imported catalogs remain searchable on narrow screens. */
+.offline-price-workbench__product-picker { display: grid; gap: .45rem; min-width: 0; width: 100%; }
+.offline-price-workbench__product-picker label { display: grid; gap: .35rem; min-width: 0; }
+.offline-price-workbench__product-picker input,
+.offline-price-workbench__product-picker select { width: 100%; max-width: 100%; min-width: 0; }
+.offline-price-workbench__product-picker small { color: var(--text-muted, #5d666e); }
