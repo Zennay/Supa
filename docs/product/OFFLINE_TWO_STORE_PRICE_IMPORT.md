@@ -984,3 +984,11 @@ het bestand ingaan. De cellen gebruiken exact dezelfde conservatieve
 formule-injectie-afscherming als de bestaande private twee-winkel-CSV.
 Deze export is uitsluitend een privéoverzicht, geen opnieuw
 te importeren prijsbron, geen retailerrecht en geen live besparingsclaim.
+
+Wanneer voor de daadwerkelijk gekozen gecombineerde route extra
+tweede-bezoekkosten zijn opgegeven, bevat dezelfde CSV een afzonderlijke
+rij voor die kosten en een finale rij met het door de gebruiker
+berekende totaal inclusief die kosten. Onbekende extra bezoekkosten
+blijven een lege cel, nooit impliciet nul. Een een-winkelroute heeft
+geen extra tweede winkelbezoek. De expliciet geselecteerde
+automatische, gemengde of een-winkelstrategie wordt eveneens vermeld.

@@ -99,6 +99,7 @@ export function MixedStoreShoppingCard({
       const csv = exportMixedStoreRouteCsv({
         plus, deka, route: plan, captured,
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
+        extraVisitCostCents: appliedCostCents, strategy: mode,
       })
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       try {

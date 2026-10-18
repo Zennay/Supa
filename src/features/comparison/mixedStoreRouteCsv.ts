@@ -28,8 +28,15 @@ export function exportMixedStoreRouteCsv(input: {
   route: MixedStoreShoppingPlan
   captured: Record<Store, string>
   checked: ReadonlySet<string>
+  extraVisitCostCents: number | null
+  strategy: 'auto' | 'mixed' | 'single'
 }): string {
   const { plus, deka, route, captured, checked } = input
+  if (!['auto', 'mixed', 'single'].includes(input.strategy) ||
+      (input.extraVisitCostCents !== null &&
+        (!Number.isSafeInteger(input.extraVisitCostCents) ||
+          input.extraVisitCostCents < 0 || input.extraVisitCostCents > 100_000)))
+    throw Error('Extra bezoekkosten en routekeuze zijn niet geldig.')
   if (plus.store.id !== 'PLUS' || deka.store.id !== 'DekaMarkt' ||
       typeof captured.PLUS !== 'string' || !captured.PLUS ||
       typeof captured.DekaMarkt !== 'string' || !captured.DekaMarkt)
@@ -96,6 +103,24 @@ export function exportMixedStoreRouteCsv(input: {
   summary[23] = String(deka.totalCents)
   summary[27] = 'Alleen eigen opname. Reiskosten, bronrechten en zelfstandig veldbewijs niet inbegrepen.'
   rows.push(summary)
+  const visitBoth = route.lines.some(line => line.store === 'PLUS') &&
+    route.lines.some(line => line.store === 'DekaMarkt')
+  const extraCost = visitBoth ? input.extraVisitCostCents : 0
+  const costs = Array<string>(columns.length).fill('')
+  costs[0] = 'persoonlijke_extra_bezoekkosten'
+  costs[10] = extraCost === null ? '' : String(extraCost)
+  costs[27] = visitBoth
+    ? extraCost === null
+      ? 'Extra bezoekkosten onbekend: geen aantoonbaar netto financieel voordeel.'
+      : 'Uitsluitend jouw eigen aanvullende kosten voor een tweede winkel.'
+    : 'Geen tweede winkelbezoek in deze gekozen route.'
+  rows.push(costs)
+  const afterCosts = Array<string>(columns.length).fill('')
+  afterCosts[0] = 'route_inclusief_opgegeven_extra_kosten'
+  afterCosts[10] = extraCost === null ? '' : String(route.totalCents + extraCost)
+  afterCosts[27] = 'Keuzemodus: ' + input.strategy +
+    '; zonder prijs- of reiskostengarantie; bedragen uitsluitend uit eigen invoer.'
+  rows.push(afterCosts)
   if (rows.some(row => row.length !== columns.length)) throw Error('Ongeldige lokale winkelroute.')
   const csv = rows.map(row => row.map((value, index) =>
     literalCsv(value, index === 25)).join(',')).join('\r\n') + '\r\n'
