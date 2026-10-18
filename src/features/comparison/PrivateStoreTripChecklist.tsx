@@ -174,6 +174,27 @@ export function PrivateStoreTripChecklist({
     setSavedRaw(null)
     setMessage('Automatisch bewaren gestopt; eigen vinkjes blijven alleen in dit scherm.')
   }
+  function releaseProtectedConcept() {
+    // Only this explicit click may remove a previous or unknown session record.
+    // Compare-and-delete protects a newer concept written by another tab.
+    if (typeof window === 'undefined') return
+    try {
+      const key = progressStorageKey(basket)
+      const current = window.sessionStorage.getItem(key)
+      if (current !== savedRaw) {
+        setMessage('Het andere concept is inmiddels gewijzigd; er is niets overschreven of verwijderd.')
+        return
+      }
+      if (current !== null) window.sessionStorage.removeItem(key)
+      setSavedRaw(null)
+      setStorageProtected(false)
+      setSaveEnabled(false)
+      setMessage('Het vorige privéconcept is gewist. Je kunt nu vinkjes voor dit mandje bewaren.')
+    } catch {
+      setMessage('Dit tabblad geeft geen toestemming om het oude concept te wijzigen. Er is niets verwijderd.')
+    }
+  }
+
   const consistent = useMemo(() => basketConsistent(basket), [basket])
   const lines = consistent ? basket.lines : []
   const completed = lines.filter(line => done.has(line.id)).length
@@ -236,10 +257,13 @@ export function PrivateStoreTripChecklist({
         onChange={event => changeOptIn(event.target.checked)} />
       <span>Bewaar mijn vinkjes in dit browsertabblad (optioneel)</span>
     </label>
-    {storageProtected && <p className="private-store-trip__warning" role="status">
-      Een bestaand privéconcept voor een andere opname of onbekende versie is beschermd en wordt niet overschreven.
-      Je kunt deze lijst wel gewoon afvinken en downloaden.
-    </p>}
+    {storageProtected && <div className="private-store-trip__warning" role="status">
+      <p>Een eerder concept voor een andere opname of onbekende versie is beschermd.
+        Je kunt deze lijst gewoon afvinken en downloaden.</p>
+      <button type="button" className="ghost-button" onClick={releaseProtectedConcept}>
+        Wis vorig privéconcept en gebruik dit mandje
+      </button>
+    </div>}
     {basket.unresolvedLineCount > 0 && <p className="private-store-trip__warning">
       {basket.unresolvedLineCount} ontbrekende productkeuzes. Het bekende deelbedrag is geen volledig mandtotaal.
     </p>}
