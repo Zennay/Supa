@@ -66,7 +66,9 @@ export function saveLocalRecipeReviewDraft(
   expectedRevision: number | null,
   explicitDeviceStorageConsent: boolean,
 ): DraftStorageWrite | { status: 'consent_required' } {
-  if (!explicitDeviceStorageConsent) return { status: 'consent_required' }
+  // Only primitive true is informed opt-in: string 'false', numeric 1,
+  // Boolean objects and untrusted form/settings values cannot authorize storage.
+  if (explicitDeviceStorageConsent !== true) return { status: 'consent_required' }
   return saveRecipeDeviceDraft(storage, id, draft, expectedRevision)
 }
 
