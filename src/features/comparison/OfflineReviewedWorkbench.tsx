@@ -314,25 +314,50 @@ export function OfflineReviewedWorkbench({
       return false
     }
   }
-  /** Paste supports the exact same canonical single/paired JSON as file import.
-   * No fallback parser, synthetic other retailer or automatic storage. */
-  function importPastedJson() {
-    if (!text.trim()) return
-    importVersion.current++
-    setBusy(false)
+  /** Paste is admitted through exactly the same local JSON/CSV adapters as
+   * file upload, and never creates a missing retailer or relaxed price rule. */
+  async function importPastedData() {
+    const supplied = text
+    if (!supplied.trim()) return
+    const version = ++importVersion.current
+    setBusy(true)
+    setMessage('Geplakte brongegevens worden uitsluitend lokaal verwerkt.')
     try {
-      const root: unknown = JSON.parse(text)
+      let json = supplied
+      if (!supplied.trimStart().startsWith('{')) {
+        // Import the existing strict converter asset. The pasted CSV never
+        // leaves the browser and no second CSV validation path is invented.
+        const moduleUrl = new URL('offline-two-store-csv.mjs',
+          new URL(import.meta.env.BASE_URL, window.location.origin)).href
+        const adapter: {
+          convertTwoStoreCsv: (input: string) => string
+          convertSingleStoreCsv: (input: string) => string
+        } = await import(/* @vite-ignore */ moduleUrl)
+        if (version !== importVersion.current) return
+        try { json = adapter.convertTwoStoreCsv(supplied) }
+        catch (pairedError) {
+          try { json = adapter.convertSingleStoreCsv(supplied) }
+          catch { throw pairedError }
+        }
+      }
+      if (version !== importVersion.current) return
+      const root: unknown = JSON.parse(json)
       if (root && typeof root === 'object' && !Array.isArray(root) &&
         (root as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
-        importOneStore(text)
-      } else {
-        const accepted = importSnapshots(text)
-        if (accepted) clearStaged()
+        importOneStore(json)
+      } else if (importSnapshots(json)) {
+        // Keep the original parsed captures as JSON, including null prices;
+        // the raw pasted CSV is never confused with canonical JSON here.
+        setText(json)
+        clearStaged()
       }
     } catch (error) {
+      if (version !== importVersion.current) return
       setImported(null)
-      setMessage((error instanceof Error ? error.message : 'Deze JSON-opname is ongeldig.') +
-        ' Je gegevens worden niet als een vergelijkbare winkelprijs gebruikt.')
+      setMessage((error instanceof Error ? error.message : 'Deze brongegevens zijn ongeldig.') +
+        ' Er wordt geen winkelprijs of prijsverschil uit dit concept afgeleid.')
+    } finally {
+      if (version === importVersion.current) setBusy(false)
     }
   }
 
@@ -679,7 +704,7 @@ export function OfflineReviewedWorkbench({
           <code>packUnit</code> (g/kg/ml/l/piece), <code>priceCents</code> (geheel aantal centen of
           null), en <code>available</code> (true/false). Optioneel <code>packCount</code>.
           Gebruik uitsluitend gegevens die je mag bewaren en verwerken.
-          Je mag een afzonderlijke JSON-opname ook hieronder in het tekstveld plakken
+          Je mag een afzonderlijke JSON- of CSV-opname hieronder ook plakken
           en direct als voorlopige winkelboodschappenlijst openen, zonder prijsverschil.
           Je mag ook twee aparte JSON-bestanden aanleveren. Gebruik dan per bestand
           <code>schema: "supa-offline-store-capture-v1"</code> en één <code>capture</code>
@@ -745,7 +770,7 @@ export function OfflineReviewedWorkbench({
             plan={plan} recipes={recipes} activeDays={activeDays} clockMs={clockMs}
           />
         ))}
-        <label>Of plak één losse of twee gecombineerde winkelopnames als JSON
+        <label>Of plak een losse of gecombineerde winkelopname als JSON of CSV
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
@@ -764,7 +789,7 @@ export function OfflineReviewedWorkbench({
             }} />
         </label>
         <div className="offline-price-workbench__actions">
-          <button type="button" disabled={busy || !text.trim()} onClick={importPastedJson}>
+          <button type="button" disabled={busy || !text.trim()} onClick={() => { void importPastedData() }}>
             {imported ? 'Herbereken mandjes' : 'Importeer en bereken'}
           </button>
           <button type="button" className="ghost-button" disabled={!imported || busy}
