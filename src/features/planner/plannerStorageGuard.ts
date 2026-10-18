@@ -69,7 +69,10 @@ export function persistPlannerRecord({
   } catch {
     return { status: 'unavailable', raw: expectedRaw }
   }
-  if ((current !== null && current !== expectedRaw) || !canReplacePlannerRecord(current, validDays, validRecipeIds)) {
+  // A deletion made by another tab is a change, too. Treat null as a
+  // real expected revision: otherwise an old tab recreates a record the
+  // owner explicitly removed elsewhere, without telling them.
+  if (current !== expectedRaw || !canReplacePlannerRecord(current, validDays, validRecipeIds)) {
     return { status: 'protected', raw: current }
   }
   if (!canReplacePlannerRecord(nextRaw, validDays, validRecipeIds)) {
