@@ -31,7 +31,7 @@ function literalCsv(value: unknown, signedMoneyDelta = false): string {
   const prefix = /^[\p{White_Space}\p{Cf}\p{Mn}\p{Mc}\p{Me}]*[=+@-]/u
   // A negative difference is canonical arithmetic, not untrusted formula text.
   // All other user-supplied text still receives conservative formula escaping.
-  const text = signedMoneyDelta && /^-\\d+$/.test(raw)
+  const text = signedMoneyDelta && /^-\d+$/.test(raw)
     ? raw : prefix.test(raw.normalize('NFKC')) ? "'" + raw : raw
   return '"' + text.replaceAll('"', '""') + '"'
 }
