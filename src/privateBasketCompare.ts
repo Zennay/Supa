@@ -55,6 +55,7 @@ const tripStore = document.querySelector<HTMLSelectElement>('#trip-store')!
 const tripItems = document.querySelector<HTMLElement>('#trip-items')!
 const tripSummary = document.querySelector<HTMLElement>('#trip-summary')!
 let tripBaskets: Record<StoreName, OneStoreBasket> | null = null
+let comparisonValidThroughNs: bigint | null = null
 const ticked = new Set<string>()
 let inputRevision = 0
 
@@ -333,6 +334,16 @@ function tripProgress(): void {
     ' Prijzen zijn historische privéwaarnemingen, geen kassagarantie.'
 }
 
+function invalidateAgedComparison(): boolean {
+  if (result.hidden || comparisonValidThroughNs === null) return false
+  const nowNs = BigInt(Date.now()) * 1000000n
+  if (nowNs <= comparisonValidThroughNs) return false
+  result.hidden = true
+  clearTrip()
+  setStatus('Een van de oorspronkelijke winkelopnames is inmiddels ouder dan zeven dagen. Open recente werkelijke opnames en vergelijk opnieuw; het oude volledige prijsverschil is niet meer geldig.', true)
+  return true
+}
+
 function renderTrip(): void {
   tripItems.replaceChildren()
   const lines = shoppingTripLines()
@@ -349,6 +360,7 @@ function renderTrip(): void {
     check.checked = ticked.has(line.id)
     check.setAttribute('aria-label', line.packs + ' hele verpakkingen ' + line.productName + ' afvinken')
     check.addEventListener('change', () => {
+      if (invalidateAgedComparison()) return
       if (check.checked) ticked.add(line.id)
       else ticked.delete(line.id)
       tripProgress()
@@ -380,6 +392,7 @@ function clearTrip(): void {
 }
 
 tripStore.addEventListener('change', () => {
+  if (invalidateAgedComparison()) return
   ticked.clear()
   renderTrip()
 })
@@ -388,6 +401,7 @@ document.querySelector<HTMLButtonElement>('#trip-reset')!.addEventListener('clic
   renderTrip()
 })
 document.querySelector<HTMLButtonElement>('#trip-export')!.addEventListener('click', () => {
+  if (invalidateAgedComparison()) return
   if (result.hidden || trip.hidden || !tripBaskets) return
   const lines = shoppingTripLines()
   if (!lines.length) return
@@ -436,6 +450,7 @@ function show(source: Source, demand: Demand): void {
   const firstAge = nowNs - start
   const secondAge = nowNs - end
   const gap = abs(start - end)
+  comparisonValidThroughNs = (start <= end ? start : end) + weekNs
   const fresh = firstAge >= 0n && secondAge >= 0n &&
     firstAge <= weekNs && secondAge <= weekNs && gap <= dayNs
   const complete = fresh && comparison.claimable && comparison.deltaCents !== null &&
@@ -565,6 +580,7 @@ document.querySelector<HTMLButtonElement>('#download-missing')!.addEventListener
   window.setTimeout(() => URL.revokeObjectURL(url), 60000)
 })
 document.querySelector<HTMLButtonElement>('#print')!.addEventListener('click', () => {
+  if (invalidateAgedComparison()) return
   if (!result.hidden) window.print()
 })
 
@@ -584,4 +600,11 @@ document.addEventListener('supa:compare-private-basket', (event: Event) => {
   } catch {
     setStatus('Geen veilige volledige vergelijking mogelijk. Controleer beide lokale bronopnames, expliciete producten en fysieke hoeveelheden.', true)
   }
+})
+
+// A private source can become too old while the app is open in a background tab.
+// Refuse to expose the old full comparison or export list on return to the tab.
+window.addEventListener('focus', invalidateAgedComparison)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') invalidateAgedComparison()
 })
