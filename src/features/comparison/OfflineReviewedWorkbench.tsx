@@ -35,13 +35,25 @@ function reviewedLineKey(store: typeof stores[number], observedAt: string, line:
     line.packs, line.pricePerPackCents, line.lineTotalCents,
   ])
 }
+function shoppingTaskKey(store: typeof stores[number], line: BasketTraceLine): string {
+  // A trip tick belongs to the exact physical requirement and chosen pack,
+  // not a demo store or a potentially changed price.
+  return JSON.stringify([
+    store, line.id, line.requirement.amount, line.requirement.unit,
+    line.status === 'matched' ? line.productId : null,
+    line.status === 'matched' ? line.pack.amount : null,
+    line.status === 'matched' ? line.pack.unit : null,
+    line.status === 'matched' ? line.pack.count : null,
+    line.status === 'matched' ? line.packs : null,
+  ])
+}
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
-function shoppingChecklist(basket: OneStoreBasket): string {
+function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number], done: Record<string, boolean>): string {
   return [
     `Supa · boodschappen voor ${basket.store.name} · privé ingevoerde prijzen, niet geverifieerd`,
     ...basket.lines.map(line => line.status === 'matched'
-      ? `☐ ${line.ingredientLabel}: ${line.packs} × ${line.productName} (${euros.format(line.lineTotalCents / 100)})`
-      : `☐ ${line.ingredientLabel}: handmatig kiezen, hoeveelheid ${line.requirement.amount ?? '?'} ${line.requirement.unit}`),
+      ? `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: ${line.packs} × ${line.productName} (${euros.format(line.lineTotalCents / 100)})`
+      : `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: handmatig kiezen, hoeveelheid ${line.requirement.amount ?? '?'} ${line.requirement.unit}`),
     'Prijzen zijn alleen indicatief op basis van lokaal aangeleverde gegevens.',
   ].join('\n')
 }
@@ -61,6 +73,8 @@ export function OfflineReviewedWorkbench({
   const importRevision = useRef(0)
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
+  const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
+  const [openTripOnly, setOpenTripOnly] = useState(false)
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
   const [clockMs, setClockMs] = useState(() => Date.now())
@@ -99,6 +113,7 @@ export function OfflineReviewedWorkbench({
   function importSnapshots(input: string) {
     // A new import, even identical bytes, requires explicit source review.
     setReviewedLines({})
+    setDoneTripItems({})
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setClockMs(Date.now())
@@ -115,6 +130,7 @@ export function OfflineReviewedWorkbench({
     const version = ++importRevision.current
     setImported(null)
     setReviewedLines({})
+    setDoneTripItems({})
     setBusy(true)
     try {
       if (!file.size || file.size > 256000) {
@@ -228,7 +244,7 @@ export function OfflineReviewedWorkbench({
         }}
         onEdit={() => {
           importRevision.current += 1
-          setBusy(false); setImported(null); setReviewedLines({}); setText('')
+          setBusy(false); setImported(null); setReviewedLines({}); setDoneTripItems({}); setText('')
           setMessage('Het vorige prijsbestand is ingetrokken omdat je de invoer bewerkt. Bereken de gewijzigde winkelopname opnieuw.')
         }}
       />
@@ -257,6 +273,7 @@ export function OfflineReviewedWorkbench({
               setText(event.target.value)
               setImported(null)
               setReviewedLines({})
+              setDoneTripItems({})
               setMessage('Invoer gewijzigd. Bereken opnieuw; eerder resultaat is niet meer geldig.')
             }} />
         </label>
@@ -270,7 +287,7 @@ export function OfflineReviewedWorkbench({
           <button type="button" className="ghost-button" onClick={() => {
             importRevision.current += 1
             setBusy(false)
-            setImported(null); setReviewedLines({}); setText(''); setMessage('Geïmporteerde prijsdata uit dit scherm gewist.')
+            setImported(null); setReviewedLines({}); setDoneTripItems({}); setText(''); setMessage('Geïmporteerde prijsdata uit dit scherm gewist.')
           }}>Wis lokaal geladen data</button>
         </div>
         <p role="status" aria-live="polite">{message}</p>
@@ -344,23 +361,50 @@ export function OfflineReviewedWorkbench({
                     ))}
                 </section>
               )}
+              <div className="offline-price-workbench__trip-actions">
+                <label><input type="checkbox" checked={openTripOnly}
+                    onChange={event => setOpenTripOnly(event.currentTarget.checked)} />
+                  Toon alleen nog te kopen</label>
+                <button type="button" className="ghost-button" onClick={() => setDoneTripItems({})}>
+                  Alle afvinkingen wissen
+                </button>
+              </div>
               <div className="offline-price-workbench__stores">
                 {stores.map(store => {
                   const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+                  const purchased = basket.lines.filter(line => doneTripItems[shoppingTaskKey(store, line)]).length
+                  const visible = basket.lines.filter(line =>
+                    !openTripOnly || !doneTripItems[shoppingTaskKey(store, line)])
                   return (
                     <section key={store}>
-                      <h4>{store} · mandregels</h4>
+                      <h4>{store} · boodschappen</h4>
+                      <p className="offline-price-workbench__trip-progress" role="status">
+                        {purchased} van {basket.lines.length} afgevinkt · alleen privé op dit apparaat
+                      </p>
                       <details className="offline-price-workbench__checklist">
                         <summary>Kopieer boodschappenlijst voor {store}</summary>
                         <p>Selecteer en kopieer deze lijst; de tekst blijft op je apparaat.</p>
                         <textarea readOnly rows={Math.min(18, basket.lines.length + 4)}
                           aria-label={`Boodschappenlijst ${store}`}
-                          value={shoppingChecklist(basket)} onFocus={event => event.currentTarget.select()} />
+                          value={shoppingChecklist(basket, store, doneTripItems)} onFocus={event => event.currentTarget.select()} />
                       </details>
-                      {basket.lines.map(line => (
+                      {visible.length === 0 && basket.lines.length > 0 &&
+                        <p className="offline-price-workbench__trip-complete" role="status">
+                          Alles afgevinkt voor {store}.
+                        </p>}
+                      {visible.map(line => (
                         <article key={line.id} className="offline-price-workbench__line">
                           <div>
-                            <strong>{line.ingredientLabel}</strong>
+                            <label className="offline-price-workbench__trip-tick">
+                              <input type="checkbox" checked={Boolean(doneTripItems[shoppingTaskKey(store, line)])}
+                                onChange={event => {
+                                  const key = shoppingTaskKey(store, line)
+                                  const checked = event.currentTarget.checked
+                                  setDoneTripItems(previous => ({ ...previous, [key]: checked }))
+                                }} />
+                              <strong>{line.ingredientLabel}</strong>
+                              <span>Afvinken als gekocht</span>
+                            </label>
                             <span>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</span>
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
                             {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
