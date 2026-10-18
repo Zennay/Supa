@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 
 import { buildPrivateM3ProductComparison } from './m3-private-product-comparison.mjs'
 import { renderPrivateM3ProductComparisonHtml } from './m3-private-comparison-html.mjs'
+import { snapshotPrivateM3Comparison } from './m3-private-comparison-snapshot.mjs'
 import {
   assertNoSymlinkedM3OutputParents,
   writeDerivedM3Output,
@@ -21,7 +22,17 @@ function cell(value, { untrustedText = false } = {}) {
   // remain literal text, not execute formula or DDE/URL side effects.
   // Control characters can masquerade as cell/row separators.
   const clean = raw.replace(/[\u0000-\u001f\u007f-\u009f\ufeff]/g, ' ')
-  const safe = untrustedText && /^[\s\u200b-\u200d]*[=+\-@]/u.test(clean)
+  // Preserve the existing ASCII/whitespace literal-text contract. For other
+  // visually disguised formulas, refuse the private export rather than emit
+  // text that an independent spreadsheet preflight cannot safely interpret.
+  // NFKC is inspection-only: the original operator label remains unchanged.
+  const asciiFormula = /^[\s\u200b-\u200d]*[=+\-@]/u.test(clean)
+  const disguisedFormula = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+\-@\u2212]/u
+    .test(clean.normalize('NFKC'))
+  // Escape formula-like text as an explicit literal even with compatibility
+  // or invisible prefixes. The separate pre-open gate will still require
+  // operator review for ambiguous Unicode, rather than silently approving it.
+  const safe = untrustedText && (asciiFormula || disguisedFormula)
     ? "'" + clean
     : clean
   return '"' + safe.replace(/"/g, '""') + '"'
@@ -67,8 +78,11 @@ function productValues(p) {
 export function renderPrivateM3ComparisonCsv(report) {
   // This method validates totals and all eleven physical demand rows, rejecting
   // forged savings or status and negative/overflow cents before any CSV output.
-  renderPrivateM3ProductComparisonHtml(report)
-  const data = report.lines.map((line) => {
+  const snapshot = snapshotPrivateM3Comparison(report)
+  renderPrivateM3ProductComparisonHtml(snapshot)
+  // Both the financial validation and every exported cell use immutable local
+  // ordinary data. A caller's getters/prototypes cannot influence the CSV.
+  const data = snapshot.lines.map((line) => {
     const plus = line.plus.status === 'known'
     const deka = line.dekamarkt.status === 'known'
     const comparable = plus && deka
@@ -79,7 +93,7 @@ export function renderPrivateM3ComparisonCsv(report) {
       t(comparable ? 'Voorlopig vergelijkbaar' : 'Onbekend / niet volledig'),
     ])
   })
-  const full = report.fullBasket
+  const full = snapshot.fullBasket
   // Never present partial known subtotals as full basket totals or a retailer
   // winner. The verified-retailer flag is always FALSE for this private draft.
   const summary = Array.from({ length: HEADERS.length }, () => n(''))
