@@ -32,7 +32,7 @@ Kopieer onderstaande structuur, vervang de inhoud door ingrediënten van het wer
 }
 ```
 
-Bovenstaande structuur is alleen een **onbeprijsd invulsjabloon**, geen aangetroffen product en geen uitgevoerde winkelvergelijking. Toegestane eenheden: `g`, `kg`, `ml`, `l`, `piece`. Gebruik dezelfde `id`, fysieke `amount` en `unit` voor beide winkels. Een winkelproduct-ID mag pas worden ingevuld nadat het voorkomt in de ingelezen eigen waarneming en bij het bedoelde ingrediënt past. Onbekende hoeveelheden mogen `null` blijven; zulke regels worden nooit op €0 geprijsd.
+Bovenstaande structuur is alleen een **onbeprijsd invulsjabloon**, geen aangetroffen product en geen uitgevoerde winkelvergelijking. Toegestane eenheden: `g`, `kg`, `ml`, `l`, `piece`. Gebruik dezelfde `id`, fysieke `amount` en `unit` voor beide winkels. De lokale HTML-rapportage geeft bij ontbrekende regels nu ook mogelijke productkoppelingen uit de bestaande Supa-matcher, wanneer de score en afstand voldoende zijn. **Deze suggesties worden nooit automatisch geselecteerd of meegerekend**: controleer de echte productnaam, verpakking en bron-ID en vul pas daarna zelf het passende `productIds`-veld in. Bij twijfel blijft de regel onbekend.\n\nEen winkelproduct-ID mag pas worden ingevuld nadat het voorkomt in de ingelezen eigen waarneming en bij het bedoelde ingrediënt past. Onbekende hoeveelheden mogen `null` blijven; zulke regels worden nooit op €0 geprijsd.
 
 ## Stap 3 — HTML op eigen apparaat genereren
 
