@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { StoreProduct } from '../../domain/basket.ts'
 import { parseSingleOfflineCapture, type OfflineCapture, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 import { offlineSessionFresh } from '../comparison/offlineSessionBaskets.ts'
+import { privatePackUnitRate } from '../comparison/privateUnitPrice.ts'
 import type { OfflineComparisonSession } from '../comparison/offlineComparisonSession.ts'
 import './ownImportedProducts.css'
 
@@ -19,15 +20,11 @@ function detail(store: OfflineRetailer, product: StoreProduct): Result {
   const group: Group | null = packUnit === 'g' || packUnit === 'kg' ? 'kg'
     : packUnit === 'ml' || packUnit === 'l' ? 'liter'
       : packUnit === 'piece' ? 'stuk' : null
-  const physical = packAmount === null ? null : packAmount * packCount
-  const basis = physical === null ? null :
-    packUnit === 'g' || packUnit === 'ml' ? physical / 1000 : physical
-  const known = available && Number.isSafeInteger(priceCents) && priceCents >= 0
-  const calculated = known && basis !== null && Number.isFinite(basis) && basis > 0
-    ? Math.round(priceCents / basis) : null
+  const calculated = privatePackUnitRate({ amount: packAmount, unit: packUnit,
+    count: packCount, priceCents: available ? priceCents : null })
   return {
     store, product, group,
-    unitCents: calculated !== null && Number.isSafeInteger(calculated) && calculated >= 0 ? calculated : null,
+    unitCents: calculated?.centsPerUnit ?? null,
     amount: packAmount === null ? 'Verpakking onbekend'
       : String(packCount > 1 ? packCount + ' × ' : '') + String(packAmount) + ' ' + packUnit,
   }
