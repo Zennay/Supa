@@ -159,8 +159,17 @@ apply.addEventListener('click', submit)
 document.querySelector('#manual-cancel').addEventListener('click', () => {
   acceptedCsv = null
   save.disabled = true
+  // Discard ONLY unsaved form fields, not the separately admitted mapping data.
+  // A new manual capture starts truly empty: no invented ID, price or clock.
+  for (const store of stores) {
+    areas[store].replaceChildren()
+    document.querySelector('[data-capture="' + store + '"]').value = ''
+    addRow(store, false)
+  }
+  mode.value = 'both'
+  updateMode()
   document.dispatchEvent(new Event('supa:manual-source-cancelled'))
-  setStatus('Concept geannuleerd. Je eerder toegelaten oorspronkelijke winkelbron is behouden. Een nieuw concept invoeren is nog steeds mogelijk; de vorige bron wordt niet stilzwijgend vervangen.')
+  setStatus('Conceptvelden zijn leeggemaakt. De eerder toegelaten originele winkelbron en bewuste productkeuzes blijven beschikbaar. Een nieuwe opname vereist opnieuw je echte productgegevens, prijs en tijd.')
 })
 save.addEventListener('click', () => {
   if (acceptedCsv === null) return
