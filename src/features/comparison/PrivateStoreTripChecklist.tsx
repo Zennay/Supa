@@ -298,6 +298,25 @@ export function PrivateStoreTripChecklist({
     setMessage('')
   }
 
+  async function shareOnDevice() {
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function' ||
+        !consistent || !text || text.length > 64000) {
+      setMessage('Delen is hier niet beschikbaar. Download of kopieer de lijst.')
+      return
+    }
+    try {
+      // An explicit user gesture opens the device's own share sheet; Supa
+      // never chooses a destination or sends anything to its own backend.
+      await navigator.share({ title: 'SUPA · privéboodschappenlijst · ' + basket.store.name, text })
+      setMessage('Deelactie door je apparaat afgehandeld.')
+    } catch (error) {
+      setMessage(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Delen geannuleerd; de lijst is niet door Supa verzonden.'
+        : 'Dit apparaat kon niet delen. Gebruik Download lijst of kopieer de tekst.')
+    }
+  }
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+
   function download() {
     const uri = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
     try {
@@ -366,6 +385,10 @@ export function PrivateStoreTripChecklist({
       <button type="button" className="ghost-button" disabled={!lines.length && !extraLines.length} onClick={download}>
         Download lijst
       </button>
+      {canShare && <button type="button" className="ghost-button"
+        disabled={!lines.length && !extraLines.length} onClick={() => { void shareOnDevice() }}>
+        Deel privéboodschappenlijst via apparaat
+      </button>}
       <button type="button" className="ghost-button" disabled={!lines.length && !extraLines.length}
         aria-expanded={copyVisible} onClick={() => setCopyVisible(visible => !visible)}>
         {copyVisible ? 'Verberg kopieerbare tekst' : 'Toon kopieerbare tekst'}
@@ -398,6 +421,8 @@ export function PrivateStoreTripChecklist({
       de vinkjes en een mandgebonden sleutel lokaal in de sessieopslag van dit tabblad bewaard;
       een andere bronopname of week krijgt nooit automatisch jouw oude vinkjes.
       Deze privéopname wordt niet vermengd met demo-/algemene lijsten en gaat niet naar de server.
+      Delen via het apparaat gebeurt alleen na jouw klik en bevestiging bij een zelf gekozen bestemming;
+      de gedeelde tekst kan de eigen prijsgegevens en de afvinkstatus bevatten.
     </p>
   </section>
 }
