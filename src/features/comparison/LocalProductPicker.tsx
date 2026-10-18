@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { StoreProduct } from '../../domain/basket.ts'
 import type { MatchUnit } from '../../domain/matching.ts'
+import { privatePackUnitRate } from './privateUnitPrice.ts'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const collator = new Intl.Collator('nl-NL', { sensitivity: 'base', numeric: true })
@@ -42,6 +43,18 @@ export function LocalProductPicker({
   onSelect: (productId: string) => void
 }) {
   const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<'relevance' | 'unit' | 'pack'>('relevance')
+  function unitRate(product: StoreProduct) {
+    return privatePackUnitRate({
+      amount: product.packAmount, unit: product.packUnit,
+      count: product.packCount ?? 1, priceCents: product.priceCents,
+    })
+  }
+  function unitRateLabel(product: StoreProduct) {
+    const rate = unitRate(product)
+    return rate ? euros.format(rate.centsPerUnit / 100) + ' / ' + rate.unit
+      : 'eenheidsprijs onbekend'
+  }
   const compatible = useMemo(() => products.filter(product =>
     product.available && product.packAmount !== null && product.packAmount > 0 &&
     Number.isSafeInteger(product.priceCents) && product.priceCents >= 0 &&
@@ -56,6 +69,14 @@ export function LocalProductPicker({
   const matching = compatible.filter(product =>
     !search || (product.name + ' ' + product.id)
       .normalize('NFKD').toLocaleLowerCase('nl-NL').includes(search))
+  if (sort !== 'relevance') matching.sort((a, b) => {
+    // Physical unit prices are display-only; no automatic retailer choice.
+    const aCost = sort === 'unit' ? unitRate(a)?.centsPerUnit : a.priceCents
+    const bCost = sort === 'unit' ? unitRate(b)?.centsPerUnit : b.priceCents
+    return (aCost ?? Number.POSITIVE_INFINITY) -
+      (bCost ?? Number.POSITIVE_INFINITY) ||
+      collator.compare(a.name, b.name) || collator.compare(a.id, b.id)
+  })
   const visible = matching.slice(0, MAX_VISIBLE)
   const chosen = compatible.find(product => product.id === selected)
   if (chosen && !visible.some(product => product.id === chosen.id)) {
@@ -70,8 +91,17 @@ export function LocalProductPicker({
           placeholder="Zoek op productnaam of artikel-ID"
           onChange={event => setQuery(event.target.value)} />
       </label>
-      <small>Producten met overeenkomende woorden staan vooraan.
-        Controleer altijd zelf merk, verpakking en geschiktheid; dit is geen geverifieerde match.</small>
+      <label>
+        <span>Sorteer producten bij {store}</span>
+        <select value={sort} onChange={event => setSort(event.target.value as typeof sort)}>
+          <option value="relevance">Beste overeenkomst met ingrediënt</option>
+          <option value="unit">Laagste eenheidsprijs (kg, liter of stuk)</option>
+          <option value="pack">Laagste prijs per verpakking</option>
+        </select>
+      </label>
+      <small>Eenheidsprijzen gebruiken jouw gemeten verpakking, multipack en centprijs.
+        De laagste prijs per kg of liter is niet noodzakelijk de goedkoopste
+        volledige winkeltrip. Controleer zelf het product; niets wordt automatisch gekozen.</small>
       <label className="offline-price-workbench__manual-match">
         <span>Product handmatig beoordelen (alleen jouw geïmporteerde voorraad)</span>
         <select aria-label={`Handmatige productkeuze ${store} voor ${ingredient}`}
@@ -80,7 +110,7 @@ export function LocalProductPicker({
           <option value="!">Geen passend product — laat onbekend</option>
           {visible.map(product =>
             <option key={product.id} value={product.id}>
-              {`${product.name} · ${product.packAmount} ${product.packUnit} × ${product.packCount ?? 1} · ${euros.format(product.priceCents / 100)}`}
+              {`${product.name} · ${product.packAmount} ${product.packUnit} × ${product.packCount ?? 1} · ${euros.format(product.priceCents / 100)} · ${unitRateLabel(product)}`}
             </option>)}
         </select>
       </label>
