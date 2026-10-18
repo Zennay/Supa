@@ -1,3 +1,4 @@
+import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl.ts'
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport.ts'
 
 export type SavedRecipe = UserRecipeDraft & { id: string; savedAt: string }
@@ -25,7 +26,12 @@ export function reviewRecipe(draft: UserRecipeDraft): UserRecipeDraft {
     ingredient.reviewReason ? [`Ingrediënt ${index + 1}: ${ingredient.reviewReason}`] : [])
   if (reviewed.servings === null) warnings.push('Porties ontbreken of zijn onduidelijk')
   if (reviewed.minutes === null) warnings.push('Bereidingstijd ontbreekt of zijn onduidelijk')
-  return { ...reviewed, ingredients, warnings, source: draft.source, sourceUrl: draft.sourceUrl }
+  const sourceUrl = draft.source === 'url' ? safeRecipeSourceUrl(draft.sourceUrl) : null
+  if (draft.source === 'url' && !sourceUrl) throw new Error('Receptbronlink ontbreekt.')
+  if (draft.source !== 'url' && (draft.source !== 'manual' || draft.sourceUrl !== null)) {
+    throw new Error('Receptbron en bronlink spreken elkaar tegen.')
+  }
+  return { ...reviewed, ingredients, warnings, source: draft.source, sourceUrl }
 }
 
 export function readRecipeLibrary(storage: Storage): LibraryState {

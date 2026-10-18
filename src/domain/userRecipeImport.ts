@@ -1,3 +1,4 @@
+import { safeRecipeSourceUrl } from './recipeSourceUrl.ts'
 /**
  * Private user-recipe intake, before any persistence, price calculation or fetch.
  * A caller must fetch HTML through a separately protected server boundary.
@@ -217,8 +218,9 @@ function locateRecipe(value: unknown, depth = 0): Record<string, unknown> | null
  */
 export function importRecipeFromHtml(html: string, sourceUrl: string): UserRecipeDraft {
   if (typeof html !== 'string' || !html || html.length > MAX_HTML) throw new Error('HTML ontbreekt of is te groot')
-  let parsedUrl: URL
-  try { parsedUrl = new URL(sourceUrl) } catch { throw new Error('Ongeldige receptlink') }
+  const approvedSource = safeRecipeSourceUrl(sourceUrl)
+  if (!approvedSource) throw new Error('Ongeldige publieke receptbronlink')
+  const parsedUrl = new URL(approvedSource)
   if (parsedUrl.protocol !== 'https:' || !parsedUrl.hostname || parsedUrl.username || parsedUrl.password) {
     throw new Error('Alleen publieke HTTPS-receptlinks zijn toegestaan')
   }
