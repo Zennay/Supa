@@ -224,6 +224,7 @@ export function OfflineReviewedWorkbench({
   const [openTripOnly, setOpenTripOnly] = useState(false)
   const [tripExportMessage, setTripExportMessage] = useState('')
   const [tripProgressMessage, setTripProgressMessage] = useState('')
+  const [coverageMessage, setCoverageMessage] = useState('')
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
   const [clockMs, setClockMs] = useState(() => Date.now())
@@ -831,15 +832,48 @@ export function OfflineReviewedWorkbench({
       PLUS: review('PLUS'), DekaMarkt: review('DekaMarkt'),
     }
   })
-  function downloadCoverageChecklist() {
+  const olderPairCapture = imported?.captures.PLUS && imported.captures.DekaMarkt &&
+    !imported.pairedWithin24h
+    ? imported.captures.PLUS.observedNs <= imported.captures.DekaMarkt.observedNs
+      ? 'PLUS' : 'DekaMarkt'
+    : null
+  const openCoverageRows = coverageRows.filter(row =>
+    !!olderPairCapture || stores.some(store => row[store].status !== 'Persoonlijk bevestigd'))
+  function downloadCoverageChecklist(onlyOpen = false) {
     if (!imported || coverageRows.length === 0) return
+    // Refresh source age at the moment the field list is downloaded rather
+    // than reusing the 60-second screen clock. The list is a work aid, never
+    // authoritative evidence of a current shop price.
+    const nowNs = BigInt(Date.now()) * 1_000_000n
+    const rows = coverageRows.map(row => ({
+      ...row,
+      ...Object.fromEntries(stores.map(store => {
+        const captured = imported.captures[store]
+        const fresh = !!captured &&
+          nowNs >= captured.observedNs - 300_000_000_000n &&
+          nowNs - captured.observedNs <= 604_800_000_000_000n
+        const item = row[store]
+        return [store, !fresh && item.status === 'Persoonlijk bevestigd'
+          ? { ...item, status: 'Eigen opname verouderd of toekomstig; opnieuw opnemen' }
+          : olderPairCapture === store && item.status === 'Persoonlijk bevestigd'
+            ? { ...item, status: 'Ouder bronmoment; neem binnen 24 uur van de andere winkel opnieuw op' }
+            : item]
+      })),
+    })) as typeof coverageRows
+    const selected = onlyOpen ? rows.filter(row =>
+      stores.some(store => row[store].status !== 'Persoonlijk bevestigd')) : rows
+    if (!selected.length) {
+      setCoverageMessage('Geen open productcontroles. Alle beschikbare eigen bronartikelen zijn afzonderlijk bevestigd.')
+      return
+    }
     const content = [
-      'SUPA · privé veld- en productcontrole voor exact dezelfde Planner-vraag',
+      onlyOpen ? 'SUPA · uitsluitend OPEN winkelproductcontroles uit jouw Planner' :
+        'SUPA · privé veld- en productcontrole voor exact dezelfde Planner-vraag',
       'Geen prijs- of bronrechtenbewijs. Ontbrekend/verlopen is onbekend, niet EUR 0.',
       ...stores.map(store => store + ' · eigen waarneming: ' +
         (imported.captures[store]?.observedAt ?? 'ONTBREEKT')),
       '',
-      ...coverageRows.flatMap(row => [
+      ...selected.flatMap(row => [
         row.label.replace(/[\r\n\u0000-\u001f\u007f-\u009f]/gu, ' ') +
           ' · ' + (row.amount ?? '?') + ' ' + row.unit,
         '  PLUS: ' + row.PLUS.status + (row.PLUS.product ? ' · voorgesteld bronartikel ' + row.PLUS.product.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ') : ''),
@@ -851,10 +885,13 @@ export function OfflineReviewedWorkbench({
     try {
       const link = document.createElement('a')
       link.href = url
-      link.download = 'supa-prive-dekking-en-ontbrekende-producten.txt'
+      link.download = onlyOpen ? 'supa-alleen-open-winkelcontroles.txt' :
+        'supa-prive-dekking-en-ontbrekende-producten.txt'
       document.body.append(link)
       try { link.click() } finally { link.remove() }
-      setTripExportMessage('Alle Planner-ingrediënten en ontbrekende winkelcontroles zijn als privé TXT bewaard. Geen prijzen of nieuwe bronnen toegevoegd.')
+      setCoverageMessage((onlyOpen ? 'Alleen de ' + selected.length + ' nog open Planner-regels' :
+        'Alle ' + selected.length + ' Planner-regels') +
+        ' lokaal bewaard met bronstatus per winkel. Geen prijzen of bronrechten toegevoegd.')
     } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
   }
 
@@ -1124,9 +1161,20 @@ export function OfflineReviewedWorkbench({
                   <h4>Hetzelfde mandje: {coverageRows.length} ingrediënten × twee winkels</h4>
                   <p>Bekijk welke originele bronregels en eigen controles ontbreken. Dit is de fysieke
                     Planner-vraag voor beide winkels; onvolledige of oude prijzen leveren geen winnaar.</p>
-                  <button className="ghost-button" type="button" onClick={downloadCoverageChecklist}>
-                    Download ontbrekende winkelcontroles (TXT)
-                  </button>
+                  <p>{openCoverageRows.length} van {coverageRows.length} ingrediënten
+                    hebben nog een ontbrekende bron, verlopen opname of niet-bevestigde productregel.</p>
+                  <div className="offline-price-workbench__actions">
+                    <button className="ghost-button" type="button"
+                      disabled={openCoverageRows.length === 0}
+                      onClick={() => downloadCoverageChecklist(true)}>
+                      Download uitsluitend open controles (TXT)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      onClick={() => downloadCoverageChecklist(false)}>
+                      Download complete winkeldekking (TXT)
+                    </button>
+                  </div>
+                  {coverageMessage && <p role="status" aria-live="polite">{coverageMessage}</p>}
                   <div className="offline-price-workbench__breakdown-scroll">
                     <table>
                       <caption>Bron- en reviewstatus per ingrediënt, zonder fictieve prijs.</caption>

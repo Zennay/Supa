@@ -778,3 +778,26 @@ actueel CSV/TXT worden gedownload. Het offline HTML-overzicht
 kan nog steeds als **onvolledig/onactueel** werkdocument
 worden bewaard, maar laat dan geen winnaar of totaaldelta
 zien. Er wordt niets uit externe retailercatalogi aangevuld.
+
+### Eén download met uitsluitend nog open winkelcontroles
+
+Naast het volledige twee-winkeldekkingsoverzicht biedt Vergelijk
+nu **Download uitsluitend open controles (TXT)**. Die lokale
+lijst laat alle reeds persoonlijk bevestigde én actuele
+fysieke ingrediëntregels weg. Behouden blijven de regels
+waarvoor PLUS of DekaMarkt ontbreekt, de oorspronkelijke SKU
+niet past, de eigen opname te oud of toekomstig is, of de
+artikelidentiteit/verpakking/prijs nog niet expliciet is
+bevestigd. De bestaande volledige dekking blijft daarnaast
+apart downloadbaar voor eigen administratie.
+
+De winkelopnametijden worden ook op **downloadmoment** opnieuw
+beoordeeld; een intussen verlopen bron kan niet ongemerkt
+als volledig bevestigd in de veldlijst verschijnen. Liggen
+beide individuele winkelopnames meer dan 24 uur uiteen,
+dan wordt het oudere bronmoment in de open lijst aangewezen
+als opnieuw te observeren, zelfs als alle artikelen eerder
+persoonlijk waren bevestigd. Er worden nooit prijzen of
+nieuwe winkelproducten in het werkblad gefabriceerd.
+De lijst blijft een privé werkinstructie, geen bewijs
+voor daadwerkelijke veldvalidatie of retailerrechten.
