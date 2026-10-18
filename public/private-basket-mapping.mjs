@@ -184,7 +184,7 @@ async function readLocalFile(file) {
   if (!file || !file.size || file.size > maxBytes) {
     throw Error('Ieder bronbestand moet tussen 1 en 256.000 bytes groot zijn.')
   }
-  return file.text()
+  return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
 }
 
 function removeCsvHeader(source) {
@@ -304,7 +304,7 @@ demandImport.addEventListener('change', async () => {
   if (!file) return
   try {
     if (!file.size || file.size > maxBytes) throw Error('Vraagbestand is te groot of leeg.')
-    const saved = parsePrivateDemand(await file.text())
+    const saved = parsePrivateDemand(new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()))
     // Atomic UI replacement after all content is admitted.
     mealCount.value = String(saved.meals)
     lines.replaceChildren()
