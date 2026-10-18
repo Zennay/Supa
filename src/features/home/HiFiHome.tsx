@@ -19,6 +19,7 @@ export type PrivateHomeSummary = {
   fresh: boolean
   totalCents: number
   deltaCents: number | null
+  paired: boolean
 }
 export type HiFiTab = 'home' | 'recipes' | 'products'
 export const designProducts = [
@@ -119,7 +120,11 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
               ownEuros.format(privateSummary.totalCents / 100) + '. ' : ''}
               Geen volledig mandtotaal: de ontbrekende producten hebben nog geen betrouwbare prijs.</p>
           )}
-          {privateSummary.deltaCents !== null && <p>
+          {!privateSummary.paired && <p role="status">
+            Dit is uitsluitend je eigen {privateSummary.selectedStore}-mandje.
+            Voeg de andere winkel toe in Vergelijk om een eventueel prijsverschil te kunnen berekenen.
+          </p>}
+          {privateSummary.paired && privateSummary.deltaCents !== null && <p>
             {privateSummary.deltaCents === 0
               ? 'Beide volledige zelf ingevoerde winkelmandjes zijn even duur.'
               : (privateSummary.deltaCents > 0 ? 'PLUS' : 'DekaMarkt') +
@@ -131,7 +136,8 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
         </>}
         <div className="hifi-private-summary__actions">
           <button type="button" onClick={() => onNavigate('basket')}>
-            {privateSummary ? 'Vergelijk mijn winkels' : stagedStoreNames.length > 0
+            {privateSummary?.paired ? 'Vergelijk mijn winkels' :
+              privateSummary ? 'Voeg tweede winkel toe' : stagedStoreNames.length > 0
               ? 'Tweede winkel importeren' : 'Eigen prijsdata importeren'}
           </button>
           {(privateSummary || stagedStoreNames.length > 0) && <button type="button" onClick={() => onNavigate('list')}>
