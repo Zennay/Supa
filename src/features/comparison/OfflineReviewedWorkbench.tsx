@@ -103,6 +103,20 @@ export function OfflineReviewedWorkbench({
       DekaMarkt: { fingerprint: '', products: {} },
     })
   }
+  function clearPrivateSession() {
+    importVersion.current++
+    setBusy(false)
+    clearStaged()
+    setImported(null)
+    setText('')
+    setManualSelections({ fingerprint: '', products: {} })
+    session.setReviewTarget(null)
+    session.setTripMemory({})
+    session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
+    session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
+    session.setExtraQuantities({ PLUS: {}, DekaMarkt: {} })
+    setImportEpoch(epoch => epoch + 1)
+  }
   function importOneStore(content: string) {
     const { retailer, capture } = parseSingleOfflineCapture(content, Date.now())
     const previousCapture = stagedCaptures.current[retailer]
@@ -691,11 +705,8 @@ export function OfflineReviewedWorkbench({
             ? ' Laad de andere winkel als JSON of CSV. Tot die tijd is alleen deze winkel afzonderlijk beschikbaar, zonder prijsverschil.'
             : ' Beide bestanden geladen; de bestaande regels bepalen of de prijzen vergelijkbaar zijn.'}
           <button type="button" className="ghost-button" onClick={() => {
-            importVersion.current++
-            clearStaged()
-            setImported(null)
-            setText('')
-            setMessage('Beide losse winkelopnames uit dit scherm verwijderd.')
+            clearPrivateSession()
+            setMessage('Alle tijdelijke winkelopnames, matches en losse artikelen uit dit tabblad gewist.')
           }}>Wis losse opnames</button>
         </div>}
         {!imported && stagedStores.map(store => (
@@ -730,10 +741,8 @@ export function OfflineReviewedWorkbench({
             Download mijn {store}-opname apart
           </button>)}
           <button type="button" className="ghost-button" onClick={() => {
-            importVersion.current++
-            setBusy(false)
-            clearStaged()
-            setImported(null); setText(''); setMessage('Geïmporteerde prijsdata uit dit scherm gewist.')
+            clearPrivateSession()
+            setMessage('Alle tijdelijke prijsopnames, productkeuzes, aantallen en vinkjes uit dit tabblad gewist.')
           }}>Wis lokaal geladen data</button>
         </div>
         <p role="status" aria-live="polite">{message}</p>
