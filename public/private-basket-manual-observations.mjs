@@ -156,6 +156,61 @@ save.addEventListener('click', () => {
   link.remove()
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 })
+document.addEventListener('supa:manual-prefill-own-source', event => {
+  try {
+    const incoming = event.detail?.captures
+    if (!Array.isArray(incoming) || incoming.length !== 2 ||
+        new Set(incoming.map(item => item?.retailer)).size !== 2) {
+      throw Error('Kies eerst twee geldige eigen winkelopnames.')
+    }
+    const checked = Object.create(null)
+    for (const capture of incoming) {
+      if (!capture || !stores.includes(capture.retailer) ||
+          typeof capture.observedAt !== 'string' ||
+          !Array.isArray(capture.products) || !capture.products.length ||
+          capture.products.length > 100) {
+        throw Error('Deze bron heeft meer dan 100 artikelen per winkel. Bewerk de bestaande CSV zelf.')
+      }
+      if (!capture.products.every(p => p && typeof p.id === 'string' &&
+          typeof p.name === 'string' && ['g','kg','ml','l','piece'].includes(p.packUnit) &&
+          (p.packAmount === null || typeof p.packAmount === 'number') &&
+          (p.priceCents === null || Number.isSafeInteger(p.priceCents)) &&
+          (p.packCount === undefined || p.packCount === null ||
+            Number.isSafeInteger(p.packCount)) && typeof p.available === 'boolean')) {
+        throw Error('De originele eigen winkelopname bevat onbekende productvelden.')
+      }
+      checked[capture.retailer] = capture
+    }
+    if (!stores.every(store => checked[store])) throw Error('Beide winkels ontbreken.')
+    // All records checked before the first visible field is replaced.
+    for (const store of stores) {
+      areas[store].replaceChildren()
+      document.querySelector('[data-capture="' + store + '"]').value = checked[store].observedAt
+      for (const product of checked[store].products) {
+        addRow(store, false)
+        const row = areas[store].lastElementChild
+        const set = (name, value) => {
+          row.querySelector('[data-field="' + name + '"]').value = String(value ?? '')
+        }
+        set('id', product.id)
+        set('name', product.name)
+        set('packAmount', product.packAmount)
+        set('packUnit', product.packUnit)
+        set('packCount', product.packCount)
+        set('priceEuro', product.priceCents === null ? '' :
+          Math.floor(product.priceCents / 100) + ',' +
+          String(product.priceCents % 100).padStart(2, '0'))
+        set('available', product.available ? 'true' : 'false')
+      }
+    }
+    removeReview()
+    setStatus('Bestaande eigen opnames geladen voor menselijke correctie. Oorspronkelijke opnametijden zijn ongewijzigd. Pas een prijs of datum alleen aan na werkelijke hercontrole van het artikel/de opname. Kies daarna Neem mijn twee winkelopnames over; oude artikelkoppelingen blijven ingetrokken.')
+    document.querySelector('#manual-observations').scrollIntoView({ block: 'start', behavior: 'smooth' })
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : 'Geen veilig bronconcept gemaakt.', 'warning')
+  }
+})
+
 for (const store of stores) {
   document.querySelector('[data-add-product="' + store + '"]').addEventListener('click', () => addRow(store))
   addRow(store, false)

@@ -13,6 +13,7 @@ const dekaInput = document.querySelector('#deka-source')
 const csvHeader = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 let sourceRevision = 0
 const sourceStatus = document.querySelector('#source-status')
+const editSource = document.querySelector('#edit-owned-source')
 const status = document.querySelector('#status')
 const lines = document.querySelector('#lines')
 const coverage = document.querySelector('#match-coverage')
@@ -228,6 +229,7 @@ function refresh() {
   downloadUnpriced.disabled = save.disabled
   showUnpriced.disabled = save.disabled
   compareNow.disabled = !captures || save.disabled
+  editSource.disabled = !captures
   updateCoverage()
 }
 function addIngredient(restored = null) {
@@ -305,6 +307,14 @@ function addIngredient(restored = null) {
   invalidatePrice()
   updateCoverage()
 }
+
+editSource.addEventListener('click', () => {
+  if (!captures) return
+  if (!window.confirm('Bewerk je al geopende eigen PLUS/Deka-opnames? Bestaande handmatige conceptregels worden vervangen en huidige productmatches gewist. Opnametijden blijven de originele tijdstippen: vul uitsluitend na echte hercontrole nieuwe prijs of opnametijd in.')) return
+  document.dispatchEvent(new CustomEvent('supa:manual-prefill-own-source', {
+    detail: { captures: stores.map(store => captures[store]) },
+  }))
+})
 
 function acceptJson(json) {
   if (!json || Array.isArray(json) || json.schema !== 'supa-offline-prices-v1' ||
