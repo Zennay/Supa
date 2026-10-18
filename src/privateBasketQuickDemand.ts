@@ -29,14 +29,14 @@ const unit = '(kg|gram|g|ml|l|stukken|stuks|stuk)'
 const leading = new RegExp('^' + quantity + '\\s*' + unit + '\\s+(.+)$', 'iu')
 const trailing = new RegExp('^(.+?)\\s*[:;–—-]\\s*' + quantity + '\\s*' + unit + '$', 'iu')
 const allowedLabel = (label: string) => label.length > 0 && label.length <= 160 &&
-  label === label.trim() && /[\\p{L}\\p{N}]/u.test(label) &&
-  !/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/u.test(label) &&
+  label === label.trim() && /[\p{L}\p{N}]/u.test(label) &&
+  !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(label) &&
   !/^[=+@-]/u.test(label)
 const family = (value: MetricUnit) => value === 'g' || value === 'kg'
   ? 'mass' : value === 'ml' || value === 'l' ? 'volume' : 'piece'
 
 function parseLine(rawLine: string, lineNumber: number): ParsedRow {
-  const value = rawLine.trim().replace(/^[•*]\\s+/, '')
+  const value = rawLine.trim().replace(/^[•*]\s+/, '')
   const first = leading.exec(value)
   const last = first ? null : trailing.exec(value)
   if (!first && !last) {
@@ -60,7 +60,7 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
   if (text.length > maxChars) throw Error('Je plaklijst is te lang; maximaal 16.000 tekens.')
   if (!Number.isSafeInteger(selectedMealCount) || selectedMealCount < 1 ||
       selectedMealCount > 1000) throw Error('Kies eerst een geldig aantal maaltijden van 1 tot 1000.')
-  const rawLines = text.replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(line => line.trim())
+  const rawLines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim())
   if (!rawLines.length || rawLines.length > maxRows) {
     throw Error('Plak 1 tot 200 ingredientregels met een metrische hoeveelheid.')
   }
@@ -102,7 +102,7 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
 importButton.addEventListener('click', () => {
   try {
     const count = Number(mealsInput.value)
-    if (!/^[1-9]\\d*$/.test(mealsInput.value)) {
+    if (!/^[1-9]\d*$/.test(mealsInput.value)) {
       throw Error('Vul eerst bij het aantal maaltijden een geheel getal van 1 tot 1000 in.')
     }
     // Parse the entire text BEFORE replacing any existing physical demand or
