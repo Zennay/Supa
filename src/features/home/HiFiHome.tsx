@@ -59,7 +59,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [message, setMessage] = useState('')
   const [sortByPrice, setSortByPrice] = useState(false)
   const [unitFilter, setUnitFilter] = useState<DemoUnitFilter>('all')
-  const [productSource, setProductSource] = useState<'own' | 'history' | 'figma'>('own')
+  const [productSource, setProductSource] = useState<'own' | 'history' | 'figma'>(priceSession?.imported ? 'own' : 'history')
   const [storeFilter, setStoreFilter] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
   const dialog = useRef<HTMLDialogElement>(null)
   const matches = (item: { id: string; name: string }) =>
