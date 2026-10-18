@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { buildOneStoreBasket, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { parseSingleOfflineCapture, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
@@ -58,6 +58,14 @@ export function StagedStorePreview({
   session: OfflineComparisonSession
 }) {
   const [fileMessage, setFileMessage] = useState('')
+  const matchingPanel = useRef<HTMLDetailsElement>(null)
+  function showIngredient(id: string) {
+    if (matchingPanel.current) matchingPanel.current.open = true
+    window.requestAnimationFrame(() => {
+      document.getElementById('staged-match-' + store + '-' + encodeURIComponent(id))
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
   const fingerprint = useMemo(() => stagedStoreFingerprint(capture, plan, recipes, activeDays),
     [capture, plan, recipes, activeDays])
   const manual = session.stagedManual[store]
@@ -158,13 +166,32 @@ export function StagedStorePreview({
         }}>Download ontbrekende producten ({basket.unresolvedLineCount})</button>
     </div>
     {fileMessage && <p role="status" aria-live="polite">{fileMessage}</p>}
+    {basket.unresolvedLineCount > 0 && <section className="offline-list-missing"
+      aria-label={'Ontbrekende ingrediëntkoppelingen voor ' + store}>
+      <h4>Maak je {store}-mandje compleet</h4>
+      <p>Voor {basket.unresolvedLineCount} ingrediënten is nog geen geschikte
+        verpakkingsprijs gekozen. Koppel ze zelf aan jouw eerder ingevoerde
+        producten, zonder fictieve of externe prijsgegevens.</p>
+      <ul>{basket.lines.filter(line => line.status === 'unresolved').slice(0, 25)
+        .map(line => <li key={line.id}>
+          <span><strong>{line.ingredientLabel}</strong> · benodigd:
+            {' '}{line.requirement.amount ?? '?'} {line.requirement.unit}</span>
+          <button type="button" onClick={() => showIngredient(line.id)}>
+            Koppel product
+          </button>
+        </li>)}</ul>
+      {basket.unresolvedLineCount > 25 && <small>
+        De overige ontbrekende ingrediënten staan onder ‘Controleer / koppel’.</small>}
+    </section>}
     <p className="disclaimer">De koppeling is uitsluitend een technisch voorstel uit
       jouw lokale opname. Controleer verpakkingen, identiteit, hoeveelheden en prijzen
       zelf. Handmatige keuzes zijn tijdelijk en brongebonden; ze worden pas door de
       normale twee-winkeltoelating overgenomen als de originele opname en je weekmenu gelijk blijven.</p>
-    <details className="offline-staged-preview__matches">
+    <details ref={matchingPanel} className="offline-staged-preview__matches">
       <summary>Controleer / koppel mijn {basket.lines.length} weekmenu-ingrediënten</summary>
-      {basket.lines.map(line => <div key={line.id} className="offline-price-workbench__line">
+      {basket.lines.map(line => <div key={line.id}
+        id={'staged-match-' + store + '-' + encodeURIComponent(line.id)}
+        className="offline-price-workbench__line">
         <div><strong>{line.ingredientLabel}</strong>
           <small>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</small>
           {line.status === 'matched' ?
