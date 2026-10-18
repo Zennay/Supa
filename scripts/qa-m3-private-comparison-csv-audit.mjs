@@ -54,15 +54,21 @@ function quotedCells(line) {
 }
 
 function hasUnguardedFormulaText(value) {
-  if (value.startsWith("'")) return false
-  const normalized = value.normalize('NFKC')
+  const literal = value.startsWith("'")
+  const source = literal ? value.slice(1) : value
+  const normalized = source.normalize('NFKC')
   // A leading Unicode formatting/combining character can make a formula
   // visually start with "=" while bypassing an ASCII-only exporter check.
   const visuallyLeading = normalized.replace(
     /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mn}\p{Me}]+/gu,
     '',
   )
-  return /^[=+\-@]/u.test(visuallyLeading)
+  if (!/^[=+\-@\u2212]/u.test(visuallyLeading)) return false
+  // Escaped ordinary ASCII formulas remain literal. A compatibility alias
+  // or invisible/bidi/combining prefix is still ambiguous at the boundary
+  // between spreadsheet engines: refuse operator admission until reviewed.
+  // This pre-open check does not change the underlying private evidence.
+  return !literal || !/^[\s\u200b-\u200d]*[=+\-@]/u.test(source)
 }
 
 export function auditPrivateM3ComparisonCsv(csv) {
