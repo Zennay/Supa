@@ -13,6 +13,11 @@ export type ShareableWeek = {
 const MAX_DAYS = 14
 const MAX_RECIPES = 100
 const MAX_LABEL = 120
+// The Planner can restore or edit meals in a different insertion order.
+// Share a genuine week as a week, rather than exposing storage order.
+const WEEKDAY_RANK = new Map<string, number>([
+  'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo',
+].map((day, index): [string, number] => [day, index]))
 // Reject control/format and Unicode line/paragraph separators, including
 // zero-width and bidi spoofing. Dutch diacritics and readable non-ASCII stay valid.
 const BAD_LABEL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u
@@ -65,7 +70,7 @@ export function formatShareableWeek(input: ShareableWeek): string {
   }
 
   const seenDays = new Set<string>()
-  const chosen: string[] = []
+  const chosen: Array<{ day: string; label: string }> = []
   for (const meal of input.plannedMeals) {
     if (!meal || !safeLabel(meal.day) || !safeLabel(meal.recipeId) ||
         seenDays.has(meal.day)) throw new Error('Weekmenu niet beschikbaar')
@@ -80,18 +85,25 @@ export function formatShareableWeek(input: ShareableWeek): string {
       recipe.servings > 100
     )) throw new Error('Weekmenu niet beschikbaar')
 
-    chosen.push(
-      `${meal.day}: ${recipe.title}` +
-      (input.includeDetails ? ` · ${recipe.minutes} min · ${recipe.servings} ${recipe.servings === 1 ? 'portie' : 'porties'}` : ''),
-    )
+    chosen.push({
+      day: meal.day,
+      label: `${meal.day}: ${recipe.title}` +
+        (input.includeDetails ? ` · ${recipe.minutes} min · ${recipe.servings} ${recipe.servings === 1 ? 'portie' : 'porties'}` : ''),
+    })
   }
   if (chosen.length !== active.size) throw new Error('Weekmenu niet beschikbaar')
+  // Keep unfamiliar but readable user-defined day labels stable. Standard
+  // Dutch day abbreviations always follow Monday -> Sunday, even if saved
+  // planner records/active-day toggles were restored in another order.
+  const ordered = chosen.sort((a, b) =>
+    (WEEKDAY_RANK.get(a.day) ?? 7) - (WEEKDAY_RANK.get(b.day) ?? 7))
+    .map(item => item.label)
 
   return [
     'SUPA · Weekmenu',
     ...(input.includeBudget ? [`Weekbudget (eigen voorkeur): ${euro.format(input.budget)}`] : []),
     '',
-    ...(chosen.length ? chosen : ['Geen maaltijden geselecteerd.']),
+    ...(ordered.length ? ordered : ['Geen maaltijden geselecteerd.']),
     '',
     'Dit is een planning, geen prijsopgave.',
     'Receptschattingen en echte winkelprijzen zijn niet inbegrepen.',
