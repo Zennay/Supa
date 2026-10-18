@@ -9,6 +9,7 @@ import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { TwoStoreIngredientLedger } from './TwoStoreIngredientLedger.tsx'
 import { StagedStorePreview } from './StagedStorePreview.tsx'
+import { stagedStoreFingerprint } from './stagedStoreFingerprint.ts'
 import { LocalProductPicker } from './LocalProductPicker.tsx'
 import './offlineReviewedWorkbench.css'
 
@@ -97,13 +98,22 @@ export function OfflineReviewedWorkbench({
   function clearStaged() {
     stagedCaptures.current = {}
     setStagedCaptures({})
+    session.setStagedManual({
+      PLUS: { fingerprint: '', products: {} },
+      DekaMarkt: { fingerprint: '', products: {} },
+    })
   }
   function importOneStore(content: string) {
     const { retailer, capture } = parseSingleOfflineCapture(content, Date.now())
     const previousCapture = stagedCaptures.current[retailer]
     // Each staged selection belongs to the exact original source bytes. A new
     // capture never inherits stale prices, checkmarks or loose pack quantities.
-    if (!previousCapture || JSON.stringify(previousCapture) !== JSON.stringify(capture)) {
+    const unchangedCapture = !!previousCapture &&
+      JSON.stringify(previousCapture) === JSON.stringify(capture)
+    if (!unchangedCapture) {
+      session.setStagedManual(previous => ({
+        ...previous, [retailer]: { fingerprint: '', products: {} },
+      }))
       session.setExtraProductIds(previous => ({ ...previous, [retailer]: [] }))
       session.setExtraDoneIds(previous => ({ ...previous, [retailer]: [] }))
       session.setExtraQuantities(previous => ({ ...previous, [retailer]: {} }))
@@ -123,7 +133,10 @@ export function OfflineReviewedWorkbench({
     // Reuse the complete canonical gate, including 256 kB, timestamps,
     // package fields, duplicate IDs and incomplete / stale price handling.
     setText(joined)
-    importSnapshots(joined, true)
+    // The new/changed store never carries previous selections into the pair.
+    // The untouched staged capture may keep its own reviewed source-bound choices.
+    const eligible = stores.filter(store => store !== retailer || unchangedCapture)
+    importSnapshots(joined, eligible)
   }
 
   // Prevent stale imports from appearing comparable after an open browser tab
@@ -207,7 +220,7 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  function importSnapshots(input: string, retainStagedExtras = false) {
+  function importSnapshots(input: string, retainStagedStores: readonly OfflineRetailer[] = []) {
     setImportEpoch(epoch => epoch + 1)
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
@@ -219,9 +232,28 @@ export function OfflineReviewedWorkbench({
         offlineSessionFingerprint(imported, plan, recipes, activeDays) ===
           offlineSessionFingerprint(parsed, plan, recipes, activeDays)
       if (!sameSource) {
-        setManualSelections({ fingerprint: '', products: {} })
+        const preservedMatches: Record<string, string> = {}
+        const currentProducts: Record<OfflineRetailer, Set<string>> = {
+          PLUS: new Set(parsed.captures.PLUS.products.filter(p => p.available).map(p => p.id)),
+          DekaMarkt: new Set(parsed.captures.DekaMarkt.products.filter(p => p.available).map(p => p.id)),
+        }
+        for (const store of retainStagedStores) {
+          const capture = stagedCaptures.current[store]
+          const saved = session.stagedManual[store]
+          if (!capture || !saved || saved.fingerprint !==
+            stagedStoreFingerprint(capture, plan, recipes, activeDays)) continue
+          for (const [ingredientId, productId] of Object.entries(saved.products)) {
+            if (currentProducts[store].has(productId) || productId === '!') {
+              preservedMatches[manualKey(store, ingredientId)] = productId
+            }
+          }
+        }
+        setManualSelections({
+          fingerprint: offlineSessionFingerprint(parsed, plan, recipes, activeDays),
+          products: preservedMatches,
+        })
         session.setTripMemory({})
-        if (retainStagedExtras) {
+        if (retainStagedStores.length > 0) {
           // Both staged captures were canonical-admitted from the same files
           // we are now joining. Carry only still-present selected product IDs.
           const retainedIds = { PLUS: [] as string[], DekaMarkt: [] as string[] }
@@ -231,6 +263,7 @@ export function OfflineReviewedWorkbench({
             DekaMarkt: {} as Record<string, number>,
           }
           for (const store of stores) {
+            if (!retainStagedStores.includes(store)) continue
             const sourceIds = new Set(parsed.captures[store].products.map(item => item.id))
             retainedIds[store] = session.extraProductIds[store].filter(id => sourceIds.has(id))
             retainedDone[store] = session.extraDoneIds[store].filter(id => retainedIds[store].includes(id))
@@ -252,8 +285,8 @@ export function OfflineReviewedWorkbench({
       setImported(parsed)
       setMessage(sameSource
         ? 'Dezelfde geldige privéopnames opnieuw berekend; je productkeuzes en losse artikelen zijn behouden.'
-        : retainStagedExtras
-          ? 'Beide toegestane privéopnames geladen. Je al gekozen losse winkelproducten zijn behouden; handmatige ingrediëntenmatches vragen controle.'
+        : retainStagedStores.length > 0
+          ? 'Beide privéopnames geladen. Geldige keuzes uit ongewijzigde winkelbronnen en Planner zijn meegenomen; controleer de vergelijking.'
           : 'Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
     } catch (error) {
       // Never retain/display a previous basket after an invalid new import.
