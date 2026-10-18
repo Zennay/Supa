@@ -16,6 +16,8 @@ const sourceStatus = document.querySelector('#source-status')
 const status = document.querySelector('#status')
 const lines = document.querySelector('#lines')
 const mealCount = document.querySelector('#meal-count')
+const demandImport = document.querySelector('#demand-import')
+const maxLines = 200
 const save = document.querySelector('#save')
 const add = document.querySelector('#add')
 let captures = null
@@ -83,9 +85,16 @@ function refresh() {
   }
   save.disabled = !captures || !lines.children.length
 }
-function addIngredient() {
-  if (lines.children.length >= 1000) return
-  const id = 'ingredient-' + nextId++
+function addIngredient(restored = null) {
+  if (lines.children.length >= maxLines) return
+  const existing = new Set(Array.from(lines.children, row => row.dataset.id))
+  let id
+  if (restored !== null) {
+    id = restored.id
+    if (existing.has(id)) return
+  } else {
+    do { id = 'ingredient-' + nextId++ } while (existing.has(id))
+  }
   const row = node('div', { className: 'ingredient' })
   row.dataset.id = id
   const heading = node('strong', {}, 'Ingrediënt ' + (lines.children.length + 1))
@@ -93,12 +102,15 @@ function addIngredient() {
   const label = node('input', { type: 'text', placeholder: 'Bijv. rijst' })
   label.maxLength = 160
   label.className = 'label'
+  if (restored !== null) label.value = restored.label
   const amount = node('input', { type: 'text', placeholder: 'bijv. 500' })
   amount.maxLength = 24
   amount.className = 'amount'
+  if (restored !== null && restored.amount !== null) amount.value = String(restored.amount)
   const unit = node('select')
   unit.className = 'unit'
   for (const item of units) unit.add(new Option(item === 'piece' ? 'stuk (piece)' : item, item))
+  if (restored !== null) unit.value = restored.unit
   unit.addEventListener('change', () => {
     for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit.value)
   })
@@ -236,6 +248,59 @@ for (const input of [plusInput, dekaInput]) {
     void loadSources()
   })
 }
+
+function parsePrivateDemand(text) {
+  const root = JSON.parse(text)
+  if (!root || typeof root !== 'object' || Array.isArray(root) ||
+      Object.keys(root).some(k => !['schema', 'selectedMealCount', 'ingredients'].includes(k)) ||
+      root.schema !== 'supa-private-basket-demand-v1' ||
+      !Number.isSafeInteger(root.selectedMealCount) ||
+      root.selectedMealCount < 1 || root.selectedMealCount > 1000 ||
+      !Array.isArray(root.ingredients) || !root.ingredients.length ||
+      root.ingredients.length > maxLines) {
+    throw Error('Ongeldig of te groot eerder mandvraagbestand (maximaal 200 regels in dit scherm).')
+  }
+  const ids = new Set()
+  const items = root.ingredients.map(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item) ||
+        Object.keys(item).some(k => !['id', 'label', 'amount', 'unit', 'productIds'].includes(k)) ||
+        !validText(item.id, 100) || ids.has(item.id) || !validText(item.label) ||
+        !units.includes(item.unit) ||
+        (item.amount !== null && (typeof item.amount !== 'number' ||
+          !Number.isFinite(item.amount) || item.amount <= 0 || item.amount > 100000)) ||
+        !item.productIds || typeof item.productIds !== 'object' ||
+        Array.isArray(item.productIds) ||
+        Object.keys(item.productIds).some(store => !stores.includes(store))) {
+      throw Error('Een ingrediënt uit de vorige mandvraag is ongeldig.')
+    }
+    ids.add(item.id)
+    for (const store of stores) {
+      const id = item.productIds[store]
+      if (id !== null && id !== undefined && !validText(id, 100)) {
+        throw Error('Eerder geselecteerde winkelproduct-ID is ongeldig.')
+      }
+    }
+    // No silent reuse of a product ID against newer/different observations.
+    return { id: item.id, label: item.label, amount: item.amount, unit: item.unit }
+  })
+  return { meals: root.selectedMealCount, items }
+}
+demandImport.addEventListener('change', async () => {
+  const file = demandImport.files?.[0]
+  if (!file) return
+  try {
+    if (!file.size || file.size > maxBytes) throw Error('Vraagbestand is te groot of leeg.')
+    const saved = parsePrivateDemand(await file.text())
+    // Atomic UI replacement after all content is admitted.
+    mealCount.value = String(saved.meals)
+    lines.replaceChildren()
+    for (const item of saved.items) addIngredient(item)
+    refresh()
+    notice(status, saved.items.length + ' ingrediënten hersteld. Kies alle PLUS- en DekaMarkt-producten opnieuw op basis van de nu geopende eigen opnames; oude productmatches zijn niet automatisch betrouwbaar.')
+  } catch (error) {
+    notice(status, error instanceof Error ? error.message : 'Kan eerdere mandvraag niet veilig openen.', 'error')
+  }
+})
 
 function demand() {
   if (!captures) throw Error('Open eerst een geldige eigen winkelbron.')
