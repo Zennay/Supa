@@ -7,6 +7,7 @@ import { renderPrivateBasketSnapshot } from './privateBasketSnapshotExport.ts'
 import { currentTripKey, saveTripProgress, loadTripProgress } from './privateShoppingProgress.ts'
 import { compareFullBaskets } from './domain/basketComparison.ts'
 import { calculateDecimalPackCount } from './domain/decimalPackArithmetic.ts'
+import { privateBasketMissingReason } from './domain/privateBasketMissingReason.ts'
 import type { BasketTraceLine, OneStoreBasket } from './domain/basket.ts'
 import type { MatchUnit } from './domain/matching.ts'
 
@@ -242,10 +243,10 @@ function storeBasket(store: StoreName, capture: Capture, demand: Demand): OneSto
       continue
     }
     const p = choice === null ? undefined : products.get(choice)
-    if (!p || !p.available || p.priceCents === null ||
+    const missing = privateBasketMissingReason(choice, p, d.amount)
+    if (missing !== null || !p || p.priceCents === null ||
         p.packAmount === null || d.amount === null) {
-      lines.push(unresolved(d, !choice ? 'Nog geen gecontroleerde winkelproductkeuze' :
-        'Geen bruikbaar eigen product, hoeveelheid of prijs'))
+      lines.push(unresolved(d, missing ?? 'De bron bevat geen compleet controleerbare fysieke winkelregel'))
       unresolvedLineCount++
       continue
     }

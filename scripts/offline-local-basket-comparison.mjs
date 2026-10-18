@@ -17,6 +17,7 @@ import { readPrivateCsv, joinPrivateStoreCsv } from './offline-two-store-csv-to-
 import { convertTwoStoreCsv } from '../public/offline-two-store-csv.mjs'
 import { offlinePriceJsonToCsv } from './offline-private-prices-json-to-csv.mjs'
 import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
+import { privateBasketMissingReason } from '../src/domain/privateBasketMissingReason.ts'
 import { matchIngredient } from '../src/domain/matching.ts'
 import { compareFullBaskets } from '../src/domain/basketComparison.ts'
 
@@ -125,10 +126,10 @@ function makeStoreBasket(store, capture, demand) {
         'Hetzelfde winkelproduct is meermaals gekoppeld; voeg de fysieke behoeften samen en kies daarna opnieuw')
     }
     const product = products.get(productId)
-    if (!product || !product.available || product.priceCents === null ||
-        product.packAmount === null || ingredient.amount === null) {
+    const missing = privateBasketMissingReason(productId, product, ingredient.amount)
+    if (missing !== null) {
       unresolvedLineCount++
-      return unresolved(ingredient, 'Product, verpakking, hoeveelheid of eigen prijs onbekend')
+      return unresolved(ingredient, missing)
     }
     const count = product.packCount ?? 1
     const packs = calculateDecimalPackCount(
