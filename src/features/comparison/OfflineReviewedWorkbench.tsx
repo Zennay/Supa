@@ -206,6 +206,7 @@ export function OfflineReviewedWorkbench({
       setImported(parsed)
       session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
       session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
+      session.setExtraQuantities({ PLUS: {}, DekaMarkt: {} })
       setMessage('Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
     } catch (error) {
       // Never retain/display a previous basket after an invalid new import.
@@ -386,6 +387,10 @@ export function OfflineReviewedWorkbench({
       const otherCatalogIds = new Set(parsed.captures[other].products.map(product => product.id))
       const remainingExtras = session.extraProductIds[other].filter(id => otherCatalogIds.has(id))
       const remainingDone = session.extraDoneIds[other].filter(id => remainingExtras.includes(id))
+      const remainingQuantities = Object.fromEntries(remainingExtras.map(id => {
+        const packs = session.extraQuantities[other][id]
+        return [id, Number.isSafeInteger(packs) && packs >= 1 && packs <= 99 ? packs : 1]
+      }))
       clearStaged()
       setManualSelections({ fingerprint: nextFingerprint, products: retainedSelections })
       session.setTripMemory(previous => ({ [other]: previous[other] }))
@@ -396,6 +401,10 @@ export function OfflineReviewedWorkbench({
       session.setExtraDoneIds({
         PLUS: other === 'PLUS' ? remainingDone : [],
         DekaMarkt: other === 'DekaMarkt' ? remainingDone : [],
+      })
+      session.setExtraQuantities({
+        PLUS: other === 'PLUS' ? remainingQuantities : {},
+        DekaMarkt: other === 'DekaMarkt' ? remainingQuantities : {},
       })
       setText(next)
       setClockMs(Date.now())
@@ -589,8 +598,9 @@ export function OfflineReviewedWorkbench({
               onChange={event => { void replaceOneStoreFile(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
           </label>
           <p className="disclaimer">Vervang PLUS of DekaMarkt afzonderlijk. De andere originele
-            opname blijft intact. Supa herberekent pas na volledige bronvalidatie en
-            vraagt opnieuw om je handmatige productkoppelingen te beoordelen.
+            opname en haar geldige productkeuzes, losse artikelen en aantallen blijven behouden.
+            Supa herberekent pas na volledige bronvalidatie en vraagt om de vernieuwde winkel
+            opnieuw te beoordelen.
             Een ongeldig bestand verwijdert je bestaande vergelijking niet.
             Tijdstippen moeten nog steeds maximaal 24 uur uiteenliggen
             om een prijsverschil te mogen tonen.</p>
