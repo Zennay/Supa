@@ -19,6 +19,7 @@ const mealCount = document.querySelector('#meal-count')
 const demandImport = document.querySelector('#demand-import')
 const maxLines = 200
 const save = document.querySelector('#save')
+const compareNow = document.querySelector('#compare-now')
 const add = document.querySelector('#add')
 let captures = null
 let nextId = 1
