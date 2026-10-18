@@ -98,8 +98,10 @@ prijsverschil vergeleken na de bestaande versheids-/24-uursgrenzen.
 
 ## Twee losse winkelopnames lokaal samenvoegen
 
-Dezelfde **Vergelijk**-interface kan nu ook twee afzonderlijke JSON-opnames
+Dezelfde **Vergelijk**-interface kan nu ook twee afzonderlijke JSON- of CSV-opnames
 één voor één laden, zonder een server, browseropslag of extern prijsverzoek.
+Voor een losse CSV gelden de bestaande negen kolommen en ten minste één
+werkelijke productregel van slechts één winkel; lege invulregels tellen niet.
 Elke losse opname gebruikt dit contract (de productvelden volgen exact het
 hierboven beschreven `captures[].products`-contract):
 

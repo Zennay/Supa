@@ -236,11 +236,25 @@ export function OfflineReviewedWorkbench({
         // not the site root, so preview and subpath deployments both work.
         const moduleUrl = new URL('offline-two-store-csv.mjs',
           new URL(import.meta.env.BASE_URL, window.location.origin)).href
-        const converter: { convertTwoStoreCsv: (input: string) => string } =
-          await import(/* @vite-ignore */ moduleUrl)
-        json = converter.convertTwoStoreCsv(content)
+        const converter: {
+          convertTwoStoreCsv: (input: string) => string
+          convertSingleStoreCsv: (input: string) => string
+        } = await import(/* @vite-ignore */ moduleUrl)
+        try { json = converter.convertTwoStoreCsv(content) }
+        catch (pairedError) {
+          // Only the existing converter parses CSV; do not introduce a weaker
+          // second CSV parser or silently manufacture a missing retailer.
+          try { json = converter.convertSingleStoreCsv(content) }
+          catch { throw pairedError }
+        }
       }
       if (version !== importVersion.current) return
+      const converted: unknown = JSON.parse(json)
+      if (converted && typeof converted === 'object' && !Array.isArray(converted) &&
+        (converted as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
+        importOneStore(json)
+        return
+      }
       clearStaged()
       setText(json)
       importSnapshots(json)
