@@ -12,6 +12,12 @@ const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores = ['PLUS', 'DekaMarkt'] as const
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
+const EMPTY_MANUAL_CHOICES: Readonly<Record<string, string>> = Object.freeze({})
+const manualKey = (store: string, ingredientId: string) => store + '\u0000' + ingredientId
+function unitFamily(unit: string): string {
+  return unit === 'g' || unit === 'kg' ? 'massa' :
+    unit === 'ml' || unit === 'l' ? 'volume' : unit === 'piece' ? 'stuks' : 'onbekend'
+}
 
 function pricePerUnit(line: Matched): string | null {
   const { unit, amount, count } = line.pack
@@ -77,6 +83,34 @@ export function OfflineReviewedWorkbench({
   const importVersion = useRef(0)
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
+  const [manualSelections, setManualSelections] = useState<{
+    fingerprint: string
+    products: Record<string, string>
+  }>({ fingerprint: '', products: {} })
+  // Manual decisions belong to the exact imported products/prices and plan.
+  // Older selection state cannot affect a newly uploaded or edited observation.
+  const importFingerprint = useMemo(() => imported ? JSON.stringify([
+    plan, activeDays,
+    recipes.map(recipe => [recipe.id, recipe.ingredients]),
+    ...stores.map(store => [
+      imported.captures[store].observedAt,
+      imported.captures[store].products,
+    ]),
+  ]) : '', [imported, plan, recipes, activeDays])
+  const choices: Readonly<Record<string, string>> =
+    manualSelections.fingerprint === importFingerprint
+      ? manualSelections.products : EMPTY_MANUAL_CHOICES
+  function chooseProduct(store: 'PLUS' | 'DekaMarkt', ingredientId: string, productId: string) {
+    if (!imported || !importFingerprint) return
+    setManualSelections(previous => {
+      const products = previous.fingerprint === importFingerprint
+        ? { ...previous.products } : {}
+      const id = manualKey(store, ingredientId)
+      if (productId) products[id] = productId
+      else delete products[id]
+      return { fingerprint: importFingerprint, products }
+    })
+  }
   const [clockMs, setClockMs] = useState(() => Date.now())
   useEffect(() => {
     const refresh = () => setClockMs(Date.now())
@@ -140,17 +174,23 @@ export function OfflineReviewedWorkbench({
   const basketPair = useMemo(() => {
     if (!imported) return null
     try {
+      const userReviewed = (store: 'PLUS' | 'DekaMarkt') =>
+        Object.fromEntries(Object.entries(choices)
+          .filter(([key]) => key.startsWith(store + '\u0000'))
+          .map(([key, productId]) => [key.slice(store.length + 1), productId]))
       const plus = buildOneStoreBasket({
         store: { id: 'PLUS', name: 'PLUS' }, plan, recipes, activeDays,
         products: imported.captures.PLUS.products,
+        manualProductIds: userReviewed('PLUS'),
       })
       const deka = buildOneStoreBasket({
         store: { id: 'DekaMarkt', name: 'DekaMarkt' }, plan, recipes, activeDays,
         products: imported.captures.DekaMarkt.products,
+        manualProductIds: userReviewed('DekaMarkt'),
       })
       return { plus, deka, comparison: compareFullBaskets({ baseline: plus, candidate: deka }) }
     } catch { return null }
-  }, [imported, plan, recipes, activeDays])
+  }, [imported, plan, recipes, activeDays, choices])
   const currentEnough = useMemo(() => {
     if (!imported) return false
     const nowNs = BigInt(Math.trunc(clockMs)) * 1000000n
@@ -347,6 +387,27 @@ export function OfflineReviewedWorkbench({
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
                             {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
                             {line.status === 'unresolved' && <span>Niet gekoppeld · controleer bronproduct, beschikbaarheid of verpakking.</span>}
+                            {line.status === 'matched' &&
+                              line.reasons.includes('explicit local user selection; not an automatic or verified retailer match') &&
+                              <span>Door jou handmatig gekoppeld; dit is geen geverifieerde winkelmatch.</span>}
+                            <label className="offline-price-workbench__manual-match">
+                              <span>Product handmatig beoordelen (alleen jouw geïmporteerde voorraad)</span>
+                              <select aria-label={`Handmatige productkeuze ${store} voor ${line.ingredientLabel}`}
+                                value={choices[manualKey(store, line.id)] ?? ''}
+                                onChange={event => chooseProduct(store, line.id, event.target.value)}>
+                                <option value="">Automatische match / onbekend</option>
+                                <option value="!">Geen passend product — laat onbekend</option>
+                                {imported.captures[store].products
+                                  .filter(product => product.available && product.packAmount !== null &&
+                                    product.packAmount > 0 && Number.isSafeInteger(product.priceCents) &&
+                                    product.priceCents >= 0 && product.packCount !== 0 &&
+                                    unitFamily(product.packUnit) === unitFamily(line.requirement.unit))
+                                  .map(product =>
+                                    <option key={product.id} value={product.id}>
+                                      {`${product.name} · ${product.packAmount} ${product.packUnit} × ${product.packCount ?? 1} · ${euros.format(product.priceCents / 100)}`}
+                                    </option>)}
+                              </select>
+                            </label>
                           </div>
                           <strong>{line.status === 'matched' ? euros.format(line.lineTotalCents / 100) : '—'}</strong>
                         </article>
