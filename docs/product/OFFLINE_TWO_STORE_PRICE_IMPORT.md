@@ -214,3 +214,23 @@ vraagt het scherm om twee oorspronkelijke opnames in één tijdcontext.
 Bij voltooide broncontrole verdwijnt dit actieoverzicht automatisch en
 verschijnt de eigen volledige mandvergelijking/CSV-export. Er worden geen
 prijzen, matchingclaims of bronrechten door de instructietekst toegevoegd.
+
+### Handmatig juiste productcode koppelen binnen bestaande bron
+
+De gewone Vergelijk-tab toont nu naast automatische matching een keuzelijst
+met **uitsluitend werkelijk in de huidige eigen winkelopname ingelezen**
+beschikbare bronproducten met bekende verpakking, prijs en passende
+fysieke eenheid (g/kg, ml/l of stuk). Hiermee kan de gebruiker een
+abstinerende naamvergelijking oplossen of een fout automatisch voorstel
+corrigeren zonder via de aparte wizard nieuwe bronnen te verzinnen.
+De gekozen SKU moet exact en uniek in de geselecteerde opname staan:
+verwijderde, dubbele of onbeschikbare codes vallen terug naar onbekend.
+Vervolgens doorloopt het artikel ongewijzigd de echte hele-verpakkingen-
+en centenberekening. Een handmatige keuze krijgt slechts de minimaal
+geaccepteerde matchscore; expliciete SKU/inhoud/prijscontrole per bron is
+**nog steeds verplicht** voor een totaal en winkelverschil.
+Elke gewijzigde keuze trekt de eerdere reviews/afvinkingen in beide winkels
+in; een ander geselecteerd artikel erft dus nooit een oude goedkeuring.
+Ingevoerde SKU-keuzes leven alleen in de huidige browsercomponent en
+worden gewist bij een nieuwe bronimport of het opnieuw opbouwen van
+het bronbestand. Dit is geen productgelijkheidsbewijs of bronrecht.

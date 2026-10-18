@@ -171,12 +171,15 @@ export function buildOneStoreBasket({
   recipes,
   activeDays,
   products,
+  selectedProducts,
 }: {
   store: Store
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   products: StoreProduct[]
+  /** Explicitly chosen SKU from THIS store's admitted source, never a new price. */
+  selectedProducts?: Readonly<Record<string, string>>
 }): OneStoreBasket {
   if (typeof store.id !== 'string' || !store.id.trim()) {
     throw new Error('Store identity must be non-blank')
@@ -216,7 +219,19 @@ export function buildOneStoreBasket({
       }
     }
 
-    const decision = matchIngredient(ingredient, storeProducts)
+    const chosenId = selectedProducts?.[ingredient.id]
+    // A user can resolve fuzzy-name ambiguity with an EXACT SKU already
+    // present in their own selected store capture. Selection is not proof of
+    // product equivalence: downstream capture-specific review is still needed.
+    const selected = typeof chosenId === 'string' && chosenId.length > 0
+      ? storeProducts.filter(product => product.id === chosenId) : null
+    const decision = selected === null
+      ? matchIngredient(ingredient, storeProducts)
+      : selected.length === 1 && selected[0].available
+        ? { type: 'match' as const, productId: chosenId, score: 65,
+            runnerUpScore: null, reasons: ['own-source SKU explicitly selected by user, not independently verified'] }
+        : { type: 'abstain' as const, score: null, runnerUpScore: null,
+            reasons: ['selected product is absent, duplicated or unavailable in this store capture'] }
     if (decision.type === 'abstain') {
       return {
         id: ingredient.id,

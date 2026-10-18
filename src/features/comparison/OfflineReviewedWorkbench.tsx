@@ -50,6 +50,13 @@ function shoppingTaskKey(store: typeof stores[number], line: BasketTraceLine): s
     line.status === 'matched' ? line.packs : null,
   ])
 }
+function compatibleSourceUnit(demand: BasketTraceLine['requirement']['unit'],
+  source: BasketTraceLine['requirement']['unit']): boolean {
+  if (demand === 'unknown' || source === 'unknown') return false
+  if (demand === source) return true
+  return (['g', 'kg'].includes(demand) && ['g', 'kg'].includes(source)) ||
+    (['ml', 'l'].includes(demand) && ['ml', 'l'].includes(source))
+}
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number], done: Record<string, boolean>): string {
   return [
@@ -76,6 +83,9 @@ export function OfflineReviewedWorkbench({
   const importRevision = useRef(0)
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
+  const [manualSku, setManualSku] = useState<Record<typeof stores[number], Record<string, string>>>({
+    PLUS: {}, DekaMarkt: {},
+  })
   const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
   const [openTripOnly, setOpenTripOnly] = useState(false)
   const [tripExportMessage, setTripExportMessage] = useState('')
@@ -203,6 +213,7 @@ export function OfflineReviewedWorkbench({
     // A new import, even identical bytes, requires explicit source review.
     setReviewedLines({})
     setDoneTripItems({})
+    setManualSku({ PLUS: {}, DekaMarkt: {} })
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setClockMs(Date.now())
@@ -223,6 +234,7 @@ export function OfflineReviewedWorkbench({
       setImported(null)
       setReviewedLines({})
       setDoneTripItems({})
+      setManualSku({ PLUS: {}, DekaMarkt: {} })
     }
     setBusy(true)
     try {
@@ -298,16 +310,18 @@ export function OfflineReviewedWorkbench({
         ? buildOneStoreBasket({
             store: { id: 'PLUS', name: 'PLUS' }, plan, recipes, activeDays,
             products: imported.captures.PLUS.products,
+          selectedProducts: manualSku.PLUS,
           }) : null
       const deka = imported.captures.DekaMarkt
         ? buildOneStoreBasket({
             store: { id: 'DekaMarkt', name: 'DekaMarkt' }, plan, recipes, activeDays,
             products: imported.captures.DekaMarkt.products,
+          selectedProducts: manualSku.DekaMarkt,
           }) : null
       return { plus, deka, comparison: plus && deka
         ? compareFullBaskets({ baseline: plus, candidate: deka }) : null }
     } catch { return null }
-  }, [imported, plan, recipes, activeDays])
+  }, [imported, plan, recipes, activeDays, manualSku])
   function downloadConfirmedComparisonCsv() {
     try {
       if (!canShowDifference || !basketPair?.plus || !basketPair.deka ||
@@ -626,6 +640,36 @@ export function OfflineReviewedWorkbench({
                               <span>Afvinken als gekocht</span>
                             </label>
                             <span>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</span>
+                            {capture.products.some(product => product.available &&
+                              product.packAmount !== null &&
+                              compatibleSourceUnit(line.requirement.unit, product.packUnit)) && (
+                              <label>Eigen bronartikel voor dit ingrediënt
+                                <select value={manualSku[store][line.id] ?? ''}
+                                  onChange={event => {
+                                    const id = event.currentTarget.value
+                                    setManualSku(previous => ({
+                                      ...previous, [store]: { ...previous[store], [line.id]: id },
+                                    }))
+                                    // A manual source switch changes the exact product identity.
+                                    // An older human check must never certify the new selection.
+                                    setReviewedLines({})
+                                    setDoneTripItems({})
+                                    setTripExportMessage('')
+                                    setTripProgressMessage('')
+                                  }}>
+                                  <option value="">Automatisch voorstellen (of onbekend)</option>
+                                  {capture.products.filter(product => product.available &&
+                                    product.packAmount !== null &&
+                                    compatibleSourceUnit(line.requirement.unit, product.packUnit))
+                                    .map(product => (
+                                      <option key={product.id} value={product.id}>
+                                        {product.name} · {product.id} · {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)}
+                                      </option>
+                                    ))}
+                                </select>
+                              </label>
+                            )}
+
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
                             {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
                             {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {euros.format(line.pricePerPackCents / 100)} per verpakking</span>}
