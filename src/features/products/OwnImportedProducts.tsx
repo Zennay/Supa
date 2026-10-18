@@ -40,6 +40,7 @@ export function OwnImportedProducts({
 }) {
   const [storeFilter, setStoreFilter] = useState<'all' | OfflineRetailer>('all')
   const [unitFilter, setUnitFilter] = useState<'all' | Group>('all')
+  const [priceFilter, setPriceFilter] = useState<'all' | 'priced' | 'unknown'>('all')
   const [sortByUnitPrice, setSortByUnitPrice] = useState(false)
   const [limit, setLimit] = useState(48)
   const [clock, setClock] = useState(() => Date.now())
@@ -94,7 +95,10 @@ export function OwnImportedProducts({
     const filtered = all.filter(row =>
       (storeFilter === 'all' || row.store === storeFilter) &&
       (unitFilter === 'all' || row.group === unitFilter) &&
-      row.product.name.toLocaleLowerCase('nl-NL').includes(words))
+      (priceFilter === 'all' ||
+        (priceFilter === 'priced' ? row.product.available : !row.product.available)) &&
+      (row.product.name.toLocaleLowerCase('nl-NL').includes(words) ||
+        row.product.id.toLocaleLowerCase('nl-NL').includes(words)))
     if (sortByUnitPrice) {
       const rank: Record<Group, number> = { kg: 0, liter: 1, stuk: 2 }
       filtered.sort((a, b) => {
@@ -109,7 +113,7 @@ export function OwnImportedProducts({
       })
     }
     return filtered
-  }, [availableCaptures, query, storeFilter, unitFilter, sortByUnitPrice, freshByStore])
+  }, [availableCaptures, query, storeFilter, unitFilter, priceFilter, sortByUnitPrice, freshByStore])
 
   if (availableStores.length === 0 || !session) return <section className="hifi-section own-products" aria-label="Eigen prijsopnames">
     <h2>Mijn eigen winkelprijzen</h2>
@@ -135,7 +139,9 @@ export function OwnImportedProducts({
         store + ': ' + dates.format(new Date(availableCaptures[store]!.observedMs)) +
         (freshByStore[store] ? ' (recent)' : ' (verlopen)')).join('; ')}.
       {' '}Alleen jouw eigen invoer, niet onafhankelijk geverifieerd of gepubliceerd.
-      {!imported && ' De andere winkel ontbreekt: geen twee-winkel prijsverschil.'}
+      {!imported && (availableStores.length === 1
+        ? ' De andere winkel ontbreekt: geen twee-winkel prijsverschil.'
+        : ' Beide opnames zijn los geladen maar nog niet als geldig paar toegelaten: geen prijsverschil.')}
       {imported && !imported.pairedWithin24h && ' De twee opnames liggen meer dan 24 uur uiteen.'}
     </p>
     {availableStores.some(store => !freshByStore[store]) && (
@@ -170,6 +176,12 @@ export function OwnImportedProducts({
         <option value="PLUS">PLUS</option>
         <option value="DekaMarkt">DekaMarkt</option>
       </select></label>
+      <label>Prijsstatus <select value={priceFilter}
+        onChange={event => { setPriceFilter(event.target.value as typeof priceFilter); setLimit(48) }}>
+        <option value="all">Alle productstatussen</option>
+        <option value="priced">Bekende eigen prijs</option>
+        <option value="unknown">Prijs of voorraad onbekend</option>
+      </select></label>
       <label>Eenheid <select value={unitFilter}
         onChange={event => { setUnitFilter(event.target.value as typeof unitFilter); setLimit(48) }}>
         <option value="all">Alle eenheden</option>
@@ -177,11 +189,20 @@ export function OwnImportedProducts({
         <option value="liter">Per liter</option>
         <option value="stuk">Per stuk</option>
       </select></label>
+      {(storeFilter !== 'all' || priceFilter !== 'all' || unitFilter !== 'all' ||
+        sortByUnitPrice) && <button type="button" className="ghost-button" onClick={() => {
+        setStoreFilter('all'); setPriceFilter('all'); setUnitFilter('all')
+        setSortByUnitPrice(false); setLimit(48)
+      }}>Wis catalogusfilters</button>}
       <button type="button" className="ghost-button" aria-pressed={sortByUnitPrice}
         onClick={() => setSortByUnitPrice(current => !current)}>
         {sortByUnitPrice ? 'Sortering uit' : 'Sorteer op eenheidsprijs'}
       </button>
     </div>
+    <p role="status" className="own-products__results">
+      {rows.length} gevonden artikelen; {rows.filter(row => !row.product.available).length}
+      {' '}met onbekende prijs of voorraad. Zoek op productnaam of eigen artikel-ID.
+    </p>
     <p className="disclaimer">Sortering vergelijkt uitsluitend prijzen binnen dezelfde
       eenheid (kg, liter of stuk). Onbekende en niet-beschikbare producten komen achteraan.
       Het zijn geen gecontroleerde winkelprijzen of aanbiedingen.
@@ -197,6 +218,7 @@ export function OwnImportedProducts({
           </div>
           <div className="hifi-product-copy">
             <h3>{product.name}</h3>
+            <small className="own-products__identity">Eigen artikel-ID: {product.id}</small>
             <p className="own-products__pack">{amount}</p>
             {product.available ? <>
               <div className="hifi-product-price">

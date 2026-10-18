@@ -23,3 +23,6 @@
   border:1px solid #b9d3c3; border-radius:14px; background:#eff8f1; }
 .own-products__list-pulse span { flex:1; min-width:200px; font-size:13px; }
 @media (max-width:600px) { .own-products__list-pulse .own-products__primary { width:100%; } }
+
+.own-products__identity { display:block; overflow-wrap:anywhere; font-size:11px; color:#476458; }
+.own-products__results { margin:0; color:#3a5547; font-size:13px; }
