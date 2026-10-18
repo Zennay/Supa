@@ -82,8 +82,10 @@ function progressIdentity(basket: OneStoreBasket, observedAt: string): string {
     basket.store.id, observedAt, basket.selectedMealCount, basket.totalCents,
     basket.matchedLineCount, basket.unresolvedLineCount,
     basket.lines.map(line => line.status === 'matched'
-      ? [line.id, line.productId, line.packs, line.pricePerPackCents, line.lineTotalCents]
-      : [line.id, 'unknown', line.requirement.amount, line.requirement.unit]),
+      ? [line.id, line.ingredientLabel, line.requirement.amount, line.requirement.unit,
+        line.productId, line.productName, line.pack.amount, line.pack.unit, line.pack.count,
+        line.packs, line.pricePerPackCents, line.lineTotalCents]
+      : [line.id, line.ingredientLabel, 'unknown', line.requirement.amount, line.requirement.unit]),
   ])
 }
 
