@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import type { BasketComparison } from '../../domain/basketComparison.ts'
-import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
+import type { BasketTraceLine, OneStoreBasket, StoreProduct } from '../../domain/basket.ts'
 import { unresolvedProductGuidance } from './unresolvedProductGuidance.ts'
 import { privateUnitPrice } from './privateUnitPrice.ts'
+import { LocalProductPicker } from './LocalProductPicker.tsx'
 
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 type Row = {
@@ -37,14 +38,18 @@ function StoreCell({ line, store, onReview }: {
 
 /** Same planned physical ingredients in both stores, never a derived or synthetic price source. */
 export function TwoStoreIngredientLedger({
-  plus, deka, comparison, comparable, onReview,
+  plus, deka, comparison, comparable, onReview, productsByStore, selections, onSelect,
 }: {
   plus: OneStoreBasket
   deka: OneStoreBasket
   comparison: BasketComparison
   comparable: boolean
   onReview: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
+  productsByStore: Record<'PLUS' | 'DekaMarkt', StoreProduct[]>
+  selections: Readonly<Record<string, string>>
+  onSelect: (store: 'PLUS' | 'DekaMarkt', ingredientId: string, productId: string) => void
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [onlyMissing, setOnlyMissing] = useState(false)
   const [sortImpact, setSortImpact] = useState(false)
   const rows = useMemo(() => {
@@ -93,11 +98,15 @@ export function TwoStoreIngredientLedger({
         <strong role="columnheader">DekaMarkt</strong>
         <strong role="columnheader">Verschil</strong>
       </div>
-      {visible.map(row => <div className="offline-ingredient-ledger__row" role="row" key={row.id}>
+      {visible.map(row => <Fragment key={row.id}><div className="offline-ingredient-ledger__row" role="row">
         <div className="offline-ingredient-ledger__need" role="cell">
           <strong>{row.label}</strong>
           <small>Benodigd: {row.plus?.requirement.amount ?? row.deka?.requirement.amount ?? '?'}
             {' '}{row.plus?.requirement.unit ?? row.deka?.requirement.unit ?? ''}</small>
+          <button type="button" aria-expanded={editingId === row.id}
+            onClick={() => { setOnlyMissing(false); setEditingId(id => id === row.id ? null : row.id) }}>
+            {editingId === row.id ? 'Sluit productkeuze' : 'Kies bij beide winkels'}
+          </button>
         </div>
         <div role="cell"><StoreCell line={row.plus} store="PLUS" onReview={onReview} /></div>
         <div role="cell"><StoreCell line={row.deka} store="DekaMarkt" onReview={onReview} /></div>
@@ -108,7 +117,30 @@ export function TwoStoreIngredientLedger({
                 <small>{row.deltaCents > 0 ? 'PLUS goedkoper' : 'DekaMarkt goedkoper'}</small></>
             : 'Niet vergelijkbaar'}
         </div>
-      </div>)}
+      </div>
+      {editingId === row.id && <div className="offline-ingredient-ledger__row offline-ingredient-ledger__edit" role="row">
+        <div className="offline-ingredient-ledger__editor" role="cell" aria-colspan={4}>
+          <p>Controleer per winkel hetzelfde benodigde ingrediënt. Alleen producten uit je
+            eigen toegelaten lokale opname zijn te kiezen; onbekende prijzen blijven onbekend.</p>
+          <div className="offline-ingredient-ledger__edit-stores">
+            {(['PLUS', 'DekaMarkt'] as const).map(store => {
+              const line = store === 'PLUS' ? row.plus : row.deka
+              return <section key={store} aria-label={store + ' producten voor ' + row.label}>
+                <h5>{store}</h5>
+                {line ? <LocalProductPicker
+                  store={store} ingredient={line.ingredientLabel}
+                  requirementUnit={line.requirement.unit}
+                  requirementAmount={line.requirement.amount}
+                  products={productsByStore[store]}
+                  selected={selections[store + String.fromCharCode(0) + row.id] ?? ''}
+                  onSelect={id => onSelect(store, row.id, id)}
+                /> : <p>Geen geldige Planner-ingrediëntregel.</p>}
+              </section>
+            })}
+          </div>
+        </div>
+      </div>}
+      </Fragment>)}
     </div>
     {visible.length === 0 && <p role="status">
       {rows.length === 0

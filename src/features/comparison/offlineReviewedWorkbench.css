@@ -282,3 +282,14 @@
 .offline-match-choices__grid button:focus-visible { outline:3px solid #27744a; outline-offset:3px; }
 .offline-match-choices__grid button span { display:grid; gap:.1rem; }
 .offline-match-choices__grid button small { font-size:.82rem; color:#536456; }
+
+/* Side-by-side selection of the same demand from two admitted local captures. */
+.offline-ingredient-ledger__edit { background:#f3f8f3 !important; }
+.offline-ingredient-ledger__editor { grid-column:1 / -1; display:grid; gap:.8rem; min-width:0; }
+.offline-ingredient-ledger__editor > p { margin:0; font-size:.87rem; }
+.offline-ingredient-ledger__edit-stores { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.offline-ingredient-ledger__edit-stores section { min-width:0; display:grid; gap:.6rem;
+  padding:.8rem; border:1px solid #cbdcce; border-radius:10px; background:white; }
+.offline-ingredient-ledger__edit-stores h5 { font-size:1rem; margin:0; }
+.offline-ingredient-ledger__edit-stores .offline-match-choices__grid { grid-template-columns:1fr; }
+@media(max-width:760px) { .offline-ingredient-ledger__edit-stores { grid-template-columns:1fr; } }

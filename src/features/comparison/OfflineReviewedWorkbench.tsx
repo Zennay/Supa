@@ -997,6 +997,12 @@ export function OfflineReviewedWorkbench({
                 comparison={basketPair.comparison}
                 comparable={canShowDifference}
                 onReview={focusPairMatch}
+                productsByStore={{
+                  PLUS: imported.captures.PLUS.products,
+                  DekaMarkt: imported.captures.DekaMarkt.products,
+                }}
+                selections={choices}
+                onSelect={chooseProduct}
               />
               <PrivateBasketComparisonExport
                 plus={basketPair.plus}
