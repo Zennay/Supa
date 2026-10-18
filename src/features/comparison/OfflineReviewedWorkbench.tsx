@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -10,7 +10,12 @@ import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { createMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
-import { MixedStoreShoppingCard } from './MixedStoreShoppingCard.tsx'
+// Source-heavy checkout, CSV/HTML exports and portable progress only load
+// after BOTH owned source captures become complete and personally reviewed.
+const MixedStoreShoppingCard = lazy(async () => {
+  const module = await import('./MixedStoreShoppingCard.tsx')
+  return { default: module.MixedStoreShoppingCard }
+})
 import { privatePackUnitRate } from './privateUnitPrice.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 import { describePrivateStoreCaptureChange } from './privateStoreCaptureDiff.ts'
@@ -1412,17 +1417,21 @@ export function OfflineReviewedWorkbench({
               )}
               {canShowDifference && mixedStorePlans?.mixed && mixedStorePlans.single &&
                 imported.captures.PLUS && imported.captures.DekaMarkt && (
-                  <MixedStoreShoppingCard
-                    mixed={mixedStorePlans.mixed}
-                    single={mixedStorePlans.single}
-                    plus={basketPair.plus!}
-                    deka={basketPair.deka!}
-                    captured={{
-                      PLUS: imported.captures.PLUS.observedAt,
-                      DekaMarkt: imported.captures.DekaMarkt.observedAt,
-                    }}
-                    eligibleNow={eligibleComparisonRightNow}
-                  />
+                  <Suspense fallback={<p role="status">
+                    Je persoonlijke twee-winkel-boodschappenroute wordt geopend.
+                  </p>}>
+                    <MixedStoreShoppingCard
+                      mixed={mixedStorePlans.mixed}
+                      single={mixedStorePlans.single}
+                      plus={basketPair.plus!}
+                      deka={basketPair.deka!}
+                      captured={{
+                        PLUS: imported.captures.PLUS.observedAt,
+                        DekaMarkt: imported.captures.DekaMarkt.observedAt,
+                      }}
+                      eligibleNow={eligibleComparisonRightNow}
+                    />
+                  </Suspense>
                 )}
               {canShowDifference && (
                 <div className="offline-price-workbench__actions">

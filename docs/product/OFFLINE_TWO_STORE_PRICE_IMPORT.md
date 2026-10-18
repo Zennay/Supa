@@ -1006,3 +1006,17 @@ afdruk exact dezelfde fysieke vergelijking en gekozene-route
 integriteitscheck als de nieuwe CSV-uitvoer. Een verouderde bron
 of onvolledige persoonlijke productreview krijgt nooit een
 vergelijkbaar printdocument via deze actie.
+
+#### Sneller laden vóór een volledige winkelopname
+
+De omvangrijkere persoonlijke twee-winkel-boodschappenroute,
+waaronder de optionele spreadsheet-, offline HTML- en JSON-backups,
+wordt nu pas via een afzonderlijke clientbundle geladen als beide
+eigen winkelmandjes werkelijk volledig en persoonlijk gecontroleerd
+zijn. Zolang de gebruiker nog bronnen importeert, producten matcht
+of zijn week plant, hoeft de browser deze export-/routecode niet
+mee te downloaden of uit te voeren. De bestaande bronimport,
+matching- en individuele tijd-/reviewgates zijn niet versoepeld.
+De productiebuild levert nu een aparte checkoutbundle van circa
+28 kB naast de gewone appbundle; de gewone appbundel is circa
+26 kB kleiner dan vóór de splitsing (ongecomprimeerd).
