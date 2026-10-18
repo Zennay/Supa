@@ -22,6 +22,19 @@ function pricePerUnit(line: Matched): string | null {
   return euros.format(cents / 100) + ' per ' +
     (unit === 'g' || unit === 'kg' ? 'kg' : unit === 'ml' || unit === 'l' ? 'liter' : 'stuk')
 }
+/**
+ * Only an explicit review of THIS captured article can unlock an in-app total.
+ * Changing the physical plan, original capture instant, package, price or SKU
+ * changes the key and invalidates any old acceptance synchronously in render.
+ */
+function reviewedLineKey(store: typeof stores[number], observedAt: string, line: Matched): string {
+  return JSON.stringify([
+    store, observedAt, line.id, line.ingredientLabel,
+    line.requirement.amount, line.requirement.unit, line.productId,
+    line.productName, line.pack.amount, line.pack.unit, line.pack.count,
+    line.packs, line.pricePerPackCents, line.lineTotalCents,
+  ])
+}
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 function shoppingChecklist(basket: OneStoreBasket): string {
   return [
@@ -46,6 +59,7 @@ export function OfflineReviewedWorkbench({
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [weekExportMessage, setWeekExportMessage] = useState('')
+  const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
   const [clockMs, setClockMs] = useState(() => Date.now())
@@ -82,6 +96,8 @@ export function OfflineReviewedWorkbench({
   }
 
   function importSnapshots(input: string) {
+    // A new import, even identical bytes, requires explicit source review.
+    setReviewedLines({})
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setClockMs(Date.now())
@@ -102,6 +118,7 @@ export function OfflineReviewedWorkbench({
       setText(content)
       importSnapshots(content)
     } catch (error) {
+      setReviewedLines({})
       setImported(null)
       setMessage(error instanceof Error ? error.message : 'Kon dit bestand niet lezen.')
     } finally { setBusy(false) }
@@ -130,8 +147,23 @@ export function OfflineReviewedWorkbench({
     const newest = first > second ? first : second
     return nowNs >= newest - 300000000000n && nowNs - oldest <= 604800000000000n
   }, [imported, clockMs])
+  const perStoreReview = stores.map(store => {
+    const basket = store === 'PLUS' ? basketPair?.plus : basketPair?.deka
+    const capture = imported?.captures[store]
+    const keys = basket && capture ? basket.lines.flatMap(line => line.status === 'matched'
+      ? [reviewedLineKey(store, capture.observedAt, line)] : []) : []
+    const accepted = keys.filter(key => reviewedLines[key]).length
+    const complete = !!basket && basket.selectedMealCount > 0 && basket.lines.length > 0 &&
+      basket.unresolvedLineCount === 0 && keys.length === basket.lines.length &&
+      accepted === keys.length
+    const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
+    const fresh = !!capture && nowNs >= capture.observedNs - 300_000_000_000n &&
+      nowNs - capture.observedNs <= 604_800_000_000_000n
+    return { store, accepted, required: keys.length, complete, fresh }
+  })
+  const allReviewed = perStoreReview.every(item => item.complete)
   const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
-    !!basketPair?.comparison.claimable
+    allReviewed && !!basketPair?.comparison.claimable
 
   return (
     <section className="offline-price-workbench" aria-label="Geïmporteerde winkelprijzen vergelijken">
@@ -164,7 +196,7 @@ export function OfflineReviewedWorkbench({
       <LocalTwoStorePriceEditor
         plan={plan} recipes={recipes} activeDays={activeDays}
         onGenerated={(json) => { setText(json); importSnapshots(json) }}
-        onEdit={() => { setImported(null); setMessage('Wijzigingen nog niet doorgerekend. Bereken opnieuw om de mandjes te zien.') }}
+        onEdit={() => { setImported(null); setReviewedLines({}); setMessage('Wijzigingen nog niet doorgerekend. Bereken opnieuw om de mandjes te zien.') }}
       />
       <details className="offline-price-workbench__schema">
         <summary>Welk importbestand werkt?</summary>
@@ -185,14 +217,19 @@ export function OfflineReviewedWorkbench({
         <label>Of plak de twee winkelopnames als JSON
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
-            onChange={event => setText(event.target.value)} />
+            onChange={event => {
+              setText(event.target.value)
+              setImported(null)
+              setReviewedLines({})
+              setMessage('Invoer gewijzigd. Bereken opnieuw; eerder resultaat is niet meer geldig.')
+            }} />
         </label>
         <div className="offline-price-workbench__actions">
           <button type="button" disabled={busy || !text.trim()} onClick={() => importSnapshots(text)}>
             Bereken mandjes
           </button>
           <button type="button" className="ghost-button" onClick={() => {
-            setImported(null); setText(''); setMessage('Geïmporteerde prijsdata uit dit scherm gewist.')
+            setImported(null); setReviewedLines({}); setText(''); setMessage('Geïmporteerde prijsdata uit dit scherm gewist.')
           }}>Wis lokaal geladen data</button>
         </div>
         <p role="status" aria-live="polite">{message}</p>
@@ -217,16 +254,18 @@ export function OfflineReviewedWorkbench({
               <div className="offline-price-workbench__totals">
                 {stores.map(store => {
                   const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
-                  const complete = basket.selectedMealCount > 0 && basket.lines.length > 0 &&
-                    basket.unresolvedLineCount === 0
+                  const reviewedStore = perStoreReview.find(item => item.store === store)!
+                  const complete = reviewedStore.complete && reviewedStore.fresh
                   return (
                     <section key={store}>
                       <h4>{store}</h4>
-                      <strong>{complete ? euros.format(basket.totalCents / 100) : 'Geen volledig totaal'}</strong>
+                      <strong>{complete ? euros.format(basket.totalCents / 100) : 'Nog geen bevestigd volledig totaal'}</strong>
                       {!complete && basket.matchedLineCount > 0 && (
-                        <span>Bekende regels samen: {euros.format(basket.totalCents / 100)} (geen mandtotaal)</span>
+                        <span>Voorlopig gekoppelde regels: {euros.format(basket.totalCents / 100)} (geen bevestigd mandtotaal)</span>
                       )}
-                      <span>{basket.matchedLineCount} gekoppeld, {basket.unresolvedLineCount} onbekend</span>
+                      <span>{basket.matchedLineCount} automatisch gevonden, {basket.unresolvedLineCount} onbekend</span>
+                      <span>{reviewedStore.accepted} van {reviewedStore.required} prijsregels door jou bevestigd</span>
+                      {!reviewedStore.fresh && <span>Bron verouderd of toekomstig; geen actueel mandtotaal.</span>}
                     </section>
                   )
                 })}
@@ -237,12 +276,17 @@ export function OfflineReviewedWorkbench({
                   Bekende deelbedragen zijn geen complete winkelmandprijs en worden niet als besparing vergeleken.
                 </p>
               )}
+              {!allReviewed && <p className="offline-price-workbench__missing" role="status">
+                Controleer per winkel iedere voorgestelde productmatch, verpakking en prijs
+                tegen jouw eigen oorspronkelijke bron. Zonder jouw bevestiging geen
+                geaccepteerd volledig mandtotaal of winkelwinnaar.
+              </p>}
               <p className="offline-price-workbench__difference" role="status">
                 {canShowDifference && basketPair.comparison.deltaCents !== null
                   ? basketPair.comparison.deltaCents === 0
                     ? 'Deze twee ingevoerde volledige mandjes hebben hetzelfde rekenkundige totaal.'
                     : `${basketPair.comparison.deltaCents > 0 ? 'PLUS' : 'DekaMarkt'} is op basis van deze eigen invoer ${euros.format(Math.abs(basketPair.comparison.deltaCents) / 100)} goedkoper.`
-                  : 'Nog geen vergelijkbaar prijsverschil: ontbrekende producten, verouderde gegevens of ongelijke waarnemingstijden.'}
+                  : 'Nog geen vergelijkbaar prijsverschil: controleer productmatches of vul ontbrekende / actuele bronnen aan.'}
                 <small> Dit is nooit een gecontroleerde publieke besparingsclaim.</small>
               </p>
               {canShowDifference && basketPair.comparison.lineDeltas.length > 0 && (
@@ -279,6 +323,17 @@ export function OfflineReviewedWorkbench({
                             <span>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</span>
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
                             {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
+                            {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {euros.format(line.pricePerPackCents / 100)} per verpakking</span>}
+                            {line.status === 'matched' && <label className="offline-price-workbench__review">
+                              <input type="checkbox"
+                                checked={Boolean(reviewedLines[reviewedLineKey(store, imported.captures[store].observedAt, line)])}
+                                onChange={event => {
+                                  const key = reviewedLineKey(store, imported.captures[store].observedAt, line)
+                                  const checked = event.currentTarget.checked
+                                  setReviewedLines(previous => ({ ...previous, [key]: checked }))
+                                }} />
+                              <span>Product, inhoud en prijs met mijn bronopname gecontroleerd</span>
+                            </label>}
                             {line.status === 'unresolved' && <span>Niet gekoppeld · controleer bronproduct, beschikbaarheid of verpakking.</span>}
                           </div>
                           <strong>{line.status === 'matched' ? euros.format(line.lineTotalCents / 100) : '—'}</strong>
