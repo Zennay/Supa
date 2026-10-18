@@ -171,12 +171,15 @@ export function buildOneStoreBasket({
   recipes,
   activeDays,
   products,
+  manualProductIds,
 }: {
   store: Store
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   products: StoreProduct[]
+  /** Explicit, local, user-reviewed catalog selections; never retailer evidence. */
+  manualProductIds?: Readonly<Record<string, string>>
 }): OneStoreBasket {
   if (typeof store.id !== 'string' || !store.id.trim()) {
     throw new Error('Store identity must be non-blank')
@@ -216,7 +219,33 @@ export function buildOneStoreBasket({
       }
     }
 
-    const decision = matchIngredient(ingredient, storeProducts)
+    // Auto matching remains conservative. A real user may explicitly select a
+    // product from their OWN imported inventory when token matching abstains.
+    // Never allow a manual ID to create an item, price, stock or package.
+    const manuallySelected = manualProductIds !== undefined &&
+      manualProductIds !== null && !Array.isArray(manualProductIds) &&
+      Object.hasOwn(manualProductIds, ingredient.id)
+    const manualId = manuallySelected ? manualProductIds[ingredient.id] : null
+    const selected = manuallySelected
+      ? storeProducts.filter(product => product.id === manualId && product.available)
+      : []
+    const decision = !manuallySelected
+      ? matchIngredient(ingredient, storeProducts)
+      : typeof manualId === 'string' && manualId.length > 0 && selected.length === 1
+        ? {
+            type: 'match' as const,
+            productId: manualId,
+            // Technical private basket-admission floor, NOT an AI similarity score.
+            score: 65,
+            runnerUpScore: null,
+            reasons: ['explicit local user selection; not an automatic or verified retailer match'],
+          }
+        : {
+            type: 'abstain' as const,
+            score: null,
+            runnerUpScore: null,
+            reasons: ['manual selection absent, ambiguous or unavailable in imported stock'],
+          }
     if (decision.type === 'abstain') {
       return {
         id: ingredient.id,

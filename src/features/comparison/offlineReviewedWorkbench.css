@@ -91,3 +91,35 @@
 .offline-manual-editor__draft input[type="checkbox"] { flex:0 0 20px; min-width:20px; min-height:20px; }
 .offline-manual-editor__draft span { font-size:.88rem; color:#536257; }
 .offline-manual-editor__draft button { justify-self:start; min-height:44px; }
+
+/* Human-reviewed bindings only reference actual imported available products.
+   Never style this as verified retailer evidence or AI certainty. */
+.offline-price-workbench__manual-match {
+  display: grid;
+  gap: .4rem;
+  min-width: 0;
+  margin-top: .65rem;
+  padding: .7rem;
+  background: #f5f7f2;
+  border: 1px solid #d8e3d9;
+  border-radius: 10px;
+  font-size: .82rem;
+  font-weight: 650;
+}
+.offline-price-workbench__manual-match select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: .5rem;
+  border: 1px solid #84998a;
+  border-radius: 9px;
+  background: white;
+  color: #213a2b;
+  font: inherit;
+  text-overflow: ellipsis;
+}
+.offline-price-workbench__manual-match select:focus-visible {
+  outline: 3px solid #236e54;
+  outline-offset: 2px;
+}
