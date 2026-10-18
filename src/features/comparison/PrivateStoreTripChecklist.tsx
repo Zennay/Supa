@@ -4,6 +4,29 @@ import { selectShoppingCopyText } from '../shopping-list/selectShoppingCopyText.
 import './privateStoreTripChecklist.css'
 
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+type LooseExportLine = {
+  id: string
+  name: string
+  packs: number
+  priceCents: number | null
+  done: boolean
+}
+/** User-picked extras are never a matched meal ingredient. */
+function safeLooseLines(lines: readonly LooseExportLine[]): boolean {
+  if (!Array.isArray(lines) || lines.length > 1000) return false
+  const ids = new Set<string>()
+  for (const line of lines) {
+    if (!line || typeof line.id !== 'string' || !line.id.trim() ||
+        typeof line.name !== 'string' || !line.name.trim() ||
+        !Number.isSafeInteger(line.packs) || line.packs < 1 || line.packs > 99 ||
+        typeof line.done !== 'boolean' ||
+        (line.priceCents !== null && (!Number.isSafeInteger(line.priceCents) ||
+          line.priceCents < 0 || !Number.isSafeInteger(line.priceCents * line.packs))) ||
+        ids.has(line.id)) return false
+    ids.add(line.id)
+  }
+  return true
+}
 
 function basketConsistent(basket: OneStoreBasket): boolean {
   try {
@@ -57,7 +80,8 @@ function formatLine(line: BasketTraceLine, checked: boolean): string {
     (line.requirement.amount ?? '?') + ' ' + line.requirement.unit + ' · geen prijs'
 }
 
-function checklistText(basket: OneStoreBasket, done: ReadonlySet<string>, observedAt: string, fresh: boolean): string {
+function checklistText(basket: OneStoreBasket, done: ReadonlySet<string>,
+  observedAt: string, fresh: boolean, extraLines: readonly LooseExportLine[]): string {
   const complete = basket.selectedMealCount > 0 && basket.lines.length > 0 &&
     basket.unresolvedLineCount === 0
   return [
@@ -68,6 +92,26 @@ function checklistText(basket: OneStoreBasket, done: ReadonlySet<string>, observ
       'Alleen bekende deelprijzen: ' + euro.format(basket.totalCents / 100) + ' (GEEN volledig totaal)',
     '',
     ...basket.lines.map(line => formatLine(line, done.has(line.id))),
+    ...(extraLines.length > 0 ? [
+      '',
+      'LOSSE EXTRA ARTIKELEN (buiten het berekende maaltijdmandje)',
+      ...extraLines.map(line => (line.done ? '☑ ' : '☐ ') + line.packs + ' × ' +
+        line.name + ' · ' + (line.priceCents === null
+          ? 'prijs onbekend of niet beschikbaar'
+          : euro.format(line.priceCents * line.packs / 100))),
+      (() => {
+        let total = 0
+        let unknown = 0
+        for (const line of extraLines) {
+          if (line.priceCents === null) unknown++
+          else total += line.priceCents * line.packs
+        }
+        return (unknown ? 'Bekend deelbedrag extra artikelen: ' : 'Subtotaal extra artikelen: ') +
+          euro.format(total / 100) +
+          (unknown ? ' · ' + unknown + ' prijzen onbekend, geen volledig totaal' : '') +
+          ' (niet meegeteld bij weekmandje)'
+      })(),
+    ] : []),
     '',
     'Geen live winkelgarantie, officiële bronlicentie of geverifieerde besparing.',
   ].join('\n')
@@ -135,13 +179,14 @@ function readSavedTrip(basket: OneStoreBasket, observedAt: string): SavedState {
 
 /** In-memory checklist, with optional per-tab recovery for the SAME basket. */
 export function PrivateStoreTripChecklist({
-  basket, observedAt, fresh, memoryProgress, onMemoryChange,
+  basket, observedAt, fresh, memoryProgress, onMemoryChange, extraLines = [],
 }: {
   basket: OneStoreBasket
   observedAt: string
   fresh: boolean
   memoryProgress?: { identity: string; done: string[] }
   onMemoryChange?: (identity: string, done: string[]) => void
+  extraLines?: readonly LooseExportLine[]
 }) {
   const [initial] = useState(() => readSavedTrip(basket, observedAt))
   const [localDone, setLocalDone] = useState<ReadonlySet<string>>(() => new Set(initial.done))
@@ -224,10 +269,11 @@ export function PrivateStoreTripChecklist({
     }
   }
 
-  const consistent = useMemo(() => basketConsistent(basket), [basket])
+  const consistent = useMemo(() => basketConsistent(basket) && safeLooseLines(extraLines),
+    [basket, extraLines])
   const lines = consistent ? basket.lines : []
   const completed = lines.filter(line => done.has(line.id)).length
-  const text = consistent ? checklistText(basket, done, observedAt, fresh) : ''
+  const text = consistent ? checklistText(basket, done, observedAt, fresh, extraLines) : ''
 
   if (!consistent) {
     return <div className="private-store-trip" role="alert">
@@ -301,10 +347,10 @@ export function PrivateStoreTripChecklist({
       </li>)}
     </ul>
     <div className="private-store-trip__actions">
-      <button type="button" className="ghost-button" disabled={!lines.length} onClick={download}>
+      <button type="button" className="ghost-button" disabled={!lines.length && !extraLines.length} onClick={download}>
         Download lijst
       </button>
-      <button type="button" className="ghost-button" disabled={!lines.length}
+      <button type="button" className="ghost-button" disabled={!lines.length && !extraLines.length}
         aria-expanded={copyVisible} onClick={() => setCopyVisible(visible => !visible)}>
         {copyVisible ? 'Verberg kopieerbare tekst' : 'Toon kopieerbare tekst'}
       </button>
@@ -327,6 +373,10 @@ export function PrivateStoreTripChecklist({
             'Selecteer de tekst handmatig en kies Kopieer op je apparaat.')
         }}>Selecteer alle tekst</button>
     </div>}
+    {extraLines.length > 0 && <p className="private-store-trip__notice">
+      Het downloadbare tekstoverzicht hierboven bevat ook je {extraLines.length} losse artikelen
+      met aantallen en vinkjes. Hun bedragen staan apart; het originele maaltijdmandje blijft gelijk.
+    </p>}
     <p className="private-store-trip__notice">
       Zonder jouw toestemming blijven vinkjes alleen in het geheugen van dit browsertabblad. Met opt-in worden uitsluitend
       de vinkjes en een mandgebonden sleutel lokaal in de sessieopslag van dit tabblad bewaard;
