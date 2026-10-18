@@ -897,3 +897,18 @@ artikelen, totale bedragen, vinkjesweergave en TXT-export volgen de
 werkelijk geselecteerde route; niet een oude gemengde winkelroute.
 Expliciet een andere strategie kiezen blijft mogelijk. Er is nooit
 een fictieve schatting voor omrijden of parkeren.
+
+#### Persoonlijke winkelkeuze per ingrediënt
+
+In de uitgeklapte winkelroute kun je voor elk fysiek identiek
+ingrediënt kiezen tussen de bevestigde PLUS- en DekaMarkt-verpakking,
+of de standaard goedkoopste regel behouden. Beide keuzemogelijkheden
+vertonen het *hele-verpakkingenbedrag*, met originele bronproductnaam.
+De geselecteerde route wordt geheel opnieuw berekend via de al
+bestaande canonieke basketvergelijking; er wordt geen nieuwe prijs of
+winkel-SKU geconstrueerd. In automatische modus schakelt Supa terug
+naar de goedkoopste volledige winkel wanneer handmatige voorkeuren
+de gemengde route duurder maken. Expliciet een gemengde route kiezen
+blijft mogelijk als de gebruiker zelf een bepaald artikel wil.
+Alle keuzes en vinkjes zijn tijdelijk lokaal in de open app en de
+TXT-export volgt de daadwerkelijk gekozen winkels.

@@ -1415,6 +1415,8 @@ export function OfflineReviewedWorkbench({
                   <MixedStoreShoppingCard
                     mixed={mixedStorePlans.mixed}
                     single={mixedStorePlans.single}
+                    plus={basketPair.plus!}
+                    deka={basketPair.deka!}
                     captured={{
                       PLUS: imported.captures.PLUS.observedAt,
                       DekaMarkt: imported.captures.DekaMarkt.observedAt,

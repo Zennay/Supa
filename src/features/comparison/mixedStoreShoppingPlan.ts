@@ -38,12 +38,16 @@ export function createMixedStoreShoppingPlan(
   plus: OneStoreBasket,
   deka: OneStoreBasket,
   mode: 'mixed' | 'single' = 'mixed',
+  preferred: Readonly<Record<string, MixedStore>> = {},
 ): MixedStoreShoppingPlan | null {
   if (plus.store.id !== 'PLUS' || deka.store.id !== 'DekaMarkt') return null
   const comparison = compareFullBaskets({ baseline: plus, candidate: deka })
   if (!comparison.claimable || comparison.deltaCents === null ||
       comparison.lineDeltas.length !== plus.lines.length ||
       comparison.lineDeltas.length !== deka.lines.length) return null
+  const allowed = new Set(comparison.lineDeltas.map(line => line.id))
+  if (Object.entries(preferred).some(([id, store]) =>
+    !allowed.has(id) || (store !== 'PLUS' && store !== 'DekaMarkt'))) return null
   const byStore = (basket: OneStoreBasket) =>
     new Map(basket.lines.filter((line): line is Extract<BasketTraceLine, {status: 'matched'}> =>
       line.status === 'matched').map(line => [line.id, line]))
@@ -60,7 +64,7 @@ export function createMixedStoreShoppingPlan(
     // when every ingredient can be bought for the same total at one shop.
     const store: MixedStore = mode === 'single'
       ? (deka.totalCents < plus.totalCents ? 'DekaMarkt' : 'PLUS')
-      : (b.lineTotalCents < a.lineTotalCents ? 'DekaMarkt' : 'PLUS')
+      : preferred[delta.id] ?? (b.lineTotalCents < a.lineTotalCents ? 'DekaMarkt' : 'PLUS')
     const picked = store === 'PLUS' ? a : b
     const other = store === 'PLUS' ? b : a
     const next = totals[store] + picked.lineTotalCents
@@ -86,7 +90,7 @@ export function createMixedStoreShoppingPlan(
   const cheapestWholeStoreCents = Math.min(plus.totalCents, deka.totalCents)
   const additionalDifferenceCents = cheapestWholeStoreCents - totalCents
   if (!Number.isSafeInteger(totalCents) || !Number.isSafeInteger(additionalDifferenceCents) ||
-      additionalDifferenceCents < 0 || totalCents < 0 || lines.length === 0) return null
+      totalCents < 0 || lines.length === 0) return null
   return {
     lines, totalCents, totals, cheapestWholeStoreCents,
     additionalDifferenceCents, plusWholeCents: plus.totalCents,

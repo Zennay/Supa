@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import type { OneStoreBasket } from '../../domain/basket.ts'
 import type { MixedStoreShoppingPlan, MixedStore } from './mixedStoreShoppingPlan.ts'
-import { formatMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
+import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
@@ -10,10 +11,12 @@ const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
  * Download/copy still requires the parent source gate at click time.
  */
 export function MixedStoreShoppingCard({
-  mixed, single, captured, eligibleNow,
+  mixed, single, plus, deka, captured, eligibleNow,
 }: {
   mixed: MixedStoreShoppingPlan
   single: MixedStoreShoppingPlan
+  plus: OneStoreBasket
+  deka: OneStoreBasket
   captured: Record<MixedStore, string>
   eligibleNow: () => boolean
 }) {
@@ -23,6 +26,12 @@ export function MixedStoreShoppingCard({
   const [message, setMessage] = useState('')
   const [extraVisitCost, setExtraVisitCost] = useState('')
   const [mode, setMode] = useState<'auto' | 'mixed' | 'single'>('auto')
+  const [preferred, setPreferred] = useState<Record<string, MixedStore>>({})
+  const chosenMixed = useMemo(() => createMixedStoreShoppingPlan(plus, deka, 'mixed', preferred),
+    [plus, deka, preferred])
+  // Source comparisons are prevalidated. A malformed choice must not quietly
+  // become an apparently reviewed custom basket.
+  const selectedMixed = chosenMixed ?? mixed
 
   const mixedUsesBoth = stores.every(store => mixed.lines.some(line => line.store === store))
   const rawCost = extraVisitCost.trim()
@@ -32,13 +41,14 @@ export function MixedStoreShoppingCard({
   const extraCostCents = mixedUsesBoth && cents !== null &&
     Number.isSafeInteger(cents) && cents >= 0 && cents <= 100_000 ? cents : null
   const costInvalid = mixedUsesBoth && rawCost !== '' && (extraCostCents === null || !costShapeOk)
-  const suggestedSingle = extraCostCents !== null && extraCostCents >= mixed.additionalDifferenceCents
+  const suggestedSingle = selectedMixed.additionalDifferenceCents < 0 ||
+    (extraCostCents !== null && extraCostCents >= selectedMixed.additionalDifferenceCents)
   const chooseSingle = mode === 'single' || (mode === 'auto' && suggestedSingle)
-  const plan = chooseSingle ? single : mixed
+  const plan = chooseSingle ? single : selectedMixed
   const visitsBoth = stores.every(store => plan.lines.some(line => line.store === store))
   const appliedCostCents = visitsBoth ? extraCostCents : null
   const netAdvantage = extraCostCents === null ? null :
-    mixed.additionalDifferenceCents - extraCostCents
+    selectedMixed.additionalDifferenceCents - extraCostCents
   const key = (id: string) => JSON.stringify([captured.PLUS, captured.DekaMarkt, id])
   const done = (id: string) => !!checked[key(id)]
   const progress = Object.fromEntries(plan.lines.map(line => [line.key, done(line.key)]))
@@ -73,6 +83,11 @@ export function MixedStoreShoppingCard({
     }
   }
 
+  if (!chosenMixed) return <p role="alert">
+    De aangepaste winkelroute kon niet veilig uit dezelfde complete fysieke mand worden
+    berekend. Kies opnieuw een winkel per ingrediënt; er wordt geen nieuw bedrag getoond.
+  </p>
+
   return <section className="offline-price-workbench__full-breakdown"
     aria-label="Boodschappenroute met persoonlijke PLUS- en DekaMarkt-prijzen">
     <h4>Mijn boodschappenroute: goedkoopste artikelen of één winkel</h4>
@@ -103,10 +118,46 @@ export function MixedStoreShoppingCard({
         ? 'PLUS én DekaMarkt'
         : plan.lines[0]?.store ?? 'Geen winkel'} ·
         {' '}{money.format(plan.totalCents / 100)} aan winkelproducten.</p>
-      {mode === 'auto' && chooseSingle && extraCostCents !== null && <p role="status">
-        Met jouw extra kosten is een complete mand bij één winkel minstens zo voordelig.
-        Je boodschappenlijst is automatisch op één winkel gezet.</p>}
+      {mode === 'auto' && chooseSingle && <p role="status">
+        {selectedMixed.additionalDifferenceCents < 0
+          ? 'Door je handmatige winkelvoorkeuren kost de samengestelde route al meer dan het goedkoopste hele mandje bij één winkel.'
+          : 'Met jouw ingevoerde extra kosten is een compleet mandje bij één winkel minstens zo voordelig.'}
+        {' '}Supa heeft daarom de boodschappenlijst op één winkel gezet. Kies expliciet de gemengde
+        route als je toch beide winkels wilt bezoeken.</p>}
     </div>
+    <details className="offline-price-workbench__full-breakdown">
+      <summary>Kies zelf een winkel per ingrediënt (optioneel)</summary>
+      <p>De standaard is het goedkoopste hele-verpakkingenbedrag per ingrediënt.
+        Je mag een andere winkel kiezen op basis van je eigen voorkeur;
+        het bedrag blijft uitsluitend de door jou gecontroleerde bronprijs.</p>
+      <button type="button" className="ghost-button" onClick={() => {
+        setPreferred({}); setShowText(false)
+      }}>Zet alle keuzes terug op goedkoopste artikelen</button>
+      <div className="offline-price-workbench__dates">
+        {mixed.lines.map(line => {
+          const plusLine = plus.lines.find(item => item.id === line.id)
+          const dekaLine = deka.lines.find(item => item.id === line.id)
+          if (plusLine?.status !== 'matched' || dekaLine?.status !== 'matched') return null
+          return <label key={line.id}>{line.ingredientLabel} · {line.amount} {line.unit}
+            <select value={preferred[line.id] ?? ''} onChange={event => {
+              const chosen = event.currentTarget.value as MixedStore | ''
+              setPreferred(old => {
+                const next = { ...old }
+                if (chosen) next[line.id] = chosen
+                else delete next[line.id]
+                return next
+              })
+              setShowText(false)
+              setMessage('Winkelvoorkeur aangepast. Supa herberekent de route uit de twee eerder gecontroleerde bronartikelen.')
+            }}>
+              <option value="">Kies automatisch het goedkoopste artikel</option>
+              <option value="PLUS">PLUS · {money.format(plusLine.lineTotalCents / 100)} · {plusLine.productName}</option>
+              <option value="DekaMarkt">DekaMarkt · {money.format(dekaLine.lineTotalCents / 100)} · {dekaLine.productName}</option>
+            </select>
+          </label>
+        })}
+      </div>
+    </details>
     {mixedUsesBoth && <div className="offline-price-workbench__actions">
       <label>Extra kosten van de tweede stop (€)
         <input type="text" inputMode="decimal" value={extraVisitCost} maxLength={9}
