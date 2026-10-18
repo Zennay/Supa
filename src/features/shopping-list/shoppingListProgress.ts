@@ -9,6 +9,15 @@ type ShoppingListProgress = {
 }
 
 const matchUnits = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
+// A visible retailer ID and name are necessary even when a basket has rows.
+// Never stamp checkmark identity for Unicode filler or direction-control text.
+const hiddenStoreCharacters = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\u115F\u1160\u3164\uFFA0\u2800]/u
+function visibleStoreText(value: unknown): value is string {
+  return typeof value === 'string' &&
+    value === value.trim() &&
+    !hiddenStoreCharacters.test(value) &&
+    /[\p{L}\p{N}]/u.test(value)
+}
 
 type ShoppingListBasketState = {
   basketKey: string
@@ -147,7 +156,8 @@ function projectShoppingListBasketState(basket: unknown): ShoppingListBasketStat
   const basketLines = ownFact(basket, 'lines')
   if (!isRecord(store) || !Array.isArray(basketLines)) return null
   const storeId = ownFact(store, 'id')
-  if (!isNonBlankString(storeId)) return null
+  const storeName = ownFact(store, 'name')
+  if (!visibleStoreText(storeId) || !visibleStoreText(storeName)) return null
 
   const validIds = new Set<string>()
   const lines: Record<string, unknown>[] = []
@@ -161,6 +171,38 @@ function projectShoppingListBasketState(basket: unknown): ShoppingListBasketStat
     validIds.add(line.id)
     lines.push(line)
   }
+
+  // The persistent v1 key deliberately stays the same for valid baskets.
+  // The old implementation trusted only nested lines; root totals could lie,
+  // allowing checkmarks or print/copy to survive a mismatched price ledger.
+  const meals = ownFact(basket, 'selectedMealCount')
+  const matchedCount = ownFact(basket, 'matchedLineCount')
+  const unresolvedCount = ownFact(basket, 'unresolvedLineCount')
+  const declaredTotal = ownFact(basket, 'totalCents')
+  if (!isNonNegativeSafeInteger(meals) ||
+      !isNonNegativeSafeInteger(matchedCount) ||
+      !isNonNegativeSafeInteger(unresolvedCount) ||
+      !isNonNegativeSafeInteger(declaredTotal) ||
+      (lines.length > 0 && meals === 0) ||
+      matchedCount + unresolvedCount !== lines.length) return null
+
+  let actualMatched = 0
+  let actualUnresolved = 0
+  let actualCents = 0
+  for (const line of lines) {
+    if (line.status === 'unresolved') {
+      actualUnresolved++
+      continue
+    }
+    if (line.status !== 'matched' ||
+        !isNonNegativeSafeInteger(line.lineTotalCents)) return null
+    actualMatched++
+    actualCents += line.lineTotalCents
+    if (!Number.isSafeInteger(actualCents)) return null
+  }
+  if (actualMatched !== matchedCount ||
+      actualUnresolved !== unresolvedCount ||
+      actualCents !== declaredTotal) return null
 
   return {
     basketKey: JSON.stringify({ storeId, lines }),
