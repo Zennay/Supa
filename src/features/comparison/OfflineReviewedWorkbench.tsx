@@ -4,6 +4,7 @@ import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
+import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -44,6 +45,7 @@ export function OfflineReviewedWorkbench({
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [weekExportMessage, setWeekExportMessage] = useState('')
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
   const [clockMs, setClockMs] = useState(() => Date.now())
@@ -58,6 +60,26 @@ export function OfflineReviewedWorkbench({
       window.removeEventListener('focus', refresh)
     }
   }, [])
+
+  function saveSelectedWeek() {
+    try {
+      const json = exportPrivatePlannerWeek(plan, recipes, activeDays)
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      try {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'supa-geselecteerd-weekmenu-prive.json'
+        document.body.appendChild(a)
+        try { a.click() } finally { a.remove() }
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+      setWeekExportMessage('Je geselecteerde weekmenu is lokaal gedownload. Open het bestand in de privévergelijker onder stap 2. Geen winkelprijzen of winkelproduct-ID’s meegestuurd.')
+    } catch {
+      setWeekExportMessage('Weekmenu niet exporteerbaar. Controleer geselecteerde dagen, eigen recepten en metrische hoeveelheden in Planner.')
+    }
+  }
 
   function importSnapshots(input: string) {
     try {
@@ -122,6 +144,22 @@ export function OfflineReviewedWorkbench({
         <p className="disclaimer">Privé rekenhulp: een aangeleverd bestand bewijst geen toestemming, productidentiteit,
           actuele winkelprijs of besparing. Onbekende producten krijgen nooit een verzonnen prijs.
           PLUS en DekaMarkt zijn hier uitsluitend vergelijkingslabels.</p>
+      </div>
+      <div className="offline-price-workbench__input" aria-label="Weekmenu naar eigen-bronvergelijker">
+        <h3>Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden</h3>
+        <p>Exporteer alleen de werkelijk geselecteerde maaltijden en fysieke ingrediënten naar de
+          uitgebreide privéwerkbank. Importeer daar jouw eigen PLUS- en/of DekaMarkt-opname en
+          kies zelf de bijpassende bronproducten. Recepten en hoeveelheden gaan alleen in het
+          lokaal gedownloade bestand; geen prijzen of winkelrechten worden overgedragen.</p>
+        <div className="offline-price-workbench__actions">
+          <button type="button" onClick={saveSelectedWeek}>
+            Download geselecteerd weekmenu (JSON)
+          </button>
+          <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
+            Open uitgebreide privévergelijker
+          </a>
+        </div>
+        <p role="status" aria-live="polite">{weekExportMessage}</p>
       </div>
       <LocalTwoStorePriceEditor
         plan={plan} recipes={recipes} activeDays={activeDays}

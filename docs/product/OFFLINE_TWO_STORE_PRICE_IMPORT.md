@@ -19,6 +19,16 @@ Supa vult **nooit** productnamen, winkelspecifieke verpakkingsmaten, prijzen of 
 
 Als het Vergelijk-scherm langer open blijft staan, ververst de UI de vervaltermijn periodiek en bij terugkeer naar het tabblad. Een verlopen zeven-dagenvergelijking verliest direct zijn prijsverschil zonder dat de gebruiker opnieuw hoeft te importeren. De opgeslagen fysieke waarnemingstijd verandert niet.
 
+## Het actieve Supa-weekmenu in de uitgebreide privévergelijker gebruiken
+
+1. Stel je gekozen dagen en recepten in onder **Planner**. Ga in de gewone Supa-app naar **Vergelijk**.
+2. Onder **Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden**, klik **Download geselecteerd weekmenu (JSON)**. Dit exporteert uitsluitend de geselecteerde maaltijden en hun fysieke ingrediënten, niet de demonstratieprijzen, winkeltijden of productkoppelingen.
+3. Klik **Open uitgebreide privévergelijker**. Open in dat scherm onder **2 · Vul de fysieke behoefte in** het bestand bij **Importeer een lokaal geselecteerd Planner-weekmenu**. De exacte fysieke behoefte wordt met de bestaande Supa-aggregatie opnieuw bepaald.
+4. Voeg uitsluitend je eigen rechtmatig verkregen PLUS- en/of DekaMarkt-bronbestand toe. Kies per ingrediënt en winkel zelf de werkelijke productmatch. Bij slechts één geobserveerde winkel blijft de andere onbekend.
+5. Een volledige winkelwinnaar of prijsverschil verschijnt alleen als beide echte volledige opnames en de versheid/contextvoorwaarden dat toestaan. De brongegevens worden niet automatisch gedeeld tussen tabs.
+
+Het weekbestand gebruikt schema supa-private-planner-week-v1 (UTF-8, maximaal 256 kB, maximaal 14 geselecteerde dagen, 200 unieke fysieke ingrediënten). Ongeldige hoeveelheden of een onsamenhangend weekmenu worden geweigerd, zonder data aan een server te verzenden. Publiek gebruik wacht op de bestaande CI-, review- en mainwriter-gates.
+
 ## Importeren
 
 1. Maak lokaal een JSON-bestand met **één** PLUS- en **één** DekaMarkt-opname. Beide opnames beschrijven de daadwerkelijk waargenomen prijscontext, met een ISO-tijd en een expliciete UTC-offset.
