@@ -1412,8 +1412,15 @@ export function OfflineReviewedWorkbench({
                                         setManualSku(previous => ({
                                           ...previous, [store]: { ...previous[store], [line.id]: id },
                                         }))
-                                        setReviewedLines({})
-                                        setDoneTripItems({})
+                                        // A new SKU can change matching within this store,
+                                        // but does not revoke the other store's independently
+                                        // reviewed source or shopping progress.
+                                        const sameStore = (key: string) =>
+                                          key.startsWith('[' + JSON.stringify(store) + ',')
+                                        setReviewedLines(previous => Object.fromEntries(
+                                          Object.entries(previous).filter(([key]) => !sameStore(key))))
+                                        setDoneTripItems(previous => Object.fromEntries(
+                                          Object.entries(previous).filter(([key]) => !sameStore(key))))
                                         setTripExportMessage('')
                                         setTripProgressMessage('')
                                       }}>
