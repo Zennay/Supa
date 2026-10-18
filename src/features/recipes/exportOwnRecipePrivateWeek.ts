@@ -10,7 +10,12 @@ export function exportOwnRecipePrivateWeek(recipe: SavedRecipe, portions: number
   if (!checklist.canCopy || checklist.lines.some(line => line.needsReview)) {
     throw new Error('Corrigeer eerst onzekere hoeveelheden en gedeeltelijke stuks.')
   }
-  const plannerRecipe = toPlannerRecipe(recipe)
+  // Cooking duration is optional for a physical shopping list and never
+  // appears in the exported demand. Only the own ingredient facts matter.
+  const plannerRecipe = toPlannerRecipe({
+    ...recipe,
+    minutes: recipe.minutes ?? 0,
+  })
   if (!plannerRecipe || typeof recipe.servings !== 'number' || recipe.servings <= 0) {
     throw new Error('Dit recept mist volledig bevestigde metrische ingrediënten.')
   }
