@@ -235,3 +235,11 @@
 .offline-own-extras__quantity select { min-width:75px; min-height:44px;
   background:#fff; border:1px solid #829c8c; border-radius:8px;
   padding:.45rem; font:inherit; color:#243f2e; }
+
+
+/* A single validated local retailer can show a private list, never a two-store delta. */
+.offline-staged-preview { display:grid; gap:.65rem; margin:.75rem 0; padding:1rem;
+  border:1px solid #adc4b1; background:#f6faf5; border-radius:14px; min-width:0; }
+.offline-staged-preview h3 { margin:0; }
+.offline-staged-preview p { margin:.1rem 0; }
+.offline-staged-preview .private-store-trip { margin-top:.5rem; }
