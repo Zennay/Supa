@@ -119,6 +119,7 @@ export function ingestReviewedBatch(records) {
     throw new Error('Reviewed batch requires 1–32 source records')
   }
   const unique = new Set()
+  const physicalCaptures = new Set()
   const results = []
   for (const record of records) {
     const { key } = validatedInput(record)
@@ -126,7 +127,19 @@ export function ingestReviewedBatch(records) {
     if (unique.has(identifier)) {
       throw new Error('Duplicate reviewed capture identity')
     }
+    // Internal IDs are labels, not physical source uniqueness. The exact
+    // same reviewed capture cannot become two independent observations just
+    // because one app-specific source ID was renamed.
+    const physical = JSON.stringify([
+      record.source.supermarket, record.source.kind,
+      record.source.url, record.source.capturedAt, record.source.sha256,
+      record.evidenceType,
+    ])
+    if (physicalCaptures.has(physical)) {
+      throw new Error('Duplicate physical reviewed capture')
+    }
     unique.add(identifier)
+    physicalCaptures.add(physical)
     results.push(ingestSafeReviewedEvidence(record))
   }
   const accepted = results.filter(result => result.accepted)
