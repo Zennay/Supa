@@ -790,6 +790,10 @@ export function OfflineReviewedWorkbench({
           {stagedStores.length === 1
             ? ' Laad de andere winkel als JSON of CSV. Tot die tijd is alleen deze winkel afzonderlijk beschikbaar, zonder prijsverschil.'
             : ' Beide bestanden geladen; de bestaande regels bepalen of de prijzen vergelijkbaar zijn.'}
+          {onOpenList && stagedStores.length === 1 && <button type="button"
+            onClick={() => { session.setSelectedStore(stagedStores[0]); onOpenList() }}>
+            Open mijn {stagedStores[0]}-boodschappenlijst
+          </button>}
           <button type="button" className="ghost-button" onClick={() => {
             clearPrivateSession()
             setMessage('Alle tijdelijke winkelopnames, matches en losse artikelen uit dit tabblad gewist.')
