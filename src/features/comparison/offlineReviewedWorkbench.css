@@ -96,3 +96,15 @@
 .offline-price-workbench__review { display:flex; gap:.65rem; align-items:flex-start; cursor:pointer; padding:.6rem .35rem; background:#f2f7f1; border-radius:9px; line-height:1.35; }
 .offline-price-workbench__review input[type=checkbox] { flex:0 0 20px; width:20px; height:20px; margin-top:.1rem; accent-color:#246b50; }
 .offline-price-workbench__review input:focus-visible { outline:3px solid #226f52; outline-offset:3px; }
+
+/* Private, plan-bound shopping progress, distinct from retailer source review. */
+.offline-price-workbench__trip-actions {display:flex;flex-wrap:wrap;gap:1rem;align-items:center;padding:.7rem 1rem;background:#ecf4ec;border-radius:12px;}
+.offline-price-workbench__trip-actions label {display:flex;align-items:center;gap:.5rem;font-weight:650;cursor:pointer;}
+.offline-price-workbench__trip-actions input {width:20px;height:20px;accent-color:#236d4d;}
+.offline-price-workbench__trip-actions button {min-height:42px;}
+.offline-price-workbench__trip-tick {display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;cursor:pointer;}
+.offline-price-workbench__trip-tick input {width:20px;height:20px;flex:0 0 20px;accent-color:#236d4d;}
+.offline-price-workbench__trip-tick span {font-size:.82rem;color:#526359;}
+.offline-price-workbench__trip-progress {font-weight:650;background:#f1f7f0;padding:.55rem;border-radius:9px;}
+.offline-price-workbench__trip-complete {font-weight:700;color:#236d4d;}
+.offline-price-workbench__trip-tick input:focus-visible,.offline-price-workbench__trip-actions input:focus-visible {outline:3px solid #226f52;outline-offset:3px;}
