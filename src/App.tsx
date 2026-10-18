@@ -14,7 +14,8 @@ import { toPlannerRecipe } from './features/recipes/plannerRecipes'
 import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
 import { figmaAssets } from './features/home/figmaAssets'
 import { buildOneStoreBasket } from './domain/basket'
-import type { OfflinePriceSnapshots, OfflineRetailer } from './domain/offlineReviewedImport.ts'
+import { parseSingleOfflineCapture, type OfflinePriceSnapshots, type OfflineRetailer } from './domain/offlineReviewedImport.ts'
+import { stagedStoreFingerprint } from './features/comparison/stagedStoreFingerprint.ts'
 import type { OfflineComparisonSession } from './features/comparison/offlineComparisonSession.ts'
 import { StagedStorePreview } from './features/comparison/StagedStorePreview.tsx'
 import { compareFullBaskets } from './domain/basketComparison'
@@ -328,16 +329,54 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const currentStoreBasket = importedPair
     ? offlinePriceSession.selectedStore === 'PLUS' ? importedPair.plus : importedPair.deka
     : null
-  const plannerSource = !offlinePriceSession.imported ? 'example'
-    : !importedSourceFresh ? 'expired'
-      : currentStoreBasket && currentStoreBasket.selectedMealCount > 0 &&
-        currentStoreBasket.lines.length > 0 ? 'private' : 'empty'
 
-  // One-store captures can be used for a private list without a fabricated
-  // second retailer. No comparison outcome exists before paired admission.
+  // One-store captures can already price their OWN selected-week demand.
+  // Never synthesize a second retailer, compare staged baskets or reuse old
+  // manual choices after the source or Planner changes.
   const stagedRetailers = (['PLUS', 'DekaMarkt'] as const).filter(
     store => !!offlinePriceSession.stagedCaptures[store],
   )
+  const stagedForPlanner = useMemo(() => {
+    if (offlinePriceSession.imported) return null
+    const store = offlinePriceSession.stagedCaptures[offlinePriceSession.selectedStore]
+      ? offlinePriceSession.selectedStore
+      : stagedRetailers[0]
+    if (!store) return null
+    const capture = offlinePriceSession.stagedCaptures[store]
+    if (!capture) return null
+    try {
+      const source = parseSingleOfflineCapture(JSON.stringify({
+        schema: 'supa-offline-store-capture-v1', capture,
+      }), sourceClock).normalized
+      if (source.retailer !== store) return null
+      const fingerprint = stagedStoreFingerprint(capture, plannedMeals, recipes, activeDays)
+      const manual = offlinePriceSession.stagedManual[store]
+      const selections = manual.fingerprint === fingerprint ? manual.products : {}
+      const stagedBasket = buildOneStoreBasket({
+        store: { id: store, name: store },
+        plan: plannedMeals, recipes, activeDays, products: source.products,
+        manualProductIds: selections,
+      })
+      const nowNs = BigInt(Math.trunc(sourceClock)) * 1_000_000n
+      const fresh = nowNs >= source.observedNs - 300_000_000_000n &&
+        nowNs - source.observedNs <= 604_800_000_000_000n
+      return { store, basket: stagedBasket, fresh }
+    } catch { return null }
+  }, [offlinePriceSession.imported, offlinePriceSession.stagedCaptures,
+    offlinePriceSession.selectedStore, offlinePriceSession.stagedManual,
+    plannedMeals, recipes, activeDays, sourceClock])
+  const plannerBasket = currentStoreBasket ?? stagedForPlanner?.basket ?? null
+  const plannerSource = offlinePriceSession.imported
+    ? !importedSourceFresh ? 'expired'
+      : currentStoreBasket && currentStoreBasket.selectedMealCount > 0 &&
+        currentStoreBasket.lines.length > 0 ? 'private' : 'empty'
+    : stagedForPlanner
+      ? !stagedForPlanner.fresh ? 'expired'
+        : stagedForPlanner.basket.selectedMealCount > 0 &&
+          stagedForPlanner.basket.lines.length > 0 ? 'private' : 'empty'
+      : 'example'
+  const plannerStore = offlinePriceSession.imported
+    ? offlinePriceSession.selectedStore : stagedForPlanner?.store
 
   const privateHomeSummary = useMemo(() => {
     const source = offlinePriceSession.imported
@@ -520,10 +559,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             activeDays={activeDays}
             plannedMeals={plannedMeals}
             recipes={recipes}
-            basketTotalCents={plannerSource === 'private' && currentStoreBasket ? currentStoreBasket.totalCents : basket.totalCents}
-            basketUnresolvedLineCount={plannerSource === 'private' && currentStoreBasket ? currentStoreBasket.unresolvedLineCount : basket.unresolvedLineCount}
+            basketTotalCents={plannerSource === 'private' && plannerBasket ? plannerBasket.totalCents : basket.totalCents}
+            basketUnresolvedLineCount={plannerSource === 'private' && plannerBasket ? plannerBasket.unresolvedLineCount : basket.unresolvedLineCount}
             priceSource={plannerSource}
-            priceStore={plannerSource === 'private' ? offlinePriceSession.selectedStore : undefined}
+            priceStore={plannerSource === 'private' ? plannerStore : undefined}
             onOpenComparison={() => navigate('basket')}
             onBudgetChange={(nextBudget) =>
               setPreferences((current) => ({
