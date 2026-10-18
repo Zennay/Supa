@@ -44,6 +44,7 @@ const combined = document.querySelector<HTMLInputElement>('#combined')!
 const plus = document.querySelector<HTMLInputElement>('#plus')!
 const deka = document.querySelector<HTMLInputElement>('#deka')!
 const demandFile = document.querySelector<HTMLInputElement>('#demand')!
+const sessionFile = document.querySelector<HTMLInputElement>('#session')!
 const compare = document.querySelector<HTMLButtonElement>('#compare')!
 const status = document.querySelector<HTMLDivElement>('#price-status')!
 const result = document.querySelector<HTMLElement>('#result')!
@@ -215,6 +216,39 @@ async function parseSource(): Promise<Source> {
   const canonicalUrl = '/offline-two-store-csv.mjs'
   const { convertTwoStoreCsv } = await import(/* @vite-ignore */ canonicalUrl)
   return sourceFrom(JSON.parse(convertTwoStoreCsv(csv)))
+}
+
+async function readOwnBasketInputs(): Promise<{ source: Source; demand: Demand }> {
+  const ownSession = sessionFile.files?.[0]
+  if (ownSession) {
+    const root: unknown = JSON.parse(await readSource(ownSession))
+    if (!record(root) || root.schema !== 'supa-private-basket-session-v1' ||
+        Object.keys(root).sort().join(',') !== 'demand,schema,source') {
+      throw Error('Dit is geen ondersteunde privésessie')
+    }
+    // Reuse existing strict local intake; no automatic retail provenance or
+    // inferred product equivalence flows from a saved user file.
+    const source = sourceFrom(root.source)
+    const demand = demandFrom(root.demand)
+    for (const ingredient of demand.ingredients) {
+      for (const store of stores) {
+        const id = ingredient.productIds[store]
+        if (id === null) continue
+        const capture = source.captures.find(item => item.retailer === store)!
+        const product = capture.products.find(item => item.id === id)
+        const family = (unit: MatchUnit) => unit === 'g' || unit === 'kg' ? 'weight'
+          : unit === 'ml' || unit === 'l' ? 'volume' : 'piece'
+        if (!product || family(product.packUnit) !== family(ingredient.unit)) {
+          throw Error('Opgeslagen SKU komt niet overeen met eigen winkelopname')
+        }
+      }
+    }
+    return { source, demand }
+  }
+  const demandInput = demandFile.files?.[0]
+  if (!demandInput) throw Error('Mandvraag ontbreekt')
+  const [source, rawDemand] = await Promise.all([parseSource(), readSource(demandInput)])
+  return { source, demand: demandFrom(JSON.parse(rawDemand)) }
 }
 
 function unresolved(d: DemandLine, reason: string): BasketTraceLine {
@@ -743,7 +777,7 @@ function show(source: Source, demand: Demand): void {
   }
 }
 
-for (const el of [combined, plus, deka, demandFile]) {
+for (const el of [sessionFile, combined, plus, deka, demandFile]) {
   if (!el) continue
   el.addEventListener('change', () => {
     inputRevision++
@@ -753,11 +787,19 @@ for (const el of [combined, plus, deka, demandFile]) {
     renderBudget()
     clearTrip()
     setStatus('Bronbestanden gewijzigd. Klik opnieuw op Vergelijk; eerdere prijsuitkomst is niet meer geldig.')
-    if (el === combined) {
+    if (el === sessionFile) {
+      combined.value = ''
       plus.value = ''
       deka.value = ''
-    } else if (el === plus || el === deka) {
-      combined.value = ''
+      demandFile.value = ''
+    } else {
+      sessionFile.value = ''
+      if (el === combined) {
+        plus.value = ''
+        deka.value = ''
+      } else if (el === plus || el === deka) {
+        combined.value = ''
+      }
     }
   })
 }
@@ -771,16 +813,12 @@ compare?.addEventListener('click', async () => {
   clearTrip()
   setStatus('Lokale eigen bestanden worden verwerkt…')
   try {
-    const file = demandFile.files?.[0]
-    if (!file || !file.size || file.size > limit) throw Error('Mandvraag ontbreekt')
-    const [source, demand] = await Promise.all([
-      parseSource(), file.arrayBuffer().then(bytes => demandFrom(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)))),
-    ])
+    const { source, demand } = await readOwnBasketInputs()
     if (snapshotRevision !== inputRevision) return
     show(source, demand)
   } catch {
     if (snapshotRevision !== inputRevision) return
-    setStatus('Geen veilige volledige vergelijking mogelijk. Controleer jouw eigen CSV/JSON, productkoppelingen en benodigde hoeveelheden. Er wordt geen bedrag als volledig getoond.', true)
+    setStatus('Geen veilige volledige vergelijking mogelijk. Controleer jouw privésessie of eigen CSV/JSON, productkoppelingen en benodigde hoeveelheden. Er wordt geen bedrag als volledig getoond.', true)
   } finally {
     compare.disabled = false
   }

@@ -207,3 +207,20 @@ compleetheid- en zeven-dagen-controle. De budgetkaart kijkt ook bij opnieuw
 focussen, terugkeren naar de tab, of budgetinvoer naar ouderdom en maakt een
 verlopen winkelmandje dan onbekend. De algemene twee-winkelvergelijking blijft
 onverminderd onder de strikte oorspronkelijke bronpaarvoorwaarden staan.
+
+## Eén privésessiebestand direct op de losse vergelijkpagina
+
+De bestaande `/private-basket-compare.html` kan nu ook rechtstreeks het eerder
+vanuit het koppelscherm gedownloade **supa-private-basket-session-v1** bestand
+openen, in plaats van apart de PLUS-/Deka-bronnen én mandvraag te moeten
+selecteren. Kies het ene lokale JSON-bestand en klik zelf op **Vergelijk mijn
+twee mandjes**. Bestaande strikte bron- en mandnormalisatie blijft van kracht;
+iedere herstelde originele retailer-SKU moet daadwerkelijk in de desbetreffende
+bronopname staan en dezelfde fysieke eenheidsfamilie hebben. Maximaal 256 kB,
+strikte UTF-8; geen opslag, automatische bronrefresh, scraping of netwerk.
+Wisselen tussen volledige sessie en de bestaande losse CSV/JSON-invoer wist de
+tegenstrijdige bestandsselectie en maakt eerdere prijsresultaten ongeldig.
+Originele bronmomenten blijven onveranderd: een oud sessiebestand mag dus nooit
+automatisch een nieuwe complete prijsvergelijking suggereren. Wanneer slechts
+één winkel compleet is, blijft de eigen afvinklijst/budget van die winkel
+mogelijk, maar de volledige winkelwinnaar blijft onbekend.
