@@ -12,6 +12,21 @@ function unitFamily(unit: string): string {
   return unit === 'piece' ? 'stuks' : 'onbekend'
 }
 
+// Only an ordering hint for the user's manual review. Never auto-select by
+// this hint; the canonical domain matcher alone decides automatic matches.
+function textWords(value: string): string[] {
+  return value.normalize('NFD').toLocaleLowerCase('nl-NL')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(/\s+/u)
+    .filter(word => word.length > 1 && !['de', 'het', 'een', 'van', 'voor', 'pak', 'fles'].includes(word))
+}
+function labelRelevance(ingredient: string, productName: string): number {
+  const words = textWords(ingredient)
+  if (!words.length) return 0
+  const candidate = new Set(textWords(productName))
+  return words.reduce((score, word) => score + (candidate.has(word) ? 1 : 0), 0)
+}
+
 /**
  * Search only the user's admitted offline products. This picker does not infer
  * a price or convert an incompatible package into a valid ingredient match.
@@ -32,8 +47,10 @@ export function LocalProductPicker({
     Number.isSafeInteger(product.priceCents) && product.priceCents >= 0 &&
     Number.isSafeInteger(product.packCount ?? 1) && (product.packCount ?? 1) > 0 &&
     unitFamily(product.packUnit) === unitFamily(requirementUnit),
-  ).sort((a, b) => collator.compare(a.name, b.name) || collator.compare(a.id, b.id)),
-  [products, requirementUnit])
+  ).sort((a, b) =>
+    labelRelevance(ingredient, b.name) - labelRelevance(ingredient, a.name) ||
+    collator.compare(a.name, b.name) || collator.compare(a.id, b.id)),
+  [products, requirementUnit, ingredient])
 
   const search = query.trim().normalize('NFKD').toLocaleLowerCase('nl-NL')
   const matching = compatible.filter(product =>
@@ -53,6 +70,8 @@ export function LocalProductPicker({
           placeholder="Zoek op productnaam of artikel-ID"
           onChange={event => setQuery(event.target.value)} />
       </label>
+      <small>Producten met overeenkomende woorden staan vooraan.
+        Controleer altijd zelf merk, verpakking en geschiktheid; dit is geen geverifieerde match.</small>
       <label className="offline-price-workbench__manual-match">
         <span>Product handmatig beoordelen (alleen jouw geïmporteerde voorraad)</span>
         <select aria-label={`Handmatige productkeuze ${store} voor ${ingredient}`}

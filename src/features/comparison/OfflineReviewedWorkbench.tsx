@@ -30,13 +30,14 @@ function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays, budgetEuros, session,
+  plan, recipes, activeDays, budgetEuros, session, onOpenList,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   budgetEuros?: number
   session: OfflineComparisonSession
+  onOpenList?: () => void
 }) {
   const ingredientNeeds = useMemo(() => {
     try {
@@ -83,6 +84,7 @@ export function OfflineReviewedWorkbench({
     manualSelections, setManualSelections,
   } = session
   const [message, setMessage] = useState('')
+  const [onlyUnresolved, setOnlyUnresolved] = useState<Record<OfflineRetailer, boolean>>({ PLUS: false, DekaMarkt: false })
   const [busy, setBusy] = useState(false)
   const importVersion = useRef(0)
   // User-supplied single-store observations stay in private App memory only.
@@ -606,15 +608,25 @@ export function OfflineReviewedWorkbench({
                         <progress aria-label={store + ' gekoppelde ingrediënten'}
                           max={basket.lines.length || 1} value={basket.matchedLineCount} />
                         {basket.unresolvedLineCount > 0 && <button type="button" className="ghost-button"
+                          aria-pressed={onlyUnresolved[store]}
+                          onClick={() => setOnlyUnresolved(previous => ({ ...previous, [store]: !previous[store] }))}>
+                          {onlyUnresolved[store] ? 'Toon alle ingrediënten' : 'Toon alleen ontbrekende ingrediënten'}
+                        </button>}
+                        {basket.unresolvedLineCount > 0 && <button type="button" className="ghost-button"
                           onClick={() => downloadMissingItems(store)}>
                           Download {basket.unresolvedLineCount} ontbrekende ingrediënten als TXT
                         </button>}
                       </div>
+                      {onOpenList && <button type="button"
+                        className="offline-price-workbench__open-list"
+                        onClick={() => { session.setSelectedStore(store); onOpenList() }}>
+                        Open mijn {store}-boodschappenlijst
+                      </button>}
                       <p className="disclaimer">Kies een product alleen als je zelf hebt gecontroleerd
                         dat het werkelijk bij dit ingrediënt past. Supa gebruikt uitsluitend jouw
                         geïmporteerde producten, met bestaande verpakkings- en prijscontroles.
                         Een handmatige keuze is geen onafhankelijk supermarktbewijs.</p>
-                      {basket.lines.map(line => (
+                      {basket.lines.filter(line => !onlyUnresolved[store] || line.status === 'unresolved').map(line => (
                         <article key={line.id} className="offline-price-workbench__line">
                           <div>
                             <strong>{line.ingredientLabel}</strong>

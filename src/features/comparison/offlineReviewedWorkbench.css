@@ -141,3 +141,10 @@
 
 .offline-price-workbench__budget { font-weight:700; border-top:1px solid #d0ddd1;
   padding-top:.5rem; color:#294b34 !important; line-height:1.45; }
+
+.offline-price-workbench__open-list {
+  min-height: 44px; padding: .8rem 1rem; width: 100%; text-align: center;
+  border: 0; border-radius: 12px; color: #fff; background: #005135;
+  font-size: .94rem; font-weight: 650; cursor: pointer;
+}
+.offline-price-workbench__open-list:focus-visible { outline: 3px solid #008b64; outline-offset: 3px; }

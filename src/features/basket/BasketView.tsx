@@ -36,6 +36,7 @@ export function BasketView({
   offlinePriceSession,
   displayLocalList,
   onOpenComparison,
+  onOpenList,
 }: {
   basket: OneStoreBasket
   comparison: BasketComparison
@@ -48,6 +49,7 @@ export function BasketView({
   offlinePriceSession: OfflineComparisonSession
   displayLocalList?: boolean
   onOpenComparison?: () => void
+  onOpenList?: () => void
 }) {
   if (displayLocalList && manualPlan && manualRecipes && manualActiveDays) {
     return <ImportedShoppingList
@@ -101,7 +103,8 @@ export function BasketView({
     <section className="screen">
       {manualPlan && manualRecipes && manualActiveDays && (
         <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
-          budgetEuros={manualWeekBudgetEuros} session={offlinePriceSession} />
+          budgetEuros={manualWeekBudgetEuros} session={offlinePriceSession}
+          onOpenList={onOpenList} />
       )}
       {manualPlan && manualRecipes && manualActiveDays && (
         <details className="demo-comparison-disclosure">
