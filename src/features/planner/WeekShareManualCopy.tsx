@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { downloadPreparedWeekMenu } from './downloadWeekMenuText.ts'
+import { downloadPreparedWeekCalendar } from './downloadWeekMenuCalendar.ts'
 import { selectWeekMenuText, weekMenuSelectionFeedback } from './selectWeekMenuText.ts'
 
 type WeekShareManualCopyProps = {
@@ -13,6 +14,8 @@ type WeekShareManualCopyProps = {
  */
 export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [calendarMonday, setCalendarMonday] = useState('')
+  const [calendarFeedback, setCalendarFeedback] = useState<{ sourceText: string; monday: string; message: string } | null>(null)
   const [saveFeedback, setSaveFeedback] = useState<{ sourceText: string; message: string } | null>(null)
   const [selectFeedback, setSelectFeedback] = useState<{ sourceText: string; message: string } | null>(null)
 
@@ -54,6 +57,32 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
     })
   }
 
+  const saveCalendar = () => {
+    setSelectFeedback(null)
+    const saved = downloadPreparedWeekCalendar(textareaRef.current, text, calendarMonday, {
+      createObjectURL: (content) =>
+        URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' })),
+      triggerDownload: (url, filename) => {
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = filename
+        anchor.rel = 'noopener'
+        document.body.appendChild(anchor)
+        try { anchor.click() } finally { anchor.remove() }
+      },
+      scheduleRevoke: (url) => {
+        window.setTimeout(() => URL.revokeObjectURL(url), 3000)
+      },
+    })
+    setCalendarFeedback({
+      sourceText: text,
+      monday: calendarMonday,
+      message: saved
+        ? 'Agenda-bestand gemaakt. Open het .ics-bestand om de maaltijden in je agenda te zetten.'
+        : 'Agenda-export niet beschikbaar. Kies de maandag van je week en controleer het weekmenu.',
+    })
+  }
+
   return (
     <div className="week-share-manual">
       <div className="week-share-copy-tools">
@@ -73,6 +102,27 @@ export function WeekShareManualCopy({ text, rows }: WeekShareManualCopyProps) {
       <button type="button" className="ghost-button" onClick={saveWeekMenu}>
         Bewaar als tekstbestand
       </button>
+      <div className="week-share-calendar">
+        <label htmlFor="week-share-calendar-monday">Maandag van deze week (voor agenda-export)</label>
+        <input
+          id="week-share-calendar-monday"
+          type="date"
+          min="2000-01-01"
+          max="2099-12-31"
+          value={calendarMonday}
+          onChange={(event) => setCalendarMonday(event.currentTarget.value)}
+        />
+        <button type="button" className="ghost-button" onClick={saveCalendar}>
+          Voeg weekmenu toe aan agenda (.ics)
+        </button>
+        <p className="disclaimer">
+          Kies zelf de juiste maandag. De export maakt alleen lokale, hele-dag
+          maaltijden zonder winkelprijzen; er wordt niets automatisch gedeeld.
+        </p>
+      </div>
+      {calendarFeedback?.sourceText === text && calendarFeedback.monday === calendarMonday && (
+        <p role="status" aria-live="polite" className="disclaimer">{calendarFeedback.message}</p>
+      )}
       {selectFeedback?.sourceText === text && (
         <p role="status" aria-live="polite" className="disclaimer">{selectFeedback.message}</p>
       )}
