@@ -328,8 +328,3 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   )
 }
 
-// Keep the public List route under one stable module boundary. Legacy app
-// consumers can mount their existing ShoppingListView without importing the
-// independent, private unpriced-notes implementation.
-export { ManualShoppingNotes } from './ManualShoppingNotes.tsx'
-export type { UnpricedShoppingNote } from './ManualShoppingNotes.tsx'

@@ -5,7 +5,8 @@ import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView, resolveStagedBasket } from './features/basket/BasketView'
-import { ShoppingListView, ManualShoppingNotes, type UnpricedShoppingNote } from './features/shopping-list/ShoppingListView'
+import { ShoppingListView } from './features/shopping-list/ShoppingListView'
+import type { UnpricedShoppingNote } from './features/shopping-list/ManualShoppingNotes.tsx'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
@@ -156,6 +157,23 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [sourceClock, setSourceClock] = useState(() => Date.now())
   const [unpricedNotes, setUnpricedNotes] = useState<UnpricedShoppingNote[]>([])
+  // The established shopping route remains independently loadable. Only the
+  // optional local notes editor is code-split when the user actually opens List.
+  const [privateNotesView, setPrivateNotesView] = useState<
+    typeof import('./features/shopping-list/ManualShoppingNotes.tsx').ManualShoppingNotes | null
+  >(null)
+  const [privateNotesLoadError, setPrivateNotesLoadError] = useState(false)
+  useEffect(() => {
+    if (tab !== 'list' || privateNotesView || privateNotesLoadError) return
+    let active = true
+    void import('./features/shopping-list/ManualShoppingNotes.tsx')
+      .then(({ ManualShoppingNotes }) => {
+        if (active) setPrivateNotesView(() => ManualShoppingNotes)
+      })
+      .catch(() => { if (active) setPrivateNotesLoadError(true) })
+    return () => { active = false }
+  }, [tab, privateNotesView, privateNotesLoadError])
+
   useEffect(() => {
     if (typeof document === 'undefined' || typeof window.setInterval !== 'function') return
     const refresh = () => setSourceClock(Date.now())
@@ -637,7 +655,14 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             <ShoppingListView basket={basket} />
           </details>
         )}
-        {tab === 'list' && <ManualShoppingNotes notes={unpricedNotes} setNotes={setUnpricedNotes} />}
+        {tab === 'list' && (privateNotesView
+          ? (() => {
+              const PrivateNotes = privateNotesView
+              return <PrivateNotes notes={unpricedNotes} setNotes={setUnpricedNotes} />
+            })()
+          : <p role="status">{privateNotesLoadError
+              ? 'Eigen ongeprijsde lijst kon niet worden geopend; je bestaande mandjes zijn behouden.'
+              : 'Eigen ongeprijsde lijst openen…'}</p>)}
         {tab === 'observe' && <ObservationView />}
       </div>
 
