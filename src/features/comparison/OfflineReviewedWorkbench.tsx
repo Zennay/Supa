@@ -1367,6 +1367,8 @@ export function OfflineReviewedWorkbench({
                 sourceFresh={currentEnough}
                 pairedWithin24h={imported.pairedWithin24h}
                 comparable={canShowDifference}
+                captures={imported.captures}
+                nowMs={clockMs}
                 onOpenPlanner={onOpenPlanner}
                 onReviewMissing={focusPairMatch}
                 onOpenImport={() => document.getElementById('supa-private-price-import')
