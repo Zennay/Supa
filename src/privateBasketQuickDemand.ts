@@ -23,10 +23,10 @@ const maxChars = 40000
 const maxRows = 200
 const units: Record<string, MetricUnit> = {
   g: 'g', gram: 'g', kg: 'kg', ml: 'ml', l: 'l',
-  stuk: 'piece', stuks: 'piece', stukken: 'piece',
+  stuk: 'piece', stuks: 'piece', stukken: 'piece', 'stuk(s)': 'piece',
 }
 const quantity = '(\\d{1,7}(?:[.,]\\d{1,6})?)'
-const unit = '(kg|gram|g|ml|l|stukken|stuks|stuk)'
+const unit = '(kg|gram|g|ml|l|stukken|stuks|stuk\\(s\\)|stuk)'
 const leading = new RegExp('^' + quantity + '\\s*' + unit + '\\s+(.+)$', 'iu')
 const trailing = new RegExp('^(.+?)\\s*[:;–—-]\\s*' + quantity + '\\s*' + unit + '$', 'iu')
 const allowedLabel = (label: string) => label.length > 0 && label.length <= 160 &&
