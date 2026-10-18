@@ -41,7 +41,10 @@ loadButton.addEventListener('click', () => {
     for (const recipe of ready.slice(0, 100)) {
       const card = document.createElement('label')
       card.style.display = 'grid'
-      card.style.gridTemplateColumns = 'auto minmax(0,1fr) 80px'
+      card.style.gridTemplateColumns = 'auto minmax(0,1fr) 92px 92px'
+      card.style.padding = '10px 0'
+      card.style.borderBottom = '1px solid #d8e5d9'
+      card.style.maxWidth = '100%'
       card.style.alignItems = 'center'
       card.style.gap = '10px'
       const selected = document.createElement('input')
@@ -59,13 +62,28 @@ loadButton.addEventListener('click', () => {
       repeats.value = '1'
       repeats.setAttribute('aria-label', 'Aantal bereidingen van ' + recipe.title)
       repeats.dataset.recipeRepeats = recipe.id
-      card.append(selected, caption, repeats)
+      const portions = document.createElement('input')
+      portions.type = 'number'
+      portions.min = '1'
+      portions.max = '100'
+      portions.step = '1'
+      portions.value = String(recipe.servings ?? 2)
+      portions.setAttribute('aria-label', 'Porties per bereiding van ' + recipe.title)
+      portions.title = 'Gewenste porties per bereiding (1–100)'
+      portions.dataset.recipePortions = recipe.id
+      const inputs = [repeats, portions]
+      for (const field of inputs) {
+        field.style.minWidth = '0'
+        field.style.width = '100%'
+      }
+      card.append(selected, caption, repeats, portions)
       choices.append(card)
     }
     convertButton.disabled = ready.length === 0
     setStatus(ready.length + ' eigen recepten met volledig beoordeelde metrische ingrediënten beschikbaar. ' +
       (snapshot.recipes.length - ready.length) + ' recepten vereisen nog metrische hoeveelheden, hele fysieke stuks, porties of menselijke review. ' +
-      'Vink maximaal zeven bereidingen aan; herhalingen tellen mee voor het echte aantal maaltijden.',
+      'Vink maximaal zeven bereidingen aan. De eerste invoer per recept is het aantal bereidingen, de tweede het gewenste aantal porties per bereiding. ' +
+      'Porties worden voor de bronmatching opnieuw uit de bevestigde metrische ingrediënten berekend.',
     ready.length === 0)
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Kan lokale eigen recepten niet lezen.', true)
@@ -92,15 +110,35 @@ convertButton.addEventListener('click', () => {
       if (!repeatsInput || !/^[1-7]$/.test(repeatsInput.value) || !Number.isSafeInteger(times)) {
         throw Error('Gebruik een volledig aantal bereidingen van 1 tot 7.')
       }
+      const portionsInput = card?.querySelector<HTMLInputElement>('input[data-recipe-portions]')
+      const portions = Number(portionsInput?.value)
+      if (!portionsInput || !/^(?:[1-9]|[1-9]\\d|100)$/.test(portionsInput.value) ||
+          !Number.isSafeInteger(portions)) {
+        throw Error('Kies tussen 1 en 100 hele porties per bereiding.')
+      }
       const reviewed = reviewedForBasket(recipe)
-      if (!reviewed || recipe.warnings.length || reviewed.ingredients.some(item =>
+      if (!reviewed || !Number.isFinite(recipe.servings) || recipe.servings === null ||
+          recipe.servings <= 0 || recipe.warnings.length || reviewed.ingredients.some(item =>
           item.amount === null || !units.includes(item.unit) ||
           !Number.isFinite(item.amount) || item.amount <= 0 || item.amount > 100000)) {
         throw Error('Een eigen recept vereist nog menselijke metrische controle in Mijn recepten.')
       }
       count += times
       if (count > 7) throw Error('Kies maximaal zeven bereidingen bij elkaar.')
-      recipes.push(reviewed)
+      // Each selection produces one canonical recipe identity. The normal
+      // Supa aggregator then combines repeated preparations and equivalent
+      // store demands; never round physical pieces up or infer a package.
+      const scaledIngredients = reviewed.ingredients.map(item => {
+        const scaled = item.amount! * portions / recipe.servings!
+        const rounded = Math.round(scaled * 1000) / 1000
+        if (!Number.isFinite(scaled) || scaled <= 0 ||
+            !Number.isFinite(rounded) || rounded <= 0 || rounded > 100000 ||
+            (item.unit === 'piece' && !Number.isSafeInteger(scaled))) {
+          throw Error('Gedeeltelijke stuks of onveilige metrische porties: corrigeer het recept eerst.')
+        }
+        return { ...item, amount: rounded }
+      })
+      recipes.push({ ...reviewed, servings: portions, ingredients: scaledIngredients })
       for (let index = 0; index < times; index++) {
         const day = 'Eigen maaltijd ' + String(activeDays.length + 1)
         activeDays.push(day)
@@ -128,7 +166,7 @@ convertButton.addEventListener('click', () => {
     }
     document.dispatchEvent(new CustomEvent('supa:private-planner-demand', { detail: demand }))
     setStatus(count + ' bereidingen omgezet naar ' + ingredients.length +
-      ' exacte metrische ingrediëntbehoeften. Iedere winkel-SKU en prijs blijft onbekend ' +
+      ' exacte, op jouw gekozen porties geschaalde metrische ingrediëntbehoeften. Iedere winkel-SKU en prijs blijft onbekend ' +
       'tot je de eigen bronartikelen bewust koppelt. Geen gegevens verzonden.')
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Eigen recepten konden niet veilig worden omgezet.', true)
