@@ -6,7 +6,7 @@ export default defineConfig({
   server: { proxy: { '/api': 'http://127.0.0.1:4174' } },
   build: {
     sourcemap: false,
-    rollupOptions: { input: ['index.html', 'private-basket-compare.html'] },
+    rollupOptions: { input: ['index.html', 'private-basket-mapping.html', 'private-basket-compare.html'] },
   },
   preview: {
     strictPort: true,
