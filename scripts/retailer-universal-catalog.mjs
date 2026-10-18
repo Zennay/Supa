@@ -79,13 +79,26 @@ function safeDirectRetailerSourceUrl(raw, retailer, kind) {
   }
 }
 
-function normalizedObservation(value) {
+// A legacy internal cross-kind view may label *the same validated product
+// observation* as catalog evidence. It is never proof of an independent
+// capture or a new permitted URL. Compare all physical and price facts.
+function physicalProductFactSignature(value) {
+  return JSON.stringify([
+    value.supermarket, value.sourceProductId, value.provenance.url,
+    value.provenance.capturedAt, value.provenance.sha256, value.name,
+    value.currentPriceCents, value.currency, value.pack, value.offer,
+    value.availability,
+  ])
+}
+
+function normalizedObservation(value, pairedProductAlias = false) {
   validateRawProductObservation(value)
   if (!safeId(value.sourceProductId)) throw new Error('Unsafe/missing retail product identity')
   // A direct caller must not bypass source trust by providing a structurally
   // valid yet credential-bearing URL, impossible clock or unsafe money value.
   safeDirectRetailerSourceUrl(
-    value.provenance.url, value.supermarket, value.provenance.kind,
+    value.provenance.url, value.supermarket,
+    pairedProductAlias ? 'product' : value.provenance.kind,
   )
   // Strict direct API admission: Date.parse alone normalizes impossible
   // days such as February 30 and drops submillisecond source chronology.
@@ -129,6 +142,23 @@ export function buildUniversalRetailerCatalog(batch) {
   }
   const groups = new Map()
   let observationsCount = 0
+  // Only recognize a product-route URL with a catalog label if an *identical*
+  // separately validated product observation is present in this same private
+  // batch. This preserves historical cross-kind UI grouping without accepting
+  // arbitrary catalog URLs under the product-route exception.
+  const productAliases = new Set()
+  for (const result of batch.results) {
+    if (result?.accepted !== true ||
+        !['plus:product', 'dekamarkt:product'].includes(result.key) ||
+        !Array.isArray(result.observations)) continue
+    for (const observation of result.observations) {
+      const normalized = normalizedObservation(observation)
+      if (result.key !== observation.supermarket + ':' + normalized.sourceKind) {
+        throw new Error('Ingestion result does not match validated retailer adapter')
+      }
+      productAliases.add(physicalProductFactSignature(observation))
+    }
+  }
   for (const result of batch.results) {
     if (!result || result.accepted !== true ||
         !Array.isArray(result.observations) ||
@@ -137,7 +167,9 @@ export function buildUniversalRetailerCatalog(batch) {
       throw new Error('Refusing incomplete or untrusted retailer ingest batch')
     }
     for (const observation of result.observations) {
-      const normalized = normalizedObservation(observation)
+      const isPairedProductAlias = observation?.provenance?.kind === 'catalog' &&
+        productAliases.has(physicalProductFactSignature(observation))
+      const normalized = normalizedObservation(observation, isPairedProductAlias)
       const scope = observation.supermarket
       if (!['plus', 'dekamarkt'].includes(scope) ||
           result.key !== scope + ':' + normalized.sourceKind) {
