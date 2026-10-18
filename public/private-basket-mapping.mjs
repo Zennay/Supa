@@ -12,6 +12,7 @@ const plusInput = document.querySelector('#plus-source')
 const dekaInput = document.querySelector('#deka-source')
 const csvHeader = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 let sourceRevision = 0
+let pendingManualEdit = false
 const sourceStatus = document.querySelector('#source-status')
 const editSource = document.querySelector('#edit-owned-source')
 const status = document.querySelector('#status')
@@ -278,9 +279,9 @@ function refresh() {
   }
   save.disabled = !lines.children.length
   downloadUnpriced.disabled = save.disabled
-  saveSession.disabled = save.disabled || !captures
+  saveSession.disabled = save.disabled || !captures || pendingManualEdit
   showUnpriced.disabled = save.disabled
-  compareNow.disabled = !captures || save.disabled
+  compareNow.disabled = !captures || save.disabled || pendingManualEdit
   editSource.disabled = !captures
   updateCoverage()
 }
@@ -463,6 +464,7 @@ async function loadSources() {
       captures: stores.map(store => verified[store] ?? captures[store]),
     })
     if (captures && JSON.stringify(verified) === JSON.stringify(captures)) {
+      pendingManualEdit = false
       notice(sourceStatus, 'Exact dezelfde eigen bron opnieuw geopend. Productkeuzes blijven behouden; vergelijk zelf opnieuw.')
       refresh()
       return
@@ -491,6 +493,7 @@ async function loadSources() {
     }))
     clearSourceMatches()
     captures = verified
+    pendingManualEdit = false
     for (const item of kept) for (const store of unchanged) {
       const sku = item.selected[store]
       if (sku) item.row.querySelector('[data-store="' + store + '"]').value = sku
@@ -528,21 +531,64 @@ async function loadSources() {
   }
   refresh()
 }
+// Unsaved edits are private drafts, not admitted price source changes.
+ // Keep the last accepted observations and human matches in memory; immediately
+ // hide prior monetary results and disable comparison until admission/cancel.
 document.addEventListener('supa:manual-source-edited', () => {
   ++sourceRevision
-  captures = null
-  clearSourceMatches()
+  pendingManualEdit = true
+  invalidatePrice()
   refresh()
-  notice(sourceStatus, 'Handmatige brongegevens gewijzigd. Neem de twee echte winkelopnames opnieuw over, en bevestig daarna alle winkelproductkeuzes opnieuw.', 'warning')
+  notice(sourceStatus, 'Handmatig bronconcept gewijzigd. Vorige echte winkelopname en SKU-keuzes blijven bewaard, maar vergelijkingen zijn uitgeschakeld totdat je het concept overneemt of annuleert.', 'warning')
+})
+document.addEventListener('supa:manual-source-cancelled', () => {
+  ++sourceRevision
+  pendingManualEdit = false
+  invalidatePrice()
+  refresh()
+  notice(sourceStatus, captures
+    ? 'Concept geannuleerd. Eerder toegelaten winkelbron en gecontroleerde SKU-keuzes zijn behouden; vergelijk opnieuw voor een actueel privéresultaat.'
+    : 'Concept geannuleerd. Er is nog geen eigen winkelbron ingelezen.')
 })
 document.addEventListener('supa:manual-source-admitted', event => {
   ++sourceRevision
-  captures = null
   try {
-    const parsed = event.detail?.source
-    const verified = acceptJson(parsed)
-    clearSourceMatches()
+    const source = acceptJson(event.detail?.source)
+    // An explicitly observed one-store manual capture may add/replace only
+    // THAT retailer. The other store is preserved from the original admitted
+    // real capture, never generated as a fake observation.
+    const combined = stores
+      .map(store => source[store] ?? captures?.[store])
+      .filter(Boolean)
+    const verified = acceptJson({
+      schema: combined.length === 2 ? 'supa-offline-prices-v1' : 'supa-private-single-store-prices-v1',
+      captures: combined,
+    })
+    if (captures && JSON.stringify(verified) !== JSON.stringify(captures)) {
+      const changed = stores.filter(store => source[store]).join(' en ')
+      const retained = stores.filter(store => !source[store] && captures[store]).join(' en ')
+      const question = 'Neem werkelijk zelf geobserveerde ' + changed + '-producten over? ' +
+        (retained ? 'De bestaande oorspronkelijke ' + retained + '-opname blijft letterlijk ongewijzigd. ' : '') +
+        'Eerdere SKU-keuzes blijven alleen bij letterlijk ongewijzigde winkelopnames bewaard. ' +
+        'Gewijzigde winkels vereisen nieuwe handmatige productmatching; alle privébedragen worden opnieuw berekend.'
+      if (!window.confirm(question)) {
+        event.detail.accepted = false
+        pendingManualEdit = false
+        refresh()
+        notice(sourceStatus, 'Handmatige bronvervanging niet uitgevoerd. Vorige echte opnames en SKU-keuzes blijven behouden. Vergelijk desgewenst opnieuw.')
+        return
+      }
+    }
+    const unchanged = stores.filter(store => captures?.[store] && verified[store] &&
+      JSON.stringify(captures[store]) === JSON.stringify(verified[store]))
+    // Clear ONLY changed-store choices before re-rendering new product options.
+    for (const store of stores) {
+      if (unchanged.includes(store)) continue
+      for (const select of lines.querySelectorAll('[data-store="' + store + '"]')) select.value = ''
+    }
     captures = verified
+    pendingManualEdit = false
+    event.detail.accepted = true
     sourceInput.value = ''
     plusInput.value = ''
     dekaInput.value = ''
@@ -552,7 +598,7 @@ document.addEventListener('supa:manual-source-admitted', event => {
       const capture = captures[store]
       if (!capture) return store + ': geen echte opname; onbekende artikelen en prijzen'
       const age = now - Date.parse(capture.observedAt)
-      return store + ': ' + capture.products.length + ' zelf ingevoerde product(en), ' +
+      return store + ': ' + capture.products.length + ' echt ingevoerde product(en), ' +
         capture.observedAt + (age < 0 ? ' · toekomstig' :
           age > 7 * 86400000 ? ' · ouder dan 7 dagen' : '')
     })
@@ -560,7 +606,9 @@ document.addEventListener('supa:manual-source-admitted', event => {
       ? Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt)) : null
     if (gap === null) labels.push('De tweede winkel is niet waargenomen; geen volledig prijsverschil.')
     else if (gap > 86400000) labels.push('Opnames meer dan 24 uur uiteen: geen volledig betrouwbaar prijsverschil.')
-    labels.push('Kies per ingrediënt opnieuw handmatig gecontroleerde artikel-ID’s uit deze nieuwe bron.')
+    labels.push(unchanged.length
+      ? 'SKU-keuzes van uitsluitend ongewijzigde echte opname(n) behouden; gewijzigde winkelproducten opnieuw kiezen.'
+      : 'Bevestig nu per ingrediënt de originele echte winkelproduct-ID’s.')
     const expired = stores.some(store => {
       if (!captures[store]) return false
       const age = now - Date.parse(captures[store].observedAt)
@@ -568,9 +616,10 @@ document.addEventListener('supa:manual-source-admitted', event => {
     })
     notice(sourceStatus, labels.join('\n'), gap === null || gap > 86400000 || expired ? 'warning' : '')
   } catch {
-    captures = null
+    event.detail.accepted = false
+    // A malformed replacement never destroys the existing valid source.
     refresh()
-    notice(sourceStatus, 'Handmatig ingevoerde bron voldoet niet aan het Supa-formaat.', 'error')
+    notice(sourceStatus, 'Handmatige bron geweigerd. Vorige echt toegelaten opname en SKU-keuzes blijven intact. Corrigeer het concept of annuleer.', 'error')
   }
 })
 
