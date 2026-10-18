@@ -428,3 +428,35 @@ alleen in een optioneel details-paneel. De losse artikelen tellen nooit
 mee in de eigen bronprijzen of het echte twee-winkelmandje.
 Dit behoudt de Producten → Lijst gebruikersflow zonder de nieuwe
 Planner-first lijst terug te veranderen in een fictieve winkelmand.
+
+## Kosten- en runnerveiligheid: alleen self-hosted CI/preview
+
+Op de bestaande Supa-productbranch zijn de **ongewijzigde verplichte**
+`CI` en `Recipe UI preview` workflows van `ubuntu-latest` naar
+`self-hosted` gerouteerd. Externe fork-PR's mogen op deze privé-VPS
+geen onbetrouwbare code uitvoeren; alleen interne repo-PR's/push naar
+main starten die bestaande jobs. Geen npm/audit/security/buildchecks
+zijn verwijderd of verzwakt. Er is geen fallback naar hosted minuten.
+
+**Exacte runnerblokkade 18 oktober 2026:** de bestaande systemd-unit
+`actions.runner.Zennay-Supa.vps-bb300bba-supa.service` is sinds
+13 oktober 19:28 UTC in `failed (oom-kill)`, met `Restart=no`.
+De VPS heeft 10 GiB RAM, circa 3,5 GiB beschikbaar maar 4 GiB van
+4 GiB swap benut; meerdere bestaande Firefox-processen gebruiken
+veel geheugen. Sluit nooit zonder eigenaartoetsing actieve relayprocessen.
+
+Verbonden zSSH kan de status lezen en repositorywijzigingen uitvoeren
+maar kan deze systemd-rootservice niet herstarten: `sudo -n` is
+uitdrukkelijk geweigerd door `no-new-privileges`. Niet omzeild.
+Een bevoegde hostbeheerder moet na vrijmaken van voldoende capaciteit
+via de normale hostbeheerroute deze **bestaande** unit heractiveren:
+
+```bash
+sudo systemctl reset-failed actions.runner.Zennay-Supa.vps-bb300bba-supa.service
+sudo systemctl start actions.runner.Zennay-Supa.vps-bb300bba-supa.service
+systemctl is-active actions.runner.Zennay-Supa.vps-bb300bba-supa.service
+```
+
+Tot de runner opnieuw online is mogen verplichte jobs veilig in de
+self-hosted-queue wachten; geen main-merge of productie-deploy zonder
+de nieuwe exacte-head checks/review. Gevraagde hosted-billing: €0.
