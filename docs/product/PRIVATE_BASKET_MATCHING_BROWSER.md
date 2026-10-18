@@ -165,3 +165,17 @@ een heropend bestand is geen nieuwe waarneming, geen geldige bronlicentie,
 geen bewezen actuele kassaprijs en geen hergebruik van een oude savings-claim.
 Dit is een extra privéopslagmogelijkheid; zonder bronbestand blijven de
 bestaande ongeprijsde Planner- en boodschappenlijstfuncties bruikbaar.
+
+## Ongeprijsde lijst meenemen tussen apparaten
+
+Ook als je nog geen toegelaten winkelprijzen hebt, kun je de eigen mobiele
+ongeprijsde ingrediëntenlijst openen, artikelen afvinken en nu via **Bewaar
+ongeprijsde afvinkstatus (JSON)** opt-in meenemen. Het bestand
+`supa-private-unpriced-checklist-v1` bevat uitsluitend de actuele fysieke
+ingrediënten (ID, naam, aantal, eenheid) en aangevinkte ID's; **nooit** winkel-SKU,
+bronmoment, prijs of retailerproduct. **Herstel eigen ongeprijsde afvinkstatus**
+vereist exact dezelfde fysieke ingrediënten, volgorde en hoeveelheden, unieke
+geldige aangevinkte ID's, strict UTF-8, maximaal 256 kB, en expliciete
+gebruikersbevestiging. Bij een gewijzigd weekmenu of ingrediënten faalt herstel
+zonder voortgang te muteren; een bronprijsupdate alleen wijzigt geen fysieke
+vraag. Er is geen automatische opslag, prijsvergelijking of synchronisatie.

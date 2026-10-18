@@ -683,6 +683,73 @@ document.querySelector('#unpriced-reset').addEventListener('click', () => {
   updateUnpricedProgress()
 })
 
+// Optional local backup for the *unpriced* checklist. No retailer price or SKU
+// is ever written to this portable file; it is bound to exact physical demand.
+const unpricedRestore = document.querySelector('#unpriced-restore')
+const physicalRows = data => data.ingredients.map(({ id, label, amount, unit }) =>
+  ({ id, label, amount, unit }))
+const currentUnpricedRows = () => {
+  if (unpricedTrip.hidden || !unpricedSnapshot) throw Error('Open eerst de ongeprijsde afvinklijst.')
+  const current = physicalRows(demand())
+  if (JSON.stringify(current) !== JSON.stringify(physicalRows(unpricedSnapshot))) {
+    throw Error('De ingrediënten zijn veranderd. Open een nieuwe afvinklijst.')
+  }
+  return current
+}
+document.querySelector('#unpriced-backup').addEventListener('click', () => {
+  try {
+    const ingredients = currentUnpricedRows()
+    const content = JSON.stringify({ schema: 'supa-private-unpriced-checklist-v1',
+      ingredients, checkedIds: ingredients.filter(item => unpricedChecked.has(item.id)).map(item => item.id) }, null, 2) + '\n'
+    if (new TextEncoder().encode(content).length > maxBytes) throw Error('De afvinkstatus is te groot.')
+    const url = URL.createObjectURL(new Blob([content], { type: 'application/json;charset=utf-8' }))
+    const link = node('a')
+    link.href = url
+    link.download = 'supa-ongeprijsde-afvinkstatus.json'
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+    notice(status, 'Ongeprijsde afvinkstatus lokaal aangeboden: zonder winkelbron, SKU of prijs.')
+  } catch (error) { notice(status, error instanceof Error ? error.message :
+    'Kan afvinkstatus niet bewaren.', 'error') }
+})
+let unpricedRestoreRevision = 0
+unpricedRestore.addEventListener('change', async () => {
+  const file = unpricedRestore.files?.[0]
+  if (!file) return
+  const attempt = ++unpricedRestoreRevision
+  try {
+    const original = currentUnpricedRows()
+    const source = await readLocalFile(file)
+    if (attempt !== unpricedRestoreRevision) return
+    const saved = JSON.parse(source)
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved) ||
+        Object.keys(saved).sort().join(',') !== 'checkedIds,ingredients,schema' ||
+        saved.schema !== 'supa-private-unpriced-checklist-v1' ||
+        !Array.isArray(saved.ingredients) || !Array.isArray(saved.checkedIds) ||
+        JSON.stringify(saved.ingredients) !== JSON.stringify(original) ||
+        !saved.checkedIds.every(id => typeof id === 'string' &&
+          original.some(item => item.id === id)) ||
+        new Set(saved.checkedIds).size !== saved.checkedIds.length ||
+        JSON.stringify(currentUnpricedRows()) !== JSON.stringify(original)) {
+      throw Error('Afvinkbestand hoort niet bij precies deze fysieke ingrediëntenlijst.')
+    }
+    if (!window.confirm('Herstel uitsluitend de vinkjes van exact deze ongeprijsde ingrediënten? ' +
+        'De huidige vinkjes worden vervangen; winkelprijzen blijven volledig buiten beeld.')) return
+    if (attempt !== unpricedRestoreRevision ||
+        JSON.stringify(currentUnpricedRows()) !== JSON.stringify(original)) return
+    unpricedChecked.clear()
+    for (const id of saved.checkedIds) unpricedChecked.add(id)
+    const checkboxes = unpricedItems.querySelectorAll('input[type="checkbox"]')
+    checkboxes.forEach((box, index) => { box.checked = unpricedChecked.has(original[index].id) })
+    updateUnpricedProgress()
+    notice(status, saved.checkedIds.length + ' ongeprijsde afvinkingen uitsluitend voor deze fysieke mand hersteld.')
+  } catch (error) { if (attempt === unpricedRestoreRevision)
+    notice(status, error instanceof Error ? error.message : 'Kan afvinkstatus niet veilig herstellen.', 'error')
+  } finally { if (attempt === unpricedRestoreRevision) unpricedRestore.value = '' }
+})
+
 downloadUnpriced.addEventListener('click', () => {
   try {
     const data = demand()

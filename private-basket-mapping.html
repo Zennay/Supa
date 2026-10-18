@@ -153,7 +153,10 @@ Bewaar desgewenst je <strong>lokale bron- en mandinvoersessie</strong> inclusief
 <p>Deze lijst bevat uitsluitend de <strong>eigen ingevoerde fysieke behoefte</strong>. Er zijn nog geen winkelproducten of prijzen vastgesteld. Vink af wat je al hebt gekocht of zelf hebt gevonden. Er wordt niets automatisch opgeslagen.</p>
 <div id="unpriced-progress" class="notice" role="status" aria-live="polite"></div>
 <div id="unpriced-items" role="group" aria-label="Ongeprijsde ingrediënten afvinken"></div>
-<div class="row-actions"><button id="unpriced-reset" class="secondary" type="button">Wis afvinkingen</button></div>
+<div class="row-actions"><button id="unpriced-reset" class="secondary" type="button">Wis afvinkingen</button>
+<button id="unpriced-backup" class="secondary" type="button">Bewaar ongeprijsde afvinkstatus (JSON)</button>
+<label for="unpriced-restore">Herstel eigen ongeprijsde afvinkstatus
+<input id="unpriced-restore" type="file" accept=".json,application/json"></label></div>
 </section>
 <div id="price-status" class="notice" role="status" aria-live="polite">Nog geen prijsberekening gestart.</div>
 <section id="result" hidden aria-label="Vergelijking van de eigen winkelmandjes">
