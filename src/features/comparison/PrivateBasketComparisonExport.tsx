@@ -14,7 +14,15 @@ const COLUMNS = [
 ]
 
 function cell(value: string | number): string {
-  const input = String(value)
+  // A signed, already-validated arithmetic delta is a NUMBER, not a formula
+  // supplied by a product name. Do not prefix negative cents with an apostrophe
+  // (that would turn valid -125 numeric differences into spreadsheet text).
+  // Invalid JS numbers are never allowed into this downloadable money ledger.
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error('Ongeldige numerieke prijsdata')
+    return '"' + String(value) + '"'
+  }
+  const input = value
   // Protect spreadsheet importers from formula-like product/ingredient names.
   // NFKC detects width/compatibility aliases. Strip invisible format marks,
   // combining marks and Unicode whitespace only for the safety check, not
@@ -22,7 +30,7 @@ function cell(value: string | number): string {
   // word joiners before a spreadsheet formula prefix.
   const leading = input.normalize('NFKC')
     .replace(/^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*/gu, '')
-  const text = /^[=+\-@]/u.test(leading) ? "'" + input : input
+  const text = /^[=+\-@\u2212]/u.test(leading) ? "'" + input : input
   return '"' + text.replace(/"/g, '""') + '"'
 }
 
