@@ -175,6 +175,17 @@ convertButton.addEventListener('click', () => {
         productIds: { PLUS: null, DekaMarkt: null },
       })),
     }
+    // A prior private basket may contain manually admitted physical products.
+    // Never destroy those product choices merely because this picker was
+    // opened or a portion count changed: ask before replacing accepted demand.
+    const existingRows = document.querySelector<HTMLElement>('#lines')
+    if (existingRows?.children.length && !window.confirm(
+      'Vervang de huidige mandvraag door ' + ingredients.length + ' ingrediënten uit je gekozen eigen recepten? ' +
+      'Bestaande PLUS/Deka-productkoppelingen en afvinkstatus voor dat mandje moeten opnieuw worden bevestigd.'
+    )) {
+      setStatus('Huidig mandje behouden. Je kunt de bereidingen of porties nog aanpassen.')
+      return
+    }
     document.dispatchEvent(new CustomEvent('supa:private-planner-demand', { detail: demand }))
     setStatus(count + ' bereidingen omgezet naar ' + ingredients.length +
       ' exacte, op jouw gekozen porties geschaalde metrische ingrediëntbehoeften. Iedere winkel-SKU en prijs blijft onbekend ' +
