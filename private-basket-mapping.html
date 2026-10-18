@@ -36,7 +36,7 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 #result #summary{white-space:pre-wrap}
 @media(max-width:650px){main{padding:15px 10px 50px}#result{padding:12px}#result th,#result td{padding:9px}}
 /* A user pressing Print comparison must not print their editable import forms. */
-@media print{
+@media print{#budget-euros,#budget-label{display:none!important}
  body{background:white;color:#122a1c}main{max-width:none;padding:0}
  header,section[aria-labelledby],#price-status,#unpriced-trip,#trip,.row-actions,button{display:none!important}
  #result:not([hidden]){display:block!important;border:0;box-shadow:none;margin:0;padding:0}
@@ -162,6 +162,11 @@ Bewaar desgewenst je <strong>lokale bron- en mandinvoersessie</strong> inclusief
 <section id="result" hidden aria-label="Vergelijking van de eigen winkelmandjes">
 <h2>Jouw mandje · PLUS tegenover DekaMarkt</h2>
 <div id="summary" class="notice" role="status" aria-live="polite"></div>
+<div id="budget-panel" style="padding:12px;margin-top:12px;border:1px solid #d6e0d4;border-radius:10px">
+<label id="budget-label" for="budget-euros">Optioneel: eigen budget voor dit hele mandje (€)</label>
+<input id="budget-euros" type="text" inputmode="decimal" placeholder="Bijv. 50,00" maxlength="12" style="width:160px;max-width:100%" autocomplete="off">
+<div id="budget-status" class="notice" role="status" aria-live="polite">Vul eventueel je eigen budget in. Zonder volledig geldig winkelmandje geen budgetconclusie.</div>
+</div>
 <p id="captures"></p>
 <div class="table-wrap"><table>
 <thead><tr><th scope="col">Ingrediënt en benodigde hoeveelheid</th><th scope="col">PLUS</th><th scope="col">DekaMarkt</th><th scope="col">Verschil per ingrediënt</th></tr></thead>

@@ -19,7 +19,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.nav{background:#e2eee6;color:#174
 .tablewrap{overflow-x:auto}table{border-collapse:collapse;min-width:660px;width:100%}td,th{text-align:left;vertical-align:top;padding:11px;border-bottom:1px solid #d7e4dc}
 small{color:#587566}strong{color:#164d33}
 @media(max-width:650px){.grid{grid-template-columns:1fr}section{padding:14px}}
-@media print{body{background:white}.inputs,.nav,button{display:none!important}section{border:0;break-inside:avoid}}
+@media print{#budget-euros,#budget-label{display:none!important}body{background:white}.inputs,.nav,button{display:none!important}section{border:0;break-inside:avoid}}
 #trip-items{display:grid;gap:9px;margin:14px 0}
 #trip .trip-line{display:flex;align-items:flex-start;gap:12px;border:1px solid #d6e0d4;border-radius:11px;background:#fafdfa;padding:13px;font-weight:500}
 #trip input[type=checkbox]{width:1.35rem;height:1.35rem;min-width:1.35rem;margin:3px 0 0;accent-color:#17643e}
@@ -54,6 +54,11 @@ publieke besparingsclaim. Datumvoorwaarden worden pas bij het klikken opnieuw be
 <section id="result" hidden aria-label="Privé vergelijking">
 <h2>Mandjes naast elkaar</h2>
 <div id="summary" class="notice" role="status"></div>
+<div id="budget-panel" style="padding:12px;margin-top:12px;border:1px solid #d6e0d4;border-radius:10px">
+<label id="budget-label" for="budget-euros">Optioneel: eigen budget voor dit hele mandje (€)</label>
+<input id="budget-euros" type="text" inputmode="decimal" placeholder="Bijv. 50,00" maxlength="12" style="width:160px;max-width:100%" autocomplete="off">
+<div id="budget-status" class="notice" role="status" aria-live="polite">Vul eventueel je eigen budget in. Zonder volledig geldig winkelmandje geen budgetconclusie.</div>
+</div>
 <p id="captures"></p>
 <div class="tablewrap"><table>
 <thead><tr><th scope="col">Ingrediënt en fysieke behoefte</th><th scope="col">PLUS</th><th scope="col">DekaMarkt</th><th scope="col">Verschil per ingrediënt</th></tr></thead>

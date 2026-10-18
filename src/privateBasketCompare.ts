@@ -48,6 +48,9 @@ const compare = document.querySelector<HTMLButtonElement>('#compare')!
 const status = document.querySelector<HTMLDivElement>('#price-status')!
 const result = document.querySelector<HTMLElement>('#result')!
 const summary = document.querySelector<HTMLDivElement>('#summary')!
+const budgetInput = document.querySelector<HTMLInputElement>('#budget-euros')!
+const budgetStatus = document.querySelector<HTMLDivElement>('#budget-status')!
+let budgetTotals: Record<StoreName, number> | null = null
 const capturesLabel = document.querySelector<HTMLParagraphElement>('#captures')!
 const rows = document.querySelector<HTMLTableSectionElement>('#rows')!
 const nextActions = document.querySelector<HTMLElement>('#next-actions')!
@@ -298,6 +301,43 @@ function setStatus(message: string, isError = false): void {
   status.textContent = message
   status.className = 'notice' + (isError ? ' error' : '')
 }
+// Budget comparison is derived exclusively from two complete, fresh canonical
+// whole-pack basket totals. The user supplies an optional personal amount.
+function budgetInCents(text: string): number | null {
+  const match = /^(0|[1-9]\d{0,6})(?:[,.](\d{1,2}))?$/.exec(text)
+  if (!match) return null
+  const cents = Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0') || '0')
+  return Number.isSafeInteger(cents) && cents > 0 && cents <= 100000000 ? cents : null
+}
+function renderBudget(): void {
+  const input = budgetInput.value.trim()
+  if (!input) {
+    budgetStatus.textContent = 'Geen budget ingevuld. De eigen mandprijzen blijven los daarvan zichtbaar.'
+    budgetStatus.className = 'notice'
+    return
+  }
+  const ceiling = budgetInCents(input)
+  if (ceiling === null) {
+    budgetStatus.textContent = 'Vul een positief eigen bedrag tot € 1.000.000 in, bijvoorbeeld 50,00.'
+    budgetStatus.className = 'notice warning'
+    return
+  }
+  if (!budgetTotals || result.hidden) {
+    budgetStatus.textContent = 'Budgetuitkomst onbekend: alleen twee complete, recente eigen winkelmandjes kunnen worden afgezet tegen dit budget.'
+    budgetStatus.className = 'notice warning'
+    return
+  }
+  budgetStatus.textContent = stores.map(store => {
+    const total = budgetTotals![store]
+    const diff = ceiling - total
+    return store + ': ' + (diff >= 0
+      ? euro.format(diff / 100) + ' ruimte binnen jouw budget'
+      : euro.format(-diff / 100) + ' boven jouw budget')
+  }).join(' · ') + '. Alleen eigen oorspronkelijke waarnemingen; geen kassagarantie.'
+  budgetStatus.className = 'notice'
+}
+budgetInput.addEventListener('input', renderBudget)
+
 function advisoryUnitPrice(line: Extract<BasketTraceLine,{status:'matched'}>): string {
   const pack = line.pack
   const family = pack.unit === 'g' || pack.unit === 'kg' ? 'kg' :
@@ -616,9 +656,11 @@ function show(source: Source, demand: Demand): void {
     firstAge <= weekNs && secondAge <= weekNs && gap <= dayNs
   const complete = fresh && comparison.claimable && comparison.deltaCents !== null &&
     Number.isSafeInteger(comparison.deltaCents)
+  budgetTotals = complete ? { PLUS: left.totalCents, DekaMarkt: right.totalCents } : null
   tripCapturedAt = { PLUS: captures.PLUS.observedAt, DekaMarkt: captures.DekaMarkt.observedAt }
   comparisonValidThroughNs = complete ? (start <= end ? start : end) + weekNs : null
   result.hidden = false
+  renderBudget()
   loadTrip(left, right, demand,
     { PLUS: firstAge, DekaMarkt: secondAge },
     { PLUS: start, DekaMarkt: end })
@@ -757,7 +799,9 @@ document.querySelector<HTMLButtonElement>('#download-html')!.addEventListener('c
     })
     const html = renderPrivateBasketSnapshot({
       capturedAt: new Date().toISOString(),
-      summary: summary.textContent ?? '',
+      summary: (summary.textContent ?? '') +
+        (budgetInCents(budgetInput.value.trim()) !== null && budgetTotals
+          ? ' Eigen budget: ' + (budgetStatus.textContent ?? '') : ''),
       sourceMoments: capturesLabel.textContent ?? '',
       rows: reportRows,
       nextActions: nextActions.hidden ? [] : [...missingTasks],

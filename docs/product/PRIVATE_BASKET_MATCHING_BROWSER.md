@@ -179,3 +179,18 @@ geldige aangevinkte ID's, strict UTF-8, maximaal 256 kB, en expliciete
 gebruikersbevestiging. Bij een gewijzigd weekmenu of ingrediënten faalt herstel
 zonder voortgang te muteren; een bronprijsupdate alleen wijzigt geen fysieke
 vraag. Er is geen automatische opslag, prijsvergelijking of synchronisatie.
+
+## Budget-first: eigen doel naast twee complete mandjes
+
+Op beide lokale vergelijkingpagina's kan de gebruiker **optioneel zelf** een
+budget in euro's opgeven (bijvoorbeeld `50,00`). Supa rekent invoer strikt in
+hele eurocenten om (maximaal € 1.000.000) en vergelijkt het uitsluitend met de
+bestaande canonieke complete hele-verpakkingsmandtotalen. Per winkel verschijnt
+de resterende budgetruimte of de overschrijding. Zonder twee complete én
+recente winkelmanden, of met een ongeldige budgetinvoer, verschijnt **geen**
+financiële budgetconclusie. Een budget wijzigen maakt nooit onbekende prijzen
+bekend en voert geen nieuwe winkelprijsberekening uit. De huidige privé HTML-
+momentopname kan de expliciet berekende budgetcontext meenemen, duidelijk als
+historisch overzicht, en de browserprint toont de budgetuitkomst zonder het
+persoonlijke invoerveld. Geen gesuggereerde, gemockte of automatisch opgehaalde
+prijzen en geen kassagarantie.
