@@ -922,3 +922,14 @@ bronnamen blijven binnen de kaarten en kunnen niet meer horizontaal
 buiten het scherm vallen. De afzonderlijke winkelafdelingen blijven
 duidelijk te onderscheiden en het volledige tekstoverzicht is lokaal
 te selecteren.
+
+#### Extra ritten na handmatige winkelvoorkeuren
+
+Een handmatige winkelvoorkeur kan een tweede winkel introduceren zelfs
+als de puur goedkoopste artikelen in één winkel verkrijgbaar zijn.
+Daarom baseert Supa het tonen van het extra-kostenveld op de werkelijk
+gekozen én de goedkoopste theoretische route, en berekent het
+twee-winkelbedrag uit de handmatig gekozen route. De maximale
+theoretische voordelige ruimte zonder voorkeuren blijft afzonderlijk
+herkenbaar; er worden nooit niet-gekozen productprijzen als jouw
+persoonlijke route uitgegeven.

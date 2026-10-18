@@ -33,7 +33,11 @@ export function MixedStoreShoppingCard({
   // become an apparently reviewed custom basket.
   const selectedMixed = chosenMixed ?? mixed
 
-  const mixedUsesBoth = stores.every(store => mixed.lines.some(line => line.store === store))
+  // An explicit preferred store can introduce a second visit even when the
+  // cheapest-by-line route would only use one store. Cost entry must follow
+  // this *actual* proposed route, never only the theoretical minimum.
+  const mixedUsesBoth = stores.every(store => mixed.lines.some(line => line.store === store)) ||
+    stores.every(store => selectedMixed.lines.some(line => line.store === store))
   const rawCost = extraVisitCost.trim()
   const costShapeOk = rawCost === '' || /^\d{1,4}(?:[,.]\d{1,2})?$/.test(rawCost)
   const cents = rawCost && costShapeOk
@@ -167,12 +171,13 @@ export function MixedStoreShoppingCard({
       </label>
       <p>Dit zijn jouw zelf opgegeven extra omrij-/parkeerkosten ten opzichte
         van één winkel. Zonder ingevuld bedrag is het netto voordeel onbekend.
-        De ruimte voor extra kosten is {money.format(mixed.additionalDifferenceCents / 100)}.</p>
+        Het maximale theoretische voordeel vóór jouw winkelvoorkeuren is
+        {' '}{money.format(mixed.additionalDifferenceCents / 100)}.</p>
       {costInvalid && <p role="alert">Voer een geldig bedrag in tussen € 0,00 en
         € 1.000,00, met hoogstens twee decimalen.</p>}
       {!costInvalid && netAdvantage !== null && <p role="status">
         Twee winkels zouden inclusief jouw extra kosten{' '}
-        <strong>{money.format((mixed.totalCents + extraCostCents!) / 100)}</strong>
+        <strong>{money.format((selectedMixed.totalCents + extraCostCents!) / 100)}</strong>
         {' '}kosten. {netAdvantage > 0
           ? 'Dat is ' + money.format(netAdvantage / 100) + ' minder dan één complete winkel.'
           : netAdvantage === 0
