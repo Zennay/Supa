@@ -18,7 +18,7 @@ const importButton = document.querySelector<HTMLButtonElement>('#quick-demand-im
 const status = document.querySelector<HTMLElement>('#quick-demand-status')!
 const mealsInput = document.querySelector<HTMLInputElement>('#meal-count')!
 const existingLines = document.querySelector<HTMLElement>('#lines')!
-const maxChars = 16000
+const maxChars = 40000
 const maxRows = 200
 const units: Record<string, MetricUnit> = {
   g: 'g', gram: 'g', kg: 'kg', ml: 'ml', l: 'l',
@@ -57,12 +57,40 @@ function parseLine(rawLine: string, lineNumber: number): ParsedRow {
 
 /** Combine only human-identical ingredient labels, never infer equivalent products. */
 export function readQuickMetricDemand(text: string, selectedMealCount: number) {
-  if (text.length > maxChars) throw Error('Je plaklijst is te lang; maximaal 16.000 tekens.')
+  if (text.length > maxChars) throw Error('Je plaklijst is te lang; maximaal 40.000 tekens.')
   if (!Number.isSafeInteger(selectedMealCount) || selectedMealCount < 1 ||
       selectedMealCount > 1000) throw Error('Kies eerst een geldig aantal maaltijden van 1 tot 1000.')
-  const rawLines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim())
+  let rawLines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim())
+  let meals = selectedMealCount
+  // Reopen the existing plain-text Supa shopping checklist as editable,
+  // unpriced demand. Headers/checkbox state are not product prices or SKUs.
+  if (rawLines[0] === 'SUPA · eigen ongeprijsde ingrediëntenlijst') {
+    const savedMeals = /^Geselecteerde maaltijden: ([1-9]\d{0,3})$/.exec(rawLines[2] ?? '')
+    if (rawLines.length < 6 ||
+        !rawLines[1]?.startsWith('Aangemaakt op: ') ||
+        !savedMeals || Number(savedMeals[1]) > 1000 ||
+        rawLines[3] !== 'Geen winkelprijzen, automatische productmatching of besparingsclaim.' ||
+        rawLines.at(-1) !== 'Gebruik jouw eigen feitelijke verpakkingsinformatie bij het winkelen.') {
+      throw Error('Het eigen Supa TXT-overzicht is incompleet of heeft onbekende velden.')
+    }
+    meals = Number(savedMeals[1])
+    rawLines = rawLines.slice(4, -1).map((row, index) => {
+      if (!/^\[[ x]\] /.test(row)) {
+        throw Error('De originele Supa TXT-regel ' + (index + 1) + ' is niet herkenbaar.')
+      }
+      const body = row.slice(4)
+      const separator = body.lastIndexOf(' · ')
+      if (separator <= 0) throw Error('Onbekende hoeveelheid in de originele Supa TXT-lijst.')
+      const label = body.slice(0, separator)
+      const amount = body.slice(separator + 3)
+      if (amount === 'hoeveelheid nog controleren') {
+        throw Error('Controleer eerst ontbrekende hoeveelheden in je oude lijst voordat je prijsproducten koppelt.')
+      }
+      return label + ': ' + amount
+    })
+  }
   if (!rawLines.length || rawLines.length > maxRows) {
-    throw Error('Plak 1 tot 200 ingredientregels met een metrische hoeveelheid.')
+    throw Error('Plak 1 tot 200 ingrediëntregels met een metrische hoeveelheid.')
   }
   const rows: ParsedRow[] = []
   const keys = new Map<string, number>()
@@ -96,7 +124,7 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
     ...item, id: 'plaklijst-' + (index + 1),
     productIds: { PLUS: null, DekaMarkt: null },
   }))
-  return { schema: 'supa-private-basket-demand-v1' as const, selectedMealCount, ingredients }
+  return { schema: 'supa-private-basket-demand-v1' as const, selectedMealCount: meals, ingredients }
 }
 
 importButton.addEventListener('click', () => {
@@ -115,7 +143,7 @@ importButton.addEventListener('click', () => {
     )) return
     document.dispatchEvent(new CustomEvent('supa:private-planner-demand', { detail: demand }))
     status.textContent = demand.ingredients.length + ' fysieke, metrische ingrediënten ingevoerd voor ' +
-      count + ' maaltijd(en). Gelijke namen zijn exact samengevoegd; winkelproducten en prijzen ' +
+      demand.selectedMealCount + ' maaltijd(en). Gelijke namen zijn exact samengevoegd; winkelproducten en prijzen ' +
       'blijven onbekend totdat je jouw echt waargenomen SKU’s zelf koppelt.'
     status.className = 'notice'
   } catch (error) {
