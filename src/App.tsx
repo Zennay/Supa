@@ -574,10 +574,13 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           en voorbeeldprijzen zijn apart verborgen; ze worden nooit als huidige
           winkelprijs of geverifieerde besparing gebruikt.
         </p>}
-        {tab === 'list' && <details className="demo-comparison-disclosure">
-          <summary>Open alleen de oorspronkelijke ontwerpvoorbeelden (geen winkelprijzen)</summary>
+        {tab === 'list' && <section className="demo-comparison-disclosure"
+          aria-label="Oorspronkelijke niet-actuele ontwerpvoorbeelden">
+          <h3>Ontwerpvoorbeelden · geen actuele winkelprijzen</h3>
+          <p className="disclaimer">Je in Producten gekozen Figma-voorbeelden staan hier
+            los van je eigen weekmand en PLUS/DekaMarkt-prijsvergelijking.</p>
           <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-        </details>}
+        </section>}
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
           <p role="status" className="disclaimer">
             {productSelectionWarning === 'protected'
@@ -675,10 +678,14 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <ShoppingListView basket={basket} />
         </details>}
         {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && (
-          <details className="demo-comparison-disclosure">
-            <summary>Open de oude voorbeeldboodschappenlijst (geen actuele bronprijzen)</summary>
+          <section className="demo-comparison-disclosure"
+            aria-label="Oude voorbeeldmand zonder actuele winkelprijzen">
+            <h3>Voorbeeldmand · geen actuele winkelprijzen</h3>
+            <p className="disclaimer">De oude ontwerpmand gebruikt fictieve voorbeelddata.
+              Alleen je eigen boodschappen bovenaan en uitdrukkelijk geïmporteerde
+              bronopnames kunnen voor je echte winkeltrip worden gebruikt.</p>
             <ShoppingListView basket={basket} />
-          </details>
+          </section>
         )}
         {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length > 0 && (
           <details className="demo-comparison-disclosure">
