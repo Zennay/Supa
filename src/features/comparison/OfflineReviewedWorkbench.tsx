@@ -203,11 +203,23 @@ export function OfflineReviewedWorkbench({
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setClockMs(Date.now())
+      // Recalculating the exact same admitted observations should not erase
+      // unrelated extra quantities/checkmarks or force reviewed matches again.
+      // A changed capture always invalidates the previous source-bound choices.
+      const sameSource = !!imported &&
+        offlineSessionFingerprint(imported, plan, recipes, activeDays) ===
+          offlineSessionFingerprint(parsed, plan, recipes, activeDays)
+      if (!sameSource) {
+        setManualSelections({ fingerprint: '', products: {} })
+        session.setTripMemory({})
+        session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
+        session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
+        session.setExtraQuantities({ PLUS: {}, DekaMarkt: {} })
+      }
       setImported(parsed)
-      session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
-      session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
-      session.setExtraQuantities({ PLUS: {}, DekaMarkt: {} })
-      setMessage('Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
+      setMessage(sameSource
+        ? 'Dezelfde geldige privéopnames opnieuw berekend; je productkeuzes en losse artikelen zijn behouden.'
+        : 'Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
     } catch (error) {
       // Never retain/display a previous basket after an invalid new import.
       setImported(null)
