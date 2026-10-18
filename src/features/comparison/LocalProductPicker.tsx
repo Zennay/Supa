@@ -136,6 +136,26 @@ export function LocalProductPicker({
             </option>)}
         </select>
       </label>
+      {matching.length > 0 && <section className="offline-match-choices"
+        aria-label={'Snelle productkeuze voor ' + ingredient + ' bij ' + store}>
+        <strong>{Math.min(matching.length, 5)} alternatieven uit jouw eigen opname</strong>
+        <div className="offline-match-choices__grid">
+          {matching.slice(0, 5).map(product => (
+            <button type="button" key={product.id}
+              aria-pressed={selected === product.id}
+              onClick={() => onSelect(product.id)}>
+              <span><strong>{product.name}</strong>
+                <small>{product.packAmount} {product.packUnit} × {product.packCount ?? 1}
+                  {' · '}verpakking {euros.format(product.priceCents / 100)}</small>
+              </span>
+              <span><strong>{ingredientCostLabel(product)}</strong>
+                <small>{unitRateLabel(product)}</small></span>
+              <small>{selected === product.id ? 'Door jou gekozen product' :
+                'Kies dit product voor jouw weekmand'}</small>
+            </button>
+          ))}
+        </div>
+      </section>}
       {chosen && <p role="status">
         Zelf gekozen: {chosen.name} · {ingredientCostLabel(chosen)} uit jouw
         eigen winkelopname. Pas na de productkeuze herberekent Supa het weekmandje.

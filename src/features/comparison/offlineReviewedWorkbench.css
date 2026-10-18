@@ -267,3 +267,18 @@
   .offline-readiness__steps li { display:grid; }
   .offline-readiness__steps li button { justify-self:stretch; white-space:normal; }
 }
+
+/* Preview actual permitted local candidates without truncating long mobile
+   select options. The user must tap explicitly to change a product match. */
+.offline-match-choices { min-width:0; display:grid; gap:.55rem; padding:.7rem;
+  border:1px solid #c9dccb; background:#f6faf6; border-radius:13px; }
+.offline-match-choices__grid { display:grid; gap:.5rem;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr)); }
+.offline-match-choices__grid button { display:grid; gap:.4rem; text-align:left;
+  padding:.7rem; min-height:72px; border:1px solid #b4ccb7; border-radius:10px;
+  background:#fff; color:#203d2b; cursor:pointer; overflow-wrap:anywhere; }
+.offline-match-choices__grid button[aria-pressed=true] { border:2px solid #27744a;
+  background:#e5f3e7; }
+.offline-match-choices__grid button:focus-visible { outline:3px solid #27744a; outline-offset:3px; }
+.offline-match-choices__grid button span { display:grid; gap:.1rem; }
+.offline-match-choices__grid button small { font-size:.82rem; color:#536456; }
