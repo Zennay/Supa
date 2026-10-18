@@ -20,6 +20,12 @@ button:disabled{opacity:.5;cursor:not-allowed}.nav{background:#e2eee6;color:#174
 small{color:#587566}strong{color:#164d33}
 @media(max-width:650px){.grid{grid-template-columns:1fr}section{padding:14px}}
 @media print{body{background:white}.inputs,.nav,button{display:none!important}section{border:0;break-inside:avoid}}
+#trip-items{display:grid;gap:9px;margin:14px 0}
+#trip .trip-line{display:flex;align-items:flex-start;gap:12px;border:1px solid #d6e0d4;border-radius:11px;background:#fafdfa;padding:13px;font-weight:500}
+#trip input[type=checkbox]{width:1.35rem;height:1.35rem;min-width:1.35rem;margin:3px 0 0;accent-color:#17643e}
+#trip .trip-line:has(input:checked) span{text-decoration:line-through;color:#698376}
+#trip select{max-width:100%;width:100%;border:1px solid #afc4b6;border-radius:9px;padding:11px;background:white;color:#183b2d}
+#trip .row-actions{display:flex;gap:12px;flex-wrap:wrap}
 </style>
 <script type="module" src="/src/privateBasketCompare.ts"></script>
 </head>
@@ -63,7 +69,7 @@ publieke besparingsclaim. Datumvoorwaarden worden pas bij het klikken opnieuw be
 hele benodigde verpakkingen en de oorspronkelijk opgegeven centen; onvolledige mandjes hebben geen totaal/winnaar.</small></p>
 <section id="trip" hidden aria-label="Eigen boodschappenlijst">
 <h3>4 · Ga boodschappen doen met jouw gekozen winkel</h3>
-<p>Deze afvinklijst gebruikt uitsluitend het <strong>volledige</strong> mandje uit jouw lokale winkelopname. Een prijs is geen garantie voor de actuele kassaprijs. Er wordt niets naar een server verzonden of automatisch bewaard.</p>
+<p>Deze afvinklijst gebruikt uitsluitend een <strong>volledig en recent lokaal bekend mandje voor de gekozen winkel</strong>. Als de andere winkel geen bruikbare data heeft, mag je nog steeds een boodschappenlijst maken, maar Supa toont dan geen goedkoopste winkel of volledig prijsverschil. Een prijs is geen garantie voor de actuele kassaprijs. Er wordt niets naar een server verzonden of automatisch bewaard.</p>
 <label for="trip-store">Kies zelf de winkel waar je gaat winkelen</label>
 <select id="trip-store"><option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option></select>
 <div id="trip-summary" class="notice" role="status" aria-live="polite"></div>
