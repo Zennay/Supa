@@ -375,6 +375,8 @@ export function OfflineReviewedWorkbench({
   async function loadFile(file?: File) {
     if (!file) return
     const version = ++importVersion.current
+    const previousImported = imported
+    const previousText = text
     // Never leave an older basket, price difference or claim on screen while
     // a second local import is being read, converted or rejected.
     setImported(null)
@@ -418,14 +420,20 @@ export function OfflineReviewedWorkbench({
         importOneStore(json)
         return
       }
-      clearStaged()
+      // A rejected replacement must not erase a previously accepted capture.
+      // Defer stage clearing until the strict pair admission succeeds.
       setText(json)
-      importSnapshots(json)
+      if (importSnapshots(json)) clearStaged()
+      else {
+        setText(previousText)
+        setImported(previousImported)
+      }
     } catch (error) {
       if (version !== importVersion.current) return
-      setText('')
-      setImported(null)
-      setMessage(error instanceof Error ? error.message : 'Kon dit bestand niet lezen.')
+      setText(previousText)
+      setImported(previousImported)
+      setMessage((error instanceof Error ? error.message : 'Kon dit bestand niet lezen.') +
+        ' Je eerdere geldige opname is behouden.')
     } finally {
       if (version === importVersion.current) setBusy(false)
     }
@@ -437,10 +445,11 @@ export function OfflineReviewedWorkbench({
     // Two independent captures can be selected together without ever treating
     // the first uploaded store as an admissible or priced two-store basket.
     const version = ++importVersion.current
+    const previousImported = imported
+    const previousText = text
     setImported(null)
-    setText('')
-    clearStaged()
     if (files.length !== 2) {
+      setImported(previousImported)
       setMessage('Selecteer één gecombineerd bestand of precies twee afzonderlijke winkelbestanden.')
       return
     }
@@ -475,14 +484,19 @@ export function OfflineReviewedWorkbench({
       // observation timestamps, duplicate IDs, packages and missing prices.
       parseOfflinePriceSnapshots(combined, Date.now())
       setText(combined)
-      importSnapshots(combined)
+      if (!importSnapshots(combined)) {
+        setText(previousText)
+        setImported(previousImported)
+        return
+      }
+      clearStaged()
       setMessage('PLUS en DekaMarkt zijn samen lokaal geïmporteerd. Controleer nu de productkoppelingen.')
     } catch (error) {
       if (version !== importVersion.current) return
-      setImported(null)
-      setText('')
-      clearStaged()
-      setMessage(error instanceof Error ? error.message : 'Kon de winkelbestanden niet veilig importeren.')
+      setImported(previousImported)
+      setText(previousText)
+      setMessage((error instanceof Error ? error.message : 'Kon de winkelbestanden niet veilig importeren.') +
+        ' Je eerdere geldige opname is behouden.')
     } finally {
       if (version === importVersion.current) setBusy(false)
     }
