@@ -29,11 +29,12 @@ function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays,
+  plan, recipes, activeDays, budgetEuros,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
+  budgetEuros?: number
 }) {
   const ingredientNeeds = useMemo(() => {
     try {
@@ -394,6 +395,36 @@ export function OfflineReviewedWorkbench({
     setMessage('Je lijst met ontbrekende ingrediënten voor ' + store + ' is lokaal gedownload.')
   }
 
+  function budgetStatus(store: OfflineRetailer, basket: ReturnType<typeof buildOneStoreBasket>): string | null {
+    if (typeof budgetEuros !== 'number' || !Number.isFinite(budgetEuros) || budgetEuros <= 0) return null
+    const budgetCents = Math.round(budgetEuros * 100)
+    if (!Number.isSafeInteger(budgetCents) || budgetEuros !== budgetCents / 100 ||
+        !Number.isSafeInteger(basket.totalCents) || basket.totalCents < 0) return null
+    const nowNs = BigInt(Math.trunc(clockMs)) * 1000000n
+    const observedNs = imported?.captures[store].observedNs
+    if (observedNs === undefined || nowNs < observedNs - 300000000000n ||
+        nowNs - observedNs > 604800000000000n) {
+      return 'Geen budgetindicatie: deze winkelopname is verlopen of heeft een ongeldige tijd.'
+    }
+    const complete = basket.selectedMealCount > 0 && basket.lines.length > 0 &&
+      basket.unresolvedLineCount === 0
+    if (complete) {
+      const remaining = budgetCents - basket.totalCents
+      return remaining >= 0
+        ? euros.format(remaining / 100) + ' ruimte binnen je weekbudget'
+        : euros.format(-remaining / 100) + ' boven je weekbudget'
+    }
+    if (basket.selectedMealCount <= 0 || basket.lines.length === 0) {
+      return 'Plan eerst maaltijden om dit weekbudget te vergelijken.'
+    }
+    const knownOverrun = basket.totalCents - budgetCents
+    return knownOverrun > 0
+      ? 'Bekende artikelen zijn al minstens ' + euros.format(knownOverrun / 100) +
+        ' boven budget; onbekende prijzen ontbreken nog.'
+      : 'Budgetruimte nog onbekend: er ontbreken ' + basket.unresolvedLineCount +
+        ' productprijzen. Bekende bedragen zijn geen volledig totaal.'
+  }
+
   return (
     <section className="offline-price-workbench" aria-label="Geïmporteerde winkelprijzen vergelijken">
       <div className="offline-price-workbench__intro">
@@ -545,6 +576,8 @@ export function OfflineReviewedWorkbench({
                         <span>Bekende regels samen: {euros.format(basket.totalCents / 100)} (geen mandtotaal)</span>
                       )}
                       <span>{basket.matchedLineCount} gekoppeld, {basket.unresolvedLineCount} onbekend</span>
+                      {budgetStatus(store, basket) && <span className="offline-price-workbench__budget"
+                        aria-live="polite">{budgetStatus(store, basket)}</span>}
                     </section>
                   )
                 })}

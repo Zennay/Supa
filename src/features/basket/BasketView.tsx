@@ -30,6 +30,7 @@ export function BasketView({
   manualPlan,
   manualRecipes,
   manualActiveDays,
+  manualWeekBudgetEuros,
 }: {
   basket: OneStoreBasket
   comparison: BasketComparison
@@ -38,6 +39,7 @@ export function BasketView({
   manualPlan?: PlannedMeal[]
   manualRecipes?: RecipeWithIngredients[]
   manualActiveDays?: string[]
+  manualWeekBudgetEuros?: number
 }) {
   const basketCost = basketCostDisclosure(
     basket.totalCents,
@@ -83,7 +85,8 @@ export function BasketView({
   return (
     <section className="screen">
       {manualPlan && manualRecipes && manualActiveDays && (
-        <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays} />
+        <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
+          budgetEuros={manualWeekBudgetEuros} />
       )}
       {manualPlan && manualRecipes && manualActiveDays && (
         <ManualStoreComparison

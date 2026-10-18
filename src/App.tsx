@@ -390,6 +390,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             manualPlan={plannedMeals}
             manualRecipes={recipes}
             manualActiveDays={activeDays}
+            manualWeekBudgetEuros={budget}
           />
         )}
         {tab === 'list' && <ShoppingListView basket={basket} />}

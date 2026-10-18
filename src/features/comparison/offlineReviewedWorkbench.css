@@ -138,3 +138,6 @@
 .offline-price-workbench__coverage button { min-height:44px; padding:.65rem; justify-self:start;
   border-radius:9px; border:1px solid #597461; background:white; color:#234a30; cursor:pointer; }
 .offline-price-workbench__coverage button:focus-visible { outline:3px solid #226f52; outline-offset:2px; }
+
+.offline-price-workbench__budget { font-weight:700; border-top:1px solid #d0ddd1;
+  padding-top:.5rem; color:#294b34 !important; line-height:1.45; }
