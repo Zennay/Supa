@@ -106,6 +106,7 @@ function parseCapture(raw: unknown, now: number): OfflineCapture {
 export function parseSingleOfflineCapture(text: string, now: number): {
   retailer: OfflineRetailer
   capture: Record<string, unknown>
+  normalized: OfflineCapture
 } {
   if (typeof text !== 'string' || new TextEncoder().encode(text).length > 256000 ||
       !Number.isFinite(now)) throw new Error('Winkelopname ontbreekt of is te groot (256 kB).')
@@ -116,7 +117,13 @@ export function parseSingleOfflineCapture(text: string, now: number): {
     throw new Error('Verwacht schema supa-offline-store-capture-v1 met één capture.')
   }
   const valid = parseCapture(root.capture, now)
-  return { retailer: valid.retailer, capture: root.capture as Record<string, unknown> }
+  return {
+    retailer: valid.retailer,
+    capture: root.capture as Record<string, unknown>,
+    // Use precisely the canonical single-source admission for staged UI.
+    // This is not a retailer permission, publication or paired price proof.
+    normalized: valid,
+  }
 }
 
 export function parseOfflinePriceSnapshots(
