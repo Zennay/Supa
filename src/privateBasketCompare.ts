@@ -42,7 +42,7 @@ const plus = document.querySelector<HTMLInputElement>('#plus')!
 const deka = document.querySelector<HTMLInputElement>('#deka')!
 const demandFile = document.querySelector<HTMLInputElement>('#demand')!
 const compare = document.querySelector<HTMLButtonElement>('#compare')!
-const status = document.querySelector<HTMLDivElement>('#status')!
+const status = document.querySelector<HTMLDivElement>('#price-status')!
 const result = document.querySelector<HTMLElement>('#result')!
 const summary = document.querySelector<HTMLDivElement>('#summary')!
 const capturesLabel = document.querySelector<HTMLParagraphElement>('#captures')!
@@ -347,6 +347,7 @@ function show(source: Source, demand: Demand): void {
 }
 
 for (const el of [combined, plus, deka, demandFile]) {
+  if (!el) continue
   el.addEventListener('change', () => {
     inputRevision++
     result.hidden = true
@@ -359,7 +360,7 @@ for (const el of [combined, plus, deka, demandFile]) {
     }
   })
 }
-compare.addEventListener('click', async () => {
+compare?.addEventListener('click', async () => {
   const snapshotRevision = inputRevision
   compare.disabled = true
   result.hidden = true
@@ -381,4 +382,21 @@ compare.addEventListener('click', async () => {
 })
 document.querySelector<HTMLButtonElement>('#print')!.addEventListener('click', () => {
   if (!result.hidden) window.print()
+})
+
+/** Same-tab handoff from the local SKU mapping wizard.
+ *  No files, sources or prices are stored or transported off-device.
+ *  Re-admit the exact inputs before any monetary result is shown.
+ */
+document.addEventListener('supa:compare-private-basket', (event: Event) => {
+  result.hidden = true
+  try {
+    const payload = (event as CustomEvent<{ source: unknown; demand: unknown }>).detail
+    if (!payload) throw Error('Private inputs missing')
+    const source = sourceFrom(payload.source)
+    const demand = demandFrom(payload.demand)
+    show(source, demand)
+  } catch {
+    setStatus('Geen veilige volledige vergelijking mogelijk. Controleer beide lokale bronopnames, expliciete producten en fysieke hoeveelheden.', true)
+  }
 })
