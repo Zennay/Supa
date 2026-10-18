@@ -7,6 +7,7 @@ import type { OfflinePriceSnapshots, OfflineRetailer } from '../../domain/offlin
  * No automatic localStorage, sessionStorage, sync API or retailer requests.
  */
 export function useOfflineComparisonSession() {
+  const [selectedStore, setSelectedStore] = useState<OfflineRetailer>('PLUS')
   const [text, setText] = useState('')
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [stagedCaptures, setStagedCaptures] = useState<
@@ -18,7 +19,7 @@ export function useOfflineComparisonSession() {
   }>({ fingerprint: '', products: {} })
   const [importEpoch, setImportEpoch] = useState(0)
   return {
-    text, setText, imported, setImported,
+    selectedStore, setSelectedStore, text, setText, imported, setImported,
     stagedCaptures, setStagedCaptures,
     manualSelections, setManualSelections,
     importEpoch, setImportEpoch,

@@ -20,7 +20,7 @@ export function ImportedShoppingList({
   activeDays: string[]
   onOpenComparison: () => void
 }) {
-  const [store, setStore] = useState<OfflineRetailer>('PLUS')
+  const store = session.selectedStore
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const refresh = () => setNow(Date.now())
@@ -64,7 +64,7 @@ export function ImportedShoppingList({
     <div className="offline-price-workbench__actions" role="group" aria-label="Kies je winkel">
       {stores.map(option => <button key={option} type="button"
         aria-pressed={store === option}
-        onClick={() => setStore(option)}>{option}</button>)}
+        onClick={() => session.setSelectedStore(option)}>{option}</button>)}
       <button type="button" className="ghost-button" onClick={onOpenComparison}>
         Productkoppelingen bewerken
       </button>

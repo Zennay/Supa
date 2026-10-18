@@ -544,6 +544,11 @@ export function OfflineReviewedWorkbench({
                   return (
                     <section key={store}>
                       <h4>{store}</h4>
+                      <button type="button" className="ghost-button"
+                        aria-pressed={session.selectedStore === store}
+                        onClick={() => session.setSelectedStore(store)}>
+                        {session.selectedStore === store ? 'Gekozen voor Planner en Lijst' : 'Gebruik deze winkel in Planner en Lijst'}
+                      </button>
                       <strong>{complete ? euros.format(basket.totalCents / 100) : 'Geen volledig totaal'}</strong>
                       {!complete && basket.matchedLineCount > 0 && (
                         <span>Bekende regels samen: {euros.format(basket.totalCents / 100)} (geen mandtotaal)</span>

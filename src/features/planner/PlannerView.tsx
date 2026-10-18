@@ -21,6 +21,9 @@ type PlannerViewProps = {
   recipes: Recipe[]
   basketTotalCents: number
   basketUnresolvedLineCount: number
+  priceSource?: 'example' | 'private' | 'expired' | 'empty'
+  priceStore?: 'PLUS' | 'DekaMarkt'
+  onOpenComparison?: () => void
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
@@ -34,6 +37,9 @@ export function PlannerView({
   recipes,
   basketTotalCents,
   basketUnresolvedLineCount,
+  priceSource = 'example',
+  priceStore,
+  onOpenComparison,
   onBudgetChange,
   onToggleDay,
   onRecipeChange,
@@ -42,6 +48,7 @@ export function PlannerView({
   const [customOpen, setCustomOpen] = useState(false)
   const [customDraft, setCustomDraft] = useState('')
   const [customError, setCustomError] = useState('')
+  const pricesUnavailable = priceSource === 'expired' || priceSource === 'empty'
   const customActive = validCustomWeekBudgetEuros(budget) !== null && !budgetOptions.includes(budget)
 
   const commitCustomBudget = (event: FormEvent<HTMLFormElement>) => {
@@ -169,7 +176,11 @@ export function PlannerView({
             }
             aria-live="polite"
           >
-            {budgetKnown
+            {pricesUnavailable
+              ? priceSource === 'empty'
+                ? 'Plan maaltijden om je ingeladen winkels te vergelijken'
+                : 'Prijsopnames verlopen · geen actuele budgetstatus'
+              : budgetKnown
               ? exactRemainingCents === null
                 ? 'Budgetgegevens controleren'
                 : exactRemainingCents < 0
@@ -234,7 +245,7 @@ export function PlannerView({
           )}
         </div>
 
-        <div
+        {!pricesUnavailable && <div
           className="budget-progress"
           role="progressbar"
           aria-label={
@@ -247,18 +258,26 @@ export function PlannerView({
           aria-valuenow={Math.min(plannedCost, budget)}
         >
           <span style={{ width: `${budgetState.usage * 100}%` }} />
-        </div>
+        </div>}
 
-        <div className="budget-summary">
+        {pricesUnavailable
+          ? <p className="attention-card" role="status">
+              {priceSource === 'expired'
+                ? 'De privéprijsopnames zijn verlopen. Importeer nieuwe toegestane gegevens in Vergelijk.'
+                : 'Er is geen berekenbare mand voor je actuele weekmenu. Controleer de planning en productkoppelingen in Vergelijk.'}
+              {' '}Er wordt geen voorbeeldprijs als werkelijk mandbedrag gebruikt.
+            </p>
+          : <div className="budget-summary">
           <span>{activeDays.length} maaltijden actief</span>
           <strong>
             {budgetKnown
               ? euro.format(plannedCost)
               : `min. ${euro.format(plannedCost)}`}
           </strong>
-        </div>
+        </div>}
         <p className="disclaimer">
-          {budgetKnown ? (
+          {pricesUnavailable ? 'Geen betrouwbaar actueel winkelbedrag beschikbaar.' : null}
+          {!pricesUnavailable && (budgetKnown ? (
             <>
               Dit bedrag komt uit exact dezelfde productmatching en
               verpakkingsberekening als de Mand-tab.
@@ -276,8 +295,19 @@ export function PlannerView({
                 <> SUPA kan nog niet bepalen of je binnen of boven budget zit.</>
               )}
             </>
+          ))}
+          {priceSource === 'private' && (
+            <> De bedragen zijn afkomstig uit jouw eigen lokale {priceStore}-opname,
+              niet onafhankelijk geverifieerd en geen officiële prijs- of besparingsclaim.</>
+          )}
+          {priceSource === 'example' && (
+            <> Dit zijn uitsluitend voorbeeldproducten en voorbeeldprijzen, geen actuele winkelwaarnemingen.</>
           )}
         </p>
+        {onOpenComparison && <button type="button" className="ghost-button"
+          onClick={onOpenComparison}>
+          {priceSource === 'expired' ? 'Nieuwe prijsopnames importeren' : 'Bekijk winkels in Vergelijk'}
+        </button>}
       </section>
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}

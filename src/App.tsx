@@ -7,6 +7,7 @@ import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { useOfflineComparisonSession } from './features/comparison/offlineComparisonSession.ts'
 import { ImportedShoppingList } from './features/comparison/ImportedShoppingList.tsx'
+import { offlineSessionBaskets, offlineSessionFresh } from './features/comparison/offlineSessionBaskets.ts'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
@@ -107,6 +108,18 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
 
 export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
+  const [sourceClock, setSourceClock] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => setSourceClock(Date.now())
+    const timer = window.setInterval(refresh, 60000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
   const offlinePriceSession = useOfflineComparisonSession()
   const [initialProductSelection] = useState(readChosenProducts)
   const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)
@@ -213,6 +226,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       }),
     [activeDays, plannedMeals, recipes],
   )
+
+  const importedPair = useMemo(
+    () => offlineSessionBaskets(offlinePriceSession, plannedMeals, recipes, activeDays),
+    [offlinePriceSession.imported, offlinePriceSession.manualSelections, plannedMeals, recipes, activeDays],
+  )
+  const importedSourceFresh = offlinePriceSession.imported !== null &&
+    offlineSessionFresh(offlinePriceSession.imported, sourceClock)
+  const currentStoreBasket = importedPair
+    ? offlinePriceSession.selectedStore === 'PLUS' ? importedPair.plus : importedPair.deka
+    : null
+  const plannerSource = !offlinePriceSession.imported ? 'example'
+    : !importedSourceFresh ? 'expired'
+      : currentStoreBasket && currentStoreBasket.selectedMealCount > 0 &&
+        currentStoreBasket.lines.length > 0 ? 'private' : 'empty'
 
   const basketComparison = useMemo(
     () =>
@@ -351,8 +378,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             activeDays={activeDays}
             plannedMeals={plannedMeals}
             recipes={recipes}
-            basketTotalCents={basket.totalCents}
-            basketUnresolvedLineCount={basket.unresolvedLineCount}
+            basketTotalCents={plannerSource === 'private' && currentStoreBasket ? currentStoreBasket.totalCents : basket.totalCents}
+            basketUnresolvedLineCount={plannerSource === 'private' && currentStoreBasket ? currentStoreBasket.unresolvedLineCount : basket.unresolvedLineCount}
+            priceSource={plannerSource}
+            priceStore={plannerSource === 'private' ? offlinePriceSession.selectedStore : undefined}
+            onOpenComparison={() => navigate('basket')}
             onBudgetChange={(nextBudget) =>
               setPreferences((current) => ({
                 ...current,
