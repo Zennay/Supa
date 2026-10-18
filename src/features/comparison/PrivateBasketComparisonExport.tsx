@@ -128,6 +128,7 @@ function privateComparisonHtml(
   plusObservedAt: string,
   dekaObservedAt: string,
   comparable: boolean,
+  generatedAt: string,
 ): string {
   // This throws if a basket total, physical row or shared ingredient changes
   // independently of the paired comparison. Never print a forged winner.
@@ -200,7 +201,8 @@ function privateComparisonHtml(
     'Dit bestand bevat geen scripts of externe bronnen.</p></header>' +
     '<div class="meta"><p><strong>PLUS waargenomen:</strong><br>' + clean(plusObservedAt) +
     '</p><p><strong>DekaMarkt waargenomen:</strong><br>' + clean(dekaObservedAt) +
-    '</p></div><h2>' + (showDifference ? 'Volledig privémandje — rekenkundige vergelijking' :
+    '</p><p><strong>Bestand aangemaakt (apparaatklok):</strong><br>' +
+    clean(generatedAt) + '</p></div><h2>' + (showDifference ? 'Volledig privémandje — rekenkundige vergelijking' :
       'Onvolledig of verouderd — geen betrouwbaar totaalverschil') +
     '</h2>' + totals + '<table><thead><tr><th>Gepland ingrediënt</th><th>PLUS</th>' +
     '<th>DekaMarkt</th><th>Verschil</th></tr></thead><tbody>' + rows +
@@ -211,18 +213,22 @@ function privateComparisonHtml(
 
 /** User-initiated local CSV export: no publication, no retailer network or inferred prices. */
 export function PrivateBasketComparisonExport({
-  plus, deka, plusObservedAt, dekaObservedAt, comparable,
+  plus, deka, plusObservedAt, dekaObservedAt, comparable, eligibleNow,
 }: {
   plus: OneStoreBasket
   deka: OneStoreBasket
   plusObservedAt: string
   dekaObservedAt: string
   comparable: boolean
+  /** At the moment of download, re-evaluate the existing exact nanosecond
+   * freshness and canonical same-basket gates, not last-minute UI state. */
+  eligibleNow: () => boolean
 }) {
   const [message, setMessage] = useState('')
   const download = () => {
     try {
-      const csv = buildCsv(plus, deka, plusObservedAt, dekaObservedAt, comparable)
+      const csv = buildCsv(plus, deka, plusObservedAt, dekaObservedAt,
+        comparable && eligibleNow())
       const uri = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       try {
         const a = document.createElement('a')
@@ -241,7 +247,8 @@ export function PrivateBasketComparisonExport({
   }
   const downloadHtml = () => {
     try {
-      const html = privateComparisonHtml(plus, deka, plusObservedAt, dekaObservedAt, comparable)
+      const html = privateComparisonHtml(plus, deka, plusObservedAt, dekaObservedAt,
+        comparable && eligibleNow(), new Date().toISOString())
       const uri = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
       try {
         const link = document.createElement('a')
