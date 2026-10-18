@@ -1,5 +1,4 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
-import { shoppingListBasketKey } from './shoppingListProgress.ts'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation.ts'
 
 const KNOWN_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece'])
@@ -184,7 +183,6 @@ export function buildShoppingListCopyText(
   doneLineIds: readonly string[] = [],
 ): string | null {
   try {
-    shoppingListBasketKey(basket)
     return buildShoppingListCopyTextUnchecked(basket, doneLineIds)
   } catch {
     // A partial local checklist is discarded: invalid input is never copyable.
