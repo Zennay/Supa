@@ -211,3 +211,17 @@
   .offline-ingredient-ledger__delta { grid-column:1 / -1; border-top:1px solid #dbe5d9;
     padding-top:.5rem; }
 }
+
+
+/* Direct correction of unresolved shopping items without inventing any prices. */
+.offline-list-missing { display:grid; gap:.65rem; padding:1rem; margin:.8rem 0;
+  border:1px solid #bfcfbd; background:#f6faf3; border-radius:12px; }
+.offline-list-missing h3 { margin:0; font-size:1.05rem; }
+.offline-list-missing p { margin:0; font-size:.9rem; }
+.offline-list-missing ul { list-style:none; padding:0; margin:0; display:grid; gap:.5rem; }
+.offline-list-missing li { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between;
+  padding:.7rem; gap:.65rem; border:1px solid #d8e2d7; border-radius:10px; background:#fff; }
+.offline-list-missing li span { overflow-wrap:anywhere; min-width:0; }
+.offline-list-missing button { min-height:44px; border:1px solid #477657;
+  background:white; color:#204f31; border-radius:9px; cursor:pointer; padding:.5rem .85rem; }
+.offline-list-missing button:focus-visible { outline:3px solid #226f52; outline-offset:3px; }
