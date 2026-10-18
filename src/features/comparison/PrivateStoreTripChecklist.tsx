@@ -208,6 +208,7 @@ export function PrivateStoreTripChecklist({
   const [saveEnabled, setSaveEnabled] = useState(initial.enabled)
   const [storageProtected, setStorageProtected] = useState(initial.protected)
   const [savedRaw, setSavedRaw] = useState(initial.raw)
+  const [openOnly, setOpenOnly] = useState(false)
   const [copyVisible, setCopyVisible] = useState(false)
   const copyField = useRef<HTMLTextAreaElement>(null)
   const [message, setMessage] = useState(initial.protected
@@ -278,6 +279,9 @@ export function PrivateStoreTripChecklist({
     [basket, extraLines])
   const lines = consistent ? basket.lines : []
   const completed = lines.filter(line => done.has(line.id)).length
+  // This is presentation-only: checked items are still retained in the source
+  // basket and the always-complete exported/copyable trip.
+  const visibleLines = openOnly ? lines.filter(line => !done.has(line.id)) : lines
   const text = consistent ? checklistText(basket, done, observedAt, fresh, extraLines) : ''
 
   if (!consistent) {
@@ -337,8 +341,15 @@ export function PrivateStoreTripChecklist({
       {basket.unresolvedLineCount} ontbrekende productkeuzes. Het bekende deelbedrag is geen volledig mandtotaal.
     </p>}
     {lines.length === 0 && <p>Plan eerst maaltijden om artikelen te zien.</p>}
+    {lines.length > 0 && <label className="private-store-trip__filter">
+      <input type="checkbox" checked={openOnly}
+        onChange={event => setOpenOnly(event.target.checked)} />
+      <span>Toon alleen nog te kopen maaltijdproducten</span>
+    </label>}
+    {openOnly && visibleLines.length === 0 && lines.length > 0 && <p className="private-store-trip__empty"
+      role="status">Alle maaltijdproducten zijn afgevinkt. Je volledige lijst blijft downloadbaar.</p>}
     <ul className="private-store-trip__items">
-      {lines.map(line => <li key={line.id}>
+      {visibleLines.map(line => <li key={line.id}>
         <label>
           <input type="checkbox" checked={done.has(line.id)} onChange={() => toggle(line.id)} />
           <span className={done.has(line.id) ? 'private-store-trip__checked' : ''}>
