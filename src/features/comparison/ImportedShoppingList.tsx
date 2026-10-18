@@ -133,6 +133,11 @@ export function ImportedShoppingList({
             session.setImported(null)
             session.setText('')
             session.setStagedCaptures({})
+            session.setStagedManual({
+              PLUS: { fingerprint: '', products: {} },
+              DekaMarkt: { fingerprint: '', products: {} },
+            })
+            session.setReviewTarget(null)
             session.setManualSelections({ fingerprint: '', products: {} })
             session.setTripMemory({})
             session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
