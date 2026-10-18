@@ -380,7 +380,22 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
 
   const privateHomeSummary = useMemo(() => {
     const source = offlinePriceSession.imported
-    if (!source || !importedPair || !currentStoreBasket) return null
+    if (!source || !importedPair || !currentStoreBasket) {
+      if (!stagedForPlanner) return null
+      const lone = stagedForPlanner.basket
+      return {
+        selectedStore: stagedForPlanner.store,
+        matched: lone.matchedLineCount,
+        unresolved: lone.unresolvedLineCount,
+        hasDemand: lone.selectedMealCount > 0 && lone.lines.length > 0,
+        complete: lone.selectedMealCount > 0 && lone.lines.length > 0 &&
+          lone.unresolvedLineCount === 0,
+        fresh: stagedForPlanner.fresh,
+        totalCents: lone.totalCents,
+        deltaCents: null,
+        paired: false,
+      }
+    }
     const complete = (value: typeof importedPair.plus) =>
       value.selectedMealCount > 0 && value.lines.length > 0 && value.unresolvedLineCount === 0
     const ownComparison = compareFullBaskets({
@@ -398,9 +413,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       fresh: importedSourceFresh,
       totalCents: currentStoreBasket.totalCents,
       deltaCents: comparable ? ownComparison.deltaCents : null,
+      paired: true,
     }
   }, [offlinePriceSession.imported, offlinePriceSession.selectedStore, importedPair,
-    importedSourceFresh, currentStoreBasket])
+    importedSourceFresh, currentStoreBasket, stagedForPlanner])
 
   const basketComparison = useMemo(
     () =>
