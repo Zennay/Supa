@@ -699,7 +699,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {tab === 'list' && offlinePriceSession.imported && <details className="demo-comparison-disclosure">
           <summary>Oude voorbeeldboodschappenlijst (niet de geïmporteerde mand)</summary>
-          <ShoppingListView basket={basket} />
+          {tab === 'list' && <ShoppingListView basket={basket} />}
         </details>}
         {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && (
           <section className="demo-comparison-disclosure"
