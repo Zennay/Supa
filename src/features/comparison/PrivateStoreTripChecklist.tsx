@@ -73,13 +73,14 @@ function basketConsistent(basket: OneStoreBasket): boolean {
   }
 }
 
-function formatLine(line: BasketTraceLine, checked: boolean): string {
+function formatLine(line: BasketTraceLine, checked: boolean, fresh: boolean): string {
   const box = checked ? '☑ ' : '☐ '
   if (line.status === 'matched') {
     return box + line.ingredientLabel + ': ' + line.packs + ' × ' +
       line.productName +
       (line.reasons.includes('explicit local user selection; not an automatic or verified retailer match') ?
-        ' (zelf gekoppeld)' : '') + ' · ' + euro.format(line.lineTotalCents / 100)
+        ' (zelf gekoppeld)' : '') + ' · ' + euro.format(line.lineTotalCents / 100) +
+      (fresh ? '' : ' · VEROUDERDE PRIVÉPRIJS (geen actuele winkelprijs)')
   }
   return box + line.ingredientLabel + ': handmatig kiezen; nodig ' +
     (line.requirement.amount ?? '?') + ' ' + line.requirement.unit + ' · geen prijs'
@@ -93,10 +94,12 @@ function checklistText(basket: OneStoreBasket, done: ReadonlySet<string>,
     'SUPA · PRIVÉBOODSCHAPPENLIJST · ' + basket.store.name,
     'Geobserveerd: ' + observedAt + ' (eigen invoer, niet onafhankelijk geverifieerd)',
     fresh ? 'Prijsdatum recent genoeg voor particuliere vergelijking' : 'LET OP: verouderde prijswaarneming',
-    complete ? 'Totaal eigen invoer: ' + euro.format(basket.totalCents / 100) :
-      'Alleen bekende deelprijzen: ' + euro.format(basket.totalCents / 100) + ' (GEEN volledig totaal)',
+    complete && fresh ? 'Totaal eigen invoer: ' + euro.format(basket.totalCents / 100) :
+      complete ? 'Historisch privémandtotaal (niet actueel): ' + euro.format(basket.totalCents / 100) :
+      fresh ? 'Alleen bekende deelprijzen: ' + euro.format(basket.totalCents / 100) + ' (GEEN volledig totaal)' :
+      'Historisch bekend deelbedrag (verouderd, GEEN volledig totaal): ' + euro.format(basket.totalCents / 100),
     '',
-    ...basket.lines.map(line => formatLine(line, done.has(line.id))),
+    ...basket.lines.map(line => formatLine(line, done.has(line.id), fresh)),
     ...(extraLines.length > 0 ? [
       '',
       'LOSSE EXTRA ARTIKELEN (buiten het berekende maaltijdmandje)',
@@ -355,7 +358,8 @@ export function PrivateStoreTripChecklist({
           <span className={done.has(line.id) ? 'private-store-trip__checked' : ''}>
             <strong>{line.ingredientLabel}</strong>
             <small>{line.status === 'matched'
-              ? line.packs + ' × ' + line.productName + ' · ' + euro.format(line.lineTotalCents / 100)
+              ? line.packs + ' × ' + line.productName + ' · ' + euro.format(line.lineTotalCents / 100) +
+                (fresh ? '' : ' · verouderde privéprijs')
               : 'Zelf kiezen · ' + (line.requirement.amount ?? '?') + ' ' + line.requirement.unit +
                 ' · prijs onbekend'}</small>
           </span>
