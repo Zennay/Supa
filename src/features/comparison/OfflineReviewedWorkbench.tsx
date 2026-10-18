@@ -8,6 +8,7 @@ import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { TwoStoreIngredientLedger } from './TwoStoreIngredientLedger.tsx'
+import { MissingPriceChecklist } from './MissingPriceChecklist.tsx'
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { StagedStorePreview } from './StagedStorePreview.tsx'
 import { stagedStoreFingerprint } from './stagedStoreFingerprint.ts'
@@ -1383,6 +1384,12 @@ export function OfflineReviewedWorkbench({
                 }}
                 selections={choices}
                 onSelect={chooseProduct}
+              />
+              <MissingPriceChecklist
+                plus={basketPair.plus}
+                deka={basketPair.deka}
+                plusObservedAt={imported.captures.PLUS.observedAt}
+                dekaObservedAt={imported.captures.DekaMarkt.observedAt}
               />
               <PrivateBasketComparisonExport
                 plus={basketPair.plus}
