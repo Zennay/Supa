@@ -99,3 +99,6 @@
 .recipe-own-actions__confirm p { margin: 0 0 12px; }
 .recipe-own-actions :is(button):focus-visible { outline: 3px solid #276644; outline-offset: 2px; }
 @media (max-width: 600px) { .recipe-own-actions__buttons { flex-direction: column; } }
+
+.recipe-review__pending { margin: 14px 0; padding: 12px; border: 1px solid #bd9b6d; border-radius: 12px; background: #fffaf1; }
+.recipe-review__pending ul { margin: 8px 0; }
