@@ -38,6 +38,10 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 #trip .trip-line:has(input:checked) span{text-decoration:line-through;color:#698376}
 #trip select{max-width:100%;width:100%;border:1px solid #afc4b6;border-radius:9px;padding:11px;background:white;color:#183b2d}
 #trip .row-actions{display:flex;gap:12px;flex-wrap:wrap}
+#unpriced-items{display:grid;gap:9px;margin:14px 0}
+#unpriced-items .unpriced-line{display:flex;align-items:flex-start;gap:12px;border:1px solid #d6e0d4;border-radius:11px;background:#fafdfa;padding:13px;font-weight:500}
+#unpriced-items input[type=checkbox]{width:1.35rem;height:1.35rem;min-width:1.35rem;margin:3px 0 0;accent-color:#17643e}
+#unpriced-items .unpriced-line:has(input:checked) span{text-decoration:line-through;color:#698376}
 </style>
 <script type="module" src="/private-basket-mapping.mjs"></script>
 <script type="module" src="/private-basket-manual-observations.mjs"></script>
@@ -109,7 +113,15 @@ Een volledig prijsverschil verschijnt alleen met complete, geldige eigen winkelo
 <div id="status" class="notice" role="status" aria-live="polite">Voeg ingrediënten toe en open je bronbestand.</div>
 <div class="row-actions"><button id="compare-now" type="button" disabled>Vergelijk mijn twee mandjes</button><button id="save" type="button" disabled>Download mand-vraag.json</button>
 <button id="download-unpriced" type="button" class="secondary" disabled>Download ongeprijsde ingrediëntenlijst</button>
+<button id="show-unpriced" type="button" class="secondary" disabled>Open ongeprijsde afvinklijst</button>
 <a href="/private-basket-compare.html" class="secondary" style="display:inline-block;padding:11px 16px;border-radius:10px;text-decoration:none">Open de privé prijsvergelijking →</a></div>
+</section>
+<section id="unpriced-trip" hidden aria-label="Eigen ongeprijsde boodschappenlijst">
+<h2>Ongeprijsde boodschappenlijst uit jouw Planner</h2>
+<p>Deze lijst bevat uitsluitend de <strong>eigen ingevoerde fysieke behoefte</strong>. Er zijn nog geen winkelproducten of prijzen vastgesteld. Vink af wat je al hebt gekocht of zelf hebt gevonden. Er wordt niets automatisch opgeslagen.</p>
+<div id="unpriced-progress" class="notice" role="status" aria-live="polite"></div>
+<div id="unpriced-items" role="group" aria-label="Ongeprijsde ingrediënten afvinken"></div>
+<div class="row-actions"><button id="unpriced-reset" class="secondary" type="button">Wis afvinkingen</button></div>
 </section>
 <div id="price-status" class="notice" role="status" aria-live="polite">Nog geen prijsberekening gestart.</div>
 <section id="result" hidden aria-label="Vergelijking van de eigen winkelmandjes">
