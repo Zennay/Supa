@@ -161,9 +161,21 @@ function updateCoverage() {
         ' gekoppeld maar niet prijsbaar/beschikbaar' : '') +
       (duplicated ? ' · ' + duplicated + ' regels met dubbel gekozen SKU' : '')
   })
-  coverage.className = 'notice' + (messages.some(value => !value.includes(' ' + rows.length + ' van ' + rows.length)) ? ' warning' : '')
-  coverage.textContent = messages.join(' · ') +
-    '. Alleen een verse, volledige mandvergelijking kan winkelbedragen en prijsverschillen vaststellen; onbekende prijzen blijven onbekend.'
+  const now = Date.now()
+  const observed = stores.map(store => Date.parse(captures[store].observedAt))
+  const ages = observed.map(time => now - time)
+  const fresh = ages.every(age => Number.isFinite(age) && age >= 0 && age <= 7 * 86400000)
+  const paired = Math.abs(observed[0] - observed[1]) <= 86400000
+  const complete = messages.every(value => value.includes(' ' + rows.length + ' van ' + rows.length))
+  const expiry = Math.min(...observed) + 7 * 86400000
+  const timeStatus = !fresh ? 'Eén of beide bronopnames zijn toekomstig of ouder dan zeven dagen. ' :
+    !paired ? 'De twee bronmomenten liggen meer dan 24 uur uit elkaar. ' :
+      'Beide bronmomenten zijn binnen zeven dagen en maximaal 24 uur uiteen. '
+  coverage.className = 'notice' + (!complete || !fresh || !paired ? ' warning' : '')
+  coverage.textContent = messages.join(' · ') + '. ' + timeStatus +
+    (fresh && paired ? 'Bronpaar geldig tot uiterlijk ' +
+      new Date(expiry).toLocaleString('nl-NL') + ' volgens de oorspronkelijke waarnemingen. ' : '') +
+    'Alleen een complete, opnieuw berekende privévergelijking stelt de winkelbedragen vast. Onbekende of verlopen prijzen zijn nooit €0.'
 }
 
 function updateSelect(select, store, unit) {
@@ -412,7 +424,11 @@ async function loadSources() {
       Date.parse(captures.DekaMarkt.observedAt))
     if (gap > 86400000) descriptions.push('Opnames >24 uur uiteen. Opnieuw meten voor een volledige vergelijking.')
     descriptions.push('Selecteer uitsluitend door jou gecontroleerde matches. Geen automatische bronrechten of besparing.')
-    notice(sourceStatus, descriptions.join('\n'), gap > 86400000 ? 'warning' : '')
+    const expired = stores.some(store => {
+      const age = now - Date.parse(captures[store].observedAt)
+      return age < 0 || age > 7 * 86400000
+    })
+    notice(sourceStatus, descriptions.join('\n'), gap > 86400000 || expired ? 'warning' : '')
   } catch {
     if (revision !== sourceRevision) return
     captures = null
@@ -451,7 +467,11 @@ document.addEventListener('supa:manual-source-admitted', event => {
       Date.parse(captures.DekaMarkt.observedAt))
     if (gap > 86400000) labels.push('Opnames meer dan 24 uur uiteen: geen volledig betrouwbaar prijsverschil.')
     labels.push('Kies per ingrediënt opnieuw handmatig gecontroleerde artikel-ID’s uit deze nieuwe bron.')
-    notice(sourceStatus, labels.join('\n'), gap > 86400000 ? 'warning' : '')
+    const expired = stores.some(store => {
+      const age = now - Date.parse(captures[store].observedAt)
+      return age < 0 || age > 7 * 86400000
+    })
+    notice(sourceStatus, labels.join('\n'), gap > 86400000 || expired ? 'warning' : '')
   } catch {
     captures = null
     refresh()
