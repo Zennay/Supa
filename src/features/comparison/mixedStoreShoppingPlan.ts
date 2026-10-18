@@ -46,8 +46,12 @@ export function createMixedStoreShoppingPlan(
       comparison.lineDeltas.length !== plus.lines.length ||
       comparison.lineDeltas.length !== deka.lines.length) return null
   const allowed = new Set(comparison.lineDeltas.map(line => line.id))
+  // A changed Planner week can remove ingredient IDs. Old UI preferences for
+  // now-absent IDs must not make the new verified week unusable. Ignore those
+  // orphaned preferences; the current basket only applies choices for its
+  // exact known ingredient IDs. Never admit an invalid *active* store choice.
   if (Object.entries(preferred).some(([id, store]) =>
-    !allowed.has(id) || (store !== 'PLUS' && store !== 'DekaMarkt'))) return null
+    allowed.has(id) && store !== 'PLUS' && store !== 'DekaMarkt')) return null
   const byStore = (basket: OneStoreBasket) =>
     new Map(basket.lines.filter((line): line is Extract<BasketTraceLine, {status: 'matched'}> =>
       line.status === 'matched').map(line => [line.id, line]))
