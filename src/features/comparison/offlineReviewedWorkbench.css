@@ -169,3 +169,45 @@
 .offline-own-extras button { min-height:44px; padding:.5rem .8rem; border-radius:10px; }
 .offline-own-extras > small { color:#5a6c60; font-size:.78rem; }
 .offline-own-extras :is(button,input):focus-visible { outline:3px solid #008b64; outline-offset:3px; }
+
+
+/* Complete, private per-ingredient ledger: mobile layout never hides missing prices. */
+.offline-ingredient-ledger { display:grid; gap:.9rem; padding:1rem 0;
+  border-top:1px solid #d6ded6; border-bottom:1px solid #d6ded6; min-width:0; }
+.offline-ingredient-ledger__header { display:flex; flex-wrap:wrap; align-items:start;
+  justify-content:space-between; gap:1rem; }
+.offline-ingredient-ledger__header p { max-width:65ch; margin:.3rem 0; font-size:.91rem; }
+.offline-ingredient-ledger__controls { display:grid; gap:.5rem; }
+.offline-ingredient-ledger__controls label { display:flex; gap:.6rem; align-items:center;
+  font-size:.88rem; cursor:pointer; }
+.offline-ingredient-ledger__controls input { width:19px; height:19px; accent-color:#216344; }
+.offline-ingredient-ledger__controls input:disabled { opacity:.4; }
+.offline-ingredient-ledger__table { display:grid; overflow-x:auto; border:1px solid #dbe5d9;
+  border-radius:12px; min-width:0; }
+.offline-ingredient-ledger__row { display:grid; grid-template-columns:minmax(130px,1.15fr)
+  minmax(165px,1fr) minmax(165px,1fr) minmax(116px,.75fr); gap:.75rem;
+  padding:.75rem; border-bottom:1px solid #e6ece4; align-items:start; }
+.offline-ingredient-ledger__row:last-child { border:0; }
+.offline-ingredient-ledger__row:nth-child(2n) { background:#f7faf6; }
+.offline-ingredient-ledger__column-head { background:#e8f1e8 !important; font-size:.9rem; }
+.offline-ingredient-ledger__need,.offline-ingredient-ledger__store,
+.offline-ingredient-ledger__unknown,.offline-ingredient-ledger__delta {
+  display:grid; gap:.3rem; min-width:0; overflow-wrap:anywhere; }
+.offline-ingredient-ledger__store span { font-size:.88rem; }
+.offline-ingredient-ledger__row small { font-size:.78rem; line-height:1.4; color:#57655b; }
+.offline-ingredient-ledger__unknown strong { color:#82521a; }
+.offline-ingredient-ledger__delta { font-size:.85rem; }
+.offline-ingredient-ledger__row button { min-height:40px; justify-self:start;
+  padding:.45rem .65rem; margin-top:.3rem; background:white; color:#24533b;
+  border:1px solid #8dac98; border-radius:8px; font:inherit; font-size:.84rem;
+  cursor:pointer; }
+.offline-ingredient-ledger :is(button,input):focus-visible {
+  outline:3px solid #226f52; outline-offset:3px; }
+@media(max-width:760px) {
+  .offline-ingredient-ledger__column-head { display:none; }
+  .offline-ingredient-ledger__row:not(.offline-ingredient-ledger__column-head) {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); min-width:0; }
+  .offline-ingredient-ledger__need { grid-column:1 / -1; }
+  .offline-ingredient-ledger__delta { grid-column:1 / -1; border-top:1px solid #dbe5d9;
+    padding-top:.5rem; }
+}
