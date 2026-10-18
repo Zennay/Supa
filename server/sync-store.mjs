@@ -197,17 +197,13 @@ export function createFileSyncStore({ dir }) {
 
   function write(key, baseRevision, entries) {
     return exclusive(key, async () => {
-      // Direct callers must never persist something a later read will reject.
-      // Normalize optional omitted keys through the same public PUT contract.
-      const admitted = validateSyncEntries(entries)
-      if (admitted.error) throw new Error('invalid sync entries')
       await checkDir({ create: true })
       return withFileLock(key, async stillOwned => {
         const current = await read(key)
         if (current.revision !== baseRevision) return { conflict: true, record: current }
         // Never publish a revision this store could not read back.
         if (!Number.isSafeInteger(current.revision + 1)) throw new Error('sync revision limit reached')
-        const record = { revision: current.revision + 1, updatedAt: new Date().toISOString(), entries: admitted.entries }
+        const record = { revision: current.revision + 1, updatedAt: new Date().toISOString(), entries }
         const file = `${baseFor(key)}.json`
         const temporary = `${baseFor(key)}.${randomUUID()}.tmp`
         try {
