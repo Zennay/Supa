@@ -23,7 +23,9 @@ function lineFields(line: BasketTraceLine): (string | number)[] {
     'niet gekoppeld', '', '', '', '', '', '', '',
   ]
   return [
-    'gekoppeld', line.productName, line.packs, line.pack.amount,
+    line.reasons.includes('explicit local user selection; not an automatic or verified retailer match')
+      ? 'door gebruiker gekoppeld' : 'automatisch gekoppeld',
+    line.productName, line.packs, line.pack.amount,
     line.pack.unit, line.pack.count, line.pricePerPackCents, line.lineTotalCents,
   ]
 }
