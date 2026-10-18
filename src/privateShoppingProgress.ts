@@ -44,7 +44,9 @@ export function saveTripProgress(key: TripKey, checked: ReadonlySet<string>, bas
   if (new TextEncoder().encode(json).length > maxBytes) throw Error('Afvinkbestand is te groot')
   return json
 }
-export function loadTripProgress(text: string, live: TripKey, basket: OneStoreBasket): Set<string> {
+export function loadTripProgress(
+  text: string, live: TripKey, basket: OneStoreBasket, allowPriceRefresh = false,
+): Set<string> {
   if (typeof text !== 'string' || new TextEncoder().encode(text).length > maxBytes) throw Error('Te groot')
   const data: unknown = JSON.parse(text)
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw Error('Ongeldige voortgang')
@@ -52,9 +54,42 @@ export function loadTripProgress(text: string, live: TripKey, basket: OneStoreBa
   if (Object.keys(saved).length !== keys.length ||
       Object.keys(saved).some(key => !keys.includes(key)) ||
       !Array.isArray(saved.checked) || saved.checked.length > basket.lines.length) throw Error('Ongeldige voortgang')
-  for (const field of keys.filter(key => key !== 'checked')) {
-    if (JSON.stringify(saved[field]) !== JSON.stringify(live[field as keyof TripKey])) {
-      throw Error('Afvinkbestand hoort bij een andere winkelmand of andere bronopname')
+  if (allowPriceRefresh) {
+    // Only previously checked physical products may be carried forward.
+    // Product name, SKU, pack, exact requirement and quantities MUST agree;
+    // the current basket alone supplies new prices and capture timestamps.
+    for (const field of ['schema', 'store', 'selectedMealCount']) {
+      if (JSON.stringify(saved[field]) !== JSON.stringify(live[field as keyof TripKey])) {
+        throw Error('Afvinkbestand hoort bij een andere fysieke winkelmand')
+      }
+    }
+    const oldTime = typeof saved.observedAt === 'string'
+      ? Date.parse(saved.observedAt) : Number.NaN
+    const newTime = Date.parse(live.observedAt)
+    if (!Number.isFinite(oldTime) || !Number.isFinite(newTime) || oldTime > newTime ||
+        !Array.isArray(saved.lines) || saved.lines.length !== live.lines.length) {
+      throw Error('Afvinkbestand heeft een latere bron of een ander aantal regels')
+    }
+    for (let i = 0; i < live.lines.length; i++) {
+      const oldLine = saved.lines[i]
+      const currentLine = JSON.parse(live.lines[i]) as unknown
+      if (typeof oldLine !== 'string' || oldLine.length > 10000) {
+        throw Error('Ongeldige fysieke winkelregel in afvinkbestand')
+      }
+      const previous: unknown = JSON.parse(oldLine)
+      if (!Array.isArray(previous) || !Array.isArray(currentLine) ||
+          previous.length !== 12 || currentLine.length !== 12 ||
+          !Number.isSafeInteger(previous[10]) || previous[10] < 0 ||
+          !Number.isSafeInteger(previous[11]) || previous[11] < 0 ||
+          JSON.stringify(previous.slice(0, 10)) !== JSON.stringify(currentLine.slice(0, 10))) {
+        throw Error('Productidentiteit, verpakking of hoeveelheid is veranderd')
+      }
+    }
+  } else {
+    for (const field of keys.filter(key => key !== 'checked')) {
+      if (JSON.stringify(saved[field]) !== JSON.stringify(live[field as keyof TripKey])) {
+        throw Error('Afvinkbestand hoort bij een andere winkelmand of andere bronopname')
+      }
     }
   }
   const ids = new Set(basket.lines.map(line => line.id))

@@ -571,6 +571,7 @@ document.querySelector<HTMLButtonElement>('#trip-backup')!.addEventListener('cli
 })
 
 const restoreTrip = document.querySelector<HTMLInputElement>('#trip-restore')!
+const allowPriceRefresh = document.querySelector<HTMLInputElement>('#trip-restore-price-refresh')!
 restoreTrip.addEventListener('change', async () => {
   const file = restoreTrip.files?.[0]
   if (!file) return
@@ -582,15 +583,20 @@ restoreTrip.addEventListener('change', async () => {
     if (!trip) throw Error('Geen huidige volledige winkelmand')
     // The saved file never replaces prices, products, quantities or timestamps.
     // Admit every line against the current physical basket before modifying ticks.
-    const restored = loadTripProgress(text, trip.key, trip.basket)
+    const optIn = allowPriceRefresh.checked
+    const restored = loadTripProgress(text, trip.key, trip.basket, optIn)
+    if (optIn && !window.confirm('Supa heeft uitsluitend dezelfde fysieke producten en hoeveelheden gevonden. Neem alleen de oude vinkjes over naar de huidige opnieuw gecontroleerde winkelmand? Oudere productprijzen en opnametijden worden nooit hersteld.')) return
     ticked.clear()
     for (const id of restored) ticked.add(id)
     renderTrip()
-    setStatus('Afvinkingen voor exact deze winkelmand hersteld. Oorspronkelijke eigen opnameprijzen blijven historische bedragen.')
+    setStatus(optIn
+      ? 'Uitsluitend afvinkingen voor dezelfde fysieke winkelmand hersteld na jouw bevestiging. De huidige eigen bronprijzen en huidige opnametijd blijven leidend.'
+      : 'Afvinkingen voor exact deze winkelmand hersteld. Oorspronkelijke eigen opnameprijzen blijven historische bedragen.')
   } catch {
     setStatus('Afvinkstatus geweigerd. Open eerst dezelfde winkel, opname en ongewijzigde mand; huidige vinkjes blijven bewaard.', true)
   } finally {
     restoreTrip.value = ''
+    allowPriceRefresh.checked = false
   }
 })
 
