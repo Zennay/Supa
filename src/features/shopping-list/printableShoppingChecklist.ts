@@ -1,5 +1,4 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
-import { shoppingListBasketKey } from './shoppingListProgress.ts'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation.ts'
 
 export type PrintableShoppingLine = {
@@ -117,9 +116,6 @@ export function preparePrintableShoppingChecklist(
       throw new Error('Onvolledige boodschappenmand')
     }
   }
-
-  // The printed list is only safe if the entire root ledger matches its physical lines.
-  shoppingListBasketKey(basket)
 
   const seen = new Set<string>()
   const lines: PrintableShoppingLine[] = basket.lines.map((line) => {

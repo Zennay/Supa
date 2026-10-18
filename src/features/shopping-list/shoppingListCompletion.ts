@@ -1,5 +1,4 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
-import { shoppingListBasketKey } from './shoppingListProgress.ts'
 
 export type ShoppingListCompletion = {
   state: 'empty' | 'in-progress' | 'complete' | 'review-needed' | 'invalid'
@@ -39,7 +38,6 @@ export function shoppingListCompletion(
   basket: OneStoreBasket,
   doneLineIds: unknown,
 ): ShoppingListCompletion {
-  try { shoppingListBasketKey(basket) } catch { return { ...invalid } }
   if (!basket || typeof basket !== 'object' || !Array.isArray(basket.lines)) {
     return { ...invalid }
   }
