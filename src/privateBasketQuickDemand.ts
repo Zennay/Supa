@@ -111,7 +111,7 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
   // number of selected meals. Checked boxes never imply a retailer purchase
   // and are deliberately not omitted from full same-demand comparisons.
   if (rawLines[0]?.startsWith('Mijn recept: ')) {
-    const heading = /^Mijn recept: (.+) — ([1-9]\\d?|100) porties$/u.exec(rawLines[0])
+    const heading = /^Mijn recept: (.+) — ([1-9]\d?|100) porties$/u.exec(rawLines[0])
     if (!heading || rawLines.length < 4 ||
         rawLines[1] !== 'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.' ||
         rawLines.at(-1) !== 'Prijzen, winkelvoorraad en besparingen zijn onbekend.') {
@@ -119,10 +119,10 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
     }
     meals = 1
     rawLines = rawLines.slice(2, -1).map((line, index) => {
-      if (/^\\[\\?\\] /u.test(line)) {
+      if (/^\[\?\] /u.test(line)) {
         throw Error('Receptregel ' + (index + 1) + ': onzekere hoeveelheid. Corrigeer die in Recepten voordat je vergelijkt.')
       }
-      if (!/^\\[[ x]\\] /u.test(line)) {
+      if (!/^\[[ x]\] /u.test(line)) {
         throw Error('Receptregel ' + (index + 1) + ': verwacht een eigen [ ] of [x] ingrediëntregel.')
       }
       return line.slice(4)
