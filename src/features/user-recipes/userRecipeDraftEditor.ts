@@ -27,6 +27,12 @@ const MAX_INGREDIENTS = 100
 // The normalized importer accepts at most one million g, ml or pieces.
 // The editor must never confirm a value its source parser would reject.
 const MAX_CANONICAL_METRIC_AMOUNT = 1_000_000
+const NATIVE_EDITOR_REVIEW_PROMPTS = new Set([
+  'Vul een ingrediëntnaam in.', 'Vul een ingrediëntnaam en hoeveelheid in.',
+  'Vul een geldige hoeveelheid in.',
+  'Vul een geldige hoeveelheid in (maximaal 1.000.000 g, ml of stuks).',
+  'Kies gram, milliliter of stuks.',
+])
 let ingredientSequence = 0
 function newClientIngredientId(): string {
   ingredientSequence += 1
@@ -78,6 +84,15 @@ export function updateEditorIngredient(
   const ingredients = draft.ingredients.map((ingredient, row) => {
     if (row !== index) return ingredient
     const next = { ...ingredient, ...patch }
+    // Imported unit-conversion warnings are provenance, not a validation
+    // error on the visible ingredient name. A cosmetic rename must not mark
+    // an unverified measurement as reviewed.
+    const measurementCorrected =
+      (Object.hasOwn(patch, 'amount') && patch.amount !== ingredient.amount) ||
+      (Object.hasOwn(patch, 'unit') && patch.unit !== ingredient.unit)
+    const preserveImportedReview = !measurementCorrected &&
+      ingredient.reviewReason !== null &&
+      !NATIVE_EDITOR_REVIEW_PROMPTS.has(ingredient.reviewReason)
     next.label = next.label.trimStart().slice(0, MAX_TEXT)
     next.query = next.label.toLowerCase()
     next.reviewReason = !next.label.trim()
@@ -86,7 +101,7 @@ export function updateEditorIngredient(
         ? 'Vul een geldige hoeveelheid in (maximaal 1.000.000 g, ml of stuks).'
         : !['g', 'ml', 'piece'].includes(next.unit ?? '')
           ? 'Kies gram, milliliter of stuks.'
-          : null
+          : preserveImportedReview ? ingredient.reviewReason : null
     return next
   })
   return { ...draft, ingredients }
