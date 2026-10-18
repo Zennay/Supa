@@ -1,6 +1,7 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { buildShoppingListCopyText } from './shoppingListCopyText.ts'
 import { shoppingListBasketKey } from './shoppingListProgress.ts'
+import { privateTripProgressIdentity } from '../comparison/PrivateStoreTripChecklist.tsx'
 import type { UnpricedShoppingNote } from './ManualShoppingNotes.tsx'
 
 export type PrivateLooseProduct = Readonly<{
@@ -15,13 +16,15 @@ export type PrivateLooseProduct = Readonly<{
  * cents, weekly budget, or a second retailer's comparison.
  */
 export function combinedPrivateTripText({
-  basket, store, sourceFresh, notes, extras = [],
+  basket, store, sourceFresh, notes, extras = [], observedAt = null, tripProgress,
 }: {
   basket: OneStoreBasket | null
   store: 'PLUS' | 'DekaMarkt'
   sourceFresh: boolean
   notes: readonly UnpricedShoppingNote[]
   extras?: readonly PrivateLooseProduct[]
+  observedAt?: string | null
+  tripProgress?: Readonly<{ identity: string; done: string[] }>
 }): string | null {
   if (!['PLUS', 'DekaMarkt'].includes(store) ||
       !Array.isArray(notes) || notes.length > 100 ||
@@ -39,7 +42,15 @@ export function combinedPrivateTripText({
     try { shoppingListBasketKey(basket) }
     catch { return null }
   }
-  const priced = basket ? buildShoppingListCopyText(basket) : null
+  // Reuse the exact same source/basket identity as the live shop-trip editor.
+  // A checkmark from a different week, import or package price is never
+  // replayed into the exported list.
+  const checked = basket && observedAt && tripProgress &&
+    tripProgress.identity === privateTripProgressIdentity(basket, observedAt) &&
+    Array.isArray(tripProgress.done)
+    ? tripProgress.done.filter(id => basket.lines.some(line => line.id === id))
+    : []
+  const priced = basket ? buildShoppingListCopyText(basket, checked) : null
   if (basket && priced === null) return null
   if (!priced && !extras.length && !allowedNotes.length) return null
   const safe = (text: string) => text

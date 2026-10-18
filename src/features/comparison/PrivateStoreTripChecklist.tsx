@@ -144,7 +144,7 @@ function deleteTripValue(id: string) {
 }
 
 /** Basket-specific identity; includes prices and selected source time, not only IDs. */
-function progressIdentity(basket: OneStoreBasket, observedAt: string): string {
+export function privateTripProgressIdentity(basket: OneStoreBasket, observedAt: string): string {
   return JSON.stringify([
     basket.store.id, observedAt, basket.selectedMealCount, basket.totalCents,
     basket.matchedLineCount, basket.unresolvedLineCount,
@@ -170,7 +170,7 @@ function readSavedTrip(basket: OneStoreBasket, observedAt: string): SavedState {
     const record = parsed as Record<string, unknown>
     if (record.schemaVersion !== 1 ||
         Object.keys(record).some(key => !['schemaVersion', 'basketIdentity', 'done'].includes(key)) ||
-        record.basketIdentity !== progressIdentity(basket, observedAt) ||
+        record.basketIdentity !== privateTripProgressIdentity(basket, observedAt) ||
         !Array.isArray(record.done) || record.done.length > basket.lines.length ||
         !record.done.every(value => typeof value === 'string') ||
         new Set(record.done).size !== record.done.length ||
@@ -195,7 +195,7 @@ export function PrivateStoreTripChecklist({
 }) {
   const [initial] = useState(() => readSavedTrip(basket, observedAt))
   const [localDone, setLocalDone] = useState<ReadonlySet<string>>(() => new Set(initial.done))
-  const identity = progressIdentity(basket, observedAt)
+  const identity = privateTripProgressIdentity(basket, observedAt)
   const memoryDone = memoryProgress?.identity === identity ? memoryProgress.done : null
   const done = useMemo<ReadonlySet<string>>(
     () => memoryDone === null ? localDone : new Set(memoryDone),
@@ -225,7 +225,7 @@ export function PrivateStoreTripChecklist({
       }
       const next = JSON.stringify({
         schemaVersion: 1,
-        basketIdentity: progressIdentity(basket, observedAt),
+        basketIdentity: privateTripProgressIdentity(basket, observedAt),
         done: [...done],
       })
       if (new TextEncoder().encode(next).length > 64000) throw Error('oversized')

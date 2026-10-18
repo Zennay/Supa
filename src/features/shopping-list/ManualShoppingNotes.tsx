@@ -13,6 +13,7 @@ const safeLabel = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\
 /** Private volatile notes; no product match, price or retailer-source authority. */
 export function ManualShoppingNotes({ notes, setNotes, storeBasket = null,
   activeStore = 'PLUS', sourceFresh = false, ownExtras = [],
+  observedAt = null, tripProgress,
 }: {
   notes: UnpricedShoppingNote[]
   setNotes: SetNotes
@@ -20,6 +21,8 @@ export function ManualShoppingNotes({ notes, setNotes, storeBasket = null,
   activeStore?: 'PLUS' | 'DekaMarkt'
   sourceFresh?: boolean
   ownExtras?: readonly PrivateLooseProduct[]
+  observedAt?: string | null
+  tripProgress?: Readonly<{ identity: string; done: string[] }>
 }) {
   const [name, setName] = useState('')
   const [bulkDraft, setBulkDraft] = useState('')
@@ -35,6 +38,8 @@ export function ManualShoppingNotes({ notes, setNotes, storeBasket = null,
     basket: combinedStore === activeStore ? storeBasket : null,
     store: combinedStore, sourceFresh: combinedStore === activeStore && sourceFresh,
     notes, extras: combinedStore === activeStore ? ownExtras : [],
+    observedAt: combinedStore === activeStore ? observedAt : null,
+    tripProgress: combinedStore === activeStore ? tripProgress : undefined,
   })
   function downloadCombinedTrip() {
     if (!combinedText) return
