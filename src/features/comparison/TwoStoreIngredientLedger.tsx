@@ -120,7 +120,13 @@ export function TwoStoreIngredientLedger({
         </div>
       </div>)}
     </div>
-    {visible.length === 0 && <p>Alle ingrediënten zijn in beide winkels gekoppeld.</p>}
+    {visible.length === 0 && <p role="status">
+      {rows.length === 0
+        ? 'Je hebt nog geen berekenbare weekmenu-ingrediënten gekozen. Open Planner om maaltijden te plannen.'
+        : onlyMissing && missing.length === 0
+          ? 'Geen ontbrekende productkoppelingen: alle geplande ingrediënten zijn in beide winkels gekoppeld.'
+          : 'Er zijn geen ingrediënten zichtbaar met deze filterinstelling.'}
+    </p>}
     <small className="disclaimer">Alle bedragen zijn uitsluitend berekend uit jouw lokale bronopnames.
       Een lagere regelprijs bewijst geen daadwerkelijke besparing of retailerautorisatie.</small>
   </section>
