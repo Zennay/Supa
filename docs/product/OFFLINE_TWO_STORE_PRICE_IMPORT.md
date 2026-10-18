@@ -595,3 +595,18 @@ gecontroleerde actuele prijs**. De veldchecklist transporteert geen
 bedrag en kan niet als bronopname worden geïmporteerd. Bij ontbrekende
 SKU blijft het bronartikelveld leeg; er wordt geen fictieve match
 ingevoerd.
+
+### Niet-prijsklare bronartikelen blijven zichtbaar voor herstel
+
+In de gewone Vergelijk-tab kun je de originele winkelproductnamen
+en SKU's nu accent-onafhankelijk doorzoeken. Alleen daadwerkelijk
+als beschikbaar met fysieke verpakking en prijs toegelaten artikelen
+mogen in de productkeuze terechtkomen; ook hun exact gekozen match
+vereist nog expliciete menselijke controle. Originele winkelregels
+zonder bruikbare prijs, voorraadstatus of verpakking worden
+**apart en uitsluitend informatief** getoond, met echte naam,
+broncode en eventueel geobserveerde eenheid. Ze krijgen nooit
+een automatisch matchbaar bedrag en worden niet als EUR 0 gezien.
+Met het eerder toegevoegde herobservatie-CSV-blad kan de gebruiker
+die ontbrekende feiten opnieuw rechtmatig opnemen; alle andere
+broncontroles blijven ongewijzigd.

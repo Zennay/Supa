@@ -61,19 +61,33 @@ function compatibleSourceUnit(demand: BasketTraceLine['requirement']['unit'],
   return (['g', 'kg'].includes(demand) && ['g', 'kg'].includes(source)) ||
     (['ml', 'l'].includes(demand) && ['ml', 'l'].includes(source))
 }
+function searchableSourceText(value: string): string {
+  // Discoverability only: never change an original source name/SKU/price.
+  // A user typing 'creme' should find an observed 'crème' article.
+  return value.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl').trim()
+}
 function sourceOptions(products: import('../../domain/basket.ts').StoreProduct[],
   unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string) {
-  const query = text.trim().toLocaleLowerCase('nl')
-  const available = products.filter(p => p.available && p.packAmount !== null &&
-    compatibleSourceUnit(unit, p.packUnit))
-  const filtered = query
-    ? available.filter(p => p.name.toLocaleLowerCase('nl').includes(query) ||
-        p.id.toLocaleLowerCase('nl').includes(query))
-    : available
+  const query = searchableSourceText(text)
+  const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) =>
+    !query || searchableSourceText(product.name).includes(query) ||
+    searchableSourceText(product.id).includes(query)
+  const physicallyCompatible = products.filter(p => compatibleSourceUnit(unit, p.packUnit))
+  const available = physicallyCompatible.filter(p => p.available && p.packAmount !== null)
+  const filtered = available.filter(matchesQuery)
   const shown = filtered.slice(0, 40)
   const current = available.find(p => p.id === keepId)
   if (current && !shown.some(p => p.id === keepId)) shown.unshift(current)
-  return { shown, total: filtered.length, availableCount: available.length }
+
+  // These are honest original capture records, but not purchasable price
+  // candidates. Never put them in the select or recalculate a basket from them.
+  const unpriced = physicallyCompatible.filter(p => !p.available || p.packAmount === null)
+  const unpricedFiltered = unpriced.filter(matchesQuery)
+  return {
+    shown, total: filtered.length, availableCount: available.length,
+    unpricedShown: unpricedFiltered.slice(0, 5),
+    unpricedTotal: unpricedFiltered.length, unpricedCount: unpriced.length,
+  }
 }
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 function reviewRowId(store: string, ingredientId: string): string {
@@ -1086,35 +1100,53 @@ export function OfflineReviewedWorkbench({
                               <span>Afvinken als gekocht</span>
                             </label>
                             <span>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</span>
-                            {choices.availableCount > 0 && (
-                              <label>Eigen bronartikel voor dit ingrediënt
-                                <span>Zoek binnen je originele geobserveerde winkelartikelen (naam of code)</span>
-                                <input type="search" value={skuFilter[searchKey] ?? ''}
-                                  maxLength={120} placeholder="Zoek product of artikelcode"
-                                  onChange={event => setSkuFilter(current =>
-                                    ({ ...current, [searchKey]: event.currentTarget.value }))} />
-                                <small>{choices.total} passende bronartikelen · maximaal 40 zichtbaar, verfijn je zoekterm.</small>
-                                <select value={manualSku[store][line.id] ?? ''}
-                                  onChange={event => {
-                                    const id = event.currentTarget.value
-                                    setManualSku(previous => ({
-                                      ...previous, [store]: { ...previous[store], [line.id]: id },
-                                    }))
-                                    // A manual source switch changes the exact product identity.
-                                    // An older human check must never certify the new selection.
-                                    setReviewedLines({})
-                                    setDoneTripItems({})
-                                    setTripExportMessage('')
-                                    setTripProgressMessage('')
-                                  }}>
-                                  <option value="">Automatisch voorstellen (of onbekend)</option>
-                                  {choices.shown.map(product => (
-                                      <option key={product.id} value={product.id}>
-                                        {product.name} · {product.id} · {product.packAmount} {product.packUnit} · {product.priceCents === null ? 'Prijs onbekend' : euros.format(product.priceCents / 100)}
-                                      </option>
-                                    ))}
-                                </select>
-                              </label>
+                            {(choices.availableCount > 0 || choices.unpricedCount > 0) && (
+                              <div className="offline-price-workbench__source-choices">
+                                <label>Zoek eigen bronartikel voor dit ingrediënt
+                                  <span>Zoek op originele productnaam of artikelcode; ook zonder accent.</span>
+                                  <input type="search" value={skuFilter[searchKey] ?? ''}
+                                    maxLength={120} placeholder="Zoek product of artikelcode"
+                                    onChange={event => setSkuFilter(current =>
+                                      ({ ...current, [searchKey]: event.currentTarget.value }))} />
+                                  <small>{choices.total} prijsklare en {choices.unpricedTotal} niet-prijsklare bronartikelen in deze zoekopdracht.</small>
+                                </label>
+                                {choices.availableCount > 0 && (
+                                  <label>Kies een werkelijk waargenomen, prijsklaar bronartikel
+                                    <select value={manualSku[store][line.id] ?? ''}
+                                      onChange={event => {
+                                        const id = event.currentTarget.value
+                                        setManualSku(previous => ({
+                                          ...previous, [store]: { ...previous[store], [line.id]: id },
+                                        }))
+                                        setReviewedLines({})
+                                        setDoneTripItems({})
+                                        setTripExportMessage('')
+                                        setTripProgressMessage('')
+                                      }}>
+                                      <option value="">Automatisch voorstellen (of onbekend)</option>
+                                      {choices.shown.map(product => (
+                                        <option key={product.id} value={product.id}>
+                                          {product.name} · {product.id} · {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <small>Maximaal 40 prijsklare keuzes tegelijk; verfijn de zoekterm. Een keuze vergt nog persoonlijke broncontrole.</small>
+                                  </label>
+                                )}
+                                {choices.unpricedShown.length > 0 && (
+                                  <div className="offline-price-workbench__missing">
+                                    <strong>Wel in jouw bron, nog niet prijsklaar</strong>
+                                    <p>Deze originele artikelen zijn niet beschikbaar of missen een bruikbare verpakking of prijs.
+                                      Ze zijn niet te kiezen voor een mandbedrag. Neem de werkelijke brongegevens opnieuw op.</p>
+                                    <ul>{choices.unpricedShown.map(product => (
+                                      <li key={product.id}>{product.name} · broncode {product.id}
+                                        {' '}· {product.packAmount ?? '?'} {product.packUnit}</li>
+                                    ))}</ul>
+                                    {choices.unpricedTotal > choices.unpricedShown.length &&
+                                      <small>Er zijn meer ongeprijsde artikelen; verfijn de zoekterm.</small>}
+                                  </div>
+                                )}
+                              </div>
                             )}
 
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
