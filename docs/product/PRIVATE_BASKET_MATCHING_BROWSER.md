@@ -110,3 +110,7 @@ Na opnieuw laden van de **zelfde** eigen prijsbestanden en dezelfde mandvraag ka
 ## Verpakkings- en indicatieve eenheidsprijs tijdens het matchen
 
 Zodra de gebruiker in zijn **eigen** PLUS-/Deka-opname een artikel selecteert, toont de wizard direct de daadwerkelijk ingevoerde SKU, europrijs **per volledige verpakking** en een duidelijke **indicatieve** prijs per kg, liter of stuk, inclusief multipack-aantal. De keuze wordt nooit automatisch gemaakt of gesorteerd als een claim over de goedkoopste winkel. Eenheidsprijzen zijn uitsluitend informatie tijdens menselijke productidentiteitscontrole; de latere mandjesberekening blijft de enige autoriteit voor hele eurocenten, verpakkingafronding en de complete twee-winkelvergelijking. Bij opnieuw importeren van winkelbronnen worden SKU-keuzes nog steeds gewist.
+
+## Kleine schermen en privé printuitvoer
+
+Het gekoppelde twee-winkelmandjesoverzicht heeft nu een eigen horizontaal scrollgebied voor de vier fysieke/prijsverschilkolommen. De pagina zelf schuift niet langer mee met de brede tabel op telefoons. Bij **Print deze privévergelijking** worden bronkeuzeschermen, eigen invoervelden, lokale bestandsselecties, andere bedieningsknoppen en de aparte afvinklijst bewust buiten de afdruk gehouden. Alleen het werkelijk geopende prijsresultaat, originele opnametijden, bekende regels en noodzakelijke ontbrekende-productenwaarschuwingen gaan mee. Een onzichtbare/ongeldige prijsvergelijking wordt niet via print alsnog als resultaat getoond.

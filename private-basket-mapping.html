@@ -26,6 +26,28 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 .stores{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .row-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
 #status{white-space:pre-line}#source-status{white-space:pre-line}
+/* Preserve readable same-demand rows on narrow phones without page-wide overflow. */
+.table-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+#result table{width:100%;min-width:700px;border-collapse:collapse}
+#result th,#result td{padding:12px 10px;border-bottom:1px solid #dce6db;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+#result th{font-weight:700}
+#result td{min-width:130px}
+#result #rows th{min-width:180px}
+#result #summary{white-space:pre-wrap}
+@media(max-width:650px){main{padding:15px 10px 50px}#result{padding:12px}#result th,#result td{padding:9px}}
+/* A user pressing Print comparison must not print their editable import forms. */
+@media print{
+ body{background:white;color:#122a1c}main{max-width:none;padding:0}
+ header,section[aria-labelledby],#price-status,#unpriced-trip,#trip,.row-actions,button{display:none!important}
+ #result:not([hidden]){display:block!important;border:0;box-shadow:none;margin:0;padding:0}
+ #result[hidden]{display:none!important}
+ #result .table-wrap{overflow:visible}
+ #result table{min-width:0}
+ #result th,#result td{font-size:10pt;padding:7px;break-inside:avoid}
+ #result tr{break-inside:avoid}
+ #result #next-actions{break-inside:avoid}
+}
+
 @media(max-width:650px){.grid,.stores{grid-template-columns:1fr}section{padding:15px}.row-actions button{flex:1}}
 .observation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
 .observed-product{padding:16px;border:1px solid #d6e0d4;border-radius:12px;margin:12px 0;background:#fcfefd}
