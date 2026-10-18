@@ -38,7 +38,6 @@ async function readPrivateCsv(path) {
   }
 }
 
-
 async function main() {
   if (process.argv.length !== 4 || process.argv[2].startsWith('-') || process.argv[3].startsWith('-')) {
     error('Gebruik: node scripts/offline-two-store-csv-to-json.mjs waarnemingen.csv uitvoer.json')
@@ -53,7 +52,7 @@ async function main() {
   // prices, source URLs, participant identities or an implied license.
   const counts = captures.map(capture => capture.retailer + ': ' + capture.products.length)
   await writeFile(target, json, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-  process.stdout.write('Privé CSV omgezet (' + counts.join(', ') + '). Importeer JSON in Supa → Vergelijk. Geen openbare prijsclaim.\\n')
+  process.stdout.write('Privé CSV omgezet (' + counts.join(', ') + '). Importeer JSON in Supa → Vergelijk. Geen openbare prijsclaim.\n')
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
