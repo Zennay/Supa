@@ -154,3 +154,18 @@
   border:1px solid #a9cfb2; border-radius:12px;
 }
 .offline-price-workbench__replace label { font-weight:700; color:#245337; }
+
+/* User-selected extras are explicitly outside the exact two-store meal basket. */
+.offline-own-extras { display:grid; gap:.8rem; margin:1rem 0; padding:1rem;
+  border:1px solid #9dbca6; border-radius:13px; background:#f4faf5; }
+.offline-own-extras h3 { margin:0; font-size:1.06rem; }
+.offline-own-extras ul { list-style:none; margin:0; padding:0; display:grid; gap:.7rem; }
+.offline-own-extras li { display:flex; align-items:center; gap:.8rem; flex-wrap:wrap;
+  background:white; border:1px solid #d3ded5; border-radius:10px; padding:.75rem; }
+.offline-own-extras label { display:flex; gap:.6rem; align-items:center; flex:1; min-width:0; cursor:pointer; }
+.offline-own-extras label input { width:22px; height:22px; flex:0 0 22px; }
+.offline-own-extras label span { display:grid; gap:3px; overflow-wrap:anywhere; }
+.offline-own-extras label small { font-size:.77rem; color:#526458; }
+.offline-own-extras button { min-height:44px; padding:.5rem .8rem; border-radius:10px; }
+.offline-own-extras > small { color:#5a6c60; font-size:.78rem; }
+.offline-own-extras :is(button,input):focus-visible { outline:3px solid #008b64; outline-offset:3px; }

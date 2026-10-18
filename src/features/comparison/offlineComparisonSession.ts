@@ -17,6 +17,13 @@ export function useOfflineComparisonSession() {
     fingerprint: string
     products: Record<string, string>
   }>({ fingerprint: '', products: {} })
+  // Volatile user-picked extra products, explicitly excluded from priced meal baskets.
+  const [extraProductIds, setExtraProductIds] = useState<Record<OfflineRetailer, string[]>>({
+    PLUS: [], DekaMarkt: [],
+  })
+  const [extraDoneIds, setExtraDoneIds] = useState<Record<OfflineRetailer, string[]>>({
+    PLUS: [], DekaMarkt: [],
+  })
   // Volatile checkbox memory shared by Vergelijk and Lijst. No persistence
   // unless the existing private checklist's explicit opt-in is enabled.
   const [tripMemory, setTripMemory] = useState<
@@ -28,6 +35,7 @@ export function useOfflineComparisonSession() {
     stagedCaptures, setStagedCaptures,
     manualSelections, setManualSelections,
     importEpoch, setImportEpoch, tripMemory, setTripMemory,
+    extraProductIds, setExtraProductIds, extraDoneIds, setExtraDoneIds,
   }
 }
 export type OfflineComparisonSession = ReturnType<typeof useOfflineComparisonSession>

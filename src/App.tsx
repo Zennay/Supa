@@ -118,6 +118,13 @@ function useOfflineComparisonSession(): OfflineComparisonSession {
     fingerprint: string
     products: Record<string, string>
   }>({ fingerprint: '', products: {} })
+  // Explicit user-selected extras are outside the calculated same-demand basket.
+  const [extraProductIds, setExtraProductIds] = useState<Record<OfflineRetailer, string[]>>({
+    PLUS: [], DekaMarkt: [],
+  })
+  const [extraDoneIds, setExtraDoneIds] = useState<Record<OfflineRetailer, string[]>>({
+    PLUS: [], DekaMarkt: [],
+  })
   const [tripMemory, setTripMemory] = useState<
     Partial<Record<OfflineRetailer, { identity: string; done: string[] }>>
   >({})
@@ -125,7 +132,8 @@ function useOfflineComparisonSession(): OfflineComparisonSession {
   return {
     selectedStore, setSelectedStore, text, setText, imported, setImported,
     stagedCaptures, setStagedCaptures, manualSelections, setManualSelections,
-    tripMemory, setTripMemory, importEpoch, setImportEpoch,
+    tripMemory, setTripMemory, extraProductIds, setExtraProductIds,
+    extraDoneIds, setExtraDoneIds, importEpoch, setImportEpoch,
   }
 }
 
@@ -148,7 +156,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   // An explicit discard/new invalid import also discards volatile ticks.
   // Reusing a different source cannot resurrect checkmarks from an old basket.
   useEffect(() => {
-    if (!offlinePriceSession.imported) offlinePriceSession.setTripMemory({})
+    if (!offlinePriceSession.imported) {
+      offlinePriceSession.setTripMemory({})
+      offlinePriceSession.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
+      offlinePriceSession.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
+    }
   }, [offlinePriceSession.imported])
   const [initialProductSelection] = useState(readChosenProducts)
   const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)

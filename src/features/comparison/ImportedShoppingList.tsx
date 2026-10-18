@@ -45,6 +45,9 @@ export function ImportedShoppingList({
     <button type="button" onClick={onOpenComparison}>Controleer in Vergelijk</button>
   </section>
   const basket = store === 'PLUS' ? pair.plus : pair.deka
+  const extras = imported.captures[store].products.filter(product =>
+    session.extraProductIds[store].includes(product.id))
+  const extraDone = session.extraDoneIds[store]
   const fresh = offlineSessionFresh(imported, now)
   const complete = basket.selectedMealCount > 0 && basket.lines.length > 0 &&
     basket.unresolvedLineCount === 0
@@ -98,6 +101,8 @@ export function ImportedShoppingList({
             session.setStagedCaptures({})
             session.setManualSelections({ fingerprint: '', products: {} })
             session.setTripMemory({})
+            session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
+            session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
             session.setImportEpoch(current => current + 1)
             setConfirmDiscard(false)
           }}>Ja, wis deze privégegevens</button>
@@ -106,6 +111,44 @@ export function ImportedShoppingList({
         </div>
       )}
     </div>
+    {extras.length > 0 && <section className="offline-own-extras"
+      aria-label={'Losse extra producten bij ' + store}>
+      <h3>Mijn losse {store}-artikelen ({extras.length})</h3>
+      <p className="disclaimer">Zelf gekozen via Producten. Deze losse artikelen
+        staan buiten de Planner-ingrediënten: hun prijzen zijn niet meegenomen
+        in het berekende mandtotaal, weekbudget of prijsverschil met de andere winkel.</p>
+      <ul>
+        {extras.map(product => <li key={product.id}>
+          <label>
+            <input type="checkbox" checked={extraDone.includes(product.id)}
+              onChange={() => session.setExtraDoneIds(previous => ({
+                ...previous, [store]: previous[store].includes(product.id)
+                  ? previous[store].filter(id => id !== product.id)
+                  : [...previous[store], product.id],
+              }))} />
+            <span>
+              <strong>{product.name}</strong>
+              <small>{product.packAmount ?? '?'} {product.packUnit}
+                {product.packCount && product.packCount > 1 ? ' × ' + product.packCount : ''}
+                {' '}· {product.available ? 'Eigen opname: ' + euro.format(product.priceCents / 100) :
+                  'Prijs onbekend of niet beschikbaar'} (niet meegeteld)
+              </small>
+            </span>
+          </label>
+          <button type="button" className="ghost-button"
+            onClick={() => {
+              session.setExtraProductIds(previous => ({
+                ...previous, [store]: previous[store].filter(id => id !== product.id),
+              }))
+              session.setExtraDoneIds(previous => ({
+                ...previous, [store]: previous[store].filter(id => id !== product.id),
+              }))
+            }}>Verwijder</button>
+        </li>)}
+      </ul>
+      <small>Extra artikelen en hun vinkjes blijven alleen in het geheugen van dit
+        open app-tabblad. Nieuwe of gewiste bronopnames wissen deze selectie.</small>
+    </section>}
     <PrivateStoreTripChecklist key={identity} basket={basket}
       observedAt={imported.captures[store].observedAt} fresh={fresh}
       memoryProgress={session.tripMemory[store]}

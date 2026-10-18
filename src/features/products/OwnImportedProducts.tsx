@@ -122,7 +122,9 @@ export function OwnImportedProducts({
     </div>
     <p className="disclaimer">Sortering vergelijkt uitsluitend prijzen binnen dezelfde
       eenheid (kg, liter of stuk). Onbekende en niet-beschikbare producten komen achteraan.
-      Het zijn geen gecontroleerde winkelprijzen of aanbiedingen.</p>
+      Het zijn geen gecontroleerde winkelprijzen of aanbiedingen.
+      Los toegevoegde artikelen staan apart op Lijst, buiten het berekende
+      weekmandtotaal en het prijsverschil.</p>
     <div className="hifi-product-grid">
       {rows.slice(0, limit).map(({ store, product, group, unitCents, amount }) => (
         <article className="hifi-product-card own-products__card" key={store + ':' + product.id}>
@@ -145,6 +147,25 @@ export function OwnImportedProducts({
             </> : <p className="hifi-no-price">Prijs onbekend of product niet beschikbaar</p>}
             {!fresh && <small>Verouderd · geen actuele winkelprijs</small>}
           </div>
+          <button type="button" className="own-products__extra"
+            aria-pressed={session.extraProductIds[store].includes(product.id)}
+            aria-label={session.extraProductIds[store].includes(product.id)
+              ? 'Verwijder extra artikel uit lijst: ' + product.name + ' bij ' + store
+              : 'Voeg extra artikel toe aan lijst: ' + product.name + ' bij ' + store}
+            onClick={() => {
+              session.setExtraProductIds(previous => ({
+                ...previous,
+                [store]: previous[store].includes(product.id)
+                  ? previous[store].filter(id => id !== product.id)
+                  : [...previous[store], product.id],
+              }))
+              session.setExtraDoneIds(previous => ({
+                ...previous, [store]: previous[store].filter(id => id !== product.id),
+              }))
+            }}>
+            {session.extraProductIds[store].includes(product.id)
+              ? '✓ Extra op mijn lijst' : '+ Los artikel aan lijst toevoegen'}
+          </button>
           <button type="button" className="own-products__choose"
             onClick={() => { session.setSelectedStore(store); onCompare() }}>
             Controleer match in Vergelijk

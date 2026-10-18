@@ -203,6 +203,8 @@ export function OfflineReviewedWorkbench({
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
       setClockMs(Date.now())
       setImported(parsed)
+      session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
+      session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
       setMessage('Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
     } catch (error) {
       // Never retain/display a previous basket after an invalid new import.
@@ -365,6 +367,8 @@ export function OfflineReviewedWorkbench({
       clearStaged()
       setManualSelections({ fingerprint: '', products: {} })
       session.setTripMemory({})
+      session.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
+      session.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
       setText(next)
       setClockMs(Date.now())
       setImportEpoch(epoch => epoch + 1)
