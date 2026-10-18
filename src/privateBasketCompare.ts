@@ -781,6 +781,13 @@ function show(source: Source, demand: Demand): void {
         ' Opname verouderd, toekomstig of meer dan 24 uur uiteen.'))
   missingTasks = []
   for (const [store, basket] of [['PLUS', left], ['DekaMarkt', right]] as const) {
+    if (!captures[store]) {
+      // Eleven absent products are ONE actionable problem: this retailer
+      // was never observed. A single truthful next step helps on mobile.
+      missingTasks.push(store + ' · nog geen eigen bronopname. Voeg een werkelijk geobserveerde ' +
+        store + '-CSV, JSON of handmatige opname toe; daarna kies je de echte SKU per ingrediënt.')
+      continue
+    }
     for (const line of basket.lines) {
       if (line.status === 'unresolved') {
         missingTasks.push(store + ' · ' + line.ingredientLabel + ': ' + line.reasons.join('; '))
