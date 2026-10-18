@@ -194,3 +194,16 @@ momentopname kan de expliciet berekende budgetcontext meenemen, duidelijk als
 historisch overzicht, en de browserprint toont de budgetuitkomst zonder het
 persoonlijke invoerveld. Geen gesuggereerde, gemockte of automatisch opgehaalde
 prijzen en geen kassagarantie.
+
+### Budget bij één bekende winkel
+
+Een bruikbaar, volledig en recent waargenomen mandje bij **één** winkel is
+voldoende om dat ene eigen bedrag met jouw optionele budget te vergelijken,
+ook wanneer voor de andere winkel SKU's, hoeveelheid of prijzen ontbreken, of
+wanneer de twee opnames meer dan 24 uur uiteen liggen. De tweede winkel blijft
+letterlijk **onbekend**: geen fictief totaal, geen laagste-winkelclaim en geen
+volledige twee-winkelbesparing. Voor elke winkel geldt afzonderlijk de bestaande
+compleetheid- en zeven-dagen-controle. De budgetkaart kijkt ook bij opnieuw
+focussen, terugkeren naar de tab, of budgetinvoer naar ouderdom en maakt een
+verlopen winkelmandje dan onbekend. De algemene twee-winkelvergelijking blijft
+onverminderd onder de strikte oorspronkelijke bronpaarvoorwaarden staan.

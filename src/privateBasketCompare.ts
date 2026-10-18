@@ -50,7 +50,8 @@ const result = document.querySelector<HTMLElement>('#result')!
 const summary = document.querySelector<HTMLDivElement>('#summary')!
 const budgetInput = document.querySelector<HTMLInputElement>('#budget-euros')!
 const budgetStatus = document.querySelector<HTMLDivElement>('#budget-status')!
-let budgetTotals: Record<StoreName, number> | null = null
+let budgetTotals: Record<StoreName, number | null> | null = null
+let budgetValidThroughNs: Record<StoreName, bigint> | null = null
 const capturesLabel = document.querySelector<HTMLParagraphElement>('#captures')!
 const rows = document.querySelector<HTMLTableSectionElement>('#rows')!
 const nextActions = document.querySelector<HTMLElement>('#next-actions')!
@@ -322,19 +323,24 @@ function renderBudget(): void {
     budgetStatus.className = 'notice warning'
     return
   }
-  if (!budgetTotals || result.hidden) {
-    budgetStatus.textContent = 'Budgetuitkomst onbekend: alleen twee complete, recente eigen winkelmandjes kunnen worden afgezet tegen dit budget.'
-    budgetStatus.className = 'notice warning'
-    return
-  }
-  budgetStatus.textContent = stores.map(store => {
-    const total = budgetTotals![store]
+  const now = BigInt(Date.now()) * 1000000n
+  const messages = stores.map(store => {
+    const total = budgetTotals?.[store]
+    const expiry = budgetValidThroughNs?.[store]
+    if (result.hidden || total === null || total === undefined || expiry === undefined ||
+        now > expiry) return store + ': onbekend (geen volledig recent eigen mandje)'
     const diff = ceiling - total
     return store + ': ' + (diff >= 0
       ? euro.format(diff / 100) + ' ruimte binnen jouw budget'
       : euro.format(-diff / 100) + ' boven jouw budget')
-  }).join(' · ') + '. Alleen eigen oorspronkelijke waarnemingen; geen kassagarantie.'
-  budgetStatus.className = 'notice'
+  })
+  const eligible = stores.some(store => budgetTotals?.[store] !== null &&
+    budgetTotals?.[store] !== undefined && budgetValidThroughNs?.[store] !== undefined &&
+    now <= budgetValidThroughNs[store] && !result.hidden)
+  budgetStatus.textContent = messages.join(' · ') + (eligible
+    ? '. Alleen eigen oorspronkelijke winkelwaarnemingen; geen kassagarantie of goedkoopste-winkelclaim.'
+    : '. Zonder een volledig recent winkelmandje geen budgetconclusie.')
+  budgetStatus.className = eligible ? 'notice' : 'notice warning'
 }
 budgetInput.addEventListener('input', () => {
   // Editing an optional budget is still a user action: invalidate an elapsed
@@ -661,7 +667,13 @@ function show(source: Source, demand: Demand): void {
     firstAge <= weekNs && secondAge <= weekNs && gap <= dayNs
   const complete = fresh && comparison.claimable && comparison.deltaCents !== null &&
     Number.isSafeInteger(comparison.deltaCents)
-  budgetTotals = complete ? { PLUS: left.totalCents, DekaMarkt: right.totalCents } : null
+  // A single complete, fresh retailer can supply an honest own-budget result,
+  // independently of paired-price eligibility. Never imply a store winner.
+  budgetTotals = {
+    PLUS: validOneStoreTrip(left, demand, firstAge) ? left.totalCents : null,
+    DekaMarkt: validOneStoreTrip(right, demand, secondAge) ? right.totalCents : null,
+  }
+  budgetValidThroughNs = { PLUS: start + weekNs, DekaMarkt: end + weekNs }
   tripCapturedAt = { PLUS: captures.PLUS.observedAt, DekaMarkt: captures.DekaMarkt.observedAt }
   comparisonValidThroughNs = complete ? (start <= end ? start : end) + weekNs : null
   result.hidden = false
@@ -736,6 +748,9 @@ for (const el of [combined, plus, deka, demandFile]) {
   el.addEventListener('change', () => {
     inputRevision++
     result.hidden = true
+    budgetTotals = null
+    budgetValidThroughNs = null
+    renderBudget()
     clearTrip()
     setStatus('Bronbestanden gewijzigd. Klik opnieuw op Vergelijk; eerdere prijsuitkomst is niet meer geldig.')
     if (el === combined) {
@@ -750,6 +765,9 @@ compare?.addEventListener('click', async () => {
   const snapshotRevision = inputRevision
   compare.disabled = true
   result.hidden = true
+  budgetTotals = null
+  budgetValidThroughNs = null
+  renderBudget()
   clearTrip()
   setStatus('Lokale eigen bestanden worden verwerkt…')
   try {
@@ -836,6 +854,9 @@ document.querySelector<HTMLButtonElement>('#print')!.addEventListener('click', (
  */
 document.addEventListener('supa:compare-private-basket', (event: Event) => {
   result.hidden = true
+  budgetTotals = null
+  budgetValidThroughNs = null
+  renderBudget()
   clearTrip()
   try {
     const payload = (event as CustomEvent<{ source: unknown; demand: unknown }>).detail
@@ -850,7 +871,7 @@ document.addEventListener('supa:compare-private-basket', (event: Event) => {
 
 // A private source can become too old while the app is open in a background tab.
 // Refuse to expose the old full comparison or export list on return to the tab.
-window.addEventListener('focus', invalidateAgedComparison)
+window.addEventListener('focus', () => { invalidateAgedComparison(); renderBudget() })
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') invalidateAgedComparison()
+  if (document.visibilityState === 'visible') { invalidateAgedComparison(); renderBudget() }
 })
