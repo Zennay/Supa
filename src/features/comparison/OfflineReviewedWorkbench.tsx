@@ -150,7 +150,11 @@ export function OfflineReviewedWorkbench({
     // The new/changed store never carries previous selections into the pair.
     // The untouched staged capture may keep its own reviewed source-bound choices.
     const eligible = stores.filter(store => store !== retailer || unchangedCapture)
-    importSnapshots(joined, eligible)
+    if (importSnapshots(joined, eligible)) {
+      // Once paired admission succeeds, the canonical pair owns the data.
+      // Do not show duplicate staged banners or a misleading extra wipe action.
+      clearStaged()
+    }
   }
 
   // Prevent stale imports from appearing comparable after an open browser tab
@@ -234,7 +238,7 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  function importSnapshots(input: string, retainStagedStores: readonly OfflineRetailer[] = []) {
+  function importSnapshots(input: string, retainStagedStores: readonly OfflineRetailer[] = []): boolean {
     setImportEpoch(epoch => epoch + 1)
     try {
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
@@ -302,10 +306,12 @@ export function OfflineReviewedWorkbench({
         : retainStagedStores.length > 0
           ? 'Beide privéopnames geladen. Geldige keuzes uit ongewijzigde winkelbronnen en Planner zijn meegenomen; controleer de vergelijking.'
           : 'Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
+      return true
     } catch (error) {
       // Never retain/display a previous basket after an invalid new import.
       setImported(null)
       setMessage(error instanceof Error ? error.message : 'Ongeldige import.')
+      return false
     }
   }
   async function loadFile(file?: File) {
@@ -699,7 +705,7 @@ export function OfflineReviewedWorkbench({
             Tijdstippen moeten nog steeds maximaal 24 uur uiteenliggen
             om een prijsverschil te mogen tonen.</p>
         </div>}
-        {stagedStores.length > 0 && <div className="offline-price-workbench__staged" role="status">
+        {!imported && stagedStores.length > 0 && <div className="offline-price-workbench__staged" role="status">
           <strong>Losse winkelopnames in geheugen:</strong> {stagedStores.join(' + ')}.
           {stagedStores.length === 1
             ? ' Laad de andere winkel als JSON of CSV. Tot die tijd is alleen deze winkel afzonderlijk beschikbaar, zonder prijsverschil.'
