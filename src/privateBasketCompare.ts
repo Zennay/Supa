@@ -209,12 +209,19 @@ function unresolved(d: DemandLine, reason: string): BasketTraceLine {
 }
 function storeBasket(store: StoreName, capture: Capture, demand: Demand): OneStoreBasket {
   const products = new Map(capture.products.map(p => [p.id, p]))
+  const chosenIds = new Set<string>()
   const lines: BasketTraceLine[] = []
   let totalCents = 0
   let matchedLineCount = 0
   let unresolvedLineCount = 0
   for (const d of demand.ingredients) {
     const choice = d.productIds[store]
+    if (choice !== null && chosenIds.has(choice)) {
+      lines.push(unresolved(d, 'Hetzelfde winkelartikel is dubbel gekozen: combineer de fysieke behoefte in één ingrediëntregel.'))
+      unresolvedLineCount++
+      continue
+    }
+    if (choice !== null) chosenIds.add(choice)
     const p = choice === null ? undefined : products.get(choice)
     if (!p || !p.available || p.priceCents === null ||
         p.packAmount === null || d.amount === null) {
