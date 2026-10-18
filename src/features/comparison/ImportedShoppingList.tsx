@@ -75,6 +75,26 @@ export function ImportedShoppingList({
     </div>
     <p><strong>{store}:</strong> {basket.matchedLineCount} van {basket.lines.length}
       gekoppeld · {basket.unresolvedLineCount} nog te controleren.</p>
+    {basket.unresolvedLineCount > 0 && <section className="offline-list-missing" aria-label="Ontbrekende producten oplossen">
+      <h3>Maak je winkelmand compleet</h3>
+      <p>Voor {store} ontbreken {basket.unresolvedLineCount} geldige productkoppelingen.
+        Kies per ingrediënt zelf een passend product uit je bestaande privéprijsopname.
+        Er wordt geen winkelprijs verzonnen of online opgehaald.</p>
+      <ul>
+        {basket.lines.filter(line => line.status === 'unresolved').slice(0, 25)
+          .map(line => <li key={line.id}>
+            <span><strong>{line.ingredientLabel}</strong> · benodigd:
+              {' '}{line.requirement.amount ?? '?'} {line.requirement.unit}</span>
+            <button type="button" onClick={() => {
+              session.setReviewTarget({ store, ingredientId: line.id })
+              onOpenComparison()
+            }}>Koppel product</button>
+          </li>)}
+      </ul>
+      {basket.unresolvedLineCount > 25 && <small>
+        Nog {basket.unresolvedLineCount - 25} ontbrekende ingrediënten vind je onder Vergelijk.
+      </small>}
+    </section>}
     <p><strong>{complete ? 'Totaal eigen invoer' : 'Bekend deelbedrag, geen mandtotaal'}:</strong>{' '}
       {basket.matchedLineCount || complete ? euro.format(basket.totalCents / 100) : 'onbekend'}</p>
     {!fresh && <p className="attention-card" role="alert">
