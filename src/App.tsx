@@ -6,6 +6,7 @@ import { currentWeekSharePreview, formatShareableWeek } from './features/planner
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView, resolveStagedBasket } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
+import { UnpricedPlannerShoppingList } from './features/shopping-list/UnpricedPlannerShoppingList.tsx'
 import type { UnpricedShoppingNote } from './features/shopping-list/ManualShoppingNotes.tsx'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
@@ -157,6 +158,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [sourceClock, setSourceClock] = useState(() => Date.now())
   const [unpricedNotes, setUnpricedNotes] = useState<UnpricedShoppingNote[]>([])
+  const [unpricedWeekProgress, setUnpricedWeekProgress] = useState<{
+    identity: string; done: string[]
+  }>({ identity: '', done: [] })
   // The established shopping route remains independently loadable. Only the
   // optional local notes editor is code-split when the user actually opens List.
   const [privateNotesView, setPrivateNotesView] = useState<
@@ -551,13 +555,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           />
         )}
         {tab === 'list' && !offlinePriceSession.imported && stagedRetailers.length === 0 && (
-          <p className="disclaimer" role="status">
-            Nog geen privéwinkelopnames geladen. Open Vergelijk om je eigen
-            PLUS- en DekaMarkt-producten in je boodschappenlijst te gebruiken.
-            <button type="button" className="ghost-button" onClick={() => navigate('basket')}>
-              Naar Vergelijk
-            </button>
-          </p>
+          <UnpricedPlannerShoppingList
+            plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+            progress={unpricedWeekProgress} setProgress={setUnpricedWeekProgress}
+            onOpenPlanner={() => navigate('planner')}
+            onOpenCompare={() => navigate('basket')}
+          />
         )}
         {tab === 'list' && (privateNotesView
           ? (() => {
