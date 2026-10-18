@@ -6,7 +6,7 @@ import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, 
 import { importRecipeLink } from './importRecipeLink'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
-import { ownRecipeShoppingChecklist } from './recipeShoppingChecklist'
+import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
 import { exportOwnRecipePrivateWeek } from './exportOwnRecipePrivateWeek'
 import './recipes.css'
 
@@ -59,6 +59,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isVariant, setIsVariant] = useState(false)
   const [shoppingPortions, setShoppingPortions] = useState('2')
+  const [shoppingChecks, setShoppingChecks] = useState<Record<string, boolean>>({})
+  const [shoppingOpenOnly, setShoppingOpenOnly] = useState(false)
   const [showShoppingCopy, setShowShoppingCopy] = useState(false)
   const [privateWeekMessage, setPrivateWeekMessage] = useState('')
   const shoppingCopy = useRef<HTMLTextAreaElement>(null)
@@ -78,6 +80,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const own = library.recipes.filter(matches)
   if (sort) { demo.sort((x, y) => x.title.localeCompare(y.title, 'nl')); own.sort((x, y) => x.title.localeCompare(y.title, 'nl')) }
   const ownShopping = selected && 'savedAt' in selected ? ownRecipeShoppingChecklist(selected, Number(shoppingPortions)) : null
+  const selectedRecipeShoppingText = ownShopping ? formatOwnRecipeChecklist(ownShopping, shoppingChecks) : ''
+  const shoppingCompleted = ownShopping?.lines.filter(line => shoppingChecks[line.key]).length ?? 0
+  const shoppingVisible = ownShopping?.lines.filter(line => !shoppingOpenOnly || !shoppingChecks[line.key]) ?? []
   const favorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
 
   function downloadOwnRecipes() {
@@ -103,7 +108,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   function downloadOwnRecipeChecklist() {
     if (!ownShopping?.canCopy) return
     try {
-      const uri = URL.createObjectURL(new Blob([ownShopping.copyText], { type: 'text/plain;charset=utf-8' }))
+      const uri = URL.createObjectURL(new Blob([selectedRecipeShoppingText], { type: 'text/plain;charset=utf-8' }))
       const link = document.createElement('a')
       try {
         link.href = uri
@@ -299,7 +304,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     <section className="hifi-section"><div className="hifi-section-heading"><div><h2>Recepten</h2><p className="recipe-count">{demo.length + own.length} recepten</p></div><button aria-label="Sorteer recepten op naam" aria-pressed={sort} onClick={() => setSort(!sort)}><FigmaImage asset={a.recipeSort} alt="" /></button></div>
       <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe && recipe.image ? '' : ' own-recipe-card'}`} key={recipe.id}>
         {'image' in recipe && recipe.image && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
-        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setShoppingPortions(String(recipe.servings ?? 2)); setShowShoppingCopy(false); setPrivateWeekMessage(''); detail.current?.showModal() }} />
+        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelected(recipe); setShoppingPortions(String(recipe.servings ?? 2)); setShowShoppingCopy(false); setPrivateWeekMessage(''); setShoppingChecks({}); setShoppingOpenOnly(false); detail.current?.showModal() }} />
         <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
         <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p></div>
       </article>)}</div>
@@ -388,20 +393,31 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <p>Maak een ongeprijsde lijst voor het gewenste aantal porties. Stuks die niet heel uitkomen, moet je zelf beoordelen.</p>
           <label>Gewenste porties
             <input type="number" min="1" max="100" step="1" value={shoppingPortions}
-              onChange={event => { setShoppingPortions(event.target.value); setShowShoppingCopy(false); setPrivateWeekMessage('') }} />
+              onChange={event => { setShoppingPortions(event.target.value); setShowShoppingCopy(false); setPrivateWeekMessage(''); setShoppingChecks({}); setShoppingOpenOnly(false) }} />
           </label>
           {ownShopping && ownShopping.canCopy ? <>
-            <ul>{ownShopping.lines.map(line => <li key={line.key}>
-              {line.needsReview ? `${line.original} — hoeveelheid controleren`
-                : `${line.amount?.toLocaleString('nl-NL', { maximumFractionDigits: 3 })} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`}
+            <div className="recipe-shopping-panel__progress">
+              <strong role="status">{shoppingCompleted} van {ownShopping.lines.length} boodschappen afgevinkt</strong>
+              <label><input type="checkbox" checked={shoppingOpenOnly}
+                onChange={event => setShoppingOpenOnly(event.currentTarget.checked)} /> Alleen nog te kopen</label>
+              <button type="button" onClick={() => { setShoppingChecks({}); setShowShoppingCopy(false) }}>Wis vinkjes</button>
+            </div>
+            <ul>{shoppingVisible.map(line => <li key={line.key}>
+              <label className="recipe-shopping-panel__row">
+                <input type="checkbox" checked={!!shoppingChecks[line.key]}
+                  onChange={event => setShoppingChecks(current => ({ ...current, [line.key]: event.currentTarget.checked }))} />
+                <span>{line.needsReview ? `${line.original} — hoeveelheid controleren`
+                  : `${line.amount?.toLocaleString('nl-NL', { maximumFractionDigits: 3 })} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`}</span>
+              </label>
             </li>)}</ul>
+            {!shoppingVisible.length && <p role="status">Alle boodschappen voor dit recept afgevinkt.</p>}
             {ownShopping.lines.some(line => line.needsReview) && <p role="status">Onbekende of gedeeltelijke stuks blijven voor handmatige controle gemarkeerd; er wordt niets gegokt.</p>}
             <button type="button" onClick={() => setShowShoppingCopy(value => !value)}>
               {showShoppingCopy ? 'Tekst verbergen' : 'Boodschappenlijst selecteren'}
             </button>
             {showShoppingCopy && <textarea ref={shoppingCopy} readOnly rows={Math.min(20, Math.max(6, ownShopping.lines.length + 4))}
               aria-label="Kopieer mijn ongeprijsde boodschappenlijst"
-              value={ownShopping.copyText} onFocus={event => event.currentTarget.select()} />}
+              value={selectedRecipeShoppingText} onFocus={event => event.currentTarget.select()} />}
             {showShoppingCopy && <button type="button" onClick={() => shoppingCopy.current?.select()}>Selecteer alle tekst</button>}
             <button type="button" onClick={downloadOwnRecipeChecklist}>Download ongeprijsde lijst (TXT)</button>
             <button type="button" onClick={downloadForPrivateComparison}>Gebruik dit recept in winkelvergelijker (JSON)</button>
