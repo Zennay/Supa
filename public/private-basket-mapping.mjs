@@ -41,6 +41,24 @@ const numeric = (text) => {
   const number = Number(text.replace(',', '.'))
   return Number.isFinite(number) && number > 0 && number <= 100000 ? number : null
 }
+function validSourceInstant(value) {
+  if (typeof value !== 'string') return false
+  const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.\d{1,9})?([+-])(\d\d):(\d\d)$/.exec(value)
+  if (!m) return false
+  const [year, month, day, hour, minute, second, zoneHour, zoneMinute] =
+    [m[1], m[2], m[3], m[4], m[5], m[6], m[8], m[9]].map(Number)
+  if (year < 2000 || year > 2100 || zoneMinute > 59 ||
+      (m[7] === '+' ? zoneHour > 14 || (zoneHour === 14 && zoneMinute !== 0)
+        : zoneHour > 12 || (zoneHour === 12 && zoneMinute !== 0))) return false
+  const civil = new Date(0)
+  civil.setUTCFullYear(year, month - 1, day)
+  civil.setUTCHours(hour, minute, second, 0)
+  return civil.getUTCFullYear() === year && civil.getUTCMonth() === month - 1 &&
+    civil.getUTCDate() === day && civil.getUTCHours() === hour &&
+    civil.getUTCMinutes() === minute && civil.getUTCSeconds() === second &&
+    Number.isFinite(Date.parse(value))
+}
+
 const node = (tag, attrs = {}, value) => {
   const el = document.createElement(tag)
   for (const [key, val] of Object.entries(attrs)) {
@@ -187,7 +205,7 @@ function acceptJson(json) {
     if (!capture || typeof capture !== 'object' ||
         !stores.includes(capture.retailer) || result[capture.retailer] ||
         !Array.isArray(capture.products) || capture.products.length > 1000 ||
-        !Number.isFinite(Date.parse(capture.observedAt))) {
+        !validSourceInstant(capture.observedAt)) {
       throw Error('Ongeldige winkelopname; controleer winkel en tijd.')
     }
     const used = new Set()
