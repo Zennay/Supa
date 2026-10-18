@@ -47,6 +47,8 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 <script type="module" src="/private-basket-manual-observations.mjs"></script>
 <script type="module" src="/src/privateBasketCompare.ts"></script>
 <script type="module" src="/src/privatePlannerDemandImport.ts"></script>
+<script type="module" src="/src/privateBasketDemandMerge.ts"></script>
+<script type="module" src="/private-basket-merge-ui.mjs"></script>
 </head>
 <body><main>
 <header><p><strong>SUPA · PRIVÉ · LOKAAL</strong></p>
@@ -103,7 +105,8 @@ dan kan er geen volledig prijsverschil worden berekend. Pas na eigen controle ki
 <label for="meal-count">Aantal daadwerkelijk geselecteerde maaltijden</label>
 <input id="meal-count" type="number" min="1" max="1000" step="1" value="1">
 <div id="lines" aria-live="polite"></div>
-<div class="row-actions"><button id="add" class="secondary" type="button">+ Ingrediënt toevoegen</button></div>
+<div class="row-actions"><button id="add" class="secondary" type="button">+ Ingrediënt toevoegen</button>
+<button id="merge-ingredients" class="secondary" type="button">Combineer herhaalde ingrediëntnamen</button></div>
 </section>
 <section aria-labelledby="save-title">
 <h2 id="save-title">3 · Vergelijk direct of bewaar jouw mandje</h2>

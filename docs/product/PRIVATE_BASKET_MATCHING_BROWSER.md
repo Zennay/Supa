@@ -94,3 +94,9 @@ Het bestand is nadrukkelijk een **historische momentopname**: het doet later gee
 ## Boodschappenlijst kopiëren zonder klembordmachtiging
 
 De bestaande beveiligingsgate laat geen ongereviewde rechtstreekse browserklembordtoegang toe. De knop **Selecteer boodschappenlijst om te kopiëren** toont daarom een strikt lokaal, alleen-lezen tekstveld met de huidige winkel, originele opnameprijzen en afvinkstatus, selecteert de tekst en laat de gebruiker zelf Ctrl+C/Cmd+C of de telefoon-kopieeractie kiezen. De knop claimt nooit zelf een kopie naar het klembord te maken. Wijzigingen van winkel, afvinkstatus of bronmand wissen de selecteerbare preview; verlopen opnames kunnen geen actuele lijst opleveren. Downloaden als TXT blijft werken zonder deze browserbevoegdheid.
+
+## Echte dubbele ingrediënten expliciet samenvoegen
+
+De browserwizard heeft nu de actie **Combineer herhaalde ingrediëntnamen**. Deze maakt een samengevoegde fysieke ingrediëntbehoefte voor exact dezelfde (hoofdletterongevoelige) naam en dezelfde metrische eenheidsfamilie, pas na expliciete gebruikersbevestiging. De berekening gebruikt Supa's bestaande `sumDecimalDemandUnits`, waardoor bijvoorbeeld gram en kilogram met exacte decimale rekenkunde worden samengevoegd; onbekende, onverenigbare of niet exact berekenbare hoeveelheden blijven afzonderlijk zonder gegevensverlies.
+
+**Geen automatische winkelproductidentiteit:** de wizard wist voor alle samengevoegde ingrediëntregels de huidige PLUS-/Deka-SKU-selecties, wist eerdere prijsresultaten en afvinkingen, en vraagt de gebruiker beide winkelproducten opnieuw te controleren. Anders genoemde producten worden nooit als equivalent beschouwd. Dit herstelt het praktische vervolgpad wanneer de bestaande vergelijker dezelfde SKU voor meerdere regels terecht als onbekend markeert, zonder prijzen, bronrechten of productequivalentie te verzinnen.

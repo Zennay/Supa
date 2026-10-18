@@ -585,6 +585,10 @@ save.addEventListener('click', () => {
     notice(status, error instanceof Error ? error.message : 'Kan mandvraag niet maken.', 'error')
   }
 })
+document.addEventListener('supa:private-ingredient-merged', () => {
+  invalidateUnpricedDemand()
+  refresh()
+})
 add.addEventListener('click', () => addIngredient())
 addIngredient()
 
