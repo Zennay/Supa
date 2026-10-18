@@ -272,3 +272,19 @@ heeft bewaard. De importknop respecteert daarmee de bestaande menselijke
 reviewgrens voor fractionele stuks. Een recept kan na expliciete menselijke
 herziening bijvoorbeeld in een geschikte gehele stuksaankoop worden omgezet;
 Supa maakt dat besluit niet zelf en claimt geen fictieve afgeronde behoefte.
+
+## Fouttolerante bronvervanging in de gekoppelde wizard
+
+De browserwizard laat bij een nieuwe import de eerder toegelaten PLUS- en
+Deka-bronnen en menselijke productkeuzes in geheugen staan totdat het hele
+nieuwe lokale bronbestand strikte CSV/JSON-admissie heeft gehaald. De vorige
+getoonde vergelijking wordt **wel meteen verborgen** bij een nieuwe poging.
+Daarna kan de gebruiker een echt nieuwe bron expliciet bevestigen; alle
+retailer-SKU-koppelingen worden dan opnieuw ter review vrijgegeven. Exact
+ongewijzigde opnamebestanden zijn een noop zonder verlies van eerdere matches.
+Bij mislukte bestandslezing, verkeerde CSV-kop, ontbrekende tweede CSV of
+annulering blijft de vorige geldige bron behouden, zonder verzonnen prijs of
+verlengde opnametijd. Bereken opnieuw op verzoek na afloop. Bestaande
+handmatige bronbewerking houdt zijn eigen strengere grens: na expliciete
+wijziging zijn vroegere bronkeuzes ongeldig totdat beide echte opnames
+opnieuw zijn toegelaten.

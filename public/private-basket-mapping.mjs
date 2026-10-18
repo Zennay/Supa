@@ -418,17 +418,21 @@ function removeCsvHeader(source) {
 
 async function loadSources() {
   const revision = ++sourceRevision
-  captures = null
-  refresh()
+  // Keep the last admitted source and manual choices during a new file read;
+  // old prices are immediately hidden until this explicit import is resolved.
+  invalidatePrice()
+  compareNow.disabled = true
   const combined = sourceInput.files?.[0]
   const plus = plusInput.files?.[0]
   const deka = dekaInput.files?.[0]
   if (!combined && !plus && !deka) {
-    notice(sourceStatus, 'Nog geen bronbestand gekozen.')
+    notice(sourceStatus, captures ? 'Geen nieuw bestand gekozen; eerdere eigen bron blijft bewaard.' : 'Nog geen bronbestand gekozen.')
+    refresh()
     return
   }
   if (!combined && (!plus || !deka)) {
-    notice(sourceStatus, 'Selecteer zowel de PLUS- als de DekaMarkt-CSV.', 'warning')
+    notice(sourceStatus, 'Selecteer zowel de PLUS- als de DekaMarkt-CSV; eerdere bron en productkeuzes blijven bewaard.', 'warning')
+    refresh()
     return
   }
   try {
@@ -447,6 +451,20 @@ async function loadSources() {
     }
     const verified = acceptJson(parsed)
     if (revision !== sourceRevision) return
+    if (captures && JSON.stringify(verified) === JSON.stringify(captures)) {
+      notice(sourceStatus, 'Exact dezelfde eigen bron opnieuw geopend. Productkeuzes blijven behouden; vergelijk zelf opnieuw.')
+      refresh()
+      return
+    }
+    if (captures && !window.confirm('Vervang de vorige eigen winkelopnames door deze nieuwe gevalideerde bron? ' +
+        'Alle eerder gekozen SKU-koppelingen moeten daarna opnieuw handmatig worden gecontroleerd.')) {
+      sourceInput.value = ''
+      plusInput.value = ''
+      dekaInput.value = ''
+      notice(sourceStatus, 'Bronvervanging geannuleerd. Vorige bron en productkeuzes zijn bewaard; bereken opnieuw indien gewenst.')
+      refresh()
+      return
+    }
     clearSourceMatches()
     captures = verified
     const now = Date.now()
@@ -469,8 +487,11 @@ async function loadSources() {
     notice(sourceStatus, descriptions.join('\n'), gap > 86400000 || expired ? 'warning' : '')
   } catch {
     if (revision !== sourceRevision) return
-    captures = null
-    notice(sourceStatus, 'Kan eigen bronnen niet veilig verwerken. Controleer de strikte CSV-koppen, winkelopnames en bronbestanden.', 'error')
+    sourceInput.value = ''
+    plusInput.value = ''
+    dekaInput.value = ''
+    notice(sourceStatus, 'Nieuw bestand geweigerd. Controleer de strikte CSV-koppen, winkelopnames en echte brondata. ' +
+      (captures ? 'De vorige geldige bron en je SKU-keuzes blijven beschikbaar.' : 'Nog geen geldige bron aanwezig.'), 'error')
   }
   refresh()
 }
