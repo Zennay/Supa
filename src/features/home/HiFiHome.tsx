@@ -9,6 +9,17 @@ import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFi
 import { OwnImportedProducts } from '../products/OwnImportedProducts.tsx'
 import type { OfflineComparisonSession } from '../comparison/offlineComparisonSession.ts'
 
+const ownEuros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+export type PrivateHomeSummary = {
+  selectedStore: 'PLUS' | 'DekaMarkt'
+  matched: number
+  unresolved: number
+  hasDemand: boolean
+  complete: boolean
+  fresh: boolean
+  totalCents: number
+  deltaCents: number | null
+}
 export type HiFiTab = 'home' | 'recipes' | 'products'
 export const designProducts = [
   { id: 'cola-zero', name: 'Coca cola zero 1.5l fl', image: a.imgProductFoto, logo: a.imgDirk, store: 'Dirk', crop: 'dirk', unit: '1.5L', unitPrice: '€1.16/L', old: '€2.15', price: '€1.75' },
@@ -31,6 +42,7 @@ type Props = {
   onToggleProduct: (id: string) => void
   activeDays?: readonly string[]
   priceSession?: OfflineComparisonSession
+  privateSummary?: PrivateHomeSummary
 }
 
 export function HiFiHome(props: Props) {
@@ -38,7 +50,7 @@ export function HiFiHome(props: Props) {
   return <HiFiDiscovery {...props} />
 }
 
-function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [], priceSession }: Props) {
+function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [], priceSession, privateSummary }: Props) {
   const [query, setQuery] = useState('')
   const [favorites, setFavorites] = useState<string[]>([])
   const [filterOpen, setFilterOpen] = useState(false)
@@ -68,9 +80,49 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
         <button className="hifi-icon-button" aria-label="Meldingen" onClick={() => setMessage('Je hebt geen nieuwe meldingen.')}><FigmaImage asset={a.imgFrame7312} alt="" /></button>
       </header>
       <section className="hifi-week" aria-labelledby="hifi-week-title" data-figma-node="3307:4186">
-        <div><h1 id="hifi-week-title">Weekplanning</h1><p>Maak een planning en ontdek wat je kunt besparen met aanbiedingen en overlappende ingrediënten.</p></div>
+        <div><h1 id="hifi-week-title">Weekplanning</h1><p>Plan je maaltijden en vergelijk zelf ingevoerde winkelprijzen. Zonder actuele brondata blijven bedragen onbekend.</p></div>
         <div className="hifi-days">{upcomingHomeWeek().map(({ label, date, plannerDay, fullName, month, year }) => <button key={`${year}-${month}-${date}`} onClick={() => onNavigate('planner')} aria-label={`Open weekplanning voor ${fullName} ${date}`}><span className={activeDays.includes(plannerDay) ? 'hifi-today' : ''}>{label}</span><span>{date}</span></button>)}</div>
-        <button className="hifi-plan-button" onClick={() => onNavigate('planner')}><FigmaImage asset={a.imgVector} alt="" />Plan en bespaar</button>
+        <button className="hifi-plan-button" onClick={() => onNavigate('planner')}><FigmaImage asset={a.imgVector} alt="" />Open weekplanner</button>
+      </section>
+      <section className="hifi-private-summary" aria-labelledby="hifi-private-summary-title">
+        <span className="eyebrow">Mijn eigen prijsgegevens</span>
+        <h2 id="hifi-private-summary-title">Van weekmenu naar winkelmand</h2>
+        {!privateSummary ? (
+          <p>Er zijn nog geen eigen winkelopnames geladen. Importeer toegestane PLUS-
+            en DekaMarkt-prijsgegevens om je huidige weekmenu privé te vergelijken.</p>
+        ) : <>
+          <p><strong>{privateSummary.selectedStore}</strong> · {privateSummary.matched} producten
+            gekoppeld · {privateSummary.unresolved} nog te beoordelen.</p>
+          {!privateSummary.fresh ? (
+            <p role="status">De opgeslagen waarnemingen zijn verlopen.
+              Importeer recente brongegevens voordat je bedragen vergelijkt.</p>
+          ) : !privateSummary.hasDemand ? (
+            <p role="status">Kies eerst maaltijden in Planner om een winkelmand te berekenen.</p>
+          ) : privateSummary.complete ? (
+            <p>Mandtotaal op basis van jouw invoer: <strong>{ownEuros.format(privateSummary.totalCents / 100)}</strong>.</p>
+          ) : (
+            <p role="status">{privateSummary.matched > 0 ? 'Bekend deelbedrag: ' +
+              ownEuros.format(privateSummary.totalCents / 100) + '. ' : ''}
+              Geen volledig mandtotaal: de ontbrekende producten hebben nog geen betrouwbare prijs.</p>
+          )}
+          {privateSummary.deltaCents !== null && <p>
+            {privateSummary.deltaCents === 0
+              ? 'Beide volledige zelf ingevoerde winkelmandjes zijn even duur.'
+              : (privateSummary.deltaCents > 0 ? 'PLUS' : 'DekaMarkt') +
+                ' is binnen jouw privéberekening ' +
+                ownEuros.format(Math.abs(privateSummary.deltaCents) / 100) + ' goedkoper.'}
+          </p>}
+          <small>Dit zijn uitsluitend privé ingevoerde prijzen, geen onafhankelijk
+            gecontroleerde winkelprijzen of publieke besparingsclaims.</small>
+        </>}
+        <div className="hifi-private-summary__actions">
+          <button type="button" onClick={() => onNavigate('basket')}>
+            {privateSummary ? 'Vergelijk mijn winkels' : 'Eigen prijsdata importeren'}
+          </button>
+          {privateSummary && <button type="button" onClick={() => onNavigate('list')}>
+            Open boodschappenlijst
+          </button>}
+        </div>
       </section>
     </> : <header className="hifi-products-heading"><h1 className="hifi-page-title">Producten</h1><button type="button" className="hifi-go-to-list" onClick={() => onNavigate('list')}
       aria-label={`Bekijk mijn lijst met ${addedProducts.length} gekozen producten`}>

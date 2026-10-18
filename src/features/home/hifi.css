@@ -214,3 +214,19 @@ body { background: #e9eeec; }
   color: #254e38; font-weight: 750; cursor: pointer; margin-left: auto; }
 .hifi-go-to-list:focus-visible { outline: 3px solid #226f52; outline-offset: 3px; }
 @media(max-width:420px) { .hifi-go-to-list { font-size: .82rem; padding: .5rem .6rem; } }
+
+/* Private planner → comparison status stays separate from Figma demo products. */
+.hifi-private-summary {
+  display:grid; gap:12px; padding:20px; background:#fff;
+  border:1px solid #d8e6dc; border-radius:18px; color:#244136;
+}
+.hifi-private-summary .eyebrow { font-size:11px; color:#377454; font-weight:700; }
+.hifi-private-summary h2 { font-size:17px; }
+.hifi-private-summary p { font-size:13px; line-height:1.5; margin:0; }
+.hifi-private-summary small { color:#596b62; font-size:11px; line-height:1.5; }
+.hifi-private-summary__actions { display:grid; gap:8px; }
+.hifi-private-summary__actions button { min-height:44px; padding:11px 15px;
+  border:0; border-radius:12px; font-size:13px; font-weight:700;
+  color:#fff; background:#005135; }
+.hifi-private-summary__actions button+button { color:#005135; border:1px solid #b4d3c0; background:#f3faf4; }
+.hifi-private-summary__actions button:focus-visible { outline:3px solid #008b64; outline-offset:3px; }

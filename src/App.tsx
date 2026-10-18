@@ -305,6 +305,30 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       : currentStoreBasket && currentStoreBasket.selectedMealCount > 0 &&
         currentStoreBasket.lines.length > 0 ? 'private' : 'empty'
 
+  const privateHomeSummary = useMemo(() => {
+    const source = offlinePriceSession.imported
+    if (!source || !importedPair || !currentStoreBasket) return null
+    const complete = (value: typeof importedPair.plus) =>
+      value.selectedMealCount > 0 && value.lines.length > 0 && value.unresolvedLineCount === 0
+    const ownComparison = compareFullBaskets({
+      baseline: importedPair.plus, candidate: importedPair.deka,
+    })
+    const comparable = importedSourceFresh && source.pairedWithin24h &&
+      complete(importedPair.plus) && complete(importedPair.deka) &&
+      ownComparison.claimable && ownComparison.deltaCents !== null
+    return {
+      selectedStore: offlinePriceSession.selectedStore,
+      matched: currentStoreBasket.matchedLineCount,
+      unresolved: currentStoreBasket.unresolvedLineCount,
+      hasDemand: currentStoreBasket.selectedMealCount > 0 && currentStoreBasket.lines.length > 0,
+      complete: complete(currentStoreBasket),
+      fresh: importedSourceFresh,
+      totalCents: currentStoreBasket.totalCents,
+      deltaCents: comparable ? ownComparison.deltaCents : null,
+    }
+  }, [offlinePriceSession.imported, offlinePriceSession.selectedStore, importedPair,
+    importedSourceFresh, currentStoreBasket])
+
   const basketComparison = useMemo(
     () =>
       compareFullBaskets({
@@ -398,7 +422,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       </header>}
 
       <div className="content">
-        {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} priceSession={offlinePriceSession} />}
+        {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} priceSession={offlinePriceSession}
+          privateSummary={privateHomeSummary ?? undefined} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
         {tab === 'list' && offlinePriceSession.imported && (
           <BasketView basket={basket} comparison={basketComparison}
