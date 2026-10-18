@@ -243,3 +243,26 @@
 .offline-staged-preview h3 { margin:0; }
 .offline-staged-preview p { margin:.1rem 0; }
 .offline-staged-preview .private-store-trip { margin-top:.5rem; }
+
+
+/* In-product next actions for completing the *private* two-store comparison. */
+.offline-readiness { display:grid; gap:.8rem; padding:clamp(.9rem,2.5vw,1.35rem);
+  margin:1rem 0; background:#f7faf6; border:1px solid #adcbb6; border-radius:15px; }
+.offline-readiness__heading h4 { margin:0 0 .35rem; }
+.offline-readiness__heading p { margin:.2rem 0; max-width:70ch; font-size:.9rem; }
+.offline-readiness__steps { display:grid; gap:.7rem; list-style:none;
+  margin:0; padding:0; counter-reset:readiness; }
+.offline-readiness__steps li { display:flex; justify-content:space-between;
+  gap:1rem; align-items:center; min-width:0; padding:.85rem; border-radius:11px;
+  background:white; border:1px solid #d4e2d6; counter-increment:readiness; }
+.offline-readiness__steps li strong::before { content:counter(readiness) ". "; color:#256247; }
+.offline-readiness__steps li p { margin:.3rem 0 0; font-size:.83rem; color:#536058; }
+.offline-readiness__steps li button { flex:0 0 auto; max-width:100%; min-height:44px;
+  padding:.6rem .8rem; border:1px solid #256247; background:#fff; color:#17452d;
+  border-radius:9px; cursor:pointer; font-weight:600; }
+.offline-readiness__steps li button:focus-visible { outline:3px solid #1e8b5c; outline-offset:3px; }
+.offline-readiness__complete { margin:0; color:#254d37; font-weight:600; }
+@media (max-width:640px) {
+  .offline-readiness__steps li { display:grid; }
+  .offline-readiness__steps li button { justify-self:stretch; white-space:normal; }
+}
