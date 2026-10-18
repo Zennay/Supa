@@ -123,7 +123,34 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const wordMatch = tail.match(/^([^\s,]+)(?:\s+|,\s*)(.*)$/u)
   const word = (wordMatch ? wordMatch[1] : tail).toLowerCase()
   const metric = units[word]
-  const label = metric ? (wordMatch?.[2] || '').trim() : tail
+  let label = metric ? (wordMatch?.[2] || '').trim() : tail
+  let compoundAmount = 0
+  let compoundFound = false
+  // Parse consecutive measurable additions instead of trusting only the first
+  // quantity (which would silently underbuy 1 kg 250 g as 1000 g).
+  if (metric) {
+    const additional = /^(?:(?:en|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([^\s,]+)(?:\s+|,\s*)(.*)$/u
+    for (let index = 0; index < 8; index++) {
+      const second = additional.exec(label)
+      if (!second) break
+      const extraUnit = units[second[2].toLowerCase()]
+      const extraAmount = quantity(second[1])
+      if (!extraUnit || extraUnit.unit !== metric.unit ||
+          extraAmount === null || !Number.isFinite(extraAmount) || extraAmount <= 0) {
+        return { original, label: original, query: original.toLocaleLowerCase('nl'),
+          amount: null, unit: null,
+          reviewReason: 'Controleer samengestelde hoeveelheden en voer het metrische totaal in' }
+      }
+      compoundFound = true
+      compoundAmount += extraAmount * extraUnit.factor
+      label = second[3].trim()
+    }
+    // A ninth quantity is not silently accepted as the ingredient label.
+    if (compoundFound && additional.test(label)) {
+      return { original, label: original, query: original.toLocaleLowerCase('nl'),
+        amount: null, unit: null, reviewReason: 'Te veel samengestelde hoeveelheden: controleer handmatig' }
+    }
+  }
   const inferredPiece = !metric && pieceNouns.test(tail)
   if (!amount || !Number.isFinite(amount) || amount > 100_000 || !label) {
     return { original, label: label || original, query: (label || original).toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Controleer de hoeveelheid en het ingrediënt' }
@@ -132,7 +159,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Onbekende maat: voer een metrische hoeveelheid in' }
   }
   const unit = metric?.unit || 'piece'
-  const normalized = rounded(amount * (metric?.factor || 1))
+  const normalized = rounded(amount * (metric?.factor || 1) + compoundAmount)
   if (!Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid is buiten bereik' }
   }
