@@ -68,6 +68,7 @@ let tripEligible: Record<StoreName, boolean> = { PLUS: false, DekaMarkt: false }
 let tripValidUntilNs: Record<StoreName, bigint> | null = null
 let tripCapturedAt: Record<StoreName, string> | null = null
 let comparisonValidThroughNs: bigint | null = null
+let freshnessRepaintTimer: number | null = null
 let privateComparisonCsv: string | null = null
 let privateCsvFreshUntilNs: bigint | null = null
 const ticked = new Set<string>()
@@ -715,6 +716,55 @@ restoreTrip.addEventListener('change', async () => {
   }
 })
 
+/**
+ * Re-evaluate ORIGINAL local evidence when one retailer ages out while the
+ * browser stays open. Do not refresh capture timestamps or synthesize prices.
+ * Keep the still-fresh shop usable even if its peer expired, including
+ * previously checked rows only for the EXACT unchanged physical basket.
+ */
+function scheduleFreshnessRepaint(
+  source: Source, demand: Demand,
+  moments: readonly (bigint | null)[], nowNs: bigint,
+): void {
+  if (freshnessRepaintTimer !== null) window.clearTimeout(freshnessRepaintTimer)
+  freshnessRepaintTimer = null
+  const upcoming = moments.filter((instant): instant is bigint =>
+    instant !== null && instant <= nowNs && instant + weekNs >= nowNs)
+    .map(instant => instant + weekNs)
+  if (!upcoming.length) return
+  const deadline = upcoming.reduce((earliest, value) => value < earliest ? value : earliest)
+  const durationMs = Number((deadline - nowNs) / 1000000n) + 50
+  freshnessRepaintTimer = window.setTimeout(() => {
+    freshnessRepaintTimer = null
+    if (result.hidden) return // An edited source/demand has already revoked the result.
+    const oldStore = tripStore.value as StoreName
+    let saved: string | null = null
+    const current = currentTripProgress()
+    if (current) {
+      try { saved = saveTripProgress(current.key, ticked, current.basket) }
+      catch { saved = null }
+    }
+    // Runs the same canonical source, physical-matching and original-time
+    // gates again; an expired store becomes unknown, never a fresh quote.
+    show(source, demand)
+    if (saved && tripEligible[oldStore]) {
+      tripStore.value = oldStore
+      const stillValid = currentTripProgress()
+      if (stillValid) {
+        try {
+          const restored = loadTripProgress(saved, stillValid.key, stillValid.basket)
+          ticked.clear()
+          for (const id of restored) ticked.add(id)
+          renderTrip()
+        } catch { /* Changed identity: do not restore a stale tick. */ }
+      }
+    }
+    setStatus('De oorspronkelijke prijsopnames zijn opnieuw op ouderdom beoordeeld. ' +
+      'Verlopen bedragen zijn niet meer bruikbaar; een nog complete recente winkel blijft afzonderlijk zichtbaar. ' +
+      'Er zijn geen winkelprijzen opnieuw opgehaald of opgefrist.')
+  }, Math.max(1, durationMs))
+}
+
 function show(source: Source, demand: Demand): void {
   clearComparisonTextPreview()
   privateComparisonCsv = null
@@ -859,6 +909,7 @@ function show(source: Source, demand: Demand): void {
     privateComparisonCsv = null
     privateCsvFreshUntilNs = null
   }
+  scheduleFreshnessRepaint(source, demand, [start, end], nowNs)
 }
 
 for (const el of [sessionFile, combined, plus, deka, demandFile]) {
