@@ -148,3 +148,9 @@
   font-size: .94rem; font-weight: 650; cursor: pointer;
 }
 .offline-price-workbench__open-list:focus-visible { outline: 3px solid #008b64; outline-offset: 3px; }
+
+.offline-price-workbench__replace {
+  display:grid; gap:.55rem; padding:1rem; background:#eaf5ec;
+  border:1px solid #a9cfb2; border-radius:12px;
+}
+.offline-price-workbench__replace label { font-weight:700; color:#245337; }

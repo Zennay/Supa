@@ -326,6 +326,61 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  /** Replace one original private capture, not a merged/synthetic observation.
+   * Keep the previously admitted pair intact if the replacement is invalid. */
+  async function replaceOneStoreFile(file?: File) {
+    if (!file || !imported || !text) return
+    const version = ++importVersion.current
+    setBusy(true)
+    setMessage('Nieuwe winkelopname wordt lokaal gecontroleerd. De bestaande vergelijking blijft behouden bij een fout.')
+    try {
+      if (file.size > 256000) throw new Error('Nieuwe opname is groter dan 256 kB.')
+      let json = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (version !== importVersion.current) return
+      if (/\.csv$/i.test(file.name) || file.type === 'text/csv') {
+        const moduleUrl = new URL('offline-two-store-csv.mjs',
+          new URL(import.meta.env.BASE_URL, window.location.origin)).href
+        const converter: { convertSingleStoreCsv: (input: string) => string } =
+          await import(/* @vite-ignore */ moduleUrl)
+        if (version !== importVersion.current) return
+        json = converter.convertSingleStoreCsv(json)
+      }
+      const { retailer, capture } = parseSingleOfflineCapture(json, Date.now())
+      // Validate the prior raw source bytes again: never reconstruct them
+      // from a normalized StoreProduct with unknown price mapped to zero.
+      parseOfflinePriceSnapshots(text, Date.now())
+      const previous: unknown = JSON.parse(text)
+      if (!previous || typeof previous !== 'object' || Array.isArray(previous)) {
+        throw new Error('Bestaande bronopname is niet meer beschikbaar.')
+      }
+      const captures = (previous as { captures?: unknown }).captures
+      if (!Array.isArray(captures) || captures.length !== 2) {
+        throw new Error('Bestaande twee-winkelopname is ongeldig.')
+      }
+      const next = JSON.stringify({ schema: 'supa-offline-prices-v1',
+        captures: captures.map(raw => raw && typeof raw === 'object' &&
+          (raw as { retailer?: unknown }).retailer === retailer ? capture : raw) })
+      const parsed = parseOfflinePriceSnapshots(next, Date.now())
+      if (version !== importVersion.current) return
+      clearStaged()
+      setManualSelections({ fingerprint: '', products: {} })
+      session.setTripMemory({})
+      setText(next)
+      setClockMs(Date.now())
+      setImportEpoch(epoch => epoch + 1)
+      setImported(parsed)
+      setMessage(retailer + ' is vervangen. De andere originele winkelopname is onveranderd. ' +
+        'Controleer je productkoppelingen opnieuw.' +
+        (parsed.pairedWithin24h ? '' : ' De opnames liggen meer dan 24 uur uiteen: geen vergelijkbaar verschil.'))
+    } catch (error) {
+      if (version === importVersion.current) setMessage(
+        (error instanceof Error ? error.message : 'Kon de vervanging niet inlezen.') +
+        ' Je vorige twee winkelopnames blijven onveranderd.')
+    } finally {
+      if (version === importVersion.current) setBusy(false)
+    }
+  }
+
   const basketPair = useMemo(() =>
     offlineSessionBaskets(session, plan, recipes, activeDays),
     [session.imported, session.manualSelections, plan, recipes, activeDays])
@@ -474,6 +529,18 @@ export function OfflineReviewedWorkbench({
           <input type="file" multiple accept=".json,.csv,application/json,text/csv" disabled={busy}
             onChange={event => { void loadFiles(event.currentTarget.files); event.currentTarget.value = '' }} />
         </label>
+        {imported && <div className="offline-price-workbench__replace">
+          <label>Werk één van je bestaande winkelopnames bij (JSON of CSV)
+            <input type="file" accept=".json,.csv,application/json,text/csv" disabled={busy}
+              onChange={event => { void replaceOneStoreFile(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
+          </label>
+          <p className="disclaimer">Vervang PLUS of DekaMarkt afzonderlijk. De andere originele
+            opname blijft intact. Supa herberekent pas na volledige bronvalidatie en
+            vraagt opnieuw om je handmatige productkoppelingen te beoordelen.
+            Een ongeldig bestand verwijdert je bestaande vergelijking niet.
+            Tijdstippen moeten nog steeds maximaal 24 uur uiteenliggen
+            om een prijsverschil te mogen tonen.</p>
+        </div>}
         {stagedStores.length > 0 && <div className="offline-price-workbench__staged" role="status">
           <strong>Losse winkelopnames in geheugen:</strong> {stagedStores.join(' + ')}.
           {stagedStores.length === 1
