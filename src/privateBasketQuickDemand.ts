@@ -7,7 +7,7 @@ import { sumDecimalDemandUnits } from './domain/decimalPackArithmetic.ts'
 import type { MatchUnit } from './domain/matching.ts'
 
 type MetricUnit = MatchUnit
-type ParsedRow = { label: string; amount: number; unit: MetricUnit }
+type ParsedRow = { label: string; amount: number | null; unit: MetricUnit }
 type DemandLine = ParsedRow & {
   id: string
   productIds: { PLUS: null; DekaMarkt: null }
@@ -23,12 +23,13 @@ const maxChars = 40000
 const maxRows = 200
 const units: Record<string, MetricUnit> = {
   g: 'g', gram: 'g', kg: 'kg', ml: 'ml', l: 'l',
-  stuk: 'piece', stuks: 'piece', stukken: 'piece', 'stuk(s)': 'piece',
+  stuk: 'piece', stuks: 'piece', stukken: 'piece', 'stuk(s)': 'piece', piece: 'piece',
 }
 const quantity = '(\\d{1,7}(?:[.,]\\d{1,6})?)'
 const unit = '(kg|gram|g|ml|l|stukken|stuks|stuk\\(s\\)|stuk)'
 const leading = new RegExp('^' + quantity + '\\s*' + unit + '\\s+(.+)$', 'iu')
 const trailing = new RegExp('^(.+?)\\s*[:;–—-]\\s*' + quantity + '\\s*' + unit + '$', 'iu')
+const unknown = /^(.+?)\s*:\s*\?\s*(kg|g|ml|l|piece)$/iu
 const allowedLabel = (label: string) => label.length > 0 && label.length <= 160 &&
   label === label.trim() && /[\p{L}\p{N}]/u.test(label) &&
   !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(label) &&
@@ -38,6 +39,12 @@ const family = (value: MetricUnit) => value === 'g' || value === 'kg'
 
 function parseLine(rawLine: string, lineNumber: number): ParsedRow {
   const value = rawLine.trim().replace(/^[•*]\s+/, '')
+  const pending = unknown.exec(value)
+  if (pending) {
+    const label = pending[1].trim()
+    if (!allowedLabel(label)) throw Error('Regel ' + lineNumber + ': onveilige ingrediëntnaam.')
+    return { label, amount: null, unit: units[pending[2].toLocaleLowerCase('nl-NL')] }
+  }
   const first = leading.exec(value)
   const last = first ? null : trailing.exec(value)
   if (!first && !last) {
@@ -85,9 +92,10 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
       const label = body.slice(0, separator)
       const amount = body.slice(separator + 3)
       if (amount === 'hoeveelheid nog controleren') {
-        throw Error('Controleer eerst ontbrekende hoeveelheden in je oude lijst voordat je prijsproducten koppelt.')
+        throw Error('Deze oude lijst mist de eenheid bij ' + label + '. Vul die zelf in; Supa verzint geen fysieke maat.')
       }
-      return label + ': ' + amount
+      const pending = /^hoeveelheid nog controleren \((g|kg|ml|l|piece)\)$/.exec(amount)
+      return pending ? label + ': ? ' + pending[1] : label + ': ' + amount
     })
   }
   if (!rawLines.length || rawLines.length > maxRows) {
@@ -107,6 +115,9 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
     const previous = rows[position]
     if (family(previous.unit) !== family(item.unit)) {
       throw Error('Regel ' + (i + 1) + ': dezelfde naam heeft verschillende maateenheden; controleer de ingrediënten.')
+    }
+    if (previous.amount === null || item.amount === null) {
+      throw Error('Regel ' + (i + 1) + ': herhaald ingrediënt met onbekende hoeveelheid; eerst handmatig controleren.')
     }
     const baseUnit: MetricUnit = family(previous.unit) === 'mass' ? 'g'
       : family(previous.unit) === 'volume' ? 'ml' : 'piece'
