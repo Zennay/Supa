@@ -968,3 +968,19 @@ Eenheidsprijzen zijn uitleghulp uit de al bestaande
 privateUnitPrice-berekening: uitsluitend de werkelijk benodigde hele
 verpakkingen bepalen de goedkoopste route. Geen ongeprijsd artikel,
 fictieve hoeveelheidsmatch of onafhankelijke marktclaim toegevoegd.
+
+#### CSV van de werkelijk gekozen winkelroute
+
+De nieuwe knop voor een **gekozen-route-CSV** exporteert één overzicht
+met hetzelfde fysieke ingrediënt, de zelf gekozen winkel en originele
+bron-SKU, het benodigde aantal hele pakken, plus telkens beide
+gecontroleerde winkelproducten, hun pakprijs en indicatieve
+eenheidsprijs. Het per-ingrediënt verschil DekaMarkt minus PLUS en de
+lokale afvinkstatus blijven apart zichtbaar. Er wordt alleen
+geëxporteerd na een nieuwe klikcontrole van de bestaande
+persoonlijke review en tijdvensters. De route en beide fysieke
+bronmandjes worden opnieuw rekenkundig vergeleken voordat bedragen
+het bestand ingaan. De cellen gebruiken exact dezelfde conservatieve
+formule-injectie-afscherming als de bestaande private twee-winkel-CSV.
+Deze export is uitsluitend een privéoverzicht, geen opnieuw
+te importeren prijsbron, geen retailerrecht en geen live besparingsclaim.

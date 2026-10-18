@@ -4,6 +4,7 @@ import type { MixedStoreShoppingPlan, MixedStore } from './mixedStoreShoppingPla
 import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
 import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
+import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
@@ -86,6 +87,30 @@ export function MixedStoreShoppingCard({
       setMessage('De gekozen route met jouw persoonlijke bronartikelen is lokaal opgeslagen. Geen onafhankelijke retailerprijzen.')
     } catch {
       setMessage('Download mislukt. Je kunt de route ook lokaal selecteren en kopiëren.')
+    }
+  }
+
+  function downloadRouteCsv() {
+    if (block || !eligibleNow()) {
+      setMessage('Controleer eerst alle originele bronartikelen en de eventueel opgegeven extra kosten.')
+      return
+    }
+    try {
+      const csv = exportMixedStoreRouteCsv({
+        plus, deka, route: plan, captured,
+        checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
+      })
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-gekozen-winkelroute-prive.csv'
+        document.body.appendChild(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('De gekozen winkelroute is met beide originele productprijzen als veilige lokale CSV bewaard.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Deze privéwinkelroute kan niet worden geëxporteerd.')
     }
   }
 
@@ -197,6 +222,9 @@ export function MixedStoreShoppingCard({
         onChange={event => setOnlyOpen(event.currentTarget.checked)} /> Alleen nog te kopen</label>
       <button type="button" className="ghost-button" onClick={() => setChecked({})}>Wis vinkjes</button>
       <button type="button" className="ghost-button" onClick={download}>Download gekozen route (TXT)</button>
+      <button type="button" className="ghost-button" onClick={downloadRouteCsv}>
+        Download dezelfde route met beide winkelprijzen (CSV)
+      </button>
       <button type="button" className="ghost-button" onClick={() => {
         if (block) { setMessage('Corrigeer eerst je extra kosten.'); return }
         if (!eligibleNow()) { setShowText(false); setMessage('Bronnen verlopen: opnieuw controleren.'); return }

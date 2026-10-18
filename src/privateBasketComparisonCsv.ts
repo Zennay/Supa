@@ -27,7 +27,7 @@ const header = [
   'verschil_cent_DekaMarkt_minus_PLUS', 'vergelijking',
 ]
 
-function literalCsv(value: unknown, signedMoneyDelta = false): string {
+export function literalCsv(value: unknown, signedMoneyDelta = false): string {
   const raw = String(value ?? '')
   // NFKC discovers compatibility characters (e.g. full-width equals);
   // invisible marks may precede spreadsheet formula operators.
