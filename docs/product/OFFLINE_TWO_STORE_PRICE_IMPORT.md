@@ -19,6 +19,10 @@ Supa vult **nooit** productnamen, winkelspecifieke verpakkingsmaten, prijzen of 
 
 Als het Vergelijk-scherm langer open blijft staan, ververst de UI de vervaltermijn periodiek en bij terugkeer naar het tabblad. Een verlopen zeven-dagenvergelijking verliest direct zijn prijsverschil zonder dat de gebruiker opnieuw hoeft te importeren. De opgeslagen fysieke waarnemingstijd verandert niet.
 
+## Direct boodschappen doen zonder prijsdata
+
+De gewone tab **Vergelijk** biedt nu ook **Mijn weekboodschappen zonder winkelprijzen**, boven de bron- en prijsinvoer. Deze lijst gebruikt direct dezelfde canonieke ingredientenaggregatie als de Planner, inclusief eigen recepten en geselecteerde dagen. Ook als helemaal geen PLUS- of DekaMarkt-bron bestaat, worden dezelfde fysieke behoeften en de werkelijk bekende metrische hoeveelheden getoond. Onbekende hoeveelheden blijven expliciet onbekend. Vink boodschappen af, filter op nog te kopen en maak een lokaal kopieerbare tekstlijst. Er wordt niets opgeslagen op een server of bij een retailer; vinkjes verdwijnen bij het verlaten van het scherm. Deze lijst is los van winkelproduct-/prijsreview, bronrechten en Figma-demoproducten.
+
 ## Het actieve Supa-weekmenu in de uitgebreide privévergelijker gebruiken
 
 1. Stel je gekozen dagen en recepten in onder **Planner**. Ga in de gewone Supa-app naar **Vergelijk**.
