@@ -112,6 +112,26 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function downloadOwnSources() {
+    if (!imported) return
+    try {
+      // Keep original unknown-price nulls and physical source timestamps.
+      // Revalidate exactly the already accepted original JSON before backup.
+      parseOfflinePriceSnapshots(text, Date.now())
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-eigen-winkelopnames-prive.json'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('De originele privébronopname(s) lokaal gedownload; je kunt dit bestand later opnieuw importeren.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch {
+      setMessage('De bronopname is niet meer geldig om te bewaren. Importeer je originele bronbestand opnieuw.')
+    }
+  }
+
   function downloadShoppingTrip(basket: OneStoreBasket, store: typeof stores[number]) {
     try {
       const content = shoppingChecklist(basket, store, doneTripItems)
@@ -347,6 +367,9 @@ export function OfflineReviewedWorkbench({
             importSnapshots(text)
           }}>
             Bereken mandjes
+          </button>
+          <button type="button" className="ghost-button" disabled={!imported || busy} onClick={downloadOwnSources}>
+            Download mijn originele bronopnames (JSON)
           </button>
           <button type="button" className="ghost-button" onClick={() => {
             importRevision.current += 1

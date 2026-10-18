@@ -156,3 +156,19 @@ gegevens niet verloren gaan, maar vereisen menselijke aanvulling van de
 echte code voordat ze tot een nieuw bronbestand worden verheven.
 Een door de gebruiker getypte code blijft een privébronvermelding en
 bewijst zonder onafhankelijke verificatie geen retailerautorisatie.
+
+### Lokale overdracht zonder verlies van onbekende bedragen
+
+Met **Download mijn originele bronopnames (JSON)** bewaart de gebruiker
+expliciet de reeds toegelaten eigen één- of twee-winkelopname op het
+apparaat. Dit bestand behoudt de daadwerkelijk ingelezen oorspronkelijke
+artikelcodes, tijdstippen en `null` voor onbekende prijzen; het resultaat
+wordt voor download opnieuw langs dezelfde lokale importer gelegd.
+Na een volgende sessie kan het via de bestaande JSON-ingang terug.
+
+Een daadwerkelijk waargenomen en expliciet ingevoerde **€0,00**-pakprijs
+wordt nu als geldige gehele centprijs bewaard (mits de gebruiker de
+beschikbaarheid en echte verpakking bevestigt). Een leeg prijsveld blijft
+`null`, onbekend of onbeschikbaar en wordt nooit automatisch tot €0,00
+gemaakt. Een prijs van nul is op zichzelf geen bewijs van promotie,
+bronrechten of publieke besparing.

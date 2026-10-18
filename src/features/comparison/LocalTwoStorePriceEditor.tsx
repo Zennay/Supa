@@ -43,7 +43,7 @@ function eurosToCents(raw: string): number | null {
   if (!/^\d{1,5}(?:[.,]\d{1,2})?$/.test(raw)) return null
   const [whole, decimal = ''] = raw.replace(',', '.').split('.')
   const cents = Number(whole) * 100 + Number(decimal.padEnd(2, '0'))
-  return Number.isSafeInteger(cents) && cents > 0 && cents <= 1000000 ? cents : null
+  return Number.isSafeInteger(cents) && cents >= 0 && cents <= 1000000 ? cents : null
 }
 
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
@@ -224,7 +224,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
           }
           const price = draft.priceEuros ? eurosToCents(draft.priceEuros.trim()) : null
           if (draft.priceEuros && price === null) {
-            throw new Error(`${store} · ${need.label}: bedrag moet een positief bedrag in euro's zijn.`)
+            throw new Error(`${store} · ${need.label}: bedrag moet een geldige, daadwerkelijk geobserveerde prijs in euro's zijn.`)
           }
           if (draft.available && (packAmount === null || price === null)) {
             throw new Error(`${store} · ${need.label}: beschikbaar vereist geobserveerde verpakking en prijs.`)
@@ -369,7 +369,7 @@ export function LocalTwoStorePriceEditor({ plan, recipes, activeDays, onGenerate
                 </label>
               </div>
               <label>Geobserveerde prijs voor één verpakking (€)
-                <input type="text" inputMode="decimal" placeholder="Bijv. 2,49" value={row.priceEuros}
+                <input type="text" inputMode="decimal" placeholder="Bijv. 2,49 (0,00 alleen als echt geobserveerd)" value={row.priceEuros}
                   onChange={e => changeRow(store, need.id, { priceEuros: e.target.value }, need.unit)} />
               </label>
               <label className="offline-manual-editor__available">
