@@ -260,8 +260,10 @@ function nanoseconds(raw: string): bigint {
     BigInt(fraction || '0')
 }
 const abs = (value: bigint) => value < 0n ? -value : value
-function create(tag: string, content?: string): HTMLElement {
-  const el = document.createElement(tag)
+function create(tag: 'strong' | 'p' | 'small' | 'li', content?: string): HTMLElement {
+  const el = tag === 'strong' ? document.createElement('strong') :
+    tag === 'p' ? document.createElement('p') :
+      tag === 'small' ? document.createElement('small') : document.createElement('li')
   if (content !== undefined) el.textContent = content
   return el
 }
