@@ -168,15 +168,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     }
   }, [])
   const offlinePriceSession = useOfflineComparisonSession()
-  // An explicit discard/new invalid import also discards volatile ticks.
-  // Reusing a different source cannot resurrect checkmarks from an old basket.
-  useEffect(() => {
-    if (!offlinePriceSession.imported) {
-      offlinePriceSession.setTripMemory({})
-      offlinePriceSession.setExtraProductIds({ PLUS: [], DekaMarkt: [] })
-      offlinePriceSession.setExtraDoneIds({ PLUS: [], DekaMarkt: [] })
-    }
-  }, [offlinePriceSession.imported])
+  // Volatile choices are cleared by explicit source replacement/discard in
+  // the canonical importer. An empty pair is not a discard: one-store staging
+  // and in-progress file reads must not wipe valid shopping progress.
   const [initialProductSelection] = useState(readChosenProducts)
   const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)
   const [savedProductRaw, setSavedProductRaw] = useState(initialProductSelection.raw)

@@ -735,9 +735,9 @@ export function OfflineReviewedWorkbench({
           setBusy(false)
           // Do not destroy a previously admitted one-store capture simply
           // because the user starts entering the other store in this editor.
-          // Only canonical admission of new source bytes replaces its state.
-          setImported(null)
-          setMessage('Invoer gewijzigd. Bestaande losse winkelopnames blijven beschikbaar; bereken de nieuwe gegevens wanneer je klaar bent.')
+          // The editor is a draft. Keep previously admitted pair and one-store
+          // baskets visible until the user explicitly admits valid new bytes.
+          setMessage('Je wijziging is nog niet toegepast. Bestaande geldige winkelopnames blijven zichtbaar; bereken de nieuwe invoer wanneer je klaar bent.')
         }}
       />
       <details className="offline-price-workbench__schema">
