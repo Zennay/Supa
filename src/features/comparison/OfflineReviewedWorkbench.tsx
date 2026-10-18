@@ -6,6 +6,7 @@ import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../do
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
+import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
@@ -157,6 +158,37 @@ export function OfflineReviewedWorkbench({
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Kan deze privémand-sessie niet maken.')
+    }
+  }
+
+  async function restorePortableSession(file?: File) {
+    if (!file) return
+    const version = ++importRevision.current
+    setBusy(true)
+    try {
+      if (!file.size || file.size > 256000) throw Error('Privésessie is leeg of groter dan 256 kB.')
+      const data = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (version !== importRevision.current) return
+      const result = importPrivateBasketSession({
+        text: data, plan, recipes, activeDays, now: Date.now(),
+      })
+      // Consent is required before replacing a local, possibly unsaved source.
+      if (!window.confirm('Herstel de originele winkelopname(s) en bronartikelkeuzes voor ditzelfde weekmenu? Bestaande lokale invoer, productbevestigingen en afvinkingen worden vervangen. Alle prijzen moeten opnieuw worden beoordeeld.')) return
+      if (version !== importRevision.current) return
+      setText(result.rawSource)
+      setImported(result.captured)
+      setManualSku(result.selected)
+      setReviewedLines({})
+      setDoneTripItems({})
+      setClockMs(Date.now())
+      setTripExportMessage('')
+      setTripProgressMessage('')
+      setMessage('Je originele bron en gekozen SKU’s zijn hersteld voor exact dit weekmenu. Controleer iedere verpakking, prijs en bronopname opnieuw; er zijn geen oude goedkeuringen hersteld.')
+    } catch (error) {
+      if (version === importRevision.current)
+        setMessage(error instanceof Error ? error.message : 'Privésessie niet geldig; bestaande invoer behouden.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
     }
   }
 
@@ -483,6 +515,10 @@ export function OfflineReviewedWorkbench({
           Ontbrekende prijzen: zet <code>priceCents: null</code> en <code>available: false</code>.</p>
       </details>
       <div className="offline-price-workbench__input">
+        <label>Herstel eerdere privémand-sessie van ditzelfde weekmenu (zonder oude bevestigingen)
+          <input type="file" accept=".json,application/json" disabled={busy}
+            onChange={event => { void restorePortableSession(event.currentTarget.files?.[0]) }} />
+        </label>
         <label>Open je eigen één- of twee-winkel CSV of JSON vanaf dit apparaat
           <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
             onChange={event => { void loadFile(event.currentTarget.files?.[0]) }} />

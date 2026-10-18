@@ -261,3 +261,24 @@ toestemming vóór het overschrijven van die eigen lokale werkbank en
 rekent niet automatisch. Het bestand bewaart geen toestemming,
 controle-checkboxes, onafhankelijk veldbewijs of actuele
 besparingsclaim en is niet naar een server verzonden.
+
+### Privésessie terugzetten in de gewone Supa-app
+
+**Herstel eerdere privémand-sessie van ditzelfde weekmenu** opent
+uitsluitend een lokale `supa-private-basket-session-v1` JSON. Supa
+gebruikt daarvoor hetzelfde reeds ondersteunde weekmenu-exportcontract,
+de originele één- of twee-winkelbronimport en de canonieke aggregatie.
+De import controleert alle fysieke ingrediënten (ID, etiket, metrische
+eenheid en exacte benodigde hoeveelheid), het geselecteerde aantal
+maaltijden, de exacte SKU's binnen de juiste winkels, beschikbaarheid,
+verpakkingsgrootte en passende eenheidsfamilie. Dezelfde bronverpakking
+mag niet onterecht worden gekoppeld aan twee afzonderlijke ingrediënten.
+Een groter of ongeschikt bestand en een gewijzigde Planner leveren
+een foutmelding op zonder de aanwezige brondata te vervangen.
+
+Na een volledig toegelaten sessie vraagt de browser expliciet toestemming
+vóórdat Supa de eerdere werkbanksessie vervangt. Alleen oorspronkelijke
+brondata en eerder gekozen SKU's gaan mee. **Alle product-/prijsreview
+checkboxes, afvinkingen en eventuele financiële uitspraken beginnen opnieuw
+onbevestigd**. Een oude sessie wordt niet automatisch ververst,
+automatisch gepubliceerd of door het netwerk verstuurd.
