@@ -477,6 +477,15 @@ export function OfflineReviewedWorkbench({
   }
   const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
     allReviewed && !!basketPair?.comparison?.claimable
+  const fullDifferenceRows = canShowDifference && basketPair?.plus && basketPair.deka &&
+    basketPair.comparison ? [...basketPair.comparison.lineDeltas]
+      .sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents))
+      .flatMap(delta => {
+        const plus = basketPair.plus!.lines.find(line => line.id === delta.id)
+        const deka = basketPair.deka!.lines.find(line => line.id === delta.id)
+        return plus?.status === 'matched' && deka?.status === 'matched'
+          ? [{ delta, plus, deka }] : []
+      }) : []
 
   return (
     <section className="offline-price-workbench" aria-label="Geïmporteerde winkelprijzen vergelijken">
@@ -670,6 +679,44 @@ export function OfflineReviewedWorkbench({
                   </button>
                   <small>Originele PLUS- en Deka-productcodes, geobserveerde pakprijzen, indicatieve eenheidsprijzen en per-ingrediënt verschil. Uitsluitend jouw geaccepteerde lokale opname; geen publieke besparingsclaim.</small>
                 </div>
+              )}
+              {canShowDifference && fullDifferenceRows.length > 0 && (
+                <details className="offline-price-workbench__full-breakdown">
+                  <summary>Bekijk alle {fullDifferenceRows.length} prijsverschillen, bronartikelen en verpakkingen</summary>
+                  <div className="offline-price-workbench__breakdown-scroll">
+                    <table>
+                      <caption>Zelf bevestigde prijsvergelijking van exact dezelfde Planner-ingrediënten; geen onafhankelijke retailerprijzen.</caption>
+                      <thead><tr>
+                        <th scope="col">Benodigd ingrediënt</th>
+                        <th scope="col">PLUS · eigen artikel</th>
+                        <th scope="col">DekaMarkt · eigen artikel</th>
+                        <th scope="col">Verschil (Deka − PLUS)</th>
+                      </tr></thead>
+                      <tbody>{fullDifferenceRows.map(({ delta, plus, deka }) => (
+                        <tr key={delta.id}>
+                          <th scope="row">{delta.ingredientLabel}
+                            <small>{plus.requirement.amount} {plus.requirement.unit} benodigd</small>
+                          </th>
+                          <td><strong>{euros.format(plus.lineTotalCents / 100)}</strong>
+                            <small>{plus.productName} · broncode {plus.productId}</small>
+                            <small>{plus.packs} × {plus.pack.amount} {plus.pack.unit} × {plus.pack.count}</small>
+                            <small>{pricePerUnit(plus) ?? 'Eenheidsprijs onbekend'}</small>
+                          </td>
+                          <td><strong>{euros.format(deka.lineTotalCents / 100)}</strong>
+                            <small>{deka.productName} · broncode {deka.productId}</small>
+                            <small>{deka.packs} × {deka.pack.amount} {deka.pack.unit} × {deka.pack.count}</small>
+                            <small>{pricePerUnit(deka) ?? 'Eenheidsprijs onbekend'}</small>
+                          </td>
+                          <td><strong>{delta.deltaCents === 0 ? 'Gelijk'
+                            : (delta.deltaCents > 0 ? '+' : '−') +
+                              euros.format(Math.abs(delta.deltaCents) / 100)}</strong>
+                            <small>Bedragen voor gehele benodigde verpakkingen.</small>
+                          </td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </details>
               )}
               <div className="offline-price-workbench__trip-actions">
                 <label><input type="checkbox" checked={openTripOnly}

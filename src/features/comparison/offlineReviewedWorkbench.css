@@ -108,3 +108,34 @@
 .offline-price-workbench__trip-progress {font-weight:650;background:#f1f7f0;padding:.55rem;border-radius:9px;}
 .offline-price-workbench__trip-complete {font-weight:700;color:#236d4d;}
 .offline-price-workbench__trip-tick input:focus-visible,.offline-price-workbench__trip-actions input:focus-visible {outline:3px solid #226f52;outline-offset:3px;}
+
+/* Detailed private same-demand comparison: readable on narrow touch screens. */
+.offline-price-workbench__full-breakdown {
+  border:1px solid #cbdcd0; border-radius:12px; padding:1rem;
+  background:#f8fbf8; min-width:0;
+}
+.offline-price-workbench__full-breakdown summary {
+  cursor:pointer; font-weight:700; min-height:44px;
+}
+.offline-price-workbench__full-breakdown summary:focus-visible {
+  outline:3px solid #226f52; outline-offset:3px;
+}
+.offline-price-workbench__breakdown-scroll {
+  max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+.offline-price-workbench__full-breakdown table {
+  width:100%; min-width:740px; border-collapse:collapse; text-align:left;
+}
+.offline-price-workbench__full-breakdown caption {
+  padding:.8rem 0; text-align:left; color:#516759; font-size:.87rem;
+}
+.offline-price-workbench__full-breakdown :is(th,td) {
+  padding:.85rem .65rem; vertical-align:top; border-bottom:1px solid #dce7dc;
+}
+.offline-price-workbench__full-breakdown thead th {
+  font-size:.85rem; background:#e9f3eb;
+}
+.offline-price-workbench__full-breakdown small {
+  display:block; margin-top:.25rem; font-size:.83rem; overflow-wrap:anywhere;
+  color:#496054;
+}

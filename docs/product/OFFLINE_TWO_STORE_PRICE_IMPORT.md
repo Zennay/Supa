@@ -316,3 +316,18 @@ worden niet stil aangepast en niet als een later onbruikbaar
 sessiebestand geëxporteerd. De oorspronkelijke lokale winkeldata
 blijven onaangetast en zijn nog afzonderlijk op te slaan; de
 app toont welk contract de overdracht tegenhoudt.
+
+### Alle ingrediëntprijzen naast elkaar in de gewone app
+
+Wanneer exact dezelfde fysieke winkelmand bij beide winkels volledig
+gekoppeld, recent en handmatig bevestigd is, verschijnt nu naast de
+winnaar en grootste prijsdrijvers een uitklapbaar **alle prijsverschillen**
+overzicht. Voor elk werkelijk geselecteerd ingrediënt toont dit de
+gehele benodigde hoeveelheid, oorspronkelijke artikelcode en naam
+per winkel, aantal en grootte van hele verpakkingen, indicatieve
+€/kg, €/liter of €/stuk, het werkelijke regelbedrag voor hele
+verpakkingen en het verschil DekaMarkt minus PLUS.
+De regels worden op absolute bijdrage gesorteerd; een horizontaal
+scrollbare tabel blijft bruikbaar op smalle telefoons. Zonder twee
+volledig door de gebruiker gecontroleerde winkelbronnen bestaat dit
+overzicht niet en wordt er geen fictief prijsverschil getoond.
