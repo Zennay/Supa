@@ -129,6 +129,19 @@ export function OfflineReviewedWorkbench({
   // The textarea is a draft; the shared session text contains only admitted source bytes.
   const [draftText, setDraftText] = useState(() => text)
   const [message, setMessage] = useState('')
+  const [pendingReplacement, setPendingReplacement] = useState<{
+    sourceText: string
+    json: string
+    retailer: OfflineRetailer
+    previousObservedAt: string
+    nextObservedAt: string
+    previousCount: number
+    nextCount: number
+    added: number
+    removed: number
+    changed: number
+    pairedWithin24h: boolean
+  } | null>(null)
   const [onlyUnresolved, setOnlyUnresolved] = useState<Record<OfflineRetailer, boolean>>({ PLUS: false, DekaMarkt: false })
   const [busy, setBusy] = useState(false)
   const [matchBackupPreview, setMatchBackupPreview] = useState<{
@@ -157,6 +170,7 @@ export function OfflineReviewedWorkbench({
     })
   }
   function clearPrivateSession() {
+    setPendingReplacement(null)
     archiveVersion.current++
     setArchivePreview(null)
     matchBackupVersion.current++
@@ -391,6 +405,7 @@ export function OfflineReviewedWorkbench({
   /** Paste is admitted through exactly the same local JSON/CSV adapters as
    * file upload, and never creates a missing retailer or relaxed price rule. */
   async function importPastedData() {
+    setPendingReplacement(null)
     const supplied = draftText
     if (!supplied.trim()) return
     const version = ++importVersion.current
@@ -418,7 +433,7 @@ export function OfflineReviewedWorkbench({
       const root: unknown = JSON.parse(json)
       if (root && typeof root === 'object' && !Array.isArray(root) &&
         (root as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
-        if (imported && text) applyStoreReplacement(json)
+        if (imported && text) stageStoreReplacement(json)
         else importOneStore(json)
         setDraftText(json)
       } else if (importSnapshots(json)) {
@@ -438,6 +453,7 @@ export function OfflineReviewedWorkbench({
 
   async function loadFile(file?: File) {
     if (!file) return
+    setPendingReplacement(null)
     const version = ++importVersion.current
     const previousImported = imported
     const previousText = text
@@ -456,7 +472,10 @@ export function OfflineReviewedWorkbench({
         if (root && typeof root === 'object' && !Array.isArray(root) &&
           (root as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
           if (version !== importVersion.current) return
-          if (previousImported && previousText) applyStoreReplacement(content)
+          if (previousImported && previousText) {
+            stageStoreReplacement(content)
+            setImported(previousImported)
+          }
           else importOneStore(content)
           setDraftText(content)
           return
@@ -483,7 +502,10 @@ export function OfflineReviewedWorkbench({
       const converted: unknown = JSON.parse(json)
       if (converted && typeof converted === 'object' && !Array.isArray(converted) &&
         (converted as Record<string, unknown>).schema === 'supa-offline-store-capture-v1') {
-        if (previousImported && previousText) applyStoreReplacement(json)
+        if (previousImported && previousText) {
+          stageStoreReplacement(json)
+          setImported(previousImported)
+        }
         else importOneStore(json)
         setDraftText(json)
         return
@@ -508,6 +530,7 @@ export function OfflineReviewedWorkbench({
 
   async function loadFiles(files: FileList | null) {
     if (!files?.length) return
+    setPendingReplacement(null)
     if (files.length === 1) { await loadFile(files[0]); return }
     // Two independent captures can be selected together without ever treating
     // the first uploaded store as an admissible or priced two-store basket.
@@ -569,7 +592,47 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  /** A manually entered or uploaded replacement uses the SAME exact original
+  /** A new retailer capture is only a private PROPOSAL until the user
+   * confirms what changes. Validate the exact two-store candidate first.
+   * Nothing is written to the active session or other retailer at preview.
+   */
+  function stageStoreReplacement(json: string) {
+    if (!imported || !text) throw new Error('Er is geen bestaand winkelpaar om bij te werken.')
+    const { retailer, capture } = parseSingleOfflineCapture(json, Date.now())
+    const previous = parseOfflinePriceSnapshots(text, Date.now())
+    const previousRaw: unknown = JSON.parse(text)
+    if (!previousRaw || typeof previousRaw !== 'object' || Array.isArray(previousRaw)) {
+      throw new Error('Bestaande opname kan niet meer worden gecontroleerd.')
+    }
+    const sourceCaptures = (previousRaw as { captures?: unknown }).captures
+    if (!Array.isArray(sourceCaptures) || sourceCaptures.length !== 2) {
+      throw new Error('Bestaand bronpaar is ongeldig.')
+    }
+    const candidate = JSON.stringify({
+      schema: 'supa-offline-prices-v1',
+      captures: sourceCaptures.map(source => source && typeof source === 'object' &&
+        (source as { retailer?: unknown }).retailer === retailer ? capture : source),
+    })
+    const next = parseOfflinePriceSnapshots(candidate, Date.now())
+    const before = new Map(previous.captures[retailer].products.map(product => [product.id, product] as const))
+    const after = new Map(next.captures[retailer].products.map(product => [product.id, product] as const))
+    const added = [...after.keys()].filter(id => !before.has(id)).length
+    const removed = [...before.keys()].filter(id => !after.has(id)).length
+    const changed = [...after].filter(([id, product]) => {
+      const old = before.get(id)
+      return old && JSON.stringify(old) !== JSON.stringify(product)
+    }).length
+    setPendingReplacement({
+      sourceText: text, json, retailer,
+      previousObservedAt: previous.captures[retailer].observedAt,
+      nextObservedAt: next.captures[retailer].observedAt,
+      previousCount: before.size, nextCount: after.size,
+      added, removed, changed, pairedWithin24h: next.pairedWithin24h,
+    })
+    setMessage('Nieuwe ' + retailer + '-opname gecontroleerd maar NIET toegepast. Bekijk de wijzigingen en bevestig bewust.')
+  }
+
+  /** A confirmed replacement uses the SAME exact original
    * capture admission, peer-source preservation, and reviewed-match rebinding. */
   function applyStoreReplacement(json: string) {
     if (!imported || !text) throw new Error('Er is geen bestaand twee-winkelpaar om bij te werken.')
@@ -640,8 +703,24 @@ export function OfflineReviewedWorkbench({
       (parsed.pairedWithin24h ? '' : ' De opnames liggen meer dan 24 uur uiteen: geen vergelijkbaar verschil.'))
   }
 
+  function confirmStoreReplacement() {
+    if (!pendingReplacement) return
+    const proposal = pendingReplacement
+    setPendingReplacement(null)
+    if (!imported || text !== proposal.sourceText) {
+      setMessage('De eerdere winkelopnames zijn ondertussen gewijzigd. Laad de nieuwe opname opnieuw.')
+      return
+    }
+    try {
+      applyStoreReplacement(proposal.json)
+    } catch {
+      setMessage('Vervanging niet toegepast: huidige bron of tijdstempels zijn niet meer geldig. De oude opnames blijven behouden.')
+    }
+  }
+
   async function replaceOneStoreFile(file?: File) {
     if (!file || !imported || !text) return
+    setPendingReplacement(null)
     const version = ++importVersion.current
     setBusy(true)
     setMessage('Nieuwe winkelopname wordt lokaal gecontroleerd. De bestaande vergelijking blijft behouden bij een fout.')
@@ -657,7 +736,7 @@ export function OfflineReviewedWorkbench({
         if (version !== importVersion.current) return
         json = converter.convertSingleStoreCsv(json)
       }
-      applyStoreReplacement(json)
+      stageStoreReplacement(json)
     } catch (error) {
       if (version === importVersion.current) setMessage(
         (error instanceof Error ? error.message : 'Kon de vervanging niet inlezen.') +
@@ -926,7 +1005,7 @@ export function OfflineReviewedWorkbench({
               // Editing only PLUS or Deka in the form is the same scoped
               // replacement as uploading an individual new original capture.
               // Preserve the untouched store's source/reviews and fail closed.
-              try { applyStoreReplacement(json) }
+              try { stageStoreReplacement(json) }
               catch (error) {
                 setMessage((error instanceof Error ? error.message : 'Kon deze winkel niet bijwerken.') +
                   ' Je eerder toegelaten winkelpaar is behouden.')
@@ -940,6 +1019,7 @@ export function OfflineReviewedWorkbench({
         }}
         onEdit={() => {
           // A user editing the in-app wizard also invalidates a pending file read.
+          setPendingReplacement(null)
           importVersion.current++
           setBusy(false)
           // Do not destroy a previously admitted one-store capture simply
@@ -1017,6 +1097,33 @@ export function OfflineReviewedWorkbench({
             Tijdstippen moeten nog steeds maximaal 24 uur uiteenliggen
             om een prijsverschil te mogen tonen.</p>
         </div>}
+        {pendingReplacement && imported && <section className="offline-price-workbench__replace-preview"
+          aria-label="Controleer de winkelvervanging">
+          <h4>{pendingReplacement.retailer} vervangen? Eerst de verschillen bekijken</h4>
+          <p><strong>Bestaande opname:</strong> {pendingReplacement.previousObservedAt}<br />
+            <strong>Nieuwe opname:</strong> {pendingReplacement.nextObservedAt}</p>
+          <p>{pendingReplacement.previousCount} bestaande producten → {pendingReplacement.nextCount} nieuwe producten.
+            Toegevoegd: {pendingReplacement.added}; verdwenen: {pendingReplacement.removed};
+            gewijzigde productgegevens: {pendingReplacement.changed}.</p>
+          <p className="disclaimer">
+            Alleen {pendingReplacement.retailer} wordt na bevestiging vervangen.
+            Handmatige keuzes, afvinkstatus en extra artikelen van die winkel worden opnieuw beoordeeld.
+            De andere winkel behoudt haar eigen oorspronkelijke bron en gekoppelde keuzes.
+            {pendingReplacement.pairedWithin24h
+              ? ' De opnametijden vallen binnen 24 uur, maar prijzen en rechten zijn niet onafhankelijk geverifieerd.'
+              : ' De opnametijden liggen meer dan 24 uur uiteen: geen vergelijkbare volledige mandprijs.'}
+          </p>
+          <div className="offline-price-workbench__actions">
+            <button type="button" onClick={confirmStoreReplacement} disabled={busy}>
+              Bevestig en vervang alleen {pendingReplacement.retailer}
+            </button>
+            <button type="button" className="ghost-button" onClick={() => {
+              setPendingReplacement(null)
+              setDraftText(text)
+              setMessage('Vervanging geannuleerd. Beide oorspronkelijke winkelopnames zijn behouden.')
+            }}>Annuleer, behoud beide winkelopnames</button>
+          </div>
+        </section>}
         {!imported && stagedStores.length > 0 && <div className="offline-price-workbench__staged" role="status">
           <strong>Losse winkelopnames in geheugen:</strong> {stagedStores.join(' + ')}.
           {stagedStores.length === 1
@@ -1043,6 +1150,7 @@ export function OfflineReviewedWorkbench({
             onChange={event => {
               // A pending file read is no longer authoritative after manual edits.
               importVersion.current++
+              setPendingReplacement(null)
               setBusy(false)
               setDraftText(event.target.value)
               setMessage('Concept gewijzigd. Bestaande geldige bronnen blijven intact tot de nieuwe gegevens zijn toegelaten.')
