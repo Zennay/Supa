@@ -106,7 +106,8 @@ function checklistText(basket: OneStoreBasket, done: ReadonlySet<string>,
       ...extraLines.map(line => (line.done ? '☑ ' : '☐ ') + line.packs + ' × ' +
         line.name + ' · ' + (line.priceCents === null
           ? 'prijs onbekend of niet beschikbaar'
-          : euro.format(line.priceCents * line.packs / 100))),
+          : euro.format(line.priceCents * line.packs / 100) +
+            (fresh ? '' : ' · verouderde privéprijs'))),
       (() => {
         let total = 0
         let unknown = 0
@@ -114,7 +115,8 @@ function checklistText(basket: OneStoreBasket, done: ReadonlySet<string>,
           if (line.priceCents === null) unknown++
           else total += line.priceCents * line.packs
         }
-        return (unknown ? 'Bekend deelbedrag extra artikelen: ' : 'Subtotaal extra artikelen: ') +
+        return (fresh ? (unknown ? 'Bekend deelbedrag extra artikelen: ' : 'Subtotaal extra artikelen: ') :
+          (unknown ? 'Historisch bekend deelbedrag extra artikelen: ' : 'Historisch subtotaal extra artikelen: ')) +
           euro.format(total / 100) +
           (unknown ? ' · ' + unknown + ' prijzen onbekend, geen volledig totaal' : '') +
           ' (niet meegeteld bij weekmandje)'
