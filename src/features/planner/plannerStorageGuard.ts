@@ -69,7 +69,18 @@ export function persistPlannerRecord({
   } catch {
     return { status: 'unavailable', raw: expectedRaw }
   }
-  if ((current !== null && current !== expectedRaw) || !canReplacePlannerRecord(current, validDays, validRecipeIds)) {
+  // A deletion made by another tab is a change, too. Treat null as a
+  // real expected revision: otherwise an old tab recreates a record the
+  // owner explicitly removed elsewhere, without telling them.
+  // An explicitly cleared unsupported/future-format record may be replaced
+  // on the next intentional planner edit. Its bytes were protected while
+  // present; removing them is the user's opt-in recovery path. Conversely,
+  // deleting a VALID v2 record in another tab remains a revision conflict:
+  // a stale tab must not silently resurrect that deleted week.
+  const explicitlyClearedUnsupportedRecord = current === null && expectedRaw !== null &&
+    !canReplacePlannerRecord(expectedRaw, validDays, validRecipeIds)
+  if ((current !== expectedRaw && !explicitlyClearedUnsupportedRecord) ||
+      !canReplacePlannerRecord(current, validDays, validRecipeIds)) {
     return { status: 'protected', raw: current }
   }
   if (!canReplacePlannerRecord(nextRaw, validDays, validRecipeIds)) {
