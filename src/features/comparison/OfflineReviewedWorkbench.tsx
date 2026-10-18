@@ -270,6 +270,63 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  async function loadFiles(files: FileList | null) {
+    if (!files?.length) return
+    if (files.length === 1) { await loadFile(files[0]); return }
+    // Two independent captures can be selected together without ever treating
+    // the first uploaded store as an admissible or priced two-store basket.
+    const version = ++importVersion.current
+    setImported(null)
+    setText('')
+    clearStaged()
+    if (files.length !== 2) {
+      setMessage('Selecteer één gecombineerd bestand of precies twee afzonderlijke winkelbestanden.')
+      return
+    }
+    setBusy(true)
+    setMessage('Beide bestanden worden privé op dit apparaat gelezen en gecontroleerd.')
+    try {
+      const captures: Partial<Record<OfflineRetailer, Record<string, unknown>>> = {}
+      for (const file of Array.from(files)) {
+        if (file.size > 256000) throw new Error('Bestand is te groot (maximaal 256 kB).')
+        const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+        if (version !== importVersion.current) return
+        let json = content
+        if (/\.csv$/i.test(file.name) || file.type === 'text/csv') {
+          const moduleUrl = new URL('offline-two-store-csv.mjs',
+            new URL(import.meta.env.BASE_URL, window.location.origin)).href
+          const converter: { convertSingleStoreCsv: (input: string) => string } =
+            await import(/* @vite-ignore */ moduleUrl)
+          if (version !== importVersion.current) return
+          json = converter.convertSingleStoreCsv(content)
+        }
+        const { retailer, capture } = parseSingleOfflineCapture(json, Date.now())
+        if (captures[retailer]) throw new Error('Twee keer dezelfde winkel geselecteerd. Kies één PLUS- en één DekaMarkt-bestand.')
+        captures[retailer] = capture
+      }
+      if (version !== importVersion.current) return
+      if (!captures.PLUS || !captures.DekaMarkt) {
+        throw new Error('Selecteer één PLUS- en één DekaMarkt-opname.')
+      }
+      const combined = JSON.stringify({ schema: 'supa-offline-prices-v1',
+        captures: [captures.PLUS, captures.DekaMarkt] })
+      // The canonical pair gate remains authoritative for size, age, exact
+      // observation timestamps, duplicate IDs, packages and missing prices.
+      parseOfflinePriceSnapshots(combined, Date.now())
+      setText(combined)
+      importSnapshots(combined)
+      setMessage('PLUS en DekaMarkt zijn samen lokaal geïmporteerd. Controleer nu de productkoppelingen.')
+    } catch (error) {
+      if (version !== importVersion.current) return
+      setImported(null)
+      setText('')
+      clearStaged()
+      setMessage(error instanceof Error ? error.message : 'Kon de winkelbestanden niet veilig importeren.')
+    } finally {
+      if (version === importVersion.current) setBusy(false)
+    }
+  }
+
   const basketPair = useMemo(() => {
     if (!imported) return null
     try {
@@ -372,9 +429,9 @@ export function OfflineReviewedWorkbench({
             kan dit blad worden geïmporteerd. De product-ID vermeldt welk ingrediënt je moet zoeken;
             die ID is geen geverifieerd winkelartikel.</p>
         </div>
-        <label>Importeer een gecombineerd bestand of twee losse winkelopnames vanaf dit apparaat
-          <input type="file" accept=".json,.csv,application/json,text/csv" disabled={busy}
-            onChange={event => { void loadFile(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
+        <label>Importeer één gecombineerd bestand of selecteer twee losse winkelopnames tegelijk vanaf dit apparaat
+          <input type="file" multiple accept=".json,.csv,application/json,text/csv" disabled={busy}
+            onChange={event => { void loadFiles(event.currentTarget.files); event.currentTarget.value = '' }} />
         </label>
         {stagedStores.length > 0 && <div className="offline-price-workbench__staged" role="status">
           <strong>Losse winkelopnames in geheugen:</strong> {stagedStores.join(' + ')}.
