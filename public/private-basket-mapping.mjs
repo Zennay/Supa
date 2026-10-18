@@ -261,6 +261,9 @@ function invalidateUnpricedDemand() {
   unpricedSnapshot = null
 }
 function invalidatePrice() {
+  // Revoke old same-tab source/price snapshots as soon as physical demand or
+  // human SKU selection changes; an old expiry timer must not revive them.
+  document.dispatchEvent(new Event('supa:private-basket-invalidated'))
   if (priceResult) priceResult.hidden = true
   if (priceStatus) {
     priceStatus.textContent = 'De bron of mandvraag is veranderd. Vergelijk opnieuw voor een betrouwbaar privéresultaat.'
