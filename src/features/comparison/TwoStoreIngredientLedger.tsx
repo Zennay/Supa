@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { BasketComparison } from '../../domain/basketComparison.ts'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
+import { unresolvedProductGuidance } from './unresolvedProductGuidance.ts'
 
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
@@ -30,7 +31,7 @@ function StoreCell({ line, store, onReview }: {
 }) {
   if (!line || line.status === 'unresolved') return <div className="offline-ingredient-ledger__unknown">
     <strong>Onbekend</strong>
-    <small>Geen geldige koppeling en prijs</small>
+    <small>{unresolvedProductGuidance(line)}</small>
     {line && <button type="button" onClick={() => onReview(store, line.id)}>
       Koppel in {store}
     </button>}

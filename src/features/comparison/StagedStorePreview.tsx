@@ -6,6 +6,7 @@ import { PrivateStoreTripChecklist } from './PrivateStoreTripChecklist.tsx'
 import type { OfflineComparisonSession } from './offlineComparisonSession.ts'
 import { LocalProductPicker } from './LocalProductPicker.tsx'
 import { stagedStoreFingerprint } from './stagedStoreFingerprint.ts'
+import { unresolvedProductGuidance } from './unresolvedProductGuidance.ts'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const dates = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -201,7 +202,7 @@ export function StagedStorePreview({
           <small>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</small>
           {line.status === 'matched' ?
             <small>{line.packs} × {line.productName} · {euros.format(line.lineTotalCents / 100)}</small> :
-            <small>Nog geen geschikte koppeling of eigen prijs.</small>}
+            <small>{unresolvedProductGuidance(line)}</small>}
           <LocalProductPicker key={fingerprint + ':' + line.id}
             store={store} ingredient={line.ingredientLabel}
             requirementUnit={line.requirement.unit}

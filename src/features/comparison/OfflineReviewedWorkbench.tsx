@@ -12,6 +12,7 @@ import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { StagedStorePreview } from './StagedStorePreview.tsx'
 import { stagedStoreFingerprint } from './stagedStoreFingerprint.ts'
 import { LocalProductPicker } from './LocalProductPicker.tsx'
+import { unresolvedProductGuidance } from './unresolvedProductGuidance.ts'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -1009,7 +1010,7 @@ export function OfflineReviewedWorkbench({
                             <span>Benodigd: {line.requirement.amount ?? '?'} {line.requirement.unit}</span>
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
                             {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
-                            {line.status === 'unresolved' && <span>Niet gekoppeld · controleer bronproduct, beschikbaarheid of verpakking.</span>}
+                            {line.status === 'unresolved' && <span>{unresolvedProductGuidance(line)}</span>}
                             {line.status === 'matched' &&
                               line.reasons.includes('explicit local user selection; not an automatic or verified retailer match') &&
                               <span>Door jou handmatig gekoppeld; dit is geen geverifieerde winkelmatch.</span>}
