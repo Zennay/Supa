@@ -21,7 +21,7 @@ const header = [
   'DekaMarkt_opnametijd', 'DekaMarkt_product_id', 'DekaMarkt_product',
   'DekaMarkt_hele_verpakkingen', 'DekaMarkt_pakprijs_cent', 'DekaMarkt_regel_cent',
   'DekaMarkt_indicatief_euro_per_eenheid', 'DekaMarkt_status',
-  'verschil_cent_PLUS_minus_DekaMarkt', 'vergelijking',
+  'verschil_cent_DekaMarkt_minus_PLUS', 'vergelijking',
 ]
 
 function literalCsv(value: unknown): string {
@@ -98,7 +98,7 @@ export function createPrivateBasketComparisonCsv(input: {
   const plusTotal = completeOwnStore(baskets.PLUS, fresh.PLUS) ? baskets.PLUS.totalCents : null
   const dekaTotal = completeOwnStore(baskets.DekaMarkt, fresh.DekaMarkt) ? baskets.DekaMarkt.totalCents : null
   const totalDelta = comparable && plusTotal !== null && dekaTotal !== null
-    ? plusTotal - dekaTotal : null
+    ? dekaTotal - plusTotal : null
   rows.push([
     'mandje_totaal', '', '', '', '',
     captures.PLUS?.observedAt ?? '', '', '', '', '',
