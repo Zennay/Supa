@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket, BasketTraceLine } from '../../domain/basket.ts'
 import './privateStoreTripChecklist.css'
 
@@ -69,7 +69,51 @@ function checklistText(basket: OneStoreBasket, done: ReadonlySet<string>, observ
   ].join('\n')
 }
 
-/** In-memory shop trip progress for ONE import, separate from saved demo list. */
+const STORAGE_PREFIX = 'supa:private-trip:v1:'
+type SavedState = { enabled: boolean; protected: boolean; raw: string | null; done: string[] }
+
+function progressStorageKey(basket: OneStoreBasket): string {
+  return STORAGE_PREFIX + basket.store.id.toLowerCase().replace(/[^a-z0-9-]/g, '')
+}
+
+/** Basket-specific identity; includes prices and selected source time, not only IDs. */
+function progressIdentity(basket: OneStoreBasket, observedAt: string): string {
+  return JSON.stringify([
+    basket.store.id, observedAt, basket.selectedMealCount, basket.totalCents,
+    basket.matchedLineCount, basket.unresolvedLineCount,
+    basket.lines.map(line => line.status === 'matched'
+      ? [line.id, line.productId, line.packs, line.pricePerPackCents, line.lineTotalCents]
+      : [line.id, 'unknown', line.requirement.amount, line.requirement.unit]),
+  ])
+}
+
+function readSavedTrip(basket: OneStoreBasket, observedAt: string): SavedState {
+  const empty: SavedState = { enabled: false, protected: false, raw: null, done: [] }
+  if (typeof window === 'undefined') return empty
+  let raw: string | null = null
+  try { raw = window.sessionStorage.getItem(progressStorageKey(basket)) }
+  catch { return { ...empty, protected: true } }
+  if (raw === null) return empty
+  if (raw.length > 64000) return { ...empty, raw, protected: true }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Error('shape')
+    const record = parsed as Record<string, unknown>
+    if (record.schemaVersion !== 1 ||
+        Object.keys(record).some(key => !['schemaVersion', 'basketIdentity', 'done'].includes(key)) ||
+        record.basketIdentity !== progressIdentity(basket, observedAt) ||
+        !Array.isArray(record.done) || record.done.length > basket.lines.length ||
+        !record.done.every(value => typeof value === 'string') ||
+        new Set(record.done).size !== record.done.length ||
+        record.done.some(id => !basket.lines.some(line => line.id === id))) throw Error('shape')
+    return { enabled: true, protected: false, raw, done: record.done as string[] }
+  } catch {
+    // A saved list for a different basket or unknown schema is kept intact.
+    return { ...empty, raw, protected: true }
+  }
+}
+
+/** In-memory checklist, with optional per-tab recovery for the SAME basket. */
 export function PrivateStoreTripChecklist({
   basket, observedAt, fresh,
 }: {
@@ -77,8 +121,57 @@ export function PrivateStoreTripChecklist({
   observedAt: string
   fresh: boolean
 }) {
-  const [done, setDone] = useState<ReadonlySet<string>>(() => new Set<string>())
-  const [message, setMessage] = useState('')
+  const [initial] = useState(() => readSavedTrip(basket, observedAt))
+  const [done, setDone] = useState<ReadonlySet<string>>(() => new Set(initial.done))
+  const [saveEnabled, setSaveEnabled] = useState(initial.enabled)
+  const [storageProtected, setStorageProtected] = useState(initial.protected)
+  const [savedRaw, setSavedRaw] = useState(initial.raw)
+  const [message, setMessage] = useState(initial.protected
+    ? 'Een eerder concept voor een andere winkelmand of versie is beschermd tegen overschrijven.'
+    : initial.enabled ? 'Vinkjes voor ditzelfde mandje hersteld uit de huidige browsertab.' : '')
+  useEffect(() => {
+    if (!saveEnabled || storageProtected || typeof window === 'undefined') return
+    try {
+      const key = progressStorageKey(basket)
+      const current = window.sessionStorage.getItem(key)
+      if (current !== savedRaw) {
+        setStorageProtected(true)
+        setMessage('Een ander of gewijzigd concept is beschermd tegen overschrijven.')
+        return
+      }
+      const next = JSON.stringify({
+        schemaVersion: 1,
+        basketIdentity: progressIdentity(basket, observedAt),
+        done: [...done],
+      })
+      if (new TextEncoder().encode(next).length > 64000) throw Error('oversized')
+      if (next !== current) window.sessionStorage.setItem(key, next)
+      if (savedRaw !== next) setSavedRaw(next)
+    } catch {
+      setSaveEnabled(false)
+      setMessage('Vinkjes kunnen niet worden bewaard in dit tabblad. Download je lijst.')
+    }
+  }, [saveEnabled, storageProtected, savedRaw, basket, observedAt, done])
+
+  function changeOptIn(checked: boolean) {
+    if (checked) {
+      if (storageProtected) return
+      setSaveEnabled(true)
+      setMessage('Optioneel bewaren ingeschakeld; alleen in deze browsertab.')
+      return
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const key = progressStorageKey(basket)
+        const current = window.sessionStorage.getItem(key)
+        if (current === savedRaw) window.sessionStorage.removeItem(key)
+        else setStorageProtected(true)
+      } catch { setStorageProtected(true) }
+    }
+    setSaveEnabled(false)
+    setSavedRaw(null)
+    setMessage('Automatisch bewaren gestopt; eigen vinkjes blijven alleen in dit scherm.')
+  }
   const consistent = useMemo(() => basketConsistent(basket), [basket])
   const lines = consistent ? basket.lines : []
   const completed = lines.filter(line => done.has(line.id)).length
@@ -136,6 +229,15 @@ export function PrivateStoreTripChecklist({
     </div>
     <progress value={completed} max={Math.max(lines.length, 1)}
       aria-label={'Boodschappenvoortgang ' + basket.store.name} />
+    <label className="private-store-trip__save">
+      <input type="checkbox" checked={saveEnabled} disabled={storageProtected}
+        onChange={event => changeOptIn(event.target.checked)} />
+      <span>Bewaar mijn vinkjes in dit browsertabblad (optioneel)</span>
+    </label>
+    {storageProtected && <p className="private-store-trip__warning" role="status">
+      Een bestaand privéconcept voor een andere opname of onbekende versie is beschermd en wordt niet overschreven.
+      Je kunt deze lijst wel gewoon afvinken en downloaden.
+    </p>}
     {basket.unresolvedLineCount > 0 && <p className="private-store-trip__warning">
       {basket.unresolvedLineCount} ontbrekende productkeuzes. Het bekende deelbedrag is geen volledig mandtotaal.
     </p>}
@@ -172,8 +274,11 @@ export function PrivateStoreTripChecklist({
         value={text} aria-label={'Kopieerbare lijst ' + basket.store.name}
         onFocus={event => event.currentTarget.select()} />
     </details>
-    <p className="private-store-trip__notice">Vinkjes worden alleen tijdelijk in dit scherm bijgehouden.
-      Deze privéopname wordt niet vermengd met de algemene of demo-boodschappenlijst en
-      er wordt niets naar retailers of een server verstuurd.</p>
+    <p className="private-store-trip__notice">
+      Zonder jouw toestemming blijven vinkjes alleen in dit scherm. Met opt-in worden uitsluitend
+      de vinkjes en een mandgebonden sleutel lokaal in de sessieopslag van dit tabblad bewaard;
+      een andere bronopname of week krijgt nooit automatisch jouw oude vinkjes.
+      Deze privéopname wordt niet vermengd met demo-/algemene lijsten en gaat niet naar de server.
+    </p>
   </section>
 }
