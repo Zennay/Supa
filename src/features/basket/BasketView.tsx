@@ -2,6 +2,7 @@ import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { ManualStoreComparison } from '../comparison/ManualStoreComparison'
 import { OfflineReviewedWorkbench } from '../comparison/OfflineReviewedWorkbench'
+import type { OfflineComparisonSession } from '../comparison/offlineComparisonSession.ts'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
@@ -31,6 +32,7 @@ export function BasketView({
   manualRecipes,
   manualActiveDays,
   manualWeekBudgetEuros,
+  offlinePriceSession,
 }: {
   basket: OneStoreBasket
   comparison: BasketComparison
@@ -40,6 +42,7 @@ export function BasketView({
   manualRecipes?: RecipeWithIngredients[]
   manualActiveDays?: string[]
   manualWeekBudgetEuros?: number
+  offlinePriceSession: OfflineComparisonSession
 }) {
   const basketCost = basketCostDisclosure(
     basket.totalCents,
@@ -86,7 +89,7 @@ export function BasketView({
     <section className="screen">
       {manualPlan && manualRecipes && manualActiveDays && (
         <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
-          budgetEuros={manualWeekBudgetEuros} />
+          budgetEuros={manualWeekBudgetEuros} session={offlinePriceSession} />
       )}
       {manualPlan && manualRecipes && manualActiveDays && (
         <details className="demo-comparison-disclosure">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { OfflineComparisonSession } from './offlineComparisonSession.ts'
+import { offlineSessionBaskets, offlineSessionFingerprint, offlineSessionFresh } from './offlineSessionBaskets.ts'
 import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine } from '../../domain/basket.ts'
-import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, parseSingleOfflineCapture, type OfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor } from './LocalTwoStorePriceEditor.tsx'
@@ -29,12 +30,13 @@ function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays, budgetEuros,
+  plan, recipes, activeDays, budgetEuros, session,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   budgetEuros?: number
+  session: OfflineComparisonSession
 }) {
   const ingredientNeeds = useMemo(() => {
     try {
@@ -75,25 +77,28 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  const [text, setText] = useState('')
-  const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
-  const [importEpoch, setImportEpoch] = useState(0)
+  const {
+    text, setText, imported, setImported, importEpoch, setImportEpoch,
+    stagedCaptures: storedStages, setStagedCaptures,
+    manualSelections, setManualSelections,
+  } = session
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const importVersion = useRef(0)
-  // User-supplied single-store observations stay in memory; a half-pair never
-  // reaches matching, totals, clipboard or persistent browser storage.
-  const stagedCaptures = useRef<Partial<Record<OfflineRetailer, Record<string, unknown>>>>({})
-  const [stagedStores, setStagedStores] = useState<OfflineRetailer[]>([])
+  // User-supplied single-store observations stay in private App memory only.
+  // The ref makes consecutive uploads synchronous; App owns state across tabs.
+  const stagedCaptures = useRef(storedStages)
+  const stagedStores = stores.filter(store => !!storedStages[store])
+  useEffect(() => () => { importVersion.current++ }, [])
   function clearStaged() {
     stagedCaptures.current = {}
-    setStagedStores([])
+    setStagedCaptures({})
   }
   function importOneStore(content: string) {
     const { retailer, capture } = parseSingleOfflineCapture(content, Date.now())
     const next = { ...stagedCaptures.current, [retailer]: capture }
     stagedCaptures.current = next
-    setStagedStores(stores.filter(store => !!next[store]))
+    setStagedCaptures(next)
     // First store never becomes an apparently valid comparison.
     setImported(null)
     setText('')
@@ -111,20 +116,11 @@ export function OfflineReviewedWorkbench({
 
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
-  const [manualSelections, setManualSelections] = useState<{
-    fingerprint: string
-    products: Record<string, string>
-  }>({ fingerprint: '', products: {} })
   // Manual decisions belong to the exact imported products/prices and plan.
   // Older selection state cannot affect a newly uploaded or edited observation.
-  const importFingerprint = useMemo(() => imported ? JSON.stringify([
-    plan, activeDays,
-    recipes.map(recipe => [recipe.id, recipe.ingredients]),
-    ...stores.map(store => [
-      imported.captures[store].observedAt,
-      imported.captures[store].products,
-    ]),
-  ]) : '', [imported, plan, recipes, activeDays])
+  const importFingerprint = useMemo(() =>
+    offlineSessionFingerprint(imported, plan, recipes, activeDays),
+    [imported, plan, recipes, activeDays])
   const choices: Readonly<Record<string, string>> =
     manualSelections.fingerprint === importFingerprint
       ? manualSelections.products : EMPTY_MANUAL_CHOICES
@@ -328,35 +324,12 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  const basketPair = useMemo(() => {
-    if (!imported) return null
-    try {
-      const userReviewed = (store: 'PLUS' | 'DekaMarkt') =>
-        Object.fromEntries(Object.entries(choices)
-          .filter(([key]) => key.startsWith(store + '\u0000'))
-          .map(([key, productId]) => [key.slice(store.length + 1), productId]))
-      const plus = buildOneStoreBasket({
-        store: { id: 'PLUS', name: 'PLUS' }, plan, recipes, activeDays,
-        products: imported.captures.PLUS.products,
-        manualProductIds: userReviewed('PLUS'),
-      })
-      const deka = buildOneStoreBasket({
-        store: { id: 'DekaMarkt', name: 'DekaMarkt' }, plan, recipes, activeDays,
-        products: imported.captures.DekaMarkt.products,
-        manualProductIds: userReviewed('DekaMarkt'),
-      })
-      return { plus, deka, comparison: compareFullBaskets({ baseline: plus, candidate: deka }) }
-    } catch { return null }
-  }, [imported, plan, recipes, activeDays, choices])
-  const currentEnough = useMemo(() => {
-    if (!imported) return false
-    const nowNs = BigInt(Math.trunc(clockMs)) * 1000000n
-    const first = imported.captures.PLUS.observedNs
-    const second = imported.captures.DekaMarkt.observedNs
-    const oldest = first < second ? first : second
-    const newest = first > second ? first : second
-    return nowNs >= newest - 300000000000n && nowNs - oldest <= 604800000000000n
-  }, [imported, clockMs])
+  const basketPair = useMemo(() =>
+    offlineSessionBaskets(session, plan, recipes, activeDays),
+    [session.imported, session.manualSelections, plan, recipes, activeDays])
+  const currentEnough = useMemo(() =>
+    imported !== null && offlineSessionFresh(imported, clockMs),
+    [imported, clockMs])
   const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
     !!basketPair?.comparison.claimable
 

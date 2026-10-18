@@ -5,6 +5,8 @@ import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
+import { useOfflineComparisonSession } from './features/comparison/offlineComparisonSession.ts'
+import { ImportedShoppingList } from './features/comparison/ImportedShoppingList.tsx'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
@@ -105,6 +107,7 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
 
 export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
+  const offlinePriceSession = useOfflineComparisonSession()
   const [initialProductSelection] = useState(readChosenProducts)
   const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)
   const [savedProductRaw, setSavedProductRaw] = useState(initialProductSelection.raw)
@@ -306,7 +309,28 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       <div className="content">
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
-        {tab === 'list' && <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />}
+        {tab === 'list' && offlinePriceSession.imported && (
+          <ImportedShoppingList
+            session={offlinePriceSession}
+            plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+            onOpenComparison={() => navigate('basket')}
+          />
+        )}
+        {tab === 'list' && !offlinePriceSession.imported && (
+          <p className="disclaimer" role="status">
+            Nog geen privéwinkelopnames geladen. Open Vergelijk om je werkelijke
+            ingevoerde PLUS- en DekaMarkt-boodschappenlijst te bekijken.
+            <button type="button" className="ghost-button" onClick={() => navigate('basket')}>
+              Naar Vergelijk
+            </button>
+          </p>
+        )}
+        {tab === 'list' && (offlinePriceSession.imported
+          ? <details className="demo-comparison-disclosure">
+              <summary>Voorbeeldproducten uit het oorspronkelijke ontwerp</summary>
+              <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+            </details>
+          : <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />)}
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
           <p role="status" className="disclaimer">
             {productSelectionWarning === 'protected'
@@ -391,9 +415,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             manualRecipes={recipes}
             manualActiveDays={activeDays}
             manualWeekBudgetEuros={budget}
+            offlinePriceSession={offlinePriceSession}
           />
         )}
-        {tab === 'list' && <ShoppingListView basket={basket} />}
+        {tab === 'list' && (offlinePriceSession.imported
+          ? <details className="demo-comparison-disclosure">
+              <summary>Oude voorbeeldboodschappenlijst (niet de geïmporteerde mand)</summary>
+              <ShoppingListView basket={basket} />
+            </details>
+          : <ShoppingListView basket={basket} />)}
         {tab === 'observe' && <ObservationView />}
       </div>
 
