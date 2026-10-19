@@ -147,3 +147,27 @@
   font-weight: 400;
   line-height: 1.45;
 }
+
+.own-store-planner__copy-fallback {
+  display: grid;
+  gap: .35rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #254932;
+}
+.own-store-planner__copy-fallback textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: .65rem;
+  border: 1px solid #8ba991;
+  border-radius: 8px;
+  resize: vertical;
+  background: #fbfdfb;
+  color: #173d2a;
+  font: .85rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.own-store-planner__copy-fallback textarea:focus-visible {
+  outline: 3px solid #246b50;
+  outline-offset: 2px;
+}
