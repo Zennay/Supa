@@ -22,8 +22,8 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
     setDraft(raw); setPreview(null); setBusy(false)
     setMessage(raw ? 'Concept gewijzigd. Controleer opnieuw voor import.' : '')
   }
-  async function inspect() {
-    const raw = draft, ticket = ++revision.current
+  async function inspectSource(raw: string) {
+    const ticket = ++revision.current
     setPreview(null); setMessage('')
     if (!raw.trim()) { setMessage('Plak eerst echte eigen CSV-, TSV- of JSON-bronregels.'); return }
     if (new TextEncoder().encode(raw).length > limit) {
@@ -52,6 +52,29 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
       if (ticket === revision.current) setBusy(false)
     }
   }
+  async function inspect() { await inspectSource(draft) }
+
+  async function previewOneFile(file: File | undefined) {
+    if (!file) return
+    const ticket = ++revision.current
+    setPreview(null); setMessage('')
+    if (file.size === 0 || file.size > limit) {
+      setMessage('Kies één gevuld bronbestand van maximaal 256 kB.')
+      return
+    }
+    setBusy(true)
+    try {
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (ticket !== revision.current) return
+      setDraft(raw)
+      await inspectSource(raw)
+    } catch {
+      if (ticket === revision.current) setMessage('Bronbestand moet geldige UTF-8 CSV, TSV of JSON bevatten.')
+    } finally {
+      if (ticket === revision.current) setBusy(false)
+    }
+  }
+
   async function pasteClipboard() {
     const ticket = ++revision.current
     setPreview(null); setMessage('')
@@ -72,8 +95,11 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
     if (!preview || preview.raw !== draft) return
     try {
       const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
-      if (!current.currentEnough)
-        throw new Error('Opname te oud of toekomstig. Vernieuw eerst de echte bron.')
+      // Old sources may still be inspected or renewed. Only the canonical
+      // Workbench can admit an amount into a current complete basket.
+      if (!current.currentEnough) {
+        setMessage('Oude opname: in Vergelijk alleen voor broncontrole of vernieuwing; geen actueel prijsverschil.')
+      }
       const file = new File([preview.normalized], 'supa-eigen-winkelbron.json',
         { type: 'application/json' })
       if (file.size > limit) throw new Error('Genormaliseerde bron te groot.')
@@ -90,6 +116,15 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
         Supa-kolommen als CSV, puntkomma-CSV of tabgescheiden spreadsheet, of
         eigen JSON met één of beide winkels. Alles wordt lokaal gecontroleerd:
         een geldige import bewijst geen bronrechten of actuele winkelprijzen.</p>
+      <label>Of bekijk eerst één eigen CSV-, TSV- of JSON-bestand
+        <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json"
+          onChange={event => {
+            const file = event.currentTarget.files?.[0]
+            event.currentTarget.value = ''
+            void previewOneFile(file)
+          }} />
+        <small>Een bestand met beide winkels mag ook. Twee aparte bestanden selecteer je bovenaan met de directe bestandskiezer.</small>
+      </label>
       <button type="button" className="ghost-button" onClick={() => void pasteClipboard()}>
         Plak uit mijn klembord
       </button>
@@ -112,7 +147,7 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
           return <section key={store}>
             <h4>{store}</h4>
             <p>{capture.products.length} originele SKU's;
-              {' '}{priced} met bruikbare pakprijs en
+              {' '}{priced} met vastgelegde (niet per se actuele) pakprijs en
               {' '}{capture.products.length - priced} zonder bruikbare prijs.</p>
             <small>Oorspronkelijk bronmoment: {dateText.format(new Date(capture.observedMs))}</small>
           </section>
@@ -124,7 +159,7 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
             : Object.keys(preview.data.captures).length === 2
               ? 'Bronmomenten meer dan 24 uur uiteen: geen volledig prijsverschil mogelijk.'
               : 'Nog maar één winkelbron. De andere winkel blijft ongeprijsd.'}</p>
-        <button type="button" disabled={!hasDemand || !preview.data.currentEnough}
+        <button type="button" disabled={!hasDemand}
           onClick={handoff}>Open mijn bron in Vergelijk voor productmatching</button>
         {!hasDemand && <small>Kies eerst recepten in je Planner-weekmenu.</small>}
       </div>}
