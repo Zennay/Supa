@@ -36,6 +36,9 @@ export function privateReviewedPairWithin24Hours(
 export type PrivateReviewedSourceLine = {
   ingredientId: string
   ingredientLabel: string
+  requiredAmount: number
+  requiredUnit: string
+  lineTotalCents: number
   productId: string
   productName: string
   packAmount: number

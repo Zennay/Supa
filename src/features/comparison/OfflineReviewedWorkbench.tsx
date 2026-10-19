@@ -1556,6 +1556,9 @@ export function OfflineReviewedWorkbench({
               line.lineTotalCents < 0) return []
           return [{
             ingredientId: line.id, ingredientLabel: line.ingredientLabel,
+            requiredAmount: line.requirement.amount,
+            requiredUnit: line.requirement.unit,
+            lineTotalCents: line.lineTotalCents,
             productId: line.productId, productName: line.productName,
             packAmount: line.pack.amount, packUnit: line.pack.unit,
             packCount: line.pack.count, packagesNeeded: line.packs,

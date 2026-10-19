@@ -30,3 +30,17 @@
 .supa-reviewed-source-lines :is(input,select,button,summary):focus-visible {
   outline: 3px solid #28724f; outline-offset: 2px;
 }
+.supa-reviewed-source-lines__paired {
+  margin: 1rem 0; padding: 1rem; background: #ecf4ef;
+  border: 1px solid #b3d0bd; border-radius: 10px;
+}
+.supa-reviewed-source-lines__paired h4 { margin: 0 0 .5rem; }
+.supa-reviewed-source-lines__paired-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  gap: .65rem;
+}
+.supa-reviewed-source-lines__paired-grid article {
+  display: grid; gap: .35rem; padding: .7rem;
+  background: #fff; border-radius: 8px;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}

@@ -316,6 +316,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     </Suspense>}
     {captureProgress && <Suspense fallback={<p role="status">Eigen producten laden…</p>}>
       <PlannerReviewedSourceLines progress={captureProgress} now={now}
+        hasCompleteComparison={summary.status === 'comparable'}
         onReviewIngredient={onReviewIngredient} />
     </Suspense>}
     {captureProgress && <div className="own-store-planner__review-download">

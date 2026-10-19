@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant, type OwnStore, type PrivateCaptureProgress } from '../comparison/privateReviewedBasketBridge.ts'
 import './plannerReviewedSourceLines.css'
 
@@ -6,10 +7,12 @@ const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
 const eur = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 /** Individual admitted SKU facts only. Never a complete basket authority. */
-export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient }: {
+export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
+  hasCompleteComparison = false }: {
   progress: PrivateCaptureProgress | null
   now: number
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
+  hasCompleteComparison?: boolean
 }) {
   const [query, setQuery] = useState('')
   const [shop, setShop] = useState<'both' | OwnStore>('both')
@@ -21,6 +24,26 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient }
     return (source.confirmedSourceLines ?? []).map(line => ({ store, line }))
   })
   if (entries.length === 0) return null
+  const plus = progress.stores.PLUS
+  const deka = progress.stores.DekaMarkt
+  const first = plus && observedInstant(plus.observedAt)
+  const second = deka && observedInstant(deka.observedAt)
+  const gap = first && second
+    ? (first.ns >= second.ns ? first.ns - second.ns : second.ns - first.ns) : null
+  const pairedTime = gap !== null && gap <= 86_400_000_000_000n
+  const right = new Map((deka?.confirmedSourceLines ?? []).map(line => [line.ingredientId, line]))
+  const pairs = !hasCompleteComparison && pairedTime &&
+    entries.some(entry => entry.store === 'PLUS') &&
+    entries.some(entry => entry.store === 'DekaMarkt')
+    ? (plus?.confirmedSourceLines ?? []).flatMap(one => {
+      const other = right.get(one.ingredientId)
+      if (!other || one.requiredAmount !== other.requiredAmount ||
+          one.requiredUnit !== other.requiredUnit ||
+          one.ingredientLabel !== other.ingredientLabel) return []
+      const difference = other.lineTotalCents - one.lineTotalCents
+      return Number.isSafeInteger(difference) ? [{ one, other, difference }] : []
+    }).sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference))
+    : []
   const search = query.trim().normalize('NFKC').toLocaleLowerCase('nl')
   const shown = entries.filter(({ store, line }) =>
     (shop === 'both' || shop === store) &&
@@ -34,6 +57,25 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient }
         gekoppelde regels, geen compleet mandje. Ontbrekende prijzen blijven onbekend.
         Zonder twee volledige recente mandjes is er <strong>geen winkelwinnaar
         of totale besparing</strong>.</p>
+      {pairs.length > 0 && <section className="supa-reviewed-source-lines__paired">
+        <h4>{pairs.length} ingrediënten met een eigen bronprijs bij beide winkels</h4>
+        <p>Voorlopige regelverschillen bij exact dezelfde fysieke behoefte, met
+          opnamemomenten maximaal 24 uur uiteen. <strong>Geen volledig mandtotaal,
+          winkelwinnaar of bewezen besparing.</strong> Ontbrekende artikelen blijven onbekend.</p>
+        <div className="supa-reviewed-source-lines__paired-grid">
+          {pairs.slice(0, 12).map(({ one, other, difference }) =>
+            <article key={one.ingredientId}>
+              <strong>{one.ingredientLabel} · {one.requiredAmount} {one.requiredUnit}</strong>
+              <span>PLUS: {eur.format(one.lineTotalCents / 100)} · {one.packagesNeeded} pak(ken)</span>
+              <span>DekaMarkt: {eur.format(other.lineTotalCents / 100)} · {other.packagesNeeded} pak(ken)</span>
+              <strong>{difference === 0 ? 'Gelijke regelprijs'
+                : eur.format(Math.abs(difference) / 100) + ' verschil op deze regel (' +
+                  (difference > 0 ? 'PLUS' : 'DekaMarkt') + ' lager)'}</strong>
+            </article>)}
+        </div>
+        {pairs.length > 12 && <small>En {pairs.length - 12} andere gekoppelde regels.
+          Het volledige bedrag verschijnt pas na controle van het hele mandje.</small>}
+      </section>}
       <div className="supa-reviewed-source-lines__controls">
         <label>Zoek ingrediënt, product of SKU
           <input type="search" value={query} maxLength={120}
