@@ -22,6 +22,8 @@ export type PrivateCaptureProgress = {
     demandLineCount: number
     matchedLineCount: number
     reviewedLineCount: number
+    missingIngredientLabels: string[]
+    awaitingReviewLabels: string[]
     fresh: boolean
   }>>
 }

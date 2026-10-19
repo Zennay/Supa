@@ -224,6 +224,12 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               <small>{progress.fresh
                 ? 'Nog niet volledig gecontroleerd: prijs en budget blijven onbekend.'
                 : 'Bronopname te oud of toekomstig: vernieuw de echte bron voordat prijzen meetellen.'}</small>
+              {progress.fresh && progress.missingIngredientLabels.length > 0 &&
+                <small>Zoek echte producten voor: {progress.missingIngredientLabels.join(', ')}
+                  {progress.demandLineCount - progress.matchedLineCount > 3 ? ' …' : ''}.</small>}
+              {progress.fresh && progress.awaitingReviewLabels.length > 0 &&
+                <small>Bevestig origineel artikel, verpakking en prijs voor:
+                  {' '}{progress.awaitingReviewLabels.join(', ')}.</small>}
               <button type="button" className="ghost-button" onClick={onOpenComparison}>
                 Ga naar mijn ontbrekende productcontroles
               </button>
