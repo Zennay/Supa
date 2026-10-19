@@ -139,7 +139,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage(error instanceof Error ? error.message : 'Controlelijst downloaden mislukt.')
     }
   }
-  async function downloadMissingCaptureFor(store: CaptureStore, kind: 'csv' | 'guide') {
+  async function downloadMissingCaptureFor(store: CaptureStore, kind: 'csv' | 'guide' | 'print') {
     setDownloadMessage('')
     try {
       const needs = missingCaptureFor(store, Date.now())
@@ -147,16 +147,20 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       const content = kind === 'csv'
         ? (await import('../comparison/plannerPriceCaptureSheet.ts'))
           .makeBlankPlannerCaptureCsv(needs, [store])
-        : (await import('../comparison/plannerPriceCaptureGuide.ts'))
-          .makePlannerCaptureGuide(needs, [store])
+        : kind === 'print'
+          ? (await import('../comparison/plannerPriceCapturePrint.ts'))
+            .makePrintablePlannerCaptureHtml(needs, [store])
+          : (await import('../comparison/plannerPriceCaptureGuide.ts'))
+            .makePlannerCaptureGuide(needs, [store])
       const url = URL.createObjectURL(new Blob([content], {
-        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' :
+          kind === 'print' ? 'text/html;charset=utf-8' : 'text/plain;charset=utf-8',
       }))
       try {
         const link = document.createElement('a')
         link.href = url
         link.download = 'supa-' + store.toLowerCase() + '-' + needs.length +
-          '-ontbrekende-producten.' + (kind === 'csv' ? 'csv' : 'txt')
+          '-ontbrekende-producten.' + (kind === 'csv' ? 'csv' : kind === 'print' ? 'html' : 'txt')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
@@ -336,6 +340,9 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               </button>
               <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'guide')}>
                 Meeneemlijst {store} (TXT)
+              </button>
+              <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'print')}>
+                Printbaar {store}-opnameblad (HTML)
               </button>
             </>}
           </div>
