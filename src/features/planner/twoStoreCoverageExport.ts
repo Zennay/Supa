@@ -30,11 +30,11 @@ export function privateTwoStoreCoverageCsv(rows: readonly CoverageExportLine[]):
   const line = (values: readonly string[]) => values.map(value => literalCsv(value)).join(';')
   const header = ['Origineel ingrediënt-ID', 'Ingrediënt', 'Fysieke behoefte',
     'PLUS controle', 'PLUS bronmoment', 'DekaMarkt controle', 'DekaMarkt bronmoment',
-    'Prijsverschil']
+    'Financiële vergelijking']
   const output = '\ufeff' + [line(header),
     ...known.map(item => line([item.ingredientId, item.ingredient, item.demand,
       item.plusStatus, item.plusObservedAt, item.dekaStatus, item.dekaObservedAt,
-      'Onbekend zonder twee complete actuele mandjes']))].join('\r\n') + '\r\n'
+      'Niet in dit controleblad: bekijk geprijsde mandjes in Supa']))].join('\r\n') + '\r\n'
   if (new TextEncoder().encode(output).length > 256_000) {
     throw new Error('De broncontrolelijst is te groot voor lokale CSV-export.')
   }
