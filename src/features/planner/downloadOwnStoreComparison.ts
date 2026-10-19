@@ -1,4 +1,5 @@
 import type { OwnStoreWeekComparison } from './ownStoreBudgetComparison.ts'
+import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
@@ -32,9 +33,11 @@ export function printableOwnStoreComparison(
       line.packs + ' volledige verpakking(en)',
       line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count + ' per verpakking',
       money.format(line.pricePerPackCents / 100) + ' per verpakking',
+      (privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'),
       money.format(line.lineTotalCents / 100) + ' benodigd',
     ].join(' · ')
-    lines.push('', label, '  ' + entry('PLUS', row.plus), '  ' + entry('DekaMarkt', row.deka),
+    lines.push('', label + ': ' + row.plus.requirement.amount + ' ' + row.plus.requirement.unit + ' benodigd',
+      '  ' + entry('PLUS', row.plus), '  ' + entry('DekaMarkt', row.deka),
       '  Regelverschil: ' + (row.deltaCents === 0 ? 'gelijk' :
         money.format(Math.abs(row.deltaCents) / 100) +
         (row.deltaCents > 0 ? ' lager bij PLUS' : ' lager bij DekaMarkt')))

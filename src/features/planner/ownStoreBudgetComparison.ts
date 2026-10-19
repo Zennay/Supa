@@ -63,7 +63,8 @@ export function ownStoreWeekComparison(reviewed: PrivateReviewedBaskets | null):
   const mixedRoute = route ? {
     totalCents: route.totalCents,
     possibleProductDifferenceCents: route.additionalDifferenceCents,
-    requiresTwoStops: route.totals.PLUS > 0 && route.totals.DekaMarkt > 0,
+    requiresTwoStops: route.lines.some(line => line.store === 'PLUS') &&
+      route.lines.some(line => line.store === 'DekaMarkt'),
   } : null
   return {
     status: 'comparable', available: ['PLUS', 'DekaMarkt'],
