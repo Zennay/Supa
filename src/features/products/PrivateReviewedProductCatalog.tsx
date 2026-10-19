@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
 import type { OwnStore, PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import './privateReviewedProductCatalog.css'
 
@@ -39,6 +40,8 @@ export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOp
         <label>Zoek eigen product <input type="search" value={query}
           onChange={event => setQuery(event.target.value)} placeholder="Product, SKU of ingrediënt" /></label>
       </div>
+      {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
+        search={search} onOpenComparison={onOpenComparison} onOpenList={() => onOpenList()} />}
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.</p>
       <div className="private-reviewed-products__grid">{visible.map(({ shop, line, observedAt }) => <article
         key={JSON.stringify([shop, line.id, line.productId])}>
