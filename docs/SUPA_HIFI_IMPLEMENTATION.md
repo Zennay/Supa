@@ -16,6 +16,14 @@ Figma's fixed identity is labelled demo. Its unverified “up to 40%” claim is
 ## Remaining screens
 Planner `3359:4896`, Recipes `3342:5608`, Products `3064:3125` and Shoplist `3342:4815` need individual high-fidelity context extraction and full visual adaptation. The current recipe/product discovery tabs reuse the exact Home cards. Existing working domain screens inherit the palette, not full screen parity.
 
+
+## Producten + Lijst visual follow-up (2026-10-20, PR #3946)
+
+- Re-read Figma design context for Products node `3064:3125` and Shoplist node `3342:4815`. Initial Producten view now uses the previously exported Figma image/photo assets rather than showing price-free historical monogram cards first. The Poppins 18px header, icon/search sizes, two-column product cards, product ordering, unit-price sorting, filters and planner shortcut follow the Figma composition. Historical source identities remain available under the filter panel.
+- Lijst has 16px circle checks, 50px thumbnail slots, label/quantity, conditional line-price column, 20px white cards, source basket totals in a bottom 24px-padding card and a collapsed copy/print area. The real checklist, local storage protections and empty/unresolved states remain intact. Figma demo-product selections are secondary to the actual list.
+- Restored **five** Figma floating navigation tabs. Existing Vergelijk and Meten remain reachable from secondary utilities on the live Planner/List screens.
+- **Not yet 1:1 visually accepted.** Figma screenshot retrieval hit the connected Starter-tool quota. Original Figma-only photos for Shoplist/Producten, exact assets/crops, visual screenshot diff and remaining full Planner parity are still pending. Avoid claims that these two screens, or the complete app, are pixel-perfect until screenshot comparison and an exact-head production build succeed. UI-only implementation does not represent a current supermarket-price feed or rights-document audit.
+
 ## Validation
 The M2 Firefox workflow enters Planner from the new Home before replaying all existing planner/basket/list and storage checks. The dedicated hi-fi browser check verifies navigation, search, favorite filtering, modal dismissal, demo selection/removal, local asset loading and narrow-screen overflow. No scraper or price-source gates are modified.
 
