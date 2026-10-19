@@ -15,6 +15,11 @@ export type CaptureRefreshChanges = Readonly<{
   priceChangedSkus: number
   packageChangedSkus: number
   becameUnpricedSkus: number
+  availabilityChangedSkus: number
+  previousObservedAt: string | null
+  newObservedAt: string
+  affectedTotal: number
+  affectedProducts: readonly Readonly<{ sku: string; name: string; change: string }>[]
 }>
 
 function refreshChanges(
@@ -27,23 +32,58 @@ function refreshChanges(
   let priceChangedSkus = 0
   let packageChangedSkus = 0
   let becameUnpricedSkus = 0
+  let availabilityChangedSkus = 0
+  const affected: { sku: string; name: string; change: string; priority: number }[] = []
   for (const [id, current] of after) {
     const previous = before.get(id)
-    if (!previous) { addedSkus++; continue }
-    if (previous.sourcePriceCents !== null && current.sourcePriceCents !== null &&
-        previous.sourcePriceCents !== current.sourcePriceCents) priceChangedSkus++
-    if (previous.packAmount !== current.packAmount ||
-        previous.packUnit !== current.packUnit ||
-        previous.packCount !== current.packCount) packageChangedSkus++
-    if (previous.sourcePriceCents !== null && current.sourcePriceCents === null)
-      becameUnpricedSkus++
+    if (!previous) {
+      addedSkus++
+      affected.push({ sku: id, name: current.name, change: 'Nieuwe originele SKU', priority: 4 })
+      continue
+    }
+    const priceChanged = previous.sourcePriceCents !== null &&
+      current.sourcePriceCents !== null &&
+      previous.sourcePriceCents !== current.sourcePriceCents
+    const packChanged = previous.packAmount !== current.packAmount ||
+      previous.packUnit !== current.packUnit || previous.packCount !== current.packCount
+    const becameUnpriced = previous.sourcePriceCents !== null &&
+      current.sourcePriceCents === null
+    const availableChanged = previous.sourceAvailable !== current.sourceAvailable
+    if (priceChanged) priceChangedSkus++
+    if (packChanged) packageChangedSkus++
+    if (becameUnpriced) becameUnpricedSkus++
+    if (availableChanged) availabilityChangedSkus++
+    const labels = [
+      becameUnpriced && 'Pakprijs ontbreekt nu',
+      availableChanged && 'Beschikbaarheid gewijzigd',
+      packChanged && 'Verpakking gewijzigd',
+      priceChanged && 'Opgenomen pakprijs gewijzigd',
+    ].filter((label): label is string => !!label)
+    if (labels.length) affected.push({
+      sku: id, name: current.name, change: labels.join(' · '),
+      priority: becameUnpriced ? 1 : availableChanged ? 2 : packChanged ? 3 : 4,
+    })
   }
+  for (const [id, previous] of before) {
+    if (!after.has(id)) affected.push({
+      sku: id, name: previous.name, change: 'Verdwenen uit nieuwe winkelbron',
+      priority: 0,
+    })
+  }
+  affected.sort((a, b) => a.priority - b.priority || a.sku.localeCompare(b.sku, 'nl'))
   return {
     addedSkus,
     removedSkus: [...before.keys()].filter(id => !after.has(id)).length,
     priceChangedSkus,
     packageChangedSkus,
     becameUnpricedSkus,
+    availabilityChangedSkus,
+    previousObservedAt: old?.observedAt ?? null,
+    newObservedAt: updated.observedAt,
+    affectedTotal: affected.length,
+    affectedProducts: affected.slice(0, 15).map(({ sku, name, change }) => ({
+      sku, name, change,
+    })),
   }
 }
 
