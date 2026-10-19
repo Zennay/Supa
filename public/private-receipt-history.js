@@ -4,6 +4,13 @@
 const $ = id => document.getElementById(id)
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores = ['PLUS', 'DekaMarkt']
+const safeMismatchMessages = new Set([
+  'De tweede opname moet voor beide winkels later zijn dan de eerste.',
+  'De fysieke weekvraag verschilt: aantal ingrediënten ongelijk.',
+  'Een fysiek ingrediënt of benodigde hoeveelheid is veranderd. Geen zuivere prijsontwikkeling.',
+  'Een SKU, productnaam, pakinhoud of pakaantal is veranderd. Dit is geen zuivere prijsontwikkeling.',
+  'Prijswijzigingen sluiten niet op de oorspronkelijke mandtotalen aan.'
+])
 const units = new Set(['g', 'kg', 'ml', 'l', 'piece'])
 const controls = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u
 const rec = v => v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -211,9 +218,13 @@ $('compare').addEventListener('click',async()=>{
     const result=compare(old,fresh)
     render(old,fresh,result)
     $('status').textContent='Twee historische privérapporten voor exact dezelfde producten vergeleken. Geen actuele prijsclaim.'
-  }catch{
-    if(serial===readSerial)$('status').textContent=
-      'Deze rapporten zijn niet veilig vergelijkbaar. Controleer volgorde, bronmomenten, fysieke ingrediënten, SKU’s, verpakkingen en bedragen. De oorspronkelijke bestanden blijven intact.'
+  }catch(error){
+    if(serial===readSerial){
+      const detail = error instanceof Error && safeMismatchMessages.has(error.message)
+        ? error.message + ' Je kunt alleen een nieuw rapport vergelijken met exact dezelfde producten.'
+        : 'Minstens één lokaal JSON-rapport heeft ongeldige of onvolledige brongegevens. Controleer originele SKU’s, bronmomenten, hele centen en de twee mandtotalen.'
+      $('status').textContent=detail+' De oorspronkelijke bestanden blijven intact en niets geldt als actuele prijsbron.'
+    }
   }finally{if(serial===readSerial)$('compare').disabled=false}
 })
 // Choosing a different local file invalidates all previously displayed
