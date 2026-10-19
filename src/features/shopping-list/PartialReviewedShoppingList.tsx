@@ -1,0 +1,221 @@
+import { useEffect, useRef, useState } from 'react'
+import {
+  recentOwnCaptureInstant,
+  type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
+} from '../comparison/privateReviewedBasketBridge.ts'
+import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
+import './partialReviewedShoppingList.css'
+
+const STORES: readonly OwnStore[] = ['PLUS', 'DekaMarkt']
+const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+
+type Ticks = { key: string; checked: Record<string, boolean> }
+const emptyTicks = (): Ticks => ({ key: '', checked: {} })
+
+/** Shopping progress on admitted *partial* source lines, held in this tab only.
+ * The complete-basket Lijst owns its own separate checkmarks and financial
+ * decisions. Neither unfinished totals nor ticks can reach its price engine. */
+export function PartialReviewedShoppingList({
+  progress, complete, onOpenComparison, onReviewIngredient,
+}: {
+  progress: PrivateCaptureProgress | null
+  complete: PrivateReviewedBaskets | null
+  onOpenComparison: () => void
+  onReviewIngredient: (store: OwnStore, ingredientId: string) => void
+}) {
+  const [preferred, setPreferred] = useState<OwnStore>('PLUS')
+  const [ticks, setTicks] = useState<Record<OwnStore, Ticks>>({
+    PLUS: emptyTicks(), DekaMarkt: emptyTicks(),
+  })
+  const [message, setMessage] = useState('')
+  const [copyFallback, setCopyFallback] = useState<{ key: string; text: string } | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => setNow(Date.now())
+    const timer = window.setInterval(refresh, 60_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
+
+  const validStores = STORES.filter(store => {
+    const reviewed = confirmedPartialBasket(progress, store, now)
+    return reviewed && reviewed.remainingCount > 0 && !complete?.stores[store]
+  })
+  const store = validStores.includes(preferred) ? preferred : validStores[0]
+  const capture = store && progress?.stores[store]
+  const summary = store ? confirmedPartialBasket(progress, store, now) : null
+  const rows = capture?.confirmedSourceLines ?? []
+  const identity = capture && progress ? JSON.stringify([
+    progress.planKey, store, capture.observedAt,
+    rows.map(row => [
+      row.ingredientId, row.requiredAmount, row.requiredUnit, row.productId,
+      row.packAmount, row.packUnit, row.packCount, row.packagesNeeded,
+      row.pricePerPackCents, row.lineTotalCents,
+    ]),
+  ]) : ''
+  const checked = store && ticks[store].key === identity
+    ? ticks[store].checked : {}
+  const checkedKey = JSON.stringify([identity, checked])
+  const currentKey = useRef(checkedKey)
+  currentKey.current = checkedKey
+  const currentPlan = useRef(progress?.planKey)
+  currentPlan.current = progress?.planKey
+  if (!store || !capture || !summary || !identity || summary.remainingCount < 1) return null
+
+  const incompleteNeeds = [
+    ...capture.missingIngredients,
+    ...capture.awaitingReviewIngredients,
+  ]
+  function setTick(ingredientId: string) {
+    if (!confirmedPartialBasket(progress, store, Date.now()) ||
+        !recentOwnCaptureInstant(capture!.observedAt, Date.now())) {
+      setMessage('De originele bron is verlopen; controleer eerst je opname in Vergelijk.')
+      return
+    }
+    setCopyFallback(null)
+    setTicks(previous => {
+      const current = previous[store]
+      const existing = current.key === identity ? current.checked : {}
+      return {
+        ...previous,
+        [store]: { key: identity, checked: {
+          ...existing, [ingredientId]: !existing[ingredientId],
+        } },
+      }
+    })
+  }
+  async function produce(kind: 'text' | 'csv' | 'copy') {
+    setMessage('')
+    setCopyFallback(null)
+    const snapshot = identity
+    const plan = progress?.planKey
+    const confirmed = confirmedPartialBasket(progress, store, Date.now())
+    if (!confirmed || confirmed.remainingCount < 1 ||
+        !recentOwnCaptureInstant(capture!.observedAt, Date.now())) {
+      setMessage('Oude of gewijzigde winkelopname; open de bron eerst opnieuw.')
+      return
+    }
+    try {
+      const { privatePartialShoppingExport } = await import('./privatePartialShoppingExport.ts')
+      if (currentKey.current !== checkedKey ||
+          currentPlan.current !== plan ||
+          !confirmedPartialBasket(progress, store, Date.now()) ||
+          !recentOwnCaptureInstant(capture!.observedAt, Date.now())) {
+        throw new Error('De ingrediënten of bron zijn veranderd tijdens het maken van de lijst.')
+      }
+      const content = privatePartialShoppingExport({
+        store, observedAt: capture!.observedAt, rows, checked,
+        totalDemandLines: confirmed.physicalLineCount,
+      }, kind === 'csv' ? 'csv' : 'text')
+      if (kind === 'copy') {
+        try {
+          if (!navigator.clipboard?.writeText)
+            throw new Error('Geen klembordtoegang')
+          await navigator.clipboard.writeText(content)
+          if (currentKey.current !== checkedKey) return
+          setMessage(store + ': de gecontroleerde deelboodschappen zijn gekopieerd.')
+          return
+        } catch {
+          if (currentKey.current !== checkedKey ||
+              !confirmedPartialBasket(progress, store, Date.now())) return
+          setCopyFallback({ key: checkedKey, text: content })
+          setMessage('Selecteer de eigen deellijst hieronder om handmatig te kopiëren.')
+          return
+        }
+      }
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-bevestigde-deelboodschappen.' +
+          (kind === 'csv' ? 'csv' : 'txt')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      if (currentKey.current === checkedKey)
+        setMessage('Alleen de persoonlijk gecontroleerde deelboodschappen lokaal gedownload; geen compleet winkelmandje.')
+    } catch (cause) {
+      if (currentKey.current === checkedKey)
+        setMessage(cause instanceof Error ? cause.message : 'De deellijst kon niet worden gemaakt.')
+    }
+    void snapshot
+  }
+  return <section className="screen supa-partial-shop" aria-label="Mijn gedeeltelijk gecontroleerde winkelboodschappen">
+    <header>
+      <div>
+        <span className="eyebrow">Eigen bronproducten · nog niet compleet</span>
+        <h3>Neem al bevestigde winkelproducten mee</h3>
+      </div>
+      <button type="button" className="ghost-button" onClick={onOpenComparison}>
+        Controleer mijn ontbrekende producten
+      </button>
+    </header>
+    {validStores.length > 1 && <div className="supa-partial-shop__switch" aria-label="Kies eigen winkelbron">
+      {validStores.map(option => <button key={option} type="button"
+        aria-pressed={store === option} onClick={() => {
+          setPreferred(option)
+          setMessage('')
+          setCopyFallback(null)
+        }}>{option}</button>)}
+    </div>}
+    <p><strong>{store}</strong> · jouw oorspronkelijke bronmoment: {capture.observedAt}</p>
+    <p className="supa-partial-shop__warning">
+      <strong>{summary.confirmedCount} van {summary.physicalLineCount} ingrediënten</strong>
+      {' '}hebben gecontroleerde artikelcodes en pakprijzen.
+      {' '}{summary.remainingCount} nog niet compleet; hun prijzen blijven onbekend.
+      De waarde {euro.format(summary.knownCents / 100)} betreft alleen de
+      bevestigde regels, <strong>geen totaalbedrag, winkelwinnaar of besparingsclaim</strong>.
+    </p>
+    <div className="supa-partial-shop__items">
+      {rows.map(line => <article key={line.ingredientId}>
+        <label>
+          <input type="checkbox" checked={checked[line.ingredientId] === true}
+            onChange={() => setTick(line.ingredientId)} />
+          <span>
+            <strong>{line.ingredientLabel}</strong>
+            {' '}· {line.requiredAmount} {line.requiredUnit}
+            <small>{line.packagesNeeded} × {line.productName} · SKU {line.productId}</small>
+            <small>{line.packCount} × {line.packAmount} {line.packUnit} per pak ·
+              {' '}{euro.format(line.pricePerPackCents / 100)} per pak ·
+              {' '}{line.unitPrice ?? 'eenheidsprijs onbekend'}</small>
+          </span>
+        </label>
+        <strong>{euro.format(line.lineTotalCents / 100)}</strong>
+        <button type="button" className="ghost-button"
+          onClick={() => onReviewIngredient(store, line.ingredientId)}>
+          Controleer SKU in Vergelijk
+        </button>
+      </article>)}
+    </div>
+    {incompleteNeeds.length > 0 && <div className="supa-partial-shop__unknown">
+      <h4>Ontbrekende of nog te controleren artikelen</h4>
+      <p>Deze boodschappen staan ook op je ongeprijsde weeklijst hieronder.
+        Ze zijn niet meegenomen in het bedrag hierboven.</p>
+      {incompleteNeeds.slice(0, 8).map(item =>
+        <button type="button" key={item.id} className="ghost-button"
+          onClick={() => onReviewIngredient(store, item.id)}>
+          {item.label} · bronproduct controleren
+        </button>)}
+      {incompleteNeeds.length > 8 &&
+        <small>En nog {incompleteNeeds.length - 8} andere ingrediënten.</small>}
+    </div>}
+    <div className="supa-partial-shop__actions">
+      <button type="button" onClick={() => void produce('copy')}>Kopieer gecontroleerde deellijst</button>
+      <button type="button" className="ghost-button" onClick={() => void produce('text')}>Download TXT</button>
+      <button type="button" className="ghost-button" onClick={() => void produce('csv')}>Download CSV</button>
+    </div>
+    {copyFallback?.key === checkedKey && <label className="supa-partial-shop__fallback">
+      Selecteer en kopieer je eigen deellijst
+      <textarea readOnly rows={9} value={copyFallback.text}
+        onFocus={event => event.currentTarget.select()} />
+    </label>}
+    {message && <p role="status" aria-live="polite">{message}</p>}
+  </section>
+}
