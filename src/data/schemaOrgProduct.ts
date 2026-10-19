@@ -71,15 +71,13 @@ function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
 }
 
 function extractPrice(offers: JsonObject[]): number | null {
-  const prices = offers
-    .flatMap((offer) => [
-      cents(offer.price ?? offer.lowPrice),
-      ...priceSpecificationCandidates(offer).map((specification) =>
-        cents(specification.price ?? specification.lowPrice),
-      ),
-    ])
-    .filter((value): value is number => value !== null)
-  return uniqueKnown(prices)
+  // AggregateOffer.lowPrice and ranges describe many offers, not the
+  // payable price of this exact SKU/pack. Multiple offers or a unit-price
+  // specification cannot independently prove a checkout package price.
+  // An unambiguous concrete typed Offer.price is the only price authority.
+  if (offers.length !== 1 || !hasType(offers[0], 'Offer') ||
+      hasType(offers[0], 'AggregateOffer')) return null
+  return cents(offers[0].price)
 }
 
 function extractCurrency(offers: JsonObject[]): string | null {
