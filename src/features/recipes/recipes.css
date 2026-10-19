@@ -113,3 +113,5 @@
 .recipe-shopping-panel__row span { overflow-wrap:anywhere; }
 .recipe-shopping-panel li { margin:4px 0; }
 @media(max-width:460px){.recipe-shopping-panel__progress{flex-direction:column;align-items:stretch}.recipe-shopping-panel__progress strong{margin-right:0}}
+
+.recipe-planner-readiness { display: block; padding: 3px 0 6px; overflow-wrap: anywhere; font-size: .8rem; line-height: 1.3; }

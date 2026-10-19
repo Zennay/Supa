@@ -7,6 +7,7 @@ import { importRecipeLink } from './importRecipeLink'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
+import { toPlannerRecipe } from './plannerRecipes.ts'
 import { exportOwnRecipePrivateWeek } from './exportOwnRecipePrivateWeek'
 import { RECIPE_FAVORITES_KEY, readRecipeFavorites, toggleRecipeFavorite, type RecipeFavorites } from './recipeFavorites'
 import './recipes.css'
@@ -321,7 +322,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       const next = saveRecipeLibrary(window.localStorage, library, entries)
       setLibrary(next); setBackupPreview(null); window.dispatchEvent(new Event('supa-recipes-changed')); setFilter('own'); setQuery('')
       setSelected(recipe)
-      setMessage(`${recipe.title} is ${current ? 'bijgewerkt' : 'opgeslagen'} op dit apparaat. De Planner gebruikt de bijgewerkte metrische hoeveelheden.`)
+      setMessage(`${recipe.title} is ${current ? 'bijgewerkt' : 'opgeslagen'} op dit apparaat. ` +
+        (toPlannerRecipe(recipe)
+          ? 'Het recept is klaar voor Planner. Winkelprijzen blijven onbekend tot je echte brondata bevestigt.'
+          : 'Het recept blijft bewaard. Controleer eerst onzekere hoeveelheden of gedeeltelijke stuks voordat je het in Planner gebruikt.'))
       closeEditor()
     } catch (e) { setError(e instanceof Error ? e.message : 'Opslaan is niet gelukt. Je invoer blijft staan.') }
     finally { saving.current = false }
@@ -337,7 +341,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`}
           aria-pressed={favorites.includes(recipe.id)} disabled={!!favoriteState.error}
           onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
-        <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p></div>
+        <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p>{'savedAt' in recipe && <small className="recipe-planner-readiness">{toPlannerRecipe(recipe) ? '✓ Klaar voor Planner · ongeprijsd' : 'Ingrediënten nog controleren voor Planner'}</small>}</div>
       </article>)}</div>
       {!demo.length && !own.length && <p className="hifi-empty">{query ? 'Geen recepten gevonden. Probeer een andere zoekterm.' : 'Voeg je eerste eigen recept toe of importeer een receptlink.'}</p>}
       <small>Favorieten blijven lokaal bewaard in deze browser; receptgegevens en links worden niet meegestuurd.</small>
@@ -347,8 +351,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
       <h2>Mijn recepten meenemen</h2>
       <p>Maak een privé-backup van je eigen recepten, of herstel een eerdere SUPA-receptenbackup.
-        Dit gebruikt alleen je browser, geen upload en geen winkelprijzen. Eigen recepten met
-        volledige metrische hoeveelheden verschijnen ook in Planner.</p>
+        Dit gebruikt alleen je browser, geen upload en geen winkelprijzen. Eigen recepten verschijnen
+        pas in Planner nadat ingrediënten, hele fysieke stuks en overige hoeveelheden bevestigd zijn.</p>
       <div className="recipe-backup-panel__actions">
         <button type="button" onClick={downloadOwnRecipes}
           disabled={!!library.error || !library.recipes.length}>
@@ -417,7 +421,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           </button>
         </form>
         : <form className="recipe-form" onSubmit={check} onChange={() => setPreview(null)}><label>Naam van het recept<input required maxLength={160} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label><div className="recipe-form-row"><label>Porties<input required type="number" min="1" max="1000" value={form.servings} onChange={e => setForm({ ...form, servings: e.target.value })} /></label><label>Minuten<input required type="number" min="1" max="1440" value={form.minutes} onChange={e => setForm({ ...form, minutes: e.target.value })} /></label></div><label>Ingrediënten<textarea required rows={5} placeholder={'200 g rijst\n1 paprika\n250 ml kokosmelk'} value={form.ingredients} onChange={e => setForm({ ...form, ingredients: e.target.value })} /></label><small>Eén ingrediënt per regel, met hoeveelheid en eenheid.</small><label>Bereiding<textarea required rows={5} placeholder="Eén stap per regel" value={form.steps} onChange={e => setForm({ ...form, steps: e.target.value })} /></label>{source && <p>Bron: <a href={source} target="_blank" rel="noopener noreferrer">Bekijk het oorspronkelijke recept</a></p>}<button className="recipe-primary">Controleer recept</button></form>}
-      {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <p>Onbekende hoeveelheden blijven als tekst bewaard. Vul ze aan voordat je een boodschappenberekening maakt.</p>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>{editingId ? 'Wijzigingen opslaan' : isVariant ? 'Variant als nieuw recept opslaan' : 'Opslaan in mijn recepten'}</button></section>}
+      {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <p>Onzekere hoeveelheden en gedeeltelijke stuks blijven als tekst bewaard. Corrigeer deze regels in het recept voordat je de Planner of prijsvergelijking gebruikt.</p>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>{editingId ? 'Wijzigingen opslaan' : isVariant ? 'Variant als nieuw recept opslaan' : 'Opslaan in mijn recepten'}</button></section>}
       {error && <p role="alert" className="recipe-error">{error}</p>}
     </dialog>
     <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p>{'savedAt' in selected && <><div className="recipe-detail-actions"><button type="button" onClick={() => openSavedRecipeEditor(selected)}>Bewerk mijn recept</button><button type="button" onClick={() => openSavedRecipeEditor(selected, true)}>Maak een variant</button></div>
