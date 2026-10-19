@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
@@ -27,9 +27,24 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
   const [downloadMessage, setDownloadMessage] = useState('')
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => setNow(Date.now())
+    const timer = window.setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
   const [captureTarget, setCaptureTarget] = useState<'both' | CaptureStore>('both')
   const [secondStopCost, setSecondStopCost] = useState<{ key: string; raw: string }>({ key: '', raw: '' })
-  const summary = ownStoreWeekComparison(reviewed)
+  // Never let a long-open Planner keep displaying expired personal prices.
+  const currentSources = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', now)
+  const summary = ownStoreWeekComparison(currentSources)
+  const expiredSources = !!reviewed &&
+    (Object.keys(reviewed.stores) as OwnStore[]).some(store =>
+      !!reviewed.stores[store] && !currentSources?.stores[store])
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
   // An own travel-cost scenario cannot silently follow a replaced source.
@@ -40,7 +55,24 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
   const shownCost = secondStopCost.key === costSourceKey ? secondStopCost.raw : ''
   const parsedSecondStopCents = parsePrivateExtraVisitCostCents(shownCost)
 
-  const selected = reviewed?.stores[preferred] ? preferred : reviewed?.stores.PLUS ? 'PLUS' : reviewed?.stores.DekaMarkt ? 'DekaMarkt' : preferred
+  const selected = currentSources?.stores[preferred] ? preferred : currentSources?.stores.PLUS ? 'PLUS' : currentSources?.stores.DekaMarkt ? 'DekaMarkt' : preferred
+  function selectCurrentStore(store: OwnStore) {
+    if (!freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())?.stores[store]) {
+      setDownloadMessage('Deze winkelprijs is verlopen of veranderd. Herzie de originele bron in Vergelijk.')
+      return
+    }
+    setDownloadMessage('')
+    onSelect(store)
+  }
+  function openCurrentMixedRoute() {
+    const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+    if (ownStoreWeekComparison(current).status !== 'comparable') {
+      setDownloadMessage('De winkelprijzen zijn verlopen of niet vergelijkbaar. Herzie de bronnen eerst.')
+      return
+    }
+    setDownloadMessage('')
+    onOpenMixedRoute(parsedSecondStopCents === null ? undefined : shownCost)
+  }
   function openConfirmedStoreList(store: OwnStore) {
     // A Planner tab may stay open while its source crosses the freshness
     // boundary. Never hand an expired or different source to Lijst.
@@ -175,7 +207,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
     </div>}
     <div className="own-store-planner__cards">
       {stores.map(store => {
-        const capture = reviewed?.stores[store]
+        const capture = currentSources?.stores[store]
         const cents = capture?.basket.totalCents
         return <div className="own-store-planner__card" key={store}>
           <strong>{store}</strong>
@@ -191,7 +223,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
             <small className="own-store-planner__budget-gap">{cents > budgetCents
               ? `${money.format((cents - budgetCents) / 100)} boven je ingestelde weekbudget`
               : `${money.format((budgetCents - cents) / 100)} binnen je ingestelde weekbudget`}</small>}
-          {capture && <button type="button" onClick={() => onSelect(store)}
+          {capture && <button type="button" onClick={() => selectCurrentStore(store)}
             className="ghost-button" aria-pressed={selected === store}>
             {selected === store ? 'Gekozen voor mijn budget' : 'Gebruik voor mijn budget'}
           </button>}
@@ -202,6 +234,10 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
         </div>
       })}
     </div>
+    {expiredSources && <p className="own-store-planner__age" role="status">
+      Een of meer persoonlijke winkelopnames zijn verlopen of niet meer bruikbaar.
+      Oude bedragen zijn verborgen; controleer de originele bronproducten opnieuw in Vergelijk.
+    </p>}
     {summary.status === 'missing' && summary.available.length === 0 && <div className="own-store-planner__start" role="status">
       <strong>Prijsverschil onbekend · nog geen gecontroleerde winkelmandjes</strong>
       {hasDemand ? <>
@@ -221,8 +257,8 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
             : `${summary.cheapest} is ${money.format(summary.differenceCents / 100)} voordeliger voor jouw mandje.`}</strong>
           <p>Dezelfde gecontroleerde fysieke vraag en benodigde hele verpakkingen, eigen bronmomenten maximaal 24 uur uit elkaar. Geen kassagarantie of onafhankelijk bewezen besparing.</p>
           {summary.cheapest && selected !== summary.cheapest && <button type="button" className="ghost-button"
-            onClick={() => onSelect(summary.cheapest!)}>Kies {summary.cheapest} voor mijn weekbudget</button>}
-          <button type="button" className="ghost-button" onClick={onOpenList}>Open eigen boodschappenlijst</button>
+            onClick={() => selectCurrentStore(summary.cheapest!)}>Kies {summary.cheapest} voor mijn weekbudget</button>}
+          <button type="button" className="ghost-button" onClick={() => openConfirmedStoreList(selected)}>Open eigen boodschappenlijst</button>
           <button type="button" className="ghost-button" onClick={downloadPrivateComparison}>
             Download privévergelijking (TXT)
           </button>
@@ -267,7 +303,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
                     : money.format((budgetCents - summary.mixedRoute.totalCents - parsedSecondStopCents) / 100) + ' over.'}</p>}
               </>}
             </div>}
-            <button type="button" className="ghost-button" onClick={() => onOpenMixedRoute(parsedSecondStopCents === null ? undefined : shownCost)}>
+            <button type="button" className="ghost-button" onClick={openCurrentMixedRoute}>
               Open mijn gecombineerde winkelroute in Lijst
             </button>
           </div>}
