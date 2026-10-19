@@ -72,13 +72,14 @@ const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
 
 type StoredDraft = {
   saved: boolean
+  sourceSelection: 'both' | OfflineRetailer
   rows: Record<string, ProductDraft>
   capturedAt: Record<OfflineRetailer, string>
   raw: string | null
   protected: boolean
 }
 function readPrivateDraft(fingerprint: string): StoredDraft {
-  const empty: StoredDraft = { saved: false, rows: {}, capturedAt: { PLUS: '', DekaMarkt: '' }, raw: null, protected: false }
+  const empty: StoredDraft = { saved: false, sourceSelection: 'both', rows: {}, capturedAt: { PLUS: '', DekaMarkt: '' }, raw: null, protected: false }
   if (typeof window === 'undefined') return empty
   let raw: string | null
   try { raw = window.sessionStorage.getItem(privateDraftStorageKey) }
@@ -90,7 +91,8 @@ function readPrivateDraft(fingerprint: string): StoredDraft {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('shape')
     const r = value as Record<string, unknown>
     if (r.schemaVersion !== 1 || typeof r.fingerprint !== 'string' ||
-        Object.keys(r).some(k => !['schemaVersion', 'fingerprint', 'rows', 'capturedAt'].includes(k)) ||
+        Object.keys(r).some(k => !['schemaVersion', 'fingerprint', 'rows', 'capturedAt', 'sourceSelection'].includes(k)) ||
+        (r.sourceSelection !== undefined && !['both', 'PLUS', 'DekaMarkt'].includes(String(r.sourceSelection))) ||
         !r.rows || typeof r.rows !== 'object' || Array.isArray(r.rows) ||
         !r.capturedAt || typeof r.capturedAt !== 'object' || Array.isArray(r.capturedAt)) throw Error('shape')
     if (r.fingerprint !== fingerprint) return { ...empty, raw, protected: true }
@@ -112,7 +114,8 @@ function readPrivateDraft(fingerprint: string): StoredDraft {
         typeof row.priceEuros === 'string' && row.priceEuros.length <= 24 &&
         typeof row.available === 'boolean'
     })) throw Error('rows')
-    return { saved: true, rows: rows as Record<string, ProductDraft>,
+    return { saved: true, sourceSelection: (r.sourceSelection ?? 'both') as 'both' | OfflineRetailer,
+      rows: rows as Record<string, ProductDraft>,
       capturedAt: { PLUS: dates.PLUS, DekaMarkt: dates.DekaMarkt }, raw, protected: false }
   } catch {
     return { ...empty, raw, protected: true }
@@ -160,6 +163,7 @@ export function LocalTwoStorePriceEditor({
   useEffect(() => {
     const old = readPrivateDraft(selectedPlanFingerprint)
     setRows(old.rows)
+    setSourceSelection(old.sourceSelection)
     setCapturedAt(old.capturedAt)
     setDraftOptIn(old.saved)
     setDraftFingerprint(selectedPlanFingerprint)
@@ -180,7 +184,7 @@ export function LocalTwoStorePriceEditor({
         setDraftStatus('Een ander of onbekend concept is bewaard; SUPA overschrijft dit niet.')
         return
       }
-      const next = JSON.stringify({ schemaVersion: 1, fingerprint: selectedPlanFingerprint, rows, capturedAt })
+      const next = JSON.stringify({ schemaVersion: 1, fingerprint: selectedPlanFingerprint, rows, capturedAt, sourceSelection })
       if (new TextEncoder().encode(next).length > 256000) throw Error('oversized')
       if (next !== actual) window.sessionStorage.setItem(privateDraftStorageKey, next)
       setSavedDraftRaw(next)
@@ -189,7 +193,7 @@ export function LocalTwoStorePriceEditor({
       setDraftOptIn(false)
       setDraftStatus('Kon dit privéconcept niet bewaren. Gebruik desgewenst de lokale JSON-download.')
     }
-  }, [draftOptIn, draftProtected, draftFingerprint, rows, capturedAt, selectedPlanFingerprint])
+  }, [draftOptIn, draftProtected, draftFingerprint, rows, capturedAt, sourceSelection, selectedPlanFingerprint])
 
   function clearDraft() {
     if (typeof window !== 'undefined') {
