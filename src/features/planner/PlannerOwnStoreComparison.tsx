@@ -21,7 +21,7 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, captureNeeds }: {
+export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onImportSourceFiles, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, captureNeeds }: {
   reviewed: PrivateReviewedBaskets | null
   captureProgress: PrivateCaptureProgress | null
   captureNeeds: readonly PlannerCaptureGuideNeed[]
@@ -30,6 +30,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   budget: number
   onSelect: (store: OwnStore) => void
   onOpenComparison: () => void
+  onImportSourceFiles: (files: File[]) => void
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
   onOpenList: () => void
   onOpenMixedRoute: (extraCostRaw?: string) => void
@@ -270,6 +271,18 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       <div><span className="eyebrow">Eigen gecontroleerde winkelopnames</span>
         <h3 id="own-store-planner-heading">Jouw weekmand per winkel</h3></div>
       <button type="button" className="ghost-button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>
+      <label className="supa-planner-direct-source">
+        Direct eigen winkelopname(s) openen in Vergelijk
+        <input type="file" multiple
+          accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json"
+          onChange={event => {
+            const files = Array.from(event.currentTarget.files ?? [])
+            event.currentTarget.value = ''
+            if (files.length > 0) onImportSourceFiles(files)
+          }} />
+        <small>Selecteer één of twee eigen PLUS-/Deka-bestanden. Broncontrole,
+          productmatching en expliciete bevestiging blijven verplicht.</small>
+      </label>
     </header>
     {captureNeeds.length > 0 && <div className="own-store-planner__capture" aria-label="Mijn lokale winkelprijsopname">
       <strong>Zelf winkelprijzen vastleggen voor dit weekmenu</strong>

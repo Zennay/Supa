@@ -7,6 +7,7 @@ const ManualStoreComparison = lazy(async () => {
 })
 import { OfflineReviewedWorkbench } from '../comparison/OfflineReviewedWorkbench'
 import type { PrivateReviewedBaskets, PrivateCaptureProgress, PrivateReviewFocus } from '../comparison/privateReviewedBasketBridge.ts'
+import type { PrivateSourceFileHandoff } from '../comparison/privateSourceFileHandoff.ts'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
@@ -36,6 +37,7 @@ export function BasketView({
   manualRecipes,
   manualActiveDays,
   privatePlanKey,
+  incomingSources,
   onReviewedBaskets,
   onCaptureProgress,
   focusReview,
@@ -49,6 +51,7 @@ export function BasketView({
   manualRecipes?: RecipeWithIngredients[]
   manualActiveDays?: string[]
   privatePlanKey?: string
+  incomingSources?: PrivateSourceFileHandoff | null
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
   onCaptureProgress?: (value: PrivateCaptureProgress | null) => void
   focusReview?: PrivateReviewFocus | null
@@ -104,7 +107,7 @@ export function BasketView({
     <section className="screen">
       {manualPlan && manualRecipes && manualActiveDays && (
         <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
-          planKey={privatePlanKey} onReviewedBaskets={onReviewedBaskets}
+          planKey={privatePlanKey} incomingSources={incomingSources} onReviewedBaskets={onReviewedBaskets}
           onCaptureProgress={onCaptureProgress} focusReview={focusReview} />
       )}
       {manualPlan && manualRecipes && manualActiveDays && (

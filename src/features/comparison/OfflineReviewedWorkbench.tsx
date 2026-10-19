@@ -10,6 +10,7 @@ import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
 import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
+import type { PrivateSourceFileHandoff } from './privateSourceFileHandoff.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { createMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
@@ -303,12 +304,13 @@ function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number],
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays, planKey, onReviewedBaskets, onCaptureProgress, focusReview,
+  plan, recipes, activeDays, planKey, incomingSources, onReviewedBaskets, onCaptureProgress, focusReview,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   planKey?: string
+  incomingSources?: PrivateSourceFileHandoff | null
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
   onCaptureProgress?: (value: PrivateCaptureProgress | null) => void
   focusReview?: PrivateReviewFocus | null
@@ -327,6 +329,7 @@ export function OfflineReviewedWorkbench({
   const [busy, setBusy] = useState(false)
   const [dropActive, setDropActive] = useState(false)
   const importRevision = useRef(0)
+  const lastPlannerFileSerial = useRef(0)
   const [pendingReplacement, setPendingReplacement] = useState<{
     sourceText: string; newText: string
     version: number; store: typeof stores[number]
@@ -1119,6 +1122,22 @@ export function OfflineReviewedWorkbench({
       if (version === importRevision.current) setBusy(false)
     }
   }
+
+  // Planner only passes original user-picked File objects. This effect does
+  // not authorize their content: the existing importer and human review decide.
+  useEffect(() => {
+    if (!incomingSources || incomingSources.serial <= lastPlannerFileSerial.current) return
+    lastPlannerFileSerial.current = incomingSources.serial
+    if (incomingSources.planKey !== planKey) {
+      setMessage('Je weekmenu is veranderd na de bestandskeuze. Kies opnieuw voor deze week.')
+      return
+    }
+    if (incomingSources.files.length === 0 || incomingSources.files.length > 2) {
+      setMessage('Selecteer maximaal twee eigen winkelbronbestanden.')
+      return
+    }
+    void loadSelectedSources(incomingSources.files)
+  }, [incomingSources, planKey])
 
   async function appendSameCapture(store: typeof stores[number], file?: File) {
     if (!file || !imported?.captures[store]) return

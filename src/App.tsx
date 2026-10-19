@@ -26,6 +26,7 @@ const OwnExtraGroceries = lazy(async () => {
   return { default: module.OwnExtraGroceries }
 })
 import type { PrivateExtraVisitCostIntent } from './features/comparison/privateExtraVisitCost.ts'
+import type { PrivateSourceFileHandoff } from './features/comparison/privateSourceFileHandoff.ts'
 import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
@@ -133,6 +134,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [mixedCostIntent, setMixedCostIntent] = useState<PrivateExtraVisitCostIntent | null>(null)
   const [privateRouteChoice, setPrivateRouteChoice] = useState<PrivateRouteChoice | null>(null)
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
+  const [incomingPriceFiles, setIncomingPriceFiles] = useState<PrivateSourceFileHandoff | null>(null)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
   const [privateReviewFocus, setPrivateReviewFocus] = useState<PrivateReviewFocus | null>(null)
@@ -561,6 +563,14 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               if (store === 'PLUS' || store === 'DekaMarkt') setPreferredOwnStore(store)
             }}
             onOpenComparison={openOwnPriceImport}
+            onImportSourceFiles={files => {
+              if (!files.length) return
+              setIncomingPriceFiles(previous => ({
+                serial: (previous?.serial ?? 0) + 1,
+                planKey: privatePlanKey, files,
+              }))
+              openOwnPriceImport()
+            }}
             onReviewIngredient={(store, ingredientId) => {
               setPrivateReviewFocus(previous => ({
                 planKey: privatePlanKey, store, ingredientId,
@@ -656,6 +666,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             manualRecipes={recipes}
             manualActiveDays={activeDays}
             privatePlanKey={privatePlanKey}
+            incomingSources={incomingPriceFiles}
             onReviewedBaskets={onReviewedBaskets}
             onCaptureProgress={onCaptureProgress}
             focusReview={privateReviewFocus?.planKey === privatePlanKey ? privateReviewFocus : null}
