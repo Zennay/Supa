@@ -57,6 +57,18 @@ function reviewedLineKey(store: typeof stores[number], observedAt: string, line:
     line.packs, line.pricePerPackCents, line.lineTotalCents,
   ])
 }
+/** Invalidate only the edited physical ingredient. Unchanged captures,
+ * SKU reviews and picked groceries for other requirements stay valid.
+ * Serialized identities are generated locally by reviewedLineKey and
+ * shoppingTaskKey; malformed entries are simply not trusted as matches. */
+function isOwnIngredientKey(key: string, store: typeof stores[number],
+  ingredientId: string, ingredientIndex: number): boolean {
+  try {
+    const parts: unknown = JSON.parse(key)
+    return Array.isArray(parts) && parts[0] === store &&
+      parts[ingredientIndex] === ingredientId
+  } catch { return false }
+}
 function shoppingTaskKey(store: typeof stores[number], line: BasketTraceLine): string {
   // A trip tick belongs to the exact physical requirement and chosen pack,
   // not a demo store or a potentially changed price.
@@ -1951,17 +1963,21 @@ export function OfflineReviewedWorkbench({
                                         setManualSku(previous => ({
                                           ...previous, [store]: { ...previous[store], [line.id]: id },
                                         }))
-                                        // A new SKU can change matching within this store,
-                                        // but does not revoke the other store's independently
-                                        // reviewed source or shopping progress.
-                                        const sameStore = (key: string) =>
-                                          key.startsWith('[' + JSON.stringify(store) + ',')
+                                        // A changed SKU needs fresh approval for THIS
+                                        // ingredient, not every unrelated purchased line
+                                        // at the same shop. The basket comparator still
+                                        // refuses duplicate-SKU or changed-demand conflicts.
                                         setReviewedLines(previous => Object.fromEntries(
-                                          Object.entries(previous).filter(([key]) => !sameStore(key))))
+                                          Object.entries(previous).filter(([key]) =>
+                                            !isOwnIngredientKey(key, store, line.id, 2))))
                                         setDoneTripItems(previous => Object.fromEntries(
-                                          Object.entries(previous).filter(([key]) => !sameStore(key))))
+                                          Object.entries(previous).filter(([key]) =>
+                                            !isOwnIngredientKey(key, store, line.id, 1))))
                                         setTripExportMessage('')
                                         setTripProgressMessage('')
+                                        setMessage(store + ': bronartikel voor ' + line.ingredientLabel +
+                                          ' gewijzigd. Controleer deze SKU, verpakking en prijs opnieuw. ' +
+                                          'Andere ongewijzigde productbevestigingen en afvinkingen blijven staan.')
                                       }}>
                                       <option value="">Automatisch voorstellen (of onbekend)</option>
                                       {choices.shown.map(product => (
