@@ -206,6 +206,14 @@ export function previewOwnStoreCsv(text) {
       retailer: capture.retailer,
       enteredProducts: capture.products.length,
       unobservedRows: blanks[capture.retailer],
+      observedAt: capture.observedAt,
+      unavailableProducts: capture.products.filter(p => !p.available || p.priceCents === null).length,
+      // Display only. These are the user's original, canonically admitted
+      // local source fields, NOT independently verified retailer facts.
+      previewProducts: capture.products.slice(0, 12).map(p => ({
+        id: p.id, name: p.name, packAmount: p.packAmount, packUnit: p.packUnit,
+        packCount: p.packCount ?? 1, priceCents: p.priceCents, available: p.available,
+      })),
     })),
     unobservedOtherStoreRows: RETAILERS
       .filter(store => !admitted.captures.some(c => c.retailer === store))

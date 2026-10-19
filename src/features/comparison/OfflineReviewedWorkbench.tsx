@@ -227,7 +227,14 @@ export function OfflineReviewedWorkbench({
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [capturePreview, setCapturePreview] = useState<{
     file: File; week: string
-    stores: { retailer: CaptureStore; enteredProducts: number; unobservedRows: number }[]
+    stores: {
+      retailer: CaptureStore; enteredProducts: number; unobservedRows: number
+      observedAt: string; unavailableProducts: number
+      previewProducts: {
+        id: string; name: string; packAmount: number | null; packUnit: string
+        packCount: number; priceCents: number | null; available: boolean
+      }[]
+    }[]
     unobservedOtherStoreRows: number
   } | null>(null)
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
@@ -277,7 +284,14 @@ export function OfflineReviewedWorkbench({
         !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
         throw Error('De lokale CSV-converter is niet beschikbaar.')
       const summary = (module.previewOwnStoreCsv as (v: string) => {
-        stores: { retailer: CaptureStore; enteredProducts: number; unobservedRows: number }[]
+        stores: {
+      retailer: CaptureStore; enteredProducts: number; unobservedRows: number
+      observedAt: string; unavailableProducts: number
+      previewProducts: {
+        id: string; name: string; packAmount: number | null; packUnit: string
+        packCount: number; priceCents: number | null; available: boolean
+      }[]
+    }[]
         unobservedOtherStoreRows: number
       })(raw)
       parseOfflinePriceSnapshots((module.convertOwnStoreCsv as (v: string) => string)(raw), Date.now())
@@ -1287,6 +1301,37 @@ export function OfflineReviewedWorkbench({
                 <p key={store.retailer}>{store.retailer}: {store.enteredProducts}
                   {' '}zelf ingevoerde bronproducten, {store.unobservedRows}
                   {' '}lege en ongeprijsde regels.</p>
+              ))}
+              {currentPreview.stores.map(store => (
+                <details key={'details-' + store.retailer}>
+                  <summary>{store.retailer}: originele ingevoerde artikelen bekijken
+                    {' '}({store.unavailableProducts} zonder bruikbare pakprijs)</summary>
+                  <p>Oorspronkelijk ingevoerd bronmoment:
+                    {' '}<time>{store.observedAt}</time>. Nog géén match- of herkomstbevestiging.</p>
+                  <ul>
+                    {store.previewProducts.map(product => {
+                      const rate = privatePackUnitRate({
+                        amount: product.packAmount, unit: product.packUnit,
+                        count: product.packCount,
+                        priceCents: product.available ? product.priceCents : null,
+                      })
+                      return <li key={product.id}>
+                        <strong>{product.name}</strong> · originele code {product.id}
+                        {' '}· {product.packAmount ?? 'onbekend'} {product.packUnit}
+                        {' '}× {product.packCount}
+                        {' '}· {product.available && product.priceCents !== null
+                          ? euros.format(product.priceCents / 100) + ' per verpakking'
+                          : 'pakprijs onbekend / niet beschikbaar'}
+                        {rate && <> · {euros.format(rate.centsPerUnit / 100)} / {rate.unit}</>}
+                      </li>
+                    })}
+                  </ul>
+                  {store.enteredProducts > store.previewProducts.length && (
+                    <p className="disclaimer">Nog
+                      {' '}{store.enteredProducts - store.previewProducts.length}
+                      {' '}ingevulde bronartikelen; na overname per product te beoordelen.</p>
+                  )}
+                </details>
               ))}
               {currentPreview.unobservedOtherStoreRows > 0 && (
                 <p>{currentPreview.unobservedOtherStoreRows}
