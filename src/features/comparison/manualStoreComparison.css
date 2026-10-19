@@ -33,11 +33,3 @@
 /* The original Figma primary navigation has five destinations.
    Compare and Meten remain available via the secondary in-app utilities. */
 body .bottom-nav.hifi-nav { grid-template-columns: repeat(5,minmax(0,1fr)); }
-body .bottom-nav.hifi-nav button { width: min(46px, 100%); }
-body .bottom-nav.hifi-nav button:last-child { align-content: center; gap: 1px; }
-body .bottom-nav.hifi-nav button:last-child .hifi-sr-only {
-  position: static; width: auto; height: auto; padding: 0;
-  border: 0; margin: 0; overflow: visible; clip: auto; clip-path: none; white-space: normal;
-  font-size: .6rem; font-weight: 600; line-height: 1; color: #244537;
-}
-body .bottom-nav.hifi-nav button:last-child img { max-width: 25px; max-height: 25px; }
