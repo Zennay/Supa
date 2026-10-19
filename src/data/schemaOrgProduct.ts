@@ -90,11 +90,30 @@ function conflictingOfferEvidence(offers: JsonObject[]): boolean {
           new Set(values).size !== 1) return true
     }
 
-    // A concrete Offer.price and another lowPrice assertion cannot differ
-    // while we claim to know the payable price of one specific package.
-    const exact = cents(offer.price)
-    const range = cents(offer.lowPrice)
-    if (exact !== null && range !== null && exact !== range) return true
+    // Case variants of a lowPrice range remain evidence even though they can
+    // NEVER themselves serve as the pack price. They must not contradict the
+    // one concrete Offer.price or its parallel alias.
+    const prices = Object.entries(offer)
+      .filter(([key]) => key.toLocaleLowerCase('en') === 'price')
+      .map(([, value]) => cents(value))
+    const ranges = Object.entries(offer)
+      .filter(([key]) => key.toLocaleLowerCase('en') === 'lowprice')
+      .map(([, value]) => cents(value))
+    if (prices.length && ranges.length &&
+        [...prices, ...ranges].some(value => value === null ||
+          value !== prices[0])) return true
+
+    // Source currencies also have to agree with any explicit case-variant
+    // priceSpecification currency. Do not silently prefer the familiar key.
+    const currencyClaims = [
+      ...Object.entries(offer)
+        .filter(([key]) => key.toLocaleLowerCase('en') === 'pricecurrency'),
+      ...priceSpecificationCandidates(offer).flatMap(specification =>
+        Object.entries(specification).filter(([key]) =>
+          key.toLocaleLowerCase('en') === 'pricecurrency')),
+    ].map(([, value]) => asString(value)?.toUpperCase() ?? null)
+    if (currencyClaims.length && (currencyClaims.some(value => value === null) ||
+        new Set(currencyClaims).size > 1)) return true
   }
   return false
 }
