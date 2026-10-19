@@ -546,15 +546,15 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             <summary>Bekijk originele SKU’s die opnieuw aandacht vragen
               {' '}({refreshSummary.changes.affectedTotal})</summary>
             <ul>
-              {refreshSummary.changes.affectedProducts.map(item =>
+              {refreshSummary.changes.affectedProducts.slice(0, 15).map(item =>
                 <li key={item.sku}><strong>{item.name}</strong>
                   {' '}· originele SKU {item.sku}
                   <small>{item.change}</small>
                 </li>)}
             </ul>
-            {refreshSummary.changes.affectedTotal > refreshSummary.changes.affectedProducts.length &&
+            {refreshSummary.changes.affectedTotal > 15 &&
               <small>En nog
-                {' '}{refreshSummary.changes.affectedTotal - refreshSummary.changes.affectedProducts.length}
+                {' '}{refreshSummary.changes.affectedTotal - 15}
                 {' '}andere originele artikelen. Open de complete nieuwe bron in Vergelijk.
               </small>}
           </details>}

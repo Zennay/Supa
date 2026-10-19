@@ -81,7 +81,9 @@ function refreshChanges(
     previousObservedAt: old?.observedAt ?? null,
     newObservedAt: updated.observedAt,
     affectedTotal: affected.length,
-    affectedProducts: affected.slice(0, 15).map(({ sku, name, change }) => ({
+    // Keep the complete bounded (<=2000 SKU) private action list available
+    // for local export; the React screen itself shows only the first 15.
+    affectedProducts: affected.map(({ sku, name, change }) => ({
       sku, name, change,
     })),
   }
