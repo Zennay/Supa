@@ -282,17 +282,17 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     setPreview(null)
     setMessage(messageText)
   }
-  async function loadLocalRecipeSource(file?: File) {
+  async function loadLocalRecipeSource(file?: File, format: 'schema' | 'plain' = 'schema') {
     if (!file) return
     const revision = ++pasteReadVersion.current
     setPasteFileMessage(''); setError('')
     try {
-      if (!file.size || file.size > 500_000) throw new Error('Selecteer een HTML- of JSON-LD-bestand van maximaal 500 kB.')
+      if (!file.size || file.size > 500_000) throw new Error('Selecteer een lokaal receptbestand van maximaal 500 kB.')
       const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
       if (revision !== pasteReadVersion.current) return
       setPastedSource(content)
       setPreview(null)
-      setPasteFileMessage('Bestand lokaal gelezen. Controleer de gegevens en vul de oorspronkelijke openbare HTTPS-bronlink in.')
+      setPasteFileMessage(format === 'plain' ? 'Tekstbestand lokaal gelezen. Controleer de ingrediënten vóór import.' : 'Bestand lokaal gelezen. Controleer de gegevens en vul de oorspronkelijke openbare HTTPS-bronlink in.')
     } catch (cause) {
       if (revision === pasteReadVersion.current) setError(cause instanceof Error ? cause.message : 'Het bestand kan niet lokaal worden gelezen.')
     }
@@ -431,6 +431,11 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <p>Plak een gewone recepttekst, bijvoorbeeld van een pagina zonder JSON-LD.
             Gebruik een titel, Porties: 2, Tijd: 20 minuten en de koppen Ingrediënten:
             en Bereiding:. De omzetting blijft lokaal. Elke hoeveelheid moet je daarna controleren.</p>
+          <label>Of kies een lokaal tekstbestand (.txt, maximaal 500 kB)
+            <input type="file" accept=".txt,.md,text/plain,text/markdown"
+              onChange={event => { void loadLocalRecipeSource(event.currentTarget.files?.[0], 'plain'); event.currentTarget.value = '' }} />
+          </label>
+          {pasteFileMessage && <p role="status">{pasteFileMessage}</p>}
           <label>Recepttekst (maximaal 500 kB)
             <textarea required rows={12} maxLength={500000}
               placeholder={'Pasta met spinazie\nPorties: 2\nTijd: 20 minuten\nIngrediënten:\n- 200 g pasta\n- 100 g spinazie\nBereiding:\n1. Kook pasta'}

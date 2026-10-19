@@ -18,7 +18,7 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
   const steps: string[] = []
   for (const original of lines) {
     if (!original) continue
-    const heading = original.replace(/:$/u, '').toLocaleLowerCase('nl')
+    const heading = original.replace(/^#{1,6}\s+/u, '').replace(/^\*\*(.+)\*\*:?$/u, '$1').replace(/:$/u, '').toLocaleLowerCase('nl')
     if (/^ingredi[eë]nten$/u.test(heading)) { section = 'ingredients'; continue }
     if (/^(?:bereiding|bereidingswijze|instructies|stappen)$/u.test(heading)) {
       section = 'steps'; continue
@@ -30,7 +30,7 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
       if (named) title = named[1].trim()
       else if (count) servings = Number(count[1])
       else if (duration) minutes = Number(duration[1])
-      else if (!title) title = original
+      else if (!title) title = original.replace(/^#{1,6}\s+/u, '')
       else throw new Error('Gebruik een titel, Porties: en Tijd:, gevolgd door Ingrediënten: en Bereiding:.')
       continue
     }
