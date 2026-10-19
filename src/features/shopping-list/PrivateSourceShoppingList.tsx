@@ -141,6 +141,29 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       setMessage(error instanceof Error ? error.message : 'De privé-CSV kon niet worden gemaakt.')
     }
   }
+  async function downloadPrintable() {
+    if (!currentCaptureAvailable()) {
+      setMessage('De bron is verlopen. Herzie eerst de winkelprijzen.')
+      return
+    }
+    try {
+      const { privateSingleStorePrintableHtml } = await import('./privateSingleStorePrintableHtml.ts')
+      if (!currentCaptureAvailable()) throw Error('Verlopen bron')
+      const html = privateSingleStorePrintableHtml({
+        basket, observedAt: capture.observedAt,
+        done: new Set(basket.lines.filter(line => checked[tick(line)]).map(line => line.id)),
+      })
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-boodschappenlijst.html'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('Printbare offline lijst lokaal opgeslagen. Open het HTML-bestand en druk af.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch { setMessage('Deze eigen winkelbron kon niet veilig worden afgedrukt.') }
+  }
   async function saveProgress() {
     if (!currentCaptureAvailable()) {
       setMessage('De winkelbron is verlopen. Werk de brongegevens bij.')
@@ -248,6 +271,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           onChange={event => setRemainingOnly(event.target.checked)} /> Alleen nog te kopen</label>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
         <button type="button" onClick={() => { void downloadCsv() }}>Download met eigen SKU’s en centprijzen (CSV)</button>
+        <button type="button" onClick={() => { void downloadPrintable() }}>Printbare offline boodschappenlijst (HTML)</button>
         <button type="button" onClick={() => { void saveProgress() }}>Bewaar vinkjes (JSON)</button>
         <button type="button" onClick={() => progressInputRef.current?.click()}>Herstel vinkjes</button>
         <input ref={progressInputRef} type="file" accept=".json,application/json"
