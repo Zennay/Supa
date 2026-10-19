@@ -1,8 +1,13 @@
 import { FigmaImage } from '../../components/FigmaImage'
-import { useRef, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import { figmaAssets as a } from './figmaAssets'
 import { upcomingHomeWeek } from './homeWeekDates'
-import { RecipeLibrary } from '../recipes/RecipeLibrary'
+// The full recipe editor, URL parsing and private backup tools are only needed
+// after visiting Recepten. Keep the home/product browsing bundle lean.
+const RecipeLibrary = lazy(async () => {
+  const module = await import('../recipes/RecipeLibrary')
+  return { default: module.RecipeLibrary }
+})
 import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
@@ -31,7 +36,11 @@ type Props = {
 }
 
 export function HiFiHome(props: Props) {
-  if (props.view === 'recipes') return <RecipeLibrary onBack={() => props.onNavigate('home')} />
+  if (props.view === 'recipes') return <Suspense fallback={
+    <section className="hifi-home" role="status" aria-live="polite">
+      <p>Je recepten worden geopend…</p>
+    </section>
+  }><RecipeLibrary onBack={() => props.onNavigate('home')} /></Suspense>
   return <HiFiDiscovery {...props} />
 }
 
