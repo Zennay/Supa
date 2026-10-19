@@ -30,10 +30,10 @@ Het programma doet **geen HTTP-verzoek**, logt geen productnamen of prijzen, en 
 
 ## Twee losse, verschillend geëxporteerde winkelbestanden
 
-Bij twee afzonderlijke eigen bronopnames hoeft de PLUS-export niet dezelfde CSV-scheiding als DekaMarkt te gebruiken. De bestaande strikte converter leest **ieder bestand afzonderlijk** en controleert daarna één echte opname per verschillende supermarkt. Bijvoorbeeld:
+Bij twee afzonderlijke eigen bronopnames hoeft de PLUS-export niet dezelfde CSV-scheiding als DekaMarkt te gebruiken. **Ook een eerder door Supa opgeslagen éénwinkel-JSON** mag aan één kant worden ingevoerd; het wordt eerst door de bestaande strikte JSON→CSV-adapter en vervolgens door de gewone CSV-parser verwerkt. De bestaande strikte converter leest **ieder bestand afzonderlijk** en controleert daarna één echte opname per verschillende supermarkt. Bijvoorbeeld:
 
 ```bash
-node scripts/offline-two-store-csv-to-json.mjs --pair plus.csv deka.tsv mijn-twee-winkels.json
+node scripts/offline-two-store-csv-to-json.mjs --pair plus.csv deka.json mijn-twee-winkels.json
 ```
 
 Ook een Nederlandse puntkomma-CSV met een komma-CSV combineren werkt wanneer beide precies de negen Supa-kolommen bevatten. Onbekende prijzen blijven leeg; de tool voegt geen winkel, product of bronmoment toe. De samengestelde bron blijft maximaal 256 kB.

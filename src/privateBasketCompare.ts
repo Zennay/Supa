@@ -199,6 +199,16 @@ async function readSource(file: File): Promise<string> {
   if (!file.size || file.size > limit) throw Error('Bronbestand is te groot of leeg')
   return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
 }
+function parseOneOwnSource(raw: string, convertOwnStoreCsv: (csv: string) => string): Source {
+  // Supa's existing standalone source validator handles user-saved JSON;
+  // the same canonical CSV converter continues to govern every spreadsheet.
+  const parsed: unknown = JSON.parse(raw.trimStart().startsWith('{')
+    ? raw : convertOwnStoreCsv(raw))
+  const source = sourceFrom(parsed)
+  if (source.captures.length !== 1) throw Error('Verwacht één echte winkelopname per bestand.')
+  return source
+}
+
 async function parseSource(): Promise<Source> {
   const file = combined.files?.[0]
   const left = plus.files?.[0]
@@ -217,8 +227,8 @@ async function parseSource(): Promise<Source> {
   }
   if (left && right) {
     const [a, b] = await Promise.all([readSource(left), readSource(right)])
-    const first = JSON.parse(convertOwnStoreCsv(a)) as Source
-    const second = JSON.parse(convertOwnStoreCsv(b)) as Source
+    const first = parseOneOwnSource(a, convertOwnStoreCsv)
+    const second = parseOneOwnSource(b, convertOwnStoreCsv)
     const captures = [...first.captures, ...second.captures]
     if (captures.length !== 2 || captures[0].retailer !== 'PLUS' ||
         captures[1].retailer !== 'DekaMarkt')
@@ -228,7 +238,7 @@ async function parseSource(): Promise<Source> {
       throw Error('Twee winkelbronnen samen overschrijden 256 KB')
     return sourceFrom(composed)
   }
-  const one = JSON.parse(convertOwnStoreCsv(await readSource((left ?? right)!))) as Source
+  const one = parseOneOwnSource(await readSource((left ?? right)!), convertOwnStoreCsv)
   const selectedInput = left ? 'PLUS' : 'DekaMarkt'
   if (one.captures.length !== 1 || one.captures[0].retailer !== selectedInput)
     throw Error('Het gekozen winkelvak hoort niet bij de winkelcode in de originele opname.')

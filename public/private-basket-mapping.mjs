@@ -453,6 +453,18 @@ async function readLocalFile(file) {
   return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
 }
 
+function parseSingleSource(text) {
+  const parsed = text.trimStart().startsWith('{')
+    ? JSON.parse(text) : JSON.parse(convertOwnStoreCsv(text))
+  // The existing mapping wizard's source boundary checks original IDs,
+  // prices, timestamps and physical packages. A full two-store JSON is not
+  // allowed in a single-retailer input field.
+  const verified = acceptJson(parsed)
+  if (Object.keys(verified).length !== 1) throw Error('Kies één winkelopname per los bestand.')
+  return { schema: 'supa-private-single-store-prices-v1',
+    captures: [verified[Object.keys(verified)[0]]] }
+}
+
 async function loadSources() {
   const revision = ++sourceRevision
   // Keep the last admitted source and manual choices during a new file read;
@@ -477,8 +489,8 @@ async function loadSources() {
       const [plusText, dekaText] = await Promise.all([readLocalFile(plus), readLocalFile(deka)])
       // Each real shop file passes the existing strict spreadsheet converter.
       // Different separator conventions no longer corrupt or block the pair.
-      const first = JSON.parse(convertOwnStoreCsv(plusText))
-      const second = JSON.parse(convertOwnStoreCsv(dekaText))
+      const first = parseSingleSource(plusText)
+      const second = parseSingleSource(dekaText)
       if (first.captures.length !== 1 || second.captures.length !== 1 ||
           first.captures[0].retailer !== 'PLUS' ||
           second.captures[0].retailer !== 'DekaMarkt') {
@@ -489,7 +501,7 @@ async function loadSources() {
       if (new TextEncoder().encode(JSON.stringify(parsed)).length > maxBytes)
         throw Error('De twee winkelbronnen samen overschrijden 256 kB.')
     } else {
-      parsed = JSON.parse(convertOwnStoreCsv(await readLocalFile(plus ?? deka)))
+      parsed = parseSingleSource(await readLocalFile(plus ?? deka))
       const selectedStore = plus ? 'PLUS' : 'DekaMarkt'
       if (parsed.captures.length !== 1 || parsed.captures[0].retailer !== selectedStore)
         throw Error('Het gekozen winkelvak hoort niet bij de winkelcode in het originele bestand.')

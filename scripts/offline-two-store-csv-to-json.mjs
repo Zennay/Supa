@@ -40,14 +40,22 @@ export async function readPrivateCsv(path) {
 }
 
 /**
- * Normalize two independent owned sheets through the SAME strict one-store
- * converter before composing their canonical two-store CSV. Excel semicolon,
- * TSV and comma exports may differ. Neither store may be fabricated or copied
+ * Normalize two independent owned CSV/TSV/JSON files through the SAME strict
+ * one-store converter before composing their canonical two-store CSV. Excel
+ * semicolon, TSV and comma exports may differ. Neither store may be fabricated or copied
  * under the other retailer ID; unknowns remain null, not zero prices.
  */
 export function joinPrivateStoreCsv(first, second) {
-  const one = JSON.parse(convertOwnStoreCsv(first))
-  const two = JSON.parse(convertOwnStoreCsv(second))
+  const oneStore = (raw) => {
+    if (typeof raw !== 'string') error('Eigen winkelbron moet een tekstbestand zijn.')
+    const source = raw.replace(/^\uFEFF/u, '')
+    const csv = source.trimStart().startsWith('{')
+      ? offlinePriceJsonToCsv(source) : source
+    // Original, canonical CSV intake, including exact recorded source facts.
+    return JSON.parse(convertOwnStoreCsv(csv))
+  }
+  const one = oneStore(first)
+  const two = oneStore(second)
   if (one.captures.length !== 1 || two.captures.length !== 1 ||
       one.captures[0].retailer !== 'PLUS' ||
       two.captures[0].retailer !== 'DekaMarkt') {
@@ -101,7 +109,7 @@ async function main() {
   if ((!pairing && names.length !== 2) || (pairing && names.length !== 3) ||
       names.some(name => !name || name.startsWith('-'))) {
     error('Gebruik: node scripts/offline-two-store-csv-to-json.mjs samen.csv uitvoer.json ' +
-      'of --pair plus.csv deka.csv uitvoer.json of --single een-winkel.csv uitvoer.json')
+      'of --pair plus.csv deka.json uitvoer.json of --single een-winkel.csv uitvoer.json')
   }
   const sources = names.slice(0, -1).map(resolve)
   const target = resolve(names.at(-1))
