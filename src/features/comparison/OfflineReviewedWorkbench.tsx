@@ -1066,6 +1066,15 @@ export function OfflineReviewedWorkbench({
             lokale CSV-converter (opent in een nieuw tabblad)
           </a>.
           Er wordt niets naar een server verstuurd; ontbrekende prijzen blijven onbekend.</p>
+        <p>Wil je met je eigen bronbestanden zelfstandig de producten van exact dezelfde fysieke
+          boodschappenlijst aan PLUS en DekaMarkt koppelen?{' '}
+          <a href={`${import.meta.env.BASE_URL}private-basket-mapping.html`}
+            target="_blank" rel="noopener noreferrer">
+            Open de lokale twee-winkel productkoppeling
+          </a>.
+          Daar kun je per winkel een echte SKU bevestigen en daarna beide hele-verpakkingsmandjes
+          vergelijken. De aparte werkbank neemt geen ingelezen bron, match, winkelprijs of
+          toestemming automatisch uit de app over.</p>
         <div>
           <button type="button" className="ghost-button"
             disabled={ingredientNeeds.length === 0 || ingredientNeeds.length > 200}
