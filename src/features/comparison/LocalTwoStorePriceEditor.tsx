@@ -86,6 +86,16 @@ function isReviewedUnavailableDraft(row: ProductDraft): boolean {
 const isEnteredOwnCapture = (row: ProductDraft) =>
   isCompleteOwnPriceDraft(row) || isReviewedUnavailableDraft(row)
 
+// Default pack-count and unit do not count as an observed product. Unfinished
+// identities and prices remain in the editing draft, not a retailer snapshot.
+function hasPartialOwnCapture(row: ProductDraft): boolean {
+  return !isEnteredOwnCapture(row) && Boolean(
+    (row.sourceId ?? '').trim() || row.name.trim() ||
+    row.packAmount.trim() || row.priceEuros.trim() ||
+    row.available || row.availabilityReviewed,
+  )
+}
+
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
 
 type StoredDraft = {
@@ -300,12 +310,27 @@ export function LocalTwoStorePriceEditor({
       if (times.some(time => Date.parse(time!) > Date.now() + 300000)) {
         throw new Error('Een waarnemingstijd ligt in de toekomst.')
       }
+      // Only explicitly entered, complete local observations enter the
+      // canonical source gate. Warn before omitting drafts, never discard
+      // them or silently reinterpret missing data as free or out of stock.
+      const incompleteRows = selectedStores.flatMap(store => activeNeeds.flatMap(need => {
+        const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+        return hasPartialOwnCapture(draft) ? [`${store} · ${need.label}`] : []
+      }))
+      if (incompleteRows.length && !window.confirm(
+        `${incompleteRows.length} half ingevulde artikelregel(s) worden NIET meegenomen in de bronopname:\n` +
+        incompleteRows.slice(0, 10).join('\n') +
+        (incompleteRows.length > 10 ? `\n… en nog ${incompleteRows.length - 10}` : '') +
+        '\n\nHun prijzen blijven onbekend. Je invoerconcept blijft bewaard; ' +
+        'gebruik Annuleren om eerst de regels af te maken. Wil je alleen de volledig gecontroleerde regels verwerken?'
+      )) {
+        setError('Niets verwerkt: vul ontbrekende brongegevens aan of bevestig bewust dat deze regels onbekend blijven.')
+        return
+      }
       const captures = selectedStores.map((store, storeIndex) => {
         const products = activeNeeds.flatMap((need) => {
           const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
-          const entered = draft.sourceId?.trim() || draft.name.trim() || draft.packAmount.trim() ||
-            draft.priceEuros.trim() || draft.available || draft.availabilityReviewed
-          if (!entered) return []
+          if (!isEnteredOwnCapture(draft)) return []
           if (draft.name !== draft.name.trim() || !draft.name.trim()) {
             throw new Error(`${store} · ${need.label}: vul een werkelijke, complete productnaam in.`)
           }
