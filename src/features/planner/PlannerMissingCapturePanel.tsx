@@ -32,6 +32,10 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
     captureNeeds.map(need => [need.id, need.label, need.unit, need.amount]),
     captureProgress?.planKey, captureProgress?.stores, reviewed?.planKey,
     reviewed?.stores.PLUS?.observedAt, reviewed?.stores.DekaMarkt?.observedAt,
+    // A long-open phone tab can cross a 7-day source deadline without a
+    // source-file edit. A previously selectable partial guide must then be
+    // invalidated and replaced by the entire expired retailer's needs.
+    stores.map(store => [store, missingCaptureFor(store, now).map(need => need.id)]),
   ])
   const latestCaptureFingerprint = useRef(captureFingerprint)
   latestCaptureFingerprint.current = captureFingerprint
