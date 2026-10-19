@@ -295,6 +295,42 @@ export function MixedStoreShoppingCard({
     }
   }
 
+  async function downloadRouteCsvWithExtras() {
+    if (!privatePlanKey || block || !eligibleNow()) {
+      setMessage('Herzie de exacte Planner-week, eigen bronopnames en extra kosten.')
+      return
+    }
+    try {
+      const [{ readSavedExtrasForPlan }, { appendUnpricedExtrasToMixedRouteCsv }] =
+        await Promise.all([
+          import('./ownExtraGroceriesStorage.ts'),
+          import('./mixedStoreWithExtrasCsv.ts'),
+        ])
+      const saved = readSavedExtrasForPlan(privatePlanKey)
+      if (!saved.available || !saved.items.length) {
+        setMessage('Bewaar eerst je eigen extra boodschappen in deze tab om ze aan de route-CSV toe te voegen.')
+        return
+      }
+      if (!eligibleNow()) throw Error('Originele opnames zijn verlopen.')
+      const reviewedCsv = exportMixedStoreRouteCsv({
+        plus, deka, route: plan, captured,
+        checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
+        extraVisitCostCents: appliedCostCents, strategy: mode,
+      })
+      const csv = appendUnpricedExtrasToMixedRouteCsv(reviewedCsv, saved.items)
+      if (!eligibleNow()) throw Error('Bronopnames zijn intussen verlopen.')
+      const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a'); link.href = url
+        link.download = 'supa-gekozen-winkelroute-met-ongeprijsde-extra-boodschappen.csv'
+        document.body.append(link); try { link.click() } finally { link.remove() }
+        setMessage('28-koloms CSV gedownload: gecontroleerde routebedragen en losse ongeprijsde extras; zonder bedragen voor extras.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch {
+      setMessage('Kon de samengestelde route-CSV niet veilig maken. Herzie de bronnen en extra boodschappen.')
+    }
+  }
+
   function downloadPrintHtml() {
     if (block || !eligibleNow()) {
       setMessage('Controleer je huidige originele winkelprijzen en extra bezoekkosten voordat je een afdruk bewaart.')
@@ -461,6 +497,10 @@ export function MixedStoreShoppingCard({
       <button type="button" className="ghost-button" onClick={downloadRouteCsv}>
         Download volledige route met beide winkelprijzen (CSV)
       </button>
+      {privatePlanKey && <button type="button" className="ghost-button"
+        onClick={() => { void downloadRouteCsvWithExtras() }}>
+        Download gecontroleerde route + ongeprijsde extras (CSV)
+      </button>}
       <button type="button" className="ghost-button" onClick={downloadPrintHtml}>
         Bewaar / print volledige route (HTML)
       </button>
