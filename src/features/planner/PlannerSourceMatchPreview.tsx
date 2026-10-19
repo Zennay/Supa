@@ -40,10 +40,21 @@ export function PlannerSourceMatchPreview({ needs, source }: {
           suggestions[store] = null
           continue
         }
+        // Candidates without an actual captured price or compatible physical
+        // packaging cannot satisfy this shopping need. Exclude them BEFORE
+        // ranking: an unpriced high-scoring SKU must not shadow a genuine,
+        // uniquely identifiable priced product from the same source.
+        const eligible = capture.products.filter(product =>
+          product.available === true &&
+          typeof product.sourcePriceCents === 'number' &&
+          Number.isSafeInteger(product.sourcePriceCents) &&
+          product.sourcePriceCents >= 0 &&
+          product.packAmount !== null && product.packAmount > 0 &&
+          family(product.packUnit) === family(need.unit))
         const choice = matchIngredient({
           id: need.id, query: need.query || need.label, amount: need.amount,
           unit: need.unit as MatchUnit,
-        }, capture.products)
+        }, eligible)
         const match = choice.type === 'match' ? products[store].get(choice.productId) : null
         // The fuzzy matcher can rank an attractive name even if the source
         // package belongs to a different physical unit family. Never present
