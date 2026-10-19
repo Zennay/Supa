@@ -526,6 +526,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           preferences={preferences}
           days={m2InitialPlan.map(meal => meal.day)}
           recipeIds={recipes.map(recipe => recipe.id)}
+          recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
           storageProtected={persistenceWarning !== null}
           onRestore={next => {
             setPreferences(next)

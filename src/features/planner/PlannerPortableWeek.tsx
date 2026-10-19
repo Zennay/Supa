@@ -3,14 +3,15 @@ import type { PlannerPreferences } from '../../domain/plannerPreferences.ts'
 import { exportOwnedPlannerWeek, previewOwnedPlannerWeek, PORTABLE_PLANNER_MAX_BYTES } from './plannerPortableBackup.ts'
 import './plannerPortableWeek.css'
 
-export function PlannerPortableWeek({ preferences, days, recipeIds, onRestore, storageProtected }: {
+export function PlannerPortableWeek({ preferences, days, recipeIds, recipeNames, onRestore, storageProtected }: {
   preferences: PlannerPreferences
   days: readonly string[]
   recipeIds: readonly string[]
+  recipeNames: Readonly<Record<string, string>>
   onRestore: (value: PlannerPreferences) => void
   storageProtected: boolean
 }) {
-  const [candidate, setCandidate] = useState<{ raw: string; value: PlannerPreferences } | null>(null)
+  const [candidate, setCandidate] = useState<{ raw: string; base: string; value: PlannerPreferences } | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const revision = useRef(0)
@@ -35,7 +36,7 @@ export function PlannerPortableWeek({ preferences, days, recipeIds, onRestore, s
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
       const value = previewOwnedPlannerWeek(raw, days, recipeIds)
       if (version === revision.current) {
-        setCandidate({ raw, value })
+        setCandidate({ raw, base: JSON.stringify(preferences), value })
         setMessage('Controleer de dagen, recepten en je budget vóór je de weekplanning vervangt.')
       }
     } catch (error) {
@@ -44,6 +45,11 @@ export function PlannerPortableWeek({ preferences, days, recipeIds, onRestore, s
   }
   function restore() {
     if (!candidate || busy || storageProtected) return
+    if (candidate.base !== JSON.stringify(preferences)) {
+      setCandidate(null)
+      setMessage('De actieve weekplanning is na het openen van deze backup veranderd. Laad het bestand opnieuw om overschrijven te voorkomen.')
+      return
+    }
     try {
       const chosen = previewOwnedPlannerWeek(candidate.raw, days, recipeIds)
       onRestore(chosen); setCandidate(null)
@@ -68,8 +74,12 @@ export function PlannerPortableWeek({ preferences, days, recipeIds, onRestore, s
       <strong>Voorgestelde nieuwe weekplanning</strong>
       <p>{candidate.value.activeDays.length} van {days.length} dagen actief · weekbudget
         {' '}{new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(candidate.value.budget)}</p>
-      <ul>{days.map(day => <li key={day}><strong>{day}</strong> — {candidate.value.recipeByDay[day]}
-        {' '}{candidate.value.activeDays.includes(day) ? '(actief)' : '(niet actief)'}</li>)}</ul>
+      <ul>{days.map(day => <li key={day}><strong>{day}</strong> — {recipeNames[candidate.value.recipeByDay[day]] ?? candidate.value.recipeByDay[day]}
+        {' '}{candidate.value.activeDays.includes(day) ? '(actief)' : '(niet actief)'}
+        {candidate.value.recipeByDay[day] !== preferences.recipeByDay[day] ||
+         candidate.value.activeDays.includes(day) !== preferences.activeDays.includes(day)
+          ? ' · wijzigt' : ''}
+      </li>)}</ul>
       <div className="planner-portable-week__actions">
         <button type="button" onClick={restore}>Bevestig en herstel deze planning</button>
         <button type="button" className="ghost-button" onClick={() => {
