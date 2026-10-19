@@ -431,6 +431,13 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     <Suspense fallback={<p role="status">Lokale rapportlezer laden…</p>}>
       <PrivateOwnReceiptViewer />
     </Suspense>
+    <p className="own-store-planner__history-link">
+      <a href="./private-receipt-history.html" rel="nofollow">
+        Vergelijk twee eerder opgeslagen eigen PLUS/Deka-weekrapporten →
+      </a>
+      <small>Volledig offline. Alleen dezelfde fysieke ingrediënten, SKU’s en verpakkingen
+        krijgen een historisch prijsverschil; nooit een actuele winkelprijsclaim.</small>
+    </p>
     {captureNeeds.length > 0 && <div className="own-store-planner__capture" aria-label="Mijn lokale winkelprijsopname">
       <strong>Zelf winkelprijzen vastleggen voor dit weekmenu</strong>
       <p>Download een leeg invulblad of opnamegids voor {captureNeeds.length} fysieke ingrediënten. Productcodes, bronmomenten en prijzen moet je werkelijk vastleggen. CSV met puntkomma of komma en gekopieerde tabgescheiden spreadsheetcellen worden lokaal herkend; decimalen mogen een komma bevatten. Prijzen blijven hele eurocenten.</p>
