@@ -139,6 +139,7 @@ function movement(amount) {
   if (amount === 0) return 'ongewijzigd'
   return (amount > 0 ? '+' : '−')+euro.format(Math.abs(amount)/100)
 }
+let localTextExport = null
 function render(old,fresh,result) {
   const wrap=$('summary'), body=$('rows')
   wrap.replaceChildren(); body.replaceChildren()
@@ -168,12 +169,34 @@ function render(old,fresh,result) {
       line.dekaChange>0?'delta-up':line.dekaChange<0?'delta-down':''))
     tr.append(delta); body.append(tr)
   }
+  localTextExport = [
+    'Supa · eigen offline historische PLUS/Deka-prijsvergelijking',
+    'Alleen twee eigen afgeleide rapporten; geen actuele prijs of onafhankelijk besparingsbewijs.',
+    'PLUS eerste bronmoment: '+old.textDates.PLUS,
+    'PLUS tweede bronmoment: '+fresh.textDates.PLUS,
+    'DekaMarkt eerste bronmoment: '+old.textDates.DekaMarkt,
+    'DekaMarkt tweede bronmoment: '+fresh.textDates.DekaMarkt,
+    'PLUS hele-verpakkingenmand: '+euro.format(old.totals.PLUS/100)+' → '+
+      euro.format(fresh.totals.PLUS/100)+' ('+movement(result.changes.PLUS)+')',
+    'DekaMarkt hele-verpakkingenmand: '+euro.format(old.totals.DekaMarkt/100)+' → '+
+      euro.format(fresh.totals.DekaMarkt/100)+' ('+movement(result.changes.DekaMarkt)+')',
+    '',
+    'Dezelfde fysieke vraag en bronproducten per ingredient:',
+    ...result.rows.map(line => line.name+' | PLUS SKU '+line.old.PLUS.id+
+      ' | Deka SKU '+line.old.DekaMarkt.id+
+      ' | PLUS '+movement(line.plusChange)+
+      ' | DekaMarkt '+movement(line.dekaChange)),
+    '',
+    'Geen actuele kassagarantie, retailerrecht of geverifieerde besparing.'
+  ].join('\n')+'\n'
+  $('download').disabled=false
   $('result').hidden=false
 }
 let readSerial=0
 $('compare').addEventListener('click',async()=>{
   const serial=++readSerial
   $('result').hidden=true
+  localTextExport=null; $('download').disabled=true
   const a=$('old').files?.[0], b=$('new').files?.[0]
   if (!a || !b){$('status').textContent='Kies eerst twee eigen JSON-rapporten.';return}
   if (!a.size || !b.size || a.size>512000 || b.size>512000){
@@ -191,8 +214,21 @@ $('compare').addEventListener('click',async()=>{
       'Deze rapporten zijn niet veilig vergelijkbaar. Controleer volgorde, bronmomenten, fysieke ingrediënten, SKU’s, verpakkingen en bedragen. De oorspronkelijke bestanden blijven intact.'
   }finally{if(serial===readSerial)$('compare').disabled=false}
 })
+$('download').addEventListener('click',()=>{
+  if (localTextExport === null) return
+  const blob=new Blob([localTextExport],{type:'text/plain;charset=utf-8'})
+  const url=URL.createObjectURL(blob)
+  try {
+    const link=document.createElement('a')
+    link.href=url
+    link.download='supa-eigen-historische-prijsvergelijking.txt'
+    document.body.append(link)
+    try { link.click() } finally { link.remove() }
+  } finally { window.setTimeout(()=>URL.revokeObjectURL(url),1000) }
+})
 $('clear').addEventListener('click',()=>{
   ++readSerial
+  localTextExport=null; $('download').disabled=true
   $('old').value=''; $('new').value=''
   $('rows').replaceChildren(); $('summary').replaceChildren()
   $('context').textContent=''; $('status').textContent='Gegevens uit dit tabblad gewist.'
