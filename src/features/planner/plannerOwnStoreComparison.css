@@ -1,0 +1,12 @@
+.own-store-planner { border: 1px solid #d9ded9; border-radius: 18px; padding: clamp(14px, 3vw, 24px); margin: 20px 0; background: #fff; }
+.own-store-planner__header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.own-store-planner__header h3 { margin: 4px 0 12px; font-size: 1.15rem; }
+.own-store-planner__cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.own-store-planner__card { padding: 14px; border-radius: 12px; border: 1px solid #d9ded9; min-width: 0; display: grid; gap: 8px; }
+.own-store-planner__price { font-size: 1.4rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.own-store-planner__card small { overflow-wrap: anywhere; }
+.own-store-planner__card button, .own-store-planner__result button { min-height: 44px; white-space: normal; }
+.own-store-planner__result { margin-top: 15px; border-top: 1px solid #d9ded9; padding-top: 13px; }
+.own-store-planner__result p { line-height: 1.5; }
+.own-store-planner__result button { margin: 3px 8px 3px 0; }
+@media (max-width: 550px) { .own-store-planner__cards { grid-template-columns: 1fr; } }

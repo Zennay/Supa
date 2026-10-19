@@ -10,6 +10,8 @@ import { RecipePriceExplanation } from './RecipePriceExplanation'
 import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts'
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { HiFiPlannerWeekCard } from './HiFiPlannerWeekCard.tsx'
+import { PlannerOwnStoreComparison } from './PlannerOwnStoreComparison.tsx'
+import type { PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -19,11 +21,14 @@ type PlannerViewProps = {
   activeDays: string[]
   plannedMeals: PlannedMeal[]
   recipes: Recipe[]
+  ownReviewed?: PrivateReviewedBaskets | null
+  preferredOwnStore: OwnStore
+  onOpenShoppingList: () => void
   basketTotalCents: number | null
   basketUnresolvedLineCount: number
   ownSource?: { store: string; observedAt: string }
   ownSourceChoices?: { store: string; observedAt: string }[]
-  onOwnSourceChange?: (store: string) => void
+  onOwnSourceChange: (store: OwnStore) => void
   onOpenComparison: () => void
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
@@ -36,6 +41,9 @@ export function PlannerView({
   activeDays,
   plannedMeals,
   recipes,
+  ownReviewed,
+  preferredOwnStore,
+  onOpenShoppingList,
   basketTotalCents,
   basketUnresolvedLineCount,
   ownSource,
@@ -172,7 +180,10 @@ export function PlannerView({
         <div className="budget-card" aria-label="Kies welke echte winkelbron jouw weekbudget gebruikt">
           <label htmlFor="own-source-budget-store"><strong>Winkel voor jouw eigen bronbudget</strong></label>
           <select id="own-source-budget-store" value={ownSource.store}
-            onChange={event => onOwnSourceChange(event.currentTarget.value)}
+            onChange={event => {
+              const choice = event.currentTarget.value
+              if (choice === 'PLUS' || choice === 'DekaMarkt') onOwnSourceChange(choice)
+            }}
             style={{ display: 'block', width: '100%', minHeight: 44, marginTop: 8 }}>
             {ownSourceChoices.map(choice =>
               <option key={choice.store} value={choice.store}>{choice.store} · eigen opname {choice.observedAt}</option>)}
@@ -314,6 +325,10 @@ export function PlannerView({
               </>}
         </p>}
       </section>
+
+      <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} preferred={preferredOwnStore}
+        onSelect={onOwnSourceChange}
+        onOpenComparison={onOpenComparison} onOpenList={onOpenShoppingList} />
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
       {hasIngredientData && (
