@@ -19,7 +19,7 @@ type PlannerViewProps = {
   activeDays: string[]
   plannedMeals: PlannedMeal[]
   recipes: Recipe[]
-  basketTotalCents: number
+  basketTotalCents: number | null
   basketUnresolvedLineCount: number
   ownSource?: { store: string; observedAt: string }
   ownSourceChoices?: { store: string; observedAt: string }[]
@@ -62,28 +62,34 @@ export function PlannerView({
     setCustomOpen(false)
   }
 
-  const plannedCost = basketTotalCents / 100
-  const budgetState = getBudgetState(plannedCost, budget)
-  const budgetAssessment = assessPlannerBudget(
-    plannedCost,
-    budget,
-    basketUnresolvedLineCount,
+  // Never use internal example-catalog prices as a real budget total.
+  // Only a still-current, fully reviewed user's own store basket can
+  // establish a spent amount. The chosen budget remains editable regardless.
+  const trustedCents = ownSource && typeof basketTotalCents === 'number' &&
+    Number.isSafeInteger(basketTotalCents) && basketTotalCents >= 0
+    ? basketTotalCents : null
+  const plannedCost = trustedCents === null ? null : trustedCents / 100
+  const budgetState = plannedCost === null ? null : getBudgetState(plannedCost, budget)
+  const budgetAssessment = plannedCost === null ? null : assessPlannerBudget(
+    plannedCost, budget, basketUnresolvedLineCount,
   )
-  const budgetKnown = budgetAssessment.status === 'known'
+  const budgetKnown = budgetAssessment?.status === 'known'
+  const unresolvedCount = budgetAssessment?.status === 'unknown'
+    ? budgetAssessment.unresolvedLineCount : 0
   // The basket already uses canonical integer cents. Do not subtract floating
   // euros and then let the strict formatter silently show an em dash.
   const budgetCents = Math.round(budget * 100)
   const exactRemainingCents =
-    Number.isSafeInteger(basketTotalCents) && basketTotalCents >= 0 &&
+    trustedCents !== null &&
     Number.isSafeInteger(budgetCents) && budget >= 0 &&
     budget === budgetCents / 100
-      ? budgetCents - basketTotalCents
+      ? budgetCents - trustedCents
       : null
   // Only a strictly validated cent-native lower bound can prove minimum
   // overspend while unfinished matches keep the final total uncertain.
-  const knownMinimumOverrunCents = !budgetKnown
+  const knownMinimumOverrunCents = trustedCents !== null && !budgetKnown
     ? plannerKnownMinimumOverrunCents({
-        knownCostCents: basketTotalCents,
+        knownCostCents: trustedCents,
         budgetEuros: budget,
         unresolvedLineCount: basketUnresolvedLineCount,
       })
@@ -181,7 +187,7 @@ export function PlannerView({
           </div>
           <span
             className={
-              budgetKnown && budgetAssessment.budgetState.overBudget
+              budgetKnown && budgetAssessment?.status === 'known' && budgetAssessment.budgetState.overBudget
                 ? 'budget-status warning'
                 : budgetKnown
                   ? 'budget-status'
@@ -189,15 +195,17 @@ export function PlannerView({
             }
             aria-live="polite"
           >
-            {budgetKnown
+            {trustedCents === null
+              ? 'Prijs onbekend · nog geen eigen winkelbron'
+              : budgetKnown
               ? exactRemainingCents === null
                 ? 'Budgetgegevens controleren'
                 : exactRemainingCents < 0
                   ? `${euro.formatCents(-exactRemainingCents)} boven budget`
                   : `${euro.formatCents(exactRemainingCents)} over`
               : knownMinimumOverrunCents !== null
-                ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget · ${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`
-                : `${budgetAssessment.unresolvedLineCount} ${budgetAssessment.unresolvedLineCount === 1 ? 'mandregel' : 'mandregels'} open`}
+                ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget · ${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`
+                : `${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`}
           </span>
         </div>
 
@@ -254,59 +262,51 @@ export function PlannerView({
           )}
         </div>
 
-        <div
-          className="budget-progress"
-          role="progressbar"
-          aria-label={
-            budgetKnown
-              ? 'Gepland deel van het weekbudget'
-              : 'Bekend minimum van het weekbudget'
-          }
-          aria-valuemin={0}
-          aria-valuemax={budget}
-          aria-valuenow={Math.min(plannedCost, budget)}
-        >
-          <span style={{ width: `${budgetState.usage * 100}%` }} />
-        </div>
+        {plannedCost !== null && budgetState !== null
+          ? <div
+              className="budget-progress"
+              role="progressbar"
+              aria-label={budgetKnown ? 'Gepland deel van het weekbudget' : 'Bekend minimum van het weekbudget'}
+              aria-valuemin={0}
+              aria-valuemax={budget}
+              aria-valuenow={Math.min(plannedCost, budget)}
+            >
+              <span style={{ width: `${budgetState.usage * 100}%` }} />
+            </div>
+          : <p className="disclaimer" role="status">
+              Geen budgetbalk berekend: er zijn nog geen complete, zelf gecontroleerde winkelprijzen.
+            </p>}
 
         <div className="budget-summary">
           <span>{activeDays.length} maaltijden actief</span>
           <strong>
-            {budgetKnown
-              ? euro.format(plannedCost)
-              : `min. ${euro.format(plannedCost)}`}
+            {plannedCost === null
+              ? 'Prijs onbekend'
+              : budgetKnown ? euro.format(plannedCost)
+                : `min. ${euro.format(plannedCost)}`}
           </strong>
         </div>
-        {ownSource && <p className="disclaimer" role="status">
+        {trustedCents !== null && ownSource && <p className="disclaimer" role="status">
           Privécontrole: {ownSource.store} · eigen winkelopname {ownSource.observedAt}.
           Het getoonde budgetbedrag gebruikt jouw volledige, persoonlijk bevestigde winkelmand
           in plaats van de Supa-voorbeeldprijzen. Geen kassagarantie of publieke besparingsclaim.
         </p>}
-        {!ownSource && <p className="disclaimer">
-          Dit budget gebruikt voorlopig de Supa-voorbeeldcatalogus.
-          Controleer je eigen bronartikelen in Vergelijk voor een persoonlijk mandbedrag.
+        {trustedCents === null && <p className="disclaimer" role="status">
+          Je weekbudget is ingesteld, maar de werkelijke mandprijs is onbekend.
+          Supa rekent voorbeeldcatalogusprijzen niet mee als jouw uitgaven.
+          Open Vergelijk om eigen actuele winkelproducten, verpakkingen en prijzen te controleren.
         </p>}
-        <p className="disclaimer">
-          {budgetKnown ? (
-            <>
-              Dit bedrag komt uit exact dezelfde productmatching en
-              verpakkingsberekening als de Mand-tab.
-            </>
-          ) : (
-            <>
-              Nog {budgetAssessment.unresolvedLineCount}{' '}
-              {budgetAssessment.unresolvedLineCount === 1
-                ? 'productmatch is'
-                : 'productmatches zijn'}{' '}
-              onopgelost. Daarom is dit alleen het bekende minimum;
-              {knownMinimumOverrunCents !== null ? (
-                <> de bekende kosten liggen al minimaal {euro.formatCents(knownMinimumOverrunCents)} boven je budget. Het uiteindelijke tekort kan groter zijn.</>
-              ) : (
-                <> SUPA kan nog niet bepalen of je binnen of boven budget zit.</>
-              )}
-            </>
-          )}
-        </p>
+        {trustedCents !== null && <p className="disclaimer">
+          {budgetKnown
+            ? <>Dit bedrag komt uit jouw persoonlijk bevestigde winkelbron
+                en dezelfde fysieke verpakkingsberekening als Vergelijk.</>
+            : <>Nog {unresolvedCount} {unresolvedCount === 1 ? 'productmatch is' : 'productmatches zijn'}
+                {' '}onopgelost; dit is uitsluitend het bekende minimum.
+                {knownMinimumOverrunCents !== null
+                  ? <> De huidige eigen bronkosten liggen minimaal {euro.formatCents(knownMinimumOverrunCents)} boven budget. Het werkelijke tekort kan groter zijn.</>
+                  : <> Supa kan nog niet bepalen of je binnen budget zit.</>}
+              </>}
+        </p>}
       </section>
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}

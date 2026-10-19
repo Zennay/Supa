@@ -353,8 +353,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             activeDays={activeDays}
             plannedMeals={plannedMeals}
             recipes={recipes}
-            basketTotalCents={preferredPrivateBasket?.basket.totalCents ?? basket.totalCents}
-            basketUnresolvedLineCount={preferredPrivateBasket?.basket.unresolvedLineCount ?? basket.unresolvedLineCount}
+            basketTotalCents={preferredPrivateBasket?.basket.totalCents ?? null}
+            basketUnresolvedLineCount={preferredPrivateBasket?.basket.unresolvedLineCount ?? 0}
             ownSource={preferredPrivateBasket ? {
               store: preferredPrivateBasket.basket.store.name,
               observedAt: preferredPrivateBasket.observedAt,
