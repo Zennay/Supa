@@ -36,6 +36,7 @@ const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 type CapturePreviewStore = {
   retailer: CaptureStore; enteredProducts: number; unobservedRows: number
+  appendableNewProducts?: number
   matching?: {
     proposed: number; unresolved: number; total: number
     lines: { id: string; label: string; status: 'matched' | 'unresolved'
@@ -339,6 +340,17 @@ export function OfflineReviewedWorkbench({
         const source = combined.captures[entry.retailer]
         if (!source) throw Error('Een winkelbron ontbreekt in de gekoppelde opname.')
         entry.observedNs = source.observedNs
+        const previousCapture = imported?.captures[entry.retailer]
+        if (files.length === 1 && storesInPreview.length === 1 &&
+            previousCapture && previousCapture.observedAt === source.observedAt &&
+            source.products.length > 0) {
+          const previousIds = new Set(previousCapture.products.map(item => item.id))
+          const age = BigInt(Date.now()) * 1_000_000n - previousCapture.observedNs
+          if (age >= -300_000_000_000n && age <= 604_800_000_000_000n &&
+              source.products.every(item => !previousIds.has(item.id))) {
+            entry.appendableNewProducts = source.products.length
+          }
+        }
         const basket = buildOneStoreBasket({
           store: { id: entry.retailer, name: entry.retailer },
           plan, recipes, activeDays, products: source.products,
@@ -430,6 +442,9 @@ export function OfflineReviewedWorkbench({
     const previous = imported ? Object.keys(imported.captures) : []
     if (files.length === 2)
       void loadSelectedSources(files)
+    else if (incoming.length === 1 && currentPreview.stores[0].appendableNewProducts &&
+             imported?.captures[incoming[0]])
+      void appendSameCapture(incoming[0], file)
     else if (incoming.length === 1 && imported?.captures[incoming[0]])
       void replaceStoreFile(incoming[0], file)
     else if (incoming.length === 1 && previous.length === 1)
@@ -1653,9 +1668,22 @@ export function OfflineReviewedWorkbench({
                   Download alleen ontbrekende winkelproducten (TXT)
                 </button>
               ) : null}
+              {currentPreview.stores.length === 1 &&
+                currentPreview.stores[0].appendableNewProducts && (
+                <p className="disclaimer" role="status">
+                  Deze {currentPreview.stores[0].appendableNewProducts} nieuwe originele
+                  artikelcode(s) horen bij exact hetzelfde eerdere winkelbronmoment.
+                  Je kunt ze zonder oude productcodes of prijzen te vervangen aan
+                  dezelfde privéopname toevoegen. Supa vraagt nog om je toestemming;
+                  alle nieuwe matches moeten opnieuw worden gecontroleerd.
+                </p>
+              )}
               <button type="button" disabled={busy} onClick={applyPreviewCsv}>
                 {currentPreview.files.length === 2
                   ? 'Neem beide eigen winkelopnames over en controleer producten'
+                  : currentPreview.stores.length === 1 &&
+                    currentPreview.stores[0].appendableNewProducts
+                    ? 'Voeg nieuwe bronproducten toe zonder bestaande prijzen te vervangen'
                   : currentPreview.stores.length === 1 &&
                     imported?.captures[currentPreview.stores[0].retailer]
                   ? 'Bekijk bronverschillen vóór vervanging'
