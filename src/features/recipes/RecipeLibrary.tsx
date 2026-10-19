@@ -9,6 +9,7 @@ import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPrev
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { m2InitialPlan } from '../../data/m2Fixture'
 import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
+import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { exportOwnRecipePrivateWeek } from './exportOwnRecipePrivateWeek'
 import { RECIPE_FAVORITES_KEY, readRecipeFavorites, toggleRecipeFavorite, type RecipeFavorites } from './recipeFavorites'
@@ -154,6 +155,24 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     } catch {
       setMessage('Downloaden lukte niet. Selecteer de tekst van je lijst om die zelf op te slaan.')
       setShowShoppingCopy(true)
+    }
+  }
+  function downloadOwnRecipeChecklistCsv() {
+    if (!ownShopping?.canCopy) return
+    try {
+      const csv = exportOwnRecipeChecklistCsv(ownShopping, shoppingChecks)
+      const uri = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-recept-boodschappen-ongeprijsd.csv'
+        document.body.append(link)
+        link.click()
+        link.remove()
+        setMessage('Je eigen ongeprijsde boodschappenlijst is als CSV opgeslagen; winkelprijzen blijven onbekend.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Kon het CSV-bestand niet veilig exporteren.')
     }
   }
   function planOwnRecipe(recipe: SavedRecipe, destination: 'planner' | 'basket' | 'list' = 'planner') {
@@ -530,6 +549,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
               value={selectedRecipeShoppingText} onFocus={event => event.currentTarget.select()} />}
             {showShoppingCopy && <button type="button" onClick={() => shoppingCopy.current?.select()}>Selecteer alle tekst</button>}
             <button type="button" onClick={downloadOwnRecipeChecklist}>Download ongeprijsde lijst (TXT)</button>
+            <button type="button" onClick={downloadOwnRecipeChecklistCsv}>Download ongeprijsde lijst (CSV)</button>
             <button type="button" onClick={downloadForPrivateComparison}>Gebruik dit recept in winkelvergelijker (JSON)</button>
             <a href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">Open privéwinkelvergelijker met dit JSON-bestand</a>
             <a href="/private-basket-mapping.html#own-recipe-import" target="_blank" rel="noopener noreferrer">Of kies mijn lokaal opgeslagen recepten rechtstreeks in de vergelijker</a>
