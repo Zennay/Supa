@@ -53,6 +53,21 @@ function eurosToCents(raw: string): number | null {
   return Number.isSafeInteger(cents) && cents >= 0 && cents <= 1000000 ? cents : null
 }
 
+// A completed form is still only an unverified personal observation.
+// Canonical SKU matching, freshness and human review remain separate.
+function isCompleteOwnPriceDraft(row: ProductDraft): boolean {
+  const id = row.sourceId ?? ''
+  const amount = amountOrNull(row.packAmount.trim())
+  const count = Number(row.packCount)
+  return row.available && id.length > 0 && id === id.trim() && id.length <= 100 &&
+    /[\p{L}\p{N}]/u.test(id) &&
+    !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(id) &&
+    row.name.trim().length > 0 && row.name === row.name.trim() &&
+    amount !== null && (row.packUnit !== 'piece' || Number.isSafeInteger(amount)) &&
+    /^\d{1,4}$/.test(row.packCount) && Number.isSafeInteger(count) && count >= 1 && count <= 1000 &&
+    eurosToCents(row.priceEuros.trim()) !== null
+}
+
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
 
 type StoredDraft = {
@@ -120,6 +135,7 @@ export function LocalTwoStorePriceEditor({
   plan, recipes, activeDays, onGenerated, onEdit, reviewedRecaptureSeeds = {},
 }: Props) {
   const [open, setOpen] = useState(false)
+  const [onlyOpenRows, setOnlyOpenRows] = useState(false)
   const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
   const selectedStores = sourceSelection === 'both' ? stores : [sourceSelection]
   const [rows, setRows] = useState<Record<string, ProductDraft>>({})
@@ -411,10 +427,41 @@ export function LocalTwoStorePriceEditor({
           <label className="offline-manual-editor__time">Wanneer zijn deze producten echt waargenomen?
             <input type="datetime-local" value={capturedAt[store]} onChange={e => changeTimestamp(store, e.target.value)} />
           </label>
-          {activeNeeds.map(need => {
+          {(() => {
+            const completed = activeNeeds.filter(need => isCompleteOwnPriceDraft(
+              rows[key(store, need.id)] ?? emptyDraft(need.unit))).length
+            const next = activeNeeds.findIndex(need => !isCompleteOwnPriceDraft(
+              rows[key(store, need.id)] ?? emptyDraft(need.unit)))
+            return <div className="offline-manual-editor__progress" role="status">
+              <strong>{completed} van {activeNeeds.length} invoerregels ingevuld</strong>
+              <small>Eigen invoer; bronmatching, actualiteit en persoonlijke prijsreview volgen nog.</small>
+              <div className="offline-manual-editor__progress-actions">
+                <button type="button" className="ghost-button" disabled={next < 0}
+                  onClick={() => {
+                    const target = document.getElementById(`own-price-${store}-${next}`)
+                    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    target?.querySelector('input')?.focus({ preventScroll: true })
+                  }}>Naar volgende open ingrediënt</button>
+                <button type="button" className="ghost-button" aria-pressed={onlyOpenRows}
+                  onClick={() => setOnlyOpenRows(value => !value)}>
+                  {onlyOpenRows ? 'Toon alle producten' : 'Toon alleen open producten'}
+                </button>
+              </div>
+            </div>
+          })()}
+          {onlyOpenRows && activeNeeds.length > 0 && activeNeeds.every(need => isCompleteOwnPriceDraft(
+            rows[key(store, need.id)] ?? emptyDraft(need.unit))) &&
+            <p role="status">Alle regels voor {store} zijn ingevuld. Toon alle producten om ze na te kijken.</p>}
+          {activeNeeds.map((need, index) => {
             const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
-            return <fieldset key={need.id} className="offline-manual-editor__row">
-              <legend>{need.label} · benodigd {need.amount ?? '?'} {need.unit}</legend>
+            const complete = isCompleteOwnPriceDraft(row)
+            if (onlyOpenRows && complete) return null
+            return <fieldset key={need.id} id={`own-price-${store}-${index}`} className="offline-manual-editor__row">
+              <legend>{need.label} · benodigd {need.amount ?? '?'} {need.unit}
+                <small className="offline-manual-editor__row-status">
+                  {complete ? ' · ingevuld, nog niet bevestigd' : ' · invoer onvolledig'}
+                </small>
+              </legend>
               <label>Originele productcode uit jouw waarneming (EAN of artikelnummer)
                 <input value={row.sourceId ?? ''} maxLength={100} autoComplete="off"
                   placeholder="Code op verpakking, bon of bronartikel"

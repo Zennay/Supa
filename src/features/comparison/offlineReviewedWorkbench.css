@@ -62,6 +62,14 @@
 .offline-manual-editor__row { display:grid; gap:.7rem; padding:1rem;
   border:1px solid #cbd6ca; border-radius:12px; min-width:0; background:#fafcf9; }
 .offline-manual-editor__row legend { font-weight:700; padding:0 .4rem; overflow-wrap:anywhere; }
+.offline-manual-editor__progress { display:grid; gap:.5rem; padding:.9rem; background:#f1f6ef;
+  border:1px solid #d6e1d3; border-radius:12px; }
+.offline-manual-editor__progress small { color:#526154; line-height:1.45; }
+.offline-manual-editor__progress-actions { display:flex; flex-wrap:wrap; gap:.5rem; }
+.offline-manual-editor__progress-actions button { min-height:44px; padding:.55rem .8rem; }
+.offline-manual-editor__progress-actions button:disabled { opacity:.55; cursor:not-allowed; }
+.offline-manual-editor__row-status { font-weight:500; font-size:.78rem; color:#536258; }
+
 .offline-manual-editor__row label { display:grid; gap:.35rem; font-size:.88rem; }
 .offline-manual-editor__row input,.offline-manual-editor__row select,
 .offline-manual-editor__time input { min-width:0; max-width:100%; box-sizing:border-box;
