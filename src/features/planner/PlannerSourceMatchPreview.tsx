@@ -38,6 +38,14 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   const [showMobileGuide, setShowMobileGuide] = useState(false)
   const [showActionList, setShowActionList] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
+  // A single-store capture can be fresh (<7 days) but still unusable for a
+  // paired comparison if the other store was observed >24h apart. Point the
+  // user at the OLDER store instead of promising a reviewable paired SKU.
+  const olderPairedStore = !source.pairedWithin24h &&
+    source.captures.PLUS && source.captures.DekaMarkt
+    ? source.captures.PLUS.observedNs < source.captures.DekaMarkt.observedNs
+      ? 'PLUS' : 'DekaMarkt'
+    : null
   const coverage = useMemo(() => {
     const products = Object.fromEntries(stores.map(store => [
       store, new Map(source.captures[store]?.products.map(p => [p.id, p]) ?? []),
@@ -47,7 +55,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       const manualReview = { PLUS: false, DekaMarkt: false }
       for (const store of stores) {
         const capture = source.captures[store]
-        if (!capture || !recentOwnCaptureInstant(capture.observedAt, Date.now()) ||
+        if (!capture || olderPairedStore === store ||
+            !recentOwnCaptureInstant(capture.observedAt, Date.now()) ||
             need.amount === null || !Number.isFinite(need.amount) ||
             need.amount <= 0 || !units.has(need.unit)) {
           suggestions[store] = null
@@ -95,7 +104,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       }
       return { need, suggestions, manualReview }
     })
-  }, [needs, source])
+  }, [needs, source, olderPairedStore])
   if (!coverage.length) return null
   const suggested = stores.map(store => coverage.filter(line => line.suggestions[store]).length)
   const paired = coverage.filter(line => line.suggestions.PLUS && line.suggestions.DekaMarkt).length
@@ -129,6 +138,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       const capture = source.captures[store]
       if (capture && !recentOwnCaptureInstant(capture.observedAt, Date.now()))
         return 'Bronopname verlopen of toekomstig · werkelijke winkelbron opnieuw opnemen'
+      if (olderPairedStore === store)
+        return 'Bronpaar meer dan 24 uur uiteen · oudste winkel opnieuw opnemen'
       if (line.manualReview[store]) return 'Kies zelf bestaande originele SKU in Vergelijk'
       const candidate = line.suggestions[store]
       return candidate
@@ -169,11 +180,6 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     // Expired/missing original source: no SKU is a currently usable price.
     // More-than-24h pairs require a fresh recording of the older retailer,
     // even if its candidate list looks complete in isolation.
-    const olderPairedStore = !source.pairedWithin24h &&
-      source.captures.PLUS && source.captures.DekaMarkt
-      ? source.captures.PLUS.observedNs < source.captures.DekaMarkt.observedNs
-        ? 'PLUS' : 'DekaMarkt'
-      : null
     if (!capture || !recentOwnCaptureInstant(capture.observedAt, nowMs) ||
         olderPairedStore === store) return [...needs]
     return missing.filter(({ suggestions, manualReview }) =>
@@ -314,6 +320,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
             : source.captures[store] &&
               !recentOwnCaptureInstant(source.captures[store]!.observedAt, Date.now())
               ? 'Verlopen of toekomstige bron: geen actueel geprijsd voorstel; leg een echte nieuwe opname vast'
+            : olderPairedStore === store
+              ? 'Bronpaar >24 uur uiteen: neem deze oudste winkel opnieuw op voordat je prijzen vergelijkt'
             : manualReview[store]
               ? 'Meerdere geschikte SKU’s: kies de juiste originele verpakking zelf in Vergelijk'
               : 'Geen geschikte geprijsde SKU in deze bron; ontbrekende bron vastleggen'}
