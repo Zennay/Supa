@@ -106,6 +106,19 @@ export function readPrivateReceipt(raw: string): SavedReceipt | null {
       ? plusObserved.ns - dekaObserved.ns
       : dekaObserved.ns - plusObserved.ns
     if (timeGap > 86_400_000_000_000n) return null
+    // The generated timestamp is not retail evidence. Still refuse a
+    // document purporting to be exported in the future or before its own
+    // captured observations. Supa only exports fresh reviewed <=7-day data.
+    const minted = root.generatedAt as string
+    const mintedMs = Date.parse(minted)
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(minted) ||
+        !Number.isFinite(mintedMs) || new Date(mintedMs).toISOString() !== minted ||
+        mintedMs > Date.now() + 300_000) return null
+    const createdNs = BigInt(mintedMs) * 1_000_000n
+    for (const instant of [plusObserved, dekaObserved]) {
+      if (instant.ns > createdNs + 300_000_000_000n ||
+          createdNs - instant.ns > 604_800_000_000_000n) return null
+    }
 
     const plusCents = root.stores.PLUS.totalWholePackagesCents
     const dekaCents = root.stores.DekaMarkt.totalWholePackagesCents

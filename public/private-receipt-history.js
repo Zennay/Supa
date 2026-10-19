@@ -105,6 +105,19 @@ function readReceipt(raw) {
   }
   const diff = dates.PLUS > dates.DekaMarkt ? dates.PLUS - dates.DekaMarkt : dates.DekaMarkt - dates.PLUS
   if (diff > 86400000000000n) throw Error('Opnames te ver uiteen')
+  // The export date is not an observed retailer price. Reject fabricated
+  // future exports and impossible observation-to-export chronology nonetheless.
+  const generatedMs = Date.parse(v.generatedAt)
+  if (typeof v.generatedAt !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(v.generatedAt) ||
+      !Number.isFinite(generatedMs) ||
+      new Date(generatedMs).toISOString() !== v.generatedAt ||
+      generatedMs > Date.now() + 300000) throw Error('Ongeldige exportdatum')
+  const generatedNs = BigInt(generatedMs)*1000000n
+  if (stores.some(store =>
+    dates[store] > generatedNs+300000000000n ||
+    generatedNs-dates[store] > 604800000000000n))
+    throw Error('De bronmomenten passen niet binnen de exportcontext')
   const sum = { PLUS:0, DekaMarkt:0 }
   for (const entry of v.products) {
     if (!rec(entry) || !safeText(entry.ingredientId, 120) || !safeText(entry.ingredient) ||
