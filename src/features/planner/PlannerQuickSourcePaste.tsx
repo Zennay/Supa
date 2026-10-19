@@ -397,7 +397,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, need
               ? 'Bronmomenten meer dan 24 uur uiteen: geen volledig prijsverschil mogelijk.'
               : 'Nog maar één winkelbron. De andere winkel blijft ongeprijsd.'}</p>
         {hasDemand && needs.length > 0 && <PlannerSourceMatchPreview needs={needs}
-          source={preview.data} />}
+          source={liveAdmission ?? preview.data} />}
         <button type="button" disabled={!hasDemand}
           onClick={handoff}>Open mijn bron in Vergelijk voor productmatching</button>
         <button type="button" className="ghost-button"

@@ -3,6 +3,7 @@ import { matchIngredient, type MatchUnit } from '../../domain/matching.ts'
 import type { OfflinePriceSnapshots, OfflineRetailer, OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
+import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
 import './plannerSourceMatchPreview.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
@@ -17,6 +18,7 @@ type Suggestion = {
   packCents: number; unitRate: string | null
 } | null
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+const sourceDate = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
 /** Unconfirmed, read-only candidate hints. Canonical Workbench approves totals. */
 export function PlannerSourceMatchPreview({ needs, source }: {
@@ -103,6 +105,20 @@ export function PlannerSourceMatchPreview({ needs, source }: {
   }
   return <section className="supa-planner-source-matches" aria-label="Voorlopige weekmand-productmatching">
     <h4>Weekmand tegenover de aangeleverde bron-SKU’s</h4>
+    <div role="status" className="supa-planner-source-matches__capture-status">
+      {stores.map(store => {
+        const capture = source.captures[store]
+        return <p key={store}><strong>{store}:</strong>{' '}
+          {capture ? <>bronopname {sourceDate.format(new Date(capture.observedMs))}
+            {' · '}{recentOwnCaptureInstant(capture.observedAt, Date.now())
+              ? 'bron jonger dan 7 dagen' : 'bron te oud voor een actuele vergelijking'}</>
+            : 'geen bronopname; alle winkelprijzen onbekend'}</p>
+      })}
+      {source.captures.PLUS && source.captures.DekaMarkt &&
+        !source.pairedWithin24h && <p><strong>Niet gelijktijdig vergelijkbaar:</strong>
+          {' '}de twee oorspronkelijke opnames liggen meer dan 24 uur uit elkaar.
+          Nieuwe echte opnames zijn nodig voor een actuele twee-winkeldelta.</p>}
+    </div>
     <p>{coverage.length} fysieke ingrediënten: PLUS {suggested[0]} mogelijke kandidaten,
       DekaMarkt {suggested[1]}. Voor {paired} ingrediënten is er voorlopig een
       kandidaat bij beide winkels.</p>
