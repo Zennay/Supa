@@ -1,3 +1,5 @@
+import { safeRecipeSourceUrl } from './recipeSourceUrl.ts'
+
 /**
  * Private user-recipe intake, before any persistence, price calculation or fetch.
  * A caller must fetch HTML through a separately protected server boundary.
@@ -245,7 +247,7 @@ export function importRecipeFromHtml(html: string, sourceUrl: string | null = nu
     const lines = ingredients.map(item => typeof item === 'string' ? item : record(item) ? text(item.name) : '').filter(Boolean)
     if (!lines.length) throw new Error('Geen herkenbare ingrediënten; vul het recept handmatig in')
     return normalizedDraft({
-      source: parsedUrl ? 'url' : 'manual', sourceUrl: parsedUrl?.toString() ?? null,
+      source: parsedUrl ? 'url' : 'manual', sourceUrl: parsedUrl ? safeRecipeSourceUrl(parsedUrl.toString()) : null,
       title: recipe.name,
       servings: recipeServings(recipe.recipeYield),
       minutes: recipeMinutes(recipe.totalTime) ?? recipeMinutes(recipe.cookTime),

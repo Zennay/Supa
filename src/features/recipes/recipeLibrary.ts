@@ -1,4 +1,5 @@
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport.ts'
+import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl.ts'
 
 export type SavedRecipe = UserRecipeDraft & { id: string; savedAt: string }
 export const RECIPE_LIBRARY_KEY = 'supa.recipe-library.v1'
@@ -12,7 +13,12 @@ export function reviewRecipe(draft: UserRecipeDraft): UserRecipeDraft {
     ingredients: draft.ingredients.map(i => i.original), steps: draft.steps,
   })
   if (!reviewed.steps.length) throw new Error('Voeg minstens één bereidingsstap toe.')
-  return { ...reviewed, source: draft.source, sourceUrl: draft.sourceUrl }
+  return {
+    ...reviewed, source: draft.source,
+    sourceUrl: draft.source === 'url'
+      ? safeRecipeSourceUrl(draft.sourceUrl ?? '')
+      : null,
+  }
 }
 
 export function readRecipeLibrary(storage: Storage): LibraryState {
@@ -30,8 +36,9 @@ export function readRecipeLibrary(storage: Storage): LibraryState {
           !['manual', 'url'].includes(r.source) || !Array.isArray(r.ingredients) || !Array.isArray(r.steps) ||
           !r.steps.every(s => typeof s === 'string') || !r.ingredients.every(i => i && typeof i.original === 'string')) throw new Error('record')
       if (r.source === 'url') {
-        const url = new URL(r.sourceUrl ?? '')
-        if (url.protocol !== 'https:' || url.username || url.password) throw new Error('url')
+        // Existing private recipes are normalized on read too: neither
+        // portable export nor device restore may retain auth query secrets.
+        safeRecipeSourceUrl(r.sourceUrl ?? '')
       } else if (r.sourceUrl !== null) throw new Error('url')
       ids.add(r.id)
       return { ...reviewRecipe(r), id: r.id, savedAt: r.savedAt }
