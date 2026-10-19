@@ -325,7 +325,8 @@ export function OfflineReviewedWorkbench({
     changes: { store: typeof stores[number]; previousAt: string | null
       nextAt: string; previousCount: number; nextCount: number
       added: number; removed: number; changed: number
-      previousPriced: number; nextPriced: number }[]
+      previousPriced: number; nextPriced: number
+      examples: { id: string; name: string; before: string; after: string }[] }[]
   } | null>(null)
 
   const [weekExportMessage, setWeekExportMessage] = useState('')
@@ -746,6 +747,32 @@ export function OfflineReviewedWorkbench({
           old.sourcePriceCents !== item.sourcePriceCents ||
           old.sourceAvailable !== item.sourceAvailable)
       }).length
+      const priceLabel = (product?: OfflineStoreProduct) => {
+        if (!product) return 'niet meer in bestand'
+        if (product.sourceAvailable !== true || product.sourcePriceCents === null ||
+            product.sourcePriceCents === undefined || product.packAmount === null)
+          return 'pakprijs of beschikbaarheid onbekend'
+        return euros.format(product.sourcePriceCents / 100) + ' per pak · ' +
+          product.packCount + ' × ' + product.packAmount + ' ' + product.packUnit
+      }
+      const examples = [...new Set([...oldBySku.keys(), ...newBySku.keys()])]
+        .filter(id => {
+          const old = oldBySku.get(id)
+          const latest = newBySku.get(id)
+          return !old || !latest || old.name !== latest.name ||
+            old.packAmount !== latest.packAmount || old.packUnit !== latest.packUnit ||
+            old.packCount !== latest.packCount ||
+            old.sourcePriceCents !== latest.sourcePriceCents ||
+            old.sourceAvailable !== latest.sourceAvailable
+        })
+        .slice(0, 6)
+        .map(id => {
+          const before = oldBySku.get(id)
+          const after = newBySku.get(id)
+          return { id, name: after?.name ?? before?.name ?? id,
+            before: before ? priceLabel(before) : 'nieuw bronproduct',
+            after: priceLabel(after) }
+        })
       const priced = (product: OfflineStoreProduct) =>
         product.sourceAvailable === true && product.sourcePriceCents !== null &&
         product.sourcePriceCents !== undefined && product.packAmount !== null
@@ -753,7 +780,7 @@ export function OfflineReviewedWorkbench({
         nextAt: incoming.observedAt, previousCount: prior?.products.length ?? 0,
         nextCount: incoming.products.length, added, removed, changed,
         previousPriced: prior?.products.filter(priced).length ?? 0,
-        nextPriced: incoming.products.filter(priced).length }
+        nextPriced: incoming.products.filter(priced).length, examples }
     })
     setPendingReplacement(null)
     setPendingTwoStore({ sourceText: text, newText: input, version,
@@ -1793,6 +1820,14 @@ export function OfflineReviewedWorkbench({
                 {' '}{change.previousPriced}/{change.previousCount} →{' '}
                 {change.nextPriced}/{change.nextCount}.
                 {' '}{change.nextCount - change.nextPriced} producten zonder bruikbare geobserveerde pakprijs.
+                {change.examples.length > 0 && <details>
+                  <summary>Bekijk originele SKU- en pakprijswijzigingen (maximaal 6)</summary>
+                  <ul>{change.examples.map(item => (
+                    <li key={item.id}>{item.name} · broncode {item.id}
+                      <br />Oud: {item.before}
+                      <br />Nieuw: {item.after}</li>
+                  ))}</ul>
+                </details>}
               </li>
             ))}
           </ul>
