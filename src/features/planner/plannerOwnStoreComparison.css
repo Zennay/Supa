@@ -10,3 +10,5 @@
 .own-store-planner__result p { line-height: 1.5; }
 .own-store-planner__result button { margin: 3px 8px 3px 0; }
 @media (max-width: 550px) { .own-store-planner__cards { grid-template-columns: 1fr; } }
+
+.own-store-planner__budget-gap { font-weight: 650; font-variant-numeric: tabular-nums; }

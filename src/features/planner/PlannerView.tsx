@@ -326,7 +326,7 @@ export function PlannerView({
         </p>}
       </section>
 
-      <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} preferred={preferredOwnStore}
+      <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} preferred={preferredOwnStore} budget={budget}
         onSelect={onOwnSourceChange}
         onOpenComparison={onOpenComparison} onOpenList={onOpenShoppingList} />
 
