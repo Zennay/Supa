@@ -44,13 +44,17 @@ export function MixedStoreShoppingCard({
   // this *actual* proposed route, never only the theoretical minimum.
   const mixedUsesBoth = stores.every(store =>
     selectedMixed.lines.some(line => line.store === store))
+  // Even if the hypothetical mixed candidate has two shops, selecting
+  // explicit single-shop mode must not prompt for a second stop or count
+  // stale editing input as a cost for the selected route.
+  const canEditSecondStop = mixedUsesBoth && mode !== 'single'
   const rawCost = extraVisitCost.trim()
   const costShapeOk = rawCost === '' || /^\d{1,4}(?:[,.]\d{1,2})?$/.test(rawCost)
   const cents = rawCost && costShapeOk
     ? Math.round(Number(rawCost.replace(',', '.')) * 100) : null
-  const extraCostCents = mixedUsesBoth && cents !== null &&
+  const extraCostCents = canEditSecondStop && cents !== null &&
     Number.isSafeInteger(cents) && cents >= 0 && cents <= 100_000 ? cents : null
-  const costInvalid = mixedUsesBoth && rawCost !== '' && (extraCostCents === null || !costShapeOk)
+  const costInvalid = canEditSecondStop && rawCost !== '' && (extraCostCents === null || !costShapeOk)
   const suggestedSingle = selectedMixed.additionalDifferenceCents <= 0 ||
     (extraCostCents !== null && extraCostCents >= selectedMixed.additionalDifferenceCents)
   const chooseSingle = mode === 'single' || (mode === 'auto' && suggestedSingle)
@@ -253,7 +257,7 @@ export function MixedStoreShoppingCard({
       </div>
     </details>
     <MixedStoreUnitBreakdown plus={plus} deka={deka} route={plan} />
-    {mixedUsesBoth && <div className="offline-price-workbench__actions">
+    {canEditSecondStop && <div className="offline-price-workbench__actions">
       <label>Extra kosten van de tweede stop (€)
         <input type="text" inputMode="decimal" value={extraVisitCost} maxLength={9}
           placeholder="Bijv. 2,50" onChange={event => {
