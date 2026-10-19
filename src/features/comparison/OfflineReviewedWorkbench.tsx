@@ -217,6 +217,7 @@ export function OfflineReviewedWorkbench({
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [dropActive, setDropActive] = useState(false)
   const importRevision = useRef(0)
   const [pendingReplacement, setPendingReplacement] = useState<{
     sourceText: string; newText: string
@@ -1361,15 +1362,37 @@ export function OfflineReviewedWorkbench({
           <input type="file" accept=".json,application/json" disabled={busy}
             onChange={event => { void restorePortableSession(event.currentTarget.files?.[0]) }} />
         </label>
-        <label>Open één bronbestand, of selecteer tegelijk je aparte PLUS- en DekaMarkt-bestanden (CSV/JSON)
-          <input type="file" accept=".csv,.json,text/csv,application/json" multiple disabled={busy}
-            onChange={event => {
-              const files = Array.from(event.currentTarget.files ?? [])
-              event.currentTarget.value = ''
-              void loadSelectedSources(files)
-            }} />
-          <small>Twee bestanden moeten ieder precies één verschillende winkel bevatten. Ongeldige of dubbele opnames worden samen geweigerd; onbekende prijzen blijven onbekend.</small>
-        </label>
+        <div className={'offline-price-workbench__dropzone' + (dropActive ? ' is-dragging' : '')}
+          onDragOver={event => {
+            if (busy || !Array.from(event.dataTransfer.types).includes('Files')) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'copy'
+            setDropActive(true)
+          }}
+          onDragLeave={event => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false)
+          }}
+          onDrop={event => {
+            if (!Array.from(event.dataTransfer.types).includes('Files')) return
+            event.preventDefault()
+            setDropActive(false)
+            if (!busy) void loadSelectedSources(Array.from(event.dataTransfer.files))
+          }}>
+          <strong>{dropActive ? 'Laat je eigen bestanden los om ze lokaal te openen' :
+            'Sleep eigen PLUS-/Deka-prijsbestanden hierheen'}</strong>
+          <label>Open één bronbestand, of selecteer tegelijk je aparte PLUS- en DekaMarkt-bestanden (CSV/JSON)
+            <input type="file" accept=".csv,.json,text/csv,application/json" multiple disabled={busy}
+              onChange={event => {
+                const files = Array.from(event.currentTarget.files ?? [])
+                event.currentTarget.value = ''
+                void loadSelectedSources(files)
+              }} />
+            <small>Twee bestanden moeten ieder precies één verschillende winkel bevatten. Ongeldige of dubbele opnames worden samen geweigerd; onbekende prijzen blijven onbekend.</small>
+          </label>
+          <small>Sleep of selecteer maximaal twee eigen CSV/JSON-bestanden (elk 256 kB).
+            Deze import gebruikt dezelfde lokale broncontrole als de bestandskiezer:
+            ontbrekende prijzen blijven onbekend, en iedere SKU vereist jouw review.</small>
+        </div>
         {imported && Object.keys(imported.captures).length === 1 && (
           <label>Voeg de echte opname van de andere winkel toe (CSV of JSON)
             <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}

@@ -257,3 +257,13 @@ border-radius:12px;padding:1rem;background:#f3f8f3}
 
 .mixed-store-route__chosen-from-products{background:#edf7e8;border:2px solid #38835e;
 border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
+
+/* Drag/drop shares the strict local CSV/JSON file-picker admission flow. */
+.offline-price-workbench__dropzone {
+  display:grid; gap:.65rem; padding:clamp(.9rem,2.5vw,1.35rem);
+  background:#f5f8f4; border:2px dashed #8aab97; border-radius:14px;
+}
+.offline-price-workbench__dropzone>strong { color:#215a40; }
+.offline-price-workbench__dropzone.is-dragging { background:#e4f2e8; border-color:#17563a; }
+.offline-price-workbench__dropzone small { line-height:1.5; color:#4c6357; }
+.offline-price-workbench__dropzone:focus-within { outline:2px solid #246b50; outline-offset:2px; }
