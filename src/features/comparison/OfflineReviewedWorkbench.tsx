@@ -21,6 +21,7 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 import { privatePackUnitRate } from './privateUnitPrice.ts'
 import { rankOwnSourceSuggestions } from './ownSourceSuggestions.ts'
+import { automaticallyAcceptedSourceLine } from './automaticSourceMatch.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 import { appendPrivateCaptureProducts } from './appendPrivateCaptureProducts.ts'
 import { describePrivateStoreCaptureChange } from './privateStoreCaptureDiff.ts'
@@ -334,6 +335,7 @@ export function OfflineReviewedWorkbench({
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
+  const [rejectedAutoReviews, setRejectedAutoReviews] = useState<Record<string, boolean>>({})
   const [manualSku, setManualSku] = useState<Record<typeof stores[number], Record<string, string>>>({
     PLUS: {}, DekaMarkt: {},
   })
@@ -466,7 +468,7 @@ export function OfflineReviewedWorkbench({
           // A consciously chosen SKU can travel, but the independent
           // wizard must still ask the user to inspect source/matches.
           const explicit = manualSku[store][line.id] === line.productId
-          const reviewed = reviewedLines[reviewedLineKey(store, capture.observedAt, line)]
+          const reviewed = isAcceptedKey(reviewedLineKey(store, capture.observedAt, line))
           if (explicit || reviewed) selected[store][line.id] = line.productId
         }
       }
@@ -1306,7 +1308,7 @@ export function OfflineReviewedWorkbench({
         setTripExportMessage('')
         setTripProgressMessage('')
         setMessage('Eigen originele ' + (isCsv ? 'winkel-CSV' : 'winkel-JSON') +
-          ' geldig geladen; alle nieuwe fysieke artikelmatches en prijzen opnieuw controleren.')
+          ' geladen. Eenduidige producten worden automatisch gekoppeld; twijfelgevallen blijven open voor controle.')
       }
     } catch (error) {
       if (version !== importRevision.current) return
@@ -1336,6 +1338,38 @@ export function OfflineReviewedWorkbench({
         ? compareFullBaskets({ baseline: plus, candidate: deka }) : null }
     } catch { return null }
   }, [imported, plan, recipes, activeDays, manualSku])
+  // Decisive, exact-semantic matches from the currently admitted local capture
+  // are accepted automatically. Every key includes original SKU, pack/price,
+  // physical demand and observation instant; old facts never carry over.
+  const autoReviewKeys = useMemo(() => {
+    const keys = new Set<string>()
+    if (!imported || !basketPair) return keys
+    try {
+      const ingredients = aggregatePlanIngredients(plan, recipes, activeDays)
+      const byId = new Map(ingredients.map(item => [item.id, item.query]))
+      for (const store of stores) {
+        const capture = imported.captures[store]
+        const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+        if (!capture || !basket) continue
+        for (const line of basket.lines) {
+          const query = byId.get(line.id)
+          if (line.status === 'matched' && query && automaticallyAcceptedSourceLine(
+            line, capture.products, query, manualSku[store][line.id],
+          )) keys.add(reviewedLineKey(store, capture.observedAt, line))
+        }
+      }
+    } catch {
+      return new Set<string>()
+    }
+    return keys
+  }, [imported, basketPair, plan, recipes, activeDays, manualSku])
+
+  const isAcceptedKey = (key: string): boolean =>
+    reviewedLines[key] === true ||
+    (autoReviewKeys.has(key) && rejectedAutoReviews[key] !== true)
+  const isAutomaticKey = (key: string): boolean =>
+    autoReviewKeys.has(key) && rejectedAutoReviews[key] !== true
+
   const reviewedRecaptureSeeds = useMemo(() => {
     const seeds: Record<string, ReviewedRecaptureSeed> = {}
     if (!imported || !basketPair) return seeds
@@ -1345,7 +1379,7 @@ export function OfflineReviewedWorkbench({
       if (!capture || !basket) continue
       for (const line of basket.lines) {
         if (line.status !== 'matched' || line.pack.unit === 'unknown' ||
-            !reviewedLines[reviewedLineKey(store, capture.observedAt, line)])
+            !isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
           continue
         seeds[JSON.stringify([store, line.id])] = {
           sourceId: line.productId, name: line.productName,
@@ -1355,7 +1389,7 @@ export function OfflineReviewedWorkbench({
       }
     }
     return seeds
-  }, [imported, basketPair, reviewedLines])
+  }, [imported, basketPair, reviewedLines, autoReviewKeys, rejectedAutoReviews])
 
   function downloadConfirmedComparisonCsv() {
     try {
@@ -1403,14 +1437,15 @@ export function OfflineReviewedWorkbench({
     const capture = imported?.captures[store]
     const keys = basket && capture ? basket.lines.flatMap(line => line.status === 'matched'
       ? [reviewedLineKey(store, capture.observedAt, line)] : []) : []
-    const accepted = keys.filter(key => reviewedLines[key]).length
+    const accepted = keys.filter(isAcceptedKey).length
+    const autoMatched = keys.filter(isAutomaticKey).length
     const complete = !!basket && basket.selectedMealCount > 0 && basket.lines.length > 0 &&
       basket.unresolvedLineCount === 0 && keys.length === basket.lines.length &&
       accepted === keys.length
     const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
     const fresh = !!capture && nowNs >= capture.observedNs - 300_000_000_000n &&
       nowNs - capture.observedNs <= 604_800_000_000_000n
-    return { store, accepted, required: keys.length, complete, fresh }
+    return { store, accepted, autoMatched, required: keys.length, complete, fresh }
   })
   const reviewedBridge = useMemo((): PrivateReviewedBaskets | null => {
     if (!imported || !basketPair || !planKey) return null
@@ -1423,7 +1458,7 @@ export function OfflineReviewedWorkbench({
         basket.unresolvedLineCount === 0 &&
         basket.matchedLineCount === basket.lines.length &&
         basket.lines.every(line => line.status === 'matched' &&
-          reviewedLines[reviewedLineKey(store, capture.observedAt, line)] === true)
+          isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
       const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
       const fresh = nowNs >= capture.observedNs - 300_000_000_000n &&
         nowNs - capture.observedNs <= 604_800_000_000_000n
@@ -1432,7 +1467,7 @@ export function OfflineReviewedWorkbench({
       }
     }
     return Object.keys(verified).length > 0 ? { planKey, stores: verified } : null
-  }, [imported, basketPair, reviewedLines, clockMs, planKey])
+  }, [imported, basketPair, reviewedLines, autoReviewKeys, rejectedAutoReviews, clockMs, planKey])
   useEffect(() => {
     onReviewedBaskets?.(reviewedBridge)
   }, [onReviewedBaskets, reviewedBridge])
@@ -1450,9 +1485,7 @@ export function OfflineReviewedWorkbench({
         observedAt: capture.observedAt,
         originalProductCount: capture.products.length,
         nextIngredientId: basket?.lines.find(line =>
-          line.status !== 'matched' || reviewedLines[
-            reviewedLineKey(store, capture.observedAt, line)
-          ] !== true)?.id ?? null,
+          line.status !== 'matched' || !isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))?.id ?? null,
         pricedProductCount: capture.products.filter(product =>
           product.sourceAvailable === true &&
           product.sourcePriceCents !== null &&
@@ -1461,19 +1494,20 @@ export function OfflineReviewedWorkbench({
         demandLineCount: basket?.lines.length ?? 0,
         matchedLineCount: basket?.matchedLineCount ?? 0,
         reviewedLineCount: perStoreReview.find(item => item.store === store)?.accepted ?? 0,
+        autoMatchedLineCount: perStoreReview.find(item => item.store === store)?.autoMatched ?? 0,
         missingIngredients: basket?.lines.filter(line =>
           line.status !== 'matched')
           .map(line => ({ id: line.id, label: line.ingredientLabel })) ?? [],
         awaitingReviewIngredients: basket?.lines.filter(line =>
           line.status === 'matched' &&
-          reviewedLines[reviewedLineKey(store, capture.observedAt, line)] !== true)
+          !isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
           .map(line => ({ id: line.id, label: line.ingredientLabel })) ?? [],
         fresh: nowNs >= capture.observedNs - 300_000_000_000n &&
           nowNs - capture.observedNs <= 604_800_000_000_000n,
       }
     }
     return { planKey, stores: statuses }
-  }, [imported, planKey, basketPair, reviewedLines, clockMs])
+  }, [imported, planKey, basketPair, reviewedLines, autoReviewKeys, rejectedAutoReviews, clockMs])
   useEffect(() => {
     onCaptureProgress?.(captureProgress)
   }, [onCaptureProgress, captureProgress])
@@ -1591,7 +1625,7 @@ export function OfflineReviewedWorkbench({
         ' · ' + line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count
       if (!perStoreReview.find(item => item.store === store)?.fresh)
         return { status: 'Opname verlopen of toekomstig', canReview: true, product }
-      if (!reviewedLines[reviewedLineKey(store, capture.observedAt, line)])
+      if (!isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
         return { status: 'Product, verpakking en prijs controleren', canReview: true, product }
       return { status: 'Persoonlijk bevestigd', canReview: true, product }
     }
@@ -2131,7 +2165,7 @@ export function OfflineReviewedWorkbench({
                         const capture = imported.captures[store]
                         return basket && capture ? basket.lines.filter(line =>
                           line.status === 'matched' &&
-                          !reviewedLines[reviewedLineKey(store, capture.observedAt, line)]
+                          !isAcceptedKey(reviewedLineKey(store, capture.observedAt, line))
                         ).map(line => ({ store, id: line.id })) : []
                       })[0]
                       if (pending) goToReviewRow(pending.store, pending.id)
@@ -2534,16 +2568,26 @@ export function OfflineReviewedWorkbench({
                                   Dit is geen kans op correctheid of externe productvalidatie.</small>}
                               </details>
                             )}
-                            {line.status === 'matched' && <label className="offline-price-workbench__review">
-                              <input type="checkbox"
-                                checked={Boolean(reviewedLines[reviewedLineKey(store, capture.observedAt, line)])}
-                                onChange={event => {
-                                  const key = reviewedLineKey(store, capture.observedAt, line)
-                                  const checked = event.currentTarget.checked
-                                  setReviewedLines(previous => ({ ...previous, [key]: checked }))
-                                }} />
-                              <span>Product, inhoud en prijs met mijn bronopname gecontroleerd</span>
-                            </label>}
+                            {line.status === 'matched' && (() => {
+                              const key = reviewedLineKey(store, capture.observedAt, line)
+                              const automatic = isAutomaticKey(key)
+                              return <label className="offline-price-workbench__review">
+                                <input type="checkbox"
+                                  checked={isAcceptedKey(key)}
+                                  onChange={event => {
+                                    const checked = event.currentTarget.checked
+                                    // Rejecting an automatic match keeps it unknown until the
+                                    // user deliberately approves the original SKU or changes it.
+                                    setRejectedAutoReviews(previous => ({ ...previous,
+                                      [key]: !checked }))
+                                    setReviewedLines(previous => ({ ...previous,
+                                      [key]: checked }))
+                                  }} />
+                                <span>{automatic
+                                  ? 'Automatisch gekoppeld: exacte productnaam, originele SKU, passende verpakking en bekende bronprijs. Haal het vinkje weg als dit niet klopt.'
+                                  : 'Dit product is niet eenduidig automatisch te koppelen: controleer originele SKU, inhoud en bronprijs.'}</span>
+                              </label>
+                            })()}
                             {line.status === 'unresolved' && <span>{line.reasons.some(reason => reason.includes('same source SKU'))
                               ? 'Dezelfde winkel-SKU is aan meerdere ingrediënten gekoppeld. Combineer de fysieke hoeveelheden in Planner of kies andere echte artikelen; zonder die keuze geen volledige prijs.'
                               : 'Niet gekoppeld · controleer bronproduct, beschikbaarheid of verpakking.'}</span>}

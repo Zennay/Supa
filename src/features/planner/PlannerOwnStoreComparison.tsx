@@ -308,7 +308,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                     max={progress.demandLineCount} />
                   <span>{progress.matchedLineCount} van {progress.demandLineCount}</span>
                 </label>
-                <label>Producten door jou gecontroleerd
+                <label>Automatisch gekoppeld of door jou bevestigd
                   <progress value={Math.min(progress.demandLineCount, Math.max(0, progress.reviewedLineCount))}
                     max={progress.demandLineCount} />
                   <span>{progress.reviewedLineCount} van {progress.demandLineCount}</span>
@@ -321,8 +321,12 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                   <span>{progress.pricedProductCount} van {progress.originalProductCount}</span>
                 </label>
               </div>}
+              {progress.autoMatchedLineCount > 0 && <small>
+                {progress.autoMatchedLineCount} eenduidige productmatch(es) automatisch gekoppeld.
+                {' '}Alleen onzekere artikelen moet je nog beoordelen.
+              </small>}
               <small>{progress.fresh
-                ? 'Nog niet volledig gecontroleerd: prijs en budget blijven onbekend.'
+                ? 'Nog niet volledig gekoppeld: prijs en budget blijven onbekend.'
                 : 'Bronopname te oud of toekomstig: vernieuw de echte bron voordat prijzen meetellen.'}</small>
               {progress.fresh && progress.missingIngredients.length > 0 &&
                 <div className="own-store-planner__review-queue" aria-label={'Ontbrekende bronproducten bij ' + store}>
