@@ -538,12 +538,27 @@ function isFinancialComparison(value: Record<string, unknown>): value is Record<
   )
 }
 
+// Distinguish an executable claimed outcome from ordinary malformed data
+// without ever invoking an accessor or exposing its error text.
+const ROOT_CLAIM_ACCESSOR = Symbol('unsafe claimed financial outcome')
+
 function snapshotFinancialInputs(input: unknown): {
   comparison: AttributionComparison
   evidence: unknown
-} | null {
+} | typeof ROOT_CLAIM_ACCESSOR | null {
   const args = ownDataRecord(input, ['comparison', 'evidence'])
   if (!args) return null
+  if (args.comparison && typeof args.comparison === 'object' &&
+      !Array.isArray(args.comparison)) {
+    try {
+      for (const field of ['outcome', 'savingsCents']) {
+        const descriptor = Object.getOwnPropertyDescriptor(args.comparison, field)
+        if (descriptor && !('value' in descriptor)) return ROOT_CLAIM_ACCESSOR
+      }
+    } catch {
+      return null
+    }
+  }
   const comparison = ownDataRecord(args.comparison, [
     'claimable', 'reasons', 'deltaCents', 'lineDeltas',
     'baselineTotalCents', 'candidateTotalCents', 'outcome', 'savingsCents',
@@ -570,8 +585,14 @@ function snapshotFinancialInputs(input: unknown): {
   }
   const items = ownDataArray(args.evidence)
   if (!items) return null
-  const safeItems: Record<string, unknown>[] = []
+  const safeItems: unknown[] = []
   for (const item of items) {
+    // Malformed JSON data is not executable. Let the trusted validator give
+    // the useful missing-item reason instead of silently losing it.
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      safeItems.push(null)
+      continue
+    }
     const record = ownDataRecord(item, [
       'lineId', 'effect', 'deltaCents', 'evidenceRef',
     ])
@@ -586,6 +607,15 @@ export function attributeSavingsEffects(input: {
   evidence: unknown
 }): SavingsAttribution {
   const snapshot = snapshotFinancialInputs(input)
+  if (snapshot === ROOT_CLAIM_ACCESSOR) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: null,
+      effectTotals: emptyTotals(),
+      reasons: ['basket comparison outcome or savings disagrees with physical cents'],
+    }
+  }
   if (!snapshot) {
     return {
       status: 'unknown',
