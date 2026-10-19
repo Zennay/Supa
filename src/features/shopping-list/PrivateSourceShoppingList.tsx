@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
-import type { OwnStore, PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
+import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import './privateSourceShoppingList.css'
 
@@ -9,11 +10,12 @@ const date = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 
 const stores: OwnStore[] = ['PLUS', 'DekaMarkt']
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
-export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore }: {
+export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison }: {
   reviewed: PrivateReviewedBaskets
   budget: number
   preferred: OwnStore
   onChooseStore: (store: OwnStore) => void
+  onOpenComparison: () => void
 }) {
   const available = stores.filter(store => !!reviewed.stores[store])
   const store = available.includes(preferred) ? preferred : available[0]
@@ -34,13 +36,18 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   const tick = (line: BasketTraceLine) => JSON.stringify([identity, line.id])
   const doneCount = basket.lines.filter(line => checked[tick(line)]).length
   const visibleLines = remainingOnly ? basket.lines.filter(line => !checked[tick(line)]) : basket.lines
+  const readable = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
   const label = (line: BasketTraceLine) => line.status === 'matched'
-    ? line.ingredientLabel + ': ' + line.packs + ' × ' + line.productName +
-      ' (' + line.productId + ') · ' + euros.format(line.lineTotalCents / 100)
+    ? readable(line.ingredientLabel) + ': ' + line.packs + ' × ' + readable(line.productName) +
+      ' (SKU ' + readable(line.productId) + ') · ' +
+      line.pack.count + ' × ' + line.pack.amount + ' ' + line.pack.unit + ' per pak · ' +
+      euros.format(line.pricePerPackCents / 100) + ' per pak · ' +
+      (privateUnitPrice(line) ?? 'eenheidsprijs onbekend') + ' · ' +
+      euros.format(line.lineTotalCents / 100) + ' totaal'
     : line.ingredientLabel + ': product onbekend'
   const textList = [
     'Supa · ' + store + ' · privé gecontroleerd mandje',
-    'Eigen bronopname: ' + capture.observedAt,
+    'Eigen bronopname: ' + readable(capture.observedAt),
     ...basket.lines.map(line => (checked[tick(line)] ? '☑ ' : '☐ ') + label(line)),
     'Privébron. Geen actuele kassagarantie of publieke besparingsclaim.',
   ].join('\n')
@@ -52,7 +59,15 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
     ? compareFullBaskets({ baseline: plus!.basket, candidate: deka!.basket }) : null
   const budgetCents = Number.isFinite(budget) ? Math.round(budget * 100) : null
 
+  function currentCaptureAvailable() {
+    const valid = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())?.stores[store]
+    return !!valid && valid.observedAt === capture.observedAt && valid.basket === basket
+  }
   function downloadList() {
+    if (!currentCaptureAvailable()) {
+      setMessage('De bronopname is inmiddels verlopen. Werk je eigen winkelprijzen opnieuw bij in Vergelijk.')
+      return
+    }
     try {
       const url = URL.createObjectURL(new Blob([textList], { type: 'text/plain;charset=utf-8' }))
       try {
@@ -102,6 +117,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         <label><input type="checkbox" checked={remainingOnly}
           onChange={event => setRemainingOnly(event.target.checked)} /> Alleen nog te kopen</label>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
+        <button type="button" onClick={onOpenComparison}>Herzie prijzen en productmatching</button>
       </div>
       <p role="status" aria-live="polite">{message}</p>
       <div className="private-source-shopping__items">
@@ -113,7 +129,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
             <span><strong>{line.ingredientLabel}</strong>
               <small>{line.status === 'matched'
                 ? line.packs + ' × ' + line.productName + ' · SKU ' + line.productId +
-                  ' · ' + line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count + ' per verpakking'
+                  ' · ' + line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count + ' per verpakking' +
+                  ' · ' + euros.format(line.pricePerPackCents / 100) + ' per pak' +
+                  ' · ' + (privateUnitPrice(line) ?? 'eenheidsprijs onbekend')
                 : 'Dit product is niet betrouwbaar gekoppeld.'}</small>
             </span>
             <strong>{line.status === 'matched' ? euros.format(line.lineTotalCents / 100) : 'Onbekend'}</strong>
@@ -124,7 +142,10 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       <details>
         <summary>Kopieer de eigen boodschappenlijst</summary>
         <textarea readOnly value={textList} rows={Math.min(16, basket.lines.length + 4)}
-          onFocus={event => event.currentTarget.select()}
+          onFocus={event => {
+            if (currentCaptureAvailable()) event.currentTarget.select()
+            else { event.currentTarget.blur(); setMessage('Deze winkelopname is verlopen. Werk de brongegevens bij.') }
+          }}
           aria-label="Kopieerbare eigen boodschappenlijst" />
       </details>
       <p className="disclaimer">Vinkjes zijn tijdelijk in deze browsersessie en worden niet opgeslagen

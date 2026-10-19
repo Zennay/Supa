@@ -490,7 +490,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
-              preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore} />
+              preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
+              onOpenComparison={() => navigate('basket')} />
           </div>
         )}
         {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
