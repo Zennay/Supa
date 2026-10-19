@@ -29,6 +29,24 @@ export function privateReviewedPairWithin24Hours(
   return elapsed <= 86_400_000_000_000n
 }
 
+/** Only admitted, fully matched source product lines for local display.
+ * A partial set is never sufficient to infer a complete basket total or
+ * retailer winner. This metadata is never stored as source evidence.
+ */
+export type PrivateReviewedSourceLine = {
+  ingredientId: string
+  ingredientLabel: string
+  productId: string
+  productName: string
+  packAmount: number
+  packUnit: string
+  packCount: number
+  packagesNeeded: number
+  pricePerPackCents: number
+  unitPrice: string | null
+  review: 'manual' | 'automatic'
+}
+
 /** In-memory progress for incomplete private shopping data. Never represents
  * a priced, reviewed basket and must never become a savings authority. */
 export type PrivateCaptureProgress = {
@@ -42,6 +60,7 @@ export type PrivateCaptureProgress = {
     matchedLineCount: number
     reviewedLineCount: number
     autoMatchedLineCount: number
+    confirmedSourceLines?: PrivateReviewedSourceLine[]
     missingIngredients: { id: string; label: string }[]
     awaitingReviewIngredients: { id: string; label: string }[]
     fresh: boolean

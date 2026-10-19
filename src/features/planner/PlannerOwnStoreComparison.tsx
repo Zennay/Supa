@@ -12,6 +12,8 @@ const PlannerTwoStoreCoverage = lazy(() => import('./PlannerTwoStoreCoverage.tsx
   .then(module => ({ default: module.PlannerTwoStoreCoverage })))
 const PlannerMissingCapturePanel = lazy(() => import('./PlannerMissingCapturePanel.tsx')
   .then(module => ({ default: module.PlannerMissingCapturePanel })))
+const PlannerReviewedSourceLines = lazy(() => import('./PlannerReviewedSourceLines.tsx')
+  .then(module => ({ default: module.PlannerReviewedSourceLines })))
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
@@ -310,6 +312,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       <PlannerTwoStoreCoverage needs={captureNeeds} progress={captureProgress}
         reviewed={reviewed} now={now} comparisonStatus={summary.status}
         onOpenComparison={onOpenComparison}
+        onReviewIngredient={onReviewIngredient} />
+    </Suspense>}
+    {captureProgress && <Suspense fallback={<p role="status">Eigen producten laden…</p>}>
+      <PlannerReviewedSourceLines progress={captureProgress} now={now}
         onReviewIngredient={onReviewIngredient} />
     </Suspense>}
     {captureProgress && <div className="own-store-planner__review-download">

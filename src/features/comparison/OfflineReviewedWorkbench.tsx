@@ -1543,6 +1543,28 @@ export function OfflineReviewedWorkbench({
         matchedLineCount: basket?.matchedLineCount ?? 0,
         reviewedLineCount: perStoreReview.find(item => item.store === store)?.accepted ?? 0,
         autoMatchedLineCount: perStoreReview.find(item => item.store === store)?.autoMatched ?? 0,
+        // These original source amounts exist only after canonical matching
+        // AND the exact receipt-bound review/automatic-identity admission.
+        // Never send a partial sum upstream as an eligible basket total.
+        confirmedSourceLines: basket?.lines.flatMap(line => {
+          if (line.status !== 'matched' || !isAcceptedKey(
+            reviewedLineKey(store, capture.observedAt, line))) return []
+          if (!Number.isSafeInteger(line.pricePerPackCents) ||
+              line.pricePerPackCents < 0 ||
+              !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
+              !Number.isSafeInteger(line.lineTotalCents) ||
+              line.lineTotalCents < 0) return []
+          return [{
+            ingredientId: line.id, ingredientLabel: line.ingredientLabel,
+            productId: line.productId, productName: line.productName,
+            packAmount: line.pack.amount, packUnit: line.pack.unit,
+            packCount: line.pack.count, packagesNeeded: line.packs,
+            pricePerPackCents: line.pricePerPackCents,
+            unitPrice: privateUnitPrice(line),
+            review: isAutomaticKey(reviewedLineKey(store, capture.observedAt, line))
+              ? 'automatic' as const : 'manual' as const,
+          }]
+        }) ?? [],
         missingIngredients: basket?.lines.filter(line =>
           line.status !== 'matched')
           .map(line => ({ id: line.id, label: line.ingredientLabel })) ?? [],
