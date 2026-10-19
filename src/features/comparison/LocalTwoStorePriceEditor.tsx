@@ -290,7 +290,29 @@ export function LocalTwoStorePriceEditor({
 
   function changeRow(store: OfflineRetailer, id: string, patch: Partial<ProductDraft>, unit: string) {
     const idKey = key(store, id)
-    setRows(prev => ({ ...prev, [idKey]: { ...(prev[idKey] ?? emptyDraft(unit)), ...patch } }))
+    const prior = rows[idKey] ?? emptyDraft(unit)
+    const identityFields: (keyof ProductDraft)[] = ['sourceId', 'name', 'packAmount', 'packUnit', 'packCount']
+    const identityChanged = identityFields.some(field =>
+      Object.prototype.hasOwnProperty.call(patch, field) && patch[field] !== prior[field])
+    const hasPreviousDecision = prior.available || prior.availabilityReviewed ||
+      Boolean(prior.priceEuros.trim())
+    setRows(prev => {
+      const current = prev[idKey] ?? emptyDraft(unit)
+      const changed = identityFields.some(field =>
+        Object.prototype.hasOwnProperty.call(patch, field) && patch[field] !== current[field])
+      const updated = { ...current, ...patch }
+      // A SKU/pack edit cannot inherit the former product's availability
+      // confirmation or financial facts, even before the downstream review.
+      if (changed) {
+        updated.available = false
+        updated.availabilityReviewed = false
+        updated.priceEuros = ''
+      }
+      return { ...prev, [idKey]: updated }
+    })
+    if (identityChanged && hasPreviousDecision) {
+      setDraftStatus(`${store}: na wijziging van het bronartikel of de verpakking zijn oude prijs en beschikbaarheidsbevestiging ingetrokken. Controleer het nieuwe artikel opnieuw.`)
+    }
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
   }
   function changeTimestamp(store: OfflineRetailer, value: string) {
