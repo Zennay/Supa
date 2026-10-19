@@ -105,6 +105,17 @@ export function PlannerSourceMatchPreview({ needs, source }: {
   }
   const pendingPlus = needsForNewSource('PLUS', Date.now()).length
   const pendingDeka = needsForNewSource('DekaMarkt', Date.now()).length
+  function mobileGuideText(): string {
+    try {
+      return selectiveTwoStoreCaptureGuide({
+        PLUS: needsForNewSource('PLUS', Date.now()),
+        DekaMarkt: needsForNewSource('DekaMarkt', Date.now()),
+      })
+    } catch (cause) {
+      return cause instanceof Error ? cause.message
+        : 'Het opnameblad is onduidelijk. Controleer het geselecteerde weekmenu.'
+    }
+  }
   function downloadMissingSourceCapture(kind: 'csv' | 'csv-excel' | 'guide') {
     try {
       // Derive two distinct genuinely missing sets against the SAME selected
@@ -216,10 +227,7 @@ export function PlannerSourceMatchPreview({ needs, source }: {
       {showMobileGuide && <label className="supa-planner-source-matches__mobile-guide">
         Alle ontbrekende winkelregels met exacte CSV-rijnummers · alleen eigen Planner-behoefte
         <textarea readOnly rows={11}
-          value={selectiveTwoStoreCaptureGuide({
-            PLUS: needsForNewSource('PLUS', Date.now()),
-            DekaMarkt: needsForNewSource('DekaMarkt', Date.now()),
-          })}
+          value={mobileGuideText()}
           onFocus={event => event.currentTarget.select()}
           aria-label="Selecteer mijn ontbrekende PLUS- en Deka-producten" />
       </label>}

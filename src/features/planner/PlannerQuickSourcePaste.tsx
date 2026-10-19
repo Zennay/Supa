@@ -52,9 +52,11 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, need
   }, [preview])
   // This is not the originally cached freshness flag: a tab can stay open
   // past seven days while the original retailer capture does not change.
-  const liveAdmission = useMemo(() =>
-    preview ? parseOfflinePriceSnapshots(preview.normalized, now) : null,
-    [preview, now])
+  const liveAdmission = useMemo(() => {
+    if (!preview) return null
+    try { return parseOfflinePriceSnapshots(preview.normalized, now) }
+    catch { return null } // e.g. device clock moved back beyond source time
+  }, [preview, now])
   const revision = useRef(0)
   function changeDraft(raw: string) {
     ++revision.current
@@ -396,8 +398,12 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, need
             : Object.keys(preview.data.captures).length === 2
               ? 'Bronmomenten meer dan 24 uur uiteen: geen volledig prijsverschil mogelijk.'
               : 'Nog maar één winkelbron. De andere winkel blijft ongeprijsd.'}</p>
-        {hasDemand && needs.length > 0 && <PlannerSourceMatchPreview needs={needs}
-          source={liveAdmission ?? preview.data} />}
+        {!liveAdmission && <p role="alert">
+          De bronopname is niet geldig voor de actuele apparaatklok of invoer.
+          Controleer het bronmoment opnieuw voordat er een kandidaat kan worden voorgesteld.
+        </p>}
+        {hasDemand && needs.length > 0 && liveAdmission &&
+          <PlannerSourceMatchPreview needs={needs} source={liveAdmission} />}
         <button type="button" disabled={!hasDemand}
           onClick={handoff}>Open mijn bron in Vergelijk voor productmatching</button>
         <button type="button" className="ghost-button"
