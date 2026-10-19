@@ -8,7 +8,7 @@ import { constants } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { convertTwoStoreCsv } from '../public/offline-two-store-csv.mjs'
+import { convertTwoStoreCsv, convertOwnStoreCsv } from '../public/offline-two-store-csv.mjs'
 
 const CSV_HEADER = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 const MAX_BYTES = 256_000
@@ -96,11 +96,12 @@ function localCaptureGuidance(captures) {
 async function main() {
   const args = process.argv.slice(2)
   const pairing = args[0] === '--pair'
-  const names = pairing ? args.slice(1) : args
+  const single = args[0] === '--single'
+  const names = pairing || single ? args.slice(1) : args
   if ((!pairing && names.length !== 2) || (pairing && names.length !== 3) ||
       names.some(name => !name || name.startsWith('-'))) {
     error('Gebruik: node scripts/offline-two-store-csv-to-json.mjs samen.csv uitvoer.json ' +
-      'of --pair plus.csv deka.csv uitvoer.json')
+      'of --pair plus.csv deka.csv uitvoer.json of --single een-winkel.csv uitvoer.json')
   }
   const sources = names.slice(0, -1).map(resolve)
   const target = resolve(names.at(-1))
@@ -110,15 +111,18 @@ async function main() {
   const texts = await Promise.all(sources.map(readPrivateCsv))
   const csv = pairing ? joinPrivateStoreCsv(texts[0], texts[1]) : texts[0]
   // Keep the one existing converter as the only authority for captured-at
-  // timestamps, two retail identities, SKU uniqueness and physical prices.
-  const json = convertTwoStoreCsv(csv)
+  // timestamps, SKU uniqueness and physical prices. `--single` does not
+  // manufacture a second store or relax the two-store default mode.
+  const json = single ? convertOwnStoreCsv(csv) : convertTwoStoreCsv(csv)
   const captures = JSON.parse(json).captures
+  if (single && captures.length !== 1) error('Geef exact één winkelopname bij --single.')
   // The operator receives only row counts, never private names, amounts,
   // prices, source URLs, participant identities or an implied license.
   const counts = captures.map(capture => capture.retailer + ': ' + capture.products.length)
   await writeFile(target, json, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
   process.stdout.write('Privé CSV omgezet (' + counts.join(', ') + '). Importeer JSON in Supa → Vergelijk. Geen openbare prijsclaim.\n' +
     localCaptureGuidance(captures).join('\n') + '\n' +
+    (single ? 'Tweede winkel ontbreekt: prijsverschil onbekend tot eigen tweede bron is ingelezen.\n' : '') +
     'Prijsverschil en ontbrekende productmatches zijn pas in de gekozen Supa-week te beoordelen.\n')
 }
 
