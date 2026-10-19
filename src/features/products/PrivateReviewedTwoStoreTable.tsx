@@ -23,11 +23,36 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenCompariso
     Math.abs(plus.capturedMs - deka.capturedMs) <= 86_400_000 &&
     compareFullBaskets({ baseline: plus.basket, candidate: deka.basket }).claimable
   if (!comparable || !plus || !deka) {
+    const missing = (['PLUS', 'DekaMarkt'] as const).filter(store => !fresh?.stores[store])
+    const gap = !!plus && !!deka && Math.abs(plus.capturedMs - deka.capturedMs) > 86_400_000
     return <section className="private-reviewed-products__paired" aria-label="Winkelvergelijking van eigen artikelen">
       <h3>Vergelijk PLUS met DekaMarkt</h3>
-      <p role="status">Nog geen volledig vergelijkbaar, actueel paar. Controleer beide eigen
-        winkelopnames voor hetzelfde weekmenu binnen 24 uur. Ontbrekende prijzen blijven onbekend.</p>
-      <button type="button" onClick={onOpenComparison}>Controleer twee winkels en producten</button>
+      <div className="private-reviewed-products__source-coverage">
+        {(['PLUS', 'DekaMarkt'] as const).map(shop => {
+          const capture = fresh?.stores[shop]
+          return <article key={shop}>
+            <h4>{shop}</h4>
+            {capture ? <>
+              <strong>{money.format(capture.basket.totalCents / 100)}</strong>
+              <small>{capture.basket.lines.length} oorspronkelijke, gecontroleerde SKU-regels</small>
+              <time dateTime={capture.observedAt}>{capture.observedAt}</time>
+              <button type="button" onClick={() => onOpenList(shop)}>
+                Bekijk mijn {shop}-boodschappenlijst
+              </button>
+            </> : <>
+              <strong>Prijs onbekend</strong>
+              <small>Geen volledige, actuele en door jou gecontroleerde eigen opname.</small>
+            </>}
+          </article>
+        })}
+      </div>
+      <p role="status">{gap
+        ? 'Beide eigen winkelmandjes bestaan, maar de waarnemingen liggen meer dan 24 uur uiteen. Herzie de oudere opname; er is nog geen geldig prijsverschil.'
+        : missing.length > 0
+          ? missing.join(' en ') + ' heeft nog geen volledig bruikbare eigen prijsopname. Vul de brongegevens aan voordat Supa een prijsverschil toont.'
+          : 'Het bestaande bronpaar is nog niet betrouwbaar vergelijkbaar voor hetzelfde fysieke weekmandje. Controleer de productkoppelingen opnieuw.'}</p>
+      <button type="button" onClick={onOpenComparison}>Open bronimport en productmatching</button>
+      <small>Geen kassagarantie of onafhankelijk bewezen besparing. Een onbekende prijs is niet nul.</small>
     </section>
   }
   const dekaById = new Map(deka.basket.lines.filter((line): line is Matched =>
