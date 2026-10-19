@@ -333,6 +333,44 @@ export function LocalTwoStorePriceEditor({
     onEdit()
   }
 
+  // Re-record one store without destroying the other store’s unfinished
+  // form, timestamp, receipts or user-entered details. Only previously
+  // reviewed source identities are reused; prices and stock are never copied.
+  function prefillReviewedStore(store: OfflineRetailer) {
+    const allowedIds = new Set(activeNeeds.map(need => need.id))
+    const replacements: Record<string, ProductDraft> = {}
+    for (const [rowKey, item] of Object.entries(reviewedRecaptureSeeds)) {
+      let pair: unknown
+      try { pair = JSON.parse(rowKey) } catch { continue }
+      if (!Array.isArray(pair) || pair.length !== 2 || pair[0] !== store ||
+          typeof pair[1] !== 'string' || !allowedIds.has(pair[1])) continue
+      replacements[rowKey] = {
+        ...item, priceEuros: '', available: false, availabilityReviewed: false,
+      }
+    }
+    if (!Object.keys(replacements).length) {
+      setDraftStatus(store + ': er zijn nog geen eerder persoonlijk gecontroleerde bronartikelen beschikbaar.')
+      return
+    }
+    if (!window.confirm(
+      store + ': vervang alleen jouw conceptregels voor deze winkel door de eerder gecontroleerde ' +
+      'codes en verpakkingen? De oude prijzen, voorraadstatus en opnametijd worden gewist. ' +
+      'Alle ingevoerde regels van de andere winkel blijven bewaard.')) return
+    setRows(prev => ({
+      ...Object.fromEntries(Object.entries(prev).filter(([rowKey]) => {
+        try { const pair: unknown = JSON.parse(rowKey)
+          return !Array.isArray(pair) || pair[0] !== store
+        } catch { return true }
+      })),
+      ...replacements,
+    }))
+    setCapturedAt(prev => ({ ...prev, [store]: '' }))
+    setOutput(''); setError(''); setPreparedFor('')
+    setDraftStatus(store + ': alleen eerdere gecontroleerde bronidentiteiten hergebruikt. ' +
+      'Voer alle actuele prijzen, beschikbaarheid en het echte nieuwe bronmoment zelf opnieuw in.')
+    onEdit()
+  }
+
   function changeRow(store: OfflineRetailer, id: string, patch: Partial<ProductDraft>, unit: string) {
     const idKey = key(store, id)
     const prior = rows[idKey] ?? emptyDraft(unit)
@@ -718,6 +756,16 @@ export function LocalTwoStorePriceEditor({
           <p className="disclaimer">Suggesties voor productnamen komen alleen uit historische, prijsloze bronwaarnemingen
             van 4 oktober 2026. Controleer zelf of het product vandaag echt bestaat; er wordt nooit een
             prijs, verpakking of beschikbaarheid uit dit archief automatisch overgenomen.</p>
+          {Object.keys(reviewedRecaptureSeeds).some(rawKey => {
+            try {
+              const pair: unknown = JSON.parse(rawKey)
+              return Array.isArray(pair) && pair.length === 2 && pair[0] === store &&
+                activeNeeds.some(need => need.id === pair[1])
+            } catch { return false }
+          }) && <button type="button" className="ghost-button"
+            onClick={() => prefillReviewedStore(store)}>
+            Hergebruik mijn gecontroleerde {store}-artikelen · alleen deze winkel, zonder prijzen
+          </button>}
           <datalist id={`historical-products-${store}`}>
             {historicalRetailerProducts.filter(item => item.store === store).map(item => (
               <option key={item.id} value={item.name} label={`Historisch: ${item.pack}`} />
