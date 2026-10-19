@@ -1838,7 +1838,11 @@ export function OfflineReviewedWorkbench({
       <div id="supa-own-price-import" className="offline-price-workbench__input">
         <label>Herstel eerdere privémand-sessie van ditzelfde weekmenu (zonder oude bevestigingen)
           <input type="file" accept=".json,application/json" disabled={busy}
-            onChange={event => { void restorePortableSession(event.currentTarget.files?.[0]) }} />
+            onChange={event => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              void restorePortableSession(file)
+            }} />
         </label>
         <div className={'offline-price-workbench__dropzone' + (dropActive ? ' is-dragging' : '')}
           onDragOver={event => {
@@ -1874,7 +1878,11 @@ export function OfflineReviewedWorkbench({
         {imported && Object.keys(imported.captures).length === 1 && (
           <label>Voeg de echte opname van de andere winkel toe (CSV of JSON)
             <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
-              onChange={event => { void loadFile(event.currentTarget.files?.[0], true) }} />
+              onChange={event => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                void loadFile(file, true)
+              }} />
             <small>De al gecontroleerde oorspronkelijke winkel blijft bewaard. Nieuwe producten moet je zelf bevestigen; er wordt geen tweede winkel verzonnen.</small>
           </label>
         )}
