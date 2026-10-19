@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 
@@ -44,8 +45,7 @@ export function describePrivateStoreCaptureChange(
   }).length
   const formatCents = (item: SourceProduct): string => {
     if (!item.available || item.priceCents === null) return 'prijs onbekend / niet beschikbaar'
-    return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
-      .format(item.priceCents / 100) + ' per pak'
+    return exactEuro.formatCents(item.priceCents) + ' per pak'
   }
   const priceExamples = newCapture.products.flatMap(item => {
     const previous = original.get(item.id)

@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useState } from 'react'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
@@ -140,9 +141,7 @@ export function privateComparisonHtml(
     .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-  const money = (cents: number) => new Intl.NumberFormat('nl-NL', {
-    style: 'currency', currency: 'EUR',
-  }).format(cents / 100)
+  const money = (cents: number) => exactEuro.formatCents(cents)
   const dekaLines = new Map(deka.lines.map(line => [line.id, line] as const))
   function product(line: BasketTraceLine) {
     if (line.status === 'unresolved') return '<strong>Niet gekoppeld</strong><br><small>Prijs onbekend — handmatig kiezen</small>'

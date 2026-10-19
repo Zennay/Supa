@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
@@ -131,7 +132,6 @@ function hasPartialOwnCapture(row: ProductDraft): boolean {
   )
 }
 
-const draftEuros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 function currentDraftPackPreview(row: ProductDraft, need: { amount: number | null; unit: MatchUnit }): string | null {
   if (!isCompleteOwnPriceDraft(row) || need.amount === null || !Number.isFinite(need.amount) ||
       need.amount <= 0) return null
@@ -149,8 +149,8 @@ function currentDraftPackPreview(row: ProductDraft, need: { amount: number | nul
   const rate = privatePackUnitRate({
     amount: packAmount, unit: row.packUnit, count, priceCents,
   })
-  return packs + ' hele verpakking(en) × ' + draftEuros.format(priceCents / 100) +
-    ' = ' + draftEuros.format(total / 100) + ' voor deze ingrediëntvraag' +
+  return packs + ' hele verpakking(en) × ' + exactEuro.formatCents(priceCents) +
+    ' = ' + exactEuro.formatCents(total) + ' voor deze ingrediëntvraag' +
     (rate ? ' · ' + formatPrivateUnitRate(rate) : '')
 }
 
