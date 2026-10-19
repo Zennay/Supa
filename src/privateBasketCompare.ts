@@ -220,8 +220,9 @@ async function parseSource(): Promise<Source> {
     const first = JSON.parse(convertOwnStoreCsv(a)) as Source
     const second = JSON.parse(convertOwnStoreCsv(b)) as Source
     const captures = [...first.captures, ...second.captures]
-    if (captures.length !== 2 || captures[0].retailer === captures[1].retailer)
-      throw Error('Selecteer één echte PLUS- en één DekaMarkt-opname.')
+    if (captures.length !== 2 || captures[0].retailer !== 'PLUS' ||
+        captures[1].retailer !== 'DekaMarkt')
+      throw Error('Het bestand bij PLUS moet een PLUS-opname zijn; bij DekaMarkt een DekaMarkt-opname.')
     const composed = { schema: 'supa-offline-prices-v1', captures }
     if (new TextEncoder().encode(JSON.stringify(composed)).length > limit)
       throw Error('Twee winkelbronnen samen overschrijden 256 KB')
