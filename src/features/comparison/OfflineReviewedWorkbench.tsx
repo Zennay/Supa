@@ -861,6 +861,12 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function isSameSingleStoreCapture(preview: ReturnType<typeof describePrivateStoreCaptureChange>) {
+    return preview.previousObservedAt === preview.nextObservedAt &&
+      preview.previousCount === preview.nextCount &&
+      preview.added === 0 && preview.removed === 0 && preview.changed === 0
+  }
+
   function acceptManualSource(input: string) {
     ++importRevision.current
     setPendingReplacement(null)
@@ -872,6 +878,10 @@ export function OfflineReviewedWorkbench({
         const store = shops[0]
         if (imported.captures[store]) {
           const preview = describePrivateStoreCaptureChange(text, input, store, Date.now())
+          if (isSameSingleStoreCapture(preview)) {
+            setMessage(store + ': deze winkelopname is volledig identiek. Je gekozen producten en afvinkingen blijven behouden.')
+            return
+          }
           setPendingReplacement({ sourceText: text, newText: input, store,
             version: importRevision.current, preview })
           setMessage(store + ': bekijk eerst de bronverschillen en bevestig de vervanging. De andere winkel blijft behouden.')
@@ -1135,6 +1145,10 @@ export function OfflineReviewedWorkbench({
       // The original-price-null-sensitive comparison is purely informational.
       const preview = describePrivateStoreCaptureChange(text, json, store, Date.now())
       if (version !== importRevision.current) return
+      if (isSameSingleStoreCapture(preview)) {
+        setMessage(store + ': deze oorspronkelijke opname is identiek. Je producten en afvinkingen blijven staan.')
+        return
+      }
       setPendingReplacement({ sourceText: text, newText: json, store, version, preview })
       setMessage(store + ': nieuw bronbestand geldig gelezen. Bekijk eerst welke originele producten en prijzen wijzigen. De twee bestaande winkelopnames zijn nog niet vervangen.')
     } catch (error) {
