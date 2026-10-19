@@ -52,8 +52,27 @@ function normalizedObservation(value) {
   // A direct caller must not bypass source trust by providing a structurally
   // valid yet credential-bearing URL, impossible clock or unsafe money value.
   const origin = new URL(value.provenance.url)
+  // A decoded URL query key is case-insensitive for credential purposes:
+  // ACCESS_TOKEN, Access_Token and %41CCESS_TOKEN are the same secret marker.
+  // Keep legitimate search/page/locale parameters as pure provenance.
+  const hasCredentialQuery = [...origin.searchParams.keys()].some(key => {
+    let candidate = key
+    for (let i = 0; i < 5; i++) {
+      const normalized = candidate.normalize('NFKC')
+        .replace(/[\p{Default_Ignorable_Code_Point}\p{Mark}]/gu, '')
+        .replace(/[^a-z0-9]/giu, '').toLowerCase()
+      if (/^(?:accesstoken|refreshtoken|idtoken|apikey|bearer|authorization|oauthcode|authcode|sessionid|sessiontoken|password|passwd|clientsecret|codeverifier|signature|sig|token|secret)$/u.test(normalized)) return true
+      if (!/%[0-9a-f]{2}/iu.test(candidate)) break
+      try {
+        const decoded = decodeURIComponent(candidate)
+        if (decoded === candidate) break
+        candidate = decoded
+      } catch { return true }
+    }
+    return false
+  })
   if (origin.username || origin.password || origin.hash ||
-      origin.port || origin.searchParams.has('access_token')) {
+      origin.port || hasCredentialQuery) {
     throw new Error('Untrusted retailer capture source URL')
   }
   // Strict direct API admission: Date.parse alone normalizes impossible
