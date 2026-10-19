@@ -77,6 +77,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [shoppingOpenOnly, setShoppingOpenOnly] = useState(false)
   const [showShoppingCopy, setShowShoppingCopy] = useState(false)
   const [privateWeekMessage, setPrivateWeekMessage] = useState('')
+  const [recipeFileMessage, setRecipeFileMessage] = useState('')
   const shoppingCopy = useRef<HTMLTextAreaElement>(null)
   const [backupPreview, setBackupPreview] = useState<RecipeBackupPreview | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
@@ -137,6 +138,29 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
     } catch (cause) {
       setBackupError(cause instanceof Error ? cause.message : 'Downloaden is niet gelukt.')
+    }
+  }
+  function downloadSingleOwnRecipe(recipe: SavedRecipe) {
+    setRecipeFileMessage('')
+    try {
+      if (library.error) throw new Error(library.error)
+      if (!library.recipes.some(item => item.id === recipe.id && item === recipe)) {
+        throw new Error('Dit recept is inmiddels gewijzigd. Open de actuele versie opnieuw.')
+      }
+      // Existing portable backup envelope, not an unvalidated JSON draft.
+      const output = serializeRecipeBackup([recipe])
+      const url = URL.createObjectURL(new Blob([output], { type: 'application/json;charset=utf-8' }))
+      const link = document.createElement('a')
+      try {
+        link.href = url
+        link.download = 'supa-eigen-recept.json'
+        document.body.append(link)
+        link.click()
+        link.remove()
+        setRecipeFileMessage('Dit ene eigen recept is als privé JSON-back-up opgeslagen. Importeer het via Mijn recepten.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (cause) {
+      setRecipeFileMessage(cause instanceof Error ? cause.message : 'Kon dit recept niet exporteren.')
     }
   }
   function downloadOwnRecipeChecklist() {
@@ -494,7 +518,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <p>Onzekere hoeveelheden en gedeeltelijke stuks blijven als tekst bewaard. Corrigeer deze regels in het recept voordat je de Planner of prijsvergelijking gebruikt.</p>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>{editingId ? 'Wijzigingen opslaan' : isVariant ? 'Variant als nieuw recept opslaan' : 'Opslaan in mijn recepten'}</button></section>}
       {error && <p role="alert" className="recipe-error">{error}</p>}
     </dialog>
-    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p>{'savedAt' in selected && <><div className="recipe-detail-actions"><button type="button" onClick={() => openSavedRecipeEditor(selected)}>Bewerk mijn recept</button><button type="button" onClick={() => openSavedRecipeEditor(selected, true)}>Maak een variant</button></div>
+    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p>{'savedAt' in selected && <><div className="recipe-detail-actions"><button type="button" onClick={() => openSavedRecipeEditor(selected)}>Bewerk mijn recept</button><button type="button" onClick={() => openSavedRecipeEditor(selected, true)}>Maak een variant</button><button type="button" onClick={() => downloadSingleOwnRecipe(selected)}>Download alleen dit recept (JSON)</button></div>
+        {recipeFileMessage && <p role="status">{recipeFileMessage}</p>}
         <section className="recipe-plan-panel" aria-label="Zet eigen recept direct in de weekplanning">
           <h3>Plan dit eigen recept</h3>
           {toPlannerRecipe(selected) ? <>
