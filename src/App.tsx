@@ -645,7 +645,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {visitedList && !livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
-              <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
+              <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays} onOpenPriceImport={openOwnPriceImport} />
               {tab === 'list' && (designProductIds.length > 0
                 ? <section aria-label="Mijn expliciet toegevoegde producten">
                     <h3>Mijn toegevoegde producten · apart van receptboodschappen</h3>

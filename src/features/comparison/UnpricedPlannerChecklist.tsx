@@ -9,6 +9,7 @@ type ChecklistProps = {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
+  onOpenPriceImport?: () => void
 }
 type DemandRow = ReturnType<typeof aggregatePlanIngredients>[number]
 const unitLabels: Record<string, string> = {
@@ -31,7 +32,7 @@ const portableQuantity = (item: DemandRow) =>
  * The exact physical week demand, independent of either supermarket.
  * No sample product, inferred SKU, price, license or retailer observation.
  */
-export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: ChecklistProps) {
+export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPriceImport }: ChecklistProps) {
   const [progress, setProgress] = useState<{ identity: string; checked: Record<string, boolean> }>({ identity: '', checked: {} })
   const [backupMessage, setBackupMessage] = useState('')
   const currentDemand = useRef('')
@@ -152,6 +153,27 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
     }
   }
 
+  async function downloadUnpricedCsv() {
+    if (error || !items.length) return
+    try {
+      // Keep the spreadsheet exporter out of the ordinary offline-list bundle.
+      const { exportUnpricedPlannerCsv } = await import('./unpricedPlannerCsv.ts')
+      const csv = exportUnpricedPlannerCsv(items, checked, openOnly)
+      const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = openOnly ? 'supa-planner-nog-te-kopen-ongeprijsd.csv' :
+          'supa-planner-weekmandje-ongeprijsd.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setBackupMessage('CSV lokaal gedownload: fysieke Planner-vraag zonder verzonnen winkelproducten of prijzen.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (cause) {
+      setBackupMessage(cause instanceof Error ? cause.message : 'De ongeprijsde CSV kon niet veilig worden gemaakt.')
+    }
+  }
+
   function downloadUnpricedList() {
     if (error || !items.length) return
     const url = URL.createObjectURL(new Blob([shoppingText()], { type: 'text/plain;charset=utf-8' }))
@@ -220,6 +242,12 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
             <button type="button" className="ghost-button" onClick={downloadUnpricedList}>
               Download weekboodschappen (TXT)
             </button>
+            <button type="button" className="ghost-button" onClick={() => void downloadUnpricedCsv()}>
+              Download weekboodschappen (CSV)
+            </button>
+            {onOpenPriceImport && <button type="button" className="ghost-button" onClick={onOpenPriceImport}>
+              Vergelijk mijn weekmandje met eigen PLUS/Deka-prijzen
+            </button>}
             <button type="button" className="ghost-button" onClick={openWithCurrentDemand}>
               Neem exact weekmenu mee naar privévergelijker
             </button>
