@@ -12,6 +12,7 @@ import { m2InitialPlan } from '../../data/m2Fixture'
 import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv'
 import { toPlannerRecipe } from './plannerRecipes.ts'
+import { scaleOwnRecipe, ownRecipeId } from './scaleOwnRecipe.ts'
 import { exportOwnRecipePrivateWeek } from './exportOwnRecipePrivateWeek'
 import { RECIPE_FAVORITES_KEY, readRecipeFavorites, toggleRecipeFavorite, type RecipeFavorites } from './recipeFavorites'
 import './recipes.css'
@@ -252,6 +253,35 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         ' Gebruik de Markdown-download als alternatief.')
     }
   }
+  function savePortionVariant(recipe: SavedRecipe) {
+    setRecipeFileMessage('')
+    try {
+      if (library.error || !library.recipes.some(item => item === recipe)) {
+        throw new Error('Het recept is tussentijds gewijzigd. Open de actuele versie opnieuw.')
+      }
+      const portions = Number(shoppingPortions)
+      const draft = scaleOwnRecipe(recipe, portions)
+      const variant: SavedRecipe = {
+        ...reviewRecipe(draft), id: ownRecipeId(), savedAt: new Date().toISOString(),
+      }
+      if (library.recipes.some(item => item.id === variant.id)) {
+        throw new Error('Er is een dubbele lokale recept-ID ontstaan. Probeer opnieuw.')
+      }
+      const next = saveRecipeLibrary(window.localStorage, library, [variant, ...library.recipes])
+      const saved = next.recipes.find(item => item.id === variant.id)
+      if (!saved) throw new Error('De receptvariant is niet beschikbaar.')
+      setLibrary(next)
+      setSelected(saved)
+      setFilter('own')
+      setQuery('')
+      window.dispatchEvent(new Event('supa-recipes-changed'))
+      setRecipeFileMessage('Nieuwe ongeprijsde receptvariant voor ' + portions +
+        ' porties bewaard. Gram/ml zijn conservatief naar boven afgerond op 0,001. ' +
+        'Kies nu hieronder een Planner-dag; de winkelprijzen en matches moet je opnieuw controleren.')
+    } catch (cause) {
+      setRecipeFileMessage(cause instanceof Error ? cause.message : 'Variant maken mislukt. Het origineel is ongewijzigd.')
+    }
+  }
   function downloadOwnRecipeChecklist() {
     if (!ownShopping?.canCopy) return
     try {
@@ -484,7 +514,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       // The library's CAS write refuses newer changes from another browser tab.
       const recipe: SavedRecipe = current
         ? { ...reviewed, id: current.id, savedAt: current.savedAt }
-        : { ...reviewed, id: `own-${crypto.randomUUID()}`, savedAt: new Date().toISOString() }
+        : { ...reviewed, id: ownRecipeId(), savedAt: new Date().toISOString() }
       const entries = current
         ? library.recipes.map(item => item.id === current.id ? recipe : item)
         : [recipe, ...library.recipes]
@@ -648,6 +678,11 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <input type="number" min="1" max="100" step="1" value={shoppingPortions}
               onChange={event => { setShoppingPortions(event.target.value); setShowShoppingCopy(false); setPrivateWeekMessage(''); setShoppingChecks({}); setShoppingOpenOnly(false) }} />
           </label>
+          <button type="button" onClick={() => savePortionVariant(selected)}>
+            Maak een nieuwe Planner-receptvariant voor {shoppingPortions || '…'} porties
+          </button>
+          <small>Het originele recept blijft ongewijzigd. Bij gedeeltelijke stuks moet je de variant handmatig maken.
+            De nieuwe variant bevat geen nieuwe winkelprijzen of goedgekeurde productmatches.</small>
           {ownShopping && ownShopping.canCopy ? <>
             <div className="recipe-shopping-panel__progress">
               <strong role="status">{shoppingCompleted} van {ownShopping.lines.length} boodschappen afgevinkt</strong>
