@@ -3,7 +3,17 @@ import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 type Unit = 'g' | 'ml' | 'piece'
 type Item = { id: string; name: string; quantity: number; unit: Unit; done: boolean }
-const key = 'supa:extra-groceries-tab:v1'
+const legacyKey = 'supa:extra-groceries-tab:v1'
+// Every exact physical Planner demand has its own private tab snapshot.
+// Hash collisions cannot cross-restore: decodeSaved checks full identity.
+function storageKey(identity: string) {
+  let hash = 2166136261
+  for (let i = 0; i < identity.length; i++) {
+    hash ^= identity.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return legacyKey + ':' + (hash >>> 0).toString(16)
+}
 const valid = (x: Item) => /^[\w-]{1,100}$/.test(x.id) &&
   typeof x.name === 'string' && x.name.length > 0 && x.name.length <= 120 &&
   x.name === x.name.trim() && /[\p{L}\p{N}]/u.test(x.name) &&
@@ -34,9 +44,16 @@ function decodeSaved(raw: string, identity: string) {
 function restore(identity: string) {
   let raw: string | null = null
   try {
-    raw = sessionStorage.getItem(key)
-    if (!raw) return { items: [] as Item[], raw, locked: false }
-    return { items: decodeSaved(raw, identity), raw, locked: false }
+    raw = sessionStorage.getItem(storageKey(identity))
+    if (raw !== null) return { items: decodeSaved(raw, identity), raw, locked: false }
+    // Backward-compatible, read-only recovery of the original single-week
+    // format. Never delete the legacy record belonging to another week.
+    const legacy = sessionStorage.getItem(legacyKey)
+    if (legacy !== null) {
+      try { return { items: decodeSaved(legacy, identity), raw: null, locked: false } }
+      catch { /* Another week or corrupt legacy entry: retain it untouched. */ }
+    }
+    return { items: [] as Item[], raw: null, locked: false }
   } catch { return { items: [] as Item[], raw, locked: true } }
 }
 export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
@@ -204,10 +221,18 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   function persist() {
     if (data.locked) return
     try {
-      if (sessionStorage.getItem(key) !== data.raw) throw Error('De bewaarde lijst is gewijzigd.')
+      const scopedKey = storageKey(identity)
+      if (sessionStorage.getItem(scopedKey) !== data.raw) throw Error('De bewaarde lijst is gewijzigd.')
       const raw = JSON.stringify({ schema: 'supa-extra-v1', identity, items })
       if (new TextEncoder().encode(raw).length > 100000) throw Error('Lijst te groot.')
-      sessionStorage.setItem(key, raw)
+      sessionStorage.setItem(scopedKey, raw)
+      // Retire only the exact legacy record for THIS week after successful
+      // scoped write. Never erase another week or an unknown legacy schema.
+      const old = sessionStorage.getItem(legacyKey)
+      if (old !== null) {
+        try { decodeSaved(old, identity); if (sessionStorage.getItem(legacyKey) === old) sessionStorage.removeItem(legacyKey) }
+        catch { /* Preserve unrelated or corrupt original data. */ }
+      }
       setData(prev => ({ ...prev, raw }))
       setNotice('Extra lijst uitsluitend in dit browsertabblad bewaard.')
     } catch (e) { setNotice(e instanceof Error ? e.message : 'Bewaren mislukt.') }
@@ -442,8 +467,8 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       <button type="button" disabled={!data.raw} onClick={() => {
         if (!window.confirm('Verwijder alleen de bewaarde extra boodschappen uit dit tabblad?')) return
         try {
-          if (sessionStorage.getItem(key) !== data.raw) throw Error('changed')
-          sessionStorage.removeItem(key)
+          if (sessionStorage.getItem(storageKey(identity)) !== data.raw) throw Error('changed')
+          sessionStorage.removeItem(storageKey(identity))
           setData(prev => ({ ...prev, raw: null, locked: false }))
           setNotice('Tabopslag gewist; items blijven tijdelijk in beeld.')
         } catch { setNotice('Bewaard record gewijzigd; niets verwijderd.') }
@@ -457,8 +482,8 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
             value={preparedCopy.text} onFocus={event => event.currentTarget.select()} />
         </label>
       </div>}
-    {data.locked && <p role="alert">Bestaande extra lijst van een andere week of versie
-      is beschermd tegen overschrijven. Je huidige extra items blijven tijdelijk beschikbaar.</p>}
+    {data.locked && <p role="alert">De opgeslagen extra lijst voor deze week is niet leesbaar of is gewijzigd.
+      Het bewaarde bestand wordt niet overschreven.</p>}
     {notice && <p role="status">{notice}</p>}
   </section>
 }
