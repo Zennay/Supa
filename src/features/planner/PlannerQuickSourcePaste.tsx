@@ -6,6 +6,17 @@ type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
 const limit = 256000
 const dateText = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
+async function normalizedOwnSource(raw: string): Promise<string> {
+  if (/^\s*\{/u.test(raw)) return raw
+  const moduleUrl = import.meta.env.BASE_URL + 'offline-two-store-csv.mjs'
+  const converter: unknown = await import(/* @vite-ignore */ moduleUrl)
+  if (!converter || typeof converter !== 'object' ||
+      !('convertOwnStoreCsv' in converter) ||
+      typeof converter.convertOwnStoreCsv !== 'function')
+    throw new Error('De bestaande lokale CSV-converter ontbreekt.')
+  return (converter.convertOwnStoreCsv as (input: string) => string)(raw)
+}
+
 /** Local preview using the same converter and source contract as Vergelijk. */
 export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
   onImport: (files: File[]) => void
@@ -31,16 +42,7 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
     }
     setBusy(true)
     try {
-      let normalized = raw
-      if (!/^\s*\{/u.test(raw)) {
-        const moduleUrl = import.meta.env.BASE_URL + 'offline-two-store-csv.mjs'
-        const converter: unknown = await import(/* @vite-ignore */ moduleUrl)
-        if (!converter || typeof converter !== 'object' ||
-            !('convertOwnStoreCsv' in converter) ||
-            typeof converter.convertOwnStoreCsv !== 'function')
-          throw new Error('De bestaande lokale CSV-converter ontbreekt.')
-        normalized = (converter.convertOwnStoreCsv as (input: string) => string)(raw)
-      }
+      const normalized = await normalizedOwnSource(raw)
       if (ticket !== revision.current) return
       const data = parseOfflinePriceSnapshots(normalized, Date.now())
       setPreview({ raw, normalized, data })
@@ -70,6 +72,52 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
       await inspectSource(raw)
     } catch {
       if (ticket === revision.current) setMessage('Bronbestand moet geldige UTF-8 CSV, TSV of JSON bevatten.')
+    } finally {
+      if (ticket === revision.current) setBusy(false)
+    }
+  }
+
+  async function previewFiles(files: File[]) {
+    if (files.length === 1) { await previewOneFile(files[0]); return }
+    if (files.length !== 2) {
+      setMessage('Selecteer één of twee echte winkelbestanden.')
+      return
+    }
+    const ticket = ++revision.current
+    setPreview(null); setMessage(''); setBusy(true)
+    try {
+      const captures: unknown[] = []
+      const seen = new Set<string>()
+      for (const file of files) {
+        if (file.size === 0 || file.size > limit)
+          throw new Error('Elk bestand moet gevuld en maximaal 256 kB zijn.')
+        const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+        if (ticket !== revision.current) return
+        const normalized = await normalizedOwnSource(raw)
+        if (ticket !== revision.current) return
+        const source = parseOfflinePriceSnapshots(normalized, Date.now())
+        const names = Object.keys(source.captures)
+        if (names.length !== 1)
+          throw new Error('Twee bestanden moeten elk precies één winkel bevatten.')
+        if (seen.has(names[0]))
+          throw new Error('Beide bestanden zijn dezelfde winkel. Kies PLUS én DekaMarkt.')
+        seen.add(names[0])
+        const input = JSON.parse(normalized) as { captures: unknown[] }
+        if (!Array.isArray(input.captures) || input.captures.length !== 1)
+          throw new Error('Originele winkelopname niet herkenbaar.')
+        captures.push(input.captures[0])
+      }
+      const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures })
+      if (new TextEncoder().encode(combined).length > limit)
+        throw new Error('Gecombineerde winkelbestanden zijn groter dan 256 kB.')
+      const data = parseOfflinePriceSnapshots(combined, Date.now())
+      if (ticket !== revision.current) return
+      setDraft(combined)
+      setPreview({ raw: combined, normalized: combined, data })
+      setMessage('Twee originele winkelbestanden lokaal gecombineerd voor preview. Alle SKU’s en bronmomenten blijven ongewijzigd.')
+    } catch (cause) {
+      if (ticket === revision.current)
+        setMessage(cause instanceof Error ? cause.message : 'Twee winkelbronnen niet herkend.')
     } finally {
       if (ticket === revision.current) setBusy(false)
     }
@@ -116,14 +164,14 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
         Supa-kolommen als CSV, puntkomma-CSV of tabgescheiden spreadsheet, of
         eigen JSON met één of beide winkels. Alles wordt lokaal gecontroleerd:
         een geldige import bewijst geen bronrechten of actuele winkelprijzen.</p>
-      <label>Of bekijk eerst één eigen CSV-, TSV- of JSON-bestand
-        <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json"
+      <label>Of bekijk eerst één of twee eigen CSV-, TSV- of JSON-bestanden
+        <input type="file" multiple accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json"
           onChange={event => {
-            const file = event.currentTarget.files?.[0]
+            const files = Array.from(event.currentTarget.files ?? [])
             event.currentTarget.value = ''
-            void previewOneFile(file)
+            if (files.length) void previewFiles(files)
           }} />
-        <small>Een bestand met beide winkels mag ook. Twee aparte bestanden selecteer je bovenaan met de directe bestandskiezer.</small>
+        <small>Eén bestand mag beide winkels bevatten; twee aparte bestanden moeten ieder precies één verschillende winkel bevatten.</small>
       </label>
       <button type="button" className="ghost-button" onClick={() => void pasteClipboard()}>
         Plak uit mijn klembord
