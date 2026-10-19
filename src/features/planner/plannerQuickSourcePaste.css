@@ -38,3 +38,15 @@
   max-width: 100%;
   padding: .45rem 0;
 }
+
+.supa-planner-source-paste__separate {
+  display: grid; gap: .4rem; padding: 1rem; border: 1px solid #a7c4ad;
+  border-radius: 10px; background: #fff; margin: .8rem 0;
+}
+.supa-planner-source-paste__separate strong { font-weight: 700; }
+@media (min-width: 780px) {
+  .supa-planner-source-paste__separate { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .supa-planner-source-paste__separate > strong,
+  .supa-planner-source-paste__separate > p,
+  .supa-planner-source-paste__separate > button { grid-column: 1 / -1; }
+}

@@ -26,6 +26,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand }: {
 }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
+  const [separateDrafts, setSeparateDrafts] = useState({ PLUS: '', DekaMarkt: '' })
   const [preview, setPreview] = useState<Preview | null>(null)
   const [busy, setBusy] = useState(false)
   const [dropActive, setDropActive] = useState(false)
@@ -126,6 +127,57 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand }: {
     }
   }
 
+  function changeSeparateDraft(store: 'PLUS' | 'DekaMarkt', raw: string) {
+    ++revision.current
+    setSeparateDrafts(previous => ({ ...previous, [store]: raw }))
+    setPreview(null)
+    setMessage('Winkelbron gewijzigd. Controleer beide originele bronnen opnieuw.')
+  }
+
+  // Each paste is checked as an original single-retailer capture first.
+  async function inspectSeparateDrafts() {
+    const ticket = ++revision.current
+    setPreview(null); setMessage(''); setBusy(true)
+    try {
+      const provided = (['PLUS', 'DekaMarkt'] as const)
+        .filter(store => separateDrafts[store].trim().length > 0)
+      if (!provided.length) throw new Error('Plak eerst PLUS en/of DekaMarkt-bronregels.')
+      const captures: unknown[] = []
+      let singleNormalized = ''
+      for (const store of provided) {
+        const raw = separateDrafts[store]
+        if (new TextEncoder().encode(raw).length > limit)
+          throw new Error(store + ': maximaal 256 kB aan originele bronregels.')
+        const normalized = await normalizedOwnSource(raw)
+        if (ticket !== revision.current) return
+        const checked = parseOfflinePriceSnapshots(normalized, Date.now())
+        if (Object.keys(checked.captures).length !== 1 || !checked.captures[store])
+          throw new Error(store + ': bron bevat niet precies deze winkel. Controleer de originele retailer-ID.')
+        const original = JSON.parse(normalized) as { captures?: unknown[] }
+        if (!Array.isArray(original.captures) || original.captures.length !== 1)
+          throw new Error(store + ': originele opname niet herkenbaar.')
+        captures.push(original.captures[0])
+        singleNormalized = normalized
+      }
+      const normalized = provided.length === 1 ? singleNormalized
+        : JSON.stringify({ schema: 'supa-offline-prices-v1', captures })
+      if (new TextEncoder().encode(normalized).length > limit)
+        throw new Error('Gecombineerde winkelbronnen zijn groter dan 256 kB.')
+      const data = parseOfflinePriceSnapshots(normalized, Date.now())
+      if (ticket !== revision.current) return
+      setDraft(normalized)
+      setPreview({ raw: normalized, normalized, data })
+      setMessage(provided.length === 2
+        ? 'Twee originele bronnen lokaal gecombineerd. Controleer de SKU’s en bronmomenten in Vergelijk.'
+        : provided[0] + ' lokaal herkend; de andere winkel blijft ongeprijsd.')
+    } catch (cause) {
+      if (ticket === revision.current)
+        setMessage(cause instanceof Error ? cause.message : 'Winkelbronnen niet herkend.')
+    } finally {
+      if (ticket === revision.current) setBusy(false)
+    }
+  }
+
   async function pasteClipboard() {
     const ticket = ++revision.current
     setPreview(null); setMessage('')
@@ -210,6 +262,23 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand }: {
           }} />
         <small>Eén bestand mag beide winkels bevatten; twee aparte bestanden moeten ieder precies één verschillende winkel bevatten.</small>
       </label>
+      </div>
+      <div className="supa-planner-source-paste__separate">
+        <strong>Heb je twee losse spreadsheetselecties? Plak ze per winkel.</strong>
+        <p>De winkelidentiteit moet in de originele negen kolommen staan. Supa voegt
+          alleen gecontroleerde winkelopnames samen; prijzen blijven ongeverifieerd
+          tot je de producten en verpakkingen in Vergelijk beoordeelt.</p>
+        {(['PLUS', 'DekaMarkt'] as const).map(store => <label key={store}>
+          {store} — eigen CSV-, TSV- of JSON-bron
+          <textarea rows={4} spellCheck={false} value={separateDrafts[store]}
+            placeholder="retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available"
+            onChange={event => changeSeparateDraft(store, event.target.value)} />
+        </label>)}
+        <button type="button" disabled={busy ||
+          (!separateDrafts.PLUS.trim() && !separateDrafts.DekaMarkt.trim())}
+          onClick={() => void inspectSeparateDrafts()}>
+          Controleer losse winkelbronnen en maak één import
+        </button>
       </div>
       <button type="button" className="ghost-button" onClick={() => void pasteClipboard()}>
         Plak uit mijn klembord
