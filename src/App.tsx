@@ -44,6 +44,11 @@ const PlannerPortableWeek = lazy(() =>
     .then(module => ({ default: module.PlannerPortableWeek }))
 )
 
+const OwnSourceProductLibrary = lazy(() =>
+  import('./features/products/OwnSourceProductLibrary.tsx')
+    .then(module => ({ default: module.OwnSourceProductLibrary }))
+)
+
 const PlannerActualTwoStoreSummary = lazy(() =>
   import('./features/planner/PlannerActualTwoStoreSummary.tsx')
     .then(module => ({ default: module.PlannerActualTwoStoreSummary }))
@@ -545,6 +550,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       </header>}
 
       <div className="content">
+        {tab === 'products' && (
+          <Suspense fallback={<p role="status">Mijn eigen bronartikelen openen…</p>}>
+            <OwnSourceProductLibrary
+              source={offlinePriceSession.imported}
+              baskets={importedPair}
+              nowMs={sourceClock}
+              onCompare={() => navigate('basket')}
+              onList={(shop) => {
+                offlinePriceSession.setSelectedStore(shop)
+                navigate('list')
+              }}
+            />
+          </Suspense>
+        )}
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} onPlanRecipe={planOwnRecipe} priceSession={offlinePriceSession}
           privateSummary={privateHomeSummary ?? undefined} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
