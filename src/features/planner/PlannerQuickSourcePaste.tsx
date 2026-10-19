@@ -178,6 +178,8 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       const data = parseOfflinePriceSnapshots(result.normalized, Date.now())
       if (ticket !== revision.current) return
       setDraft(result.normalized)
+      // Do not retain a second raw copy of the just-ingested private source.
+      setUpdateDraft('')
       setPreview({ raw: result.normalized, normalized: result.normalized, data })
       setMessage(result.retailer + ': originele nieuwere winkelopname ' +
         (result.action === 'replaced' ? 'vervangt de oudere opname' : 'is toegevoegd') +
