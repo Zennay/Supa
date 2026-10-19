@@ -101,7 +101,37 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
     }
   }
 
-  return <details className="supa-reviewed-source-lines" open={expanded}
+  return <div className="supa-reviewed-source-lines__wrapper">
+    {pairs.length > 0 && <section className="supa-reviewed-source-lines__peek"
+      aria-label="Voorlopige prijsverschillen op bevestigde productregels">
+      <header>
+        <div>
+          <strong>{pairs.length} ingrediënten met bevestigde prijzen bij beide winkels</strong>
+          <p>Alleen dezelfde fysieke behoefte, originele bronmomenten maximaal 24 uur uiteen.
+            Dit zijn <strong>losse regelprijzen, geen mandtotaal of winkelwinnaar</strong>.
+            Overige producten en kosten zijn onbekend.</p>
+        </div>
+        <button type="button" className="ghost-button" onClick={() => setExpanded(true)}>
+          Bekijk alle bronproducten
+        </button>
+      </header>
+      <div className="supa-reviewed-source-lines__peek-grid">
+        {pairs.slice(0, 3).map(({ one, other, difference }) =>
+          <article key={one.ingredientId}>
+            <strong>{one.ingredientLabel} · {one.requiredAmount} {one.requiredUnit}</strong>
+            <small>PLUS · {one.productName} · SKU {one.productId}</small>
+            <span>{one.packagesNeeded} pak(ken) · {eur.format(one.lineTotalCents / 100)}</span>
+            <small>DekaMarkt · {other.productName} · SKU {other.productId}</small>
+            <span>{other.packagesNeeded} pak(ken) · {eur.format(other.lineTotalCents / 100)}</span>
+            <strong>{difference === 0 ? 'Gelijke bevestigde regelprijs' :
+              eur.format(Math.abs(difference) / 100) + ' op deze regel ' +
+                (difference > 0 ? 'lager bij PLUS' : 'lager bij DekaMarkt')}</strong>
+          </article>)}
+      </div>
+      {pairs.length > 3 && <small>En {pairs.length - 3} andere controleerbare
+        regelverschillen. De totale winkelprijs blijft onbekend tot beide mandjes compleet zijn.</small>}
+    </section>}
+    <details className="supa-reviewed-source-lines" open={expanded}
     onToggle={event => setExpanded(event.currentTarget.open)}>
     <summary>{entries.length} gekoppelde bronproducten en eenheidsprijzen bekijken</summary>
     {expanded && <>
@@ -168,5 +198,6 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
         </article>)}
       </div>
     </>}
-  </details>
+    </details>
+  </div>
 }
