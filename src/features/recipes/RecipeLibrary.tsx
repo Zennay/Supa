@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
-import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
+import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { importPlainTextRecipe } from './importPlainTextRecipe'
+import { ownRecipeAsMarkdown } from './ownRecipeMarkdown'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { m2InitialPlan } from '../../data/m2Fixture'
@@ -89,6 +90,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const detail = useRef<HTMLDialogElement>(null)
   const request = useRef<AbortController | null>(null)
   const saving = useRef(false)
+  const editingBaseline = useRef<{ id: string; raw: string } | null>(null)
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
     const refresh = (event: StorageEvent) => {
@@ -100,6 +102,35 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     }
     window.addEventListener('storage', refresh)
     return () => window.removeEventListener('storage', refresh)
+  }, [])
+  useEffect(() => {
+    const refreshOwnRecipes = (event: StorageEvent) => {
+      if (event.key !== RECIPE_LIBRARY_KEY && event.key !== null) return
+      if (event.storageArea && event.storageArea !== window.localStorage) return
+      const next = initialLibrary()
+      backupReadVersion.current += 1
+      setBackupBusy(false)
+      setBackupPreview(null)
+      setLibrary(next)
+      const editing = editingBaseline.current
+      if (editing && JSON.stringify(next.recipes.find(recipe => recipe.id === editing.id) ?? null) !== editing.raw) {
+        setPreview(null)
+        setError('Dit recept is in een ander tabblad gewijzigd of verwijderd. Open de actuele versie opnieuw voordat je opslaat; je huidige invoer blijft zichtbaar.')
+      }
+      setSelected(previous => {
+        if (!previous || !('savedAt' in previous)) return previous
+        const current = next.recipes.find(recipe => recipe.id === previous.id)
+        if (!current) {
+          queueMicrotask(() => detail.current?.close())
+          return null
+        }
+        return JSON.stringify(current) === JSON.stringify(previous) ? previous : current
+      })
+      setMessage(next.error ??
+        'Je eigen recepten zijn bijgewerkt vanuit een ander tabblad. De Planner leest de actuele recepten.')
+    }
+    window.addEventListener('storage', refreshOwnRecipes)
+    return () => window.removeEventListener('storage', refreshOwnRecipes)
   }, [])
   const matches = (r: { id: string; title: string }) => r.title.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) && (filter !== 'favorites' || favorites.includes(r.id))
   const demo = filter === 'own' ? [] : examples.filter(matches)
@@ -161,6 +192,42 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (cause) {
       setRecipeFileMessage(cause instanceof Error ? cause.message : 'Kon dit recept niet exporteren.')
+    }
+  }
+  function currentMarkdown(recipe: SavedRecipe): string {
+    const current = library.recipes.find(item => item.id === recipe.id)
+    if (!current || current !== recipe || library.error) {
+      throw new Error('Dit recept is gewijzigd. Open de actuele versie opnieuw om het te delen.')
+    }
+    return ownRecipeAsMarkdown(current)
+  }
+  function downloadOwnRecipeMarkdown(recipe: SavedRecipe) {
+    setRecipeFileMessage('')
+    try {
+      const markdown = currentMarkdown(recipe)
+      const uri = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-eigen-recept.md'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setRecipeFileMessage('Recept als leesbare privé-Markdown opgeslagen. Je kunt dit opnieuw importeren via gewone recepttekst; er zijn geen winkelprijzen toegevoegd.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch (cause) {
+      setRecipeFileMessage(cause instanceof Error ? cause.message : 'Recept exporteren mislukt.')
+    }
+  }
+  async function copyOwnRecipeMarkdown(recipe: SavedRecipe) {
+    setRecipeFileMessage('')
+    try {
+      const markdown = currentMarkdown(recipe)
+      if (!navigator.clipboard?.writeText) throw new Error('Klembord is niet beschikbaar.')
+      await navigator.clipboard.writeText(markdown)
+      setRecipeFileMessage('Recepttekst gekopieerd, zonder prijs- of besparingsclaims.')
+    } catch (cause) {
+      setRecipeFileMessage((cause instanceof Error ? cause.message : 'Kopiëren mislukt.') +
+        ' Gebruik de Markdown-download als alternatief.')
     }
   }
   function downloadOwnRecipeChecklist() {
@@ -277,15 +344,17 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   }
   function openEditor(next: 'manual' | 'url' | 'paste' | 'plain') {
     pasteReadVersion.current++; setPasteFileMessage('')
+    editingBaseline.current = null
     request.current?.abort(); setBusy(false); setMode(next); setForm(blank); setSource(null); setUrl(''); setPastedSource(''); setPreview(null); setError(''); setEditingId(null); setIsVariant(false); saving.current = false
     setBackupPreview(null)
     editor.current?.showModal()
   }
-  function closeEditor() { pasteReadVersion.current++; request.current?.abort(); setBusy(false); editor.current?.close(); setEditingId(null); setIsVariant(false) }
+  function closeEditor() { editingBaseline.current = null; pasteReadVersion.current++; request.current?.abort(); setBusy(false); editor.current?.close(); setEditingId(null); setIsVariant(false) }
   function openSavedRecipeEditor(recipe: SavedRecipe, duplicate = false) {
     if (library.error) { setMessage(library.error); return }
     request.current?.abort()
     setBusy(false); saving.current = false
+    editingBaseline.current = duplicate ? null : { id: recipe.id, raw: JSON.stringify(recipe) }
     setEditingId(duplicate ? null : recipe.id); setIsVariant(duplicate)
     setMode('manual')
     setForm({
@@ -384,7 +453,11 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     try {
       const reviewed = reviewRecipe(preview)
       const current = editingId ? library.recipes.find(recipe => recipe.id === editingId) : null
-      if (editingId && !current) throw new Error('Dit recept bestaat niet meer. Herlaad de recepten voordat je verdergaat.')
+      if (editingId && (!current || !editingBaseline.current ||
+          editingBaseline.current.id !== editingId ||
+          JSON.stringify(current) !== editingBaseline.current.raw)) {
+        throw new Error('Dit recept is tussentijds gewijzigd of verwijderd. Open de actuele versie opnieuw voordat je opslaat; je invoer blijft staan.')
+      }
       // Keep the identity of a recipe already referenced by the weekly Planner.
       // The library's CAS write refuses newer changes from another browser tab.
       const recipe: SavedRecipe = current
@@ -518,7 +591,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {preview && <section className="recipe-review"><h3>Zo wordt je recept bewaard</h3><ul>{keyed(preview.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.amount !== null ? `${i.amount} ${i.unit === 'piece' ? 'stuks' : i.unit} ${i.label}` : i.original}{i.reviewReason && <small> · {i.reviewReason}</small>}</li>)}</ul>{preview.warnings.length > 0 && <p>Onzekere hoeveelheden en gedeeltelijke stuks blijven als tekst bewaard. Corrigeer deze regels in het recept voordat je de Planner of prijsvergelijking gebruikt.</p>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>{editingId ? 'Wijzigingen opslaan' : isVariant ? 'Variant als nieuw recept opslaan' : 'Opslaan in mijn recepten'}</button></section>}
       {error && <p role="alert" className="recipe-error">{error}</p>}
     </dialog>
-    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p>{'savedAt' in selected && <><div className="recipe-detail-actions"><button type="button" onClick={() => openSavedRecipeEditor(selected)}>Bewerk mijn recept</button><button type="button" onClick={() => openSavedRecipeEditor(selected, true)}>Maak een variant</button><button type="button" onClick={() => downloadSingleOwnRecipe(selected)}>Download alleen dit recept (JSON)</button></div>
+    <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p>{'savedAt' in selected && <><div className="recipe-detail-actions"><button type="button" onClick={() => openSavedRecipeEditor(selected)}>Bewerk mijn recept</button><button type="button" onClick={() => openSavedRecipeEditor(selected, true)}>Maak een variant</button><button type="button" onClick={() => downloadSingleOwnRecipe(selected)}>Download alleen dit recept (JSON)</button><button type="button" onClick={() => downloadOwnRecipeMarkdown(selected)}>Download recept als Markdown</button><button type="button" onClick={() => void copyOwnRecipeMarkdown(selected)}>Kopieer recepttekst</button></div>
         {recipeFileMessage && <p role="status">{recipeFileMessage}</p>}
         <section className="recipe-plan-panel" aria-label="Zet eigen recept direct in de weekplanning">
           <h3>Plan dit eigen recept</h3>
