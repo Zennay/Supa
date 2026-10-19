@@ -127,3 +127,17 @@
   border-radius: 8px;
   overflow-wrap: anywhere;
 }
+.own-store-planner__targeted-combined {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  align-items: center;
+  padding: .9rem;
+  border-radius: 12px;
+  background: #eff7f1;
+  border: 1px solid #a8c7ae;
+}
+.own-store-planner__targeted-combined > strong,
+.own-store-planner__targeted-combined > span,
+.own-store-planner__targeted-combined > small { flex: 1 1 100%; }
+.own-store-planner__targeted-combined button { flex: 1 1 210px; }

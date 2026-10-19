@@ -178,6 +178,46 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage(cause instanceof Error ? cause.message : 'Mobiele meeneemlijst niet beschikbaar.')
     }
   }
+  async function downloadCombinedMissingCapture(kind: 'csv' | 'csv-excel' | 'guide') {
+    setDownloadMessage('')
+    try {
+      const fingerprint = captureFingerprint
+      const byStore = {
+        PLUS: missingCaptureFor('PLUS', Date.now()),
+        DekaMarkt: missingCaptureFor('DekaMarkt', Date.now()),
+      }
+      if (!byStore.PLUS.length && !byStore.DekaMarkt.length) {
+        throw new Error('Er zijn geen ontbrekende winkelproducten. Bevestig bestaande SKU’s in Vergelijk.')
+      }
+      const { selectiveTwoStoreCaptureCsv, selectiveTwoStoreCaptureGuide } =
+        await import('./selectiveTwoStoreCapture.ts')
+      const content = kind === 'guide'
+        ? selectiveTwoStoreCaptureGuide(byStore)
+        : selectiveTwoStoreCaptureCsv(byStore, kind === 'csv-excel' ? ';' : ',')
+      if (latestCaptureFingerprint.current !== fingerprint ||
+          JSON.stringify(byStore) !== JSON.stringify({
+            PLUS: missingCaptureFor('PLUS', Date.now()),
+            DekaMarkt: missingCaptureFor('DekaMarkt', Date.now()),
+          })) throw new Error('Je weekmenu of winkelbron is gewijzigd. Download het actuele blad opnieuw.')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'guide' ? 'text/plain;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-plus-deka-alleen-ontbrekende-producten' +
+          (kind === 'csv-excel' ? '-spreadsheet.csv' :
+            kind === 'guide' ? '-meeneemlijst.txt' : '.csv')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setDownloadMessage('Een gecombineerd leeg blad voor ' + byStore.PLUS.length +
+        ' PLUS- en ' + byStore.DekaMarkt.length + ' DekaMarkt-producten is lokaal gedownload. ' +
+        'De originele weekvraag blijft gelijk en ontbrekende bronprijzen blijven onbekend.')
+    } catch (cause) {
+      setDownloadMessage(cause instanceof Error ? cause.message : 'Het gecombineerde invulblad is niet beschikbaar.')
+    }
+  }
   async function downloadMissingCaptureFor(store: CaptureStore, kind: 'csv' | 'csv-excel' | 'guide' | 'print') {
     setDownloadMessage('')
     try {
@@ -373,6 +413,24 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
         <strong>Alleen ontbrekende producten aanvullen</strong>
         <p>Vul ontbrekende bronproducten opnieuw in zonder de complete week over te schrijven.
           Nog niet bevestigde SKU’s controleer je direct in Vergelijk.</p>
+        {(missingCaptureFor('PLUS').length > 0 || missingCaptureFor('DekaMarkt').length > 0) &&
+          <div className="own-store-planner__targeted-combined" aria-label="Eén opnameblad voor beide winkels">
+            <strong>Beide winkels in één invulbestand</strong>
+            <span>{missingCaptureFor('PLUS').length} ontbrekende PLUS-producten ·
+              {' '}{missingCaptureFor('DekaMarkt').length} ontbrekende DekaMarkt-producten</span>
+            <button type="button" className="ghost-button" onClick={() => void downloadCombinedMissingCapture('csv')}>
+              Download gecombineerd importeerbaar CSV
+            </button>
+            <button type="button" className="ghost-button" onClick={() => void downloadCombinedMissingCapture('csv-excel')}>
+              Gecombineerd spreadsheet-CSV (puntkomma)
+            </button>
+            <button type="button" className="ghost-button" onClick={() => void downloadCombinedMissingCapture('guide')}>
+              Download één bijbehorende rijgids (TXT)
+            </button>
+            <small>De winkels mogen verschillende aantallen lege regels hebben.
+              De gids vermeldt exact welke rij bij welk Planner-ingrediënt hoort.
+              Importeer het ingevulde bestand via de bestaande Vergelijk-knop.</small>
+          </div>}
         {stores.map(store => {
           const pending = missingCaptureFor(store)
           return <div key={store} className="own-store-planner__targeted-store">
