@@ -25,3 +25,7 @@
 .own-store-planner__mix-preview { margin-top: 18px; padding: 14px; background: #f4f7f4; border-radius: 12px; }
 .own-store-planner__mix-preview h4 { margin: 0 0 8px; font-size: 1rem; }
 .own-store-planner__mix-preview p { margin: 6px 0 12px; }
+
+.own-store-planner__start { padding: 14px; margin-top: 16px; border: 1px dashed #b7c8b9; border-radius: 12px; background: #f8faf8; }
+.own-store-planner__start p { line-height: 1.55; }
+.own-store-planner__start button { min-height: 44px; }

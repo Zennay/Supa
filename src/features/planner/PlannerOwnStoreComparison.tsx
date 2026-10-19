@@ -9,9 +9,10 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelect, onOpenComparison, onOpenList }: {
+export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList }: {
   reviewed: PrivateReviewedBaskets | null
   preferred: OwnStore
+  hasDemand: boolean
   budget: number
   onSelect: (store: OwnStore) => void
   onOpenComparison: () => void
@@ -41,12 +42,11 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelec
       setDownloadMessage(error instanceof Error ? error.message : 'Download is niet gelukt.')
     }
   }
-  if (!summary.available.length) return null
   return <section className="own-store-planner" aria-labelledby="own-store-planner-heading">
     <header className="own-store-planner__header">
       <div><span className="eyebrow">Eigen gecontroleerde winkelopnames</span>
         <h3 id="own-store-planner-heading">Jouw weekmand per winkel</h3></div>
-      <button type="button" className="ghost-button" onClick={onOpenComparison}>Controleer bronartikelen</button>
+      <button type="button" className="ghost-button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>
     </header>
     <div className="own-store-planner__cards">
       {stores.map(store => {
@@ -68,6 +68,19 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelec
         </div>
       })}
     </div>
+    {summary.status === 'missing' && summary.available.length === 0 && <div className="own-store-planner__start" role="status">
+      <strong>Prijsverschil onbekend · nog geen gecontroleerde winkelmandjes</strong>
+      {hasDemand ? <>
+        <p>Je weekmenu is de basis. Vul voor PLUS en DekaMarkt alleen echt verkregen
+          productgegevens, verpakkingen, beschikbaarheid, pakprijzen en bronmomenten in.
+          Bevestig vervolgens per ingrediënt de originele bronartikelen. Zonder beide
+          volledig gecontroleerde mandjes wordt geen prijsverschil berekend.</p>
+        <button type="button" className="ghost-button" onClick={onOpenComparison}>
+          Start met eigen winkelprijsdata
+        </button>
+      </> : <p>Kies eerst minstens één maaltijd in je Planner-weekmenu.
+        Daarna kun je de benodigde producten bij de twee winkels invoeren en vergelijken.</p>}
+    </div>}
     {summary.status === 'comparable'
       ? <div className="own-store-planner__result" role="status">
           <strong>{summary.cheapest === null ? 'Beide eigen mandjes hebben hetzelfde totaal.'
@@ -94,7 +107,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelec
           </div>}
           <PlannerOwnProductDeltas lines={summary.lines} />
         </div>
-      : <div className="own-store-planner__result" role="status">
+      : summary.available.length > 0 ? <div className="own-store-planner__result" role="status">
           <strong>Geen betrouwbaar twee-winkelprijsverschil</strong>
           <p>{summary.status === 'missing'
             ? 'Voor dezelfde Planner-week ontbreekt nog een volledig, persoonlijk gecontroleerd mandje bij de andere winkel.'
@@ -102,7 +115,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelec
               ? 'De bronmomenten liggen meer dan 24 uur uit elkaar. Maak een nieuwe opname voordat je prijzen vergelijkt.'
               : 'De fysieke hoeveelheden, verpakkingen of mandregels zijn niet gelijkwaardig bevestigd. Herzie de matches in Vergelijk.'}</p>
           <button type="button" className="ghost-button" onClick={onOpenComparison}>Vul ontbrekende brongegevens aan</button>
-        </div>}
+        </div> : null}
     {downloadMessage && <p role="status" aria-live="polite">{downloadMessage}</p>}
   </section>
 }
