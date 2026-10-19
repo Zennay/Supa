@@ -684,6 +684,16 @@ export function OfflineReviewedWorkbench({
       const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures: sources })
       const admitted = parseOfflinePriceSnapshots(combined, Date.now())
       if (version !== importRevision.current) return
+      if (imported && !window.confirm(
+        'Je hebt al eigen winkeldata geladen. Vervang beide huidige winkelopnames en ' +
+        'wis alle eerdere productbevestigingen en afvinkingen door deze twee nieuwe originele bestanden? ' +
+        'PLUS: ' + admitted.captures.PLUS!.products.length + ' bronartikelen; DekaMarkt: ' +
+        admitted.captures.DekaMarkt!.products.length + ' bronartikelen. ' +
+        'Je kunt eerst je oorspronkelijke brondata downloaden om ze te bewaren.')) {
+        setMessage('Nieuwe twee-winkelimport geannuleerd. Beide eerdere winkelopnames en beoordelingen blijven behouden.')
+        return
+      }
+      if (version !== importRevision.current) return
       setText(combined)
       setImported(admitted)
       setReviewedLines({})
@@ -830,6 +840,16 @@ export function OfflineReviewedWorkbench({
         // Only after canonical admission may it revoke previous human
         // selections. Invalid files leave the prior exact data untouched.
         const admitted = parseOfflinePriceSnapshots(content, Date.now())
+        if (version !== importRevision.current) return
+        if (imported && !window.confirm(
+          'Vervang je bestaande eigen winkelopname(s) met dit ' +
+          (isCsv ? 'CSV-' : 'JSON-') + 'bestand? De vorige bronprijzen, ' +
+          'productreviews en boodschappenafvinkingen worden hierbij ingetrokken; ' +
+          'bewaar eerst desgewenst je oorspronkelijke privébron.')) {
+          setMessage('Nieuwe bronimport geannuleerd. Je eerdere winkelopnames en productkeuzes blijven behouden.')
+          return
+        }
+        if (version !== importRevision.current) return
         setText(content)
         setImported(admitted)
         setReviewedLines({})
