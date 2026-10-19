@@ -447,10 +447,12 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : mode === 'paste' ? 'Receptgegevens lokaal plakken' : mode === 'plain' ? 'Recepttekst lokaal importeren' : editingId ? 'Mijn recept aanpassen' : isVariant ? 'Receptvariant maken' : 'Eigen recept toevoegen'}</h2>
       {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('plain'); setError('') }}>Plak gewone recepttekst</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
         : mode === 'plain' ? <form className="recipe-form" onSubmit={importPlainText}>
-          <p>Plak een gewone recepttekst, bijvoorbeeld van een pagina zonder JSON-LD.
-            Gebruik een titel, Porties: 2, Tijd: 20 minuten en de koppen Ingrediënten:
-            en Bereiding:. De omzetting blijft lokaal. Elke hoeveelheid moet je daarna controleren.</p>
-          <label>Of kies een lokaal tekstbestand (.txt, maximaal 500 kB)
+          <p>Plak een zelf verkregen recept, ook als Markdown uit een notitie of website.
+            Koppen als Ingrediënten, Benodigdheden, Bereiding of Zo maak je het worden herkend,
+            net als lijstjes en genummerde stappen. Porties en tijd zijn optioneel;
+            ontbrekende of onduidelijke hoeveelheden blijven ter controle staan.
+            De omzetting blijft lokaal, zonder website- of prijsverzoek.</p>
+          <label>Of kies een lokaal tekst- of Markdownbestand (.txt of .md, maximaal 500 kB)
             <input type="file" accept=".txt,.md,text/plain,text/markdown"
               onChange={event => { void loadLocalRecipeSource(event.currentTarget.files?.[0], 'plain'); event.currentTarget.value = '' }} />
           </label>
