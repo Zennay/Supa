@@ -13,12 +13,13 @@ type Cell = { kind: 'ready' | 'reviewed' | 'review' | 'missing' | 'source' | 'ex
  * remains unknown; neither readiness nor a unit price is a savings claim. */
 function cellFor(
   store: OwnStore, id: string, progress: PrivateCaptureProgress | null,
-  reviewed: PrivateReviewedBaskets | null, now: number,
+  reviewed: PrivateReviewedBaskets | null,
+  admitted: PrivateReviewedBaskets | null, now: number,
 ): Cell {
   // Re-evaluate the original nanosecond timestamp, the physical rows and the
   // whole-pack ledger for each export action. An old React prop is no longer
   // enough to call an otherwise visible store "ready".
-  const receipt = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', now)?.stores[store]
+  const receipt = admitted?.stores[store]
   if (receipt) return { kind: 'ready', text: 'Heel mandje gecontroleerd' }
   if (reviewed?.stores[store]) return {
     kind: 'expired', text: 'Bron verlopen of mandregels gewijzigd: controle vereist',
@@ -66,9 +67,13 @@ export function PlannerTwoStoreCoverage({
   const samePlan = !progress || !reviewed || progress.planKey === reviewed.planKey
   const safeReviewed = samePlan ? reviewed : null
   const safeProgress = samePlan ? progress : null
+  // Revalidate each complete source only ONCE per render/CSV generation.
+  // Repeating its whole-pack calculation for each of up to 1,000 ingredient
+  // cells would turn the progress view into a quadratic UI bottleneck.
+  const admitted = freshReviewedBaskets(safeReviewed, safeReviewed?.planKey ?? '', now)
   const items = needs.map(need => ({
     need,
-    cells: STORES.map(store => cellFor(store, need.id, safeProgress, safeReviewed, now)),
+    cells: STORES.map(store => cellFor(store, need.id, safeProgress, safeReviewed, admitted, now)),
   }))
   const ready = STORES.map((_, index) => items.filter(item =>
     ['ready', 'reviewed'].includes(item.cells[index].kind)).length)
@@ -84,9 +89,12 @@ export function PlannerTwoStoreCoverage({
     return cell.kind !== 'ready' && cell.kind !== 'reviewed'
   })
   function exportRows(at: number): CoverageExportLine[] {
+    // A previously rendered tab may have crossed its freshness boundary.
+    // Recheck before emitting the private, locally downloadable status list.
+    const current = freshReviewedBaskets(safeReviewed, safeReviewed?.planKey ?? '', at)
     return needs.map(need => {
-      const plus = cellFor('PLUS', need.id, safeProgress, safeReviewed, at)
-      const deka = cellFor('DekaMarkt', need.id, safeProgress, safeReviewed, at)
+      const plus = cellFor('PLUS', need.id, safeProgress, safeReviewed, current, at)
+      const deka = cellFor('DekaMarkt', need.id, safeProgress, safeReviewed, current, at)
       return {
         ingredientId: need.id, ingredient: need.label, demand: amountText(need),
         plusStatus: plus.text,
