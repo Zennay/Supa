@@ -188,6 +188,20 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       setActionMessage('Geen geldige, beperkte selectie voor export. Kies eerst fysieke ingrediënten.')
     }
   }
+  async function copyActionList() {
+    setActionMessage('')
+    try {
+      const output = actionListText()
+      if (!navigator.clipboard?.writeText) throw new Error('Klembord niet beschikbaar')
+      await navigator.clipboard.writeText(output)
+      setActionMessage('Je geselecteerde privé-SKU-controles zijn gekopieerd. Er zijn geen bronprijzen gewijzigd of bevestigd.')
+    } catch {
+      // No clipboard permissions on many mobile browsers / local previews.
+      // Display the EXACT same safe formatter output as selectable plain text.
+      setShowActionList(true)
+      setActionMessage('Klembord geweigerd of niet beschikbaar. Selecteer de privé-controlelijst hieronder.')
+    }
+  }
   const needsForNewSource = (store: 'PLUS' | 'DekaMarkt',
     nowMs: number): PlannerCaptureGuideNeed[] => {
     const capture = source.captures[store]
@@ -400,6 +414,10 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       <button type="button" className="ghost-button" onClick={downloadActionList}
         disabled={!filtered.length}>
         Download deze SKU-controles als privé TXT
+      </button>
+      <button type="button" className="ghost-button" disabled={!filtered.length}
+        onClick={() => { void copyActionList() }}>
+        Kopieer geselecteerde SKU-controles direct
       </button>
       <button type="button" className="ghost-button" disabled={!filtered.length}
         aria-expanded={showActionList} onClick={() => setShowActionList(value => !value)}>
