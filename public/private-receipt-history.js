@@ -196,6 +196,8 @@ let readSerial=0
 $('compare').addEventListener('click',async()=>{
   const serial=++readSerial
   $('result').hidden=true
+  $('summary').replaceChildren(); $('rows').replaceChildren()
+  $('context').textContent=''
   localTextExport=null; $('download').disabled=true
   const a=$('old').files?.[0], b=$('new').files?.[0]
   if (!a || !b){$('status').textContent='Kies eerst twee eigen JSON-rapporten.';return}
@@ -213,6 +215,18 @@ $('compare').addEventListener('click',async()=>{
     if(serial===readSerial)$('status').textContent=
       'Deze rapporten zijn niet veilig vergelijkbaar. Controleer volgorde, bronmomenten, fysieke ingrediënten, SKU’s, verpakkingen en bedragen. De oorspronkelijke bestanden blijven intact.'
   }finally{if(serial===readSerial)$('compare').disabled=false}
+})
+// Choosing a different local file invalidates all previously displayed
+// figures AND any in-flight read. A late File.text() completion cannot restore
+// an old price document after the picker now shows another file.
+for (const id of ['old','new']) $(id).addEventListener('change',()=>{
+  ++readSerial
+  localTextExport=null; $('download').disabled=true
+  $('compare').disabled=false
+  $('result').hidden=true
+  $('summary').replaceChildren(); $('rows').replaceChildren()
+  $('context').textContent=''
+  $('status').textContent='Bestand gewijzigd. Kies opnieuw Vergelijk om de nieuwe bronrapporten te lezen.'
 })
 $('download').addEventListener('click',()=>{
   if (localTextExport === null) return
