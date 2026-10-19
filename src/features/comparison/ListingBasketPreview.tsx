@@ -35,6 +35,8 @@ export function ListingBasketPreview() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<PriceFilter>('all')
   const [sort, setSort] = useState<'original' | 'difference'>('original')
+  const [copyText, setCopyText] = useState<string | null>(null)
+  const [copyStatus, setCopyStatus] = useState('')
 
   const listing = source.lines
   const rows = useMemo(() => {
@@ -55,6 +57,32 @@ export function ListingBasketPreview() {
   const delta = candidate - baseline
   const cheapStore = delta >= 0 ? 'PLUS' : 'DekaMarkt'
 
+  function makeListText() {
+    return [
+      'SUPA — PLUS / DekaMarkt · bewaarde vergelijking',
+      ...listing.map(line => [
+        line.canonicalDemandLabel,
+        `PLUS ${line.plus.referencePackText}: ${euro.formatCents(line.plus.listingBasketLineTotalCents)}`,
+        `DekaMarkt ${line.dekamarkt.referencePackText}: ${euro.formatCents(line.dekamarkt.listingBasketLineTotalCents)}`,
+      ].join(' | ')),
+      `Totaal PLUS: ${euro.formatCents(baseline)}`,
+      `Totaal DekaMarkt: ${euro.formatCents(candidate)}`,
+      'Referentie 17 oktober 2026 — bedragen per gekozen hele verpakkingen',
+    ].join('\\n')
+  }
+
+  async function copyList() {
+    const text = makeListText()
+    setCopyText(text)
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Kopiëren niet ondersteund')
+      await navigator.clipboard.writeText(text)
+      setCopyStatus('Overzicht gekopieerd. Je kunt het nu delen of bewaren.')
+    } catch {
+      setCopyStatus('Selecteer de tekst hieronder en kopieer handmatig.')
+    }
+  }
+
   return (
     <section className="listing-basket" aria-labelledby="listing-basket-title">
       <header>
@@ -71,6 +99,14 @@ export function ListingBasketPreview() {
         <strong>{delta === 0 ? 'Beide winkels zijn even duur' : `${cheapStore} is ${euro.formatCents(Math.abs(delta))} goedkoper`}</strong>
         <span>voor precies deze geselecteerde verpakkingen</span>
       </p>
+      <div className="listing-basket__share">
+        <button type="button" onClick={copyList}>Kopieer de complete boodschappenvergelijking</button>
+        {copyStatus && <p role="status">{copyStatus}</p>}
+        {copyText !== null && <details><summary>Bekijk en selecteer het overzicht</summary>
+          <textarea readOnly aria-label="Kopieerbaar PLUS en DekaMarkt overzicht" value={copyText} rows={11}
+            onFocus={event => event.currentTarget.select()} />
+        </details>}
+      </div>
       <p className="listing-basket__source-note">
         Bewaarde prijsvergelijking van 17 oktober 2026. Geen automatische actuele winkelprijzen;
         niet gekoppeld aan je persoonlijke weekmenu. Verpakkingsgroottes en varianten kunnen verschillen.
