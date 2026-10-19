@@ -91,6 +91,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isVariant, setIsVariant] = useState(false)
   const [shoppingPortions, setShoppingPortions] = useState('2')
+  const [portionVariantPreview, setPortionVariantPreview] = useState<{
+    sourceId: string; sourceSnapshot: string; portions: number; draft: UserRecipeDraft
+  } | null>(null)
   const [plannerDay, setPlannerDay] = useState(m2InitialPlan[0].day)
   const [shoppingChecks, setShoppingChecks] = useState<Record<string, boolean>>({})
   const [shoppingOpenOnly, setShoppingOpenOnly] = useState(false)
@@ -253,6 +256,23 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         ' Gebruik de Markdown-download als alternatief.')
     }
   }
+  function previewPortionVariant(recipe: SavedRecipe) {
+    setPortionVariantPreview(null)
+    setRecipeFileMessage('')
+    try {
+      if (library.error || !library.recipes.some(item => item === recipe)) {
+        throw new Error('Dit recept is inmiddels veranderd. Open de actuele versie opnieuw.')
+      }
+      const portions = Number(shoppingPortions)
+      const draft = scaleOwnRecipe(recipe, portions)
+      setPortionVariantPreview({
+        sourceId: recipe.id, sourceSnapshot: JSON.stringify(recipe), portions, draft,
+      })
+      setRecipeFileMessage('Bekijk de hoeveelheden. Er is nog niets opgeslagen.')
+    } catch (cause) {
+      setRecipeFileMessage(cause instanceof Error ? cause.message : 'Kan deze porties niet veilig omrekenen.')
+    }
+  }
   function savePortionVariant(recipe: SavedRecipe) {
     setRecipeFileMessage('')
     try {
@@ -260,7 +280,15 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         throw new Error('Het recept is tussentijds gewijzigd. Open de actuele versie opnieuw.')
       }
       const portions = Number(shoppingPortions)
+      if (!portionVariantPreview || portionVariantPreview.sourceId !== recipe.id ||
+          portionVariantPreview.sourceSnapshot !== JSON.stringify(recipe) ||
+          portionVariantPreview.portions !== portions) {
+        throw new Error('Deze portiepreview is verlopen. Controleer de hoeveelheden opnieuw.')
+      }
       const draft = scaleOwnRecipe(recipe, portions)
+      if (JSON.stringify(draft) !== JSON.stringify(portionVariantPreview.draft)) {
+        throw new Error('De hoeveelheden zijn gewijzigd. Bekijk de preview opnieuw.')
+      }
       const variant: SavedRecipe = {
         ...reviewRecipe(draft), id: ownRecipeId(), savedAt: new Date().toISOString(),
       }
@@ -271,6 +299,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       const saved = next.recipes.find(item => item.id === variant.id)
       if (!saved) throw new Error('De receptvariant is niet beschikbaar.')
       setLibrary(next)
+      setPortionVariantPreview(null)
       setSelected(saved)
       setFilter('own')
       setQuery('')
@@ -676,11 +705,30 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <p>Maak een ongeprijsde lijst voor het gewenste aantal porties. Stuks die niet heel uitkomen, moet je zelf beoordelen.</p>
           <label>Gewenste porties
             <input type="number" min="1" max="100" step="1" value={shoppingPortions}
-              onChange={event => { setShoppingPortions(event.target.value); setShowShoppingCopy(false); setPrivateWeekMessage(''); setShoppingChecks({}); setShoppingOpenOnly(false) }} />
+              onChange={event => { setShoppingPortions(event.target.value); setPortionVariantPreview(null); setShowShoppingCopy(false); setPrivateWeekMessage(''); setShoppingChecks({}); setShoppingOpenOnly(false) }} />
           </label>
-          <button type="button" onClick={() => savePortionVariant(selected)}>
-            Maak een nieuwe Planner-receptvariant voor {shoppingPortions || '…'} porties
+          <button type="button" onClick={() => previewPortionVariant(selected)}>
+            Bekijk hoeveelheden voor Planner-variant ({shoppingPortions || '…'} porties)
           </button>
+          {portionVariantPreview?.sourceId === selected.id &&
+            portionVariantPreview.sourceSnapshot === JSON.stringify(selected) &&
+            portionVariantPreview.portions === Number(shoppingPortions) && (
+            <div className="recipe-backup-panel__review" role="group"
+              aria-label="Controleer alle hoeveelheden vóór bewaren">
+              <strong>Nieuwe variant: {portionVariantPreview.draft.title}</strong>
+              <p>Deze hoeveelheden worden ongeprijsd bewaard. Productmatching blijft apart.</p>
+              <ul>{portionVariantPreview.draft.ingredients.map((ingredient, index) =>
+                <li key={index}>{ingredient.original}</li>)}</ul>
+              <div className="recipe-backup-panel__actions">
+                <button type="button" onClick={() => savePortionVariant(selected)}>
+                  Bevestig en bewaar deze variant
+                </button>
+                <button type="button" onClick={() => {
+                  setPortionVariantPreview(null); setRecipeFileMessage('Geen variant opgeslagen.')
+                }}>Annuleer</button>
+              </div>
+            </div>
+          )}
           <small>Het originele recept blijft ongewijzigd. Bij gedeeltelijke stuks moet je de variant handmatig maken.
             De nieuwe variant bevat geen nieuwe winkelprijzen of goedgekeurde productmatches.</small>
           {ownShopping && ownShopping.canCopy ? <>
