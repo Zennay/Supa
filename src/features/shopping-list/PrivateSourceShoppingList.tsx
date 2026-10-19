@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { BasketTraceLine, RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, privateReviewedPairWithin24Hours, type OwnStore, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { extraGroceriesSavedEvent, readSavedExtrasForPlan } from '../comparison/ownExtraGroceriesStorage.ts'
 import { privatePhysicalShoppingTick } from './privatePhysicalShoppingTick.ts'
@@ -115,7 +115,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   const plus = reviewed.stores.PLUS
   const deka = reviewed.stores.DekaMarkt
   const paired = !!plus && !!deka &&
-    Math.abs(plus.capturedMs - deka.capturedMs) <= 86400000
+    privateReviewedPairWithin24Hours(plus, deka)
   const comparison = paired
     ? compareFullBaskets({ baseline: plus!.basket, candidate: deka!.basket }) : null
   const pairReady = paired && comparison?.claimable === true && !!plus && !!deka
@@ -131,7 +131,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
     const current = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
     if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
         current.stores.PLUS !== plus || current.stores.DekaMarkt !== deka ||
-        Math.abs(current.stores.PLUS.capturedMs - current.stores.DekaMarkt.capturedMs) > 86400000) return false
+        !privateReviewedPairWithin24Hours(current.stores.PLUS, current.stores.DekaMarkt)) return false
     return compareFullBaskets({ baseline: plus!.basket, candidate: deka!.basket }).claimable
   }
   const budgetCents = Number.isFinite(budget) ? Math.round(budget * 100) : null
@@ -420,7 +420,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
             <button type="button" disabled={store === name} onClick={() => {
               const current = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
               if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
-                  Math.abs(current.stores.PLUS.capturedMs - current.stores.DekaMarkt.capturedMs) > 86400000 ||
+                  !privateReviewedPairWithin24Hours(current.stores.PLUS, current.stores.DekaMarkt) ||
                   !compareFullBaskets({
                     baseline: current.stores.PLUS.basket,
                     candidate: current.stores.DekaMarkt.basket,
