@@ -155,7 +155,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setShowShoppingCopy(true)
     }
   }
-  function planOwnRecipe(recipe: SavedRecipe) {
+  function planOwnRecipe(recipe: SavedRecipe, destination: 'planner' | 'basket' = 'planner') {
     if (library.error || !toPlannerRecipe(recipe)) {
       setMessage('Controleer eerst alle metrische hoeveelheden en hele stuks in dit recept.')
       return
@@ -163,7 +163,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     if (!m2InitialPlan.some(meal => meal.day === plannerDay)) return
     const accepted = window.dispatchEvent(new CustomEvent('supa-plan-own-recipe', {
       cancelable: true,
-      detail: { recipeId: recipe.id, day: plannerDay },
+      detail: { recipeId: recipe.id, day: plannerDay, destination },
     }))
     if (!accepted) {
       setPrivateWeekMessage('Dit recept is niet meer geldig beschikbaar voor Planner. Herlaad je eigen recepten en controleer het opnieuw.')
@@ -457,6 +457,11 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <button type="button" onClick={() => planOwnRecipe(selected)}>
               Zet {selected.title} op {plannerDay} in Planner
             </button>
+            <button type="button" onClick={() => planOwnRecipe(selected, 'basket')}>
+              Plan dit recept en open mijn winkelvergelijking
+            </button>
+            <small>De vergelijking gebruikt alleen zelf ingevoerde en opnieuw gecontroleerde winkelprijzen.
+              Ontbrekende of verlopen prijzen blijven onbekend. Geen JSON-export nodig.</small>
             {privateWeekMessage && <p role="status">{privateWeekMessage}</p>}
           </> : <p>Controleer eerst de hoeveelheid, metrische eenheid en eventuele gedeeltelijke stuks.
             Pas daarna kun je dit recept zonder gokwerk plannen.</p>}

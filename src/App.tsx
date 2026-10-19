@@ -235,7 +235,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         event.preventDefault()
         return
       }
-      const { recipeId, day } = detail as { recipeId?: unknown; day?: unknown }
+      const { recipeId, day, destination } = detail as {
+        recipeId?: unknown; day?: unknown; destination?: unknown
+      }
       if (typeof recipeId !== 'string' || typeof day !== 'string' ||
           !m2InitialPlan.some(meal => meal.day === day)) {
         event.preventDefault()
@@ -259,7 +261,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             [...current.activeDays, day],
           recipeByDay: { ...current.recipeByDay, [day]: recipeId },
         }))
-        navigate('planner')
+        // Explicit recipe-to-price navigation reuses the existing local
+        // source-import flow. Re-keying the plan invalidates any old retailer
+        // matching; no sample or stale price is carried to the new recipe.
+        if (destination === 'basket') {
+          navigate('basket')
+          setOwnPriceImportSignal(value => value + 1)
+        } else {
+          navigate('planner')
+        }
       } catch {
         // Never switch planning or use example prices after storage failure.
         event.preventDefault()
