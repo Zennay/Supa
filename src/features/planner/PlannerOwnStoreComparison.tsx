@@ -421,7 +421,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     </header>
     {hasDemand && <Suspense fallback={<p role="status">Lokale plakimport laden…</p>}>
       <PlannerQuickSourcePaste onImport={onImportSourceFiles} hasDemand={hasDemand}
-        needs={captureNeeds}
+        needs={captureNeeds} onReviewIngredient={onReviewIngredient}
         onRecapture={store => {
           setCaptureTarget(store)
           window.requestAnimationFrame(() =>

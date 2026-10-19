@@ -23,9 +23,10 @@ async function normalizedOwnSource(raw: string): Promise<string> {
 }
 
 /** Local preview using the same converter and source contract as Vergelijk. */
-export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, needs }: {
+export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredient, hasDemand, needs }: {
   onImport: (files: File[]) => void
   onRecapture: (store: 'PLUS' | 'DekaMarkt') => void
+  onReviewIngredient?: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
   hasDemand: boolean
   needs: readonly PlannerCaptureGuideNeed[]
 }) {
@@ -258,7 +259,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, need
     }
   }
 
-  function handoff() {
+  function handoff(focus?: { store: 'PLUS' | 'DekaMarkt'; ingredientId: string }) {
     if (!preview || preview.raw !== draft) return
     try {
       const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
@@ -270,7 +271,14 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, need
       const file = new File([preview.normalized], 'supa-eigen-winkelbron.json',
         { type: 'application/json' })
       if (file.size > limit) throw new Error('Genormaliseerde bron te groot.')
+      if (focus && (!current.captures[focus.store] ||
+          !recentOwnCaptureInstant(current.captures[focus.store]!.observedAt, Date.now()))) {
+        throw new Error('De gekozen winkelopname is niet actueel. Vernieuw eerst je echte bron.')
+      }
       onImport([file])
+      // Existing App review intent merely focuses an ingredient after the
+      // canonical Workbench import. It does not approve a price or source.
+      if (focus) onReviewIngredient?.(focus.store, focus.ingredientId)
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Importeren niet mogelijk.')
     }
@@ -403,9 +411,12 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, need
           Controleer het bronmoment opnieuw voordat er een kandidaat kan worden voorgesteld.
         </p>}
         {hasDemand && needs.length > 0 && liveAdmission &&
-          <PlannerSourceMatchPreview needs={needs} source={liveAdmission} />}
+          <PlannerSourceMatchPreview needs={needs} source={liveAdmission}
+            onReviewIngredient={onReviewIngredient
+              ? (store, ingredientId) => handoff({ store, ingredientId })
+              : undefined} />}
         <button type="button" disabled={!hasDemand}
-          onClick={handoff}>Open mijn bron in Vergelijk voor productmatching</button>
+          onClick={() => handoff()}>Open mijn bron in Vergelijk voor productmatching</button>
         <button type="button" className="ghost-button"
           onClick={downloadCanonicalPreview}>
           Download mijn gecombineerde winkelbron als lokaal JSON-bestand

@@ -18,3 +18,5 @@
 .supa-planner-source-matches__controls input[type=search],
 .supa-planner-source-matches__controls select { width: 100%; min-width: 0; min-height: 44px; font: inherit; padding: .45rem; }
 .supa-planner-source-matches__controls .supa-planner-source-matches__check { display: flex; gap: .5rem; align-items: center; font-weight: 400; }
+
+.supa-planner-source-matches__row [role=cell] button { display: block; margin-top: .55rem; min-height: 40px; width: 100%; white-space: normal; text-align: left; }

@@ -23,9 +23,10 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const sourceDate = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
 /** Unconfirmed, read-only candidate hints. Canonical Workbench approves totals. */
-export function PlannerSourceMatchPreview({ needs, source }: {
+export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient }: {
   needs: readonly PlannerCaptureGuideNeed[]
   source: OfflinePriceSnapshots
+  onReviewIngredient?: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
 }) {
   const [showAll, setShowAll] = useState(false)
   const [onlyMissing, setOnlyMissing] = useState(false)
@@ -315,6 +316,12 @@ export function PlannerSourceMatchPreview({ needs, source }: {
             : manualReview[store]
               ? 'Meerdere geschikte SKU’s: kies de juiste originele verpakking zelf in Vergelijk'
               : 'Geen geschikte geprijsde SKU in deze bron; ontbrekende bron vastleggen'}
+          {onReviewIngredient && source.captures[store] &&
+            recentOwnCaptureInstant(source.captures[store]!.observedAt, Date.now()) &&
+            <button type="button" className="ghost-button"
+              onClick={() => onReviewIngredient(store, need.id)}>
+              Controleer deze {store}-SKU in Vergelijk
+            </button>}
         </span>)}
       </div>)}
     </div>
