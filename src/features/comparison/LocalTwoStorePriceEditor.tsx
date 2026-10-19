@@ -316,14 +316,21 @@ export function LocalTwoStorePriceEditor({
       'Neem alleen eerder door jou gecontroleerde bronartikelen, codes en verpakkingen over? Het huidige invoerconcept wordt vervangen. Prijzen, beschikbaarheid en nieuwe opnametijden blijven leeg.')) return
     const replacements: Record<string, ProductDraft> = {}
     const included = new Set<OfflineRetailer>()
+    const allowedIds = new Set(activeNeeds.map(need => need.id))
     for (const [rowKey, item] of seeds) {
-      const pair: unknown = JSON.parse(rowKey)
-      if (!Array.isArray(pair) || (pair[0] !== 'PLUS' && pair[0] !== 'DekaMarkt')) continue
+      let pair: unknown
+      try { pair = JSON.parse(rowKey) } catch { continue }
+      if (!Array.isArray(pair) || pair.length !== 2 ||
+          (pair[0] !== 'PLUS' && pair[0] !== 'DekaMarkt') ||
+          typeof pair[1] !== 'string' || !allowedIds.has(pair[1])) continue
       const store = pair[0] as OfflineRetailer
       included.add(store)
-      replacements[rowKey] = { ...item, priceEuros: '', available: false }
+      replacements[rowKey] = { ...item, priceEuros: '', available: false, availabilityReviewed: false }
     }
-    if (!included.size) return
+    if (!included.size) {
+      setDraftStatus('Er zijn geen eerder persoonlijk gecontroleerde bronartikelen voor deze exacte Planner-week.')
+      return
+    }
     setRows(replacements)
     setCapturedAt({ PLUS: '', DekaMarkt: '' })
     setSourceSelection(included.size === 2 ? 'both' : [...included][0])
