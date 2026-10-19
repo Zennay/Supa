@@ -12,8 +12,10 @@ export function offlinePriceJsonToCsv(text) {
   }
   const source = JSON.parse(text)
   if (!record(source) || !only(source, ['schema', 'captures']) ||
-      source.schema !== 'supa-offline-prices-v1' ||
-      !Array.isArray(source.captures) || source.captures.length !== 2) {
+      !Array.isArray(source.captures) || !(
+        (source.schema === 'supa-offline-prices-v1' && source.captures.length === 2) ||
+        (source.schema === 'supa-private-single-store-prices-v1' && source.captures.length === 1)
+      )) {
     throw Error('Ongeldig Supa prijsbronformaat')
   }
   const seen = new Set()
@@ -40,7 +42,7 @@ export function offlinePriceJsonToCsv(text) {
         p.priceCents ?? '', p.available ? 'true' : 'false'].map(cell).join(','))
     }
   }
-  if (seen.size !== STORES.size) throw Error('Twee winkelbronnen vereist')
+  if (seen.size !== source.captures.length) throw Error('Winkelbronnen ongeldig')
   const csv = rows.join('\n') + '\n'
   if (new TextEncoder().encode(csv).length > 256000) throw Error('Eigen bron te groot')
   return csv

@@ -74,6 +74,14 @@ Je kunt ook een eerder door Supa gegenereerd **eigen `supa-offline-prices-v1` JS
 node --experimental-strip-types scripts/offline-local-basket-comparison.mjs --prices-json eigen-prijzen.json vraag.json mand.html
 ```
 
+Heb je nog maar **één echte winkelopname**? Maak toch een lokaal HTML-overzicht met werkelijke productregels, hele verpakkingen en indicatieve eenheidsprijzen. De tweede winkel en ieder prijsverschil blijven **onbekend**:
+
+```sh
+node --experimental-strip-types scripts/offline-local-basket-comparison.mjs --single een-winkel.csv vraag.json mand-onvolledig.html
+```
+
+`--prices-json` ondersteunt ook één reeds bestaande `supa-private-single-store-prices-v1`-opname. De standaard tweewinkelroute blijft strikt en verlangt twee echte opnames; er wordt geen tweede winkelbron verzonnen en niets opgehaald.
+
 Een ongeldig of verrijkt JSON-bronbestand wordt afgewezen. Er wordt niets automatisch opgevraagd, genormaliseerd naar fictieve prijzen of geüpload.
 
 Als de eigen opname al in één CSV met beide winkels staat:
