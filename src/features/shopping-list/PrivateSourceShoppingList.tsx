@@ -5,7 +5,7 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
-import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
+import { createMixedStoreShoppingPlan, type MixedStoreLine } from '../comparison/mixedStoreShoppingPlan.ts'
 import './privateSourceShoppingList.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -52,14 +52,26 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   // approval of a price. A fresh reviewed price-only correction may update the
   // displayed cents without losing purchased-quantity progress in this session.
   // Week, store, SKU, quantity, pack, or matched state change -> a new key.
-  const tick = (line: BasketTraceLine) => JSON.stringify([
-    reviewed.planKey, store, basket.store.id, line.id, line.status,
-    line.ingredientLabel, line.requirement.amount, line.requirement.unit,
-    line.status === 'matched' ? [
-      line.productId, line.productName, line.packs,
-      line.pack.amount, line.pack.unit, line.pack.count,
-    ] : null,
-  ])
+  const physicalTick = (name: OwnStore, shopId: string, line: BasketTraceLine) =>
+    JSON.stringify([
+      reviewed.planKey, name, shopId, line.id, line.status,
+      line.ingredientLabel, line.requirement.amount, line.requirement.unit,
+      line.status === 'matched' ? [
+        line.productId, line.productName, line.packs,
+        line.pack.amount, line.pack.unit, line.pack.count,
+      ] : null,
+    ])
+  const tick = (line: BasketTraceLine) => physicalTick(store, basket.store.id, line)
+  const isSingleCheckedOnRoute = (item: MixedStoreLine): boolean => {
+    const source = reviewed.stores[item.store]
+    const line = source?.basket.lines.find(entry => entry.id === item.id)
+    if (!source || !line || line.status !== 'matched' ||
+        line.productId !== item.productId || line.productName !== item.productName ||
+        line.packs !== item.packs || line.pack.amount !== item.packAmount ||
+        line.pack.unit !== item.packUnit || line.pack.count !== item.packCount ||
+        line.requirement.amount !== item.amount || line.requirement.unit !== item.unit) return false
+    return checked[physicalTick(item.store, source.basket.store.id, line)] === true
+  }
   const doneCount = basket.lines.filter(line => checked[tick(line)]).length
   const remainingCents = basket.lines.reduce((sum, line) =>
     sum + (line.status === 'matched' && !checked[tick(line)] ? line.lineTotalCents : 0), 0)
@@ -340,7 +352,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               plus={plus.basket} deka={deka.basket}
               captured={{ PLUS: plus.observedAt, DekaMarkt: deka.observedAt }}
               eligibleNow={pairCurrentNow} weekBudget={budget}
-              plannerPlan={plan} plannerRecipes={recipes} plannerActiveDays={activeDays} />
+              plannerPlan={plan} plannerRecipes={recipes} plannerActiveDays={activeDays}
+              isSingleCheckedOnRoute={isSingleCheckedOnRoute} />
           </Suspense>}
         </div>
       </section>}

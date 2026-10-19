@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import type { MixedStoreShoppingPlan, MixedStore } from './mixedStoreShoppingPlan.ts'
+import type { MixedStoreShoppingPlan, MixedStore, MixedStoreLine } from './mixedStoreShoppingPlan.ts'
 import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
 import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
@@ -18,7 +18,7 @@ const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
  */
 export function MixedStoreShoppingCard({
   mixed, single, plus, deka, captured, eligibleNow, weekBudget,
-  plannerPlan, plannerRecipes, plannerActiveDays,
+  plannerPlan, plannerRecipes, plannerActiveDays, isSingleCheckedOnRoute,
 }: {
   mixed: MixedStoreShoppingPlan
   single: MixedStoreShoppingPlan
@@ -30,6 +30,7 @@ export function MixedStoreShoppingCard({
   plannerPlan?: PlannedMeal[]
   plannerRecipes?: RecipeWithIngredients[]
   plannerActiveDays?: string[]
+  isSingleCheckedOnRoute?: (line: MixedStoreLine) => boolean
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [onlyOpen, setOnlyOpen] = useState(false)
@@ -93,6 +94,35 @@ export function MixedStoreShoppingCard({
     (sum, store) => sum + perStoreProgress[store].remainingCents, 0)
   const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents, onlyOpen)
   const block = costInvalid && !chooseSingle
+
+  function importSingleStoreChecks() {
+    if (!isSingleCheckedOnRoute || !eligibleNow()) {
+      setMessage('Open een geldige eigen winkelbron voordat je afvinkingen overneemt.')
+      return
+    }
+    const candidates = plan.lines.filter(line => isSingleCheckedOnRoute(line) && !done(line.key))
+    if (!candidates.length) {
+      setMessage('Geen nieuwe passende afvinkingen uit je eigen één-winkellijsten beschikbaar.')
+      return
+    }
+    if (!window.confirm('Voeg ' + candidates.length +
+      ' afgevinkte artikelen uit je eigen gecontroleerde winkellijsten toe aan deze route?' +
+      ' Alleen exact dezelfde winkel, SKU, verpakking en hoeveelheid gelden; geen prijsgoedkeuring.')) return
+    if (!eligibleNow()) {
+      setMessage('De bronopnames zijn gewijzigd of verlopen. Controleer ze opnieuw.')
+      return
+    }
+    const current = plan.lines.filter(line => isSingleCheckedOnRoute(line) && !done(line.key))
+    if (current.length !== candidates.length ||
+        current.some((line, index) => line.key !== candidates[index].key)) {
+      setMessage('De lijst is ondertussen gewijzigd. Herhaal het overnemen.')
+      return
+    }
+    setChecked(before => ({
+      ...before, ...Object.fromEntries(current.map(line => [key(line.key), true])),
+    }))
+    setMessage(current.length + ' exact passende winkelvinkjes toegevoegd aan deze route.')
+  }
 
   async function importPlannerChecks() {
     if (!plannerPlan || !plannerRecipes || !plannerActiveDays) return
@@ -331,6 +361,8 @@ export function MixedStoreShoppingCard({
     <div className="offline-price-workbench__actions">
       <label><input type="checkbox" checked={onlyOpen}
         onChange={event => setOnlyOpen(event.currentTarget.checked)} /> Alleen nog te kopen</label>
+      {isSingleCheckedOnRoute && <button type="button" className="ghost-button"
+        onClick={importSingleStoreChecks}>Neem vinkjes uit mijn aparte winkellijsten over</button>}
       {plannerPlan && plannerRecipes && plannerActiveDays && <button type="button"
         className="ghost-button" onClick={() => { void importPlannerChecks() }}>
         Neem ongeprijsde Planner-vinkjes over
