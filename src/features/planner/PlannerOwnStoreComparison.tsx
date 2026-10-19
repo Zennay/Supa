@@ -280,17 +280,35 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               <small>{progress.fresh
                 ? 'Nog niet volledig gecontroleerd: prijs en budget blijven onbekend.'
                 : 'Bronopname te oud of toekomstig: vernieuw de echte bron voordat prijzen meetellen.'}</small>
-              {progress.fresh && progress.missingIngredientLabels.length > 0 &&
-                <small>Zoek echte producten voor: {progress.missingIngredientLabels.join(', ')}
-                  {progress.demandLineCount - progress.matchedLineCount > 3 ? ' …' : ''}.</small>}
-              {progress.fresh && progress.awaitingReviewLabels.length > 0 &&
-                <small>Bevestig origineel artikel, verpakking en prijs voor:
-                  {' '}{progress.awaitingReviewLabels.join(', ')}.</small>}
+              {progress.fresh && progress.missingIngredients.length > 0 &&
+                <div className="own-store-planner__review-queue" aria-label={'Ontbrekende bronproducten bij ' + store}>
+                  <strong>Zoek echte bronproducten</strong>
+                  {progress.missingIngredients.map(item =>
+                    <button type="button" key={item.id} className="ghost-button"
+                      onClick={() => onReviewIngredient(store, item.id)}
+                      aria-label={'Zoek bij ' + store + ' een product voor ' + item.label}>
+                      Zoek {item.label} in Vergelijk
+                    </button>)}
+                  {progress.demandLineCount - progress.matchedLineCount > progress.missingIngredients.length &&
+                    <small>En {progress.demandLineCount - progress.matchedLineCount - progress.missingIngredients.length} andere zonder match.</small>}
+                </div>}
+              {progress.fresh && progress.awaitingReviewIngredients.length > 0 &&
+                <div className="own-store-planner__review-queue" aria-label={'Te controleren winkelproducten bij ' + store}>
+                  <strong>Controleer originele SKU, verpakking en pakprijs</strong>
+                  {progress.awaitingReviewIngredients.map(item =>
+                    <button type="button" key={item.id} className="ghost-button"
+                      onClick={() => onReviewIngredient(store, item.id)}
+                      aria-label={'Controleer bij ' + store + ' de originele SKU voor ' + item.label}>
+                      Controleer {item.label} in Vergelijk
+                    </button>)}
+                  {progress.matchedLineCount - progress.reviewedLineCount > progress.awaitingReviewIngredients.length &&
+                    <small>En {progress.matchedLineCount - progress.reviewedLineCount - progress.awaitingReviewIngredients.length} andere productkeuzes zonder controle.</small>}
+                </div>}
               <button type="button" className="ghost-button"
-                onClick={() => progress.nextIngredientId
+                onClick={() => progress.fresh && progress.nextIngredientId
                   ? onReviewIngredient(store, progress.nextIngredientId) : onOpenComparison()}>
-                {progress.nextIngredientId
-                  ? 'Open eerste ontbrekende ingrediënt in Vergelijk'
+                {!progress.fresh ? 'Vernieuw winkelbron in Vergelijk'
+                  : progress.nextIngredientId ? 'Open volgende controle in Vergelijk'
                   : 'Open winkelbron in Vergelijk'}
               </button>
             </div>
