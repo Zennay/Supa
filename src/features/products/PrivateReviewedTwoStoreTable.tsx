@@ -5,7 +5,7 @@ import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
-import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, privateReviewedPairWithin24Hours, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 type OwnStore = 'PLUS' | 'DekaMarkt'
@@ -36,11 +36,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const plus = fresh?.stores.PLUS
   const deka = fresh?.stores.DekaMarkt
   const comparable = !!plus && !!deka &&
-    Math.abs(plus.capturedMs - deka.capturedMs) <= 86_400_000 &&
+    privateReviewedPairWithin24Hours(plus, deka) &&
     compareFullBaskets({ baseline: plus.basket, candidate: deka.basket }).claimable
   if (!comparable || !plus || !deka) {
     const missing = (['PLUS', 'DekaMarkt'] as const).filter(store => !fresh?.stores[store])
-    const gap = !!plus && !!deka && Math.abs(plus.capturedMs - deka.capturedMs) > 86_400_000
+    const gap = !!plus && !!deka && !privateReviewedPairWithin24Hours(plus, deka)
     return <section className="private-reviewed-products__paired" aria-label="Winkelvergelijking van eigen artikelen">
       <h3>Vergelijk PLUS met DekaMarkt</h3>
       <div className="private-reviewed-products__source-coverage">

@@ -40,7 +40,7 @@ function validName(value: unknown, max: number): value is string {
     !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(value)
 }
 /** Only real Gregorian civil dates and explicit timezone offsets are accepted. */
-function observedInstant(raw: unknown): { ms: number; ns: bigint } | null {
+export function observedInstant(raw: unknown): { ms: number; ns: bigint } | null {
   if (typeof raw !== 'string') return null
   const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?([+-])(\d\d):(\d\d)$/.exec(raw)
   if (!match) return null

@@ -1,3 +1,4 @@
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 
 /** Transient, human-reviewed own-source baskets. No storage, no retailer rights. */
@@ -10,6 +11,21 @@ export type PrivateReviewedBasket = {
 export type PrivateReviewedBaskets = {
   planKey: string
   stores: Partial<Record<OwnStore, PrivateReviewedBasket>>
+}
+
+/** Compare the exact canonical UTC instants originally admitted from local
+ * source JSON. Millisecond timestamps can erase a +1 ns violation of the
+ * strict 24-hour pairing rule. Never infer or extend retailer permission.
+ */
+export function privateReviewedPairWithin24Hours(
+  first: PrivateReviewedBasket, second: PrivateReviewedBasket,
+): boolean {
+  const left = observedInstant(first.observedAt)
+  const right = observedInstant(second.observedAt)
+  if (!left || !right || left.ms !== first.capturedMs ||
+      right.ms !== second.capturedMs) return false
+  const elapsed = left.ns >= right.ns ? left.ns - right.ns : right.ns - left.ns
+  return elapsed <= 86_400_000_000_000n
 }
 
 /** In-memory progress for incomplete private shopping data. Never represents

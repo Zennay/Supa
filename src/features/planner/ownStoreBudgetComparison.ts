@@ -1,7 +1,7 @@
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
-import type { PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
+import { privateReviewedPairWithin24Hours, type PrivateReviewedBaskets, type OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
 
 export type ComparedOwnLine = {
   id: string
@@ -31,8 +31,7 @@ export function ownStoreWeekComparison(reviewed: PrivateReviewedBaskets | null):
   const deka = reviewed?.stores.DekaMarkt
   const available = (['PLUS', 'DekaMarkt'] as const).filter(store => !!reviewed?.stores[store])
   if (!plus || !deka) return { status: 'missing', available }
-  if (!Number.isFinite(plus.capturedMs) || !Number.isFinite(deka.capturedMs) ||
-      Math.abs(plus.capturedMs - deka.capturedMs) > 86_400_000) {
+  if (!privateReviewedPairWithin24Hours(plus, deka)) {
     return { status: 'different-moments', available }
   }
   const result = compareFullBaskets({ baseline: plus.basket, candidate: deka.basket })

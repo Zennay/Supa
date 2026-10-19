@@ -1,3 +1,4 @@
+import { privateReviewedPairWithin24Hours } from '../comparison/privateReviewedBasketBridge.ts'
 import type { OwnStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
@@ -68,7 +69,7 @@ export function downloadOwnStoreCsv(
 ): void {
   const plus = reviewed.stores.PLUS
   const deka = reviewed.stores.DekaMarkt
-  if (!plus || !deka || Math.abs(plus.capturedMs - deka.capturedMs) > 86400000) {
+  if (!plus || !deka || !privateReviewedPairWithin24Hours(plus, deka)) {
     throw new Error('De eigen winkelbronnen zijn niet allebei vergelijkbaar.')
   }
   const content = createPrivateBasketComparisonCsv({

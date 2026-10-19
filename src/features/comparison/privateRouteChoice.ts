@@ -1,6 +1,6 @@
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { createMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
-import { freshReviewedBaskets } from './privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, privateReviewedPairWithin24Hours } from './privateReviewedBasketBridge.ts'
 import type { OwnStore, PrivateReviewedBaskets, PrivateRouteChoice } from './privateReviewedBasketBridge.ts'
 
 /** Shared source-bound click contract for Products and Planner → mixed List.
@@ -15,7 +15,7 @@ export function currentPrivateRouteChoice(
   const plus = fresh?.stores.PLUS
   const deka = fresh?.stores.DekaMarkt
   if (!plus || !deka ||
-      Math.abs(plus.capturedMs - deka.capturedMs) > 86400000 ||
+      !privateReviewedPairWithin24Hours(plus, deka) ||
       !compareFullBaskets({ baseline: plus.basket, candidate: deka.basket }).claimable) return null
   const route = createMixedStoreShoppingPlan(
     plus.basket, deka.basket, 'mixed', { [ingredientId]: store })
