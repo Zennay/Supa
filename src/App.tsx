@@ -267,6 +267,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         if (destination === 'basket') {
           navigate('basket')
           setOwnPriceImportSignal(value => value + 1)
+        } else if (destination === 'list') {
+          // The existing list renders the newly selected physical Planner
+          // demand even without a usable price source (explicitly unpriced).
+          navigate('list')
         } else {
           navigate('planner')
         }

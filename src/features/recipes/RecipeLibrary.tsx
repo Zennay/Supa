@@ -155,7 +155,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setShowShoppingCopy(true)
     }
   }
-  function planOwnRecipe(recipe: SavedRecipe, destination: 'planner' | 'basket' = 'planner') {
+  function planOwnRecipe(recipe: SavedRecipe, destination: 'planner' | 'basket' | 'list' = 'planner') {
     if (library.error || !toPlannerRecipe(recipe)) {
       setMessage('Controleer eerst alle metrische hoeveelheden en hele stuks in dit recept.')
       return
@@ -457,11 +457,14 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <button type="button" onClick={() => planOwnRecipe(selected)}>
               Zet {selected.title} op {plannerDay} in Planner
             </button>
+            <button type="button" onClick={() => planOwnRecipe(selected, 'list')}>
+              Plan dit recept en open mijn boodschappenlijst
+            </button>
             <button type="button" onClick={() => planOwnRecipe(selected, 'basket')}>
               Plan dit recept en open mijn winkelvergelijking
             </button>
             <small>De vergelijking gebruikt alleen zelf ingevoerde en opnieuw gecontroleerde winkelprijzen.
-              Ontbrekende of verlopen prijzen blijven onbekend. Geen JSON-export nodig.</small>
+              De boodschappenlijst werkt ook zonder prijzen. Ontbrekende of verlopen winkelprijzen blijven onbekend. Geen JSON-export nodig.</small>
             {privateWeekMessage && <p role="status">{privateWeekMessage}</p>}
           </> : <p>Controleer eerst de hoeveelheid, metrische eenheid en eventuele gedeeltelijke stuks.
             Pas daarna kun je dit recept zonder gokwerk plannen.</p>}
