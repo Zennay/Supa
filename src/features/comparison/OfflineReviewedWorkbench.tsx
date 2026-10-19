@@ -351,9 +351,15 @@ export function OfflineReviewedWorkbench({
             entry.appendableNewProducts = source.products.length
           }
         }
+        // A valid append adds genuine new SKUs while retaining the original
+        // immutable capture. Preview the actual resulting entire catalogue,
+        // not only the appended rows (which would falsely mark prior matches
+        // missing). No previous human approval is manufactured.
+        const projectedProducts = entry.appendableNewProducts && previousCapture
+          ? [...previousCapture.products, ...source.products] : source.products
         const basket = buildOneStoreBasket({
           store: { id: entry.retailer, name: entry.retailer },
-          plan, recipes, activeDays, products: source.products,
+          plan, recipes, activeDays, products: projectedProducts,
         })
         entry.matching = {
           proposed: basket.matchedLineCount,
@@ -1627,6 +1633,7 @@ export function OfflineReviewedWorkbench({
                 <details key={'matches-' + store.retailer}
                   className="offline-price-workbench__capture-matching">
                   <summary>{store.retailer}: Planner-productmatching vooraf bekijken
+                    {store.appendableNewProducts ? ' (bestaande + nieuwe bronproducten)' : ''}
                     {' '}({store.matching.proposed} voorstellen,
                     {' '}{store.matching.unresolved} nog zonder match)</summary>
                   <p className="disclaimer">Deze suggesties komen uit exact dezelfde
