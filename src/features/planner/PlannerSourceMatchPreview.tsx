@@ -36,6 +36,7 @@ export function PlannerSourceMatchPreview({ needs, source }: {
     ])) as Record<OfflineRetailer, Map<string, OfflineStoreProduct>>
     return needs.map(need => {
       const suggestions = {} as Record<OfflineRetailer, Suggestion>
+      const manualReview = { PLUS: false, DekaMarkt: false }
       for (const store of stores) {
         const capture = source.captures[store]
         if (!capture || need.amount === null || !Number.isFinite(need.amount) ||
@@ -58,6 +59,11 @@ export function PlannerSourceMatchPreview({ needs, source }: {
           id: need.id, query: need.query || need.label, amount: need.amount,
           unit: need.unit as MatchUnit,
         }, eligible)
+        // An ambiguous source already contains several valid original SKUs.
+        // The user must pick one in Vergelijk, not re-observe a made-up new
+        // product or silently treat the first result as a match.
+        manualReview[store] = choice.type === 'abstain' &&
+          choice.reasons.includes('top candidates too close')
         const match = choice.type === 'match' ? products[store].get(choice.productId) : null
         // The fuzzy matcher can rank an attractive name even if the source
         // package belongs to a different physical unit family. Never present
@@ -78,13 +84,15 @@ export function PlannerSourceMatchPreview({ needs, source }: {
                 unitRate: rate ? formatPrivateUnitRate(rate) : null }
             })() : null
       }
-      return { need, suggestions }
+      return { need, suggestions, manualReview }
     })
   }, [needs, source])
   if (!coverage.length) return null
   const suggested = stores.map(store => coverage.filter(line => line.suggestions[store]).length)
   const paired = coverage.filter(line => line.suggestions.PLUS && line.suggestions.DekaMarkt).length
   const missing = coverage.filter(line => !line.suggestions.PLUS || !line.suggestions.DekaMarkt)
+  const requiringChoice = stores.map(store =>
+    coverage.filter(line => line.manualReview[store]).length)
   const filtered = onlyMissing ? missing : coverage
   const shown = filtered.slice(0, showAll ? 200 : 12)
   const needsForNewSource = (store: 'PLUS' | 'DekaMarkt',
@@ -100,8 +108,8 @@ export function PlannerSourceMatchPreview({ needs, source }: {
       : null
     if (!capture || !recentOwnCaptureInstant(capture.observedAt, nowMs) ||
         olderPairedStore === store) return [...needs]
-    return missing.filter(({ suggestions }) => !suggestions[store])
-      .map(({ need }) => need)
+    return missing.filter(({ suggestions, manualReview }) =>
+      !suggestions[store] && !manualReview[store]).map(({ need }) => need)
   }
   const pendingPlus = needsForNewSource('PLUS', Date.now()).length
   const pendingDeka = needsForNewSource('DekaMarkt', Date.now()).length
@@ -171,6 +179,13 @@ export function PlannerSourceMatchPreview({ needs, source }: {
     <p>{coverage.length} fysieke ingrediënten: PLUS {suggested[0]} mogelijke kandidaten,
       DekaMarkt {suggested[1]}. Voor {paired} ingrediënten is er voorlopig een
       kandidaat bij beide winkels.</p>
+    {(requiringChoice[0] > 0 || requiringChoice[1] > 0) && <p role="status">
+      <strong>Handmatige bronkeuze vereist:</strong> {requiringChoice[0]} PLUS-
+      en {requiringChoice[1]} DekaMarkt-ingrediënten hebben meerdere
+      vergelijkbaar passende echte bronproducten. Kies de juiste oorspronkelijke
+      SKU in Vergelijk; voor deze bestaande artikelen hoeft niet opnieuw een
+      fictieve winkelopname te worden aangevraagd.
+    </p>}
     <p><strong>Dit zijn onbevestigde naam- en verpakkingssuggesties.</strong> Een
       winkelprijs of besparing ontstaat pas nadat Vergelijk de originele SKU,
       benodigde hele verpakkingen, volledige mandjes en bronmomenten controleert.</p>
@@ -184,7 +199,7 @@ export function PlannerSourceMatchPreview({ needs, source }: {
         <strong role="columnheader">PLUS</strong>
         <strong role="columnheader">DekaMarkt</strong>
       </div>
-      {shown.map(({ need, suggestions }) => <div className="supa-planner-source-matches__row"
+      {shown.map(({ need, suggestions, manualReview }) => <div className="supa-planner-source-matches__row"
         role="row" key={need.id}>
         <span role="cell"><strong>{need.label}</strong>
           <small>{need.amount ?? 'Onbekend'} {need.unit}</small></span>
@@ -197,14 +212,18 @@ export function PlannerSourceMatchPreview({ needs, source }: {
               {suggestions[store]!.unitRate
                 ? ' · informatief ' + suggestions[store]!.unitRate : ''}
               {' '}· bronmoment niet automatisch gevalideerd</small></>
-            : 'Geen eenduidige geprijsde kandidaat; handmatig koppelen'}
+            : manualReview[store]
+              ? 'Meerdere geschikte SKU’s: kies de juiste originele verpakking zelf in Vergelijk'
+              : 'Geen geschikte geprijsde SKU in deze bron; ontbrekende bron vastleggen'}
         </span>)}
       </div>)}
     </div>
     {(pendingPlus > 0 || pendingDeka > 0) && <div className="supa-planner-source-matches__exports">
       <p><strong>Nieuwe echte bronopname vereist:</strong>
         {' '}{pendingPlus} PLUS- en {pendingDeka} DekaMarkt-regels.
-        Ontbrekende prijzen vragen alleen ontbrekende SKU’s; bij een verouderde
+        Onduidelijke bestaande SKU-keuzes gaan naar Vergelijk en niet naar dit
+        nieuwe bronblad. Ontbrekende prijzen vragen alleen ontbrekende SKU’s;
+        bij een verouderde
         opname of een bronpaar buiten 24 uur moet de betreffende winkel
         opnieuw worden vastgelegd.</p>
       <button type="button" className="ghost-button"
