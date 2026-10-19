@@ -109,7 +109,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     if (Number.isSafeInteger(repetitions) && repetitions >= 1 &&
         repetitions <= 1000 && perPart !== null && Number.isFinite(perPart) &&
         perPart > 0 && perPart <= 100_000 && physical &&
-        Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 &&
+        amount !== null && Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 &&
         (physical.unit !== 'piece' || (Number.isSafeInteger(perPart) && Number.isSafeInteger(amount))) &&
         label && !/^\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|oz|lb|stuks?)\b/iu.test(label)) {
       return { original, label, query: label.toLocaleLowerCase('nl'),
