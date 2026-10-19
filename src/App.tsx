@@ -1,5 +1,5 @@
 import { FigmaImage } from './components/FigmaImage'
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
@@ -38,6 +38,11 @@ import {
   m3CandidateProducts,
   m3CandidateStore,
 } from './data/m3ComparisonFixture'
+
+const PlannerPortableWeek = lazy(() =>
+  import('./features/planner/PlannerPortableWeek.tsx')
+    .then(module => ({ default: module.PlannerPortableWeek }))
+)
 
 type Tab = 'home' | 'recipes' | 'products' | 'planner' | 'basket' | 'list' | 'observe'
 
@@ -643,6 +648,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
           />
+        )}
+        {tab === 'planner' && (
+          <Suspense fallback={<p role="status">Privé weekplanning laden…</p>}>
+            <PlannerPortableWeek
+              preferences={preferences}
+              days={m2InitialPlan.map(meal => meal.day)}
+              recipeIds={validRecipeIds}
+              recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
+              onRestore={(restored) => {
+                if (!persistenceWarning) setPreferences(restored)
+              }}
+              storageProtected={persistenceWarning !== null}
+            />
+          </Suspense>
         )}
         {tab === 'planner' && (
           <section className="week-share-panel" aria-label="Weekmenu delen">
