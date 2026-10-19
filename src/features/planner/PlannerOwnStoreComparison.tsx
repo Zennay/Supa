@@ -4,8 +4,6 @@ import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
-import { printableOwnStoreComparison } from './downloadOwnStoreComparison.ts'
-import { pendingOwnSourceReviewText } from './pendingOwnSourceReviewCsv.ts'
 // Price deltas only exist after both sources are fully reviewed; defer these
 // heavier presentational modules so the everyday Planner loads sooner.
 const PlannerOwnProductDeltas = lazy(() => import('./PlannerOwnProductDeltas.tsx')
@@ -103,6 +101,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       if (!captureProgress) throw new Error('Er zijn nog geen eigen winkelopnames.')
       if (!navigator.clipboard?.writeText)
         throw new Error('Klembord niet beschikbaar in deze browser.')
+      const { pendingOwnSourceReviewText } = await import('./pendingOwnSourceReviewCsv.ts')
       const output = pendingOwnSourceReviewText(captureProgress, captureProgress.planKey, Date.now())
       await navigator.clipboard.writeText(output)
       setDownloadMessage('Je openstaande PLUS/Deka-winkelcontroles gekopieerd. Geen onbekende prijzen als bedragen overgenomen.')
@@ -199,9 +198,15 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       if (!latest?.stores.PLUS || !latest.stores.DekaMarkt || checked.status !== 'comparable') {
         throw new Error('Je bronopnames zijn veranderd of verlopen; kopiëren is geannuleerd.')
       }
-      const content = printableOwnStoreComparison(checked, {
-        PLUS: latest.stores.PLUS.observedAt,
-        DekaMarkt: latest.stores.DekaMarkt.observedAt,
+      const { printableOwnStoreComparison } = await import('./downloadOwnStoreComparison.ts')
+      // Source can expire during a delayed module load; check again before copy.
+      const currentAtCopy = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      const copySummary = ownStoreWeekComparison(currentAtCopy)
+      if (!currentAtCopy?.stores.PLUS || !currentAtCopy.stores.DekaMarkt ||
+          copySummary.status !== 'comparable') throw Error('Winkelbron is verlopen')
+      const content = printableOwnStoreComparison(copySummary, {
+        PLUS: currentAtCopy.stores.PLUS.observedAt,
+        DekaMarkt: currentAtCopy.stores.DekaMarkt.observedAt,
       })
       await navigator.clipboard.writeText(content)
       setDownloadMessage('Eigen PLUS/Deka-weekvergelijking met bronmomenten en originele SKU’s gekopieerd. Deel alleen bewust je privébrondata.')
