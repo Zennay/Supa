@@ -1161,6 +1161,25 @@ export function OfflineReviewedWorkbench({
       behavior: 'smooth', block: 'center',
     }), 0)
   }
+  function chooseSourceSku(store: typeof stores[number], line: BasketTraceLine, id: string) {
+    // Selecting a candidate is never the human's price/pack review.
+    if (manualSku[store][line.id] === id) return
+    setManualSku(previous => ({
+      ...previous, [store]: { ...previous[store], [line.id]: id },
+    }))
+    setReviewedLines(previous => Object.fromEntries(
+      Object.entries(previous).filter(([key]) =>
+        !isOwnIngredientKey(key, store, line.id, 2))))
+    setDoneTripItems(previous => Object.fromEntries(
+      Object.entries(previous).filter(([key]) =>
+        !isOwnIngredientKey(key, store, line.id, 1))))
+    setTripExportMessage('')
+    setTripProgressMessage('')
+    setMessage(store + ': bronartikel voor ' + line.ingredientLabel +
+      ' gekozen. Bevestig de originele code, verpakking en prijs hieronder. ' +
+      'Overige fysieke boodschappen en bronreviews zijn behouden.')
+  }
+
   const allReviewed = perStoreReview.every(item => item.complete)
   const comparisonNextSteps = perStoreReview.flatMap(item => {
     const capture = imported?.captures[item.store]
@@ -1989,27 +2008,7 @@ export function OfflineReviewedWorkbench({
                                 {choices.availableCount > 0 && (
                                   <label>Kies een werkelijk waargenomen, prijsklaar bronartikel
                                     <select value={manualSku[store][line.id] ?? ''}
-                                      onChange={event => {
-                                        const id = event.currentTarget.value
-                                        setManualSku(previous => ({
-                                          ...previous, [store]: { ...previous[store], [line.id]: id },
-                                        }))
-                                        // A changed SKU needs fresh approval for THIS
-                                        // ingredient, not every unrelated purchased line
-                                        // at the same shop. The basket comparator still
-                                        // refuses duplicate-SKU or changed-demand conflicts.
-                                        setReviewedLines(previous => Object.fromEntries(
-                                          Object.entries(previous).filter(([key]) =>
-                                            !isOwnIngredientKey(key, store, line.id, 2))))
-                                        setDoneTripItems(previous => Object.fromEntries(
-                                          Object.entries(previous).filter(([key]) =>
-                                            !isOwnIngredientKey(key, store, line.id, 1))))
-                                        setTripExportMessage('')
-                                        setTripProgressMessage('')
-                                        setMessage(store + ': bronartikel voor ' + line.ingredientLabel +
-                                          ' gewijzigd. Controleer deze SKU, verpakking en prijs opnieuw. ' +
-                                          'Andere ongewijzigde productbevestigingen en afvinkingen blijven staan.')
-                                      }}>
+                                      onChange={event => chooseSourceSku(store, line, event.currentTarget.value)}>
                                       <option value="">Automatisch voorstellen (of onbekend)</option>
                                       {choices.shown.map(product => (
                                         <option key={product.id} value={product.id}>
@@ -2029,6 +2028,13 @@ export function OfflineReviewedWorkbench({
                                           {' '}· {euros.format(product.priceCents / 100)} per verpakking
                                           {sourcePackRate(product)}
                                           {sourceWholePackPreview(product, line.requirement)}
+                                          <button type="button"
+                                            disabled={manualSku[store][line.id] === product.id}
+                                            aria-label={'Kies bronartikel ' + product.name + ' voor ' + line.ingredientLabel}
+                                            onClick={() => chooseSourceSku(store, line, product.id)}>
+                                            {manualSku[store][line.id] === product.id
+                                              ? 'Dit artikel is gekozen' : 'Kies deze broncode'}
+                                          </button>
                                         </li>
                                       ))}</ul>
                                     </details>}

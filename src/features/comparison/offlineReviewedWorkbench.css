@@ -274,3 +274,7 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-price-workbench__candidate-preview ul { margin:.4rem 0; padding-left:1.3rem; }
 .offline-price-workbench__candidate-preview li { margin:.45rem 0; overflow-wrap:anywhere; }
 .offline-price-workbench__candidate-preview summary:focus-visible { outline:3px solid #22734f; outline-offset:2px; }
+
+.offline-price-workbench__candidate-preview li button { display:block; min-height:44px; margin:.35rem 0; padding:.5rem .8rem; border:1px solid #7ca88e; border-radius:9px; color:#19503a; background:#eff8f1; cursor:pointer; font:inherit; }
+.offline-price-workbench__candidate-preview li button:disabled { opacity:.65; cursor:default; }
+.offline-price-workbench__candidate-preview li button:focus-visible { outline:3px solid #22734f; outline-offset:2px; }
