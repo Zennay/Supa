@@ -73,7 +73,7 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
     }
 
     if (section === 'header') {
-      const named = /^(?:recept|titel|naam)\s*:\s*(.+)$/iu.exec(original)
+      const named = /^(?:recept|recipe|titel|title|naam)\s*:\s*(.+)$/iu.exec(headingText(original))
       const count = headerNumber(original, 'servings')
       const duration = headerNumber(original, 'minutes')
       if (named) title = headingText(named[1])
