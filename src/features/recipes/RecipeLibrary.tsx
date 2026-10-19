@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
+import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl'
 import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { importPlainTextRecipe } from './importPlainTextRecipe'
@@ -536,11 +537,13 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       ingredients: draft.ingredients.map(item => item.original).join('\n'),
       steps: draft.steps.join('\n'),
     })
-    setSource(draft.sourceUrl)
+    const sourceUrl = draft.sourceUrl ? safeRecipeSourceUrl(draft.sourceUrl) : null
+    setSource(sourceUrl)
     setMode('manual')
     setPastedSource('')
     setPreview(null)
-    setMessage(messageText)
+    setMessage(messageText + (draft.sourceUrl && sourceUrl !== draft.sourceUrl
+      ? ' Privé-inlogparameters zijn uit de bronlink verwijderd.' : ''))
   }
   async function loadLocalRecipeSource(file?: File, format: 'schema' | 'plain' = 'schema') {
     if (!file) return
