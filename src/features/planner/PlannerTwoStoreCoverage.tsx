@@ -1,16 +1,12 @@
 import { useState } from 'react'
 import { privateTwoStoreCoverageCsv, privateTwoStoreCoverageText, type CoverageExportLine } from './twoStoreCoverageExport.ts'
-import type { PrivateCaptureProgress, PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateCaptureProgress, type PrivateReviewedBaskets, type OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import './plannerTwoStoreCoverage.css'
 
 const STORES = ['PLUS', 'DekaMarkt'] as const
 type Cell = { kind: 'ready' | 'reviewed' | 'review' | 'missing' | 'source' | 'expired'; text: string }
 
-function sourceStillRecent(observedAt: string, now: number): boolean {
-  const ms = Date.parse(observedAt)
-  return Number.isFinite(ms) && now >= ms - 300_000 && now - ms <= 604_800_000
-}
 
 /** This is a work queue over the canonical physical Planner demand, never a
  * second financial calculation. One shop may be ready while the paired total
@@ -19,16 +15,17 @@ function cellFor(
   store: OwnStore, id: string, progress: PrivateCaptureProgress | null,
   reviewed: PrivateReviewedBaskets | null, now: number,
 ): Cell {
-  const receipt = reviewed?.stores[store]
-  if (receipt && sourceStillRecent(receipt.observedAt, now) &&
-      Number.isFinite(receipt.capturedMs) &&
-      now >= receipt.capturedMs - 300_000 && now - receipt.capturedMs <= 604_800_000) {
-    return { kind: 'ready', text: 'Heel mandje gecontroleerd' }
+  // Re-evaluate the original nanosecond timestamp, the physical rows and the
+  // whole-pack ledger for each export action. An old React prop is no longer
+  // enough to call an otherwise visible store "ready".
+  const receipt = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', now)?.stores[store]
+  if (receipt) return { kind: 'ready', text: 'Heel mandje gecontroleerd' }
+  if (reviewed?.stores[store]) return {
+    kind: 'expired', text: 'Bron verlopen of mandregels gewijzigd: controle vereist',
   }
-  if (receipt) return { kind: 'expired', text: 'Bevestigde bron inmiddels verlopen' }
   const capture = progress?.stores[store]
   if (!capture) return { kind: 'source', text: 'Bronbestand ontbreekt' }
-  if (!capture.fresh || !sourceStillRecent(capture.observedAt, now)) {
+  if (!capture.fresh || !recentOwnCaptureInstant(capture.observedAt, now)) {
     return { kind: 'expired', text: 'Bron verouderd of ongeldig' }
   }
   if (capture.missingIngredients.some(item => item.id === id)) {

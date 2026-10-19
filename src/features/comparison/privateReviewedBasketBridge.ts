@@ -55,6 +55,17 @@ export type PrivateReviewFocus = {
   serial: number
 }
 
+/** Canonical original-source clock admission shared by UI status and exports.
+ * No rounded millisecond difference may make an expired receipt appear usable.
+ * Incomplete/invalid dates are unknown, never fresh by default. */
+export function recentOwnCaptureInstant(observedAt: string, nowMs: number): boolean {
+  if (!Number.isSafeInteger(nowMs)) return false
+  const instant = observedInstant(observedAt)
+  if (!instant) return false
+  const ageNs = BigInt(nowMs) * 1_000_000n - instant.ns
+  return ageNs >= -300_000_000_000n && ageNs <= 604_800_000_000_000n
+}
+
 export function freshReviewedBaskets(
   snapshots: PrivateReviewedBaskets | null,
   expectedPlanKey: string,
@@ -62,9 +73,6 @@ export function freshReviewedBaskets(
 ): PrivateReviewedBaskets | null {
   if (!snapshots || snapshots.planKey !== expectedPlanKey ||
       !Number.isSafeInteger(nowMs)) return null
-  const nowNs = BigInt(nowMs) * 1_000_000n
-  const allowedFutureNs = 300_000_000_000n
-  const maxAgeNs = 604_800_000_000_000n
   const entries = Object.entries(snapshots.stores).filter(([store, value]) => {
     if ((store !== 'PLUS' && store !== 'DekaMarkt') || !value ||
         !Number.isSafeInteger(value.capturedMs) ||
@@ -74,8 +82,7 @@ export function freshReviewedBaskets(
     // a millisecond, and never ignore a changed capturedMs envelope.
     const instant = observedInstant(value.observedAt)
     if (!instant || instant.ms !== value.capturedMs ||
-        nowNs < instant.ns - allowedFutureNs ||
-        nowNs - instant.ns > maxAgeNs) return false
+        !recentOwnCaptureInstant(value.observedAt, nowMs)) return false
     // Counts alone are insufficient to admit a store as priced: the shared
     // basket contract above also checks SKU pack arithmetic, exact total cents,
     // required quantities, duplicate rows and retailer identity.

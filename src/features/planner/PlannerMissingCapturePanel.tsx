@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { freshReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateCaptureProgress, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import './plannerMissingCapture.css'
@@ -22,9 +22,8 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
   const missingCaptureFor = (store: CaptureStore, at = now): PlannerCaptureGuideNeed[] => {
     if (freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', at)?.stores[store]) return []
     const progress = captureProgress?.stores[store]
-    if (!progress || !progress.fresh || !Number.isFinite(Date.parse(progress.observedAt)) ||
-        at < Date.parse(progress.observedAt) - 300_000 ||
-        at - Date.parse(progress.observedAt) > 604_800_000) return [...captureNeeds]
+    if (!progress || !progress.fresh ||
+        !recentOwnCaptureInstant(progress.observedAt, at)) return [...captureNeeds]
     const missing = new Set(progress.missingIngredients.map(need => need.id))
     return captureNeeds.filter(need => missing.has(need.id))
   }
