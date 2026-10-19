@@ -19,6 +19,7 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 import { privatePackUnitRate } from './privateUnitPrice.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
+import { appendPrivateCaptureProducts } from './appendPrivateCaptureProducts.ts'
 import { describePrivateStoreCaptureChange } from './privateStoreCaptureDiff.ts'
 import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
@@ -712,6 +713,55 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  async function appendSameCapture(store: typeof stores[number], file?: File) {
+    if (!file || !imported?.captures[store]) return
+    const version = ++importRevision.current
+    setBusy(true)
+    setPendingReplacement(null)
+    try {
+      if (!file.size || file.size > 256000)
+        throw new Error('Een aanvulbestand moet gevuld zijn en maximaal 256 kB bevatten.')
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      let source = raw
+      if (isCsv) {
+        const converterUrl = '/offline-two-store-csv.mjs'
+        const module: unknown = await import(/* @vite-ignore */ converterUrl)
+        if (!module || typeof module !== 'object' ||
+            !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
+          throw new Error('De lokale bron-CSV-converter is niet beschikbaar.')
+        source = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      }
+      if (version !== importRevision.current) return
+      const candidate = appendPrivateCaptureProducts(text, source, store, Date.now())
+      if (!window.confirm(
+        store + ': voeg ' + candidate.added + ' nieuw geobserveerde bronartikelen toe ' +
+        'aan je bestaande opname van exact hetzelfde originele bronmoment? ' +
+        'Oorspronkelijke producten en prijzen blijven letterlijk behouden. ' +
+        'Een oude SKU-beslissing geldt alleen zolang ook de gekozen brondata ongewijzigd blijven.')) {
+        setMessage(store + ': aanvulling geannuleerd. Oorspronkelijke prijzen en winkelreviews behouden.')
+        return
+      }
+      if (version !== importRevision.current) return
+      const admitted = parseOfflinePriceSnapshots(candidate.source, Date.now())
+      setText(candidate.source)
+      setImported(admitted)
+      setClockMs(Date.now())
+      setTripExportMessage('')
+      setTripProgressMessage('')
+      setMessage(store + ': ' + candidate.added +
+        ' daadwerkelijk ingevoerde nieuwe bronartikelen toegevoegd. Nu ' +
+        candidate.products + ' unieke producten met onveranderd origineel bronmoment. ' +
+        'Kies en controleer eventueel nieuwe SKU’s; er zijn geen prijzen verzonnen.')
+    } catch (error) {
+      if (version === importRevision.current)
+        setMessage((error instanceof Error ? error.message : 'De bronaanvulling is ongeldig.') +
+          ' Bestaande beide winkelopnames, reviews en vinkjes blijven behouden.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
+    }
+  }
+
   async function replaceStoreFile(store: typeof stores[number], file?: File) {
     if (!file || !imported?.captures[store]) return
     setPendingReplacement(null)
@@ -1079,6 +1129,44 @@ export function OfflineReviewedWorkbench({
     : null
   const openCoverageRows = coverageRows.filter(row =>
     !!olderPairCapture || stores.some(store => row[store].status !== 'Persoonlijk bevestigd'))
+  // Price capture is needed only for missing source facts or stale
+  // observations. An existing matched SKU awaiting human review does not
+  // require another fictitious catalog observation.
+  const missingPriceCaptureNeeds = Object.fromEntries(stores.map(store => {
+    const missing = coverageRows.filter(row =>
+      olderPairCapture === store ||
+      ['Geen bron', 'SKU/verpakking ontbreekt', 'Planning niet koppelbaar',
+        'Opname verlopen of toekomstig'].includes(row[store].status))
+    const ids = new Set(missing.map(row => row.id))
+    return [store, plannerCaptureNeeds.filter(need => ids.has(need.id))]
+  })) as Record<(typeof stores)[number], typeof plannerCaptureNeeds>
+
+  async function downloadMissingPriceCapture(store: (typeof stores)[number], kind: 'csv' | 'guide') {
+    const needs = missingPriceCaptureNeeds[store]
+    if (!needs.length) return
+    try {
+      const text = kind === 'csv'
+        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store])
+        : (await import('./plannerPriceCaptureGuide.ts')).makePlannerCaptureGuide(needs, [store])
+      const url = URL.createObjectURL(new Blob([text], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-ontbrekende-' + needs.length +
+          (kind === 'csv' ? '.csv' : '-gids.txt')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setCoverageMessage(store + ': ' + needs.length +
+        ' onvolledige of verlopen bronregels als nieuwe lege ' +
+        (kind === 'csv' ? 'CSV' : 'opnamegids') +
+        ' gedownload. Vul alleen echte nieuwe productfeiten in; oude prijzen, namen en bronmomenten zijn niet gekopieerd.')
+    } catch {
+      setCoverageMessage('Geen geldig kort invulblad. Gebruik het volledige Planner-invulblad.')
+    }
+  }
   function downloadCoverageChecklist(onlyOpen = false) {
     if (!imported || coverageRows.length === 0) return
     // Refresh source age at the moment the field list is downloaded rather
@@ -1345,6 +1433,17 @@ export function OfflineReviewedWorkbench({
                     <button className="ghost-button" type="button" onClick={() => downloadPrivateRecaptureCsv(store)}>
                       Maak nieuw prijsinvulblad voor {store} (CSV)
                     </button>
+                    <label>Voeg originele nog ontbrekende {store}-producten toe uit dezelfde opname (CSV/JSON)
+                      <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
+                        onChange={event => {
+                          const file = event.currentTarget.files?.[0]
+                          event.currentTarget.value = ''
+                          void appendSameCapture(store, file)
+                        }} />
+                      <small>Alleen producten met nieuwe broncodes en exact hetzelfde oorspronkelijke
+                        waarnemingstijdstip. Bij verschillende momenten geen oude prijzen doorschuiven:
+                        vervang dan de hele winkelopname. Eerdere artikelen worden nooit overschreven.</small>
+                    </label>
                     <label>Vervang uitsluitend de {store}-opname met je nieuwe echte bron (CSV of JSON)
                       <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
                         onChange={event => {
@@ -1466,6 +1565,26 @@ export function OfflineReviewedWorkbench({
                     Planner-vraag voor beide winkels; onvolledige of oude prijzen leveren geen winnaar.</p>
                   <p>{openCoverageRows.length} van {coverageRows.length} ingrediënten
                     hebben nog een ontbrekende bron, verlopen opname of niet-bevestigde productregel.</p>
+                  <p>Nieuw bronbewijs nodig? Download per winkel uitsluitend de ontbrekende
+                    of verlopen fysieke Planner-producten als lege CSV met bijpassende
+                    regelnummergids. Alleen nog te bevestigen bestaande SKU’s blijven buiten deze lijst.</p>
+                  <div className="offline-price-workbench__actions">
+                    {stores.map(store => <div key={store}>
+                      <strong>{store} · {missingPriceCaptureNeeds[store].length} bronregels opnieuw opnemen</strong>
+                      <div className="offline-price-workbench__actions">
+                        <button className="ghost-button" type="button"
+                          disabled={missingPriceCaptureNeeds[store].length === 0}
+                          onClick={() => void downloadMissingPriceCapture(store, 'csv')}>
+                          Download open {store}-opnames (CSV)
+                        </button>
+                        <button className="ghost-button" type="button"
+                          disabled={missingPriceCaptureNeeds[store].length === 0}
+                          onClick={() => void downloadMissingPriceCapture(store, 'guide')}>
+                          {store}-regelnummergids (TXT)
+                        </button>
+                      </div>
+                    </div>)}
+                  </div>
                   <div className="offline-price-workbench__actions">
                     <button className="ghost-button" type="button"
                       disabled={openCoverageRows.length === 0}
