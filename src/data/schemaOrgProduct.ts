@@ -70,6 +70,35 @@ function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
   return values.filter((value): value is JsonObject => isObject(value))
 }
 
+/**
+ * Schema.org JSON-LD may contain case-variant keys on the same typed Offer.
+ * Do not silently trust the first spelling when a second spelling asserts
+ * a different financial, currency or stock fact. This is still source
+ * evidence, never an independent retailer-price verification.
+ */
+function conflictingOfferEvidence(offers: JsonObject[]): boolean {
+  const facts = ['price', 'lowprice', 'pricecurrency', 'availability'] as const
+  for (const offer of offers) {
+    for (const fact of facts) {
+      const entries = Object.entries(offer)
+        .filter(([key]) => key.toLocaleLowerCase('en') === fact)
+      if (entries.length < 2) continue
+      const values = entries.map(([, raw]) => fact === 'price' || fact === 'lowprice'
+        ? cents(raw)
+        : asString(raw)?.toLocaleLowerCase('en') ?? null)
+      if (values.some(value => value === null) ||
+          new Set(values).size !== 1) return true
+    }
+
+    // A concrete Offer.price and another lowPrice assertion cannot differ
+    // while we claim to know the payable price of one specific package.
+    const exact = cents(offer.price)
+    const range = cents(offer.lowPrice)
+    if (exact !== null && range !== null && exact !== range) return true
+  }
+  return false
+}
+
 function extractPrice(offers: JsonObject[]): number | null {
   // AggregateOffer.lowPrice and ranges describe many offers, not the
   // payable price of this exact SKU/pack. Multiple offers or a unit-price
@@ -204,6 +233,9 @@ export function parseSchemaOrgProduct(
   }
 
   const offers = offerCandidates(product.offers)
+  if (conflictingOfferEvidence(offers)) {
+    return { type: 'abstain', reason: 'contradictory price, currency or availability on the same Schema.org Offer' }
+  }
   const currency = extractCurrency(offers)
   if (currency !== null && currency !== 'EUR') {
     return {
