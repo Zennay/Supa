@@ -2,7 +2,7 @@
  * Source admission delegates to the existing canonical offline CSV converter.
  * No storage, remote requests, inferred product equivalence or monetary computation.
  */
-import { convertTwoStoreCsv, convertOwnStoreCsv } from './offline-two-store-csv.mjs'
+import { convertOwnStoreCsv } from './offline-two-store-csv.mjs'
 
 const stores = ['PLUS', 'DekaMarkt']
 const units = ['g', 'kg', 'ml', 'l', 'piece']
@@ -10,7 +10,6 @@ const maxBytes = 256000
 const sourceInput = document.querySelector('#source')
 const plusInput = document.querySelector('#plus-source')
 const dekaInput = document.querySelector('#deka-source')
-const csvHeader = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 let sourceRevision = 0
 let pendingManualEdit = false
 const sourceStatus = document.querySelector('#source-status')
@@ -454,17 +453,6 @@ async function readLocalFile(file) {
   return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
 }
 
-function removeCsvHeader(source) {
-  const normalized = source.startsWith('\uFEFF') ? source.slice(1) : source
-  const firstEnd = normalized.indexOf('\n')
-  if (firstEnd < 0 || normalized.slice(0, firstEnd).replace(/\r$/, '') !== csvHeader) {
-    throw Error('Ieder CSV-bestand moet de bestaande negenkoloms-kop bevatten.')
-  }
-  const body = normalized.slice(firstEnd + 1)
-  if (!body) throw Error('Een van de winkelbestanden bevat geen opnameregels.')
-  return body.endsWith('\n') ? body : body + '\n'
-}
-
 async function loadSources() {
   const revision = ++sourceRevision
   // Keep the last admitted source and manual choices during a new file read;
@@ -483,15 +471,22 @@ async function loadSources() {
     let parsed
     if (combined) {
       const content = await readLocalFile(combined)
-      parsed = combined.name.toLowerCase().endsWith('.json')
+      parsed = combined.name.toLowerCase().endsWith('.json') || content.trimStart().startsWith('{')
         ? JSON.parse(content) : JSON.parse(convertOwnStoreCsv(content))
     } else if (plus && deka) {
       const [plusText, dekaText] = await Promise.all([readLocalFile(plus), readLocalFile(deka)])
-      const joined = csvHeader + '\n' + removeCsvHeader(plusText) + removeCsvHeader(dekaText)
-      if (new TextEncoder().encode(joined).length > maxBytes) {
-        throw Error('Twee samengevoegde CSV-bronnen zijn groter dan 256 kB.')
+      // Each real shop file passes the existing strict spreadsheet converter.
+      // Different separator conventions no longer corrupt or block the pair.
+      const first = JSON.parse(convertOwnStoreCsv(plusText))
+      const second = JSON.parse(convertOwnStoreCsv(dekaText))
+      if (first.captures.length !== 1 || second.captures.length !== 1 ||
+          first.captures[0].retailer === second.captures[0].retailer) {
+        throw Error('Selecteer één echte PLUS- en één DekaMarkt-opname.')
       }
-      parsed = JSON.parse(convertTwoStoreCsv(joined))
+      parsed = { schema: 'supa-offline-prices-v1',
+        captures: [...first.captures, ...second.captures] }
+      if (new TextEncoder().encode(JSON.stringify(parsed)).length > maxBytes)
+        throw Error('De twee winkelbronnen samen overschrijden 256 kB.')
     } else {
       parsed = JSON.parse(convertOwnStoreCsv(await readLocalFile(plus ?? deka)))
     }

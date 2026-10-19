@@ -38,7 +38,6 @@ const units: MatchUnit[] = ['g', 'kg', 'ml', 'l', 'piece']
 const limit = 256000
 const dayNs = 86400000000000n
 const weekNs = 7n * dayNs
-const csvHeader = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 const combined = document.querySelector<HTMLInputElement>('#combined')!
@@ -200,16 +199,6 @@ async function readSource(file: File): Promise<string> {
   if (!file.size || file.size > limit) throw Error('Bronbestand is te groot of leeg')
   return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
 }
-function withoutCsvHeader(value: string): string {
-  const source = value.startsWith('\uFEFF') ? value.slice(1) : value
-  const index = source.indexOf('\n')
-  if (index < 0 || source.slice(0, index).replace(/\r$/, '') !== csvHeader) {
-    throw Error('CSV-kop ontbreekt of is ongeldig')
-  }
-  const body = source.slice(index + 1)
-  if (!body) throw Error('Winkelbron bevat geen productregels')
-  return body.endsWith('\n') ? body : body + '\n'
-}
 async function parseSource(): Promise<Source> {
   const file = combined.files?.[0]
   const left = plus.files?.[0]
@@ -217,22 +206,28 @@ async function parseSource(): Promise<Source> {
   if ((file && (left || right)) || (!file && !left && !right)) {
     throw Error('Kies één gecombineerd bestand of eigen winkel-CSV’s')
   }
-  if (file && file.name.toLowerCase().endsWith('.json')) {
-    return sourceFrom(JSON.parse(await readSource(file)))
+  // Use one strict canonical converter for BOTH individual source sheets.
+  // Each file may have its own comma, semicolon or tab separator.
+  const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
+  const { convertOwnStoreCsv } = await import(/* @vite-ignore */ converterUrl)
+  if (file) {
+    const raw = await readSource(file)
+    return sourceFrom(JSON.parse(file.name.toLowerCase().endsWith('.json') ||
+      raw.trimStart().startsWith('{') ? raw : convertOwnStoreCsv(raw)))
   }
-  let csv: string
-  if (file) csv = await readSource(file)
-  else if (left && right) {
+  if (left && right) {
     const [a, b] = await Promise.all([readSource(left), readSource(right)])
-    csv = csvHeader + '\n' + withoutCsvHeader(a) + withoutCsvHeader(b)
-  } else {
-    csv = await readSource((left ?? right)!)
+    const first = JSON.parse(convertOwnStoreCsv(a)) as Source
+    const second = JSON.parse(convertOwnStoreCsv(b)) as Source
+    const captures = [...first.captures, ...second.captures]
+    if (captures.length !== 2 || captures[0].retailer === captures[1].retailer)
+      throw Error('Selecteer één echte PLUS- en één DekaMarkt-opname.')
+    const composed = { schema: 'supa-offline-prices-v1', captures }
+    if (new TextEncoder().encode(JSON.stringify(composed)).length > limit)
+      throw Error('Twee winkelbronnen samen overschrijden 256 KB')
+    return sourceFrom(composed)
   }
-  if (new TextEncoder().encode(csv).length > limit) throw Error('Samengevoegde bron overschrijdt 256 KB')
-  // Existing strict canonical reader is intentionally served unchanged from public.
-  const canonicalUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
-  const { convertOwnStoreCsv } = await import(/* @vite-ignore */ canonicalUrl)
-  return sourceFrom(JSON.parse(convertOwnStoreCsv(csv)))
+  return sourceFrom(JSON.parse(convertOwnStoreCsv(await readSource((left ?? right)!))))
 }
 
 async function readOwnBasketInputs(): Promise<{ source: Source; demand: Demand }> {

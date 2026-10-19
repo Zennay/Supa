@@ -36,6 +36,22 @@ const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores = ['PLUS', 'DekaMarkt'] as const
 type SourceSort = 'relevance' | 'whole-pack' | 'unit-price'
+// Some spreadsheet exports and mobile shares arrive as .txt or generic
+// application/octet-stream. Recognize only the EXACT existing nine-column
+// Supa header, then delegate all source facts to the canonical converter.
+// Never infer a retailer, observation time, SKU, package or price from a name.
+const privateSourceColumns = [
+  'retailer', 'observedAt', 'id', 'name', 'packAmount',
+  'packUnit', 'packCount', 'priceCents', 'available',
+] as const
+function isPrivateCaptureCsv(file: File, source: string): boolean {
+  if (/\.(?:csv|tsv)$/iu.test(file.name) || file.type === 'text/csv' ||
+      file.type === 'text/tab-separated-values') return true
+  const line = source.replace(/^\uFEFF/u, '').split(/\r?\n/u, 1)[0]
+  return [',', ';', '\t'].some(separator =>
+    line === privateSourceColumns.join(separator) ||
+    line === privateSourceColumns.map(column => '"' + column + '"').join(separator))
+}
 const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
 function exactPlanCheckpointKey(planKey: string): string {
   let hash = 2166136261
@@ -1017,8 +1033,7 @@ export function OfflineReviewedWorkbench({
       if (!file.size || file.size > 256000)
         throw new Error('Bronbestand is leeg of groter dan 256 kB.')
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
-        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
+      const isCsv = isPrivateCaptureCsv(file, raw)
       let source = raw
       if (isCsv) {
         const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
@@ -1060,8 +1075,7 @@ export function OfflineReviewedWorkbench({
         if (!file.size || file.size > 256000)
           throw new Error('Elk origineel winkelbestand moet gevuld zijn en maximaal 256 kB bevatten.')
         const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-        const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
-        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
+        const isCsv = isPrivateCaptureCsv(file, raw)
         let json = raw
         if (isCsv) {
           const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
@@ -1115,8 +1129,7 @@ export function OfflineReviewedWorkbench({
       if (!file.size || file.size > 256000)
         throw new Error('Een aanvulbestand moet gevuld zijn en maximaal 256 kB bevatten.')
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
-        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
+      const isCsv = isPrivateCaptureCsv(file, raw)
       let source = raw
       if (isCsv) {
         const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
@@ -1165,8 +1178,7 @@ export function OfflineReviewedWorkbench({
       if (!file.size || file.size > 256000)
         throw new Error('Nieuwe winkelopname is leeg of groter dan 256 kB.')
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
-        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
+      const isCsv = isPrivateCaptureCsv(file, raw)
       let json = raw
       if (isCsv) {
         const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
@@ -1244,8 +1256,7 @@ export function OfflineReviewedWorkbench({
       // The same canonical local CSV converter is already used by the
       // independent browser mapping wizard. It does not request retailer data.
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
-        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
+      const isCsv = isPrivateCaptureCsv(file, raw)
       let content = raw
       if (isCsv) {
         // Vite copies the existing public module without changing its parser.
@@ -1898,8 +1909,8 @@ export function OfflineReviewedWorkbench({
           }}>
           <strong>{dropActive ? 'Laat je eigen bestanden los om ze lokaal te openen' :
             'Sleep eigen PLUS-/Deka-prijsbestanden hierheen'}</strong>
-          <label>Open één bronbestand, of selecteer tegelijk je aparte PLUS- en DekaMarkt-bestanden (CSV/JSON)
-            <input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" multiple disabled={busy}
+          <label>Open één bronbestand, of selecteer tegelijk je aparte PLUS- en DekaMarkt-bestanden (CSV/TSV/JSON of negenkoloms-TXT)
+            <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" multiple disabled={busy}
               onChange={event => {
                 const files = Array.from(event.currentTarget.files ?? [])
                 event.currentTarget.value = ''
@@ -1907,7 +1918,7 @@ export function OfflineReviewedWorkbench({
               }} />
             <small>Twee bestanden moeten ieder precies één verschillende winkel bevatten. Ongeldige of dubbele opnames worden samen geweigerd; onbekende prijzen blijven onbekend.</small>
           </label>
-          <small>Sleep of selecteer maximaal twee eigen CSV/JSON-bestanden (elk 256 kB).
+          <small>Sleep of selecteer maximaal twee eigen CSV/JSON-bestanden (elk 256 kB), ook tekstbestanden met exact de Supa-CSV-kop.
             Excel-/spreadsheetgegevens mogen komma's, puntkomma's of tabs tussen kolommen hebben;
             een verpakkingsmaat mag een decimale komma gebruiken (bijvoorbeeld 0,75 kg).
             Beschikbaarheid: true/false of ja/nee; prijs uitsluitend in hele eurocenten.
@@ -1916,7 +1927,7 @@ export function OfflineReviewedWorkbench({
         </div>
         {imported && Object.keys(imported.captures).length === 1 && (
           <label>Voeg de echte opname van de andere winkel toe (CSV of JSON)
-            <input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" disabled={busy}
+            <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" disabled={busy}
               onChange={event => {
                 const file = event.currentTarget.files?.[0]
                 event.currentTarget.value = ''
@@ -2057,7 +2068,7 @@ export function OfflineReviewedWorkbench({
                       Maak nieuw prijsinvulblad voor {store} (CSV)
                     </button>
                     <label>Voeg originele nog ontbrekende {store}-producten toe uit dezelfde opname (CSV/JSON)
-                      <input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" disabled={busy}
+                      <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" disabled={busy}
                         onChange={event => {
                           const file = event.currentTarget.files?.[0]
                           event.currentTarget.value = ''
@@ -2068,7 +2079,7 @@ export function OfflineReviewedWorkbench({
                         vervang dan de hele winkelopname. Eerdere artikelen worden nooit overschreven.</small>
                     </label>
                     <label>Vervang uitsluitend de {store}-opname met je nieuwe echte bron (CSV of JSON)
-                      <input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" disabled={busy}
+                      <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" disabled={busy}
                         onChange={event => {
                           const file = event.currentTarget.files?.[0]
                           event.currentTarget.value = ''
