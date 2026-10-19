@@ -1,0 +1,55 @@
+.own-store-breakdown__overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  margin: .75rem 0 1rem;
+}
+.own-store-breakdown__overview span {
+  background: #f0f6f1;
+  color: #264d36;
+  padding: .55rem .8rem;
+  border-radius: 9px;
+  border: 1px solid #c7d9cc;
+}
+.own-store-breakdown__overview strong { font-variant-numeric: tabular-nums; }
+.own-store-breakdown__controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .8rem;
+  margin-bottom: .75rem;
+}
+.own-store-breakdown__controls label {
+  display: grid;
+  gap: .35rem;
+  font-size: .92rem;
+  font-weight: 650;
+  min-width: 0;
+}
+.own-store-breakdown__controls input,
+.own-store-breakdown__controls select {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #8da99a;
+  border-radius: 9px;
+  background: white;
+  color: #1e3428;
+  padding: .6rem;
+  min-height: 44px;
+  font: inherit;
+}
+.own-store-breakdown__controls :is(input,select):focus-visible {
+  outline: 3px solid #267650;
+  outline-offset: 2px;
+}
+.own-store-breakdown__count { margin: .5rem 0; font-variant-numeric: tabular-nums; }
+.own-store-breakdown__empty {
+  padding: 1rem;
+  border: 1px dashed #adc3b2;
+  border-radius: 9px;
+  background: #f8faf8;
+}
+.own-store-breakdown__empty button { min-height: 44px; }
+@media (max-width: 740px) {
+  .own-store-breakdown__controls { grid-template-columns: 1fr; }
+  .own-store-breakdown__overview { display: grid; grid-template-columns: 1fr; }
+}
