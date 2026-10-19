@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
+import type { MatchUnit } from '../../domain/matching.ts'
+import { privatePackUnitRate } from './privateUnitPrice.ts'
 import { historicalRetailerProducts } from '../products/historicalRetailerProducts.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
@@ -94,6 +97,29 @@ function hasPartialOwnCapture(row: ProductDraft): boolean {
     row.packAmount.trim() || row.priceEuros.trim() ||
     row.available || row.availabilityReviewed,
   )
+}
+
+const draftEuros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+function currentDraftPackPreview(row: ProductDraft, need: { amount: number | null; unit: MatchUnit }): string | null {
+  if (!isCompleteOwnPriceDraft(row) || need.amount === null || !Number.isFinite(need.amount) ||
+      need.amount <= 0) return null
+  const packAmount = amountOrNull(row.packAmount.trim())
+  const priceCents = eurosToCents(row.priceEuros.trim())
+  if (packAmount === null || priceCents === null) return null
+  const count = Number(row.packCount)
+  const packs = calculateDecimalPackCount(
+    [{ amount: need.amount, unit: need.unit }],
+    { amount: packAmount, unit: row.packUnit, count },
+  )
+  if (packs === null || !Number.isSafeInteger(packs) || packs <= 0) return null
+  const total = packs * priceCents
+  if (!Number.isSafeInteger(total) || total < 0) return null
+  const rate = privatePackUnitRate({
+    amount: packAmount, unit: row.packUnit, count, priceCents,
+  })
+  return packs + ' hele verpakking(en) × ' + draftEuros.format(priceCents / 100) +
+    ' = ' + draftEuros.format(total / 100) + ' voor deze ingrediëntvraag' +
+    (rate ? ' · ' + draftEuros.format(rate.centsPerUnit / 100) + ' per ' + rate.unit : '')
 }
 
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
@@ -441,6 +467,63 @@ export function LocalTwoStorePriceEditor({
   }
   const validOutput = output && selectedPlanFingerprint === preparedFor
 
+  // A pocket-sized to-do from only the still-unresolved *current* Planner
+  // demands. Unlike the admitted source JSON, this never states a retailer
+  // price, availability or permission and cannot be fed to the price parser.
+  function downloadMissingCaptureList() {
+    try {
+      const plain = (value: string) =>
+        value.replace(/[\r\n\u2028\u2029\u0000-\u001f\u007f-\u009f]/gu, ' ').trim()
+      const tasks = selectedStores.flatMap(store => activeNeeds.flatMap(need => {
+        const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+        if (isEnteredOwnCapture(draft)) return []
+        return [{ store, need, draft }]
+      }))
+      if (!tasks.length) {
+        setDraftStatus('Geen open artikelregels meer in de gekozen winkel(s). Controleer nog de bronmomenten en de persoonlijke productreviews.')
+        return
+      }
+      const text = [
+        'SUPA · nog zelf te observeren winkelproducten',
+        'Dit is een privé-invulhulp, GEEN prijsopname, productgoedkeuring of bronrechtenbewijs.',
+        'Laat een artikel onbekend totdat je de echte code, naam, inhoud, status en prijs hebt gecontroleerd.',
+        '',
+        ...selectedStores.flatMap(store => {
+          const pending = tasks.filter(task => task.store === store)
+          if (!pending.length) return []
+          return [
+            'Winkel: ' + store + ' · ' + pending.length + ' open artikel(en)',
+            ...pending.flatMap(({ need, draft }, index) => [
+              (index + 1) + '. [ ] ' + plain(need.label) +
+                ' · gevraagd ' + (need.amount ?? '?') + ' ' + plain(need.unit),
+              '    Originele broncode: ' + (draft.sourceId?.trim() ? plain(draft.sourceId) + ' [CONCEPT]' : '__________'),
+              '    Productnaam: ' + (draft.name.trim() ? plain(draft.name) + ' [CONCEPT]' : '__________'),
+              '    Verpakking, aantal pakken, prijs, beschikbaarheid, werkelijk bronmoment: zelf controleren.',
+            ]),
+            '',
+          ]
+        }),
+        'Na je winkelbezoek: werk het bestaande persoonlijke concept bij in SUPA;',
+        'de winkelvergelijking blijft onbekend tot beide mandjes werkelijk compleet en bevestigd zijn.',
+      ].join('\n')
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-open-winkelwaarnemingen.txt'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        setDraftStatus(tasks.length + ' nog te controleren winkelregels als privé-TXT gedownload.')
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+    } catch {
+      setDraftStatus('De lokale lijst met open artikelregels kon niet worden gedownload.')
+    }
+  }
+
   // Portable *unfinished form*, not an admitted retailer price snapshot.
   // The two formats intentionally cannot be mistaken for one another.
   function downloadUnfinishedDraft() {
@@ -546,6 +629,9 @@ export function LocalTwoStorePriceEditor({
         </label>
         <span role="status">{draftStatus}</span>
         <div className="offline-manual-editor__progress-actions">
+          <button type="button" className="ghost-button" onClick={downloadMissingCaptureList}>
+            Download open winkelwaarnemingen (TXT)
+          </button>
           <button type="button" className="ghost-button" onClick={downloadUnfinishedDraft}>
             Download onvoltooid invulconcept (JSON)
           </button>
@@ -677,6 +763,14 @@ export function LocalTwoStorePriceEditor({
                   }, need.unit)} />
                 Zelf gecontroleerd niet beschikbaar (geen prijs; aangevinkte status wist een ingevoerde prijs)
               </label>
+              {currentDraftPackPreview(row, need) && (
+                <p className="offline-manual-editor__pack-preview">
+                  <strong>Verpakkingsberekening uit jouw concept</strong><br />
+                  {currentDraftPackPreview(row, need)}
+                  <small>Alleen rekenhulp: originele SKU, prijs en beschikbaarheid
+                    worden pas in de volgende stap persoonlijk beoordeeld.</small>
+                </p>
+              )}
             </fieldset>
           })}
         </section>)}

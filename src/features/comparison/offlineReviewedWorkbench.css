@@ -69,6 +69,10 @@
 .offline-manual-editor__progress-actions button { min-height:44px; padding:.55rem .8rem; }
 .offline-manual-editor__progress-actions button:disabled { opacity:.55; cursor:not-allowed; }
 .offline-manual-editor__row-status { font-weight:500; font-size:.78rem; color:#536258; }
+.offline-manual-editor__pack-preview { margin:.25rem 0; padding:.8rem; border-radius:10px;
+  background:#eef5ed; border-left:3px solid #538667; font-size:.9rem; line-height:1.5; }
+.offline-manual-editor__pack-preview small { display:block; margin-top:.4rem; color:#536258; }
+
 
 .offline-manual-editor__row label { display:grid; gap:.35rem; font-size:.88rem; }
 .offline-manual-editor__row input,.offline-manual-editor__row select,
