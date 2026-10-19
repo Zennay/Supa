@@ -41,6 +41,12 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
   const [downloadMessage, setDownloadMessage] = useState('')
+  const [copyableStore, setCopyableStore] = useState<{
+    store: OwnStore
+    receipt: NonNullable<PrivateReviewedBaskets['stores'][OwnStore]>
+    text: string
+  } | null>(null)
+
   const [directImportMessage, setDirectImportMessage] = useState('')
   const [directDropActive, setDirectDropActive] = useState(false)
   function takeOwnSourceFiles(files: File[]) {
@@ -319,6 +325,35 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     }
   }
 
+  async function copySingleStoreBasket(store: OwnStore) {
+    setDownloadMessage('')
+    setCopyableStore(null)
+    try {
+      const receipt = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())?.stores[store]
+      if (!receipt) throw new Error('De eigen winkelbron is niet actueel of niet volledig gecontroleerd.')
+      const { privateSingleStoreShoppingText } =
+        await import('../shopping-list/privateSingleStoreShoppingText.ts')
+      const content = privateSingleStoreShoppingText({
+        basket: receipt.basket, observedAt: receipt.observedAt,
+      })
+      if (freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())?.stores[store] !== receipt)
+        throw new Error('De winkelbron is gewijzigd of verlopen. Controleer opnieuw in Vergelijk.')
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(content)
+          setDownloadMessage(store + ': je volledige privéboodschappenlijst is gekopieerd. Geen tweede winkelprijs verzonnen.')
+          return
+        } catch { /* Use the same locally generated text below. */ }
+      }
+      if (freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())?.stores[store] !== receipt)
+        throw new Error('De bron is verlopen tijdens het kopiëren. Herzie de winkelbron.')
+      setCopyableStore({ store, receipt, text: content })
+      setDownloadMessage(store + ': selecteer en kopieer de eigen lijst hieronder (klembordtoegang ontbreekt).')
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : 'Je winkelmandje kan niet worden gekopieerd.')
+    }
+  }
+
   function chooseConfirmedLine(id: string, store: OwnStore) {
     const choice = currentPrivateRouteChoice(reviewed, id, store, Date.now())
     if (!choice) {
@@ -527,8 +562,18 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               onClick={() => void downloadSingleStoreBasket(store, 'html')}>
               Print {store}-boodschappen (HTML)
             </button>
+            <button type="button" className="ghost-button"
+              onClick={() => void copySingleStoreBasket(store)}>
+              Kopieer {store}-boodschappen (mobiel)
+            </button>
             <small>Werkt zonder tweede winkel; uitsluitend je originele, gecontroleerde en
               actuele pakprijzen. Geen winkelverschil of besparingsclaim.</small>
+            {copyableStore?.store === store && copyableStore.receipt === capture &&
+              <label className="own-store-planner__copy-fallback">
+                Selecteer en kopieer deze privéboodschappenlijst
+                <textarea readOnly value={copyableStore.text} rows={9}
+                  onFocus={event => event.currentTarget.select()} />
+              </label>}
           </div>}
         </div>
       })}
