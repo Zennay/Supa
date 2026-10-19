@@ -250,6 +250,7 @@ export function OfflineReviewedWorkbench({
     stores: CapturePreviewStore[]
     unobservedOtherStoreRows: number
     pairedWithin24h: boolean
+    retainedOther?: { retailer: CaptureStore; within24h: boolean; observedNs: bigint }
   } | null>(null)
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   const [manualSku, setManualSku] = useState<Record<typeof stores[number], Record<string, string>>>({
@@ -282,11 +283,13 @@ export function OfflineReviewedWorkbench({
   }, [plan, recipes, activeDays])
   const captureWeek = JSON.stringify([planKey ?? null, plannerCaptureNeeds.map(n => [n.id, n.label, n.unit, n.amount])])
   const currentPreview = capturePreview?.week === captureWeek ? capturePreview : null
-  const capturePreviewFresh = (store: CapturePreviewStore) => {
-    if (store.observedNs === undefined || !Number.isSafeInteger(clockMs)) return false
-    const age = BigInt(Math.trunc(clockMs)) * 1_000_000n - store.observedNs
+  const freshPreviewInstant = (observedNs?: bigint): boolean => {
+    if (observedNs === undefined || !Number.isSafeInteger(clockMs)) return false
+    const age = BigInt(Math.trunc(clockMs)) * 1_000_000n - observedNs
     return age >= -300_000_000_000n && age <= 604_800_000_000_000n
   }
+  const capturePreviewFresh = (store: CapturePreviewStore) =>
+    freshPreviewInstant(store.observedNs)
 
   async function previewFilledCsv(files: File[]) {
     if (files.length === 0) return
@@ -377,10 +380,28 @@ export function OfflineReviewedWorkbench({
         }
       }
       if (version !== importRevision.current) return
+      // One newly imported store can be compared with the independently
+      // retained other capture, not merely the stores inside this CSV file.
+      // Never invent a missing retailer instant or silently refresh the old one.
+      let retainedOther: { retailer: CaptureStore; within24h: boolean; observedNs: bigint } | undefined
+      if (storesInPreview.length === 1) {
+        const otherStore = stores.find(store => store !== storesInPreview[0].retailer)!
+        const other = imported?.captures[otherStore]
+        const incoming = combined.captures[storesInPreview[0].retailer]
+        if (other && incoming) {
+          const gap = other.observedNs > incoming.observedNs
+            ? other.observedNs - incoming.observedNs : incoming.observedNs - other.observedNs
+          retainedOther = {
+            retailer: otherStore,
+            within24h: gap <= 86_400_000_000_000n,
+            observedNs: other.observedNs,
+          }
+        }
+      }
       setCapturePreview({
         files, week: captureWeek, stores: storesInPreview,
         unobservedOtherStoreRows: blankOtherRows,
-        pairedWithin24h: combined.pairedWithin24h,
+        pairedWithin24h: combined.pairedWithin24h, retainedOther,
       })
       setWeekExportMessage('Eigen CSV-bronopnames lokaal gecontroleerd. Bekijk beide winkels en neem de brondata bewust over.')
     } catch (e) {
@@ -1596,6 +1617,23 @@ export function OfflineReviewedWorkbench({
                 <p role="status" className="offline-price-workbench__capture-alert">
                   De twee oorspronkelijke bronmomenten liggen meer dan 24 uur uiteen.
                   Ook na import kan Supa hieruit geen vergelijkbaar prijsverschil afleiden.
+                </p>
+              )}
+              {currentPreview.retainedOther && (
+                <p role="status" className={
+                  currentPreview.retainedOther.within24h &&
+                  freshPreviewInstant(currentPreview.retainedOther.observedNs)
+                    ? 'disclaimer' : 'offline-price-workbench__capture-alert'
+                }>
+                  Je hebt al een eigen {currentPreview.retainedOther.retailer}-opname geladen.
+                  {freshPreviewInstant(currentPreview.retainedOther.observedNs)
+                    ? ' Dat bewaarde bronmoment ligt nog binnen zeven dagen.'
+                    : ' Dat bewaarde bronmoment is verlopen of toekomstig.'}
+                  {currentPreview.retainedOther.within24h
+                    ? ' De twee werkelijk ingevoerde bronmomenten liggen binnen 24 uur.'
+                    : ' De nieuwe bron en de bewaarde winkel liggen meer dan 24 uur uiteen.'}
+                  {' '}Een prijsverschil blijft onbekend totdat beide bronopnames
+                  actueel zijn en alle fysieke productmatches afzonderlijk zijn bevestigd.
                 </p>
               )}
               {currentPreview.stores.map(store => (
