@@ -100,8 +100,15 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
     }
     const preview: Item[] = []
     for (const line of lines) {
-      const parts = line.split(';').map(s => s.trim())
-      let name = line
+      // Common personal notes can be Markdown checklists or plain bullets.
+      // Preserve a user-explicit [x] only in THIS new private list; importing
+      // a different Planner week separately always resets its old checkmarks.
+      const checkbox = /^(?:[-*•]\s*)?\[([ xX])\]\s+(.+)$/u.exec(line)
+      const cleaned = checkbox ? checkbox[2].trim() :
+        line.replace(/^[-*•]\s+/, '').trim()
+      const done = checkbox?.[1].toLowerCase() === 'x'
+      const parts = cleaned.split(';').map(s => s.trim())
+      let name = cleaned
       let quantity = 1
       let unit: Unit = 'piece'
       if (parts.length === 3) {
@@ -121,7 +128,7 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
         setNotice('Gebruik één artikel per regel of artikel; hoeveelheid; stuks/g/ml.')
         return
       }
-      const next: Item = { id: 'preview', name, quantity, unit, done: false }
+      const next: Item = { id: 'preview', name, quantity, unit, done }
       if (!valid(next)) {
         setNotice('Een van de regels bevat een ongeldig artikel of een ongeldige hoeveelheid.')
         return
@@ -370,9 +377,9 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       <button type="submit">Voeg toe</button>
     </form>
     <form onSubmit={previewPaste} className="unpriced-planner-checklist__paste">
-      <label>Plak eigen boodschappen · één artikel per regel, of artikel; hoeveelheid; stuks/g/ml
+      <label>Plak boodschappen · naam per regel, artikel; hoeveelheid; stuks/g/ml of Markdown - [x]
         <textarea value={paste} maxLength={20000} rows={5}
-          placeholder={'Koffie; 500; g\nToiletpapier; 6; stuks\nAfwasmiddel'}
+          placeholder={'- [ ] Koffie; 500; g\n- [x] Toiletpapier; 6; stuks\n* Afwasmiddel'}
           onChange={event => { setPaste(event.target.value); setPendingPaste(null) }} />
       </label>
       <label className="unpriced-planner-checklist__upload">Of lees een lokaal tekstbestand (.txt / .md)
@@ -387,7 +394,7 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
     {pendingPaste && <div className="unpriced-planner-checklist__paste-preview">
       <h4>Controleer {pendingPaste.length} extra boodschappen zonder winkelprijzen</h4>
       <ul>{pendingPaste.map((row, index) => <li key={index}>
-        {row.quantity} {row.unit === 'piece' ? 'stuks' : row.unit} {row.name}
+        {row.done ? '☑' : '☐'} {row.quantity} {row.unit === 'piece' ? 'stuks' : row.unit} {row.name}
       </li>)}</ul>
       <button type="button" onClick={acceptPaste}>Voeg alle artikelen toe</button>
       <button type="button" onClick={() => setPendingPaste(null)}>Annuleer</button>
