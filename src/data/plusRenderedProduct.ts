@@ -92,7 +92,15 @@ function safeCapturedAt(value: unknown): value is string {
         (offsetHour === upper && offsetMinute !== 0)) return false
   }
 
-  return Number.isFinite(Date.parse(value))
+  const millis = Date.parse(value)
+  if (!Number.isFinite(millis)) return false
+  // The product adapters must apply the same ±60s future skew rule as
+  // catalog/offers capture ingestion, with the original 1–9 fractional
+  // digits retained rather than silently accepting a future sub-ms tick.
+  const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/u.exec(value)?.[1] ?? ''
+  const capturedNs = BigInt(millis) * 1_000_000n +
+    BigInt((fraction.padEnd(9, '0').slice(3)) || '0')
+  return capturedNs <= BigInt(Date.now() + 60_000) * 1_000_000n
 }
 
 function safePlusProductUrl(value: unknown): value is string {
