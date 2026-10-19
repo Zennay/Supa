@@ -1,6 +1,7 @@
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { ManualStoreComparison } from '../comparison/ManualStoreComparison'
+import { ListingBasketPreview } from '../comparison/ListingBasketPreview'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
@@ -81,6 +82,7 @@ export function BasketView({
 
   return (
     <section className="screen">
+      <ListingBasketPreview />
       {manualPlan && manualRecipes && manualActiveDays && (
         <ManualStoreComparison
           key={JSON.stringify([manualPlan, manualActiveDays, manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
