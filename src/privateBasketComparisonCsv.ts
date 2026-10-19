@@ -5,6 +5,7 @@
  */
 import type { OneStoreBasket, BasketTraceLine } from './domain/basket.ts'
 import type { MatchUnit } from './domain/matching.ts'
+import { privatePackUnitRate } from './features/comparison/privateUnitPrice.ts'
 
 type Store = 'PLUS' | 'DekaMarkt'
 type Capture = { observedAt: string }
@@ -40,15 +41,16 @@ export function literalCsv(value: unknown, signedMoneyDelta = false): string {
 }
 
 function advisory(line: Extract<BasketTraceLine, { status: 'matched' }>): string {
-  const count = line.pack.count
-  const metric = line.pack.unit === 'kg' || line.pack.unit === 'l' ? 1000 : 1
-  const quantity = line.pack.amount * count * metric
-  const unitAmount = line.pack.unit === 'piece' ? 1 : 1000
-  const centsPerUnit = line.pricePerPackCents * unitAmount / quantity
-  if (!(quantity > 0) || !Number.isFinite(centsPerUnit) || centsPerUnit < 0) return ''
-  const label = line.pack.unit === 'g' || line.pack.unit === 'kg' ? 'kg'
-    : line.pack.unit === 'ml' || line.pack.unit === 'l' ? 'liter' : 'stuk'
-  return (centsPerUnit / 100).toFixed(2) + ' EUR/' + label + ' (indicatief)'
+  const rate = privatePackUnitRate({
+    amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
+    priceCents: line.pricePerPackCents,
+  })
+  if (!rate) return ''
+  const cents = rate.roundedCentsPerUnit
+  // Exact cent formatting: don't reintroduce a binary floating rounding step
+  // after matching a user's original pack and whole-pack price.
+  return String(Math.floor(cents / 100)) + '.' + String(cents % 100).padStart(2, '0') +
+    ' EUR/' + rate.unit + ' (indicatief)'
 }
 
 function storeColumns(

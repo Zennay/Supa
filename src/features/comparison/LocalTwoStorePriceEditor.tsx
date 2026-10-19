@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { MatchUnit } from '../../domain/matching.ts'
-import { privatePackUnitRate } from './privateUnitPrice.ts'
+import { privatePackUnitRate, formatPrivateUnitRate } from './privateUnitPrice.ts'
 import { ownPriceCapturesToCsv } from './ownPriceCsvExport.ts'
 import { historicalRetailerProducts } from '../products/historicalRetailerProducts.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -151,7 +151,7 @@ function currentDraftPackPreview(row: ProductDraft, need: { amount: number | nul
   })
   return packs + ' hele verpakking(en) × ' + draftEuros.format(priceCents / 100) +
     ' = ' + draftEuros.format(total / 100) + ' voor deze ingrediëntvraag' +
-    (rate ? ' · ' + draftEuros.format(rate.centsPerUnit / 100) + ' per ' + rate.unit : '')
+    (rate ? ' · ' + formatPrivateUnitRate(rate) : '')
 }
 
 type CaptureStatus = 'priced' | 'unavailable' | 'incompatible' | 'partial' | 'missing'

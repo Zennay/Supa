@@ -19,7 +19,7 @@ const MixedStoreShoppingCard = lazy(async () => {
   const module = await import('./MixedStoreShoppingCard.tsx')
   return { default: module.MixedStoreShoppingCard }
 })
-import { privatePackUnitRate } from './privateUnitPrice.ts'
+import { privatePackUnitRate, formatPrivateUnitRate } from './privateUnitPrice.ts'
 import { rankOwnSourceSuggestions } from './ownSourceSuggestions.ts'
 import { automaticallyAcceptedSourceLine } from './automaticSourceMatch.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
@@ -137,7 +137,7 @@ function sourcePackRate(product: import('../../domain/basket.ts').StoreProduct):
     count: product.packCount ?? 1,
     priceCents: product.available ? product.priceCents : null,
   })
-  return rate ? ' · ' + euros.format(rate.centsPerUnit / 100) + ' per ' + rate.unit : ''
+  return rate ? ' · ' + formatPrivateUnitRate(rate) : ''
 }
 /** Exact whole-pack preview for one original source candidate only.
  * The canonical basket/review gate still decides whether this can become

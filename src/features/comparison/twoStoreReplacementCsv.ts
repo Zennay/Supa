@@ -27,9 +27,15 @@ function observedUnitRate(item: OfflineStoreProduct | undefined) {
   return privatePackUnitRate({ amount: item.packAmount, unit: item.packUnit,
     count: item.packCount ?? 1, priceCents: item.sourcePriceCents })
 }
+function exactMilliCentsText(milli: number): string {
+  const negative = milli < 0 ? '-' : ''
+  const abs = Math.abs(milli)
+  return negative + String(Math.floor(abs / 1000)) + '.' +
+    String(abs % 1000).padStart(3, '0')
+}
 function formattedUnitRate(item: OfflineStoreProduct | undefined) {
   const rate = observedUnitRate(item)
-  return rate ? rate.centsPerUnit.toFixed(3) + ' cent/' + rate.unit : 'Onbekend'
+  return rate ? exactMilliCentsText(rate.milliCentsPerUnit) + ' cent/' + rate.unit : 'Onbekend'
 }
 
 /** Export only genuine, locally imported, original SKU facts. A changed
@@ -74,7 +80,7 @@ export function twoStoreReplacementCsv(
       const oldUnit = observedUnitRate(was)
       const newUnit = observedUnitRate(after)
       const unitDelta = oldUnit && newUnit && oldUnit.unit === newUnit.unit
-        ? (newUnit.centsPerUnit - oldUnit.centsPerUnit).toFixed(3) : 'Onbekend'
+        ? exactMilliCentsText(newUnit.milliCentsPerUnit - oldUnit.milliCentsPerUnit) : 'Onbekend'
       rows.push(cells([store, id, kind, old?.observedAt ?? 'Onbekend',
         next.observedAt, was?.name ?? '', after?.name ?? '',
         pack(was), pack(after), money(was), money(after),
