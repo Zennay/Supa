@@ -6,7 +6,7 @@ const ManualStoreComparison = lazy(async () => {
   return { default: module.ManualStoreComparison }
 })
 import { OfflineReviewedWorkbench } from '../comparison/OfflineReviewedWorkbench'
-import type { PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
+import type { PrivateReviewedBaskets, PrivateCaptureProgress } from '../comparison/privateReviewedBasketBridge.ts'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
@@ -37,6 +37,7 @@ export function BasketView({
   manualActiveDays,
   privatePlanKey,
   onReviewedBaskets,
+  onCaptureProgress,
   onPrivateImportReady,
 }: {
   basket: OneStoreBasket
@@ -48,6 +49,7 @@ export function BasketView({
   manualActiveDays?: string[]
   privatePlanKey?: string
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
+  onCaptureProgress?: (value: PrivateCaptureProgress | null) => void
   onPrivateImportReady?: () => void
 }) {
   // Called once for the first lazy mount, when the import DOM is available.
@@ -100,7 +102,8 @@ export function BasketView({
     <section className="screen">
       {manualPlan && manualRecipes && manualActiveDays && (
         <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
-          planKey={privatePlanKey} onReviewedBaskets={onReviewedBaskets} />
+          planKey={privatePlanKey} onReviewedBaskets={onReviewedBaskets}
+          onCaptureProgress={onCaptureProgress} />
       )}
       {manualPlan && manualRecipes && manualActiveDays && (
         <details className="demo-comparison-disclosure" onToggle={event => {

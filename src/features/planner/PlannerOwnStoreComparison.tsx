@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
@@ -14,8 +14,9 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, captureNeeds }: {
+export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, captureNeeds }: {
   reviewed: PrivateReviewedBaskets | null
+  captureProgress: PrivateCaptureProgress | null
   captureNeeds: readonly PlannerCaptureGuideNeed[]
   preferred: OwnStore
   hasDemand: boolean
@@ -214,6 +215,20 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
           <span className="own-store-planner__price">{capture && typeof cents === 'number' && Number.isSafeInteger(cents) && cents >= 0
             ? money.format(cents / 100) : 'Prijs onbekend'}</span>
           <small>{capture ? `Eigen opname: ${capture.observedAt}` : 'Nog geen complete, gecontroleerde opname'}</small>
+          {captureProgress?.stores[store] && !capture && (() => {
+            const progress = captureProgress.stores[store]!
+            return <div className="own-store-planner__capture-status" role="status">
+              <small>Eigen bron: {progress.observedAt} · {progress.originalProductCount} originele SKU’s.</small>
+              <small>{progress.matchedLineCount}/{progress.demandLineCount} ingrediënten hebben een voorgestelde match;
+                {' '}{progress.reviewedLineCount}/{progress.demandLineCount} fysiek gecontroleerd.</small>
+              <small>{progress.fresh
+                ? 'Nog niet volledig gecontroleerd: prijs en budget blijven onbekend.'
+                : 'Bronopname te oud of toekomstig: vernieuw de echte bron voordat prijzen meetellen.'}</small>
+              <button type="button" className="ghost-button" onClick={onOpenComparison}>
+                Ga naar mijn ontbrekende productcontroles
+              </button>
+            </div>
+          })()}
           {capture && privatePriceAgeNotice(capture.capturedMs, Date.now()) && (
             <small className="own-store-planner__age" role="status">
               {privatePriceAgeNotice(capture.capturedMs, Date.now())}

@@ -28,7 +28,7 @@ import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
-import type { PrivateReviewedBaskets } from './privateReviewedBasketBridge.ts'
+import type { PrivateReviewedBaskets, PrivateCaptureProgress } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -289,13 +289,14 @@ function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number],
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays, planKey, onReviewedBaskets,
+  plan, recipes, activeDays, planKey, onReviewedBaskets, onCaptureProgress,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   planKey?: string
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
+  onCaptureProgress?: (value: PrivateCaptureProgress | null) => void
 }) {
   // A pasted source is a proposal, never the admitted receipt currently
   // powering reviews, exports, and shopping progress.
@@ -1434,6 +1435,31 @@ export function OfflineReviewedWorkbench({
   useEffect(() => {
     onReviewedBaskets?.(reviewedBridge)
   }, [onReviewedBaskets, reviewedBridge])
+  // Never promote partial source matching to a priced Planner budget.
+  // This metadata is for navigation and explaining what remains to review.
+  const captureProgress = useMemo((): PrivateCaptureProgress | null => {
+    if (!imported || !planKey) return null
+    const statuses: PrivateCaptureProgress['stores'] = {}
+    for (const store of stores) {
+      const capture = imported.captures[store]
+      const basket = store === 'PLUS' ? basketPair?.plus : basketPair?.deka
+      if (!capture) continue
+      const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
+      statuses[store] = {
+        observedAt: capture.observedAt,
+        originalProductCount: capture.products.length,
+        demandLineCount: basket?.lines.length ?? 0,
+        matchedLineCount: basket?.matchedLineCount ?? 0,
+        reviewedLineCount: perStoreReview.find(item => item.store === store)?.accepted ?? 0,
+        fresh: nowNs >= capture.observedNs - 300_000_000_000n &&
+          nowNs - capture.observedNs <= 604_800_000_000_000n,
+      }
+    }
+    return { planKey, stores: statuses }
+  }, [imported, planKey, basketPair, reviewedLines, clockMs])
+  useEffect(() => {
+    onCaptureProgress?.(captureProgress)
+  }, [onCaptureProgress, captureProgress])
   function goToReviewRow(store: typeof stores[number], id: string) {
     setOpenTripOnly(false)
     window.setTimeout(() => document.getElementById(reviewRowId(store, id))?.scrollIntoView({

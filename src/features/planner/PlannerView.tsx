@@ -11,7 +11,7 @@ import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { HiFiPlannerWeekCard } from './HiFiPlannerWeekCard.tsx'
 import { PlannerOwnStoreComparison } from './PlannerOwnStoreComparison.tsx'
-import type { PrivateReviewedBaskets, OwnStore, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import type { PrivateReviewedBaskets, PrivateCaptureProgress, OwnStore, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -22,6 +22,7 @@ type PlannerViewProps = {
   plannedMeals: PlannedMeal[]
   recipes: Recipe[]
   ownReviewed?: PrivateReviewedBaskets | null
+  captureProgress?: PrivateCaptureProgress | null
   preferredOwnStore: OwnStore
   onOpenShoppingList: () => void
   onOpenMixedRoute: (extraCostRaw?: string) => void
@@ -44,6 +45,7 @@ export function PlannerView({
   plannedMeals,
   recipes,
   ownReviewed,
+  captureProgress,
   preferredOwnStore,
   onOpenShoppingList,
   onOpenMixedRoute,
@@ -334,7 +336,8 @@ export function PlannerView({
         </p>}
       </section>
 
-      <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} preferred={preferredOwnStore}
+      <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} captureProgress={captureProgress ?? null}
+        preferred={preferredOwnStore}
         captureNeeds={captureNeeds}
         hasDemand={activeDays.length > 0} budget={budget}
         onSelect={onOwnSourceChange}

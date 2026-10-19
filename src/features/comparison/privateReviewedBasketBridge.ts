@@ -12,6 +12,20 @@ export type PrivateReviewedBaskets = {
   stores: Partial<Record<OwnStore, PrivateReviewedBasket>>
 }
 
+/** In-memory progress for incomplete private shopping data. Never represents
+ * a priced, reviewed basket and must never become a savings authority. */
+export type PrivateCaptureProgress = {
+  planKey: string
+  stores: Partial<Record<OwnStore, {
+    observedAt: string
+    originalProductCount: number
+    demandLineCount: number
+    matchedLineCount: number
+    reviewedLineCount: number
+    fresh: boolean
+  }>>
+}
+
 export function freshReviewedBaskets(
   snapshots: PrivateReviewedBaskets | null,
   expectedPlanKey: string,

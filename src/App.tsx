@@ -27,7 +27,7 @@ const OwnExtraGroceries = lazy(async () => {
 })
 import type { PrivateExtraVisitCostIntent } from './features/comparison/privateExtraVisitCost.ts'
 import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
-import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
@@ -134,6 +134,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [privateRouteChoice, setPrivateRouteChoice] = useState<PrivateRouteChoice | null>(null)
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
+  const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
   // Only transient shopping ticks. Never persist prices or review approvals.
   // Keep across a temporary unpriced edit so a price-only correction preserves
   // the physical items already ticked; different SKUs or quantities use new keys.
@@ -148,6 +149,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     if (next) setPreferredOwnStore(current => next.stores[current] ? current
       : next.stores.PLUS ? 'PLUS' : next.stores.DekaMarkt ? 'DekaMarkt' : current)
     setPrivateReviewed(previous => JSON.stringify(previous) === JSON.stringify(next)
+      ? previous : next)
+  }, [])
+  const onCaptureProgress = useCallback((next: PrivateCaptureProgress | null) => {
+    setPrivateCaptureProgress(previous => JSON.stringify(previous) === JSON.stringify(next)
       ? previous : next)
   }, [])
   // A sleeping tab cannot keep displaying a once-valid private price as current.
@@ -514,6 +519,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             plannedMeals={plannedMeals}
             recipes={recipes}
             ownReviewed={livePrivateReviewed}
+            captureProgress={privateCaptureProgress?.planKey === privatePlanKey
+              ? privateCaptureProgress : null}
             preferredOwnStore={preferredOwnStore}
             onOpenShoppingList={() => navigate('list')}
             onOpenMixedRoute={rawCost => {
@@ -642,6 +649,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             manualActiveDays={activeDays}
             privatePlanKey={privatePlanKey}
             onReviewedBaskets={onReviewedBaskets}
+            onCaptureProgress={onCaptureProgress}
           />
           </Suspense>
           </div>
