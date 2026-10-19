@@ -140,6 +140,13 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   if (!Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid is buiten bereik' }
   }
+  // Half an egg, onion or other physical item cannot be purchased as an
+  // automatically confirmed piece. Keep the literal recipe line editable
+  // instead of accidentally promoting it into the priced Planner basket.
+  if (unit === 'piece' && !Number.isSafeInteger(normalized)) {
+    return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null,
+      reviewReason: 'Een deel van een stuk: kies bewust een heel aantal stuks' }
+  }
   return { original, label, query: label.toLocaleLowerCase('nl'), amount: normalized, unit, reviewReason: null }
 }
 
