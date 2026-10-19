@@ -22,3 +22,34 @@
 .unpriced-planner-checklist__upload input[type=file]::file-selector-button { margin-right:.45rem; padding:.5rem; border:1px solid #8aad96; border-radius:7px; color:#244e36; background:#fff; cursor:pointer; }
 
 .unpriced-planner-checklist__progress{width:min(220px,100%);height:12px;accent-color:#236b48}
+
+/* User-owned grocery extras never enter the priced, matched week basket. */
+.unpriced-planner-checklist__extras {
+  margin-top: 1.35rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #d2d8dc);
+  border-radius: 1rem;
+}
+.unpriced-planner-checklist__extras > p { max-width: 70ch; }
+.unpriced-planner-checklist__extras form label {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  min-width: 8rem;
+}
+.unpriced-planner-checklist__extras form input,
+.unpriced-planner-checklist__extras form select { max-width: 19rem; min-height: 2.5rem; }
+.unpriced-planner-checklist__extras ul { list-style: none; padding: 0; }
+.unpriced-planner-checklist__extras li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .65rem 0;
+  border-bottom: 1px solid #d8dfdf;
+}
+.unpriced-planner-checklist__extras li label { display: flex; gap: .7rem; align-items: center; }
+@media (max-width: 520px) {
+  .unpriced-planner-checklist__extras li { flex-wrap: wrap; }
+  .unpriced-planner-checklist__extras form label { width: 100%; }
+}

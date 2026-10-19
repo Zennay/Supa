@@ -21,6 +21,7 @@ const PrivateReviewedProductCatalog = lazy(async () => {
   return { default: module.PrivateReviewedProductCatalog }
 })
 import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
+import { OwnExtraGroceries } from './features/comparison/OwnExtraGroceries.tsx'
 import type { PrivateExtraVisitCostIntent } from './features/comparison/privateExtraVisitCost.ts'
 import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
@@ -642,6 +643,19 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           </Suspense>
           </div>
         )}
+        {tab === 'list' && (
+          <nav className="screen" aria-label="Snelle acties voor je boodschappenlijst">
+            <button type="button" className="ghost-button" onClick={() =>
+              document.getElementById('supa-own-extra-groceries')?.scrollIntoView({
+                behavior: 'smooth', block: 'start',
+              })}>
+              Voeg eigen boodschappen toe · zonder winkelprijs
+            </button>
+            <button type="button" className="ghost-button" onClick={openOwnPriceImport}>
+              Open mijn PLUS/Deka-winkelvergelijking
+            </button>
+          </nav>
+        )}
         {visitedList && !livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
@@ -681,6 +695,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               Historische artikelen en Figma-voorbeelden zijn geen nieuwe bronprijzen,
               volledige verpakkingsmatches of besparingsbewijs.</p>
             <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+          </section>
+        )}
+        {tab === 'list' && (
+          <section className="screen" aria-label="Persoonlijke extra boodschappen buiten het prijsmandje">
+            <OwnExtraGroceries identity={privatePlanKey}
+              plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
           </section>
         )}
         {tab === 'observe' && <ObservationView />}
