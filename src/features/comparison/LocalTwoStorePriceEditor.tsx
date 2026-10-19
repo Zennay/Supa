@@ -229,7 +229,12 @@ export function LocalTwoStorePriceEditor({
   }, [plan, recipes, activeDays])
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
   const allowedDraftRows = new Set(activeNeeds.flatMap(need => stores.map(store => key(store, need.id))))
-  const selectedPlanFingerprint = JSON.stringify([plan, activeDays, needs.map(item => [item.id, item.amount, item.unit])])
+  // Ingredient identity includes its human meaning, not just a stable ID.
+  // Editing a recipe from e.g. 'rice' to 'pasta' with the same ID, quantity
+  // and unit must never silently revive that rice SKU, price or stock review.
+  const selectedPlanFingerprint = JSON.stringify([
+    plan, activeDays, needs.map(item => [item.id, item.label, item.query, item.amount, item.unit]),
+  ])
   // Avoid importing a draft into a different plan if it changed during File.text().
   const currentPlanFingerprint = useRef(selectedPlanFingerprint)
   currentPlanFingerprint.current = selectedPlanFingerprint
