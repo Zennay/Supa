@@ -7,6 +7,7 @@ import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
+import { PrivateReviewedProductCatalog } from './features/products/PrivateReviewedProductCatalog.tsx'
 import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
@@ -355,6 +356,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       </header>}
 
       <div className="content">
+        {tab === 'products' && <PrivateReviewedProductCatalog reviewed={livePrivateReviewed}
+          onOpenComparison={() => navigate('basket')} onOpenList={() => navigate('list')} />}
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
 
