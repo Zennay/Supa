@@ -1,0 +1,72 @@
+.own-store-planner__targeted-capture {
+  display: grid;
+  gap: .65rem;
+  border-top: 1px solid #d9ded9;
+  padding-top: .85rem;
+}
+.own-store-planner__targeted-capture p { margin: 0; line-height: 1.5; }
+.own-store-planner__targeted-store {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  padding: .75rem;
+  border: 1px solid #dbe4dc;
+  border-radius: 10px;
+  background: #f8faf8;
+}
+.own-store-planner__targeted-store > span { flex: 1 1 170px; }
+.own-store-planner__targeted-store button {
+  flex: 0 1 auto;
+  min-height: 44px;
+}
+@media (max-width: 550px) {
+  .own-store-planner__targeted-store button { flex: 1 1 100%; }
+}
+.own-store-planner__targeted-guide {
+  flex: 1 1 100%;
+  min-width: 0;
+  padding: .55rem .65rem;
+  border: 1px solid #d2ddd3;
+  border-radius: 9px;
+  background: white;
+}
+.own-store-planner__targeted-guide summary {
+  cursor: pointer;
+  font-weight: 650;
+  min-height: 44px;
+  padding: .6rem 0;
+}
+.own-store-planner__targeted-guide ol { margin: .6rem 0 0; padding-left: 2.2rem; }
+.own-store-planner__targeted-guide li { padding: .4rem 0; overflow-wrap: anywhere; border-top: 1px solid #e8eee8; }
+.own-store-planner__targeted-guide summary:focus-visible { outline: 3px solid #246b50; }
+.own-store-planner__targeted-copy {
+  display: grid;
+  flex: 1 1 100%;
+  gap: .4rem;
+  min-width: 0;
+}
+.own-store-planner__targeted-copy textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: .7rem;
+  font: inherit;
+  font-size: .86rem;
+  border: 1px solid #829d8c;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.own-store-planner__targeted-combined {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  align-items: center;
+  padding: .9rem;
+  border-radius: 12px;
+  background: #eff7f1;
+  border: 1px solid #a8c7ae;
+}
+.own-store-planner__targeted-combined > strong,
+.own-store-planner__targeted-combined > span,
+.own-store-planner__targeted-combined > small { flex: 1 1 100%; }
+.own-store-planner__targeted-combined button { flex: 1 1 210px; }
