@@ -116,18 +116,17 @@ export function convertTwoStoreCsv(text, { singleStore = false } = {}) {
     if (row.length !== HEADER.length) error(location + ': verwacht negen kolommen.')
     const [retailer, observedAt, id, name, pack, unit, count, cents, availableText] = row
     if (!RETAILERS.includes(retailer)) error(location + ': onbekende winkel.')
-    if (!validLabel(id, 100)) error(location + ': product-ID ongeldig.')
     if (!UNITS.includes(unit)) error(location + ': eenheid moet g/kg/ml/l/piece zijn.')
     if (!['true', 'false'].includes(availableText)) {
       error(location + ': beschikbaarheid moet letterlijk true of false zijn.')
     }
-    // The planner deliberately exports one unobserved demand row per store.
-    // No product name, package, price or time exists for such a row. Omit it
-    // instead of inventing a retailer SKU. The existing basket matcher then
-    // leaves the corresponding ingredient unresolved, never priced at €0.
-    if (name === '' && pack === '' && count === '' && cents === '' && availableText === 'false') {
+    // Ignore only fully blank Planner placeholders. A partial observation
+    // must never disappear silently or be priced as zero.
+    if (observedAt === '' && id === '' && name === '' &&
+        pack === '' && count === '' && cents === '' && availableText === 'false') {
       continue
     }
+    if (!validLabel(id, 100)) error(location + ': vul de originele winkelproductcode in.')
     if (!validObservedAt(observedAt)) error(location + ': werkelijke ISO-tijd met UTC-offset vereist.')
     if (!validLabel(name, 160)) error(location + ': productnaam ongeldig of ontbreekt.')
     if (seen.get(retailer).has(id)) error(location + ': dubbele product-ID.')
