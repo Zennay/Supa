@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
@@ -36,6 +36,25 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, need
   const [busy, setBusy] = useState(false)
   const [dropActive, setDropActive] = useState(false)
   const [message, setMessage] = useState('')
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!preview) return
+    const refresh = () => setNow(Date.now())
+    refresh()
+    const timer = window.setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [preview])
+  // This is not the originally cached freshness flag: a tab can stay open
+  // past seven days while the original retailer capture does not change.
+  const liveAdmission = useMemo(() =>
+    preview ? parseOfflinePriceSnapshots(preview.normalized, now) : null,
+    [preview, now])
   const revision = useRef(0)
   function changeDraft(raw: string) {
     ++revision.current
@@ -202,7 +221,6 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, need
   const nextSourceToCapture = (() => {
     if (!preview) return null
     const shops = preview.data.captures
-    const now = Date.now()
     const stale = (['PLUS', 'DekaMarkt'] as const).find(store =>
       shops[store] && !recentOwnCaptureInstant(shops[store]!.observedAt, now))
     if (stale) return stale
@@ -371,7 +389,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, need
             </details>
           </section>
         })}
-        <p>{!preview.data.currentEnough
+        <p>{!liveAdmission?.currentEnough
           ? 'Oude of toekomstige bron. Vernieuw je werkelijke waarnemingen.'
           : preview.data.pairedWithin24h
             ? 'Beide opnames binnen 24 uur; SKU, pakken en volledige mand nog te controleren.'
