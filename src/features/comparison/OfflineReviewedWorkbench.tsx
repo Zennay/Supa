@@ -34,6 +34,7 @@ import './offlineReviewedWorkbench.css'
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores = ['PLUS', 'DekaMarkt'] as const
+type SourceSort = 'relevance' | 'whole-pack' | 'unit-price'
 const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
@@ -154,7 +155,7 @@ function searchableSourceText(value: string): string {
 }
 function sourceOptions(products: OfflineStoreProduct[],
   unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string,
-  ingredient: string, requestedAmount: number | null) {
+  ingredient: string, requestedAmount: number | null, sort: SourceSort) {
   const query = searchableSourceText(text)
   const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) =>
     !query || searchableSourceText(product.name).includes(query) ||
@@ -163,7 +164,30 @@ function sourceOptions(products: OfflineStoreProduct[],
   const available = physicallyCompatible.filter(p => p.available && p.packAmount !== null)
   const filtered = rankOwnSourceSuggestions(
     available.filter(matchesQuery), ingredient, requestedAmount, unit, text)
-  const shown = filtered.slice(0, 40)
+  // Price sorting is DISCOVERY, never an accepted match or a claim about
+  // products being interchangeable. Reject impossible whole-pack arithmetic.
+  // The existing suggestion rank wins ties and remains the default.
+  const wholeCost = (p: OfflineStoreProduct): number | null => {
+    if (requestedAmount === null || !Number.isFinite(requestedAmount) ||
+        requestedAmount <= 0 || p.packAmount === null ||
+        !Number.isSafeInteger(p.priceCents) || p.priceCents < 0) return null
+    const packs = calculateDecimalPackCount(
+      [{ amount: requestedAmount, unit }],
+      { amount: p.packAmount, unit: p.packUnit, count: p.packCount ?? 1 })
+    if (packs === null || !Number.isSafeInteger(packs) || packs < 1) return null
+    const total = packs * p.priceCents
+    return Number.isSafeInteger(total) ? total : null
+  }
+  const rate = (p: OfflineStoreProduct): number | null =>
+    privatePackUnitRate({ amount: p.packAmount, unit: p.packUnit,
+      count: p.packCount ?? 1, priceCents: p.priceCents })?.centsPerUnit ?? null
+  const ranked = sort === 'relevance' ? filtered : [...filtered].sort((a, b) => {
+    const left = sort === 'whole-pack' ? wholeCost(a) : rate(a)
+    const right = sort === 'whole-pack' ? wholeCost(b) : rate(b)
+    return left === null && right === null ? 0 :
+      left === null ? 1 : right === null ? -1 : left - right
+  })
+  const shown = ranked.slice(0, 40)
   const current = available.find(p => p.id === keepId)
   if (current && !shown.some(p => p.id === keepId)) shown.unshift(current)
 
@@ -280,6 +304,7 @@ export function OfflineReviewedWorkbench({
     PLUS: {}, DekaMarkt: {},
   })
   const [skuFilter, setSkuFilter] = useState<Record<string, string>>({})
+  const [sourceSort, setSourceSort] = useState<Record<string, SourceSort>>({})
   const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
   const [openTripOnly, setOpenTripOnly] = useState(false)
   const [tripExportMessage, setTripExportMessage] = useState('')
@@ -2021,7 +2046,8 @@ export function OfflineReviewedWorkbench({
                         const searchKey = JSON.stringify([store, line.id])
                         const choices = sourceOptions(capture.products, line.requirement.unit,
                           skuFilter[searchKey] ?? '', manualSku[store][line.id] ?? '',
-                          line.ingredientLabel, line.requirement.amount)
+                          line.ingredientLabel, line.requirement.amount,
+                          sourceSort[searchKey] ?? 'relevance')
                         return (
                         <article key={line.id} id={reviewRowId(store, line.id)} className="offline-price-workbench__line">
                           <div>
@@ -2047,6 +2073,23 @@ export function OfflineReviewedWorkbench({
                                   <small>{choices.total} prijsklare en {choices.unpricedTotal} niet-prijsklare bronartikelen in deze zoekopdracht.</small>
                                 </label>
                                 {choices.availableCount > 0 && (
+                                  <label>Sorteer mijn beschikbare geprijsde bronartikelen
+                                    <select value={sourceSort[searchKey] ?? 'relevance'}
+                                      onChange={event => setSourceSort(previous => ({ ...previous,
+                                        [searchKey]: event.currentTarget.value as SourceSort,
+                                      }))}>
+                                      <option value="relevance">Beste tekst- en verpakkingsmatch</option>
+                                      <option value="whole-pack" disabled={line.requirement.amount === null}>
+                                        Laagste prijs voor alle benodigde hele pakken
+                                      </option>
+                                      <option value="unit-price">Laagste indicatieve eenheidsprijs</option>
+                                    </select>
+                                    <small>Alleen jouw oorspronkelijke prijsklare en fysiek passende bronartikelen.
+                                      Goedkoopst betekent niet automatisch hetzelfde product; controleer zelf de verpakking,
+                                      broncode en toepassing voor je de match bevestigt.</small>
+                                  </label>
+                                )}
+                                {choices.availableCount > 0 && (
                                   <label>Kies een werkelijk waargenomen, prijsklaar bronartikel
                                     <select value={manualSku[store][line.id] ?? ''}
                                       onChange={event => chooseSourceSku(store, line, event.currentTarget.value)}>
@@ -2057,7 +2100,9 @@ export function OfflineReviewedWorkbench({
                                         </option>
                                       ))}
                                     </select>
-                                    <small>Maximaal 40 originele artikelen, op naam en passende verpakkingsomvang gerangschikt. Dit is uitsluitend een zoekhulp: kies en controleer zelf de SKU, inhoud en prijs.</small>
+                                    <small>Maximaal 40 originele artikelen, gerangschikt volgens jouw huidige keuze.
+                                      Het oorspronkelijke bronartikel blijft in de keuzelijst, ook wanneer een andere
+                                      sortering of zoekterm het verbergt. Controleer zelf de SKU, inhoud en prijs.</small>
                                     {choices.shown.length > 0 && <details className="offline-price-workbench__candidate-preview">
                                       <summary>Bekijk de eerste bronartikelen met benodigde hele verpakkingen</summary>
                                       <p>Dit zijn ongetoetste alternatieven uit je eigen bron.
