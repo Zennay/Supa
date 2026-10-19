@@ -76,6 +76,31 @@ function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
  * a different financial, currency or stock fact. This is still source
  * evidence, never an independent retailer-price verification.
  */
+/**
+ * Explicitly malformed prices are not absent prices. A second typed Offer
+ * or an auxiliary PriceSpecification cannot be silently discarded while a
+ * well-formed amount on the same product is still proposed to the user.
+ */
+function malformedDeclaredOfferPrice(offers: JsonObject[]): boolean {
+  for (const offer of offers) {
+    const specifications = priceSpecificationCandidates(offer)
+    const rawSpecification = offer.priceSpecification
+    if (rawSpecification !== undefined && rawSpecification !== null &&
+        (Array.isArray(rawSpecification)
+          ? rawSpecification.some(value => !isObject(value))
+          : !isObject(rawSpecification))) return true
+    for (const source of [offer, ...specifications]) {
+      for (const [key, value] of Object.entries(source)) {
+        const field = key.toLocaleLowerCase('en')
+        if (field !== 'price' && field !== 'lowprice') continue
+        const amount = cents(value)
+        if (amount === null || !Number.isSafeInteger(amount) || amount < 0) return true
+      }
+    }
+  }
+  return false
+}
+
 function conflictingOfferEvidence(offers: JsonObject[]): boolean {
   const facts = ['price', 'lowprice', 'pricecurrency', 'availability'] as const
   for (const offer of offers) {
@@ -252,6 +277,9 @@ export function parseSchemaOrgProduct(
   }
 
   const offers = offerCandidates(product.offers)
+  if (malformedDeclaredOfferPrice(offers)) {
+    return { type: 'abstain', reason: 'malformed declared Offer or PriceSpecification amount' }
+  }
   if (conflictingOfferEvidence(offers)) {
     return { type: 'abstain', reason: 'contradictory price, currency or availability on the same Schema.org Offer' }
   }
