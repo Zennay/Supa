@@ -139,28 +139,29 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage(error instanceof Error ? error.message : 'Controlelijst downloaden mislukt.')
     }
   }
-  async function downloadMissingCaptureFor(store: CaptureStore, kind: 'csv' | 'guide' | 'print') {
+  async function downloadMissingCaptureFor(store: CaptureStore, kind: 'csv' | 'csv-excel' | 'guide' | 'print') {
     setDownloadMessage('')
     try {
       const needs = missingCaptureFor(store, Date.now())
       if (!needs.length) throw new Error(store + ': geen ontbrekende productmatches. Beoordeel bestaande SKU’s in Vergelijk.')
-      const content = kind === 'csv'
+      const content = kind === 'csv' || kind === 'csv-excel'
         ? (await import('../comparison/plannerPriceCaptureSheet.ts'))
-          .makeBlankPlannerCaptureCsv(needs, [store])
+          .makeBlankPlannerCaptureCsv(needs, [store], kind === 'csv-excel' ? ';' : ',')
         : kind === 'print'
           ? (await import('../comparison/plannerPriceCapturePrint.ts'))
             .makePrintablePlannerCaptureHtml(needs, [store])
           : (await import('../comparison/plannerPriceCaptureGuide.ts'))
             .makePlannerCaptureGuide(needs, [store])
       const url = URL.createObjectURL(new Blob([content], {
-        type: kind === 'csv' ? 'text/csv;charset=utf-8' :
+        type: kind === 'csv' || kind === 'csv-excel' ? 'text/csv;charset=utf-8' :
           kind === 'print' ? 'text/html;charset=utf-8' : 'text/plain;charset=utf-8',
       }))
       try {
         const link = document.createElement('a')
         link.href = url
         link.download = 'supa-' + store.toLowerCase() + '-' + needs.length +
-          '-ontbrekende-producten.' + (kind === 'csv' ? 'csv' : kind === 'print' ? 'html' : 'txt')
+          '-ontbrekende-producten' + (kind === 'csv-excel' ? '-spreadsheet' : '') + '.' +
+          (kind === 'csv' || kind === 'csv-excel' ? 'csv' : kind === 'print' ? 'html' : 'txt')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
@@ -338,12 +339,28 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'csv')}>
                 Download ontbrekende {store}-producten (CSV)
               </button>
+              <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'csv-excel')}>
+                Spreadsheet-CSV {store} (puntkomma)
+              </button>
               <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'guide')}>
                 Meeneemlijst {store} (TXT)
               </button>
               <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'print')}>
                 Printbaar {store}-opnameblad (HTML)
               </button>
+              <details className="own-store-planner__targeted-guide">
+                <summary>Welke CSV-rij hoort bij welk ontbrekend ingrediënt?</summary>
+                <p>De importeerbare CSV heeft eerst een kopregel en daarna onderstaande
+                  winkelregels. Vul echte originele winkelproducten in, niet de Planner-namen
+                  als vervanging van een artikelcode.</p>
+                <ol start={2}>{pending.map((need, index) =>
+                  <li key={need.id} value={index + 2}>
+                    <strong>{need.label}</strong> · nodig:
+                    {' '}{need.amount === null ? 'hoeveelheid controleren' :
+                      need.amount.toLocaleString('nl-NL', { useGrouping: false, maximumFractionDigits: 3 }) +
+                      ' ' + need.unit}
+                  </li>)}</ol>
+              </details>
             </>}
           </div>
         })}

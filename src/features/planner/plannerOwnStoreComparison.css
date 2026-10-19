@@ -94,3 +94,20 @@
 @media (max-width: 550px) {
   .own-store-planner__targeted-store button { flex: 1 1 100%; }
 }
+.own-store-planner__targeted-guide {
+  flex: 1 1 100%;
+  min-width: 0;
+  padding: .55rem .65rem;
+  border: 1px solid #d2ddd3;
+  border-radius: 9px;
+  background: white;
+}
+.own-store-planner__targeted-guide summary {
+  cursor: pointer;
+  font-weight: 650;
+  min-height: 44px;
+  padding: .6rem 0;
+}
+.own-store-planner__targeted-guide ol { margin: .6rem 0 0; padding-left: 2.2rem; }
+.own-store-planner__targeted-guide li { padding: .4rem 0; overflow-wrap: anywhere; border-top: 1px solid #e8eee8; }
+.own-store-planner__targeted-guide summary:focus-visible { outline: 3px solid #246b50; }
