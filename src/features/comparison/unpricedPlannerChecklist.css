@@ -16,3 +16,7 @@
 .unpriced-planner-checklist__copy p {margin:0 0 .5rem;}
 .unpriced-planner-checklist__copy textarea {width:100%;box-sizing:border-box;max-width:100%;padding:.65rem;border:1px solid #9fb1a2;border-radius:8px;color:#24362a;background:#fff;font: .86rem/1.5 ui-monospace,monospace;resize:vertical;}
 .unpriced-planner-checklist :is(input,button,textarea):focus-visible {outline:3px solid #226f52;outline-offset:3px;}
+
+.unpriced-planner-checklist__upload { display:flex; flex-wrap:wrap; align-items:center; gap:.55rem; padding:.55rem .75rem; border:1px solid #aec9b4; border-radius:9px; color:#244e36; background:#f5f8f3; font-weight:600; }
+.unpriced-planner-checklist__upload input[type=file] { max-width:min(100%,260px); min-height:32px; font-size:.85rem; }
+.unpriced-planner-checklist__upload input[type=file]::file-selector-button { margin-right:.45rem; padding:.5rem; border:1px solid #8aad96; border-radius:7px; color:#244e36; background:#fff; cursor:pointer; }

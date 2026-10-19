@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
+import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
 import './unpricedPlannerChecklist.css'
 
 type ChecklistProps = {
@@ -24,7 +25,9 @@ const quantity = (item: DemandRow) =>
  * No sample product, inferred SKU, price, license or retailer observation.
  */
 export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: ChecklistProps) {
-  const [checked, setChecked] = useState<Record<string, boolean>>({})
+  const [progress, setProgress] = useState<{ identity: string; checked: Record<string, boolean> }>({ identity: '', checked: {} })
+  const [backupMessage, setBackupMessage] = useState('')
+  const currentDemand = useRef('')
   const [openOnly, setOpenOnly] = useState(false)
   const [prepared, setPrepared] = useState<{ key: string; text: string } | null>(null)
   const result = useMemo(() => {
@@ -41,6 +44,33 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
 
   const { items, error } = result
   const demandIdentity = JSON.stringify([activeDays, items.map(itemKey)])
+  currentDemand.current = demandIdentity
+  const keys = items.map(itemKey)
+  const storageKey = unpricedProgressStorageKey(demandIdentity)
+  const checked = progress.identity === demandIdentity ? progress.checked : {}
+
+  useEffect(() => {
+    let restored: Record<string, boolean> = {}
+    try {
+      const saved = window.sessionStorage.getItem(storageKey)
+      if (saved) restored = importUnpricedProgress(saved, demandIdentity, keys)
+    } catch {
+      // A corrupt or unrelated tab snapshot must never check a different list.
+      setBackupMessage('Oud herstelpunt niet bruikbaar; je huidige weeklijst blijft ongehinderd beschikbaar.')
+    }
+    setProgress({ identity: demandIdentity, checked: restored })
+  }, [demandIdentity, storageKey])
+
+  useEffect(() => {
+    if (progress.identity !== demandIdentity) return
+    try {
+      window.sessionStorage.setItem(
+        storageKey, exportUnpricedProgress(demandIdentity, keys, progress.checked))
+    } catch {
+      setBackupMessage('Automatisch bewaren is niet beschikbaar in deze browser. Download een privéback-up om je vinkjes te bewaren.')
+    }
+  }, [progress, demandIdentity, storageKey])
+
   const completed = items.filter(item => checked[itemKey(item)]).length
   const visible = items.filter(item => !openOnly || !checked[itemKey(item)])
   const copy = prepared?.key === JSON.stringify([demandIdentity, checked]) ? prepared.text : null
@@ -55,6 +85,44 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
   function prepareCopy() {
     setPrepared({ key: JSON.stringify([demandIdentity, checked]), text: shoppingText() })
   }
+  function downloadProgress() {
+    if (error || !items.length) return
+    try {
+      const content = exportUnpricedProgress(demandIdentity, keys, checked)
+      const url = URL.createObjectURL(new Blob([content], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-weeklijst-afvinkingen-prive.json'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setBackupMessage('Privéback-up gedownload. Alleen jouw afvinkingen en de exacte weekboodschappen, geen winkelprijzen.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch {
+      setBackupMessage('Back-up niet gemaakt. Controleer je weekmenu en de grootte van je lijst.')
+    }
+  }
+
+  async function restoreProgress(file?: File) {
+    if (!file || error || !items.length) return
+    const targetIdentity = demandIdentity
+    try {
+      if (!file.size || file.size > unpricedProgressMaxBytes)
+        throw new Error('Het bestand is leeg of groter dan 128 kB.')
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (currentDemand.current !== targetIdentity)
+        throw new Error('Het weekmenu is tijdens import veranderd. Geen afvinkingen hersteld.')
+      const restored = importUnpricedProgress(raw, targetIdentity, keys)
+      if (!window.confirm('Herstel de afvinkingen voor exact deze weekboodschappen? De huidige vinkjes worden vervangen; er komen geen prijzen of winkelproducten bij.')) return
+      if (currentDemand.current !== targetIdentity) return
+      setProgress({ identity: targetIdentity, checked: restored })
+      setPrepared(null)
+      setBackupMessage('Afvinkingen hersteld voor exact hetzelfde weekmenu en dezelfde hoeveelheden.')
+    } catch (err) {
+      setBackupMessage(err instanceof Error ? err.message : 'De privéback-up is ongeldig; je vinkjes zijn niet veranderd.')
+    }
+  }
+
   function downloadUnpricedList() {
     if (error || !items.length) return
     const url = URL.createObjectURL(new Blob([shoppingText()], { type: 'text/plain;charset=utf-8' }))
@@ -77,7 +145,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
         <p>Dezelfde samengestelde hoeveelheden als in de mandvergelijking,
           zonder een winkel of prijs te verzinnen. Ook bruikbaar zolang echte winkeldata ontbreken.
           Vinkjes blijven lokaal beschikbaar zolang dit browsertabblad open is,
-          ook als je tussen Planner en Lijst wisselt. Er wordt niets verstuurd of opgeslagen.</p>
+          ook bij herladen van dit browsertabblad. Afvinkingen worden alleen in je eigen tabopslag bewaard;
+          je kunt ze privé downloaden en op een ander apparaat voor exact hetzelfde weekmenu herstellen.</p>
       </div>
       {error ? <p role="status" className="unpriced-planner-checklist__note">{error}</p> : (
         <>
@@ -87,16 +156,31 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
               onChange={event => setOpenOnly(event.currentTarget.checked)} />
               Alleen nog te kopen</label>
             <button type="button" className="ghost-button" onClick={() => {
-              setChecked({})
+              setProgress({ identity: demandIdentity, checked: {} })
               setPrepared(null)
+              setBackupMessage('Alle vinkjes voor dit weekmenu gewist.')
             }}>Wis vinkjes</button>
             <button type="button" className="ghost-button" onClick={prepareCopy}>
               Toon kopieerbare weeklijst
             </button>
+            <button type="button" className="ghost-button" onClick={downloadProgress}>
+              Download afvinkingen (JSON)
+            </button>
+            <label className="unpriced-planner-checklist__upload">
+              Herstel afvinkingen (JSON)
+              <input type="file" accept=".json,application/json"
+                aria-label="Kies een privéback-up van deze exacte weeklijst"
+                onChange={event => {
+                  const file = event.currentTarget.files?.[0]
+                  event.currentTarget.value = ''
+                  void restoreProgress(file)
+                }} />
+            </label>
             <button type="button" className="ghost-button" onClick={downloadUnpricedList}>
               Download weekboodschappen (TXT)
             </button>
           </div>
+          {backupMessage && <p role="status" className="unpriced-planner-checklist__note">{backupMessage}</p>}
           <div className="unpriced-planner-checklist__rows">
             {visible.length ? visible.map(item => (
               <label key={itemKey(item)} className="unpriced-planner-checklist__item">
@@ -104,7 +188,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
                   onChange={event => {
                     const selected = event.currentTarget.checked
                     const key = itemKey(item)
-                    setChecked(current => ({ ...current, [key]: selected }))
+                    setProgress({ identity: demandIdentity, checked: { ...checked, [key]: selected } })
+                  setPrepared(null)
                   }} />
                 <span><strong>{item.label}</strong><small>{quantity(item)}</small></span>
               </label>
