@@ -23,7 +23,7 @@ export type PlannerCaptureNeed = Readonly<{
 export function makeBlankPlannerCaptureCsv(
   needs: readonly PlannerCaptureNeed[],
   selectedStores: readonly CaptureStore[] = STORES,
-  delimiter: ',' | ';' = ',',
+  delimiter: ',' | ';' | '\t' = ',',
 ): string {
   if (!Array.isArray(needs) || needs.length < 1 || needs.length > 200 ||
       needs.some(need => !need || typeof need.id !== 'string' ||

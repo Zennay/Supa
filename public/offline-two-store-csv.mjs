@@ -108,17 +108,22 @@ const validHeader = rows => rows.length > 0 &&
   HEADER.every((name, index) => rows[0][index] === name)
 
 function convertStoreCsv(text, allowOne) {
-  // Dutch spreadsheet programs frequently export semicolon-separated CSV.
-  // Accept either delimiter only when the canonical nine-column header
-  // agrees exactly. Do not guess column names, numbers, money or retailers.
-  let commaRows = null
-  try { commaRows = parseCsv(text, ',') }
-  catch { /* A valid semicolon file may contain quotes next to semicolons. */ }
-  const rows = commaRows && validHeader(commaRows)
-    ? commaRows : parseCsv(text, ';')
-  if (!validHeader(rows)) {
-    error('CSV-kop moet exact zijn: ' + HEADER.join(',') +
-      ' (kommagescheiden of puntkommagescheiden CSV).')
+  // Spreadsheet export/paste is comma CSV, Dutch semicolon CSV or TSV.
+  // Admit a separator only when ALL nine canonical column names are intact;
+  // never guess user facts, source rights, physical quantities or prices.
+  let rows = null
+  for (const delimiter of [',', ';', '\t']) {
+    let candidate
+    try { candidate = parseCsv(text, delimiter) }
+    catch { continue }
+    if (validHeader(candidate)) {
+      rows = candidate
+      break
+    }
+  }
+  if (!rows) {
+    error('Kolomkop moet exact zijn: ' + HEADER.join(',') +
+      ' (CSV komma/puntkomma of gekopieerde tabgescheiden spreadsheet).')
   }
   const captures = new Map()
   const seen = new Map()

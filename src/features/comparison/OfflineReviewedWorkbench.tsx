@@ -1020,7 +1020,8 @@ export function OfflineReviewedWorkbench({
       if (!file.size || file.size > 256000)
         throw new Error('Bronbestand is leeg of groter dan 256 kB.')
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
+        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
       let source = raw
       if (isCsv) {
         const converterUrl = '/offline-two-store-csv.mjs'
@@ -1062,7 +1063,8 @@ export function OfflineReviewedWorkbench({
         if (!file.size || file.size > 256000)
           throw new Error('Elk origineel winkelbestand moet gevuld zijn en maximaal 256 kB bevatten.')
         const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-        const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+        const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
+        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
         let json = raw
         if (isCsv) {
           const converterUrl = '/offline-two-store-csv.mjs'
@@ -1116,7 +1118,8 @@ export function OfflineReviewedWorkbench({
       if (!file.size || file.size > 256000)
         throw new Error('Een aanvulbestand moet gevuld zijn en maximaal 256 kB bevatten.')
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
+        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
       let source = raw
       if (isCsv) {
         const converterUrl = '/offline-two-store-csv.mjs'
@@ -1165,7 +1168,8 @@ export function OfflineReviewedWorkbench({
       if (!file.size || file.size > 256000)
         throw new Error('Nieuwe winkelopname is leeg of groter dan 256 kB.')
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
+        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
       let json = raw
       if (isCsv) {
         const converterUrl = '/offline-two-store-csv.mjs'
@@ -1243,7 +1247,8 @@ export function OfflineReviewedWorkbench({
       // The same canonical local CSV converter is already used by the
       // independent browser mapping wizard. It does not request retailer data.
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      const isCsv = /\.(?:csv|tsv)$/iu.test(file.name) ||
+        file.type === 'text/csv' || file.type === 'text/tab-separated-values'
       let content = raw
       if (isCsv) {
         // Vite copies the existing public module without changing its parser.
@@ -1897,7 +1902,7 @@ export function OfflineReviewedWorkbench({
           <strong>{dropActive ? 'Laat je eigen bestanden los om ze lokaal te openen' :
             'Sleep eigen PLUS-/Deka-prijsbestanden hierheen'}</strong>
           <label>Open één bronbestand, of selecteer tegelijk je aparte PLUS- en DekaMarkt-bestanden (CSV/JSON)
-            <input type="file" accept=".csv,.json,text/csv,application/json" multiple disabled={busy}
+            <input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" multiple disabled={busy}
               onChange={event => {
                 const files = Array.from(event.currentTarget.files ?? [])
                 event.currentTarget.value = ''
@@ -1906,7 +1911,7 @@ export function OfflineReviewedWorkbench({
             <small>Twee bestanden moeten ieder precies één verschillende winkel bevatten. Ongeldige of dubbele opnames worden samen geweigerd; onbekende prijzen blijven onbekend.</small>
           </label>
           <small>Sleep of selecteer maximaal twee eigen CSV/JSON-bestanden (elk 256 kB).
-            Excel-/spreadsheet-CSV mag komma's of puntkomma's tussen kolommen hebben;
+            Excel-/spreadsheetgegevens mogen komma's, puntkomma's of tabs tussen kolommen hebben;
             een verpakkingsmaat mag een decimale komma gebruiken (bijvoorbeeld 0,75 kg).
             Beschikbaarheid: true/false of ja/nee; prijs uitsluitend in hele eurocenten.
             Deze import gebruikt dezelfde lokale broncontrole als de bestandskiezer:
@@ -1914,7 +1919,7 @@ export function OfflineReviewedWorkbench({
         </div>
         {imported && Object.keys(imported.captures).length === 1 && (
           <label>Voeg de echte opname van de andere winkel toe (CSV of JSON)
-            <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
+            <input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" disabled={busy}
               onChange={event => {
                 const file = event.currentTarget.files?.[0]
                 event.currentTarget.value = ''
@@ -2055,7 +2060,7 @@ export function OfflineReviewedWorkbench({
                       Maak nieuw prijsinvulblad voor {store} (CSV)
                     </button>
                     <label>Voeg originele nog ontbrekende {store}-producten toe uit dezelfde opname (CSV/JSON)
-                      <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
+                      <input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" disabled={busy}
                         onChange={event => {
                           const file = event.currentTarget.files?.[0]
                           event.currentTarget.value = ''
@@ -2066,7 +2071,7 @@ export function OfflineReviewedWorkbench({
                         vervang dan de hele winkelopname. Eerdere artikelen worden nooit overschreven.</small>
                     </label>
                     <label>Vervang uitsluitend de {store}-opname met je nieuwe echte bron (CSV of JSON)
-                      <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
+                      <input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" disabled={busy}
                         onChange={event => {
                           const file = event.currentTarget.files?.[0]
                           event.currentTarget.value = ''
