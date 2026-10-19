@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
-import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
+import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { importPlainTextRecipe } from './importPlainTextRecipe'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
@@ -89,6 +89,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const detail = useRef<HTMLDialogElement>(null)
   const request = useRef<AbortController | null>(null)
   const saving = useRef(false)
+  const editingBaseline = useRef<{ id: string; raw: string } | null>(null)
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
     const refresh = (event: StorageEvent) => {
@@ -100,6 +101,35 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     }
     window.addEventListener('storage', refresh)
     return () => window.removeEventListener('storage', refresh)
+  }, [])
+  useEffect(() => {
+    const refreshOwnRecipes = (event: StorageEvent) => {
+      if (event.key !== RECIPE_LIBRARY_KEY && event.key !== null) return
+      if (event.storageArea && event.storageArea !== window.localStorage) return
+      const next = initialLibrary()
+      backupReadVersion.current += 1
+      setBackupBusy(false)
+      setBackupPreview(null)
+      setLibrary(next)
+      const editing = editingBaseline.current
+      if (editing && JSON.stringify(next.recipes.find(recipe => recipe.id === editing.id) ?? null) !== editing.raw) {
+        setPreview(null)
+        setError('Dit recept is in een ander tabblad gewijzigd of verwijderd. Open de actuele versie opnieuw voordat je opslaat; je huidige invoer blijft zichtbaar.')
+      }
+      setSelected(previous => {
+        if (!previous || !('savedAt' in previous)) return previous
+        const current = next.recipes.find(recipe => recipe.id === previous.id)
+        if (!current) {
+          queueMicrotask(() => detail.current?.close())
+          return null
+        }
+        return JSON.stringify(current) === JSON.stringify(previous) ? previous : current
+      })
+      setMessage(next.error ??
+        'Je eigen recepten zijn bijgewerkt vanuit een ander tabblad. De Planner leest de actuele recepten.')
+    }
+    window.addEventListener('storage', refreshOwnRecipes)
+    return () => window.removeEventListener('storage', refreshOwnRecipes)
   }, [])
   const matches = (r: { id: string; title: string }) => r.title.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) && (filter !== 'favorites' || favorites.includes(r.id))
   const demo = filter === 'own' ? [] : examples.filter(matches)
@@ -277,15 +307,17 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   }
   function openEditor(next: 'manual' | 'url' | 'paste' | 'plain') {
     pasteReadVersion.current++; setPasteFileMessage('')
+    editingBaseline.current = null
     request.current?.abort(); setBusy(false); setMode(next); setForm(blank); setSource(null); setUrl(''); setPastedSource(''); setPreview(null); setError(''); setEditingId(null); setIsVariant(false); saving.current = false
     setBackupPreview(null)
     editor.current?.showModal()
   }
-  function closeEditor() { pasteReadVersion.current++; request.current?.abort(); setBusy(false); editor.current?.close(); setEditingId(null); setIsVariant(false) }
+  function closeEditor() { editingBaseline.current = null; pasteReadVersion.current++; request.current?.abort(); setBusy(false); editor.current?.close(); setEditingId(null); setIsVariant(false) }
   function openSavedRecipeEditor(recipe: SavedRecipe, duplicate = false) {
     if (library.error) { setMessage(library.error); return }
     request.current?.abort()
     setBusy(false); saving.current = false
+    editingBaseline.current = duplicate ? null : { id: recipe.id, raw: JSON.stringify(recipe) }
     setEditingId(duplicate ? null : recipe.id); setIsVariant(duplicate)
     setMode('manual')
     setForm({
@@ -384,7 +416,11 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     try {
       const reviewed = reviewRecipe(preview)
       const current = editingId ? library.recipes.find(recipe => recipe.id === editingId) : null
-      if (editingId && !current) throw new Error('Dit recept bestaat niet meer. Herlaad de recepten voordat je verdergaat.')
+      if (editingId && (!current || !editingBaseline.current ||
+          editingBaseline.current.id !== editingId ||
+          JSON.stringify(current) !== editingBaseline.current.raw)) {
+        throw new Error('Dit recept is tussentijds gewijzigd of verwijderd. Open de actuele versie opnieuw voordat je opslaat; je invoer blijft staan.')
+      }
       // Keep the identity of a recipe already referenced by the weekly Planner.
       // The library's CAS write refuses newer changes from another browser tab.
       const recipe: SavedRecipe = current
