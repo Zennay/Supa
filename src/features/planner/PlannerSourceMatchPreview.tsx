@@ -22,6 +22,15 @@ type Suggestion = {
 } | null
 type UnpricedHint = { name: string; sku: string; reason: string } | null
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+const wholeMoney = new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 0 })
+/** Exact original integer cent presentation, including large safe pack totals. */
+const exactEuro = (cents: number): string => {
+  if (!Number.isSafeInteger(cents)) return 'Prijs onbekend'
+  const absolute = BigInt(Math.abs(cents))
+  return (cents < 0 ? '−' : '') + '€\u00a0' +
+    wholeMoney.format(absolute / 100n) + ',' +
+    String(absolute % 100n).padStart(2, '0')
+}
 const sourceDate = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
 /** Unconfirmed, read-only candidate hints. Canonical Workbench approves totals. */
@@ -533,12 +542,12 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               const diff = suggestions.DekaMarkt.lineCents - suggestions.PLUS.lineCents
               return <span className="supa-planner-source-matches__tentative-delta">
                 <small>Alleen dit ingrediënt · voorlopige hele-pakkenregel:
-                  {' '}PLUS {money.format(suggestions.PLUS.lineCents / 100)},
-                  {' '}DekaMarkt {money.format(suggestions.DekaMarkt.lineCents / 100)}.
+                  {' '}PLUS {exactEuro(suggestions.PLUS.lineCents)},
+                  {' '}DekaMarkt {exactEuro(suggestions.DekaMarkt.lineCents)}.
                 </small>
                 <small>Verschil Deka min PLUS:
                   {' '}{diff === 0 ? 'gelijk (' + money.format(0) + ')' :
-                    (diff > 0 ? '+' : '−') + money.format(Math.abs(diff) / 100)}.
+                    (diff > 0 ? '+' : '−') + exactEuro(Math.abs(diff))}.
                   {' '}Nog geen bevestigd prijsverschil of mandbesparing.
                 </small>
               </span>
@@ -559,7 +568,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               {' '}· bronmoment niet automatisch gevalideerd</small>
             <small>{suggestions[store]!.packsNeeded} hele verpakking(en) voor
               alleen dit ingrediënt · voorlopige regel
-              {' '}{money.format(suggestions[store]!.lineCents / 100)}
+              {' '}{exactEuro(suggestions[store]!.lineCents)}
               {' '}volgens exacte metrische behoefte;
               {' '}niet bevestigd, gedeelde producten pas in Vergelijk samenvoegen.</small></>
             : source.captures[store] &&
