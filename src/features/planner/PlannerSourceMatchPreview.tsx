@@ -173,6 +173,27 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   const candidateLineGap = (line: typeof coverage[number]) =>
     source.pairedWithin24h && line.suggestions.PLUS && line.suggestions.DekaMarkt
       ? line.suggestions.DekaMarkt.lineCents - line.suggestions.PLUS.lineCents : null
+  // Explain precisely why a physical week ingredient cannot yet be compared.
+  // A local uploaded source is not proof that either retailer authorized reuse.
+  const noLineGapReason = (line: typeof coverage[number]): string | null => {
+    if (candidateLineGap(line) !== null) return null
+    if (olderPairedStore) return 'Bronmomenten meer dan 24 uur uiteen: vernieuw ' +
+      olderPairedStore + ' met een echte waarneming.'
+    for (const store of stores) {
+      const capture = source.captures[store]
+      if (!capture) return store + ': oorspronkelijke winkelbron ontbreekt.'
+      if (!recentOwnCaptureInstant(capture.observedAt, clock))
+        return store + ': opname is verlopen of komt uit de toekomst.'
+      if (line.manualReview[store])
+        return store + ': kies handmatig één van de meerdere passende originele SKU’s.'
+      if (line.unpricedHints[store])
+        return store + ': bestaande mogelijke SKU ' + line.unpricedHints[store]!.sku +
+          ' heeft geen bruikbare brondata (' + line.unpricedHints[store]!.reason + ').'
+      if (!line.suggestions[store])
+        return store + ': geen passende, geprijsde en beschikbare oorspronkelijke SKU.'
+    }
+    return 'Er is nog geen controleerbaar prijsverschil voor dit ingrediënt.'
+  }
   // Count ONLY provisional original-SKU rows, never imply an additive bill:
   // two physical ingredients may both map to a single pack of the same SKU.
   const previewRows = coverage.filter(line => candidateLineGap(line) !== null)
@@ -521,7 +542,12 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                   {' '}Nog geen bevestigd prijsverschil of mandbesparing.
                 </small>
               </span>
-            })()}</span>
+            })()}
+          {noLineGapReason({ need, suggestions, manualReview, unpricedHints }) &&
+            <small className="supa-planner-source-matches__missing-delta">
+              Prijsverschil onbekend:
+              {' '}{noLineGapReason({ need, suggestions, manualReview, unpricedHints })}
+            </small>}</span>
         {stores.map(store => <span role="cell" data-store={store} key={store}>
           {suggestions[store] ? <>Kandidaat: {suggestions[store]!.name}
             <small>SKU {suggestions[store]!.sku} · niet bevestigd</small>

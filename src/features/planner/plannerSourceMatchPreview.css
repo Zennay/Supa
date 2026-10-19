@@ -68,3 +68,5 @@
 .supa-planner-source-matches__tentative-summary { padding: .65rem; border: 1px dashed #b9c9bf; border-radius: .5rem; background: #f8faf9; }
 
 .supa-planner-source-matches__paired-next { display: block; margin-top: .7rem; min-height: 44px; text-align: left; white-space: normal; }
+
+.supa-planner-source-matches__missing-delta { margin-top: .4rem !important; padding: .35rem 0; color: #4b554e; }
