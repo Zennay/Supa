@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Supa · lokale prijsontwikkeling van hetzelfde mandje</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,sans-serif;color:#17342b;background:#f6f8f4}
+    body{max-width:1050px;margin:0 auto;padding:clamp(1rem,3vw,2.5rem);line-height:1.5}
+    header,main section{background:white;border:1px solid #d9e2db;border-radius:1rem;padding:1.2rem;margin-block:1rem}
+    h1{font-size:clamp(1.5rem,4vw,2.25rem);margin:.2rem 0}.hint{color:#4b6059}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem}
+    label{display:grid;gap:.5rem;font-weight:600}.notice{padding:.75rem;border-left:4px solid #587468;background:#f0f4f1}
+    input,button{font:inherit;max-width:100%;padding:.65rem;border:1px solid #739687;border-radius:.5rem;background:white}
+    button{background:#1c5342;color:white;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
+    .scroll{max-width:100%;overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:690px}
+    th,td{text-align:left;border-bottom:1px solid #dae2db;padding:.65rem;vertical-align:top}
+    th{background:#e9f0ea}.delta-up{font-weight:bold;color:#9e302b}.delta-down{font-weight:bold;color:#20633e}
+    .small{font-size:.88rem;color:#4d6258}a{color:#14523f}
+    [hidden]{display:none!important}
+  </style>
+  <script src="./private-receipt-history.js" defer></script>
+</head>
+<body>
+  <header>
+    <p class="small">SUPA · offline privéonderzoek · geen actuele supermarktprijzen</p>
+    <h1>Hoe veranderde jouw eigen mandje?</h1>
+    <p>Vergelijk twee <strong>eerder zelf geëxporteerde PLUS/Deka-rapporten</strong> van exact dezelfde fysieke
+      producten en verpakkingen. De prijsontwikkeling wordt alleen getoond als beide bestanden volledig
+      kloppen en dezelfde behoeften, SKU's en pakaantallen bevatten.</p>
+    <p class="notice">De gekozen bestanden blijven uitsluitend in dit tabblad. Deze pagina doet geen
+      netwerkverzoeken, heeft geen bronrechten en geeft geen onafhankelijke verificatie of kassagarantie.</p>
+    <a href="./private-basket-compare.html">Terug naar lokale mandjesvergelijker</a>
+  </header>
+  <main>
+    <section aria-labelledby="files-heading">
+      <h2 id="files-heading">Twee eerdere prijsrapporten</h2>
+      <div class="grid">
+        <label>1. Oudste eigen Supa-rapport (JSON)
+          <input id="old" type="file" accept=".json,application/json">
+        </label>
+        <label>2. Nieuwere eigen Supa-rapport (JSON)
+          <input id="new" type="file" accept=".json,application/json">
+        </label>
+      </div>
+      <p class="small">Gebruik de bestaande knop “Download volledig eigen prijsrapport (JSON)” in de Planner.
+        Twee maal dezelfde opname telt niet als nieuwe prijswaarneming.</p>
+      <button id="compare" type="button">Vergelijk mijn twee opnames</button>
+      <button id="clear" type="button">Wis getoonde gegevens</button>
+      <p id="status" role="status" aria-live="polite"></p>
+    </section>
+    <section id="result" aria-labelledby="result-heading" hidden>
+      <h2 id="result-heading">Historische prijsontwikkeling</h2>
+      <p id="context" class="hint"></p>
+      <div id="summary" class="grid"></div>
+      <h3>Productregels</h3>
+      <p class="small">Bedragen zijn hele-verpakkingenprijzen uit jouw eigen offline rapporten.
+        Ze zijn niet geschikt als actuele winkelprijs of publieke besparingsclaim.</p>
+      <div class="scroll"><table>
+        <thead><tr><th scope="col">Ingrediënt en SKU</th><th scope="col">PLUS eerder → later</th>
+        <th scope="col">DekaMarkt eerder → later</th><th scope="col">Verandering</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <p class="notice">Zelfde fysieke behoefte is geen onafhankelijk bewijs van winkelprijs,
+        betaling of daadwerkelijke besparing. Alle bronrechten en onderzoeksvoorwaarden blijven apart.</p>
+    </section>
+  </main>
+</body>
+</html>
