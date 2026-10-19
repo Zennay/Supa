@@ -19,6 +19,7 @@ const PlannerQuickSourcePaste = lazy(() => import('./PlannerQuickSourcePaste.tsx
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
+import { confirmedPartialBasket } from './confirmedPartialBasket.ts'
 import './plannerOwnStoreComparison.css'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -468,6 +469,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
           <small>{capture ? `Eigen opname: ${capture.observedAt}` : 'Nog geen complete, gecontroleerde opname'}</small>
           {captureProgress?.stores[store] && !capture && (() => {
             const progress = captureProgress.stores[store]!
+            const partial = confirmedPartialBasket(captureProgress, store, now)
             return <div className="own-store-planner__capture-status" role="status">
               <small>Eigen bron: {progress.observedAt} · {progress.originalProductCount} originele SKU’s.</small>
               <small>{progress.pricedProductCount}/{progress.originalProductCount} bronproducten met
@@ -475,6 +477,20 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                 {' '}{progress.originalProductCount - progress.pricedProductCount} bronproducten zonder bruikbare pakprijs.</small>
               <small>{progress.matchedLineCount}/{progress.demandLineCount} ingrediënten hebben een voorgestelde match;
                 {' '}{progress.reviewedLineCount}/{progress.demandLineCount} fysiek gecontroleerd.</small>
+              {partial && <div className="own-store-planner__partial-amount"
+                aria-label={store + ': alleen persoonlijk gecontroleerde prijzen'}>
+                <strong>Al gecontroleerde artikelregels: {money.format(partial.knownCents / 100)}</strong>
+                <small>{partial.confirmedCount} van {partial.physicalLineCount} ingrediënten bevestigd.
+                  {' '}{partial.remainingCount} nog niet volledig in deze deelberekening.
+                  Dit is <strong>geen volledig mandtotaal</strong>, geen winkelwinnaar en
+                  geen betrouwbare budget- of besparingsvergelijking.</small>
+                <button type="button" className="ghost-button"
+                  onClick={() => progress.nextIngredientId
+                    ? onReviewIngredient(store, progress.nextIngredientId)
+                    : onOpenComparison()}>
+                  Volgende productprijs controleren
+                </button>
+              </div>}
               {progress.demandLineCount > 0 && <div className="own-store-planner__progress-meters"
                 aria-label={'Voortgang eigen ' + store + '-winkelopname'}>
                 <label>Ingrediënten met voorgesteld product
