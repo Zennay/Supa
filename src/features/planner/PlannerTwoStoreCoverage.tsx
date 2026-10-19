@@ -49,11 +49,12 @@ function amountText(need: PlannerCaptureGuideNeed): string {
 }
 
 export function PlannerTwoStoreCoverage({
-  needs, progress, reviewed, onReviewIngredient, onOpenComparison, now,
+  needs, progress, reviewed, comparisonStatus, onReviewIngredient, onOpenComparison, now,
 }: {
   needs: readonly PlannerCaptureGuideNeed[]
   progress: PrivateCaptureProgress | null
   reviewed: PrivateReviewedBaskets | null
+  comparisonStatus: 'missing' | 'different-moments' | 'not-comparable' | 'comparable'
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
   onOpenComparison: () => void
   now: number
@@ -156,9 +157,20 @@ export function PlannerTwoStoreCoverage({
         <span>{ready[index]} / {needs.length} ingrediënten gekoppeld</span>
       </div>)}
     </div>
+    {comparisonStatus === 'different-moments' && <p className="supa-two-store-coverage__warning" role="status">
+      De twee echte bronmomenten liggen meer dan 24 uur uit elkaar. Een prijsverschil
+      is daarom onbekend, ook als alle individuele SKU’s gekoppeld zijn.
+      Vernieuw een van je winkelopnames in Vergelijk.
+    </p>}
+    {comparisonStatus === 'not-comparable' && <p className="supa-two-store-coverage__warning" role="status">
+      De fysieke mandregels zijn nog niet aantoonbaar gelijkwaardig.
+      Controleer de oorspronkelijke productkeuzes opnieuw in Vergelijk.
+    </p>}
     <div className="supa-two-store-coverage__toolbar">
       <p role="status">{pending.length === 0
-        ? 'Alle ingrediënten hebben een bronkoppeling. Alleen een complete actuele twee-winkelvergelijking mag een verschil tonen.'
+        ? comparisonStatus === 'comparable'
+          ? 'Alle originele fysieke ingrediënten zijn voor beide winkels volledig gecontroleerd.'
+          : 'De ingrediëntkoppelingen zijn compleet, maar er is nog geen betrouwbaar twee-winkelprijsverschil.'
         : `${pending.length} van ${needs.length} ingrediënten hebben nog een controle nodig bij minstens één winkel.`}</p>
       <label><input type="checkbox" checked={showAll}
         onChange={event => setShowAll(event.currentTarget.checked)} />
