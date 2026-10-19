@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
-import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
 import type { OwnStore, PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import './privateReviewedProductCatalog.css'
@@ -17,15 +17,33 @@ export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOp
 }) {
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
+  const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
+  const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal'>('source')
   const sources = shops.flatMap(shop => {
     const capture = reviewed?.stores[shop]
     return capture ? capture.basket.lines.filter((line): line is Matched => line.status === 'matched')
       .map(line => ({ shop, line, observedAt: capture.observedAt })) : []
   })
   const search = query.trim().toLocaleLowerCase('nl')
-  const visible = sources.filter(row => (store === 'all' || row.shop === store) &&
+  const rate = (line: Matched) => privatePackUnitRate({
+    amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
+    priceCents: line.pricePerPackCents,
+  })
+  const visible = sources.filter(row =>
+    (store === 'all' || row.shop === store) &&
+    (unitFilter === 'all' || rate(row.line)?.unit === unitFilter) &&
     (!search || [row.line.productName, row.line.productId, row.line.ingredientLabel]
       .some(value => value.toLocaleLowerCase('nl').includes(search))))
+  // Price/kg cannot meaningfully be compared to price/litre/piece. Keep
+  // incompatible units in distinct stable groups; prices are advisory only,
+  // while weekly whole-pack costs remain the authoritative budget calculation.
+  const group = (line: Matched) =>
+    ({ kg: 0, liter: 1, stuk: 2 } as Record<string, number>)[rate(line)?.unit ?? ''] ?? 3
+  const ordered = order === 'source' ? visible : [...visible].sort((a, b) =>
+    order === 'lineTotal'
+      ? a.line.lineTotalCents - b.line.lineTotalCents
+      : group(a.line) - group(b.line) ||
+        (rate(a.line)?.centsPerUnit ?? Infinity) - (rate(b.line)?.centsPerUnit ?? Infinity))
   return <section className="private-reviewed-products" aria-label="Mijn persoonlijk gecontroleerde winkelproducten">
     <h2>Mijn echte bronartikelen voor dit weekmenu</h2>
     <p>Alleen jouw zelf gecontroleerde productregels, geen actuele winkelcatalogus of kassagarantie.
@@ -37,13 +55,30 @@ export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOp
           <option value="all">Beide winkels</option>
           {shops.map(shop => <option value={shop} key={shop}>{shop}</option>)}
         </select></label>
+        <label>Eenheid <select value={unitFilter}
+          onChange={event => setUnitFilter(event.target.value as typeof unitFilter)}>
+          <option value="all">Alle eenheden</option>
+          <option value="kg">Prijs per kg</option>
+          <option value="liter">Prijs per liter</option>
+          <option value="stuk">Prijs per stuk</option>
+        </select></label>
+        <label>Sortering <select value={order}
+          onChange={event => setOrder(event.target.value as typeof order)}>
+          <option value="source">Oorspronkelijke bronvolgorde</option>
+          <option value="unitPrice">Eenheidsprijs laag naar hoog</option>
+          <option value="lineTotal">Weekregelbedrag laag naar hoog</option>
+        </select></label>
         <label>Zoek eigen product <input type="search" value={query}
           onChange={event => setQuery(event.target.value)} placeholder="Product, SKU of ingrediënt" /></label>
       </div>
       {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
         search={search} onOpenComparison={onOpenComparison} onOpenList={onOpenList} />}
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.</p>
-      <div className="private-reviewed-products__grid">{visible.map(({ shop, line, observedAt }) => <article
+      {order === 'unitPrice' && unitFilter === 'all' && <p className="private-reviewed-products__sort-note">
+        Eerst per kg, dan per liter en per stuk gesorteerd; verschillende eenheden
+        worden niet met elkaar vergeleken. Voor het mandje tellen hele verpakkingen.
+      </p>}
+      <div className="private-reviewed-products__grid">{ordered.map(({ shop, line, observedAt }) => <article
         key={JSON.stringify([shop, line.id, line.productId])}>
         <small>{shop} · opname {observedAt}</small><h3>{line.productName}</h3>
         <small>Broncode {line.productId}</small>
