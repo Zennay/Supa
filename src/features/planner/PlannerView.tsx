@@ -361,6 +361,7 @@ export function PlannerView({
           activeDays={activeDays}
           recipes={ingredientRecipes}
           onChooseRecipe={onRecipeChange}
+          onOpenComparison={onOpenComparison}
         />
       )}
 

@@ -3,25 +3,29 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import { previewRecipeReuseChange } from '../../domain/ingredientReusePreview.ts'
 import { IngredientReusePreviewCard } from './IngredientReusePreviewCard.tsx'
+import { recipeShoppingChange } from './recipeShoppingChange.ts'
+import { RecipeShoppingChangePanel } from './RecipeShoppingChangePanel.tsx'
 import './recipe-reuse-preview-panel.css'
 
 /**
  * Optional, non-destructive recipe comparison.
  *
  * The user's real week remains owned by PlannerView's onRecipeChange handler.
- * This panel never calls that handler or writes preferences: it only compares
- * the current recipe identities, and no money/leftover claim is inferred.
+ * Preview has no side effects; only the user's explicit recipe choice calls
+ * the Planner handler. The physical shopping delta is never a price claim.
  */
 export function RecipeReusePreviewPanel({
   plannedMeals,
   activeDays,
   recipes,
   onChooseRecipe,
+  onOpenComparison,
 }: {
   plannedMeals: PlannedMeal[]
   activeDays: string[]
   recipes: RecipeWithIngredients[]
   onChooseRecipe: (day: string, recipeId: string) => void
+  onOpenComparison: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [requestedDay, setRequestedDay] = useState<string | null>(null)
@@ -61,6 +65,18 @@ export function RecipeReusePreviewPanel({
         recipeId,
       })
     : null
+  const shoppingPreview = expanded ? recipeShoppingChange({
+    plan: plannedMeals, recipes, activeDays, day, recipeId,
+  }) : null
+  const canApply = preview !== null && shoppingPreview?.status === 'ready'
+  function apply(continueToComparison: boolean) {
+    // Both previews are derived from this render's actual active Planner
+    // state. Do not apply a candidate with unknown quantities or identities.
+    if (!canApply) return
+    onChooseRecipe(day, recipeId)
+    setExpanded(false)
+    if (continueToComparison) onOpenComparison()
+  }
 
   return (
     <section className="recipe-reuse-preview-panel" aria-label="Een ander recept bekijken">
@@ -107,19 +123,17 @@ export function RecipeReusePreviewPanel({
             geen boodschappenprijzen of bewezen besparing.
           </p>
           <IngredientReusePreviewCard preview={preview} />
-          {preview !== null && (
-            <button
-              type="button"
-              className="recipe-reuse-preview-apply"
-              onClick={() => {
-                // Only a confirmed, current proposal can mutate the week.
-                onChooseRecipe(day, recipeId)
-                setExpanded(false)
-              }}
-            >
+          {shoppingPreview && <RecipeShoppingChangePanel preview={shoppingPreview} day={day} />}
+          {canApply && <div className="recipe-reuse-preview-shopping__actions">
+            <button type="button" className="recipe-reuse-preview-apply"
+              onClick={() => apply(false)}>
               Kies {alternatives.find((recipe) => recipe.id === recipeId)?.title} voor {day}
             </button>
-          )}
+            <button type="button" className="recipe-reuse-preview-apply"
+              onClick={() => apply(true)}>
+              Kies recept en controleer PLUS/Deka-prijzen
+            </button>
+          </div>}
         </div>
       )}
     </section>

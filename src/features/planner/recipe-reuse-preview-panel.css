@@ -81,3 +81,38 @@
   outline: 3px solid currentColor;
   outline-offset: 3px;
 }
+
+.recipe-reuse-preview-shopping {
+  min-width: 0;
+  display: grid;
+  gap: .7rem;
+  border: 1px solid var(--border, #d9dfd7);
+  border-radius: .85rem;
+  padding: clamp(.8rem, 2vw, 1.15rem);
+  background: var(--surface, #fff);
+}
+.recipe-reuse-preview-shopping h4,
+.recipe-reuse-preview-shopping p { margin: 0; }
+.recipe-reuse-preview-shopping__rows { padding: 0; margin: 0; list-style: none; }
+.recipe-reuse-preview-shopping__rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .25rem .8rem;
+  border-bottom: 1px solid var(--border, #d9dfd7);
+  padding: .6rem 0;
+}
+.recipe-reuse-preview-shopping__rows strong { flex-basis: 100%; overflow-wrap: anywhere; }
+.recipe-reuse-preview-shopping__rows span { overflow-wrap: anywhere; }
+.recipe-reuse-preview-shopping__actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .6rem;
+}
+.recipe-reuse-preview-shopping__actions button { min-height: 44px; max-width: 100%; }
+.recipe-reuse-preview-shopping label { display: grid; gap: .5rem; }
+.recipe-reuse-preview-shopping textarea {
+  width: 100%; min-width: 0; max-width: 100%; font: inherit;
+  border: 1px solid var(--border, #d9dfd7); border-radius: .7rem;
+}
+@media (max-width: 480px) {
+  .recipe-reuse-preview-shopping__actions > button { flex: 1 1 100%; }
+}
