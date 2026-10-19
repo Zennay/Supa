@@ -435,7 +435,12 @@ export function LocalTwoStorePriceEditor({
         const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
         return hasPartialOwnCapture(draft) ? [`${store} · ${need.label}`] : []
       }))
-      if ((incompleteRows.length || missingStores.length) && !window.confirm(
+      const incompatibleRows = captureStores.flatMap(store => activeNeeds.flatMap(need => {
+        const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+        return ownCaptureStatus(draft, need) === 'incompatible'
+          ? [`${store} · ${need.label} (${need.amount ?? '?'} ${need.unit})`] : []
+      }))
+      if ((incompleteRows.length || missingStores.length || incompatibleRows.length) && !window.confirm(
         (missingStores.length
           ? 'De volgende winkel(s) hebben nog geen complete geobserveerde productregel en worden niet als winkelbron opgeslagen: ' +
             missingStores.join(', ') + '.\nEr is dus nog GEEN volledige twee-winkelvergelijking.\n'
@@ -445,8 +450,14 @@ export function LocalTwoStorePriceEditor({
             incompleteRows.slice(0, 10).join('\n') +
             (incompleteRows.length > 10 ? `\n… en nog ${incompleteRows.length - 10}` : '') + '\n'
           : '') +
+        (incompatibleRows.length
+          ? `\n${incompatibleRows.length} geprijsde bronregel(s) passen NIET fysiek bij de Planner-hoeveelheid:\n` +
+            incompatibleRows.slice(0, 10).join('\n') +
+            (incompatibleRows.length > 10 ? `\n… en nog ${incompatibleRows.length - 10}` : '') +
+            '\nDeze originele producten mogen als eigen bron worden bewaard, maar zullen GEEN prijs-match opleveren.\n'
+          : '') +
         '\nJe invoerconcept blijft behouden en ontbrekende prijzen blijven onbekend. ' +
-        'Wil je uitsluitend de complete, persoonlijk geobserveerde regels verwerken?'
+        'Wil je de echte volledige bronregels verwerken en de genoemde problemen later corrigeren?'
       )) {
         setError('Niets verwerkt: vul ontbrekende brongegevens aan of bevestig bewust dat deze regels onbekend blijven.')
         return
