@@ -28,3 +28,5 @@
 .private-source-shopping__mixed h3,.private-source-shopping__mixed p { margin:0; }
 .private-source-shopping__mixed p { line-height:1.5; }
 .private-source-shopping__mixed #supa-mixed-shopping-list { min-width:0; }
+
+.private-source-shopping__mixed { scroll-margin-top: 18px; }

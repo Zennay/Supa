@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
@@ -31,7 +31,16 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   const [remainingOnly, setRemainingOnly] = useState(false)
   const [message, setMessage] = useState('')
   const [showMixedRoute, setShowMixedRoute] = useState(false)
-  useEffect(() => { if (routeOpenSignal > 0) setShowMixedRoute(true) }, [routeOpenSignal])
+  const mixedSectionRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (routeOpenSignal <= 0) return
+    setShowMixedRoute(true)
+    // The Planner deep link should land on the actual shopping route, not
+    // only switch the tab while the route stays below the viewport.
+    const frame = window.requestAnimationFrame(() =>
+      mixedSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [routeOpenSignal])
   // Physical quantity, original source instant, SKU and money bind each tick.
   const identity = useMemo(() => JSON.stringify([
     reviewed.planKey, store, capture.observedAt, basket.store.id,
@@ -162,7 +171,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               ' goedkoper volgens jouw twee lokale, binnen 24 uur waargenomen bronnen.'}
           <small>Geen onafhankelijk gecontroleerde besparing.</small>
         </p>}
-      {mixed && single && plus && deka && <section className="private-source-shopping__mixed" aria-label="Combineer beide eigen winkelmandjes">
+      {mixed && single && plus && deka && <section ref={mixedSectionRef} className="private-source-shopping__mixed" aria-label="Combineer beide eigen winkelmandjes">
         <h3>Goedkoopste artikelen combineren</h3>
         <p>Verdeel alleen jouw gecontroleerde hele verpakkingen over beide winkels.
           De productkosten bedragen {euros.format(mixed.totalCents / 100)}.
@@ -173,14 +182,14 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           onClick={() => setShowMixedRoute(value => !value)}>
           {showMixedRoute ? 'Verberg gecombineerde route' : 'Open gecombineerde winkelroute'}
         </button>
-        {showMixedRoute && <div id="supa-mixed-shopping-list">
-          <Suspense fallback={<p role="status">Jouw gecontroleerde winkelroute openen…</p>}>
+        <div id="supa-mixed-shopping-list" hidden={!showMixedRoute}>
+          {showMixedRoute && <Suspense fallback={<p role="status">Jouw gecontroleerde winkelroute openen…</p>}>
             <MixedStoreShoppingCard key={pairIdentity ?? ''} mixed={mixed} single={single}
               plus={plus.basket} deka={deka.basket}
               captured={{ PLUS: plus.observedAt, DekaMarkt: deka.observedAt }}
               eligibleNow={pairCurrentNow} weekBudget={budget} />
-          </Suspense>
-        </div>}
+          </Suspense>}
+        </div>
       </section>}
       <div className="private-source-shopping__actions">
         <label><input type="checkbox" checked={remainingOnly}
