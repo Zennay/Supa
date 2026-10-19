@@ -340,7 +340,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             manualActiveDays={activeDays}
           />
         )}
-        {tab === 'list' && <ShoppingListView basket={basket} />}
+        {tab === 'list' && <ShoppingListView basket={basket} plan={plannedMeals} recipes={recipes} activeDays={activeDays} />}
         {tab === 'list' && designProductIds.length > 0 && (
           <details className="hifi-demo-details">
             <summary>Voorbeeldproducten uit het ontwerp</summary>

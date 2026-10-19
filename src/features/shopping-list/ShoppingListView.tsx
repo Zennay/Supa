@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { OneStoreBasket } from '../../domain/basket'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
+import type { PlannedMeal } from '../../domain/types'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import { euro } from '../../lib/money'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
@@ -11,6 +12,7 @@ import {
   shoppingListBasketKey,
   shoppingListProgressStorageKey,
 } from './shoppingListProgress'
+import { groupShoppingByRecipe } from './shoppingRecipeGroups'
 
 // An empty checklist is trustworthy only when its store identity is readable.
 // This guards the empty-state message, not ordinary populated product rows.
@@ -92,7 +94,12 @@ function canOverwriteStoredProgress(raw: string | null): boolean {
   }
 }
 
-export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
+export function ShoppingListView({ basket, plan, recipes, activeDays }: {
+  basket: OneStoreBasket
+  plan?: PlannedMeal[]
+  recipes?: RecipeWithIngredients[]
+  activeDays?: string[]
+}) {
   const basketKey = useMemo(() => {
     try {
       return shoppingListBasketKey(basket)
@@ -117,6 +124,10 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   const visibleLines = basketKey === null
     ? []
     : shoppingVisibleLines(basket.lines, done, openOnly)
+
+  const recipeGroups = groupShoppingByRecipe(visibleLines, plan, recipes, activeDays)
+  const groupedLines = recipeGroups.flatMap(group => group.lines)
+  const firstLineGroups = new Map(recipeGroups.filter(group => group.lines.length > 0).map(group => [group.lines[0].id, group] as const))
 
   // A genuinely empty plan has no shopping tasks. An empty row array with
   // inconsistent counters is not proof that the customer needs nothing.
@@ -266,12 +277,6 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
         </div>
       )}
 
-      {basket.lines.length > 0 && (
-        <div className="hifi-shoplist-category" data-figma-node="3342:4838">
-          <h3>Jouw boodschappen</h3>
-          <span>{visibleLines.length} items</span>
-        </div>
-      )}
       <div className="list-card">
         {basket.lines.length === 0 ? (
           <p className="disclaimer" role="status">
@@ -283,12 +288,19 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
           <p className="disclaimer" role="status">
             Alle regels zijn afgevinkt. Onzekere productkeuzes blijven een handmatige controle.
           </p>
-        ) : visibleLines.map((line) => {
+        ) : groupedLines.map((line) => {
           const checked = done.includes(line.id)
           const label =
             line.status === 'matched' ? line.productName : line.ingredientLabel
 
           return (
+            <Fragment key={line.id}>
+              {firstLineGroups.get(line.id) && (
+                <div className="hifi-shoplist-category" data-figma-node="3342:4838">
+                  <h3>{firstLineGroups.get(line.id)!.title}</h3>
+                  <span>{firstLineGroups.get(line.id)!.lines.length} items</span>
+                </div>
+              )}
             <button
               type="button"
               aria-pressed={checked}
@@ -301,7 +313,6 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
                     ? 'shopping-row checked'
                     : 'shopping-row'
               }
-              key={line.id}
               onClick={() =>
                 setProgress((current) => {
                   const currentDone =
@@ -327,6 +338,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
                 {line.status === 'matched' ? euro.formatCents(line.lineTotalCents) : '—'}
               </span>
             </button>
+            </Fragment>
           )
         })}
       </div>
