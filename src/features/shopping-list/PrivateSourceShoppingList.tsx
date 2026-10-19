@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
@@ -15,12 +15,13 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
-export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison }: {
+export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, routeOpenSignal = 0 }: {
   reviewed: PrivateReviewedBaskets
   budget: number
   preferred: OwnStore
   onChooseStore: (store: OwnStore) => void
   onOpenComparison: () => void
+  routeOpenSignal?: number
 }) {
   const available = stores.filter(store => !!reviewed.stores[store])
   const store = available.includes(preferred) ? preferred : available[0]
@@ -30,6 +31,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   const [remainingOnly, setRemainingOnly] = useState(false)
   const [message, setMessage] = useState('')
   const [showMixedRoute, setShowMixedRoute] = useState(false)
+  useEffect(() => { if (routeOpenSignal > 0) setShowMixedRoute(true) }, [routeOpenSignal])
   // Physical quantity, original source instant, SKU and money bind each tick.
   const identity = useMemo(() => JSON.stringify([
     reviewed.planKey, store, capture.observedAt, basket.store.id,

@@ -24,6 +24,7 @@ type PlannerViewProps = {
   ownReviewed?: PrivateReviewedBaskets | null
   preferredOwnStore: OwnStore
   onOpenShoppingList: () => void
+  onOpenMixedRoute: () => void
   basketTotalCents: number | null
   basketUnresolvedLineCount: number
   ownSource?: { store: string; observedAt: string }
@@ -44,6 +45,7 @@ export function PlannerView({
   ownReviewed,
   preferredOwnStore,
   onOpenShoppingList,
+  onOpenMixedRoute,
   basketTotalCents,
   basketUnresolvedLineCount,
   ownSource,
@@ -329,7 +331,8 @@ export function PlannerView({
       <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} preferred={preferredOwnStore}
         hasDemand={activeDays.length > 0} budget={budget}
         onSelect={onOwnSourceChange}
-        onOpenComparison={onOpenComparison} onOpenList={onOpenShoppingList} />
+        onOpenComparison={onOpenComparison} onOpenList={onOpenShoppingList}
+        onOpenMixedRoute={onOpenMixedRoute} />
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
       {hasIngredientData && (

@@ -9,7 +9,7 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList }: {
+export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList, onOpenMixedRoute }: {
   reviewed: PrivateReviewedBaskets | null
   preferred: OwnStore
   hasDemand: boolean
@@ -17,6 +17,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
   onSelect: (store: OwnStore) => void
   onOpenComparison: () => void
   onOpenList: () => void
+  onOpenMixedRoute: () => void
 }) {
   const [downloadMessage, setDownloadMessage] = useState('')
   const summary = ownStoreWeekComparison(reviewed)
@@ -101,8 +102,8 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
                     {' '}lager dan de goedkoopste volledige winkel, <strong>vóór extra bezoekkosten</strong>.
                     Het werkelijke voordeel is onbekend zolang reistijd of extra kosten niet zijn ingevuld.</>
                 : <> Deze selectie past bij één winkel; een tweede winkelstop is niet nodig.</>}</p>
-            <button type="button" className="ghost-button" onClick={onOpenComparison}>
-              Bekijk mijn winkelroute en eventuele extra kosten in Vergelijk
+            <button type="button" className="ghost-button" onClick={onOpenMixedRoute}>
+              Open mijn gecombineerde winkelroute in Lijst
             </button>
           </div>}
           <PlannerOwnProductDeltas lines={summary.lines} />

@@ -116,6 +116,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [visitedBasket, setVisitedBasket] = useState(initialTab === 'basket')
   const [visitedList, setVisitedList] = useState(initialTab === 'list')
+  const [mixedRouteOpenSignal, setMixedRouteOpenSignal] = useState(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [sourceNowMs, setSourceNowMs] = useState(() => Date.now())
   const [preferredOwnStore, setPreferredOwnStore] = useState<OwnStore>('PLUS')
@@ -391,6 +392,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             ownReviewed={livePrivateReviewed}
             preferredOwnStore={preferredOwnStore}
             onOpenShoppingList={() => navigate('list')}
+            onOpenMixedRoute={() => { setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
             basketTotalCents={preferredPrivateBasket?.basket.totalCents ?? null}
             basketUnresolvedLineCount={preferredPrivateBasket?.basket.unresolvedLineCount ?? 0}
             ownSource={preferredPrivateBasket ? {
@@ -498,7 +500,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
-              onOpenComparison={() => navigate('basket')} />
+              onOpenComparison={() => navigate('basket')} routeOpenSignal={mixedRouteOpenSignal} />
           </div>
         )}
         {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
