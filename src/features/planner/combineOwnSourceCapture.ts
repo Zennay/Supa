@@ -9,6 +9,44 @@ const maxBytes = 256_000
 type RawCapture = { retailer: OfflineRetailer; [key: string]: unknown }
 type RawSource = { captures: RawCapture[] }
 
+export type CaptureRefreshChanges = Readonly<{
+  addedSkus: number
+  removedSkus: number
+  priceChangedSkus: number
+  packageChangedSkus: number
+  becameUnpricedSkus: number
+}>
+
+function refreshChanges(
+  old: NonNullable<ReturnType<typeof parseOfflinePriceSnapshots>['captures'][OfflineRetailer]> | undefined,
+  updated: NonNullable<ReturnType<typeof parseOfflinePriceSnapshots>['captures'][OfflineRetailer]>,
+): CaptureRefreshChanges {
+  const before = new Map(old?.products.map(product => [product.id, product]) ?? [])
+  const after = new Map(updated.products.map(product => [product.id, product]))
+  let addedSkus = 0
+  let priceChangedSkus = 0
+  let packageChangedSkus = 0
+  let becameUnpricedSkus = 0
+  for (const [id, current] of after) {
+    const previous = before.get(id)
+    if (!previous) { addedSkus++; continue }
+    if (previous.sourcePriceCents !== null && current.sourcePriceCents !== null &&
+        previous.sourcePriceCents !== current.sourcePriceCents) priceChangedSkus++
+    if (previous.packAmount !== current.packAmount ||
+        previous.packUnit !== current.packUnit ||
+        previous.packCount !== current.packCount) packageChangedSkus++
+    if (previous.sourcePriceCents !== null && current.sourcePriceCents === null)
+      becameUnpricedSkus++
+  }
+  return {
+    addedSkus,
+    removedSkus: [...before.keys()].filter(id => !after.has(id)).length,
+    priceChangedSkus,
+    packageChangedSkus,
+    becameUnpricedSkus,
+  }
+}
+
 /**
  * Keep each *original* retailer capture intact when a person supplies an
  * explicitly newer single-retailer source. Never stitch price rows from two
@@ -24,6 +62,7 @@ export function replaceOwnStoreCapture(
   retailer: OfflineRetailer
   action: 'added' | 'replaced'
   pairedWithin24h: boolean
+  changes: CaptureRefreshChanges
 } {
   const original = parseOfflinePriceSnapshots(originalText, nowMs)
   const incoming = parseOfflinePriceSnapshots(incomingSingleStoreText, nowMs)
@@ -57,5 +96,6 @@ export function replaceOwnStoreCapture(
     retailer,
     action: old ? 'replaced' : 'added',
     pairedWithin24h: result.pairedWithin24h,
+    changes: refreshChanges(old, updated),
   }
 }
