@@ -188,6 +188,72 @@ function corroborateDekaOffer(offer: JsonObject, expectedCents: number): boolean
   return true
 }
 
+type ComparablePack = { amount: number; unit: string; count: number }
+const explicitWeightUnits: Record<string, string> = {
+  g: 'g', gram: 'g', grams: 'g', kg: 'kg', kilogram: 'kg',
+  ml: 'ml', milliliter: 'ml', millilitre: 'ml', l: 'l',
+  liter: 'l', litre: 'l', st: 'piece', stuk: 'piece',
+  stuks: 'piece', piece: 'piece',
+  GRM: 'g', KGM: 'kg', MLT: 'ml', LTR: 'l', C62: 'piece',
+}
+
+/** A metric quantity becomes an exact, bounded decimal integer in base
+ * micrograms/microlitres/millionths of a piece, with multipack included. */
+function exactPhysicalPack(pack: ComparablePack): string | null {
+  const factor = pack.unit === 'kg' || pack.unit === 'l' ? 1000n :
+    pack.unit === 'g' || pack.unit === 'ml' || pack.unit === 'piece' ? 1n : null
+  if (factor === null || !Number.isSafeInteger(pack.count) || pack.count < 1) return null
+  const amount = String(pack.amount)
+  const match = /^(\d+)(?:\.(\d{1,6}))?$/u.exec(amount)
+  if (!match || match[1].length > 15) return null
+  const family = pack.unit === 'g' || pack.unit === 'kg'
+    ? 'mass' : pack.unit === 'ml' || pack.unit === 'l' ? 'volume' : 'piece'
+  const micro = BigInt(match[1]) * 1_000_000n +
+    BigInt((match[2] ?? '').padEnd(6, '0'))
+  if (micro <= 0n) return null
+  return family + ':' + (micro * factor * BigInt(pack.count)).toString()
+}
+
+/** Optional JSON-LD physical weight cannot contradict the Nuxt package.
+ * Missing JSON-LD weight remains allowed; invalid explicit quantities do not
+ * become a source-priced candidate. */
+function corroborateDekaWeight(weight: unknown, nuxtPack: ComparablePack): boolean {
+  if (weight === undefined || weight === null) return true
+  if (typeof weight !== 'string' && !isObject(weight)) return false
+  let value: unknown = weight
+  let unitText: unknown
+  let unitCode: unknown
+  if (isObject(weight)) {
+    value = weight.value
+    unitText = weight.unitText
+    unitCode = weight.unitCode
+  }
+  const metadata = [unitText, unitCode].filter(item => item !== undefined && item !== null)
+  const declaredUnits: string[] = []
+  for (const item of metadata) {
+    if (typeof item !== 'string') return false
+    const unit = explicitWeightUnits[item.trim()] ??
+      explicitWeightUnits[item.trim().toLocaleLowerCase('en')]
+    if (!unit) return false
+    declaredUnits.push(unit)
+  }
+  if (new Set(declaredUnits).size > 1) return false
+  const raw = typeof value === 'string' ? value.trim() :
+    typeof value === 'number' && Number.isFinite(value) ? String(value) : ''
+  if (!raw) return false
+  let parsed = normalizePackText(raw)
+  if (parsed.amount === null || parsed.unit === 'unknown') {
+    if (!declaredUnits.length || !/^(?:\d+)(?:[.,]\d+)?$/u.test(raw)) return false
+    parsed = normalizePackText(raw + ' ' + declaredUnits[0])
+  } else if (declaredUnits.some(unit => unit !== parsed.unit)) {
+    return false
+  }
+  if (parsed.amount === null || parsed.unit === 'unknown') return false
+  const declared = exactPhysicalPack(parsed)
+  const original = exactPhysicalPack(nuxtPack)
+  return declared !== null && original !== null && declared === original
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
   if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
     return undefined
@@ -348,9 +414,10 @@ export function parseDekaMarktSsrProductEvidence(
       declaredUrl !== evidence.source.url)) ||
     !offers ||
     typeof observedCapitalPrice !== 'number' ||
-    !corroborateDekaOffer(offers, currentPriceCents)
+    !corroborateDekaOffer(offers, currentPriceCents) ||
+    !corroborateDekaWeight(jsonLd.weight, normalizedPack)
   ) {
-    return { type: 'abstain', reason: 'DekaMarkt JSON-LD does not corroborate Nuxt source, identity, price, currency or availability' }
+    return { type: 'abstain', reason: 'DekaMarkt JSON-LD does not corroborate Nuxt source, identity, package, price, currency or availability' }
   }
 
   const observation: RawProductObservation = {
