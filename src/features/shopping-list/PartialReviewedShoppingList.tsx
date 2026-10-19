@@ -100,8 +100,8 @@ export function PartialReviewedShoppingList({
         throw new Error('De ingrediënten of bron zijn veranderd tijdens het maken van de lijst.')
       }
       const content = privatePartialShoppingExport({
-        store, observedAt: capture!.observedAt, rows, checked: selected,
-        totalDemandLines: confirmed.physicalLineCount,
+        store, observedAt: capture!.observedAt, rows, unknown: incompleteNeeds,
+        checked: selected, totalDemandLines: confirmed.physicalLineCount,
       }, kind === 'csv' ? 'csv' : 'text')
       if (kind === 'copy') {
         try {
