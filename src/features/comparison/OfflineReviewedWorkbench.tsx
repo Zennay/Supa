@@ -2571,6 +2571,7 @@ export function OfflineReviewedWorkbench({
                             {line.status === 'matched' && (() => {
                               const key = reviewedLineKey(store, capture.observedAt, line)
                               const automatic = isAutomaticKey(key)
+                              const rejected = autoReviewKeys.has(key) && rejectedAutoReviews[key] === true
                               return <label className="offline-price-workbench__review">
                                 <input type="checkbox"
                                   checked={isAcceptedKey(key)}
@@ -2584,8 +2585,10 @@ export function OfflineReviewedWorkbench({
                                       [key]: checked }))
                                   }} />
                                 <span>{automatic
-                                  ? 'Automatisch gekoppeld: exacte productnaam, originele SKU, passende verpakking en bekende bronprijs. Haal het vinkje weg als dit niet klopt.'
-                                  : 'Dit product is niet eenduidig automatisch te koppelen: controleer originele SKU, inhoud en bronprijs.'}</span>
+                                  ? 'Automatisch gekoppeld: exacte ingrediënt- en productnaam, originele SKU, passende verpakking en bekende bronprijs. Haal het vinkje weg als dit niet klopt.'
+                                  : rejected
+                                    ? 'Automatische match door jou afgewezen. Kies een ander bronartikel, of controleer en bevestig dit product bewust.'
+                                    : 'Match niet eenduidig: controleer de originele SKU, inhoud en bronprijs. Alleen hier is nog een vinkje nodig.'}</span>
                               </label>
                             })()}
                             {line.status === 'unresolved' && <span>{line.reasons.some(reason => reason.includes('same source SKU'))

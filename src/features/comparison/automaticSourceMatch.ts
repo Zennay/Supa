@@ -41,7 +41,8 @@ export function automaticallyAcceptedSourceLine(
       !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0 ||
       !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
       !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
-      !tokensMatch(query, line.productName)) return false
+      !tokensMatch(query, line.productName) ||
+      !tokensMatch(line.ingredientLabel, line.productName)) return false
 
   const matching = products.filter(product => product.id === line.productId)
   if (matching.length !== 1) return false
