@@ -134,3 +134,11 @@
   color:#17482e; font:inherit; font-weight:650;
 }
 .recipe-plan-panel :is(button,select):focus-visible { outline:3px solid #226f52; outline-offset:3px; }
+
+.recipe-ingredient-match {
+  display: block;
+  font-size: .78rem;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}

@@ -16,6 +16,23 @@ import { exportOwnRecipePrivateWeek } from './exportOwnRecipePrivateWeek'
 import { RECIPE_FAVORITES_KEY, readRecipeFavorites, toggleRecipeFavorite, type RecipeFavorites } from './recipeFavorites'
 import './recipes.css'
 
+type RecipeSearchable = {
+  title: string
+  ingredients: readonly { label: string; original?: string }[]
+  tags?: readonly string[]
+}
+function searchableRecipeText(input: string): string {
+  return input.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl').trim()
+}
+/** Discoverability only: this does not substitute food, change ingredients or
+ * make any recipe source, SKU or price evidence more trustworthy. */
+function recipeIngredientHit(recipe: RecipeSearchable, query: string): string | null {
+  if (!query) return null
+  const found = recipe.ingredients.find(item =>
+    searchableRecipeText(item.label).includes(query) ||
+    (item.original && searchableRecipeText(item.original).includes(query)))
+  return found?.label ?? null
+}
 function keyed<T>(items: readonly T[], identity: (item: T) => string) {
   const occurrences = new Map<string, number>()
   return items.map(value => {
@@ -132,7 +149,12 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     window.addEventListener('storage', refreshOwnRecipes)
     return () => window.removeEventListener('storage', refreshOwnRecipes)
   }, [])
-  const matches = (r: { id: string; title: string }) => r.title.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) && (filter !== 'favorites' || favorites.includes(r.id))
+  const searchTerm = searchableRecipeText(query)
+  const matches = (r: RecipeSearchable & { id: string }) =>
+    (filter !== 'favorites' || favorites.includes(r.id)) &&
+    (!searchTerm || searchableRecipeText(r.title).includes(searchTerm) ||
+      r.tags?.some(tag => searchableRecipeText(tag).includes(searchTerm)) ||
+      recipeIngredientHit(r, searchTerm) !== null)
   const demo = filter === 'own' ? [] : examples.filter(matches)
   const own = library.recipes.filter(matches)
   if (sort) { demo.sort((x, y) => x.title.localeCompare(y.title, 'nl')); own.sort((x, y) => x.title.localeCompare(y.title, 'nl')) }
@@ -479,7 +501,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   }
   return <div className="hifi-home recipe-library" data-figma-node="3342:5608">
     <header className="recipe-heading"><button className="recipe-back" onClick={onBack} aria-label="Terug naar Home"><FigmaImage asset={a.recipeBack} alt="" /></button><h1>{filter === 'own' ? 'Mijn eigen recepten' : 'Alle recepten'}</h1></header>
-    <div className="hifi-search-row"><label className="hifi-search"><FigmaImage asset={a.recipeSearch} alt="" /><input type="search" aria-label="Zoek recepten" placeholder="Zoek recepten" value={query} onChange={e => setQuery(e.target.value)} /></label><button className="hifi-filter" aria-label="Receptfilters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><FigmaImage asset={a.imgVector2} alt="" /></button></div>
+    <div className="hifi-search-row"><label className="hifi-search"><FigmaImage asset={a.recipeSearch} alt="" /><input type="search" aria-label="Zoek recepten op naam of ingrediënt" placeholder="Zoek recept of ingrediënt" value={query} onChange={e => setQuery(e.target.value)} /></label><button className="hifi-filter" aria-label="Receptfilters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><FigmaImage asset={a.imgVector2} alt="" /></button></div>
     {filtersOpen && <div className="recipe-tabs" aria-label="Receptfilter">{(['all', 'own', 'favorites'] as const).map((id, i) => <button key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>{['Alle recepten', 'Eigen recepten', 'Favorieten'][i]}</button>)}</div>}
     <section className="hifi-section"><div className="hifi-section-heading"><div><h2>Recepten</h2><p className="recipe-count">{demo.length + own.length} recepten</p></div><button aria-label="Sorteer recepten op naam" aria-pressed={sort} onClick={() => setSort(!sort)}><FigmaImage asset={a.recipeSort} alt="" /></button></div>
       <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe && recipe.image ? '' : ' own-recipe-card'}`} key={recipe.id}>
@@ -488,9 +510,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         <div className="hifi-recipe-top"><span className="hifi-saving">{'sourceLabel' in recipe ? recipe.sourceLabel : 'Eigen recept'}</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`}
           aria-pressed={favorites.includes(recipe.id)} disabled={!!favoriteState.error}
           onClick={() => favorite(recipe.id)}><FigmaImage asset={favorites.includes(recipe.id) ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
-        <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p>{'savedAt' in recipe && <small className="recipe-planner-readiness">{toPlannerRecipe(recipe) ? '✓ Klaar voor Planner · ongeprijsd' : 'Ingrediënten nog controleren voor Planner'}</small>}</div>
+        <div className="hifi-recipe-caption"><h3>{recipe.title}</h3>{searchTerm && recipeIngredientHit(recipe, searchTerm) &&
+          <small className="recipe-ingredient-match">Ingrediënt: {recipeIngredientHit(recipe, searchTerm)}</small>}<p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes ?? '?'}</span><span>{`${recipe.servings ?? '?'} porties`}</span></p>{'savedAt' in recipe && <small className="recipe-planner-readiness">{toPlannerRecipe(recipe) ? '✓ Klaar voor Planner · ongeprijsd' : 'Ingrediënten nog controleren voor Planner'}</small>}</div>
       </article>)}</div>
-      {!demo.length && !own.length && <p className="hifi-empty">{query ? 'Geen recepten gevonden. Probeer een andere zoekterm.' : 'Voeg je eerste eigen recept toe of importeer een receptlink.'}</p>}
+      {!demo.length && !own.length && <p className="hifi-empty">{query ? 'Geen recepten met deze naam of dit ingrediënt gevonden.' : 'Voeg je eerste eigen recept toe of importeer een receptlink.'}</p>}
       <small>Favorieten blijven lokaal bewaard in deze browser; receptgegevens en links worden niet meegestuurd.</small>
       {favoriteState.error && <p role="alert" className="recipe-error">{favoriteState.error}</p>}
     </section>
