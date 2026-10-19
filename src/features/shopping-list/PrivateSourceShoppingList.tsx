@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { BasketTraceLine } from '../../domain/basket.ts'
+import type { BasketTraceLine, RecipeWithIngredients } from '../../domain/basket.ts'
+import type { PlannedMeal } from '../../domain/types.ts'
 import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
@@ -16,7 +17,7 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
-export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, routeOpenSignal = 0 }: {
+export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeOpenSignal = 0 }: {
   reviewed: PrivateReviewedBaskets
   budget: number
   preferred: OwnStore
@@ -24,6 +25,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   onOpenComparison: () => void
   checked: Record<string, boolean>
   setChecked: Dispatch<SetStateAction<Record<string, boolean>>>
+  plan: PlannedMeal[]
+  recipes: RecipeWithIngredients[]
+  activeDays: string[]
   routeOpenSignal?: number
 }) {
   const available = stores.filter(store => !!reviewed.stores[store])
@@ -106,6 +110,44 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   function currentCaptureAvailable() {
     const valid = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())?.stores[store]
     return !!valid && valid.observedAt === capture.observedAt && valid.basket === basket
+  }
+  async function bringUnpricedWeekChecks() {
+    if (!currentCaptureAvailable()) {
+      setMessage('Controleer eerst de actuele bronproducten voor deze winkel.')
+      return
+    }
+    try {
+      const { unpricedWeekToReviewedTicks } = await import('./unpricedWeekToReviewedTicks.ts')
+      const imported = unpricedWeekToReviewedTicks({
+        plan, recipes, activeDays, basket,
+        read: key => window.sessionStorage.getItem(key),
+      })
+      if (!imported.checkedIds.length) {
+        setMessage('Geen afgevinkte artikelen gevonden in de ongeprijsde Planner-weeklijst van dit browsertabblad.')
+        return
+      }
+      if (!window.confirm(imported.checkedIds.length + ' van ' + imported.total +
+        ' al afgevinkte fysieke Planner-boodschappen toevoegen aan jouw ' + store +
+        '-lijst? Je bestaande vinkjes blijven behouden. Dit bevestigt geen prijs of betaling.')) return
+      if (!currentCaptureAvailable()) throw Error('De bron is inmiddels verlopen.')
+      // A changed current week must never inherit completion from the former.
+      const current = unpricedWeekToReviewedTicks({
+        plan, recipes, activeDays, basket,
+        read: key => window.sessionStorage.getItem(key),
+      })
+      if (JSON.stringify(current.checkedIds) !== JSON.stringify(imported.checkedIds))
+        throw Error('De Planner-vinkjes zijn ondertussen gewijzigd.')
+      setChecked(before => ({
+        ...before,
+        ...Object.fromEntries(imported.checkedIds.map(id => {
+          const line = basket.lines.find(row => row.id === id)!
+          return [tick(line), true]
+        })),
+      }))
+      setMessage(imported.checkedIds.length + ' vinkjes toegevoegd vanuit je eigen ongeprijsde weeklijst.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Overnemen van Planner-vinkjes is niet gelukt.')
+    }
   }
   function downloadList() {
     if (!currentCaptureAvailable()) {
@@ -323,6 +365,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         }}>{doneCount === basket.lines.length
           ? 'Vinkjes bij ' + store + ' wissen'
           : 'Alle ' + store + '-artikelen afvinken'}</button>
+        <button type="button" onClick={() => { void bringUnpricedWeekChecks() }}>
+          Neem vinkjes uit mijn ongeprijsde Planner-lijst over
+        </button>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
         <button type="button" onClick={() => { void downloadCsv() }}>Download volledig mandje met SKU’s (CSV)</button>
         <button type="button" onClick={() => { void downloadPrintable() }}>Print volledig eigen mandje (HTML)</button>

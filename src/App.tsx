@@ -524,6 +524,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
               checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
+              plan={plannedMeals} recipes={recipes} activeDays={activeDays}
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
               onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal} />
           </div>
