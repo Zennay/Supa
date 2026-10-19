@@ -1,6 +1,7 @@
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
@@ -119,25 +120,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     : (delta > 0 ? 'PLUS' : 'DekaMarkt') + ' is ' +
       money.format(Math.abs(delta) / 100) + ' goedkoper voor alle hele verpakkingen.'
   const chooseIngredientStore = (ingredientId: string, store: OwnStore) => {
-    // Re-admit source age + exact same demand at click time. A stale Products
-    // render can never authorize navigation using an expired SKU or amount.
-    const now = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
-    const a = now?.stores.PLUS
-    const b = now?.stores.DekaMarkt
-    if (!a || !b || Math.abs(a.capturedMs - b.capturedMs) > 86_400_000 ||
-        !compareFullBaskets({ baseline: a.basket, candidate: b.basket }).claimable) {
-      onOpenComparison()
-      return
-    }
-    const proposed = createMixedStoreShoppingPlan(
-      a.basket, b.basket, 'mixed', { [ingredientId]: store })
-    const line = proposed?.lines.find(item => item.id === ingredientId && item.store === store)
-    if (!line) { onOpenComparison(); return }
-    onChooseRouteLine({
-      planKey: reviewed.planKey,
-      observedAt: { PLUS: a.observedAt, DekaMarkt: b.observedAt },
-      ingredientId, store, lineKey: line.key,
-    })
+    const intent = currentPrivateRouteChoice(reviewed, ingredientId, store, Date.now())
+    if (!intent) { onOpenComparison(); return }
+    onChooseRouteLine(intent)
   }
   const product = (line: Matched, store: OwnStore) => <div className="private-reviewed-products__paired-option">
     <strong>{store}</strong>

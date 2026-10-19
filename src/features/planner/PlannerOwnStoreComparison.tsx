@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { PlannerOwnProductDeltas } from './PlannerOwnProductDeltas.tsx'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
@@ -9,7 +10,7 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList, onOpenMixedRoute }: {
+export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine }: {
   reviewed: PrivateReviewedBaskets | null
   preferred: OwnStore
   hasDemand: boolean
@@ -18,6 +19,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
   onOpenComparison: () => void
   onOpenList: () => void
   onOpenMixedRoute: () => void
+  onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
   const [downloadMessage, setDownloadMessage] = useState('')
   const summary = ownStoreWeekComparison(reviewed)
@@ -70,6 +72,15 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
     } catch (error) {
       setDownloadMessage(error instanceof Error ? error.message : 'CSV-download mislukt.')
     }
+  }
+  function chooseConfirmedLine(id: string, store: OwnStore) {
+    const choice = currentPrivateRouteChoice(reviewed, id, store, Date.now())
+    if (!choice) {
+      setDownloadMessage('De winkelbron of Planner-vraag is veranderd of verlopen. Bevestig de producten opnieuw in Vergelijk.')
+      return
+    }
+    setDownloadMessage('')
+    onChooseRouteLine(choice)
   }
   return <section className="own-store-planner" aria-labelledby="own-store-planner-heading">
     <header className="own-store-planner__header">
@@ -141,7 +152,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
               Open mijn gecombineerde winkelroute in Lijst
             </button>
           </div>}
-          <PlannerOwnProductDeltas lines={summary.lines} />
+          <PlannerOwnProductDeltas lines={summary.lines} onChooseLine={chooseConfirmedLine} />
         </div>
       : summary.available.length > 0 ? <div className="own-store-planner__result" role="status">
           <strong>Geen betrouwbaar twee-winkelprijsverschil</strong>

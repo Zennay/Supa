@@ -445,6 +445,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             preferredOwnStore={preferredOwnStore}
             onOpenShoppingList={() => navigate('list')}
             onOpenMixedRoute={() => { setPrivateRouteChoice(null); setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
+            onChooseRouteLine={intent => {
+              const serial = mixedRouteOpenSignal + 1
+              setPrivateRouteChoice({ ...intent, serial })
+              setMixedRouteOpenSignal(serial)
+              navigate('list')
+            }}
             basketTotalCents={preferredPrivateBasket?.basket.totalCents ?? null}
             basketUnresolvedLineCount={preferredPrivateBasket?.basket.unresolvedLineCount ?? 0}
             ownSource={preferredPrivateBasket ? {

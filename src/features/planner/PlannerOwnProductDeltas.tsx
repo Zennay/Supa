@@ -1,10 +1,14 @@
 import type { ComparedOwnLine } from './ownStoreBudgetComparison.ts'
+import type { OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 /** A readable drilldown of the same canonically confirmed basket lines. */
-export function PlannerOwnProductDeltas({ lines }: { lines: ComparedOwnLine[] }) {
+export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
+  lines: ComparedOwnLine[]
+  onChooseLine: (ingredientId: string, store: OwnStore) => void
+}) {
   if (!lines.length) return null
   return <details className="own-store-planner__details">
     <summary>Bekijk {lines.length} productprijzen, verpakkingen en regelverschillen</summary>
@@ -24,6 +28,10 @@ export function PlannerOwnProductDeltas({ lines }: { lines: ComparedOwnLine[] })
           </td>)}
           <td><strong>{item.deltaCents === 0 ? 'Gelijk' : euro.format(Math.abs(item.deltaCents) / 100)}</strong>
             <small>{item.deltaCents > 0 ? 'PLUS lager' : item.deltaCents < 0 ? 'DekaMarkt lager' : 'Geen verschil'}</small>
+            <div className="own-store-planner__line-actions" aria-label={'Kies winkel voor ' + item.ingredientLabel}>
+              <button type="button" onClick={() => onChooseLine(item.id, 'PLUS')}>Kies PLUS</button>
+              <button type="button" onClick={() => onChooseLine(item.id, 'DekaMarkt')}>Kies DekaMarkt</button>
+            </div>
           </td>
         </tr>)}</tbody>
       </table>

@@ -11,7 +11,7 @@ import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { HiFiPlannerWeekCard } from './HiFiPlannerWeekCard.tsx'
 import { PlannerOwnStoreComparison } from './PlannerOwnStoreComparison.tsx'
-import type { PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
+import type { PrivateReviewedBaskets, OwnStore, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -25,6 +25,7 @@ type PlannerViewProps = {
   preferredOwnStore: OwnStore
   onOpenShoppingList: () => void
   onOpenMixedRoute: () => void
+  onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   basketTotalCents: number | null
   basketUnresolvedLineCount: number
   ownSource?: { store: string; observedAt: string }
@@ -46,6 +47,7 @@ export function PlannerView({
   preferredOwnStore,
   onOpenShoppingList,
   onOpenMixedRoute,
+  onChooseRouteLine,
   basketTotalCents,
   basketUnresolvedLineCount,
   ownSource,
@@ -332,7 +334,7 @@ export function PlannerView({
         hasDemand={activeDays.length > 0} budget={budget}
         onSelect={onOwnSourceChange}
         onOpenComparison={onOpenComparison} onOpenList={onOpenShoppingList}
-        onOpenMixedRoute={onOpenMixedRoute} />
+        onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine} />
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
       {hasIngredientData && (

@@ -29,3 +29,12 @@
 .own-store-planner__start { padding: 14px; margin-top: 16px; border: 1px dashed #b7c8b9; border-radius: 12px; background: #f8faf8; }
 .own-store-planner__start p { line-height: 1.55; }
 .own-store-planner__start button { min-height: 44px; }
+.own-store-planner__line-actions { display:grid; gap:.45rem; margin-top:.75rem; }
+.own-store-planner__line-actions button {
+  min-height:42px; padding:.4rem .6rem; border:1px solid #6b947c;
+  background:#f1f8f3; color:#20563a; border-radius:8px; cursor:pointer;
+  text-align:left; font-weight:600;
+}
+.own-store-planner__line-actions button:focus-visible {
+  outline:3px solid #226f52; outline-offset:2px;
+}
