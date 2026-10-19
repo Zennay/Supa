@@ -40,6 +40,7 @@ export function MixedStoreShoppingCard({
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [onlyOpen, setOnlyOpen] = useState(false)
+  const [extraCount, setExtraCount] = useState(0)
   const [showText, setShowText] = useState(false)
   const [message, setMessage] = useState('')
   const [extraVisitCost, setExtraVisitCost] = useState('')
@@ -406,6 +407,12 @@ export function MixedStoreShoppingCard({
         ? 'PLUS én DekaMarkt'
         : plan.lines[0]?.store ?? 'Geen winkel'} ·
         {' '}{money.format(plan.totalCents / 100)} aan winkelproducten.</p>
+      {weekBudgetCents !== null && extraCount > 0 && <p role="status"
+        className="mixed-store-route__budget">
+        Je hebt ook {extraCount} eigen extra boodschappen zonder bronprijs. De werkelijke totale
+        weekuitgaven en resterende budgetruimte zijn daarom <strong>onbekend</strong>.
+        Vergelijk het weekbudget hieronder uitsluitend met de bekende geprijsde Planner-producten.
+      </p>}
       {weekBudgetCents !== null && <p role="status" className="mixed-store-route__budget">
         {routeWithCostCents === null
           ? <>Je Planner-weekbudget is {money.format(weekBudgetCents / 100)}.
@@ -413,12 +420,12 @@ export function MixedStoreShoppingCard({
               totale budgetruimte <strong>onbekend</strong>.
               Alleen de gecontroleerde producten kosten {money.format(plan.totalCents / 100)}.</>
           : routeWithCostCents > weekBudgetCents
-            ? <>Je gekozen route kost {money.format(routeWithCostCents / 100)}
+            ? <>Je bekende geprijsde Planner-route kost {money.format(routeWithCostCents / 100)}
                 {' '}en ligt <strong>{money.format((routeWithCostCents - weekBudgetCents) / 100)}
                 {' '}boven je Planner-weekbudget</strong>{visitsBoth ? ' inclusief jouw extra bezoekkosten' : ''}.</>
-            : <>Je gekozen route kost {money.format(routeWithCostCents / 100)}
+            : <>Je bekende geprijsde Planner-route kost {money.format(routeWithCostCents / 100)}
                 {' '}en blijft <strong>{money.format((weekBudgetCents - routeWithCostCents) / 100)}
-                {' '}binnen je Planner-weekbudget</strong>{visitsBoth ? ' inclusief jouw extra bezoekkosten' : ''}.</>}
+                {' '}voor deze bekende producten binnen je Planner-weekbudget</strong>{visitsBoth ? ' inclusief jouw extra bezoekkosten' : ''}.</>}
         {' '}Geen garantie op actuele kassaprijzen of andere niet-ingevulde kosten.
       </p>}
       {mode === 'auto' && chooseSingle && <p role="status">
@@ -586,7 +593,7 @@ export function MixedStoreShoppingCard({
       })}
     </div>
     {privatePlanKey && <PrivateRouteExtraGroceries
-      identity={privatePlanKey} onlyOpen={onlyOpen} />}
+      identity={privatePlanKey} onlyOpen={onlyOpen} onCount={setExtraCount} />}
     {showText && <label>Kopieer mijn private boodschappenroute
       <textarea readOnly rows={Math.min(18, plan.lines.length + 15)}
         spellCheck={false} value={printable} onFocus={event => {

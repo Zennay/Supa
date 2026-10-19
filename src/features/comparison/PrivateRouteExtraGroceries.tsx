@@ -9,11 +9,14 @@ type Snapshot = { identity: string; items: Item[]; raw: string | null; locked: b
  * a price, retailer SKU or product equivalence to the compared basket.
  */
 export function PrivateRouteExtraGroceries({
-  identity, onlyOpen,
-}: { identity: string; onlyOpen: boolean }) {
+  identity, onlyOpen, onCount,
+}: { identity: string; onlyOpen: boolean; onCount?: (count: number) => void }) {
   const [snapshot, setSnapshot] = useState<Snapshot>(() => ({ identity, ...restore(identity) }))
   const [message, setMessage] = useState('')
   const active = snapshot.identity === identity ? snapshot : null
+  useEffect(() => {
+    onCount?.(active?.items.length ?? 0)
+  }, [active?.items.length, identity, onCount])
   const reload = () => {
     setSnapshot({ identity, ...restore(identity) })
   }
