@@ -8,6 +8,7 @@ import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
 import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
+import { parsePrivateExtraVisitCostCents, type PrivateExtraVisitCostIntent } from './privateExtraVisitCost.ts'
 import type { PrivateRouteChoice } from './privateReviewedBasketBridge.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -19,7 +20,7 @@ const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
  */
 export function MixedStoreShoppingCard({
   mixed, single, plus, deka, captured, eligibleNow, weekBudget,
-  plannerPlan, plannerRecipes, plannerActiveDays, isSingleCheckedOnRoute, routeChoice,
+  plannerPlan, plannerRecipes, plannerActiveDays, isSingleCheckedOnRoute, routeChoice, routeCostIntent,
 }: {
   mixed: MixedStoreShoppingPlan
   single: MixedStoreShoppingPlan
@@ -33,6 +34,7 @@ export function MixedStoreShoppingCard({
   plannerActiveDays?: string[]
   isSingleCheckedOnRoute?: (line: MixedStoreLine) => boolean
   routeChoice?: PrivateRouteChoice | null
+  routeCostIntent?: PrivateExtraVisitCostIntent | null
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [onlyOpen, setOnlyOpen] = useState(false)
@@ -42,6 +44,22 @@ export function MixedStoreShoppingCard({
   const [mode, setMode] = useState<'auto' | 'mixed' | 'single'>('auto')
   const [preferred, setPreferred] = useState<Record<string, MixedStore>>({})
   const selectedLineRef = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    if (!routeCostIntent) return
+    if (!eligibleNow() ||
+        routeCostIntent.observedAt.PLUS !== captured.PLUS ||
+        routeCostIntent.observedAt.DekaMarkt !== captured.DekaMarkt ||
+        parsePrivateExtraVisitCostCents(routeCostIntent.raw) === null) {
+      setMessage('De eerdere Planner-kostenkeuze hoort niet bij deze bronopnames. Voer je extra kosten opnieuw in.')
+      return
+    }
+    // An explicit own cost, not a product price: only apply once to the
+    // exact matching reviewed two-store receipts and same Planner demand.
+    setExtraVisitCost(routeCostIntent.raw)
+    setMode('auto')
+    setMessage('De eerder door jou ingevulde extra kosten van de tweede stop zijn meegenomen.')
+  }, [routeCostIntent?.serial, captured.PLUS, captured.DekaMarkt])
+
   const chosenMixed = useMemo(() => createMixedStoreShoppingPlan(plus, deka, 'mixed', preferred),
     [plus, deka, preferred])
   useEffect(() => {
@@ -83,12 +101,9 @@ export function MixedStoreShoppingCard({
   // stale editing input as a cost for the selected route.
   const canEditSecondStop = mixedUsesBoth && mode !== 'single'
   const rawCost = extraVisitCost.trim()
-  const costShapeOk = rawCost === '' || /^\d{1,4}(?:[,.]\d{1,2})?$/.test(rawCost)
-  const cents = rawCost && costShapeOk
-    ? Math.round(Number(rawCost.replace(',', '.')) * 100) : null
-  const extraCostCents = canEditSecondStop && cents !== null &&
-    Number.isSafeInteger(cents) && cents >= 0 && cents <= 100_000 ? cents : null
-  const costInvalid = canEditSecondStop && rawCost !== '' && (extraCostCents === null || !costShapeOk)
+  const parsedCost = parsePrivateExtraVisitCostCents(rawCost)
+  const extraCostCents = canEditSecondStop ? parsedCost : null
+  const costInvalid = canEditSecondStop && rawCost !== '' && parsedCost === null
   const suggestedSingle = selectedMixed.additionalDifferenceCents <= 0 ||
     (extraCostCents !== null && extraCostCents >= selectedMixed.additionalDifferenceCents)
   const chooseSingle = mode === 'single' || (mode === 'auto' && suggestedSingle)

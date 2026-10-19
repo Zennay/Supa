@@ -48,3 +48,8 @@
 .own-store-planner__capture-buttons { display:flex; flex-wrap:wrap; gap:.5rem; }
 .own-store-planner__capture-buttons button { min-height:44px; }
 .own-store-planner__age { display:block; padding:.65rem; border-left:3px solid #a47638; background:#faf5ea; color:#624c2c; line-height:1.45; }
+.own-store-planner__second-stop { display:grid; gap:.55rem; padding:1rem; margin:1rem 0; background:#f0f6f1; border:1px solid #b9d5c2; border-radius:12px; }
+.own-store-planner__second-stop label { display:grid; gap:.5rem; max-width:340px; font-weight:600; }
+.own-store-planner__second-stop input { min-height:44px; padding:.6rem; border:1px solid #789687; border-radius:8px; font:inherit; }
+.own-store-planner__second-stop p { margin:0; line-height:1.5; }
+.own-store-planner__second-stop input:focus-visible { outline:3px solid #246b50; outline-offset:2px; }

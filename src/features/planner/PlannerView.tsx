@@ -24,7 +24,7 @@ type PlannerViewProps = {
   ownReviewed?: PrivateReviewedBaskets | null
   preferredOwnStore: OwnStore
   onOpenShoppingList: () => void
-  onOpenMixedRoute: () => void
+  onOpenMixedRoute: (extraCostRaw?: string) => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   basketTotalCents: number | null
   basketUnresolvedLineCount: number

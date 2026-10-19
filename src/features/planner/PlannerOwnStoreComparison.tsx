@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
+import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { PlannerOwnProductDeltas } from './PlannerOwnProductDeltas.tsx'
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
@@ -22,14 +23,23 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
   onSelect: (store: OwnStore) => void
   onOpenComparison: () => void
   onOpenList: () => void
-  onOpenMixedRoute: () => void
+  onOpenMixedRoute: (extraCostRaw?: string) => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
   const [downloadMessage, setDownloadMessage] = useState('')
   const [captureTarget, setCaptureTarget] = useState<'both' | CaptureStore>('both')
+  const [secondStopCost, setSecondStopCost] = useState<{ key: string; raw: string }>({ key: '', raw: '' })
   const summary = ownStoreWeekComparison(reviewed)
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
+  // An own travel-cost scenario cannot silently follow a replaced source.
+  const costSourceKey = JSON.stringify([
+    reviewed?.planKey, reviewed?.stores.PLUS?.observedAt,
+    reviewed?.stores.DekaMarkt?.observedAt, summary,
+  ])
+  const shownCost = secondStopCost.key === costSourceKey ? secondStopCost.raw : ''
+  const parsedSecondStopCents = parsePrivateExtraVisitCostCents(shownCost)
+
   const selected = reviewed?.stores[preferred] ? preferred : reviewed?.stores.PLUS ? 'PLUS' : reviewed?.stores.DekaMarkt ? 'DekaMarkt' : preferred
   function openConfirmedStoreList(store: OwnStore) {
     // A Planner tab may stay open while its source crosses the freshness
@@ -231,7 +241,33 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
                     {' '}lager dan de goedkoopste volledige winkel, <strong>vóór extra bezoekkosten</strong>.
                     Het werkelijke voordeel is onbekend zolang reistijd of extra kosten niet zijn ingevuld.</>
                 : <> Deze selectie past bij één winkel; een tweede winkelstop is niet nodig.</>}</p>
-            <button type="button" className="ghost-button" onClick={onOpenMixedRoute}>
+            {summary.mixedRoute.requiresTwoStops && <div className="own-store-planner__second-stop">
+              <label>Extra kosten tweede winkelstop (€)
+                <input type="text" inputMode="decimal" maxLength={9}
+                  placeholder="Bijvoorbeeld 2,50" value={shownCost}
+                  onChange={event => setSecondStopCost({ key: costSourceKey, raw: event.currentTarget.value })} />
+              </label>
+              <p>Jouw eigen omrij-/parkeerscenario. Zonder ingevulde kosten is het
+                netto voordeel onbekend. Dit is geen kassaprijs- of besparingsbewijs.</p>
+              {shownCost.trim() && parsedSecondStopCents === null && <p role="alert">
+                Vul € 0,00 tot € 1.000,00 in, met maximaal twee decimalen.</p>}
+              {parsedSecondStopCents !== null && <>
+                <p role="status">Twee winkelstops inclusief extra kosten:
+                  {' '}<strong>{money.format((summary.mixedRoute.totalCents + parsedSecondStopCents) / 100)}</strong>.
+                  {' '}{summary.mixedRoute.possibleProductDifferenceCents > parsedSecondStopCents
+                    ? money.format((summary.mixedRoute.possibleProductDifferenceCents - parsedSecondStopCents) / 100) +
+                      ' minder dan één hele winkel.'
+                    : summary.mixedRoute.possibleProductDifferenceCents === parsedSecondStopCents
+                      ? 'Gelijk aan één hele winkel.'
+                      : money.format((parsedSecondStopCents - summary.mixedRoute.possibleProductDifferenceCents) / 100) +
+                        ' duurder dan één hele winkel.'}</p>
+                {budgetCents !== null && <p>Weekbudget:
+                  {' '}{summary.mixedRoute.totalCents + parsedSecondStopCents > budgetCents
+                    ? money.format((summary.mixedRoute.totalCents + parsedSecondStopCents - budgetCents) / 100) + ' overschreden.'
+                    : money.format((budgetCents - summary.mixedRoute.totalCents - parsedSecondStopCents) / 100) + ' over.'}</p>}
+              </>}
+            </div>}
+            <button type="button" className="ghost-button" onClick={() => onOpenMixedRoute(parsedSecondStopCents === null ? undefined : shownCost)}>
               Open mijn gecombineerde winkelroute in Lijst
             </button>
           </div>}

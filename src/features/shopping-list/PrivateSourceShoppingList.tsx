@@ -1,3 +1,4 @@
+import type { PrivateExtraVisitCostIntent } from '../comparison/privateExtraVisitCost.ts'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { BasketTraceLine, RecipeWithIngredients } from '../../domain/basket.ts'
@@ -18,7 +19,7 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
-export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeChoice, routeOpenSignal = 0 }: {
+export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeChoice, routeCostIntent, routeOpenSignal = 0 }: {
   reviewed: PrivateReviewedBaskets
   budget: number
   preferred: OwnStore
@@ -31,6 +32,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   activeDays: string[]
   routeOpenSignal?: number
   routeChoice?: PrivateRouteChoice | null
+  routeCostIntent?: PrivateExtraVisitCostIntent | null
 }) {
   const available = stores.filter(store => !!reviewed.stores[store])
   const store = available.includes(preferred) ? preferred : available[0]
@@ -352,7 +354,11 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               eligibleNow={pairCurrentNow} weekBudget={budget}
               plannerPlan={plan} plannerRecipes={recipes} plannerActiveDays={activeDays}
               isSingleCheckedOnRoute={isSingleCheckedOnRoute}
-              routeChoice={routeChoice?.planKey === reviewed.planKey ? routeChoice : null} />
+              routeChoice={routeChoice?.planKey === reviewed.planKey ? routeChoice : null}
+              routeCostIntent={routeCostIntent?.planKey === reviewed.planKey &&
+                routeCostIntent.observedAt.PLUS === plus.observedAt &&
+                routeCostIntent.observedAt.DekaMarkt === deka.observedAt
+                ? routeCostIntent : null} />
           </Suspense>}
         </div>
       </section>}

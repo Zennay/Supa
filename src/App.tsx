@@ -16,6 +16,8 @@ const PrivateReviewedProductCatalog = lazy(async () => {
   return { default: module.PrivateReviewedProductCatalog }
 })
 import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
+import type { PrivateExtraVisitCostIntent } from './features/comparison/privateExtraVisitCost.ts'
+import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
@@ -119,6 +121,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [visitedBasket, setVisitedBasket] = useState(initialTab === 'basket')
   const [visitedList, setVisitedList] = useState(initialTab === 'list')
   const [mixedRouteOpenSignal, setMixedRouteOpenSignal] = useState(0)
+  const [mixedCostIntent, setMixedCostIntent] = useState<PrivateExtraVisitCostIntent | null>(null)
   const [privateRouteChoice, setPrivateRouteChoice] = useState<PrivateRouteChoice | null>(null)
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
@@ -489,7 +492,21 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             ownReviewed={livePrivateReviewed}
             preferredOwnStore={preferredOwnStore}
             onOpenShoppingList={() => navigate('list')}
-            onOpenMixedRoute={() => { setPrivateRouteChoice(null); setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
+            onOpenMixedRoute={rawCost => {
+              const serial = mixedRouteOpenSignal + 1
+              const fresh = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
+              const plus = fresh?.stores.PLUS
+              const deka = fresh?.stores.DekaMarkt
+              setMixedCostIntent(rawCost !== undefined &&
+                parsePrivateExtraVisitCostCents(rawCost) !== null && plus && deka ? {
+                  serial, planKey: fresh!.planKey,
+                  observedAt: { PLUS: plus.observedAt, DekaMarkt: deka.observedAt },
+                  raw: rawCost,
+                } : null)
+              setPrivateRouteChoice(null)
+              setMixedRouteOpenSignal(serial)
+              navigate('list')
+            }}
             onChooseRouteLine={intent => {
               const serial = mixedRouteOpenSignal + 1
               setPrivateRouteChoice({ ...intent, serial })
@@ -618,7 +635,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               plan={plannedMeals} recipes={recipes} activeDays={activeDays}
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
               onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
-              routeChoice={privateRouteChoice} />
+              routeChoice={privateRouteChoice}
+              routeCostIntent={mixedCostIntent} />
           </div>
         )}
         {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
