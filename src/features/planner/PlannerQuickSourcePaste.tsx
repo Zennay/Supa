@@ -16,7 +16,7 @@ async function normalizedOwnSource(raw: string): Promise<string> {
   // Spreadsheet/desktop copy can include a single UTF-8 BOM even when the
   // rest of the supplied input is JSON. JSON.parse refuses that marker,
   // while the existing CSV converter already handles the CSV BOM itself.
-  const jsonInput = raw.startsWith('﻿') ? raw.slice(1) : raw
+  const jsonInput = raw.startsWith('\uFEFF') ? raw.slice(1) : raw
   if (/^\s*\{/u.test(jsonInput)) return jsonInput
   const moduleUrl = import.meta.env.BASE_URL + 'offline-two-store-csv.mjs'
   const converter: unknown = await import(/* @vite-ignore */ moduleUrl)
