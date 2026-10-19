@@ -70,3 +70,14 @@
 .own-store-planner__targeted-combined > span,
 .own-store-planner__targeted-combined > small { flex: 1 1 100%; }
 .own-store-planner__targeted-combined button { flex: 1 1 210px; }
+
+.own-store-planner__targeted-import {
+  justify-self: start;
+  min-height: 44px;
+  padding: .7rem 1rem;
+  border: 1px solid #5f9174;
+  border-radius: 8px;
+}
+@media (max-width: 550px) {
+  .own-store-planner__targeted-import { width: 100%; }
+}

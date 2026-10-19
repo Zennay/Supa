@@ -6,11 +6,12 @@ import './plannerMissingCapture.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
 
-export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, reviewed, now }: {
+export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, reviewed, now, onOpenComparison }: {
   captureNeeds: readonly PlannerCaptureGuideNeed[]
   captureProgress: PrivateCaptureProgress | null
   reviewed: PrivateReviewedBaskets | null
   now: number
+  onOpenComparison: () => void
 }) {
   const [localMessage, setLocalMessage] = useState('')
   const [copyableMissingGuide, setCopyableMissingGuide] = useState<{
@@ -251,6 +252,10 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
         })}
         <small>Geen bestaande bron? Dan bevat dit lege blad de hele fysieke Planner-behoefte.
           Prijzen blijven onbekend tot jij echte productgegevens in Vergelijk controleert.</small>
+        <button type="button" className="ghost-button own-store-planner__targeted-import"
+          onClick={onOpenComparison}>
+          Klaar met invullen? Open Vergelijk om mijn bronbestand te importeren
+        </button>
         {localMessage && <p role="status" aria-live="polite">{localMessage}</p>}
       </div>
   )

@@ -285,7 +285,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       </div>
       <Suspense fallback={<p role="status">Gerichte opnamebladen laden…</p>}>
         <PlannerMissingCapturePanel captureNeeds={captureNeeds} captureProgress={captureProgress}
-          reviewed={reviewed} now={now} />
+          reviewed={reviewed} now={now} onOpenComparison={onOpenComparison} />
       </Suspense>
     </div>}
     {captureNeeds.length > 0 && <Suspense fallback={<p role="status">Winkelcontroles laden…</p>}>
