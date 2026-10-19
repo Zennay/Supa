@@ -82,8 +82,49 @@ function demandFromWeek(week: Week) {
 type PrivateDemand = ReturnType<typeof demandFromWeek>
 const handoffKey = 'supa:private-planner-week-handoff:v1'
 const acceptHandoff = document.querySelector<HTMLButtonElement>('#week-handoff-accept')!
+const cancelHandoff = document.querySelector<HTMLButtonElement>('#week-handoff-cancel')!
 const currentLines = document.querySelector<HTMLElement>('#lines')!
+const preview = document.querySelector<HTMLElement>('#week-import-preview')!
+const previewItems = document.querySelector<HTMLOListElement>('#week-import-preview-items')!
 let stagedHandoff: PrivateDemand | null = null
+function presentStagedWeek(demand: PrivateDemand, source: string) {
+  stagedHandoff = demand
+  acceptHandoff.hidden = false
+  acceptHandoff.disabled = false
+  cancelHandoff.hidden = false
+  cancelHandoff.disabled = false
+  // Use textContent only: recipe labels came from a private JSON file or
+  // another browser UI and must never become executable markup.
+  const list = demand.ingredients.slice(0, 30).map(row => {
+    const li = document.createElement('li')
+    li.textContent = row.label + ' · ' +
+      (row.amount === null ? 'hoeveelheid onbekend' : String(row.amount)) +
+      ' ' + row.unit
+    return li
+  })
+  previewItems.replaceChildren(...list)
+  if (demand.ingredients.length > list.length) {
+    const remaining = document.createElement('li')
+    remaining.textContent = 'En nog ' + (demand.ingredients.length - list.length) +
+      ' overige fysieke ingrediënten.'
+    previewItems.append(remaining)
+  }
+  preview.hidden = false
+  info.textContent = source + ' staat klaar: ' +
+    demand.selectedMealCount + ' geselecteerde maaltijden en ' +
+    demand.ingredients.length + ' originele fysieke ingrediënten. ' +
+    'Controleer de eerste regels, daarna kun je de invoer expliciet accepteren; er zijn geen winkelprijzen of SKU’s overgenomen.'
+  info.className = 'notice'
+}
+function discardStage() {
+  stagedHandoff = null
+  acceptHandoff.hidden = true
+  acceptHandoff.disabled = true
+  cancelHandoff.hidden = true
+  cancelHandoff.disabled = true
+  preview.hidden = true
+  previewItems.replaceChildren()
+}
 try {
   // Do not leave a sensitive week/menu payload in tab storage after display.
   const saved = window.sessionStorage.getItem(handoffKey)
@@ -91,20 +132,21 @@ try {
     window.sessionStorage.removeItem(handoffKey)
     if (!saved.length || new TextEncoder().encode(saved).length > maxBytes)
       throw Error('Het doorgestuurde weekmenu is leeg of te groot.')
-    stagedHandoff = demandFromWeek(readWeek(JSON.parse(saved)))
-    acceptHandoff.hidden = false
-    acceptHandoff.disabled = false
-    info.textContent = 'Je gekozen Planner-week staat klaar: ' +
-      stagedHandoff.selectedMealCount + ' maaltijden en ' +
-      stagedHandoff.ingredients.length + ' oorspronkelijke fysieke ingrediënten. ' +
-      'Controleer ze en klik zelf op Neem mijn Planner-week over. Er zijn geen winkelproducten of prijzen geïmporteerd.'
-    info.className = 'notice'
+    presentStagedWeek(demandFromWeek(readWeek(JSON.parse(saved))), 'Jouw doorgestuurde Planner-week')
   }
 } catch {
-  stagedHandoff = null
+  discardStage()
   info.textContent = 'De directe Planner-overdracht was niet bruikbaar. Je kunt dezelfde week zelf als JSON openen; het eerdere mandje blijft ongewijzigd.'
   info.className = 'notice error'
 }
+
+cancelHandoff.addEventListener('click', () => {
+  ++revision
+  discardStage()
+  upload.value = ''
+  info.textContent = 'Planner-importconcept bewust gewist. Je huidige mand en werkelijk ingevoerde winkelbronnen blijven onveranderd.'
+  info.className = 'notice'
+})
 
 acceptHandoff.addEventListener('click', () => {
   const demand = stagedHandoff
@@ -116,9 +158,7 @@ acceptHandoff.addEventListener('click', () => {
   // The only state-changing operation is this explicit button press. The
   // existing wizard alone decides which manual source choices remain valid.
   document.dispatchEvent(new CustomEvent('supa:private-planner-demand', { detail: demand }))
-  stagedHandoff = null
-  acceptHandoff.hidden = true
-  acceptHandoff.disabled = true
+  discardStage()
   info.textContent = 'Originele Planner-vraag overgenomen: ' + demand.selectedMealCount +
     ' maaltijden en ' + demand.ingredients.length + ' fysieke ingrediënten. ' +
     'Kies nu jouw werkelijk geobserveerde producten per winkel; onbekende prijzen blijven onbekend.'
@@ -129,20 +169,20 @@ upload.addEventListener('change', async () => {
   const current = ++revision
   const file = upload.files?.[0]
   if (!file) return
+  discardStage()
   try {
     if (!file.size || file.size > maxBytes) throw Error('Het lokale weekmenu is leeg of groter dan 256 kB.')
     const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-    const demand = demandFromWeek(readWeek(JSON.parse(content)))
     if (revision !== current) return
-    document.dispatchEvent(new CustomEvent('supa:private-planner-demand', { detail: demand }))
-    info.textContent = String(demand.ingredients.length) +
-      ' fysieke ingrediëntbehoeften uit ' + demand.selectedMealCount +
-      ' geselecteerde maaltijden geïmporteerd. Winkelproducten blijven onbekend tot je de echte bron-SKU per winkel kiest.'
-    info.className = 'notice'
+    const demand = demandFromWeek(readWeek(JSON.parse(content)))
+    presentStagedWeek(demand, 'Jouw lokale Planner-JSON')
   } catch (error) {
     if (revision !== current) return
+    discardStage()
     info.textContent = error instanceof Error ? error.message :
-      'Weekmenu kan niet veilig worden samengevoegd.'
+      'Weekmenu kan niet veilig worden ingelezen; bestaande mand ongewijzigd.'
     info.className = 'notice error'
+  } finally {
+    if (revision === current) upload.value = ''
   }
 })

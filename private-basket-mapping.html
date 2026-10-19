@@ -163,11 +163,21 @@ boodschappenbehoefte als een Planner-weekmenu.</p>
 </div>
 <label for="week-import">Of: importeer een lokaal geselecteerd Planner-weekmenu</label>
 <input id="week-import" type="file" accept=".json,application/json">
-<small>Accepteert alleen supa-private-planner-week-v1 met echte gekozen dagen, recepten en metrische hoeveelheden. Supa gebruikt dezelfde canonieke aggregatie als de bestaande offline Planner-converter. Winkelprijzen en artikel-ID's blijven onbekend.</small>
+<small>Accepteert alleen supa-private-planner-week-v1 met echte gekozen dagen, recepten en metrische hoeveelheden. Supa toont eerst een ongeprijsde preview en vraagt om een extra klik voordat het bestaande mandje verandert. De originele ingredient-ID's blijven behouden; winkelprijzen en winkelartikel-ID's blijven onbekend.</small>
 <div id="week-status" class="notice" role="status" aria-live="polite">Nog geen eigen Planner-weekmenu geopend.</div>
+<details id="week-import-preview" hidden>
+<summary>Toon originele ingrediënten uit mijn Planner-week</summary>
+<p>Deze gegevens zijn uitsluitend een ongeprijsd concept. Vervangen van een bestaande mand vereist daarna een afzonderlijke bevestiging.</p>
+<ol id="week-import-preview-items"></ol>
+</details>
+<div class="row-actions">
 <button id="week-handoff-accept" type="button" class="secondary" hidden disabled>
   Neem mijn Planner-week over (originele ingrediënten)
 </button>
+<button id="week-handoff-cancel" type="button" class="secondary" hidden disabled>
+  Wis Planner-importconcept (mand blijft staan)
+</button>
+</div>
 <label for="demand-import">Optioneel: eerder gemaakte privé mandvraag opnieuw openen</label>
 <input id="demand-import" type="file" accept=".json,application/json">
 <small>Dezelfde ingrediënten en hoeveelheden worden hersteld, maar eerder gekozen winkelproduct-ID's worden bewust opnieuw ter controle vrijgegeven.</small>
