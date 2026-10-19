@@ -480,8 +480,9 @@ async function loadSources() {
       const first = JSON.parse(convertOwnStoreCsv(plusText))
       const second = JSON.parse(convertOwnStoreCsv(dekaText))
       if (first.captures.length !== 1 || second.captures.length !== 1 ||
-          first.captures[0].retailer === second.captures[0].retailer) {
-        throw Error('Selecteer één echte PLUS- en één DekaMarkt-opname.')
+          first.captures[0].retailer !== 'PLUS' ||
+          second.captures[0].retailer !== 'DekaMarkt') {
+        throw Error('Het PLUS-vak vereist een echte PLUS-opname en het DekaMarkt-vak een echte DekaMarkt-opname.')
       }
       parsed = { schema: 'supa-offline-prices-v1',
         captures: [...first.captures, ...second.captures] }
