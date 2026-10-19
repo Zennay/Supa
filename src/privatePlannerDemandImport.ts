@@ -25,9 +25,10 @@ const validText = (value: unknown, max = 160): value is string =>
   !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(value) && !/^[=+@-]/u.test(value)
 const only = (value: Record<string, unknown>, permitted: string[]) =>
   Object.keys(value).every(key => permitted.includes(key))
-const quantity = (value: unknown) =>
+const quantity = (value: unknown, unit: unknown) =>
   value === null || (typeof value === 'number' && Number.isFinite(value) &&
-    value > 0 && value <= 100000)
+    value > 0 && value <= 100000 &&
+    (unit !== 'piece' || Number.isSafeInteger(value)))
 
 function readWeek(value: unknown): Week {
   if (!record(value) || value.schema !== 'supa-private-planner-week-v1' ||
@@ -39,16 +40,20 @@ function readWeek(value: unknown): Week {
   }
   if (new Set(value.activeDays).size !== value.activeDays.length ||
       !value.activeDays.every(day => validText(day, 40))) throw Error('Weekdagen ontbreken of zijn dubbel.')
-  if (!value.plan.every(meal => record(meal) &&
+  if (value.plan.length !== value.activeDays.length ||
+      !value.plan.every(meal => record(meal) &&
       only(meal, ['day', 'recipeId']) && validText(meal.day, 40) &&
-      validText(meal.recipeId, 100))) throw Error('Onvolledige geplande maaltijd.')
+      validText(meal.recipeId, 100) && (value.activeDays as string[]).includes(meal.day)) ||
+      new Set(value.plan.map(meal => (meal as { day: string }).day)).size !== value.plan.length) {
+    throw Error('Het weekmenu bevat ontbrekende, dubbele of niet-geselecteerde maaltijden.')
+  }
   if (!value.recipes.every(recipe => record(recipe) &&
       only(recipe, ['id', 'ingredients']) && validText(recipe.id, 100) &&
       Array.isArray(recipe.ingredients) && recipe.ingredients.length <= 1000 &&
       recipe.ingredients.every(item => record(item) &&
         only(item, ['id', 'label', 'query', 'amount', 'unit']) &&
         validText(item.id, 100) && validText(item.label) && validText(item.query) &&
-        units.includes(item.unit as string) && quantity(item.amount)))) {
+        units.includes(item.unit as string) && quantity(item.amount, item.unit)))) {
     throw Error('Onjuiste recepten of niet-metrische ingrediënten.')
   }
   if (new Set(value.recipes.map(recipe => recipe.id)).size !== value.recipes.length) {
@@ -65,7 +70,7 @@ function demandFromWeek(week: Week) {
   )
   if (!ingredients.length || ingredients.length > 200 ||
       ingredients.some(item => !validText(item.id, 100) || !validText(item.label) ||
-        !units.includes(item.unit) || !quantity(item.amount))) {
+        !units.includes(item.unit) || !quantity(item.amount, item.unit))) {
     throw Error('Weekmenu bevat geen ondersteunde volledige fysieke vraag; maximaal 200 ingrediënten.')
   }
   return {
