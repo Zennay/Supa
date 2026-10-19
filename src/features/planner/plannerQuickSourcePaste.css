@@ -50,3 +50,13 @@
   .supa-planner-source-paste__separate > p,
   .supa-planner-source-paste__separate > button { grid-column: 1 / -1; }
 }
+
+.supa-planner-source-paste__products { margin: .5rem 0; }
+.supa-planner-source-paste__products summary { font-weight: 600; }
+.supa-planner-source-paste__products ul {
+  list-style: none; padding: 0; margin: .4rem 0; display: grid; gap: .5rem;
+}
+.supa-planner-source-paste__products li {
+  display: grid; gap: .15rem; overflow-wrap: anywhere; border-bottom: 1px solid #e2eee5;
+  padding: .45rem 0;
+}

@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
+import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
 const limit = 256000
 const dateText = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
+const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 async function normalizedOwnSource(raw: string): Promise<string> {
   if (/^\s*\{/u.test(raw)) return raw
@@ -305,6 +307,40 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand }: {
               {' '}{priced} met vastgelegde (niet per se actuele) pakprijs en
               {' '}{capture.products.length - priced} zonder bruikbare prijs.</p>
             <small>Oorspronkelijk bronmoment: {dateText.format(new Date(capture.observedMs))}</small>
+            <details className="supa-planner-source-paste__products">
+              <summary>Bekijk originele SKU’s, verpakkingen en ontbrekende prijzen</summary>
+              <p>Bronpreview, geen geaccepteerde matching of actueel winkelmandtotaal.
+                De maximaal twaalf weergegeven producten komen uit je eigen opname.</p>
+              <ul>
+                {[...capture.products].sort((a, b) => {
+                  const missing = (item: typeof a) =>
+                    item.sourcePriceCents === null || !item.sourceAvailable ||
+                    item.packAmount === null ? 0 : 1
+                  return missing(a) - missing(b)
+                }).slice(0, 12).map(product => {
+                  const priced = product.sourcePriceCents !== null &&
+                    product.sourceAvailable === true && product.packAmount !== null
+                  const rate = priced ? privatePackUnitRate({
+                    amount: product.packAmount, unit: product.packUnit,
+                    count: product.packCount ?? 1, priceCents: product.sourcePriceCents ?? null,
+                  }) : null
+                  return <li key={product.id}>
+                    <strong>{product.name}</strong> — SKU {product.id}
+                    <span>{product.packAmount ?? 'onbekend'} {product.packUnit}
+                      {product.packCount && product.packCount > 1
+                        ? ' × ' + product.packCount + ' per verpakking' : ' per verpakking'}</span>
+                    <span>{!product.sourceAvailable
+                      ? 'Niet beschikbaar volgens eigen bron; geen pakprijs'
+                      : !priced
+                        ? 'Pakprijs of verpakking ontbreekt'
+                        : money.format(product.sourcePriceCents! / 100) +
+                          ' per pak · ' + (rate ? formatPrivateUnitRate(rate) : 'eenheidsprijs onbekend')}</span>
+                  </li>
+                })}
+              </ul>
+              {capture.products.length > 12 &&
+                <small>Overige {capture.products.length - 12} originele SKU’s bekijk je in Vergelijk.</small>}
+            </details>
           </section>
         })}
         <p>{!preview.data.currentEnough
