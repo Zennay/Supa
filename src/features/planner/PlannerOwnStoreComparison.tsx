@@ -1,5 +1,6 @@
 import type { PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
+import { PlannerOwnProductDeltas } from './PlannerOwnProductDeltas.tsx'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import './plannerOwnStoreComparison.css'
 
@@ -54,6 +55,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelec
           {summary.cheapest && selected !== summary.cheapest && <button type="button" className="ghost-button"
             onClick={() => onSelect(summary.cheapest!)}>Kies {summary.cheapest} voor mijn weekbudget</button>}
           <button type="button" className="ghost-button" onClick={onOpenList}>Open eigen boodschappenlijst</button>
+          <PlannerOwnProductDeltas lines={summary.lines} />
         </div>
       : <div className="own-store-planner__result" role="status">
           <strong>Geen betrouwbaar twee-winkelprijsverschil</strong>

@@ -12,3 +12,12 @@
 @media (max-width: 550px) { .own-store-planner__cards { grid-template-columns: 1fr; } }
 
 .own-store-planner__budget-gap { font-weight: 650; font-variant-numeric: tabular-nums; }
+.own-store-planner__details { margin-top: 18px; max-width: 100%; }
+.own-store-planner__details summary { cursor: pointer; font-weight: 700; min-height: 44px; padding: 10px 0; }
+.own-store-planner__scroll { max-width: 100%; overflow-x: auto; border: 1px solid #d9ded9; border-radius: 10px; }
+.own-store-planner__scroll table { width: 100%; min-width: 660px; border-collapse: collapse; text-align: left; }
+.own-store-planner__scroll th, .own-store-planner__scroll td { border-bottom: 1px solid #e5e9e5; padding: 12px; vertical-align: top; }
+.own-store-planner__scroll thead { background: #f4f7f4; }
+.own-store-planner__scroll tbody tr:last-child td, .own-store-planner__scroll tbody tr:last-child th { border-bottom: none; }
+.own-store-planner__scroll td small { display: block; margin-top: 5px; overflow-wrap: anywhere; max-width: 260px; }
+.own-store-planner__scroll td strong { white-space: nowrap; font-variant-numeric: tabular-nums; }

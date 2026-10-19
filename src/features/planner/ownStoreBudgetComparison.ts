@@ -1,5 +1,14 @@
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import type { BasketTraceLine } from '../../domain/basket.ts'
 import type { PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
+
+export type ComparedOwnLine = {
+  id: string
+  ingredientLabel: string
+  plus: Extract<BasketTraceLine, { status: 'matched' }>
+  deka: Extract<BasketTraceLine, { status: 'matched' }>
+  deltaCents: number
+}
 
 export type OwnStoreWeekComparison =
   | { status: 'missing'; available: OwnStore[] }
@@ -7,7 +16,7 @@ export type OwnStoreWeekComparison =
   | { status: 'not-comparable'; available: OwnStore[] }
   | { status: 'comparable'; available: ['PLUS', 'DekaMarkt'];
       plusCents: number; dekaCents: number; differenceCents: number;
-      cheapest: OwnStore | null }
+      cheapest: OwnStore | null; lines: ComparedOwnLine[] }
 
 /**
  * Only human-reviewed, plan-bound in-memory baskets reach this adapter.
@@ -30,9 +39,25 @@ export function ownStoreWeekComparison(reviewed: PrivateReviewedBaskets | null):
       !Number.isSafeInteger(deka.basket.totalCents)) {
     return { status: 'not-comparable', available }
   }
+  // The canonical comparison has already checked every physical requirement,
+  // pack count, price and cent total. Show original source lines, never
+  // reconstruct quantities or financial deltas in the presentation layer.
+  const plusById = new Map(plus.basket.lines.filter((line): line is ComparedOwnLine['plus'] =>
+    line.status === 'matched').map(line => [line.id, line]))
+  const dekaById = new Map(deka.basket.lines.filter((line): line is ComparedOwnLine['deka'] =>
+    line.status === 'matched').map(line => [line.id, line]))
+  const lines: ComparedOwnLine[] = result.lineDeltas.map(delta => ({
+    id: delta.id,
+    ingredientLabel: delta.ingredientLabel,
+    plus: plusById.get(delta.id)!, deka: dekaById.get(delta.id)!,
+    deltaCents: delta.deltaCents,
+  }))
+  lines.sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents) ||
+    a.ingredientLabel.localeCompare(b.ingredientLabel, 'nl'))
   return {
     status: 'comparable', available: ['PLUS', 'DekaMarkt'],
     plusCents: plus.basket.totalCents, dekaCents: deka.basket.totalCents,
+    lines,
     differenceCents: Math.abs(result.deltaCents),
     cheapest: result.deltaCents === 0 ? null : result.deltaCents > 0 ? 'PLUS' : 'DekaMarkt',
   }
