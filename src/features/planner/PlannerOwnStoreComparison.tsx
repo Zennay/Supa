@@ -517,6 +517,19 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
             onClick={() => openConfirmedStoreList(store)}>
             Open mijn {store}-boodschappenlijst
           </button>}
+          {capture && <div className="own-store-planner__single-exports"
+            aria-label={store + ' eigen winkelmand exporteren'}>
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadSingleStoreBasket(store, 'csv')}>
+              Download {store}-mandje (CSV)
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadSingleStoreBasket(store, 'html')}>
+              Print {store}-boodschappen (HTML)
+            </button>
+            <small>Werkt zonder tweede winkel; uitsluitend je originele, gecontroleerde en
+              actuele pakprijzen. Geen winkelverschil of besparingsclaim.</small>
+          </div>}
         </div>
       })}
     </div>
