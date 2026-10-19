@@ -37,3 +37,12 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Home's original five Sunday→Thursday calendar chips now derive the upcoming real local dates, carry selected-day markers from persisted planner preferences, and navigate back to Planner. Regression coverage includes Sunday, upcoming Sunday, Dutch weekday labels, DST and year rollover; no frozen prototype 19–23 strip in production.
 - Branch `feat/supa-figma-planner-week-card-20261016` deliberately targets UI owner `feat/supa-original-figma-hifi-home-20261016`, not `main`; no scraper, reviewer QA, price evidence, rights or deploy mutation.
 - Remaining: verified hosted build/tests on exact new head; mobile Firefox visual screenshot; full Figma Planner/Recipes/Products/Shoplist parity and asset reconciliation. Do not merge stacked work before the parent UI branch is resolved.
+
+
+## Originele Figma-productbeelden en iconen (20 oktober 2026)
+
+- Producten node `3064:3125`: 18 originele, lokaal gebundelde Figma-exports hersteld onder `src/assets/figma/products/` (10 product-PNG's + 8 SVG's); bestaande originele Home-assets hergebruikt waar ze byte-identiek dezelfde bron-export zijn. Geen runtime-links naar tijdelijke Figma-bestanden.
+- Nu 13 oorspronkelijke Producten-afbeeldingsslots uit de gelezen Figma-designcontext beschikbaar: Coca-Cola-varianten, rode paprika, watermeloen, melk, sixpack, gebak, muffins, pindakaas, fruitsalade en gember. Fotoweergave `68×72` binnen de `120px` productkaart-fotovlakken. Alle nieuw toegevoegde productkaarten zijn **demo**; ontbrekende Figma-prijzen worden niet verzonnen en staan niet in het echte mandtotaal.
+- Oorspronkelijke Producten-icons voor filter, zoekveld, weekknop, sortering en 5-vaks navigatie gebruikt, inclusief ongewijzigde SVG-intrinsieke maten. De Home-productcatalogus is bewust onveranderd.
+- Code-build `npm run build -- --base=/supa/` is geslaagd op exacte productiebron-HEAD `34393e9`; er zijn geen QA- of regressiesuites toegevoegd of uitgevoerd.
+- **Nog open richting exact 1:1:** individuele Figma-productteksten, ontbrekende voorbeeldprijzen, exacte schermscreenshotvergelijking en specifieke Lijst-productfoto's. Figma MCP Starter limiet blokkeert nu nieuwe screenshots; geen volledige visuele acceptatie claimen tot de bron weer beschikbaar is. De originele lokale afbeeldingen zijn geen bewijs van actuele supermarktprijzen.
