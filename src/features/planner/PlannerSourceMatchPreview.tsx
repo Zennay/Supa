@@ -46,7 +46,9 @@ export function PlannerSourceMatchPreview({ needs, source }: {
         // The fuzzy matcher can rank an attractive name even if the source
         // package belongs to a different physical unit family. Never present
         // e.g. ml rice as a viable candidate for a gram-based rice demand.
-        suggestions[store] = match && match.available && match.sourcePriceCents !== null &&
+        suggestions[store] = match && match.available &&
+          typeof match.sourcePriceCents === 'number' &&
+          Number.isSafeInteger(match.sourcePriceCents) && match.sourcePriceCents >= 0 &&
           match.packAmount !== null && family(match.packUnit) === family(need.unit)
           ? (() => {
               const count = match.packCount ?? 1
