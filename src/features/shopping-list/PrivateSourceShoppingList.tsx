@@ -245,7 +245,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       setMessage('Gecombineerde export niet beschikbaar: controleer de bron en je opgeslagen extra artikelen.')
     }
   }
-  async function downloadCsv() {
+  async function downloadCsv(includeExtras = false) {
     if (!currentCaptureAvailable()) {
       setMessage('De eigen bronopname is verlopen. Herzie de oorspronkelijke prijzen voordat je CSV downloadt.')
       return
@@ -254,14 +254,28 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       const { privateSingleStoreShoppingCsv } = await import('./privateSourceShoppingCsv.ts')
       // Avoid a stale asynchronous export across a newly expired source moment.
       if (!currentCaptureAvailable()) throw Error('Bronopname inmiddels verlopen.')
-      const csv = privateSingleStoreShoppingCsv({ basket, observedAt: capture.observedAt,
+      const reviewedCsv = privateSingleStoreShoppingCsv({ basket, observedAt: capture.observedAt,
         done: new Set(basket.lines.filter(line => checked[tick(line)]).map(line => line.id)),
       })
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      let csv = reviewedCsv
+      if (includeExtras) {
+        const [{ readSavedExtrasForPlan }, { appendUnpricedExtrasToSingleStoreCsv }] =
+          await Promise.all([
+            import('../comparison/ownExtraGroceriesStorage.ts'),
+            import('./singleStoreWithExtrasCsv.ts'),
+          ])
+        const saved = readSavedExtrasForPlan(reviewed.planKey)
+        if (!saved.available || !saved.items.length)
+          throw Error('Bewaar eerst je eigen extra boodschappen voor deze week in de Lijst-tab.')
+        csv = appendUnpricedExtrasToSingleStoreCsv(reviewedCsv, saved.items)
+      }
+      if (!currentCaptureAvailable()) throw Error('De originele bron is intussen verlopen.')
+      const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = 'supa-' + store.toLowerCase() + '-eigen-boodschappen.csv'
+        link.download = 'supa-' + store.toLowerCase() +
+          (includeExtras ? '-met-ongeprijsde-extras.csv' : '-eigen-boodschappen.csv')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
         setMessage('Eigen artikelen, hele verpakkingen en exacte centprijzen lokaal als CSV opgeslagen.')
@@ -477,7 +491,10 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         <button type="button" onClick={() => { void downloadStoreWithExtras() }}>
           Download winkelmand + mijn bewaarde extra boodschappen (TXT)
         </button>
-        <button type="button" onClick={() => { void downloadCsv() }}>Download volledig mandje met SKU’s (CSV)</button>
+        <button type="button" onClick={() => { void downloadCsv(false) }}>Download volledig mandje met SKU’s (CSV)</button>
+        <button type="button" onClick={() => { void downloadCsv(true) }}>
+          Download dit winkelmandje + ongeprijsde extras (CSV)
+        </button>
         <button type="button" onClick={() => { void downloadPrintable(false) }}>Print volledig eigen mandje (HTML)</button>
         <button type="button" onClick={() => { void downloadPrintable(true) }}>
           Print dit winkelmandje én mijn extra boodschappen (HTML)
