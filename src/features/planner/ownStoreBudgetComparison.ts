@@ -1,5 +1,6 @@
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { BasketTraceLine } from '../../domain/basket.ts'
+import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import type { PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
 
 export type ComparedOwnLine = {
@@ -16,7 +17,9 @@ export type OwnStoreWeekComparison =
   | { status: 'not-comparable'; available: OwnStore[] }
   | { status: 'comparable'; available: ['PLUS', 'DekaMarkt'];
       plusCents: number; dekaCents: number; differenceCents: number;
-      cheapest: OwnStore | null; lines: ComparedOwnLine[] }
+      cheapest: OwnStore | null; lines: ComparedOwnLine[];
+      mixedRoute: { totalCents: number; possibleProductDifferenceCents: number;
+        requiresTwoStops: boolean } | null }
 
 /**
  * Only human-reviewed, plan-bound in-memory baskets reach this adapter.
@@ -54,10 +57,18 @@ export function ownStoreWeekComparison(reviewed: PrivateReviewedBaskets | null):
   }))
   lines.sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents) ||
     a.ingredientLabel.localeCompare(b.ingredientLabel, 'nl'))
+  // Reuse the existing full physical mixed-store engine. This is a product-only
+  // preview: net trip economics still require explicit user's visit costs in Vergelijk.
+  const route = createMixedStoreShoppingPlan(plus.basket, deka.basket)
+  const mixedRoute = route ? {
+    totalCents: route.totalCents,
+    possibleProductDifferenceCents: route.additionalDifferenceCents,
+    requiresTwoStops: route.totals.PLUS > 0 && route.totals.DekaMarkt > 0,
+  } : null
   return {
     status: 'comparable', available: ['PLUS', 'DekaMarkt'],
     plusCents: plus.basket.totalCents, dekaCents: deka.basket.totalCents,
-    lines,
+    lines, mixedRoute,
     differenceCents: Math.abs(result.deltaCents),
     cheapest: result.deltaCents === 0 ? null : result.deltaCents > 0 ? 'PLUS' : 'DekaMarkt',
   }

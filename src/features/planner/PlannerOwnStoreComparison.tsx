@@ -79,6 +79,19 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelec
           <button type="button" className="ghost-button" onClick={downloadPrivateComparison}>
             Download privévergelijking (TXT)
           </button>
+          {summary.mixedRoute && <div className="own-store-planner__mix-preview">
+            <h4>Combineren van goedkoopste artikelen</h4>
+            <p><strong>{money.format(summary.mixedRoute.totalCents / 100)} aan winkelproducten</strong>
+              {' '}als je per ingrediënt het goedkoopste gecontroleerde hele-verpakkingenbedrag neemt.
+              {summary.mixedRoute.requiresTwoStops
+                ? <> Dit is {money.format(summary.mixedRoute.possibleProductDifferenceCents / 100)}
+                    {' '}lager dan de goedkoopste volledige winkel, <strong>vóór extra bezoekkosten</strong>.
+                    Het werkelijke voordeel is onbekend zolang reistijd of extra kosten niet zijn ingevuld.</>
+                : <> Deze selectie past bij één winkel; een tweede winkelstop is niet nodig.</>}</p>
+            <button type="button" className="ghost-button" onClick={onOpenComparison}>
+              Bekijk mijn winkelroute en eventuele extra kosten in Vergelijk
+            </button>
+          </div>}
           <PlannerOwnProductDeltas lines={summary.lines} />
         </div>
       : <div className="own-store-planner__result" role="status">

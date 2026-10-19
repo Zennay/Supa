@@ -21,3 +21,7 @@
 .own-store-planner__scroll tbody tr:last-child td, .own-store-planner__scroll tbody tr:last-child th { border-bottom: none; }
 .own-store-planner__scroll td small { display: block; margin-top: 5px; overflow-wrap: anywhere; max-width: 260px; }
 .own-store-planner__scroll td strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.own-store-planner__mix-preview { margin-top: 18px; padding: 14px; background: #f4f7f4; border-radius: 12px; }
+.own-store-planner__mix-preview h4 { margin: 0 0 8px; font-size: 1rem; }
+.own-store-planner__mix-preview p { margin: 6px 0 12px; }
