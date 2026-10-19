@@ -45,6 +45,28 @@ export function reviewRecipe(draft: UserRecipeDraft): UserRecipeDraft {
   }
 }
 
+/** Source-level caveats are distinct from amounts that the metric parser
+ * itself requires a person to correct. A person may explicitly acknowledge
+ * these caveats; they cannot acknowledge a fractional or unknown ingredient
+ * into a trusted shopping requirement through this action.
+ */
+export function sourceOnlyRecipeWarnings(draft: UserRecipeDraft): string[] {
+  if (!Array.isArray(draft.warnings)) return []
+  return draft.warnings.filter(warning => typeof warning === 'string' &&
+    warning.length > 0 && warning.length <= 400 &&
+    !/^Ingrediënt \d+:/u.test(warning) &&
+    warning !== 'Porties ontbreken of zijn onduidelijk' &&
+    warning !== 'Bereidingstijd ontbreekt of is onduidelijk')
+}
+
+export function acknowledgeRecipeSourceWarnings(draft: UserRecipeDraft): UserRecipeDraft {
+  const extra = new Set(sourceOnlyRecipeWarnings(draft))
+  return reviewRecipe({
+    ...draft,
+    warnings: draft.warnings.filter(warning => !extra.has(warning)),
+  })
+}
+
 /**
  * Keep human-review holds when an imported recipe is edited cosmetically.
  * A genuine new amount/unit must be parsed and reviewed again. Source-level

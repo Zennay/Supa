@@ -3,7 +3,7 @@ import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl'
-import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, retainUnresolvedRecipeReview, type LibraryState, type SavedRecipe } from './recipeLibrary'
+import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, retainUnresolvedRecipeReview, sourceOnlyRecipeWarnings, acknowledgeRecipeSourceWarnings, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
 import { importPlainTextRecipe } from './importPlainTextRecipe'
 import { ownRecipeAsMarkdown } from './ownRecipeMarkdown'
@@ -785,7 +785,16 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             Tot die tijd blijft de Planner- en winkelprijsvergelijking geblokkeerd.</p>
           <ul>{preview.warnings.map((warning, index) =>
             <li key={index}>{warning}</li>)}</ul>
-        </div>}<p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>{editingId ? 'Wijzigingen opslaan' : isVariant ? 'Variant als nieuw recept opslaan' : 'Opslaan in mijn recepten'}</button></section>}
+        </div>}
+        {sourceOnlyRecipeWarnings(preview).length > 0 && <button type="button"
+          className="ghost-button" onClick={() => setPreview(current =>
+            current ? acknowledgeRecipeSourceWarnings(current) : null)}>
+          Ik heb de oorspronkelijke bronwaarschuwingen zelf nagekeken
+        </button>}
+        <p>Bij een bronbevestiging verdwijnen alleen algemene bronwaarschuwingen;
+          onzekere hoeveelheden en gedeeltelijke stuks blijven te corrigeren.
+          Dit levert geen winkelbronrechten, echte prijzen of onafhankelijk bewijs op.</p>
+        <p>Bewaren op dit apparaat. Ingrediëntprijzen zijn nog onbekend.</p><button className="recipe-primary" onClick={save} disabled={!!library.error}>{editingId ? 'Wijzigingen opslaan' : isVariant ? 'Variant als nieuw recept opslaan' : 'Opslaan in mijn recepten'}</button></section>}
       {error && <p role="alert" className="recipe-error">{error}</p>}
     </dialog>
     <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p>{'savedAt' in selected && <><div className="recipe-detail-actions"><button type="button" onClick={() => openSavedRecipeEditor(selected)}>Bewerk mijn recept</button><button type="button" onClick={() => openSavedRecipeEditor(selected, true)}>Maak een variant</button><button type="button" onClick={() => requestRecipeRemoval(selected)}>Verwijder ongebruikt recept</button><button type="button" onClick={() => downloadSingleOwnRecipe(selected)}>Download alleen dit recept (JSON)</button><button type="button" onClick={() => downloadOwnRecipeMarkdown(selected)}>Download recept als Markdown</button><button type="button" onClick={() => void copyOwnRecipeMarkdown(selected)}>Kopieer recepttekst</button></div>
