@@ -1,6 +1,7 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import type { MixedStore, MixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
+import type { OwnExtraGrocery } from './ownExtraGroceriesCsv.ts'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const clean = (input: string | number) => String(input)
@@ -20,9 +21,15 @@ export function printMixedStoreRouteHtml(input: {
   checked: ReadonlySet<string>
   extraVisitCostCents: number | null
   strategy: 'auto' | 'mixed' | 'single'
+  extras?: readonly OwnExtraGrocery[]
 }): string {
   exportMixedStoreRouteCsv(input)
   const { route, captured, checked } = input
+  if (input.extras && (input.extras.length > 100 || !input.extras.every(item =>
+      typeof item.name === 'string' && item.name.length > 0 && item.name.length <= 120 &&
+      Number.isFinite(item.quantity) && item.quantity > 0 && item.quantity <= 100000 &&
+      ['piece', 'g', 'ml'].includes(item.unit) && typeof item.done === 'boolean')))
+    throw Error('Eigen ongeprijsde boodschappen zijn niet geldig.')
   const both = route.lines.some(line => line.store === 'PLUS') &&
     route.lines.some(line => line.store === 'DekaMarkt')
   const totalWithCost = !both ? route.totalCents : input.extraVisitCostCents === null
@@ -51,6 +58,16 @@ export function printMixedStoreRouteHtml(input: {
           '</small><br><b>' + clean(euros.format(line.lineTotalCents / 100)) +
           '</b></div></li>').join('')) + '</ul></section>'
   }
+  const extrasSection = input.extras?.length ?
+    '<section><h2>Eigen extra boodschappen · winkel en prijs onbekend</h2>' +
+    '<p><strong>Niet meegerekend</strong> in de berekende winkelbedragen. ' +
+    'Het volledige totaal inclusief deze extra aankopen is onbekend.</p><ul>' +
+    input.extras.map(item => '<li><span class="tick">' +
+      (item.done ? '&#9745;' : '&#9744;') + '</span><div><strong>' +
+      clean(item.name) + '</strong><br><small>' + clean(item.quantity) + ' ' +
+      (item.unit === 'piece' ? 'stuks' : clean(item.unit)) +
+      ' · geen gecontroleerde winkelprijs</small></div></li>').join('') +
+    '</ul></section>' : ''
   const summary = '<div class="totals"><p>PLUS hele mand <b>' +
     clean(euros.format(route.plusWholeCents / 100)) + '</b></p>' +
     '<p>DekaMarkt hele mand <b>' + clean(euros.format(route.dekaWholeCents / 100)) +
@@ -90,7 +107,7 @@ export function printMixedStoreRouteHtml(input: {
     'Dit bestand bevat geen scripts of internetbronnen.</p></header>' +
     '<div class="meta">' + paragraphs.map(item =>
       '<p>' + clean(item) + '</p>').join('') + '</div>' + summary +
-    storeSection('PLUS') + storeSection('DekaMarkt') +
+    storeSection('PLUS') + storeSection('DekaMarkt') + extrasSection +
     '<footer><p>Handmatige winkelkeuzes en afvinkingen zijn uitsluitend voor ' +
     'je eigen boodschappen. Verouderde prijsopnames kunnen andere actuele ' +
     'winkelprijzen hebben. Print via je browser.</p></footer></body></html>'

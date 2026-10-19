@@ -332,22 +332,36 @@ export function MixedStoreShoppingCard({
     }
   }
 
-  function downloadPrintHtml() {
+  async function downloadPrintHtml(includeExtras = false) {
     if (block || !eligibleNow()) {
       setMessage('Controleer je huidige originele winkelprijzen en extra bezoekkosten voordat je een afdruk bewaart.')
       return
     }
     try {
+      let extras: import('./ownExtraGroceriesStorage.ts').Item[] | undefined
+      if (includeExtras) {
+        if (!privatePlanKey) throw Error('Geen huidig Planner-weekmandje beschikbaar.')
+        const { readSavedExtrasForPlan } = await import('./ownExtraGroceriesStorage.ts')
+        const saved = readSavedExtrasForPlan(privatePlanKey)
+        if (!saved.available || !saved.items.length)
+          throw Error('Bewaar eerst je eigen extra boodschappen in de Lijst-tab.')
+        extras = saved.items
+      }
+      if (!eligibleNow()) throw Error('De oorspronkelijke bronopnames zijn verlopen.')
       const page = printMixedStoreRouteHtml({
         plus, deka, route: plan, captured,
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
+        extras,
       })
+      if (!eligibleNow()) throw Error('Deze opnames zijn inmiddels verlopen.')
       const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = 'supa-mijn-winkelroute-prive.html'
+        link.download = includeExtras
+          ? 'supa-mijn-winkelroute-en-ongeprijsde-extras.html'
+          : 'supa-mijn-winkelroute-prive.html'
         document.body.appendChild(link)
         try { link.click() } finally { link.remove() }
         setMessage('Afdrukbaar privéoverzicht opgeslagen. Open het HTML-bestand lokaal en kies Afdrukken in je browser.')
@@ -502,9 +516,13 @@ export function MixedStoreShoppingCard({
         onClick={() => { void downloadRouteCsvWithExtras() }}>
         Download gecontroleerde route + ongeprijsde extras (CSV)
       </button>}
-      <button type="button" className="ghost-button" onClick={downloadPrintHtml}>
+      <button type="button" className="ghost-button" onClick={() => { void downloadPrintHtml(false) }}>
         Bewaar / print volledige route (HTML)
       </button>
+      {privatePlanKey && <button type="button" className="ghost-button"
+        onClick={() => { void downloadPrintHtml(true) }}>
+        Print gekozen route én bewaarde extra boodschappen (HTML)
+      </button>}
       <button type="button" className="ghost-button" onClick={() => {
         if (block) { setMessage('Corrigeer eerst je extra kosten.'); return }
         if (!eligibleNow()) { setShowText(false); setMessage('Bronnen verlopen: opnieuw controleren.'); return }
