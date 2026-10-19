@@ -49,7 +49,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   const [onlyMissing, setOnlyMissing] = useState(false)
   const [search, setSearch] = useState('')
   const [storeFilter, setStoreFilter] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
-  const [actionFilter, setActionFilter] = useState<'all' | 'choose-sku' | 'capture' | 'paired'>('all')
+  const [actionFilter, setActionFilter] = useState<'all' | 'choose-sku' | 'fix-source' | 'capture' | 'paired'>('all')
   const [captureMessage, setCaptureMessage] = useState('')
   const [showMobileGuide, setShowMobileGuide] = useState(false)
   const [showActionList, setShowActionList] = useState(false)
@@ -177,8 +177,11 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         line.unpricedHints[store]?.name, line.unpricedHints[store]?.sku]),
     ].some(value => value?.normalize('NFKC').toLocaleLowerCase('nl').includes(term))) return false
     if (actionFilter === 'choose-sku') return selectedStores.some(store => line.manualReview[store])
+    if (actionFilter === 'fix-source') return selectedStores.some(store =>
+      !!line.unpricedHints[store])
     if (actionFilter === 'capture') return selectedStores.some(store =>
-      !line.suggestions[store] && !line.manualReview[store])
+      !line.suggestions[store] && !line.manualReview[store] &&
+      !line.unpricedHints[store])
     if (actionFilter === 'paired') return stores.every(store => !!line.suggestions[store])
     return storeFilter === 'both' || selectedStores.some(store =>
       !line.suggestions[store] || line.manualReview[store])
@@ -285,7 +288,9 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   const nextReview = coverage.flatMap(line => stores.flatMap(store =>
     line.manualReview[store] ? [{ store, need: line.need, ambiguous: true }] : [],
   ))[0] ?? coverage.flatMap(line => stores.flatMap(store =>
-    line.suggestions[store] ? [{ store, need: line.need, ambiguous: false }] : [],
+    line.unpricedHints[store] ? [{ store, need: line.need, ambiguous: false, incomplete: true }] : [],
+  ))[0] ?? coverage.flatMap(line => stores.flatMap(store =>
+    line.suggestions[store] ? [{ store, need: line.need, ambiguous: false, incomplete: false }] : [],
   ))[0]
   const nextCapture = pendingPlus ? 'PLUS' : pendingDeka ? 'DekaMarkt' : null
   function mobileGuideText(): string {
@@ -374,7 +379,9 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               onReviewIngredient(nextReview.store, nextReview.need.id)
           }}>
           {nextCapture ? '2.' : '1.'} Beoordeel {nextReview.need.label} bij {nextReview.store}
-          {nextReview.ambiguous ? ' (meerdere SKU’s)' : ' (bron-SKU nog onbevestigd)'}
+          {nextReview.ambiguous ? ' (meerdere SKU’s)' :
+            'incomplete' in nextReview && nextReview.incomplete
+              ? ' (bestaande SKU mist brondata)' : ' (bron-SKU nog onbevestigd)'}
         </button>}
       </div>
       {!nextCapture && !nextReview && <small>
@@ -413,7 +420,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         }}>
           <option value="all">Alle productregels</option>
           <option value="choose-sku">Kies bestaande SKU in Vergelijk</option>
-          <option value="capture">Echte bronopname ontbreekt</option>
+          <option value="fix-source">Bestaande SKU mist pakprijs of brondata</option>
+          <option value="capture">Geen geschikte originele SKU beschikbaar</option>
           <option value="paired">Voorstel voor beide winkels</option>
         </select>
       </label>
