@@ -40,7 +40,7 @@ type CapturePreviewStore = {
       product: string | null; originalSku: string | null
       packs: number | null; reasons: string[] }[]
   }
-  observedAt: string; unavailableProducts: number
+  observedAt: string; observedNs?: bigint; unavailableProducts: number
   previewProducts: {
     id: string; name: string; packAmount: number | null; packUnit: string
     packCount: number; priceCents: number | null; available: boolean
@@ -243,6 +243,7 @@ export function OfflineReviewedWorkbench({
     files: File[]; week: string
     stores: CapturePreviewStore[]
     unobservedOtherStoreRows: number
+    pairedWithin24h: boolean
   } | null>(null)
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   const [manualSku, setManualSku] = useState<Record<typeof stores[number], Record<string, string>>>({
@@ -275,6 +276,11 @@ export function OfflineReviewedWorkbench({
   }, [plan, recipes, activeDays])
   const captureWeek = JSON.stringify([planKey ?? null, plannerCaptureNeeds.map(n => [n.id, n.label, n.unit, n.amount])])
   const currentPreview = capturePreview?.week === captureWeek ? capturePreview : null
+  const capturePreviewFresh = (store: CapturePreviewStore) => {
+    if (store.observedNs === undefined || !Number.isSafeInteger(clockMs)) return false
+    const age = BigInt(Math.trunc(clockMs)) * 1_000_000n - store.observedNs
+    return age >= -300_000_000_000n && age <= 604_800_000_000_000n
+  }
 
   async function previewFilledCsv(files: File[]) {
     if (files.length === 0) return
@@ -327,6 +333,7 @@ export function OfflineReviewedWorkbench({
       for (const entry of storesInPreview) {
         const source = combined.captures[entry.retailer]
         if (!source) throw Error('Een winkelbron ontbreekt in de gekoppelde opname.')
+        entry.observedNs = source.observedNs
         const basket = buildOneStoreBasket({
           store: { id: entry.retailer, name: entry.retailer },
           plan, recipes, activeDays, products: source.products,
@@ -349,6 +356,7 @@ export function OfflineReviewedWorkbench({
       setCapturePreview({
         files, week: captureWeek, stores: storesInPreview,
         unobservedOtherStoreRows: blankOtherRows,
+        pairedWithin24h: combined.pairedWithin24h,
       })
       setWeekExportMessage('Eigen CSV-bronopnames lokaal gecontroleerd. Bekijk beide winkels en neem de brondata bewust over.')
     } catch (e) {
@@ -1358,6 +1366,20 @@ export function OfflineReviewedWorkbench({
                   {' '}zelf ingevoerde bronproducten, {store.unobservedRows}
                   {' '}lege en ongeprijsde regels.</p>
               ))}
+              {currentPreview.stores.map(store => (
+                <p key={'fresh-' + store.retailer} role="status"
+                  className={capturePreviewFresh(store) ? 'disclaimer' : 'offline-price-workbench__capture-alert'}>
+                  {store.retailer}: {capturePreviewFresh(store)
+                    ? 'bronmoment binnen 7 dagen; controleer altijd de oorspronkelijke prijs'
+                    : 'bronmoment ouder dan 7 dagen, onmogelijk toekomstig of onbekend; géén actuele winkelprijs'}
+                </p>
+              ))}
+              {currentPreview.stores.length === 2 && !currentPreview.pairedWithin24h && (
+                <p role="status" className="offline-price-workbench__capture-alert">
+                  De twee oorspronkelijke bronmomenten liggen meer dan 24 uur uiteen.
+                  Ook na import kan Supa hieruit geen vergelijkbaar prijsverschil afleiden.
+                </p>
+              )}
               {currentPreview.stores.map(store => (
                 <details key={'details-' + store.retailer}>
                   <summary>{store.retailer}: originele ingevoerde artikelen bekijken

@@ -279,3 +279,10 @@
 @media (max-width: 640px) {
   .offline-price-workbench__capture-preview button { width: 100%; }
 }
+
+
+.offline-price-workbench__capture-alert {
+  padding: .75rem .9rem; margin: .25rem 0;
+  background: #fff6e5; color: #644211; border-left: 3px solid #af7326;
+  border-radius: 6px; font-weight: 650; overflow-wrap: anywhere;
+}
