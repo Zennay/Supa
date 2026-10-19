@@ -73,7 +73,8 @@ export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOp
           onChange={event => setQuery(event.target.value)} placeholder="Product, SKU of ingrediënt" /></label>
       </div>
       {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
-        search={search} onOpenComparison={onOpenComparison} onOpenList={onOpenList}
+        search={search} unitFilter={unitFilter} order={order}
+        onOpenComparison={onOpenComparison} onOpenList={onOpenList}
         onOpenMixedRoute={onOpenMixedRoute} />}
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.</p>
       {order === 'unitPrice' && unitFilter === 'all' && <p className="private-reviewed-products__sort-note">

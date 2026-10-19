@@ -1,6 +1,6 @@
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
-import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 
@@ -11,9 +11,11 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
  * No independent source authorization, live pricing or retail claim is implied.
  */
-export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenComparison, onOpenList, onOpenMixedRoute }: {
+export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, onOpenComparison, onOpenList, onOpenMixedRoute }: {
   reviewed: PrivateReviewedBaskets
   search: string
+  unitFilter: 'all' | 'kg' | 'liter' | 'stuk'
+  order: 'source' | 'unitPrice' | 'lineTotal'
   onOpenComparison: () => void
   onOpenList: (store: OwnStore) => void
   onOpenMixedRoute: () => void
@@ -59,13 +61,40 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenCompariso
   }
   const dekaById = new Map(deka.basket.lines.filter((line): line is Matched =>
     line.status === 'matched').map(line => [line.id, line]))
+  const rate = (line: Matched) => privatePackUnitRate({
+    amount: line.pack.amount, unit: line.pack.unit,
+    count: line.pack.count, priceCents: line.pricePerPackCents,
+  })
+  const family = (first: Matched, second: Matched) => {
+    const a = rate(first)?.unit
+    const b = rate(second)?.unit
+    // €/kg cannot be sorted against €/liter even when totals use
+    // the same physical ingredient demand. Keep conflicting packs ungrouped.
+    return a && a === b ? a : null
+  }
   const rows = plus.basket.lines.flatMap(line => {
     const alternate = dekaById.get(line.id)
     if (line.status !== 'matched' || !alternate) return []
+    if (unitFilter !== 'all' && family(line, alternate) !== unitFilter) return []
     if (search && ![line.ingredientLabel, line.productId, line.productName,
       alternate.productId, alternate.productName].some(value =>
         value.toLocaleLowerCase('nl').includes(search))) return []
     return [{ plus: line, deka: alternate }]
+  })
+  if (order !== 'source') rows.sort((a, b) => {
+    if (order === 'lineTotal') return (
+      Math.min(a.plus.lineTotalCents, a.deka.lineTotalCents) -
+      Math.min(b.plus.lineTotalCents, b.deka.lineTotalCents)
+    )
+    const unitOrder: Record<string, number> = { kg: 0, liter: 1, stuk: 2 }
+    const groupA = family(a.plus, a.deka)
+    const groupB = family(b.plus, b.deka)
+    const groupDelta = (groupA ? unitOrder[groupA] : 3) -
+      (groupB ? unitOrder[groupB] : 3)
+    if (groupDelta) return groupDelta
+    if (!groupA || !groupB) return 0
+    return Math.min(rate(a.plus)!.centsPerUnit, rate(a.deka)!.centsPerUnit) -
+      Math.min(rate(b.plus)!.centsPerUnit, rate(b.deka)!.centsPerUnit)
   })
   const mix = createMixedStoreShoppingPlan(plus.basket, deka.basket)
   const splitTrip = !!mix && mix.lines.some(line => line.store === 'PLUS') &&
@@ -105,6 +134,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenCompariso
     <small>Jouw gecontroleerde PLUS-bron: {plus.observedAt}. DekaMarkt-bron: {deka.observedAt}.
       Geen kassagarantie of onafhankelijk bewezen besparing; oorspronkelijke producten en
       prijzen kunnen veranderen.</small>
+    <p role="status">{rows.length} van {plus.basket.lines.length} vergelijkbare ingrediënten
+      bij je zoek-, eenheids- en sorteerselectie. Alle mandtotalen hierboven blijven
+      gebaseerd op het volledige weekmenu, niet alleen de gefilterde producten.</p>
     <div className="private-reviewed-products__paired-rows">
       {rows.map(({ plus: first, deka: second }) => <article key={first.id}>
         <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
@@ -117,7 +149,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenCompariso
             money.format(Math.abs(first.lineTotalCents - second.lineTotalCents) / 100) +
             ' voordeliger voor dit ingrediënt.'}</p>
       </article>)}
-      {!rows.length && <p>Geen vergelijkbare artikelen passen bij je zoekopdracht.</p>}
+      {!rows.length && <p>Geen vergelijkbare artikelen passen bij je zoekopdracht of eenheidsfilter.</p>}
     </div>
     <button type="button" onClick={() => onOpenList(cheapest)}>Open het goedkoopste volledige winkelmandje ({cheapest}) in Lijst</button>
   </section>
