@@ -106,7 +106,7 @@ type StoredDraft = {
   raw: string | null
   protected: boolean
 }
-function readPrivateDraft(fingerprint: string, importedRaw?: string): StoredDraft {
+function readPrivateDraft(fingerprint: string, allowedRows: ReadonlySet<string>, importedRaw?: string): StoredDraft {
   const empty: StoredDraft = { saved: false, sourceSelection: 'both', rows: {}, capturedAt: { PLUS: '', DekaMarkt: '' }, raw: null, protected: false }
   if (typeof window === 'undefined' && importedRaw === undefined) return empty
   let raw: string | null = importedRaw ?? null
@@ -132,7 +132,9 @@ function readPrivateDraft(fingerprint: string, importedRaw?: string): StoredDraf
         typeof dates.DekaMarkt !== 'string' || dates.DekaMarkt.length > 16) throw Error('times')
     const rows = r.rows as Record<string, unknown>
     if (Object.keys(rows).length > 2000 || !Object.entries(rows).every(([k, rawRow]) => {
-      if (k.length > 500 || !Array.isArray(JSON.parse(k)) ||
+      // A portable or session draft must be bound to a REAL selected Planner
+      // ingredient/store pair, not arbitrary hidden rows from another week.
+      if (k.length > 500 || !allowedRows.has(k) ||
           !rawRow || typeof rawRow !== 'object' || Array.isArray(rawRow)) return false
       const row = rawRow as Record<string, unknown>
       return (row.sourceId === undefined || (typeof row.sourceId === 'string' && row.sourceId.length <= 100)) &&
@@ -181,6 +183,7 @@ export function LocalTwoStorePriceEditor({
     catch { return [] }
   }, [plan, recipes, activeDays])
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
+  const allowedDraftRows = new Set(activeNeeds.flatMap(need => stores.map(store => key(store, need.id))))
   const selectedPlanFingerprint = JSON.stringify([plan, activeDays, needs.map(item => [item.id, item.amount, item.unit])])
   // Avoid importing a draft into a different plan if it changed during File.text().
   const currentPlanFingerprint = useRef(selectedPlanFingerprint)
@@ -195,7 +198,7 @@ export function LocalTwoStorePriceEditor({
   // Explicitly opt-in to *session-only* recovery. A different planner or
   // unknown/future record can never silently be reinterpreted or replaced.
   useEffect(() => {
-    const old = readPrivateDraft(selectedPlanFingerprint)
+    const old = readPrivateDraft(selectedPlanFingerprint, allowedDraftRows)
     setRows(old.rows)
     setSourceSelection(old.sourceSelection)
     setCapturedAt(old.capturedAt)
@@ -475,7 +478,7 @@ export function LocalTwoStorePriceEditor({
         setDraftStatus('Het weekmenu veranderde tijdens het lezen. Kies het concept opnieuw.')
         return
       }
-      const restored = readPrivateDraft(fingerprint, raw)
+      const restored = readPrivateDraft(fingerprint, allowedDraftRows, raw)
       if (!restored.saved) {
         setDraftStatus('Dit concept hoort niet bij dit exacte weekmenu, is te groot of heeft een onbekende indeling.')
         return
