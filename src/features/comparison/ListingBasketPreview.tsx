@@ -68,7 +68,7 @@ export function ListingBasketPreview() {
       `Totaal PLUS: ${euro.formatCents(baseline)}`,
       `Totaal DekaMarkt: ${euro.formatCents(candidate)}`,
       'Referentie 17 oktober 2026 — bedragen per gekozen hele verpakkingen',
-    ].join('\\n')
+    ].join('\n')
   }
 
   async function copyList() {
