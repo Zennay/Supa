@@ -554,6 +554,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <Suspense fallback={<p role="status">Mijn eigen bronartikelen openen…</p>}>
             <OwnSourceProductLibrary
               source={offlinePriceSession.imported}
+              staged={stagedForPlanner ?? null}
               baskets={importedPair}
               nowMs={sourceClock}
               onCompare={() => navigate('basket')}

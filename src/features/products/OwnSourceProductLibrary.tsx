@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket.ts'
-import type { OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
+import type { OfflineCapture, OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { privatePackUnitRate } from '../comparison/privateUnitPrice.ts'
 import './ownSourceProductLibrary.css'
 type Shop = 'PLUS' | 'DekaMarkt'
@@ -8,8 +8,9 @@ const shops: Shop[] = ['PLUS', 'DekaMarkt']
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const date = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'short', timeStyle: 'short' })
 /** Read-only source catalog. Only caller-admitted private data; never infer prices. */
-export function OwnSourceProductLibrary({ source, baskets, nowMs, onCompare, onList }: {
+export function OwnSourceProductLibrary({ source, staged, baskets, nowMs, onCompare, onList }: {
   source: OfflinePriceSnapshots | null
+  staged: { store: Shop; source: OfflineCapture; basket: OneStoreBasket } | null
   baskets: { plus: OneStoreBasket; deka: OneStoreBasket } | null
   nowMs: number; onCompare: () => void; onList: (shop: Shop) => void
 }) {
@@ -17,23 +18,30 @@ export function OwnSourceProductLibrary({ source, baskets, nowMs, onCompare, onL
   const [search, setSearch] = useState('')
   const [linkedOnly, setLinkedOnly] = useState(false)
   const [sort, setSort] = useState<'source' | 'name' | 'unit'>('source')
-  const rows = useMemo(() => !source ? [] : shops.flatMap(shop => {
+  const rows = useMemo(() => source ? shops.flatMap(shop => {
     const basket = shop === 'PLUS' ? baskets?.plus : baskets?.deka
     return source.captures[shop].products.map((item, index) => ({
-      shop, item, index,
-      uses: basket?.lines.filter(line => line.status === 'matched' &&
-        line.productId === item.id).map(line => line.ingredientLabel) ?? [],
+      shop, item, index, uses: basket?.lines.filter(line =>
+        line.status === 'matched' && line.productId === item.id)
+        .map(line => line.ingredientLabel) ?? [],
     }))
-  }), [source, baskets])
-  if (!source) return <section className="own-products">
+  }) : staged ? staged.source.products.map((item, index) => ({
+    shop: staged.store, item, index,
+    uses: staged.basket.lines.filter(line => line.status === 'matched' &&
+      line.productId === item.id).map(line => line.ingredientLabel),
+  })) : [], [source, staged, baskets])
+  if (!source && !staged) return <section className="own-products">
     <h2>Mijn eigen winkelproducten</h2>
-    <p>Er zijn nog geen geautoriseerd ingevoerde persoonlijke winkelproducten.
-      De overige kaarten zijn ontwerpvoorbeelden, geen actuele prijzen.</p>
+    <p>Er zijn nog geen persoonlijke winkelopnames ingelezen. De overige
+      kaarten zijn ontwerpvoorbeelden, geen actuele prijzen.</p>
     <button type="button" onClick={onCompare}>Eigen bron invoeren</button>
   </section>
+  const capture = (shop: Shop) => source?.captures[shop] ??
+    (staged?.store === shop ? staged.source : null)
   const recent = (shop: Shop) => {
-    const delta = BigInt(Math.trunc(nowMs)) * 1_000_000n -
-      source.captures[shop].observedNs
+    const current = capture(shop)
+    if (!current) return false
+    const delta = BigInt(Math.trunc(nowMs)) * 1_000_000n - current.observedNs
     return delta >= -300_000_000_000n && delta <= 604_800_000_000_000n
   }
   const unitRate = (item: typeof rows[number]['item']) => item.available
@@ -57,12 +65,18 @@ export function OwnSourceProductLibrary({ source, baskets, nowMs, onCompare, onL
     <h2>Mijn eigen winkelproducten</h2>
     <p>Alleen eigen bronartikelen. Geen live winkelprijzen, kassagarantie of onafhankelijk
       besparingsbewijs. Koppel originele SKU's afzonderlijk aan je weekmenu.</p>
-    <div className="own-products__sources">{shops.map(shop => <section key={shop}>
-      <h3>{shop}</h3><small>{source.captures[shop].products.length} artikelen ·
-        eigen opname {date.format(new Date(source.captures[shop].observedMs))}</small>
-      {!recent(shop) && <p role="status">Bron verouderd: historische prijzen.</p>}
-      <button type="button" onClick={() => onList(shop)}>Open mijn {shop}-lijst</button>
-    </section>)}</div>
+    {!source && staged && <p role="status">Alleen {staged.store} is ingelezen.
+      De tweede winkel ontbreekt nog; er wordt geen prijsverschil berekend.</p>}
+    <div className="own-products__sources">{shops.filter(shop => capture(shop))
+      .map(shop => {
+        const own = capture(shop)!
+        return <section key={shop}><h3>{shop}</h3>
+          <small>{own.products.length} bronartikelen · eigen opname
+            {' '}{date.format(new Date(own.observedMs))}</small>
+          {!recent(shop) && <p role="status">Bron verouderd: historische prijzen.</p>}
+          <button type="button" onClick={() => onList(shop)}>Open mijn {shop}-lijst</button>
+        </section>
+      })}</div>
     <div className="own-products__filters">
       <label>Winkel<select value={selected} onChange={e =>
         setSelected(e.target.value as typeof selected)}>

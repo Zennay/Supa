@@ -29,6 +29,6 @@ export function resolveStagedBasket(
     const now = BigInt(Math.trunc(clockMs)) * 1_000_000n
     const fresh = now >= source.observedNs - 300_000_000_000n &&
       now - source.observedNs <= 604_800_000_000_000n
-    return { store, basket, fresh }
+    return { store, basket, fresh, source }
   } catch { return null }
 }
