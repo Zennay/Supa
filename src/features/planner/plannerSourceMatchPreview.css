@@ -56,3 +56,11 @@
   .supa-planner-source-matches__next-actions { display: grid; }
   .supa-planner-source-matches__next-actions button { width: 100%; text-align: left; }
 }
+
+/* The original 2-shop line amounts are explicitly NOT an approved basket. */
+.supa-planner-source-matches__tentative-delta {
+  display: block; margin-top: .55rem; padding: .45rem .55rem;
+  border: 1px dashed #b9c9bf; border-radius: .45rem; background: #f8faf9;
+  font-weight: 500;
+}
+.supa-planner-source-matches__tentative-delta small { line-height: 1.4; }

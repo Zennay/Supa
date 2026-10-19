@@ -18,7 +18,7 @@ const family = (unit: string): 'mass' | 'volume' | 'piece' | null =>
 type Suggestion = {
   name: string; sku: string
   packCount: number; packAmount: number; packUnit: string
-  packCents: number; unitRate: string | null; packsNeeded: number
+  packCents: number; unitRate: string | null; packsNeeded: number; lineCents: number
 } | null
 type UnpricedHint = { name: string; sku: string; reason: string } | null
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -149,7 +149,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               return { name: match.name, sku: match.id,
                 packCount: count, packAmount: match.packAmount,
                 packUnit: match.packUnit, packCents: match.sourcePriceCents,
-                unitRate: rate ? formatPrivateUnitRate(rate) : null, packsNeeded }
+                unitRate: rate ? formatPrivateUnitRate(rate) : null,
+                packsNeeded, lineCents: packsNeeded * match.sourcePriceCents }
             })() : null
       }
       return { need, suggestions, manualReview, unpricedHints }
@@ -444,7 +445,25 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       {shown.map(({ need, suggestions, manualReview, unpricedHints }) => <div className="supa-planner-source-matches__row"
         role="row" key={need.id}>
         <span role="cell" data-store="Fysieke behoefte"><strong>{need.label}</strong>
-          <small>{need.amount ?? 'Onbekend'} {need.unit}</small></span>
+          <small>{need.amount ?? 'Onbekend'} {need.unit}</small>
+          {source.pairedWithin24h && suggestions.PLUS && suggestions.DekaMarkt &&
+            (() => {
+              // Exact source-derived line arithmetic for the SAME physical
+              // ingredient, but two *unconfirmed* SKU choices. Do not sum:
+              // one SKU may cover multiple ingredients in a canonical basket.
+              const diff = suggestions.DekaMarkt.lineCents - suggestions.PLUS.lineCents
+              return <span className="supa-planner-source-matches__tentative-delta">
+                <small>Alleen dit ingrediënt · voorlopige hele-pakkenregel:
+                  {' '}PLUS {money.format(suggestions.PLUS.lineCents / 100)},
+                  {' '}DekaMarkt {money.format(suggestions.DekaMarkt.lineCents / 100)}.
+                </small>
+                <small>Verschil Deka min PLUS:
+                  {' '}{diff === 0 ? 'gelijk (' + money.format(0) + ')' :
+                    (diff > 0 ? '+' : '−') + money.format(Math.abs(diff) / 100)}.
+                  {' '}Nog geen bevestigd prijsverschil of mandbesparing.
+                </small>
+              </span>
+            })()}</span>
         {stores.map(store => <span role="cell" data-store={store} key={store}>
           {suggestions[store] ? <>Kandidaat: {suggestions[store]!.name}
             <small>SKU {suggestions[store]!.sku} · niet bevestigd</small>
@@ -455,7 +474,9 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                 ? ' · informatief ' + suggestions[store]!.unitRate : ''}
               {' '}· bronmoment niet automatisch gevalideerd</small>
             <small>{suggestions[store]!.packsNeeded} hele verpakking(en) voor
-              alleen dit ingrediënt volgens exacte metrische behoefte;
+              alleen dit ingrediënt · voorlopige regel
+              {' '}{money.format(suggestions[store]!.lineCents / 100)}
+              {' '}volgens exacte metrische behoefte;
               {' '}niet bevestigd, gedeelde producten pas in Vergelijk samenvoegen.</small></>
             : source.captures[store] &&
               !recentOwnCaptureInstant(source.captures[store]!.observedAt, clock)
