@@ -1490,6 +1490,11 @@ export function OfflineReviewedWorkbench({
       if (target) {
         handledReviewFocus.current = focusReview.serial
         target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // A visible keyboard focus completes the jump for screen-reader
+        // and keyboard users. Do not select or approve the product.
+        const search = target.querySelector<HTMLInputElement>('input[type="search"]')
+        if (search) search.focus({ preventScroll: true })
+        else target.focus({ preventScroll: true })
       }
     }, 100)
     return () => window.clearTimeout(timer)
@@ -2396,7 +2401,8 @@ export function OfflineReviewedWorkbench({
                           onlyCheaper[searchKey] && line.status === 'matched'
                             ? line.lineTotalCents : null)
                         return (
-                        <article key={line.id} id={reviewRowId(store, line.id)} className="offline-price-workbench__line">
+                        <article key={line.id} id={reviewRowId(store, line.id)} tabIndex={-1}
+                          className="offline-price-workbench__line">
                           <div>
                             <label className="offline-price-workbench__trip-tick">
                               <input type="checkbox" checked={Boolean(doneTripItems[shoppingTaskKey(store, line)])}
