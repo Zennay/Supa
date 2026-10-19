@@ -279,6 +279,46 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage(error instanceof Error ? error.message : 'Afdrukbaar overzicht mislukt.')
     }
   }
+  /**
+   * A complete single-store basket remains useful even when the other shop
+   * cannot be compared. Export the existing canonical Lijst serializers,
+   * not a parallel calculator with weaker price or physical-pack admission.
+   */
+  async function downloadSingleStoreBasket(store: OwnStore, kind: 'csv' | 'html') {
+    setDownloadMessage('')
+    try {
+      const original = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())?.stores[store]
+      if (!original) throw new Error('Deze winkelopname is niet meer actueel of volledig. Herzie de bron in Vergelijk.')
+      const content = kind === 'html'
+        ? (await import('../shopping-list/privateSingleStorePrintableHtml.ts'))
+          .privateSingleStorePrintableHtml({
+            basket: original.basket, observedAt: original.observedAt, done: new Set<string>(),
+          })
+        : (await import('../shopping-list/privateSourceShoppingCsv.ts'))
+          .privateSingleStoreShoppingCsv({
+            basket: original.basket, observedAt: original.observedAt, done: new Set<string>(),
+          })
+      // An asynchronously loaded formatter must not authorize a source that
+      // expired or changed during its load. The same exact object stays valid.
+      const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())?.stores[store]
+      if (current !== original) throw new Error('De bronopname is gewijzigd of verlopen. Probeer de actuele winkelbron opnieuw.')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'html' ? 'text/html;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() +
+          '-eigen-weekboodschappen.' + kind
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setDownloadMessage(store + ': volledig privémandje met originele SKU’s, pakprijzen, bronmoment en eenheidsprijzen opgeslagen. Er is geen tweede winkelprijs of besparing verzonnen.')
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : 'Deze bron kan niet worden geëxporteerd.')
+    }
+  }
+
   function chooseConfirmedLine(id: string, store: OwnStore) {
     const choice = currentPrivateRouteChoice(reviewed, id, store, Date.now())
     if (!choice) {
