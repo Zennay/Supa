@@ -134,6 +134,38 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage(error instanceof Error ? error.message : 'Download is niet gelukt.')
     }
   }
+  async function copyPrivateComparison() {
+    setDownloadMessage('')
+    try {
+      // A price can cross the seven-day boundary while this tab stays open.
+      // Clipboard emission is a new action: re-admit both original sources
+      // and their same-demand whole-pack comparison at the time of copying.
+      const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      const fresh = ownStoreWeekComparison(current)
+      if (!current?.stores.PLUS || !current.stores.DekaMarkt || fresh.status !== 'comparable') {
+        throw new Error('De winkelprijzen zijn verlopen of niet volledig gecontroleerd. Herzie eerst de originele bronnen.')
+      }
+      if (!navigator.clipboard?.writeText) {
+        setDownloadMessage('Kopiëren is hier niet beschikbaar. Gebruik de TXT-download voor dezelfde privévergelijking.')
+        return
+      }
+      const { printableOwnStoreComparison } = await import('./downloadOwnStoreComparison.ts')
+      // Dynamic imports can cross the freshness boundary; check again.
+      const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      const checked = ownStoreWeekComparison(latest)
+      if (!latest?.stores.PLUS || !latest.stores.DekaMarkt || checked.status !== 'comparable') {
+        throw new Error('Je bronopnames zijn veranderd of verlopen; kopiëren is geannuleerd.')
+      }
+      const content = printableOwnStoreComparison(checked, {
+        PLUS: latest.stores.PLUS.observedAt,
+        DekaMarkt: latest.stores.DekaMarkt.observedAt,
+      })
+      await navigator.clipboard.writeText(content)
+      setDownloadMessage('Eigen PLUS/Deka-weekvergelijking met bronmomenten en originele SKU’s gekopieerd. Deel alleen bewust je privébrondata.')
+    } catch {
+      setDownloadMessage('Kopiëren is mislukt of niet toegestaan door je browser. Gebruik de TXT-download en controleer je originele winkelbronnen.')
+    }
+  }
   async function downloadPrivateCsv() {
     setDownloadMessage('')
     try {
@@ -310,6 +342,9 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
           <button type="button" className="ghost-button" onClick={() => openConfirmedStoreList(selected)}>Open eigen boodschappenlijst</button>
           <button type="button" className="ghost-button" onClick={downloadPrivateComparison}>
             Download privévergelijking (TXT)
+          </button>
+          <button type="button" className="ghost-button" onClick={() => void copyPrivateComparison()}>
+            Kopieer mijn prijsvergelijking (tekst)
           </button>
           <button type="button" className="ghost-button" onClick={downloadPrivateCsv}>
             Download privévergelijking met originele SKU's (CSV)
