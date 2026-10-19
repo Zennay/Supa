@@ -5,7 +5,7 @@ import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureG
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
 import { selectiveTwoStoreCaptureCsv, selectiveTwoStoreCaptureGuide } from './selectiveTwoStoreCapture.ts'
-import { privateTwoStoreCoverageText, type CoverageExportLine } from './twoStoreCoverageExport.ts'
+import { privateTwoStoreCoverageCsv, privateTwoStoreCoverageText, type CoverageExportLine } from './twoStoreCoverageExport.ts'
 import './plannerSourceMatchPreview.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
@@ -147,7 +147,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   const shown = filtered.slice(0, showAll ? 200 : 12)
   // Portable, non-financial next-action list for the CURRENT filters.
   // It never saves candidate prices, guesses a SKU, or alters imports.
-  function actionListText(): string {
+  function actionListRows(): CoverageExportLine[] {
     const statusFor = (line: typeof coverage[number], store: 'PLUS' | 'DekaMarkt') => {
       const capture = source.captures[store]
       if (capture && !recentOwnCaptureInstant(capture.observedAt, Date.now()))
@@ -160,7 +160,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         ? 'Onbevestigd bronvoorstel SKU ' + candidate.sku + ' · controleer verpakking in Vergelijk'
         : 'Geen passende geprijsde bron-SKU · echte waarneming ontbreekt'
     }
-    const rows: CoverageExportLine[] = filtered.map(line => ({
+    return filtered.map(line => ({
       ingredientId: line.need.id,
       ingredient: line.need.label,
       demand: String(line.need.amount ?? 'onbekend') + ' ' + line.need.unit,
@@ -169,7 +169,9 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       dekaStatus: statusFor(line, 'DekaMarkt'),
       dekaObservedAt: source.captures.DekaMarkt?.observedAt ?? '',
     }))
-    return privateTwoStoreCoverageText(rows)
+  }
+  function actionListText(): string {
+    return privateTwoStoreCoverageText(actionListRows())
   }
   function downloadActionList() {
     setActionMessage('')
@@ -186,6 +188,25 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       setActionMessage('Actuele selectie lokaal opgeslagen. Originele prijzen zijn niet bevestigd of gewijzigd.')
     } catch {
       setActionMessage('Geen geldige, beperkte selectie voor export. Kies eerst fysieke ingrediënten.')
+    }
+  }
+  function downloadActionCsv() {
+    setActionMessage('')
+    try {
+      // The same filtered physical needs and source status facts as the mobile
+      // TXT list; this spreadsheet is an action sheet, not a price receipt.
+      const output = privateTwoStoreCoverageCsv(actionListRows())
+      const url = URL.createObjectURL(new Blob([output], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-gefilterde-plus-deka-broncontroles.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setActionMessage('Gefilterde bronacties als privé CSV opgeslagen. Dit bevat geen bevestigde mandprijzen.')
+    } catch {
+      setActionMessage('Kon de geselecteerde bronacties niet exporteren. Controleer de fysieke weekbehoefte.')
     }
   }
   async function copyActionList() {
@@ -414,6 +435,10 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       <button type="button" className="ghost-button" onClick={downloadActionList}
         disabled={!filtered.length}>
         Download deze SKU-controles als privé TXT
+      </button>
+      <button type="button" className="ghost-button" onClick={downloadActionCsv}
+        disabled={!filtered.length}>
+        Download deze SKU-controles als spreadsheet-CSV
       </button>
       <button type="button" className="ghost-button" disabled={!filtered.length}
         onClick={() => { void copyActionList() }}>
