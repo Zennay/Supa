@@ -181,6 +181,10 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     DekaMarkt: previewRows.filter(line => candidateLineGap(line)! < 0).length,
     equal: previewRows.filter(line => candidateLineGap(line) === 0).length,
   }
+  // Only navigation to the existing manual product workbench: NEVER approve
+  // an unverified candidate here. Pick the most material single-line hint.
+  const largestPairedReview = [...previewRows].sort((a, b) =>
+    Math.abs(candidateLineGap(b)!) - Math.abs(candidateLineGap(a)!))[0]
   const selectedStores = storeFilter === 'both' ? stores : [storeFilter]
   const term = search.trim().normalize('NFKC').toLocaleLowerCase('nl')
   const filtered = (onlyMissing ? missing : coverage).filter(line => {
@@ -391,6 +395,19 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       {' '}Geen winnaar voor het hele mandje: productkeuzes zijn niet bevestigd,
       {' '}dezelfde verpakking kan meerdere ingrediënten dekken.
       {' '}Controleer de volledige mandjes in Vergelijk.
+      {largestPairedReview && onReviewIngredient && <button
+        type="button" className="ghost-button supa-planner-source-matches__paired-next"
+        onClick={() => {
+          const capture = source.captures.PLUS
+          if (source.pairedWithin24h && capture &&
+              recentOwnCaptureInstant(capture.observedAt, Date.now()) &&
+              source.captures.DekaMarkt &&
+              recentOwnCaptureInstant(source.captures.DekaMarkt.observedAt, Date.now()))
+            onReviewIngredient('PLUS', largestPairedReview.need.id)
+        }}>
+        Controleer grootste voorlopige regelverschil in Vergelijk:
+        {' '}{largestPairedReview.need.label}
+      </button>}
     </p>}
     <div className="supa-planner-source-matches__next" aria-label="Snel door met je echte broncontrole">
       <strong>Volgende stappen naar een vergelijkbaar weekmandje</strong>
