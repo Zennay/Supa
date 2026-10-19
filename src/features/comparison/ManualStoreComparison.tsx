@@ -20,7 +20,11 @@ const UNIT_LABEL: Record<string, string> = {
 }
 const tableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tprijs'
 function safeTableCell(value: string) {
-  return value.replace(/[\t\r\n]/gu, ' ').replace(/^[\s\uFEFF]*[=+@-]/u, "'")
+  // The plain TSV route must guard the same invisible-prefix and NFKC
+  // spreadsheet formula cases as the existing private CSV exports.
+  const flat = value.replace(/[\t\r\n]/gu, ' ')
+  const formula = /^[\p{White_Space}\p{Cf}\p{Mn}\p{Mc}\p{Me}]*[=+@-]/u
+  return formula.test(flat.normalize('NFKC')) ? "'" + flat : flat
 }
 function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): string {
   return [
