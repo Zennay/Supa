@@ -13,6 +13,10 @@ const BasketView = lazy(async () => {
 })
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
+const PartialReviewedShoppingList = lazy(async () => {
+  const module = await import('./features/shopping-list/PartialReviewedShoppingList.tsx')
+  return { default: module.PartialReviewedShoppingList }
+})
 import { privatePhysicalShoppingTick } from './features/shopping-list/privatePhysicalShoppingTick.ts'
 // Historical demo products remain separate. Only load the user's reviewed
 // private source catalogue when they actually open the Products screen.
@@ -720,6 +724,25 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
               routeChoice={privateRouteChoice}
               routeCostIntent={mixedCostIntent} />
+          </div>
+        )}
+        {visitedList && (
+          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <Suspense fallback={<p role="status">Eigen gedeeltelijke bronproducten laden…</p>}>
+              <PartialReviewedShoppingList
+                progress={privateCaptureProgress?.planKey === privatePlanKey
+                  ? privateCaptureProgress : null}
+                complete={livePrivateReviewed}
+                onOpenComparison={openOwnPriceImport}
+                onReviewIngredient={(store, ingredientId) => {
+                  setPrivateReviewFocus(previous => ({
+                    planKey: privatePlanKey, store, ingredientId,
+                    serial: (previous?.serial ?? 0) + 1,
+                  }))
+                  navigate('basket')
+                }}
+              />
+            </Suspense>
           </div>
         )}
         {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
