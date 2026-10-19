@@ -5,7 +5,7 @@ type OwnProduct = {
   name: string
   packAmount: number | null
   packUnit: string
-  packCount: number
+  packCount?: number
   priceCents: number | null
   available: boolean
 }
@@ -34,7 +34,7 @@ export async function ownPriceCapturesToCsv(
   const rows = captures.flatMap(capture => capture.products.map(product => [
     capture.retailer, capture.observedAt, product.id, product.name,
     product.packAmount === null ? '' : String(product.packAmount),
-    product.packUnit, String(product.packCount),
+    product.packUnit, String(product.packCount ?? 1),
     product.priceCents === null ? '' : String(product.priceCents),
     String(product.available),
   ]))
@@ -66,7 +66,7 @@ export async function ownPriceCapturesToCsv(
           const other = restored.products[index]
           return !other || p.id !== other.id || p.name !== other.name ||
             p.packAmount !== other.packAmount || p.packUnit !== other.packUnit ||
-            p.packCount !== other.packCount || p.priceCents !== other.priceCents ||
+            (p.packCount ?? 1) !== (other.packCount ?? 1) || p.priceCents !== other.priceCents ||
             p.available !== other.available
         })) {
       throw new Error('CSV zou originele producten, verpakkingen of prijzen wijzigen. Gebruik JSON.')
