@@ -304,13 +304,14 @@ function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number],
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays, planKey, incomingSources, onReviewedBaskets, onCaptureProgress, focusReview,
+  plan, recipes, activeDays, planKey, incomingSources, onSourceFilesConsumed, onReviewedBaskets, onCaptureProgress, focusReview,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   planKey?: string
   incomingSources?: PrivateSourceFileHandoff | null
+  onSourceFilesConsumed?: (serial: number) => void
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
   onCaptureProgress?: (value: PrivateCaptureProgress | null) => void
   focusReview?: PrivateReviewFocus | null
@@ -1128,16 +1129,21 @@ export function OfflineReviewedWorkbench({
   useEffect(() => {
     if (!incomingSources || incomingSources.serial <= lastPlannerFileSerial.current) return
     lastPlannerFileSerial.current = incomingSources.serial
+    // Release original File references after admission (or refusal), so
+    // selected source bytes never linger in App's long-lived tab state.
+    const release = () => onSourceFilesConsumed?.(incomingSources.serial)
     if (incomingSources.planKey !== planKey) {
+      release()
       setMessage('Je weekmenu is veranderd na de bestandskeuze. Kies opnieuw voor deze week.')
       return
     }
     if (incomingSources.files.length === 0 || incomingSources.files.length > 2) {
       setMessage('Selecteer maximaal twee eigen winkelbronbestanden.')
+      release()
       return
     }
-    void loadSelectedSources(incomingSources.files)
-  }, [incomingSources, planKey])
+    void loadSelectedSources(incomingSources.files).finally(release)
+  }, [incomingSources, planKey, onSourceFilesConsumed])
 
   async function appendSameCapture(store: typeof stores[number], file?: File) {
     if (!file || !imported?.captures[store]) return

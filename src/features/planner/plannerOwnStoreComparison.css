@@ -69,3 +69,46 @@
 .own-store-planner__review-download p { margin: .3rem 0 .65rem; }
 .own-store-planner__review-download button { min-height: 44px; }
 
+
+/* Direct Planner → canonical source import: a touch-friendly local file picker.
+   It does not mark prices, matches or retailer rights as verified. */
+.supa-planner-direct-source {
+  display: grid;
+  gap: .35rem;
+  width: 100%;
+  padding: .8rem;
+  border: 1px solid #bfd7c7;
+  background: #f7faf8;
+  border-radius: 10px;
+  color: #1d5037;
+  font-weight: 650;
+}
+.supa-planner-direct-source input[type="file"] {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: .5rem;
+  border: 1px solid #819f8c;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+.supa-planner-direct-source input[type="file"]::file-selector-button {
+  min-height: 44px;
+  margin-right: .75rem;
+  padding: .45rem .7rem;
+  border: 1px solid #4b8865;
+  border-radius: 8px;
+  background: #e8f2ea;
+  font: inherit;
+  cursor: pointer;
+}
+.supa-planner-direct-source input[type="file"]:focus-visible {
+  outline: 3px solid #246b50;
+  outline-offset: 2px;
+}
+.supa-planner-direct-source small {
+  font-weight: 400;
+  color: #395a48;
+  line-height: 1.5;
+}

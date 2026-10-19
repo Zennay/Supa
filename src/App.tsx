@@ -1,5 +1,5 @@
 import { FigmaImage } from './components/FigmaImage'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { PlannerPortableWeek } from './features/planner/PlannerPortableWeek.tsx'
@@ -135,6 +135,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [privateRouteChoice, setPrivateRouteChoice] = useState<PrivateRouteChoice | null>(null)
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [incomingPriceFiles, setIncomingPriceFiles] = useState<PrivateSourceFileHandoff | null>(null)
+  const nextPriceFileSerial = useRef(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
   const [privateReviewFocus, setPrivateReviewFocus] = useState<PrivateReviewFocus | null>(null)
@@ -565,10 +566,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onOpenComparison={openOwnPriceImport}
             onImportSourceFiles={files => {
               if (!files.length) return
-              setIncomingPriceFiles(previous => ({
-                serial: (previous?.serial ?? 0) + 1,
-                planKey: privatePlanKey, files,
-              }))
+              nextPriceFileSerial.current += 1
+              setIncomingPriceFiles({
+                serial: nextPriceFileSerial.current, planKey: privatePlanKey, files,
+              })
               openOwnPriceImport()
             }}
             onReviewIngredient={(store, ingredientId) => {
@@ -667,6 +668,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             manualActiveDays={activeDays}
             privatePlanKey={privatePlanKey}
             incomingSources={incomingPriceFiles}
+            onSourceFilesConsumed={serial => setIncomingPriceFiles(previous =>
+              previous?.serial === serial ? null : previous)}
             onReviewedBaskets={onReviewedBaskets}
             onCaptureProgress={onCaptureProgress}
             focusReview={privateReviewFocus?.planKey === privatePlanKey ? privateReviewFocus : null}

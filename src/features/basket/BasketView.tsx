@@ -38,6 +38,7 @@ export function BasketView({
   manualActiveDays,
   privatePlanKey,
   incomingSources,
+  onSourceFilesConsumed,
   onReviewedBaskets,
   onCaptureProgress,
   focusReview,
@@ -52,6 +53,7 @@ export function BasketView({
   manualActiveDays?: string[]
   privatePlanKey?: string
   incomingSources?: PrivateSourceFileHandoff | null
+  onSourceFilesConsumed?: (serial: number) => void
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
   onCaptureProgress?: (value: PrivateCaptureProgress | null) => void
   focusReview?: PrivateReviewFocus | null
@@ -107,7 +109,8 @@ export function BasketView({
     <section className="screen">
       {manualPlan && manualRecipes && manualActiveDays && (
         <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
-          planKey={privatePlanKey} incomingSources={incomingSources} onReviewedBaskets={onReviewedBaskets}
+          planKey={privatePlanKey} incomingSources={incomingSources}
+          onSourceFilesConsumed={onSourceFilesConsumed} onReviewedBaskets={onReviewedBaskets}
           onCaptureProgress={onCaptureProgress} focusReview={focusReview} />
       )}
       {manualPlan && manualRecipes && manualActiveDays && (
