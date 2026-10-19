@@ -117,6 +117,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [visitedBasket, setVisitedBasket] = useState(initialTab === 'basket')
   const [visitedList, setVisitedList] = useState(initialTab === 'list')
   const [mixedRouteOpenSignal, setMixedRouteOpenSignal] = useState(0)
+  const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   // Only transient shopping ticks. Never persist prices or review approvals.
   // Keep across a temporary unpriced edit so a price-only correction preserves
@@ -165,6 +166,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     if (next === 'list') setVisitedList(true)
     setTab(next); window.scrollTo?.(0, 0)
   }
+  const openOwnPriceImport = () => {
+    navigate('basket')
+    setOwnPriceImportSignal(value => value + 1)
+  }
+  // Directly reveal the existing local source upload controls, not the
+  // unrelated historical demonstration basket above them.
+  useEffect(() => {
+    if (tab !== 'basket' || ownPriceImportSignal === 0) return
+    const frame = window.requestAnimationFrame(() =>
+      document.getElementById('supa-own-price-import')?.scrollIntoView({
+        block: 'start', behavior: 'smooth',
+      }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [tab, ownPriceImportSignal])
   const toggleDesignProduct = (id: string) => {
     setDesignProductIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])
     setProductSelectionTouched(true)
@@ -368,7 +383,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       <div className="content">
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed}
-            onOpenComparison={() => navigate('basket')}
+            onOpenComparison={openOwnPriceImport}
             onOpenMixedRoute={() => { setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
             onOpenList={(store) => {
               if (store) setPreferredOwnStore(store)
@@ -416,7 +431,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onOwnSourceChange={(store) => {
               if (store === 'PLUS' || store === 'DekaMarkt') setPreferredOwnStore(store)
             }}
-            onOpenComparison={() => navigate('basket')}
+            onOpenComparison={openOwnPriceImport}
             onBudgetChange={(nextBudget) =>
               setPreferences((current) => ({
                 ...current,
@@ -510,7 +525,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
               checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
-              onOpenComparison={() => navigate('basket')} routeOpenSignal={mixedRouteOpenSignal} />
+              onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal} />
           </div>
         )}
         {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (

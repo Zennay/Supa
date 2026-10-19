@@ -248,3 +248,5 @@
 @media(max-width:740px) {
   .mixed-store-route__unit-stores { grid-template-columns:minmax(0,1fr); }
 }
+
+#supa-own-price-import{scroll-margin-top:18px}
