@@ -5,6 +5,7 @@ import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureG
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
 import { selectiveTwoStoreCaptureCsv, selectiveTwoStoreCaptureGuide } from './selectiveTwoStoreCapture.ts'
+import { privateTwoStoreCoverageText, type CoverageExportLine } from './twoStoreCoverageExport.ts'
 import './plannerSourceMatchPreview.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
@@ -33,6 +34,8 @@ export function PlannerSourceMatchPreview({ needs, source }: {
   const [actionFilter, setActionFilter] = useState<'all' | 'choose-sku' | 'capture' | 'paired'>('all')
   const [captureMessage, setCaptureMessage] = useState('')
   const [showMobileGuide, setShowMobileGuide] = useState(false)
+  const [showActionList, setShowActionList] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
   const coverage = useMemo(() => {
     const products = Object.fromEntries(stores.map(store => [
       store, new Map(source.captures[store]?.products.map(p => [p.id, p]) ?? []),
@@ -116,6 +119,44 @@ export function PlannerSourceMatchPreview({ needs, source }: {
   }).sort((a, b) => priority(a) - priority(b) ||
     a.need.label.localeCompare(b.need.label, 'nl'))
   const shown = filtered.slice(0, showAll ? 200 : 12)
+  // Portable, non-financial next-action list for the CURRENT filters.
+  // It never saves candidate prices, guesses a SKU, or alters imports.
+  function actionListText(): string {
+    const statusFor = (line: typeof coverage[number], store: 'PLUS' | 'DekaMarkt') => {
+      if (line.manualReview[store]) return 'Kies zelf bestaande originele SKU in Vergelijk'
+      const candidate = line.suggestions[store]
+      return candidate
+        ? 'Onbevestigd bronvoorstel SKU ' + candidate.sku + ' · controleer verpakking in Vergelijk'
+        : 'Geen passende geprijsde bron-SKU · echte waarneming ontbreekt'
+    }
+    const rows: CoverageExportLine[] = filtered.map(line => ({
+      ingredientId: line.need.id,
+      ingredient: line.need.label,
+      demand: String(line.need.amount ?? 'onbekend') + ' ' + line.need.unit,
+      plusStatus: statusFor(line, 'PLUS'),
+      plusObservedAt: source.captures.PLUS?.observedAt ?? '',
+      dekaStatus: statusFor(line, 'DekaMarkt'),
+      dekaObservedAt: source.captures.DekaMarkt?.observedAt ?? '',
+    }))
+    return privateTwoStoreCoverageText(rows)
+  }
+  function downloadActionList() {
+    setActionMessage('')
+    try {
+      const output = actionListText()
+      const url = URL.createObjectURL(new Blob([output], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-gefilterde-bronmatch-controles.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setActionMessage('Actuele selectie lokaal opgeslagen. Originele prijzen zijn niet bevestigd of gewijzigd.')
+    } catch {
+      setActionMessage('Geen geldige, beperkte selectie voor export. Kies eerst fysieke ingrediënten.')
+    }
+  }
   const needsForNewSource = (store: 'PLUS' | 'DekaMarkt',
     nowMs: number): PlannerCaptureGuideNeed[] => {
     const capture = source.captures[store]
@@ -277,6 +318,25 @@ export function PlannerSourceMatchPreview({ needs, source }: {
         setOnlyMissing(false); setShowAll(false)
       }}>Toon alle ingrediënten</button>
     </div>}
+    <div className="supa-planner-source-matches__exports" aria-label="Mijn geselecteerde productcontroles meenemen">
+      <button type="button" className="ghost-button" onClick={downloadActionList}
+        disabled={!filtered.length}>
+        Download deze SKU-controles als privé TXT
+      </button>
+      <button type="button" className="ghost-button" disabled={!filtered.length}
+        aria-expanded={showActionList} onClick={() => setShowActionList(value => !value)}>
+        {showActionList ? 'Verberg kopieerbare lijst' : 'Bekijk kopieerbare SKU-controles (mobiel)'}
+      </button>
+      {showActionList && filtered.length > 0 && <label className="supa-planner-source-matches__mobile-guide">
+        Alleen de huidige filters; geen geverifieerde winkelprijzen of mandbesparing
+        <textarea readOnly rows={11} value={(() => {
+          try { return actionListText() }
+          catch { return 'Actielijst te groot of ongeldig. Verklein de selectie.' }
+        })()} onFocus={event => event.currentTarget.select()}
+          aria-label="Selecteer mijn huidige SKU-controlelijst" />
+      </label>}
+      {actionMessage && <p role="status">{actionMessage}</p>}
+    </div>
     {(pendingPlus > 0 || pendingDeka > 0) && <div className="supa-planner-source-matches__exports">
       <p><strong>Nieuwe echte bronopname vereist:</strong>
         {' '}{pendingPlus} PLUS- en {pendingDeka} DekaMarkt-regels.
