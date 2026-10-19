@@ -149,16 +149,20 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   const missing = coverage.filter(line => !line.suggestions.PLUS || !line.suggestions.DekaMarkt)
   const requiringChoice = stores.map(store =>
     coverage.filter(line => line.manualReview[store]).length)
+  const sourceKnownButUnpriced = stores.map(store =>
+    coverage.filter(line => !!line.unpricedHints[store]).length)
   // Review ambiguous existing SKUs before asking for new source capture.
   const priority = (line: typeof coverage[number]) =>
     stores.some(store => line.manualReview[store]) ? 0 :
-    stores.some(store => !line.suggestions[store]) ? 1 : 2
+    stores.some(store => line.unpricedHints[store]) ? 1 :
+    stores.some(store => !line.suggestions[store]) ? 2 : 3
   const selectedStores = storeFilter === 'both' ? stores : [storeFilter]
   const term = search.trim().normalize('NFKC').toLocaleLowerCase('nl')
   const filtered = (onlyMissing ? missing : coverage).filter(line => {
     if (term && ![
       line.need.label, line.need.id,
-      ...stores.flatMap(store => [line.suggestions[store]?.name, line.suggestions[store]?.sku]),
+      ...stores.flatMap(store => [line.suggestions[store]?.name, line.suggestions[store]?.sku,
+        line.unpricedHints[store]?.name, line.unpricedHints[store]?.sku]),
     ].some(value => value?.normalize('NFKC').toLocaleLowerCase('nl').includes(term))) return false
     if (actionFilter === 'choose-sku') return selectedStores.some(store => line.manualReview[store])
     if (actionFilter === 'capture') return selectedStores.some(store =>
@@ -179,6 +183,9 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       if (olderPairedStore === store)
         return 'Bronpaar meer dan 24 uur uiteen · oudste winkel opnieuw opnemen'
       if (line.manualReview[store]) return 'Kies zelf bestaande originele SKU in Vergelijk'
+      const incomplete = line.unpricedHints[store]
+      if (incomplete) return 'Originele mogelijke SKU ' + incomplete.sku +
+        ' (' + incomplete.reason + ') · controleer echte brondata opnieuw'
       const candidate = line.suggestions[store]
       return candidate
         ? 'Onbevestigd bronvoorstel SKU ' + candidate.sku + ' · controleer verpakking in Vergelijk'
@@ -339,6 +346,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       <strong>Volgende stappen naar een vergelijkbaar weekmandje</strong>
       <p>Nieuwe bronregels: PLUS {pendingPlus}, DekaMarkt {pendingDeka}.
         {' '}Twijfelachtige originele SKU-keuzes: PLUS {requiringChoice[0]}, DekaMarkt {requiringChoice[1]}.
+        {' '}Mogelijk bestaande SKU zonder bruikbare bronprijs/verpakking/beschikbaarheid:
+        {' '}PLUS {sourceKnownButUnpriced[0]}, DekaMarkt {sourceKnownButUnpriced[1]}.
         {' '}Kandidaten zijn nog niet definitief gecontroleerd.</p>
       <div className="supa-planner-source-matches__next-actions">
         {nextCapture && onRecapture && <button type="button" className="ghost-button"
@@ -412,7 +421,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         <strong role="columnheader">PLUS</strong>
         <strong role="columnheader">DekaMarkt</strong>
       </div>
-      {shown.map(({ need, suggestions, manualReview }) => <div className="supa-planner-source-matches__row"
+      {shown.map(({ need, suggestions, manualReview, unpricedHints }) => <div className="supa-planner-source-matches__row"
         role="row" key={need.id}>
         <span role="cell" data-store="Fysieke behoefte"><strong>{need.label}</strong>
           <small>{need.amount ?? 'Onbekend'} {need.unit}</small></span>
@@ -432,7 +441,12 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               ? 'Bronpaar >24 uur uiteen: neem deze oudste winkel opnieuw op voordat je prijzen vergelijkt'
             : manualReview[store]
               ? 'Meerdere geschikte SKU’s: kies de juiste originele verpakking zelf in Vergelijk'
-              : 'Geen geschikte geprijsde SKU in deze bron; ontbrekende bron vastleggen'}
+              : unpricedHints[store]
+                ? <>Mogelijke bestaande originele SKU: {unpricedHints[store]!.sku}
+                  <small>{unpricedHints[store]!.name} · {unpricedHints[store]!.reason}.
+                    Dit is geen beschikbare prijs of bevestigde productmatch;
+                    controleer de werkelijkheid vóór een nieuwe opname.</small></>
+                : 'Geen geschikte geprijsde SKU in deze bron; ontbrekende bron vastleggen'}
           {onReviewIngredient && (suggestions[store] || manualReview[store]) &&
             source.captures[store] &&
             recentOwnCaptureInstant(source.captures[store]!.observedAt, clock) &&
