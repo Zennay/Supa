@@ -524,8 +524,25 @@ export function OfflineReviewedWorkbench({
 
   function deleteTabCheckpoint() {
     try {
+      let ownedKey = tabCheckpointKey
+      if (window.sessionStorage.getItem(ownedKey) === null &&
+          ownedKey !== privateTabCheckpointKey) {
+        // The original global slot may contain another week's saved private
+        // prices. Only delete it when strict import admits this exact week.
+        const old = window.sessionStorage.getItem(privateTabCheckpointKey)
+        if (old) {
+          try {
+            importPrivateBasketSession({ text: old, plan, recipes, activeDays, now: Date.now() })
+            ownedKey = privateTabCheckpointKey
+          } catch { /* Never delete another week's snapshot. */ }
+        }
+      }
+      if (window.sessionStorage.getItem(ownedKey) === null) {
+        setMessage('Voor dit weekmenu bestaat geen opgeslagen privéherstelpunt.')
+        return
+      }
       if (!window.confirm('Wis het bewaarde privéherstelpunt voor dit weekmenu? Andere weken blijven onaangeroerd.')) return
-      window.sessionStorage.removeItem(tabCheckpointKey)
+      window.sessionStorage.removeItem(ownedKey)
       setMessage('Herstelpunt voor deze week gewist; andere weken en geopende winkeldata blijven intact.')
     } catch {
       setMessage('De browseropslag kon niet worden gewist. Gebruik de privacyinstellingen van je browser.')
