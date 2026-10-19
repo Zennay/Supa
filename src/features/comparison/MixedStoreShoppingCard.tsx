@@ -82,7 +82,7 @@ export function MixedStoreShoppingCard({
   }>
   const remainingProductCents = stores.reduce(
     (sum, store) => sum + perStoreProgress[store].remainingCents, 0)
-  const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents)
+  const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents, onlyOpen)
   const block = costInvalid && !chooseSingle
 
   function download() {
@@ -289,12 +289,12 @@ export function MixedStoreShoppingCard({
       <label><input type="checkbox" checked={onlyOpen}
         onChange={event => setOnlyOpen(event.currentTarget.checked)} /> Alleen nog te kopen</label>
       <button type="button" className="ghost-button" onClick={() => setChecked({})}>Wis vinkjes</button>
-      <button type="button" className="ghost-button" onClick={download}>Download gekozen route (TXT)</button>
+      <button type="button" className="ghost-button" onClick={download}>Download gekozen weergave (TXT)</button>
       <button type="button" className="ghost-button" onClick={downloadRouteCsv}>
-        Download dezelfde route met beide winkelprijzen (CSV)
+        Download volledige route met beide winkelprijzen (CSV)
       </button>
       <button type="button" className="ghost-button" onClick={downloadPrintHtml}>
-        Bewaar / print mijn gekozen route (HTML)
+        Bewaar / print volledige route (HTML)
       </button>
       <button type="button" className="ghost-button" onClick={() => {
         if (block) { setMessage('Corrigeer eerst je extra kosten.'); return }
@@ -302,6 +302,9 @@ export function MixedStoreShoppingCard({
         setShowText(value => !value)
       }}>{showText ? 'Verberg kopieerbare lijst' : 'Toon kopieerbare lijst'}</button>
     </div>
+    <small>TXT en kopieerweergave volgen 'Alleen nog te kopen'. CSV en printbare
+      HTML bewaren steeds de volledige gecontroleerde route inclusief vinkjes,
+      originele SKU’s, pakprijzen en bronmomenten.</small>
     <div className="offline-price-workbench__dates mixed-store-route__shops">
       {stores.map(store => {
         const all = plan.lines.filter(item => item.store === store)

@@ -107,6 +107,7 @@ export function formatMixedStoreShoppingPlan(
   captured: Record<MixedStore, string>,
   done: Readonly<Record<string, boolean>> = {},
   extraVisitCostCents: number | null = null,
+  onlyOpen = false,
 ): string {
   const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
   const clean = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, ' ')
@@ -114,6 +115,10 @@ export function formatMixedStoreShoppingPlan(
     'SUPA · mijn persoonlijke twee-winkel-boodschappenroute',
     'Alleen zelf ingevoerde, persoonlijk bevestigde prijsopnames.',
     'Geen actuele live winkelprijzen, bronrechten of onafhankelijk besparingsbewijs.',
+    onlyOpen ? 'Alleen nog niet-afgevinkte artikelen; hieronder staan TOTAALbedragen van de volledige oorspronkelijke winkelroute.' :
+      'Volledige gekozen winkelroute inclusief afgevinkte artikelen.',
+    'Nog niet afgevinkt: ' + money.format(plan.lines.filter(line => !done[line.key])
+      .reduce((sum, line) => sum + line.lineTotalCents, 0) / 100),
     'Niet-opgegeven reistijd, bezoekkosten en eventuele winkelkortingen zijn NIET meegenomen.',
     'PLUS opname: ' + clean(captured.PLUS),
     'DekaMarkt opname: ' + clean(captured.DekaMarkt),
@@ -138,7 +143,7 @@ export function formatMixedStoreShoppingPlan(
     ...(['PLUS','DekaMarkt'] as const).flatMap(store => [
       '',
       store + ' · ' + money.format(plan.totals[store] / 100),
-      ...plan.lines.filter(item => item.store === store).map(item =>
+      ...plan.lines.filter(item => item.store === store && (!onlyOpen || !done[item.key])).map(item =>
         (done[item.key] ? '[x] ' : '[ ] ') +
         clean(item.ingredientLabel) + ': ' + item.amount + ' ' + item.unit +
         ' → ' + item.packs + ' x ' + clean(item.productName) +
