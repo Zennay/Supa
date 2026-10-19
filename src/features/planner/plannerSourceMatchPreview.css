@@ -8,3 +8,7 @@
 .supa-planner-source-matches__row > :not(:last-child) { border-right: 1px solid #e3e9e5; }
 .supa-planner-source-matches__row small { display: block; margin-top: .2rem; }
 @media(max-width: 620px) { .supa-planner-source-matches__row { min-width: 560px; } }
+
+.supa-planner-source-matches__exports { display: grid; gap: .5rem; justify-items: start; }
+.supa-planner-source-matches__mobile-guide { display: grid !important; gap: .35rem; width: 100%; }
+.supa-planner-source-matches__mobile-guide textarea { width: 100%; max-width: 100%; font: inherit; }

@@ -29,6 +29,7 @@ export function PlannerSourceMatchPreview({ needs, source }: {
   const [showAll, setShowAll] = useState(false)
   const [onlyMissing, setOnlyMissing] = useState(false)
   const [captureMessage, setCaptureMessage] = useState('')
+  const [showMobileGuide, setShowMobileGuide] = useState(false)
   const coverage = useMemo(() => {
     const products = Object.fromEntries(stores.map(store => [
       store, new Map(source.captures[store]?.products.map(p => [p.id, p]) ?? []),
@@ -207,6 +208,21 @@ export function PlannerSourceMatchPreview({ needs, source }: {
         onClick={() => downloadMissingSourceCapture('guide')}>
         Download bijbehorende CSV-rijgids (TXT)
       </button>
+      <button type="button" className="ghost-button"
+        aria-expanded={showMobileGuide}
+        onClick={() => setShowMobileGuide(value => !value)}>
+        {showMobileGuide ? 'Verberg mobiele meeneemlijst' : 'Bekijk en kopieer mobiele meeneemlijst'}
+      </button>
+      {showMobileGuide && <label className="supa-planner-source-matches__mobile-guide">
+        Alle ontbrekende winkelregels met exacte CSV-rijnummers · alleen eigen Planner-behoefte
+        <textarea readOnly rows={11}
+          value={selectiveTwoStoreCaptureGuide({
+            PLUS: needsForNewSource('PLUS', Date.now()),
+            DekaMarkt: needsForNewSource('DekaMarkt', Date.now()),
+          })}
+          onFocus={event => event.currentTarget.select()}
+          aria-label="Selecteer mijn ontbrekende PLUS- en Deka-producten" />
+      </label>}
       <small>CSV en rijgids gebruiken dezelfde volgorde per winkel.
         Alle artikelcodes, tijden, werkelijk gemeten verpakkingen en prijzen
         moeten nog in de lege cellen worden ingevuld; dit is geen retailerbron.</small>
