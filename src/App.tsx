@@ -2,6 +2,7 @@ import { FigmaImage } from './components/FigmaImage'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
+import { PlannerPortableWeek } from './features/planner/PlannerPortableWeek.tsx'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
@@ -521,6 +522,17 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onReset={resetPlan}
           />
         )}
+        {tab === 'planner' && <PlannerPortableWeek
+          preferences={preferences}
+          days={m2InitialPlan.map(meal => meal.day)}
+          recipeIds={recipes.map(recipe => recipe.id)}
+          storageProtected={persistenceWarning !== null}
+          onRestore={next => {
+            setPreferences(next)
+            setManualWeekCopy(null)
+            setWeekCopyMessage('Weekplanning hersteld; controleer de nieuwe ingrediënten en prijsbronnen.')
+          }}
+        />}
         {tab === 'planner' && (
           <section className="week-share-panel" aria-label="Weekmenu delen">
             <div className="week-share-actions">
