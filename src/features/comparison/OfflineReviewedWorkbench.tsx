@@ -1142,7 +1142,14 @@ export function OfflineReviewedWorkbench({
   })) as Record<(typeof stores)[number], typeof plannerCaptureNeeds>
 
   async function downloadMissingPriceCapture(store: (typeof stores)[number], kind: 'csv' | 'guide') {
-    const needs = missingPriceCaptureNeeds[store]
+    // Freshness is checked again at click time; a sleeping tab must not
+    // quietly present expired observed prices as completed source coverage.
+    const capture = imported?.captures[store]
+    const nowNs = BigInt(Date.now()) * 1_000_000n
+    const sourceFresh = !!capture && nowNs >= capture.observedNs - 300_000_000_000n &&
+      nowNs - capture.observedNs <= 604_800_000_000_000n
+    const needs = !sourceFresh || olderPairCapture === store
+      ? plannerCaptureNeeds : missingPriceCaptureNeeds[store]
     if (!needs.length) return
     try {
       const text = kind === 'csv'
