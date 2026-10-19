@@ -697,7 +697,8 @@ function parsePrivateDemand(text) {
         !validText(item.id, 100) || ids.has(item.id) || !validText(item.label) ||
         !units.includes(item.unit) ||
         (item.amount !== null && (typeof item.amount !== 'number' ||
-          !Number.isFinite(item.amount) || item.amount <= 0 || item.amount > 100000)) ||
+          !Number.isFinite(item.amount) || item.amount <= 0 || item.amount > 100000 ||
+          (item.unit === 'piece' && !Number.isSafeInteger(item.amount)))) ||
         !item.productIds || typeof item.productIds !== 'object' ||
         Array.isArray(item.productIds) ||
         Object.keys(item.productIds).some(store => !stores.includes(store))) {
@@ -730,20 +731,49 @@ document.addEventListener('supa:private-planner-demand', event => {
   }
 })
 
+let demandImportRevision = 0
+const physicalDraftFingerprint = () => JSON.stringify([
+  mealCount.value,
+  Array.from(lines.children, row => [
+    row.dataset.id, row.querySelector('.label')?.value,
+    row.querySelector('.amount')?.value, row.querySelector('.unit')?.value,
+    ...stores.map(store => row.querySelector('[data-store=\"' + store + '\"]')?.value),
+  ]),
+])
 demandImport.addEventListener('change', async () => {
   const file = demandImport.files?.[0]
+  const revision = ++demandImportRevision
   if (!file) return
+  const before = physicalDraftFingerprint()
   try {
     if (!file.size || file.size > maxBytes) throw Error('Vraagbestand is te groot of leeg.')
     const saved = parsePrivateDemand(new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()))
-    // Atomic UI replacement after all content is admitted.
+    if (revision !== demandImportRevision) return
+    if (physicalDraftFingerprint() !== before) {
+      throw Error('Je mandvraag veranderde tijdens het openen. Het nieuwe bestand is niet toegepast.')
+    }
+    if (lines.children.length && !window.confirm(
+      'Vervang jouw bestaande fysieke mandvraag door ' + saved.items.length +
+      ' originele ingrediënten voor ' + saved.meals + ' geselecteerde maaltijd(en)? ' +
+      'Je bestaande productkoppelingen en afvinkingen voor dit mandje vervallen; ' +
+      'de originele eigen winkelbronprijzen blijven los bewaard.')) {
+      notice(status, 'Mandvraagimport geannuleerd. Eerdere ingrediënten en winkelproductkeuzes zijn behouden.')
+      return
+    }
+    if (revision !== demandImportRevision || physicalDraftFingerprint() !== before) return
+    // Atomic UI replacement after full schema and consent admission.
     mealCount.value = String(saved.meals)
     lines.replaceChildren()
     for (const item of saved.items) addIngredient(item)
+    invalidateUnpricedDemand()
     refresh()
-    notice(status, saved.items.length + ' ingrediënten hersteld. Kies alle PLUS- en DekaMarkt-producten opnieuw op basis van de nu geopende eigen opnames; oude productmatches zijn niet automatisch betrouwbaar.')
+    notice(status, saved.items.length + ' ingrediënten bewust hersteld. Kies alle PLUS- en DekaMarkt-producten opnieuw op basis van de nu geopende eigen opnames; oude productmatches zijn niet automatisch betrouwbaar.')
   } catch (error) {
-    notice(status, error instanceof Error ? error.message : 'Kan eerdere mandvraag niet veilig openen.', 'error')
+    if (revision === demandImportRevision) notice(status,
+      (error instanceof Error ? error.message : 'Kan eerdere mandvraag niet veilig openen.') +
+      ' De vorige mandvraag en jouw eigen bronprijzen zijn niet vervangen.', 'error')
+  } finally {
+    if (revision === demandImportRevision) demandImport.value = ''
   }
 })
 
@@ -762,8 +792,9 @@ function demand() {
     const amount = rawAmount === '' ? null : numeric(rawAmount)
     const unit = row.querySelector('.unit').value
     if (!validText(label)) throw Error('Controleer de naam van ingrediënt ' + (ingredients.length + 1) + '.')
-    if (rawAmount !== '' && amount === null) {
-      throw Error('Ongeldige hoeveelheid bij ' + label + '. Gebruik metrische positieve getallen.')
+    if (rawAmount !== '' && (amount === null ||
+        (unit === 'piece' && !Number.isSafeInteger(amount)))) {
+      throw Error('Ongeldige hoeveelheid bij ' + label + '. Losse stuks moeten hele aantallen zijn; overige hoeveelheden metrisch en positief.')
     }
     const productIds = {}
     for (const store of stores) {
