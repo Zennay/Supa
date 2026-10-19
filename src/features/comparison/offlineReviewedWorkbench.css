@@ -279,3 +279,41 @@
 .offline-manual-editor__pair-stores button[data-capture-status="unavailable"] { border-left:4px solid #a87936; }
 .offline-manual-editor__pair-stores button[data-capture-status="incompatible"] { border-left:4px solid #aa493f; }
 @media(max-width:620px) { .offline-manual-editor__pair-row { grid-template-columns:1fr; gap:.35rem; } }
+
+
+/* Original private retailer CSV preview: readable on small phones without
+   concealing a long user-entered SKU or mistaking a quote for trusted money. */
+.offline-price-workbench__capture-review {
+  background: #f5faf5; border-color: #b9d3be;
+  padding: clamp(.8rem, 2vw, 1.15rem);
+}
+.offline-price-workbench__capture-preview { display: grid; gap: .7rem; min-width: 0; }
+.offline-price-workbench__capture-preview > strong { overflow-wrap: anywhere; }
+.offline-price-workbench__capture-preview details {
+  background: #fff; border: 1px solid #d5e1d5; border-radius: 10px;
+  padding: .5rem .75rem; min-width: 0;
+}
+.offline-price-workbench__capture-preview summary {
+  cursor: pointer; font-weight: 700; min-height: 44px; overflow-wrap: anywhere;
+}
+.offline-price-workbench__capture-preview summary:focus-visible {
+  outline: 3px solid #226f52; outline-offset: 3px;
+}
+.offline-price-workbench__capture-preview ul {
+  padding-left: 1.3rem; margin: .6rem 0; min-width: 0;
+}
+.offline-price-workbench__capture-preview li {
+  padding: .6rem 0; border-bottom: 1px solid #e5ebe4;
+  overflow-wrap: anywhere; line-height: 1.5;
+}
+.offline-price-workbench__capture-preview button { min-height: 44px; }
+@media (max-width: 640px) {
+  .offline-price-workbench__capture-preview button { width: 100%; }
+}
+
+
+.offline-price-workbench__capture-alert {
+  padding: .75rem .9rem; margin: .25rem 0;
+  background: #fff6e5; color: #644211; border-left: 3px solid #af7326;
+  border-radius: 6px; font-weight: 650; overflow-wrap: anywhere;
+}
