@@ -1,15 +1,42 @@
 import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import type { SavedRecipe } from './recipeLibrary.ts'
 
-/** Same canonical recipe shape as built-ins, with no invented cost estimate. */
+/**
+ * An owned recipe may join the ordinary weekly Planner only when its entire
+ * physical demand is safe to shop for. The unpriced recipe checklist and
+ * standalone basket importer already require whole physical pieces; the normal
+ * Planner must not silently bypass that rule through local recipe storage.
+ *
+ * Rejected recipes remain editable in Mijn recepten. Never round eggs or other
+ * pieces up, invent a pack, or turn missing source measurements into a price.
+ */
 export function toPlannerRecipe(recipe: SavedRecipe): RecipeWithIngredients | null {
-  if (recipe.servings === null || recipe.minutes === null || recipe.ingredients.some(i => i.reviewReason || i.amount === null || i.unit === null)) return null
+  if (!recipe || typeof recipe !== 'object' ||
+      !Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0 ||
+      !Array.isArray(recipe.warnings) || recipe.warnings.length !== 0 ||
+      typeof recipe.servings !== 'number' || !Number.isFinite(recipe.servings) ||
+      recipe.servings <= 0 || recipe.servings > 1000 ||
+      typeof recipe.minutes !== 'number' || !Number.isFinite(recipe.minutes) ||
+      recipe.minutes <= 0 || recipe.minutes > 1440) return null
+
+  const ready = recipe.ingredients.every(ingredient => {
+    if (!ingredient || ingredient.reviewReason !== null ||
+        typeof ingredient.query !== 'string' || !ingredient.query.trim() ||
+        typeof ingredient.label !== 'string' || !ingredient.label.trim() ||
+        typeof ingredient.amount !== 'number' || !Number.isFinite(ingredient.amount) ||
+        ingredient.amount <= 0 || ingredient.amount > 1_000_000 ||
+        !['g', 'ml', 'piece'].includes(ingredient.unit ?? '')) return false
+    return ingredient.unit !== 'piece' || Number.isSafeInteger(ingredient.amount)
+  })
+  if (!ready) return null
+
   return {
     id: recipe.id, title: recipe.title, minutes: recipe.minutes, servings: recipe.servings,
     estimatedCost: Number.NaN, tags: ['Eigen recept'],
-    ingredients: recipe.ingredients.map(i => ({
-      id: `own-ingredient:${i.query}:${i.unit}`, label: i.label, query: i.query,
-      amount: i.amount, unit: i.unit ?? 'unknown',
+    ingredients: recipe.ingredients.map(ingredient => ({
+      id: `own-ingredient:${ingredient.query}:${ingredient.unit}`,
+      label: ingredient.label, query: ingredient.query,
+      amount: ingredient.amount, unit: ingredient.unit ?? 'unknown',
     })),
   }
 }
