@@ -274,3 +274,21 @@
   .own-store-planner__history { padding: .8rem; }
   .own-store-planner__history-actions button { flex-basis: 100%; }
 }
+
+/* Keep the historic store/changed-product filters operable at phone widths. */
+.own-store-planner__history .own-store-planner__history-check {
+  display: flex;
+  flex: 1 1 12rem;
+  gap: .55rem;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.own-store-planner__history-check input[type=checkbox] {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+}
+.own-store-planner__history td > div { margin-bottom: .25rem; }
+.own-store-planner__history td > strong { display: inline-block; margin: .1rem 0; }

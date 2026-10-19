@@ -54,6 +54,8 @@ export function PrivateOwnReceiptHistory() {
   const [result, setResult] = useState<HistoricalReceiptResult | null>(null)
   const [status, setStatus] = useState('')
   const [query, setQuery] = useState('')
+  const [storeFilter, setStoreFilter] = useState<'all' | ReceiptStore>('all')
+  const [changedOnly, setChangedOnly] = useState(false)
   const [busy, setBusy] = useState(false)
   const version = useRef(0)
   const earlierPicker = useRef<HTMLInputElement>(null)
@@ -65,6 +67,8 @@ export function PrivateOwnReceiptHistory() {
     setFiles(previous => index === 0 ? [file, previous[1]] : [previous[0], file])
     setResult(null)
     setQuery('')
+    setChangedOnly(false)
+    setStoreFilter('all')
     setBusy(false)
     setStatus('Bestanden gewijzigd; vergelijk opnieuw. Eerdere bedragen zijn uit dit scherm gewist.')
   }
@@ -75,6 +79,8 @@ export function PrivateOwnReceiptHistory() {
     setFiles([null, null])
     setResult(null)
     setQuery('')
+    setChangedOnly(false)
+    setStoreFilter('all')
     setBusy(false)
     setStatus('Beide privérapporten en de afgeleide prijsverschillen uit dit scherm gewist.')
   }
@@ -116,10 +122,14 @@ export function PrivateOwnReceiptHistory() {
   }
   const ready = result?.status === 'ready' ? result : null
   const term = query.normalize('NFKC').trim().toLocaleLowerCase('nl')
-  const visible = ready?.rows.filter(row => !term || [
-    row.ingredient, row.old.PLUS.sourceProductId, row.old.PLUS.sourceProductName,
-    row.old.DekaMarkt.sourceProductId, row.old.DekaMarkt.sourceProductName,
-  ].some(value => value.normalize('NFKC').toLocaleLowerCase('nl').includes(term))) ?? []
+  const shownStores = storeFilter === 'all' ? STORES : [storeFilter]
+  const visible = ready?.rows.filter(row =>
+    (!changedOnly || shownStores.some(store => row.changeCents[store] !== null &&
+      row.changeCents[store] !== 0)) &&
+    (!term || [
+      row.ingredient, row.old.PLUS.sourceProductId, row.old.PLUS.sourceProductName,
+      row.old.DekaMarkt.sourceProductId, row.old.DekaMarkt.sourceProductName,
+    ].some(value => value.normalize('NFKC').toLocaleLowerCase('nl').includes(term)))) ?? []
 
   return <details className="own-store-planner__archive own-store-planner__history">
     <summary>Vergelijk de prijzen uit twee eerdere eigen winkelrapporten</summary>
@@ -163,19 +173,38 @@ export function PrivateOwnReceiptHistory() {
           </section>
         })}
       </div>
-      <label>Zoek ingrediënt of SKU in historische resultaten
-        <input type="search" value={query} maxLength={120}
-          onChange={event => setQuery(event.currentTarget.value)} />
-      </label>
-      <p>{visible.length} van {ready.rows.length} vergelijkbare ingrediënten getoond.
-        Deze zoekfilter verandert de mandbedragen niet.</p>
+      <div className="own-store-planner__archive-filters">
+        <label>Zoek ingrediënt of SKU
+          <input type="search" value={query} maxLength={120}
+            onChange={event => setQuery(event.currentTarget.value)} />
+        </label>
+        <label>Bekijk winkel
+          <select value={storeFilter} onChange={event =>
+            setStoreFilter(event.currentTarget.value as typeof storeFilter)}>
+            <option value="all">Beide winkels</option>
+            <option value="PLUS">PLUS</option>
+            <option value="DekaMarkt">DekaMarkt</option>
+          </select>
+        </label>
+        <label className="own-store-planner__history-check">
+          <input type="checkbox" checked={changedOnly}
+            onChange={event => setChangedOnly(event.currentTarget.checked)} />
+          Alleen werkelijk gewijzigde prijzen
+        </label>
+      </div>
+      <p role="status">{visible.length} van {ready.rows.length} vergelijkbare ingrediënten getoond.
+        Zoeken en filteren veranderen de oorspronkelijke mandbedragen niet.</p>
       <div className="own-store-planner__scroll" role="region"
         aria-label="Vergelijking historisch prijsverschil per product" tabIndex={0}>
-        <table><thead><tr><th>Ingrediënt</th><th>PLUS</th><th>DekaMarkt</th></tr></thead>
+        <table><thead><tr><th>Ingrediënt</th>{shownStores.map(store =>
+          <th key={store}>{store} · eerder → later</th>)}</tr></thead>
           <tbody>{visible.map(row => <tr key={row.ingredientId}>
             <th scope="row">{row.ingredient}</th>
-            {STORES.map(store => <td key={store}>
+            {shownStores.map(store => <td key={store}>
               <div>{row.old[store].sourceProductName} · {row.old[store].sourceProductId}</div>
+              {row.changeCents[store] !== null &&
+                <div>{amount(row.old[store].totalWholePackagesCents)} → {' '}
+                  {amount(row.later[store].totalWholePackagesCents)}</div>}
               <strong>{movement(row.changeCents[store])}</strong>
               {row.changeCents[store] === null && <small>Andere SKU of verpakking</small>}
             </td>)}
