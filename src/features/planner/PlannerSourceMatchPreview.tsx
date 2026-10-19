@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { matchIngredient, type MatchUnit } from '../../domain/matching.ts'
+import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { OfflinePriceSnapshots, OfflineRetailer, OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
@@ -17,7 +18,7 @@ const family = (unit: string): 'mass' | 'volume' | 'piece' | null =>
 type Suggestion = {
   name: string; sku: string
   packCount: number; packAmount: number; packUnit: string
-  packCents: number; unitRate: string | null
+  packCents: number; unitRate: string | null; packsNeeded: number
 } | null
 type UnpricedHint = { name: string; sku: string; reason: string } | null
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -131,6 +132,16 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           match.packAmount !== null && family(match.packUnit) === family(need.unit)
           ? (() => {
               const count = match.packCount ?? 1
+              // The *same* exact decimal ceiling used by the canonical
+              // basket engine. This is only a per-ingredient shopping hint:
+              // shared SKUs across ingredients are aggregated downstream.
+              if (need.unit === 'piece' && !Number.isSafeInteger(need.amount)) return null
+              const packsNeeded = calculateDecimalPackCount(
+                [{ amount: need.amount, unit: need.unit as MatchUnit }],
+                { amount: match.packAmount!, unit: match.packUnit, count },
+              )
+              if (packsNeeded === null ||
+                  !Number.isSafeInteger(packsNeeded * match.sourcePriceCents)) return null
               const rate = privatePackUnitRate({
                 amount: match.packAmount, unit: match.packUnit,
                 count, priceCents: match.sourcePriceCents,
@@ -138,7 +149,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               return { name: match.name, sku: match.id,
                 packCount: count, packAmount: match.packAmount,
                 packUnit: match.packUnit, packCents: match.sourcePriceCents,
-                unitRate: rate ? formatPrivateUnitRate(rate) : null }
+                unitRate: rate ? formatPrivateUnitRate(rate) : null, packsNeeded }
             })() : null
       }
       return { need, suggestions, manualReview, unpricedHints }
@@ -434,7 +445,10 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               {' '}{money.format(suggestions[store]!.packCents / 100)}
               {suggestions[store]!.unitRate
                 ? ' · informatief ' + suggestions[store]!.unitRate : ''}
-              {' '}· bronmoment niet automatisch gevalideerd</small></>
+              {' '}· bronmoment niet automatisch gevalideerd</small>
+            <small>{suggestions[store]!.packsNeeded} hele verpakking(en) voor
+              alleen dit ingrediënt volgens exacte metrische behoefte;
+              {' '}niet bevestigd, gedeelde producten pas in Vergelijk samenvoegen.</small></>
             : source.captures[store] &&
               !recentOwnCaptureInstant(source.captures[store]!.observedAt, clock)
               ? 'Verlopen of toekomstige bron: geen actueel geprijsd voorstel; leg een echte nieuwe opname vast'
