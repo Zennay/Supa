@@ -364,7 +364,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       <div className="content">
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed}
-            onOpenComparison={() => navigate('basket')} onOpenList={() => navigate('list')} />
+            onOpenComparison={() => navigate('basket')}
+            onOpenList={(store) => {
+              if (store) setPreferredOwnStore(store)
+              navigate('list')
+            }} />
         </Suspense>}
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}

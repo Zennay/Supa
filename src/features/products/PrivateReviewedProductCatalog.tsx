@@ -12,7 +12,7 @@ type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOpenList }: {
   reviewed: PrivateReviewedBaskets | null
   onOpenComparison: () => void
-  onOpenList: () => void
+  onOpenList: (store?: OwnStore) => void
 }) {
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
@@ -50,7 +50,9 @@ export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOp
         <small>{money.format(line.pricePerPackCents / 100)} per verpakking · {privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'}</small>
       </article>)}</div>
       {!visible.length && <p>Geen producten gevonden voor deze selectie.</p>}
-      <button type="button" onClick={onOpenList}>Mijn gecontroleerde boodschappenlijst</button>
+      <button type="button" onClick={() => onOpenList(store === 'all' ? undefined : store)}>
+        {store === 'all' ? 'Open mijn gecontroleerde boodschappenlijst' : `Open mijn ${store}-boodschappenlijst`}
+      </button>
     </>}
     <button type="button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>
     <small>Ontbrekende of verlopen bronproducten krijgen nooit een verzonnen prijs.</small>
