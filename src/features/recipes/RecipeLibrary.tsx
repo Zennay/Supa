@@ -568,7 +568,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('plain'); setError('') }}>Plak gewone recepttekst</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
         : mode === 'plain' ? <form className="recipe-form" onSubmit={importPlainText}>
           <p>Plak een zelf verkregen recept, ook als Markdown uit een notitie of website.
-            Koppen als Ingrediënten, Benodigdheden, Bereiding of Zo maak je het worden herkend,
+            Nederlandse en Engelse koppen zoals Ingrediënten, Ingredients, Bereiding, Method en Directions worden herkend,
             net als lijstjes en genummerde stappen. Porties en tijd zijn optioneel;
             ontbrekende of onduidelijke hoeveelheden blijven ter controle staan.
             De omzetting blijft lokaal, zonder website- of prijsverzoek.</p>

@@ -13,19 +13,22 @@ function headingText(line: string): string {
 
 function recognizedSection(line: string): 'ingredients' | 'steps' | null {
   const heading = headingText(line).toLocaleLowerCase('nl')
-  if (/^(?:ingredi[eë]nten|benodigdheden|wat heb je nodig)(?:\s+(?:voor\s+)?\d{1,4}\s*(?:personen|porties))?$/u.test(heading)) return 'ingredients'
-  if (/^(?:bereiding|bereidingswijze|instructies|stappen|werkwijze|zo maak je het)(?:\s*\(?(?:ca\.?\s*)?\d{1,4}\s*(?:min(?:uten)?|uur)\)?)?$/u.test(heading)) return 'steps'
+    .replace(/[?!]$/u, '').replace(/[()]/gu, '').trim()
+  if (/^(?:ingredi[eë]nten|benodigdheden|wat heb je nodig|ingredients|what you need)(?:\s+(?:(?:voor|for|serves?)\s+)?\d{1,4}\s*(?:personen|porties|servings?|people)?)?$/u.test(heading)) return 'ingredients'
+  if (/^(?:bereiding|bereidingswijze|instructies|stappen|werkwijze|zo maak je het|method|directions|instructions|steps|preparation|how to make it)(?:\s+(?:(?:ca\.?|approx\.?|about)\s*)?\d{1,4}\s*(?:min(?:uten)?|mins?|minutes?|uur|hours?))?$/u.test(heading)) return 'steps'
   return null
 }
 
 function headerNumber(line: string, kind: 'servings' | 'minutes'): number | null {
   const normalized = headingText(line)
   const match = kind === 'servings'
-    ? /^(?:(?:aantal\s+)?porties|personen|voor)\s*:?\s*(\d{1,4})(?:\s*(?:personen|porties))?$/iu.exec(normalized)
-    : /^(?:tijd|bereidingstijd|totale\s+tijd|klaar\s+in|minuten)\s*:?\s*(\d{1,4})(?:\s*(?:minuten|min))?$/iu.exec(normalized)
+    ? /^(?:(?:aantal\s+)?porties|personen|voor|servings?|serves?|yield|for)\s*:?\s*(\d{1,4})(?:\s*(?:personen|porties|servings?|people))?$/iu.exec(normalized)
+    : /^(?:tijd|bereidingstijd|totale\s+tijd|klaar\s+in|minuten|time|prep(?:aration)?\s+time|cook(?:ing)?\s+time|total\s+time|ready\s+in)\s*:?\s*(\d{1,4})(?:\s*(min(?:uten)?|mins?|minutes?|uur|hours?))?$/iu.exec(normalized)
   if (!match) return null
-  const value = Number(match[1])
-  return Number.isSafeInteger(value) && value > 0 ? value : null
+  const value = Number(match[1]) *
+    (kind === 'minutes' && /^(?:uur|hours?)$/iu.test(match[2] ?? '') ? 60 : 1)
+  return Number.isSafeInteger(value) && value > 0 &&
+    (kind === 'minutes' ? value <= 1440 : value <= 1000) ? value : null
 }
 
 /**
@@ -54,11 +57,15 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
     if (!original || /^---+$/u.test(original)) continue
     const sectionHeading = recognizedSection(original)
     if (sectionHeading) {
-      const count = /\b(?:voor\s+)?(\d{1,4})\s*(?:personen|porties)\s*$/iu.exec(headingText(original))
-      if (sectionHeading === 'ingredients' && count && servings === null) servings = Number(count[1])
-      const duration = /(?:ca\.?\s*)?(\d{1,4})\s*(min(?:uten)?|uur)\)?$/iu.exec(headingText(original))
+      const caption = headingText(original).replace(/[()]/gu, '').trim()
+      const count = /\b(?:(?:voor|for|serves?)\s+)?(\d{1,4})\s*(?:personen|porties|servings?|people)?\s*$/iu.exec(caption)
+      if (sectionHeading === 'ingredients' && count && servings === null) {
+        const value = Number(count[1])
+        if (value > 0 && value <= 1000) servings = value
+      }
+      const duration = /(?:(?:ca\.?|approx\.?|about)\s*)?(\d{1,4})\s*(min(?:uten)?|mins?|minutes?|uur|hours?)\s*$/iu.exec(caption)
       if (sectionHeading === 'steps' && duration && minutes === null) {
-        const value = Number(duration[1]) * (duration[2] === 'uur' ? 60 : 1)
+        const value = Number(duration[1]) * (/^(?:uur|hours?)$/iu.test(duration[2]) ? 60 : 1)
         if (value > 0 && value <= 1440) minutes = value
       }
       section = sectionHeading
