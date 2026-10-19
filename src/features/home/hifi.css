@@ -279,3 +279,16 @@ body { background: #e9eeec; }
   .hifi-shopping-thumb { width: 42px; height: 42px; }
   .hifi-shopping-price { grid-column: 3; justify-self: start; font-size: 12px; }
 }
+
+/* Keep secondary prototype selections out of the primary Figma shoplist frame. */
+.hifi-demo-details { margin: 4px 0 26px; }
+.hifi-demo-details > summary {
+  display: flex; align-items: center; min-height: 44px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: #4f7262;
+}
+.hifi-demo-details .hifi-demo-list { margin: 0 0 12px; }
+@media (max-width: 390px) {
+  .hifi-products .hifi-search { gap: 12px; }
+  .hifi-products .hifi-search input { font-size: 14px; }
+  .hifi-products .hifi-product-grid { margin: 0 -4px; }
+}
