@@ -638,6 +638,39 @@ export function OfflineReviewedWorkbench({
       setMessage(error instanceof Error ? error.message : 'Ongeldige import.')
     }
   }
+  /** Paste CSV straight from the user's own sheet; still use canonical
+   * source admission and require every original SKU/price to be reviewed. */
+  async function importPastedSource() {
+    const raw = text
+    const version = ++importRevision.current
+    if (!raw.trim() || raw.trimStart().startsWith('{')) {
+      importSnapshots(raw)
+      return
+    }
+    setBusy(true)
+    try {
+      const converterUrl = '/offline-two-store-csv.mjs'
+      const module: unknown = await import(/* @vite-ignore */ converterUrl)
+      if (!module || typeof module !== 'object' ||
+          !('convertOwnStoreCsv' in module) ||
+          typeof module.convertOwnStoreCsv !== 'function') {
+        throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
+      }
+      const normalized = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      parseOfflinePriceSnapshots(normalized, Date.now())
+      if (version !== importRevision.current) return
+      setText(normalized)
+      importSnapshots(normalized)
+      setMessage('Geplakte eigen winkel-CSV lokaal omgezet. Controleer nu per ingrediënt de originele SKU, verpakking en prijs; niets is automatisch goedgekeurd.')
+    } catch (error) {
+      if (version !== importRevision.current) return
+      setMessage((error instanceof Error ? error.message : 'CSV kon niet worden verwerkt.') +
+        ' Corrigeer je geplakte brongegevens. Er zijn geen prijzen verzonnen.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
+    }
+  }
+
   async function loadSelectedSources(files: File[]) {
     if (files.length === 0) return
     if (files.length === 1) {
@@ -1400,7 +1433,7 @@ export function OfflineReviewedWorkbench({
             <small>De al gecontroleerde oorspronkelijke winkel blijft bewaard. Nieuwe producten moet je zelf bevestigen; er wordt geen tweede winkel verzonnen.</small>
           </label>
         )}
-        <label>Of plak je eigen winkelopname(s) als JSON
+        <label>Of plak je eigen winkelopname(s) als CSV of JSON
           <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
@@ -1415,10 +1448,9 @@ export function OfflineReviewedWorkbench({
         </label>
         <div className="offline-price-workbench__actions">
           <button type="button" disabled={busy || !text.trim()} onClick={() => {
-            importRevision.current += 1
-            importSnapshots(text)
+            void importPastedSource()
           }}>
-            Bereken mandjes
+            Importeer CSV/JSON en bereken mandjes
           </button>
           <button type="button" className="ghost-button" disabled={!imported || busy} onClick={downloadOwnSources}>
             Download mijn originele bronopnames (JSON)
