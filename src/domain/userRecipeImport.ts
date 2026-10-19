@@ -220,12 +220,17 @@ function locateRecipe(value: unknown, depth = 0): Record<string, unknown> | null
  * Parse already-retrieved HTML. This function performs NO network operations.
  * Its caller must enforce SSRF, redirect, private-IP, size and time limits.
  */
-export function importRecipeFromHtml(html: string, sourceUrl: string): UserRecipeDraft {
+export function importRecipeFromHtml(html: string, sourceUrl: string | null = null): UserRecipeDraft {
   if (typeof html !== 'string' || !html || html.length > MAX_HTML) throw new Error('HTML ontbreekt of is te groot')
-  let parsedUrl: URL
-  try { parsedUrl = new URL(sourceUrl) } catch { throw new Error('Ongeldige receptlink') }
-  if (parsedUrl.protocol !== 'https:' || !parsedUrl.hostname || parsedUrl.username || parsedUrl.password) {
-    throw new Error('Alleen publieke HTTPS-receptlinks zijn toegestaan')
+  // A local JSON-LD/HTML file does not need a fabricated public source URL.
+  // When a URL is supplied it must still meet the exact server/import contract.
+  let parsedUrl: URL | null = null
+  if (sourceUrl) {
+    try { parsedUrl = new URL(sourceUrl) } catch { throw new Error('Ongeldige receptlink') }
+    if (parsedUrl.protocol !== 'https:' || !parsedUrl.hostname ||
+        parsedUrl.username || parsedUrl.password) {
+      throw new Error('Alleen publieke HTTPS-receptlinks zijn toegestaan')
+    }
   }
   const script = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
   let match: RegExpExecArray | null
@@ -240,7 +245,7 @@ export function importRecipeFromHtml(html: string, sourceUrl: string): UserRecip
     const lines = ingredients.map(item => typeof item === 'string' ? item : record(item) ? text(item.name) : '').filter(Boolean)
     if (!lines.length) throw new Error('Geen herkenbare ingrediënten; vul het recept handmatig in')
     return normalizedDraft({
-      source: 'url', sourceUrl: parsedUrl.toString(),
+      source: parsedUrl ? 'url' : 'manual', sourceUrl: parsedUrl?.toString() ?? null,
       title: recipe.name,
       servings: recipeServings(recipe.recipeYield),
       minutes: recipeMinutes(recipe.totalTime) ?? recipeMinutes(recipe.cookTime),

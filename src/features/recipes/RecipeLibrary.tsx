@@ -466,11 +466,12 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <button type="button" onClick={() => { setMode('manual'); setError('') }}>Handmatig toevoegen</button>
         </form>
         : mode === 'paste' ? <form className="recipe-form" onSubmit={importPastedRecipe}>
-          <p>Plak JSON-LD met schema.org/Recipe of de HTML-broncode van een receptpagina
-            die je zelf rechtmatig hebt ontvangen. Supa leest alleen lokaal: er wordt geen link
-            geopend, geen website opgevraagd en geen code uitgevoerd.</p>
-          <label>Oorspronkelijke openbare HTTPS-receptlink (alleen als bronvermelding)
-            <input required type="url" placeholder="https://…" value={url}
+          <p>Importeer je eigen JSON-LD met schema.org/Recipe of lokaal bewaarde HTML.
+            Een oorspronkelijke publieke HTTPS-link is optioneel voor bronvermelding.
+            Zonder link blijft dit een privé, handmatig toegevoegd recept.
+            Supa verwerkt alles lokaal: geen websitebezoek of uitvoering van code.</p>
+          <label>Optionele openbare HTTPS-bronlink (alleen bronvermelding)
+            <input type="url" placeholder="https://…" value={url}
               onChange={event => setUrl(event.target.value)} />
           </label>
           <label>Lokaal receptbestand (HTML of JSON-LD, maximaal 500 kB)
