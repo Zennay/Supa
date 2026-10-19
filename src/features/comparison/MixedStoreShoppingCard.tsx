@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import type { OneStoreBasket } from '../../domain/basket.ts'
+import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket.ts'
+import type { PlannedMeal } from '../../domain/types.ts'
 import type { MixedStoreShoppingPlan, MixedStore } from './mixedStoreShoppingPlan.ts'
 import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
@@ -17,6 +18,7 @@ const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
  */
 export function MixedStoreShoppingCard({
   mixed, single, plus, deka, captured, eligibleNow, weekBudget,
+  plannerPlan, plannerRecipes, plannerActiveDays,
 }: {
   mixed: MixedStoreShoppingPlan
   single: MixedStoreShoppingPlan
@@ -25,6 +27,9 @@ export function MixedStoreShoppingCard({
   captured: Record<MixedStore, string>
   eligibleNow: () => boolean
   weekBudget?: number
+  plannerPlan?: PlannedMeal[]
+  plannerRecipes?: RecipeWithIngredients[]
+  plannerActiveDays?: string[]
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [onlyOpen, setOnlyOpen] = useState(false)
@@ -88,6 +93,40 @@ export function MixedStoreShoppingCard({
     (sum, store) => sum + perStoreProgress[store].remainingCents, 0)
   const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents, onlyOpen)
   const block = costInvalid && !chooseSingle
+
+  async function importPlannerChecks() {
+    if (!plannerPlan || !plannerRecipes || !plannerActiveDays) return
+    if (!eligibleNow()) {
+      setMessage('Controleer eerst de actuele originele bronopnames.')
+      return
+    }
+    try {
+      const { unpricedWeekToReviewedTicks } = await import('../shopping-list/unpricedWeekToReviewedTicks.ts')
+      const source = unpricedWeekToReviewedTicks({
+        plan: plannerPlan, recipes: plannerRecipes, activeDays: plannerActiveDays,
+        basket: plus, read: key => window.sessionStorage.getItem(key),
+      })
+      if (!source.checkedIds.length) {
+        setMessage('Geen afvinkingen uit dit exacte ongeprijsde weekmenu gevonden in deze browsertab.')
+        return
+      }
+      if (!window.confirm('Neem ' + source.checkedIds.length +
+        ' fysieke Planner-vinkjes over naar de huidige route? Je bevestigt geen winkels, prijzen of betalingen.')) return
+      if (!eligibleNow()) throw Error('Deze bronopnames zijn inmiddels verlopen.')
+      const latest = unpricedWeekToReviewedTicks({
+        plan: plannerPlan, recipes: plannerRecipes, activeDays: plannerActiveDays,
+        basket: plus, read: key => window.sessionStorage.getItem(key),
+      })
+      if (JSON.stringify(latest.checkedIds) !== JSON.stringify(source.checkedIds))
+        throw Error('De Planner-vinkjes zijn ondertussen gewijzigd.')
+      const allowed = new Set(source.checkedIds)
+      setChecked(before => ({ ...before, ...Object.fromEntries(plan.lines
+        .filter(line => allowed.has(line.id)).map(line => [key(line.key), true])) }))
+      setMessage('Fysieke Planner-vinkjes voor deze route overgenomen; prijsreviews blijven onafhankelijk.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Kon de Planner-vinkjes niet overnemen.')
+    }
+  }
 
   function download() {
     if (block) {
@@ -292,6 +331,10 @@ export function MixedStoreShoppingCard({
     <div className="offline-price-workbench__actions">
       <label><input type="checkbox" checked={onlyOpen}
         onChange={event => setOnlyOpen(event.currentTarget.checked)} /> Alleen nog te kopen</label>
+      {plannerPlan && plannerRecipes && plannerActiveDays && <button type="button"
+        className="ghost-button" onClick={() => { void importPlannerChecks() }}>
+        Neem ongeprijsde Planner-vinkjes over
+      </button>}
       <button type="button" className="ghost-button" onClick={() => setChecked({})}>Wis vinkjes</button>
       <button type="button" className="ghost-button" onClick={download}>Download gekozen weergave (TXT)</button>
       <button type="button" className="ghost-button" onClick={downloadRouteCsv}>

@@ -339,7 +339,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
             <MixedStoreShoppingCard key={pairIdentity ?? ''} mixed={mixed} single={single}
               plus={plus.basket} deka={deka.basket}
               captured={{ PLUS: plus.observedAt, DekaMarkt: deka.observedAt }}
-              eligibleNow={pairCurrentNow} weekBudget={budget} />
+              eligibleNow={pairCurrentNow} weekBudget={budget}
+              plannerPlan={plan} plannerRecipes={recipes} plannerActiveDays={activeDays} />
           </Suspense>}
         </div>
       </section>}
