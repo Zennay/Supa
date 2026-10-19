@@ -171,3 +171,22 @@
   outline: 3px solid #246b50;
   outline-offset: 2px;
 }
+
+/* Progress-only subtotal of personally admitted SKU lines; it must never
+   look like the complete basket total or claim an entire-shop winner. */
+.own-store-planner__partial-amount {
+  display: grid;
+  gap: .55rem;
+  margin: .65rem 0;
+  padding: .8rem;
+  border: 1px dashed #9baea2;
+  border-radius: 10px;
+  background: #f5f8f5;
+  line-height: 1.5;
+}
+.own-store-planner__partial-amount > strong {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+.own-store-planner__partial-amount small { display: block; color: #405948; }
+.own-store-planner__partial-amount button { min-height: 44px; }
