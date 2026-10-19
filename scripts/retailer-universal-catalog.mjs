@@ -45,14 +45,45 @@ function safeId(value) {
   return typeof value === 'string' && /^[a-zA-Z0-9._-]{1,160}$/.test(value)
 }
 
+// Direct catalog consumers do not pass through the six retailer adapters.
+// Bind each observation to the same explicitly reviewed offline host/route;
+// never turn a plausible but unrelated URL into retailer price provenance.
+function verifiedRetailerSourceUrl(raw, supermarket, kind) {
+  const host = { plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' }[supermarket]
+  if (typeof raw !== 'string' || !host ||
+      !['product', 'catalog', 'offers'].includes(kind)) {
+    return false
+  }
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'https:' || url.hostname !== host ||
+        url.username || url.password || url.port || url.search || url.hash) {
+      return false
+    }
+    const route = supermarket === 'plus'
+      ? { product: '/product/', catalog: '/producten', offers: '/aanbiedingen' }[kind]
+      : { product: '/producten/', catalog: '/producten/', offers: '/aanbiedingen' }[kind]
+    const pathMatches = kind === 'product' || (supermarket === 'dekamarkt' && kind === 'catalog')
+      ? url.pathname.startsWith(route) && url.pathname.length > route.length
+      : url.pathname === route || url.pathname.startsWith(route + '/')
+    if (!pathMatches) return false
+    // WHATWG normalizes an explicit default HTTPS port; tolerate ONLY the
+    // existing reviewed :443 spelling, never loose percent/host/port aliases.
+    return raw === url.href ||
+      raw === url.href.replace('https://' + host + '/', 'https://' + host + ':443/')
+  } catch {
+    return false
+  }
+}
+
 function normalizedObservation(value) {
   validateRawProductObservation(value)
   if (!safeId(value.sourceProductId)) throw new Error('Unsafe/missing retail product identity')
   // A direct caller must not bypass source trust by providing a structurally
   // valid yet credential-bearing URL, impossible clock or unsafe money value.
-  const origin = new URL(value.provenance.url)
-  if (origin.username || origin.password || origin.hash ||
-      origin.port || origin.searchParams.has('access_token')) {
+  if (!verifiedRetailerSourceUrl(
+    value.provenance.url, value.supermarket, value.provenance.kind,
+  )) {
     throw new Error('Untrusted retailer capture source URL')
   }
   // Strict direct API admission: Date.parse alone normalizes impossible
