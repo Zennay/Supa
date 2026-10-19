@@ -45,7 +45,7 @@ function attributeSavingsEffectsTrusted({
   comparison,
   evidence,
 }: {
-  comparison: AttributionComparison
+  comparison: BasketComparison
   evidence: unknown
 }): SavingsAttribution {
   // Direct JS/persisted JSON callers can bypass BasketComparison's TS type.
@@ -474,7 +474,15 @@ function ownDataRecord(
   try {
     for (const field of fields) {
       const property = Object.getOwnPropertyDescriptor(value, field)
-      if (!property || !('value' in property)) return null
+      // Missing fields are copied as own undefined data, never inherited:
+      // the existing financial validator can then give the right refusal
+      // reason. Accessor properties remain unsafe even if they return
+      // undefined, so never evaluate them.
+      if (!property) {
+        snapshot[field] = undefined
+        continue
+      }
+      if (!('value' in property)) return null
       snapshot[field] = property.value
     }
   } catch {
@@ -503,61 +511,25 @@ function ownDataArray(value: unknown): unknown[] | null {
   }
 }
 
-// The attribution engine consumes only these fields. Keep the runtime
-// snapshot typed to this narrow financial projection instead of forcing an
-// arbitrary record through an unverified BasketComparison cast.
-type AttributionComparison = Pick<BasketComparison,
-  'claimable' | 'reasons' | 'deltaCents' |
-  'baselineTotalCents' | 'candidateTotalCents' |
-  'outcome' | 'savingsCents'
-> & {
-  lineDeltas: Array<Pick<BasketComparison['lineDeltas'][number],
-    'id' | 'deltaCents' | 'baselineLineTotalCents' | 'candidateLineTotalCents'>>
-}
-
-function isFinancialComparison(value: Record<string, unknown>): value is Record<string, unknown> & AttributionComparison {
-  return (
-    typeof value.claimable === 'boolean' &&
-    Array.isArray(value.reasons) &&
-    value.reasons.every((reason: unknown) => typeof reason === 'string') &&
-    Number.isSafeInteger(value.baselineTotalCents) &&
-    Number.isSafeInteger(value.candidateTotalCents) &&
-    (value.deltaCents === null || Number.isSafeInteger(value.deltaCents)) &&
-    (value.savingsCents === null || Number.isSafeInteger(value.savingsCents)) &&
-    (value.outcome === 'better' || value.outcome === 'same' ||
-      value.outcome === 'worse' || value.outcome === 'unknown') &&
-    Array.isArray(value.lineDeltas) &&
-    value.lineDeltas.every((line: unknown) => {
-      if (!line || typeof line !== 'object' || Array.isArray(line)) return false
-      const row = line as Record<string, unknown>
-      return typeof row.id === 'string' &&
-        Number.isSafeInteger(row.deltaCents) &&
-        Number.isSafeInteger(row.baselineLineTotalCents) &&
-        Number.isSafeInteger(row.candidateLineTotalCents)
-    })
-  )
-}
-
-// Distinguish an executable claimed outcome from ordinary malformed data
-// without ever invoking an accessor or exposing its error text.
-const ROOT_CLAIM_ACCESSOR = Symbol('unsafe claimed financial outcome')
+const ROOT_CLAIM_ACCESSOR = Symbol('M3 root claim accessor')
 
 function snapshotFinancialInputs(input: unknown): {
-  comparison: AttributionComparison
+  comparison: BasketComparison
   evidence: unknown
 } | typeof ROOT_CLAIM_ACCESSOR | null {
   const args = ownDataRecord(input, ['comparison', 'evidence'])
   if (!args) return null
+  // An accessor-backed outcome or savings field is an invalid financial
+  // assertion. Preserve the established customer-facing mismatch reason,
+  // without accessing either property or any prototype.
   if (args.comparison && typeof args.comparison === 'object' &&
       !Array.isArray(args.comparison)) {
     try {
       for (const field of ['outcome', 'savingsCents']) {
-        const descriptor = Object.getOwnPropertyDescriptor(args.comparison, field)
-        if (descriptor && !('value' in descriptor)) return ROOT_CLAIM_ACCESSOR
+        const fact = Object.getOwnPropertyDescriptor(args.comparison, field)
+        if (fact && !('value' in fact)) return ROOT_CLAIM_ACCESSOR
       }
-    } catch {
-      return null
-    }
+    } catch { return null }
   }
   const comparison = ownDataRecord(args.comparison, [
     'claimable', 'reasons', 'deltaCents', 'lineDeltas',
@@ -578,17 +550,16 @@ function snapshotFinancialInputs(input: unknown): {
   }
   comparison.reasons = reasons
   comparison.lineDeltas = safeRows
-  if (!isFinancialComparison(comparison)) return null
 
   if (!Array.isArray(args.evidence)) {
-    return { comparison, evidence: args.evidence }
+    return { comparison: comparison as BasketComparison, evidence: args.evidence }
   }
   const items = ownDataArray(args.evidence)
   if (!items) return null
   const safeItems: unknown[] = []
   for (const item of items) {
-    // Malformed JSON data is not executable. Let the trusted validator give
-    // the useful missing-item reason instead of silently losing it.
+    // Preserve ordinary malformed JSON records for the existing detailed
+    // error reporting. Invalid primitives cannot contain executable accessors.
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
       safeItems.push(null)
       continue
@@ -599,7 +570,7 @@ function snapshotFinancialInputs(input: unknown): {
     if (!record) return null
     safeItems.push(record)
   }
-  return { comparison, evidence: safeItems }
+  return { comparison: comparison as BasketComparison, evidence: safeItems }
 }
 
 export function attributeSavingsEffects(input: {
