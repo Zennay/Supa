@@ -4,6 +4,7 @@ import type { OfflinePriceSnapshots, OfflineRetailer, OfflineStoreProduct } from
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
+import { selectiveTwoStoreCaptureCsv, selectiveTwoStoreCaptureGuide } from './selectiveTwoStoreCapture.ts'
 import './plannerSourceMatchPreview.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
@@ -27,6 +28,7 @@ export function PlannerSourceMatchPreview({ needs, source }: {
 }) {
   const [showAll, setShowAll] = useState(false)
   const [onlyMissing, setOnlyMissing] = useState(false)
+  const [captureMessage, setCaptureMessage] = useState('')
   const coverage = useMemo(() => {
     const products = Object.fromEntries(stores.map(store => [
       store, new Map(source.captures[store]?.products.map(p => [p.id, p]) ?? []),
@@ -84,35 +86,59 @@ export function PlannerSourceMatchPreview({ needs, source }: {
   const missing = coverage.filter(line => !line.suggestions.PLUS || !line.suggestions.DekaMarkt)
   const filtered = onlyMissing ? missing : coverage
   const shown = filtered.slice(0, showAll ? 200 : 12)
-  function downloadMissingSourceCapture() {
-    // This sheet contains the CURRENT local user's physical demand only.
-    // A candidate is no price proof and no retailer rights are implied.
-    const singleLine = (value: string) => value
-      .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
-    const rows = [
-      'SUPA · ontbrekende producten voor hetzelfde Planner-weekmandje',
-      'Lokaal controleblad, GEEN echte winkelwaarneming, prijs of toestemming.',
-      'Alleen zelf rechtmatig verkregen bronnen en originele SKU’s noteren.',
-      '',
-      ...missing.flatMap(({ need, suggestions }) => stores.flatMap(store =>
-        suggestions[store] ? [] : [
-          store + ' · ' + singleLine(need.label) + ' · nodig: ' +
-          (need.amount === null ? 'onbekend' : need.amount + ' ' + need.unit) +
-          ' · bron-SKU/pakprijs nog koppelen of vastleggen',
-        ])),
-      '',
-      'Na daadwerkelijke bronopname: importeer in Supa Vergelijk en bevestig hele verpakkingen.',
-    ]
-    const url = URL.createObjectURL(new Blob([rows.join('\n')], {
-      type: 'text/plain;charset=utf-8',
-    }))
+  const needsForNewSource = (store: 'PLUS' | 'DekaMarkt',
+    nowMs: number): PlannerCaptureGuideNeed[] => {
+    const capture = source.captures[store]
+    // Expired/missing original source: no SKU is a currently usable price.
+    // More-than-24h pairs require a fresh recording of the older retailer,
+    // even if its candidate list looks complete in isolation.
+    const olderPairedStore = !source.pairedWithin24h &&
+      source.captures.PLUS && source.captures.DekaMarkt
+      ? source.captures.PLUS.observedNs < source.captures.DekaMarkt.observedNs
+        ? 'PLUS' : 'DekaMarkt'
+      : null
+    if (!capture || !recentOwnCaptureInstant(capture.observedAt, nowMs) ||
+        olderPairedStore === store) return [...needs]
+    return missing.filter(({ suggestions }) => !suggestions[store])
+      .map(({ need }) => need)
+  }
+  const pendingPlus = needsForNewSource('PLUS', Date.now()).length
+  const pendingDeka = needsForNewSource('DekaMarkt', Date.now()).length
+  function downloadMissingSourceCapture(kind: 'csv' | 'csv-excel' | 'guide') {
     try {
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'supa-ontbrekende-winkel-SKUs-voor-weekmand.txt'
-      document.body.append(link)
-      try { link.click() } finally { link.remove() }
-    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      // Derive two distinct genuinely missing sets against the SAME selected
+      // Planner week. Original source facts are never copied into empty rows,
+      // and an unconfirmed candidate can never masquerade as field evidence.
+      const nowMs = Date.now()
+      const missingByStore = {
+        PLUS: needsForNewSource('PLUS', nowMs),
+        DekaMarkt: needsForNewSource('DekaMarkt', nowMs),
+      }
+      const content = kind === 'guide'
+        ? selectiveTwoStoreCaptureGuide(missingByStore)
+        : selectiveTwoStoreCaptureCsv(missingByStore,
+            kind === 'csv-excel' ? ';' : ',')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'guide' ? 'text/plain;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = kind === 'guide'
+          ? 'supa-ontbrekende-plus-deka-rijgids.txt'
+          : kind === 'csv-excel'
+            ? 'supa-ontbrekende-plus-deka-spreadsheet.csv'
+            : 'supa-ontbrekende-plus-deka-import.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setCaptureMessage(kind === 'guide'
+        ? 'De rijgids vermeldt per winkel en CSV-regel de originele Planner-behoefte.'
+        : 'Leeg importeerbaar bronblad opgeslagen. Vul uitsluitend werkelijk geobserveerde SKU’s, prijzen en bronmomenten in; importeer daarna via Vergelijk.')
+    } catch (cause) {
+      setCaptureMessage(cause instanceof Error ? cause.message
+        : 'Kon het lege winkelopnameblad niet opstellen.')
+    }
   }
   return <section className="supa-planner-source-matches" aria-label="Voorlopige weekmand-productmatching">
     <h4>Weekmand tegenover de aangeleverde bron-SKU’s</h4>
@@ -163,10 +189,29 @@ export function PlannerSourceMatchPreview({ needs, source }: {
         </span>)}
       </div>)}
     </div>
-    {missing.length > 0 && <button type="button" className="ghost-button"
-      onClick={downloadMissingSourceCapture}>
-      Download ontbrekende PLUS/Deka-productcontroles (TXT)
-    </button>}
+    {(pendingPlus > 0 || pendingDeka > 0) && <div className="supa-planner-source-matches__exports">
+      <p><strong>Nieuwe echte bronopname vereist:</strong>
+        {' '}{pendingPlus} PLUS- en {pendingDeka} DekaMarkt-regels.
+        Ontbrekende prijzen vragen alleen ontbrekende SKU’s; bij een verouderde
+        opname of een bronpaar buiten 24 uur moet de betreffende winkel
+        opnieuw worden vastgelegd.</p>
+      <button type="button" className="ghost-button"
+        onClick={() => downloadMissingSourceCapture('csv')}>
+        Download alleen ontbrekende PLUS/Deka-producten (importeerbaar CSV)
+      </button>
+      <button type="button" className="ghost-button"
+        onClick={() => downloadMissingSourceCapture('csv-excel')}>
+        Spreadsheet-CSV (puntkomma)
+      </button>
+      <button type="button" className="ghost-button"
+        onClick={() => downloadMissingSourceCapture('guide')}>
+        Download bijbehorende CSV-rijgids (TXT)
+      </button>
+      <small>CSV en rijgids gebruiken dezelfde volgorde per winkel.
+        Alle artikelcodes, tijden, werkelijk gemeten verpakkingen en prijzen
+        moeten nog in de lege cellen worden ingevuld; dit is geen retailerbron.</small>
+    </div>}
+    {captureMessage && <p role="status">{captureMessage}</p>}
     {filtered.length > shown.length && <button type="button" className="ghost-button"
       onClick={() => setShowAll(true)}>Toon alle {filtered.length} ingrediënten</button>}
     <small>Een kandidaat uit een verouderde opname is geen actuele prijs.
