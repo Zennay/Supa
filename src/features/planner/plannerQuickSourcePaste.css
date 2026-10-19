@@ -21,3 +21,20 @@
 .supa-planner-source-paste :is(summary,textarea,button):focus-visible {
   outline: 3px solid #297252; outline-offset: 2px;
 }
+.supa-planner-source-paste__drop {
+  padding: .8rem;
+  border: 2px dashed #a7c4ad;
+  border-radius: 10px;
+  background: #fff;
+  display: grid;
+  gap: .2rem;
+}
+.supa-planner-source-paste__drop.is-dragging {
+  background: #e9f8eb;
+  border-color: #317c51;
+}
+.supa-planner-source-paste__drop label { margin: .35rem 0; }
+.supa-planner-source-paste__drop input[type="file"] {
+  max-width: 100%;
+  padding: .45rem 0;
+}

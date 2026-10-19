@@ -26,6 +26,7 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
   const [draft, setDraft] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
   const [busy, setBusy] = useState(false)
+  const [dropActive, setDropActive] = useState(false)
   const [message, setMessage] = useState('')
   const revision = useRef(0)
   function changeDraft(raw: string) {
@@ -164,6 +165,26 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
         Supa-kolommen als CSV, puntkomma-CSV of tabgescheiden spreadsheet, of
         eigen JSON met één of beide winkels. Alles wordt lokaal gecontroleerd:
         een geldige import bewijst geen bronrechten of actuele winkelprijzen.</p>
+      <div className={'supa-planner-source-paste__drop' + (dropActive ? ' is-dragging' : '')}
+        onDragOver={event => {
+          if (!Array.from(event.dataTransfer.types).includes('Files')) return
+          event.preventDefault()
+          event.dataTransfer.dropEffect = 'copy'
+          setDropActive(true)
+        }}
+        onDragLeave={event => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            setDropActive(false)
+        }}
+        onDrop={event => {
+          if (!Array.from(event.dataTransfer.types).includes('Files')) return
+          event.preventDefault()
+          setDropActive(false)
+          void previewFiles(Array.from(event.dataTransfer.files))
+        }}>
+        <strong>{dropActive
+          ? 'Laat de eigen winkelbestanden los om eerst de bron te controleren'
+          : 'Sleep hier je eigen PLUS-/Deka-bestand(en) voor een lokale preview'}</strong>
       <label>Of bekijk eerst één of twee eigen CSV-, TSV- of JSON-bestanden
         <input type="file" multiple accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json"
           onChange={event => {
@@ -173,6 +194,7 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
           }} />
         <small>Eén bestand mag beide winkels bevatten; twee aparte bestanden moeten ieder precies één verschillende winkel bevatten.</small>
       </label>
+      </div>
       <button type="button" className="ghost-button" onClick={() => void pasteClipboard()}>
         Plak uit mijn klembord
       </button>
