@@ -11,10 +11,10 @@ const scale = (unit: MatchUnit) => unit === 'kg' || unit === 'l' ? 1000 : 1
  * Never auto-approve a product, alter its price, or infer a source receipt.
  * Cheapness does NOT count as identity evidence.
  */
-export function rankOwnSourceSuggestions(
-  products: readonly StoreProduct[], ingredient: string, amount: number | null,
+export function rankOwnSourceSuggestions<T extends StoreProduct>(
+  products: readonly T[], ingredient: string, amount: number | null,
   unit: MatchUnit, search = '',
-): StoreProduct[] {
+): T[] {
   const ingredientName = fold(ingredient).trim()
   const tokens = [...new Set(words(ingredient).filter(w =>
     w.length > 1 && !['een', 'de', 'het', 'van', 'voor'].includes(w)))]

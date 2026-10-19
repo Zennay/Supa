@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
+import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwoStorePriceEditor.tsx'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
@@ -132,7 +132,7 @@ function searchableSourceText(value: string): string {
   // A user typing 'creme' should find an observed 'crème' article.
   return value.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl').trim()
 }
-function sourceOptions(products: import('../../domain/basket.ts').StoreProduct[],
+function sourceOptions(products: OfflineStoreProduct[],
   unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string,
   ingredient: string, requestedAmount: number | null) {
   const query = searchableSourceText(text)
@@ -157,6 +157,13 @@ function sourceOptions(products: import('../../domain/basket.ts').StoreProduct[]
     unpricedShown: unpricedFiltered.slice(0, 5),
     unpricedTotal: unpricedFiltered.length, unpricedCount: unpriced.length,
   }
+}
+function explainUnpricedSource(product: OfflineStoreProduct): string {
+  const reasons: string[] = []
+  if (product.sourceAvailable === false) reasons.push('niet beschikbaar volgens de opname')
+  if (product.sourcePriceCents === null) reasons.push('prijs niet vastgelegd')
+  if (product.packAmount === null) reasons.push('verpakkingsinhoud ontbreekt')
+  return reasons.join(' · ') || 'nog niet volledig prijsklaar'
 }
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 function reviewRowId(store: string, ingredientId: string): string {
@@ -1997,11 +2004,13 @@ export function OfflineReviewedWorkbench({
                                 {choices.unpricedShown.length > 0 && (
                                   <div className="offline-price-workbench__missing">
                                     <strong>Wel in jouw bron, nog niet prijsklaar</strong>
-                                    <p>Deze originele artikelen zijn niet beschikbaar of missen een bruikbare verpakking of prijs.
-                                      Ze zijn niet te kiezen voor een mandbedrag. Neem de werkelijke brongegevens opnieuw op.</p>
+                                    <p>Per bronartikel staat hieronder waarom het nog niet voor een
+                                      rekenbaar mandbedrag kan worden gekozen. Maak alleen een nieuwe opname
+                                      als je het ontbrekende gegeven werkelijk kunt vaststellen; onbekend is nooit € 0.</p>
                                     <ul>{choices.unpricedShown.map(product => (
                                       <li key={product.id}>{product.name} · broncode {product.id}
-                                        {' '}· {product.packAmount ?? '?'} {product.packUnit}</li>
+                                        {' '}· {product.packAmount ?? '?'} {product.packUnit}
+                                        <small> — {explainUnpricedSource(product)}</small></li>
                                     ))}</ul>
                                     {choices.unpricedTotal > choices.unpricedShown.length &&
                                       <small>Er zijn meer ongeprijsde artikelen; verfijn de zoekterm.</small>}

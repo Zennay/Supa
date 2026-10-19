@@ -3,12 +3,20 @@ import type { MatchUnit } from './matching.ts'
 
 /** Local user-supplied observations. This format is NOT proof of retailer permission or independent field verification. */
 export type OfflineRetailer = 'PLUS' | 'DekaMarkt'
+/** Raw missing-price and availability signals only for explanatory UI.
+ * The purchasable StoreProduct shape is still fail-closed: no unknown price
+ * can become a zero-cent match through these optional source annotations. */
+export type OfflineStoreProduct = StoreProduct & {
+  sourcePriceCents?: number | null
+  sourceAvailable?: boolean
+}
+
 export type OfflineCapture = Readonly<{
   retailer: OfflineRetailer
   observedAt: string
   observedMs: number
   observedNs: bigint
-  products: StoreProduct[]
+  products: OfflineStoreProduct[]
 }>
 export type OfflinePriceSnapshots = Readonly<{
   captures: Readonly<Partial<Record<OfflineRetailer, OfflineCapture>>>
@@ -55,7 +63,7 @@ function observedInstant(raw: unknown): { ms: number; ns: bigint } | null {
   const fractionalMillis = Number(fraction.slice(0, 3))
   return { ms: parsed, ns: BigInt(parsed - fractionalMillis) * 1_000_000n + BigInt(fraction) }
 }
-function parseProduct(raw: unknown, retailer: OfflineRetailer): StoreProduct {
+function parseProduct(raw: unknown, retailer: OfflineRetailer): OfflineStoreProduct {
   if (!isRecord(raw) || !allowedFields(raw, ['id', 'name', 'packAmount', 'packUnit', 'packCount', 'priceCents', 'available']) ||
       !validName(raw.id, 100) || !validName(raw.name, 160) ||
       (raw.packAmount !== null && (typeof raw.packAmount !== 'number' || !Number.isFinite(raw.packAmount) ||
@@ -81,6 +89,10 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): StoreProduct {
     // Missing price is always unavailable; never promote it to a zero-price match.
     available: raw.available && raw.priceCents !== null,
     priceCents: (raw.priceCents as number | null) ?? 0,
+    // Distinguish missing price from genuinely observed unavailability in
+    // the user's private UI, without loosening the strict CSV/JSON importer.
+    sourcePriceCents: raw.priceCents as number | null,
+    sourceAvailable: raw.available,
   }
 }
 export function parseOfflinePriceSnapshots(
