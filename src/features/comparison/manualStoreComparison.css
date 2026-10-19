@@ -30,8 +30,9 @@
  .manual-compare__fields label:last-child { grid-column: 1/-1; }
 }
 
-/* Six real destinations: a sixth tab must stay on the same mobile nav row. */
-body .bottom-nav.hifi-nav { grid-template-columns: repeat(6,minmax(0,1fr)); }
+/* The original Figma primary navigation has five destinations.
+   Compare and Meten remain available via the secondary in-app utilities. */
+body .bottom-nav.hifi-nav { grid-template-columns: repeat(5,minmax(0,1fr)); }
 body .bottom-nav.hifi-nav button { width: min(46px, 100%); }
 body .bottom-nav.hifi-nav button:last-child { align-content: center; gap: 1px; }
 body .bottom-nav.hifi-nav button:last-child .hifi-sr-only {
