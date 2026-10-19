@@ -34,6 +34,12 @@ const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 type CapturePreviewStore = {
   retailer: CaptureStore; enteredProducts: number; unobservedRows: number
+  matching?: {
+    proposed: number; unresolved: number; total: number
+    lines: { id: string; label: string; status: 'matched' | 'unresolved'
+      product: string | null; originalSku: string | null
+      packs: number | null; reasons: string[] }[]
+  }
   observedAt: string; unavailableProducts: number
   previewProducts: {
     id: string; name: string; packAmount: number | null; packUnit: string
@@ -310,11 +316,34 @@ export function OfflineReviewedWorkbench({
         blankOtherRows += summary.unobservedOtherStoreRows
         captures.push(...parsed.captures)
       }
-      if (files.length === 2) {
-        parseOfflinePriceSnapshots(JSON.stringify({
-          schema: 'supa-offline-prices-v1', captures,
-        }), Date.now())
-        blankOtherRows = 0
+      const combined = parseOfflinePriceSnapshots(JSON.stringify({
+        schema: captures.length === 2
+          ? 'supa-offline-prices-v1' : 'supa-private-single-store-prices-v1',
+        captures,
+      }), Date.now())
+      if (files.length === 2) blankOtherRows = 0
+      // Preview the SAME conservative matcher as the final shopping route.
+      // These are unverified proposals, never confirmed pricing or savings.
+      for (const entry of storesInPreview) {
+        const source = combined.captures[entry.retailer]
+        if (!source) throw Error('Een winkelbron ontbreekt in de gekoppelde opname.')
+        const basket = buildOneStoreBasket({
+          store: { id: entry.retailer, name: entry.retailer },
+          plan, recipes, activeDays, products: source.products,
+        })
+        entry.matching = {
+          proposed: basket.matchedLineCount,
+          unresolved: basket.unresolvedLineCount,
+          total: basket.lines.length,
+          lines: basket.lines.slice(0, 60).map(line => ({
+            id: line.id, label: line.ingredientLabel,
+            status: line.status,
+            product: line.status === 'matched' ? line.productName : null,
+            originalSku: line.status === 'matched' ? line.productId : null,
+            packs: line.status === 'matched' ? line.packs : null,
+            reasons: line.reasons,
+          })),
+        }
       }
       if (version !== importRevision.current) return
       setCapturePreview({
@@ -1357,6 +1386,35 @@ export function OfflineReviewedWorkbench({
                     <p className="disclaimer">Nog
                       {' '}{store.enteredProducts - store.previewProducts.length}
                       {' '}ingevulde bronartikelen; na overname per product te beoordelen.</p>
+                  )}
+                </details>
+              ))}
+              {currentPreview.stores.map(store => store.matching && (
+                <details key={'matches-' + store.retailer}
+                  className="offline-price-workbench__capture-matching">
+                  <summary>{store.retailer}: Planner-productmatching vooraf bekijken
+                    {' '}({store.matching.proposed} voorstellen,
+                    {' '}{store.matching.unresolved} nog zonder match)</summary>
+                  <p className="disclaimer">Deze suggesties komen uit exact dezelfde
+                    conservatieve matching en fysieke verpakkingsberekening als
+                    jouw uiteindelijke winkelmand. Er is nog niets bevestigd,
+                    geen compleet mandbedrag en geen prijsverschil vrijgegeven.</p>
+                  <ul>
+                    {store.matching.lines.map(line => (
+                      <li key={line.id}>
+                        <strong>{line.label}</strong>:
+                        {' '}{line.status === 'matched'
+                          ? 'Voorstel: ' + line.product + ' · broncode ' + line.originalSku +
+                            ' · ' + line.packs + ' hele verpakking(en). Controleer zelf.'
+                          : 'Nog geen betrouwbare productmatch. ' +
+                            (line.reasons[0] ? humanMatchReason(line.reasons[0]) : 'Handmatige keuze nodig.')}
+                      </li>
+                    ))}
+                  </ul>
+                  {store.matching.total > store.matching.lines.length && (
+                    <p className="disclaimer">Nog
+                      {' '}{store.matching.total - store.matching.lines.length}
+                      {' '}Planner-regels verschijnen na het overnemen bij de volledige productreview.</p>
                   )}
                 </details>
               ))}
