@@ -157,8 +157,10 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
             <strong>{one.ingredientLabel} · {one.requiredAmount} {one.requiredUnit}</strong>
             <small>PLUS · {one.productName} · SKU {one.productId}</small>
             <span>{one.packagesNeeded} pak(ken) · {eur.format(one.lineTotalCents / 100)}</span>
+            <small>{one.unitPrice ?? 'Eenheidsprijs onbekend'}</small>
             <small>DekaMarkt · {other.productName} · SKU {other.productId}</small>
             <span>{other.packagesNeeded} pak(ken) · {eur.format(other.lineTotalCents / 100)}</span>
+            <small>{other.unitPrice ?? 'Eenheidsprijs onbekend'}</small>
             <strong>{difference === 0 ? 'Gelijke bevestigde regelprijs' :
               eur.format(Math.abs(difference) / 100) + ' op deze regel ' +
                 (difference > 0 ? 'lager bij PLUS' : 'lager bij DekaMarkt')}</strong>
