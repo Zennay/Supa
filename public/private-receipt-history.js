@@ -107,42 +107,53 @@ function sameProduct(a,b) {
     a.amount === b.amount && a.unit === b.unit && a.count === b.count
 }
 function compare(old, fresh) {
-  if (fresh.dates.PLUS <= old.dates.PLUS || fresh.dates.DekaMarkt <= old.dates.DekaMarkt)
+  if (fresh.dates.PLUS<=old.dates.PLUS || fresh.dates.DekaMarkt<=old.dates.DekaMarkt)
     throw Error('De tweede opname moet voor beide winkels later zijn dan de eerste.')
   const rows=[], excluded=[]
-  for (const [id, a] of old.rows) {
+  for (const [id,a] of old.rows) {
     const b=fresh.rows.get(id)
-    const base={id, name:a.name}
     if (!b || a.name!==b.name || a.amount!==b.amount || a.unit!==b.unit) {
-      excluded.push({...base, reason:'Ingrediënt of fysieke hoeveelheid gewijzigd/ontbreekt'})
+      excluded.push({id,name:a.name,reason:'Ingrediënt of fysieke hoeveelheid gewijzigd/ontbreekt'})
       continue
     }
-    if (!stores.every(store=>sameProduct(a[store],b[store]))) {
-      excluded.push({...base, reason:'SKU, productnaam, verpakking of pakaantal gewijzigd'})
+    const plusSame=sameProduct(a.PLUS,b.PLUS)
+    const dekaSame=sameProduct(a.DekaMarkt,b.DekaMarkt)
+    if (!plusSame && !dekaSame) {
+      excluded.push({id,name:a.name,reason:'Bij beide winkels ander SKU, pak of pakaantal'})
       continue
     }
     rows.push({id,name:a.name,old:a,fresh:b,
-      plusChange:b.PLUS.total-a.PLUS.total,
-      dekaChange:b.DekaMarkt.total-a.DekaMarkt.total})
+      plusChange:plusSame?b.PLUS.total-a.PLUS.total:null,
+      dekaChange:dekaSame?b.DekaMarkt.total-a.DekaMarkt.total:null})
   }
   for (const [id,b] of fresh.rows) if (!old.rows.has(id))
     excluded.push({id,name:b.name,reason:'Extra ingrediënt in latere opname'})
-  const complete=excluded.length===0 && rows.length===old.rows.size && rows.length===fresh.rows.size
   const subsetOld={PLUS:0,DekaMarkt:0},subsetNew={PLUS:0,DekaMarkt:0}
+  const counts={PLUS:0,DekaMarkt:0},completeByStore={}
   for (const row of rows) for(const store of stores) {
+    const key=store==='PLUS'?'plusChange':'dekaChange'
+    if (row[key]===null) continue
+    counts[store]++
     subsetOld[store]+=row.old[store].total
     subsetNew[store]+=row.fresh[store].total
     if (!cents(subsetOld[store]) || !cents(subsetNew[store]))
       throw Error('Som van productregels is ongeldig')
   }
+  for(const store of stores) {
+    completeByStore[store]=excluded.length===0 && rows.length===old.rows.size &&
+      rows.length===fresh.rows.size && counts[store]===rows.length
+    if (completeByStore[store] &&
+      (subsetOld[store]!==old.totals[store] || subsetNew[store]!==fresh.totals[store]))
+      throw Error('Prijswijzigingen sluiten niet op de oorspronkelijke mandtotalen aan.')
+  }
   const changes={PLUS:subsetNew.PLUS-subsetOld.PLUS,
     DekaMarkt:subsetNew.DekaMarkt-subsetOld.DekaMarkt}
-  if (complete && stores.some(store=>
-      subsetOld[store]!==old.totals[store] || subsetNew[store]!==fresh.totals[store]))
-    throw Error('Prijswijzigingen sluiten niet op de oorspronkelijke mandtotalen aan.')
-  rows.sort((a,b)=>Math.max(Math.abs(b.plusChange),Math.abs(b.dekaChange))-
-    Math.max(Math.abs(a.plusChange),Math.abs(a.dekaChange)) || a.name.localeCompare(b.name,'nl'))
-  return {complete,rows,excluded,subsetOld,subsetNew,changes}
+  rows.sort((a,b)=>
+    Math.max(Math.abs(b.plusChange??0),Math.abs(b.dekaChange??0))-
+    Math.max(Math.abs(a.plusChange??0),Math.abs(a.dekaChange??0)) ||
+    a.name.localeCompare(b.name,'nl'))
+  return {complete:stores.every(store=>completeByStore[store]),completeByStore,
+    counts,rows,excluded,subsetOld,subsetNew,changes}
 }
 const el = (tag, text='', className='') => {
   const node = document.createElement(tag)
@@ -162,22 +173,23 @@ function render(old,fresh,result) {
     'Eerder: PLUS '+old.textDates.PLUS+' en Deka '+old.textDates.DekaMarkt+
     ' · Later: PLUS '+fresh.textDates.PLUS+' en Deka '+fresh.textDates.DekaMarkt
   const scope=result.complete
-    ? 'Alle '+result.rows.length+' identieke fysieke producten: volledige mandjes vergelijkbaar.'
-    : 'Alleen '+result.rows.length+' ongewijzigde van '+(result.rows.length+result.excluded.length)+
-      ' productregels vergelijkbaar. '+result.excluded.length+
-      ' gewijzigd of ontbrekend; volledig mandverschil ONBEKEND.'
+    ? 'Alle '+result.rows.length+' identieke producten: beide volledige mandjes vergelijkbaar.'
+    : 'Geen volledig twee-winkelmandverschil. PLUS: '+result.counts.PLUS+
+      ', DekaMarkt: '+result.counts.DekaMarkt+
+      ' identieke productregels. Verschillende SKU’s blijven per winkel onbekend.'
   wrap.append(el('p',scope,result.complete?'hint':'notice'))
   for (const store of stores) {
+    const count=result.counts[store]
     const card=el('article','','notice')
-    card.append(el('strong',store),el('p',
-      euro.format(result.subsetOld[store]/100)+' → '+
+    card.append(el('strong',store))
+    if(count>0) card.append(el('p',euro.format(result.subsetOld[store]/100)+' → '+
       euro.format(result.subsetNew[store]/100)),
-      el('small',result.complete ? 'Gehele identieke winkelmand' :
-        'Uitsluitend onveranderde SKU’s met exact gelijke fysieke hoeveelheden','small'),
-      el('p',result.complete?'Verandering volledige eigen mand: '+
-        movement(result.changes[store]) :
-        'Verschil alleen voor vergelijkbare regels: '+movement(result.changes[store]),
+      el('small',result.completeByStore[store]?'Volledige identieke winkelmand':
+        'Uitsluitend '+count+' identieke productregels; overige producten onbekend','small'),
+      el('p',(result.completeByStore[store]?'Verandering hele eigen mand: ':
+        'Verandering uitsluitend gelijke producten: ')+movement(result.changes[store]),
       result.changes[store]>0?'delta-up':result.changes[store]<0?'delta-down':''))
+    else card.append(el('p','Geen identieke SKU’s: prijsverandering onbekend.'))
     wrap.append(card)
   }
   for (const line of result.rows) {
@@ -186,13 +198,19 @@ function render(old,fresh,result) {
     item.scope='row'
     item.append(el('div','SKU PLUS '+line.old.PLUS.id+' · Deka '+line.old.DekaMarkt.id,'small'))
     tr.append(item)
-    for (const store of stores) tr.append(el('td',euro.format(line.old[store].total/100)+
-      ' → '+euro.format(line.fresh[store].total/100)))
+    for (const store of stores) {
+      const key=store==='PLUS'?'plusChange':'dekaChange'
+      tr.append(el('td',line[key]===null
+        ? 'Ander SKU of pak · geen vergelijkbaar bedrag'
+        : euro.format(line.old[store].total/100)+' → '+
+          euro.format(line.fresh[store].total/100)))
+    }
     const delta=el('td')
-    delta.append(el('div','PLUS: '+movement(line.plusChange),
-      line.plusChange>0?'delta-up':line.plusChange<0?'delta-down':''))
-    delta.append(el('div','DekaMarkt: '+movement(line.dekaChange),
-      line.dekaChange>0?'delta-up':line.dekaChange<0?'delta-down':''))
+    for (const store of stores) {
+      const change=line[store==='PLUS'?'plusChange':'dekaChange']
+      delta.append(el('div',store+': '+(change===null?'onbekend (ander product/pak)':
+        movement(change)),change===null?'':change>0?'delta-up':change<0?'delta-down':''))
+    }
     tr.append(delta); body.append(tr)
   }
   if (result.excluded.length) {
@@ -213,22 +231,22 @@ function render(old,fresh,result) {
     'PLUS tweede bronmoment: '+fresh.textDates.PLUS,
     'DekaMarkt eerste bronmoment: '+old.textDates.DekaMarkt,
     'DekaMarkt tweede bronmoment: '+fresh.textDates.DekaMarkt,
-    result.complete ? 'Volledige fysieke mandvergelijking: JA' :
-      'Volledige fysieke mandvergelijking: NEE — totaalverschil ONBEKEND.',
-    'Gelijke fysieke producten: '+result.rows.length,
-    'Gewijzigd/ontbrekend/extra: '+result.excluded.length,
-    'PLUS '+(result.complete?'hele mand':'uitsluitend gelijke SKU-regels')+': '+
-      euro.format(result.subsetOld.PLUS/100)+' → '+
-      euro.format(result.subsetNew.PLUS/100)+' ('+movement(result.changes.PLUS)+')',
-    'DekaMarkt '+(result.complete?'hele mand':'uitsluitend gelijke SKU-regels')+': '+
-      euro.format(result.subsetOld.DekaMarkt/100)+' → '+
-      euro.format(result.subsetNew.DekaMarkt/100)+' ('+movement(result.changes.DekaMarkt)+')',
+    result.complete ? 'Twee volledig identieke mandjes: JA' :
+      'Twee volledig identieke mandjes: NEE; algemeen mandverschil ONBEKEND.',
+    'PLUS identieke SKU-regels: '+result.counts.PLUS,
+    'DekaMarkt identieke SKU-regels: '+result.counts.DekaMarkt,
+    'Bij beide winkels veranderd/ontbrekend/extra: '+result.excluded.length,
+    ...stores.map(store=>store+': '+(result.counts[store]===0
+      ? 'prijsverandering ONBEKEND (geen dezelfde SKU)'
+      : (result.completeByStore[store]?'volledige fysieke mand':'alleen dezelfde SKU-regels')+
+        ': '+euro.format(result.subsetOld[store]/100)+' → '+
+        euro.format(result.subsetNew[store]/100)+' ('+movement(result.changes[store])+')')),
     '',
     'Vergelijkbare identieke fysieke vraag en bronproducten per ingredient:',
     ...result.rows.map(line => line.name+' | PLUS SKU '+line.old.PLUS.id+
       ' | Deka SKU '+line.old.DekaMarkt.id+
-      ' | PLUS '+movement(line.plusChange)+
-      ' | DekaMarkt '+movement(line.dekaChange)),
+      ' | PLUS '+(line.plusChange===null?'onbekend: andere SKU/pak':movement(line.plusChange))+
+      ' | DekaMarkt '+(line.dekaChange===null?'onbekend: andere SKU/pak':movement(line.dekaChange))),
     '',
     'Niet vergelijkbare regels — uitgesloten van alle getoonde wijzigingen:',
     ...result.excluded.map(line=>line.name+' | '+line.reason),
@@ -257,9 +275,10 @@ $('compare').addEventListener('click',async()=>{
     const result=compare(old,fresh)
     render(old,fresh,result)
     $('status').textContent=result.complete
-      ? 'Volledige historisch identieke privémandjes vergeleken. Geen actuele prijsclaim.'
-      : result.rows.length+' onveranderde productregels vergeleken; '+
-        result.excluded.length+' gewijzigd/ontbrekend uitgesloten. Volledig mandverschil onbekend.'
+      ? 'Twee volledig identieke historische privémandjes vergeleken. Geen actuele prijsclaim.'
+      : 'Gedeeltelijke vergelijking: PLUS '+result.counts.PLUS+
+        ', DekaMarkt '+result.counts.DekaMarkt+
+        ' identieke SKU-regels. Per winkel alleen bij volledige SKU-dekking een mandverschil.'
   }catch(error){
     if(serial===readSerial){
       const detail = error instanceof Error && safeMismatchMessages.has(error.message)
