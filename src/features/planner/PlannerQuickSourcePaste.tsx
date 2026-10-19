@@ -210,6 +210,31 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand }: {
     return null
   })()
 
+  function downloadCanonicalPreview() {
+    if (!preview || preview.raw !== draft) return
+    try {
+      // Re-admit the actual local source at export time, never transform
+      // unavailable, stale or unreviewed prices into confirmed basket totals.
+      const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
+      const count = Object.keys(current.captures).length
+      const bytes = new TextEncoder().encode(preview.normalized)
+      if (bytes.length > limit) throw new Error('Genormaliseerde bron te groot.')
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/json' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = count === 2
+          ? 'supa-mijn-eigen-plus-deka-bronnen.json'
+          : 'supa-mijn-eigen-winkelbron.json'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Gecontroleerde structuur lokaal opgeslagen. Dit is geen bewijs van actuele prijzen of bronrechten.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Lokale export mislukt.')
+    }
+  }
+
   function handoff() {
     if (!preview || preview.raw !== draft) return
     try {
@@ -352,6 +377,10 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand }: {
               : 'Nog maar één winkelbron. De andere winkel blijft ongeprijsd.'}</p>
         <button type="button" disabled={!hasDemand}
           onClick={handoff}>Open mijn bron in Vergelijk voor productmatching</button>
+        <button type="button" className="ghost-button"
+          onClick={downloadCanonicalPreview}>
+          Download mijn gecombineerde winkelbron als lokaal JSON-bestand
+        </button>
         {nextSourceToCapture && <button type="button" className="ghost-button"
           onClick={() => onRecapture(nextSourceToCapture)}>
           Open leeg opnameblad voor {nextSourceToCapture} en leg echte prijzen vast
