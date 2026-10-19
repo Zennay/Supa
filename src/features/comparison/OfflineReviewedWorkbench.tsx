@@ -677,10 +677,43 @@ export function OfflineReviewedWorkbench({
       if (version === importRevision.current) setBusy(false)
     }
   }
+  // Opening one file (including a drag/drop) should never silently replace
+  // the other already-reviewed shop. Reuse the same append/replacement preview
+  // that the manual editor and pasted CSV use.
+  async function stageSelectedSource(file: File) {
+    const version = ++importRevision.current
+    setPendingReplacement(null)
+    setBusy(true)
+    try {
+      if (!file.size || file.size > 256000)
+        throw new Error('Bronbestand is leeg of groter dan 256 kB.')
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      let source = raw
+      if (isCsv) {
+        const converterUrl = '/offline-two-store-csv.mjs'
+        const module: unknown = await import(/* @vite-ignore */ converterUrl)
+        if (!module || typeof module !== 'object' ||
+            !('convertOwnStoreCsv' in module) ||
+            typeof module.convertOwnStoreCsv !== 'function')
+          throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
+        source = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      }
+      if (version !== importRevision.current) return
+      acceptManualSource(source)
+    } catch (error) {
+      if (version !== importRevision.current) return
+      setMessage((error instanceof Error ? error.message : 'Ongeldig bronbestand.') +
+        ' De huidige winkeldata en productreviews zijn behouden.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
+    }
+  }
+
   async function loadSelectedSources(files: File[]) {
     if (files.length === 0) return
     if (files.length === 1) {
-      await loadFile(files[0])
+      await stageSelectedSource(files[0])
       return
     }
     // Keep current admitted sources and human checks intact until BOTH
