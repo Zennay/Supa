@@ -53,3 +53,8 @@
 .own-store-planner__second-stop input { min-height:44px; padding:.6rem; border:1px solid #789687; border-radius:8px; font:inherit; }
 .own-store-planner__second-stop p { margin:0; line-height:1.5; }
 .own-store-planner__second-stop input:focus-visible { outline:3px solid #246b50; outline-offset:2px; }
+
+.own-store-planner__progress-meters { display: grid; gap: .5rem; padding: .65rem 0; }
+.own-store-planner__progress-meters label { display: grid; gap: .25rem; font-size: .84rem; line-height: 1.4; }
+.own-store-planner__progress-meters progress { width: 100%; height: .8rem; accent-color: #276c4b; }
+.own-store-planner__progress-meters span { font-variant-numeric: tabular-nums; }

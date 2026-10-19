@@ -225,6 +225,26 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                 {' '}{progress.originalProductCount - progress.pricedProductCount} bronproducten zonder bruikbare pakprijs.</small>
               <small>{progress.matchedLineCount}/{progress.demandLineCount} ingrediënten hebben een voorgestelde match;
                 {' '}{progress.reviewedLineCount}/{progress.demandLineCount} fysiek gecontroleerd.</small>
+              {progress.demandLineCount > 0 && <div className="own-store-planner__progress-meters"
+                aria-label={'Voortgang eigen ' + store + '-winkelopname'}>
+                <label>Ingrediënten met voorgesteld product
+                  <progress value={Math.min(progress.demandLineCount, Math.max(0, progress.matchedLineCount))}
+                    max={progress.demandLineCount} />
+                  <span>{progress.matchedLineCount} van {progress.demandLineCount}</span>
+                </label>
+                <label>Producten door jou gecontroleerd
+                  <progress value={Math.min(progress.demandLineCount, Math.max(0, progress.reviewedLineCount))}
+                    max={progress.demandLineCount} />
+                  <span>{progress.reviewedLineCount} van {progress.demandLineCount}</span>
+                </label>
+              </div>}
+              {progress.originalProductCount > 0 && <div className="own-store-planner__progress-meters">
+                <label>Originele bronartikelen met bruikbare pakprijs
+                  <progress value={Math.min(progress.originalProductCount, Math.max(0, progress.pricedProductCount))}
+                    max={progress.originalProductCount} />
+                  <span>{progress.pricedProductCount} van {progress.originalProductCount}</span>
+                </label>
+              </div>}
               <small>{progress.fresh
                 ? 'Nog niet volledig gecontroleerd: prijs en budget blijven onbekend.'
                 : 'Bronopname te oud of toekomstig: vernieuw de echte bron voordat prijzen meetellen.'}</small>
