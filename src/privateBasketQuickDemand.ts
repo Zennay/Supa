@@ -22,11 +22,11 @@ const existingLines = document.querySelector<HTMLElement>('#lines')!
 const maxChars = 40000
 const maxRows = 200
 const units: Record<string, MetricUnit> = {
-  g: 'g', gram: 'g', kg: 'kg', ml: 'ml', l: 'l',
+  g: 'g', gram: 'g', kg: 'kg', ml: 'ml', l: 'l', liter: 'l',
   stuk: 'piece', stuks: 'piece', stukken: 'piece', 'stuk(s)': 'piece', piece: 'piece',
 }
 const quantity = '(\\d{1,7}(?:[.,]\\d{1,6})?)'
-const unit = '(kg|gram|g|ml|l|stukken|stuks|stuk\\(s\\)|stuk)'
+const unit = '(kg|gram|g|ml|liter|l|stukken|stuks|stuk\\(s\\)|stuk)'
 const leading = new RegExp('^' + quantity + '\\s*' + unit + '\\s+(.+)$', 'iu')
 const trailing = new RegExp('^(.+?)\\s*[:;–—-]\\s*' + quantity + '\\s*' + unit + '$', 'iu')
 const unknown = /^(.+?)\s*:\s*\?\s*(kg|g|ml|l|piece)$/iu
@@ -104,6 +104,33 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
       }
       const pending = /^hoeveelheid nog controleren \((g|kg|ml|l|piece)\)$/.exec(amount)
       return pending ? label + ': ? ' + pending[1] : label + ': ' + amount
+    })
+  }
+  // Planner's own unchecked/checked unpriced week list is now portable
+  // straight into the private mapping wizard. Treat ALL physical lines as
+  // demand regardless of ticks. The existing explicit meal-count field stays
+  // authoritative: this TXT format has no reliable saved meal count.
+  if (rawLines[0] === 'Supa · mijn weekboodschappen · zonder winkelprijzen') {
+    if (rawLines.length < 3 ||
+        rawLines.at(-1) !== 'Geen supermarktproduct of actuele prijs gekoppeld.') {
+      throw Error('Het Supa Planner TXT-overzicht mist de originele waarschuwing of ingrediënten.')
+    }
+    rawLines = rawLines.slice(1, -1).map((line, index) => {
+      if (!/^[☐☑] /u.test(line)) {
+        throw Error('Plannerregel ' + (index + 1) + ': verwachte Supa afvinkmarkering ontbreekt.')
+      }
+      const body = line.slice(2)
+      const separator = body.lastIndexOf(' · ')
+      if (separator <= 0) {
+        throw Error('Plannerregel ' + (index + 1) + ': ingrediënt of fysieke hoeveelheid ontbreekt.')
+      }
+      const label = body.slice(0, separator)
+      const amount = body.slice(separator + 3)
+      if (amount === 'hoeveelheid onbekend') {
+        throw Error('Plannerregel ' + (index + 1) + ': hoeveelheid ontbreekt. Corrigeer die in Planner.')
+      }
+      // No price, retailer SKU or source timestamp can be derived from text.
+      return label + ': ' + amount
     })
   }
   // Portable own-recipe TXT from the Recepten detail uses exactly one

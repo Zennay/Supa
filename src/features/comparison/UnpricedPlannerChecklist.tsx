@@ -19,6 +19,12 @@ const itemKey = (item: DemandRow) => JSON.stringify([
 const quantity = (item: DemandRow) =>
   (item.amount === null ? 'hoeveelheid onbekend' :
     item.amount.toLocaleString('nl-NL') + ' ' + (unitLabels[item.unit] ?? item.unit))
+// Portable TXT must never use grouping (1.250 is ambiguous with 1.25), nor
+// silently round decimal quantities. The existing strict importer decides
+// whether every original amount is physically admissible.
+const portableQuantity = (item: DemandRow) =>
+  item.amount === null ? 'hoeveelheid onbekend' :
+    String(item.amount).replace('.', ',') + ' ' + (unitLabels[item.unit] ?? item.unit)
 
 /**
  * The exact physical week demand, independent of either supermarket.
@@ -78,7 +84,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
   const shoppingText = () => [
     'Supa · mijn weekboodschappen · zonder winkelprijzen',
     ...items.map(item =>
-      (checked[itemKey(item)] ? '☑ ' : '☐ ') + item.label + ' · ' + quantity(item)),
+      (checked[itemKey(item)] ? '☑ ' : '☐ ') + item.label + ' · ' + portableQuantity(item)),
     'Geen supermarktproduct of actuele prijs gekoppeld.',
   ].join('\n')
 
@@ -146,7 +152,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
           zonder een winkel of prijs te verzinnen. Ook bruikbaar zolang echte winkeldata ontbreken.
           Vinkjes blijven lokaal beschikbaar zolang dit browsertabblad open is,
           ook bij herladen van dit browsertabblad. Afvinkingen worden alleen in je eigen tabopslag bewaard;
-          je kunt ze privé downloaden en op een ander apparaat voor exact hetzelfde weekmenu herstellen.</p>
+          je kunt ze privé downloaden en op een ander apparaat voor exact hetzelfde weekmenu herstellen.
+          Download ook de TXT-lijst om deze zonder winkelprijzen als ingrediëntenmand in de privévergelijker te importeren.</p>
       </div>
       {error ? <p role="status" className="unpriced-planner-checklist__note">{error}</p> : (
         <>
@@ -179,6 +186,9 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
             <button type="button" className="ghost-button" onClick={downloadUnpricedList}>
               Download weekboodschappen (TXT)
             </button>
+            <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
+              Open privévergelijker voor mijn TXT-lijst
+            </a>
           </div>
           {backupMessage && <p role="status" className="unpriced-planner-checklist__note">{backupMessage}</p>}
           <div className="unpriced-planner-checklist__rows">
