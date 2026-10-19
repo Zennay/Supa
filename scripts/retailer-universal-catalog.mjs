@@ -57,6 +57,22 @@ function normalizedObservation(value) {
   // A direct caller must not bypass source trust by providing a structurally
   // valid yet credential-bearing URL, impossible clock or unsafe money value.
   const origin = new URL(value.provenance.url)
+  // A direct catalog caller must meet the same bare-origin, canonical product
+  // page identity as the strict retailer ingest adapters. Generic observation
+  // validation alone only checked the host, so unknown paths or query-laden
+  // product URLs could otherwise appear to have a reviewed origin.
+  const originHost = value.supermarket === 'plus' ? 'www.plus.nl' :
+    value.supermarket === 'dekamarkt' ? 'www.dekamarkt.nl' : null
+  const productPrefix = value.supermarket === 'plus' ? '/product/' : '/producten/'
+  const rawSourceUrl = value.provenance.url
+  if (origin.protocol !== 'https:' || origin.hostname !== originHost ||
+      typeof rawSourceUrl !== 'string' || rawSourceUrl !== origin.href ||
+      /[?#]/u.test(rawSourceUrl) || origin.username || origin.password ||
+      origin.port || (value.provenance.kind === 'product' &&
+        (!origin.pathname.startsWith(productPrefix) ||
+         origin.pathname.length <= productPrefix.length))) {
+    throw new Error('Untrusted retailer capture source URL')
+  }
   // A decoded URL query key is case-insensitive for credential purposes:
   // ACCESS_TOKEN, Access_Token and %41CCESS_TOKEN are the same secret marker.
   // Keep legitimate search/page/locale parameters as pure provenance.
