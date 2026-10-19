@@ -6,6 +6,7 @@ import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
 import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
 import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
+import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
@@ -15,7 +16,7 @@ const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
  * Download/copy still requires the parent source gate at click time.
  */
 export function MixedStoreShoppingCard({
-  mixed, single, plus, deka, captured, eligibleNow,
+  mixed, single, plus, deka, captured, eligibleNow, weekBudget,
 }: {
   mixed: MixedStoreShoppingPlan
   single: MixedStoreShoppingPlan
@@ -23,6 +24,7 @@ export function MixedStoreShoppingCard({
   deka: OneStoreBasket
   captured: Record<MixedStore, string>
   eligibleNow: () => boolean
+  weekBudget?: number
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [onlyOpen, setOnlyOpen] = useState(false)
@@ -55,6 +57,13 @@ export function MixedStoreShoppingCard({
   const plan = chooseSingle ? single : selectedMixed
   const visitsBoth = stores.every(store => plan.lines.some(line => line.store === store))
   const appliedCostCents = visitsBoth ? extraCostCents : null
+  const validBudget = validCustomWeekBudgetEuros(weekBudget)
+  const weekBudgetCents = validBudget === null ? null : Math.round(validBudget * 100)
+  // A two-stop route cannot assert budget headroom until its extra visit
+  // costs are explicitly supplied. One-store routes need no second stop.
+  const routeWithCostCents = visitsBoth
+    ? extraCostCents === null ? null : plan.totalCents + extraCostCents
+    : plan.totalCents
   const netAdvantage = extraCostCents === null ? null :
     selectedMixed.additionalDifferenceCents - extraCostCents
   const key = (id: string) => JSON.stringify([captured.PLUS, captured.DekaMarkt, id])
@@ -176,6 +185,21 @@ export function MixedStoreShoppingCard({
         ? 'PLUS én DekaMarkt'
         : plan.lines[0]?.store ?? 'Geen winkel'} ·
         {' '}{money.format(plan.totalCents / 100)} aan winkelproducten.</p>
+      {weekBudgetCents !== null && <p role="status" className="mixed-store-route__budget">
+        {routeWithCostCents === null
+          ? <>Je Planner-weekbudget is {money.format(weekBudgetCents / 100)}.
+              Deze route bezoekt twee winkels; zonder jouw extra bezoekkosten is de
+              totale budgetruimte <strong>onbekend</strong>.
+              Alleen de gecontroleerde producten kosten {money.format(plan.totalCents / 100)}.</>
+          : routeWithCostCents > weekBudgetCents
+            ? <>Je gekozen route kost {money.format(routeWithCostCents / 100)}
+                {' '}en ligt <strong>{money.format((routeWithCostCents - weekBudgetCents) / 100)}
+                {' '}boven je Planner-weekbudget</strong>{visitsBoth ? ' inclusief jouw extra bezoekkosten' : ''}.</>
+            : <>Je gekozen route kost {money.format(routeWithCostCents / 100)}
+                {' '}en blijft <strong>{money.format((weekBudgetCents - routeWithCostCents) / 100)}
+                {' '}binnen je Planner-weekbudget</strong>{visitsBoth ? ' inclusief jouw extra bezoekkosten' : ''}.</>}
+        {' '}Geen garantie op actuele kassaprijzen of andere niet-ingevulde kosten.
+      </p>}
       {mode === 'auto' && chooseSingle && <p role="status">
         {selectedMixed.additionalDifferenceCents < 0
           ? 'Door je handmatige winkelvoorkeuren kost de samengestelde route al meer dan het goedkoopste hele mandje bij één winkel.'
