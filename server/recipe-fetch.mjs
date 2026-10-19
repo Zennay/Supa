@@ -13,13 +13,56 @@ export function publicAddress(address) {
     (a === 203 && b === 0 && c === 113))
 }
 
+// Apply this before DNS lookup and before EVERY redirect. A client-side
+// sanitized link is not sufficient: the endpoint also accepts direct POSTs.
+// Keys are repeatedly decoded because URLSearchParams removes only one layer.
+const PRIVATE_QUERY_KEY = /^(?:code|auth(?:orization)?code|oauthcode|accesstoken|refreshtoken|idtoken|clientsecret|clientidsecret|codeverifier|pkceverifier|codechallenge|samlrequest|samlresponse|assertion|password|passwd|session(?:id|token)?|state|csrf|jwt|bearer|apikey|secret|token|credential|signature|sig)$/u
+
+function privateRecipeQueryKey(key) {
+  let current = key
+  for (let depth = 0; depth < 8; depth++) {
+    const folded = current.normalize('NFKC')
+      .replace(/[\\p{Default_Ignorable_Code_Point}\\p{Mark}]/gu, '')
+      .toLocaleLowerCase('en').replace(/[^a-z0-9]/gu, '')
+    if (PRIVATE_QUERY_KEY.test(folded) ||
+        /(?:token|secret|password|credential|signature|apikey|codeverifier|codechallenge|samlresponse|csrf)/u.test(folded)) return true
+    if (!/%[0-9a-fA-F]{2}/u.test(current)) return false
+    let decoded
+    try { decoded = decodeURIComponent(current) } catch { return true }
+    if (decoded === current) return false
+    current = decoded
+  }
+  return true
+}
+
+function privateNestedRecipeQuery(value) {
+  let current = value
+  for (let depth = 0; depth < 8; depth++) {
+    const marker = current.indexOf('?')
+    if (marker !== -1) {
+      const query = current.slice(marker + 1).split('#', 1)[0]
+      for (const key of new URLSearchParams(query).keys())
+        if (privateRecipeQueryKey(key)) return true
+    }
+    if (!/%[0-9a-fA-F]{2}/u.test(current)) return false
+    let decoded
+    try { decoded = decodeURIComponent(current) } catch { return true }
+    if (decoded === current) return false
+    current = decoded
+  }
+  return true
+}
+
 export function recipeUrl(input) {
   if (typeof input !== 'string' || input.length > 2048) throw new Error('Ongeldige receptlink.')
   const url = new URL(input)
   if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443') ||
       isIP(url.hostname.replace(/^\[|\]$/g, '')) || !url.hostname.includes('.') ||
       /\.(localhost|local|internal|test|invalid)$/i.test(url.hostname)) throw new Error('Gebruik een publieke HTTPS-receptlink.')
-  for (const key of url.searchParams.keys()) if (/token|password|secret|auth|api.?key|signature/i.test(key)) throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
+  for (const [key, value] of url.searchParams) {
+    if (privateRecipeQueryKey(key) || privateNestedRecipeQuery(value))
+      throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
+  }
   url.hash = ''
   return url
 }
