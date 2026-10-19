@@ -133,20 +133,32 @@ function sourcePackRate(product: import('../../domain/basket.ts').StoreProduct):
 /** Exact whole-pack preview for one original source candidate only.
  * The canonical basket/review gate still decides whether this can become
  * part of a complete priced weekly shop. */
-function sourceWholePackPreview(product: OfflineStoreProduct,
-  required: BasketTraceLine['requirement']): string {
+function sourceWholePackCents(product: OfflineStoreProduct,
+  required: BasketTraceLine['requirement']): number | null {
   if (!product.available || product.packAmount === null ||
       required.amount === null || !Number.isFinite(required.amount) ||
-      required.amount <= 0) return ''
+      required.amount <= 0) return null
   const packs = calculateDecimalPackCount(
     [{ amount: required.amount, unit: required.unit }],
     { amount: product.packAmount, unit: product.packUnit, count: product.packCount ?? 1 })
-  if (packs === null || !Number.isSafeInteger(packs) || packs < 1) return ''
+  if (packs === null || !Number.isSafeInteger(packs) || packs < 1) return null
   const totalCents = packs * product.priceCents
-  return Number.isSafeInteger(totalCents) && totalCents >= 0
-    ? ' · ' + packs + ' hele pak(ken): ' + euros.format(totalCents / 100) +
-      ' voor deze ingrediëntregel'
-    : ''
+  return Number.isSafeInteger(totalCents) && totalCents >= 0 ? totalCents : null
+}
+function sourceWholePackPreview(product: OfflineStoreProduct,
+  required: BasketTraceLine['requirement'], currentCents: number | null = null): string {
+  const total = sourceWholePackCents(product, required)
+  if (total === null) return ''
+  const packs = calculateDecimalPackCount(
+    [{ amount: required.amount!, unit: required.unit }],
+    { amount: product.packAmount!, unit: product.packUnit, count: product.packCount ?? 1 })!
+  const delta = currentCents === null || !Number.isSafeInteger(currentCents) ? '' :
+    total === currentCents ? ' · gelijk aan huidige regel' :
+      ' · ' + euros.format(Math.abs(total - currentCents) / 100) +
+      (total < currentCents ? ' rekenkundig lager' : ' rekenkundig hoger') +
+      ' dan huidige regel (controleer productgelijkwaardigheid)'
+  return ' · ' + packs + ' hele pak(ken): ' + euros.format(total / 100) +
+    ' voor deze ingrediëntregel' + delta
 }
 function searchableSourceText(value: string): string {
   // Discoverability only: never change an original source name/SKU/price.
@@ -168,17 +180,8 @@ function sourceOptions(products: OfflineStoreProduct[],
   // Price sorting is DISCOVERY, never an accepted match or a claim about
   // products being interchangeable. Reject impossible whole-pack arithmetic.
   // The existing suggestion rank wins ties and remains the default.
-  const wholeCost = (p: OfflineStoreProduct): number | null => {
-    if (requestedAmount === null || !Number.isFinite(requestedAmount) ||
-        requestedAmount <= 0 || p.packAmount === null ||
-        !Number.isSafeInteger(p.priceCents) || p.priceCents < 0) return null
-    const packs = calculateDecimalPackCount(
-      [{ amount: requestedAmount, unit }],
-      { amount: p.packAmount, unit: p.packUnit, count: p.packCount ?? 1 })
-    if (packs === null || !Number.isSafeInteger(packs) || packs < 1) return null
-    const total = packs * p.priceCents
-    return Number.isSafeInteger(total) ? total : null
-  }
+  const wholeCost = (p: OfflineStoreProduct): number | null =>
+    sourceWholePackCents(p, { amount: requestedAmount, unit })
   const rate = (p: OfflineStoreProduct): number | null =>
     privatePackUnitRate({ amount: p.packAmount, unit: p.packUnit,
       count: p.packCount ?? 1, priceCents: p.priceCents })?.centsPerUnit ?? null
@@ -2116,7 +2119,8 @@ export function OfflineReviewedWorkbench({
                                       <option value="">Automatisch voorstellen (of onbekend)</option>
                                       {choices.shown.map(product => (
                                         <option key={product.id} value={product.id}>
-                                          {product.name} · {product.id} · {(product.packCount ?? 1)} × {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)} per pak{sourcePackRate(product)}{sourceWholePackPreview(product, line.requirement)}
+                                          {product.name} · {product.id} · {(product.packCount ?? 1)} × {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)} per pak{sourcePackRate(product)}{sourceWholePackPreview(product, line.requirement,
+                                            line.status === 'matched' ? line.lineTotalCents : null)}
                                         </option>
                                       ))}
                                     </select>
@@ -2133,7 +2137,8 @@ export function OfflineReviewedWorkbench({
                                           {' '}· {product.packCount ?? 1} × {product.packAmount} {product.packUnit}
                                           {' '}· {euros.format(product.priceCents / 100)} per verpakking
                                           {sourcePackRate(product)}
-                                          {sourceWholePackPreview(product, line.requirement)}
+                                          {sourceWholePackPreview(product, line.requirement,
+                                            line.status === 'matched' ? line.lineTotalCents : null)}
                                           <button type="button"
                                             disabled={manualSku[store][line.id] === product.id}
                                             aria-label={'Kies bronartikel ' + product.name + ' voor ' + line.ingredientLabel}
