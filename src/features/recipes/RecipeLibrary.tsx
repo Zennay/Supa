@@ -4,6 +4,7 @@ import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, type SavedRecipe } from './recipeLibrary'
 import { importRecipeLink } from './importRecipeLink'
+import { importPlainTextRecipe } from './importPlainTextRecipe'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { m2InitialPlan } from '../../data/m2Fixture'
@@ -57,7 +58,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [favoriteState, setFavoriteState] = useState(initialFavorites)
   const favoriteRef = useRef(favoriteState)
   const favorites = favoriteState.ids
-  const [mode, setMode] = useState<'manual' | 'url' | 'paste'>('manual')
+  const [mode, setMode] = useState<'manual' | 'url' | 'paste' | 'plain'>('manual')
   const [form, setForm] = useState(blank)
   const [url, setUrl] = useState('')
   const [pastedSource, setPastedSource] = useState('')
@@ -231,7 +232,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setBackupError(cause instanceof Error ? cause.message : 'Importeren is niet gelukt. Je bestaande recepten blijven staan.')
     }
   }
-  function openEditor(next: 'manual' | 'url' | 'paste') {
+  function openEditor(next: 'manual' | 'url' | 'paste' | 'plain') {
     pasteReadVersion.current++; setPasteFileMessage('')
     request.current?.abort(); setBusy(false); setMode(next); setForm(blank); setSource(null); setUrl(''); setPastedSource(''); setPreview(null); setError(''); setEditingId(null); setIsVariant(false); saving.current = false
     setBackupPreview(null)
@@ -316,6 +317,17 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setError(cause instanceof Error ? cause.message : 'Kon de geplakte receptgegevens niet verwerken.')
     }
   }
+  function importPlainText(event: FormEvent) {
+    event.preventDefault()
+    setError('')
+    setPreview(null)
+    try {
+      const draft = importPlainTextRecipe(pastedSource)
+      adoptImportedRecipe(draft, 'Recepttekst lokaal herkend. Controleer hoeveelheden en stappen vóór opslaan.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Kon deze recepttekst niet inlezen.')
+    }
+  }
   function check(event: FormEvent) {
     event.preventDefault(); setError('')
     try {
@@ -366,7 +378,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       <small>Favorieten blijven lokaal bewaard in deze browser; receptgegevens en links worden niet meegestuurd.</small>
       {favoriteState.error && <p role="alert" className="recipe-error">{favoriteState.error}</p>}
     </section>
-    <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button><button onClick={() => openEditor('paste')}>Plak receptgegevens (JSON-LD)</button></div>
+    <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button><button onClick={() => openEditor('paste')}>Plak receptgegevens (JSON-LD)</button><button onClick={() => openEditor('plain')}>Plak gewone recepttekst</button></div>
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
       <h2>Mijn recepten meenemen</h2>
       <p>Maak een privé-backup van je eigen recepten, of herstel een eerdere SUPA-receptenbackup.
@@ -413,8 +425,20 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     {!!demo.length && <p className="recipe-note">Zes uitgewerkte SUPA-recepten met ingrediënten en bereidingsstappen, ook beschikbaar in Planner. Dit zijn geen supermarktaanbiedingen; prijzen en besparingen zijn niet geverifieerd.</p>}
     {library.error && <p role="alert">{library.error}</p>}<p role="status" className="hifi-feedback">{message}</p>
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
-      <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : mode === 'paste' ? 'Receptgegevens lokaal plakken' : editingId ? 'Mijn recept aanpassen' : isVariant ? 'Receptvariant maken' : 'Eigen recept toevoegen'}</h2>
-      {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
+      <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : mode === 'paste' ? 'Receptgegevens lokaal plakken' : mode === 'plain' ? 'Recepttekst lokaal importeren' : editingId ? 'Mijn recept aanpassen' : isVariant ? 'Receptvariant maken' : 'Eigen recept toevoegen'}</h2>
+      {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('plain'); setError('') }}>Plak gewone recepttekst</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
+        : mode === 'plain' ? <form className="recipe-form" onSubmit={importPlainText}>
+          <p>Plak een gewone recepttekst, bijvoorbeeld van een pagina zonder JSON-LD.
+            Gebruik een titel, Porties: 2, Tijd: 20 minuten en de koppen Ingrediënten:
+            en Bereiding:. De omzetting blijft lokaal. Elke hoeveelheid moet je daarna controleren.</p>
+          <label>Recepttekst (maximaal 500 kB)
+            <textarea required rows={12} maxLength={500000}
+              placeholder={'Pasta met spinazie\nPorties: 2\nTijd: 20 minuten\nIngrediënten:\n- 200 g pasta\n- 100 g spinazie\nBereiding:\n1. Kook pasta'}
+              value={pastedSource} onChange={event => setPastedSource(event.target.value)} />
+          </label>
+          <button className="recipe-primary" type="submit">Zet tekst om naar receptconcept</button>
+          <button type="button" onClick={() => { setMode('manual'); setError('') }}>Handmatig toevoegen</button>
+        </form>
         : mode === 'paste' ? <form className="recipe-form" onSubmit={importPastedRecipe}>
           <p>Plak JSON-LD met schema.org/Recipe of de HTML-broncode van een receptpagina
             die je zelf rechtmatig hebt ontvangen. Supa leest alleen lokaal: er wordt geen link
