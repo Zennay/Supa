@@ -5,6 +5,7 @@ import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privat
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
 import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwnSourceCapture.ts'
+import { privateSourceChangeCsv } from './privateSourceChangeCsv.ts'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
@@ -205,6 +206,26 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         cause instanceof Error ? cause.message : 'De nieuwere winkelopname kon niet worden ingelezen.')
     } finally {
       if (ticket === revision.current) setBusy(false)
+    }
+  }
+
+  function downloadRefreshChanges() {
+    if (!refreshSummary) return
+    try {
+      const csv = privateSourceChangeCsv(refreshSummary.store, refreshSummary.changes)
+      const url = URL.createObjectURL(new Blob([csv], {
+        type: 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-eigen-' + refreshSummary.store.toLowerCase() + '-sku-wijzigingen.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Alle eigen originele SKU-wijzigingen lokaal als privé-CSV gedownload; geen retailerprijsbewijs.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Volledige bronwijzigingenlijst is niet exporteerbaar.')
     }
   }
 
@@ -558,6 +579,11 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
                 {' '}andere originele artikelen. Open de complete nieuwe bron in Vergelijk.
               </small>}
           </details>}
+          {refreshSummary.changes.affectedTotal > 0 &&
+            <button type="button" className="ghost-button"
+              onClick={downloadRefreshChanges}>
+              Download alle gewijzigde originele SKU’s als privé-CSV
+            </button>}
           <small>Dit zijn verschillen tussen je twee eigen bronbestanden,
             geen onafhankelijke actuele prijscontrole. Verdwenen of ongeprijsde
             artikelen moeten opnieuw gekoppeld of werkelijk opgenomen worden;
