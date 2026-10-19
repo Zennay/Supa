@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
+import type { MatchUnit } from '../../domain/matching.ts'
+import { privatePackUnitRate } from './privateUnitPrice.ts'
 import { historicalRetailerProducts } from '../products/historicalRetailerProducts.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
@@ -94,6 +97,29 @@ function hasPartialOwnCapture(row: ProductDraft): boolean {
     row.packAmount.trim() || row.priceEuros.trim() ||
     row.available || row.availabilityReviewed,
   )
+}
+
+const draftEuros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+function currentDraftPackPreview(row: ProductDraft, need: { amount: number | null; unit: MatchUnit }): string | null {
+  if (!isCompleteOwnPriceDraft(row) || need.amount === null || !Number.isFinite(need.amount) ||
+      need.amount <= 0) return null
+  const packAmount = amountOrNull(row.packAmount.trim())
+  const priceCents = eurosToCents(row.priceEuros.trim())
+  if (packAmount === null || priceCents === null) return null
+  const count = Number(row.packCount)
+  const packs = calculateDecimalPackCount(
+    [{ amount: need.amount, unit: need.unit }],
+    { amount: packAmount, unit: row.packUnit, count },
+  )
+  if (packs === null || !Number.isSafeInteger(packs) || packs <= 0) return null
+  const total = packs * priceCents
+  if (!Number.isSafeInteger(total) || total < 0) return null
+  const rate = privatePackUnitRate({
+    amount: packAmount, unit: row.packUnit, count, priceCents,
+  })
+  return packs + ' hele verpakking(en) × ' + draftEuros.format(priceCents / 100) +
+    ' = ' + draftEuros.format(total / 100) + ' voor deze ingrediëntvraag' +
+    (rate ? ' · ' + draftEuros.format(rate.centsPerUnit / 100) + ' per ' + rate.unit : '')
 }
 
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
@@ -737,6 +763,14 @@ export function LocalTwoStorePriceEditor({
                   }, need.unit)} />
                 Zelf gecontroleerd niet beschikbaar (geen prijs; aangevinkte status wist een ingevoerde prijs)
               </label>
+              {currentDraftPackPreview(row, need) && (
+                <p className="offline-manual-editor__pack-preview">
+                  <strong>Verpakkingsberekening uit jouw concept</strong><br />
+                  {currentDraftPackPreview(row, need)}
+                  <small>Alleen rekenhulp: originele SKU, prijs en beschikbaarheid
+                    worden pas in de volgende stap persoonlijk beoordeeld.</small>
+                </p>
+              )}
             </fieldset>
           })}
         </section>)}
