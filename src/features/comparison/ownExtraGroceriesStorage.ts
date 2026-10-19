@@ -108,3 +108,15 @@ export const extraGroceriesSavedEvent = 'supa:private-week-extras-saved'
 export function signalSavedExtras(identity: string) {
   window.dispatchEvent(new CustomEvent(extraGroceriesSavedEvent, { detail: identity }))
 }
+
+/** Retire only this week’s validated legacy slot AFTER a durable scoped write.
+ * Never delete a different week, corrupt data or independently updated record. */
+export function retireLegacyExtrasForWeek(identity: string) {
+  try {
+    const raw = window.sessionStorage.getItem(legacyKey)
+    if (raw === null) return
+    decodeSaved(raw, identity)
+    if (window.sessionStorage.getItem(legacyKey) === raw)
+      window.sessionStorage.removeItem(legacyKey)
+  } catch { /* Keep ambiguous legacy data untouched. */ }
+}

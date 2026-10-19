@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { decodeSaved, extraGroceriesSavedEvent, restore, signalSavedExtras, storageKey, valid, type Item, type Unit } from './ownExtraGroceriesStorage.ts'
+import { decodeSaved, extraGroceriesSavedEvent, restore, retireLegacyExtrasForWeek, signalSavedExtras, storageKey, valid, type Item, type Unit } from './ownExtraGroceriesStorage.ts'
 
 type Snapshot = { identity: string; items: Item[]; raw: string | null; locked: boolean }
 
@@ -49,6 +49,7 @@ export function PrivateRouteExtraGroceries({
         throw Error('Er passen niet meer persoonlijke boodschappen in dit weekmenu.')
       decodeSaved(raw, identity)
       window.sessionStorage.setItem(key, raw)
+      retireLegacyExtrasForWeek(identity)
       setSnapshot({ identity, items: updated, raw, locked: false })
       signalSavedExtras(identity)
       setMessage(announcement + ' Winkel en prijs blijven onbekend.')
