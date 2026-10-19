@@ -23,3 +23,7 @@
 .planner-actual-store-compare__route-stores li{margin:.4rem 0;overflow-wrap:anywhere}
 @media(max-width:680px){.planner-actual-store-compare__route-stores{grid-template-columns:1fr}}
 .planner-actual-store-compare__downloads{display:flex;flex-wrap:wrap;gap:.7rem;margin:1rem 0}
+.planner-actual-store-compare__progress{display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;margin:1rem 0}
+.planner-actual-store-compare__progress progress{width:160px;max-width:100%}
+.planner-actual-store-compare__progress label,.planner-actual-store-compare__route-stores label{display:flex;gap:.5rem;align-items:center}
+.planner-actual-store-compare__route-stores input{flex-shrink:0}

@@ -26,6 +26,21 @@ export function PlannerActualTwoStoreSummary({plus,deka,comparison,source,fresh,
   const [costChoice, setCostChoice] = useState<{ key: string; raw: string } | null>(null)
   const visitCostText = costChoice?.key === routeKey ? costChoice.raw : ''
   const [downloadMessage, setDownloadMessage] = useState('')
+  // Private in-memory ticks cannot follow an altered SKU, pack, price or week.
+  const [routeProgress, setRouteProgress] = useState<{
+    key: string; done: string[]
+  } | null>(null)
+  const [onlyOpen, setOnlyOpen] = useState(false)
+  const doneKeys = routeProgress?.key === routeKey ? routeProgress.done : []
+  const checkedKeys = new Set(doneKeys)
+  function toggleRouteLine(lineKey: string) {
+    setRouteProgress(current => {
+      const done = current?.key === routeKey ? current.done : []
+      return { key: routeKey, done: done.includes(lineKey)
+        ? done.filter(key => key !== lineKey) : [...done, lineKey] }
+    })
+  }
+
   const complete = (basket:OneStoreBasket) => basket.lines.length>0 &&
     basket.selectedMealCount>0 && basket.unresolvedLineCount===0 &&
     basket.matchedLineCount===basket.lines.length &&
@@ -75,16 +90,18 @@ export function PlannerActualTwoStoreSummary({plus,deka,comparison,source,fresh,
       }
       const costCents = second ? extra : 0
       const text = kind === 'txt'
-        ? formatMixedStoreShoppingPlan(freshPlan, captured, {}, costCents)
+        ? formatMixedStoreShoppingPlan(freshPlan, captured,
+            Object.fromEntries(doneKeys.map(key => [key, true])),
+            costCents, onlyOpen)
         : kind === 'csv'
           ? (await import('../comparison/mixedStoreRouteCsv.ts'))
             .exportMixedStoreRouteCsv({
-              plus, deka, route: freshPlan, captured, checked: new Set<string>(),
+              plus, deka, route: freshPlan, captured, checked: checkedKeys,
               extraVisitCostCents: costCents, strategy: 'auto',
             })
           : (await import('../comparison/mixedStorePrintHtml.ts'))
             .printMixedStoreRouteHtml({
-              plus, deka, route: freshPlan, captured, checked: new Set<string>(),
+              plus, deka, route: freshPlan, captured, checked: checkedKeys,
               extraVisitCostCents: costCents, strategy: 'auto',
             })
       if (new TextEncoder().encode(text).byteLength > 256_000) {
@@ -180,12 +197,35 @@ export function PlannerActualTwoStoreSummary({plus,deka,comparison,source,fresh,
           'Met jouw opgegeven extra kosten is één volledige winkel ' +
             euros.format(Math.abs(netDifference) / 100) + ' voordeliger.' :
           'Inclusief jouw opgegeven extra kosten komen beide routes gelijk uit.'}</p>
+      <div className="planner-actual-store-compare__progress">
+        <strong role="status">{doneKeys.length} van {mixed.lines.length} producten afgevinkt</strong>
+        <progress max={mixed.lines.length} value={doneKeys.length}
+          aria-label="Voortgang eigen gecombineerde winkelroute" />
+        <span>Nog op je lijst: {euros.format(mixed.lines
+          .filter(line => !checkedKeys.has(line.key))
+          .reduce((sum, line) => sum + line.lineTotalCents, 0) / 100)}</span>
+        <label><input type="checkbox" checked={onlyOpen}
+          onChange={event => setOnlyOpen(event.target.checked)} />
+          Alleen nog te kopen artikelen tonen</label>
+        <button type="button" className="ghost-button" disabled={!doneKeys.length}
+          onClick={() => setRouteProgress({ key: routeKey, done: [] })}>
+          Wis mijn vinkjes
+        </button>
+      </div>
       <div className="planner-actual-store-compare__route-stores">
         {(['PLUS', 'DekaMarkt'] as const).map(shop => <section key={shop}>
           <h4>{shop} · {euros.format(mixed.totals[shop] / 100)}</h4>
-          <ul>{mixed.lines.filter(line => line.store === shop).map(line =>
-            <li key={line.key}>{line.packs} × {line.productName}
-              {' '}({line.ingredientLabel}) · {euros.format(line.lineTotalCents / 100)}</li>)}</ul>
+          <ul>{mixed.lines.filter(line => line.store === shop &&
+            (!onlyOpen || !checkedKeys.has(line.key))).map(line =>
+            <li key={line.key}><label>
+              <input type="checkbox" checked={checkedKeys.has(line.key)}
+                onChange={() => toggleRouteLine(line.key)} />
+              <span>{line.packs} × {line.productName}
+                {' '}({line.ingredientLabel}) · {euros.format(line.lineTotalCents / 100)}</span>
+            </label></li>)}</ul>
+          {onlyOpen && !mixed.lines.some(line =>
+            line.store === shop && !checkedKeys.has(line.key)) &&
+            <p>Geen openstaande artikelen bij {shop}.</p>}
         </section>)}
       </div>
       <div className="planner-actual-store-compare__downloads">
