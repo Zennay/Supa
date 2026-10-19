@@ -1570,11 +1570,17 @@ export function OfflineReviewedWorkbench({
         }) ?? [],
         missingIngredients: basket?.lines.filter(line =>
           line.status !== 'matched')
-          .map(line => ({ id: line.id, label: line.ingredientLabel })) ?? [],
+          .map(line => ({
+            id: line.id, label: line.ingredientLabel,
+            amount: line.requirement.amount, unit: line.requirement.unit,
+          })) ?? [],
         awaitingReviewIngredients: basket?.lines.filter(line =>
           line.status === 'matched' &&
           !isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
-          .map(line => ({ id: line.id, label: line.ingredientLabel })) ?? [],
+          .map(line => ({
+            id: line.id, label: line.ingredientLabel,
+            amount: line.requirement.amount, unit: line.requirement.unit,
+          })) ?? [],
         fresh: nowNs >= capture.observedNs - 300_000_000_000n &&
           nowNs - capture.observedNs <= 604_800_000_000_000n,
       }
