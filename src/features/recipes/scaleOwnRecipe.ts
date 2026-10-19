@@ -1,6 +1,7 @@
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport.ts'
 import type { SavedRecipe } from './recipeLibrary.ts'
 import { toPlannerRecipe } from './plannerRecipes.ts'
+import { scaledMetricPortionAmount } from '../../domain/metricPortionScale.ts'
 
 /**
  * Explicitly create a new, unpriced recipe variant. Never mutate the original
@@ -18,16 +19,12 @@ export function scaleOwnRecipe(recipe: SavedRecipe, portions: number): UserRecip
     throw new Error('Dit recept heeft al dat aantal porties. Gebruik het origineel in Planner.')
   }
   const lines = recipe.ingredients.map(ingredient => {
-    const amount = ingredient.amount!
-    const scaled = amount * portions / recipe.servings!
     const unit = ingredient.unit
-    if (!Number.isFinite(scaled) || scaled <= 0 || scaled > 1_000_000 || !unit ||
-        (unit === 'piece' && !Number.isSafeInteger(scaled))) {
-      throw new Error('Eén of meer ingrediënten bevatten gedeeltelijke stuks of ongeldige hoeveelheden. Maak hiervoor handmatig een variant.')
-    }
-    const rounded = unit === 'piece' ? scaled : Math.ceil(scaled * 1000) / 1000
-    if (!Number.isFinite(rounded) || rounded <= 0 || rounded > 1_000_000) {
-      throw new Error('Een berekende hoeveelheid is te groot. Bewerk de porties handmatig.')
+    const rounded = unit
+      ? scaledMetricPortionAmount(ingredient.amount!, recipe.servings!, portions, unit)
+      : null
+    if (rounded === null) {
+      throw new Error('Eén of meer ingrediënten bevatten onveilige portiehoeveelheden of gedeeltelijke stuks. Maak hiervoor handmatig een variant.')
     }
     return String(rounded).replace('.', ',') + ' ' + (unit === 'piece' ? 'stuks' : unit) + ' ' + ingredient.label
   })
