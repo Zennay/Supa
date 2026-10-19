@@ -37,6 +37,7 @@ type CapturePreviewStore = {
   matching?: {
     proposed: number; unresolved: number; total: number
     lines: { id: string; label: string; status: 'matched' | 'unresolved'
+      amount: number | null; unit: string
       product: string | null; originalSku: string | null
       packs: number | null; reasons: string[] }[]
   }
@@ -342,8 +343,9 @@ export function OfflineReviewedWorkbench({
           proposed: basket.matchedLineCount,
           unresolved: basket.unresolvedLineCount,
           total: basket.lines.length,
-          lines: basket.lines.slice(0, 60).map(line => ({
+          lines: basket.lines.map(line => ({
             id: line.id, label: line.ingredientLabel,
+            amount: line.requirement.amount, unit: line.requirement.unit,
             status: line.status,
             product: line.status === 'matched' ? line.productName : null,
             originalSku: line.status === 'matched' ? line.productId : null,
@@ -364,6 +366,56 @@ export function OfflineReviewedWorkbench({
         (e instanceof Error ? e.message : 'CSV ongeldig.') +
         ' Vorige winkeldata en productbevestigingen zijn behouden.')
     } finally { if (version === importRevision.current) setBusy(false) }
+  }
+
+  function downloadMissingFromPreview() {
+    if (!currentPreview || busy) return
+    try {
+      const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
+      const lines = [
+        'SUPA · ontbrekende prijzen voor het huidige echte weekmenu',
+        'Dit is GEEN retailerproduct, prijsopname, bronautorisatie of besparingsbewijs.',
+        'Controleer zelf originele SKU, verpakking, bronmoment en echte prijs per winkel.',
+        '',
+      ]
+      let missing = 0
+      for (const store of stores) {
+        const observation = currentPreview.stores.find(entry => entry.retailer === store)
+        lines.push(store + (observation ? ' · opname aanwezig, openstaande productmatches:' :
+          ' · GEEN eigen winkelopname; al deze behoeften zijn ongeprijsd:'))
+        const needs = observation?.matching?.lines.filter(line => line.status === 'unresolved') ??
+          plannerCaptureNeeds.map(need => ({
+            label: need.label, amount: need.amount, unit: need.unit,
+          }))
+        if (!needs.length) lines.push('Geen openstaande matchingvoorstellen op basis van dit eigen bronblad.')
+        for (const need of needs) {
+          missing++
+          lines.push('- ' + clean(need.label) + ' · benodigd ' +
+            (need.amount === null ? 'onbekend' : String(need.amount)) +
+            ' ' + clean(need.unit) + ' · zelf oorspronkelijk winkelproduct controleren')
+        }
+        lines.push('')
+      }
+      if (!missing) {
+        setWeekExportMessage('Geen ontbrekende matches in beide lokale previews. Bevestig alsnog per winkel alle oorspronkelijke bronproducten en prijzen.')
+        return
+      }
+      lines.push('Onbekende regels zijn niet gelijk aan €0. Vul alleen echte rechtmatig verkregen gegevens in.')
+      const content = lines.join('\n') + '\n'
+      if (new TextEncoder().encode(content).byteLength > 256000)
+        throw Error('Lijst te groot voor een lokale download.')
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-alleen-ontbrekende-winkelproducten.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage(missing + ' nog openstaande fysieke winkelbehoeften lokaal opgeslagen; geen producten of prijzen verzonnen.')
+    } catch {
+      setWeekExportMessage('Onbekende producten konden niet veilig lokaal worden gedownload. Je originele bronopnames zijn behouden.')
+    }
   }
 
   function applyPreviewCsv() {
@@ -1422,7 +1474,7 @@ export function OfflineReviewedWorkbench({
                     jouw uiteindelijke winkelmand. Er is nog niets bevestigd,
                     geen compleet mandbedrag en geen prijsverschil vrijgegeven.</p>
                   <ul>
-                    {store.matching.lines.map(line => (
+                    {store.matching.lines.slice(0, 60).map(line => (
                       <li key={line.id}>
                         <strong>{line.label}</strong>:
                         {' '}{line.status === 'matched'
@@ -1433,9 +1485,9 @@ export function OfflineReviewedWorkbench({
                       </li>
                     ))}
                   </ul>
-                  {store.matching.total > store.matching.lines.length && (
+                  {store.matching.total > 60 && (
                     <p className="disclaimer">Nog
-                      {' '}{store.matching.total - store.matching.lines.length}
+                      {' '}{store.matching.total - 60}
                       {' '}Planner-regels verschijnen na het overnemen bij de volledige productreview.</p>
                   )}
                 </details>
@@ -1449,6 +1501,13 @@ export function OfflineReviewedWorkbench({
                 retailerrechten, bronverificatie of besparingsbewijs.
                 Controleer na overname zelf ieder oorspronkelijk artikel,
                 de verpakking, prijs en datum.</p>
+              {currentPreview.stores.some(store => (store.matching?.unresolved ?? 0) > 0) ||
+                currentPreview.stores.length < 2 ? (
+                <button type="button" className="ghost-button" disabled={busy}
+                  onClick={downloadMissingFromPreview}>
+                  Download alleen ontbrekende winkelproducten (TXT)
+                </button>
+              ) : null}
               <button type="button" disabled={busy} onClick={applyPreviewCsv}>
                 {currentPreview.files.length === 2
                   ? 'Neem beide eigen winkelopnames over en controleer producten'
