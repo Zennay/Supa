@@ -4,6 +4,7 @@ import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
+type OwnStore = 'PLUS' | 'DekaMarkt'
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
@@ -13,7 +14,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenCompariso
   reviewed: PrivateReviewedBaskets
   search: string
   onOpenComparison: () => void
-  onOpenList: () => void
+  onOpenList: (store: OwnStore) => void
 }) {
   const fresh = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
   const plus = fresh?.stores.PLUS
@@ -40,6 +41,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenCompariso
     return [{ plus: line, deka: alternate }]
   })
   const delta = deka.basket.totalCents - plus.basket.totalCents
+  const cheapest: OwnStore = delta >= 0 ? 'PLUS' : 'DekaMarkt'
   const leader = delta === 0 ? 'Beide mandjes zijn even duur.'
     : (delta > 0 ? 'PLUS' : 'DekaMarkt') + ' is ' +
       money.format(Math.abs(delta) / 100) + ' goedkoper voor alle hele verpakkingen.'
@@ -73,6 +75,6 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenCompariso
       </article>)}
       {!rows.length && <p>Geen vergelijkbare artikelen passen bij je zoekopdracht.</p>}
     </div>
-    <button type="button" onClick={onOpenList}>Open mijn echte boodschappenroute</button>
+    <button type="button" onClick={() => onOpenList(cheapest)}>Open het goedkoopste volledige winkelmandje ({cheapest}) in Lijst</button>
   </section>
 }

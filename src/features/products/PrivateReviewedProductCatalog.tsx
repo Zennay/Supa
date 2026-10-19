@@ -41,7 +41,7 @@ export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOp
           onChange={event => setQuery(event.target.value)} placeholder="Product, SKU of ingrediënt" /></label>
       </div>
       {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
-        search={search} onOpenComparison={onOpenComparison} onOpenList={() => onOpenList()} />}
+        search={search} onOpenComparison={onOpenComparison} onOpenList={onOpenList} />}
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.</p>
       <div className="private-reviewed-products__grid">{visible.map(({ shop, line, observedAt }) => <article
         key={JSON.stringify([shop, line.id, line.productId])}>
