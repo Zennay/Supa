@@ -60,6 +60,16 @@ export function CompleteWeekBackupControls({ identity, plan, recipes, activeDays
       const recovered = readCompleteWeekBackup(raw, selected, demandIdentity, keys)
       if (!window.confirm('Herstel alle eigen extra artikelen en Planner-vinkjes voor exact deze week? De bestaande waarden worden na jouw toestemming vervangen; er komen GEEN winkelprijzen of productgoedkeuringen bij.')) return
       if (selected !== current.current) throw Error('Weekmenu gewijzigd; niets hersteld.')
+      // A user can edit the physical recipe quantities while the browser's
+      // confirmation dialog is open. The named Planner week can stay the
+      // same while the exact demand (and allowed checkbox keys) has changed.
+      // Refuse the entire restore rather than attaching old ticks to food
+      // which now has a different physical quantity.
+      const currentPhysical = physicalWeek()
+      if (currentPhysical.demandIdentity !== demandIdentity ||
+          JSON.stringify(currentPhysical.keys) !== JSON.stringify(keys)) {
+        throw Error('De fysieke hoeveelheden van deze Planner-week zijn gewijzigd; niets hersteld.')
+      }
       const extrasKey = storageKey(selected)
       const oldExtras = window.sessionStorage.getItem(extrasKey)
       if (oldExtras !== currentRaw) throw Error('Deze tablijst werd gewijzigd; niets hersteld.')
