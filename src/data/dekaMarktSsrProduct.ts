@@ -188,7 +188,7 @@ function corroborateDekaOffer(offer: JsonObject, expectedCents: number): boolean
   return true
 }
 
-type ComparablePack = { amount: number; unit: string; count: number }
+type ComparablePack = { amount: number | null; unit: string; count: number }
 const explicitWeightUnits: Record<string, string> = {
   g: 'g', gram: 'g', grams: 'g', kg: 'kg', kilogram: 'kg',
   ml: 'ml', milliliter: 'ml', millilitre: 'ml', l: 'l',
@@ -200,6 +200,7 @@ const explicitWeightUnits: Record<string, string> = {
 /** A metric quantity becomes an exact, bounded decimal integer in base
  * micrograms/microlitres/millionths of a piece, with multipack included. */
 function exactPhysicalPack(pack: ComparablePack): string | null {
+  if (pack.amount === null || !Number.isFinite(pack.amount) || pack.amount <= 0) return null
   const factor = pack.unit === 'kg' || pack.unit === 'l' ? 1000n :
     pack.unit === 'g' || pack.unit === 'ml' || pack.unit === 'piece' ? 1n : null
   if (factor === null || !Number.isSafeInteger(pack.count) || pack.count < 1) return null
