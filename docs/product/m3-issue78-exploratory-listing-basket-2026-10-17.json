@@ -1,0 +1,356 @@
+{
+  "schemaVersion": 1,
+  "recordType": "m3-exploratory-public-listing-research",
+  "source": "https://github.com/Zennay/Supa/issues/78#issuecomment-6241870814",
+  "issue": "https://github.com/Zennay/Supa/issues/78",
+  "originalListingResearchDate": "2026-10-17",
+  "userAcknowledgedComparisonDate": "2026-10-20",
+  "privacy": "no participant/receipt/account data",
+  "evidenceStatus": "exploratory-reference-not-field-evidence",
+  "sourceKind": "public-listing-and-search-index",
+  "baseline": "PLUS",
+  "candidate": "DekaMarkt",
+  "sharedSelectedStorePriceContext": null,
+  "manualCartReceiptOrConsentedExport": null,
+  "actualObservationTimestamp": null,
+  "realTimeAvailabilityEstablished": false,
+  "retailerAutomatedReusePermissionEstablished": false,
+  "eligibleForObservedWeekAssessment": false,
+  "publicSavingsClaimEligible": false,
+  "listingTotalsCents": {
+    "plus": 3549,
+    "dekamarkt": 3700,
+    "plusLowerThanDekaBy": 151
+  },
+  "disclaimer": "Only historical public listing whole-pack arithmetic. User confirmed that the comparison numbers are correct, not independently documented store-selected live prices/availability or ≤24h field observations. Never map listing amounts into actual M3 observation fields.",
+  "knownComparabilityCautions": [
+    "Edamame requires 2 cans per store: nominal 155g each, drained 130g each.",
+    "PLUS 500g vs Deka 1kg broccoli; different overshoot.",
+    "Teriyaki variant differs (honing vs zoet).",
+    "Deka cauliflower and teriyaki source URLs are category-level, not selected-store product records.",
+    "Deka basmati listed promotion must not be assumed for an actual store.",
+    "Sources vary in index age. Date is research note date, not an observedAt timestamp.",
+    "The selected basket is not proven cheapest/optimal."
+  ],
+  "lines": [
+    {
+      "line": 1,
+      "canonicalDemandLabel": "Kippendij 600g",
+      "plus": {
+        "referencePackText": "3×200g",
+        "packCount": 3,
+        "packAmount": 200,
+        "packUnit": "g",
+        "listingPricePerPackCents": 321,
+        "listingBasketLineTotalCents": 963,
+        "referenceUrl": "https://www.plus.nl/product/plus-boerentrots-kipdijfilet-2-stuks-stuk-200-g-202417",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "4×190g",
+        "packCount": 4,
+        "packAmount": 190,
+        "packUnit": "g",
+        "listingPricePerPackCents": 296,
+        "listingBasketLineTotalCents": 1184,
+        "referenceUrl": "https://www.dekamarkt.nl/producten/vlees-vis/kip-kalkoen/dekavers-kipdijfilet-2-stuks-190-g/95794",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "PLUS gisteren; Deka ~1 maand"
+    },
+    {
+      "line": 2,
+      "canonicalDemandLabel": "Basmati 450g",
+      "plus": {
+        "referencePackText": "2×400g",
+        "packCount": 2,
+        "packAmount": 400,
+        "packUnit": "g",
+        "listingPricePerPackCents": 149,
+        "listingBasketLineTotalCents": 298,
+        "referenceUrl": "https://www.plus.nl/product/bio-basmatirijst-zakje-400-g-851028",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "2×400g",
+        "packCount": 2,
+        "packAmount": 400,
+        "packUnit": "g",
+        "listingPricePerPackCents": 99,
+        "listingBasketLineTotalCents": 198,
+        "referenceUrl": "https://www.dekamarkt.nl/boodschappen/voorraadkast/rijst-couscous-quinoa/bio%2B%20basmatirijst/122992",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "Deka promo €0,99, webindex vandaag"
+    },
+    {
+      "line": 3,
+      "canonicalDemandLabel": "Kokosmelk 400ml",
+      "plus": {
+        "referencePackText": "1×400ml",
+        "packCount": 1,
+        "packAmount": 400,
+        "packUnit": "ml",
+        "listingPricePerPackCents": 259,
+        "listingBasketLineTotalCents": 259,
+        "referenceUrl": "https://www.plus.nl/product/fairtrade-original-kokosmelk-fairtrade-blik-400-ml-257727",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "1×400ml",
+        "packCount": 1,
+        "packAmount": 400,
+        "packUnit": "ml",
+        "listingPricePerPackCents": 255,
+        "listingBasketLineTotalCents": 255,
+        "referenceUrl": "https://www.dekamarkt.nl/producten/voorraadkast/internationale-keuken/fairtrade-kokosmelk/24548",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "Listings publiek"
+    },
+    {
+      "line": 4,
+      "canonicalDemandLabel": "Bloemkool 2st",
+      "plus": {
+        "referencePackText": "2×1st",
+        "packCount": 2,
+        "packAmount": 1,
+        "packUnit": "piece",
+        "listingPricePerPackCents": 285,
+        "listingBasketLineTotalCents": 570,
+        "referenceUrl": "https://www.plus.nl/product/biologisch-plus-bloemkool-1-stuks-308024",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "2×1st",
+        "packCount": 2,
+        "packAmount": 1,
+        "packUnit": "piece",
+        "listingPricePerPackCents": 279,
+        "listingBasketLineTotalCents": 558,
+        "referenceUrl": "https://www.dekamarkt.nl/biologisch",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "Deka categorie, niet specifieke winkel"
+    },
+    {
+      "line": 5,
+      "canonicalDemandLabel": "Garam masala 20g",
+      "plus": {
+        "referencePackText": "1×30g",
+        "packCount": 1,
+        "packAmount": 30,
+        "packUnit": "g",
+        "listingPricePerPackCents": 309,
+        "listingBasketLineTotalCents": 309,
+        "referenceUrl": "https://www.plus.nl/product/silvo-garam-massala-pot-30-g-375408",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "1×30g",
+        "packCount": 1,
+        "packAmount": 30,
+        "packUnit": "g",
+        "listingPricePerPackCents": 279,
+        "listingBasketLineTotalCents": 279,
+        "referenceUrl": "https://www.dekamarkt.nl/producten/voorraadkast/kruiden-specerijen/silvo-garam-masala-30-g/48772",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "Deka bron ~2 maanden"
+    },
+    {
+      "line": 6,
+      "canonicalDemandLabel": "Broccoli 250g",
+      "plus": {
+        "referencePackText": "1×500g",
+        "packCount": 1,
+        "packAmount": 500,
+        "packUnit": "g",
+        "listingPricePerPackCents": 135,
+        "listingBasketLineTotalCents": 135,
+        "referenceUrl": "https://www.plus.nl/product/plus-broccoli-los-500-gram-114122",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "1×1kg",
+        "packCount": 1,
+        "packAmount": 1,
+        "packUnit": "kg",
+        "listingPricePerPackCents": 238,
+        "listingBasketLineTotalCents": 238,
+        "referenceUrl": "https://www.dekamarkt.nl/producten/aardappelen-groente-fruit/groente/broccoli/4431",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "Groot verschillend overschot"
+    },
+    {
+      "line": 7,
+      "canonicalDemandLabel": "Edamame uitlek 150g",
+      "plus": {
+        "referencePackText": "2×155g",
+        "packCount": 2,
+        "packAmount": 155,
+        "packUnit": "g",
+        "listingPricePerPackCents": 239,
+        "listingBasketLineTotalCents": 478,
+        "referenceUrl": "https://www.plus.nl/product/bonduelle-edamame-bonen-blik-155-g-233136",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "2×155g",
+        "packCount": 2,
+        "packAmount": 155,
+        "packUnit": "g",
+        "listingPricePerPackCents": 239,
+        "listingBasketLineTotalCents": 478,
+        "referenceUrl": "https://www.dekamarkt.nl/producten/aardappelen-groente-fruit/groenteconserven/bonduelle%20edamame%20bonen/70149",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "130g uitlek per blik; Deka 3 maanden"
+    },
+    {
+      "line": 8,
+      "canonicalDemandLabel": "Teriyakisaus 60ml",
+      "plus": {
+        "referencePackText": "1×175ml",
+        "packCount": 1,
+        "packAmount": 175,
+        "packUnit": "ml",
+        "listingPricePerPackCents": 259,
+        "listingBasketLineTotalCents": 259,
+        "referenceUrl": "https://www.plus.nl/product/conimex-woksaus-teriyaki-honing-fles-175-ml-996344",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "1×175ml",
+        "packCount": 1,
+        "packAmount": 175,
+        "packUnit": "ml",
+        "listingPricePerPackCents": 255,
+        "listingBasketLineTotalCents": 255,
+        "referenceUrl": "https://www.dekamarkt.nl/producten/voorraadkast/internationale-keuken",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "Conimex honing vs zoet: varianten"
+    },
+    {
+      "line": 9,
+      "canonicalDemandLabel": "Spaghetti 250g",
+      "plus": {
+        "referencePackText": "1×500g",
+        "packCount": 1,
+        "packAmount": 500,
+        "packUnit": "g",
+        "listingPricePerPackCents": 69,
+        "listingBasketLineTotalCents": 69,
+        "referenceUrl": "https://www.plus.nl/product/bio-spaghetti-zak-500-g-560353",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "1×500g",
+        "packCount": 1,
+        "packAmount": 500,
+        "packUnit": "g",
+        "listingPricePerPackCents": 69,
+        "listingBasketLineTotalCents": 69,
+        "referenceUrl": "https://www.dekamarkt.nl/producten/voorraadkast/pasta-pasta-sauzen/bio%2B%20spaghetti/57827",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "Deka individueel product"
+    },
+    {
+      "line": 10,
+      "canonicalDemandLabel": "Tomatenblokjes 400g",
+      "plus": {
+        "referencePackText": "1×400g",
+        "packCount": 1,
+        "packAmount": 400,
+        "packUnit": "g",
+        "listingPricePerPackCents": 37,
+        "listingBasketLineTotalCents": 37,
+        "referenceUrl": "https://www.plus.nl/product/plus-tomatenblokjes-blik-400-g-855571",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "1×400g",
+        "packCount": 1,
+        "packAmount": 400,
+        "packUnit": "g",
+        "listingPricePerPackCents": 37,
+        "listingBasketLineTotalCents": 37,
+        "referenceUrl": "https://www.dekamarkt.nl/producten/aardappelen-groente-fruit/groenteconserven/g%27woon%20tomatenblokjes/119855",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "Verschillende merken"
+    },
+    {
+      "line": 11,
+      "canonicalDemandLabel": "Griekse yoghurt 100g",
+      "plus": {
+        "referencePackText": "1×500g",
+        "packCount": 1,
+        "packAmount": 500,
+        "packUnit": "g",
+        "listingPricePerPackCents": 172,
+        "listingBasketLineTotalCents": 172,
+        "referenceUrl": "https://www.plus.nl/product/bio-yoghurt-griekse-stijl-10-vet-beker-500-g-299249",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "dekamarkt": {
+        "referencePackText": "1×500g",
+        "packCount": 1,
+        "packAmount": 500,
+        "packUnit": "g",
+        "listingPricePerPackCents": 149,
+        "listingBasketLineTotalCents": 149,
+        "referenceUrl": "https://www.dekamarkt.nl/producten/zuivel-kaas/yoghurt-kwark-pap/bio-yoghurt-griekse-stijl-10-vet-500-g/80255",
+        "actualSelectedStoreAvailability": null,
+        "actualObservedAt": null,
+        "actualStorePriceCents": null
+      },
+      "sourceCaution": "Zelfde bio+ variant"
+    }
+  ]
+}
