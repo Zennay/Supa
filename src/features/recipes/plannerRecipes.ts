@@ -41,7 +41,7 @@ export function toPlannerRecipe(
   return {
     id: recipe.id, title: recipe.title,
     // The private export removes minutes entirely. Never invent a duration.
-    minutes: durationValid ? recipe.minutes : Number.NaN, servings: recipe.servings,
+    minutes: durationValid ? Number(recipe.minutes) : Number.NaN, servings: recipe.servings,
     estimatedCost: Number.NaN, tags: ['Eigen recept'],
     ingredients: recipe.ingredients.map(ingredient => ({
       id: `own-ingredient:${ingredient.query}:${ingredient.unit}`,
