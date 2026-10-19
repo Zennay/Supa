@@ -45,7 +45,8 @@ export function PlannerSourceMatchPreview({ needs, source }: {
       const manualReview = { PLUS: false, DekaMarkt: false }
       for (const store of stores) {
         const capture = source.captures[store]
-        if (!capture || need.amount === null || !Number.isFinite(need.amount) ||
+        if (!capture || !recentOwnCaptureInstant(capture.observedAt, Date.now()) ||
+            need.amount === null || !Number.isFinite(need.amount) ||
             need.amount <= 0 || !units.has(need.unit)) {
           suggestions[store] = null
           continue
@@ -123,6 +124,9 @@ export function PlannerSourceMatchPreview({ needs, source }: {
   // It never saves candidate prices, guesses a SKU, or alters imports.
   function actionListText(): string {
     const statusFor = (line: typeof coverage[number], store: 'PLUS' | 'DekaMarkt') => {
+      const capture = source.captures[store]
+      if (capture && !recentOwnCaptureInstant(capture.observedAt, Date.now()))
+        return 'Bronopname verlopen of toekomstig · werkelijke winkelbron opnieuw opnemen'
       if (line.manualReview[store]) return 'Kies zelf bestaande originele SKU in Vergelijk'
       const candidate = line.suggestions[store]
       return candidate
@@ -305,6 +309,9 @@ export function PlannerSourceMatchPreview({ needs, source }: {
               {suggestions[store]!.unitRate
                 ? ' · informatief ' + suggestions[store]!.unitRate : ''}
               {' '}· bronmoment niet automatisch gevalideerd</small></>
+            : source.captures[store] &&
+              !recentOwnCaptureInstant(source.captures[store]!.observedAt, Date.now())
+              ? 'Verlopen of toekomstige bron: geen actueel geprijsd voorstel; leg een echte nieuwe opname vast'
             : manualReview[store]
               ? 'Meerdere geschikte SKU’s: kies de juiste originele verpakking zelf in Vergelijk'
               : 'Geen geschikte geprijsde SKU in deze bron; ontbrekende bron vastleggen'}
