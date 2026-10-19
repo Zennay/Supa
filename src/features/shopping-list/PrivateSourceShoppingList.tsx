@@ -45,10 +45,13 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
     setShowMixedRoute(true)
     // The Planner deep link should land on the actual shopping route, not
     // only switch the tab while the route stays below the viewport.
+    // When Producten supplied an exact ingredient/SKU intent, the child
+    // highlights and scrolls to THAT line instead of this section header.
+    if (routeChoice?.serial === routeOpenSignal) return
     const frame = window.requestAnimationFrame(() =>
       mixedSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
     return () => window.cancelAnimationFrame(frame)
-  }, [routeOpenSignal])
+  }, [routeOpenSignal, routeChoice])
   // Physical checkmarks mean 'put this exact item in the trolley', NOT
   // approval of a price. A fresh reviewed price-only correction may update the
   // displayed cents without losing purchased-quantity progress in this session.

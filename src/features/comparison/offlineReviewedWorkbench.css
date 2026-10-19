@@ -254,3 +254,6 @@
 .mixed-store-route__progress-summary{display:grid;gap:.35rem;border:1px solid #cbdccb;
 border-radius:12px;padding:1rem;background:#f3f8f3}
 .mixed-store-route__progress-summary small{line-height:1.4}
+
+.mixed-store-route__chosen-from-products{background:#edf7e8;border:2px solid #38835e;
+border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}

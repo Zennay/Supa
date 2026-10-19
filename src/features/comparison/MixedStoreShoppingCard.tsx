@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import type { MixedStoreShoppingPlan, MixedStore, MixedStoreLine } from './mixedStoreShoppingPlan.ts'
@@ -41,6 +41,7 @@ export function MixedStoreShoppingCard({
   const [extraVisitCost, setExtraVisitCost] = useState('')
   const [mode, setMode] = useState<'auto' | 'mixed' | 'single'>('auto')
   const [preferred, setPreferred] = useState<Record<string, MixedStore>>({})
+  const selectedLineRef = useRef<HTMLLIElement>(null)
   const chosenMixed = useMemo(() => createMixedStoreShoppingPlan(plus, deka, 'mixed', preferred),
     [plus, deka, preferred])
   useEffect(() => {
@@ -63,6 +64,7 @@ export function MixedStoreShoppingCard({
     }
     setPreferred(before => ({ ...before, [line.id]: routeChoice.store }))
     setMode('mixed')
+    setOnlyOpen(false)
     setShowText(false)
     setMessage('Jouw originele ' + routeChoice.store + '-artikel voor ' +
       line.ingredientLabel + ' is geselecteerd. De volledige route is herberekend.')
@@ -91,6 +93,15 @@ export function MixedStoreShoppingCard({
     (extraCostCents !== null && extraCostCents >= selectedMixed.additionalDifferenceCents)
   const chooseSingle = mode === 'single' || (mode === 'auto' && suggestedSingle)
   const plan = chooseSingle ? single : selectedMixed
+  useEffect(() => {
+    if (!routeChoice || mode !== 'mixed' ||
+        !plan.lines.some(line => line.key === routeChoice.lineKey)) return
+    const frame = window.requestAnimationFrame(() =>
+      selectedLineRef.current?.scrollIntoView({
+        block: 'center', behavior: 'smooth',
+      }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [routeChoice?.serial, mode, plan])
   const visitsBoth = stores.every(store => plan.lines.some(line => line.store === store))
   const appliedCostCents = visitsBoth ? extraCostCents : null
   const validBudget = validCustomWeekBudgetEuros(weekBudget)
@@ -441,7 +452,11 @@ export function MixedStoreShoppingCard({
           </button>}
           {visible.length === 0
             ? <p>{all.length ? 'Alles bij deze winkel afgevinkt.' : 'Geen producten bij deze winkel nodig.'}</p>
-            : <ul>{visible.map(item => <li key={item.key}><label>
+            : <ul>{visible.map(item => <li key={item.key}
+                ref={routeChoice?.lineKey === item.key ? selectedLineRef : undefined}
+                className={routeChoice?.lineKey === item.key
+                  ? 'mixed-store-route__chosen-from-products' : undefined}>
+              <label>
               <input type="checkbox" checked={done(item.key)}
                 onChange={event => {
                   const checkedNow = event.currentTarget.checked
