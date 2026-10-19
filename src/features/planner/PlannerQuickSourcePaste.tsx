@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
+import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
@@ -18,8 +19,9 @@ async function normalizedOwnSource(raw: string): Promise<string> {
 }
 
 /** Local preview using the same converter and source contract as Vergelijk. */
-export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
+export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand }: {
   onImport: (files: File[]) => void
+  onRecapture: (store: 'PLUS' | 'DekaMarkt') => void
   hasDemand: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -140,6 +142,20 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
         setMessage('Klembord niet beschikbaar. Plak handmatig in het tekstvak.')
     }
   }
+  const nextSourceToCapture = (() => {
+    if (!preview) return null
+    const shops = preview.data.captures
+    const now = Date.now()
+    const stale = (['PLUS', 'DekaMarkt'] as const).find(store =>
+      shops[store] && !recentOwnCaptureInstant(shops[store]!.observedAt, now))
+    if (stale) return stale
+    const missing = (['PLUS', 'DekaMarkt'] as const).find(store => !shops[store])
+    if (missing) return missing
+    if (shops.PLUS && shops.DekaMarkt && !preview.data.pairedWithin24h)
+      return shops.PLUS.observedNs <= shops.DekaMarkt.observedNs ? 'PLUS' : 'DekaMarkt'
+    return null
+  })()
+
   function handoff() {
     if (!preview || preview.raw !== draft) return
     try {
@@ -231,6 +247,10 @@ export function PlannerQuickSourcePaste({ onImport, hasDemand }: {
               : 'Nog maar één winkelbron. De andere winkel blijft ongeprijsd.'}</p>
         <button type="button" disabled={!hasDemand}
           onClick={handoff}>Open mijn bron in Vergelijk voor productmatching</button>
+        {nextSourceToCapture && <button type="button" className="ghost-button"
+          onClick={() => onRecapture(nextSourceToCapture)}>
+          Open leeg opnameblad voor {nextSourceToCapture} en leg echte prijzen vast
+        </button>}
         {!hasDemand && <small>Kies eerst recepten in je Planner-weekmenu.</small>}
       </div>}
     </>}

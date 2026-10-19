@@ -329,7 +329,14 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       </div>
     </header>
     {hasDemand && <Suspense fallback={<p role="status">Lokale plakimport laden…</p>}>
-      <PlannerQuickSourcePaste onImport={onImportSourceFiles} hasDemand={hasDemand} />
+      <PlannerQuickSourcePaste onImport={onImportSourceFiles} hasDemand={hasDemand}
+        onRecapture={store => {
+          setCaptureTarget(store)
+          window.requestAnimationFrame(() =>
+            document.querySelector('.own-store-planner__capture')?.scrollIntoView({
+              behavior: 'smooth', block: 'center',
+            }))
+        }} />
     </Suspense>}
     {captureNeeds.length > 0 && <div className="own-store-planner__capture" aria-label="Mijn lokale winkelprijsopname">
       <strong>Zelf winkelprijzen vastleggen voor dit weekmenu</strong>
