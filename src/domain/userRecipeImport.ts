@@ -76,8 +76,11 @@ function quantity(raw: string): number | null {
   return Number(raw.replace(',', '.'))
 }
 
-function rounded(value: number): number {
-  return Math.round((value + Number.EPSILON) * 1000) / 1000
+function metricRoundUp(value: number): number {
+  // An imported physical need cannot be rounded DOWN before it becomes a
+  // real, possibly expensive, whole-pack shopping demand. The original
+  // literal stays attached for human inspection.
+  return Math.ceil(value * 1000) / 1000
 }
 
 const units: Record<string, { unit: MetricUnit; factor: number }> = {
@@ -105,13 +108,15 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     const perPart = quantity(multiplied[2])
     const physical = units[multiplied[3].toLowerCase()]
     const label = multiplied[4].trim()
-    const amount = physical && perPart !== null
-      ? rounded(repetitions * perPart * physical.factor) : NaN
+    const originalAmount = physical && perPart !== null
+      ? repetitions * perPart * physical.factor : NaN
+    const amount = physical?.unit === 'piece'
+      ? originalAmount : metricRoundUp(originalAmount)
     if (Number.isSafeInteger(repetitions) && repetitions >= 1 &&
         repetitions <= 1000 && perPart !== null && Number.isFinite(perPart) &&
         perPart > 0 && perPart <= 100_000 && physical &&
         Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 &&
-        (physical.unit !== 'piece' || Number.isSafeInteger(amount)) &&
+        (physical.unit !== 'piece' || (Number.isSafeInteger(perPart) && Number.isSafeInteger(amount))) &&
         label && !/^\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|oz|lb|stuks?)\b/iu.test(label)) {
       return { original, label, query: label.toLocaleLowerCase('nl'),
         amount, unit: physical.unit, reviewReason: null }
@@ -162,7 +167,8 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Onbekende maat: voer een metrische hoeveelheid in' }
   }
   const unit = metric?.unit || 'piece'
-  const normalized = rounded(amount * (metric?.factor || 1) + compoundAmount)
+  const physicalAmount = amount * (metric?.factor || 1) + compoundAmount
+  const normalized = unit === 'piece' ? physicalAmount : metricRoundUp(physicalAmount)
   if (!Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid is buiten bereik' }
   }
