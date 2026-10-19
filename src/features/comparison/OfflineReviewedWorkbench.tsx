@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwoStorePriceEditor.tsx'
@@ -126,6 +127,24 @@ function sourcePackRate(product: import('../../domain/basket.ts').StoreProduct):
     priceCents: product.available ? product.priceCents : null,
   })
   return rate ? ' · ' + euros.format(rate.centsPerUnit / 100) + ' per ' + rate.unit : ''
+}
+/** Exact whole-pack preview for one original source candidate only.
+ * The canonical basket/review gate still decides whether this can become
+ * part of a complete priced weekly shop. */
+function sourceWholePackPreview(product: OfflineStoreProduct,
+  required: BasketTraceLine['requirement']): string {
+  if (!product.available || product.packAmount === null ||
+      required.amount === null || !Number.isFinite(required.amount) ||
+      required.amount <= 0) return ''
+  const packs = calculateDecimalPackCount(
+    [{ amount: required.amount, unit: required.unit }],
+    { amount: product.packAmount, unit: product.packUnit, count: product.packCount ?? 1 })
+  if (packs === null || !Number.isSafeInteger(packs) || packs < 1) return ''
+  const totalCents = packs * product.priceCents
+  return Number.isSafeInteger(totalCents) && totalCents >= 0
+    ? ' · ' + packs + ' hele pak(ken): ' + euros.format(totalCents / 100) +
+      ' voor deze ingrediëntregel'
+    : ''
 }
 function searchableSourceText(value: string): string {
   // Discoverability only: never change an original source name/SKU/price.
@@ -1994,11 +2013,25 @@ export function OfflineReviewedWorkbench({
                                       <option value="">Automatisch voorstellen (of onbekend)</option>
                                       {choices.shown.map(product => (
                                         <option key={product.id} value={product.id}>
-                                          {product.name} · {product.id} · {(product.packCount ?? 1)} × {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)} per pak{sourcePackRate(product)}
+                                          {product.name} · {product.id} · {(product.packCount ?? 1)} × {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)} per pak{sourcePackRate(product)}{sourceWholePackPreview(product, line.requirement)}
                                         </option>
                                       ))}
                                     </select>
                                     <small>Maximaal 40 originele artikelen, op naam en passende verpakkingsomvang gerangschikt. Dit is uitsluitend een zoekhulp: kies en controleer zelf de SKU, inhoud en prijs.</small>
+                                    {choices.shown.length > 0 && <details className="offline-price-workbench__candidate-preview">
+                                      <summary>Bekijk de eerste bronartikelen met benodigde hele verpakkingen</summary>
+                                      <p>Dit zijn ongetoetste alternatieven uit je eigen bron.
+                                        De berekening betreft alleen dit ingrediënt, nog niet het totale winkelmandje.</p>
+                                      <ul>{choices.shown.slice(0, 3).map(product => (
+                                        <li key={product.id}>
+                                          <strong>{product.name}</strong> · SKU {product.id}
+                                          {' '}· {product.packCount ?? 1} × {product.packAmount} {product.packUnit}
+                                          {' '}· {euros.format(product.priceCents / 100)} per verpakking
+                                          {sourcePackRate(product)}
+                                          {sourceWholePackPreview(product, line.requirement)}
+                                        </li>
+                                      ))}</ul>
+                                    </details>}
                                   </label>
                                 )}
                                 {choices.unpricedShown.length > 0 && (

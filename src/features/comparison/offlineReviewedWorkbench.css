@@ -267,3 +267,10 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-price-workbench__dropzone.is-dragging { background:#e4f2e8; border-color:#17563a; }
 .offline-price-workbench__dropzone small { line-height:1.5; color:#4c6357; }
 .offline-price-workbench__dropzone:focus-within { outline:2px solid #246b50; outline-offset:2px; }
+
+.offline-price-workbench__candidate-preview { padding:.75rem; margin:.5rem 0; border:1px solid #c5d9ce; border-radius:10px; }
+.offline-price-workbench__candidate-preview summary { min-height:44px; cursor:pointer; font-weight:650; }
+.offline-price-workbench__candidate-preview p { margin:.4rem 0; line-height:1.45; }
+.offline-price-workbench__candidate-preview ul { margin:.4rem 0; padding-left:1.3rem; }
+.offline-price-workbench__candidate-preview li { margin:.45rem 0; overflow-wrap:anywhere; }
+.offline-price-workbench__candidate-preview summary:focus-visible { outline:3px solid #22734f; outline-offset:2px; }
