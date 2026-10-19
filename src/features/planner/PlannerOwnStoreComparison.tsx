@@ -4,6 +4,8 @@ import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
+import { printableOwnStoreComparison } from './downloadOwnStoreComparison.ts'
+import { pendingOwnSourceReviewText } from './pendingOwnSourceReviewCsv.ts'
 import { PlannerOwnProductDeltas } from './PlannerOwnProductDeltas.tsx'
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
@@ -94,7 +96,6 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       if (!captureProgress) throw new Error('Er zijn nog geen eigen winkelopnames.')
       if (!navigator.clipboard?.writeText)
         throw new Error('Klembord niet beschikbaar in deze browser.')
-      const { pendingOwnSourceReviewText } = await import('./pendingOwnSourceReviewCsv.ts')
       const output = pendingOwnSourceReviewText(captureProgress, captureProgress.planKey, Date.now())
       await navigator.clipboard.writeText(output)
       setDownloadMessage('Je openstaande PLUS/Deka-winkelcontroles gekopieerd. Geen onbekende prijzen als bedragen overgenomen.')
@@ -183,8 +184,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
         setDownloadMessage('Kopiëren is hier niet beschikbaar. Gebruik de TXT-download voor dezelfde privévergelijking.')
         return
       }
-      const { printableOwnStoreComparison } = await import('./downloadOwnStoreComparison.ts')
-      // Dynamic imports can cross the freshness boundary; check again.
+      // Read the clock again immediately before the clipboard operation.
       const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
       const checked = ownStoreWeekComparison(latest)
       if (!latest?.stores.PLUS || !latest.stores.DekaMarkt || checked.status !== 'comparable') {
