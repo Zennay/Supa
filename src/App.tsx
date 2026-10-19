@@ -118,6 +118,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [visitedList, setVisitedList] = useState(initialTab === 'list')
   const [mixedRouteOpenSignal, setMixedRouteOpenSignal] = useState(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
+  // Only transient shopping ticks. Never persist prices or review approvals.
+  // Keep across a temporary unpriced edit so a price-only correction preserves
+  // the physical items already ticked; different SKUs or quantities use new keys.
+  const [privateShoppingTicks, setPrivateShoppingTicks] = useState<Record<string, boolean>>({})
   const [sourceNowMs, setSourceNowMs] = useState(() => Date.now())
   const [preferredOwnStore, setPreferredOwnStore] = useState<OwnStore>('PLUS')
   const onReviewedBaskets = useCallback((next: PrivateReviewedBaskets | null) => {
@@ -503,6 +507,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
+              checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
               onOpenComparison={() => navigate('basket')} routeOpenSignal={mixedRouteOpenSignal} />
           </div>

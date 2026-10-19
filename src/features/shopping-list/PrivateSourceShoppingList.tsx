@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
@@ -15,19 +16,20 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
-export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, routeOpenSignal = 0 }: {
+export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, routeOpenSignal = 0 }: {
   reviewed: PrivateReviewedBaskets
   budget: number
   preferred: OwnStore
   onChooseStore: (store: OwnStore) => void
   onOpenComparison: () => void
+  checked: Record<string, boolean>
+  setChecked: Dispatch<SetStateAction<Record<string, boolean>>>
   routeOpenSignal?: number
 }) {
   const available = stores.filter(store => !!reviewed.stores[store])
   const store = available.includes(preferred) ? preferred : available[0]
   const capture = reviewed.stores[store]!
   const basket = capture.basket
-  const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [remainingOnly, setRemainingOnly] = useState(false)
   const [message, setMessage] = useState('')
   const [showMixedRoute, setShowMixedRoute] = useState(false)
@@ -42,16 +44,18 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       mixedSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
     return () => window.cancelAnimationFrame(frame)
   }, [routeOpenSignal])
-  // Physical quantity, original source instant, SKU and money bind each tick.
-  const identity = useMemo(() => JSON.stringify([
-    reviewed.planKey, store, capture.observedAt, basket.store.id,
-    basket.lines.map(line => line.status === 'matched'
-      ? [line.id, line.productId, line.requirement.amount, line.requirement.unit,
-        line.productName, line.packs, line.pack.amount, line.pack.unit, line.pack.count,
-        line.pricePerPackCents, line.lineTotalCents]
-      : [line.id, 'unknown']),
-  ]), [reviewed.planKey, store, capture.observedAt, basket])
-  const tick = (line: BasketTraceLine) => JSON.stringify([identity, line.id])
+  // Physical checkmarks mean 'put this exact item in the trolley', NOT
+  // approval of a price. A fresh reviewed price-only correction may update the
+  // displayed cents without losing purchased-quantity progress in this session.
+  // Week, store, SKU, quantity, pack, or matched state change -> a new key.
+  const tick = (line: BasketTraceLine) => JSON.stringify([
+    reviewed.planKey, store, basket.store.id, line.id, line.status,
+    line.ingredientLabel, line.requirement.amount, line.requirement.unit,
+    line.status === 'matched' ? [
+      line.productId, line.productName, line.packs,
+      line.pack.amount, line.pack.unit, line.pack.count,
+    ] : null,
+  ])
   const doneCount = basket.lines.filter(line => checked[tick(line)]).length
   const remainingCents = basket.lines.reduce((sum, line) =>
     sum + (line.status === 'matched' && !checked[tick(line)] ? line.lineTotalCents : 0), 0)
@@ -313,8 +317,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           aria-label="Kopieerbare eigen boodschappenlijst" />
       </details>
       <p className="disclaimer">Vinkjes worden niet automatisch opgeslagen of doorgestuurd. Met Bewaar kun je
-        zelf een lokaal JSON-bestand maken en later terugzetten. Een nieuwe bron, andere producten, weekvraag of prijs vervangt de
-        fysieke lijst en maakt oudere afvinkingen ongeldig.</p>
+        zelf een lokaal JSON-bestand maken en later terugzetten. Een nieuwe week, andere winkel,
+        SKU, benodigde hoeveelheid of fysieke verpakking reset de vinkjes. Een prijswijziging
+        laat alleen de fysieke vinkjes in deze sessie staan; nieuwe bronprijzen vereisen opnieuw review.</p>
     </section>
   )
 }
