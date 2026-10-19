@@ -4,6 +4,7 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import type { MixedStoreShoppingPlan, MixedStore, MixedStoreLine } from './mixedStoreShoppingPlan.ts'
 import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
+import { PrivateRouteExtraGroceries } from './PrivateRouteExtraGroceries.tsx'
 import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
 import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
@@ -566,6 +567,8 @@ export function MixedStoreShoppingCard({
         </section>
       })}
     </div>
+    {privatePlanKey && <PrivateRouteExtraGroceries
+      identity={privatePlanKey} onlyOpen={onlyOpen} />}
     {showText && <label>Kopieer mijn private boodschappenroute
       <textarea readOnly rows={Math.min(18, plan.lines.length + 15)}
         spellCheck={false} value={printable} onFocus={event => {
