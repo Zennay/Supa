@@ -8,6 +8,7 @@ import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from './plannerPriceCaptureSheet.ts'
+import { makePlannerCaptureGuide } from './plannerPriceCaptureGuide.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { createMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
@@ -293,6 +294,27 @@ export function OfflineReviewedWorkbench({
       setWeekExportMessage('Leeg CSV-invulblad voor ' + (captureSheetStore === 'both' ? 'beide winkels' : captureSheetStore) + ' gedownload. De andere winkel kun je later apart importeren. Zonder echte productcodes, verpakking, bronmoment, beschikbaarheid en prijs wordt niets geprijsd.')
     } catch {
       setWeekExportMessage('Geen geldig weekmenu voor het prijsinvulblad. Controleer eerst je Planner-ingrediënten en hoeveelheden.')
+    }
+  }
+
+  function downloadPlannerCaptureGuide() {
+    try {
+      const selected: readonly CaptureStore[] = captureSheetStore === 'both'
+        ? stores : [captureSheetStore]
+      const guide = makePlannerCaptureGuide(plannerCaptureNeeds, selected)
+      const url = URL.createObjectURL(new Blob([guide], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = captureSheetStore === 'both'
+          ? 'supa-weekmenu-PLUS-Deka-opnamegids.txt'
+          : 'supa-weekmenu-' + captureSheetStore + '-opnamegids.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage('Opnamegids lokaal gedownload. De CSV-regels en oorspronkelijke Planner-hoeveelheden staan erin; bronproducten en prijzen moet je zelf echt vastleggen.')
+    } catch {
+      setWeekExportMessage('Geen geldig weekmenu voor de opnamegids. Controleer de Planner-ingrediënten.')
     }
   }
 
@@ -1128,6 +1150,11 @@ export function OfflineReviewedWorkbench({
             disabled={plannerCaptureNeeds.length === 0}
             onClick={downloadBlankPlannerCaptureCsv}>
             Download leeg prijsinvulblad (CSV)
+          </button>
+          <button type="button" className="ghost-button"
+            disabled={plannerCaptureNeeds.length === 0}
+            onClick={downloadPlannerCaptureGuide}>
+            Download bijhorende opnamegids (TXT)
           </button>
           <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker

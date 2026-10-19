@@ -1036,7 +1036,10 @@ heeft alleen de rijen van die winkel. Je kunt na een echte PLUS-waarneming
 later apart DekaMarkt invullen en toevoegen, zonder vooraf een tweede bron te
 verzinnen. De
 uitklapbare hulp onder de knop toont de precieze spreadsheet-rijnummers en de
-gevraagde hoeveelheid. De eenheid is hooguit een bewerkbare hint; neem de
+gevraagde hoeveelheid. Met **Download bijhorende opnamegids (TXT)** krijg je
+precies die rijnummers en hoeveelheden op papier of in een offline notitie,
+passend bij de gekozen een- of tweewinkel-CSV. De gids bevat zelf geen
+winkelproducten, prijzen of bewijs. De eenheid is hooguit een bewerkbare hint; neem de
 werkelijke inhoud van de aangeboden verpakking over. Vul per werkelijk gevonden
 winkelproduct de originele `id`, `name`, `packAmount`, `packUnit`, `packCount`,
 `priceCents` in hele centen, `observedAt` met echte tijdzone en `available` als
