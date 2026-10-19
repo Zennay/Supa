@@ -1,4 +1,5 @@
-import type { PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
+import { useState } from 'react'
+import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { PlannerOwnProductDeltas } from './PlannerOwnProductDeltas.tsx'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
@@ -16,10 +17,30 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelec
   onOpenComparison: () => void
   onOpenList: () => void
 }) {
+  const [downloadMessage, setDownloadMessage] = useState('')
   const summary = ownStoreWeekComparison(reviewed)
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
   const selected = reviewed?.stores[preferred] ? preferred : reviewed?.stores.PLUS ? 'PLUS' : reviewed?.stores.DekaMarkt ? 'DekaMarkt' : preferred
+  async function downloadPrivateComparison() {
+    setDownloadMessage('')
+    try {
+      if (!reviewed) throw new Error('Geen persoonlijke bronopnames beschikbaar.')
+      const current = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
+      const fresh = ownStoreWeekComparison(current)
+      if (fresh.status !== 'comparable' || !current?.stores.PLUS || !current.stores.DekaMarkt) {
+        throw new Error('De bronopnames zijn verlopen of niet meer vergelijkbaar. Werk ze bij in Vergelijk.')
+      }
+      const { printableOwnStoreComparison, downloadOwnStoreText } = await import('./downloadOwnStoreComparison.ts')
+      downloadOwnStoreText(printableOwnStoreComparison(fresh, {
+        PLUS: current.stores.PLUS.observedAt,
+        DekaMarkt: current.stores.DekaMarkt.observedAt,
+      }))
+      setDownloadMessage('Je eigen twee-winkelvergelijking is lokaal gedownload.')
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : 'Download is niet gelukt.')
+    }
+  }
   if (!summary.available.length) return null
   return <section className="own-store-planner" aria-labelledby="own-store-planner-heading">
     <header className="own-store-planner__header">
@@ -55,6 +76,9 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelec
           {summary.cheapest && selected !== summary.cheapest && <button type="button" className="ghost-button"
             onClick={() => onSelect(summary.cheapest!)}>Kies {summary.cheapest} voor mijn weekbudget</button>}
           <button type="button" className="ghost-button" onClick={onOpenList}>Open eigen boodschappenlijst</button>
+          <button type="button" className="ghost-button" onClick={downloadPrivateComparison}>
+            Download privévergelijking (TXT)
+          </button>
           <PlannerOwnProductDeltas lines={summary.lines} />
         </div>
       : <div className="own-store-planner__result" role="status">
@@ -66,5 +90,6 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, budget, onSelec
               : 'De fysieke hoeveelheden, verpakkingen of mandregels zijn niet gelijkwaardig bevestigd. Herzie de matches in Vergelijk.'}</p>
           <button type="button" className="ghost-button" onClick={onOpenComparison}>Vul ontbrekende brongegevens aan</button>
         </div>}
+    {downloadMessage && <p role="status" aria-live="polite">{downloadMessage}</p>}
   </section>
 }
