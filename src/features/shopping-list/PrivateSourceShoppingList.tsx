@@ -1,13 +1,18 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import './privateSourceShoppingList.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const date = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores: OwnStore[] = ['PLUS', 'DekaMarkt']
+const MixedStoreShoppingCard = lazy(async () => {
+  const module = await import('../comparison/MixedStoreShoppingCard.tsx')
+  return { default: module.MixedStoreShoppingCard }
+})
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
 export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison }: {
@@ -24,6 +29,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [remainingOnly, setRemainingOnly] = useState(false)
   const [message, setMessage] = useState('')
+  const [showMixedRoute, setShowMixedRoute] = useState(false)
   // Physical quantity, original source instant, SKU and money bind each tick.
   const identity = useMemo(() => JSON.stringify([
     reviewed.planKey, store, capture.observedAt, basket.store.id,
@@ -57,6 +63,22 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
     Math.abs(plus.capturedMs - deka.capturedMs) <= 86400000
   const comparison = paired
     ? compareFullBaskets({ baseline: plus!.basket, candidate: deka!.basket }) : null
+  const pairReady = paired && comparison?.claimable === true && !!plus && !!deka
+  const mixed = pairReady ? createMixedStoreShoppingPlan(plus!.basket, deka!.basket) : null
+  const single = pairReady ? createMixedStoreShoppingPlan(plus!.basket, deka!.basket, 'single') : null
+  // Reusing the same UI after a different verified SKU/physical pack must
+  // not retain earlier route preferences or checked-item progress.
+  const pairIdentity = pairReady ? JSON.stringify([reviewed.planKey,
+    ...stores.map(name => [name, reviewed.stores[name]!.observedAt,
+      reviewed.stores[name]!.basket.lines]),
+  ]) : null
+  const pairCurrentNow = () => {
+    const current = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
+    if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+        current.stores.PLUS !== plus || current.stores.DekaMarkt !== deka ||
+        Math.abs(current.stores.PLUS.capturedMs - current.stores.DekaMarkt.capturedMs) > 86400000) return false
+    return compareFullBaskets({ baseline: plus!.basket, candidate: deka!.basket }).claimable
+  }
   const budgetCents = Number.isFinite(budget) ? Math.round(budget * 100) : null
 
   function currentCaptureAvailable() {
@@ -113,6 +135,26 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               ' goedkoper volgens jouw twee lokale, binnen 24 uur waargenomen bronnen.'}
           <small>Geen onafhankelijk gecontroleerde besparing.</small>
         </p>}
+      {mixed && single && plus && deka && <section className="private-source-shopping__mixed" aria-label="Combineer beide eigen winkelmandjes">
+        <h3>Goedkoopste artikelen combineren</h3>
+        <p>Verdeel alleen jouw gecontroleerde hele verpakkingen over beide winkels.
+          De productkosten bedragen {euros.format(mixed.totalCents / 100)}.
+          {mixed.lines.some(line => line.store === 'PLUS') && mixed.lines.some(line => line.store === 'DekaMarkt')
+            ? ' Extra bezoekkosten en reistijd moet je zelf invullen; zonder die kosten is het netto voordeel onbekend.'
+            : ' Voor de goedkoopste combinatie is maar één winkel nodig.'}</p>
+        <button type="button" aria-expanded={showMixedRoute} aria-controls="supa-mixed-shopping-list"
+          onClick={() => setShowMixedRoute(value => !value)}>
+          {showMixedRoute ? 'Verberg gecombineerde route' : 'Open gecombineerde winkelroute'}
+        </button>
+        {showMixedRoute && <div id="supa-mixed-shopping-list">
+          <Suspense fallback={<p role="status">Jouw gecontroleerde winkelroute openen…</p>}>
+            <MixedStoreShoppingCard key={pairIdentity ?? ''} mixed={mixed} single={single}
+              plus={plus.basket} deka={deka.basket}
+              captured={{ PLUS: plus.observedAt, DekaMarkt: deka.observedAt }}
+              eligibleNow={pairCurrentNow} />
+          </Suspense>
+        </div>}
+      </section>}
       <div className="private-source-shopping__actions">
         <label><input type="checkbox" checked={remainingOnly}
           onChange={event => setRemainingOnly(event.target.checked)} /> Alleen nog te kopen</label>

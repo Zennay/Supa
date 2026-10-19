@@ -23,3 +23,8 @@
 .private-source-shopping :is(button,select,input,summary,textarea):focus-visible {outline:3px solid #226f52;outline-offset:3px}
 @media(max-width:520px){.private-source-shopping__item {flex-wrap:wrap}
   .private-source-shopping__item>strong:last-child {margin-left:2rem}}
+
+.private-source-shopping__mixed { background:#f3f8f3; border:1px solid #cbdccb; border-radius:14px; padding:1rem; display:grid; gap:.7rem; min-width:0; }
+.private-source-shopping__mixed h3,.private-source-shopping__mixed p { margin:0; }
+.private-source-shopping__mixed p { line-height:1.5; }
+.private-source-shopping__mixed #supa-mixed-shopping-list { min-width:0; }
