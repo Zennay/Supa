@@ -324,7 +324,8 @@ export function OfflineReviewedWorkbench({
     snapshots: OfflinePriceSnapshots
     changes: { store: typeof stores[number]; previousAt: string | null
       nextAt: string; previousCount: number; nextCount: number
-      added: number; removed: number; changed: number }[]
+      added: number; removed: number; changed: number
+      previousPriced: number; nextPriced: number }[]
   } | null>(null)
 
   const [weekExportMessage, setWeekExportMessage] = useState('')
@@ -745,9 +746,14 @@ export function OfflineReviewedWorkbench({
           old.sourcePriceCents !== item.sourcePriceCents ||
           old.sourceAvailable !== item.sourceAvailable)
       }).length
+      const priced = (product: OfflineStoreProduct) =>
+        product.sourceAvailable === true && product.sourcePriceCents !== null &&
+        product.sourcePriceCents !== undefined && product.packAmount !== null
       return { store, previousAt: prior?.observedAt ?? null,
         nextAt: incoming.observedAt, previousCount: prior?.products.length ?? 0,
-        nextCount: incoming.products.length, added, removed, changed }
+        nextCount: incoming.products.length, added, removed, changed,
+        previousPriced: prior?.products.filter(priced).length ?? 0,
+        nextPriced: incoming.products.filter(priced).length }
     })
     setPendingReplacement(null)
     setPendingTwoStore({ sourceText: text, newText: input, version,
@@ -1783,6 +1789,10 @@ export function OfflineReviewedWorkbench({
                 {' '}{change.changed} gewijzigde artikelen)
                 <br />Oud: {change.previousAt ?? 'Nog geen eigen opname'}
                 <br />Nieuw: {change.nextAt}
+                <br />Met vastgelegde beschikbare pakprijs:
+                {' '}{change.previousPriced}/{change.previousCount} →{' '}
+                {change.nextPriced}/{change.nextCount}.
+                {' '}{change.nextCount - change.nextPriced} producten zonder bruikbare geobserveerde pakprijs.
               </li>
             ))}
           </ul>
