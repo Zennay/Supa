@@ -446,11 +446,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onOpenComparison={openOwnPriceImport}
             onChooseRouteLine={intent => {
               const serial = mixedRouteOpenSignal + 1
+              setMixedCostIntent(null)
               setPrivateRouteChoice({ ...intent, serial })
               setMixedRouteOpenSignal(serial)
               navigate('list')
             }}
-            onOpenMixedRoute={() => { setPrivateRouteChoice(null); setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
+            onOpenMixedRoute={() => { setMixedCostIntent(null); setPrivateRouteChoice(null); setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
             onOpenList={(store) => {
               if (store) setPreferredOwnStore(store)
               navigate('list')
@@ -509,6 +510,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             }}
             onChooseRouteLine={intent => {
               const serial = mixedRouteOpenSignal + 1
+              setMixedCostIntent(null)
               setPrivateRouteChoice({ ...intent, serial })
               setMixedRouteOpenSignal(serial)
               navigate('list')
