@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
-import type { RecipeWithIngredients } from '../../domain/basket.ts'
+import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { IngredientReuseCard } from './IngredientReuseCard.tsx'
 import { RecipeReusePreviewPanel } from './RecipeReusePreviewPanel.tsx'
@@ -117,6 +117,10 @@ export function PlannerView({
   )
   const hasIngredientData = ingredientRecipes.length > 0 &&
     ingredientRecipes.length === recipes.length
+  const captureNeeds = hasIngredientData ? (() => {
+    try { return aggregatePlanIngredients(plannedMeals, ingredientRecipes, activeDays) }
+    catch { return [] }
+  })() : []
   const reuseInsight = hasIngredientData
     ? buildIngredientReuseInsight({ plan: plannedMeals, recipes: ingredientRecipes, activeDays })
     : null
@@ -331,6 +335,7 @@ export function PlannerView({
       </section>
 
       <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} preferred={preferredOwnStore}
+        captureNeeds={captureNeeds}
         hasDemand={activeDays.length > 0} budget={budget}
         onSelect={onOwnSourceChange}
         onOpenComparison={onOpenComparison} onOpenList={onOpenShoppingList}

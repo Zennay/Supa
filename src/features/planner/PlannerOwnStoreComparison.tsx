@@ -3,6 +3,8 @@ import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type 
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { PlannerOwnProductDeltas } from './PlannerOwnProductDeltas.tsx'
+import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
+import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import './plannerOwnStoreComparison.css'
 
@@ -10,8 +12,9 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine }: {
+export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, captureNeeds }: {
   reviewed: PrivateReviewedBaskets | null
+  captureNeeds: readonly PlannerCaptureGuideNeed[]
   preferred: OwnStore
   hasDemand: boolean
   budget: number
@@ -22,6 +25,7 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
   const [downloadMessage, setDownloadMessage] = useState('')
+  const [captureTarget, setCaptureTarget] = useState<'both' | CaptureStore>('both')
   const summary = ownStoreWeekComparison(reviewed)
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
@@ -38,6 +42,33 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
     onSelect(store)
     onOpenList()
     setDownloadMessage('')
+  }
+  async function downloadFieldSheet(kind: 'csv' | 'guide') {
+    setDownloadMessage('')
+    try {
+      const stores: readonly CaptureStore[] = captureTarget === 'both'
+        ? ['PLUS', 'DekaMarkt'] : [captureTarget]
+      const source = kind === 'csv'
+        ? (await import('../comparison/plannerPriceCaptureSheet.ts'))
+          .makeBlankPlannerCaptureCsv(captureNeeds, stores)
+        : (await import('../comparison/plannerPriceCaptureGuide.ts'))
+          .makePlannerCaptureGuide(captureNeeds, stores)
+      const url = URL.createObjectURL(new Blob([source], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-planner-' + captureTarget.toLowerCase() +
+          (kind === 'csv' ? '-lege-winkelopname.csv' : '-opnamegids.txt')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setDownloadMessage('Leeg ' + (kind === 'csv' ? 'prijsinvulblad' : 'opnameformulier') +
+        ' van dit weekmenu gedownload. Vul werkelijk waargenomen bronproducten in en importeer ze in Vergelijk.')
+    } catch {
+      setDownloadMessage('Prijsinvulblad niet beschikbaar. Controleer de fysieke ingrediënten en weekdagen.')
+    }
   }
   async function downloadPrivateComparison() {
     setDownloadMessage('')
@@ -115,6 +146,22 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
         <h3 id="own-store-planner-heading">Jouw weekmand per winkel</h3></div>
       <button type="button" className="ghost-button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>
     </header>
+    {captureNeeds.length > 0 && <div className="own-store-planner__capture" aria-label="Mijn lokale winkelprijsopname">
+      <strong>Zelf winkelprijzen vastleggen voor dit weekmenu</strong>
+      <p>Download een leeg invulblad of opnamegids voor {captureNeeds.length} fysieke ingrediënten. Productcodes, bronmomenten en prijzen moet je werkelijk vastleggen.</p>
+      <label>Winkel(s) voor eigen opname
+        <select value={captureTarget}
+          onChange={event => setCaptureTarget(event.currentTarget.value as 'both' | CaptureStore)}>
+          <option value="both">PLUS en DekaMarkt</option>
+          <option value="PLUS">Alleen PLUS</option>
+          <option value="DekaMarkt">Alleen DekaMarkt</option>
+        </select>
+      </label>
+      <div className="own-store-planner__capture-buttons">
+        <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('csv')}>Download leeg CSV-prijsinvulblad</button>
+        <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('guide')}>Download opnamegids (TXT)</button>
+      </div>
+    </div>}
     <div className="own-store-planner__cards">
       {stores.map(store => {
         const capture = reviewed?.stores[store]

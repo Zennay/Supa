@@ -38,3 +38,12 @@
 .own-store-planner__line-actions button:focus-visible {
   outline:3px solid #226f52; outline-offset:2px;
 }
+.own-store-planner__capture {
+  display:grid; gap:.65rem; border:1px solid #cee0d0; border-radius:12px;
+  margin-bottom:1rem; padding:1rem; background:#f7faf6;
+}
+.own-store-planner__capture p { margin:0; line-height:1.5; }
+.own-store-planner__capture label { display:grid; gap:.3rem; font-weight:600; max-width:340px; }
+.own-store-planner__capture select { min-height:44px; padding:.5rem; border:1px solid #819f8c; border-radius:8px; }
+.own-store-planner__capture-buttons { display:flex; flex-wrap:wrap; gap:.5rem; }
+.own-store-planner__capture-buttons button { min-height:44px; }
