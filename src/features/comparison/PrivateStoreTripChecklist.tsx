@@ -318,6 +318,40 @@ export function PrivateStoreTripChecklist({
     }
   }
 
+  /** A private complete, fresh single-store basket is valuable even when the
+   * other store has no prices. Import and observation rights remain separate. */
+  async function downloadCsv() {
+    try {
+      const ms = Date.parse(observedAt)
+      const age = Date.now() - ms
+      // A conservative one-second safety margin handles timestamps containing
+      // sub-millisecond evidence that Date.parse cannot represent.
+      if (!fresh || !Number.isFinite(ms) || age < -300000 ||
+          age > 7 * 86400000 - 1000) {
+        throw Error('Bronopname is verouderd of niet betrouwbaar recent; ververs de oorspronkelijke prijsgegevens.')
+      }
+      if (!basketConsistent(basket) || basket.unresolvedLineCount !== 0 ||
+          !basket.lines.length || basket.selectedMealCount <= 0) {
+        throw Error('De echte winkelmand is nog niet volledig gekoppeld.')
+      }
+      const { privateSingleStoreShoppingCsv } =
+        await import('./privateSingleStoreShoppingCsv.ts')
+      const csv = privateSingleStoreShoppingCsv({ basket, observedAt, done })
+      const uri = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-eigen-compleet-mandje-' + basket.store.id.toLowerCase() + '.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+      setMessage('Volledig eigen winkelmandje als CSV gedownload; dit is geen bronbewijs of publieke prijsclaim.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message :
+        'Geen actuele volledige winkelmand beschikbaar voor CSV.')
+    }
+  }
+
 
   return <section className="private-store-trip" aria-label={'Afvinklijst voor ' + basket.store.name}>
     <div className="private-store-trip__head">
@@ -371,6 +405,11 @@ export function PrivateStoreTripChecklist({
     <div className="private-store-trip__actions">
       <button type="button" className="ghost-button" disabled={!lines.length && !extraLines.length} onClick={download}>
         Download lijst
+      </button>
+      <button type="button" className="ghost-button"
+        disabled={!fresh || !lines.length || basket.unresolvedLineCount > 0}
+        onClick={() => { void downloadCsv() }}>
+        Download compleet eigen mandje (CSV)
       </button>
       <button type="button" className="ghost-button" disabled={!lines.length && !extraLines.length}
         aria-expanded={copyVisible} onClick={() => setCopyVisible(visible => !visible)}>
