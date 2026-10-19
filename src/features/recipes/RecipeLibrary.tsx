@@ -87,6 +87,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [recentlyDeletedRecipe, setRecentlyDeletedRecipe] = useState<{
+    recipe: SavedRecipe; afterRaw: string
+  } | null>(null)
   const [selected, setSelected] = useState<SavedRecipe | typeof examples[number] | null>(null)
   const [preview, setPreview] = useState<UserRecipeDraft | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -341,6 +344,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         window.localStorage, library, library.recipes.filter(item => item.id !== recipe.id),
       )
       setLibrary(next)
+      if (next.raw === null) throw new Error('Receptenopslag is niet bijgewerkt.')
+      setRecentlyDeletedRecipe({ recipe, afterRaw: next.raw })
       setPendingRecipeRemoval(null)
       setPortionVariantPreview(null)
       setSelected(null)
@@ -350,6 +355,27 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     } catch (cause) {
       setPendingRecipeRemoval(null)
       setRecipeFileMessage(cause instanceof Error ? cause.message : 'Verwijderen is niet gelukt. Het recept blijft bestaan.')
+    }
+  }
+  function restoreRecentlyDeletedRecipe() {
+    const removed = recentlyDeletedRecipe
+    if (!removed || library.error || library.raw !== removed.afterRaw ||
+        library.recipes.some(recipe => recipe.id === removed.recipe.id)) {
+      setRecentlyDeletedRecipe(null)
+      setMessage('De recepten zijn inmiddels gewijzigd. Herstel is hier niet meer beschikbaar.')
+      return
+    }
+    try {
+      const next = saveRecipeLibrary(
+        window.localStorage, library, [removed.recipe, ...library.recipes],
+      )
+      setLibrary(next)
+      setRecentlyDeletedRecipe(null)
+      window.dispatchEvent(new Event('supa-recipes-changed'))
+      setMessage('Het laatst verwijderde recept is teruggezet. Controleer eventuele winkelmatches opnieuw.')
+    } catch (cause) {
+      setRecentlyDeletedRecipe(null)
+      setMessage(cause instanceof Error ? cause.message : 'Herstellen is niet gelukt; andere recepten zijn onaangeroerd.')
     }
   }
   function downloadOwnRecipeChecklist() {
@@ -663,6 +689,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     </section>
     {!!demo.length && <p className="recipe-note">Zes uitgewerkte SUPA-recepten met ingrediënten en bereidingsstappen, ook beschikbaar in Planner. Dit zijn geen supermarktaanbiedingen; prijzen en besparingen zijn niet geverifieerd.</p>}
     {library.error && <p role="alert">{library.error}</p>}<p role="status" className="hifi-feedback">{message}</p>
+    {recentlyDeletedRecipe && !library.error && library.raw === recentlyDeletedRecipe.afterRaw &&
+      <button type="button" className="ghost-button" onClick={restoreRecentlyDeletedRecipe}>
+        Maak verwijderen ongedaan: {recentlyDeletedRecipe.recipe.title}
+      </button>}
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
       <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : mode === 'paste' ? 'Receptgegevens lokaal plakken' : mode === 'plain' ? 'Recepttekst lokaal importeren' : editingId ? 'Mijn recept aanpassen' : isVariant ? 'Receptvariant maken' : 'Eigen recept toevoegen'}</h2>
       {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('plain'); setError('') }}>Plak gewone recepttekst</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
