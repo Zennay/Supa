@@ -44,6 +44,11 @@ const PlannerPortableWeek = lazy(() =>
     .then(module => ({ default: module.PlannerPortableWeek }))
 )
 
+const PlannerActualTwoStoreSummary = lazy(() =>
+  import('./features/planner/PlannerActualTwoStoreSummary.tsx')
+    .then(module => ({ default: module.PlannerActualTwoStoreSummary }))
+)
+
 type Tab = 'home' | 'recipes' | 'products' | 'planner' | 'basket' | 'list' | 'observe'
 
 const tabs: { id: Tab; label: string; icon: string }[] = [
@@ -648,6 +653,19 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
           />
+        )}
+        {tab === 'planner' && importedPair && offlinePriceSession.imported && (
+          <Suspense fallback={<p role="status">Eigen winkelmandjes openen…</p>}>
+            <PlannerActualTwoStoreSummary
+              plus={importedPair.plus}
+              deka={importedPair.deka}
+              comparison={compareFullBaskets({ baseline: importedPair.plus, candidate: importedPair.deka })}
+              source={offlinePriceSession.imported}
+              fresh={importedSourceFresh}
+              budget={budget}
+              onOpen={() => navigate('basket')}
+            />
+          </Suspense>
         )}
         {tab === 'planner' && (
           <Suspense fallback={<p role="status">Privé weekplanning laden…</p>}>

@@ -1,0 +1,6 @@
+.planner-actual-store-compare{margin:1.5rem 0;padding:1.25rem;border:1px solid #a7bfb3;border-radius:1rem;background:#fbfdfb;color:#193626}
+.planner-actual-store-compare__stores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}
+.planner-actual-store-compare__stores article{border:1px solid #c8d6cd;border-radius:.75rem;padding:1rem;display:grid;gap:.4rem;min-width:0}
+.planner-actual-store-compare__stores b{font-size:1.2rem;overflow-wrap:anywhere}
+.planner-actual-store-compare__stores small{color:#4b6858}
+@media(max-width:580px){.planner-actual-store-compare__stores{grid-template-columns:1fr}}
