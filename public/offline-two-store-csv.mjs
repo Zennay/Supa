@@ -130,13 +130,9 @@ function convertStoreCsv(text, allowOne) {
     if (!['true', 'false'].includes(availableText)) {
       error(location + ': beschikbaarheid moet letterlijk true of false zijn.')
     }
-    // The planner deliberately exports one unobserved demand row per store.
-    // No product name, package, price or time exists for such a row. Omit it
-    // instead of inventing a retailer SKU. The existing basket matcher then
-    // leaves the corresponding ingredient unresolved, never priced at €0.
-    if (name === '' && pack === '' && count === '' && cents === '' && availableText === 'false') {
-      continue
-    }
+    // A row containing ANY original SKU, observation time or product fact is
+    // not an untouched Planner placeholder. It must pass full admission, or
+    // its omission would silently hide an incomplete observation from the user.
     if (!validObservedAt(observedAt)) error(location + ': werkelijke ISO-tijd met UTC-offset vereist.')
     if (!validLabel(name, 160)) error(location + ': productnaam ongeldig of ontbreekt.')
     if (seen.get(retailer).has(id)) error(location + ': dubbele product-ID.')
