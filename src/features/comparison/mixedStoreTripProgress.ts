@@ -64,7 +64,7 @@ function selectRoute(context: MixedTripContext, settings: MixedTripSettings) {
   const single = createMixedStoreShoppingPlan(context.plus, context.deka, 'single')
   if (!mixed || !single) throw Error('Herstelde productvoorkeuren passen niet bij dit fysieke mandje.')
   const cost = costCents(settings.extraVisitCost)
-  const suggestedSingle = mixed.additionalDifferenceCents < 0 ||
+  const suggestedSingle = mixed.additionalDifferenceCents <= 0 ||
     (cost !== null && cost >= mixed.additionalDifferenceCents)
   const useSingle = settings.mode === 'single' || (settings.mode === 'auto' && suggestedSingle)
   return useSingle ? single : mixed

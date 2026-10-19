@@ -51,7 +51,7 @@ export function MixedStoreShoppingCard({
   const extraCostCents = mixedUsesBoth && cents !== null &&
     Number.isSafeInteger(cents) && cents >= 0 && cents <= 100_000 ? cents : null
   const costInvalid = mixedUsesBoth && rawCost !== '' && (extraCostCents === null || !costShapeOk)
-  const suggestedSingle = selectedMixed.additionalDifferenceCents < 0 ||
+  const suggestedSingle = selectedMixed.additionalDifferenceCents <= 0 ||
     (extraCostCents !== null && extraCostCents >= selectedMixed.additionalDifferenceCents)
   const chooseSingle = mode === 'single' || (mode === 'auto' && suggestedSingle)
   const plan = chooseSingle ? single : selectedMixed
@@ -213,8 +213,8 @@ export function MixedStoreShoppingCard({
         {' '}Geen garantie op actuele kassaprijzen of andere niet-ingevulde kosten.
       </p>}
       {mode === 'auto' && chooseSingle && <p role="status">
-        {selectedMixed.additionalDifferenceCents < 0
-          ? 'Door je handmatige winkelvoorkeuren kost de samengestelde route al meer dan het goedkoopste hele mandje bij één winkel.'
+        {selectedMixed.additionalDifferenceCents <= 0
+          ? 'Met deze winkelkeuzes is de gecombineerde route niet goedkoper dan één compleet winkelmandje.'
           : 'Met jouw ingevoerde extra kosten is een compleet mandje bij één winkel minstens zo voordelig.'}
         {' '}Supa heeft daarom de boodschappenlijst op één winkel gezet. Kies expliciet de gemengde
         route als je toch beide winkels wilt bezoeken.</p>}
