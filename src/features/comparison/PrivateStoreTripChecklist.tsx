@@ -320,7 +320,7 @@ export function PrivateStoreTripChecklist({
 
   /** A private complete, fresh single-store basket is valuable even when the
    * other store has no prices. Import and observation rights remain separate. */
-  async function downloadCsv() {
+  async function downloadReviewedTrip(kind: 'csv' | 'html') {
     try {
       const ms = Date.parse(observedAt)
       const age = Date.now() - ms
@@ -334,18 +334,22 @@ export function PrivateStoreTripChecklist({
           !basket.lines.length || basket.selectedMealCount <= 0) {
         throw Error('De echte winkelmand is nog niet volledig gekoppeld.')
       }
-      const { privateSingleStoreShoppingCsv } =
-        await import('./privateSingleStoreShoppingCsv.ts')
-      const csv = privateSingleStoreShoppingCsv({ basket, observedAt, done })
-      const uri = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      const output = kind === 'csv'
+        ? (await import('./privateSingleStoreShoppingCsv.ts'))
+          .privateSingleStoreShoppingCsv({ basket, observedAt, done })
+        : (await import('./privateSingleStorePrintableHtml.ts'))
+          .privateSingleStorePrintableHtml({ basket, observedAt, done })
+      const uri = URL.createObjectURL(new Blob([output], {
+        type: (kind === 'csv' ? 'text/csv' : 'text/html') + ';charset=utf-8',
+      }))
       try {
         const link = document.createElement('a')
         link.href = uri
-        link.download = 'supa-eigen-compleet-mandje-' + basket.store.id.toLowerCase() + '.csv'
+        link.download = 'supa-eigen-compleet-mandje-' + basket.store.id.toLowerCase() + '.' + kind
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
-      setMessage('Volledig eigen winkelmandje als CSV gedownload; dit is geen bronbewijs of publieke prijsclaim.')
+      setMessage('Volledig eigen winkelmandje als ' + kind.toUpperCase() + ' gedownload; dit is geen bronbewijs of publieke prijsclaim.')
     } catch (error) {
       setMessage(error instanceof Error ? error.message :
         'Geen actuele volledige winkelmand beschikbaar voor CSV.')
@@ -408,8 +412,13 @@ export function PrivateStoreTripChecklist({
       </button>
       <button type="button" className="ghost-button"
         disabled={!fresh || !lines.length || basket.unresolvedLineCount > 0}
-        onClick={() => { void downloadCsv() }}>
+        onClick={() => { void downloadReviewedTrip('csv') }}>
         Download compleet eigen mandje (CSV)
+      </button>
+      <button type="button" className="ghost-button"
+        disabled={!fresh || !lines.length || basket.unresolvedLineCount > 0}
+        onClick={() => { void downloadReviewedTrip('html') }}>
+        Afdrukbaar eigen mandje (HTML)
       </button>
       <button type="button" className="ghost-button" disabled={!lines.length && !extraLines.length}
         aria-expanded={copyVisible} onClick={() => setCopyVisible(visible => !visible)}>
