@@ -19,7 +19,7 @@ const MixedStoreShoppingCard = lazy(async () => {
   const module = await import('./MixedStoreShoppingCard.tsx')
   return { default: module.MixedStoreShoppingCard }
 })
-import { privatePackUnitRate, formatPrivateUnitRate } from './privateUnitPrice.ts'
+import { privatePackUnitRate, formatPrivateUnitRate, privateUnitPrice } from './privateUnitPrice.ts'
 import { rankOwnSourceSuggestions } from './ownSourceSuggestions.ts'
 import { automaticallyAcceptedSourceLine } from './automaticSourceMatch.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
@@ -48,15 +48,12 @@ function exactPlanCheckpointKey(planKey: string): string {
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 function pricePerUnit(line: Matched): string | null {
-  const { unit, amount, count } = line.pack
-  const physical = amount * count
-  const basis = unit === 'g' || unit === 'ml' ? physical / 1000 : physical
-  if (!Number.isFinite(basis) || basis <= 0) return null
-  const cents = line.pricePerPackCents / basis
-  if (!Number.isFinite(cents) || cents < 0) return null
-  return euros.format(cents / 100) + ' per ' +
-    (unit === 'g' || unit === 'kg' ? 'kg' : unit === 'ml' || unit === 'l' ? 'liter' : 'stuk')
+  // One exact decimal per-kg/litre/piece rate in the private workbench,
+  // Planner product table, portable comparison and offline HTML report.
+  // Never derive the advisory unit rate through binary floating arithmetic.
+  return privateUnitPrice(line)?.replace(' / ', ' per ') ?? null
 }
+
 /**
  * Only an explicit review of THIS captured article can unlock an in-app total.
  * Changing the physical plan, original capture instant, package, price or SKU
@@ -989,7 +986,7 @@ export function OfflineReviewedWorkbench({
     }
     setBusy(true)
     try {
-      const converterUrl = '/offline-two-store-csv.mjs'
+      const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
       const module: unknown = await import(/* @vite-ignore */ converterUrl)
       if (!module || typeof module !== 'object' ||
           !('convertOwnStoreCsv' in module) ||
@@ -1024,7 +1021,7 @@ export function OfflineReviewedWorkbench({
         file.type === 'text/csv' || file.type === 'text/tab-separated-values'
       let source = raw
       if (isCsv) {
-        const converterUrl = '/offline-two-store-csv.mjs'
+        const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
         const module: unknown = await import(/* @vite-ignore */ converterUrl)
         if (!module || typeof module !== 'object' ||
             !('convertOwnStoreCsv' in module) ||
@@ -1067,7 +1064,7 @@ export function OfflineReviewedWorkbench({
         file.type === 'text/csv' || file.type === 'text/tab-separated-values'
         let json = raw
         if (isCsv) {
-          const converterUrl = '/offline-two-store-csv.mjs'
+          const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
           const module: unknown = await import(/* @vite-ignore */ converterUrl)
           if (!module || typeof module !== 'object' ||
               !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
@@ -1122,7 +1119,7 @@ export function OfflineReviewedWorkbench({
         file.type === 'text/csv' || file.type === 'text/tab-separated-values'
       let source = raw
       if (isCsv) {
-        const converterUrl = '/offline-two-store-csv.mjs'
+        const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
         const module: unknown = await import(/* @vite-ignore */ converterUrl)
         if (!module || typeof module !== 'object' ||
             !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
@@ -1172,7 +1169,7 @@ export function OfflineReviewedWorkbench({
         file.type === 'text/csv' || file.type === 'text/tab-separated-values'
       let json = raw
       if (isCsv) {
-        const converterUrl = '/offline-two-store-csv.mjs'
+        const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
         const module: unknown = await import(/* @vite-ignore */ converterUrl)
         if (!module || typeof module !== 'object' ||
             !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
@@ -1252,7 +1249,7 @@ export function OfflineReviewedWorkbench({
       let content = raw
       if (isCsv) {
         // Vite copies the existing public module without changing its parser.
-        const converterUrl = '/offline-two-store-csv.mjs'
+        const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
         const module: unknown = await import(/* @vite-ignore */ converterUrl)
         if (!module || typeof module !== 'object' ||
           !('convertTwoStoreCsv' in module) ||
@@ -1820,7 +1817,7 @@ export function OfflineReviewedWorkbench({
             onClick={downloadPrintablePlannerCapture}>
             Download printbaar opnameformulier (HTML)
           </button>
-          <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
+          <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
           </a>
         </div>

@@ -127,7 +127,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
         'Open jouw geselecteerde Planner-week in de privé-mappingwizard? Daar controleer en bevestig je eerst ' +
         'de oorspronkelijke fysieke ingrediënten; winkelproducten en prijzen worden niet overgenomen.')) return
       window.sessionStorage.setItem('supa:private-planner-week-handoff:v1', content)
-      window.location.assign('/private-basket-mapping.html')
+      window.location.assign(`${import.meta.env.BASE_URL}private-basket-mapping.html`)
     } catch {
       setBackupMessage('Het exacte Planner-weekmenu kan niet direct worden overgedragen. ' +
         'Controleer je recepten en hoeveelheden of download een eigen JSON/TXT-bestand.')
@@ -270,7 +270,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
             <button type="button" className="ghost-button" onClick={openWithCurrentDemand}>
               Neem exact weekmenu mee naar privévergelijker
             </button>
-            <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
+            <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
               Open privévergelijker voor mijn TXT-lijst
             </a>
           </div>

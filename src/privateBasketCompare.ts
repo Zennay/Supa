@@ -230,7 +230,7 @@ async function parseSource(): Promise<Source> {
   }
   if (new TextEncoder().encode(csv).length > limit) throw Error('Samengevoegde bron overschrijdt 256 KB')
   // Existing strict canonical reader is intentionally served unchanged from public.
-  const canonicalUrl = '/offline-two-store-csv.mjs'
+  const canonicalUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
   const { convertOwnStoreCsv } = await import(/* @vite-ignore */ canonicalUrl)
   return sourceFrom(JSON.parse(convertOwnStoreCsv(csv)))
 }
