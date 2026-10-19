@@ -1,4 +1,5 @@
 import type { BasketComparison } from './basketComparison.ts'
+import { snapshotOwnFinancialData } from './ownDataSnapshot.ts'
 
 export type SavingsEffect = 'pack-size' | 'offer' | 'planning'
 
@@ -41,13 +42,26 @@ function effectKey(effect: SavingsEffect): keyof Omit<SavingsEffectTotals, 'unkn
   return 'planningCents'
 }
 
-export function attributeSavingsEffects({
-  comparison,
-  evidence,
-}: {
+export function attributeSavingsEffects(input: {
   comparison: BasketComparison
   evidence: unknown
 }): SavingsAttribution {
+  // Direct callers may pass getter-backed or prototype-inherited monetary
+  // values. Snapshot every used datum once, before *any* validity/read path,
+  // and reject the entire claim on malformed evidence without invoking getters.
+  const own = snapshotOwnFinancialData(input)
+  if (!own || !Object.hasOwn(own, 'comparison') ||
+      !Object.hasOwn(own, 'evidence')) {
+    return {
+      status: 'unknown',
+      fullyAttributed: false,
+      comparisonDeltaCents: null,
+      effectTotals: emptyTotals(),
+      reasons: ['basket attribution requires plain own-data evidence'],
+    }
+  }
+  const { comparison, evidence } = own
+
   // Direct JS/persisted JSON callers can bypass BasketComparison's TS type.
   // Never read properties or spread untrusted reason containers before
   // establishing a structurally valid comparison root.
