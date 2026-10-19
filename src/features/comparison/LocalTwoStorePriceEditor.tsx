@@ -34,17 +34,35 @@ const emptyDraft = (unit: string): ProductDraft => ({
 })
 const key = (store: OfflineRetailer, ingredientId: string) => JSON.stringify([store, ingredientId])
 
-/** Convert a *user-entered* local civil time into an explicit physical offset. */
+/** Convert real Dutch retailer civil time to the physical NL UTC offset.
+ * Never borrow the browser/device timezone: a shopper can enter prices from
+ * abroad and UK/NL offsets differ for much of the year. DST gaps and repeated
+ * 02:xx times are refused rather than guessed as independent field evidence.
+ */
 function timestampWithOffset(value: string): string | null {
   if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(value)) return null
-  const date = new Date(value)
-  if (!Number.isFinite(date.getTime())) return null
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const check = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  if (check !== value) return null
-  const minutes = -date.getTimezoneOffset()
-  const offset = `${minutes < 0 ? '-' : '+'}${pad(Math.floor(Math.abs(minutes) / 60))}:${pad(Math.abs(minutes) % 60)}`
-  return `${value}:00${offset}`
+  const [year, month, day, hour, minute] =
+    value.split(/[-T:]/u).map(Number)
+  if (year < 2000 || year > 2100) return null
+  const localMs = Date.UTC(year, month - 1, day, hour, minute)
+  const date = new Date(localMs)
+  if (!Number.isFinite(localMs) || date.getUTCFullYear() !== year ||
+      date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day ||
+      date.getUTCHours() !== hour || date.getUTCMinutes() !== minute) return null
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  })
+  const legalOffsets = [60, 120].filter(offsetMinutes => {
+    const instant = new Date(localMs - offsetMinutes * 60000)
+    const parts = Object.fromEntries(formatter.formatToParts(instant)
+      .map(part => [part.type, part.value]))
+    return Number(parts.year) === year && Number(parts.month) === month &&
+      Number(parts.day) === day && Number(parts.hour) === hour &&
+      Number(parts.minute) === minute
+  })
+  if (legalOffsets.length !== 1) return null
+  return value + ':00+' + (legalOffsets[0] === 60 ? '01:00' : '02:00')
 }
 function amountOrNull(raw: string): number | null {
   if (!/^\d{1,6}(?:[.,]\d{1,4})?$/.test(raw)) return null
@@ -431,7 +449,7 @@ export function LocalTwoStorePriceEditor({
       const missingStores = selectedStores.filter(store => !captureStores.includes(store))
       const times = captureStores.map(store => timestampWithOffset(capturedAt[store]))
       if (times.some(time => time === null)) {
-        throw new Error('Vul voor iedere winkel met complete productregels de echte opnametijd in.')
+        throw new Error('Vul de echte Nederlandse opnametijd in. Een onbestaand of dubbel tijdstip bij de zomer-/wintertijdwissel kan niet automatisch als bronmoment worden bevestigd; importeer dan eigen JSON met expliciete juiste UTC-offset.')
       }
       if (times.some(time => Date.parse(time!) > Date.now() + 300000)) {
         throw new Error('Een waarnemingstijd ligt in de toekomst.')
@@ -831,7 +849,7 @@ export function LocalTwoStorePriceEditor({
               <option key={item.id} value={item.name} label={`Historisch: ${item.pack}`} />
             ))}
           </datalist>
-          <label className="offline-manual-editor__time">Wanneer zijn deze producten echt waargenomen?
+          <label className="offline-manual-editor__time">Wanneer zijn deze producten echt waargenomen? (Nederlandse tijd)
             <input type="datetime-local" value={capturedAt[store]} onChange={e => changeTimestamp(store, e.target.value)} />
           </label>
           {(() => {
