@@ -111,11 +111,31 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [visitedBasket, setVisitedBasket] = useState(initialTab === 'basket')
   const [visitedList, setVisitedList] = useState(initialTab === 'list')
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
+  const [sourceNowMs, setSourceNowMs] = useState(() => Date.now())
   const [preferredOwnStore, setPreferredOwnStore] = useState<OwnStore>('PLUS')
   const onReviewedBaskets = useCallback((next: PrivateReviewedBaskets | null) => {
+    setSourceNowMs(Date.now())
     setPrivateReviewed(previous => JSON.stringify(previous) === JSON.stringify(next)
       ? previous : next)
   }, [])
+  // A sleeping tab cannot keep displaying a once-valid private price as current.
+  // Re-check expiration while visible and immediately on returning from sleep;
+  // do not persist observations, trigger network work, or invent fresh timestamps.
+  useEffect(() => {
+    if (!privateReviewed) return
+    const refreshAge = () => setSourceNowMs(Date.now())
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'hidden') refreshAge()
+    }
+    window.addEventListener('focus', refreshAge)
+    document.addEventListener('visibilitychange', refreshIfVisible)
+    const timer = window.setInterval(refreshIfVisible, 60_000)
+    return () => {
+      window.removeEventListener('focus', refreshAge)
+      document.removeEventListener('visibilitychange', refreshIfVisible)
+      window.clearInterval(timer)
+    }
+  }, [privateReviewed])
   const [initialProductSelection] = useState(readChosenProducts)
   const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)
   const [savedProductRaw, setSavedProductRaw] = useState(initialProductSelection.raw)
@@ -185,7 +205,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     plannedMeals, activeDays,
     recipes.map(recipe => [recipe.id, recipe.ingredients]),
   ])
-  const livePrivateReviewed = freshReviewedBaskets(privateReviewed, privatePlanKey, Date.now())
+  const livePrivateReviewed = freshReviewedBaskets(privateReviewed, privatePlanKey, sourceNowMs)
   const preferredPrivateBasket = livePrivateReviewed?.stores[preferredOwnStore] ??
     livePrivateReviewed?.stores.PLUS ?? livePrivateReviewed?.stores.DekaMarkt
 
