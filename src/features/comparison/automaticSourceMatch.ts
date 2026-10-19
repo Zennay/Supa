@@ -16,13 +16,14 @@ const incidental = new Set([
   'verpakking', 'verpakkingen', 'gram', 'kilogram', 'liter', 'ml', 'kg', 'gr',
   'stuks', 'stuk', 'g', 'l', 'x',
 ])
-// Pack notation is not an ingredient modifier: "500g", "1kg", "2x500ml".
-const packNotation = /^(?:[0-9]+x)?[0-9]+(?:[.,][0-9]+)?(?:kg|gram|gr|g|ml|cl|liter|l|stuks|stuk)$/
+// Only remove numbers when they are explicitly attached to physical pack
+// units. Bare digits may distinguish variants such as baby formula 1 vs 2.
+const packNotation = /\b(?:[0-9]+\s*x\s*)?[0-9]+(?:[.,][0-9]+)?\s*(?:kg|gram|gr|g|ml|cl|liter|l|stuks|stuk)\b/gu
 const normalize = (value: string): string[] => value.normalize('NFKD')
   .replace(/\p{M}/gu, '')
   .toLocaleLowerCase('nl')
-  .match(/[\p{L}\p{N}]+/gu)?.filter(token => !incidental.has(token) &&
-    !/^[0-9]+$/.test(token) && !packNotation.test(token) && !/^[0-9]+x$/.test(token)) ?? []
+  .replace(packNotation, ' ')
+  .match(/[\p{L}\p{N}]+/gu)?.filter(token => !incidental.has(token)) ?? []
 
 function tokensMatch(query: string, productName: string): boolean {
   const queryTokens = normalize(query)
