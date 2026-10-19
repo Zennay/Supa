@@ -221,6 +221,37 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [includeWeekBudget, setIncludeWeekBudget] = useState(false)
   const [includeWeekDetails, setIncludeWeekDetails] = useState(false)
   const [weekCopyMessage, setWeekCopyMessage] = useState('')
+  // RecipeLibrary dispatches an explicit local intent after the user chooses
+  // one Planner day. Re-read the device-owned recipe at admission time: stale,
+  // deleted, unreviewed or malformed ingredients must never enter the budget.
+  useEffect(() => {
+    const chooseOwnRecipe = (event: Event) => {
+      const detail: unknown = (event as CustomEvent<unknown>).detail
+      if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return
+      const { recipeId, day } = detail as { recipeId?: unknown; day?: unknown }
+      if (typeof recipeId !== 'string' || typeof day !== 'string' ||
+          !m2InitialPlan.some(meal => meal.day === day)) return
+      try {
+        const library = readRecipeLibrary(window.localStorage)
+        if (library.error) return
+        const recipe = library.recipes.find(item => item.id === recipeId)
+        if (!recipe || !toPlannerRecipe(recipe) ||
+            !recipes.some(item => item.id === recipeId)) return
+        setPreferences(current => ({
+          ...current,
+          activeDays: current.activeDays.includes(day) ? current.activeDays :
+            [...current.activeDays, day],
+          recipeByDay: { ...current.recipeByDay, [day]: recipeId },
+        }))
+        navigate('planner')
+      } catch {
+        // Never switch planning or use example prices after storage failure.
+      }
+    }
+    window.addEventListener('supa-plan-own-recipe', chooseOwnRecipe)
+    return () => window.removeEventListener('supa-plan-own-recipe', chooseOwnRecipe)
+  }, [recipes])
+
   const { budget, activeDays, recipeByDay } = preferences
 
   const plannedMeals = useMemo(

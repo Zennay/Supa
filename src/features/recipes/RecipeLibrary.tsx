@@ -6,6 +6,7 @@ import { readRecipeLibrary, saveRecipeLibrary, reviewRecipe, type LibraryState, 
 import { importRecipeLink } from './importRecipeLink'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
+import { m2InitialPlan } from '../../data/m2Fixture'
 import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { exportOwnRecipePrivateWeek } from './exportOwnRecipePrivateWeek'
@@ -69,6 +70,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isVariant, setIsVariant] = useState(false)
   const [shoppingPortions, setShoppingPortions] = useState('2')
+  const [plannerDay, setPlannerDay] = useState(m2InitialPlan[0].day)
   const [shoppingChecks, setShoppingChecks] = useState<Record<string, boolean>>({})
   const [shoppingOpenOnly, setShoppingOpenOnly] = useState(false)
   const [showShoppingCopy, setShowShoppingCopy] = useState(false)
@@ -152,6 +154,17 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setMessage('Downloaden lukte niet. Selecteer de tekst van je lijst om die zelf op te slaan.')
       setShowShoppingCopy(true)
     }
+  }
+  function planOwnRecipe(recipe: SavedRecipe) {
+    if (library.error || !toPlannerRecipe(recipe)) {
+      setMessage('Controleer eerst alle metrische hoeveelheden en hele stuks in dit recept.')
+      return
+    }
+    if (!m2InitialPlan.some(meal => meal.day === plannerDay)) return
+    window.dispatchEvent(new CustomEvent('supa-plan-own-recipe', {
+      detail: { recipeId: recipe.id, day: plannerDay },
+    }))
+    detail.current?.close()
   }
   function downloadForPrivateComparison() {
     setPrivateWeekMessage('')
@@ -425,6 +438,22 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {error && <p role="alert" className="recipe-error">{error}</p>}
     </dialog>
     <dialog className="hifi-dialog recipe-dialog" ref={detail} aria-labelledby="recipe-detail-title"><button className="recipe-close" onClick={() => detail.current?.close()} aria-label="Details sluiten">×</button>{selected && <>{'image' in selected && selected.image && <FigmaImage className="hifi-detail-photo" asset={selected.image} alt="" />}<h2 id="recipe-detail-title">{selected.title}</h2><p>{selected.minutes ?? '?'} minuten{'servings' in selected ? ` · ${selected.servings ?? '?'} porties` : ' · ontwerpvoorbeeld'}</p>{'ingredients' in selected ? <><h3>Ingrediënten</h3><ul>{selected.source === 'supa-original-recipe' ? keyed(selected.ingredients, i => i.id).map(({key, value:i}) => <li key={key}>{i.amount} {i.unit === 'piece' ? 'stuks' : i.unit} {i.label}</li>) : keyed(selected.ingredients, i => i.original).map(({key, value:i}) => <li key={key}>{i.original}</li>)}</ul><h3>Bereiding</h3><ol>{keyed(selected.steps, s => s).map(({key, value:s}) => <li key={key}>{s}</li>)}</ol>{'sourceUrl' in selected && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Oorspronkelijk recept</a>}<p>Ingrediëntprijzen nog onbekend of alleen een niet-actueel plannervoorbeeld.</p>{'savedAt' in selected && <><div className="recipe-detail-actions"><button type="button" onClick={() => openSavedRecipeEditor(selected)}>Bewerk mijn recept</button><button type="button" onClick={() => openSavedRecipeEditor(selected, true)}>Maak een variant</button></div>
+        <section className="recipe-plan-panel" aria-label="Zet eigen recept direct in de weekplanning">
+          <h3>Plan dit eigen recept</h3>
+          {toPlannerRecipe(selected) ? <>
+            <p>Kies een dag. Supa plaatst dit recept in je Planner en activeert de dag.
+              Eerdere prijsopnames moeten opnieuw passen bij de gewijzigde ingrediënten.</p>
+            <label>Planner-dag
+              <select value={plannerDay} onChange={event => setPlannerDay(event.currentTarget.value)}>
+                {m2InitialPlan.map(meal => <option value={meal.day} key={meal.day}>{meal.day}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={() => planOwnRecipe(selected)}>
+              Zet {selected.title} op {plannerDay} in Planner
+            </button>
+          </> : <p>Controleer eerst de hoeveelheid, metrische eenheid en eventuele gedeeltelijke stuks.
+            Pas daarna kun je dit recept zonder gokwerk plannen.</p>}
+        </section>
         <section className="recipe-shopping-panel" aria-label="Boodschappen voor eigen recept">
           <h3>Mijn boodschappen voor dit recept</h3>
           <p>Maak een ongeprijsde lijst voor het gewenste aantal porties. Stuks die niet heel uitkomen, moet je zelf beoordelen.</p>
