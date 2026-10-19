@@ -104,6 +104,31 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch { setMessage('Download niet beschikbaar. Kopieer de lijst hieronder.') }
   }
+  async function downloadCsv() {
+    if (!currentCaptureAvailable()) {
+      setMessage('De eigen bronopname is verlopen. Herzie de oorspronkelijke prijzen voordat je CSV downloadt.')
+      return
+    }
+    try {
+      const { privateSingleStoreShoppingCsv } = await import('./privateSourceShoppingCsv.ts')
+      // Avoid a stale asynchronous export across a newly expired source moment.
+      if (!currentCaptureAvailable()) throw Error('Bronopname inmiddels verlopen.')
+      const csv = privateSingleStoreShoppingCsv({ basket, observedAt: capture.observedAt,
+        done: new Set(basket.lines.filter(line => checked[tick(line)]).map(line => line.id)),
+      })
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-eigen-boodschappen.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('Eigen artikelen, hele verpakkingen en exacte centprijzen lokaal als CSV opgeslagen.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'De privé-CSV kon niet worden gemaakt.')
+    }
+  }
   return (
     <section className="screen private-source-shopping" aria-label="Eigen gecontroleerde boodschappenlijst">
       <header>
@@ -161,6 +186,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         <label><input type="checkbox" checked={remainingOnly}
           onChange={event => setRemainingOnly(event.target.checked)} /> Alleen nog te kopen</label>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
+        <button type="button" onClick={() => { void downloadCsv() }}>Download met eigen SKU’s en centprijzen (CSV)</button>
         <button type="button" onClick={onOpenComparison}>Herzie prijzen en productmatching</button>
       </div>
       <p role="status" aria-live="polite">{message}</p>
