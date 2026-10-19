@@ -10,8 +10,9 @@ const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOpenList, onOpenMixedRoute }: {
+export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparison, onOpenList, onOpenMixedRoute }: {
   reviewed: PrivateReviewedBaskets | null
+  budget: number
   onOpenComparison: () => void
   onOpenList: (store?: OwnStore) => void
   onOpenMixedRoute: () => void
@@ -73,7 +74,7 @@ export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOp
           onChange={event => setQuery(event.target.value)} placeholder="Product, SKU of ingrediënt" /></label>
       </div>
       {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
-        search={search} unitFilter={unitFilter} order={order}
+        search={search} unitFilter={unitFilter} order={order} budget={budget}
         onOpenComparison={onOpenComparison} onOpenList={onOpenList}
         onOpenMixedRoute={onOpenMixedRoute} />}
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.</p>

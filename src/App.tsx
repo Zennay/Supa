@@ -382,7 +382,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
 
       <div className="content">
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
-          <PrivateReviewedProductCatalog reviewed={livePrivateReviewed}
+          <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
             onOpenComparison={openOwnPriceImport}
             onOpenMixedRoute={() => { setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
             onOpenList={(store) => {

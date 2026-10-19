@@ -2,6 +2,7 @@ import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
+import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
@@ -11,15 +12,22 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
  * No independent source authorization, live pricing or retail claim is implied.
  */
-export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, onOpenComparison, onOpenList, onOpenMixedRoute }: {
+export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, budget, onOpenComparison, onOpenList, onOpenMixedRoute }: {
   reviewed: PrivateReviewedBaskets
   search: string
   unitFilter: 'all' | 'kg' | 'liter' | 'stuk'
   order: 'source' | 'unitPrice' | 'lineTotal'
+  budget: number
   onOpenComparison: () => void
   onOpenList: (store: OwnStore) => void
   onOpenMixedRoute: () => void
 }) {
+  const exactBudget = validCustomWeekBudgetEuros(budget)
+  const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
+  const budgetComparison = (totalCents: number) => budgetCents === null ? null :
+    totalCents > budgetCents
+      ? money.format((totalCents - budgetCents) / 100) + ' boven je Planner-weekbudget'
+      : money.format((budgetCents - totalCents) / 100) + ' binnen je Planner-weekbudget'
   const fresh = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
   const plus = fresh?.stores.PLUS
   const deka = fresh?.stores.DekaMarkt
@@ -38,6 +46,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
             <h4>{shop}</h4>
             {capture ? <>
               <strong>{money.format(capture.basket.totalCents / 100)}</strong>
+              {budgetComparison(capture.basket.totalCents) && <small>
+                {budgetComparison(capture.basket.totalCents)}</small>}
               <small>{capture.basket.lines.length} oorspronkelijke, gecontroleerde SKU-regels</small>
               <time dateTime={capture.observedAt}>{capture.observedAt}</time>
               <button type="button" onClick={() => onOpenList(shop)}>
@@ -117,6 +127,13 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     <h3>Zelfde weekmandje · twee winkels</h3>
     <p>PLUS: {money.format(plus.basket.totalCents / 100)} · DekaMarkt: {' '}
       {money.format(deka.basket.totalCents / 100)}</p>
+    {budgetCents !== null && <div className="private-reviewed-products__budget-pair"
+      aria-label="Mijn volledige weekmandjes vergeleken met mijn Planner-weekbudget">
+      <p><strong>PLUS</strong> · {budgetComparison(plus.basket.totalCents)}</p>
+      <p><strong>DekaMarkt</strong> · {budgetComparison(deka.basket.totalCents)}</p>
+      <small>Alleen volledige door jou gecontroleerde mandjes, niet je zoekfilter
+        of een berekening van werkelijk afgerekende producten.</small>
+    </div>}
     <strong role="status">{leader}</strong>
     {mix && <div className="private-reviewed-products__route-preview">
       <h4>Goedkoopste originele artikelen combineren</h4>
