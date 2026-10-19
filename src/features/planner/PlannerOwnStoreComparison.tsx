@@ -88,6 +88,25 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     onOpenList()
     setDownloadMessage('')
   }
+  async function downloadReviewQueue() {
+    setDownloadMessage('')
+    try {
+      if (!captureProgress) throw new Error('Importeer eerst je eigen winkelbronnen in Vergelijk.')
+      const { pendingOwnSourceReviewCsv } = await import('./pendingOwnSourceReviewCsv.ts')
+      const csv = pendingOwnSourceReviewCsv(captureProgress, captureProgress.planKey, Date.now())
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-openstaande-eigen-winkelcontroles.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setDownloadMessage('Openstaande PLUS/Deka-productcontroles lokaal opgeslagen, zonder verzonnen winkelprijs.')
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : 'Controlelijst downloaden mislukt.')
+    }
+  }
   async function downloadFieldSheet(kind: 'csv' | 'guide') {
     setDownloadMessage('')
     try {
@@ -239,6 +258,14 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
         <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('guide')}>Download opnamegids (TXT)</button>
       </div>
     </div>}
+    {captureProgress && <div className="own-store-planner__review-download">
+      <p>Neem een privéoverzicht mee van alle nog ontbrekende winkelbronnen, productkoppelingen
+        en persoonlijke SKU-/prijscontroles. Verlopen bronnen komen afzonderlijk op de lijst;
+        onbekende prijzen blijven onbekend.</p>
+      <button type="button" className="ghost-button" onClick={() => void downloadReviewQueue()}>
+        Download openstaande winkelcontroles (CSV)
+      </button>
+    </div>}
     <div className="own-store-planner__cards">
       {stores.map(store => {
         const capture = currentSources?.stores[store]
@@ -283,26 +310,26 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               {progress.fresh && progress.missingIngredients.length > 0 &&
                 <div className="own-store-planner__review-queue" aria-label={'Ontbrekende bronproducten bij ' + store}>
                   <strong>Zoek echte bronproducten</strong>
-                  {progress.missingIngredients.map(item =>
+                  {progress.missingIngredients.slice(0, 5).map(item =>
                     <button type="button" key={item.id} className="ghost-button"
                       onClick={() => onReviewIngredient(store, item.id)}
                       aria-label={'Zoek bij ' + store + ' een product voor ' + item.label}>
                       Zoek {item.label} in Vergelijk
                     </button>)}
-                  {progress.demandLineCount - progress.matchedLineCount > progress.missingIngredients.length &&
-                    <small>En {progress.demandLineCount - progress.matchedLineCount - progress.missingIngredients.length} andere zonder match.</small>}
+                  {progress.missingIngredients.length > 5 &&
+                    <small>En {progress.missingIngredients.length - 5} andere zonder match.</small>}
                 </div>}
               {progress.fresh && progress.awaitingReviewIngredients.length > 0 &&
                 <div className="own-store-planner__review-queue" aria-label={'Te controleren winkelproducten bij ' + store}>
                   <strong>Controleer originele SKU, verpakking en pakprijs</strong>
-                  {progress.awaitingReviewIngredients.map(item =>
+                  {progress.awaitingReviewIngredients.slice(0, 5).map(item =>
                     <button type="button" key={item.id} className="ghost-button"
                       onClick={() => onReviewIngredient(store, item.id)}
                       aria-label={'Controleer bij ' + store + ' de originele SKU voor ' + item.label}>
                       Controleer {item.label} in Vergelijk
                     </button>)}
-                  {progress.matchedLineCount - progress.reviewedLineCount > progress.awaitingReviewIngredients.length &&
-                    <small>En {progress.matchedLineCount - progress.reviewedLineCount - progress.awaitingReviewIngredients.length} andere productkeuzes zonder controle.</small>}
+                  {progress.awaitingReviewIngredients.length > 5 &&
+                    <small>En {progress.awaitingReviewIngredients.length - 5} andere productkeuzes zonder controle.</small>}
                 </div>}
               <button type="button" className="ghost-button"
                 onClick={() => progress.fresh && progress.nextIngredientId

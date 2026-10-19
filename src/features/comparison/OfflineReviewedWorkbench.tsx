@@ -1462,12 +1462,12 @@ export function OfflineReviewedWorkbench({
         matchedLineCount: basket?.matchedLineCount ?? 0,
         reviewedLineCount: perStoreReview.find(item => item.store === store)?.accepted ?? 0,
         missingIngredients: basket?.lines.filter(line =>
-          line.status !== 'matched').slice(0, 5)
+          line.status !== 'matched')
           .map(line => ({ id: line.id, label: line.ingredientLabel })) ?? [],
         awaitingReviewIngredients: basket?.lines.filter(line =>
           line.status === 'matched' &&
           reviewedLines[reviewedLineKey(store, capture.observedAt, line)] !== true)
-          .slice(0, 5).map(line => ({ id: line.id, label: line.ingredientLabel })) ?? [],
+          .map(line => ({ id: line.id, label: line.ingredientLabel })) ?? [],
         fresh: nowNs >= capture.observedNs - 300_000_000_000n &&
           nowNs - capture.observedNs <= 604_800_000_000_000n,
       }

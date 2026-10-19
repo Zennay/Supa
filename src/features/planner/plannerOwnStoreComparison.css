@@ -64,3 +64,7 @@
 .own-store-planner__review-queue button {
   width: 100%; text-align: left; min-height: 44px; overflow-wrap: anywhere;
 }
+
+.own-store-planner__review-download { margin-bottom: 1rem; line-height: 1.45; }
+.own-store-planner__review-download p { margin: .3rem 0 .65rem; }
+.own-store-planner__review-download button { min-height: 44px; }
