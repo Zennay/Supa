@@ -45,3 +45,14 @@
 .supa-planner-source-matches__controls .supa-planner-source-matches__check { display: flex; gap: .5rem; align-items: center; font-weight: 400; }
 
 .supa-planner-source-matches__row [role=cell] button { display: block; margin-top: .55rem; min-height: 40px; width: 100%; white-space: normal; text-align: left; }
+
+.supa-planner-source-matches__next {
+  display: grid; gap: .5rem; padding: .75rem; border: 1px solid #d3dfd6;
+  border-radius: .65rem; background: #f8fbf9;
+}
+.supa-planner-source-matches__next-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.supa-planner-source-matches__next-actions button { min-height: 44px; }
+@media (max-width: 620px) {
+  .supa-planner-source-matches__next-actions { display: grid; }
+  .supa-planner-source-matches__next-actions button { width: 100%; text-align: left; }
+}

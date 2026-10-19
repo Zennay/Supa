@@ -199,8 +199,17 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     return missing.filter(({ suggestions, manualReview }) =>
       !suggestions[store] && !manualReview[store]).map(({ need }) => need)
   }
-  const pendingPlus = needsForNewSource('PLUS', Date.now()).length
-  const pendingDeka = needsForNewSource('DekaMarkt', Date.now()).length
+  const pendingPlus = needsForNewSource('PLUS', clock).length
+  const pendingDeka = needsForNewSource('DekaMarkt', clock).length
+  // The first concrete human decision, prioritized over unconfirmed name
+  // suggestions. Never approve an SKU here; only navigate to the canonical
+  // review workbench or to a deliberately empty real-source capture sheet.
+  const nextReview = coverage.flatMap(line => stores.flatMap(store =>
+    line.manualReview[store] ? [{ store, need: line.need, ambiguous: true }] : [],
+  ))[0] ?? coverage.flatMap(line => stores.flatMap(store =>
+    line.suggestions[store] ? [{ store, need: line.need, ambiguous: false }] : [],
+  ))[0]
+  const nextCapture = pendingPlus ? 'PLUS' : pendingDeka ? 'DekaMarkt' : null
   function mobileGuideText(): string {
     try {
       return selectiveTwoStoreCaptureGuide({
@@ -267,6 +276,32 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     <p>{coverage.length} fysieke ingrediënten: PLUS {suggested[0]} mogelijke kandidaten,
       DekaMarkt {suggested[1]}. Voor {paired} ingrediënten is er voorlopig een
       kandidaat bij beide winkels.</p>
+    <div className="supa-planner-source-matches__next" aria-label="Snel door met je echte broncontrole">
+      <strong>Volgende stappen naar een vergelijkbaar weekmandje</strong>
+      <p>Nieuwe bronregels: PLUS {pendingPlus}, DekaMarkt {pendingDeka}.
+        {' '}Twijfelachtige originele SKU-keuzes: PLUS {requiringChoice[0]}, DekaMarkt {requiringChoice[1]}.
+        {' '}Kandidaten zijn nog niet definitief gecontroleerd.</p>
+      <div className="supa-planner-source-matches__next-actions">
+        {nextCapture && onRecapture && <button type="button" className="ghost-button"
+          onClick={() => onRecapture(nextCapture)}>
+          1. Open {nextCapture}-opnameblad voor werkelijke ontbrekende brondata
+        </button>}
+        {nextReview && onReviewIngredient && <button type="button" className="ghost-button"
+          onClick={() => {
+            const capture = source.captures[nextReview.store]
+            if (olderPairedStore !== nextReview.store && capture &&
+                recentOwnCaptureInstant(capture.observedAt, Date.now()))
+              onReviewIngredient(nextReview.store, nextReview.need.id)
+          }}>
+          {nextCapture ? '2.' : '1.'} Beoordeel {nextReview.need.label} bij {nextReview.store}
+          {nextReview.ambiguous ? ' (meerdere SKU’s)' : ' (bron-SKU nog onbevestigd)'}
+        </button>}
+      </div>
+      {!nextCapture && !nextReview && <small>
+        Er zijn geen voorlopige bronvoorstellen of ontbrekende bronregels over.
+        Controleer de volledige fysieke mandjes en het prijsverschil in Vergelijk.
+      </small>}
+    </div>
     {(requiringChoice[0] > 0 || requiringChoice[1] > 0) && <p role="status">
       <strong>Handmatige bronkeuze vereist:</strong> {requiringChoice[0]} PLUS-
       en {requiringChoice[1]} DekaMarkt-ingrediënten hebben meerdere
