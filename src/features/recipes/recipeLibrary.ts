@@ -13,11 +13,70 @@ export function reviewRecipe(draft: UserRecipeDraft): UserRecipeDraft {
     ingredients: draft.ingredients.map(i => i.original), steps: draft.steps,
   })
   if (!reviewed.steps.length) throw new Error('Voeg minstens één bereidingsstap toe.')
+  // Re-parsing the original measurement is necessary, but it is NOT evidence
+  // that a previous human source/conversion warning was resolved. Keep such
+  // a warning while its literal source row remains unchanged.
+  const ingredients = reviewed.ingredients.map((item, index) => {
+    const previous = draft.ingredients[index]
+    const pending = previous?.original === item.original &&
+      typeof previous.reviewReason === 'string' &&
+      previous.reviewReason.length > 0 && previous.reviewReason.length <= 400
+      ? previous.reviewReason : null
+    return pending ? { ...item, reviewReason: pending } : item
+  })
+  const extraWarnings = Array.isArray(draft.warnings)
+    ? draft.warnings.filter(warning => typeof warning === 'string' &&
+        warning.length > 0 && warning.length <= 400 &&
+        !/^Ingrediënt \d+:/u.test(warning) &&
+        warning !== 'Porties ontbreken of zijn onduidelijk' &&
+        warning !== 'Bereidingstijd ontbreekt of is onduidelijk').slice(0, 100)
+    : []
+  const warnings = Array.from(new Set([
+    ...ingredients.flatMap((item, index) => item.reviewReason
+      ? ['Ingrediënt ' + (index + 1) + ': ' + item.reviewReason] : []),
+    ...reviewed.warnings.filter(warning => !/^Ingrediënt \d+:/u.test(warning)),
+    ...extraWarnings,
+  ]))
   return {
-    ...reviewed, source: draft.source,
+    ...reviewed, ingredients, warnings, source: draft.source,
     sourceUrl: draft.source === 'url'
       ? safeRecipeSourceUrl(draft.sourceUrl ?? '')
       : null,
+  }
+}
+
+/**
+ * Keep human-review holds when an imported recipe is edited cosmetically.
+ * A genuine new amount/unit must be parsed and reviewed again. Source-level
+ * warnings never disappear simply because the title or instructions changed.
+ */
+export function retainUnresolvedRecipeReview(
+  fresh: UserRecipeDraft, previous: UserRecipeDraft,
+): UserRecipeDraft {
+  const ingredients = fresh.ingredients.map((current, index) => {
+    const older = previous.ingredients.find(item => item.original === current.original)
+      ?? previous.ingredients[index]
+    if (!older || typeof older.reviewReason !== 'string' ||
+        !older.reviewReason || older.reviewReason.length > 400 ||
+        current.reviewReason) return current
+    if (older.amount !== current.amount || older.unit !== current.unit) {
+      return current
+    }
+    return { ...current, reviewReason: older.reviewReason }
+  })
+  const inherited = Array.isArray(previous.warnings) ? previous.warnings.filter(warning =>
+    typeof warning === 'string' && warning.length > 0 && warning.length <= 400 &&
+    !/^Ingrediënt \d+:/u.test(warning) &&
+    warning !== 'Porties ontbreken of zijn onduidelijk' &&
+    warning !== 'Bereidingstijd ontbreekt of is onduidelijk') : []
+  return {
+    ...fresh, ingredients,
+    warnings: Array.from(new Set([
+      ...ingredients.flatMap((item, index) => item.reviewReason
+        ? ['Ingrediënt ' + (index + 1) + ': ' + item.reviewReason] : []),
+      ...fresh.warnings.filter(warning => !/^Ingrediënt \d+:/u.test(warning)),
+      ...inherited,
+    ])),
   }
 }
 
