@@ -1,0 +1,45 @@
+.supa-two-store-coverage {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #d4dfd7;
+  border-radius: 14px;
+  display: grid;
+  gap: .85rem;
+  background: #fff;
+}
+.supa-two-store-coverage__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: .75rem;
+}
+.supa-two-store-coverage__heading h4 { font-size: 1.05rem; margin: 0 0 .35rem; }
+.supa-two-store-coverage__heading p { max-width: 58ch; margin: 0; line-height: 1.5; }
+.supa-two-store-coverage button { min-height: 44px; white-space: normal; }
+.supa-two-store-coverage button:focus-visible,
+.supa-two-store-coverage input:focus-visible { outline: 3px solid #286b50; outline-offset: 2px; }
+.supa-two-store-coverage__totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.supa-two-store-coverage__totals div { display: flex; flex-direction: column; gap: .2rem; background: #f5f8f5; border: 1px solid #d8e3d9; padding: .7rem; border-radius: 9px; }
+.supa-two-store-coverage__toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; justify-content: space-between; }
+.supa-two-store-coverage__toolbar p { margin: 0; line-height: 1.4; }
+.supa-two-store-coverage__toolbar label { display: inline-flex; align-items: center; gap: .5rem; }
+.supa-two-store-coverage__toolbar input { min-height: 20px; min-width: 20px; }
+.supa-two-store-coverage__rows { display: grid; gap: .65rem; max-height: 560px; overflow-y: auto; padding-right: .15rem; }
+.supa-two-store-coverage__row { border: 1px solid #e1e7e1; padding: .7rem; border-radius: 10px; }
+.supa-two-store-coverage__row > header { display: flex; justify-content: space-between; gap: .75rem; margin-bottom: .6rem; align-items: baseline; }
+.supa-two-store-coverage__row > header small { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.supa-two-store-coverage__shops { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+.supa-two-store-coverage__shops section { display: flex; flex-direction: column; min-width: 0; gap: .4rem; background: #f8faf9; border-radius: 8px; padding: .6rem; overflow-wrap: anywhere; }
+.supa-two-store-coverage__shops span { font-size: .88rem; line-height: 1.35; }
+.supa-two-store-coverage__shops [data-status="ready"],
+.supa-two-store-coverage__shops [data-status="reviewed"] { color: #225b46; }
+.supa-two-store-coverage__shops [data-status="expired"] { color: #8a4b2a; }
+.supa-two-store-coverage__shops button { align-self: start; border: 1px solid #819a89; background: #fff; color: #183d32; padding: .55rem; border-radius: 8px; cursor: pointer; }
+.supa-two-store-coverage > small { line-height: 1.5; }
+@media (max-width: 520px) {
+  .supa-two-store-coverage { padding: .65rem; }
+  .supa-two-store-coverage__shops { grid-template-columns: 1fr; }
+  .supa-two-store-coverage__row > header { flex-wrap: wrap; }
+  .supa-two-store-coverage__heading > button { width: 100%; }
+}

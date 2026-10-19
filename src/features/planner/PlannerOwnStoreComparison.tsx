@@ -7,6 +7,7 @@ import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { printableOwnStoreComparison } from './downloadOwnStoreComparison.ts'
 import { pendingOwnSourceReviewText } from './pendingOwnSourceReviewCsv.ts'
 import { PlannerOwnProductDeltas } from './PlannerOwnProductDeltas.tsx'
+import { PlannerTwoStoreCoverage } from './PlannerTwoStoreCoverage.tsx'
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
@@ -277,6 +278,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
         <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('guide')}>Download opnamegids (TXT)</button>
       </div>
     </div>}
+    {captureNeeds.length > 0 && <PlannerTwoStoreCoverage
+      needs={captureNeeds} progress={captureProgress} reviewed={currentSources}
+      now={now} onOpenComparison={onOpenComparison}
+      onReviewIngredient={onReviewIngredient} />}
     {captureProgress && <div className="own-store-planner__review-download">
       <p>Neem een privéoverzicht mee van alle nog ontbrekende winkelbronnen, productkoppelingen
         en persoonlijke SKU-/prijscontroles. Verlopen bronnen komen afzonderlijk op de lijst;
