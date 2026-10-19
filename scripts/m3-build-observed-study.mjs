@@ -70,8 +70,13 @@ function validTimestamp(value) {
       .slice(1)
       .split(':')
       .map(Number)
-    // Match the canonical +/-14:00 max timezone offset before conversion.
-    if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0)) return false
+    // Civil offsets are asymmetric: UTC+14:00 through UTC-12:00.
+    // JS Date.parse can normalize impossible UTC-13/-14 local clocks.
+    const negative = match[5].startsWith('-')
+    if (offsetHour > 14 || offsetMinute > 59 ||
+        (offsetHour === 14 && offsetMinute !== 0) ||
+        (negative && (offsetHour > 12 ||
+          (offsetHour === 12 && offsetMinute !== 0)))) return false
   }
 
   // Date.parse loses submillisecond fractional precision; nonzero hidden
