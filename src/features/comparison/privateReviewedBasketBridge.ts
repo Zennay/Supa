@@ -64,8 +64,8 @@ export type PrivateCaptureProgress = {
     reviewedLineCount: number
     autoMatchedLineCount: number
     confirmedSourceLines?: PrivateReviewedSourceLine[]
-    missingIngredients: { id: string; label: string }[]
-    awaitingReviewIngredients: { id: string; label: string }[]
+    missingIngredients: { id: string; label: string; amount?: number | null; unit?: string }[]
+    awaitingReviewIngredients: { id: string; label: string; amount?: number | null; unit?: string }[]
     fresh: boolean
   }>>
 }
