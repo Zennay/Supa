@@ -325,7 +325,7 @@ export function OfflineReviewedWorkbench({
     changes: { store: typeof stores[number]; previousAt: string | null
       nextAt: string; previousCount: number; nextCount: number
       added: number; removed: number; changed: number
-      previousPriced: number; nextPriced: number
+      previousPriced: number; nextPriced: number; unchanged: boolean
       examples: { id: string; name: string; before: string; after: string }[] }[]
   } | null>(null)
 
@@ -722,6 +722,23 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function sameCanonicalCapture(
+    previous: OfflinePriceSnapshots['captures'][typeof stores[number]],
+    incoming: OfflinePriceSnapshots['captures'][typeof stores[number]],
+  ): boolean {
+    if (!previous || !incoming || previous.observedAt !== incoming.observedAt ||
+        previous.products.length !== incoming.products.length) return false
+    const bySku = new Map(previous.products.map(product => [product.id, product]))
+    return incoming.products.every(product => {
+      const old = bySku.get(product.id)
+      return !!old && old.name === product.name &&
+        old.packAmount === product.packAmount && old.packUnit === product.packUnit &&
+        old.packCount === product.packCount &&
+        old.sourcePriceCents === product.sourcePriceCents &&
+        old.sourceAvailable === product.sourceAvailable
+    })
+  }
+
   function stageBothStoreReplacement(input: string, version: number) {
     // Reuse canonical source admission. This is a preview of local user
     // files, never a retailer-authorization or independent price claim.
@@ -732,25 +749,10 @@ export function OfflineReviewedWorkbench({
       importSnapshots(input)
       return
     }
-    // An unchanged replay must not erase the user's real source reviews and
-    // physical ticks. Compare admitted original facts, not JSON whitespace
-    // or CSV source ordering; never carry approvals across a changed fact.
-    const sameCapture = (store: typeof stores[number]) => {
-      const old = imported.captures[store]
-      const nextCapture = next.captures[store]
-      if (!old || !nextCapture || old.observedAt !== nextCapture.observedAt ||
-          old.products.length !== nextCapture.products.length) return false
-      const before = new Map(old.products.map(product => [product.id, product]))
-      return nextCapture.products.every(product => {
-        const previous = before.get(product.id)
-        return previous && previous.name === product.name &&
-          previous.packAmount === product.packAmount &&
-          previous.packUnit === product.packUnit &&
-          previous.packCount === product.packCount &&
-          previous.sourcePriceCents === product.sourcePriceCents &&
-          previous.sourceAvailable === product.sourceAvailable
-      })
-    }
+    // Admission compares original facts, independent of JSON whitespace or SKU
+    // order. No approval may outlive a changed original shop observation.
+    const sameCapture = (store: typeof stores[number]) =>
+      sameCanonicalCapture(imported.captures[store], next.captures[store])
     if (stores.every(sameCapture)) {
       setPendingTwoStore(null)
       setMessage('Beide bronopnames zijn inhoudelijk identiek aan je huidige bronnen. Eerdere productcontroles en afvinkingen zijn behouden.')
@@ -804,7 +806,8 @@ export function OfflineReviewedWorkbench({
         nextAt: incoming.observedAt, previousCount: prior?.products.length ?? 0,
         nextCount: incoming.products.length, added, removed, changed,
         previousPriced: prior?.products.filter(priced).length ?? 0,
-        nextPriced: incoming.products.filter(priced).length, examples }
+        nextPriced: incoming.products.filter(priced).length,
+        unchanged: sameCapture(store), examples }
     })
     setPendingReplacement(null)
     setPendingTwoStore({ sourceText: text, newText: input, version,
@@ -851,9 +854,37 @@ export function OfflineReviewedWorkbench({
       const source = parseOfflinePriceSnapshots(pending.newText, Date.now())
       if (!source.captures.PLUS || !source.captures.DekaMarkt)
         throw new Error('Beide originele winkelopnames moeten aanwezig zijn.')
+      if (!imported) throw new Error('Je oorspronkelijke winkeldata zijn niet meer geladen.')
+      const changed = stores.filter(store =>
+        !sameCanonicalCapture(imported.captures[store], source.captures[store]))
+      const invalidates = (key: string) => changed.some(store =>
+        key.startsWith('[' + JSON.stringify(store) + ','))
       ++importRevision.current
       setPendingTwoStore(null)
-      importSnapshots(pending.newText)
+      setPendingReplacement(null)
+      setText(pending.newText)
+      setImported(source)
+      setClockMs(Date.now())
+      // Preserve user-reviewed SKUs and physical shopping ticks only for
+      // exactly identical underlying source records. A changed original
+      // capture always revokes its store's former choices and price approvals.
+      setManualSku(previous => ({
+        PLUS: changed.includes('PLUS') ? {} : previous.PLUS,
+        DekaMarkt: changed.includes('DekaMarkt') ? {} : previous.DekaMarkt,
+      }))
+      setSkuFilter(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !invalidates(key))))
+      setReviewedLines(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !invalidates(key))))
+      setDoneTripItems(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !invalidates(key))))
+      setTripExportMessage('')
+      setTripProgressMessage('')
+      setMessage(changed.join(' en ') +
+        ': de nieuwe opname moet opnieuw worden gecontroleerd. ' +
+        stores.filter(store => !changed.includes(store)).join(' en ') +
+        (changed.length < 2 ? ' blijft met eigen originele bron, productkeuzes en afvinkingen behouden.' :
+          ' Geen oude prijsbevestigingen zijn overgenomen.'))
     } catch (error) {
       setPendingTwoStore(null)
       setMessage((error instanceof Error ? error.message : 'Nieuwe brondata niet geldig.') +
@@ -1845,11 +1876,15 @@ export function OfflineReviewedWorkbench({
           <h3>Vergelijk beide nieuwe winkelopnames met je huidige mandje</h3>
           <p>De nieuwe bestanden zijn uitsluitend lokaal gelezen. Je vorige producten,
             originele bronmomenten, persoonlijke productkeuzes en afvinkingen blijven staan
-            tot je zelf bevestigt. <strong>Beide winkels</strong> worden daarna opnieuw beoordeeld.</p>
+            tot je zelf bevestigt. Alleen winkels met gewijzigde bronfeiten
+            moeten daarna opnieuw worden beoordeeld.</p>
           <ul>
             {pendingTwoStore.changes.map(change => (
               <li key={change.store}>
-                <strong>{change.store}</strong> · {change.previousCount} → {change.nextCount} producten
+                <strong>{change.store}</strong> · {change.unchanged
+                  ? 'Ongewijzigde originele bron — eerdere controles blijven behouden.'
+                  : 'Gewijzigde of nieuwe bron — productkeuzes opnieuw controleren.'}
+                <br />{change.previousCount} → {change.nextCount} producten
                 {' '}({change.added} nieuwe codes, {change.removed} verdwenen,
                 {' '}{change.changed} gewijzigde artikelen)
                 <br />Oud: {change.previousAt ?? 'Nog geen eigen opname'}
@@ -1884,7 +1919,7 @@ export function OfflineReviewedWorkbench({
               Download volledig origineel SKU- en prijsverschillenoverzicht (CSV)
             </button>
             <button type="button" disabled={busy} onClick={confirmBothStoreReplacement}>
-              Bevestig: vervang beide opnames en controleer producten opnieuw
+              Bevestig nieuwe bronnen en hercontroleer alleen gewijzigde winkels
             </button>
             <button type="button" className="ghost-button" disabled={busy}
               onClick={() => {
