@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 type ReceiptLine = {
   ingredient: string
@@ -124,7 +124,15 @@ export function readPrivateReceipt(raw: string): SavedReceipt | null {
 export function PrivateOwnReceiptViewer() {
   const [saved, setSaved] = useState<SavedReceipt | null>(null)
   const [message, setMessage] = useState('')
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<'all' | 'PLUS' | 'DekaMarkt' | 'equal'>('all')
+  const [sort, setSort] = useState<'impact' | 'label'>('impact')
+  const readSerial = useRef(0)
   async function openFile(file: File | undefined) {
+    const serial = ++readSerial.current
+    setQuery('')
+    setFilter('all')
+    setSort('impact')
     setSaved(null)
     setMessage('')
     if (!file) return
@@ -134,13 +142,29 @@ export function PrivateOwnReceiptViewer() {
     }
     try {
       const parsed = readPrivateReceipt(await file.text())
+      if (serial !== readSerial.current) return
       if (!parsed) throw Error('Ongeldig of veranderd rapport')
       setSaved(parsed)
       setMessage('Privérapport lokaal geopend; dit is een historisch document, geen actuele winkelprijs.')
     } catch {
+      if (serial !== readSerial.current) return
       setMessage('Dit is geen volledig, rekenkundig consistent Supa-privérapport. Er is niets ingelezen als winkelbron.')
     }
   }
+
+  const needle = query.normalize('NFKC').trim().toLocaleLowerCase('nl')
+  const visible = saved?.lines.filter(line => {
+    if (filter === 'PLUS' && line.dekaMinusPlusCents <= 0) return false
+    if (filter === 'DekaMarkt' && line.dekaMinusPlusCents >= 0) return false
+    if (filter === 'equal' && line.dekaMinusPlusCents !== 0) return false
+    return !needle || [
+      line.ingredient, line.PLUS.sourceProductName, line.PLUS.sourceProductId,
+      line.DekaMarkt.sourceProductName, line.DekaMarkt.sourceProductId,
+    ].some(value => value.normalize('NFKC').toLocaleLowerCase('nl').includes(needle))
+  }).sort((a, b) => sort === 'label'
+    ? a.ingredient.localeCompare(b.ingredient, 'nl')
+    : Math.abs(b.dekaMinusPlusCents) - Math.abs(a.dekaMinusPlusCents) ||
+      a.ingredient.localeCompare(b.ingredient, 'nl')) ?? []
 
   return <details className="own-store-planner__archive">
     <summary>Open een eerder opgeslagen eigen prijsrapport (JSON)</summary>
@@ -162,9 +186,32 @@ export function PrivateOwnReceiptViewer() {
       <p>{saved.cheapest === null ? 'In dit opgeslagen rapport waren de mandjes even duur.' :
         'In dit opgeslagen rapport was ' + saved.cheapest + ' ' +
         euro.format(saved.differenceCents / 100) + ' goedkoper voor hetzelfde fysieke mandje.'}</p>
+      <div className="own-store-planner__archive-filters">
+        <label>Zoek historisch product of SKU
+          <input type="search" value={query} maxLength={120}
+            onChange={event => setQuery(event.currentTarget.value)} />
+        </label>
+        <label>Toon prijsregels
+          <select value={filter}
+            onChange={event => setFilter(event.currentTarget.value as typeof filter)}>
+            <option value="all">Alle producten</option>
+            <option value="PLUS">Goedkoper bij PLUS</option>
+            <option value="DekaMarkt">Goedkoper bij DekaMarkt</option>
+            <option value="equal">Gelijke prijs</option>
+          </select>
+        </label>
+        <label>Sorteer op
+          <select value={sort} onChange={event => setSort(event.currentTarget.value as typeof sort)}>
+            <option value="impact">Grootste prijsverschil</option>
+            <option value="label">Ingrediënt A–Z</option>
+          </select>
+        </label>
+      </div>
+      <p role="status">{visible.length} van {saved.lines.length} historische productregels zichtbaar.
+        Deze filters veranderen de oorspronkelijke mandtotalen niet.</p>
       <div className="own-store-planner__scroll" role="region" aria-label="Historische productprijzen" tabIndex={0}>
         <table><thead><tr><th>Ingrediënt</th><th>PLUS</th><th>DekaMarkt</th><th>Historisch verschil</th></tr></thead>
-          <tbody>{saved.lines.map(item => <tr key={item.ingredientId}>
+          <tbody>{visible.map(item => <tr key={item.ingredientId}>
             <th scope="row">{item.ingredient}</th>
             <td>{item.PLUS.sourceProductName} · {item.PLUS.sourceProductId} · {euro.format(item.PLUS.totalWholePackagesCents / 100)}</td>
             <td>{item.DekaMarkt.sourceProductName} · {item.DekaMarkt.sourceProductId} · {euro.format(item.DekaMarkt.totalWholePackagesCents / 100)}</td>
@@ -175,6 +222,7 @@ export function PrivateOwnReceiptViewer() {
         </table>
       </div>
       <button type="button" className="ghost-button" onClick={() => {
+        readSerial.current++
         setSaved(null)
         setMessage('Het ingelezen historische rapport is uit dit scherm gewist.')
       }}>Sluit en wis het geopende rapport</button>
