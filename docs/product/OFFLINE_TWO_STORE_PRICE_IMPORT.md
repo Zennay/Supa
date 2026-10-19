@@ -1024,13 +1024,17 @@ De productiebuild levert nu een aparte checkoutbundle van circa
 ## Nieuw weekmenu: direct een leeg CSV-prijsinvulblad downloaden
 
 In **Vergelijk → Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden** kun je
-**Download leeg PLUS/Deka-prijsinvulblad (CSV)** kiezen. Supa neemt alleen de
+**Download leeg prijsinvulblad (CSV)** kiezen. Kies eerst **beide winkels**, **alleen PLUS** of **alleen DekaMarkt**. Supa neemt alleen de
 *fysieke ingrediëntenbehoefte* van de geselecteerde Planner-dagen mee. Er wordt
 geen winkel-SKU, productnaam, oude prijs, tijdstempel, beschikbaarheid of
 retailerautorisatie aangemaakt. Het CSV-bestand heeft precies de bestaande
 negen verplichte kolomkoppen. Het is expliciet een **leeg werkblad, geen brondata**.
 
-Per ingrediënt is er één lege PLUS-regel en één lege DekaMarkt-regel. De
+Per ingrediënt is er één regel per gekozen winkel. Het gecombineerde werkblad
+heeft eerst alle PLUS-regels en dan alle DekaMarkt-regels; een enkelwinkelblad
+heeft alleen de rijen van die winkel. Je kunt na een echte PLUS-waarneming
+later apart DekaMarkt invullen en toevoegen, zonder vooraf een tweede bron te
+verzinnen. De
 uitklapbare hulp onder de knop toont de precieze spreadsheet-rijnummers en de
 gevraagde hoeveelheid. De eenheid is hooguit een bewerkbare hint; neem de
 werkelijke inhoud van de aangeboden verpakking over. Vul per werkelijk gevonden

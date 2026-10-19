@@ -1,10 +1,8 @@
 /**
- * A deliberately blank, offline worksheet for a *physical Planner demand*.
- * Every source identity, observation instant, package and price must be supplied
- * by the person with the lawful original record. A demand is not a retailer SKU.
- *
- * CSV rows follow the existing nine-field offline-two-store-csv importer;
- * unfilled rows are ignored, not interpreted as zero-price products.
+ * An editable, deliberately *unobserved* capture sheet for a physical
+ * Planner demand. No demanded ingredient becomes a retailer product or SKU.
+ * A real source identity, actual time, package, availability and price must
+ * be filled in by the person with the original lawful observation.
  */
 const HEADER = [
   'retailer', 'observedAt', 'id', 'name', 'packAmount',
@@ -14,23 +12,33 @@ const SUPPORTED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece'])
 const STORES = ['PLUS', 'DekaMarkt'] as const
 const quote = (value: string) => '"' + value.replaceAll('"', '""') + '"'
 
+export type CaptureStore = typeof STORES[number]
 export type PlannerCaptureNeed = Readonly<{
   id: string
   label: string
   unit: string
 }>
 
-export function makeBlankPlannerCaptureCsv(needs: readonly PlannerCaptureNeed[]): string {
+/** A one-store sheet can be imported alone; only actual source rows are admitted. */
+export function makeBlankPlannerCaptureCsv(
+  needs: readonly PlannerCaptureNeed[],
+  selectedStores: readonly CaptureStore[] = STORES,
+): string {
   if (!Array.isArray(needs) || needs.length < 1 || needs.length > 200 ||
       needs.some(need => !need || typeof need.id !== 'string' ||
         typeof need.label !== 'string' || typeof need.unit !== 'string')) {
     throw new Error('Selecteer eerst een geldig weekmenu met maximaal 200 ingrediënten.')
   }
+  if (!Array.isArray(selectedStores) || selectedStores.length < 1 ||
+      selectedStores.length > STORES.length ||
+      new Set(selectedStores).size !== selectedStores.length ||
+      selectedStores.some(store => !STORES.includes(store))) {
+    throw new Error('Selecteer één of beide ondersteunde winkels.')
+  }
   const rows: string[] = [HEADER.map(quote).join(',')]
-  for (const retailer of STORES) {
+  for (const retailer of selectedStores) {
     for (const need of needs) {
-      // Only the *physical unit family* may be used as an editable hint.
-      // Unknown units stay empty; they cannot become priced without correction.
+      // Unit hints are not recorded retailer packaging. Unknown stays empty.
       const packUnit = SUPPORTED_UNITS.has(need.unit) ? need.unit : ''
       rows.push([
         retailer, '', '', '', '', packUnit, '', '', 'false',
