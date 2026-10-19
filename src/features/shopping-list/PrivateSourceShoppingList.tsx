@@ -5,6 +5,7 @@ import type { BasketTraceLine, RecipeWithIngredients } from '../../domain/basket
 import type { PlannedMeal } from '../../domain/types.ts'
 import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { extraGroceriesSavedEvent, readSavedExtrasForPlan } from '../comparison/ownExtraGroceriesStorage.ts'
 import { privatePhysicalShoppingTick } from './privatePhysicalShoppingTick.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { createMixedStoreShoppingPlan, type MixedStoreLine } from '../comparison/mixedStoreShoppingPlan.ts'
@@ -41,6 +42,22 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   const [remainingOnly, setRemainingOnly] = useState(false)
   const [message, setMessage] = useState('')
   const [showMixedRoute, setShowMixedRoute] = useState(false)
+  const [unpricedExtras, setUnpricedExtras] = useState<number | null>(() => {
+    const saved = readSavedExtrasForPlan(reviewed.planKey)
+    return saved.available ? saved.items.length : null
+  })
+  useEffect(() => {
+    const refresh = () => {
+      const saved = readSavedExtrasForPlan(reviewed.planKey)
+      setUnpricedExtras(saved.available ? saved.items.length : null)
+    }
+    refresh()
+    const onChanged = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === reviewed.planKey) refresh()
+    }
+    window.addEventListener(extraGroceriesSavedEvent, onChanged)
+    return () => window.removeEventListener(extraGroceriesSavedEvent, onChanged)
+  }, [reviewed.planKey])
   const mixedSectionRef = useRef<HTMLElement>(null)
   const progressInputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -348,8 +365,15 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           <small>Vinkjes betekenen niet dat producten zijn betaald.</small></p>
         {budgetCents !== null && budgetCents >= 0 &&
           <p>{basket.totalCents <= budgetCents
-            ? euros.format((budgetCents - basket.totalCents) / 100) + ' onder je Planner-weekbudget'
-            : euros.format((basket.totalCents - budgetCents) / 100) + ' boven je Planner-weekbudget'}</p>}
+            ? euros.format((budgetCents - basket.totalCents) / 100) + ' onder je Planner-weekbudget voor alléén bekende geprijsde ingrediënten'
+            : euros.format((basket.totalCents - budgetCents) / 100) + ' boven je Planner-weekbudget voor alléén bekende geprijsde ingrediënten'}</p>}
+        {unpricedExtras !== null && unpricedExtras > 0 && <p role="status">
+          Je hebt daarnaast {unpricedExtras} eigen ongeprijsde boodschappen. Deze horen
+          niet bij het berekende winkelmandje; de echte totale weekuitgaven en
+          resterende budgetruimte blijven <strong>onbekend</strong>.
+        </p>}
+        {unpricedExtras === null && <p role="status">De opgeslagen extra boodschappen
+          zijn niet leesbaar; je uiteindelijke totale budgetruimte is onbekend.</p>}
         <small>Alleen hele verpakkingen in eigen bronopname. Geen actuele kassagarantie.</small>
       </div>
       {comparison?.claimable && comparison.deltaCents !== null &&
