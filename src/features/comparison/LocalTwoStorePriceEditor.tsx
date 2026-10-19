@@ -187,6 +187,30 @@ export function LocalTwoStorePriceEditor({
     setSavedDraftRaw(null)
   }
 
+  // Unknown versions and other-week drafts are deliberately never overwritten.
+  // The user must still be able to explicitly discard a stale/private tab draft
+  // without having to open developer tools or clear unrelated site storage.
+  function discardProtectedDraft() {
+    if (!draftProtected || typeof window === 'undefined' || !window.confirm(
+      'Verwijder het beschermde prijsconcept uit deze browsertab? Dit kan invoer van een andere week of nieuwere appversie zijn. Je kunt het niet herstellen zonder eigen backup.')) return
+    try {
+      const current = window.sessionStorage.getItem(privateDraftStorageKey)
+      if (current !== savedDraftRaw) {
+        setSavedDraftRaw(current)
+        setDraftStatus('Het opgeslagen concept is tussentijds veranderd. Controleer opnieuw voordat je het verwijdert.')
+        return
+      }
+      window.sessionStorage.removeItem(privateDraftStorageKey)
+      setSavedDraftRaw(null)
+      setDraftProtected(false)
+      setDraftOptIn(false)
+      setDraftFingerprint(selectedPlanFingerprint)
+      setDraftStatus('Het oude beschermde concept is gewist. Je huidige invulscherm blijft behouden.')
+    } catch {
+      setDraftStatus('Het beschermde concept kon niet worden gewist. Bestaande opslag blijft behouden.')
+    }
+  }
+
   function prefillReviewedSources() {
     const seeds = Object.entries(reviewedRecaptureSeeds)
     if (!seeds.length || !window.confirm(
@@ -356,6 +380,10 @@ export function LocalTwoStorePriceEditor({
         <span role="status">{draftStatus}</span>
         {draftOptIn && <button type="button" className="ghost-button" onClick={clearDraft}>
           Stop automatisch bewaren en wis concept
+        </button>}
+        {draftProtected && <button type="button" className="ghost-button"
+          onClick={discardProtectedDraft}>
+          Verwijder beschermd concept na bevestiging
         </button>}
       </div>
       <label>Welke winkel(s) heb je daadwerkelijk geobserveerd?
