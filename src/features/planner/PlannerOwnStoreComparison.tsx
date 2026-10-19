@@ -195,13 +195,15 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   async function downloadPrivateComparison() {
     setDownloadMessage('')
     try {
+      // Load the formatter before authorizing the export: asynchronous module
+      // loading must not preserve a price that has since passed its deadline.
+      const { printableOwnStoreComparison, downloadOwnStoreText } = await import('./downloadOwnStoreComparison.ts')
       if (!reviewed) throw new Error('Geen persoonlijke bronopnames beschikbaar.')
       const current = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
       const fresh = ownStoreWeekComparison(current)
       if (fresh.status !== 'comparable' || !current?.stores.PLUS || !current.stores.DekaMarkt) {
         throw new Error('De bronopnames zijn verlopen of niet meer vergelijkbaar. Werk ze bij in Vergelijk.')
       }
-      const { printableOwnStoreComparison, downloadOwnStoreText } = await import('./downloadOwnStoreComparison.ts')
       downloadOwnStoreText(printableOwnStoreComparison(fresh, {
         PLUS: current.stores.PLUS.observedAt,
         DekaMarkt: current.stores.DekaMarkt.observedAt,
@@ -251,12 +253,13 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   async function downloadPrivateCsv() {
     setDownloadMessage('')
     try {
+      const { downloadOwnStoreCsv } = await import('./downloadOwnStoreComparison.ts')
+      // Re-admit both original captures at the actual emission instant.
       const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
       const fresh = ownStoreWeekComparison(current)
-      if (!current || fresh.status !== 'comparable') {
+      if (!current?.stores.PLUS || !current.stores.DekaMarkt || fresh.status !== 'comparable') {
         throw new Error('Voor deze CSV zijn twee actuele en volledig gecontroleerde winkelmandjes nodig.')
       }
-      const { downloadOwnStoreCsv } = await import('./downloadOwnStoreComparison.ts')
       downloadOwnStoreCsv(current, fresh)
       setDownloadMessage('De privévergelijking met originele SKU’s en gehele centprijzen is lokaal als CSV gedownload.')
     } catch (error) {
@@ -277,12 +280,13 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   async function downloadPrivateHtml() {
     setDownloadMessage('')
     try {
+      const { privateComparisonHtml } = await import('../comparison/PrivateBasketComparisonExport.tsx')
+      // A slow lazy import cannot grandfather a stale, non-paired price.
       const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
       if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
           ownStoreWeekComparison(current).status !== 'comparable') {
         throw new Error('Er zijn twee actuele en volledig gecontroleerde mandjes nodig voor deze afdruk.')
       }
-      const { privateComparisonHtml } = await import('../comparison/PrivateBasketComparisonExport.tsx')
       const html = privateComparisonHtml(
         current.stores.PLUS.basket, current.stores.DekaMarkt.basket,
         current.stores.PLUS.observedAt, current.stores.DekaMarkt.observedAt,
