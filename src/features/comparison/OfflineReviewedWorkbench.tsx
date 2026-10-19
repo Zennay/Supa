@@ -36,6 +36,14 @@ const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeSty
 const stores = ['PLUS', 'DekaMarkt'] as const
 type SourceSort = 'relevance' | 'whole-pack' | 'unit-price'
 const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
+function exactPlanCheckpointKey(planKey: string): string {
+  let hash = 2166136261
+  for (let i = 0; i < planKey.length; i++) {
+    hash ^= planKey.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return privateTabCheckpointKey + ':' + (hash >>> 0).toString(16)
+}
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 function pricePerUnit(line: Matched): string | null {
@@ -291,6 +299,9 @@ export function OfflineReviewedWorkbench({
 }) {
   // A pasted source is a proposal, never the admitted receipt currently
   // powering reviews, exports, and shopping progress.
+  // A separate opt-in recovery slot for each exact physical Planner plan.
+  // The original single-slot key stays read-only for backward compatibility.
+  const tabCheckpointKey = planKey ? exactPlanCheckpointKey(planKey) : privateTabCheckpointKey
   const [text, setText] = useState('')
   const [pasteDraft, setPasteDraft] = useState('')
   const currentActiveSource = useRef(text)
@@ -471,11 +482,11 @@ export function OfflineReviewedWorkbench({
   function saveTabCheckpoint() {
     try {
       const session = portableSessionText()
-      const existing = window.sessionStorage.getItem(privateTabCheckpointKey)
+      const existing = window.sessionStorage.getItem(tabCheckpointKey)
       if (existing !== null && !window.confirm(
-        'Er bestaat al een privéherstelpunt voor deze browsertab. Vervang het bewust door de huidige bron en artikelkeuzes?')) return
-      window.sessionStorage.setItem(privateTabCheckpointKey, session)
-      setMessage('Privéherstelpunt bewaard in deze browsertab. Bij herladen kun je de bron en SKU-keuzes terughalen; alle beoordelingen moet je opnieuw doen. Download een JSON-kopie voor langer bewaren.')
+        'Er bestaat al een privéherstelpunt voor dit exacte weekmenu. Vervang het bewust door de huidige bron en artikelkeuzes?')) return
+      window.sessionStorage.setItem(tabCheckpointKey, session)
+      setMessage('Privéherstelpunt voor dit weekmenu bewaard in deze browsertab. Bij herladen kun je de bron en SKU-keuzes terughalen; alle reviews moeten opnieuw. Download JSON voor langer bewaren.')
     } catch (error) {
       setMessage(error instanceof Error ? error.message :
         'Opslaan van het privéherstelpunt is niet gelukt. Gebruik de JSON-download.')
@@ -487,8 +498,10 @@ export function OfflineReviewedWorkbench({
     setPendingReplacement(null)
     setBusy(false)
     try {
-      const saved = window.sessionStorage.getItem(privateTabCheckpointKey)
-      if (saved === null) throw Error('Geen privéherstelpunt in deze browsertab gevonden.')
+      const saved = window.sessionStorage.getItem(tabCheckpointKey) ??
+        (tabCheckpointKey === privateTabCheckpointKey ? null :
+          window.sessionStorage.getItem(privateTabCheckpointKey))
+      if (saved === null) throw Error('Geen privéherstelpunt voor dit weekmenu gevonden.')
       const result = importPrivateBasketSession({
         text: saved, plan, recipes, activeDays, now: Date.now(),
       })
@@ -511,9 +524,9 @@ export function OfflineReviewedWorkbench({
 
   function deleteTabCheckpoint() {
     try {
-      if (!window.confirm('Wis het privéherstelpunt van deze browsertab definitief? Huidig geopende winkeldata blijven staan.')) return
-      window.sessionStorage.removeItem(privateTabCheckpointKey)
-      setMessage('Privéherstelpunt uit deze browsertab gewist. Geopende winkeldata zijn niet veranderd.')
+      if (!window.confirm('Wis het bewaarde privéherstelpunt voor dit weekmenu? Andere weken blijven onaangeroerd.')) return
+      window.sessionStorage.removeItem(tabCheckpointKey)
+      setMessage('Herstelpunt voor deze week gewist; andere weken en geopende winkeldata blijven intact.')
     } catch {
       setMessage('De browseropslag kon niet worden gewist. Gebruik de privacyinstellingen van je browser.')
     }
