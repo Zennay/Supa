@@ -64,3 +64,5 @@
   font-weight: 500;
 }
 .supa-planner-source-matches__tentative-delta small { line-height: 1.4; }
+
+.supa-planner-source-matches__tentative-summary { padding: .65rem; border: 1px dashed #b9c9bf; border-radius: .5rem; background: #f8faf9; }

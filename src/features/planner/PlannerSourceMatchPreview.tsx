@@ -48,6 +48,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   const [showAll, setShowAll] = useState(false)
   const [onlyMissing, setOnlyMissing] = useState(false)
   const [search, setSearch] = useState('')
+  const [sortMode, setSortMode] = useState<'review-first' | 'largest-provisional-gap'>('review-first')
   const [storeFilter, setStoreFilter] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
   const [actionFilter, setActionFilter] = useState<'all' | 'choose-sku' | 'fix-source' | 'capture' | 'paired'>('all')
   const [captureMessage, setCaptureMessage] = useState('')
@@ -169,6 +170,17 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     stores.some(store => line.manualReview[store]) ? 0 :
     stores.some(store => line.unpricedHints[store]) ? 1 :
     stores.some(store => !line.suggestions[store]) ? 2 : 3
+  const candidateLineGap = (line: typeof coverage[number]) =>
+    source.pairedWithin24h && line.suggestions.PLUS && line.suggestions.DekaMarkt
+      ? line.suggestions.DekaMarkt.lineCents - line.suggestions.PLUS.lineCents : null
+  // Count ONLY provisional original-SKU rows, never imply an additive bill:
+  // two physical ingredients may both map to a single pack of the same SKU.
+  const previewRows = coverage.filter(line => candidateLineGap(line) !== null)
+  const provisionalLower = {
+    PLUS: previewRows.filter(line => candidateLineGap(line)! > 0).length,
+    DekaMarkt: previewRows.filter(line => candidateLineGap(line)! < 0).length,
+    equal: previewRows.filter(line => candidateLineGap(line) === 0).length,
+  }
   const selectedStores = storeFilter === 'both' ? stores : [storeFilter]
   const term = search.trim().normalize('NFKC').toLocaleLowerCase('nl')
   const filtered = (onlyMissing ? missing : coverage).filter(line => {
@@ -186,8 +198,19 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     if (actionFilter === 'paired') return stores.every(store => !!line.suggestions[store])
     return storeFilter === 'both' || selectedStores.some(store =>
       !line.suggestions[store] || line.manualReview[store])
-  }).sort((a, b) => priority(a) - priority(b) ||
-    a.need.label.localeCompare(b.need.label, 'nl'))
+  }).sort((a, b) => {
+    if (sortMode === 'largest-provisional-gap') {
+      const aGap = candidateLineGap(a)
+      const bGap = candidateLineGap(b)
+      if (aGap !== null || bGap !== null) {
+        if (aGap === null) return 1
+        if (bGap === null) return -1
+        if (Math.abs(aGap) !== Math.abs(bGap))
+          return Math.abs(bGap) - Math.abs(aGap)
+      }
+    }
+    return priority(a) - priority(b) || a.need.label.localeCompare(b.need.label, 'nl')
+  })
   const shown = filtered.slice(0, showAll ? 200 : 12)
   // Portable, non-financial next-action list for the CURRENT filters.
   // It never saves candidate prices, guesses a SKU, or alters imports.
@@ -360,6 +383,15 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     <p>{coverage.length} fysieke ingrediënten: PLUS {suggested[0]} mogelijke kandidaten,
       DekaMarkt {suggested[1]}. Voor {paired} ingrediënten is er voorlopig een
       kandidaat bij beide winkels.</p>
+    {previewRows.length > 0 && <p className="supa-planner-source-matches__tentative-summary">
+      <strong>Alleen voorlopige SKU-regels uit je twee oorspronkelijke bronnen:</strong>
+      {' '}{provisionalLower.PLUS} ingrediëntregels met lagere PLUS-hele-pakkenregel,
+      {' '}{provisionalLower.DekaMarkt} met lagere DekaMarkt-regel,
+      {' '}{provisionalLower.equal} gelijk.
+      {' '}Geen winnaar voor het hele mandje: productkeuzes zijn niet bevestigd,
+      {' '}dezelfde verpakking kan meerdere ingrediënten dekken.
+      {' '}Controleer de volledige mandjes in Vergelijk.
+    </p>}
     <div className="supa-planner-source-matches__next" aria-label="Snel door met je echte broncontrole">
       <strong>Volgende stappen naar een vergelijkbaar weekmandje</strong>
       <p>Nieuwe bronregels: PLUS {pendingPlus}, DekaMarkt {pendingDeka}.
@@ -424,6 +456,15 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           <option value="fix-source">Bestaande SKU mist pakprijs of brondata</option>
           <option value="capture">Geen geschikte originele SKU beschikbaar</option>
           <option value="paired">Voorstel voor beide winkels</option>
+        </select>
+      </label>
+      <label>Sorteren
+        <select value={sortMode} onChange={event => {
+          setSortMode(event.currentTarget.value as typeof sortMode)
+          setShowAll(false)
+        }}>
+          <option value="review-first">Ontbrekende en onzekere SKU’s eerst</option>
+          <option value="largest-provisional-gap">Grootste voorlopige prijsregelverschil eerst</option>
         </select>
       </label>
       <label className="supa-planner-source-matches__check">
