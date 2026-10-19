@@ -186,12 +186,17 @@ export function PartialReviewedShoppingList({
     </div>
     {incompleteNeeds.length > 0 && <div className="supa-partial-shop__unknown">
       <h4>Ontbrekende of nog te controleren artikelen</h4>
-      <p>Deze boodschappen staan ook op je ongeprijsde weeklijst hieronder.
-        Ze zijn niet meegenomen in het bedrag hierboven.</p>
+      <p>Hier staan de nog ongeprijsde ingrediënten van hetzelfde fysieke weekmenu.
+        Ook als de andere winkel al compleet is, blijven deze hoeveelheden
+        onafhankelijk zichtbaar. Ze tellen niet mee in het deelbedrag hierboven.</p>
       {incompleteNeeds.slice(0, 8).map(item =>
         <button type="button" key={item.id} className="ghost-button"
           onClick={() => onReviewIngredient(store, item.id)}>
-          {item.label} · bronproduct controleren
+          {item.label} · {typeof item.amount === 'number' &&
+            Number.isFinite(item.amount) && item.amount > 0
+              ? String(item.amount).replace('.', ',') + ' ' + (item.unit ?? '')
+              : 'hoeveelheid nog controleren'} ·
+          {' '}bronproduct controleren
         </button>)}
       {incompleteNeeds.length > 8 &&
         <small>En nog {incompleteNeeds.length - 8} andere ingrediënten.</small>}
