@@ -112,3 +112,23 @@
   color: #395a48;
   line-height: 1.5;
 }
+
+.supa-planner-source-drop {
+  flex: 1 1 300px;
+  max-width: 100%;
+  border: 2px dashed transparent;
+  border-radius: 12px;
+}
+.supa-planner-source-drop.is-dragging {
+  border-color: #33835b;
+  background: #edf9f0;
+}
+.supa-planner-source-error {
+  margin: .4rem .6rem;
+  padding: .5rem;
+  color: #802c20;
+  border-left: 3px solid #b64c3d;
+  background: #fff2ed;
+  font-weight: 600;
+  line-height: 1.4;
+}

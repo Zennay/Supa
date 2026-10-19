@@ -39,6 +39,24 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
   const [downloadMessage, setDownloadMessage] = useState('')
+  const [directImportMessage, setDirectImportMessage] = useState('')
+  const [directDropActive, setDirectDropActive] = useState(false)
+  function takeOwnSourceFiles(files: File[]) {
+    // Early UX-only guards: these never verify the store, its rights or SKU.
+    // All original bytes still pass the canonical import in Vergelijk.
+    if (files.length === 0) return
+    if (files.length > 2) {
+      setDirectImportMessage('Selecteer maximaal twee bestanden: één eigen PLUS- en één DekaMarkt-opname.')
+      return
+    }
+    if (files.some(file => file.size === 0 || file.size > 256000)) {
+      setDirectImportMessage('Elk bronbestand moet gevuld zijn en maximaal 256 kB groot zijn.')
+      return
+    }
+    setDirectImportMessage('')
+    onImportSourceFiles(files)
+  }
+
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const refresh = () => setNow(Date.now())
@@ -273,6 +291,23 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       <div><span className="eyebrow">Eigen gecontroleerde winkelopnames</span>
         <h3 id="own-store-planner-heading">Jouw weekmand per winkel</h3></div>
       <button type="button" className="ghost-button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>
+      <div className={'supa-planner-source-drop' + (directDropActive ? ' is-dragging' : '')}
+        onDragOver={event => {
+          if (!Array.from(event.dataTransfer.types).includes('Files')) return
+          event.preventDefault()
+          event.dataTransfer.dropEffect = 'copy'
+          setDirectDropActive(true)
+        }}
+        onDragLeave={event => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            setDirectDropActive(false)
+        }}
+        onDrop={event => {
+          if (!Array.from(event.dataTransfer.types).includes('Files')) return
+          event.preventDefault()
+          setDirectDropActive(false)
+          takeOwnSourceFiles(Array.from(event.dataTransfer.files))
+        }}>
       <label className="supa-planner-direct-source">
         Direct eigen winkelopname(s) openen in Vergelijk
         <input type="file" multiple
@@ -280,11 +315,16 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
           onChange={event => {
             const files = Array.from(event.currentTarget.files ?? [])
             event.currentTarget.value = ''
-            if (files.length > 0) onImportSourceFiles(files)
+            takeOwnSourceFiles(files)
           }} />
         <small>Selecteer één of twee eigen PLUS-/Deka-bestanden. Broncontrole,
-          productmatching en expliciete bevestiging blijven verplicht.</small>
+          productmatching en expliciete bevestiging blijven verplicht.
+          Je kunt deze bestanden ook hierheen slepen (maximaal 256 kB per bestand).</small>
       </label>
+      {directImportMessage && <p role="alert" className="supa-planner-source-error">
+        {directImportMessage}
+      </p>}
+      </div>
     </header>
     {captureNeeds.length > 0 && <div className="own-store-planner__capture" aria-label="Mijn lokale winkelprijsopname">
       <strong>Zelf winkelprijzen vastleggen voor dit weekmenu</strong>
