@@ -178,6 +178,56 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch { setMessage('Download niet beschikbaar. Kopieer de lijst hieronder.') }
   }
+  async function downloadStoreWithExtras() {
+    // Merge only presentation, not price arithmetic. The reviewed retailer
+    // receipt and the private extras remain separate evidence categories.
+    if (!currentCaptureAvailable()) {
+      setMessage('De winkelopname is verlopen. Herzie eerst je eigen prijzen.')
+      return
+    }
+    try {
+      const { readSavedExtrasForPlan } = await import('../comparison/ownExtraGroceriesStorage.ts')
+      const saved = readSavedExtrasForPlan(reviewed.planKey)
+      if (!saved.available) {
+        setMessage('Extra boodschappen van deze week zijn niet veilig leesbaar. Niets gedownload.')
+        return
+      }
+      if (!saved.items.length) {
+        setMessage('Voeg onderaan Lijst eerst eigen extra boodschappen toe en klik Bewaar in deze tab. Daarna kun je één gezamenlijke lijst downloaden.')
+        return
+      }
+      if (!currentCaptureAvailable()) throw Error('De oorspronkelijke winkelopname is inmiddels verlopen.')
+      const extraLines = saved.items.map(item =>
+        (item.done ? '☑ ' : '☐ ') + readable(item.name) + ' · ' +
+        String(item.quantity).replace('.', ',') + ' ' +
+        (item.unit === 'piece' ? 'stuks' : item.unit) +
+        ' · winkel en prijs onbekend')
+      const all = [
+        textList,
+        '',
+        'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ', expliciet in deze tab bewaard)',
+        'Niet gekoppeld aan PLUS of DekaMarkt. Buiten alle getoonde eurototalen en besparingen.',
+        ...extraLines,
+        '',
+        'De winkelbedragen hierboven zijn uitsluitend voor de eigen gecontroleerde',
+        'fysieke Planner-producten; deze extra boodschappen hebben onbekende kosten.',
+      ].join('\n')
+      if (new TextEncoder().encode(all).length > 128_000)
+        throw Error('Deze gecombineerde lokale lijst is te groot.')
+      if (!currentCaptureAvailable()) throw Error('De bron is veranderd tijdens exporteren.')
+      const url = URL.createObjectURL(new Blob([all], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-met-eigen-extra-boodschappen.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('Eigen gecontroleerde ' + store + '-lijst inclusief apart bewaarde ongeprijsde extras gedownload. Je getoonde winkelbedrag is exclusief extras.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch {
+      setMessage('Gecombineerde export niet beschikbaar: controleer de bron en je opgeslagen extra artikelen.')
+    }
+  }
   async function downloadCsv() {
     if (!currentCaptureAvailable()) {
       setMessage('De eigen bronopname is verlopen. Herzie de oorspronkelijke prijzen voordat je CSV downloadt.')
@@ -388,6 +438,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           Neem vinkjes uit mijn ongeprijsde Planner-lijst over
         </button>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
+        <button type="button" onClick={() => { void downloadStoreWithExtras() }}>
+          Download winkelmand + mijn bewaarde extra boodschappen (TXT)
+        </button>
         <button type="button" onClick={() => { void downloadCsv() }}>Download volledig mandje met SKU’s (CSV)</button>
         <button type="button" onClick={() => { void downloadPrintable() }}>Print volledig eigen mandje (HTML)</button>
         <button type="button" onClick={() => { void saveProgress() }}>Bewaar vinkjes (JSON)</button>
@@ -431,6 +484,10 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           }}
           aria-label="Kopieerbare eigen boodschappenlijst" />
       </details>
+      <p className="disclaimer">De gezamenlijke TXT-export bevat uitsluitend de
+        extra boodschappen die je apart hebt bewaard in dit browsertabblad. Niet bewaarde
+        wijzigingen zijn geen onderdeel van die export. Extras blijven ongeprijsd en
+        worden niet bij de gecontroleerde mandbedragen opgeteld.</p>
       <p className="disclaimer">Het TXT-bestand en de kopieerbare lijst volgen de optie
         'Alleen nog te kopen'. CSV en printbare HTML bevatten bewust het volledige
         persoonlijk gecontroleerde mandje, met alle vinkjes en bronbedragen.</p>
