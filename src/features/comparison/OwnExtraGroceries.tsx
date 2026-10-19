@@ -268,6 +268,32 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       setNotice(cause instanceof Error ? cause.message : 'Kon het complete weekmandje niet exporteren.')
     }
   }
+  async function downloadCompleteWeekPrint() {
+    if (!items.length && !activeDays.length) return
+    const sourceIdentity = identity
+    const extraSnapshot = JSON.stringify(items)
+    try {
+      const { renderOwnCompleteWeekPrintableHtml } = await import('./ownCompleteWeekPrintableHtml.ts')
+      const html = renderOwnCompleteWeekPrintableHtml(plan, recipes, activeDays,
+        items, await readPlannerTicks())
+      if (currentIdentity.current !== sourceIdentity ||
+          JSON.stringify(items) !== extraSnapshot) {
+        setNotice('De weeklijst is veranderd tijdens voorbereiden. Probeer opnieuw.')
+        return
+      }
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-volledige-weekboodschappen-afdruk.html'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setNotice('Offline afdrukbare HTML opgeslagen, met onbekende winkelprijzen en huidige vinkjes.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Kon de afdrukbare weeklijst niet maken.')
+    }
+  }
   function downloadBackup() {
     if (!items.length) return
     try {
@@ -394,6 +420,9 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       </button>
       <button type="button" onClick={() => void downloadCompleteWeek()}>
         Download complete weeklijst · recepten + extra (CSV)
+      </button>
+      <button type="button" onClick={() => void downloadCompleteWeekPrint()}>
+        Download afdrukbare complete weeklijst (HTML)
       </button>
       <button type="button" disabled={!items.length} onClick={downloadBackup}>
         Download privé-back-up (JSON)
