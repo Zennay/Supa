@@ -1892,6 +1892,7 @@ export function OfflineReviewedWorkbench({
                         DekaMarkt: imported.captures.DekaMarkt.observedAt,
                       }}
                       eligibleNow={eligibleComparisonRightNow}
+                      privatePlanKey={planKey}
                     />
                   </Suspense>
                 )}
