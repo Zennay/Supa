@@ -51,6 +51,7 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   const [unit, setUnit] = useState<Unit>('piece')
   const [notice, setNotice] = useState('')
   const [paste, setPaste] = useState('')
+  const [openOnly, setOpenOnly] = useState(false)
   const [pendingPaste, setPendingPaste] = useState<Item[] | null>(null)
   const currentIdentity = useRef(identity)
   currentIdentity.current = identity
@@ -71,6 +72,23 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
     setPaste('')
     setNotice('')
   }, [identity])
+  async function openPasteFile(file?: File) {
+    if (!file) return
+    try {
+      if (!file.size || file.size > 20000) throw Error('Selecteer een tekstbestand van maximaal 20 kB.')
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (new TextEncoder().encode(text).length > 20000) throw Error('Tekstbestand te groot.')
+      setPaste(text)
+      setPendingPaste(null)
+      setNotice('Tekst ingelezen. Controleer de regels via Bekijk plaklijst voordat je iets toevoegt.')
+    } catch { setNotice('Kon bestand niet lezen. Gebruik een geldig UTF-8 TXT/MD-bestand (maximaal 20 kB).') }
+  }
+  function removeCompleted() {
+    if (!items.some(item => item.done)) return
+    if (!window.confirm('Alle afgevinkte extra boodschappen verwijderen? De Planner en winkelprijzen blijven intact.')) return
+    setData(prev => ({ ...prev, items: items.filter(item => !item.done) }))
+    setNotice('Afgevinkte extra artikelen verwijderd. Bewaar de gewijzigde lijst desgewenst in deze tab.')
+  }
   function previewPaste(event: FormEvent) {
     event.preventDefault()
     setPendingPaste(null)
@@ -326,6 +344,13 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
           placeholder={'Koffie; 500; g\nToiletpapier; 6; stuks\nAfwasmiddel'}
           onChange={event => { setPaste(event.target.value); setPendingPaste(null) }} />
       </label>
+      <label className="unpriced-planner-checklist__upload">Of lees een lokaal tekstbestand (.txt / .md)
+        <input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={event => {
+          const file = event.currentTarget.files?.[0]
+          event.currentTarget.value = ''
+          void openPasteFile(file)
+        }} />
+      </label>
       <button type="submit" disabled={!paste.trim() || data.locked}>Bekijk plaklijst</button>
     </form>
     {pendingPaste && <div className="unpriced-planner-checklist__paste-preview">
@@ -337,7 +362,13 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       <button type="button" onClick={() => setPendingPaste(null)}>Annuleer</button>
     </div>}
     <p>{items.filter(x => x.done).length} van {items.length} extra artikelen afgevinkt.</p>
-    <ul>{items.map(item => <li key={item.id}>
+    <div className="unpriced-planner-checklist__actions">
+      <label><input type="checkbox" checked={openOnly}
+        onChange={event => setOpenOnly(event.target.checked)} /> Alleen nog te kopen extra boodschappen</label>
+      <button type="button" disabled={!items.some(item => item.done)}
+        onClick={removeCompleted}>Verwijder afgevinkte extra artikelen</button>
+    </div>
+    <ul>{items.filter(item => !openOnly || !item.done).map(item => <li key={item.id}>
       {editing === item.id ? <form onSubmit={saveEdit} className="unpriced-planner-checklist__actions">
         <label>Artikel <input required maxLength={120} value={editName}
           onChange={e => setEditName(e.target.value)} /></label>
