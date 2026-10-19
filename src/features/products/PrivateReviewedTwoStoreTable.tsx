@@ -3,6 +3,7 @@ import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
+import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
@@ -12,7 +13,7 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
  * No independent source authorization, live pricing or retail claim is implied.
  */
-export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine }: {
+export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, checked }: {
   reviewed: PrivateReviewedBaskets
   search: string
   unitFilter: 'all' | 'kg' | 'liter' | 'stuk'
@@ -22,6 +23,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   onOpenList: (store: OwnStore) => void
   onOpenMixedRoute: () => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
+  checked: Readonly<Record<string, boolean>>
 }) {
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
@@ -137,10 +139,13 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       ingredientId, store, lineKey: line.key,
     })
   }
-  const product = (line: Matched, store: string) => <div className="private-reviewed-products__paired-option">
+  const product = (line: Matched, store: OwnStore) => <div className="private-reviewed-products__paired-option">
     <strong>{store}</strong>
     <span>{line.productName}</span>
     <small>Originele SKU {line.productId}</small>
+    <small>{checked[privatePhysicalShoppingTick(reviewed.planKey, store,
+      (store === 'PLUS' ? plus.basket : deka.basket).store.id, line)]
+      ? '✓ Afgevinkt in eigen ' + store + '-lijst' : 'Nog niet afgevinkt in eigen ' + store + '-lijst'}</small>
     <span>{line.packs} × {line.pack.count} × {line.pack.amount} {line.pack.unit}</span>
     <small>{money.format(line.pricePerPackCents / 100)} per pak · {privateUnitPrice(line) ?? 'eenheidsprijs onbekend'}</small>
     <strong>{money.format(line.lineTotalCents / 100)} voor deze week</strong>

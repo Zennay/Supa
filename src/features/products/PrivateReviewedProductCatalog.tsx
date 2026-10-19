@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
+import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
+import { freshReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import type { OwnStore, PrivateReviewedBaskets, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './privateReviewedProductCatalog.css'
 
@@ -10,18 +12,21 @@ const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine }: {
+export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, checked, onToggleChecked }: {
   reviewed: PrivateReviewedBaskets | null
   budget: number
   onOpenComparison: () => void
   onOpenList: (store?: OwnStore) => void
   onOpenMixedRoute: () => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
+  checked: Readonly<Record<string, boolean>>
+  onToggleChecked: (shop: OwnStore, line: Matched) => void
 }) {
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
   const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal'>('source')
+  const [checkMessage, setCheckMessage] = useState('')
   const sources = shops.flatMap(shop => {
     const capture = reviewed?.stores[shop]
     return capture ? capture.basket.lines.filter((line): line is Matched => line.status === 'matched')
@@ -47,6 +52,21 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
       ? a.line.lineTotalCents - b.line.lineTotalCents
       : group(a.line) - group(b.line) ||
         (rate(a.line)?.centsPerUnit ?? Infinity) - (rate(b.line)?.centsPerUnit ?? Infinity))
+  const isChecked = (shop: OwnStore, line: Matched) => {
+    const capture = reviewed?.stores[shop]
+    return !!capture && checked[
+      privatePhysicalShoppingTick(reviewed!.planKey, shop, capture.basket.store.id, line)] === true
+  }
+  const toggleChecked = (shop: OwnStore, line: Matched) => {
+    const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+    if (!current?.stores[shop] || !current.stores[shop].basket.lines.includes(line)) {
+      setCheckMessage('Deze originele winkelbron is verlopen of gewijzigd. Controleer de bron opnieuw.')
+      return
+    }
+    onToggleChecked(shop, line)
+    setCheckMessage('Het fysieke vinkje is voor ' + shop +
+      ' aangepast. Dit is geen goedkeuring van de prijs of betaalbevestiging.')
+  }
   return <section className="private-reviewed-products" aria-label="Mijn persoonlijk gecontroleerde winkelproducten">
     <h2>Mijn echte bronartikelen voor dit weekmenu</h2>
     <p>Alleen jouw zelf gecontroleerde productregels, geen actuele winkelcatalogus of kassagarantie.
@@ -77,8 +97,12 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
       {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
         search={search} unitFilter={unitFilter} order={order} budget={budget}
         onOpenComparison={onOpenComparison} onOpenList={onOpenList}
-        onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine} />}
-      <p role="status">{visible.length} van {sources.length} bevestigde productregels.</p>
+        onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
+        checked={checked} />}
+      <p role="status">{visible.length} van {sources.length} bevestigde productregels.
+        {' '}{ordered.filter(row => isChecked(row.shop, row.line)).length}
+        {' '}van de getoonde artikelen staan op afgevinkt in je lijst.</p>
+      {checkMessage && <p role="status">{checkMessage}</p>}
       {order === 'unitPrice' && unitFilter === 'all' && <p className="private-reviewed-products__sort-note">
         Eerst per kg, dan per liter en per stuk gesorteerd; verschillende eenheden
         worden niet met elkaar vergeleken. Voor het mandje tellen hele verpakkingen.
@@ -91,6 +115,12 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
         <p>{line.packs} × verpakking van {line.pack.count} × {line.pack.amount} {line.pack.unit}</p>
         <strong>{money.format(line.lineTotalCents / 100)} voor de week</strong>
         <small>{money.format(line.pricePerPackCents / 100)} per verpakking · {privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'}</small>
+        <button type="button" className="private-reviewed-products__checked-action"
+          aria-pressed={isChecked(shop, line)}
+          onClick={() => toggleChecked(shop, line)}>
+          {isChecked(shop, line) ? '✓ Afgevinkt · maak ongedaan' :
+            'Vink dit artikel af op mijn ' + shop + '-lijst'}
+        </button>
       </article>)}</div>
       {!visible.length && <p>Geen producten gevonden voor deze selectie.</p>}
       <button type="button" onClick={() => onOpenList(store === 'all' ? undefined : store)}>

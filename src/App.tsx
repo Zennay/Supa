@@ -7,6 +7,7 @@ import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
+import { privatePhysicalShoppingTick } from './features/shopping-list/privatePhysicalShoppingTick.ts'
 // Historical demo products remain separate. Only load the user's reviewed
 // private source catalogue when they actually open the Products screen.
 const PrivateReviewedProductCatalog = lazy(async () => {
@@ -384,6 +385,16 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       <div className="content">
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
+            checked={privateShoppingTicks}
+            onToggleChecked={(shop, selected) => {
+              // No checkout progress can be created from expired or replaced
+              // source products. Existing local checkmarks remain untouched.
+              const current = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
+              const capture = current?.stores[shop]
+              if (!capture || !capture.basket.lines.includes(selected)) return
+              const key = privatePhysicalShoppingTick(privatePlanKey, shop, capture.basket.store.id, selected)
+              setPrivateShoppingTicks(before => ({ ...before, [key]: !before[key] }))
+            }}
             onOpenComparison={openOwnPriceImport}
             onChooseRouteLine={intent => {
               const serial = mixedRouteOpenSignal + 1

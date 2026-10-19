@@ -4,6 +4,7 @@ import type { BasketTraceLine, RecipeWithIngredients } from '../../domain/basket
 import type { PlannedMeal } from '../../domain/types.ts'
 import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { privatePhysicalShoppingTick } from './privatePhysicalShoppingTick.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { createMixedStoreShoppingPlan, type MixedStoreLine } from '../comparison/mixedStoreShoppingPlan.ts'
 import './privateSourceShoppingList.css'
@@ -57,14 +58,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   // displayed cents without losing purchased-quantity progress in this session.
   // Week, store, SKU, quantity, pack, or matched state change -> a new key.
   const physicalTick = (name: OwnStore, shopId: string, line: BasketTraceLine) =>
-    JSON.stringify([
-      reviewed.planKey, name, shopId, line.id, line.status,
-      line.ingredientLabel, line.requirement.amount, line.requirement.unit,
-      line.status === 'matched' ? [
-        line.productId, line.productName, line.packs,
-        line.pack.amount, line.pack.unit, line.pack.count,
-      ] : null,
-    ])
+    privatePhysicalShoppingTick(reviewed.planKey, name, shopId, line)
   const tick = (line: BasketTraceLine) => physicalTick(store, basket.store.id, line)
   const isSingleCheckedOnRoute = (item: MixedStoreLine): boolean => {
     const source = reviewed.stores[item.store]

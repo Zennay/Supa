@@ -37,3 +37,7 @@ border:1px solid #c0d3c2;border-radius:12px;padding:1rem}
 
 .private-reviewed-products__ingredient-route-actions{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:.55rem}
 .private-reviewed-products__ingredient-route-actions button{flex:1 1 180px}
+
+.private-reviewed-products__checked-action{margin-top:.6rem;font-weight:650}
+.private-reviewed-products__checked-action[aria-pressed=true]{border-color:#236d4d;
+background:#e7f4eb;color:#255336}
