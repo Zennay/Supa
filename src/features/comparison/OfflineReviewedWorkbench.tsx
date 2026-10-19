@@ -1295,7 +1295,7 @@ export function OfflineReviewedWorkbench({
       <div className="offline-price-workbench__intro">
         <span className="eyebrow">Jouw planner → brongegevens → winkelmandjes</span>
         <h2>Vergelijk twee winkels met eigen prijsdata</h2>
-        <p>Vul producten en prijzen direct per winkel in, of laad een eerder rechtmatig verkregen JSON-export.
+        <p>Vul producten en prijzen direct per winkel in, of laad een eerder rechtmatig verkregen CSV- of JSON-export.
           Supa koppelt producten aan jouw huidige weekmenu, rondt verpakkingen naar boven af
           en berekent eenheidsprijzen en volledige mandtotalen. De import start geen scraper of netwerkverzoek.</p>
         <p className="disclaimer">Privé rekenhulp: een aangeleverd bestand bewijst geen toestemming, productidentiteit,

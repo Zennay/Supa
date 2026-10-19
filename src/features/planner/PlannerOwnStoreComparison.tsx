@@ -73,6 +73,33 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
       setDownloadMessage(error instanceof Error ? error.message : 'CSV-download mislukt.')
     }
   }
+  async function downloadPrivateHtml() {
+    setDownloadMessage('')
+    try {
+      const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+          ownStoreWeekComparison(current).status !== 'comparable') {
+        throw new Error('Er zijn twee actuele en volledig gecontroleerde mandjes nodig voor deze afdruk.')
+      }
+      const { privateComparisonHtml } = await import('../comparison/PrivateBasketComparisonExport.tsx')
+      const html = privateComparisonHtml(
+        current.stores.PLUS.basket, current.stores.DekaMarkt.basket,
+        current.stores.PLUS.observedAt, current.stores.DekaMarkt.observedAt,
+        true, new Date().toISOString(),
+      )
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-prive-weekmandjes-print.html'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setDownloadMessage('Afdrukbaar privéoverzicht offline opgeslagen, zonder scripts of externe bronnen.')
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : 'Afdrukbaar overzicht mislukt.')
+    }
+  }
   function chooseConfirmedLine(id: string, store: OwnStore) {
     const choice = currentPrivateRouteChoice(reviewed, id, store, Date.now())
     if (!choice) {
@@ -138,6 +165,9 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
           </button>
           <button type="button" className="ghost-button" onClick={downloadPrivateCsv}>
             Download privévergelijking met originele SKU's (CSV)
+          </button>
+          <button type="button" className="ghost-button" onClick={downloadPrivateHtml}>
+            Download afdrukbaar volledig prijsvergelijkingsblad (HTML)
           </button>
           {summary.mixedRoute && <div className="own-store-planner__mix-preview">
             <h4>Combineren van goedkoopste artikelen</h4>

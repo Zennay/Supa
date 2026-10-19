@@ -122,7 +122,7 @@ function buildCsv(plus: OneStoreBasket, deka: OneStoreBasket,
  * ledger/same-demand admission as CSV; do not create a second looser trust
  * path for downloaded HTML. This is a local document, not a price publication.
  */
-function privateComparisonHtml(
+export function privateComparisonHtml(
   plus: OneStoreBasket,
   deka: OneStoreBasket,
   plusObservedAt: string,
