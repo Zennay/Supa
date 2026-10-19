@@ -1,32 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import {
   recentOwnCaptureInstant,
   type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
+import { privatePartialPhysicalShoppingTick } from './privatePhysicalShoppingTick.ts'
 import './partialReviewedShoppingList.css'
 
 const STORES: readonly OwnStore[] = ['PLUS', 'DekaMarkt']
 const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
-type Ticks = { key: string; checked: Record<string, boolean> }
-const emptyTicks = (): Ticks => ({ key: '', checked: {} })
-
-/** Shopping progress on admitted *partial* source lines, held in this tab only.
- * The complete-basket Lijst owns its own separate checkmarks and financial
- * decisions. Neither unfinished totals nor ticks can reach its price engine. */
+/** Admit source prices only from reviewed partial lines. Physical ticks share
+ * the exact source SKU/pack identity with a later complete basket, but never
+ * grant product approval or act as a price or savings authority. */
 export function PartialReviewedShoppingList({
-  progress, complete, onOpenComparison, onReviewIngredient,
+  progress, complete, checked, setChecked, onOpenComparison, onReviewIngredient,
 }: {
   progress: PrivateCaptureProgress | null
   complete: PrivateReviewedBaskets | null
+  checked: Record<string, boolean>
+  setChecked: Dispatch<SetStateAction<Record<string, boolean>>>
   onOpenComparison: () => void
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
 }) {
   const [preferred, setPreferred] = useState<OwnStore>('PLUS')
-  const [ticks, setTicks] = useState<Record<OwnStore, Ticks>>({
-    PLUS: emptyTicks(), DekaMarkt: emptyTicks(),
-  })
   const [message, setMessage] = useState('')
   const [copyFallback, setCopyFallback] = useState<{ key: string; text: string } | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -58,9 +56,11 @@ export function PartialReviewedShoppingList({
       row.pricePerPackCents, row.lineTotalCents,
     ]),
   ]) : ''
-  const checked = store && ticks[store].key === identity
-    ? ticks[store].checked : {}
-  const checkedKey = JSON.stringify([identity, checked])
+  const tick = (line: (typeof rows)[number]) =>
+    privatePartialPhysicalShoppingTick(progress!.planKey, store!, line)
+  const selected = Object.fromEntries(rows.map(line =>
+    [line.ingredientId, checked[tick(line)] === true]))
+  const checkedKey = JSON.stringify([identity, selected])
   const currentKey = useRef(checkedKey)
   currentKey.current = checkedKey
   const currentPlan = useRef(progress?.planKey)
@@ -71,28 +71,19 @@ export function PartialReviewedShoppingList({
     ...capture.missingIngredients,
     ...capture.awaitingReviewIngredients,
   ]
-  function setTick(ingredientId: string) {
+  function setTick(line: (typeof rows)[number]) {
     if (!confirmedPartialBasket(progress, store, Date.now()) ||
         !recentOwnCaptureInstant(capture!.observedAt, Date.now())) {
       setMessage('De originele bron is verlopen; controleer eerst je opname in Vergelijk.')
       return
     }
     setCopyFallback(null)
-    setTicks(previous => {
-      const current = previous[store]
-      const existing = current.key === identity ? current.checked : {}
-      return {
-        ...previous,
-        [store]: { key: identity, checked: {
-          ...existing, [ingredientId]: !existing[ingredientId],
-        } },
-      }
-    })
+    const key = tick(line)
+    setChecked(previous => ({ ...previous, [key]: !previous[key] }))
   }
   async function produce(kind: 'text' | 'csv' | 'copy') {
     setMessage('')
     setCopyFallback(null)
-    const snapshot = identity
     const plan = progress?.planKey
     const confirmed = confirmedPartialBasket(progress, store, Date.now())
     if (!confirmed || confirmed.remainingCount < 1 ||
@@ -109,7 +100,7 @@ export function PartialReviewedShoppingList({
         throw new Error('De ingrediënten of bron zijn veranderd tijdens het maken van de lijst.')
       }
       const content = privatePartialShoppingExport({
-        store, observedAt: capture!.observedAt, rows, checked,
+        store, observedAt: capture!.observedAt, rows, checked: selected,
         totalDemandLines: confirmed.physicalLineCount,
       }, kind === 'csv' ? 'csv' : 'text')
       if (kind === 'copy') {
@@ -145,7 +136,6 @@ export function PartialReviewedShoppingList({
       if (currentKey.current === checkedKey)
         setMessage(cause instanceof Error ? cause.message : 'De deellijst kon niet worden gemaakt.')
     }
-    void snapshot
   }
   return <section className="screen supa-partial-shop" aria-label="Mijn gedeeltelijk gecontroleerde winkelboodschappen">
     <header>
@@ -176,8 +166,8 @@ export function PartialReviewedShoppingList({
     <div className="supa-partial-shop__items">
       {rows.map(line => <article key={line.ingredientId}>
         <label>
-          <input type="checkbox" checked={checked[line.ingredientId] === true}
-            onChange={() => setTick(line.ingredientId)} />
+          <input type="checkbox" checked={checked[tick(line)] === true}
+            onChange={() => setTick(line)} />
           <span>
             <strong>{line.ingredientLabel}</strong>
             {' '}· {line.requiredAmount} {line.requiredUnit}
