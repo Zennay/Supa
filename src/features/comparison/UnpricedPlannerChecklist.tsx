@@ -24,7 +24,7 @@ const quantity = (item: DemandRow) =>
 // silently round decimal quantities. The existing strict importer decides
 // whether every original amount is physically admissible.
 const portableQuantity = (item: DemandRow) =>
-  item.amount === null ? 'hoeveelheid onbekend' :
+  item.amount === null ? 'hoeveelheid nog controleren (' + item.unit + ')' :
     String(item.amount).replace('.', ',') + ' ' + (unitLabels[item.unit] ?? item.unit)
 
 /**

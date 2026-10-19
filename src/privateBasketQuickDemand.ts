@@ -148,10 +148,16 @@ export function readQuickMetricDemand(text: string, selectedMealCount: number) {
       const label = body.slice(0, separator)
       const amount = body.slice(separator + 3)
       if (amount === 'hoeveelheid onbekend') {
-        throw Error('Plannerregel ' + (index + 1) + ': hoeveelheid ontbreekt. Corrigeer die in Planner.')
+        throw Error('Plannerregel ' + (index + 1) + ': de oudere lijst mist de oorspronkelijke fysieke eenheid. Vul de oorspronkelijke maat handmatig in.')
       }
-      // No price, retailer SKU or source timestamp can be derived from text.
-      return label + ': ' + amount
+      // A newer Planner TXT retains the source's physical dimension even
+      // when no usable amount exists. Reopen as an UNPRICED null amount;
+      // never invent a shop product or treat the missing amount as zero.
+      const pending = /^hoeveelheid nog controleren \(g|kg|ml|l|piece\)$/.exec(amount)
+      if (amount.startsWith('hoeveelheid nog controleren') && !pending) {
+        throw Error('Plannerregel ' + (index + 1) + ': onbekende eenheid; herstel deze in Planner.')
+      }
+      return label + ': ' + (pending ? '? ' + pending[1] : amount)
     })
   }
   // Portable own-recipe TXT from the Recepten detail uses exactly one
