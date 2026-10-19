@@ -6,6 +6,8 @@
 import type { OneStoreBasket, BasketTraceLine } from './domain/basket.ts'
 import type { MatchUnit } from './domain/matching.ts'
 import { privatePackUnitRate } from './features/comparison/privateUnitPrice.ts'
+import { compareFullBaskets } from './domain/basketComparison.ts'
+import { calculateDecimalPackCount } from './domain/decimalPackArithmetic.ts'
 
 type Store = 'PLUS' | 'DekaMarkt'
 type Capture = { observedAt: string }
@@ -71,10 +73,53 @@ function storeColumns(
   ]
 }
 
+// Resolve original physical demand by canonical ID, not position, before
+// emitting price rows to a spreadsheet (which is read outside the app).
+function storeLinesForDemand(
+  basket: OneStoreBasket, ingredients: readonly DemandRow[],
+): BasketTraceLine[] {
+  if (!Array.isArray(basket.lines) || basket.lines.length !== ingredients.length ||
+      !Number.isSafeInteger(basket.selectedMealCount) || basket.selectedMealCount <= 0)
+    throw new Error('Ongeldige privémand: de fysieke vraag is veranderd')
+  const byId = new Map<string, BasketTraceLine>()
+  for (let index = 0; index < basket.lines.length; index++) {
+    if (!Object.hasOwn(basket.lines, index)) throw new Error('Onvolledige mandregel')
+    const line = basket.lines[index]
+    if (!line || typeof line.id !== 'string' || byId.has(line.id))
+      throw new Error('Dubbele of ontbrekende ingrediënten in privémand')
+    byId.set(line.id, line)
+  }
+  return ingredients.map(need => {
+    const line = byId.get(need.id)
+    if (!line || line.ingredientLabel !== need.label ||
+        line.requirement.unit !== need.unit ||
+        line.requirement.amount !== need.amount) {
+      throw new Error('Originele ingrediëntvraag wijkt af van het geprijsde mandje')
+    }
+    return line
+  })
+}
+
 function completeOwnStore(basket: OneStoreBasket, fresh: boolean): boolean {
-  return fresh && basket.lines.length > 0 && basket.unresolvedLineCount === 0 &&
-    basket.matchedLineCount === basket.lines.length && Number.isSafeInteger(basket.totalCents) &&
-    basket.lines.every(line => line.status === 'matched')
+  if (!fresh || !basket.lines.length ||
+      basket.unresolvedLineCount !== 0 ||
+      basket.matchedLineCount !== basket.lines.length ||
+      !Number.isSafeInteger(basket.totalCents) || basket.totalCents < 0) return false
+  let total = 0
+  for (const line of basket.lines) {
+    if (!line || line.status !== 'matched' ||
+        !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
+        !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
+        !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0 ||
+        !Number.isSafeInteger(line.pricePerPackCents * line.packs) ||
+        line.pricePerPackCents * line.packs !== line.lineTotalCents ||
+        calculateDecimalPackCount([line.requirement], {
+          amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
+        }) !== line.packs) return false
+    total += line.lineTotalCents
+    if (!Number.isSafeInteger(total)) return false
+  }
+  return total === basket.totalCents
 }
 
 /** Exactly one private schema; never use this human receipt as 9-column source data. */
@@ -87,20 +132,29 @@ export function createPrivateBasketComparisonCsv(input: {
   deltas: ReadonlyMap<string, number>
 }): string {
   const { ingredients, captures, baskets, fresh, paired, deltas } = input
-  if (!ingredients.length ||
-      baskets.PLUS.lines.length !== ingredients.length ||
-      baskets.DekaMarkt.lines.length !== ingredients.length) {
-    throw new Error('Onvolledig privémandje')
-  }
-  const comparable = paired && storeNames.every(store => completeOwnStore(baskets[store], fresh[store]))
+  if (!ingredients.length || new Set(ingredients.map(item => item.id)).size !== ingredients.length)
+    throw new Error('Onvolledig of dubbel privémandje')
+  const plusLines = storeLinesForDemand(baskets.PLUS, ingredients)
+  const dekaLines = storeLinesForDemand(baskets.DekaMarkt, ingredients)
+  const verifiedStores = storeNames.every(store => completeOwnStore(baskets[store], fresh[store]))
+  const checked = paired && verifiedStores
+    ? compareFullBaskets({ baseline: baskets.PLUS, candidate: baskets.DekaMarkt })
+    : null
+  const comparable = checked?.claimable === true && checked.deltaCents !== null
+  const canonicalDeltas = comparable
+    ? new Map(checked.lineDeltas.map(item => [item.id, item.deltaCents]))
+    : null
+  if (comparable && (deltas.size !== canonicalDeltas!.size ||
+      [...canonicalDeltas!].some(([id, cents]) => deltas.get(id) !== cents)))
+    throw new Error('Prijsverschil komt niet overeen met de originele mandregels')
   const rows: string[][] = [header]
   for (let i = 0; i < ingredients.length; i++) {
     const item = ingredients[i]
-    const delta = comparable ? deltas.get(item.id) : undefined
+    const delta = comparable ? canonicalDeltas!.get(item.id) : undefined
     rows.push([
       'ingredient', item.id, item.label, item.amount === null ? '' : String(item.amount), item.unit,
-      ...storeColumns(captures.PLUS, fresh.PLUS, baskets.PLUS.lines[i]),
-      ...storeColumns(captures.DekaMarkt, fresh.DekaMarkt, baskets.DekaMarkt.lines[i]),
+      ...storeColumns(captures.PLUS, fresh.PLUS, plusLines[i]),
+      ...storeColumns(captures.DekaMarkt, fresh.DekaMarkt, dekaLines[i]),
       delta === undefined ? '' : String(delta),
       comparable && delta !== undefined ? 'Volledig privé vergelijkbaar' : 'Verschil onbekend',
     ])
