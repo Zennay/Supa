@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 
 import { buildPrivateM3ProductComparison } from './m3-private-product-comparison.mjs'
 import { renderPrivateM3ProductComparisonHtml } from './m3-private-comparison-html.mjs'
+import { snapshotPrivateM3Comparison } from './m3-private-comparison-snapshot.mjs'
 import {
   assertNoSymlinkedM3OutputParents,
   writeDerivedM3Output,
@@ -21,7 +22,15 @@ function cell(value, { untrustedText = false } = {}) {
   // remain literal text, not execute formula or DDE/URL side effects.
   // Control characters can masquerade as cell/row separators.
   const clean = raw.replace(/[\u0000-\u001f\u007f-\u009f\ufeff]/g, ' ')
-  const safe = untrustedText && /^[\s\u200b-\u200d]*[=+\-@]/u.test(clean)
+  // Normalise only for formula detection, never rewrite the original label.
+  // NFKC catches fullwidth/compatibility operators; invisible format,
+  // whitespace and combining marks cannot hide a leading spreadsheet formula.
+  const formulaCandidate = untrustedText
+    ? clean.normalize('NFKC').replace(
+      /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}\p{Cc}\p{Cf}]*/gu, '',
+    )
+    : ''
+  const safe = untrustedText && /^[=+\-@]/u.test(formulaCandidate)
     ? "'" + clean
     : clean
   return '"' + safe.replace(/"/g, '""') + '"'
@@ -64,9 +73,11 @@ function productValues(p) {
   ]
 }
 
-export function renderPrivateM3ComparisonCsv(report) {
-  // This method validates totals and all eleven physical demand rows, rejecting
-  // forged savings or status and negative/overflow cents before any CSV output.
+export function renderPrivateM3ComparisonCsv(untrustedReport) {
+  // Independently validate and emit from the SAME inert own-data snapshot.
+  // No original getter, inherited price or mutable local object can be read
+  // after the comparison safety checks (including the CSV-only fields).
+  const report = snapshotPrivateM3Comparison(untrustedReport)
   renderPrivateM3ProductComparisonHtml(report)
   const data = report.lines.map((line) => {
     const plus = line.plus.status === 'known'
