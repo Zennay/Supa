@@ -1,9 +1,9 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { privateUnitPrice } from './privateUnitPrice.ts'
 import type { MixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
-const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 /** Purely presentational readout of the SAME source-admitted baskets already
  * checked for complete, personally reviewed physical demand by the parent.
@@ -37,7 +37,7 @@ export function MixedStoreUnitBreakdown({
         const lessExpensive = p.lineTotalCents === d.lineTotalCents
           ? 'Beide winkels hebben hetzelfde regelbedrag.'
           : (p.lineTotalCents < d.lineTotalCents ? 'PLUS' : 'DekaMarkt') +
-            ' is ' + money.format(difference / 100) +
+            ' is ' + exactEuro.formatCents(difference) +
             ' goedkoper voor deze benodigde hoeveelheid.'
         const row = (store: 'PLUS' | 'DekaMarkt', line: Matched) =>
           <div className={chosen.store === store ? 'mixed-store-route__unit-selected' : ''}
@@ -46,9 +46,9 @@ export function MixedStoreUnitBreakdown({
             <span>{line.productName}</span>
             <small>Originele broncode: {line.productId}</small>
             <span>{line.packs} × {line.pack.count} × {line.pack.amount} {line.pack.unit}
-              {' '}· {money.format(line.pricePerPackCents / 100)} per verpakking</span>
+              {' '}· {exactEuro.formatCents(line.pricePerPackCents)} per verpakking</span>
             <span>Eenheidsprijs: {privateUnitPrice(line) ?? 'Niet berekenbaar'}</span>
-            <strong>Weekregel: {money.format(line.lineTotalCents / 100)}</strong>
+            <strong>Weekregel: {exactEuro.formatCents(line.lineTotalCents)}</strong>
           </div>
         return <article key={chosen.id}>
           <h5>{chosen.ingredientLabel} · nodig {chosen.amount} {chosen.unit}</h5>

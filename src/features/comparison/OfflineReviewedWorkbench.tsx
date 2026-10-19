@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
@@ -32,8 +33,6 @@ import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonC
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import type { PrivateReviewedBaskets, PrivateCaptureProgress, PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
-
-const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores = ['PLUS', 'DekaMarkt'] as const
 type SourceSort = 'relevance' | 'whole-pack' | 'unit-price'
@@ -177,10 +176,10 @@ function sourceWholePackPreview(product: OfflineStoreProduct,
     { amount: product.packAmount!, unit: product.packUnit, count: product.packCount ?? 1 })!
   const delta = currentCents === null || !Number.isSafeInteger(currentCents) ? '' :
     total === currentCents ? ' · gelijk aan huidige regel' :
-      ' · ' + euros.format(Math.abs(total - currentCents) / 100) +
+      ' · ' + exactEuro.formatCents(Math.abs(total - currentCents)) +
       (total < currentCents ? ' rekenkundig lager' : ' rekenkundig hoger') +
       ' dan huidige regel (controleer productgelijkwaardigheid)'
-  return ' · ' + packs + ' hele pak(ken): ' + euros.format(total / 100) +
+  return ' · ' + packs + ' hele pak(ken): ' + exactEuro.formatCents(total) +
     ' voor deze ingrediëntregel' + delta
 }
 function searchableSourceText(value: string): string {
@@ -260,7 +259,7 @@ function readablePrivateComparison(
   rows: { delta: { ingredientLabel: string; deltaCents: number }; plus: Matched; deka: Matched }[],
 ): string {
   const plain = (s: string) => s.replace(/[\r\n\u2028\u2029\u0000-\u001f\u007f-\u009f]/gu, ' ')
-  const money = (cents: number) => euros.format(cents / 100)
+  const money = (cents: number) => exactEuro.formatCents(cents)
   return [
     'SUPA · persoonlijke vergelijking van twee zelf bevestigde winkelopnames',
     'Geen live winkelprijzen, retailerautorisatie of onafhankelijk besparingsbewijs.',
@@ -296,7 +295,7 @@ function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number],
   return [
     `Supa · boodschappen voor ${basket.store.name} · privé ingevoerde prijzen, niet geverifieerd`,
     ...basket.lines.map(line => line.status === 'matched'
-      ? `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: ${line.packs} × ${line.productName} (${euros.format(line.lineTotalCents / 100)})`
+      ? `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: ${line.packs} × ${line.productName} (${exactEuro.formatCents(line.lineTotalCents)})`
       : `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: handmatig kiezen, hoeveelheid ${line.requirement.amount ?? '?'} ${line.requirement.unit}`),
     'Prijzen zijn alleen indicatief op basis van lokaal aangeleverde gegevens.',
   ].join('\n')
@@ -801,7 +800,7 @@ export function OfflineReviewedWorkbench({
         if (product.sourceAvailable !== true || product.sourcePriceCents === null ||
             product.sourcePriceCents === undefined || product.packAmount === null)
           return 'pakprijs of beschikbaarheid onbekend'
-        return euros.format(product.sourcePriceCents / 100) + ' per pak · ' +
+        return exactEuro.formatCents(product.sourcePriceCents) + ' per pak · ' +
           product.packCount + ' × ' + product.packAmount + ' ' + product.packUnit
       }
       const examples = [...new Set([...oldBySku.keys(), ...newBySku.keys()])]
@@ -2333,9 +2332,9 @@ export function OfflineReviewedWorkbench({
                   return (
                     <section key={store}>
                       <h4>{store}</h4>
-                      <strong>{complete ? euros.format(basket.totalCents / 100) : 'Nog geen bevestigd volledig totaal'}</strong>
+                      <strong>{complete ? exactEuro.formatCents(basket.totalCents) : 'Nog geen bevestigd volledig totaal'}</strong>
                       {!complete && basket.matchedLineCount > 0 && (
-                        <span>Voorlopig gekoppelde regels: {euros.format(basket.totalCents / 100)} (geen bevestigd mandtotaal)</span>
+                        <span>Voorlopig gekoppelde regels: {exactEuro.formatCents(basket.totalCents)} (geen bevestigd mandtotaal)</span>
                       )}
                       <span>{basket.matchedLineCount} automatisch gevonden, {basket.unresolvedLineCount} onbekend</span>
                       <span>{reviewedStore.accepted} van {reviewedStore.required} prijsregels door jou bevestigd</span>
@@ -2359,7 +2358,7 @@ export function OfflineReviewedWorkbench({
                 {canShowDifference && basketPair.comparison && basketPair.comparison.deltaCents !== null
                   ? basketPair.comparison.deltaCents === 0
                     ? 'Deze twee ingevoerde volledige mandjes hebben hetzelfde rekenkundige totaal.'
-                    : `${basketPair.comparison.deltaCents > 0 ? 'PLUS' : 'DekaMarkt'} is op basis van deze eigen invoer ${euros.format(Math.abs(basketPair.comparison.deltaCents) / 100)} goedkoper.`
+                    : `${basketPair.comparison.deltaCents > 0 ? 'PLUS' : 'DekaMarkt'} is op basis van deze eigen invoer ${exactEuro.formatCents(Math.abs(basketPair.comparison.deltaCents))} goedkoper.`
                   : 'Nog geen vergelijkbaar prijsverschil: controleer productmatches of vul ontbrekende / actuele bronnen aan.'}
                 <small> Dit is nooit een gecontroleerde publieke besparingsclaim.</small>
               </p>
@@ -2370,10 +2369,10 @@ export function OfflineReviewedWorkbench({
                     .sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents))
                     .slice(0, 5)
                     .map(line => (
-                      <p key={line.id}><strong>{line.ingredientLabel}</strong> · PLUS {euros.format(line.baselineLineTotalCents / 100)}
-                        {' '}· DekaMarkt {euros.format(line.candidateLineTotalCents / 100)}
+                      <p key={line.id}><strong>{line.ingredientLabel}</strong> · PLUS {exactEuro.formatCents(line.baselineLineTotalCents)}
+                        {' '}· DekaMarkt {exactEuro.formatCents(line.candidateLineTotalCents)}
                         {' '}· {line.deltaCents === 0 ? 'zelfde bedrag'
-                          : `${euros.format(Math.abs(line.deltaCents) / 100)} verschil`}</p>
+                          : `${exactEuro.formatCents(Math.abs(line.deltaCents))} verschil`}</p>
                     ))}
                 </section>
               )}
@@ -2450,19 +2449,19 @@ export function OfflineReviewedWorkbench({
                           <th scope="row">{delta.ingredientLabel}
                             <small>{plus.requirement.amount} {plus.requirement.unit} benodigd</small>
                           </th>
-                          <td><strong>{euros.format(plus.lineTotalCents / 100)}</strong>
+                          <td><strong>{exactEuro.formatCents(plus.lineTotalCents)}</strong>
                             <small>{plus.productName} · broncode {plus.productId}</small>
                             <small>{plus.packs} × {plus.pack.amount} {plus.pack.unit} × {plus.pack.count}</small>
                             <small>{pricePerUnit(plus) ?? 'Eenheidsprijs onbekend'}</small>
                           </td>
-                          <td><strong>{euros.format(deka.lineTotalCents / 100)}</strong>
+                          <td><strong>{exactEuro.formatCents(deka.lineTotalCents)}</strong>
                             <small>{deka.productName} · broncode {deka.productId}</small>
                             <small>{deka.packs} × {deka.pack.amount} {deka.pack.unit} × {deka.pack.count}</small>
                             <small>{pricePerUnit(deka) ?? 'Eenheidsprijs onbekend'}</small>
                           </td>
                           <td><strong>{delta.deltaCents === 0 ? 'Gelijk'
                             : (delta.deltaCents > 0 ? '+' : '−') +
-                              euros.format(Math.abs(delta.deltaCents) / 100)}</strong>
+                              exactEuro.formatCents(Math.abs(delta.deltaCents))}</strong>
                             <small>Bedragen voor gehele benodigde verpakkingen.</small>
                           </td>
                         </tr>
@@ -2585,7 +2584,7 @@ export function OfflineReviewedWorkbench({
                                       <option value="">Automatisch voorstellen (of onbekend)</option>
                                       {choices.shown.map(product => (
                                         <option key={product.id} value={product.id}>
-                                          {product.name} · {product.id} · {(product.packCount ?? 1)} × {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)} per pak{sourcePackRate(product)}{sourceWholePackPreview(product, line.requirement,
+                                          {product.name} · {product.id} · {(product.packCount ?? 1)} × {product.packAmount} {product.packUnit} · {exactEuro.formatCents(product.priceCents)} per pak{sourcePackRate(product)}{sourceWholePackPreview(product, line.requirement,
                                             line.status === 'matched' ? line.lineTotalCents : null)}
                                         </option>
                                       ))}
@@ -2601,7 +2600,7 @@ export function OfflineReviewedWorkbench({
                                         <li key={product.id}>
                                           <strong>{product.name}</strong> · SKU {product.id}
                                           {' '}· {product.packCount ?? 1} × {product.packAmount} {product.packUnit}
-                                          {' '}· {euros.format(product.priceCents / 100)} per verpakking
+                                          {' '}· {exactEuro.formatCents(product.priceCents)} per verpakking
                                           {sourcePackRate(product)}
                                           {sourceWholePackPreview(product, line.requirement,
                                             line.status === 'matched' ? line.lineTotalCents : null)}
@@ -2637,7 +2636,7 @@ export function OfflineReviewedWorkbench({
 
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
                             {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
-                            {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {euros.format(line.pricePerPackCents / 100)} per verpakking</span>}
+                            {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {exactEuro.formatCents(line.pricePerPackCents)} per verpakking</span>}
                             {line.reasons.length > 0 && (
                               <details className="offline-price-workbench__match-explanation">
                                 <summary>Waarom is dit {line.status === 'matched' ? 'bronartikel voorgesteld' : 'ingrediënt nog niet gekoppeld'}?</summary>
@@ -2677,7 +2676,7 @@ export function OfflineReviewedWorkbench({
                               ? 'Dezelfde winkel-SKU is aan meerdere ingrediënten gekoppeld. Combineer de fysieke hoeveelheden in Planner of kies andere echte artikelen; zonder die keuze geen volledige prijs.'
                               : 'Niet gekoppeld · controleer bronproduct, beschikbaarheid of verpakking.'}</span>}
                           </div>
-                          <strong>{line.status === 'matched' ? euros.format(line.lineTotalCents / 100) : '—'}</strong>
+                          <strong>{line.status === 'matched' ? exactEuro.formatCents(line.lineTotalCents) : '—'}</strong>
                         </article>
                       )})}
                     </section>

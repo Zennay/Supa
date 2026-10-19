@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 
@@ -109,7 +110,6 @@ export function formatMixedStoreShoppingPlan(
   extraVisitCostCents: number | null = null,
   onlyOpen = false,
 ): string {
-  const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
   const clean = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, ' ')
   return [
     'SUPA · mijn persoonlijke twee-winkel-boodschappenroute',
@@ -117,40 +117,40 @@ export function formatMixedStoreShoppingPlan(
     'Geen actuele live winkelprijzen, bronrechten of onafhankelijk besparingsbewijs.',
     onlyOpen ? 'Alleen nog niet-afgevinkte artikelen; hieronder staan TOTAALbedragen van de volledige oorspronkelijke winkelroute.' :
       'Volledige gekozen winkelroute inclusief afgevinkte artikelen.',
-    'Nog niet afgevinkt: ' + money.format(plan.lines.filter(line => !done[line.key])
-      .reduce((sum, line) => sum + line.lineTotalCents, 0) / 100),
+    'Nog niet afgevinkt: ' + exactEuro.formatCents(plan.lines.filter(line => !done[line.key])
+      .reduce((sum, line) => sum + BigInt(line.lineTotalCents), 0n)),
     'Niet-opgegeven reistijd, bezoekkosten en eventuele winkelkortingen zijn NIET meegenomen.',
     'PLUS opname: ' + clean(captured.PLUS),
     'DekaMarkt opname: ' + clean(captured.DekaMarkt),
     '',
-    'PLUS hele mand: ' + money.format(plan.plusWholeCents / 100),
-    'DekaMarkt hele mand: ' + money.format(plan.dekaWholeCents / 100),
-    'Goedkoopste volledige winkel: ' + money.format(plan.cheapestWholeStoreCents / 100),
-    'Gekozen boodschappenroute, uitsluitend artikelen: ' + money.format(plan.totalCents / 100),
+    'PLUS hele mand: ' + exactEuro.formatCents(plan.plusWholeCents),
+    'DekaMarkt hele mand: ' + exactEuro.formatCents(plan.dekaWholeCents),
+    'Goedkoopste volledige winkel: ' + exactEuro.formatCents(plan.cheapestWholeStoreCents),
+    'Gekozen boodschappenroute, uitsluitend artikelen: ' + exactEuro.formatCents(plan.totalCents),
     'Rekenkundig verschil t.o.v. goedkoopste enkele winkel, zonder extra ritkosten: ' +
-      money.format(plan.additionalDifferenceCents / 100),
+      exactEuro.formatCents(plan.additionalDifferenceCents),
     ...((plan.lines.some(line => line.store === 'PLUS') && plan.lines.some(line => line.store === 'DekaMarkt'))
       ? [extraVisitCostCents === null
         ? 'Extra bezoekkosten: niet opgegeven; werkelijk financieel voordeel onbekend.'
-        : 'Zelf opgegeven extra bezoekkosten: ' + money.format(extraVisitCostCents / 100),
+        : 'Zelf opgegeven extra bezoekkosten: ' + exactEuro.formatCents(extraVisitCostCents),
         ...(extraVisitCostCents === null ? [] : [
           'Twee-winkelroute inclusief zelf opgegeven extra kosten: ' +
-            money.format((plan.totalCents + extraVisitCostCents) / 100),
+            exactEuro.formatCents(BigInt(plan.totalCents) + BigInt(extraVisitCostCents)),
           'Verschil t.o.v. goedkoopste enkele winkel na deze extra kosten: ' +
-            money.format((plan.additionalDifferenceCents - extraVisitCostCents) / 100),
+            exactEuro.formatCents(BigInt(plan.additionalDifferenceCents) - BigInt(extraVisitCostCents)),
         ])]
       : ['Deze gekozen route bezoekt maar één winkel; geen extra tweede bezoek.']),
     ...(['PLUS','DekaMarkt'] as const).flatMap(store => [
       '',
-      store + ' · ' + money.format(plan.totals[store] / 100),
+      store + ' · ' + exactEuro.formatCents(plan.totals[store]),
       ...plan.lines.filter(item => item.store === store && (!onlyOpen || !done[item.key])).map(item =>
         (done[item.key] ? '[x] ' : '[ ] ') +
         clean(item.ingredientLabel) + ': ' + item.amount + ' ' + item.unit +
         ' → ' + item.packs + ' x ' + clean(item.productName) +
         ' [broncode ' + clean(item.productId) + ']' +
         ' (' + item.packCount + ' x ' + item.packAmount + ' ' + item.packUnit +
-        ' per pak) · ' + money.format(item.pricePerPackCents / 100) +
-        '/pak · ' + money.format(item.lineTotalCents / 100)),
+        ' per pak) · ' + exactEuro.formatCents(item.pricePerPackCents) +
+        '/pak · ' + exactEuro.formatCents(item.lineTotalCents)),
     ]),
     '',
     'Uitsluitend een lokale rekenhulp; nieuwe bronopnames of productkeuzes vereisen nieuwe controles.',

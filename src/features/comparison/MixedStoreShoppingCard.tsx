@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -11,8 +12,6 @@ import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 import { parsePrivateExtraVisitCostCents, type PrivateExtraVisitCostIntent } from './privateExtraVisitCost.ts'
 import type { PrivateRouteChoice } from './privateReviewedBasketBridge.ts'
-
-const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
 
 /** Renders only a reviewed, timely, same-demand comparison. Never loads
@@ -124,14 +123,14 @@ export function MixedStoreShoppingCard({
   const visitsBoth = stores.every(store => plan.lines.some(line => line.store === store))
   const appliedCostCents = visitsBoth ? extraCostCents : null
   const validBudget = validCustomWeekBudgetEuros(weekBudget)
-  const weekBudgetCents = validBudget === null ? null : Math.round(validBudget * 100)
+  const weekBudgetCents = validBudget === null ? null : BigInt(Math.round(validBudget * 100))
   // A two-stop route cannot assert budget headroom until its extra visit
   // costs are explicitly supplied. One-store routes need no second stop.
   const routeWithCostCents = visitsBoth
-    ? extraCostCents === null ? null : plan.totalCents + extraCostCents
-    : plan.totalCents
+    ? extraCostCents === null ? null : BigInt(plan.totalCents) + BigInt(extraCostCents)
+    : BigInt(plan.totalCents)
   const netAdvantage = extraCostCents === null ? null :
-    selectedMixed.additionalDifferenceCents - extraCostCents
+    BigInt(selectedMixed.additionalDifferenceCents) - BigInt(extraCostCents)
   const key = (id: string) => JSON.stringify([captured.PLUS, captured.DekaMarkt, id])
   const done = (id: string) => !!checked[key(id)]
   const progress = Object.fromEntries(plan.lines.map(line => [line.key, done(line.key)]))
@@ -139,15 +138,15 @@ export function MixedStoreShoppingCard({
   const perStoreProgress = Object.fromEntries(stores.map(store => {
     const lines = plan.lines.filter(line => line.store === store)
     const doneLines = lines.filter(line => progress[line.key])
-    const totalCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0)
+    const totalCents = lines.reduce((sum, line) => sum + BigInt(line.lineTotalCents), 0n)
     const remainingCents = lines.filter(line => !progress[line.key])
-      .reduce((sum, line) => sum + line.lineTotalCents, 0)
+      .reduce((sum, line) => sum + BigInt(line.lineTotalCents), 0n)
     return [store, { count: lines.length, done: doneLines.length, totalCents, remainingCents }]
   })) as Record<MixedStore, {
-    count: number; done: number; totalCents: number; remainingCents: number
+    count: number; done: number; totalCents: bigint; remainingCents: bigint
   }>
   const remainingProductCents = stores.reduce(
-    (sum, store) => sum + perStoreProgress[store].remainingCents, 0)
+    (sum, store) => sum + perStoreProgress[store].remainingCents, 0n)
   const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents, onlyOpen)
   const block = costInvalid && !chooseSingle
 
@@ -412,12 +411,12 @@ export function MixedStoreShoppingCard({
       pakprijzen en hele verpakkingen. Bij dezelfde regelprijs kiest Supa PLUS.
       Er worden geen ontbrekende bronprijzen aangevuld.</p>
     <div className="offline-price-workbench__totals">
-      <div><strong>PLUS volledig</strong><p>{money.format(mixed.plusWholeCents / 100)}</p></div>
-      <div><strong>DekaMarkt volledig</strong><p>{money.format(mixed.dekaWholeCents / 100)}</p></div>
-      <div><strong>Mijn gekozen route</strong><p>{money.format(plan.totalCents / 100)}</p></div>
+      <div><strong>PLUS volledig</strong><p>{exactEuro.formatCents(mixed.plusWholeCents)}</p></div>
+      <div><strong>DekaMarkt volledig</strong><p>{exactEuro.formatCents(mixed.dekaWholeCents)}</p></div>
+      <div><strong>Mijn gekozen route</strong><p>{exactEuro.formatCents(plan.totalCents)}</p></div>
     </div>
     <p role="status">Een route met de goedkoopste artikelen kan vóór extra bezoekkosten
-      maximaal <strong>{money.format(mixed.additionalDifferenceCents / 100)}</strong>
+      maximaal <strong>{exactEuro.formatCents(mixed.additionalDifferenceCents)}</strong>
       {' '}lager uitkomen dan het goedkoopste complete mandje bij één winkel.
       Dat is geen gegarandeerde besparing of live winkelprijs.</p>
     <div className="offline-price-workbench__actions">
@@ -434,7 +433,7 @@ export function MixedStoreShoppingCard({
       <p><strong>Geselecteerd:</strong> {visitsBoth
         ? 'PLUS én DekaMarkt'
         : plan.lines[0]?.store ?? 'Geen winkel'} ·
-        {' '}{money.format(plan.totalCents / 100)} aan winkelproducten.</p>
+        {' '}{exactEuro.formatCents(plan.totalCents)} aan winkelproducten.</p>
       {weekBudgetCents !== null && extraCount > 0 && <p role="status"
         className="mixed-store-route__budget">
         Je hebt ook {extraCount} eigen extra boodschappen zonder bronprijs. De werkelijke totale
@@ -443,16 +442,16 @@ export function MixedStoreShoppingCard({
       </p>}
       {weekBudgetCents !== null && <p role="status" className="mixed-store-route__budget">
         {routeWithCostCents === null
-          ? <>Je Planner-weekbudget is {money.format(weekBudgetCents / 100)}.
+          ? <>Je Planner-weekbudget is {exactEuro.formatCents(weekBudgetCents)}.
               Deze route bezoekt twee winkels; zonder jouw extra bezoekkosten is de
               totale budgetruimte <strong>onbekend</strong>.
-              Alleen de gecontroleerde producten kosten {money.format(plan.totalCents / 100)}.</>
+              Alleen de gecontroleerde producten kosten {exactEuro.formatCents(plan.totalCents)}.</>
           : routeWithCostCents > weekBudgetCents
-            ? <>Je bekende geprijsde Planner-route kost {money.format(routeWithCostCents / 100)}
-                {' '}en ligt <strong>{money.format((routeWithCostCents - weekBudgetCents) / 100)}
+            ? <>Je bekende geprijsde Planner-route kost {exactEuro.formatCents(routeWithCostCents)}
+                {' '}en ligt <strong>{exactEuro.formatCents((routeWithCostCents - weekBudgetCents))}
                 {' '}boven je Planner-weekbudget</strong>{visitsBoth ? ' inclusief jouw extra bezoekkosten' : ''}.</>
-            : <>Je bekende geprijsde Planner-route kost {money.format(routeWithCostCents / 100)}
-                {' '}en blijft <strong>{money.format((weekBudgetCents - routeWithCostCents) / 100)}
+            : <>Je bekende geprijsde Planner-route kost {exactEuro.formatCents(routeWithCostCents)}
+                {' '}en blijft <strong>{exactEuro.formatCents((weekBudgetCents - routeWithCostCents))}
                 {' '}voor deze bekende producten binnen je Planner-weekbudget</strong>{visitsBoth ? ' inclusief jouw extra bezoekkosten' : ''}.</>}
         {' '}Geen garantie op actuele kassaprijzen of andere niet-ingevulde kosten.
       </p>}
@@ -489,8 +488,8 @@ export function MixedStoreShoppingCard({
               setMessage('Winkelvoorkeur aangepast. Supa herberekent de route uit de twee eerder gecontroleerde bronartikelen.')
             }}>
               <option value="">Kies automatisch het goedkoopste artikel</option>
-              <option value="PLUS">PLUS · {money.format(plusLine.lineTotalCents / 100)} · {plusLine.productName}</option>
-              <option value="DekaMarkt">DekaMarkt · {money.format(dekaLine.lineTotalCents / 100)} · {dekaLine.productName}</option>
+              <option value="PLUS">PLUS · {exactEuro.formatCents(plusLine.lineTotalCents)} · {plusLine.productName}</option>
+              <option value="DekaMarkt">DekaMarkt · {exactEuro.formatCents(dekaLine.lineTotalCents)} · {dekaLine.productName}</option>
             </select>
           </label>
         })}
@@ -507,17 +506,17 @@ export function MixedStoreShoppingCard({
       <p>Dit zijn jouw zelf opgegeven extra omrij-/parkeerkosten ten opzichte
         van één winkel. Zonder ingevuld bedrag is het netto voordeel onbekend.
         Het maximale theoretische voordeel vóór jouw winkelvoorkeuren is
-        {' '}{money.format(mixed.additionalDifferenceCents / 100)}.</p>
+        {' '}{exactEuro.formatCents(mixed.additionalDifferenceCents)}.</p>
       {costInvalid && <p role="alert">Voer een geldig bedrag in tussen € 0,00 en
         € 1.000,00, met hoogstens twee decimalen.</p>}
       {!costInvalid && netAdvantage !== null && <p role="status">
         Twee winkels zouden inclusief jouw extra kosten{' '}
-        <strong>{money.format((selectedMixed.totalCents + extraCostCents!) / 100)}</strong>
-        {' '}kosten. {netAdvantage > 0
-          ? 'Dat is ' + money.format(netAdvantage / 100) + ' minder dan één complete winkel.'
-          : netAdvantage === 0
+        <strong>{exactEuro.formatCents(BigInt(selectedMixed.totalCents) + BigInt(extraCostCents!))}</strong>
+        {' '}kosten. {netAdvantage > 0n
+          ? 'Dat is ' + exactEuro.formatCents(netAdvantage) + ' minder dan één complete winkel.'
+          : netAdvantage === 0n
             ? 'Dat is gelijk aan één complete winkel.'
-            : 'Een complete winkel is ' + money.format(-netAdvantage / 100) + ' goedkoper.'}
+            : 'Een complete winkel is ' + exactEuro.formatCents(-netAdvantage) + ' goedkoper.'}
       </p>}
     </div>}
     {!visitsBoth && <p>Je gekozen lijst vergt maar één winkelbezoek.
@@ -525,7 +524,7 @@ export function MixedStoreShoppingCard({
     <div role="status" className="mixed-store-route__progress-summary">
       <strong>{doneCount} van {plan.lines.length} ingrediënten afgevinkt</strong>
       <span>Nog op jouw gekozen boodschappenlijst: <strong>{
-        money.format(remainingProductCents / 100)}</strong></span>
+        exactEuro.formatCents(remainingProductCents)}</strong></span>
       <small>Alleen productbedragen uit je eigen prijsopnames. Vinkjes bewijzen geen betaling;
         extra winkelbezoekkosten zijn niet verdeeld over de artikelen.</small>
     </div>
@@ -579,10 +578,10 @@ export function MixedStoreShoppingCard({
         const all = plan.lines.filter(item => item.store === store)
         const visible = all.filter(item => !onlyOpen || !done(item.key))
         return <section key={store}>
-          <h4>{store} · {money.format(perStoreProgress[store].totalCents / 100)}</h4>
+          <h4>{store} · {exactEuro.formatCents(perStoreProgress[store].totalCents)}</h4>
           <p><strong>{perStoreProgress[store].done} van {perStoreProgress[store].count}</strong>
             {' '}ingrediënten afgevinkt. Nog op de lijst bij deze winkel:{' '}
-            <strong>{money.format(perStoreProgress[store].remainingCents / 100)}</strong>.</p>
+            <strong>{exactEuro.formatCents(perStoreProgress[store].remainingCents)}</strong>.</p>
           {all.length > 0 && <button type="button" className="ghost-button"
             onClick={() => {
               const allDone = all.every(line => done(line.key))
@@ -618,8 +617,8 @@ export function MixedStoreShoppingCard({
               <strong>{item.ingredientLabel}</strong> · benodigd {item.amount} {item.unit}:
               {' '}{item.packs} × {item.productName} [{item.productId}]
               {' '}({item.packCount} × {item.packAmount} {item.packUnit}/pak)
-              {' '}· {money.format(item.pricePerPackCents / 100)} per pak
-              {' '}= {money.format(item.lineTotalCents / 100)}
+              {' '}· {exactEuro.formatCents(item.pricePerPackCents)} per pak
+              {' '}= {exactEuro.formatCents(item.lineTotalCents)}
             </label></li>)}</ul>}
         </section>
       })}
