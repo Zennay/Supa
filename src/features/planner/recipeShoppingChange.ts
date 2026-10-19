@@ -2,6 +2,7 @@ import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../doma
 import { sumDecimalDemandUnits } from '../../domain/decimalPackArithmetic.ts'
 import type { MatchUnit } from '../../domain/matching.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
+import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 
 export type ShoppingChange = Readonly<{
   id: string
@@ -12,7 +13,7 @@ export type ShoppingChange = Readonly<{
 }>
 export type RecipeShoppingChange =
   | { status: 'unavailable'; reason: string; changes: readonly [] }
-  | { status: 'ready'; changes: readonly ShoppingChange[]; previousCount: number; nextCount: number }
+  | { status: 'ready'; changes: readonly ShoppingChange[]; previousCount: number; nextCount: number; nextNeeds: readonly PlannerCaptureGuideNeed[] }
 
 type PhysicalRequirement = { id: string; label: string; unit: MatchUnit; amount: number | null }
 
@@ -82,7 +83,9 @@ export function recipeShoppingChange(input: {
         kind: beforeQty && afterQty ? 'changed' : beforeQty ? 'removed' : 'added',
         before: quantity(beforeQty), after: quantity(afterQty) })
     }
-    return { status: 'ready', changes, previousCount: before.length, nextCount: after.length }
+    return { status: 'ready', changes, previousCount: before.length, nextCount: after.length,
+      nextNeeds: after.map(item => ({ id: item.id, label: item.label, unit: item.unit,
+        amount: item.amount, query: item.query })) }
   } catch {
     return unavailable('De huidige of nieuwe Planner-vraag is niet betrouwbaar te berekenen.')
   }

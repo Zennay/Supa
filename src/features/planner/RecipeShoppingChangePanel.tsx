@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { recipeShoppingChangeText, type RecipeShoppingChange } from './recipeShoppingChange.ts'
+import { makeBlankPlannerCaptureCsv } from '../comparison/plannerPriceCaptureSheet.ts'
+import { makePlannerCaptureGuide } from '../comparison/plannerPriceCaptureGuide.ts'
 
 /** Source-free physical shopping preview; no SKU or stored retailer price. */
 export function RecipeShoppingChangePanel({ preview, day }: {
@@ -30,6 +32,32 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
       setNotice('De fysieke boodschappenwijziging is lokaal opgeslagen, zonder winkelprijzen.')
     } catch { setNotice('Kan het voorstel niet downloaden. Selecteer de kopieertekst hieronder.') ; setShowCopy(true) }
+  }
+  function downloadCapture(kind: 'csv' | 'guide') {
+    try {
+      // The two existing import formats share the SAME next-week physical
+      // requirements and row order. No retailer product or price is invented.
+      const stores = ['PLUS', 'DekaMarkt'] as const
+      const output = kind === 'csv'
+        ? makeBlankPlannerCaptureCsv(preview.nextNeeds, stores, ';')
+        : makePlannerCaptureGuide(preview.nextNeeds, stores)
+      const url = URL.createObjectURL(new Blob([output], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = kind === 'csv'
+          ? 'supa-nieuw-weekmandje-leeg-plus-deka.csv'
+          : 'supa-nieuw-weekmandje-opnamegids.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setNotice(kind === 'csv' ? 'Leeg broninvulblad voor het voorgestelde nieuwe weekmandje opgeslagen.' :
+        'Bijpassende opnamegids opgeslagen. Volg dezelfde rijvolgorde als de lege CSV.')
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Kan het broninvulblad niet maken.')
+    }
   }
   async function copy() {
     try {
@@ -65,7 +93,16 @@ export function RecipeShoppingChangePanel({ preview, day }: {
     <div className="recipe-reuse-preview-shopping__actions">
       <button type="button" className="ghost-button" onClick={download}>Download wijziging (TXT)</button>
       <button type="button" className="ghost-button" onClick={() => void copy()}>Kopieer wijziging</button>
+      <button type="button" className="ghost-button" onClick={() => downloadCapture('csv')}>
+        Leeg PLUS/Deka-prijsinvulblad voor nieuw weekmandje (CSV)
+      </button>
+      <button type="button" className="ghost-button" onClick={() => downloadCapture('guide')}>
+        Bijpassende fysieke opnamegids (TXT)
+      </button>
     </div>
+    <small>De invulbladen bevatten geen bronproducten of bedragen en horen alleen bij dit
+      voorgestelde weekmenu. Kies het recept eerst en vul uitsluitend echt waargenomen
+      brongegevens in voordat je de CSV via Vergelijk importeert.</small>
     {notice && <p role="status" aria-live="polite">{notice}</p>}
     {showCopy && <label>Zelf kopiëren (zonder prijzen)
       <textarea readOnly rows={Math.min(preview.changes.length + 7, 16)}
