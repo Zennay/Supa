@@ -86,6 +86,16 @@ function isReviewedUnavailableDraft(row: ProductDraft): boolean {
 const isEnteredOwnCapture = (row: ProductDraft) =>
   isCompleteOwnPriceDraft(row) || isReviewedUnavailableDraft(row)
 
+// Default pack-count and unit do not count as an observed product. Unfinished
+// identities and prices remain in the editing draft, not a retailer snapshot.
+function hasPartialOwnCapture(row: ProductDraft): boolean {
+  return !isEnteredOwnCapture(row) && Boolean(
+    (row.sourceId ?? '').trim() || row.name.trim() ||
+    row.packAmount.trim() || row.priceEuros.trim() ||
+    row.available || row.availabilityReviewed,
+  )
+}
+
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
 
 type StoredDraft = {
@@ -280,7 +290,29 @@ export function LocalTwoStorePriceEditor({
 
   function changeRow(store: OfflineRetailer, id: string, patch: Partial<ProductDraft>, unit: string) {
     const idKey = key(store, id)
-    setRows(prev => ({ ...prev, [idKey]: { ...(prev[idKey] ?? emptyDraft(unit)), ...patch } }))
+    const prior = rows[idKey] ?? emptyDraft(unit)
+    const identityFields: (keyof ProductDraft)[] = ['sourceId', 'name', 'packAmount', 'packUnit', 'packCount']
+    const identityChanged = identityFields.some(field =>
+      Object.prototype.hasOwnProperty.call(patch, field) && patch[field] !== prior[field])
+    const hasPreviousDecision = prior.available || prior.availabilityReviewed ||
+      Boolean(prior.priceEuros.trim())
+    setRows(prev => {
+      const current = prev[idKey] ?? emptyDraft(unit)
+      const changed = identityFields.some(field =>
+        Object.prototype.hasOwnProperty.call(patch, field) && patch[field] !== current[field])
+      const updated = { ...current, ...patch }
+      // A SKU/pack edit cannot inherit the former product's availability
+      // confirmation or financial facts, even before the downstream review.
+      if (changed) {
+        updated.available = false
+        updated.availabilityReviewed = false
+        updated.priceEuros = ''
+      }
+      return { ...prev, [idKey]: updated }
+    })
+    if (identityChanged && hasPreviousDecision) {
+      setDraftStatus(`${store}: na wijziging van het bronartikel of de verpakking zijn oude prijs en beschikbaarheidsbevestiging ingetrokken. Controleer het nieuwe artikel opnieuw.`)
+    }
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
   }
   function changeTimestamp(store: OfflineRetailer, value: string) {
@@ -293,19 +325,46 @@ export function LocalTwoStorePriceEditor({
       if (!activeNeeds.length || activeNeeds.length > 1000) {
         throw new Error('Kies eerst een weekmenu met ondersteunde ingrediënten (maximaal 1.000).')
       }
-      const times = selectedStores.map(store => timestampWithOffset(capturedAt[store]))
+      const captureStores = selectedStores.filter(store => activeNeeds.some(need =>
+        isEnteredOwnCapture(rows[key(store, need.id)] ?? emptyDraft(need.unit))))
+      if (captureStores.length === 0) {
+        throw new Error('Er is nog geen volledig ingevoerd bronartikel. Vul minstens één echt product bij één winkel in.')
+      }
+      const missingStores = selectedStores.filter(store => !captureStores.includes(store))
+      const times = captureStores.map(store => timestampWithOffset(capturedAt[store]))
       if (times.some(time => time === null)) {
-        throw new Error('Vul voor elke gekozen winkel de echte, lokaal genoteerde datum en tijd in.')
+        throw new Error('Vul voor iedere winkel met complete productregels de echte opnametijd in.')
       }
       if (times.some(time => Date.parse(time!) > Date.now() + 300000)) {
         throw new Error('Een waarnemingstijd ligt in de toekomst.')
       }
-      const captures = selectedStores.map((store, storeIndex) => {
+      // Only explicitly entered, complete local observations enter the
+      // canonical source gate. Warn before omitting drafts, never discard
+      // them or silently reinterpret missing data as free or out of stock.
+      const incompleteRows = selectedStores.flatMap(store => activeNeeds.flatMap(need => {
+        const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+        return hasPartialOwnCapture(draft) ? [`${store} · ${need.label}`] : []
+      }))
+      if ((incompleteRows.length || missingStores.length) && !window.confirm(
+        (missingStores.length
+          ? 'De volgende winkel(s) hebben nog geen complete geobserveerde productregel en worden niet als winkelbron opgeslagen: ' +
+            missingStores.join(', ') + '.\nEr is dus nog GEEN volledige twee-winkelvergelijking.\n'
+          : '') +
+        (incompleteRows.length
+          ? `${incompleteRows.length} half ingevulde artikelregel(s) worden overgeslagen:\n` +
+            incompleteRows.slice(0, 10).join('\n') +
+            (incompleteRows.length > 10 ? `\n… en nog ${incompleteRows.length - 10}` : '') + '\n'
+          : '') +
+        '\nJe invoerconcept blijft behouden en ontbrekende prijzen blijven onbekend. ' +
+        'Wil je uitsluitend de complete, persoonlijk geobserveerde regels verwerken?'
+      )) {
+        setError('Niets verwerkt: vul ontbrekende brongegevens aan of bevestig bewust dat deze regels onbekend blijven.')
+        return
+      }
+      const captures = captureStores.map((store, storeIndex) => {
         const products = activeNeeds.flatMap((need) => {
           const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
-          const entered = draft.sourceId?.trim() || draft.name.trim() || draft.packAmount.trim() ||
-            draft.priceEuros.trim() || draft.available || draft.availabilityReviewed
-          if (!entered) return []
+          if (!isEnteredOwnCapture(draft)) return []
           if (draft.name !== draft.name.trim() || !draft.name.trim()) {
             throw new Error(`${store} · ${need.label}: vul een werkelijke, complete productnaam in.`)
           }
