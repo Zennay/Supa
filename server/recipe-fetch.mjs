@@ -22,7 +22,7 @@ function privateRecipeQueryKey(key) {
   let current = key
   for (let depth = 0; depth < 8; depth++) {
     const folded = current.normalize('NFKC')
-      .replace(/[\\p{Default_Ignorable_Code_Point}\\p{Mark}]/gu, '')
+      .replace(/[\p{Default_Ignorable_Code_Point}\p{Mark}]/gu, '')
       .toLocaleLowerCase('en').replace(/[^a-z0-9]/gu, '')
     if (PRIVATE_QUERY_KEY.test(folded) ||
         /(?:token|secret|password|credential|signature|apikey|codeverifier|codechallenge|samlresponse|csrf)/u.test(folded)) return true
