@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { matchIngredient, type MatchUnit } from '../../domain/matching.ts'
 import type { OfflinePriceSnapshots, OfflineRetailer, OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
@@ -29,6 +29,20 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   onReviewIngredient?: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
   onRecapture?: (store: 'PLUS' | 'DekaMarkt') => void
 }) {
+  // An open Planner tab may outlive a source capture's seven-day validity.
+  // Recompute proposed SKUs on the real clock, not only on source-file edits.
+  const [clock, setClock] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => setClock(Date.now())
+    const interval = window.setInterval(refresh, 60_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
   const [showAll, setShowAll] = useState(false)
   const [onlyMissing, setOnlyMissing] = useState(false)
   const [search, setSearch] = useState('')
@@ -56,7 +70,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       for (const store of stores) {
         const capture = source.captures[store]
         if (!capture || olderPairedStore === store ||
-            !recentOwnCaptureInstant(capture.observedAt, Date.now()) ||
+            !recentOwnCaptureInstant(capture.observedAt, clock) ||
             need.amount === null || !Number.isFinite(need.amount) ||
             need.amount <= 0 || !units.has(need.unit)) {
           suggestions[store] = null
@@ -104,7 +118,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       }
       return { need, suggestions, manualReview }
     })
-  }, [needs, source, olderPairedStore])
+  }, [needs, source, olderPairedStore, clock])
   if (!coverage.length) return null
   const suggested = stores.map(store => coverage.filter(line => line.suggestions[store]).length)
   const paired = coverage.filter(line => line.suggestions.PLUS && line.suggestions.DekaMarkt).length
@@ -241,7 +255,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         const capture = source.captures[store]
         return <p key={store}><strong>{store}:</strong>{' '}
           {capture ? <>bronopname {sourceDate.format(new Date(capture.observedMs))}
-            {' · '}{recentOwnCaptureInstant(capture.observedAt, Date.now())
+            {' · '}{recentOwnCaptureInstant(capture.observedAt, clock)
               ? 'bron jonger dan 7 dagen' : 'bron te oud voor een actuele vergelijking'}</>
             : 'geen bronopname; alle winkelprijzen onbekend'}</p>
       })}
@@ -318,7 +332,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                 ? ' · informatief ' + suggestions[store]!.unitRate : ''}
               {' '}· bronmoment niet automatisch gevalideerd</small></>
             : source.captures[store] &&
-              !recentOwnCaptureInstant(source.captures[store]!.observedAt, Date.now())
+              !recentOwnCaptureInstant(source.captures[store]!.observedAt, clock)
               ? 'Verlopen of toekomstige bron: geen actueel geprijsd voorstel; leg een echte nieuwe opname vast'
             : olderPairedStore === store
               ? 'Bronpaar >24 uur uiteen: neem deze oudste winkel opnieuw op voordat je prijzen vergelijkt'
@@ -327,7 +341,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               : 'Geen geschikte geprijsde SKU in deze bron; ontbrekende bron vastleggen'}
           {onReviewIngredient && (suggestions[store] || manualReview[store]) &&
             source.captures[store] &&
-            recentOwnCaptureInstant(source.captures[store]!.observedAt, Date.now()) &&
+            recentOwnCaptureInstant(source.captures[store]!.observedAt, clock) &&
             <button type="button" className="ghost-button"
               onClick={() => onReviewIngredient(store, need.id)}>
               Controleer deze {store}-SKU in Vergelijk
