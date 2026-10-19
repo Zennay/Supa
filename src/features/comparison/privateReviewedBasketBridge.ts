@@ -59,13 +59,23 @@ export function freshReviewedBaskets(
   expectedPlanKey: string,
   nowMs: number,
 ): PrivateReviewedBaskets | null {
-  if (!snapshots || snapshots.planKey !== expectedPlanKey) return null
-  const entries = Object.entries(snapshots.stores).filter(([, value]) =>
-    value && Number.isFinite(value.capturedMs) &&
-    nowMs >= value.capturedMs - 300000 &&
-    nowMs - value.capturedMs <= 7 * 86400000 &&
-    value.basket.lines.length > 0 && value.basket.unresolvedLineCount === 0 &&
-    value.basket.matchedLineCount === value.basket.lines.length)
+  if (!snapshots || snapshots.planKey !== expectedPlanKey ||
+      !Number.isSafeInteger(nowMs)) return null
+  const nowNs = BigInt(nowMs) * 1_000_000n
+  const allowedFutureNs = 300_000_000_000n
+  const maxAgeNs = 604_800_000_000_000n
+  const entries = Object.entries(snapshots.stores).filter(([, value]) => {
+    if (!value || !Number.isSafeInteger(value.capturedMs)) return false
+    // Keep full nanoseconds exactly as the original private import already
+    // admitted them. Never display a stale source for a further fraction of
+    // a millisecond, and never ignore a changed capturedMs envelope.
+    const instant = observedInstant(value.observedAt)
+    if (!instant || instant.ms !== value.capturedMs ||
+        nowNs < instant.ns - allowedFutureNs ||
+        nowNs - instant.ns > maxAgeNs) return false
+    return value.basket.lines.length > 0 && value.basket.unresolvedLineCount === 0 &&
+      value.basket.matchedLineCount === value.basket.lines.length
+  })
   if (!entries.length) return null
   return { planKey: snapshots.planKey,
     stores: Object.fromEntries(entries) as PrivateReviewedBaskets['stores'] }
