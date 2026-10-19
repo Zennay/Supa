@@ -541,6 +541,10 @@ export function LocalTwoStorePriceEditor({
     }
   }
   const validOutput = output && selectedPlanFingerprint === preparedFor
+  const exportableStores: OfflineRetailer[] = validOutput
+    ? (JSON.parse(output) as { captures: { retailer: OfflineRetailer }[] })
+        .captures.map(capture => capture.retailer)
+    : []
 
   // A pocket-sized to-do from only the still-unresolved *current* Planner
   // demands. Unlike the admitted source JSON, this never states a retailer
@@ -657,18 +661,22 @@ export function LocalTwoStorePriceEditor({
     }
   }
 
-  async function downloadPreparedCsv() {
+  async function downloadPreparedCsv(store?: OfflineRetailer) {
     if (!validOutput || typeof window === 'undefined') return
     const prepared = output
+    const planFingerprint = selectedPlanFingerprint
     setError('')
     try {
-      const csv = await ownPriceCapturesToCsv(prepared)
-      if (prepared !== currentPreparedOutput.current) return
+      const csv = await ownPriceCapturesToCsv(prepared, store)
+      if (prepared !== currentPreparedOutput.current ||
+          planFingerprint !== currentPlanFingerprint.current) return
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = 'supa-mijn-geobserveerde-winkelprijzen.csv'
+        link.download = store
+          ? 'supa-mijn-geobserveerde-prijzen-' + store + '.csv'
+          : 'supa-mijn-geobserveerde-winkelprijzen.csv'
         link.style.display = 'none'
         document.body.appendChild(link)
         link.click()
@@ -676,7 +684,8 @@ export function LocalTwoStorePriceEditor({
         setDraftStatus('Eigen bronopname als CSV opgeslagen en verliesvrij opnieuw gecontroleerd.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (exception) {
-      if (prepared !== currentPreparedOutput.current) return
+      if (prepared !== currentPreparedOutput.current ||
+          planFingerprint !== currentPlanFingerprint.current) return
       setError((exception instanceof Error ? exception.message : 'CSV-download mislukt.') +
         ' De JSON-kopie en je eigen concept blijven beschikbaar.')
     }
@@ -932,6 +941,12 @@ export function LocalTwoStorePriceEditor({
         <button type="button" className="ghost-button" onClick={() => void downloadPreparedCsv()}>
           Bewaar mijn prijsopname als herimporteerbare CSV
         </button>
+        {exportableStores.length === 2 && exportableStores.map(store => (
+          <button type="button" className="ghost-button" key={store}
+            onClick={() => void downloadPreparedCsv(store)}>
+            Bewaar alleen {store} als aparte bron-CSV
+          </button>
+        ))}
         <small>Dezelfde negen bronkolommen als in Supa's bestaande CSV-import.
           Een afwijkende of onveilige waarde wordt niet stilzwijgend aangepast; JSON blijft beschikbaar.</small>
         <textarea readOnly rows={6} value={output} aria-label="Zelf ingevoerde prijsdata als JSON"
