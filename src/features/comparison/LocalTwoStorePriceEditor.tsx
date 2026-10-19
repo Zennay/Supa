@@ -325,9 +325,15 @@ export function LocalTwoStorePriceEditor({
       if (!activeNeeds.length || activeNeeds.length > 1000) {
         throw new Error('Kies eerst een weekmenu met ondersteunde ingrediënten (maximaal 1.000).')
       }
-      const times = selectedStores.map(store => timestampWithOffset(capturedAt[store]))
+      const captureStores = selectedStores.filter(store => activeNeeds.some(need =>
+        isEnteredOwnCapture(rows[key(store, need.id)] ?? emptyDraft(need.unit))))
+      if (captureStores.length === 0) {
+        throw new Error('Er is nog geen volledig ingevoerd bronartikel. Vul minstens één echt product bij één winkel in.')
+      }
+      const missingStores = selectedStores.filter(store => !captureStores.includes(store))
+      const times = captureStores.map(store => timestampWithOffset(capturedAt[store]))
       if (times.some(time => time === null)) {
-        throw new Error('Vul voor elke gekozen winkel de echte, lokaal genoteerde datum en tijd in.')
+        throw new Error('Vul voor iedere winkel met complete productregels de echte opnametijd in.')
       }
       if (times.some(time => Date.parse(time!) > Date.now() + 300000)) {
         throw new Error('Een waarnemingstijd ligt in de toekomst.')
@@ -339,17 +345,23 @@ export function LocalTwoStorePriceEditor({
         const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
         return hasPartialOwnCapture(draft) ? [`${store} · ${need.label}`] : []
       }))
-      if (incompleteRows.length && !window.confirm(
-        `${incompleteRows.length} half ingevulde artikelregel(s) worden NIET meegenomen in de bronopname:\n` +
-        incompleteRows.slice(0, 10).join('\n') +
-        (incompleteRows.length > 10 ? `\n… en nog ${incompleteRows.length - 10}` : '') +
-        '\n\nHun prijzen blijven onbekend. Je invoerconcept blijft bewaard; ' +
-        'gebruik Annuleren om eerst de regels af te maken. Wil je alleen de volledig gecontroleerde regels verwerken?'
+      if ((incompleteRows.length || missingStores.length) && !window.confirm(
+        (missingStores.length
+          ? 'De volgende winkel(s) hebben nog geen complete geobserveerde productregel en worden niet als winkelbron opgeslagen: ' +
+            missingStores.join(', ') + '.\nEr is dus nog GEEN volledige twee-winkelvergelijking.\n'
+          : '') +
+        (incompleteRows.length
+          ? `${incompleteRows.length} half ingevulde artikelregel(s) worden overgeslagen:\n` +
+            incompleteRows.slice(0, 10).join('\n') +
+            (incompleteRows.length > 10 ? `\n… en nog ${incompleteRows.length - 10}` : '') + '\n'
+          : '') +
+        '\nJe invoerconcept blijft behouden en ontbrekende prijzen blijven onbekend. ' +
+        'Wil je uitsluitend de complete, persoonlijk geobserveerde regels verwerken?'
       )) {
         setError('Niets verwerkt: vul ontbrekende brongegevens aan of bevestig bewust dat deze regels onbekend blijven.')
         return
       }
-      const captures = selectedStores.map((store, storeIndex) => {
+      const captures = captureStores.map((store, storeIndex) => {
         const products = activeNeeds.flatMap((need) => {
           const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
           if (!isEnteredOwnCapture(draft)) return []
