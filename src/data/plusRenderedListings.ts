@@ -166,6 +166,7 @@ function validHttpsPlusUrl(
     // was never part of its reviewed provenance.
     return (
       url.search === '' && url.hash === '' &&
+      !value.includes('?') && !value.includes('#') &&
       // WHATWG URL deliberately canonicalizes the explicit default :443
       // port away. Keep that historical valid HTTPS form, but still refuse
       // arbitrary URL spellings, queries and fragments.

@@ -111,6 +111,11 @@ function safePlusProductUrl(value: unknown): value is string {
       url.protocol === 'https:' &&
       url.hostname === 'www.plus.nl' &&
       url.port === '' &&
+      url.search === '' && url.hash === '' &&
+      !value.includes('?') && !value.includes('#') &&
+      (value === url.href || value === url.href.replace(
+        'https://' + url.hostname + '/', 'https://' + url.hostname + ':443/',
+      )) &&
       url.pathname.startsWith('/product/') &&
       url.pathname.length > '/product/'.length &&
       // Evidence must be the exact bare, canonical public product page.
