@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { historicalRetailerProducts } from '../products/historicalRetailerProducts.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -53,21 +53,39 @@ function eurosToCents(raw: string): number | null {
   return Number.isSafeInteger(cents) && cents >= 0 && cents <= 1000000 ? cents : null
 }
 
+// A completed form is still only an unverified personal observation.
+// Canonical SKU matching, freshness and human review remain separate.
+function isCompleteOwnPriceDraft(row: ProductDraft): boolean {
+  const id = row.sourceId ?? ''
+  const amount = amountOrNull(row.packAmount.trim())
+  const count = Number(row.packCount)
+  return row.available && id.length > 0 && id === id.trim() && id.length <= 100 &&
+    /[\p{L}\p{N}]/u.test(id) &&
+    !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(id) &&
+    row.name.trim().length > 0 && row.name === row.name.trim() &&
+    amount !== null && (row.packUnit !== 'piece' || Number.isSafeInteger(amount)) &&
+    /^\d{1,4}$/.test(row.packCount) && Number.isSafeInteger(count) && count >= 1 && count <= 1000 &&
+    eurosToCents(row.priceEuros.trim()) !== null
+}
+
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
 
 type StoredDraft = {
   saved: boolean
+  sourceSelection: 'both' | OfflineRetailer
   rows: Record<string, ProductDraft>
   capturedAt: Record<OfflineRetailer, string>
   raw: string | null
   protected: boolean
 }
-function readPrivateDraft(fingerprint: string): StoredDraft {
-  const empty: StoredDraft = { saved: false, rows: {}, capturedAt: { PLUS: '', DekaMarkt: '' }, raw: null, protected: false }
-  if (typeof window === 'undefined') return empty
-  let raw: string | null
-  try { raw = window.sessionStorage.getItem(privateDraftStorageKey) }
-  catch { return { ...empty, protected: true } }
+function readPrivateDraft(fingerprint: string, importedRaw?: string): StoredDraft {
+  const empty: StoredDraft = { saved: false, sourceSelection: 'both', rows: {}, capturedAt: { PLUS: '', DekaMarkt: '' }, raw: null, protected: false }
+  if (typeof window === 'undefined' && importedRaw === undefined) return empty
+  let raw: string | null = importedRaw ?? null
+  if (importedRaw === undefined) {
+    try { raw = window.sessionStorage.getItem(privateDraftStorageKey) }
+    catch { return { ...empty, protected: true } }
+  }
   if (raw === null) return empty
   if (raw.length > 256000) return { ...empty, raw, protected: true }
   try {
@@ -75,7 +93,8 @@ function readPrivateDraft(fingerprint: string): StoredDraft {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('shape')
     const r = value as Record<string, unknown>
     if (r.schemaVersion !== 1 || typeof r.fingerprint !== 'string' ||
-        Object.keys(r).some(k => !['schemaVersion', 'fingerprint', 'rows', 'capturedAt'].includes(k)) ||
+        Object.keys(r).some(k => !['schemaVersion', 'fingerprint', 'rows', 'capturedAt', 'sourceSelection'].includes(k)) ||
+        (r.sourceSelection !== undefined && !['both', 'PLUS', 'DekaMarkt'].includes(String(r.sourceSelection))) ||
         !r.rows || typeof r.rows !== 'object' || Array.isArray(r.rows) ||
         !r.capturedAt || typeof r.capturedAt !== 'object' || Array.isArray(r.capturedAt)) throw Error('shape')
     if (r.fingerprint !== fingerprint) return { ...empty, raw, protected: true }
@@ -97,7 +116,8 @@ function readPrivateDraft(fingerprint: string): StoredDraft {
         typeof row.priceEuros === 'string' && row.priceEuros.length <= 24 &&
         typeof row.available === 'boolean'
     })) throw Error('rows')
-    return { saved: true, rows: rows as Record<string, ProductDraft>,
+    return { saved: true, sourceSelection: (r.sourceSelection ?? 'both') as 'both' | OfflineRetailer,
+      rows: rows as Record<string, ProductDraft>,
       capturedAt: { PLUS: dates.PLUS, DekaMarkt: dates.DekaMarkt }, raw, protected: false }
   } catch {
     return { ...empty, raw, protected: true }
@@ -120,6 +140,7 @@ export function LocalTwoStorePriceEditor({
   plan, recipes, activeDays, onGenerated, onEdit, reviewedRecaptureSeeds = {},
 }: Props) {
   const [open, setOpen] = useState(false)
+  const [onlyOpenRows, setOnlyOpenRows] = useState(false)
   const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
   const selectedStores = sourceSelection === 'both' ? stores : [sourceSelection]
   const [rows, setRows] = useState<Record<string, ProductDraft>>({})
@@ -132,6 +153,9 @@ export function LocalTwoStorePriceEditor({
   }, [plan, recipes, activeDays])
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
   const selectedPlanFingerprint = JSON.stringify([plan, activeDays, needs.map(item => [item.id, item.amount, item.unit])])
+  // Avoid importing a draft into a different plan if it changed during File.text().
+  const currentPlanFingerprint = useRef(selectedPlanFingerprint)
+  currentPlanFingerprint.current = selectedPlanFingerprint
   const [preparedFor, setPreparedFor] = useState('')
   const [savedDraftRaw, setSavedDraftRaw] = useState<string | null>(null)
   const [draftOptIn, setDraftOptIn] = useState(false)
@@ -144,6 +168,7 @@ export function LocalTwoStorePriceEditor({
   useEffect(() => {
     const old = readPrivateDraft(selectedPlanFingerprint)
     setRows(old.rows)
+    setSourceSelection(old.sourceSelection)
     setCapturedAt(old.capturedAt)
     setDraftOptIn(old.saved)
     setDraftFingerprint(selectedPlanFingerprint)
@@ -164,7 +189,7 @@ export function LocalTwoStorePriceEditor({
         setDraftStatus('Een ander of onbekend concept is bewaard; SUPA overschrijft dit niet.')
         return
       }
-      const next = JSON.stringify({ schemaVersion: 1, fingerprint: selectedPlanFingerprint, rows, capturedAt })
+      const next = JSON.stringify({ schemaVersion: 1, fingerprint: selectedPlanFingerprint, rows, capturedAt, sourceSelection })
       if (new TextEncoder().encode(next).length > 256000) throw Error('oversized')
       if (next !== actual) window.sessionStorage.setItem(privateDraftStorageKey, next)
       setSavedDraftRaw(next)
@@ -173,7 +198,7 @@ export function LocalTwoStorePriceEditor({
       setDraftOptIn(false)
       setDraftStatus('Kon dit privéconcept niet bewaren. Gebruik desgewenst de lokale JSON-download.')
     }
-  }, [draftOptIn, draftProtected, draftFingerprint, rows, capturedAt, selectedPlanFingerprint])
+  }, [draftOptIn, draftProtected, draftFingerprint, rows, capturedAt, sourceSelection, selectedPlanFingerprint])
 
   function clearDraft() {
     if (typeof window !== 'undefined') {
@@ -185,6 +210,30 @@ export function LocalTwoStorePriceEditor({
     setDraftOptIn(false)
     setDraftStatus('Concept niet langer automatisch bewaard in deze browsertab.')
     setSavedDraftRaw(null)
+  }
+
+  // Unknown versions and other-week drafts are deliberately never overwritten.
+  // The user must still be able to explicitly discard a stale/private tab draft
+  // without having to open developer tools or clear unrelated site storage.
+  function discardProtectedDraft() {
+    if (!draftProtected || typeof window === 'undefined' || !window.confirm(
+      'Verwijder het beschermde prijsconcept uit deze browsertab? Dit kan invoer van een andere week of nieuwere appversie zijn. Je kunt het niet herstellen zonder eigen backup.')) return
+    try {
+      const current = window.sessionStorage.getItem(privateDraftStorageKey)
+      if (current !== savedDraftRaw) {
+        setSavedDraftRaw(current)
+        setDraftStatus('Het opgeslagen concept is tussentijds veranderd. Controleer opnieuw voordat je het verwijdert.')
+        return
+      }
+      window.sessionStorage.removeItem(privateDraftStorageKey)
+      setSavedDraftRaw(null)
+      setDraftProtected(false)
+      setDraftOptIn(false)
+      setDraftFingerprint(selectedPlanFingerprint)
+      setDraftStatus('Het oude beschermde concept is gewist. Je huidige invulscherm blijft behouden.')
+    } catch {
+      setDraftStatus('Het beschermde concept kon niet worden gewist. Bestaande opslag blijft behouden.')
+    }
   }
 
   function prefillReviewedSources() {
@@ -308,6 +357,64 @@ export function LocalTwoStorePriceEditor({
   }
   const validOutput = output && selectedPlanFingerprint === preparedFor
 
+  // Portable *unfinished form*, not an admitted retailer price snapshot.
+  // The two formats intentionally cannot be mistaken for one another.
+  function downloadUnfinishedDraft() {
+    try {
+      const json = JSON.stringify({
+        schemaVersion: 1, fingerprint: selectedPlanFingerprint, rows, capturedAt, sourceSelection,
+      }, null, 2)
+      if (new TextEncoder().encode(json).length > 256000) {
+        throw Error('Dit invulconcept is groter dan 256 kB.')
+      }
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-onvoltooid-prijsconcept.json'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        setDraftStatus('Privéconcept gedownload. Dit is geen gevalideerde winkelprijsbron.')
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+    } catch {
+      setDraftStatus('Kon het invulconcept niet lokaal downloaden.')
+    }
+  }
+
+  async function importUnfinishedDraft(file: File) {
+    const fingerprint = selectedPlanFingerprint
+    try {
+      if (file.size > 256000) throw Error('size')
+      const raw = await file.text()
+      if (currentPlanFingerprint.current !== fingerprint) {
+        setDraftStatus('Het weekmenu veranderde tijdens het lezen. Kies het concept opnieuw.')
+        return
+      }
+      const restored = readPrivateDraft(fingerprint, raw)
+      if (!restored.saved) {
+        setDraftStatus('Dit concept hoort niet bij dit exacte weekmenu, is te groot of heeft een onbekende indeling.')
+        return
+      }
+      if (!window.confirm('Vervang de huidige, mogelijk onvoltooide invoer door dit lokale privéconcept? ' +
+        'Oude prijzen en waarnemingstijden moeten opnieuw op actualiteit worden gecontroleerd.')) return
+      // Opt-in storage is paused. Do not overwrite an existing tab draft simply
+      // because a file was imported. User can deliberately enable saving later.
+      setDraftOptIn(false)
+      setRows(restored.rows)
+      setCapturedAt(restored.capturedAt)
+      setSourceSelection(restored.sourceSelection)
+      setPreparedFor(''); setOutput(''); setError('')
+      setDraftStatus('Onvoltooid concept lokaal geladen. Controleer prijzen en bronmomenten en bereken opnieuw.')
+      onEdit()
+    } catch {
+      setDraftStatus('Het gekozen JSON-concept kon niet veilig worden gelezen. Bestaande invoer blijft staan.')
+    }
+  }
+
   function downloadPreparedSource() {
     if (!validOutput || typeof window === 'undefined') return
     const bytes = new Blob([output], { type: 'application/json;charset=utf-8' })
@@ -354,8 +461,28 @@ export function LocalTwoStorePriceEditor({
           Onvoltooide invoer bewaren in deze browsertab (optioneel, niet naar een server)
         </label>
         <span role="status">{draftStatus}</span>
+        <div className="offline-manual-editor__progress-actions">
+          <button type="button" className="ghost-button" onClick={downloadUnfinishedDraft}>
+            Download onvoltooid invulconcept (JSON)
+          </button>
+          <label>Herstel een eigen onvoltooid invulconcept
+            <input type="file" accept=".json,application/json"
+              onChange={event => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                if (file) void importUnfinishedDraft(file)
+              }} />
+          </label>
+        </div>
+        <small>Concepten bevatten jouw eigen invoer en mogelijk oude bedragen.
+          Alleen een exact gelijk weekmenu wordt geaccepteerd; import activeert
+          nooit automatisch prijsvergelijking of opslag.</small>
         {draftOptIn && <button type="button" className="ghost-button" onClick={clearDraft}>
           Stop automatisch bewaren en wis concept
+        </button>}
+        {draftProtected && <button type="button" className="ghost-button"
+          onClick={discardProtectedDraft}>
+          Verwijder beschermd concept na bevestiging
         </button>}
       </div>
       <label>Welke winkel(s) heb je daadwerkelijk geobserveerd?
@@ -383,10 +510,41 @@ export function LocalTwoStorePriceEditor({
           <label className="offline-manual-editor__time">Wanneer zijn deze producten echt waargenomen?
             <input type="datetime-local" value={capturedAt[store]} onChange={e => changeTimestamp(store, e.target.value)} />
           </label>
-          {activeNeeds.map(need => {
+          {(() => {
+            const completed = activeNeeds.filter(need => isCompleteOwnPriceDraft(
+              rows[key(store, need.id)] ?? emptyDraft(need.unit))).length
+            const next = activeNeeds.findIndex(need => !isCompleteOwnPriceDraft(
+              rows[key(store, need.id)] ?? emptyDraft(need.unit)))
+            return <div className="offline-manual-editor__progress" role="status">
+              <strong>{completed} van {activeNeeds.length} invoerregels ingevuld</strong>
+              <small>Eigen invoer; bronmatching, actualiteit en persoonlijke prijsreview volgen nog.</small>
+              <div className="offline-manual-editor__progress-actions">
+                <button type="button" className="ghost-button" disabled={next < 0}
+                  onClick={() => {
+                    const target = document.getElementById(`own-price-${store}-${next}`)
+                    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    target?.querySelector('input')?.focus({ preventScroll: true })
+                  }}>Naar volgende open ingrediënt</button>
+                <button type="button" className="ghost-button" aria-pressed={onlyOpenRows}
+                  onClick={() => setOnlyOpenRows(value => !value)}>
+                  {onlyOpenRows ? 'Toon alle producten' : 'Toon alleen open producten'}
+                </button>
+              </div>
+            </div>
+          })()}
+          {onlyOpenRows && activeNeeds.length > 0 && activeNeeds.every(need => isCompleteOwnPriceDraft(
+            rows[key(store, need.id)] ?? emptyDraft(need.unit))) &&
+            <p role="status">Alle regels voor {store} zijn ingevuld. Toon alle producten om ze na te kijken.</p>}
+          {activeNeeds.map((need, index) => {
             const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
-            return <fieldset key={need.id} className="offline-manual-editor__row">
-              <legend>{need.label} · benodigd {need.amount ?? '?'} {need.unit}</legend>
+            const complete = isCompleteOwnPriceDraft(row)
+            if (onlyOpenRows && complete) return null
+            return <fieldset key={need.id} id={`own-price-${store}-${index}`} className="offline-manual-editor__row">
+              <legend>{need.label} · benodigd {need.amount ?? '?'} {need.unit}
+                <small className="offline-manual-editor__row-status">
+                  {complete ? ' · ingevuld, nog niet bevestigd' : ' · invoer onvolledig'}
+                </small>
+              </legend>
               <label>Originele productcode uit jouw waarneming (EAN of artikelnummer)
                 <input value={row.sourceId ?? ''} maxLength={100} autoComplete="off"
                   placeholder="Code op verpakking, bon of bronartikel"
