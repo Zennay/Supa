@@ -45,6 +45,36 @@ export function PlannerSourceMatchPreview({ needs, source }: {
   const missing = coverage.filter(line => !line.suggestions.PLUS || !line.suggestions.DekaMarkt)
   const filtered = onlyMissing ? missing : coverage
   const shown = filtered.slice(0, showAll ? 200 : 12)
+  function downloadMissingSourceCapture() {
+    // This sheet contains the CURRENT local user's physical demand only.
+    // A candidate is no price proof and no retailer rights are implied.
+    const singleLine = (value: string) => value
+      .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
+    const rows = [
+      'SUPA · ontbrekende producten voor hetzelfde Planner-weekmandje',
+      'Lokaal controleblad, GEEN echte winkelwaarneming, prijs of toestemming.',
+      'Alleen zelf rechtmatig verkregen bronnen en originele SKU’s noteren.',
+      '',
+      ...missing.flatMap(({ need, suggestions }) => stores.flatMap(store =>
+        suggestions[store] ? [] : [
+          store + ' · ' + singleLine(need.label) + ' · nodig: ' +
+          (need.amount === null ? 'onbekend' : need.amount + ' ' + need.unit) +
+          ' · bron-SKU/pakprijs nog koppelen of vastleggen',
+        ])),
+      '',
+      'Na daadwerkelijke bronopname: importeer in Supa Vergelijk en bevestig hele verpakkingen.',
+    ]
+    const url = URL.createObjectURL(new Blob([rows.join('\n')], {
+      type: 'text/plain;charset=utf-8',
+    }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-ontbrekende-winkel-SKUs-voor-weekmand.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
   return <section className="supa-planner-source-matches" aria-label="Voorlopige weekmand-productmatching">
     <h4>Weekmand tegenover de aangeleverde bron-SKU’s</h4>
     <p>{coverage.length} fysieke ingrediënten: PLUS {suggested[0]} mogelijke kandidaten,
@@ -74,6 +104,10 @@ export function PlannerSourceMatchPreview({ needs, source }: {
         </span>)}
       </div>)}
     </div>
+    {missing.length > 0 && <button type="button" className="ghost-button"
+      onClick={downloadMissingSourceCapture}>
+      Download ontbrekende PLUS/Deka-productcontroles (TXT)
+    </button>}
     {filtered.length > shown.length && <button type="button" className="ghost-button"
       onClick={() => setShowAll(true)}>Toon alle {filtered.length} ingrediënten</button>}
     <small>Een kandidaat uit een verouderde opname is geen actuele prijs.
