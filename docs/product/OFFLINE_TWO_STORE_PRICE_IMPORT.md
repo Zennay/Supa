@@ -35,6 +35,14 @@ Het weekbestand gebruikt schema supa-private-planner-week-v1 (UTF-8, maximaal 25
 
 Dezelfde bestaande, strikte negenkoloms-CSV-converter is nu ook rechtstreeks via **Vergelijk → Open je eigen twee-winkel CSV of JSON** bereikbaar. De hoofdapp leest maximaal 256 kB UTF-8, converteert CSV uitsluitend in de browser via de al bestaande Supa-module en weigert een ontbrekende of ongeldige tweede winkel voor een volledige vergelijking. Het oorspronkelijke CSV-bestand blijft onveranderd; in de invoer verschijnt het geconverteerde JSON. Een ongeldige import, bewerkte bron of veranderd handmatig prijsconcept trekt onmiddellijk de oude uitkomst én alle per-SKU-bevestigingen in. Bij slechts één echte winkel gebruik je de hierboven gekoppelde uitgebreide privévergelijker; Supa verzint nooit een tweede winkel.
 
+## Leeg opnameblad invullen, nakijken en bewust importeren
+1. Maak in **Planner** je echte weekmenu, kies in **Vergelijk** één of beide winkels en download het **lege prijsinvulblad (CSV)** plus de opnamegids met dezelfde regelnummers. Geen regel bevat een verzonnen productcode, moment of prijs.
+2. Vul in het CSV-bestand uitsluitend daadwerkelijk geobserveerde bronvelden in: oorspronkelijke productcode, naam, verpakkingsinhoud/eenheid, multipack-aantal, prijs in hele centen, waarnemingstijd met UTC-offset en beschikbaarheid. Laat een niet-geobserveerde regel **helemaal leeg**, behalve de bestaande winkel/eindwaarde `false` en een optionele eenheidshint. Een deels ingevulde regel geeft nu expliciet het foutieve CSV-regelnummer in plaats van ongemerkt te verdwijnen.
+3. Gebruik **Controleer een ingevuld CSV-prijsblad vóór import** voor één gecombineerd of één los bestand, of selecteer twee aparte één-winkel-CSV-bestanden tegelijk. De twee bestanden moeten daadwerkelijk één verschillende winkel bevatten. De lokale controle gebruikt de **bestaande strikte converter én opname-admissie**, toont per werkelijk aangeleverde winkel aantallen ingevulde bronproducten en leeg gebleven regels, en laat de eerste twaalf werkelijk ingevoerde bronartikelen met oorspronkelijke code, inhoud, pakprijs en berekende eenheidsprijs zien. Niet-beschikbare en ongeprijsde artikelen blijven expliciet onbekend. Deze inspectie wijzigt je eerdere winkelopnames niet.
+4. Open desgewenst **Planner-productmatching vooraf bekijken** per winkel: Supa berekent met dezelfde bestaande conservatieve matching alvast welke echte ingevoerde bronproducten voorstelbaar zijn voor hetzelfde fysieke weekmenu, welke ingrediënten nog onbekend zijn en hoeveel hele verpakkingen een voorstel vergt. **Er is dan nog geen match geaccepteerd, winkelmandtotaal of prijsverschil bewezen.** Met **Download alleen ontbrekende winkelproducten (TXT)** kun je alle niet-gematchte fysieke ingrediënten per winkel apart meenemen, ook als de andere winkel nog geheel ontbreekt. Dit bestand bevat géén aangenomen productcodes, prijzen of toestemming. Dezelfde preview waarschuwt apart wanneer een bronmoment meer dan zeven dagen oud of toekomstig is en wanneer twee werkelijk ingevoerde winkelopnames meer dan 24 uur uit elkaar liggen; deze voorwaarden kunnen nooit met een automatisch ingevulde datum worden omzeild.
+5. Klik pas na eigen controle op **Neem eigen brondata over**. Voor een ontbrekende tweede winkel wordt dezelfde bestaande veilige toevoegroute gebruikt; voor een al geladen winkel de **bronverschillen-preview** vóór vervanging. Als er al bronnen en controles zijn, vraagt het tegelijk inladen van twee vervangende winkelbestanden expliciet om bevestiging, nadat beide bestanden geldig zijn verklaard. Annuleren behoudt de bestaande brongegevens en vinkjes. Geaccepteerde productcodes zijn niet automatisch met Planner-ingrediënten gematcht: elk fysieke match en de oorspronkelijke prijs moeten apart worden beoordeeld.
+6. Verlopen, ontbrekende of niet-geprijsde winkelobservaties blijven **onbekend**. Een volledig prijsverschil verschijnt alleen als beide complete, brongebonden mandjes aan bestaande voorwaarden voldoen. Dit werkblad is geen toestemming van retailers en geen onafhankelijk veldbewijs.
+
 ## Importeren
 
 1. Maak lokaal een JSON-bestand met **één** PLUS- en **één** DekaMarkt-opname. Beide opnames beschrijven de daadwerkelijk waargenomen prijscontext, met een ISO-tijd en een expliciete UTC-offset.
@@ -1020,3 +1028,42 @@ matching- en individuele tijd-/reviewgates zijn niet versoepeld.
 De productiebuild levert nu een aparte checkoutbundle van circa
 28 kB naast de gewone appbundle; de gewone appbundel is circa
 26 kB kleiner dan vóór de splitsing (ongecomprimeerd).
+
+## Nieuw weekmenu: direct een leeg CSV-prijsinvulblad downloaden
+
+In **Vergelijk → Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden** kun je
+**Download leeg prijsinvulblad (CSV)** kiezen. Kies eerst **beide winkels**, **alleen PLUS** of **alleen DekaMarkt**. Supa neemt alleen de
+*fysieke ingrediëntenbehoefte* van de geselecteerde Planner-dagen mee. Er wordt
+geen winkel-SKU, productnaam, oude prijs, tijdstempel, beschikbaarheid of
+retailerautorisatie aangemaakt. Het CSV-bestand heeft precies de bestaande
+negen verplichte kolomkoppen. Het is expliciet een **leeg werkblad, geen brondata**.
+
+Per ingrediënt is er één regel per gekozen winkel. Het gecombineerde werkblad
+heeft eerst alle PLUS-regels en dan alle DekaMarkt-regels; een enkelwinkelblad
+heeft alleen de rijen van die winkel. Je kunt na een echte PLUS-waarneming
+later apart DekaMarkt invullen en toevoegen, zonder vooraf een tweede bron te
+verzinnen. De
+uitklapbare hulp onder de knop toont de precieze spreadsheet-rijnummers en de
+gevraagde hoeveelheid. Met **Download bijhorende opnamegids (TXT)** krijg je
+precies die rijnummers en hoeveelheden op papier of in een offline notitie,
+passend bij de gekozen een- of tweewinkel-CSV. De gids bevat zelf geen
+winkelproducten, prijzen of bewijs. Met **Download printbaar opnameformulier
+(HTML)** krijg je voor dezelfde keuze een geheel offline, zelf af te drukken
+winkelblad met lege schrijfvelden voor de originele productcode, naam,
+verpakking, prijs, beschikbaarheid en de echte broncontext. Het formulier
+draait geen scripts of netwerkverzoeken en verandert geen enkele bronopname;
+na de winkeltrip zet je zelf alleen de geobserveerde feiten in het CSV-bestand. De eenheid is hooguit een bewerkbare hint; neem de
+werkelijke inhoud van de aangeboden verpakking over. Vul per werkelijk gevonden
+winkelproduct de originele `id`, `name`, `packAmount`, `packUnit`, `packCount`,
+`priceCents` in hele centen, `observedAt` met echte tijdzone en `available` als
+`true` of `false` in. Iedere ingevulde regel van dezelfde winkel moet dezelfde
+echte opnametijd hebben. Gebruik alleen bronnen die je rechtmatig mag verwerken.
+
+**Laat ontbrekende productregels helemaal leeg** (behalve hun al ingevulde
+winkelnaam, eventuele eenheidshint en `available=false`). De canonieke CSV-import
+slaat uitsluitend deze volledig lege bronrecords over; een half ingevuld artikel
+wordt geweigerd. Als maar één winkel werkelijk is ingevuld, kun je alleen diens
+gegevens importeren; een niet ingevulde tweede winkel wordt nooit gesimuleerd.
+Geen enkele waarneming betekent geen geprijsd mandje. Voor een prijsverschil
+blijven de bestaande 7-dagen-/24-uursgrenzen, daadwerkelijke bronproducten,
+volledige fysieke dekking en menselijke bevestiging vereist.
