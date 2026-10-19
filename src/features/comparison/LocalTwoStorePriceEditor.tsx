@@ -251,6 +251,10 @@ export function LocalTwoStorePriceEditor({
           if (draft.packAmount && packAmount === null) {
             throw new Error(`${store} · ${need.label}: ongeldige fysieke verpakking.`)
           }
+          if (draft.packUnit === 'piece' && packAmount !== null &&
+              !Number.isSafeInteger(packAmount)) {
+            throw new Error(`${store} · ${need.label}: losse stuks op de verpakking moeten een heel aantal zijn.`)
+          }
           const count = Number(draft.packCount)
           if (!/^\d{1,4}$/.test(draft.packCount) || !Number.isSafeInteger(count) || count < 1 || count > 1000) {
             throw new Error(`${store} · ${need.label}: multipack-aantal moet 1–1.000 zijn.`)

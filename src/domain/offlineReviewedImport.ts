@@ -61,6 +61,8 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): StoreProduct {
       (raw.packAmount !== null && (typeof raw.packAmount !== 'number' || !Number.isFinite(raw.packAmount) ||
         raw.packAmount <= 0 || raw.packAmount > 100000)) ||
       (raw.available && raw.packAmount === null) ||
+      (raw.packUnit === 'piece' && raw.packAmount !== null &&
+        !Number.isSafeInteger(raw.packAmount)) ||
       !UNITS.has(raw.packUnit as string) ||
       (raw.packCount !== undefined && (!Number.isSafeInteger(raw.packCount) ||
         (raw.packCount as number) < 1 || (raw.packCount as number) > 1000)) ||
