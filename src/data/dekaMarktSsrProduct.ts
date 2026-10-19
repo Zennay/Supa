@@ -157,6 +157,37 @@ function dekaMarktProductIdFromUrl(value: string): string | null {
   }
 }
 
+/**
+ * Deka's Nuxt amount is the independent current-package reference.
+ * Every explicitly written JSON-LD price and currency must corroborate it,
+ * not merely the historical uppercase Price spelling. Case variants cannot
+ * hide an alternative SKU amount or contradictory availability statement.
+ */
+function corroborateDekaOffer(offer: JsonObject, expectedCents: number): boolean {
+  let sawPrice = false
+  let sawEuroCurrency = false
+  const availabilities: string[] = []
+  for (const [key, value] of Object.entries(offer)) {
+    const kind = key.toLocaleLowerCase('en')
+    if (kind === 'price') {
+      sawPrice = true
+      if ((typeof value !== 'string' && typeof value !== 'number') ||
+          normalizeMoneyToCents(String(value)) !== expectedCents) return false
+    } else if (kind === 'pricecurrency') {
+      sawEuroCurrency = true
+      if (typeof value !== 'string' || value !== 'EUR') return false
+    } else if (kind === 'availability') {
+      if (typeof value !== 'string' || !value.trim()) return false
+      availabilities.push(value)
+    }
+  }
+  if (!sawPrice || !sawEuroCurrency) return false
+  const known = availabilities.map(normalizeSchemaOrgAvailability)
+  if (known.length > 0 && (known.includes('unknown') ||
+      new Set(known).size !== 1)) return false
+  return true
+}
+
 function dereference(payload: unknown[], ref: unknown): unknown {
   if (!Number.isInteger(ref) || (ref as number) < 0 || (ref as number) >= payload.length) {
     return undefined
@@ -305,19 +336,21 @@ export function parseDekaMarktSsrProductEvidence(
     typeof jsonLd?.mpn === 'string' || typeof jsonLd?.mpn === 'number'
       ? String(jsonLd.mpn)
       : null
-  const jsonCurrency = typeof offers?.priceCurrency === 'string' ? offers.priceCurrency : null
   const observedCapitalPrice = offers?.Price
+  const declaredUrl = jsonLd?.url
 
   if (
     !jsonLd ||
     jsonLd['@type'] !== 'Product' ||
     jsonName !== name ||
     jsonMpn !== String(productId) ||
-    jsonCurrency !== 'EUR' ||
+    (declaredUrl !== undefined && (!safeDekaMarktProductUrl(declaredUrl) ||
+      declaredUrl !== evidence.source.url)) ||
+    !offers ||
     typeof observedCapitalPrice !== 'number' ||
-    normalizeMoneyToCents(String(observedCapitalPrice)) !== currentPriceCents
+    !corroborateDekaOffer(offers, currentPriceCents)
   ) {
-    return { type: 'abstain', reason: 'DekaMarkt JSON-LD does not corroborate Nuxt product identity/price' }
+    return { type: 'abstain', reason: 'DekaMarkt JSON-LD does not corroborate Nuxt source, identity, price, currency or availability' }
   }
 
   const observation: RawProductObservation = {
