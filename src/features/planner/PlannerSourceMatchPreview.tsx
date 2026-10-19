@@ -293,16 +293,16 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       Filters wijzigen nooit je mand of winkelprijzen.</p>
     <div className="supa-planner-source-matches__table" role="table"
       aria-label="Voorlopige bronmatching voor hetzelfde fysieke weekmandje">
-      <div className="supa-planner-source-matches__row" role="row">
+      <div className="supa-planner-source-matches__row supa-planner-source-matches__row--head" role="row">
         <strong role="columnheader">Fysieke behoefte</strong>
         <strong role="columnheader">PLUS</strong>
         <strong role="columnheader">DekaMarkt</strong>
       </div>
       {shown.map(({ need, suggestions, manualReview }) => <div className="supa-planner-source-matches__row"
         role="row" key={need.id}>
-        <span role="cell"><strong>{need.label}</strong>
+        <span role="cell" data-store="Fysieke behoefte"><strong>{need.label}</strong>
           <small>{need.amount ?? 'Onbekend'} {need.unit}</small></span>
-        {stores.map(store => <span role="cell" key={store}>
+        {stores.map(store => <span role="cell" data-store={store} key={store}>
           {suggestions[store] ? <>Kandidaat: {suggestions[store]!.name}
             <small>SKU {suggestions[store]!.sku} · niet bevestigd</small>
             <small>{suggestions[store]!.packCount} × {suggestions[store]!.packAmount}

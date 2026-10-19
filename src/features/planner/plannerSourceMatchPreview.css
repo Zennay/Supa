@@ -7,7 +7,32 @@
 .supa-planner-source-matches__row > * { padding: .55rem; overflow-wrap: anywhere; }
 .supa-planner-source-matches__row > :not(:last-child) { border-right: 1px solid #e3e9e5; }
 .supa-planner-source-matches__row small { display: block; margin-top: .2rem; }
-@media(max-width: 620px) { .supa-planner-source-matches__row { min-width: 560px; } }
+/* On a phone every physical need and its two original retail sources must be
+   readable without a sideways-scroll table or tiny tap targets. Keep the table
+   roles and the column headers available to assistive technologies. */
+@media (max-width: 620px) {
+  .supa-planner-source-matches__table { max-height: none; gap: .7rem; overflow: visible; border: 0; }
+  .supa-planner-source-matches__row:not(.supa-planner-source-matches__row--head) {
+    display: grid; grid-template-columns: minmax(0, 1fr);
+    border: 1px solid #d3dfd6; border-radius: .65rem; overflow: hidden;
+    background: #fff;
+  }
+  .supa-planner-source-matches__row > * { border-right: 0 !important; }
+  .supa-planner-source-matches__row:not(.supa-planner-source-matches__row--head) > * + * {
+    border-top: 1px solid #e3e9e5;
+  }
+  .supa-planner-source-matches__row [role=cell]::before {
+    content: attr(data-store); display: block; margin-bottom: .3rem;
+    font-size: .9rem; font-weight: 700;
+  }
+  .supa-planner-source-matches__row--head {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap;
+    border: 0;
+  }
+  .supa-planner-source-matches__row [role=cell] button { min-height: 44px; }
+}
+
 
 .supa-planner-source-matches__exports { display: grid; gap: .5rem; justify-items: start; }
 .supa-planner-source-matches__mobile-guide { display: grid !important; gap: .35rem; width: 100%; }
