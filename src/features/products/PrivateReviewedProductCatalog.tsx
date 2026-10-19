@@ -94,6 +94,39 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
         <label>Zoek eigen product <input type="search" value={query}
           onChange={event => setQuery(event.target.value)} placeholder="Product, SKU of ingrediënt" /></label>
       </div>
+      <div className="private-reviewed-products__progress" aria-label="Mijn nog te kopen artikelen per winkel">
+        {shops.filter(shop => store === 'all' || store === shop).map(shop => {
+          const capture = reviewed?.stores[shop]
+          if (!capture) return <section key={shop}>
+            <h3>{shop}</h3><strong>Prijs onbekend</strong>
+            <small>Geen volledige, actuele en persoonlijk gecontroleerde bron.</small>
+            <button type="button" onClick={onOpenComparison}>Open broninvoer</button>
+          </section>
+          const lines = capture.basket.lines.filter((line): line is Matched =>
+            line.status === 'matched')
+          const done = lines.filter(line => isChecked(shop, line)).length
+          const remaining = lines.filter(line => !isChecked(shop, line))
+            .reduce((sum, line) => sum + line.lineTotalCents, 0)
+          return <section key={shop}>
+            <h3>{shop}</h3>
+            <p><strong>{done} van {lines.length}</strong> producten afgevinkt</p>
+            <progress value={done} max={lines.length}
+              aria-label={'Voortgang originele ' + shop + '-boodschappen'} />
+            <strong>Nog op mijn lijst: {money.format(remaining / 100)}</strong>
+            <small>Oorspronkelijk volledig mandje: {
+              money.format(capture.basket.totalCents / 100)}.
+              Dit zijn nog niet-afgevinkte productbedragen, geen betaalbewijs.</small>
+            <button type="button" onClick={() => {
+              const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+              if (current?.stores[shop] !== capture) {
+                setCheckMessage('Deze eigen bron is verlopen. Open Vergelijk om je prijzen te herzien.')
+                return
+              }
+              onOpenList(shop)
+            }}>Open mijn {shop}-lijst</button>
+          </section>
+        })}
+      </div>
       {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
         search={search} unitFilter={unitFilter} order={order} budget={budget}
         onOpenComparison={onOpenComparison} onOpenList={onOpenList}

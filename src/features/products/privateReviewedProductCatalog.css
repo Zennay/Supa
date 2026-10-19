@@ -41,3 +41,12 @@ border:1px solid #c0d3c2;border-radius:12px;padding:1rem}
 .private-reviewed-products__checked-action{margin-top:.6rem;font-weight:650}
 .private-reviewed-products__checked-action[aria-pressed=true]{border-color:#236d4d;
 background:#e7f4eb;color:#255336}
+
+.private-reviewed-products__progress{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+gap:.75rem;margin:.9rem 0}
+.private-reviewed-products__progress>section{min-width:0;display:grid;gap:.5rem;
+padding:1rem;background:#f3f8f3;border:1px solid #cbdccb;border-radius:12px}
+.private-reviewed-products__progress h3,.private-reviewed-products__progress p{margin:0}
+.private-reviewed-products__progress progress{width:100%;height:12px;accent-color:#236d4d}
+.private-reviewed-products__progress small{line-height:1.45}
+@media(max-width:620px){.private-reviewed-products__progress{grid-template-columns:1fr}}
