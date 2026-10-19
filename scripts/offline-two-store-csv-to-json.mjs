@@ -76,8 +76,17 @@ export function joinPrivateStoreCsv(first, second) {
  * authorised access, published prices or matching with a selected week.
  */
 function localCaptureGuidance(captures) {
-  const now = Date.now()
-  const instants = captures.map(item => Date.parse(item.observedAt))
+  const nowNs = BigInt(Date.now()) * 1000000n
+  // Original ISO instants were already admitted by the strict source parser.
+  // Keep fractional nanoseconds for truthful operator guidance at exactly
+  // 24 h + 1 ns or 7 d + 1 ns, not Date.parse's truncated milliseconds.
+  const sourceNs = (raw) => {
+    const ms = Date.parse(raw)
+    if (!Number.isFinite(ms)) return null
+    const fraction = (/\.(\d{1,9})[+-]\d\d:\d\d$/u.exec(raw)?.[1] ?? '').padEnd(9, '0')
+    return BigInt(ms - Number(fraction.slice(0, 3))) * 1000000n + BigInt(fraction || '0')
+  }
+  const instants = captures.map(item => sourceNs(item.observedAt))
   const details = captures.map(item => {
     const usable = item.products.filter(product =>
       product.available === true && Number.isSafeInteger(product.priceCents) &&
@@ -88,14 +97,15 @@ function localCaptureGuidance(captures) {
       ' niet prijsbaar'
   })
   const warnings = []
-  if (instants.some(time => !Number.isFinite(time) || time > now)) {
+  if (instants.some(time => time === null || time > nowNs)) {
     warnings.push('Een opnametijd ligt in de toekomst; controleer datum en UTC-offset.')
   }
-  if (instants.some(time => Number.isFinite(time) && now - time > 7 * 24 * 60 * 60 * 1000)) {
+  if (instants.some(time => time !== null && nowNs - time > 604800000000000n)) {
     warnings.push('Een winkelopname is ouder dan 7 dagen; ververs de echte brondata.')
   }
-  if (instants.length === 2 && instants.every(Number.isFinite) &&
-      Math.abs(instants[0] - instants[1]) > 24 * 60 * 60 * 1000) {
+  if (instants.length === 2 && instants[0] !== null && instants[1] !== null &&
+      (instants[0] > instants[1] ? instants[0] - instants[1] : instants[1] - instants[0])
+        > 86400000000000n) {
     warnings.push('De twee winkeltijden liggen meer dan 24 uur uiteen.')
   }
   return [...details, ...warnings]
