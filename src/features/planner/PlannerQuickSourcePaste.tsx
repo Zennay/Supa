@@ -34,6 +34,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [separateDrafts, setSeparateDrafts] = useState({ PLUS: '', DekaMarkt: '' })
+  const [updateDraft, setUpdateDraft] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
   const [busy, setBusy] = useState(false)
   const [dropActive, setDropActive] = useState(false)
@@ -475,6 +476,23 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             originele SKU’s en hercontroleert de 24-uursgrens. Geen prijs of
             verpakking wordt automatisch goedgekeurd.</small>
         </label>
+        <label className="supa-planner-source-paste__refresh">
+          Of plak de nieuwere bron van één winkel
+          <textarea rows={4} spellCheck={false} value={updateDraft}
+            maxLength={256000} placeholder="retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available"
+            onChange={event => {
+              ++revision.current
+              setUpdateDraft(event.currentTarget.value)
+              setBusy(false)
+            }} />
+        </label>
+        <button type="button" className="ghost-button"
+          disabled={busy || !updateDraft.trim()}
+          onClick={() => void useNewStoreCapture(new File(
+            [updateDraft], 'supa-geplakte-nieuwe-winkelbron.csv',
+            { type: 'text/plain;charset=utf-8' }))}>
+          Vernieuw alleen deze winkel met geplakte bronregels
+        </button>
         {nextSourceToCapture && <button type="button" className="ghost-button"
           onClick={() => onRecapture(nextSourceToCapture)}>
           Open leeg opnameblad voor {nextSourceToCapture} en leg echte prijzen vast
