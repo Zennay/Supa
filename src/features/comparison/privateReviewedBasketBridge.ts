@@ -19,6 +19,7 @@ export type PrivateCaptureProgress = {
   stores: Partial<Record<OwnStore, {
     observedAt: string
     originalProductCount: number
+    pricedProductCount: number
     demandLineCount: number
     matchedLineCount: number
     reviewedLineCount: number

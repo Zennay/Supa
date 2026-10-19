@@ -1448,6 +1448,11 @@ export function OfflineReviewedWorkbench({
       statuses[store] = {
         observedAt: capture.observedAt,
         originalProductCount: capture.products.length,
+        pricedProductCount: capture.products.filter(product =>
+          product.sourceAvailable === true &&
+          product.sourcePriceCents !== null &&
+          product.sourcePriceCents !== undefined &&
+          product.packAmount !== null).length,
         demandLineCount: basket?.lines.length ?? 0,
         matchedLineCount: basket?.matchedLineCount ?? 0,
         reviewedLineCount: perStoreReview.find(item => item.store === store)?.accepted ?? 0,

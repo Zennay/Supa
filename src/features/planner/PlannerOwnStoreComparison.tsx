@@ -219,6 +219,9 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
             const progress = captureProgress.stores[store]!
             return <div className="own-store-planner__capture-status" role="status">
               <small>Eigen bron: {progress.observedAt} · {progress.originalProductCount} originele SKU’s.</small>
+              <small>{progress.pricedProductCount}/{progress.originalProductCount} bronproducten met
+                daadwerkelijk vastgelegde beschikbare pakprijs.
+                {' '}{progress.originalProductCount - progress.pricedProductCount} bronproducten zonder bruikbare pakprijs.</small>
               <small>{progress.matchedLineCount}/{progress.demandLineCount} ingrediënten hebben een voorgestelde match;
                 {' '}{progress.reviewedLineCount}/{progress.demandLineCount} fysiek gecontroleerd.</small>
               <small>{progress.fresh
