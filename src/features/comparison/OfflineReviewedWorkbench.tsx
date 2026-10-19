@@ -331,6 +331,8 @@ export function OfflineReviewedWorkbench({
   const [dropActive, setDropActive] = useState(false)
   const importRevision = useRef(0)
   const lastPlannerFileSerial = useRef(0)
+  const currentlySelectedPlan = useRef(planKey)
+  currentlySelectedPlan.current = planKey
   const [pendingReplacement, setPendingReplacement] = useState<{
     sourceText: string; newText: string
     version: number; store: typeof stores[number]
@@ -1029,7 +1031,7 @@ export function OfflineReviewedWorkbench({
   // Opening one file (including a drag/drop) should never silently replace
   // the other already-reviewed shop. Reuse the same append/replacement preview
   // that the manual editor and pasted CSV use.
-  async function stageSelectedSource(file: File) {
+  async function stageSelectedSource(file: File, selectedForPlan?: string) {
     const version = ++importRevision.current
     setPendingReplacement(null)
     setBusy(true)
@@ -1049,6 +1051,10 @@ export function OfflineReviewedWorkbench({
         source = (module.convertOwnStoreCsv as (input: string) => string)(raw)
       }
       if (version !== importRevision.current) return
+      if (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current) {
+        setMessage('Je weekmenu veranderde tijdens het lezen van dit bestand. Kies het opnieuw voor de huidige week.')
+        return
+      }
       acceptManualSource(source)
     } catch (error) {
       if (version !== importRevision.current) return
@@ -1059,10 +1065,10 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  async function loadSelectedSources(files: File[]) {
+  async function loadSelectedSources(files: File[], selectedForPlan?: string) {
     if (files.length === 0) return
     if (files.length === 1) {
-      await stageSelectedSource(files[0])
+      await stageSelectedSource(files[0], selectedForPlan)
       return
     }
     // Keep current admitted sources and human checks intact until BOTH
@@ -1101,6 +1107,10 @@ export function OfflineReviewedWorkbench({
             !Array.isArray(original.captures) || original.captures.length !== 1)
           throw new Error('Origineel winkelbestand ongeldig.')
         sources.push(original.captures[0])
+      }
+      if (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current) {
+        setMessage('Je weekmenu veranderde tijdens het lezen. Selecteer deze twee opnames opnieuw voor je huidige week.')
+        return
       }
       // Preserve original SKUs, null prices and observation timestamps. The
       // canonical parser is the final authority for this composed capture.
@@ -1142,7 +1152,7 @@ export function OfflineReviewedWorkbench({
       release()
       return
     }
-    void loadSelectedSources(incomingSources.files).finally(release)
+    void loadSelectedSources(incomingSources.files, incomingSources.planKey).finally(release)
   }, [incomingSources, planKey, onSourceFilesConsumed])
 
   async function appendSameCapture(store: typeof stores[number], file?: File) {
