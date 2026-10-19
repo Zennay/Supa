@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { matchIngredient, type MatchUnit } from '../../domain/matching.ts'
 import type { OfflinePriceSnapshots, OfflineRetailer, OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import './plannerSourceMatchPreview.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
@@ -10,7 +11,12 @@ const family = (unit: string): 'mass' | 'volume' | 'piece' | null =>
   unit === 'g' || unit === 'kg' ? 'mass' :
   unit === 'ml' || unit === 'l' ? 'volume' :
   unit === 'piece' ? 'piece' : null
-type Suggestion = { name: string; sku: string } | null
+type Suggestion = {
+  name: string; sku: string
+  packCount: number; packAmount: number; packUnit: string
+  packCents: number; unitRate: string | null
+} | null
+const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 /** Unconfirmed, read-only candidate hints. Canonical Workbench approves totals. */
 export function PlannerSourceMatchPreview({ needs, source }: {
@@ -42,7 +48,17 @@ export function PlannerSourceMatchPreview({ needs, source }: {
         // e.g. ml rice as a viable candidate for a gram-based rice demand.
         suggestions[store] = match && match.available && match.sourcePriceCents !== null &&
           match.packAmount !== null && family(match.packUnit) === family(need.unit)
-          ? { name: match.name, sku: match.id } : null
+          ? (() => {
+              const count = match.packCount ?? 1
+              const rate = privatePackUnitRate({
+                amount: match.packAmount, unit: match.packUnit,
+                count, priceCents: match.sourcePriceCents,
+              })
+              return { name: match.name, sku: match.id,
+                packCount: count, packAmount: match.packAmount,
+                packUnit: match.packUnit, packCents: match.sourcePriceCents,
+                unitRate: rate ? formatPrivateUnitRate(rate) : null }
+            })() : null
       }
       return { need, suggestions }
     })
@@ -107,7 +123,13 @@ export function PlannerSourceMatchPreview({ needs, source }: {
           <small>{need.amount ?? 'Onbekend'} {need.unit}</small></span>
         {stores.map(store => <span role="cell" key={store}>
           {suggestions[store] ? <>Kandidaat: {suggestions[store]!.name}
-            <small>SKU {suggestions[store]!.sku} · niet bevestigd</small></>
+            <small>SKU {suggestions[store]!.sku} · niet bevestigd</small>
+            <small>{suggestions[store]!.packCount} × {suggestions[store]!.packAmount}
+              {' '}{suggestions[store]!.packUnit} · opgenomen bronpakprijs
+              {' '}{money.format(suggestions[store]!.packCents / 100)}
+              {suggestions[store]!.unitRate
+                ? ' · informatief ' + suggestions[store]!.unitRate : ''}
+              {' '}· bronmoment niet automatisch gevalideerd</small></>
             : 'Geen eenduidige geprijsde kandidaat; handmatig koppelen'}
         </span>)}
       </div>)}
