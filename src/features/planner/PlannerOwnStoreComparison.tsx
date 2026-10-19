@@ -24,6 +24,19 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
   const selected = reviewed?.stores[preferred] ? preferred : reviewed?.stores.PLUS ? 'PLUS' : reviewed?.stores.DekaMarkt ? 'DekaMarkt' : preferred
+  function openConfirmedStoreList(store: OwnStore) {
+    // A Planner tab may stay open while its source crosses the freshness
+    // boundary. Never hand an expired or different source to Lijst.
+    const source = reviewed?.stores[store]
+    const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+    if (!source || current?.stores[store] !== source) {
+      setDownloadMessage('De eigen winkelopname is verlopen of veranderd. Herzie de bron eerst in Vergelijk.')
+      return
+    }
+    onSelect(store)
+    onOpenList()
+    setDownloadMessage('')
+  }
   async function downloadPrivateComparison() {
     setDownloadMessage('')
     try {
@@ -65,6 +78,10 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
           {capture && <button type="button" onClick={() => onSelect(store)}
             className="ghost-button" aria-pressed={selected === store}>
             {selected === store ? 'Gekozen voor mijn budget' : 'Gebruik voor mijn budget'}
+          </button>}
+          {capture && <button type="button" className="ghost-button"
+            onClick={() => openConfirmedStoreList(store)}>
+            Open mijn {store}-boodschappenlijst
           </button>}
         </div>
       })}
@@ -110,6 +127,9 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
         </div>
       : summary.available.length > 0 ? <div className="own-store-planner__result" role="status">
           <strong>Geen betrouwbaar twee-winkelprijsverschil</strong>
+          <p>Je kunt het complete, zelf gecontroleerde mandje van één winkel al
+            gebruiken via de winkelkaarten hierboven. Voor een prijsverschil zijn
+            twee geldige opnames van hetzelfde weekmenu nodig.</p>
           <p>{summary.status === 'missing'
             ? 'Voor dezelfde Planner-week ontbreekt nog een volledig, persoonlijk gecontroleerd mandje bij de andere winkel.'
             : summary.status === 'different-moments'
