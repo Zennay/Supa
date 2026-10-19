@@ -96,6 +96,30 @@ const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|banan
 export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const original = text(raw, 400)
   if (!original) throw new Error('Ingredientregel ontbreekt')
+  // Common food labels such as "2 × 250 g rijst" represent two measured
+  // portions, not two grams or an unexplained "x" ingredient. The exact
+  // original stays attached to the draft for user review and provenance.
+  const multiplied = /^(\d{1,4})\s*[x×*]\s*((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+(.+)$/iu.exec(original)
+  if (multiplied) {
+    const repetitions = Number(multiplied[1])
+    const perPart = quantity(multiplied[2])
+    const physical = units[multiplied[3].toLowerCase()]
+    const label = multiplied[4].trim()
+    const amount = physical && perPart !== null
+      ? rounded(repetitions * perPart * physical.factor) : NaN
+    if (Number.isSafeInteger(repetitions) && repetitions >= 1 &&
+        repetitions <= 1000 && perPart !== null && Number.isFinite(perPart) &&
+        perPart > 0 && perPart <= 100_000 && physical &&
+        Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 &&
+        (physical.unit !== 'piece' || Number.isSafeInteger(amount)) &&
+        label && !/^\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|oz|lb|stuks?)\b/iu.test(label)) {
+      return { original, label, query: label.toLocaleLowerCase('nl'),
+        amount, unit: physical.unit, reviewReason: null }
+    }
+    return { original, label: original, query: original.toLocaleLowerCase('nl'),
+      amount: null, unit: null, reviewReason:
+        'Controleer het aantal maal de verpakking en voer het metrische totaal in' }
+  }
   const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
   if (!match) return { original, label: original, query: original.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid of eenheid ontbreekt' }
   const amount = quantity(match[1])
