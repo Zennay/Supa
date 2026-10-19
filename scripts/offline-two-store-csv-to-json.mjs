@@ -9,8 +9,8 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { convertTwoStoreCsv, convertOwnStoreCsv } from '../public/offline-two-store-csv.mjs'
+import { offlinePriceJsonToCsv } from './offline-private-prices-json-to-csv.mjs'
 
-const CSV_HEADER = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 const MAX_BYTES = 256_000
 const error = (message) => { throw new Error(message) }
 
@@ -40,27 +40,26 @@ export async function readPrivateCsv(path) {
 }
 
 /**
- * Combine two independently supplied supermarket worksheets without
- * implementing another CSV parser or weakening the shared strict importer.
- * The header is intentionally fixed, so quoted multiline product names stay
- * untouched and are interpreted only by convertTwoStoreCsv.
+ * Normalize two independent owned sheets through the SAME strict one-store
+ * converter before composing their canonical two-store CSV. Excel semicolon,
+ * TSV and comma exports may differ. Neither store may be fabricated or copied
+ * under the other retailer ID; unknowns remain null, not zero prices.
  */
 export function joinPrivateStoreCsv(first, second) {
-  const body = (source) => {
-    const input = source.startsWith('\uFEFF') ? source.slice(1) : source
-    const end = input.indexOf('\n')
-    if (end < 0 || input.slice(0, end).replace(/\r$/, '') !== CSV_HEADER) {
-      error('Beide winkelbestanden moeten dezelfde negen Supa CSV-kolommen bevatten.')
-    }
-    const records = input.slice(end + 1).replace(/\r?\n$/, '')
-    if (!records.trim()) error('Elke winkelopname moet productregels bevatten.')
-    return records
+  const one = JSON.parse(convertOwnStoreCsv(first))
+  const two = JSON.parse(convertOwnStoreCsv(second))
+  if (one.captures.length !== 1 || two.captures.length !== 1 ||
+      one.captures[0].retailer === two.captures[0].retailer) {
+    error('Gebruik één echte PLUS- en één DekaMarkt-opname, geen twee keer dezelfde winkel.')
   }
-  const combined = CSV_HEADER + '\n' + body(first) + '\n' + body(second) + '\n'
-  if (new TextEncoder().encode(combined).length > MAX_BYTES) {
-    error('Samengevoegde winkelopnames zijn groter dan 256 kB.')
-  }
-  return combined
+  const composed = { schema: 'supa-offline-prices-v1',
+    captures: [...one.captures, ...two.captures] }
+  // The existing reverse adapter preserves exact source IDs, packaging,
+  // original timestamps and absent prices. Its 256 kB bound is mandatory.
+  const csv = offlinePriceJsonToCsv(JSON.stringify(composed))
+  // Keep the original two-store admission as the final authority.
+  convertTwoStoreCsv(csv)
+  return csv
 }
 
 /**
