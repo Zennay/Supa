@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
+import { euro } from '../../lib/money'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
 import { ShoppingListCopyButton } from './ShoppingListCopyButton'
 import { PrintableShoppingChecklist } from './PrintableShoppingChecklist'
@@ -241,12 +242,13 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
         </p>
       )}
 
-      {basket.lines.length > 0 && (
-        <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
-      )}
-
-      <ShoppingListCopyButton basket={basket} doneLineIds={done} />
-      <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
+      <details className="hifi-shoplist-tools">
+        <summary>Deel of print je lijst</summary>
+        <div className="hifi-shoplist-tool-actions">
+          <ShoppingListCopyButton basket={basket} doneLineIds={done} />
+          <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
+        </div>
+      </details>
 
       {basket.lines.length > 0 && (
         <div className="section-heading" data-shopping-filter={openOnly ? 'open' : 'all'}>
@@ -316,14 +318,31 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
               }
             >
               <span className="check" aria-hidden="true">{checked ? '✓' : ''}</span>
-              <span>
+              <span className="hifi-shopping-thumb" aria-hidden="true">{label.trim().slice(0, 1).toLocaleUpperCase('nl-NL')}</span>
+              <span className="hifi-shopping-detail">
                 <strong>{label}</strong>
                 <small>{shoppingQuantity(line)}</small>
+              </span>
+              <span className="hifi-shopping-price" aria-label={line.status === 'matched' ? `Voorbeeldprijs ${euro.formatCents(line.lineTotalCents)}` : 'Prijs nog onbekend'}>
+                {line.status === 'matched' ? euro.formatCents(line.lineTotalCents) : '—'}
               </span>
             </button>
           )
         })}
       </div>
+      {basket.lines.length > 0 && (
+        <section className="hifi-shoplist-total" aria-label="Overzicht boodschappen">
+          <div className="hifi-shoplist-total__line">
+            <span>{basket.unresolvedLineCount > 0 ? 'Bekend minimum' : 'Totaal'}</span>
+            <strong>{euro.formatCents(basket.totalCents)}</strong>
+          </div>
+          {basket.unresolvedLineCount > 0 && (
+            <p>{basket.unresolvedLineCount} productkeuzes zijn nog niet meegeteld.</p>
+          )}
+          <p>Voorbeeldprijzen uit de lokale planning; geen actuele kassaprijzen.</p>
+          <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
+        </section>
+      )}
     </section>
   )
 }
