@@ -45,7 +45,7 @@ function attributeSavingsEffectsTrusted({
   comparison,
   evidence,
 }: {
-  comparison: BasketComparison
+  comparison: AttributionComparison
   evidence: unknown
 }): SavingsAttribution {
   // Direct JS/persisted JSON callers can bypass BasketComparison's TS type.
@@ -503,8 +503,43 @@ function ownDataArray(value: unknown): unknown[] | null {
   }
 }
 
+// The attribution engine consumes only these fields. Keep the runtime
+// snapshot typed to this narrow financial projection instead of forcing an
+// arbitrary record through an unverified BasketComparison cast.
+type AttributionComparison = Pick<BasketComparison,
+  'claimable' | 'reasons' | 'deltaCents' |
+  'baselineTotalCents' | 'candidateTotalCents' |
+  'outcome' | 'savingsCents'
+> & {
+  lineDeltas: Array<Pick<BasketComparison['lineDeltas'][number],
+    'id' | 'deltaCents' | 'baselineLineTotalCents' | 'candidateLineTotalCents'>>
+}
+
+function isFinancialComparison(value: Record<string, unknown>): value is Record<string, unknown> & AttributionComparison {
+  return (
+    typeof value.claimable === 'boolean' &&
+    Array.isArray(value.reasons) &&
+    value.reasons.every((reason: unknown) => typeof reason === 'string') &&
+    Number.isSafeInteger(value.baselineTotalCents) &&
+    Number.isSafeInteger(value.candidateTotalCents) &&
+    (value.deltaCents === null || Number.isSafeInteger(value.deltaCents)) &&
+    (value.savingsCents === null || Number.isSafeInteger(value.savingsCents)) &&
+    (value.outcome === 'better' || value.outcome === 'same' ||
+      value.outcome === 'worse' || value.outcome === 'unknown') &&
+    Array.isArray(value.lineDeltas) &&
+    value.lineDeltas.every((line: unknown) => {
+      if (!line || typeof line !== 'object' || Array.isArray(line)) return false
+      const row = line as Record<string, unknown>
+      return typeof row.id === 'string' &&
+        Number.isSafeInteger(row.deltaCents) &&
+        Number.isSafeInteger(row.baselineLineTotalCents) &&
+        Number.isSafeInteger(row.candidateLineTotalCents)
+    })
+  )
+}
+
 function snapshotFinancialInputs(input: unknown): {
-  comparison: BasketComparison
+  comparison: AttributionComparison
   evidence: unknown
 } | null {
   const args = ownDataRecord(input, ['comparison', 'evidence'])
@@ -528,9 +563,10 @@ function snapshotFinancialInputs(input: unknown): {
   }
   comparison.reasons = reasons
   comparison.lineDeltas = safeRows
+  if (!isFinancialComparison(comparison)) return null
 
   if (!Array.isArray(args.evidence)) {
-    return { comparison: comparison as unknown as BasketComparison, evidence: args.evidence }
+    return { comparison, evidence: args.evidence }
   }
   const items = ownDataArray(args.evidence)
   if (!items) return null
@@ -542,7 +578,7 @@ function snapshotFinancialInputs(input: unknown): {
     if (!record) return null
     safeItems.push(record)
   }
-  return { comparison: comparison as unknown as BasketComparison, evidence: safeItems }
+  return { comparison, evidence: safeItems }
 }
 
 export function attributeSavingsEffects(input: {
