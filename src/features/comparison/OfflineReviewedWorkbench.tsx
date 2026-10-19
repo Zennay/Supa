@@ -317,6 +317,16 @@ export function OfflineReviewedWorkbench({
     preview: ReturnType<typeof describePrivateStoreCaptureChange>
   } | null>(null)
 
+  const [pendingTwoStore, setPendingTwoStore] = useState<{
+    sourceText: string
+    newText: string
+    version: number
+    snapshots: OfflinePriceSnapshots
+    changes: { store: typeof stores[number]; previousAt: string | null
+      nextAt: string; previousCount: number; nextCount: number
+      added: number; removed: number; changed: number }[]
+  } | null>(null)
+
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
@@ -710,6 +720,64 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function stageBothStoreReplacement(input: string, version: number) {
+    // Reuse canonical source admission. This is a preview of local user
+    // files, never a retailer-authorization or independent price claim.
+    const next = parseOfflinePriceSnapshots(input, Date.now())
+    if (!next.captures.PLUS || !next.captures.DekaMarkt)
+      throw new Error('Selecteer een oorspronkelijke PLUS- en DekaMarkt-opname.')
+    if (!imported) {
+      importSnapshots(input)
+      return
+    }
+    const changes = stores.map(store => {
+      const prior = imported.captures[store]
+      const incoming = next.captures[store]!
+      const oldBySku = new Map(prior?.products.map(product => [product.id, product]))
+      const newBySku = new Map(incoming.products.map(product => [product.id, product]))
+      const added = incoming.products.filter(item => !oldBySku.has(item.id)).length
+      const removed = prior?.products.filter(item => !newBySku.has(item.id)).length ?? 0
+      const changed = incoming.products.filter(item => {
+        const old = oldBySku.get(item.id)
+        return old && (old.name !== item.name ||
+          old.packAmount !== item.packAmount || old.packUnit !== item.packUnit ||
+          old.packCount !== item.packCount ||
+          old.sourcePriceCents !== item.sourcePriceCents ||
+          old.sourceAvailable !== item.sourceAvailable)
+      }).length
+      return { store, previousAt: prior?.observedAt ?? null,
+        nextAt: incoming.observedAt, previousCount: prior?.products.length ?? 0,
+        nextCount: incoming.products.length, added, removed, changed }
+    })
+    setPendingReplacement(null)
+    setPendingTwoStore({ sourceText: text, newText: input, version,
+      snapshots: next, changes })
+    setMessage('Twee originele bronbestanden gecontroleerd; vergelijk eerst de wijzigingen. Geen oude winkeldata of vinkjes zijn vervangen.')
+  }
+
+  function confirmBothStoreReplacement() {
+    const pending = pendingTwoStore
+    if (!pending || pending.version !== importRevision.current ||
+        pending.sourceText !== text) {
+      setPendingTwoStore(null)
+      setMessage('De actieve winkelopnames zijn ondertussen gewijzigd. Laad de twee nieuwe bestanden opnieuw.')
+      return
+    }
+    try {
+      // Recheck age and pair context at the actual approval moment.
+      const source = parseOfflinePriceSnapshots(pending.newText, Date.now())
+      if (!source.captures.PLUS || !source.captures.DekaMarkt)
+        throw new Error('Beide originele winkelopnames moeten aanwezig zijn.')
+      ++importRevision.current
+      setPendingTwoStore(null)
+      importSnapshots(pending.newText)
+    } catch (error) {
+      setPendingTwoStore(null)
+      setMessage((error instanceof Error ? error.message : 'Nieuwe brondata niet geldig.') +
+        ' De oude winkeldata en afvinkingen zijn behouden.')
+    }
+  }
+
   function acceptManualSource(input: string) {
     ++importRevision.current
     setPendingReplacement(null)
@@ -747,9 +815,8 @@ export function OfflineReviewedWorkbench({
         setMessage(store + ': tweede echte privéopname toegevoegd; de andere winkel en zijn controles blijven intact. Controleer de nieuwe SKU’s.')
         return
       }
-      if (imported && !window.confirm(
-        'Beide vorige winkelopnames en controles vervangen door deze nieuwe invoer?')) {
-        setMessage('Nieuwe invoer niet toegepast; vorige winkelopnames behouden.')
+      if (imported && shops.length === 2) {
+        stageBothStoreReplacement(input, importRevision.current)
         return
       }
       importSnapshots(input)
@@ -895,24 +962,13 @@ export function OfflineReviewedWorkbench({
       const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures: sources })
       const admitted = parseOfflinePriceSnapshots(combined, Date.now())
       if (version !== importRevision.current) return
-      if (imported && !window.confirm(
-        'Je hebt al eigen winkeldata geladen. Vervang beide huidige winkelopnames en ' +
-        'wis alle eerdere productbevestigingen en afvinkingen door deze twee nieuwe originele bestanden? ' +
-        'PLUS: ' + admitted.captures.PLUS!.products.length + ' bronartikelen; DekaMarkt: ' +
-        admitted.captures.DekaMarkt!.products.length + ' bronartikelen. ' +
-        'Je kunt eerst je oorspronkelijke brondata downloaden om ze te bewaren.')) {
-        setMessage('Nieuwe twee-winkelimport geannuleerd. Beide eerdere winkelopnames en beoordelingen blijven behouden.')
+      if (version !== importRevision.current) return
+      if (imported) {
+        stageBothStoreReplacement(combined, version)
         return
       }
-      if (version !== importRevision.current) return
-      setText(combined)
-      setImported(admitted)
-      setReviewedLines({})
-      setDoneTripItems({})
-      setManualSku({ PLUS: {}, DekaMarkt: {} })
-      setSkuFilter({})
-      setClockMs(Date.now())
-      setMessage('Twee originele winkelbestanden samen geladen, elk met eigen bronmoment en productcodes. Controleer alle fysieke matches en prijzen opnieuw voordat een prijsverschil verschijnt.')
+      importSnapshots(combined)
+      setMessage('Twee echte winkelbestanden lokaal geladen. Controleer per ingrediënt alle originele SKU’s en fysieke verpakkingen.')
     } catch (error) {
       if (version !== importRevision.current) return
       setMessage((error instanceof Error ? error.message :
@@ -1685,6 +1741,47 @@ export function OfflineReviewedWorkbench({
         </div>
         <p role="status" aria-live="polite">{message}</p>
       </div>
+      {pendingTwoStore && pendingTwoStore.version === importRevision.current &&
+        pendingTwoStore.sourceText === text && (
+        <section className="offline-price-workbench__replace-preview"
+          aria-label="Controleer beide nieuwe winkelopnames vóór vervangen">
+          <h3>Vergelijk beide nieuwe winkelopnames met je huidige mandje</h3>
+          <p>De nieuwe bestanden zijn uitsluitend lokaal gelezen. Je vorige producten,
+            originele bronmomenten, persoonlijke productkeuzes en afvinkingen blijven staan
+            tot je zelf bevestigt. <strong>Beide winkels</strong> worden daarna opnieuw beoordeeld.</p>
+          <ul>
+            {pendingTwoStore.changes.map(change => (
+              <li key={change.store}>
+                <strong>{change.store}</strong> · {change.previousCount} → {change.nextCount} producten
+                {' '}({change.added} nieuwe codes, {change.removed} verdwenen,
+                {' '}{change.changed} gewijzigde artikelen)
+                <br />Oud: {change.previousAt ?? 'Nog geen eigen opname'}
+                <br />Nieuw: {change.nextAt}
+              </li>
+            ))}
+          </ul>
+          <p role="status">
+            {pendingTwoStore.snapshots.currentEnough
+              ? 'Beide nieuwe bronmomenten vallen binnen het geldige zeven-dagenvenster.'
+              : 'Een bronmoment is verlopen of te ver in de toekomst; geen actueel prijsverschil.'}
+            {' '}{pendingTwoStore.snapshots.pairedWithin24h
+              ? 'De opnamecontext valt binnen 24 uur.'
+              : 'De nieuwe opnames liggen meer dan 24 uur uiteen; het prijsverschil blijft onbekend.'}
+            {' '}De bedragen zijn uitsluitend jouw opgegeven brondata, geen retailerbewijs.
+          </p>
+          <div className="offline-price-workbench__actions">
+            <button type="button" disabled={busy} onClick={confirmBothStoreReplacement}>
+              Bevestig: vervang beide opnames en controleer producten opnieuw
+            </button>
+            <button type="button" className="ghost-button" disabled={busy}
+              onClick={() => {
+                ++importRevision.current
+                setPendingTwoStore(null)
+                setMessage('Twee-winkelvervanging geannuleerd; je bestaande opnames, productkeuzes en vinkjes blijven intact.')
+              }}>Annuleer en behoud mijn huidige winkels</button>
+          </div>
+        </section>
+      )}
       {imported && (
         <div className="offline-price-workbench__results">
           <h3>Winkelvergelijking voor jouw huidige weekmenu</h3>
