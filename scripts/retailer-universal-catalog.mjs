@@ -57,7 +57,8 @@ function verifiedRetailerSourceUrl(raw, supermarket, kind) {
   try {
     const url = new URL(raw)
     if (url.protocol !== 'https:' || url.hostname !== host ||
-        url.username || url.password || url.port || url.search || url.hash) {
+        url.username || url.password || url.port || url.search || url.hash ||
+        raw.includes('?') || raw.includes('#')) {
       return false
     }
     const route = supermarket === 'plus'
