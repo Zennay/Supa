@@ -68,3 +68,29 @@
 .own-store-planner__review-download { margin-bottom: 1rem; line-height: 1.45; }
 .own-store-planner__review-download p { margin: .3rem 0 .65rem; }
 .own-store-planner__review-download button { min-height: 44px; }
+
+.own-store-planner__targeted-capture {
+  display: grid;
+  gap: .65rem;
+  border-top: 1px solid #d9ded9;
+  padding-top: .85rem;
+}
+.own-store-planner__targeted-capture p { margin: 0; line-height: 1.5; }
+.own-store-planner__targeted-store {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  padding: .75rem;
+  border: 1px solid #dbe4dc;
+  border-radius: 10px;
+  background: #f8faf8;
+}
+.own-store-planner__targeted-store > span { flex: 1 1 170px; }
+.own-store-planner__targeted-store button {
+  flex: 0 1 auto;
+  min-height: 44px;
+}
+@media (max-width: 550px) {
+  .own-store-planner__targeted-store button { flex: 1 1 100%; }
+}

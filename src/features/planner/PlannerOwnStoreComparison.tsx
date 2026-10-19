@@ -47,6 +47,18 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     }
   }, [])
   const [captureTarget, setCaptureTarget] = useState<'both' | CaptureStore>('both')
+  // Existing SKU reviews are not fresh source captures. Only missing physical
+  // source candidates require this deliberately blank partial input sheet.
+  const missingCaptureFor = (store: CaptureStore, at = now): PlannerCaptureGuideNeed[] => {
+    if (freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', at)?.stores[store]) return []
+    const progress = captureProgress?.stores[store]
+    if (!progress || !progress.fresh || !Number.isFinite(Date.parse(progress.observedAt)) ||
+        at < Date.parse(progress.observedAt) - 300_000 ||
+        at - Date.parse(progress.observedAt) > 604_800_000) return [...captureNeeds]
+    const missing = new Set(progress.missingIngredients.map(need => need.id))
+    return captureNeeds.filter(need => missing.has(need.id))
+  }
+
   const [secondStopCost, setSecondStopCost] = useState<{ key: string; raw: string }>({ key: '', raw: '' })
   // Never let a long-open Planner keep displaying expired personal prices.
   const currentSources = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', now)
@@ -125,6 +137,33 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage('Openstaande PLUS/Deka-productcontroles lokaal opgeslagen, zonder verzonnen winkelprijs.')
     } catch (error) {
       setDownloadMessage(error instanceof Error ? error.message : 'Controlelijst downloaden mislukt.')
+    }
+  }
+  async function downloadMissingCaptureFor(store: CaptureStore, kind: 'csv' | 'guide') {
+    setDownloadMessage('')
+    try {
+      const needs = missingCaptureFor(store, Date.now())
+      if (!needs.length) throw new Error(store + ': geen ontbrekende productmatches. Beoordeel bestaande SKU’s in Vergelijk.')
+      const content = kind === 'csv'
+        ? (await import('../comparison/plannerPriceCaptureSheet.ts'))
+          .makeBlankPlannerCaptureCsv(needs, [store])
+        : (await import('../comparison/plannerPriceCaptureGuide.ts'))
+          .makePlannerCaptureGuide(needs, [store])
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-' + needs.length +
+          '-ontbrekende-producten.' + (kind === 'csv' ? 'csv' : 'txt')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setDownloadMessage(store + ': leeg blad voor ' + needs.length +
+        ' ontbrekende originele producten gedownload. Vul uitsluitend werkelijk geobserveerde SKU, verpakking, beschikbaarheid, tijd en prijs in; importeer daarna via Vergelijk.')
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : 'Gerichte bronopname mislukt.')
     }
   }
   async function downloadFieldSheet(kind: 'csv' | 'csv-excel' | 'tsv' | 'guide') {
@@ -280,6 +319,29 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
         <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('csv-excel')}>Download spreadsheet-CSV (puntkomma)</button>
         <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('tsv')}>Download tabgescheiden werkblad (TSV)</button>
         <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('guide')}>Download opnamegids (TXT)</button>
+      </div>
+      <div className="own-store-planner__targeted-capture" aria-label="Gericht ontbrekende productbronnen vastleggen">
+        <strong>Alleen ontbrekende producten aanvullen</strong>
+        <p>Vul ontbrekende bronproducten opnieuw in zonder de complete week over te schrijven.
+          Nog niet bevestigde SKU’s controleer je direct in Vergelijk.</p>
+        {stores.map(store => {
+          const pending = missingCaptureFor(store)
+          return <div key={store} className="own-store-planner__targeted-store">
+            <span><strong>{store}</strong> · {pending.length
+              ? pending.length + ' behoeften zonder actuele match'
+              : 'geen nieuwe bronproducten nodig'}</span>
+            {pending.length > 0 && <>
+              <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'csv')}>
+                Download ontbrekende {store}-producten (CSV)
+              </button>
+              <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'guide')}>
+                Meeneemlijst {store} (TXT)
+              </button>
+            </>}
+          </div>
+        })}
+        <small>Geen bestaande bron? Dan bevat dit lege blad de hele fysieke Planner-behoefte.
+          Prijzen blijven onbekend tot jij echte productgegevens in Vergelijk controleert.</small>
       </div>
     </div>}
     {captureNeeds.length > 0 && <Suspense fallback={<p role="status">Winkelcontroles laden…</p>}>
