@@ -113,8 +113,14 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage('De winkelprijzen zijn verlopen of niet vergelijkbaar. Herzie de bronnen eerst.')
       return
     }
+    // Do not silently discard an invalid entered travel/parking amount and
+    // open the route as if no cost had been entered. Unspecified stays unknown.
+    if (shownCost.trim() && parsedSecondStopCents === null) {
+      setDownloadMessage('Corrigeer eerst de extra winkelstopkosten (€ 0,00 tot € 1.000,00, maximaal twee decimalen). De route is niet gewijzigd.')
+      return
+    }
     setDownloadMessage('')
-    onOpenMixedRoute(parsedSecondStopCents === null ? undefined : shownCost)
+    onOpenMixedRoute(shownCost.trim() ? shownCost : undefined)
   }
   function openConfirmedStoreList(store: OwnStore) {
     // A Planner tab may stay open while its source crosses the freshness
