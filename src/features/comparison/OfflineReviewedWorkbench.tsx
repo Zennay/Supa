@@ -155,7 +155,8 @@ function searchableSourceText(value: string): string {
 }
 function sourceOptions(products: OfflineStoreProduct[],
   unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string,
-  ingredient: string, requestedAmount: number | null, sort: SourceSort) {
+  ingredient: string, requestedAmount: number | null, sort: SourceSort,
+  cheaperThanCents: number | null = null) {
   const query = searchableSourceText(text)
   const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) =>
     !query || searchableSourceText(product.name).includes(query) ||
@@ -181,7 +182,12 @@ function sourceOptions(products: OfflineStoreProduct[],
   const rate = (p: OfflineStoreProduct): number | null =>
     privatePackUnitRate({ amount: p.packAmount, unit: p.packUnit,
       count: p.packCount ?? 1, priceCents: p.priceCents })?.centsPerUnit ?? null
-  const ranked = sort === 'relevance' ? filtered : [...filtered].sort((a, b) => {
+  const pricedCandidates = cheaperThanCents === null ? filtered : filtered.filter(p => {
+    const total = wholeCost(p)
+    return total !== null && total < cheaperThanCents &&
+      p.id !== keepId
+  })
+  const ranked = sort === 'relevance' ? pricedCandidates : [...pricedCandidates].sort((a, b) => {
     const left = sort === 'whole-pack' ? wholeCost(a) : rate(a)
     const right = sort === 'whole-pack' ? wholeCost(b) : rate(b)
     return left === null && right === null ? 0 :
@@ -197,7 +203,7 @@ function sourceOptions(products: OfflineStoreProduct[],
   const unpricedFiltered = rankOwnSourceSuggestions(
     unpriced.filter(matchesQuery), ingredient, requestedAmount, unit, text)
   return {
-    shown, total: filtered.length, availableCount: available.length,
+    shown, total: pricedCandidates.length, availableCount: available.length,
     unpricedShown: unpricedFiltered.slice(0, 5),
     unpricedTotal: unpricedFiltered.length, unpricedCount: unpriced.length,
   }
@@ -305,6 +311,7 @@ export function OfflineReviewedWorkbench({
   })
   const [skuFilter, setSkuFilter] = useState<Record<string, string>>({})
   const [sourceSort, setSourceSort] = useState<Record<string, SourceSort>>({})
+  const [onlyCheaper, setOnlyCheaper] = useState<Record<string, boolean>>({})
   const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
   const [openTripOnly, setOpenTripOnly] = useState(false)
   const [tripExportMessage, setTripExportMessage] = useState('')
@@ -2047,7 +2054,9 @@ export function OfflineReviewedWorkbench({
                         const choices = sourceOptions(capture.products, line.requirement.unit,
                           skuFilter[searchKey] ?? '', manualSku[store][line.id] ?? '',
                           line.ingredientLabel, line.requirement.amount,
-                          sourceSort[searchKey] ?? 'relevance')
+                          sourceSort[searchKey] ?? 'relevance',
+                          onlyCheaper[searchKey] && line.status === 'matched'
+                            ? line.lineTotalCents : null)
                         return (
                         <article key={line.id} id={reviewRowId(store, line.id)} className="offline-price-workbench__line">
                           <div>
@@ -2087,6 +2096,17 @@ export function OfflineReviewedWorkbench({
                                     <small>Alleen jouw oorspronkelijke prijsklare en fysiek passende bronartikelen.
                                       Goedkoopst betekent niet automatisch hetzelfde product; controleer zelf de verpakking,
                                       broncode en toepassing voor je de match bevestigt.</small>
+                                  </label>
+                                )}
+                                {choices.availableCount > 0 && line.status === 'matched' && (
+                                  <label><input type="checkbox" checked={Boolean(onlyCheaper[searchKey])}
+                                    onChange={event => setOnlyCheaper(previous => ({ ...previous,
+                                      [searchKey]: event.currentTarget.checked,
+                                    }))} /> Toon alleen bronproducten met een lager berekend bedrag
+                                    voor deze hele benodigde hoeveelheid
+                                    <small>Geen substitutieadvies: een goedkoper bronartikel hoeft niet geschikt
+                                      of identiek te zijn. Jouw bestaande match blijft altijd beschikbaar
+                                      en geen bronreview wordt automatisch goedgekeurd.</small>
                                   </label>
                                 )}
                                 {choices.availableCount > 0 && (
