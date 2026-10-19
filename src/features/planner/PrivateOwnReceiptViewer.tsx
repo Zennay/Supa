@@ -3,14 +3,22 @@ import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { MatchUnit } from '../../domain/matching.ts'
 
-type ReceiptLine = {
+export type ReceiptProduct = {
+  sourceProductId: string
+  sourceProductName: string
+  totalWholePackagesCents: number
+  packagesNeeded: number
+  package: { amount: number; unit: MatchUnit; count: number }
+}
+export type ReceiptLine = {
   ingredient: string
   ingredientId: string
-  PLUS: { sourceProductId: string; sourceProductName: string; totalWholePackagesCents: number }
-  DekaMarkt: { sourceProductId: string; sourceProductName: string; totalWholePackagesCents: number }
+  demand: { amount: number; unit: MatchUnit }
+  PLUS: ReceiptProduct
+  DekaMarkt: ReceiptProduct
   dekaMinusPlusCents: number
 }
-type SavedReceipt = {
+export type SavedReceipt = {
   generatedAt: string
   plusObservedAt: string
   dekaObservedAt: string
@@ -59,6 +67,9 @@ function extractProduct(
     sourceProductId: value.sourceProductId,
     sourceProductName: value.sourceProductName,
     totalWholePackagesCents: value.totalWholePackagesCents,
+    packagesNeeded: value.packagesNeeded as number,
+    package: { amount: value.package.amount as number,
+      unit: value.package.unit as MatchUnit, count: value.package.count as number },
   }
 }
 
@@ -125,6 +136,7 @@ export function readPrivateReceipt(raw: string): SavedReceipt | null {
       lines.push({
         ingredientId: item.ingredientId,
         ingredient: item.ingredient,
+        demand,
         PLUS: plus,
         DekaMarkt: deka,
         dekaMinusPlusCents: item.dekaMinusPlusCents as number,

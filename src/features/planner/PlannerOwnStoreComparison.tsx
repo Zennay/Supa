@@ -14,6 +14,8 @@ const PlannerMissingCapturePanel = lazy(() => import('./PlannerMissingCapturePan
   .then(module => ({ default: module.PlannerMissingCapturePanel })))
 const PrivateOwnReceiptViewer = lazy(() => import('./PrivateOwnReceiptViewer.tsx')
   .then(module => ({ default: module.PrivateOwnReceiptViewer })))
+const PrivateOwnReceiptHistory = lazy(() => import('./PrivateOwnReceiptHistory.tsx')
+  .then(module => ({ default: module.PrivateOwnReceiptHistory })))
 const PlannerReviewedSourceLines = lazy(() => import('./PlannerReviewedSourceLines.tsx')
   .then(module => ({ default: module.PlannerReviewedSourceLines })))
 const PlannerQuickSourcePaste = lazy(() => import('./PlannerQuickSourcePaste.tsx')
@@ -431,12 +433,15 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     <Suspense fallback={<p role="status">Lokale rapportlezer laden…</p>}>
       <PrivateOwnReceiptViewer />
     </Suspense>
+    <Suspense fallback={<p role="status">Historische privévergelijking laden…</p>}>
+      <PrivateOwnReceiptHistory />
+    </Suspense>
     <p className="own-store-planner__history-link">
       <a href="./private-receipt-history.html" rel="nofollow">
-        Vergelijk twee eerder opgeslagen eigen PLUS/Deka-weekrapporten →
+        Optioneel openen in afzonderlijke offline browserpagina →
       </a>
-      <small>Volledig offline. Alleen dezelfde fysieke ingrediënten, SKU’s en verpakkingen
-        krijgen een historisch prijsverschil; nooit een actuele winkelprijsclaim.</small>
+      <small>Ook deze pagina gebruikt uitsluitend eigen historische rapporten.
+        Geen winkelgegevens worden bijgeladen of als nieuw bewijs opgeslagen.</small>
     </p>
     {captureNeeds.length > 0 && <div className="own-store-planner__capture" aria-label="Mijn lokale winkelprijsopname">
       <strong>Zelf winkelprijzen vastleggen voor dit weekmenu</strong>

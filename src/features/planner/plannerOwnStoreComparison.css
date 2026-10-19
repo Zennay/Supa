@@ -215,3 +215,62 @@
 .own-store-planner__archive-filters label { flex: 1 1 12rem; margin: 0; }
 .own-store-planner__archive-filters input,
 .own-store-planner__archive-filters select { max-width: 100%; min-width: 0; }
+
+/* Historic local receipts in the actual Planner (not only the standalone page).
+   Product/source permission gates live upstream; this view never fetches prices. */
+.own-store-planner__history-pickers,
+.own-store-planner__history-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: .85rem;
+}
+.own-store-planner__history-pickers label { min-width: 0; }
+.own-store-planner__history-pickers input[type=file] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.own-store-planner__history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+}
+.own-store-planner__history-actions button {
+  min-height: 44px;
+  flex: 1 1 10rem;
+}
+.own-store-planner__history-cards section {
+  display: grid;
+  gap: .4rem;
+  align-content: start;
+  background: #f5f8f5;
+  border: 1px solid #cbdcd0;
+  border-radius: .8rem;
+  padding: .85rem;
+  min-width: 0;
+}
+.own-store-planner__history-cards section p { margin: 0; }
+.own-store-planner__history-cards section small { color: #385f47; }
+.own-store-planner__history-notice {
+  border-inline-start: 4px solid #54856b;
+  padding: .6rem .8rem;
+  background: #f2f7f3;
+  overflow-wrap: anywhere;
+}
+.own-store-planner__history table { width: 100%; min-width: 32rem; }
+.own-store-planner__history th,
+.own-store-planner__history td { overflow-wrap: anywhere; }
+.own-store-planner__history td small {
+  display: block;
+  color: #6c493f;
+}
+.own-store-planner__history input[type=search] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 600px) {
+  .own-store-planner__history { padding: .8rem; }
+  .own-store-planner__history-actions button { flex-basis: 100%; }
+}
