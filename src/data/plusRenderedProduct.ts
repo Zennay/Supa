@@ -104,6 +104,12 @@ function safePlusProductUrl(value: unknown): value is string {
       url.hostname === 'www.plus.nl' &&
       url.port === '' &&
       url.pathname.startsWith('/product/') &&
+      url.pathname.length > '/product/'.length &&
+      // Evidence must be the exact bare, canonical public product page.
+      // A query, fragment, credential or ambiguous URL cannot gain a
+      // verified-SKU identity just by appearing in both source/JSON-LD.
+      url.href === value &&
+      !/[?#]/u.test(value) &&
       url.username === '' &&
       url.password === ''
     )
