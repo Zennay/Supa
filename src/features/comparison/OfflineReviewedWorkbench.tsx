@@ -18,6 +18,7 @@ const MixedStoreShoppingCard = lazy(async () => {
   return { default: module.MixedStoreShoppingCard }
 })
 import { privatePackUnitRate } from './privateUnitPrice.ts'
+import { rankOwnSourceSuggestions } from './ownSourceSuggestions.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 import { appendPrivateCaptureProducts } from './appendPrivateCaptureProducts.ts'
 import { describePrivateStoreCaptureChange } from './privateStoreCaptureDiff.ts'
@@ -132,14 +133,16 @@ function searchableSourceText(value: string): string {
   return value.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl').trim()
 }
 function sourceOptions(products: import('../../domain/basket.ts').StoreProduct[],
-  unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string) {
+  unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string,
+  ingredient: string, requestedAmount: number | null) {
   const query = searchableSourceText(text)
   const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) =>
     !query || searchableSourceText(product.name).includes(query) ||
     searchableSourceText(product.id).includes(query)
   const physicallyCompatible = products.filter(p => compatibleSourceUnit(unit, p.packUnit))
   const available = physicallyCompatible.filter(p => p.available && p.packAmount !== null)
-  const filtered = available.filter(matchesQuery)
+  const filtered = rankOwnSourceSuggestions(
+    available.filter(matchesQuery), ingredient, requestedAmount, unit, text)
   const shown = filtered.slice(0, 40)
   const current = available.find(p => p.id === keepId)
   if (current && !shown.some(p => p.id === keepId)) shown.unshift(current)
@@ -147,7 +150,8 @@ function sourceOptions(products: import('../../domain/basket.ts').StoreProduct[]
   // These are honest original capture records, but not purchasable price
   // candidates. Never put them in the select or recalculate a basket from them.
   const unpriced = physicallyCompatible.filter(p => !p.available || p.packAmount === null)
-  const unpricedFiltered = unpriced.filter(matchesQuery)
+  const unpricedFiltered = rankOwnSourceSuggestions(
+    unpriced.filter(matchesQuery), ingredient, requestedAmount, unit, text)
   return {
     shown, total: filtered.length, availableCount: available.length,
     unpricedShown: unpricedFiltered.slice(0, 5),
@@ -1930,7 +1934,8 @@ export function OfflineReviewedWorkbench({
                       {visible.map(line => {
                         const searchKey = JSON.stringify([store, line.id])
                         const choices = sourceOptions(capture.products, line.requirement.unit,
-                          skuFilter[searchKey] ?? '', manualSku[store][line.id] ?? '')
+                          skuFilter[searchKey] ?? '', manualSku[store][line.id] ?? '',
+                          line.ingredientLabel, line.requirement.amount)
                         return (
                         <article key={line.id} id={reviewRowId(store, line.id)} className="offline-price-workbench__line">
                           <div>
@@ -1986,7 +1991,7 @@ export function OfflineReviewedWorkbench({
                                         </option>
                                       ))}
                                     </select>
-                                    <small>Maximaal 40 prijsklare keuzes tegelijk; verfijn de zoekterm. Een keuze vergt nog persoonlijke broncontrole.</small>
+                                    <small>Maximaal 40 originele artikelen, op naam en passende verpakkingsomvang gerangschikt. Dit is uitsluitend een zoekhulp: kies en controleer zelf de SKU, inhoud en prijs.</small>
                                   </label>
                                 )}
                                 {choices.unpricedShown.length > 0 && (
