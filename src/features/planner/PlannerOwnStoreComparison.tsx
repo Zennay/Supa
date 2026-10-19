@@ -295,7 +295,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     </div>}
     {captureNeeds.length > 0 && <Suspense fallback={<p role="status">Winkelcontroles laden…</p>}>
       <PlannerTwoStoreCoverage needs={captureNeeds} progress={captureProgress}
-        reviewed={currentSources} now={now} comparisonStatus={summary.status}
+        reviewed={reviewed} now={now} comparisonStatus={summary.status}
         onOpenComparison={onOpenComparison}
         onReviewIngredient={onReviewIngredient} />
     </Suspense>}
