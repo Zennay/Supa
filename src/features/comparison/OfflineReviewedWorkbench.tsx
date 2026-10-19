@@ -866,6 +866,13 @@ export function OfflineReviewedWorkbench({
       const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures: sources })
       const admitted = parseOfflinePriceSnapshots(combined, Date.now())
       if (version !== importRevision.current) return
+      if (imported && !window.confirm(
+        'Je hebt al eigen winkelopnames en mogelijk bevestigde bronartikelen of afvinkingen. ' +
+        'Beide bestaande winkels en hun controles vervangen door deze twee nieuwe echte opnames?')) {
+        setMessage('De bestaande twee winkelopnames, bevestigde producten en afvinkingen zijn behouden.')
+        return
+      }
+      if (version !== importRevision.current) return
       setText(combined)
       setImported(admitted)
       setReviewedLines({})
