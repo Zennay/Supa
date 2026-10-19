@@ -115,11 +115,19 @@ function normalizedObservation(value) {
 }
 
 function truthSignature(record) {
-  // Category/source kind and capture time are NOT authority to silently choose
-  // between unequal prices, packs or availability.
+  // Semantic source facts, not accidental insertion order of an incoming
+  // JSON/JS object's pack or offer keys. True amount/price/offer conflicts
+  // still remain separate captures requiring independent human review.
+  const pack = record.pack
+  const offer = record.offer
   return JSON.stringify([
     record.name, record.currentPriceCents, record.currency,
-    record.pack, record.offer, record.availability,
+    [pack.rawText, pack.amount, pack.unit],
+    offer === null ? null : [
+      offer.label, offer.mechanics, offer.offerPriceCents,
+      offer.originalPriceCents, offer.validFrom, offer.validTo,
+    ],
+    record.availability,
   ])
 }
 
