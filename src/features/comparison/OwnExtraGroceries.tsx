@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { decodeSaved, legacyKey, restore, storageKey, valid, type Item, type Unit } from './ownExtraGroceriesStorage.ts'
+import { decodeSaved, findReusableExtraLists, legacyKey, restore, storageKey, valid, type Item, type ReusableExtraList, type Unit } from './ownExtraGroceriesStorage.ts'
 export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   identity: string
   plan: PlannedMeal[]
@@ -15,6 +15,7 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   const [notice, setNotice] = useState('')
   const [paste, setPaste] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
+  const [reuse, setReuse] = useState<ReusableExtraList[]>([])
   const [pendingPaste, setPendingPaste] = useState<Item[] | null>(null)
   const currentIdentity = useRef(identity)
   currentIdentity.current = identity
@@ -33,6 +34,7 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
     setEditing(null)
     setPendingPaste(null)
     setPaste('')
+    setReuse([])
     setNotice('')
   }, [identity])
   async function openPasteFile(file?: File) {
@@ -51,6 +53,38 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
     if (!window.confirm('Alle afgevinkte extra boodschappen verwijderen? De Planner en winkelprijzen blijven intact.')) return
     setData(prev => ({ ...prev, items: items.filter(item => !item.done) }))
     setNotice('Afgevinkte extra artikelen verwijderd. Bewaar de gewijzigde lijst desgewenst in deze tab.')
+  }
+  function reuseOlderExtras(source: ReusableExtraList) {
+    if (data.locked || currentIdentity.current !== identity) return
+    // A prior week's tick is not a tick in the new physical shopping list.
+    // Respect current manual additions; skip exact repeats rather than
+    // creating multiple identical grocery rows in the new week.
+    const same = (a: Item, b: Item) => a.name.toLocaleLowerCase('nl') ===
+      b.name.toLocaleLowerCase('nl') && a.quantity === b.quantity && a.unit === b.unit
+    const additions = source.items.filter(item => !items.some(existing => same(existing, item)))
+    if (!additions.length) { setNotice('Deze boodschappen staan al in je huidige lijst.'); return }
+    if (items.length + additions.length > 100) {
+      setNotice('Deze oude lijst past niet volledig: maximaal 100 extra artikelen per week.')
+      return
+    }
+    if (!window.confirm(additions.length + ' eerdere boodschappen ZONDER vinkjes of prijzen aan dit weekmenu toevoegen? Bestaande regels blijven staan.')) return
+    if (currentIdentity.current !== identity) return
+    const random = new Uint32Array(additions.length * 4)
+    try { window.crypto.getRandomValues(random) } catch {
+      setNotice('De browser ondersteunt geen veilige nieuwe artikel-ID’s.')
+      return
+    }
+    const copied = additions.map((item, index) => ({ ...item, done: false,
+      id: Array.from(random.slice(index * 4, index * 4 + 4),
+        value => value.toString(16).padStart(8, '0')).join('-'),
+    }))
+    if (new Set([...items, ...copied].map(item => item.id)).size !== items.length + copied.length) {
+      setNotice('Kon unieke artikel-ID’s niet veilig toekennen.')
+      return
+    }
+    setData(prev => ({ ...prev, items: [...items, ...copied] }))
+    setReuse([])
+    setNotice(copied.length + ' terugkerende boodschappen toegevoegd, niet afgevinkt en zonder winkelprijs. Bewaar ze desgewenst in deze tab.')
   }
   function previewPaste(event: FormEvent) {
     event.preventDefault()
@@ -358,6 +392,23 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       <button type="button" onClick={acceptPaste}>Voeg alle artikelen toe</button>
       <button type="button" onClick={() => setPendingPaste(null)}>Annuleer</button>
     </div>}
+    <div className="unpriced-planner-checklist__actions">
+      <button type="button" disabled={data.locked} onClick={() => {
+        const candidates = findReusableExtraLists(identity)
+        setReuse(candidates)
+        setNotice(candidates.length ? 'Kies bewust welke eerdere privéboodschappen je opnieuw wilt gebruiken.' :
+          'Geen andere bewaarde weeklijsten gevonden in dit browsertabblad.')
+      }}>Gebruik extra boodschappen uit een eerdere week</button>
+    </div>
+    {reuse.length > 0 && <section className="unpriced-planner-checklist__paste-preview"
+      aria-label="Eerdere privéboodschappen voor dit weekmenu">
+      <h4>Eerdere opgeslagen lijsten · geen vinkjes of winkelprijzen overnemen</h4>
+      {reuse.map((source, index) => <details key={source.identity}>
+        <summary>Privélijst {index + 1}: {source.label}</summary>
+        <ul>{source.items.map(item => <li key={item.id}>{item.quantity} {item.unit === 'piece' ? 'stuks' : item.unit} {item.name}</li>)}</ul>
+        <button type="button" onClick={() => reuseOlderExtras(source)}>Voeg nog ontbrekende artikelen toe</button>
+      </details>)}
+    </section>}
     <p>{items.filter(x => x.done).length} van {items.length} extra artikelen afgevinkt.</p>
     <div className="unpriced-planner-checklist__actions">
       <label><input type="checkbox" checked={openOnly}

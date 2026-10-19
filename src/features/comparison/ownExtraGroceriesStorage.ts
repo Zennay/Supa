@@ -59,3 +59,46 @@ export function readSavedExtrasForPlan(identity: string): { items: Item[]; avail
   const snapshot = restore(identity)
   return { items: snapshot.items, available: !snapshot.locked }
 }
+
+export type ReusableExtraList = Readonly<{
+  identity: string
+  items: readonly Item[]
+  label: string
+}>
+
+/** Read-only discovery of other private week lists saved in THIS browser tab.
+ * Never transfers a source match, price, or already-checked state.
+ */
+export function findReusableExtraLists(currentIdentity: string): ReusableExtraList[] {
+  try {
+    const keys: string[] = []
+    // Session storage is bounded by the browser, but discovery is further
+    // capped so a hostile page cannot turn one click into an unbounded scan.
+    const count = Math.min(sessionStorage.length, 400)
+    for (let index = 0; index < count; index++) {
+      const key = sessionStorage.key(index)
+      if (key && (key === legacyKey || key.startsWith(legacyKey + ':'))) keys.push(key)
+    }
+    const unique = new Set<string>()
+    const lists: ReusableExtraList[] = []
+    for (const key of keys.slice(0, 60)) {
+      const raw = sessionStorage.getItem(key)
+      if (!raw || new TextEncoder().encode(raw).length > 100000) continue
+      let identity: unknown
+      try { identity = (JSON.parse(raw) as { identity?: unknown }).identity }
+      catch { continue }
+      if (typeof identity !== 'string' || identity.length > 100000 ||
+          identity === currentIdentity || unique.has(identity) ||
+          (key !== legacyKey && storageKey(identity) !== key)) continue
+      try {
+        const items = decodeSaved(raw, identity)
+        if (!items.length) continue
+        unique.add(identity)
+        const first = items.slice(0, 2).map(item => item.name).join(', ')
+        lists.push({ identity, items, label: items.length + ' artikelen · ' + first })
+      } catch { /* Foreign/corrupted records are left entirely untouched. */ }
+      if (lists.length === 12) break
+    }
+    return lists
+  } catch { return [] }
+}
