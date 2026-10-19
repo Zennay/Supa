@@ -47,3 +47,4 @@
 .own-store-planner__capture select { min-height:44px; padding:.5rem; border:1px solid #819f8c; border-radius:8px; }
 .own-store-planner__capture-buttons { display:flex; flex-wrap:wrap; gap:.5rem; }
 .own-store-planner__capture-buttons button { min-height:44px; }
+.own-store-planner__age { display:block; padding:.65rem; border-left:3px solid #a47638; background:#faf5ea; color:#624c2c; line-height:1.45; }

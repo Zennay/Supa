@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
+import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
 import { freshReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import type { OwnStore, PrivateReviewedBaskets, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
@@ -113,6 +114,11 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
             <progress value={done} max={lines.length}
               aria-label={'Voortgang originele ' + shop + '-boodschappen'} />
             <strong>Nog op mijn lijst: {money.format(remaining / 100)}</strong>
+            {privatePriceAgeNotice(capture.capturedMs, Date.now()) && (
+              <small role="status" className="private-reviewed-products__age">
+                {privatePriceAgeNotice(capture.capturedMs, Date.now())}
+              </small>
+            )}
             <small>Oorspronkelijk volledig mandje: {
               money.format(capture.basket.totalCents / 100)}.
               Dit zijn nog niet-afgevinkte productbedragen, geen betaalbewijs.</small>

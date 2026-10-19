@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { PlannerOwnProductDeltas } from './PlannerOwnProductDeltas.tsx'
@@ -171,6 +172,11 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
           <span className="own-store-planner__price">{capture && typeof cents === 'number' && Number.isSafeInteger(cents) && cents >= 0
             ? money.format(cents / 100) : 'Prijs onbekend'}</span>
           <small>{capture ? `Eigen opname: ${capture.observedAt}` : 'Nog geen complete, gecontroleerde opname'}</small>
+          {capture && privatePriceAgeNotice(capture.capturedMs, Date.now()) && (
+            <small className="own-store-planner__age" role="status">
+              {privatePriceAgeNotice(capture.capturedMs, Date.now())}
+            </small>
+          )}
           {capture && typeof cents === 'number' && Number.isSafeInteger(cents) && cents >= 0 && budgetCents !== null &&
             <small className="own-store-planner__budget-gap">{cents > budgetCents
               ? `${money.format((cents - budgetCents) / 100)} boven je ingestelde weekbudget`

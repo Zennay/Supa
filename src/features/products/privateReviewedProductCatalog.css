@@ -50,3 +50,4 @@ padding:1rem;background:#f3f8f3;border:1px solid #cbdccb;border-radius:12px}
 .private-reviewed-products__progress progress{width:100%;height:12px;accent-color:#236d4d}
 .private-reviewed-products__progress small{line-height:1.45}
 @media(max-width:620px){.private-reviewed-products__progress{grid-template-columns:1fr}}
+.private-reviewed-products__age { display:block; margin:.35rem 0; padding:.6rem; border-left:3px solid #a47638; background:#faf5ea; color:#624c2c; line-height:1.45; }
