@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { BasketTraceLine, RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, type OwnStore, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { createMixedStoreShoppingPlan, type MixedStoreLine } from '../comparison/mixedStoreShoppingPlan.ts'
@@ -17,7 +17,7 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
-export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeOpenSignal = 0 }: {
+export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeChoice, routeOpenSignal = 0 }: {
   reviewed: PrivateReviewedBaskets
   budget: number
   preferred: OwnStore
@@ -29,6 +29,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   routeOpenSignal?: number
+  routeChoice?: PrivateRouteChoice | null
 }) {
   const available = stores.filter(store => !!reviewed.stores[store])
   const store = available.includes(preferred) ? preferred : available[0]
@@ -353,7 +354,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               captured={{ PLUS: plus.observedAt, DekaMarkt: deka.observedAt }}
               eligibleNow={pairCurrentNow} weekBudget={budget}
               plannerPlan={plan} plannerRecipes={recipes} plannerActiveDays={activeDays}
-              isSingleCheckedOnRoute={isSingleCheckedOnRoute} />
+              isSingleCheckedOnRoute={isSingleCheckedOnRoute}
+              routeChoice={routeChoice?.planKey === reviewed.planKey ? routeChoice : null} />
           </Suspense>}
         </div>
       </section>}

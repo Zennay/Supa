@@ -28,3 +28,16 @@ export function freshReviewedBaskets(
   return { planKey: snapshots.planKey,
     stores: Object.fromEntries(entries) as PrivateReviewedBaskets['stores'] }
 }
+
+
+/** Ephemeral Products -> List intent for one exact already-reviewed SKU.
+ * Carries no source rights, pricing authority, or reviewer approval.
+ */
+export type PrivateRouteChoice = {
+  serial: number
+  planKey: string
+  observedAt: { PLUS: string; DekaMarkt: string }
+  ingredientId: string
+  store: OwnStore
+  lineKey: string
+}

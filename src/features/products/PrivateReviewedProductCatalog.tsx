@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
-import type { OwnStore, PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
+import type { OwnStore, PrivateReviewedBaskets, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './privateReviewedProductCatalog.css'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -10,12 +10,13 @@ const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparison, onOpenList, onOpenMixedRoute }: {
+export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine }: {
   reviewed: PrivateReviewedBaskets | null
   budget: number
   onOpenComparison: () => void
   onOpenList: (store?: OwnStore) => void
   onOpenMixedRoute: () => void
+  onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
@@ -76,7 +77,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
       {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
         search={search} unitFilter={unitFilter} order={order} budget={budget}
         onOpenComparison={onOpenComparison} onOpenList={onOpenList}
-        onOpenMixedRoute={onOpenMixedRoute} />}
+        onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine} />}
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.</p>
       {order === 'unitPrice' && unitFilter === 'all' && <p className="private-reviewed-products__sort-note">
         Eerst per kg, dan per liter en per stuk gesorteerd; verschillende eenheden

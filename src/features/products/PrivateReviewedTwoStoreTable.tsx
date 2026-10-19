@@ -3,7 +3,7 @@ import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
-import { freshReviewedBaskets, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 type OwnStore = 'PLUS' | 'DekaMarkt'
@@ -12,7 +12,7 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
  * No independent source authorization, live pricing or retail claim is implied.
  */
-export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, budget, onOpenComparison, onOpenList, onOpenMixedRoute }: {
+export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine }: {
   reviewed: PrivateReviewedBaskets
   search: string
   unitFilter: 'all' | 'kg' | 'liter' | 'stuk'
@@ -21,6 +21,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   onOpenComparison: () => void
   onOpenList: (store: OwnStore) => void
   onOpenMixedRoute: () => void
+  onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
@@ -115,6 +116,27 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const leader = delta === 0 ? 'Beide mandjes zijn even duur.'
     : (delta > 0 ? 'PLUS' : 'DekaMarkt') + ' is ' +
       money.format(Math.abs(delta) / 100) + ' goedkoper voor alle hele verpakkingen.'
+  const chooseIngredientStore = (ingredientId: string, store: OwnStore) => {
+    // Re-admit source age + exact same demand at click time. A stale Products
+    // render can never authorize navigation using an expired SKU or amount.
+    const now = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
+    const a = now?.stores.PLUS
+    const b = now?.stores.DekaMarkt
+    if (!a || !b || Math.abs(a.capturedMs - b.capturedMs) > 86_400_000 ||
+        !compareFullBaskets({ baseline: a.basket, candidate: b.basket }).claimable) {
+      onOpenComparison()
+      return
+    }
+    const proposed = createMixedStoreShoppingPlan(
+      a.basket, b.basket, 'mixed', { [ingredientId]: store })
+    const line = proposed?.lines.find(item => item.id === ingredientId && item.store === store)
+    if (!line) { onOpenComparison(); return }
+    onChooseRouteLine({
+      planKey: reviewed.planKey,
+      observedAt: { PLUS: a.observedAt, DekaMarkt: b.observedAt },
+      ingredientId, store, lineKey: line.key,
+    })
+  }
   const product = (line: Matched, store: string) => <div className="private-reviewed-products__paired-option">
     <strong>{store}</strong>
     <span>{line.productName}</span>
@@ -165,6 +187,15 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           : (first.lineTotalCents < second.lineTotalCents ? 'PLUS' : 'DekaMarkt') + ' is ' +
             money.format(Math.abs(first.lineTotalCents - second.lineTotalCents) / 100) +
             ' voordeliger voor dit ingrediënt.'}</p>
+        <div className="private-reviewed-products__ingredient-route-actions"
+          aria-label={'Kies winkel voor ' + first.ingredientLabel}>
+          <button type="button" onClick={() => chooseIngredientStore(first.id, 'PLUS')}>
+            Kies PLUS voor dit ingrediënt in mijn route
+          </button>
+          <button type="button" onClick={() => chooseIngredientStore(first.id, 'DekaMarkt')}>
+            Kies DekaMarkt voor dit ingrediënt in mijn route
+          </button>
+        </div>
       </article>)}
       {!rows.length && <p>Geen vergelijkbare artikelen passen bij je zoekopdracht of eenheidsfilter.</p>}
     </div>

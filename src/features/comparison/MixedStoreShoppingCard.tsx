@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import type { MixedStoreShoppingPlan, MixedStore, MixedStoreLine } from './mixedStoreShoppingPlan.ts'
@@ -8,6 +8,7 @@ import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
 import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
+import type { PrivateRouteChoice } from './privateReviewedBasketBridge.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
@@ -18,7 +19,7 @@ const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
  */
 export function MixedStoreShoppingCard({
   mixed, single, plus, deka, captured, eligibleNow, weekBudget,
-  plannerPlan, plannerRecipes, plannerActiveDays, isSingleCheckedOnRoute,
+  plannerPlan, plannerRecipes, plannerActiveDays, isSingleCheckedOnRoute, routeChoice,
 }: {
   mixed: MixedStoreShoppingPlan
   single: MixedStoreShoppingPlan
@@ -31,6 +32,7 @@ export function MixedStoreShoppingCard({
   plannerRecipes?: RecipeWithIngredients[]
   plannerActiveDays?: string[]
   isSingleCheckedOnRoute?: (line: MixedStoreLine) => boolean
+  routeChoice?: PrivateRouteChoice | null
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [onlyOpen, setOnlyOpen] = useState(false)
@@ -41,6 +43,30 @@ export function MixedStoreShoppingCard({
   const [preferred, setPreferred] = useState<Record<string, MixedStore>>({})
   const chosenMixed = useMemo(() => createMixedStoreShoppingPlan(plus, deka, 'mixed', preferred),
     [plus, deka, preferred])
+  useEffect(() => {
+    if (!routeChoice) return
+    if (!eligibleNow() ||
+        routeChoice.observedAt.PLUS !== captured.PLUS ||
+        routeChoice.observedAt.DekaMarkt !== captured.DekaMarkt) {
+      setMessage('Deze winkelkeuze is niet meer actueel. Herzie eerst je eigen bronnen.')
+      return
+    }
+    // Reconstruct exactly the ORIGINAL reviewed selected SKU / whole-pack
+    // price. Never trust a stale route intent or the Producten search filter.
+    const intended = createMixedStoreShoppingPlan(
+      plus, deka, 'mixed', { [routeChoice.ingredientId]: routeChoice.store })
+    const line = intended?.lines.find(item =>
+      item.id === routeChoice.ingredientId && item.store === routeChoice.store)
+    if (!line || line.key !== routeChoice.lineKey) {
+      setMessage('Het bronproduct of de verpakking is gewijzigd. Kies het artikel opnieuw.')
+      return
+    }
+    setPreferred(before => ({ ...before, [line.id]: routeChoice.store }))
+    setMode('mixed')
+    setShowText(false)
+    setMessage('Jouw originele ' + routeChoice.store + '-artikel voor ' +
+      line.ingredientLabel + ' is geselecteerd. De volledige route is herberekend.')
+  }, [routeChoice?.serial, plus, deka, captured.PLUS, captured.DekaMarkt])
   // Source comparisons are prevalidated. A malformed choice must not quietly
   // become an apparently reviewed custom basket.
   const selectedMixed = chosenMixed ?? mixed

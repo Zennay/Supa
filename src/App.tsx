@@ -14,7 +14,7 @@ const PrivateReviewedProductCatalog = lazy(async () => {
   return { default: module.PrivateReviewedProductCatalog }
 })
 import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
-import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore } from './features/comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
@@ -117,6 +117,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [visitedBasket, setVisitedBasket] = useState(initialTab === 'basket')
   const [visitedList, setVisitedList] = useState(initialTab === 'list')
   const [mixedRouteOpenSignal, setMixedRouteOpenSignal] = useState(0)
+  const [privateRouteChoice, setPrivateRouteChoice] = useState<PrivateRouteChoice | null>(null)
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   // Only transient shopping ticks. Never persist prices or review approvals.
@@ -384,7 +385,13 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
             onOpenComparison={openOwnPriceImport}
-            onOpenMixedRoute={() => { setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
+            onChooseRouteLine={intent => {
+              const serial = mixedRouteOpenSignal + 1
+              setPrivateRouteChoice({ ...intent, serial })
+              setMixedRouteOpenSignal(serial)
+              navigate('list')
+            }}
+            onOpenMixedRoute={() => { setPrivateRouteChoice(null); setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
             onOpenList={(store) => {
               if (store) setPreferredOwnStore(store)
               navigate('list')
@@ -416,7 +423,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             ownReviewed={livePrivateReviewed}
             preferredOwnStore={preferredOwnStore}
             onOpenShoppingList={() => navigate('list')}
-            onOpenMixedRoute={() => { setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
+            onOpenMixedRoute={() => { setPrivateRouteChoice(null); setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
             basketTotalCents={preferredPrivateBasket?.basket.totalCents ?? null}
             basketUnresolvedLineCount={preferredPrivateBasket?.basket.unresolvedLineCount ?? 0}
             ownSource={preferredPrivateBasket ? {
@@ -526,7 +533,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
               plan={plannedMeals} recipes={recipes} activeDays={activeDays}
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
-              onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal} />
+              onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
+              routeChoice={privateRouteChoice} />
           </div>
         )}
         {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
