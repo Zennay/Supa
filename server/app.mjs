@@ -5,7 +5,25 @@ import { pathToFileURL } from 'node:url'
 import { fetchRecipeHtml } from './recipe-fetch.mjs'
 import { importRecipeFromHtml } from '../src/domain/userRecipeImport.ts'
 
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' }
+// These public .mjs modules are imported by the real CSV/JSON workflow.
+// Combined with nosniff, application/octet-stream prevents their execution.
+const types = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+}
 export function createRecipeServer({ root = resolve('dist'), fetchHtml = fetchRecipeHtml, origin = process.env.APP_ORIGIN } = {}) {
   let active = 0
   const clients = new Map()
@@ -35,6 +53,9 @@ export function createRecipeServer({ root = resolve('dist'), fetchHtml = fetchRe
       const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname)
       const path = resolve(root, '.' + pathname)
       if (path !== root && !path.startsWith(root + sep)) return json(404, { error: 'Niet gevonden.' })
+      // The bundled Node entrypoint lives next to site assets so deployments
+      // can ship one artifact. It is executable server code, not a public asset.
+      if (path === resolve(root, 'server.mjs')) return json(404, { error: 'Niet gevonden.' })
       let file = path; let data
       try { data = await readFile(file) } catch {
         if (extname(path)) return json(404, { error: 'Niet gevonden.' })
