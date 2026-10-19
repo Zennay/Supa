@@ -47,6 +47,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     }
   }, [])
   const [captureTarget, setCaptureTarget] = useState<'both' | CaptureStore>('both')
+  const [copyableMissingGuide, setCopyableMissingGuide] = useState<{ store: CaptureStore; text: string } | null>(null)
   // Existing SKU reviews are not fresh source captures. Only missing physical
   // source candidates require this deliberately blank partial input sheet.
   const missingCaptureFor = (store: CaptureStore, at = now): PlannerCaptureGuideNeed[] => {
@@ -137,6 +138,27 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage('Openstaande PLUS/Deka-productcontroles lokaal opgeslagen, zonder verzonnen winkelprijs.')
     } catch (error) {
       setDownloadMessage(error instanceof Error ? error.message : 'Controlelijst downloaden mislukt.')
+    }
+  }
+  async function copyMissingCaptureFor(store: CaptureStore) {
+    setDownloadMessage('')
+    setCopyableMissingGuide(null)
+    try {
+      const needs = missingCaptureFor(store, Date.now())
+      if (!needs.length) throw new Error(store + ': er zijn geen ontbrekende producten om te kopiëren.')
+      const { makePlannerCaptureGuide } = await import('../comparison/plannerPriceCaptureGuide.ts')
+      const content = makePlannerCaptureGuide(needs, [store])
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(content)
+          setDownloadMessage(store + ': je ongeprijsde meeneemlijst met alle ontbrekende ingrediënten is gekopieerd.')
+          return
+        } catch { /* Fallback exposes same sanitized, selectable content. */ }
+      }
+      setCopyableMissingGuide({ store, text: content })
+      setDownloadMessage('Klembord niet toegestaan: selecteer de meeneemlijst van ' + store + ' hieronder.')
+    } catch (cause) {
+      setDownloadMessage(cause instanceof Error ? cause.message : 'Mobiele meeneemlijst niet beschikbaar.')
     }
   }
   async function downloadMissingCaptureFor(store: CaptureStore, kind: 'csv' | 'csv-excel' | 'guide' | 'print') {
@@ -345,9 +367,17 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'guide')}>
                 Meeneemlijst {store} (TXT)
               </button>
+              <button type="button" className="ghost-button" onClick={() => void copyMissingCaptureFor(store)}>
+                Kopieer ontbrekende {store}-producten (mobiel)
+              </button>
               <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'print')}>
                 Printbaar {store}-opnameblad (HTML)
               </button>
+              {copyableMissingGuide?.store === store && <label className="own-store-planner__targeted-copy">
+                Mobiele ongeprijsde meeneemlijst · selecteer alle tekst
+                <textarea readOnly rows={Math.min(15, Math.max(6, pending.length + 8))}
+                  value={copyableMissingGuide.text} onFocus={event => event.currentTarget.select()} />
+              </label>}
               <details className="own-store-planner__targeted-guide">
                 <summary>Welke CSV-rij hoort bij welk ontbrekend ingrediënt?</summary>
                 <p>De importeerbare CSV heeft eerst een kopregel en daarna onderstaande

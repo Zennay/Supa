@@ -111,3 +111,19 @@
 .own-store-planner__targeted-guide ol { margin: .6rem 0 0; padding-left: 2.2rem; }
 .own-store-planner__targeted-guide li { padding: .4rem 0; overflow-wrap: anywhere; border-top: 1px solid #e8eee8; }
 .own-store-planner__targeted-guide summary:focus-visible { outline: 3px solid #246b50; }
+.own-store-planner__targeted-copy {
+  display: grid;
+  flex: 1 1 100%;
+  gap: .4rem;
+  min-width: 0;
+}
+.own-store-planner__targeted-copy textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: .7rem;
+  font: inherit;
+  font-size: .86rem;
+  border: 1px solid #829d8c;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
