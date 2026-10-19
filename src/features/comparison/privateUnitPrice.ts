@@ -29,6 +29,36 @@ function decimalQuantity(value: number): { numerator: bigint; scale: bigint } | 
     : { numerator: coefficient * 10n ** BigInt(-places), scale: 1n }
 }
 
+/**
+ * This exported display API may also be invoked from plain JavaScript.
+ * Snapshot own ordinary data descriptors only; never execute getters,
+ * inherited values or a Proxy's throwing descriptor trap as price facts.
+ */
+function ownData(value: unknown, name: string): unknown {
+  if (value === null || typeof value !== 'object') return undefined
+  const descriptor = Object.getOwnPropertyDescriptor(value, name)
+  return descriptor && Object.hasOwn(descriptor, 'value')
+    ? descriptor.value : undefined
+}
+
+function readonlyPricePack(value: unknown): {
+  amount: number | null; unit: string; count: number; priceCents: number | null
+} | null {
+  try {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return null
+    const amount = ownData(value, 'amount')
+    const unit = ownData(value, 'unit')
+    const count = ownData(value, 'count')
+    const priceCents = ownData(value, 'priceCents')
+    if ((amount !== null && typeof amount !== 'number') ||
+        typeof unit !== 'string' || typeof count !== 'number' ||
+        (priceCents !== null && typeof priceCents !== 'number')) return null
+    return { amount, unit, count, priceCents } as {
+      amount: number | null; unit: string; count: number; priceCents: number | null
+    }
+  } catch { return null }
+}
+
 /** Presentation-only €/kg, €/liter or €/piece from one real captured pack.
  * The paid-for basket always uses separately validated whole-pack cent totals.
  * An unrepresentable quantity/rate stays unknown; never substitute €0. */
@@ -38,16 +68,18 @@ export function privatePackUnitRate(pack: {
   count: number
   priceCents: number | null
 }): PrivateUnitRate | null {
-  if (!['g', 'kg', 'ml', 'l', 'piece'].includes(pack.unit) ||
-      pack.amount === null ||
-      !Number.isSafeInteger(pack.count) || pack.count <= 0 ||
-      pack.priceCents === null || !Number.isSafeInteger(pack.priceCents) ||
-      pack.priceCents < 0) return null
-  const quantity = decimalQuantity(pack.amount)
+  const captured = readonlyPricePack(pack)
+  if (!captured) return null
+  if (!['g', 'kg', 'ml', 'l', 'piece'].includes(captured.unit) ||
+      captured.amount === null ||
+      !Number.isSafeInteger(captured.count) || captured.count <= 0 ||
+      captured.priceCents === null || !Number.isSafeInteger(captured.priceCents) ||
+      captured.priceCents < 0) return null
+  const quantity = decimalQuantity(captured.amount)
   if (!quantity) return null
-  const factor = pack.unit === 'g' || pack.unit === 'ml' ? 1000n : 1n
-  const numerator = BigInt(pack.priceCents) * factor * quantity.scale
-  const denominator = quantity.numerator * BigInt(pack.count)
+  const factor = captured.unit === 'g' || captured.unit === 'ml' ? 1000n : 1n
+  const numerator = BigInt(captured.priceCents) * factor * quantity.scale
+  const denominator = quantity.numerator * BigInt(captured.count)
   if (denominator <= 0n) return null
 
   const centsPerUnit = Number(numerator) / Number(denominator)
@@ -57,8 +89,8 @@ export function privatePackUnitRate(pack: {
   if (!Number.isFinite(centsPerUnit) || centsPerUnit < 0 ||
       roundedCents > max || milliCents > max) return null
   return {
-    unit: pack.unit === 'g' || pack.unit === 'kg' ? 'kg' :
-      pack.unit === 'ml' || pack.unit === 'l' ? 'liter' : 'stuk',
+    unit: captured.unit === 'g' || captured.unit === 'kg' ? 'kg' :
+      captured.unit === 'ml' || captured.unit === 'l' ? 'liter' : 'stuk',
     centsPerUnit,
     roundedCentsPerUnit: Number(roundedCents),
     milliCentsPerUnit: Number(milliCents),
@@ -71,7 +103,17 @@ export function formatPrivateUnitRate(rate: PrivateUnitRate): string {
 }
 
 export function privateUnitPrice(line: Matched): string | null {
-  const rate = privatePackUnitRate({ amount: line.pack.amount,
-    unit: line.pack.unit, count: line.pack.count, priceCents: line.pricePerPackCents })
-  return rate ? formatPrivateUnitRate(rate) : null
+  try {
+    // Do not dereference a foreign BasketTraceLine's nested pack getters.
+    // Only actual own monetary and physical values can reach the already
+    // bounded, read-only one-package unit-rate formatter.
+    const rawPack = ownData(line, 'pack')
+    const rate = privatePackUnitRate({
+      amount: ownData(rawPack, 'amount') as number | null,
+      unit: ownData(rawPack, 'unit') as string,
+      count: ownData(rawPack, 'count') as number,
+      priceCents: ownData(line, 'pricePerPackCents') as number | null,
+    })
+    return rate ? formatPrivateUnitRate(rate) : null
+  } catch { return null }
 }
