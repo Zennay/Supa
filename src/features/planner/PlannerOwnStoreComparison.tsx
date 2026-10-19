@@ -14,7 +14,7 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, captureNeeds }: {
+export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, captureNeeds }: {
   reviewed: PrivateReviewedBaskets | null
   captureProgress: PrivateCaptureProgress | null
   captureNeeds: readonly PlannerCaptureGuideNeed[]
@@ -23,6 +23,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   budget: number
   onSelect: (store: OwnStore) => void
   onOpenComparison: () => void
+  onReviewIngredient: (store: OwnStore, ingredientId: string) => void
   onOpenList: () => void
   onOpenMixedRoute: (extraCostRaw?: string) => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
@@ -233,8 +234,12 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               {progress.fresh && progress.awaitingReviewLabels.length > 0 &&
                 <small>Bevestig origineel artikel, verpakking en prijs voor:
                   {' '}{progress.awaitingReviewLabels.join(', ')}.</small>}
-              <button type="button" className="ghost-button" onClick={onOpenComparison}>
-                Ga naar mijn ontbrekende productcontroles
+              <button type="button" className="ghost-button"
+                onClick={() => progress.nextIngredientId
+                  ? onReviewIngredient(store, progress.nextIngredientId) : onOpenComparison()}>
+                {progress.nextIngredientId
+                  ? 'Open eerste ontbrekende ingrediënt in Vergelijk'
+                  : 'Open winkelbron in Vergelijk'}
               </button>
             </div>
           })()}

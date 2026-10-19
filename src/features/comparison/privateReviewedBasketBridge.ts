@@ -20,6 +20,7 @@ export type PrivateCaptureProgress = {
     observedAt: string
     originalProductCount: number
     pricedProductCount: number
+    nextIngredientId: string | null
     demandLineCount: number
     matchedLineCount: number
     reviewedLineCount: number
@@ -27,6 +28,13 @@ export type PrivateCaptureProgress = {
     awaitingReviewLabels: string[]
     fresh: boolean
   }>>
+}
+
+export type PrivateReviewFocus = {
+  planKey: string
+  store: OwnStore
+  ingredientId: string
+  serial: number
 }
 
 export function freshReviewedBaskets(

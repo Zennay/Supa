@@ -28,7 +28,7 @@ import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
-import type { PrivateReviewedBaskets, PrivateCaptureProgress } from './privateReviewedBasketBridge.ts'
+import type { PrivateReviewedBaskets, PrivateCaptureProgress, PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 
 const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -289,7 +289,7 @@ function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number],
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays, planKey, onReviewedBaskets, onCaptureProgress,
+  plan, recipes, activeDays, planKey, onReviewedBaskets, onCaptureProgress, focusReview,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
@@ -297,6 +297,7 @@ export function OfflineReviewedWorkbench({
   planKey?: string
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
   onCaptureProgress?: (value: PrivateCaptureProgress | null) => void
+  focusReview?: PrivateReviewFocus | null
 }) {
   // A pasted source is a proposal, never the admitted receipt currently
   // powering reviews, exports, and shopping progress.
@@ -1448,6 +1449,10 @@ export function OfflineReviewedWorkbench({
       statuses[store] = {
         observedAt: capture.observedAt,
         originalProductCount: capture.products.length,
+        nextIngredientId: basket?.lines.find(line =>
+          line.status !== 'matched' || reviewedLines[
+            reviewedLineKey(store, capture.observedAt, line)
+          ] !== true)?.id ?? null,
         pricedProductCount: capture.products.filter(product =>
           product.sourceAvailable === true &&
           product.sourcePriceCents !== null &&
@@ -1471,6 +1476,24 @@ export function OfflineReviewedWorkbench({
   useEffect(() => {
     onCaptureProgress?.(captureProgress)
   }, [onCaptureProgress, captureProgress])
+  const handledReviewFocus = useRef<number | null>(null)
+  // Planner may navigate into a lazily mounted compare view. The focus
+  // intent stays in App state until the actual article exists in the DOM.
+  // It is strictly navigation, never an approval of a suggested SKU.
+  useEffect(() => {
+    if (!focusReview || focusReview.planKey !== planKey || !imported ||
+        handledReviewFocus.current === focusReview.serial) return
+    setOpenTripOnly(false)
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(
+        reviewRowId(focusReview.store, focusReview.ingredientId))
+      if (target) {
+        handledReviewFocus.current = focusReview.serial
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
+    return () => window.clearTimeout(timer)
+  }, [focusReview, imported, planKey])
   function goToReviewRow(store: typeof stores[number], id: string) {
     setOpenTripOnly(false)
     window.setTimeout(() => document.getElementById(reviewRowId(store, id))?.scrollIntoView({

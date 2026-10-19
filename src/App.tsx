@@ -27,7 +27,7 @@ const OwnExtraGroceries = lazy(async () => {
 })
 import type { PrivateExtraVisitCostIntent } from './features/comparison/privateExtraVisitCost.ts'
 import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
-import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
@@ -135,6 +135,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
+  const [privateReviewFocus, setPrivateReviewFocus] = useState<PrivateReviewFocus | null>(null)
   // Only transient shopping ticks. Never persist prices or review approvals.
   // Keep across a temporary unpriced edit so a price-only correction preserves
   // the physical items already ticked; different SKUs or quantities use new keys.
@@ -560,6 +561,13 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               if (store === 'PLUS' || store === 'DekaMarkt') setPreferredOwnStore(store)
             }}
             onOpenComparison={openOwnPriceImport}
+            onReviewIngredient={(store, ingredientId) => {
+              setPrivateReviewFocus(previous => ({
+                planKey: privatePlanKey, store, ingredientId,
+                serial: (previous?.serial ?? 0) + 1,
+              }))
+              navigate('basket')
+            }}
             onBudgetChange={(nextBudget) =>
               setPreferences((current) => ({
                 ...current,
@@ -650,6 +658,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             privatePlanKey={privatePlanKey}
             onReviewedBaskets={onReviewedBaskets}
             onCaptureProgress={onCaptureProgress}
+            focusReview={privateReviewFocus?.planKey === privatePlanKey ? privateReviewFocus : null}
           />
           </Suspense>
           </div>

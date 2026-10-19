@@ -33,6 +33,7 @@ type PlannerViewProps = {
   ownSourceChoices?: { store: string; observedAt: string }[]
   onOwnSourceChange: (store: OwnStore) => void
   onOpenComparison: () => void
+  onReviewIngredient: (store: OwnStore, ingredientId: string) => void
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
@@ -56,6 +57,7 @@ export function PlannerView({
   ownSourceChoices,
   onOwnSourceChange,
   onOpenComparison,
+  onReviewIngredient,
   onBudgetChange,
   onToggleDay,
   onRecipeChange,
@@ -341,7 +343,8 @@ export function PlannerView({
         captureNeeds={captureNeeds}
         hasDemand={activeDays.length > 0} budget={budget}
         onSelect={onOwnSourceChange}
-        onOpenComparison={onOpenComparison} onOpenList={onOpenShoppingList}
+        onOpenComparison={onOpenComparison} onReviewIngredient={onReviewIngredient}
+        onOpenList={onOpenShoppingList}
         onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine} />
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
