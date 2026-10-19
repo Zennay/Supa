@@ -9,6 +9,7 @@ import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from './plannerPriceCaptureSheet.ts'
 import { makePlannerCaptureGuide } from './plannerPriceCaptureGuide.ts'
+import { makePrintablePlannerCaptureHtml } from './plannerPriceCapturePrint.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { createMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
@@ -315,6 +316,27 @@ export function OfflineReviewedWorkbench({
       setWeekExportMessage('Opnamegids lokaal gedownload. De CSV-regels en oorspronkelijke Planner-hoeveelheden staan erin; bronproducten en prijzen moet je zelf echt vastleggen.')
     } catch {
       setWeekExportMessage('Geen geldig weekmenu voor de opnamegids. Controleer de Planner-ingrediënten.')
+    }
+  }
+
+  function downloadPrintablePlannerCapture() {
+    try {
+      const selected: readonly CaptureStore[] = captureSheetStore === 'both'
+        ? stores : [captureSheetStore]
+      const html = makePrintablePlannerCaptureHtml(plannerCaptureNeeds, selected)
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = captureSheetStore === 'both'
+          ? 'supa-weekmenu-PLUS-Deka-opnameformulier.html'
+          : 'supa-weekmenu-' + captureSheetStore + '-opnameformulier.html'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage('Printbaar opnameformulier lokaal opgeslagen. Open de HTML zonder internet en print het; schrijf alleen echte bronproducten, verpakkingen en prijzen op. Vul later de bijhorende CSV in.')
+    } catch {
+      setWeekExportMessage('Geen geldig weekmenu voor het opnameformulier. Controleer de Planner-ingrediënten.')
     }
   }
 
@@ -1155,6 +1177,11 @@ export function OfflineReviewedWorkbench({
             disabled={plannerCaptureNeeds.length === 0}
             onClick={downloadPlannerCaptureGuide}>
             Download bijhorende opnamegids (TXT)
+          </button>
+          <button type="button" className="ghost-button"
+            disabled={plannerCaptureNeeds.length === 0}
+            onClick={downloadPrintablePlannerCapture}>
+            Download printbaar opnameformulier (HTML)
           </button>
           <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker

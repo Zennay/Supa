@@ -1039,7 +1039,12 @@ uitklapbare hulp onder de knop toont de precieze spreadsheet-rijnummers en de
 gevraagde hoeveelheid. Met **Download bijhorende opnamegids (TXT)** krijg je
 precies die rijnummers en hoeveelheden op papier of in een offline notitie,
 passend bij de gekozen een- of tweewinkel-CSV. De gids bevat zelf geen
-winkelproducten, prijzen of bewijs. De eenheid is hooguit een bewerkbare hint; neem de
+winkelproducten, prijzen of bewijs. Met **Download printbaar opnameformulier
+(HTML)** krijg je voor dezelfde keuze een geheel offline, zelf af te drukken
+winkelblad met lege schrijfvelden voor de originele productcode, naam,
+verpakking, prijs, beschikbaarheid en de echte broncontext. Het formulier
+draait geen scripts of netwerkverzoeken en verandert geen enkele bronopname;
+na de winkeltrip zet je zelf alleen de geobserveerde feiten in het CSV-bestand. De eenheid is hooguit een bewerkbare hint; neem de
 werkelijke inhoud van de aangeboden verpakking over. Vul per werkelijk gevonden
 winkelproduct de originele `id`, `name`, `packAmount`, `packUnit`, `packCount`,
 `priceCents` in hele centen, `observedAt` met echte tijdzone en `available` als
