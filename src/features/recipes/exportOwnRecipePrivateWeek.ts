@@ -2,6 +2,7 @@ import { exportPrivatePlannerWeek } from '../comparison/exportPrivatePlannerWeek
 import type { SavedRecipe } from './recipeLibrary.ts'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { ownRecipeShoppingChecklist } from './recipeShoppingChecklist.ts'
+import { scaledMetricPortionAmount } from '../../domain/metricPortionScale.ts'
 
 /** Real, user-reviewed physical recipe demand only. No retailer identity,
  * SKU, price, observation or source authorization is generated. */
@@ -21,9 +22,17 @@ export function exportOwnRecipePrivateWeek(recipe: SavedRecipe, portions: number
     if (ingredient.amount === null || !Number.isFinite(ingredient.amount)) {
       throw new Error('Een ingrediënt heeft geen bevestigde hoeveelheid.')
     }
-    const amount = Math.round(ingredient.amount * portions / recipe.servings! * 1000) / 1000
-    if (!Number.isFinite(amount) || amount <= 0 || amount > 100_000 ||
-        (ingredient.unit === 'piece' && !Number.isSafeInteger(amount))) {
+    // Use the exact same source-portion arithmetic as the unpriced recipe
+    // checklist and in-app Planner. No binary-float undercount at 0.001g/ml,
+    // no rounding a physical fraction of an egg or other piece.
+    if (!['g', 'ml', 'piece'].includes(ingredient.unit)) {
+      throw new Error('Een ingrediënt gebruikt een onbekende metrische eenheid.')
+    }
+    const amount = scaledMetricPortionAmount(
+      ingredient.amount, recipe.servings!, portions,
+      ingredient.unit as 'g' | 'ml' | 'piece',
+    )
+    if (amount === null || amount > 100_000) {
       throw new Error('Controleer de porties: deze hoeveelheid kan niet worden overgedragen.')
     }
     return { ...ingredient, amount }
