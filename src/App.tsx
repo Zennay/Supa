@@ -733,6 +733,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 progress={privateCaptureProgress?.planKey === privatePlanKey
                   ? privateCaptureProgress : null}
                 complete={livePrivateReviewed}
+                checked={privateShoppingTicks}
+                setChecked={setPrivateShoppingTicks}
                 onOpenComparison={openOwnPriceImport}
                 onReviewIngredient={(store, ingredientId) => {
                   setPrivateReviewFocus(previous => ({
