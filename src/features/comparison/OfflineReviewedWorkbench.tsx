@@ -213,7 +213,10 @@ export function OfflineReviewedWorkbench({
   planKey?: string
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
 }) {
+  // A pasted source is a proposal, never the admitted receipt currently
+  // powering reviews, exports, and shopping progress.
   const [text, setText] = useState('')
+  const [pasteDraft, setPasteDraft] = useState('')
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
@@ -612,7 +615,6 @@ export function OfflineReviewedWorkbench({
         setMessage('Nieuwe invoer niet toegepast; vorige winkelopnames behouden.')
         return
       }
-      setText(input)
       importSnapshots(input)
     } catch (error) {
       setMessage((error instanceof Error ? error.message : 'Ongeldige bron.') +
@@ -621,30 +623,36 @@ export function OfflineReviewedWorkbench({
   }
 
   function importSnapshots(input: string) {
-    // A new import, even identical bytes, requires explicit source review.
-    setReviewedLines({})
-    setDoneTripItems({})
-    setManualSku({ PLUS: {}, DekaMarkt: {} }); setSkuFilter({})
     try {
+      // Validate the entire proposed capture before changing the active
+      // source, review keys, physical ticks, or any derived basket totals.
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
-      setClockMs(Date.now())
+      setText(input)
       setImported(parsed)
+      setReviewedLines({})
+      setDoneTripItems({})
+      setManualSku({ PLUS: {}, DekaMarkt: {} })
+      setSkuFilter({})
+      setClockMs(Date.now())
       setMessage(Object.keys(parsed.captures).length === 1
-        ? 'Eén eigen winkelopname lokaal geladen. Een tweede winkel blijft onbekend tot je die werkelijk invoert.'
-        : 'Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
+        ? 'Eén eigen winkelopname lokaal geladen. Voeg een echte andere winkel toe voor een prijsverschil.'
+        : 'Twee privéopnames lokaal geladen. Controleer de fysieke SKU’s en prijzen opnieuw.')
     } catch (error) {
-      // Never retain/display a previous basket after an invalid new import.
-      setImported(null)
-      setMessage(error instanceof Error ? error.message : 'Ongeldige import.')
+      setMessage((error instanceof Error ? error.message : 'Ongeldige import.') +
+        ' Vorige brondata, reviews en afvinkingen blijven intact.')
     }
   }
   /** Paste CSV straight from the user's own sheet; still use canonical
    * source admission and require every original SKU/price to be reviewed. */
   async function importPastedSource() {
-    const raw = text
+    const raw = pasteDraft
     const version = ++importRevision.current
-    if (!raw.trim() || raw.trimStart().startsWith('{')) {
-      importSnapshots(raw)
+    if (!raw.trim()) {
+      setMessage('Plak eerst eigen CSV- of JSON-brongegevens.')
+      return
+    }
+    if (raw.trimStart().startsWith('{')) {
+      acceptManualSource(raw)
       return
     }
     setBusy(true)
@@ -657,20 +665,18 @@ export function OfflineReviewedWorkbench({
         throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
       }
       const normalized = (module.convertOwnStoreCsv as (input: string) => string)(raw)
-      parseOfflinePriceSnapshots(normalized, Date.now())
       if (version !== importRevision.current) return
-      setText(normalized)
-      importSnapshots(normalized)
-      setMessage('Geplakte eigen winkel-CSV lokaal omgezet. Controleer nu per ingrediënt de originele SKU, verpakking en prijs; niets is automatisch goedgekeurd.')
+      // The same guarded one-shop append, same-shop replacement preview,
+      // and explicit full-source confirmation used by manual price entry.
+      acceptManualSource(normalized)
     } catch (error) {
       if (version !== importRevision.current) return
       setMessage((error instanceof Error ? error.message : 'CSV kon niet worden verwerkt.') +
-        ' Corrigeer je geplakte brongegevens. Er zijn geen prijzen verzonnen.')
+        ' De oude winkeldata en productreviews zijn behouden.')
     } finally {
       if (version === importRevision.current) setBusy(false)
     }
   }
-
   async function loadSelectedSources(files: File[]) {
     if (files.length === 0) return
     if (files.length === 1) {
@@ -1434,20 +1440,18 @@ export function OfflineReviewedWorkbench({
           </label>
         )}
         <label>Of plak je eigen winkelopname(s) als CSV of JSON
-          <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
+          <textarea rows={5} value={pasteDraft} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
               importRevision.current += 1
               setBusy(false)
-              setText(event.target.value)
-              setImported(null)
-              setReviewedLines({})
-              setDoneTripItems({})
-              setMessage('Invoer gewijzigd. Bereken opnieuw; eerder resultaat is niet meer geldig.')
+              setPasteDraft(event.target.value)
+              setPendingReplacement(null)
+              setMessage('Concept gewijzigd. Eerder bevestigde winkeldata en vinkjes blijven actief totdat je de nieuwe bron expliciet importeert.')
             }} />
         </label>
         <div className="offline-price-workbench__actions">
-          <button type="button" disabled={busy || !text.trim()} onClick={() => {
+          <button type="button" disabled={busy || !pasteDraft.trim()} onClick={() => {
             void importPastedSource()
           }}>
             Importeer CSV/JSON en bereken mandjes
