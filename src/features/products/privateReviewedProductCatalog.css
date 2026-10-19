@@ -25,3 +25,8 @@ border:1px solid #d7e3d8;border-radius:12px;padding:.8rem;min-width:0;overflow-w
 .private-reviewed-products__source-coverage article strong{font-size:1.2rem}
 .private-reviewed-products__source-coverage time{font-size:.85rem}
 @media(max-width:620px){.private-reviewed-products__source-coverage{grid-template-columns:1fr}}
+
+.private-reviewed-products__route-preview{display:grid;gap:.5rem;background:#f3f8f3;
+border:1px solid #c0d3c2;border-radius:12px;padding:1rem}
+.private-reviewed-products__route-preview p,.private-reviewed-products__route-preview h4{margin:0}
+.private-reviewed-products__route-preview small{line-height:1.5}

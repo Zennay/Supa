@@ -10,10 +10,11 @@ const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOpenList }: {
+export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOpenList, onOpenMixedRoute }: {
   reviewed: PrivateReviewedBaskets | null
   onOpenComparison: () => void
   onOpenList: (store?: OwnStore) => void
+  onOpenMixedRoute: () => void
 }) {
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
@@ -72,7 +73,8 @@ export function PrivateReviewedProductCatalog({ reviewed, onOpenComparison, onOp
           onChange={event => setQuery(event.target.value)} placeholder="Product, SKU of ingrediënt" /></label>
       </div>
       {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
-        search={search} onOpenComparison={onOpenComparison} onOpenList={onOpenList} />}
+        search={search} onOpenComparison={onOpenComparison} onOpenList={onOpenList}
+        onOpenMixedRoute={onOpenMixedRoute} />}
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.</p>
       {order === 'unitPrice' && unitFilter === 'all' && <p className="private-reviewed-products__sort-note">
         Eerst per kg, dan per liter en per stuk gesorteerd; verschillende eenheden

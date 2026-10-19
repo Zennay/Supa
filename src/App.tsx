@@ -369,6 +369,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed}
             onOpenComparison={() => navigate('basket')}
+            onOpenMixedRoute={() => { setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
             onOpenList={(store) => {
               if (store) setPreferredOwnStore(store)
               navigate('list')

@@ -1,6 +1,7 @@
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
@@ -10,11 +11,12 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
  * No independent source authorization, live pricing or retail claim is implied.
  */
-export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenComparison, onOpenList }: {
+export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenComparison, onOpenList, onOpenMixedRoute }: {
   reviewed: PrivateReviewedBaskets
   search: string
   onOpenComparison: () => void
   onOpenList: (store: OwnStore) => void
+  onOpenMixedRoute: () => void
 }) {
   const fresh = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
   const plus = fresh?.stores.PLUS
@@ -65,6 +67,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenCompariso
         value.toLocaleLowerCase('nl').includes(search))) return []
     return [{ plus: line, deka: alternate }]
   })
+  const mix = createMixedStoreShoppingPlan(plus.basket, deka.basket)
+  const splitTrip = !!mix && mix.lines.some(line => line.store === 'PLUS') &&
+    mix.lines.some(line => line.store === 'DekaMarkt')
+  const wholeCheapestCents = Math.min(plus.basket.totalCents, deka.basket.totalCents)
   const delta = deka.basket.totalCents - plus.basket.totalCents
   const cheapest: OwnStore = delta >= 0 ? 'PLUS' : 'DekaMarkt'
   const leader = delta === 0 ? 'Beide mandjes zijn even duur.'
@@ -83,6 +89,19 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, onOpenCompariso
     <p>PLUS: {money.format(plus.basket.totalCents / 100)} · DekaMarkt: {' '}
       {money.format(deka.basket.totalCents / 100)}</p>
     <strong role="status">{leader}</strong>
+    {mix && <div className="private-reviewed-products__route-preview">
+      <h4>Goedkoopste originele artikelen combineren</h4>
+      <p>Productkosten met hele verpakkingen: <strong>{money.format(mix.totalCents / 100)}</strong></p>
+      <p>Voordeel t.o.v. goedkoopste volledige winkel, uitsluitend producten: {' '}
+        <strong>{money.format(wholeCheapestCents - mix.totalCents >= 0
+          ? (wholeCheapestCents - mix.totalCents) / 100 : 0)}</strong></p>
+      <small>{splitTrip
+        ? 'Twee winkels nodig. Extra reis-, parkeer- en tijdkosten zijn onbekend totdat je ze zelf invult. Netto voordeel wordt hier niet geclaimd.'
+        : 'Voor deze goedkoopste productroute is slechts één winkel nodig; er is geen tweede winkelstop.'}</small>
+      <button type="button" onClick={onOpenMixedRoute}>
+        Open mijn gecombineerde route en eigen extra bezoekkosten
+      </button>
+    </div>}
     <small>Jouw gecontroleerde PLUS-bron: {plus.observedAt}. DekaMarkt-bron: {deka.observedAt}.
       Geen kassagarantie of onafhankelijk bewezen besparing; oorspronkelijke producten en
       prijzen kunnen veranderen.</small>
