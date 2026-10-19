@@ -22,13 +22,14 @@ const normalize = (value: string): string[] => value.normalize('NFKD')
   .replace(/\p{M}/gu, '')
   .toLocaleLowerCase('nl')
   .match(/[\p{L}\p{N}]+/gu)?.filter(token => !incidental.has(token) &&
-    !/^[0-9]+$/.test(token) && !packNotation.test(token)) ?? []
+    !/^[0-9]+$/.test(token) && !packNotation.test(token) && !/^[0-9]+x$/.test(token)) ?? []
 
 function tokensMatch(query: string, productName: string): boolean {
   const queryTokens = normalize(query)
   const sourceTokens = normalize(productName)
   return queryTokens.length > 0 && queryTokens.length <= 8 &&
-    queryTokens.join('|') === sourceTokens.join('|')
+    queryTokens.length === sourceTokens.length &&
+    [...queryTokens].sort().join('|') === [...sourceTokens].sort().join('|')
 }
 
 export function automaticallyAcceptedSourceLine(
