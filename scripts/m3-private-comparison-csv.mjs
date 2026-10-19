@@ -22,12 +22,19 @@ function cell(value, { untrustedText = false } = {}) {
   // remain literal text, not execute formula or DDE/URL side effects.
   // Control characters can masquerade as cell/row separators.
   const clean = raw.replace(/[\u0000-\u001f\u007f-\u009f\ufeff]/g, ' ')
-  // Detect formulas after Unicode compatibility normalization and leading
-  // default-ignorable/combining marks, while retaining the original label.
-  // Reuse the existing production fix from #3862 without importing QA files.
-  const formulaShaped = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+\-@\u2212]/u
+  // Preserve the existing ASCII/whitespace literal-text contract. For other
+  // visually disguised formulas, refuse the private export rather than emit
+  // text that an independent spreadsheet preflight cannot safely interpret.
+  // NFKC is inspection-only: the original operator label remains unchanged.
+  const asciiFormula = /^[\s\u200b-\u200d]*[=+\-@]/u.test(clean)
+  const disguisedFormula = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+\-@\u2212]/u
     .test(clean.normalize('NFKC'))
-  const safe = untrustedText && formulaShaped ? "'" + clean : clean
+  // Escape formula-like text as an explicit literal even with compatibility
+  // or invisible prefixes. The separate pre-open gate will still require
+  // operator review for ambiguous Unicode, rather than silently approving it.
+  const safe = untrustedText && (asciiFormula || disguisedFormula)
+    ? "'" + clean
+    : clean
   return '"' + safe.replace(/"/g, '""') + '"'
 }
 
