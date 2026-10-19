@@ -12,3 +12,9 @@
 .supa-planner-source-matches__exports { display: grid; gap: .5rem; justify-items: start; }
 .supa-planner-source-matches__mobile-guide { display: grid !important; gap: .35rem; width: 100%; }
 .supa-planner-source-matches__mobile-guide textarea { width: 100%; max-width: 100%; font: inherit; }
+
+.supa-planner-source-matches__controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .75rem; align-items: end; }
+.supa-planner-source-matches__controls label { display: grid; gap: .3rem; min-width: 0; font-weight: 600; }
+.supa-planner-source-matches__controls input[type=search],
+.supa-planner-source-matches__controls select { width: 100%; min-width: 0; min-height: 44px; font: inherit; padding: .45rem; }
+.supa-planner-source-matches__controls .supa-planner-source-matches__check { display: flex; gap: .5rem; align-items: center; font-weight: 400; }

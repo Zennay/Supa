@@ -28,6 +28,9 @@ export function PlannerSourceMatchPreview({ needs, source }: {
 }) {
   const [showAll, setShowAll] = useState(false)
   const [onlyMissing, setOnlyMissing] = useState(false)
+  const [search, setSearch] = useState('')
+  const [storeFilter, setStoreFilter] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
+  const [actionFilter, setActionFilter] = useState<'all' | 'choose-sku' | 'capture' | 'paired'>('all')
   const [captureMessage, setCaptureMessage] = useState('')
   const [showMobileGuide, setShowMobileGuide] = useState(false)
   const coverage = useMemo(() => {
@@ -93,7 +96,25 @@ export function PlannerSourceMatchPreview({ needs, source }: {
   const missing = coverage.filter(line => !line.suggestions.PLUS || !line.suggestions.DekaMarkt)
   const requiringChoice = stores.map(store =>
     coverage.filter(line => line.manualReview[store]).length)
-  const filtered = onlyMissing ? missing : coverage
+  // Review ambiguous existing SKUs before asking for new source capture.
+  const priority = (line: typeof coverage[number]) =>
+    stores.some(store => line.manualReview[store]) ? 0 :
+    stores.some(store => !line.suggestions[store]) ? 1 : 2
+  const selectedStores = storeFilter === 'both' ? stores : [storeFilter]
+  const term = search.trim().normalize('NFKC').toLocaleLowerCase('nl')
+  const filtered = (onlyMissing ? missing : coverage).filter(line => {
+    if (term && ![
+      line.need.label, line.need.id,
+      ...stores.flatMap(store => [line.suggestions[store]?.name, line.suggestions[store]?.sku]),
+    ].some(value => value?.normalize('NFKC').toLocaleLowerCase('nl').includes(term))) return false
+    if (actionFilter === 'choose-sku') return selectedStores.some(store => line.manualReview[store])
+    if (actionFilter === 'capture') return selectedStores.some(store =>
+      !line.suggestions[store] && !line.manualReview[store])
+    if (actionFilter === 'paired') return stores.every(store => !!line.suggestions[store])
+    return storeFilter === 'both' || selectedStores.some(store =>
+      !line.suggestions[store] || line.manualReview[store])
+  }).sort((a, b) => priority(a) - priority(b) ||
+    a.need.label.localeCompare(b.need.label, 'nl'))
   const shown = filtered.slice(0, showAll ? 200 : 12)
   const needsForNewSource = (store: 'PLUS' | 'DekaMarkt',
     nowMs: number): PlannerCaptureGuideNeed[] => {
@@ -189,9 +210,40 @@ export function PlannerSourceMatchPreview({ needs, source }: {
     <p><strong>Dit zijn onbevestigde naam- en verpakkingssuggesties.</strong> Een
       winkelprijs of besparing ontstaat pas nadat Vergelijk de originele SKU,
       benodigde hele verpakkingen, volledige mandjes en bronmomenten controleert.</p>
-    <label><input type="checkbox" checked={onlyMissing}
-      onChange={e => { setOnlyMissing(e.target.checked); setShowAll(false) }} />
-      Alleen ontbrekende of onzekere bronmatches tonen</label>
+    <div className="supa-planner-source-matches__controls" aria-label="Zoek en filter bronmatches">
+      <label>Zoek ingrediënt, product of SKU
+        <input type="search" maxLength={120} value={search}
+          placeholder="Bijvoorbeeld rijst of originele SKU"
+          onChange={event => { setSearch(event.currentTarget.value); setShowAll(false) }} />
+      </label>
+      <label>Winkel
+        <select value={storeFilter} onChange={event => {
+          setStoreFilter(event.currentTarget.value as typeof storeFilter); setShowAll(false)
+        }}>
+          <option value="both">Beide winkels</option>
+          <option value="PLUS">PLUS: openstaande controles</option>
+          <option value="DekaMarkt">DekaMarkt: openstaande controles</option>
+        </select>
+      </label>
+      <label>Volgende stap
+        <select value={actionFilter} onChange={event => {
+          setActionFilter(event.currentTarget.value as typeof actionFilter); setShowAll(false)
+        }}>
+          <option value="all">Alle productregels</option>
+          <option value="choose-sku">Kies bestaande SKU in Vergelijk</option>
+          <option value="capture">Echte bronopname ontbreekt</option>
+          <option value="paired">Voorstel voor beide winkels</option>
+        </select>
+      </label>
+      <label className="supa-planner-source-matches__check">
+        <input type="checkbox" checked={onlyMissing}
+          onChange={e => { setOnlyMissing(e.target.checked); setShowAll(false) }} />
+        Alleen ontbrekende of onzekere bronmatches
+      </label>
+    </div>
+    <p role="status">{filtered.length} van {coverage.length} ingrediënten in beeld;
+      {' '}{shown.length} nu getoond. Onzekere matches staan eerst.
+      Filters wijzigen nooit je mand of winkelprijzen.</p>
     <div className="supa-planner-source-matches__table" role="table"
       aria-label="Voorlopige bronmatching voor hetzelfde fysieke weekmandje">
       <div className="supa-planner-source-matches__row" role="row">
@@ -218,6 +270,13 @@ export function PlannerSourceMatchPreview({ needs, source }: {
         </span>)}
       </div>)}
     </div>
+    {filtered.length === 0 && <div role="status">
+      <p>Geen matches voor deze filters. Dit is geen prijs- of bronbewijs.</p>
+      <button type="button" className="ghost-button" onClick={() => {
+        setSearch(''); setStoreFilter('both'); setActionFilter('all')
+        setOnlyMissing(false); setShowAll(false)
+      }}>Toon alle ingrediënten</button>
+    </div>}
     {(pendingPlus > 0 || pendingDeka > 0) && <div className="supa-planner-source-matches__exports">
       <p><strong>Nieuwe echte bronopname vereist:</strong>
         {' '}{pendingPlus} PLUS- en {pendingDeka} DekaMarkt-regels.
