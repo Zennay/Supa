@@ -434,7 +434,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       <PrivateOwnReceiptViewer />
     </Suspense>
     <Suspense fallback={<p role="status">Historische privévergelijking laden…</p>}>
-      <PrivateOwnReceiptHistory />
+      <PrivateOwnReceiptHistory reviewed={reviewed} />
     </Suspense>
     <p className="own-store-planner__history-link">
       <a href="./private-receipt-history.html" rel="nofollow">

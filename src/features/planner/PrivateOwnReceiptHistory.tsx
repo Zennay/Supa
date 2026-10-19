@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { readPrivateReceipt } from './PrivateOwnReceiptViewer.tsx'
+import { privateOwnComparisonReceipt } from './privateOwnComparisonReceipt.ts'
+import type { PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import { comparePrivateReceiptHistory, type HistoricalReceiptResult, type ReceiptStore } from './privateReceiptHistory.ts'
 import { exportPrivateReceiptHistoryCsv } from './privateReceiptHistoryCsv.ts'
 
@@ -62,7 +64,9 @@ function downloadCsv(result: Extract<HistoricalReceiptResult, { status: 'ready' 
 /** Local-only historical comparison embedded in Planner, never promoting a
  * derived report back to source admission, source dates or the live budget.
  */
-export function PrivateOwnReceiptHistory() {
+export function PrivateOwnReceiptHistory({ reviewed }: {
+  reviewed: PrivateReviewedBaskets | null
+}) {
   const [files, setFiles] = useState<[File | null, File | null]>([null, null])
   const [result, setResult] = useState<HistoricalReceiptResult | null>(null)
   const [status, setStatus] = useState('')
@@ -70,7 +74,12 @@ export function PrivateOwnReceiptHistory() {
   const [storeFilter, setStoreFilter] = useState<'all' | ReceiptStore>('all')
   const [changedOnly, setChangedOnly] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [comparisonMode, setComparisonMode] = useState<'files' | 'planner'>('files')
   const version = useRef(0)
+  // Read the latest Planner source AFTER the asynchronous local file read.
+  // A stale render closure must never turn an expired price into a new week.
+  const latestReviewed = useRef(reviewed)
+  latestReviewed.current = reviewed
   const earlierPicker = useRef<HTMLInputElement>(null)
   const laterPicker = useRef<HTMLInputElement>(null)
   useEffect(() => () => { version.current++ }, [])
@@ -82,6 +91,7 @@ export function PrivateOwnReceiptHistory() {
     setQuery('')
     setChangedOnly(false)
     setStoreFilter('all')
+    setComparisonMode('files')
     setBusy(false)
     setStatus('Bestanden gewijzigd; vergelijk opnieuw. Eerdere bedragen zijn uit dit scherm gewist.')
   }
@@ -94,9 +104,21 @@ export function PrivateOwnReceiptHistory() {
     setQuery('')
     setChangedOnly(false)
     setStoreFilter('all')
+    setComparisonMode('files')
     setBusy(false)
     setStatus('Beide privérapporten en de afgeleide prijsverschillen uit dit scherm gewist.')
   }
+  function displayCompared(compared: HistoricalReceiptResult) {
+    if (compared.status === 'unavailable') {
+      setStatus(compared.reason)
+      return
+    }
+    setResult(compared)
+    setStatus(compared.entirePairComparable ?
+      'Twee historische privémandjes volledig vergelijkbaar; geen actuele winkelprijs.' :
+      'Historische verschillen per identieke SKU beschikbaar. Onvergelijkbare mandtotalen blijven onbekend.')
+  }
+
   async function compare() {
     const serial = ++version.current
     setResult(null)
@@ -118,14 +140,8 @@ export function PrivateOwnReceiptHistory() {
       if (!old || !latest) throw Error('Ongeldig rapport')
       const compared = comparePrivateReceiptHistory(old, latest)
       if (serial !== version.current) return
-      if (compared.status === 'unavailable') {
-        setStatus(compared.reason)
-        return
-      }
-      setResult(compared)
-      setStatus(compared.entirePairComparable ?
-        'Twee historische privémandjes volledig vergelijkbaar; geen actuele winkelprijs.' :
-        'Historische verschillen per identieke SKU beschikbaar. Onvergelijkbare mandtotalen blijven onbekend.')
+      setComparisonMode('files')
+      displayCompared(compared)
     } catch {
       if (serial === version.current)
         setStatus('Een van de eigen rapporten is onvolledig of gewijzigd. Controleer de originele export. Er zijn geen prijzen ingelezen als winkelbron.')
@@ -133,6 +149,44 @@ export function PrivateOwnReceiptHistory() {
       if (serial === version.current) setBusy(false)
     }
   }
+  async function compareEarlierWithCurrent() {
+    const serial = ++version.current
+    setResult(null)
+    setStatus('')
+    const file = files[0]
+    if (!file || file.size === 0 || file.size > 512_000) {
+      setStatus('Kies eerst een geldig eerder eigen Supa-JSON-rapport (maximaal 512 kB).')
+      return
+    }
+    setBusy(true)
+    try {
+      const oldRaw = await file.text()
+      if (serial !== version.current) return
+      const previous = readPrivateReceipt(oldRaw)
+      if (!previous) {
+        setStatus('Het eerdere bestand is geen volledig, geldig eigen Supa-prijsrapport.')
+        return
+      }
+      // The live Planner handoff uses existing exact source matching,
+      // whole-pack totals and age/permission-gated reviewed baskets.
+      const currentRaw = privateOwnComparisonReceipt(latestReviewed.current, Date.now())
+      const current = readPrivateReceipt(currentRaw)
+      if (!current) throw Error('Ongeldig huidig bronpaar')
+      const compared = comparePrivateReceiptHistory(previous, current)
+      if (serial !== version.current) return
+      setComparisonMode('planner')
+      displayCompared(compared)
+    } catch (error) {
+      if (serial !== version.current) return
+      setStatus(error instanceof Error &&
+        error.message === 'Voor een privérapport zijn twee actuele, fysiek gecontroleerde winkelmandjes nodig.'
+        ? 'Geen twee actuele en volledig gecontroleerde winkelmandjes in de Planner. Vul echte eigen PLUS- en DekaMarkt-bronnen in en bevestig alle matches eerst.'
+        : 'Je eerdere rapport of de huidige gecontroleerde winkelbronnen kunnen niet veilig worden vergeleken. Niets is als nieuwe bronprijs ingelezen.')
+    } finally {
+      if (serial === version.current) setBusy(false)
+    }
+  }
+
   const ready = result?.status === 'ready' ? result : null
   const term = query.normalize('NFKC').trim().toLocaleLowerCase('nl')
   const shownStores = storeFilter === 'all' ? STORES : [storeFilter]
@@ -145,10 +199,11 @@ export function PrivateOwnReceiptHistory() {
     ].some(value => value.normalize('NFKC').toLocaleLowerCase('nl').includes(term)))) ?? []
 
   return <details className="own-store-planner__archive own-store-planner__history">
-    <summary>Vergelijk de prijzen uit twee eerdere eigen winkelrapporten</summary>
-    <p>Open twee eerder opgeslagen Supa-weekrapporten. Dit vergelijkt uitsluitend jouw eigen
-      historische, afgeleide documenten; er worden geen bestanden geüpload of actuele
-      winkelprijzen, bronrechten of besparingen geclaimd.</p>
+    <summary>Vergelijk eigen historische prijzen met je huidige Planner-mandje</summary>
+    <p>Open een ouder eigen Supa-weekrapport en vergelijk met je huidige, volledig
+      gecontroleerde PLUS/Deka-wekelijkse bronnen. Je kunt ook twee eerdere
+      rapporten vergelijken. Alles blijft lokaal; ontbrekende of oude winkelprijzen
+      blijven onbekend en er worden geen bronrechten of besparingen geclaimd.</p>
     <div className="own-store-planner__history-pickers">
       <label>Eerder rapport (eigen JSON)
         <input type="file" accept=".json,application/json" ref={earlierPicker}
@@ -161,11 +216,18 @@ export function PrivateOwnReceiptHistory() {
     </div>
     <div className="own-store-planner__history-actions">
       <button type="button" className="ghost-button" disabled={busy}
-        onClick={() => void compare()}>Vergelijk eigen opnames</button>
+        onClick={() => void compareEarlierWithCurrent()}>
+        Vergelijk oud rapport met huidige gecontroleerde Planner-prijzen
+      </button>
+      <button type="button" className="ghost-button" disabled={busy}
+        onClick={() => void compare()}>Vergelijk twee eerdere rapporten</button>
       <button type="button" className="ghost-button" onClick={clear}>Wis beide opnames</button>
     </div>
     {status && <p role="status">{status}</p>}
     {ready && <div className="own-store-planner__archive-content">
+      <p className="own-store-planner__history-notice">{comparisonMode === 'planner'
+        ? 'Het latere rapport is bij de knopdruk lokaal samengesteld uit je huidige, volledig gecontroleerde Planner-bronnen. Dit is geen nieuwe retailerobservatie.'
+        : 'Beide rapporten zijn eerder door jou geëxporteerd. Geen nieuwe retailerobservatie.'}</p>
       <p><strong>Alleen historische vergelijking</strong> · bronmomenten PLUS:
         {' '}{ready.older.plusObservedAt} → {ready.later.plusObservedAt};
         {' '}DekaMarkt: {ready.older.dekaObservedAt} → {ready.later.dekaObservedAt}.</p>
