@@ -227,16 +227,28 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   useEffect(() => {
     const chooseOwnRecipe = (event: Event) => {
       const detail: unknown = (event as CustomEvent<unknown>).detail
-      if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return
+      if (!detail || typeof detail !== 'object' || Array.isArray(detail)) {
+        event.preventDefault()
+        return
+      }
       const { recipeId, day } = detail as { recipeId?: unknown; day?: unknown }
       if (typeof recipeId !== 'string' || typeof day !== 'string' ||
-          !m2InitialPlan.some(meal => meal.day === day)) return
+          !m2InitialPlan.some(meal => meal.day === day)) {
+        event.preventDefault()
+        return
+      }
       try {
         const library = readRecipeLibrary(window.localStorage)
-        if (library.error) return
+        if (library.error) {
+          event.preventDefault()
+          return
+        }
         const recipe = library.recipes.find(item => item.id === recipeId)
         if (!recipe || !toPlannerRecipe(recipe) ||
-            !recipes.some(item => item.id === recipeId)) return
+            !recipes.some(item => item.id === recipeId)) {
+          event.preventDefault()
+          return
+        }
         setPreferences(current => ({
           ...current,
           activeDays: current.activeDays.includes(day) ? current.activeDays :
@@ -246,6 +258,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         navigate('planner')
       } catch {
         // Never switch planning or use example prices after storage failure.
+        event.preventDefault()
       }
     }
     window.addEventListener('supa-plan-own-recipe', chooseOwnRecipe)

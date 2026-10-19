@@ -161,9 +161,15 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       return
     }
     if (!m2InitialPlan.some(meal => meal.day === plannerDay)) return
-    window.dispatchEvent(new CustomEvent('supa-plan-own-recipe', {
+    const accepted = window.dispatchEvent(new CustomEvent('supa-plan-own-recipe', {
+      cancelable: true,
       detail: { recipeId: recipe.id, day: plannerDay },
     }))
+    if (!accepted) {
+      setPrivateWeekMessage('Dit recept is niet meer geldig beschikbaar voor Planner. Herlaad je eigen recepten en controleer het opnieuw.')
+      return
+    }
+    setPrivateWeekMessage('')
     detail.current?.close()
   }
   function downloadForPrivateComparison() {
@@ -451,6 +457,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <button type="button" onClick={() => planOwnRecipe(selected)}>
               Zet {selected.title} op {plannerDay} in Planner
             </button>
+            {privateWeekMessage && <p role="status">{privateWeekMessage}</p>}
           </> : <p>Controleer eerst de hoeveelheid, metrische eenheid en eventuele gedeeltelijke stuks.
             Pas daarna kun je dit recept zonder gokwerk plannen.</p>}
         </section>
