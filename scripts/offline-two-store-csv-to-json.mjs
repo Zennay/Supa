@@ -45,17 +45,19 @@ export async function readPrivateCsv(path) {
  * semicolon, TSV and comma exports may differ. Neither store may be fabricated or copied
  * under the other retailer ID; unknowns remain null, not zero prices.
  */
+/** Retain original one-shop source bytes until canonical CSV admission.
+ * A JSON input is re-serialized only by the existing strict reverse adapter;
+ * no new source rows, prices, package counts or observation times are made. */
+export function ownedSourceAsCsv(raw) {
+  if (typeof raw !== 'string') error('Eigen winkelbron moet een tekstbestand zijn.')
+  const source = raw.replace(/^\uFEFF/u, '')
+  return source.trimStart().startsWith('{')
+    ? offlinePriceJsonToCsv(source) : source
+}
+
 export function joinPrivateStoreCsv(first, second) {
-  const oneStore = (raw) => {
-    if (typeof raw !== 'string') error('Eigen winkelbron moet een tekstbestand zijn.')
-    const source = raw.replace(/^\uFEFF/u, '')
-    const csv = source.trimStart().startsWith('{')
-      ? offlinePriceJsonToCsv(source) : source
-    // Original, canonical CSV intake, including exact recorded source facts.
-    return JSON.parse(convertOwnStoreCsv(csv))
-  }
-  const one = oneStore(first)
-  const two = oneStore(second)
+  const one = JSON.parse(convertOwnStoreCsv(ownedSourceAsCsv(first)))
+  const two = JSON.parse(convertOwnStoreCsv(ownedSourceAsCsv(second)))
   if (one.captures.length !== 1 || two.captures.length !== 1 ||
       one.captures[0].retailer !== 'PLUS' ||
       two.captures[0].retailer !== 'DekaMarkt') {
@@ -127,7 +129,8 @@ async function main() {
     error('Invoerbestanden en uitvoerbestand moeten verschillende paden zijn.')
   }
   const texts = await Promise.all(sources.map(readPrivateCsv))
-  const csv = pairing ? joinPrivateStoreCsv(texts[0], texts[1]) : texts[0]
+  const csv = pairing ? joinPrivateStoreCsv(texts[0], texts[1]) :
+    single ? ownedSourceAsCsv(texts[0]) : texts[0]
   // Keep the one existing converter as the only authority for captured-at
   // timestamps, SKU uniqueness and physical prices. `--single` does not
   // manufacture a second store or relax the two-store default mode.

@@ -13,9 +13,8 @@ import { open, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readPrivateCsv, joinPrivateStoreCsv } from './offline-two-store-csv-to-json.mjs'
+import { readPrivateCsv, joinPrivateStoreCsv, ownedSourceAsCsv } from './offline-two-store-csv-to-json.mjs'
 import { convertTwoStoreCsv, convertOwnStoreCsv } from '../public/offline-two-store-csv.mjs'
-import { offlinePriceJsonToCsv } from './offline-private-prices-json-to-csv.mjs'
 import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
 import { privateBasketMissingReason } from '../src/domain/privateBasketMissingReason.ts'
 import { matchIngredient } from '../src/domain/matching.ts'
@@ -324,7 +323,7 @@ async function main() {
   ])
   const csv = paired
     ? joinPrivateStoreCsv(csvFiles[0], csvFiles[1])
-    : pricesJson ? offlinePriceJsonToCsv(csvFiles[0]) : csvFiles[0]
+    : pricesJson || single ? ownedSourceAsCsv(csvFiles[0]) : csvFiles[0]
   // Missing retailer input remains UNKNOWN, never a fabricated second store.
   const normalizedJson = single || pricesJson
     ? convertOwnStoreCsv(csv) : convertTwoStoreCsv(csv)

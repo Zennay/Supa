@@ -46,6 +46,8 @@ Voor een afzonderlijke, rechtmatig verkregen **PLUS óf DekaMarkt** CSV-opname k
 node scripts/offline-two-store-csv-to-json.mjs --single eigen-winkel.csv mijn-eerste-winkel.json
 ```
 
+Ook een eerder opgeslagen eigen **éénwinkel-JSON** is bruikbaar met `--single`, naast de bestaande CSV/TSV-export. Het JSON-bestand wordt eerst opnieuw onderworpen aan dezelfde bestaande strikte broncontrole.
+
 Dit geeft `supa-private-single-store-prices-v1` met uitsluitend die ene echte winkel. Importeer het via **Supa → Vergelijk**; productreview, Planner en boodschappenlijst blijven bruikbaar. Een winnaar of financieel prijsverschil is pas mogelijk na een apart aangeleverde, werkelijk waargenomen tweede winkel binnen dezelfde tijdcontext. Bestaande tweewinkelconversie zonder `--single` blijft verplicht twee winkels vereisen.
 
 ## Betekenis van de kolommen

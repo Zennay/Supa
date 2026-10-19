@@ -82,6 +82,8 @@ Heb je nog maar **één echte winkelopname**? Maak toch een lokaal HTML-overzich
 node --experimental-strip-types scripts/offline-local-basket-comparison.mjs --single een-winkel.csv vraag.json mand-onvolledig.html
 ```
 
+`--single` accepteert nu ook een reeds opgeslagen eigen éénwinkel-JSON; de originele bron wordt via de bestaande strikte converter beoordeeld.
+
 `--prices-json` ondersteunt ook één reeds bestaande `supa-private-single-store-prices-v1`-opname. De standaard tweewinkelroute blijft strikt en verlangt twee echte opnames; er wordt geen tweede winkelbron verzonnen en niets opgehaald.
 
 Een ongeldig of verrijkt JSON-bronbestand wordt afgewezen. Er wordt niets automatisch opgevraagd, genormaliseerd naar fictieve prijzen of geüpload.
