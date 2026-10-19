@@ -1308,7 +1308,7 @@ export function OfflineReviewedWorkbench({
             ))}</ol>
           </details>
         )}
-        <section className="offline-price-workbench__input"
+        <section className="offline-price-workbench__input offline-price-workbench__capture-review"
           aria-label="Eigen ingevuld prijsblad eerst controleren">
           <label>Controleer één ingevuld CSV-prijsblad of twee aparte winkelbladen vóór import
             <input type="file" accept=".csv,text/csv" multiple
@@ -1322,7 +1322,7 @@ export function OfflineReviewedWorkbench({
               Een gedeeltelijk ingevulde regel wordt nooit stilzwijgend weggegooid.</small>
           </label>
           {currentPreview && (
-            <div role="region" aria-label="Controle van ingevuld bronblad">
+            <div className="offline-price-workbench__capture-preview" role="region" aria-label="Controle van ingevuld bronblad">
               <strong>Bronblad leesbaar, nog geen productmatch goedgekeurd</strong>
               {currentPreview.stores.map(store => (
                 <p key={store.retailer}>{store.retailer}: {store.enteredProducts}
