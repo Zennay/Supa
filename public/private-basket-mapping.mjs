@@ -1,0 +1,774 @@
+/* Supa private basket mapping: local, explicit user selection; not a retailer scraper.
+ * Source admission delegates to the existing canonical offline CSV converter.
+ * No storage, remote requests, inferred product equivalence or monetary computation.
+ */
+import { convertTwoStoreCsv } from './offline-two-store-csv.mjs'
+
+const stores = ['PLUS', 'DekaMarkt']
+const units = ['g', 'kg', 'ml', 'l', 'piece']
+const maxBytes = 256000
+const sourceInput = document.querySelector('#source')
+const plusInput = document.querySelector('#plus-source')
+const dekaInput = document.querySelector('#deka-source')
+const csvHeader = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
+let sourceRevision = 0
+const sourceStatus = document.querySelector('#source-status')
+const editSource = document.querySelector('#edit-owned-source')
+const status = document.querySelector('#status')
+const lines = document.querySelector('#lines')
+const coverage = document.querySelector('#match-coverage')
+const mealCount = document.querySelector('#meal-count')
+const demandImport = document.querySelector('#demand-import')
+const maxLines = 200
+const save = document.querySelector('#save')
+const downloadUnpriced = document.querySelector('#download-unpriced')
+const showUnpriced = document.querySelector('#show-unpriced')
+const unpricedTrip = document.querySelector('#unpriced-trip')
+const unpricedItems = document.querySelector('#unpriced-items')
+const unpricedProgress = document.querySelector('#unpriced-progress')
+const unpricedChecked = new Set()
+let unpricedSnapshot = null
+const compareNow = document.querySelector('#compare-now')
+const priceResult = document.querySelector('#result')
+const priceStatus = document.querySelector('#price-status')
+const add = document.querySelector('#add')
+let captures = null
+let nextId = 1
+
+const classify = (unit) => ['g', 'kg'].includes(unit) ? 'weight'
+  : ['ml', 'l'].includes(unit) ? 'volume' : unit === 'piece' ? 'count' : null
+
+const own = (data, key) => data !== null && typeof data === 'object' &&
+  Object.hasOwn(data, key) ? data[key] : undefined
+
+const validText = (value, max = 160) => typeof value === 'string' &&
+  value.length > 0 && value.length <= max && value.trim() === value &&
+  /[\p{L}\p{N}]/u.test(value) && !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(value) &&
+  !/^[=+@-]/u.test(value)
+const numeric = (text) => {
+  if (!/^(?:0|[1-9]\d*)(?:[.,]\d{1,6})?$/.test(text)) return null
+  const number = Number(text.replace(',', '.'))
+  return Number.isFinite(number) && number > 0 && number <= 100000 ? number : null
+}
+function validSourceInstant(value) {
+  if (typeof value !== 'string') return false
+  const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.\d{1,9})?([+-])(\d\d):(\d\d)$/.exec(value)
+  if (!m) return false
+  const [year, month, day, hour, minute, second, zoneHour, zoneMinute] =
+    [m[1], m[2], m[3], m[4], m[5], m[6], m[8], m[9]].map(Number)
+  if (year < 2000 || year > 2100 || zoneMinute > 59 ||
+      (m[7] === '+' ? zoneHour > 14 || (zoneHour === 14 && zoneMinute !== 0)
+        : zoneHour > 12 || (zoneHour === 12 && zoneMinute !== 0))) return false
+  const civil = new Date(0)
+  civil.setUTCFullYear(year, month - 1, day)
+  civil.setUTCHours(hour, minute, second, 0)
+  return civil.getUTCFullYear() === year && civil.getUTCMonth() === month - 1 &&
+    civil.getUTCDate() === day && civil.getUTCHours() === hour &&
+    civil.getUTCMinutes() === minute && civil.getUTCSeconds() === second &&
+    Number.isFinite(Date.parse(value))
+}
+
+const node = (tag, attrs = {}, value) => {
+  const el = document.createElement(tag)
+  for (const [key, val] of Object.entries(attrs)) {
+    if (key === 'className') el.className = val
+    else if (key === 'type' || key === 'min' || key === 'max' ||
+             key === 'step' || key === 'id' || key === 'placeholder') el.setAttribute(key, val)
+  }
+  if (value !== undefined) el.textContent = value
+  return el
+}
+const field = (parent, caption, input) => {
+  const label = node('label', {}, caption)
+  label.append(input)
+  parent.append(label)
+  return input
+}
+const notice = (element, message, kind = '') => {
+  element.textContent = message
+  element.className = 'notice' + (kind ? ' ' + kind : '')
+}
+const selected = (select) => select.value === '' ? null : select.value
+
+const ownEuro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+function observedPackDescription(product) {
+  if (!product || product.priceCents === null || !Number.isSafeInteger(product.priceCents) ||
+      !Number.isFinite(product.packAmount) || product.packAmount <= 0 ||
+      !Number.isSafeInteger(product.packCount) || product.packCount < 1) return ''
+  const count = product.packCount
+  const baseAmount = product.packAmount * count *
+    (product.packUnit === 'kg' || product.packUnit === 'l' ? 1000 : 1)
+  const family = ['g', 'kg'].includes(product.packUnit) ? 'kg'
+    : ['ml', 'l'].includes(product.packUnit) ? 'liter' : 'stuk'
+  const multiplier = family === 'stuk' ? 1 : 1000
+  const advisory = product.priceCents / 100 * multiplier / baseAmount
+  return ownEuro.format(product.priceCents / 100) + ' per verpakking' +
+    (Number.isFinite(advisory) && advisory >= 0 ?
+      ' · indicatief ' + ownEuro.format(advisory) + '/' + family : '')
+}
+
+// Selection records a human-confirmed product identity, not its purchasability.
+function observedProducts(store, unit) {
+  const capture = captures?.[store]
+  if (!capture) return []
+  return capture.products.filter(product => classify(product.packUnit) === classify(unit))
+}
+
+function availableProducts(store, unit) {
+  const capture = captures?.[store]
+  if (!capture) return []
+  return capture.products.filter(product => product.available &&
+    product.priceCents !== null && product.packAmount !== null &&
+    classify(product.packUnit) === classify(unit))
+}
+
+function updateCoverage() {
+  const rows = Array.from(lines.querySelectorAll('.ingredient'))
+  if (!rows.length) {
+    coverage.textContent = 'Nog geen ingrediënten in de fysieke mandvraag.'
+    return
+  }
+  if (!captures) {
+    coverage.textContent = rows.length + ' fysieke ingrediëntregels zonder toegelaten eigen winkelopnames. ' +
+      'De ongeprijsde lijst blijft beschikbaar; geen supermarktbedragen bekend.'
+    coverage.className = 'notice warning'
+    return
+  }
+  const messages = stores.map(store => {
+    const countBySku = new Map()
+    for (const row of rows) {
+      const id = row.querySelector('[data-store="' + store + '"]').value
+      if (id) countBySku.set(id, (countBySku.get(id) ?? 0) + 1)
+    }
+    let ready = 0
+    let duplicated = 0
+    let knownButUnpriced = 0
+    for (const row of rows) {
+      const sku = row.querySelector('[data-store="' + store + '"]').value
+      if (!sku) continue
+      if (countBySku.get(sku) > 1) { duplicated++; continue }
+      const input = row.querySelector('.amount').value.trim()
+      const amount = input === '' ? null : numeric(input)
+      const unit = row.querySelector('.unit').value
+      if (amount !== null && validText(row.querySelector('.label').value.trim())) {
+        if (availableProducts(store, unit).some(p => p.id === sku)) ready++
+        else if (observedProducts(store, unit).some(p => p.id === sku)) knownButUnpriced++
+      }
+    }
+    return store + ': ' + ready + ' van ' + rows.length +
+      ' fysieke regels met uniek gekozen, prijsbaar eigen product' +
+      (knownButUnpriced ? ' · ' + knownButUnpriced +
+        ' gekoppeld maar niet prijsbaar/beschikbaar' : '') +
+      (duplicated ? ' · ' + duplicated + ' regels met dubbel gekozen SKU' : '')
+  })
+  const now = Date.now()
+  const observed = stores.map(store => Date.parse(captures[store].observedAt))
+  const ages = observed.map(time => now - time)
+  const fresh = ages.every(age => Number.isFinite(age) && age >= 0 && age <= 7 * 86400000)
+  const paired = Math.abs(observed[0] - observed[1]) <= 86400000
+  const complete = messages.every(value => value.includes(' ' + rows.length + ' van ' + rows.length))
+  const expiry = Math.min(...observed) + 7 * 86400000
+  const timeStatus = !fresh ? 'Eén of beide bronopnames zijn toekomstig of ouder dan zeven dagen. ' :
+    !paired ? 'De twee bronmomenten liggen meer dan 24 uur uit elkaar. ' :
+      'Beide bronmomenten zijn binnen zeven dagen en maximaal 24 uur uiteen. '
+  coverage.className = 'notice' + (!complete || !fresh || !paired ? ' warning' : '')
+  coverage.textContent = messages.join(' · ') + '. ' + timeStatus +
+    (fresh && paired ? 'Bronpaar geldig tot uiterlijk ' +
+      new Date(expiry).toLocaleString('nl-NL') + ' volgens de oorspronkelijke waarnemingen. ' : '') +
+    'Alleen een complete, opnieuw berekende privévergelijking stelt de winkelbedragen vast. Onbekende of verlopen prijzen zijn nooit €0.'
+}
+
+function suggestHumanReviewedSku(row, unit, candidates) {
+  const label = row.querySelector('.label').value.trim()
+  if (!validText(label)) return null
+  const tokens = label.toLocaleLowerCase('nl').split(/[^\p{L}\p{N}]+/u)
+    .filter(word => word.length > 2).slice(0, 8)
+  if (!tokens.length) return null
+  // Suggestions are explicitly nonbinding; cap local scoring on older phones.
+  const scoped = candidates.filter(product =>
+    tokens.some(word => product.name.toLocaleLowerCase('nl').includes(word))).slice(0, 150)
+  if (!scoped.length) return null
+  const rawAmount = row.querySelector('.amount').value.trim()
+  const amount = rawAmount === '' ? null : numeric(rawAmount)
+  if (rawAmount && amount === null) return null
+  const hint = {
+    requirement: { id: row.dataset.id, query: label, amount, unit },
+    candidates: scoped,
+    decision: null,
+  }
+  document.dispatchEvent(new CustomEvent('supa:private-match-hint', { detail: hint }))
+  return hint.decision?.type === 'match' ? hint.decision : null
+}
+
+function updateSelect(select, store, unit) {
+  const row = select.closest('.ingredient')
+  const search = row.querySelector('[data-search-store="' + store + '"]')
+  const query = search.value.trim().toLocaleLowerCase('nl')
+  const chosen = select.value
+  const all = observedProducts(store, unit)
+  const kept = all.find(product => product.id === chosen)
+  const filtered = all.filter(product => !query ||
+    product.name.toLocaleLowerCase('nl').includes(query) ||
+    product.id.toLocaleLowerCase('nl').includes(query))
+  const advice = query ? null : suggestHumanReviewedSku(row, unit, availableProducts(store, unit))
+  const shown = filtered.slice(0, 80)
+  if (!query && advice) {
+    const suggested = filtered.find(product => product.id === advice.productId)
+    if (suggested) {
+      const index = shown.findIndex(product => product.id === suggested.id)
+      if (index >= 0) shown.splice(index, 1)
+      shown.unshift(suggested)
+    }
+  }
+  if (kept && !shown.some(product => product.id === kept.id)) shown.unshift(kept)
+  select.replaceChildren(new Option('Niet gekoppeld · onbekend', ''))
+  for (const product of shown) {
+    const pack = product.packAmount === null ? 'verpakking onbekend'
+      : String(product.packAmount).replace('.', ',') + ' ' + product.packUnit
+    const state = !product.available ? ' · niet leverbaar'
+      : product.priceCents === null || product.packAmount === null
+        ? ' · prijs/verpakking onbekend' : ''
+    const option = new Option(product.name + ' · ' + pack + ' · ID ' + product.id + state, product.id)
+    select.add(option)
+  }
+  select.value = kept ? kept.id : ''
+  const chosenProduct = all.find(product => product.id === select.value)
+  row.querySelector('[data-matches-store="' + store + '"]').textContent =
+    String(filtered.length) + ' waargenomen eigen bronartikelen met compatibele eenheidsfamilie; ' +
+    (filtered.length > 80 ? 'maximaal 80 zichtbaar, verfijn jouw zoekterm. ' : '') +
+    (advice ? 'Suggestie van Supa op basis van naam en verpakking: SKU ' +
+      advice.productId + ' (score ' + advice.score +
+      '), bewust niet automatisch gekozen. ' : '') +
+    (chosenProduct
+      ? 'Gekozen SKU ' + chosenProduct.id + ': ' +
+        (!chosenProduct.available ? 'niet leverbaar; niet in winkelmandprijs' :
+          chosenProduct.priceCents === null || chosenProduct.packAmount === null
+            ? 'prijs of verpakking ontbreekt; blijft onbekend'
+            : observedPackDescription(chosenProduct)) +
+        '. Controleer zelf de echte productnaam, voorraad en verpakking.'
+      : 'Kies expliciet de juiste winkel-SKU; geen automatische productmatch.')
+}
+function invalidateUnpricedDemand() {
+  unpricedTrip.hidden = true
+  unpricedChecked.clear()
+  unpricedSnapshot = null
+}
+function invalidatePrice() {
+  if (priceResult) priceResult.hidden = true
+  if (priceStatus) {
+    priceStatus.textContent = 'De bron of mandvraag is veranderd. Vergelijk opnieuw voor een betrouwbaar privéresultaat.'
+    priceStatus.className = 'notice'
+  }
+}
+function clearSourceMatches() {
+  // An equal SKU string from a new capture does not guarantee the same
+  // product identity, contents, availability or price. Explicitly re-review.
+  for (const select of lines.querySelectorAll('[data-store]')) select.value = ''
+}
+function refresh() {
+  invalidatePrice()
+  for (const row of lines.querySelectorAll('.ingredient')) {
+    const unit = row.querySelector('.unit').value
+    for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit)
+  }
+  save.disabled = !lines.children.length
+  downloadUnpriced.disabled = save.disabled
+  showUnpriced.disabled = save.disabled
+  compareNow.disabled = !captures || save.disabled
+  editSource.disabled = !captures
+  updateCoverage()
+}
+function addIngredient(restored = null) {
+  if (lines.children.length >= maxLines) return
+  const existing = new Set(Array.from(lines.children, row => row.dataset.id))
+  let id
+  if (restored !== null) {
+    id = restored.id
+    if (existing.has(id)) return
+  } else {
+    do { id = 'ingredient-' + nextId++ } while (existing.has(id))
+  }
+  const row = node('div', { className: 'ingredient' })
+  row.dataset.id = id
+  const heading = node('strong', {}, 'Ingrediënt ' + (lines.children.length + 1))
+  const grid = node('div', { className: 'grid' })
+  const label = node('input', { type: 'text', placeholder: 'Bijv. rijst' })
+  label.maxLength = 160
+  label.className = 'label'
+  if (restored !== null) label.value = restored.label
+  const amount = node('input', { type: 'text', placeholder: 'bijv. 500' })
+  amount.maxLength = 24
+  amount.className = 'amount'
+  if (restored !== null && restored.amount !== null) amount.value = String(restored.amount)
+  const unit = node('select')
+  unit.className = 'unit'
+  for (const item of units) unit.add(new Option(item === 'piece' ? 'stuk (piece)' : item, item))
+  if (restored !== null) unit.value = restored.unit
+  unit.addEventListener('change', () => {
+    for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit.value)
+  })
+  field(grid, 'Ingrediëntnaam', label)
+  field(grid, 'Hoeveelheid (leeg = onbekend)', amount)
+  field(grid, 'Eenheid', unit)
+  const storesGrid = node('div', { className: 'stores' })
+  for (const store of stores) {
+    const box = node('div')
+    const filter = node('input', { type: 'search', placeholder: 'Zoek productnaam of artikel-ID' })
+    filter.dataset.searchStore = store
+    filter.maxLength = 160
+    field(box, 'Zoek in eigen ' + store + '-producten', filter)
+    const select = node('select')
+    select.dataset.store = store
+    select.setAttribute('aria-label', 'Gekozen ' + store + '-product voor ' + id)
+    field(box, store + ' · expliciete productkeuze', select)
+    const count = node('small')
+    count.dataset.matchesStore = store
+    box.append(count)
+    storesGrid.append(box)
+    filter.addEventListener('input', () => updateSelect(select, store, unit.value))
+    select.addEventListener('change', () => {
+      updateSelect(select, store, unit.value)
+      updateCoverage()
+    })
+  }
+  const actions = node('div', { className: 'row-actions' })
+  const markLabel = node('label', {}, 'Selecteer om handmatig samen te voegen')
+  const mark = node('input', { type: 'checkbox' })
+  mark.dataset.mergeSelected = '1'
+  mark.style.width = 'auto'
+  mark.style.marginInlineEnd = '8px'
+  markLabel.prepend(mark)
+  actions.append(markLabel)
+  const remove = node('button', { type: 'button', className: 'secondary' }, 'Verwijder ingrediënt')
+  remove.addEventListener('click', () => { row.remove(); invalidateUnpricedDemand(); refresh() })
+  actions.append(remove)
+  row.append(heading, grid, storesGrid, actions)
+  lines.append(row)
+  for (const store of stores) updateSelect(row.querySelector('[data-store="' + store + '"]'), store, unit.value)
+  save.disabled = false
+  downloadUnpriced.disabled = false
+  showUnpriced.disabled = false
+  compareNow.disabled = !captures
+  invalidateUnpricedDemand()
+  invalidatePrice()
+  updateCoverage()
+}
+
+editSource.addEventListener('click', () => {
+  if (!captures) return
+  if (!window.confirm('Bewerk je al geopende eigen PLUS/Deka-opnames? Bestaande handmatige conceptregels worden vervangen en huidige productmatches gewist. Opnametijden blijven de originele tijdstippen: vul uitsluitend na echte hercontrole nieuwe prijs of opnametijd in.')) return
+  document.dispatchEvent(new CustomEvent('supa:manual-prefill-own-source', {
+    detail: { captures: stores.map(store => captures[store]) },
+  }))
+})
+
+function acceptJson(json) {
+  if (!json || Array.isArray(json) || json.schema !== 'supa-offline-prices-v1' ||
+      !Array.isArray(json.captures) || json.captures.length !== 2) {
+    throw Error('Bestand heeft niet het bestaande Supa-prijsbronformaat.')
+  }
+  const result = Object.create(null)
+  for (const capture of json.captures) {
+    if (!capture || typeof capture !== 'object' ||
+        !stores.includes(capture.retailer) || result[capture.retailer] ||
+        !Array.isArray(capture.products) || capture.products.length > 1000 ||
+        !validSourceInstant(capture.observedAt)) {
+      throw Error('Ongeldige winkelopname; controleer winkel en tijd.')
+    }
+    const used = new Set()
+    for (const p of capture.products) {
+      if (!p || !validText(own(p,'id'), 100) || !validText(own(p,'name')) ||
+          used.has(p.id) || !units.includes(p.packUnit) ||
+          (p.packAmount !== null && (!Number.isFinite(p.packAmount) || p.packAmount <= 0 || p.packAmount > 100000)) ||
+          (p.packCount !== undefined && (!Number.isSafeInteger(p.packCount) || p.packCount < 1 || p.packCount > 1000)) ||
+          (p.priceCents !== null && (!Number.isSafeInteger(p.priceCents) || p.priceCents < 0 || p.priceCents > 1000000)) ||
+          typeof p.available !== 'boolean' ||
+          (p.available && (p.packAmount === null || p.priceCents === null || !Number.isSafeInteger(p.packCount)))) {
+        throw Error('Ongeldige of dubbele winkelartikelgegevens.')
+      }
+      used.add(p.id)
+    }
+    result[capture.retailer] = capture
+  }
+  if (stores.some(store => !result[store])) throw Error('Beide winkelopnames zijn vereist.')
+  return result
+}
+
+async function readLocalFile(file) {
+  if (!file || !file.size || file.size > maxBytes) {
+    throw Error('Ieder bronbestand moet tussen 1 en 256.000 bytes groot zijn.')
+  }
+  return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+}
+
+function removeCsvHeader(source) {
+  const normalized = source.startsWith('\uFEFF') ? source.slice(1) : source
+  const firstEnd = normalized.indexOf('\n')
+  if (firstEnd < 0 || normalized.slice(0, firstEnd).replace(/\r$/, '') !== csvHeader) {
+    throw Error('Ieder CSV-bestand moet de bestaande negenkoloms-kop bevatten.')
+  }
+  const body = normalized.slice(firstEnd + 1)
+  if (!body) throw Error('Een van de winkelbestanden bevat geen opnameregels.')
+  return body.endsWith('\n') ? body : body + '\n'
+}
+
+async function loadSources() {
+  const revision = ++sourceRevision
+  captures = null
+  refresh()
+  const combined = sourceInput.files?.[0]
+  const plus = plusInput.files?.[0]
+  const deka = dekaInput.files?.[0]
+  if (!combined && !plus && !deka) {
+    notice(sourceStatus, 'Nog geen bronbestand gekozen.')
+    return
+  }
+  if (!combined && (!plus || !deka)) {
+    notice(sourceStatus, 'Selecteer zowel de PLUS- als de DekaMarkt-CSV.', 'warning')
+    return
+  }
+  try {
+    let parsed
+    if (combined) {
+      const content = await readLocalFile(combined)
+      parsed = combined.name.toLowerCase().endsWith('.json')
+        ? JSON.parse(content) : JSON.parse(convertTwoStoreCsv(content))
+    } else {
+      const [plusText, dekaText] = await Promise.all([readLocalFile(plus), readLocalFile(deka)])
+      const joined = csvHeader + '\n' + removeCsvHeader(plusText) + removeCsvHeader(dekaText)
+      if (new TextEncoder().encode(joined).length > maxBytes) {
+        throw Error('Twee samengevoegde CSV-bronnen zijn groter dan 256 kB.')
+      }
+      parsed = JSON.parse(convertTwoStoreCsv(joined))
+    }
+    const verified = acceptJson(parsed)
+    if (revision !== sourceRevision) return
+    clearSourceMatches()
+    captures = verified
+    const now = Date.now()
+    const descriptions = stores.map(store => {
+      const capture = captures[store]
+      const ageMs = now - Date.parse(capture.observedAt)
+      const stale = ageMs < 0 ? ' · toekomstig' :
+        ageMs > 7 * 86400000 ? ' · ouder dan 7 dagen' : ''
+      return store + ': ' + capture.products.length + ' producten, vastgelegd ' +
+        capture.observedAt + stale
+    })
+    const gap = Math.abs(Date.parse(captures.PLUS.observedAt) -
+      Date.parse(captures.DekaMarkt.observedAt))
+    if (gap > 86400000) descriptions.push('Opnames >24 uur uiteen. Opnieuw meten voor een volledige vergelijking.')
+    descriptions.push('Selecteer uitsluitend door jou gecontroleerde matches. Geen automatische bronrechten of besparing.')
+    const expired = stores.some(store => {
+      const age = now - Date.parse(captures[store].observedAt)
+      return age < 0 || age > 7 * 86400000
+    })
+    notice(sourceStatus, descriptions.join('\n'), gap > 86400000 || expired ? 'warning' : '')
+  } catch {
+    if (revision !== sourceRevision) return
+    captures = null
+    notice(sourceStatus, 'Kan eigen bronnen niet veilig verwerken. Controleer de strikte CSV-koppen, winkelopnames en bronbestanden.', 'error')
+  }
+  refresh()
+}
+document.addEventListener('supa:manual-source-edited', () => {
+  ++sourceRevision
+  captures = null
+  clearSourceMatches()
+  refresh()
+  notice(sourceStatus, 'Handmatige brongegevens gewijzigd. Neem de twee echte winkelopnames opnieuw over, en bevestig daarna alle winkelproductkeuzes opnieuw.', 'warning')
+})
+document.addEventListener('supa:manual-source-admitted', event => {
+  ++sourceRevision
+  captures = null
+  try {
+    const parsed = event.detail?.source
+    const verified = acceptJson(parsed)
+    clearSourceMatches()
+    captures = verified
+    sourceInput.value = ''
+    plusInput.value = ''
+    dekaInput.value = ''
+    refresh()
+    const now = Date.now()
+    const labels = stores.map(store => {
+      const capture = captures[store]
+      const age = now - Date.parse(capture.observedAt)
+      return store + ': ' + capture.products.length + ' zelf ingevoerde product(en), ' +
+        capture.observedAt + (age < 0 ? ' · toekomstig' :
+          age > 7 * 86400000 ? ' · ouder dan 7 dagen' : '')
+    })
+    const gap = Math.abs(Date.parse(captures.PLUS.observedAt) -
+      Date.parse(captures.DekaMarkt.observedAt))
+    if (gap > 86400000) labels.push('Opnames meer dan 24 uur uiteen: geen volledig betrouwbaar prijsverschil.')
+    labels.push('Kies per ingrediënt opnieuw handmatig gecontroleerde artikel-ID’s uit deze nieuwe bron.')
+    const expired = stores.some(store => {
+      const age = now - Date.parse(captures[store].observedAt)
+      return age < 0 || age > 7 * 86400000
+    })
+    notice(sourceStatus, labels.join('\n'), gap > 86400000 || expired ? 'warning' : '')
+  } catch {
+    captures = null
+    refresh()
+    notice(sourceStatus, 'Handmatig ingevoerde bron voldoet niet aan het Supa-formaat.', 'error')
+  }
+})
+
+sourceInput.addEventListener('change', () => {
+  plusInput.value = ''
+  dekaInput.value = ''
+  void loadSources()
+})
+for (const input of [plusInput, dekaInput]) {
+  input.addEventListener('change', () => {
+    sourceInput.value = ''
+    void loadSources()
+  })
+}
+
+function parsePrivateDemand(text) {
+  const root = JSON.parse(text)
+  if (!root || typeof root !== 'object' || Array.isArray(root) ||
+      Object.keys(root).some(k => !['schema', 'selectedMealCount', 'ingredients'].includes(k)) ||
+      root.schema !== 'supa-private-basket-demand-v1' ||
+      !Number.isSafeInteger(root.selectedMealCount) ||
+      root.selectedMealCount < 1 || root.selectedMealCount > 1000 ||
+      !Array.isArray(root.ingredients) || !root.ingredients.length ||
+      root.ingredients.length > maxLines) {
+    throw Error('Ongeldig of te groot eerder mandvraagbestand (maximaal 200 regels in dit scherm).')
+  }
+  const ids = new Set()
+  const items = root.ingredients.map(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item) ||
+        Object.keys(item).some(k => !['id', 'label', 'amount', 'unit', 'productIds'].includes(k)) ||
+        !validText(item.id, 100) || ids.has(item.id) || !validText(item.label) ||
+        !units.includes(item.unit) ||
+        (item.amount !== null && (typeof item.amount !== 'number' ||
+          !Number.isFinite(item.amount) || item.amount <= 0 || item.amount > 100000)) ||
+        !item.productIds || typeof item.productIds !== 'object' ||
+        Array.isArray(item.productIds) ||
+        Object.keys(item.productIds).some(store => !stores.includes(store))) {
+      throw Error('Een ingrediënt uit de vorige mandvraag is ongeldig.')
+    }
+    ids.add(item.id)
+    for (const store of stores) {
+      const id = item.productIds[store]
+      if (id !== null && id !== undefined && !validText(id, 100)) {
+        throw Error('Eerder geselecteerde winkelproduct-ID is ongeldig.')
+      }
+    }
+    // No silent reuse of a product ID against newer/different observations.
+    return { id: item.id, label: item.label, amount: item.amount, unit: item.unit }
+  })
+  return { meals: root.selectedMealCount, items }
+}
+document.addEventListener('supa:private-planner-demand', event => {
+  try {
+    // Planner conversion uses Supa's existing canonical ingredient aggregator.
+    // Re-validate the cross-module envelope exactly like a restored local demand.
+    const saved = parsePrivateDemand(JSON.stringify(event.detail))
+    mealCount.value = String(saved.meals)
+    lines.replaceChildren()
+    for (const item of saved.items) addIngredient(item)
+    refresh()
+    notice(status, saved.items.length + ' fysieke ingrediënten uit jouw gekozen weekmenu klaar om te koppelen. Kies voor beide winkels opnieuw de daadwerkelijk geobserveerde SKU’s; er zijn nog geen prijzen of matches aangenomen.')
+  } catch {
+    notice(status, 'De geselecteerde plannerweek is niet geschikt voor de veilige privé-mandvraag.', 'error')
+  }
+})
+
+demandImport.addEventListener('change', async () => {
+  const file = demandImport.files?.[0]
+  if (!file) return
+  try {
+    if (!file.size || file.size > maxBytes) throw Error('Vraagbestand is te groot of leeg.')
+    const saved = parsePrivateDemand(new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()))
+    // Atomic UI replacement after all content is admitted.
+    mealCount.value = String(saved.meals)
+    lines.replaceChildren()
+    for (const item of saved.items) addIngredient(item)
+    refresh()
+    notice(status, saved.items.length + ' ingrediënten hersteld. Kies alle PLUS- en DekaMarkt-producten opnieuw op basis van de nu geopende eigen opnames; oude productmatches zijn niet automatisch betrouwbaar.')
+  } catch (error) {
+    notice(status, error instanceof Error ? error.message : 'Kan eerdere mandvraag niet veilig openen.', 'error')
+  }
+})
+
+function demand() {
+  // An unpriced shopping demand is valid without any retailer observation.
+  // The comparison button separately requires admitted real store sources.
+  const meals = Number(mealCount.value)
+  if (!/^[1-9]\d*$/.test(mealCount.value) || !Number.isSafeInteger(meals) || meals > 1000) {
+    throw Error('Vul een geldig aantal geselecteerde maaltijden van 1 tot 1000 in.')
+  }
+  const ingredients = []
+  if (!lines.children.length || lines.children.length > 1000) throw Error('Voeg minimaal één ingrediënt toe.')
+  for (const row of lines.children) {
+    const label = row.querySelector('.label').value.trim()
+    const rawAmount = row.querySelector('.amount').value.trim()
+    const amount = rawAmount === '' ? null : numeric(rawAmount)
+    const unit = row.querySelector('.unit').value
+    if (!validText(label)) throw Error('Controleer de naam van ingrediënt ' + (ingredients.length + 1) + '.')
+    if (rawAmount !== '' && amount === null) {
+      throw Error('Ongeldige hoeveelheid bij ' + label + '. Gebruik metrische positieve getallen.')
+    }
+    const productIds = {}
+    for (const store of stores) {
+      const value = selected(row.querySelector('[data-store="' + store + '"]'))
+      if (value !== null && !observedProducts(store, unit).some(p => p.id === value)) {
+        throw Error('Productkeuze van ' + store + ' past niet bij ' + label + '.')
+      }
+      productIds[store] = value
+    }
+    ingredients.push({ id: row.dataset.id, label, amount, unit, productIds })
+  }
+  return { schema: 'supa-private-basket-demand-v1', selectedMealCount: meals, ingredients }
+}
+
+function updateUnpricedProgress() {
+  if (!unpricedSnapshot) return
+  const total = unpricedSnapshot.ingredients.length
+  const done = unpricedSnapshot.ingredients.filter(item => unpricedChecked.has(item.id)).length
+  unpricedProgress.textContent = done + ' van ' + total +
+    ' ingrediënten afgevinkt · ' + (total - done) + ' resterend. ' +
+    'Geen winkelprijs of kassagarantie.'
+}
+
+function openUnpricedList() {
+  const data = demand()
+  unpricedSnapshot = data
+  unpricedChecked.clear()
+  unpricedItems.replaceChildren()
+  for (const item of data.ingredients) {
+    const label = document.createElement('label')
+    label.className = 'unpriced-line'
+    const check = document.createElement('input')
+    check.type = 'checkbox'
+    check.setAttribute('aria-label', 'Afvinken: ' + item.label)
+    check.addEventListener('change', () => {
+      if (check.checked) unpricedChecked.add(item.id)
+      else unpricedChecked.delete(item.id)
+      updateUnpricedProgress()
+    })
+    const text = document.createElement('span')
+    text.textContent = item.label + ' · ' +
+      (item.amount === null ? 'hoeveelheid nog controleren' :
+        String(item.amount).replace('.', ',') + ' ' +
+          (item.unit === 'piece' ? 'stuk(s)' : item.unit))
+    label.append(check, text)
+    unpricedItems.append(label)
+  }
+  updateUnpricedProgress()
+  unpricedTrip.hidden = false
+  unpricedTrip.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+
+showUnpriced.addEventListener('click', () => {
+  try {
+    openUnpricedList()
+  } catch (error) {
+    unpricedTrip.hidden = true
+    notice(status, error instanceof Error ? error.message :
+      'Kan eigen ongeprijsde lijst niet veilig maken.', 'error')
+  }
+})
+
+document.querySelector('#unpriced-reset').addEventListener('click', () => {
+  if (unpricedTrip.hidden || !unpricedSnapshot) return
+  unpricedChecked.clear()
+  for (const input of unpricedItems.querySelectorAll('input[type="checkbox"]')) input.checked = false
+  updateUnpricedProgress()
+})
+
+downloadUnpriced.addEventListener('click', () => {
+  try {
+    const data = demand()
+    const lines = [
+      'SUPA · eigen ongeprijsde ingrediëntenlijst',
+      'Aangemaakt op: ' + new Date().toISOString(),
+      'Geselecteerde maaltijden: ' + data.selectedMealCount,
+      'Geen winkelprijzen, automatische productmatching of besparingsclaim.',
+      '',
+      ...data.ingredients.map(item =>
+        (unpricedChecked.has(item.id) && !unpricedTrip.hidden ? '[x] ' : '[ ] ') + item.label + ' · ' +
+        (item.amount === null ? 'hoeveelheid nog controleren' :
+          String(item.amount).replace('.', ',') + ' ' +
+            (item.unit === 'piece' ? 'stuk(s)' : item.unit))),
+      '',
+      'Gebruik jouw eigen feitelijke verpakkingsinformatie bij het winkelen.',
+      '',
+    ]
+    const content = lines.join('\n')
+    if (new TextEncoder().encode(content).length > maxBytes) {
+      throw Error('De ongeprijsde ingrediëntenlijst is te groot.')
+    }
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'supa-eigen-ingredienten-ongeprijsd.txt'
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+    notice(status, 'Jouw eigen ongeprijsde ingrediëntenlijst is lokaal aangeboden. ' +
+      data.ingredients.length + ' ingrediënten, zonder fictieve winkelprijzen. Je kunt later alsnog echte bronproducten koppelen.')
+  } catch (error) {
+    notice(status, error instanceof Error ? error.message :
+      'Kan ongeprijsde ingrediëntenlijst niet veilig bewaren.', 'error')
+  }
+})
+
+save.addEventListener('click', () => {
+  try {
+    const data = demand()
+    const content = JSON.stringify(data, null, 2) + '\n'
+    if (new TextEncoder().encode(content).length > maxBytes) {
+      throw Error('Het gegenereerde vraagbestand is groter dan 256 kB.')
+    }
+    const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = node('a')
+    a.href = url
+    a.download = 'supa-private-mand-vraag.json'
+    document.body.append(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+    const unresolved = data.ingredients.reduce((count, i) => count +
+      stores.filter(store => i.productIds[store] === null).length, 0)
+    notice(status, 'Privé mandvraag als JSON aangeboden. ' + data.ingredients.length +
+      ' ingrediënten; ' + unresolved + ' ontbrekende winkelkoppelingen blijven bewust onbekend. ' +
+      'Gebruik de bestaande lokale HTML-vergelijker om exacte verpakkingbedragen en ouderdom te controleren.')
+  } catch (error) {
+    notice(status, error instanceof Error ? error.message : 'Kan mandvraag niet maken.', 'error')
+  }
+})
+document.addEventListener('supa:private-ingredient-merged', () => {
+  invalidateUnpricedDemand()
+  refresh()
+})
+add.addEventListener('click', () => addIngredient())
+addIngredient()
+
+compareNow.addEventListener('click', () => {
+  try {
+    const source = { schema: 'supa-offline-prices-v1', captures: stores.map(store => captures[store]) }
+    document.dispatchEvent(new CustomEvent('supa:compare-private-basket', { detail: { source, demand: demand() } }))
+    if (priceResult && !priceResult.hidden) priceResult.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  } catch (error) {
+    notice(status, error instanceof Error ? error.message : 'Mandvraag is ongeldig', 'error')
+  }
+})
+
+for (const kind of ['input', 'change']) {
+  document.addEventListener(kind, event => {
+    const target = event.target
+    if (!(target instanceof Element)) return
+    if (target.matches('.label, .amount, .unit') && target.closest('#lines') ||
+        target.closest('#meal-count')) invalidateUnpricedDemand()
+    if (target.closest('#lines') || target.closest('#meal-count')) updateCoverage()
+    if (target.closest('#lines') || target.closest('#meal-count') ||
+        target.closest('#source') || target.closest('#plus-source') ||
+        target.closest('#deka-source')) invalidatePrice()
+  })
+}
