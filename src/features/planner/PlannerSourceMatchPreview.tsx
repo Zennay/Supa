@@ -6,6 +6,10 @@ import './plannerSourceMatchPreview.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
 const units = new Set(['g', 'kg', 'ml', 'l', 'piece'])
+const family = (unit: string): 'mass' | 'volume' | 'piece' | null =>
+  unit === 'g' || unit === 'kg' ? 'mass' :
+  unit === 'ml' || unit === 'l' ? 'volume' :
+  unit === 'piece' ? 'piece' : null
 type Suggestion = { name: string; sku: string } | null
 
 /** Unconfirmed, read-only candidate hints. Canonical Workbench approves totals. */
@@ -33,8 +37,12 @@ export function PlannerSourceMatchPreview({ needs, source }: {
           unit: need.unit as MatchUnit,
         }, capture.products)
         const match = choice.type === 'match' ? products[store].get(choice.productId) : null
+        // The fuzzy matcher can rank an attractive name even if the source
+        // package belongs to a different physical unit family. Never present
+        // e.g. ml rice as a viable candidate for a gram-based rice demand.
         suggestions[store] = match && match.available && match.sourcePriceCents !== null &&
-          match.packAmount !== null ? { name: match.name, sku: match.id } : null
+          match.packAmount !== null && family(match.packUnit) === family(need.unit)
+          ? { name: match.name, sku: match.id } : null
       }
       return { need, suggestions }
     })
