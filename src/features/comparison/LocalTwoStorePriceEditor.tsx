@@ -122,6 +122,22 @@ function currentDraftPackPreview(row: ProductDraft, need: { amount: number | nul
     (rate ? ' · ' + draftEuros.format(rate.centsPerUnit / 100) + ' per ' + rate.unit : '')
 }
 
+type CaptureStatus = 'priced' | 'unavailable' | 'incompatible' | 'partial' | 'missing'
+function ownCaptureStatus(row: ProductDraft, need: { amount: number | null; unit: MatchUnit }): CaptureStatus {
+  if (isReviewedUnavailableDraft(row)) return 'unavailable'
+  if (isCompleteOwnPriceDraft(row)) {
+    return currentDraftPackPreview(row, need) !== null ? 'priced' : 'incompatible'
+  }
+  return hasPartialOwnCapture(row) ? 'partial' : 'missing'
+}
+const captureStatusNames: Record<CaptureStatus, string> = {
+  priced: 'Ingevuld · nog te beoordelen',
+  unavailable: 'Zelf gecontroleerd niet beschikbaar',
+  incompatible: 'Verpakking past niet bij de vraag',
+  partial: 'Onvolledig concept',
+  missing: 'Nog geen product',
+}
+
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
 
 type StoredDraft = {
@@ -666,6 +682,36 @@ export function LocalTwoStorePriceEditor({
         </select>
       </label>
       <p className="disclaimer">Voer alleen winkels in die je werkelijk hebt waargenomen. De andere winkel blijft onbekend; je kunt zijn aparte bronopname later toevoegen.</p>
+      {sourceSelection === 'both' && activeNeeds.length > 0 && (
+        <section className="offline-manual-editor__pair-matrix" aria-label="PLUS en DekaMarkt per ingrediënt">
+          <h4>Hetzelfde weekmandje · voortgang per winkel</h4>
+          <p>Dezelfde Planner-behoefte staat bij beide winkels. Invoer is nog geen
+            bevestigde SKU, actuele winkelprijs of vergelijkbaar volledig mandje.</p>
+          {activeNeeds.map((need, index) => <div key={need.id}
+            className="offline-manual-editor__pair-row">
+            <strong>{need.label} <small>· {need.amount ?? '?'} {need.unit}</small></strong>
+            <div className="offline-manual-editor__pair-stores">
+              {stores.map(store => {
+                const state = ownCaptureStatus(rows[key(store, need.id)] ?? emptyDraft(need.unit), need)
+                return <button key={store} type="button" className="ghost-button"
+                  data-capture-status={state}
+                  onClick={() => {
+                    setOnlyOpenRows(false)
+                    window.requestAnimationFrame(() => {
+                      const field = document.getElementById(`own-price-${store}-${index}`)
+                      field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      field?.querySelector('input')?.focus({ preventScroll: true })
+                    })
+                  }}>
+                  <span>{store}</span><small>{captureStatusNames[state]}</small>
+                </button>
+              })}
+            </div>
+          </div>)}
+          <p className="disclaimer">Alleen jouw lokale concepten. De echte vergelijking volgt
+            pas na beide volledige bronopnames, menselijke reviews en tijd-/prijscontroles.</p>
+        </section>
+      )}
       <div className="offline-manual-editor__stores">
         {selectedStores.map(store => <section key={store} aria-label={`Productprijzen bij ${store}`}>
           <h4>{store}</h4>
