@@ -755,6 +755,32 @@ export function OfflineReviewedWorkbench({
     setMessage('Twee originele bronbestanden gecontroleerd; vergelijk eerst de wijzigingen. Geen oude winkeldata of vinkjes zijn vervangen.')
   }
 
+  async function downloadTwoStoreChanges() {
+    const pending = pendingTwoStore
+    if (!pending || pending.version !== importRevision.current ||
+        pending.sourceText !== text) {
+      setMessage('Het wijzigingenoverzicht is verouderd; laad je eigen bronnen opnieuw.')
+      return
+    }
+    try {
+      const { twoStoreReplacementCsv } = await import('./twoStoreReplacementCsv.ts')
+      if (pending.version !== importRevision.current || pending.sourceText !== currentActiveSource.current)
+        throw new Error('De actieve winkelopnames zijn veranderd. Bekijk de nieuwe bronbestanden opnieuw.')
+      const content = twoStoreReplacementCsv(pending.sourceText, pending.newText, Date.now())
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-plus-deka-bronwijzigingen.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Alle oorspronkelijke SKU-verschillen lokaal als CSV opgeslagen. Dit bestand bewijst geen actuele retailerprijzen.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Het lokale verschillenbestand kon niet worden opgeslagen.')
+    }
+  }
+
   function confirmBothStoreReplacement() {
     const pending = pendingTwoStore
     if (!pending || pending.version !== importRevision.current ||
@@ -1770,6 +1796,10 @@ export function OfflineReviewedWorkbench({
             {' '}De bedragen zijn uitsluitend jouw opgegeven brondata, geen retailerbewijs.
           </p>
           <div className="offline-price-workbench__actions">
+            <button type="button" className="ghost-button" disabled={busy}
+              onClick={() => void downloadTwoStoreChanges()}>
+              Download volledig origineel SKU- en prijsverschillenoverzicht (CSV)
+            </button>
             <button type="button" disabled={busy} onClick={confirmBothStoreReplacement}>
               Bevestig: vervang beide opnames en controleer producten opnieuw
             </button>
