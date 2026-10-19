@@ -16,6 +16,8 @@ export function RecipeShoppingChangePanel({ preview, day }: {
     <p role="alert">{preview.reason}</p>
     <p>Controleer de hoeveelheden in Recepten. Er wordt geen product of prijs aangenomen.</p>
   </section>
+  // Capture the narrowed immutable week demand before nested download callbacks.
+  const nextNeeds = preview.nextNeeds
   const added = preview.changes.filter(line => line.kind === 'added').length
   const removed = preview.changes.filter(line => line.kind === 'removed').length
   const updated = preview.changes.filter(line => line.kind === 'changed').length
@@ -39,8 +41,8 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       // requirements and row order. No retailer product or price is invented.
       const stores = ['PLUS', 'DekaMarkt'] as const
       const output = kind === 'csv'
-        ? makeBlankPlannerCaptureCsv(preview.nextNeeds, stores, ';')
-        : makePlannerCaptureGuide(preview.nextNeeds, stores)
+        ? makeBlankPlannerCaptureCsv(nextNeeds, stores, ';')
+        : makePlannerCaptureGuide(nextNeeds, stores)
       const url = URL.createObjectURL(new Blob([output], {
         type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
       }))
