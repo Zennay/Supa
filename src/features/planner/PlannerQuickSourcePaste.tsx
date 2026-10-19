@@ -40,6 +40,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   const [separateDrafts, setSeparateDrafts] = useState({ PLUS: '', DekaMarkt: '' })
   const [updateDraft, setUpdateDraft] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
+  const [undoSnapshot, setUndoSnapshot] = useState<Preview | null>(null)
   const [busy, setBusy] = useState(false)
   const [dropActive, setDropActive] = useState(false)
   const [message, setMessage] = useState('')
@@ -67,12 +68,12 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   const revision = useRef(0)
   function changeDraft(raw: string) {
     ++revision.current
-    setDraft(raw); setPreview(null); setBusy(false)
+    setDraft(raw); setPreview(null); setUndoSnapshot(null); setBusy(false)
     setMessage(raw ? 'Concept gewijzigd. Controleer opnieuw voor import.' : '')
   }
   async function inspectSource(raw: string) {
     const ticket = ++revision.current
-    setPreview(null); setMessage('')
+    setPreview(null); setUndoSnapshot(null); setMessage('')
     if (!raw.trim()) { setMessage('Plak eerst echte eigen CSV-, TSV- of JSON-bronregels.'); return }
     if (new TextEncoder().encode(raw).length > limit) {
       setMessage('Bron groter dan 256 kB. Splits de originele opnames op.'); return
@@ -96,7 +97,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   async function previewOneFile(file: File | undefined) {
     if (!file) return
     const ticket = ++revision.current
-    setPreview(null); setMessage('')
+    setPreview(null); setUndoSnapshot(null); setMessage('')
     if (file.size === 0 || file.size > limit) {
       setMessage('Kies één gevuld bronbestand van maximaal 256 kB.')
       return
@@ -121,7 +122,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       return
     }
     const ticket = ++revision.current
-    setPreview(null); setMessage(''); setBusy(true)
+    setPreview(null); setUndoSnapshot(null); setMessage(''); setBusy(true)
     try {
       const captures: unknown[] = []
       const seen = new Set<string>()
@@ -181,6 +182,9 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       const result = replaceOwnStoreCapture(original, normalized, Date.now())
       const data = parseOfflinePriceSnapshots(result.normalized, Date.now())
       if (ticket !== revision.current) return
+      // One-step undo lives only in React memory. No browser persistence,
+      // retailer cache, remote upload or implicit Workbench approval.
+      setUndoSnapshot(preview)
       setDraft(result.normalized)
       // Do not retain a second raw copy of the just-ingested private source.
       setUpdateDraft('')
@@ -200,17 +204,34 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     }
   }
 
+  function undoStoreReplacement() {
+    if (!undoSnapshot || busy) return
+    ++revision.current
+    try {
+      // Restoring a preview is NOT approval of an old retailer price.
+      // Recheck the captured original time with the current device clock.
+      const data = parseOfflinePriceSnapshots(undoSnapshot.normalized, Date.now())
+      setDraft(undoSnapshot.raw)
+      setPreview({ ...undoSnapshot, data })
+      setUndoSnapshot(null)
+      setUpdateDraft('')
+      setMessage('Vorige eigen winkelopname(s) in de lokale preview hersteld. Open Vergelijk opnieuw om deze bron te beoordelen; oude of verlopen prijzen blijven onbekend.')
+    } catch {
+      setMessage('Vorige lokale opname kan niet opnieuw worden toegelaten. Controleer de originele bron en actuele apparaatklok.')
+    }
+  }
+
   function changeSeparateDraft(store: 'PLUS' | 'DekaMarkt', raw: string) {
     ++revision.current
     setSeparateDrafts(previous => ({ ...previous, [store]: raw }))
-    setPreview(null)
+    setPreview(null); setUndoSnapshot(null)
     setMessage('Winkelbron gewijzigd. Controleer beide originele bronnen opnieuw.')
   }
 
   // Each paste is checked as an original single-retailer capture first.
   async function inspectSeparateDrafts() {
     const ticket = ++revision.current
-    setPreview(null); setMessage(''); setBusy(true)
+    setPreview(null); setUndoSnapshot(null); setMessage(''); setBusy(true)
     try {
       const provided = (['PLUS', 'DekaMarkt'] as const)
         .filter(store => separateDrafts[store].trim().length > 0)
@@ -253,7 +274,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
 
   async function pasteClipboard() {
     const ticket = ++revision.current
-    setPreview(null); setMessage('')
+    setPreview(null); setUndoSnapshot(null); setMessage('')
     try {
       if (!navigator.clipboard?.readText) throw new Error('Klembord niet beschikbaar')
       const raw = await navigator.clipboard.readText()
@@ -499,6 +520,10 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             { type: 'text/plain;charset=utf-8' }))}>
           Vernieuw alleen deze winkel met geplakte bronregels
         </button>
+        {undoSnapshot && <button type="button" className="ghost-button"
+          disabled={busy} onClick={undoStoreReplacement}>
+          Herstel vorige eigen winkelopname in deze preview
+        </button>}
         {nextSourceToCapture && <button type="button" className="ghost-button"
           onClick={() => onRecapture(nextSourceToCapture)}>
           Open leeg opnameblad voor {nextSourceToCapture} en leg echte prijzen vast
