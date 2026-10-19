@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { readPrivateReceipt } from './PrivateOwnReceiptViewer.tsx'
 import { comparePrivateReceiptHistory, type HistoricalReceiptResult, type ReceiptStore } from './privateReceiptHistory.ts'
+import { exportPrivateReceiptHistoryCsv } from './privateReceiptHistoryCsv.ts'
 
 const MONEY = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const STORES: readonly ReceiptStore[] = ['PLUS', 'DekaMarkt']
@@ -41,6 +42,18 @@ function downloadText(content: string) {
     const a = document.createElement('a')
     a.href = url
     a.download = 'supa-historische-eigen-prijzen.txt'
+    document.body.append(a)
+    try { a.click() } finally { a.remove() }
+  } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+}
+
+function downloadCsv(result: Extract<HistoricalReceiptResult, { status: 'ready' }>) {
+  const csv = exportPrivateReceiptHistoryCsv(result)
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'supa-historische-eigen-prijzen-geen-brondata.csv'
     document.body.append(a)
     try { a.click() } finally { a.remove() }
   } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
@@ -218,6 +231,10 @@ export function PrivateOwnReceiptHistory() {
       </details>}
       <button className="ghost-button" type="button" onClick={() =>
         downloadText(privateHistoryText(ready))}>Download historische privévergelijking (TXT)</button>
+      <button className="ghost-button" type="button" onClick={() => {
+        try { downloadCsv(ready) }
+        catch { setStatus('Dit privéoverzicht is te groot voor CSV. Gebruik TXT.') }
+      }}>Download privéprijsontwikkeling als spreadsheet-CSV</button>
       <p className="own-store-planner__history-notice">Geen kassagarantie, liveprijs of onafhankelijk
         besparingsbewijs. Deze gegevens worden nooit teruggeschreven als winkelopnames.</p>
     </div>}
