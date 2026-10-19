@@ -43,3 +43,7 @@
   .supa-two-store-coverage__row > header { flex-wrap: wrap; }
   .supa-two-store-coverage__heading > button { width: 100%; }
 }
+
+.supa-two-store-coverage__export-actions { display:flex; flex-wrap:wrap; gap:.5rem; }
+.supa-two-store-coverage__export-actions button { flex: 1 1 210px; }
+.supa-two-store-coverage textarea { width:100%; min-height:150px; padding:.6rem; border-radius:8px; border:1px solid #bac8bc; overflow-wrap:anywhere; }

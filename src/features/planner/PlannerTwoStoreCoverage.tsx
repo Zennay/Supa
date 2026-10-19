@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { privateTwoStoreCoverageCsv, privateTwoStoreCoverageText, type CoverageExportLine } from './twoStoreCoverageExport.ts'
 import type { PrivateCaptureProgress, PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import './plannerTwoStoreCoverage.css'
@@ -18,7 +19,13 @@ function cellFor(
   store: OwnStore, id: string, progress: PrivateCaptureProgress | null,
   reviewed: PrivateReviewedBaskets | null, now: number,
 ): Cell {
-  if (reviewed?.stores[store]) return { kind: 'ready', text: 'Heel mandje gecontroleerd' }
+  const receipt = reviewed?.stores[store]
+  if (receipt && sourceStillRecent(receipt.observedAt, now) &&
+      Number.isFinite(receipt.capturedMs) &&
+      now >= receipt.capturedMs - 300_000 && now - receipt.capturedMs <= 604_800_000) {
+    return { kind: 'ready', text: 'Heel mandje gecontroleerd' }
+  }
+  if (receipt) return { kind: 'expired', text: 'Bevestigde bron inmiddels verlopen' }
   const capture = progress?.stores[store]
   if (!capture) return { kind: 'source', text: 'Bronbestand ontbreekt' }
   if (!capture.fresh || !sourceStillRecent(capture.observedAt, now)) {
@@ -52,6 +59,8 @@ export function PlannerTwoStoreCoverage({
   now: number
 }) {
   const [showAll, setShowAll] = useState(false)
+  const [exportMessage, setExportMessage] = useState('')
+  const [selectableText, setSelectableText] = useState('')
   if (!needs.length) return null
   // The admission bridge is plan-bound. Never mix two versions of a week.
   const samePlan = !progress || !reviewed || progress.planKey === reviewed.planKey
@@ -66,6 +75,58 @@ export function PlannerTwoStoreCoverage({
   const pending = items.filter(item => item.cells.some(cell =>
     cell.kind !== 'ready' && cell.kind !== 'reviewed'))
   const visible = showAll ? items : pending
+  function exportRows(at: number): CoverageExportLine[] {
+    return needs.map(need => {
+      const plus = cellFor('PLUS', need.id, safeProgress, safeReviewed, at)
+      const deka = cellFor('DekaMarkt', need.id, safeProgress, safeReviewed, at)
+      return {
+        ingredientId: need.id, ingredient: need.label, demand: amountText(need),
+        plusStatus: plus.text,
+        plusObservedAt: safeProgress?.stores.PLUS?.observedAt ??
+          safeReviewed?.stores.PLUS?.observedAt ?? '',
+        dekaStatus: deka.text,
+        dekaObservedAt: safeProgress?.stores.DekaMarkt?.observedAt ??
+          safeReviewed?.stores.DekaMarkt?.observedAt ?? '',
+      }
+    })
+  }
+  function downloadCoverage() {
+    setExportMessage('')
+    setSelectableText('')
+    try {
+      const csv = privateTwoStoreCoverageCsv(exportRows(Date.now()))
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-dezelfde-weekmand-twee-winkels-broncontroles.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setExportMessage('Alle fysieke ingrediënten en beide winkelstatussen lokaal geëxporteerd; geen prijzen verzonnen.')
+    } catch (cause) {
+      setExportMessage(cause instanceof Error ? cause.message : 'Lijst downloaden mislukt.')
+    }
+  }
+  async function copyCoverage() {
+    setExportMessage('')
+    try {
+      const output = privateTwoStoreCoverageText(exportRows(Date.now()))
+      if (!navigator.clipboard?.writeText) {
+        setSelectableText(output)
+        setExportMessage('Klembord niet beschikbaar. Selecteer de getoonde tekst op je apparaat.')
+        return
+      }
+      await navigator.clipboard.writeText(output)
+      setSelectableText('')
+      setExportMessage('De complete fysieke weekmand en beide bronstatussen zijn gekopieerd, zonder onbevestigde prijzen.')
+    } catch {
+      try {
+        setSelectableText(privateTwoStoreCoverageText(exportRows(Date.now())))
+        setExportMessage('Kopiëren geweigerd door je browser. Selecteer de tekst hieronder.')
+      } catch { setExportMessage('Lijst is gewijzigd of te groot. Open de actuele Planner opnieuw.') }
+    }
+  }
   return <section className="supa-two-store-coverage" aria-labelledby="supa-coverage-heading">
     <div className="supa-two-store-coverage__heading">
       <div>
@@ -77,6 +138,18 @@ export function PlannerTwoStoreCoverage({
         Open mijn bronimport
       </button>
     </div>
+    <div className="supa-two-store-coverage__export-actions">
+      <button type="button" className="ghost-button" onClick={downloadCoverage}>
+        Download complete twee-winkelstatus (CSV)
+      </button>
+      <button type="button" className="ghost-button" onClick={() => void copyCoverage()}>
+        Kopieer mijn twee-winkelcontrolelijst
+      </button>
+    </div>
+    {exportMessage && <p role="status">{exportMessage}</p>}
+    {selectableText && <textarea readOnly rows={10} value={selectableText}
+      aria-label="Selecteer volledige twee-winkelcontrolelijst"
+      onFocus={event => event.currentTarget.select()} />}
     <div className="supa-two-store-coverage__totals" aria-label="Ingrediëntenstatus per winkel">
       {STORES.map((store, index) => <div key={store}>
         <strong>{store}</strong>
