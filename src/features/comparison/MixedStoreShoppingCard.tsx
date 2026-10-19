@@ -42,8 +42,8 @@ export function MixedStoreShoppingCard({
   // An explicit preferred store can introduce a second visit even when the
   // cheapest-by-line route would only use one store. Cost entry must follow
   // this *actual* proposed route, never only the theoretical minimum.
-  const mixedUsesBoth = stores.every(store => mixed.lines.some(line => line.store === store)) ||
-    stores.every(store => selectedMixed.lines.some(line => line.store === store))
+  const mixedUsesBoth = stores.every(store =>
+    selectedMixed.lines.some(line => line.store === store))
   const rawCost = extraVisitCost.trim()
   const costShapeOk = rawCost === '' || /^\d{1,4}(?:[,.]\d{1,2})?$/.test(rawCost)
   const cents = rawCost && costShapeOk
@@ -70,6 +70,18 @@ export function MixedStoreShoppingCard({
   const done = (id: string) => !!checked[key(id)]
   const progress = Object.fromEntries(plan.lines.map(line => [line.key, done(line.key)]))
   const doneCount = plan.lines.filter(line => progress[line.key]).length
+  const perStoreProgress = Object.fromEntries(stores.map(store => {
+    const lines = plan.lines.filter(line => line.store === store)
+    const doneLines = lines.filter(line => progress[line.key])
+    const totalCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0)
+    const remainingCents = lines.filter(line => !progress[line.key])
+      .reduce((sum, line) => sum + line.lineTotalCents, 0)
+    return [store, { count: lines.length, done: doneLines.length, totalCents, remainingCents }]
+  })) as Record<MixedStore, {
+    count: number; done: number; totalCents: number; remainingCents: number
+  }>
+  const remainingProductCents = stores.reduce(
+    (sum, store) => sum + perStoreProgress[store].remainingCents, 0)
   const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents)
   const block = costInvalid && !chooseSingle
 
@@ -266,8 +278,13 @@ export function MixedStoreShoppingCard({
     </div>}
     {!visitsBoth && <p>Je gekozen lijst vergt maar één winkelbezoek.
       Extra kosten voor een tweede stop worden niet meegerekend.</p>}
-    <p><strong>{doneCount} van {plan.lines.length}</strong> producten afgevinkt ·
-      alleen in deze open pagina.</p>
+    <div role="status" className="mixed-store-route__progress-summary">
+      <strong>{doneCount} van {plan.lines.length} ingrediënten afgevinkt</strong>
+      <span>Nog op jouw gekozen boodschappenlijst: <strong>{
+        money.format(remainingProductCents / 100)}</strong></span>
+      <small>Alleen productbedragen uit je eigen prijsopnames. Vinkjes bewijzen geen betaling;
+        extra winkelbezoekkosten zijn niet verdeeld over de artikelen.</small>
+    </div>
     <div className="offline-price-workbench__actions">
       <label><input type="checkbox" checked={onlyOpen}
         onChange={event => setOnlyOpen(event.currentTarget.checked)} /> Alleen nog te kopen</label>
@@ -290,8 +307,30 @@ export function MixedStoreShoppingCard({
         const all = plan.lines.filter(item => item.store === store)
         const visible = all.filter(item => !onlyOpen || !done(item.key))
         return <section key={store}>
-          <h4>{store} · {money.format(plan.totals[store] / 100)}</h4>
-          <p>{all.length} van {plan.lines.length} fysieke ingrediënten bij deze winkel.</p>
+          <h4>{store} · {money.format(perStoreProgress[store].totalCents / 100)}</h4>
+          <p><strong>{perStoreProgress[store].done} van {perStoreProgress[store].count}</strong>
+            {' '}ingrediënten afgevinkt. Nog op de lijst bij deze winkel:{' '}
+            <strong>{money.format(perStoreProgress[store].remainingCents / 100)}</strong>.</p>
+          {all.length > 0 && <button type="button" className="ghost-button"
+            onClick={() => {
+              const allDone = all.every(line => done(line.key))
+              if (!allDone && !window.confirm('Alle ' + all.length +
+                ' artikelen voor ' + store + ' afvinken? Dit bewijst geen betaling.')) return
+              setChecked(previous => {
+                const next = { ...previous }
+                for (const line of all) {
+                  if (allDone) delete next[key(line.key)]
+                  else next[key(line.key)] = true
+                }
+                return next
+              })
+              setMessage(allDone ? 'Vinkjes bij ' + store + ' gewist.' :
+                'Artikelen bij ' + store + ' afgevinkt.')
+            }}>
+            {perStoreProgress[store].done === all.length
+              ? 'Vinkjes bij ' + store + ' wissen'
+              : 'Alle artikelen bij ' + store + ' afvinken'}
+          </button>}
           {visible.length === 0
             ? <p>{all.length ? 'Alles bij deze winkel afgevinkt.' : 'Geen producten bij deze winkel nodig.'}</p>
             : <ul>{visible.map(item => <li key={item.key}><label>
