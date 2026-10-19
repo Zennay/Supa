@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { createCompleteWeekBackup, readCompleteWeekBackup } from './completeWeekBackup.ts'
-import { storageKey, type Item } from './ownExtraGroceriesStorage.ts'
+import { signalSavedExtras, storageKey, type Item } from './ownExtraGroceriesStorage.ts'
 import { importUnpricedProgress, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
 
 /** A single portable personal week-checklist, NEVER a product/price source. */
@@ -74,6 +74,7 @@ export function CompleteWeekBackupControls({ identity, plan, recipes, activeDays
         throw cause
       }
       onRestore(recovered.items, savedExtras)
+      signalSavedExtras(selected)
       window.dispatchEvent(new Event('supa:private-planner-ticks-restored'))
       setMessage('Complete week in dit tabblad hersteld: ' + recovered.items.length +
         ' eigen extras en ' + Object.keys(recovered.checked).length +

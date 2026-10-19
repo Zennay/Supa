@@ -102,3 +102,9 @@ export function findReusableExtraLists(currentIdentity: string): ReusableExtraLi
     return lists
   } catch { return [] }
 }
+
+/** Local-tab signal only; never carries private groceries in the event body. */
+export const extraGroceriesSavedEvent = 'supa:private-week-extras-saved'
+export function signalSavedExtras(identity: string) {
+  window.dispatchEvent(new CustomEvent(extraGroceriesSavedEvent, { detail: identity }))
+}

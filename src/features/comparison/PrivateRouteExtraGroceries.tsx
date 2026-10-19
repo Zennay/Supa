@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { decodeSaved, restore, storageKey, valid, type Item, type Unit } from './ownExtraGroceriesStorage.ts'
+import { decodeSaved, extraGroceriesSavedEvent, restore, signalSavedExtras, storageKey, valid, type Item, type Unit } from './ownExtraGroceriesStorage.ts'
 
 type Snapshot = { identity: string; items: Item[]; raw: string | null; locked: boolean }
 
@@ -19,6 +19,13 @@ export function PrivateRouteExtraGroceries({
   }
   useEffect(() => { onCount?.(active?.items.length ?? 0) },
     [active?.items.length, identity, onCount])
+  useEffect(() => {
+    const onSaved = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === identity) reload()
+    }
+    window.addEventListener(extraGroceriesSavedEvent, onSaved)
+    return () => window.removeEventListener(extraGroceriesSavedEvent, onSaved)
+  }, [identity])
   useEffect(() => {
     setSnapshot({ identity, ...restore(identity) })
     setMessage('')
@@ -43,6 +50,7 @@ export function PrivateRouteExtraGroceries({
       decodeSaved(raw, identity)
       window.sessionStorage.setItem(key, raw)
       setSnapshot({ identity, items: updated, raw, locked: false })
+      signalSavedExtras(identity)
       setMessage(announcement + ' Winkel en prijs blijven onbekend.')
       return true
     } catch (error) {

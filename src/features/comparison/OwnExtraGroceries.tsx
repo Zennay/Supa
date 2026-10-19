@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { decodeSaved, findReusableExtraLists, legacyKey, restore, storageKey, valid, type Item, type ReusableExtraList, type Unit } from './ownExtraGroceriesStorage.ts'
+import { decodeSaved, findReusableExtraLists, legacyKey, restore, storageKey, signalSavedExtras, valid, type Item, type ReusableExtraList, type Unit } from './ownExtraGroceriesStorage.ts'
 import { CompleteWeekBackupControls } from './CompleteWeekBackupControls.tsx'
 export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   identity: string
@@ -214,6 +214,7 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       const raw = JSON.stringify({ schema: 'supa-extra-v1', identity, items })
       if (new TextEncoder().encode(raw).length > 100000) throw Error('Lijst te groot.')
       sessionStorage.setItem(scopedKey, raw)
+      signalSavedExtras(identity)
       // Retire only the exact legacy record for THIS week after successful
       // scoped write. Never erase another week or an unknown legacy schema.
       const old = sessionStorage.getItem(legacyKey)
