@@ -225,6 +225,11 @@ export function OfflineReviewedWorkbench({
 
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
+  const [capturePreview, setCapturePreview] = useState<{
+    file: File; week: string
+    stores: { retailer: CaptureStore; enteredProducts: number; unobservedRows: number }[]
+    unobservedOtherStoreRows: number
+  } | null>(null)
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   const [manualSku, setManualSku] = useState<Record<typeof stores[number], Record<string, string>>>({
     PLUS: {}, DekaMarkt: {},
@@ -254,6 +259,53 @@ export function OfflineReviewedWorkbench({
     try { return aggregatePlanIngredients(plan, recipes, activeDays) }
     catch { return [] }
   }, [plan, recipes, activeDays])
+  const captureWeek = JSON.stringify([planKey ?? null, plannerCaptureNeeds.map(n => [n.id, n.label, n.unit, n.amount])])
+  const currentPreview = capturePreview?.week === captureWeek ? capturePreview : null
+
+  async function previewFilledCsv(file?: File) {
+    if (!file) return
+    const version = ++importRevision.current
+    setCapturePreview(null)
+    setBusy(true)
+    try {
+      if (!file.size || file.size > 256000) throw Error('Ingevulde CSV ontbreekt of is te groot.')
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const converterUrl = '/offline-two-store-csv.mjs'
+      const module: unknown = await import(/* @vite-ignore */ converterUrl)
+      if (!module || typeof module !== 'object' ||
+        !('previewOwnStoreCsv' in module) || typeof module.previewOwnStoreCsv !== 'function' ||
+        !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
+        throw Error('De lokale CSV-converter is niet beschikbaar.')
+      const summary = (module.previewOwnStoreCsv as (v: string) => {
+        stores: { retailer: CaptureStore; enteredProducts: number; unobservedRows: number }[]
+        unobservedOtherStoreRows: number
+      })(raw)
+      parseOfflinePriceSnapshots((module.convertOwnStoreCsv as (v: string) => string)(raw), Date.now())
+      if (version !== importRevision.current) return
+      setCapturePreview({ file, week: captureWeek, ...summary })
+      setWeekExportMessage('CSV lokaal gecontroleerd. Kijk hieronder en neem de bron bewust over.')
+    } catch (e) {
+      if (version === importRevision.current) setWeekExportMessage(
+        (e instanceof Error ? e.message : 'CSV ongeldig.') +
+        ' Vorige winkeldata en productbevestigingen zijn behouden.')
+    } finally { if (version === importRevision.current) setBusy(false) }
+  }
+
+  function applyPreviewCsv() {
+    if (!currentPreview || busy) return
+    const file = currentPreview.file
+    const incoming = currentPreview.stores.map(s => s.retailer)
+    const previous = imported ? Object.keys(imported.captures) : []
+    if (incoming.length === 1 && imported?.captures[incoming[0]])
+      void replaceStoreFile(incoming[0], file)
+    else if (incoming.length === 1 && previous.length === 1)
+      void loadFile(file, true)
+    else if (previous.length === 0 || window.confirm(
+      'Deze bron vervangt eerdere winkelopnames en productbevestigingen. Doorgaan?'))
+      void loadFile(file)
+    else return
+    setCapturePreview(null)
+  }
 
   function saveSelectedWeek() {
     try {
@@ -1215,6 +1267,50 @@ export function OfflineReviewedWorkbench({
             ))}</ol>
           </details>
         )}
+        <section className="offline-price-workbench__input"
+          aria-label="Eigen ingevuld prijsblad eerst controleren">
+          <label>Controleer een ingevuld CSV-prijsblad vóór import
+            <input type="file" accept=".csv,text/csv"
+              disabled={busy || plannerCaptureNeeds.length === 0}
+              onChange={event => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                void previewFilledCsv(file)
+              }} />
+            <small>Controleert lokaal de oorspronkelijke bronvelden en timestamps.
+              Een gedeeltelijk ingevulde regel wordt nooit stilzwijgend weggegooid.</small>
+          </label>
+          {currentPreview && (
+            <div role="region" aria-label="Controle van ingevuld bronblad">
+              <strong>Bronblad leesbaar, nog geen productmatch goedgekeurd</strong>
+              {currentPreview.stores.map(store => (
+                <p key={store.retailer}>{store.retailer}: {store.enteredProducts}
+                  {' '}zelf ingevoerde bronproducten, {store.unobservedRows}
+                  {' '}lege en ongeprijsde regels.</p>
+              ))}
+              {currentPreview.unobservedOtherStoreRows > 0 && (
+                <p>{currentPreview.unobservedOtherStoreRows}
+                  {' '}niet geobserveerde regels bij de andere winkel;
+                  geen tweede winkelprijs.</p>
+              )}
+              <p className="disclaimer">Deze lokale CSV-controle geeft geen
+                retailerrechten, bronverificatie of besparingsbewijs.
+                Controleer na overname zelf ieder oorspronkelijk artikel,
+                de verpakking, prijs en datum.</p>
+              <button type="button" disabled={busy} onClick={applyPreviewCsv}>
+                {currentPreview.stores.length === 1 &&
+                  imported?.captures[currentPreview.stores[0].retailer]
+                  ? 'Bekijk bronverschillen vóór vervanging'
+                  : currentPreview.stores.length === 1 && imported &&
+                    Object.keys(imported.captures).length === 1
+                    ? 'Voeg tweede winkelopname toe'
+                    : 'Neem eigen brondata over en controleer producten'}
+              </button>
+              <button type="button" className="ghost-button"
+                onClick={() => setCapturePreview(null)}>Annuleer zonder import</button>
+            </div>
+          )}
+        </section>
         <p role="status" aria-live="polite">{weekExportMessage}</p>
       </div>
       <LocalTwoStorePriceEditor

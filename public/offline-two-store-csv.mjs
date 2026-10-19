@@ -130,13 +130,9 @@ function convertStoreCsv(text, allowOne) {
     if (!['true', 'false'].includes(availableText)) {
       error(location + ': beschikbaarheid moet letterlijk true of false zijn.')
     }
-    // The planner deliberately exports one unobserved demand row per store.
-    // No product name, package, price or time exists for such a row. Omit it
-    // instead of inventing a retailer SKU. The existing basket matcher then
-    // leaves the corresponding ingredient unresolved, never priced at €0.
-    if (name === '' && pack === '' && count === '' && cents === '' && availableText === 'false') {
-      continue
-    }
+    // A row with even one entered identity, time or product field is NOT blank.
+    // Do not silently discard a partial capture: report the exact CSV row so
+    // the user can finish it or deliberately clear every observation field.
     if (!validObservedAt(observedAt)) error(location + ': werkelijke ISO-tijd met UTC-offset vereist.')
     if (!validLabel(name, 160)) error(location + ': productnaam ongeldig of ontbreekt.')
     if (seen.get(retailer).has(id)) error(location + ': dubbele product-ID.')
@@ -179,3 +175,40 @@ function convertStoreCsv(text, allowOne) {
 // product, zero-price row or invented second observation).
 export const convertTwoStoreCsv = text => convertStoreCsv(text, false)
 export const convertOwnStoreCsv = text => convertStoreCsv(text, true)
+
+/**
+ * Read-only local worksheet preview. Reuse the exact importer rather than
+ * implementing a second, more permissive way to accept prices. A blank row
+ * is explicitly unobserved, never a free product or a source observation.
+ * Returned counts contain no original labels, SKUs, timestamps or prices.
+ */
+export function previewOwnStoreCsv(text) {
+  const rows = parseCsv(text)
+  if (!rows.length || rows[0].length !== HEADER.length ||
+      HEADER.some((field, index) => rows[0][index] !== field)) {
+    error('CSV-kop moet exact zijn: ' + HEADER.join(','))
+  }
+  const blanks = Object.fromEntries(RETAILERS.map(store => [store, 0]))
+  for (let index = 1; index < rows.length; index++) {
+    const row = rows[index]
+    if (row.length !== HEADER.length) error('CSV-regel ' + (index + 1) + ': verwacht negen kolommen.')
+    const [store, time, id, name, amount, unit, count, cents, available] = row
+    if (!RETAILERS.includes(store)) error('CSV-regel ' + (index + 1) + ': onbekende winkel.')
+    if (time === '' && id === '' && name === '' && amount === '' &&
+        count === '' && cents === '' && available === 'false' &&
+        (unit === '' || UNITS.includes(unit))) {
+      blanks[store]++
+    }
+  }
+  const admitted = JSON.parse(convertOwnStoreCsv(text))
+  return {
+    stores: admitted.captures.map(capture => ({
+      retailer: capture.retailer,
+      enteredProducts: capture.products.length,
+      unobservedRows: blanks[capture.retailer],
+    })),
+    unobservedOtherStoreRows: RETAILERS
+      .filter(store => !admitted.captures.some(c => c.retailer === store))
+      .reduce((total, store) => total + blanks[store], 0),
+  }
+}
