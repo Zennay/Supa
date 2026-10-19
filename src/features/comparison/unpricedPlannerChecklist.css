@@ -20,3 +20,5 @@
 .unpriced-planner-checklist__upload { display:flex; flex-wrap:wrap; align-items:center; gap:.55rem; padding:.55rem .75rem; border:1px solid #aec9b4; border-radius:9px; color:#244e36; background:#f5f8f3; font-weight:600; }
 .unpriced-planner-checklist__upload input[type=file] { max-width:min(100%,260px); min-height:32px; font-size:.85rem; }
 .unpriced-planner-checklist__upload input[type=file]::file-selector-button { margin-right:.45rem; padding:.5rem; border:1px solid #8aad96; border-radius:7px; color:#244e36; background:#fff; cursor:pointer; }
+
+.unpriced-planner-checklist__progress{width:min(220px,100%);height:12px;accent-color:#236b48}

@@ -80,17 +80,21 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
 
   const completed = items.filter(item => checked[itemKey(item)]).length
   const visible = items.filter(item => !openOnly || !checked[itemKey(item)])
-  const copy = prepared?.key === JSON.stringify([demandIdentity, checked]) ? prepared.text : null
+  const copyKey = JSON.stringify([demandIdentity, checked, openOnly])
+  const copy = prepared?.key === copyKey ? prepared.text : null
 
   const shoppingText = () => [
     'Supa · mijn weekboodschappen · zonder winkelprijzen',
-    ...items.map(item =>
-      (checked[itemKey(item)] ? '☑ ' : '☐ ') + item.label + ' · ' + portableQuantity(item)),
+    openOnly ? 'Alleen nog te kopen ingrediënten; dit is niet het hele weekmandje.' :
+      'Volledig geselecteerd weekmandje inclusief afgevinkte ingrediënten.',
+    ...(visible.length ? visible.map(item =>
+      (checked[itemKey(item)] ? '☑ ' : '☐ ') + item.label + ' · ' + portableQuantity(item)) :
+      ['Alle boodschappen zijn afgevinkt.']),
     'Geen supermarktproduct of actuele prijs gekoppeld.',
   ].join('\n')
 
   function prepareCopy() {
-    setPrepared({ key: JSON.stringify([demandIdentity, checked]), text: shoppingText() })
+    setPrepared({ key: copyKey, text: shoppingText() })
   }
   function openWithCurrentDemand() {
     if (error || !items.length) return
@@ -154,7 +158,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
     try {
       const link = document.createElement('a')
       link.href = url
-      link.download = 'supa-planner-weekboodschappen-zonder-prijzen.txt'
+      link.download = openOnly ? 'supa-planner-nog-te-kopen-zonder-prijzen.txt' :
+        'supa-planner-weekboodschappen-zonder-prijzen.txt'
       document.body.append(link)
       try { link.click() } finally { link.remove() }
     } finally {
@@ -178,9 +183,19 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
         <>
           <div className="unpriced-planner-checklist__actions">
             <strong role="status">{completed} van {items.length} boodschappen afgevinkt</strong>
+            <progress className="unpriced-planner-checklist__progress" value={completed}
+              max={items.length} aria-label="Voortgang ongeprijsde weekboodschappen" />
             <label><input type="checkbox" checked={openOnly}
               onChange={event => setOpenOnly(event.currentTarget.checked)} />
               Alleen nog te kopen</label>
+            <button type="button" className="ghost-button" onClick={() => {
+              if (completed === items.length) return
+              if (!window.confirm('Alle ongeprijsde ingrediënten in je huidige weeklijst afvinken?')) return
+              setProgress({ identity: demandIdentity, checked:
+                Object.fromEntries(keys.map(key => [key, true])) })
+              setPrepared(null)
+              setBackupMessage('Alle fysieke weekboodschappen afgevinkt, niet als betaald geregistreerd.')
+            }}>Alles afvinken</button>
             <button type="button" className="ghost-button" onClick={() => {
               setProgress({ identity: demandIdentity, checked: {} })
               setPrepared(null)
@@ -229,7 +244,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
           </div>
           {copy !== null && <div className="unpriced-planner-checklist__copy">
             <p>Deze kopie is alleen voor de huidige gekozen lijst. Selecteer en kopieer de tekst.</p>
-            <textarea readOnly rows={Math.min(items.length + 3, 15)}
+            <textarea readOnly rows={Math.min(visible.length + 4, 15)}
               aria-label="Kopieer mijn ongeprijsde weekboodschappen"
               value={copy} onFocus={event => event.currentTarget.select()} />
           </div>}
