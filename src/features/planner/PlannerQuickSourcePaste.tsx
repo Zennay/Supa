@@ -4,6 +4,7 @@ import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBrid
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
+import { replaceOwnStoreCapture } from './combineOwnSourceCapture.ts'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
@@ -149,6 +150,44 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     } catch (cause) {
       if (ticket === revision.current)
         setMessage(cause instanceof Error ? cause.message : 'Twee winkelbronnen niet herkend.')
+    } finally {
+      if (ticket === revision.current) setBusy(false)
+    }
+  }
+
+  // Refresh one retailer inside an already imported, local pair. This is a
+  // deliberate, whole-capture replacement, never a merger of historical SKU
+  // prices under an invented common observation timestamp.
+  async function useNewStoreCapture(file: File | undefined) {
+    if (!file || !preview || preview.raw !== draft) return
+    const original = preview.normalized
+    const ticket = ++revision.current
+    setMessage('')
+    if (file.size === 0 || file.size > limit) {
+      setMessage('Kies één gevuld nieuw winkelbestand van maximaal 256 kB.')
+      return
+    }
+    setBusy(true)
+    try {
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (ticket !== revision.current) return
+      const normalized = await normalizedOwnSource(raw)
+      if (ticket !== revision.current) return
+      const result = replaceOwnStoreCapture(original, normalized, Date.now())
+      const data = parseOfflinePriceSnapshots(result.normalized, Date.now())
+      if (ticket !== revision.current) return
+      setDraft(result.normalized)
+      setPreview({ raw: result.normalized, normalized: result.normalized, data })
+      setMessage(result.retailer + ': originele nieuwere winkelopname ' +
+        (result.action === 'replaced' ? 'vervangt de oudere opname' : 'is toegevoegd') +
+        '. ' + (Object.keys(data.captures).length === 2
+          ? result.pairedWithin24h
+            ? 'De bronmomenten liggen binnen 24 uur; controleer nu alle SKU’s en pakken in Vergelijk.'
+            : 'De bronmomenten liggen meer dan 24 uur uiteen: nog geen twee-winkelprijsverschil.'
+          : 'De andere winkel heeft nog geen bron; diens prijzen blijven onbekend.'))
+    } catch (cause) {
+      if (ticket === revision.current) setMessage(
+        cause instanceof Error ? cause.message : 'De nieuwere winkelopname kon niet worden ingelezen.')
     } finally {
       if (ticket === revision.current) setBusy(false)
     }
@@ -422,6 +461,20 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
           onClick={downloadCanonicalPreview}>
           Download mijn gecombineerde winkelbron als lokaal JSON-bestand
         </button>
+        <label className="supa-planner-source-paste__refresh">
+          Werk één winkel bij, behoud de originele andere opname
+          <input type="file" disabled={busy}
+            accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json"
+            onChange={event => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              void useNewStoreCapture(file)
+            }} />
+          <small>Gebruik één nieuwe PLUS- of DekaMarkt-bron met een later werkelijk
+            opnamemoment. Supa vervangt die winkel als geheel, bewaart de andere
+            originele SKU’s en hercontroleert de 24-uursgrens. Geen prijs of
+            verpakking wordt automatisch goedgekeurd.</small>
+        </label>
         {nextSourceToCapture && <button type="button" className="ghost-button"
           onClick={() => onRecapture(nextSourceToCapture)}>
           Open leeg opnameblad voor {nextSourceToCapture} en leg echte prijzen vast
