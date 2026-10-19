@@ -70,9 +70,13 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       euros.format(line.lineTotalCents / 100) + ' totaal'
     : line.ingredientLabel + ': product onbekend'
   const textList = [
-    'Supa · ' + store + ' · privé gecontroleerd mandje',
+    'Supa · ' + store + ' · privé gecontroleerd boodschappenlijstje',
     'Eigen bronopname: ' + readable(capture.observedAt),
-    ...basket.lines.map(line => (checked[tick(line)] ? '☑ ' : '☐ ') + label(line)),
+    remainingOnly ? 'Alleen nog te kopen artikelen (niet het hele winkelmandje).' :
+      'Volledig eigen winkelmandje, afgevinkte artikelen inbegrepen.',
+    'Nog op lijst volgens eigen bron: ' + euros.format(remainingCents / 100),
+    ...visibleLines.map(line => (checked[tick(line)] ? '☑ ' : '☐ ') + label(line)),
+    ...(remainingOnly && visibleLines.length === 0 ? ['Alles afgevinkt.'] : []),
     'Privébron. Geen actuele kassagarantie of publieke besparingsclaim.',
   ].join('\n')
   const plus = reviewed.stores.PLUS
@@ -320,8 +324,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           ? 'Vinkjes bij ' + store + ' wissen'
           : 'Alle ' + store + '-artikelen afvinken'}</button>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
-        <button type="button" onClick={() => { void downloadCsv() }}>Download met eigen SKU’s en centprijzen (CSV)</button>
-        <button type="button" onClick={() => { void downloadPrintable() }}>Printbare offline boodschappenlijst (HTML)</button>
+        <button type="button" onClick={() => { void downloadCsv() }}>Download volledig mandje met SKU’s (CSV)</button>
+        <button type="button" onClick={() => { void downloadPrintable() }}>Print volledig eigen mandje (HTML)</button>
         <button type="button" onClick={() => { void saveProgress() }}>Bewaar vinkjes (JSON)</button>
         <button type="button" onClick={() => progressInputRef.current?.click()}>Herstel vinkjes</button>
         <input ref={progressInputRef} type="file" accept=".json,application/json"
@@ -354,7 +358,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         {visibleLines.length === 0 && <p>Alles voor {store} is afgevinkt.</p>}
       </div>
       <details>
-        <summary>Kopieer de eigen boodschappenlijst</summary>
+        <summary>{remainingOnly ? 'Kopieer alleen nog te kopen artikelen' :
+          'Kopieer het volledige eigen winkelmandje'}</summary>
         <textarea readOnly value={textList} rows={Math.min(16, basket.lines.length + 4)}
           onFocus={event => {
             if (currentCaptureAvailable()) event.currentTarget.select()
@@ -362,6 +367,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           }}
           aria-label="Kopieerbare eigen boodschappenlijst" />
       </details>
+      <p className="disclaimer">Het TXT-bestand en de kopieerbare lijst volgen de optie
+        'Alleen nog te kopen'. CSV en printbare HTML bevatten bewust het volledige
+        persoonlijk gecontroleerde mandje, met alle vinkjes en bronbedragen.</p>
       <p className="disclaimer">Vinkjes worden niet automatisch opgeslagen of doorgestuurd. Met Bewaar kun je
         zelf een lokaal JSON-bestand maken en later terugzetten. Een nieuwe week, andere winkel,
         SKU, benodigde hoeveelheid of fysieke verpakking reset de vinkjes. Een prijswijziging
