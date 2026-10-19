@@ -115,6 +115,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [preferredOwnStore, setPreferredOwnStore] = useState<OwnStore>('PLUS')
   const onReviewedBaskets = useCallback((next: PrivateReviewedBaskets | null) => {
     setSourceNowMs(Date.now())
+    // The first actual owned store wins over the initial PLUS placeholder.
+    // Once a store is chosen, adding the second receipt must not silently
+    // switch the active Planner budget to the default store.
+    if (next) setPreferredOwnStore(current => next.stores[current] ? current
+      : next.stores.PLUS ? 'PLUS' : next.stores.DekaMarkt ? 'DekaMarkt' : current)
     setPrivateReviewed(previous => JSON.stringify(previous) === JSON.stringify(next)
       ? previous : next)
   }, [])
