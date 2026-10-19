@@ -259,6 +259,17 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage(error instanceof Error ? error.message : 'CSV-download mislukt.')
     }
   }
+  async function downloadPrivateJson() {
+    setDownloadMessage('')
+    try {
+      // Loading the exporter must not keep a now-expired capture eligible.
+      const { downloadPrivateOwnComparisonReceipt } = await import('./privateOwnComparisonReceipt.ts')
+      downloadPrivateOwnComparisonReceipt(reviewed)
+      setDownloadMessage('Privé-JSON met dezelfde fysieke weekvraag, originele SKU’s, bronmomenten, pakprijzen en het mandverschil lokaal opgeslagen. Dit rapport is geen opnieuw importeerbare bron of publiek besparingsbewijs.')
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : 'Het privé-JSON-rapport kon niet worden gemaakt.')
+    }
+  }
   async function downloadPrivateHtml() {
     setDownloadMessage('')
     try {
@@ -628,6 +639,9 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
           </button>
           <button type="button" className="ghost-button" onClick={downloadPrivateCsv}>
             Download privévergelijking met originele SKU's (CSV)
+          </button>
+          <button type="button" className="ghost-button" onClick={() => void downloadPrivateJson()}>
+            Download volledig eigen prijsrapport (JSON)
           </button>
           <button type="button" className="ghost-button" onClick={downloadPrivateHtml}>
             Download afdrukbaar volledig prijsvergelijkingsblad (HTML)
