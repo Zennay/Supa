@@ -45,6 +45,14 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3 },
 ]
 
+const originalProductNavIcons: Partial<Record<Tab, string>> = {
+  home: figmaAssets.productsNavHome,
+  planner: figmaAssets.productsNavPlanner,
+  recipes: figmaAssets.productsNavRecipes,
+  products: figmaAssets.productsNavProducts,
+  list: figmaAssets.productsNavList,
+}
+
 const plannerStorageKey = 'supa:planner-preferences:v2'
 function availableRecipes() {
   try {
@@ -352,7 +360,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => navigate(item.id)}
           >
-            <FigmaImage asset={item.icon} alt="" />
+            <FigmaImage asset={tab === "products" ? (originalProductNavIcons[item.id] ?? item.icon) : item.icon} alt="" />
             <span className="hifi-sr-only">{item.label}</span>
           </button>
         ))}
