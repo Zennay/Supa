@@ -64,6 +64,19 @@ function timestampWithOffset(value: string): string | null {
   if (legalOffsets.length !== 1) return null
   return value + ':00+' + (legalOffsets[0] === 60 ? '01:00' : '02:00')
 }
+// Display guidance only; authoritative freshness and the paired physical
+// capture instant are rechecked by the existing admitted-source comparator.
+function captureTimeAdvice(local: string, now = Date.now()): string {
+  if (!local) return 'Bronmoment nog onbekend: vul alleen een echt genoteerde tijd in.'
+  const observedAt = timestampWithOffset(local)
+  if (observedAt === null) return 'Dit Nederlandse bronmoment bestaat niet of is dubbelzinnig door zomer-/wintertijd.'
+  const age = now - Date.parse(observedAt)
+  if (age < -300000) return 'Bronmoment ligt in de toekomst: controleer de echte tijd.'
+  if (age > 604800000) return 'Opname is ouder dan zeven dagen. Nieuwe eigen prijzen nodig voor het volledige prijsverschil.'
+  if (age < 0) return 'Kleine tijdafwijking: controleer de apparaatklok en originele bron.'
+  return 'Binnen het zeven-dagenvenster; dit is géén onafhankelijke prijs- of bronverificatie.'
+}
+
 function amountOrNull(raw: string): number | null {
   if (!/^\d{1,6}(?:[.,]\d{1,4})?$/.test(raw)) return null
   const value = Number(raw.replace(',', '.'))
@@ -828,6 +841,16 @@ export function LocalTwoStorePriceEditor({
             pas na beide volledige bronopnames, menselijke reviews en tijd-/prijscontroles.</p>
         </section>
       )}
+      {sourceSelection === 'both' && capturedAt.PLUS && capturedAt.DekaMarkt && (() => {
+        const plus = timestampWithOffset(capturedAt.PLUS)
+        const deka = timestampWithOffset(capturedAt.DekaMarkt)
+        const gap = plus && deka ? Math.abs(Date.parse(plus) - Date.parse(deka)) : null
+        return gap !== null && gap > 86400000 ? <p role="alert" className="attention-card">
+          PLUS en DekaMarkt zijn meer dan 24 uur na elkaar geobserveerd.
+          Je eigen opnames kun je afzonderlijk bewaren, maar nog geen volledig
+          vergelijkbaar prijsverschil tonen. Vernieuw de oudere echte winkelopname.
+        </p> : null
+      })()}
       <div className="offline-manual-editor__stores">
         {selectedStores.map(store => <section key={store} aria-label={`Productprijzen bij ${store}`}>
           <h4>{store}</h4>
@@ -851,6 +874,7 @@ export function LocalTwoStorePriceEditor({
           </datalist>
           <label className="offline-manual-editor__time">Wanneer zijn deze producten echt waargenomen? (Nederlandse tijd)
             <input type="datetime-local" value={capturedAt[store]} onChange={e => changeTimestamp(store, e.target.value)} />
+            <small role="status">{captureTimeAdvice(capturedAt[store])}</small>
           </label>
           {(() => {
             const completed = activeNeeds.filter(need => isEnteredOwnCapture(
