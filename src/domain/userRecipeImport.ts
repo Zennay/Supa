@@ -1,4 +1,5 @@
 import { safeRecipeSourceUrl } from './recipeSourceUrl.ts'
+import { measuredRecipeAmount } from './metricRecipeQuantities.ts'
 
 /**
  * Private user-recipe intake, before any persistence, price calculation or fetch.
@@ -76,13 +77,6 @@ function quantity(raw: string): number | null {
   return Number(raw.replace(',', '.'))
 }
 
-function metricRoundUp(value: number): number {
-  // An imported physical need cannot be rounded DOWN before it becomes a
-  // real, possibly expensive, whole-pack shopping demand. The original
-  // literal stays attached for human inspection.
-  return Math.ceil(value * 1000) / 1000
-}
-
 const units: Record<string, { unit: MetricUnit; factor: number }> = {
   'g': { unit: 'g', factor: 1 }, 'gram': { unit: 'g', factor: 1 }, 'grams': { unit: 'g', factor: 1 },
   'kg': { unit: 'g', factor: 1000 }, 'kilogram': { unit: 'g', factor: 1000 }, 'kilograms': { unit: 'g', factor: 1000 },
@@ -108,10 +102,10 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     const perPart = quantity(multiplied[2])
     const physical = units[multiplied[3].toLowerCase()]
     const label = multiplied[4].trim()
-    const originalAmount = physical && perPart !== null
-      ? repetitions * perPart * physical.factor : NaN
-    const amount = physical?.unit === 'piece'
-      ? originalAmount : metricRoundUp(originalAmount)
+    const amount = physical ? measuredRecipeAmount([{
+      quantity: multiplied[2], factor: physical.factor, unit: physical.unit,
+      repeats: repetitions,
+    }]) : null
     if (Number.isSafeInteger(repetitions) && repetitions >= 1 &&
         repetitions <= 1000 && perPart !== null && Number.isFinite(perPart) &&
         perPart > 0 && perPart <= 100_000 && physical &&
@@ -133,7 +127,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const word = (wordMatch ? wordMatch[1] : tail).toLowerCase()
   const metric = units[word]
   let label = metric ? (wordMatch?.[2] || '').trim() : tail
-  let compoundAmount = 0
+  const parts = metric ? [{ quantity: match[1], factor: metric.factor, unit: metric.unit }] : []
   let componentCount = 0
   // Each additional unit must belong to the same physical family. Never
   // silently turn "1 kg 250 g 100 g" into a label or underbuy ingredients.
@@ -151,7 +145,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
           amount: null, unit: null,
           reviewReason: 'Controleer samengestelde hoeveelheden en voer het metrische totaal in' }
       }
-      compoundAmount += quantityValue * extraUnit.factor
+      parts.push({ quantity: next[1], factor: extraUnit.factor, unit: extraUnit.unit })
       label = next[3].trim()
     }
     if (componentCount === 8 && additional.test(label)) {
@@ -167,9 +161,8 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Onbekende maat: voer een metrische hoeveelheid in' }
   }
   const unit = metric?.unit || 'piece'
-  const physicalAmount = amount * (metric?.factor || 1) + compoundAmount
-  const normalized = unit === 'piece' ? physicalAmount : metricRoundUp(physicalAmount)
-  if (!Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
+  const normalized = metric ? measuredRecipeAmount(parts) : amount
+  if (normalized === null || !Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid is buiten bereik' }
   }
   // Half an egg, onion or other physical item cannot be purchased as an
