@@ -13,6 +13,7 @@ const BasketView = lazy(async () => {
 })
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
+import './features/shopping-list/listSourceFilePicker.css'
 const PartialReviewedShoppingList = lazy(async () => {
   const module = await import('./features/shopping-list/PartialReviewedShoppingList.tsx')
   return { default: module.PartialReviewedShoppingList }
@@ -139,6 +140,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [privateRouteChoice, setPrivateRouteChoice] = useState<PrivateRouteChoice | null>(null)
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [incomingPriceFiles, setIncomingPriceFiles] = useState<PrivateSourceFileHandoff | null>(null)
+  const [listSourceFileWarning, setListSourceFileWarning] = useState('')
   const nextPriceFileSerial = useRef(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
@@ -322,6 +324,22 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     plannedMeals, activeDays,
     recipes.map(recipe => [recipe.id, recipe.ingredients]),
   ])
+  // Planner and Lijst share the exact same real-source File handoff. Files
+  // stay in this tab until the canonical Vergelijk importer consumes them.
+  // No alternate CSV parser or implicit retailer approval is introduced.
+  const handoffOwnPriceFiles = (files: File[]) => {
+    if (!files.length) return
+    if (files.length > 2 || files.some(file => !file.size || file.size > 256_000)) {
+      setListSourceFileWarning('Kies maximaal twee gevulde eigen bronbestanden van maximaal 256 kB per bestand.')
+      return
+    }
+    setListSourceFileWarning('')
+    nextPriceFileSerial.current += 1
+    setIncomingPriceFiles({
+      serial: nextPriceFileSerial.current, planKey: privatePlanKey, files,
+    })
+    openOwnPriceImport()
+  }
   const livePrivateReviewed = freshReviewedBaskets(privateReviewed, privatePlanKey, sourceNowMs)
   const preferredPrivateBasket = livePrivateReviewed?.stores[preferredOwnStore] ??
     livePrivateReviewed?.stores.PLUS ?? livePrivateReviewed?.stores.DekaMarkt
@@ -568,14 +586,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               if (store === 'PLUS' || store === 'DekaMarkt') setPreferredOwnStore(store)
             }}
             onOpenComparison={openOwnPriceImport}
-            onImportSourceFiles={files => {
-              if (!files.length) return
-              nextPriceFileSerial.current += 1
-              setIncomingPriceFiles({
-                serial: nextPriceFileSerial.current, planKey: privatePlanKey, files,
-              })
-              openOwnPriceImport()
-            }}
+            onImportSourceFiles={handoffOwnPriceFiles}
             onReviewIngredient={(store, ingredientId) => {
               setPrivateReviewFocus(previous => ({
                 planKey: privatePlanKey, store, ingredientId,
@@ -692,6 +703,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             <button type="button" className="ghost-button" onClick={openOwnPriceImport}>
               Open mijn PLUS/Deka-winkelvergelijking
             </button>
+            <label className="supa-list-source-upload">
+              <strong>Eigen winkelopname(s) direct openen</strong>
+              <small>1 of 2 originele PLUS/DekaMarkt CSV, TSV, TXT of Supa JSON-bestanden.
+                De import gaat via Vergelijk en vraagt daar altijd om eigen controle.</small>
+              <input type="file" multiple
+                accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"
+                onChange={event => {
+                  const files = Array.from(event.currentTarget.files ?? [])
+                  event.currentTarget.value = ''
+                  handoffOwnPriceFiles(files)
+                }} />
+            </label>
+            {listSourceFileWarning &&
+              <p role="alert" className="supa-list-source-upload__error">{listSourceFileWarning}</p>}
           </nav>
         )}
         {visitedList && !livePrivateReviewed && (
