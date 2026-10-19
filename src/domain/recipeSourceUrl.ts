@@ -23,6 +23,28 @@ function queryKeyNeedsRemoval(key: string): boolean {
   return decoded.includes('%')
 }
 
+/**
+ * Nested redirect/callback links sometimes hide an OAuth code in the VALUE
+ * of an innocent-looking query key. Remove that entire parameter before
+ * storing, exporting or sending the public recipe page to our server.
+ */
+function nestedRecipeQueryNeedsRemoval(value: string): boolean {
+  let decoded = value
+  for (let depth = 0; depth < 8; depth++) {
+    const marker = decoded.indexOf('?')
+    if (marker !== -1) {
+      const query = decoded.slice(marker + 1).split('#', 1)[0]
+      if ([...new URLSearchParams(query).keys()].some(queryKeyNeedsRemoval)) return true
+    }
+    if (!/%[0-9a-fA-F]{2}/u.test(decoded)) return false
+    let next: string
+    try { next = decodeURIComponent(decoded) } catch { return true }
+    if (next === decoded) return false
+    decoded = next
+  }
+  return true
+}
+
 export function safeRecipeSourceUrl(input: string): string {
   let url: URL
   try { url = new URL(input) }
@@ -34,7 +56,7 @@ export function safeRecipeSourceUrl(input: string): string {
   url.hash = ''
   const kept: [string, string][] = []
   for (const [key, value] of url.searchParams) {
-    if (!queryKeyNeedsRemoval(key)) kept.push([key, value])
+    if (!queryKeyNeedsRemoval(key) && !nestedRecipeQueryNeedsRemoval(value)) kept.push([key, value])
   }
   url.search = ''
   for (const [key, value] of kept) url.searchParams.append(key, value)
