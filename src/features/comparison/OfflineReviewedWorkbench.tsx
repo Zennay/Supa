@@ -5,6 +5,7 @@ import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwoStorePriceEditor.tsx'
+import { ownPriceCapturesToCsv } from './ownPriceCsvExport.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
@@ -259,6 +260,8 @@ export function OfflineReviewedWorkbench({
   // powering reviews, exports, and shopping progress.
   const [text, setText] = useState('')
   const [pasteDraft, setPasteDraft] = useState('')
+  const currentActiveSource = useRef(text)
+  currentActiveSource.current = text
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
@@ -548,6 +551,33 @@ export function OfflineReviewedWorkbench({
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch {
       setMessage('De bronopname is niet meer geldig om te bewaren. Importeer je originele bronbestand opnieuw.')
+    }
+  }
+
+  async function downloadOwnSourcesCsv(store?: typeof stores[number]) {
+    if (!imported || !text) return
+    const snapshot = text
+    const revision = importRevision.current
+    try {
+      const csv = await ownPriceCapturesToCsv(snapshot, store)
+      // Changes made during the converter import must not download the
+      // previous source after the user has replaced or edited a capture.
+      if (revision !== importRevision.current || snapshot !== currentActiveSource.current) return
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = store ? 'supa-mijn-bronopname-' + store + '.csv' :
+          'supa-mijn-twee-bronopnames.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('Je eigen ' + (store ?? 'PLUS/DekaMarkt') +
+          '-bronopname is als herimporteerbare CSV opgeslagen, zonder brongegevens te wijzigen.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (error) {
+      if (revision !== importRevision.current || snapshot !== currentActiveSource.current) return
+      setMessage((error instanceof Error ? error.message : 'Kan de bronopname niet als CSV bewaren.') +
+        ' Download eventueel de oorspronkelijke JSON; de bron en reviews blijven behouden.')
     }
   }
 
@@ -1553,6 +1583,16 @@ export function OfflineReviewedWorkbench({
           <button type="button" className="ghost-button" disabled={!imported || busy} onClick={downloadOwnSources}>
             Download mijn originele bronopnames (JSON)
           </button>
+          <button type="button" className="ghost-button" disabled={!imported || busy}
+            onClick={() => void downloadOwnSourcesCsv()}>
+            Download mijn bronopname(s) als CSV
+          </button>
+          {imported && (['PLUS', 'DekaMarkt'] as const).filter(store => !!imported.captures[store]).map(store => (
+            <button type="button" className="ghost-button" key={'download-source-' + store}
+              disabled={busy} onClick={() => void downloadOwnSourcesCsv(store)}>
+              Download alleen {store} als CSV
+            </button>
+          ))}
           <button type="button" className="ghost-button" disabled={!imported || !basketPair || busy}
             onClick={downloadPortableSession}>
             Bewaar mijn winkelmand + gekozen producten (privésessie)
