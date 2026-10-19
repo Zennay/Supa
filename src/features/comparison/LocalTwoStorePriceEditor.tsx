@@ -20,12 +20,13 @@ type ProductDraft = {
   packCount: string
   priceEuros: string
   available: boolean
+  availabilityReviewed?: boolean
 }
 const stores: OfflineRetailer[] = ['PLUS', 'DekaMarkt']
 const supportedUnits: Unit[] = ['g', 'kg', 'ml', 'l', 'piece']
 const emptyDraft = (unit: string): ProductDraft => ({
   sourceId: '', name: '', packAmount: '', packUnit: supportedUnits.includes(unit as Unit) ? unit as Unit : 'g',
-  packCount: '1', priceEuros: '', available: false,
+  packCount: '1', priceEuros: '', available: false, availabilityReviewed: false,
 })
 const key = (store: OfflineRetailer, ingredientId: string) => JSON.stringify([store, ingredientId])
 
@@ -68,6 +69,23 @@ function isCompleteOwnPriceDraft(row: ProductDraft): boolean {
     eurosToCents(row.priceEuros.trim()) !== null
 }
 
+function isReviewedUnavailableDraft(row: ProductDraft): boolean {
+  const id = row.sourceId ?? ''
+  const amount = row.packAmount.trim() ? amountOrNull(row.packAmount.trim()) : null
+  const count = Number(row.packCount)
+  return row.availabilityReviewed === true && !row.available &&
+    id.length > 0 && id === id.trim() && id.length <= 100 &&
+    /[\p{L}\p{N}]/u.test(id) &&
+    !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(id) &&
+    row.name.trim().length > 0 && row.name === row.name.trim() &&
+    !row.priceEuros.trim() &&
+    (row.packAmount.trim().length === 0 || (amount !== null &&
+      (row.packUnit !== 'piece' || Number.isSafeInteger(amount)))) &&
+    /^\d{1,4}$/.test(row.packCount) && Number.isSafeInteger(count) && count >= 1 && count <= 1000
+}
+const isEnteredOwnCapture = (row: ProductDraft) =>
+  isCompleteOwnPriceDraft(row) || isReviewedUnavailableDraft(row)
+
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
 
 type StoredDraft = {
@@ -108,7 +126,8 @@ function readPrivateDraft(fingerprint: string, importedRaw?: string): StoredDraf
           !rawRow || typeof rawRow !== 'object' || Array.isArray(rawRow)) return false
       const row = rawRow as Record<string, unknown>
       return (row.sourceId === undefined || (typeof row.sourceId === 'string' && row.sourceId.length <= 100)) &&
-        Object.keys(row).every(field => ['sourceId', 'name', 'packAmount', 'packUnit', 'packCount', 'priceEuros', 'available'].includes(field)) &&
+        Object.keys(row).every(field => ['sourceId', 'name', 'packAmount', 'packUnit', 'priceEuros', 'packCount', 'available', 'availabilityReviewed'].includes(field)) &&
+        (row.availabilityReviewed === undefined || typeof row.availabilityReviewed === 'boolean') &&
         typeof row.name === 'string' && row.name.length <= 160 &&
         typeof row.packAmount === 'string' && row.packAmount.length <= 24 &&
         typeof row.packUnit === 'string' && supportedUnits.includes(row.packUnit as Unit) &&
@@ -285,7 +304,7 @@ export function LocalTwoStorePriceEditor({
         const products = activeNeeds.flatMap((need) => {
           const draft = rows[key(store, need.id)] ?? emptyDraft(need.unit)
           const entered = draft.sourceId?.trim() || draft.name.trim() || draft.packAmount.trim() ||
-            draft.priceEuros.trim() || draft.available
+            draft.priceEuros.trim() || draft.available || draft.availabilityReviewed
           if (!entered) return []
           if (draft.name !== draft.name.trim() || !draft.name.trim()) {
             throw new Error(`${store} · ${need.label}: vul een werkelijke, complete productnaam in.`)
@@ -317,6 +336,9 @@ export function LocalTwoStorePriceEditor({
           }
           if (!draft.available && price !== null) {
             throw new Error(`${store} · ${need.label}: prijs ingevuld maar beschikbaarheid niet bevestigd.`)
+          }
+          if (!draft.available && !draft.availabilityReviewed) {
+            throw new Error(`${store} · ${need.label}: markeer het geobserveerde artikel expliciet als niet beschikbaar, of bevestig de geobserveerde prijs. Laat een onbekend artikel helemaal leeg.`)
           }
           return [{
             id: originalId,
@@ -511,12 +533,15 @@ export function LocalTwoStorePriceEditor({
             <input type="datetime-local" value={capturedAt[store]} onChange={e => changeTimestamp(store, e.target.value)} />
           </label>
           {(() => {
-            const completed = activeNeeds.filter(need => isCompleteOwnPriceDraft(
+            const completed = activeNeeds.filter(need => isEnteredOwnCapture(
               rows[key(store, need.id)] ?? emptyDraft(need.unit))).length
-            const next = activeNeeds.findIndex(need => !isCompleteOwnPriceDraft(
+            const unavailable = activeNeeds.filter(need => isReviewedUnavailableDraft(
+              rows[key(store, need.id)] ?? emptyDraft(need.unit))).length
+            const next = activeNeeds.findIndex(need => !isEnteredOwnCapture(
               rows[key(store, need.id)] ?? emptyDraft(need.unit)))
             return <div className="offline-manual-editor__progress" role="status">
-              <strong>{completed} van {activeNeeds.length} invoerregels ingevuld</strong>
+              <strong>{completed} van {activeNeeds.length} bronregels vastgelegd</strong>
+              <small>{completed - unavailable} met ingevoerde prijs · {unavailable} expliciet niet beschikbaar · {activeNeeds.length - completed} open</small>
               <small>Eigen invoer; bronmatching, actualiteit en persoonlijke prijsreview volgen nog.</small>
               <div className="offline-manual-editor__progress-actions">
                 <button type="button" className="ghost-button" disabled={next < 0}
@@ -532,17 +557,19 @@ export function LocalTwoStorePriceEditor({
               </div>
             </div>
           })()}
-          {onlyOpenRows && activeNeeds.length > 0 && activeNeeds.every(need => isCompleteOwnPriceDraft(
+          {onlyOpenRows && activeNeeds.length > 0 && activeNeeds.every(need => isEnteredOwnCapture(
             rows[key(store, need.id)] ?? emptyDraft(need.unit))) &&
             <p role="status">Alle regels voor {store} zijn ingevuld. Toon alle producten om ze na te kijken.</p>}
           {activeNeeds.map((need, index) => {
             const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
-            const complete = isCompleteOwnPriceDraft(row)
+            const unavailable = isReviewedUnavailableDraft(row)
+            const complete = isEnteredOwnCapture(row)
             if (onlyOpenRows && complete) return null
             return <fieldset key={need.id} id={`own-price-${store}-${index}`} className="offline-manual-editor__row">
               <legend>{need.label} · benodigd {need.amount ?? '?'} {need.unit}
                 <small className="offline-manual-editor__row-status">
-                  {complete ? ' · ingevuld, nog niet bevestigd' : ' · invoer onvolledig'}
+                  {unavailable ? ' · gecontroleerd niet beschikbaar, geen prijs'
+                    : complete ? ' · prijs ingevuld, nog niet bevestigd' : ' · invoer onvolledig'}
                 </small>
               </legend>
               <label>Originele productcode uit jouw waarneming (EAN of artikelnummer)
@@ -576,8 +603,17 @@ export function LocalTwoStorePriceEditor({
                   onChange={e => changeRow(store, need.id, { priceEuros: e.target.value }, need.unit)} />
               </label>
               <label className="offline-manual-editor__available">
-                <input type="checkbox" checked={row.available} onChange={e => changeRow(store, need.id, { available: e.target.checked }, need.unit)} />
+                <input type="checkbox" checked={row.available} onChange={e => changeRow(store, need.id,
+                  { available: e.target.checked, availabilityReviewed: e.target.checked }, need.unit)} />
                 Beschikbaar en prijs zelf gecontroleerd
+              </label>
+              <label className="offline-manual-editor__available">
+                <input type="checkbox" checked={!row.available && row.availabilityReviewed === true}
+                  onChange={e => changeRow(store, need.id, {
+                    available: false, availabilityReviewed: e.target.checked,
+                    priceEuros: e.target.checked ? '' : row.priceEuros,
+                  }, need.unit)} />
+                Zelf gecontroleerd niet beschikbaar (geen prijs; aangevinkte status wist een ingevoerde prijs)
               </label>
             </fieldset>
           })}
