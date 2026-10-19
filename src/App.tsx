@@ -1,5 +1,5 @@
 import { FigmaImage } from './components/FigmaImage'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { PlannerView } from './features/planner/PlannerView'
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
@@ -7,7 +7,12 @@ import type { WeekSharePreview } from './features/planner/weekPlanShare'
 import { BasketView } from './features/basket/BasketView'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
-import { PrivateReviewedProductCatalog } from './features/products/PrivateReviewedProductCatalog.tsx'
+// Historical demo products remain separate. Only load the user's reviewed
+// private source catalogue when they actually open the Products screen.
+const PrivateReviewedProductCatalog = lazy(async () => {
+  const module = await import('./features/products/PrivateReviewedProductCatalog.tsx')
+  return { default: module.PrivateReviewedProductCatalog }
+})
 import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
@@ -356,8 +361,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       </header>}
 
       <div className="content">
-        {tab === 'products' && <PrivateReviewedProductCatalog reviewed={livePrivateReviewed}
-          onOpenComparison={() => navigate('basket')} onOpenList={() => navigate('list')} />}
+        {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
+          <PrivateReviewedProductCatalog reviewed={livePrivateReviewed}
+            onOpenComparison={() => navigate('basket')} onOpenList={() => navigate('list')} />
+        </Suspense>}
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
 
