@@ -26,7 +26,8 @@ function physicalCaptureNanoseconds(capturedAt) {
   const timezone = parts[8]
   if (timezone !== 'Z') {
     const [hours, minutes] = timezone.slice(1).split(':').map(Number)
-    if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) {
+    const maximum = timezone[0] === '-' ? 12 : 14
+    if (hours > maximum || minutes > 59 || (hours === maximum && minutes !== 0)) {
       throw new Error('Invalid retailer capture UTC offset')
     }
   }
