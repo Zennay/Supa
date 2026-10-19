@@ -19,6 +19,7 @@ type Suggestion = {
   packCount: number; packAmount: number; packUnit: string
   packCents: number; unitRate: string | null
 } | null
+type UnpricedHint = { name: string; sku: string; reason: string } | null
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const sourceDate = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -66,6 +67,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     ])) as Record<OfflineRetailer, Map<string, OfflineStoreProduct>>
     return needs.map(need => {
       const suggestions = {} as Record<OfflineRetailer, Suggestion>
+      const unpricedHints = { PLUS: null, DekaMarkt: null } as Record<OfflineRetailer, UnpricedHint>
       const manualReview = { PLUS: false, DekaMarkt: false }
       for (const store of stores) {
         const capture = source.captures[store]
@@ -87,10 +89,32 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           product.sourcePriceCents >= 0 &&
           product.packAmount !== null && product.packAmount > 0 &&
           family(product.packUnit) === family(need.unit))
-        const choice = matchIngredient({
+        const requirement = {
           id: need.id, query: need.query || need.label, amount: need.amount,
           unit: need.unit as MatchUnit,
-        }, eligible)
+        }
+        const choice = matchIngredient(requirement, eligible)
+        // Diagnostic only: the same original retailer file can already
+        // contain a likely SKU without a usable price/pack/availability.
+        // NEVER promote this projection into a purchasable or reviewed match.
+        const incomplete = capture.products.filter(product =>
+          !product.available && family(product.packUnit) === family(need.unit))
+        if (incomplete.length && choice.type !== 'match') {
+          const diagnostic = matchIngredient(requirement,
+            incomplete.map(product => ({ ...product, available: true })),
+            { minimumScore: 80, minimumMargin: 20 })
+          const found = diagnostic.type === 'match'
+            ? incomplete.find(product => product.id === diagnostic.productId) : null
+          if (found) {
+            unpricedHints[store] = {
+              name: found.name,
+              sku: found.id,
+              reason: found.packAmount === null ? 'verpakking onbekend'
+                : found.sourcePriceCents === null ? 'pakprijs ontbreekt'
+                  : 'volgens de originele bron niet beschikbaar',
+            }
+          }
+        }
         // An ambiguous source already contains several valid original SKUs.
         // The user must pick one in Vergelijk, not re-observe a made-up new
         // product or silently treat the first result as a match.
@@ -116,7 +140,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                 unitRate: rate ? formatPrivateUnitRate(rate) : null }
             })() : null
       }
-      return { need, suggestions, manualReview }
+      return { need, suggestions, manualReview, unpricedHints }
     })
   }, [needs, source, olderPairedStore, clock])
   if (!coverage.length) return null
