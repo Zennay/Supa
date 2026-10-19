@@ -88,6 +88,20 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     onOpenList()
     setDownloadMessage('')
   }
+  async function copyReviewQueue() {
+    setDownloadMessage('')
+    try {
+      if (!captureProgress) throw new Error('Er zijn nog geen eigen winkelopnames.')
+      if (!navigator.clipboard?.writeText)
+        throw new Error('Klembord niet beschikbaar in deze browser.')
+      const { pendingOwnSourceReviewText } = await import('./pendingOwnSourceReviewCsv.ts')
+      const output = pendingOwnSourceReviewText(captureProgress, captureProgress.planKey, Date.now())
+      await navigator.clipboard.writeText(output)
+      setDownloadMessage('Je openstaande PLUS/Deka-winkelcontroles gekopieerd. Geen onbekende prijzen als bedragen overgenomen.')
+    } catch {
+      setDownloadMessage('Mobiel kopiëren niet beschikbaar. Download de privé-CSV voor dezelfde openstaande controles.')
+    }
+  }
   async function downloadReviewQueue() {
     setDownloadMessage('')
     try {
@@ -264,6 +278,9 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
         onbekende prijzen blijven onbekend.</p>
       <button type="button" className="ghost-button" onClick={() => void downloadReviewQueue()}>
         Download openstaande winkelcontroles (CSV)
+      </button>
+      <button type="button" className="ghost-button" onClick={() => void copyReviewQueue()}>
+        Kopieer openstaande winkelcontroles (mobiel)
       </button>
     </div>}
     <div className="own-store-planner__cards">
