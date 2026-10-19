@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { historicalRetailerProducts } from '../products/historicalRetailerProducts.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -78,12 +78,14 @@ type StoredDraft = {
   raw: string | null
   protected: boolean
 }
-function readPrivateDraft(fingerprint: string): StoredDraft {
+function readPrivateDraft(fingerprint: string, importedRaw?: string): StoredDraft {
   const empty: StoredDraft = { saved: false, sourceSelection: 'both', rows: {}, capturedAt: { PLUS: '', DekaMarkt: '' }, raw: null, protected: false }
-  if (typeof window === 'undefined') return empty
-  let raw: string | null
-  try { raw = window.sessionStorage.getItem(privateDraftStorageKey) }
-  catch { return { ...empty, protected: true } }
+  if (typeof window === 'undefined' && importedRaw === undefined) return empty
+  let raw: string | null = importedRaw ?? null
+  if (importedRaw === undefined) {
+    try { raw = window.sessionStorage.getItem(privateDraftStorageKey) }
+    catch { return { ...empty, protected: true } }
+  }
   if (raw === null) return empty
   if (raw.length > 256000) return { ...empty, raw, protected: true }
   try {
@@ -151,6 +153,9 @@ export function LocalTwoStorePriceEditor({
   }, [plan, recipes, activeDays])
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
   const selectedPlanFingerprint = JSON.stringify([plan, activeDays, needs.map(item => [item.id, item.amount, item.unit])])
+  // Avoid importing a draft into a different plan if it changed during File.text().
+  const currentPlanFingerprint = useRef(selectedPlanFingerprint)
+  currentPlanFingerprint.current = selectedPlanFingerprint
   const [preparedFor, setPreparedFor] = useState('')
   const [savedDraftRaw, setSavedDraftRaw] = useState<string | null>(null)
   const [draftOptIn, setDraftOptIn] = useState(false)
@@ -352,6 +357,64 @@ export function LocalTwoStorePriceEditor({
   }
   const validOutput = output && selectedPlanFingerprint === preparedFor
 
+  // Portable *unfinished form*, not an admitted retailer price snapshot.
+  // The two formats intentionally cannot be mistaken for one another.
+  function downloadUnfinishedDraft() {
+    try {
+      const json = JSON.stringify({
+        schemaVersion: 1, fingerprint: selectedPlanFingerprint, rows, capturedAt, sourceSelection,
+      }, null, 2)
+      if (new TextEncoder().encode(json).length > 256000) {
+        throw Error('Dit invulconcept is groter dan 256 kB.')
+      }
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-onvoltooid-prijsconcept.json'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        setDraftStatus('Privéconcept gedownload. Dit is geen gevalideerde winkelprijsbron.')
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+    } catch {
+      setDraftStatus('Kon het invulconcept niet lokaal downloaden.')
+    }
+  }
+
+  async function importUnfinishedDraft(file: File) {
+    const fingerprint = selectedPlanFingerprint
+    try {
+      if (file.size > 256000) throw Error('size')
+      const raw = await file.text()
+      if (currentPlanFingerprint.current !== fingerprint) {
+        setDraftStatus('Het weekmenu veranderde tijdens het lezen. Kies het concept opnieuw.')
+        return
+      }
+      const restored = readPrivateDraft(fingerprint, raw)
+      if (!restored.saved) {
+        setDraftStatus('Dit concept hoort niet bij dit exacte weekmenu, is te groot of heeft een onbekende indeling.')
+        return
+      }
+      if (!window.confirm('Vervang de huidige, mogelijk onvoltooide invoer door dit lokale privéconcept? ' +
+        'Oude prijzen en waarnemingstijden moeten opnieuw op actualiteit worden gecontroleerd.')) return
+      // Opt-in storage is paused. Do not overwrite an existing tab draft simply
+      // because a file was imported. User can deliberately enable saving later.
+      setDraftOptIn(false)
+      setRows(restored.rows)
+      setCapturedAt(restored.capturedAt)
+      setSourceSelection(restored.sourceSelection)
+      setPreparedFor(''); setOutput(''); setError('')
+      setDraftStatus('Onvoltooid concept lokaal geladen. Controleer prijzen en bronmomenten en bereken opnieuw.')
+      onEdit()
+    } catch {
+      setDraftStatus('Het gekozen JSON-concept kon niet veilig worden gelezen. Bestaande invoer blijft staan.')
+    }
+  }
+
   function downloadPreparedSource() {
     if (!validOutput || typeof window === 'undefined') return
     const bytes = new Blob([output], { type: 'application/json;charset=utf-8' })
@@ -398,6 +461,22 @@ export function LocalTwoStorePriceEditor({
           Onvoltooide invoer bewaren in deze browsertab (optioneel, niet naar een server)
         </label>
         <span role="status">{draftStatus}</span>
+        <div className="offline-manual-editor__progress-actions">
+          <button type="button" className="ghost-button" onClick={downloadUnfinishedDraft}>
+            Download onvoltooid invulconcept (JSON)
+          </button>
+          <label>Herstel een eigen onvoltooid invulconcept
+            <input type="file" accept=".json,application/json"
+              onChange={event => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                if (file) void importUnfinishedDraft(file)
+              }} />
+          </label>
+        </div>
+        <small>Concepten bevatten jouw eigen invoer en mogelijk oude bedragen.
+          Alleen een exact gelijk weekmenu wordt geaccepteerd; import activeert
+          nooit automatisch prijsvergelijking of opslag.</small>
         {draftOptIn && <button type="button" className="ghost-button" onClick={clearDraft}>
           Stop automatisch bewaren en wis concept
         </button>}
