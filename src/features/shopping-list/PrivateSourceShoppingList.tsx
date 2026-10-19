@@ -32,6 +32,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   const [message, setMessage] = useState('')
   const [showMixedRoute, setShowMixedRoute] = useState(false)
   const mixedSectionRef = useRef<HTMLElement>(null)
+  const progressInputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (routeOpenSignal <= 0) return
     setShowMixedRoute(true)
@@ -52,6 +53,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   ]), [reviewed.planKey, store, capture.observedAt, basket])
   const tick = (line: BasketTraceLine) => JSON.stringify([identity, line.id])
   const doneCount = basket.lines.filter(line => checked[tick(line)]).length
+  const remainingCents = basket.lines.reduce((sum, line) =>
+    sum + (line.status === 'matched' && !checked[tick(line)] ? line.lineTotalCents : 0), 0)
   const visibleLines = remainingOnly ? basket.lines.filter(line => !checked[tick(line)]) : basket.lines
   const readable = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
   const label = (line: BasketTraceLine) => line.status === 'matched'
@@ -138,6 +141,53 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       setMessage(error instanceof Error ? error.message : 'De privé-CSV kon niet worden gemaakt.')
     }
   }
+  async function saveProgress() {
+    if (!currentCaptureAvailable()) {
+      setMessage('De winkelbron is verlopen. Werk de brongegevens bij.')
+      return
+    }
+    try {
+      const { exportSingleStoreProgress } = await import('./privateSingleStoreProgress.ts')
+      if (!currentCaptureAvailable()) throw Error('Verlopen bron')
+      const data = exportSingleStoreProgress({
+        planKey: reviewed.planKey, store, capture,
+        done: new Set(basket.lines.filter(line => checked[tick(line)]).map(line => line.id)),
+      })
+      const url = URL.createObjectURL(new Blob([data], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-afvinkingen.json'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('Vinkjes lokaal bewaard in je eigen bestand; niets verzonden.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch { setMessage('Kon je afvinkingen niet veilig bewaren.') }
+  }
+  async function restoreProgress(file: File) {
+    if (!currentCaptureAvailable() || file.size > 256_000) {
+      setMessage('Controleer je bron. Herstelbestanden mogen maximaal 256 kB zijn.')
+      return
+    }
+    try {
+      const text = await file.text()
+      const { importSingleStoreProgress } = await import('./privateSingleStoreProgress.ts')
+      if (!currentCaptureAvailable()) throw Error('Verlopen bron')
+      const restored = importSingleStoreProgress(text, { planKey: reviewed.planKey, store, capture })
+      if (!window.confirm('Bestaande vinkjes van ' + store + ' vervangen door ' +
+          restored.size + ' vinkjes uit je eigen bestand?')) {
+        setMessage('Herstel geannuleerd; bestaande vinkjes behouden.')
+        return
+      }
+      if (!currentCaptureAvailable()) throw Error('Verlopen bron')
+      setChecked(before => {
+        const next = { ...before }
+        for (const line of basket.lines) next[tick(line)] = restored.has(line.id)
+        return next
+      })
+      setMessage(restored.size + ' vinkjes hersteld voor exact hetzelfde eigen winkelmandje.')
+    } catch { setMessage('Herstel geweigerd: bestand, week, bron, producten of prijzen verschillen.') }
+  }
   return (
     <section className="screen private-source-shopping" aria-label="Eigen gecontroleerde boodschappenlijst">
       <header>
@@ -157,6 +207,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         <p><strong>{store}</strong> · bron van {date.format(new Date(capture.capturedMs))}</p>
         <strong>{euros.format(basket.totalCents / 100)}</strong>
         <p>{basket.lines.length} ingrediënten · {doneCount} afgevinkt</p>
+        <p><strong>Nog op je lijst: {euros.format(remainingCents / 100)}</strong>
+          <small>Vinkjes betekenen niet dat producten zijn betaald.</small></p>
         {budgetCents !== null && budgetCents >= 0 &&
           <p>{basket.totalCents <= budgetCents
             ? euros.format((budgetCents - basket.totalCents) / 100) + ' onder je Planner-weekbudget'
@@ -196,6 +248,15 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           onChange={event => setRemainingOnly(event.target.checked)} /> Alleen nog te kopen</label>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
         <button type="button" onClick={() => { void downloadCsv() }}>Download met eigen SKU’s en centprijzen (CSV)</button>
+        <button type="button" onClick={() => { void saveProgress() }}>Bewaar vinkjes (JSON)</button>
+        <button type="button" onClick={() => progressInputRef.current?.click()}>Herstel vinkjes</button>
+        <input ref={progressInputRef} type="file" accept=".json,application/json"
+          aria-label="Kies je eigen Supa-afvinkbestand" className="private-source-shopping__backup-input"
+          onChange={event => {
+            const file = event.currentTarget.files?.[0]
+            event.currentTarget.value = ''
+            if (file) void restoreProgress(file)
+          }} />
         <button type="button" onClick={onOpenComparison}>Herzie prijzen en productmatching</button>
       </div>
       <p role="status" aria-live="polite">{message}</p>
@@ -227,8 +288,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           }}
           aria-label="Kopieerbare eigen boodschappenlijst" />
       </details>
-      <p className="disclaimer">Vinkjes zijn tijdelijk in deze browsersessie en worden niet opgeslagen
-        of doorgestuurd. Een nieuwe bron, andere producten, weekvraag of prijs vervangt de
+      <p className="disclaimer">Vinkjes worden niet automatisch opgeslagen of doorgestuurd. Met Bewaar kun je
+        zelf een lokaal JSON-bestand maken en later terugzetten. Een nieuwe bron, andere producten, weekvraag of prijs vervangt de
         fysieke lijst en maakt oudere afvinkingen ongeldig.</p>
     </section>
   )

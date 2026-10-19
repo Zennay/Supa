@@ -30,3 +30,5 @@
 .private-source-shopping__mixed #supa-mixed-shopping-list { min-width:0; }
 
 .private-source-shopping__mixed { scroll-margin-top: 18px; }
+
+.private-source-shopping__backup-input {position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
