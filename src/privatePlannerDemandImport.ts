@@ -4,6 +4,7 @@
  * No recipe fetch, retailer prices, SKU inference, network calls or storage.
  */
 import { aggregatePlanIngredients } from './domain/basket.ts'
+import { hasEveryOwnArrayIndex } from './domain/denseArray.ts'
 
 type Week = {
   schema: 'supa-private-planner-week-v1'
@@ -33,9 +34,12 @@ const quantity = (value: unknown, unit: unknown) =>
 function readWeek(value: unknown): Week {
   if (!record(value) || value.schema !== 'supa-private-planner-week-v1' ||
       !only(value, ['schema', 'plan', 'activeDays', 'recipes']) ||
-      !Array.isArray(value.plan) || value.plan.length < 1 || value.plan.length > 14 ||
-      !Array.isArray(value.activeDays) || value.activeDays.length < 1 || value.activeDays.length > 14 ||
-      !Array.isArray(value.recipes) || value.recipes.length < 1 || value.recipes.length > 150) {
+      !Array.isArray(value.plan) || !hasEveryOwnArrayIndex(value.plan) ||
+      value.plan.length < 1 || value.plan.length > 14 ||
+      !Array.isArray(value.activeDays) || !hasEveryOwnArrayIndex(value.activeDays) ||
+      value.activeDays.length < 1 || value.activeDays.length > 14 ||
+      !Array.isArray(value.recipes) || !hasEveryOwnArrayIndex(value.recipes) ||
+      value.recipes.length < 1 || value.recipes.length > 150) {
     throw Error('Geen geldig lokaal geselecteerd weekmenu.')
   }
   if (new Set(value.activeDays).size !== value.activeDays.length ||
@@ -49,7 +53,8 @@ function readWeek(value: unknown): Week {
   }
   if (!value.recipes.every(recipe => record(recipe) &&
       only(recipe, ['id', 'ingredients']) && validText(recipe.id, 100) &&
-      Array.isArray(recipe.ingredients) && recipe.ingredients.length <= 1000 &&
+      Array.isArray(recipe.ingredients) && hasEveryOwnArrayIndex(recipe.ingredients) &&
+      recipe.ingredients.length <= 1000 &&
       recipe.ingredients.every(item => record(item) &&
         only(item, ['id', 'label', 'query', 'amount', 'unit']) &&
         validText(item.id, 100) && validText(item.label) && validText(item.query) &&

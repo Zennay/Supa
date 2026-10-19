@@ -1,4 +1,5 @@
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
+import { hasEveryOwnArrayIndex } from '../../domain/denseArray.ts'
 
 /**
  * Only the exact, supported planner-preferences v2 envelope may be rewritten.
@@ -21,7 +22,7 @@ export function canReplacePlannerRecord(
       return false
     }
     if (validCustomWeekBudgetEuros(record.budget) === null) return false
-    if (!Array.isArray(record.activeDays) ||
+    if (!Array.isArray(record.activeDays) || !hasEveryOwnArrayIndex(record.activeDays) ||
         !record.activeDays.every((day: unknown) => typeof day === 'string' && validDays.includes(day)) ||
         new Set(record.activeDays).size !== record.activeDays.length) {
       return false
