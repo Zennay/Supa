@@ -367,6 +367,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onOwnSourceChange={(store) => {
               if (store === 'PLUS' || store === 'DekaMarkt') setPreferredOwnStore(store)
             }}
+            onOpenComparison={() => navigate('basket')}
             onBudgetChange={(nextBudget) =>
               setPreferences((current) => ({
                 ...current,

@@ -24,6 +24,7 @@ type PlannerViewProps = {
   ownSource?: { store: string; observedAt: string }
   ownSourceChoices?: { store: string; observedAt: string }[]
   onOwnSourceChange?: (store: string) => void
+  onOpenComparison: () => void
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
@@ -40,6 +41,7 @@ export function PlannerView({
   ownSource,
   ownSourceChoices,
   onOwnSourceChange,
+  onOpenComparison,
   onBudgetChange,
   onToggleDay,
   onRecipeChange,
@@ -296,6 +298,10 @@ export function PlannerView({
           Supa rekent voorbeeldcatalogusprijzen niet mee als jouw uitgaven.
           Open Vergelijk om eigen actuele winkelproducten, verpakkingen en prijzen te controleren.
         </p>}
+        {trustedCents === null && <button type="button" className="ghost-button"
+          onClick={onOpenComparison}>
+          Open Vergelijk · voeg eigen winkelprijzen toe
+        </button>}
         {trustedCents !== null && <p className="disclaimer">
           {budgetKnown
             ? <>Dit bedrag komt uit jouw persoonlijk bevestigde winkelbron
