@@ -412,6 +412,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         </p>}
         {hasDemand && needs.length > 0 && liveAdmission &&
           <PlannerSourceMatchPreview needs={needs} source={liveAdmission}
+            onRecapture={onRecapture}
             onReviewIngredient={onReviewIngredient
               ? (store, ingredientId) => handoff({ store, ingredientId })
               : undefined} />}
