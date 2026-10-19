@@ -1,8 +1,8 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { privateSingleStoreShoppingCsv } from './privateSourceShoppingCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 
-const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const literal = (value: string | number) => String(value)
   .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
 
@@ -18,7 +18,7 @@ export function privateSingleStoreShoppingText({ basket, observedAt }: {
   const rows = [
     'SUPA · mijn eigen ' + literal(basket.store.id) + '-weekmand',
     'Bronmoment: ' + literal(observedAt),
-    'Complete pakprijzen: ' + euro.format(basket.totalCents / 100),
+    'Complete pakprijzen: ' + exactEuro.formatCents(basket.totalCents),
     'Privégegevens, niet onafhankelijk geverifieerd. Geen kassagarantie of actuele beschikbaarheid.',
     'Ontbrekende andere winkel = onbekende vergelijking, nooit € 0,00.',
     '',
@@ -32,9 +32,9 @@ export function privateSingleStoreShoppingText({ basket, observedAt }: {
         ' (SKU ' + literal(line.productId) + ')',
       '  ' + literal(line.pack.count) + ' × ' + literal(line.pack.amount) +
         ' ' + literal(line.pack.unit) + ' per pak · ' +
-        euro.format(line.pricePerPackCents / 100) + ' per pak · ' +
+        exactEuro.formatCents(line.pricePerPackCents) + ' per pak · ' +
         (privateUnitPrice(line) ?? 'eenheidsprijs onbekend'),
-      '  Regelprijs hele verpakkingen: ' + euro.format(line.lineTotalCents / 100),
+      '  Regelprijs hele verpakkingen: ' + exactEuro.formatCents(line.lineTotalCents),
       '',
     )
   }

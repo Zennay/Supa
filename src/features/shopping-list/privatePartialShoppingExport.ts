@@ -1,7 +1,7 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import type { OwnStore, PrivateReviewedSourceLine } from '../comparison/privateReviewedBasketBridge.ts'
 import { literalCsv } from '../../privateBasketComparisonCsv.ts'
 
-const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 export type PartialShoppingSheet = {
   store: OwnStore
@@ -97,8 +97,8 @@ export function privatePartialShoppingExport(
           ' (SKU ' + clean(row.productId) + ')',
         '  ' + clean(row.packCount) + ' × ' + clean(row.packAmount) +
           ' ' + clean(row.packUnit) + ' per pak · ' +
-          euro.format(row.pricePerPackCents / 100) + ' per pak',
-        '  Regelprijs: ' + euro.format(row.lineTotalCents / 100) +
+          exactEuro.formatCents(row.pricePerPackCents) + ' per pak',
+        '  Regelprijs: ' + exactEuro.formatCents(row.lineTotalCents) +
           ' · ' + clean(row.unitPrice ?? 'eenheidsprijs onbekend'),
         '',
       )

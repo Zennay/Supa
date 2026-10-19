@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import {
@@ -9,7 +10,6 @@ import { privatePartialPhysicalShoppingTick } from './privatePhysicalShoppingTic
 import './partialReviewedShoppingList.css'
 
 const STORES: readonly OwnStore[] = ['PLUS', 'DekaMarkt']
-const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 /** Admit source prices only from reviewed partial lines. Physical ticks share
  * the exact source SKU/pack identity with a later complete basket, but never
@@ -160,7 +160,7 @@ export function PartialReviewedShoppingList({
       <strong>{summary.confirmedCount} van {summary.physicalLineCount} ingrediënten</strong>
       {' '}hebben gecontroleerde artikelcodes en pakprijzen.
       {' '}{summary.remainingCount} nog niet compleet; hun prijzen blijven onbekend.
-      De waarde {euro.format(summary.knownCents / 100)} betreft alleen de
+      De waarde {exactEuro.formatCents(summary.knownCents)} betreft alleen de
       bevestigde regels, <strong>geen totaalbedrag, winkelwinnaar of besparingsclaim</strong>.
     </p>
     <div className="supa-partial-shop__items">
@@ -173,11 +173,11 @@ export function PartialReviewedShoppingList({
             {' '}· {line.requiredAmount} {line.requiredUnit}
             <small>{line.packagesNeeded} × {line.productName} · SKU {line.productId}</small>
             <small>{line.packCount} × {line.packAmount} {line.packUnit} per pak ·
-              {' '}{euro.format(line.pricePerPackCents / 100)} per pak ·
+              {' '}{exactEuro.formatCents(line.pricePerPackCents)} per pak ·
               {' '}{line.unitPrice ?? 'eenheidsprijs onbekend'}</small>
           </span>
         </label>
-        <strong>{euro.format(line.lineTotalCents / 100)}</strong>
+        <strong>{exactEuro.formatCents(line.lineTotalCents)}</strong>
         <button type="button" className="ghost-button"
           onClick={() => onReviewIngredient(store, line.ingredientId)}>
           Controleer SKU in Vergelijk

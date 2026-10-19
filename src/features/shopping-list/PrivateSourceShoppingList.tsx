@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import type { PrivateExtraVisitCostIntent } from '../comparison/privateExtraVisitCost.ts'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -11,7 +12,6 @@ import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { createMixedStoreShoppingPlan, type MixedStoreLine } from '../comparison/mixedStoreShoppingPlan.ts'
 import './privateSourceShoppingList.css'
 
-const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const date = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores: OwnStore[] = ['PLUS', 'DekaMarkt']
 const MixedStoreShoppingCard = lazy(async () => {
@@ -98,16 +98,16 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
     ? readable(line.ingredientLabel) + ': ' + line.packs + ' × ' + readable(line.productName) +
       ' (SKU ' + readable(line.productId) + ') · ' +
       line.pack.count + ' × ' + line.pack.amount + ' ' + line.pack.unit + ' per pak · ' +
-      euros.format(line.pricePerPackCents / 100) + ' per pak · ' +
+      exactEuro.formatCents(line.pricePerPackCents) + ' per pak · ' +
       (privateUnitPrice(line) ?? 'eenheidsprijs onbekend') + ' · ' +
-      euros.format(line.lineTotalCents / 100) + ' totaal'
+      exactEuro.formatCents(line.lineTotalCents) + ' totaal'
     : line.ingredientLabel + ': product onbekend'
   const textList = [
     'Supa · ' + store + ' · privé gecontroleerd boodschappenlijstje',
     'Eigen bronopname: ' + readable(capture.observedAt),
     remainingOnly ? 'Alleen nog te kopen artikelen (niet het hele winkelmandje).' :
       'Volledig eigen winkelmandje, afgevinkte artikelen inbegrepen.',
-    'Nog op lijst volgens eigen bron: ' + euros.format(remainingCents / 100),
+    'Nog op lijst volgens eigen bron: ' + exactEuro.formatCents(remainingCents),
     ...visibleLines.map(line => (checked[tick(line)] ? '☑ ' : '☐ ') + label(line)),
     ...(remainingOnly && visibleLines.length === 0 ? ['Alles afgevinkt.'] : []),
     'Privébron. Geen actuele kassagarantie of publieke besparingsclaim.',
@@ -382,16 +382,16 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       </label>
       <div className="private-source-shopping__summary">
         <p><strong>{store}</strong> · bron van {date.format(new Date(capture.capturedMs))}</p>
-        <strong>{euros.format(basket.totalCents / 100)}</strong>
+        <strong>{exactEuro.formatCents(basket.totalCents)}</strong>
         <p>{basket.lines.length} ingrediënten · {doneCount} afgevinkt</p>
         <progress className="private-source-shopping__progress" value={doneCount}
           max={basket.lines.length} aria-label={'Afgevinkte ' + store + '-boodschappen'} />
-        <p><strong>Nog op je lijst: {euros.format(remainingCents / 100)}</strong>
+        <p><strong>Nog op je lijst: {exactEuro.formatCents(remainingCents)}</strong>
           <small>Vinkjes betekenen niet dat producten zijn betaald.</small></p>
         {budgetCents !== null && budgetCents >= 0 &&
           <p>{basket.totalCents <= budgetCents
-            ? euros.format((budgetCents - basket.totalCents) / 100) + ' onder je Planner-weekbudget voor alléén bekende geprijsde ingrediënten'
-            : euros.format((basket.totalCents - budgetCents) / 100) + ' boven je Planner-weekbudget voor alléén bekende geprijsde ingrediënten'}</p>}
+            ? exactEuro.formatCents((budgetCents - basket.totalCents)) + ' onder je Planner-weekbudget voor alléén bekende geprijsde ingrediënten'
+            : exactEuro.formatCents((basket.totalCents - budgetCents)) + ' boven je Planner-weekbudget voor alléén bekende geprijsde ingrediënten'}</p>}
         {unpricedExtras !== null && unpricedExtras > 0 && <p role="status">
           Je hebt daarnaast {unpricedExtras} eigen ongeprijsde boodschappen. Deze horen
           niet bij het berekende winkelmandje; de echte totale weekuitgaven en
@@ -405,7 +405,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         <p role="status" className="private-source-shopping__comparison">
           {comparison.deltaCents === 0 ? 'Beide eigen winkelmandjes hebben hetzelfde totaal.'
             : (comparison.deltaCents > 0 ? 'PLUS' : 'DekaMarkt') + ' is ' +
-              euros.format(Math.abs(comparison.deltaCents) / 100) +
+              exactEuro.formatCents(Math.abs(comparison.deltaCents)) +
               ' goedkoper volgens jouw twee lokale, binnen 24 uur waargenomen bronnen.'}
           <small>Geen onafhankelijk gecontroleerde besparing.</small>
         </p>}
@@ -415,7 +415,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           const source = reviewed.stores[name]!
           return <div key={name}>
             <strong>{name}</strong>
-            <span>{euros.format(source.basket.totalCents / 100)}</span>
+            <span>{exactEuro.formatCents(source.basket.totalCents)}</span>
             <small>Eigen opname: {date.format(new Date(source.capturedMs))}</small>
             <button type="button" disabled={store === name} onClick={() => {
               const current = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
@@ -437,7 +437,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       {mixed && single && plus && deka && <section ref={mixedSectionRef} className="private-source-shopping__mixed" aria-label="Combineer beide eigen winkelmandjes">
         <h3>Goedkoopste artikelen combineren</h3>
         <p>Verdeel alleen jouw gecontroleerde hele verpakkingen over beide winkels.
-          De productkosten bedragen {euros.format(mixed.totalCents / 100)}.
+          De productkosten bedragen {exactEuro.formatCents(mixed.totalCents)}.
           {mixed.lines.some(line => line.store === 'PLUS') && mixed.lines.some(line => line.store === 'DekaMarkt')
             ? ' Extra bezoekkosten en reistijd moet je zelf invullen; zonder die kosten is het netto voordeel onbekend.'
             : ' Voor de goedkoopste combinatie is maar één winkel nodig.'}</p>
@@ -521,11 +521,11 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               <small>{line.status === 'matched'
                 ? line.packs + ' × ' + line.productName + ' · SKU ' + line.productId +
                   ' · ' + line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count + ' per verpakking' +
-                  ' · ' + euros.format(line.pricePerPackCents / 100) + ' per pak' +
+                  ' · ' + exactEuro.formatCents(line.pricePerPackCents) + ' per pak' +
                   ' · ' + (privateUnitPrice(line) ?? 'eenheidsprijs onbekend')
                 : 'Dit product is niet betrouwbaar gekoppeld.'}</small>
             </span>
-            <strong>{line.status === 'matched' ? euros.format(line.lineTotalCents / 100) : 'Onbekend'}</strong>
+            <strong>{line.status === 'matched' ? exactEuro.formatCents(line.lineTotalCents) : 'Onbekend'}</strong>
           </label>
         ))}
         {visibleLines.length === 0 && <p>Alles voor {store} is afgevinkt.</p>}

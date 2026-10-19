@@ -1,9 +1,9 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { privateSingleStoreShoppingCsv } from './privateSourceShoppingCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import type { OwnExtraGrocery } from '../comparison/ownExtraGroceriesCsv.ts'
 
-const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const esc = (value: string | number) => String(value)
   .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
   .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
@@ -30,9 +30,9 @@ export function privateSingleStorePrintableHtml({ basket, observedAt, done, extr
       ' <small>SKU ' + esc(line.productId) + '</small></p>' +
       '<small>Verpakking: ' + esc(line.pack.count) + ' × ' + esc(line.pack.amount) +
       ' ' + esc(line.pack.unit) + ' · ' +
-      esc(money.format(line.pricePerPackCents / 100)) + ' per pak · ' +
+      esc(exactEuro.formatCents(line.pricePerPackCents)) + ' per pak · ' +
       esc(privateUnitPrice(line) ?? 'eenheidsprijs onbekend') + '</small></div>' +
-      '<b>' + esc(money.format(line.lineTotalCents / 100)) + '</b></li>'
+      '<b>' + esc(exactEuro.formatCents(line.lineTotalCents)) + '</b></li>'
   }).join('')
   if (extras && (extras.length > 100 || !extras.every(item =>
       typeof item.name === 'string' && item.name.length > 0 && item.name.length <= 120 &&
@@ -70,8 +70,8 @@ export function privateSingleStorePrintableHtml({ basket, observedAt, done, extr
     'kassa-/beschikbaarheidsgarantie, bronlicentie of onafhankelijke besparingsclaim. ' +
     'Dit bestand werkt offline zonder scripts of netwerkverbinding.</p></header>' +
     '<section class="totals"><p>Alle hele verpakkingen<strong>' +
-    esc(money.format(basket.totalCents / 100)) + '</strong></p>' +
-    '<p>Nog op de lijst (niet-afgevinkt)<strong>' + esc(money.format(stillNeeded / 100)) +
+    esc(exactEuro.formatCents(basket.totalCents)) + '</strong></p>' +
+    '<p>Nog op de lijst (niet-afgevinkt)<strong>' + esc(exactEuro.formatCents(stillNeeded)) +
     '</strong></p></section><main><h2>Artikelen</h2><ul>' + items +
     '</ul></main>' + extrasHtml + '<footer><p>Afgevinkt betekent niet betaald. Controleer de originele ' +
     'winkelprijzen opnieuw bij een volgende boodschappenronde. Print met je browser.</p>' +
