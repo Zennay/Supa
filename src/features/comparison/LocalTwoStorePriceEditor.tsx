@@ -3,6 +3,7 @@ import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../doma
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { MatchUnit } from '../../domain/matching.ts'
 import { privatePackUnitRate } from './privateUnitPrice.ts'
+import { ownPriceCapturesToCsv } from './ownPriceCsvExport.ts'
 import { historicalRetailerProducts } from '../products/historicalRetailerProducts.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
@@ -220,6 +221,8 @@ export function LocalTwoStorePriceEditor({
   const [capturedAt, setCapturedAt] = useState<Record<OfflineRetailer, string>>({ PLUS: '', DekaMarkt: '' })
   const [error, setError] = useState('')
   const [output, setOutput] = useState('')
+  const currentPreparedOutput = useRef(output)
+  currentPreparedOutput.current = output
   const needs = useMemo(() => {
     try { return aggregatePlanIngredients(plan, recipes, activeDays) }
     catch { return [] }
@@ -654,6 +657,31 @@ export function LocalTwoStorePriceEditor({
     }
   }
 
+  async function downloadPreparedCsv() {
+    if (!validOutput || typeof window === 'undefined') return
+    const prepared = output
+    setError('')
+    try {
+      const csv = await ownPriceCapturesToCsv(prepared)
+      if (prepared !== currentPreparedOutput.current) return
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-geobserveerde-winkelprijzen.csv'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        setDraftStatus('Eigen bronopname als CSV opgeslagen en verliesvrij opnieuw gecontroleerd.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (exception) {
+      if (prepared !== currentPreparedOutput.current) return
+      setError((exception instanceof Error ? exception.message : 'CSV-download mislukt.') +
+        ' De JSON-kopie en je eigen concept blijven beschikbaar.')
+    }
+  }
+
   function downloadPreparedSource() {
     if (!validOutput || typeof window === 'undefined') return
     const bytes = new Blob([output], { type: 'application/json;charset=utf-8' })
@@ -901,6 +929,11 @@ export function LocalTwoStorePriceEditor({
         <button type="button" className="ghost-button" onClick={downloadPreparedSource}>
           Bewaar mijn invoer als JSON
         </button>
+        <button type="button" className="ghost-button" onClick={() => void downloadPreparedCsv()}>
+          Bewaar mijn prijsopname als herimporteerbare CSV
+        </button>
+        <small>Dezelfde negen bronkolommen als in Supa's bestaande CSV-import.
+          Een afwijkende of onveilige waarde wordt niet stilzwijgend aangepast; JSON blijft beschikbaar.</small>
         <textarea readOnly rows={6} value={output} aria-label="Zelf ingevoerde prijsdata als JSON"
           onFocus={e => e.currentTarget.select()} />
       </details>}
