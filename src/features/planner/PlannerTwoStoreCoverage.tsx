@@ -60,6 +60,8 @@ export function PlannerTwoStoreCoverage({
   now: number
 }) {
   const [showAll, setShowAll] = useState(false)
+  const [storeFilter, setStoreFilter] = useState<'both' | OwnStore>('both')
+  const [ingredientSearch, setIngredientSearch] = useState('')
   const [exportMessage, setExportMessage] = useState('')
   const [selectableText, setSelectableText] = useState('')
   if (!needs.length) return null
@@ -75,7 +77,15 @@ export function PlannerTwoStoreCoverage({
     ['ready', 'reviewed'].includes(item.cells[index].kind)).length)
   const pending = items.filter(item => item.cells.some(cell =>
     cell.kind !== 'ready' && cell.kind !== 'reviewed'))
-  const visible = showAll ? items : pending
+  const normalizedSearch = ingredientSearch.trim().normalize('NFKC').toLocaleLowerCase('nl')
+  const visible = (showAll ? items : pending).filter(item => {
+    if (normalizedSearch &&
+        ![item.need.label, item.need.id].some(value =>
+          value.normalize('NFKC').toLocaleLowerCase('nl').includes(normalizedSearch))) return false
+    if (storeFilter === 'both') return true
+    const cell = item.cells[storeFilter === 'PLUS' ? 0 : 1]
+    return cell.kind !== 'ready' && cell.kind !== 'reviewed'
+  })
   function exportRows(at: number): CoverageExportLine[] {
     return needs.map(need => {
       const plus = cellFor('PLUS', need.id, safeProgress, safeReviewed, at)
@@ -172,10 +182,25 @@ export function PlannerTwoStoreCoverage({
           ? 'Alle originele fysieke ingrediënten zijn voor beide winkels volledig gecontroleerd.'
           : 'De ingrediëntkoppelingen zijn compleet, maar er is nog geen betrouwbaar twee-winkelprijsverschil.'
         : `${pending.length} van ${needs.length} ingrediënten hebben nog een controle nodig bij minstens één winkel.`}</p>
+      <label>Zoek ingrediënt
+        <input type="search" maxLength={120} value={ingredientSearch}
+          placeholder="Bijvoorbeeld rijst"
+          onChange={event => setIngredientSearch(event.currentTarget.value)} />
+      </label>
+      <label>Winkel met openstaande controles
+        <select value={storeFilter}
+          onChange={event => setStoreFilter(event.currentTarget.value as 'both' | OwnStore)}>
+          <option value="both">Beide winkels</option>
+          <option value="PLUS">Alleen PLUS</option>
+          <option value="DekaMarkt">Alleen DekaMarkt</option>
+        </select>
+      </label>
       <label><input type="checkbox" checked={showAll}
         onChange={event => setShowAll(event.currentTarget.checked)} />
         Toon ook volledig gekoppelde ingrediënten</label>
     </div>
+    <p role="status">{visible.length} ingrediënt(en) zichtbaar met deze filters.
+      De oorspronkelijke fysieke Planner-vraag wordt hierdoor niet gewijzigd.</p>
     {visible.length > 0 ? <div className="supa-two-store-coverage__rows">
       {visible.map(({ need, cells }) => <article key={need.id}
         className="supa-two-store-coverage__row">
@@ -197,8 +222,12 @@ export function PlannerTwoStoreCoverage({
           })}
         </div>
       </article>)}
-    </div> : <p>Geen openstaande ingredientcontroles in deze weergave.
-      Schakel hierboven alle ingrediënten in om beide winkels naast elkaar te bekijken.</p>}
+    </div> : <div role="status" className="supa-two-store-coverage__empty">
+      <p>Geen ingrediënten voor deze zoekterm en winkelkeuze.</p>
+      <button type="button" className="ghost-button" onClick={() => {
+        setIngredientSearch(''); setStoreFilter('both'); setShowAll(true)
+      }}>Toon het complete fysieke mandje</button>
+    </div>}
     <small>Alle prijzen blijven onbekend zolang één of beide hele mandjes onvolledig,
       onveilig of verouderd zijn. Geen automatische goedkeuring van producten.</small>
   </section>

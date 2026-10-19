@@ -49,3 +49,9 @@
 .supa-two-store-coverage textarea { width:100%; min-height:150px; padding:.6rem; border-radius:8px; border:1px solid #bac8bc; overflow-wrap:anywhere; }
 
 .supa-two-store-coverage__warning { margin:0; padding:.75rem; border-left:3px solid #a47638; background:#fbf6eb; line-height:1.5; }
+
+.supa-two-store-coverage__toolbar label { display:grid; gap:.3rem; font-weight:600; }
+.supa-two-store-coverage__toolbar input[type=search],
+.supa-two-store-coverage__toolbar select { font:inherit; min-height:44px; min-width:0; max-width:240px; padding:.45rem; border-radius:8px; border:1px solid #8a9d90; }
+.supa-two-store-coverage__toolbar label:has(input[type=checkbox]) { display:inline-flex; align-items:center; }
+.supa-two-store-coverage__empty { padding:1rem; border:1px dashed #b7c8b9; border-radius:10px; }
