@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
@@ -28,8 +28,24 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
   const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal'>('source')
   const [checkMessage, setCheckMessage] = useState('')
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => setNowMs(Date.now())
+    const timer = window.setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
+  // A product tile must never outlive its original seven-day source
+  // admission. Recheck whenever the tab wakes up and at minute boundaries.
+  // Keep the raw receipt untouched so renewed evidence can be reviewed.
+  const currentReviewed = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', nowMs)
+  const hasExpiredSource = shops.some(shop =>
+    !!reviewed?.stores[shop] && !currentReviewed?.stores[shop])
   const sources = shops.flatMap(shop => {
-    const capture = reviewed?.stores[shop]
+    const capture = currentReviewed?.stores[shop]
     return capture ? capture.basket.lines.filter((line): line is Matched => line.status === 'matched')
       .map(line => ({ shop, line, observedAt: capture.observedAt })) : []
   })
@@ -54,7 +70,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
       : group(a.line) - group(b.line) ||
         (rate(a.line)?.centsPerUnit ?? Infinity) - (rate(b.line)?.centsPerUnit ?? Infinity))
   const isChecked = (shop: OwnStore, line: Matched) => {
-    const capture = reviewed?.stores[shop]
+    const capture = currentReviewed?.stores[shop]
     return !!capture && checked[
       privatePhysicalShoppingTick(reviewed!.planKey, shop, capture.basket.store.id, line)] === true
   }
@@ -72,6 +88,11 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     <h2>Mijn echte bronartikelen voor dit weekmenu</h2>
     <p>Alleen jouw zelf gecontroleerde productregels, geen actuele winkelcatalogus of kassagarantie.
       Historische ontwerpvoorbeelden elders op de pagina tellen niet mee.</p>
+    {hasExpiredSource && <p role="status" className="private-reviewed-products__age">
+      Eén of beide eerdere winkelopnames zijn verlopen of niet meer bruikbaar.
+      De bijbehorende prijzen zijn verborgen. Herzie de originele bron in Vergelijk;
+      je eerdere lijstvinkjes blijven bewaard.
+    </p>}
     {!sources.length ? <p role="status">Nog geen complete en actuele eigen bronproducten beschikbaar.
       Kies een weekmenu, importeer je eigen winkelbron en controleer iedere SKU en verpakking.</p> : <>
       <div className="private-reviewed-products__controls">
@@ -97,7 +118,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
       </div>
       <div className="private-reviewed-products__progress" aria-label="Mijn nog te kopen artikelen per winkel">
         {shops.filter(shop => store === 'all' || store === shop).map(shop => {
-          const capture = reviewed?.stores[shop]
+          const capture = currentReviewed?.stores[shop]
           if (!capture) return <section key={shop}>
             <h3>{shop}</h3><strong>Prijs onbekend</strong>
             <small>Geen volledige, actuele en persoonlijk gecontroleerde bron.</small>
@@ -114,9 +135,9 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
             <progress value={done} max={lines.length}
               aria-label={'Voortgang originele ' + shop + '-boodschappen'} />
             <strong>Nog op mijn lijst: {money.format(remaining / 100)}</strong>
-            {privatePriceAgeNotice(capture.capturedMs, Date.now()) && (
+            {privatePriceAgeNotice(capture.capturedMs, nowMs) && (
               <small role="status" className="private-reviewed-products__age">
-                {privatePriceAgeNotice(capture.capturedMs, Date.now())}
+                {privatePriceAgeNotice(capture.capturedMs, nowMs)}
               </small>
             )}
             <small>Oorspronkelijk volledig mandje: {
@@ -133,7 +154,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
           </section>
         })}
       </div>
-      {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
+      {store === 'all' && currentReviewed && <PrivateReviewedTwoStoreTable reviewed={currentReviewed}
         search={search} unitFilter={unitFilter} order={order} budget={budget}
         onOpenComparison={onOpenComparison} onOpenList={onOpenList}
         onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
