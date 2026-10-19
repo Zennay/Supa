@@ -12,6 +12,8 @@ const PlannerTwoStoreCoverage = lazy(() => import('./PlannerTwoStoreCoverage.tsx
   .then(module => ({ default: module.PlannerTwoStoreCoverage })))
 const PlannerMissingCapturePanel = lazy(() => import('./PlannerMissingCapturePanel.tsx')
   .then(module => ({ default: module.PlannerMissingCapturePanel })))
+const PrivateOwnReceiptViewer = lazy(() => import('./PrivateOwnReceiptViewer.tsx')
+  .then(module => ({ default: module.PrivateOwnReceiptViewer })))
 const PlannerReviewedSourceLines = lazy(() => import('./PlannerReviewedSourceLines.tsx')
   .then(module => ({ default: module.PlannerReviewedSourceLines })))
 const PlannerQuickSourcePaste = lazy(() => import('./PlannerQuickSourcePaste.tsx')
@@ -426,6 +428,9 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
             }))
         }} />
     </Suspense>}
+    <Suspense fallback={<p role="status">Lokale rapportlezer laden…</p>}>
+      <PrivateOwnReceiptViewer />
+    </Suspense>
     {captureNeeds.length > 0 && <div className="own-store-planner__capture" aria-label="Mijn lokale winkelprijsopname">
       <strong>Zelf winkelprijzen vastleggen voor dit weekmenu</strong>
       <p>Download een leeg invulblad of opnamegids voor {captureNeeds.length} fysieke ingrediënten. Productcodes, bronmomenten en prijzen moet je werkelijk vastleggen. CSV met puntkomma of komma en gekopieerde tabgescheiden spreadsheetcellen worden lokaal herkend; decimalen mogen een komma bevatten. Prijzen blijven hele eurocenten.</p>

@@ -190,3 +190,17 @@
 }
 .own-store-planner__partial-amount small { display: block; color: #405948; }
 .own-store-planner__partial-amount button { min-height: 44px; }
+
+/* Read-only private receipt archive. Never overlaps the live comparison totals. */
+.own-store-planner__archive {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #dce2e7);
+  border-radius: 0.9rem;
+}
+.own-store-planner__archive summary { cursor: pointer; font-weight: 650; }
+.own-store-planner__archive label { display: grid; gap: 0.4rem; margin-block: 0.9rem; }
+.own-store-planner__archive input[type=file] { width: 100%; max-width: 100%; }
+.own-store-planner__archive-content { margin-block: 1rem; }
+.own-store-planner__archive-content table { width: 100%; min-width: 580px; }
+.own-store-planner__archive-content td { overflow-wrap: anywhere; }
