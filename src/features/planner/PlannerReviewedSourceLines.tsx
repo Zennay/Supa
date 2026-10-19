@@ -17,6 +17,7 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
   const [query, setQuery] = useState('')
   const [shop, setShop] = useState<'both' | OwnStore>('both')
   const [expanded, setExpanded] = useState(false)
+  const [exportMessage, setExportMessage] = useState('')
   if (!progress) return null
   const entries = shops.flatMap(store => {
     const source = progress.stores[store]
@@ -49,6 +50,57 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
     (shop === 'both' || shop === store) &&
     (!search || [line.ingredientLabel, line.productName, line.productId]
       .some(value => value.normalize('NFKC').toLocaleLowerCase('nl').includes(search))))
+  function downloadPairedRows() {
+    // Refresh both original source instants at the actual click. A long-open
+    // tab cannot export already-expired numbers as a live price comparison.
+    const current = Date.now()
+    if (!plus || !deka || !recentOwnCaptureInstant(plus.observedAt, current) ||
+        !recentOwnCaptureInstant(deka.observedAt, current) ||
+        !pairedTime || !pairs.length) return
+    const safe = (value: string) => value.replace(
+      /[\p{Cc}\p{Cf}]/gu, ' ').trim().slice(0, 160)
+    const entries = [
+      'SUPA | PRIVÉ LOKALE WINKELBRONNEN | VOORLOPIGE REGELS',
+      'Geen compleet mandje, onafhankelijke verificatie, winkelwinnaar of besparingsclaim.',
+      'Alleen jouw persoonlijk gekoppelde producten; onbekende prijzen zijn niet nul.',
+      'PLUS eigen opname: ' + safe(plus.observedAt),
+      'DekaMarkt eigen opname: ' + safe(deka.observedAt),
+      '',
+      ...pairs.map(({ one, other, difference }) => [
+        safe(one.ingredientLabel) + ' | ' + one.requiredAmount + ' ' + safe(one.requiredUnit),
+        'PLUS SKU ' + safe(one.productId) + ': ' +
+          one.packagesNeeded + ' pak(ken) | ' + eur.format(one.lineTotalCents / 100),
+        'DekaMarkt SKU ' + safe(other.productId) + ': ' +
+          other.packagesNeeded + ' pak(ken) | ' + eur.format(other.lineTotalCents / 100),
+        'Voorlopig REGELverschil: ' +
+          (difference === 0 ? 'gelijk' : eur.format(Math.abs(difference) / 100) +
+          ' lager bij ' + (difference > 0 ? 'PLUS' : 'DekaMarkt')),
+        '',
+      ].join('\n')),
+    ].join('\n')
+    let url: string
+    try {
+      url = URL.createObjectURL(new Blob([entries], {
+        type: 'text/plain;charset=utf-8',
+      }))
+    } catch {
+      setExportMessage('Bestand maken lukt niet in deze browser. De bronprijzen zijn niet gewijzigd.')
+      return
+    }
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-eigen-voorlopige-winkelregels.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+      setExportMessage('Voorlopige lokale bronregels gedownload, zonder compleet mandtotaal.')
+    } catch {
+      setExportMessage('Download niet beschikbaar; brondata en productkeuzes blijven onaangeroerd.')
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+  }
+
   return <details className="supa-reviewed-source-lines" open={expanded}
     onToggle={event => setExpanded(event.currentTarget.open)}>
     <summary>{entries.length} gekoppelde bronproducten en eenheidsprijzen bekijken</summary>
@@ -75,6 +127,9 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
         </div>
         {pairs.length > 12 && <small>En {pairs.length - 12} andere gekoppelde regels.
           Het volledige bedrag verschijnt pas na controle van het hele mandje.</small>}
+        <button type="button" className="ghost-button"
+          onClick={downloadPairedRows}>Download voorlopige eigen regelvergelijking (TXT)</button>
+        {exportMessage && <p role="status" aria-live="polite">{exportMessage}</p>}
       </section>}
       <div className="supa-reviewed-source-lines__controls">
         <label>Zoek ingrediënt, product of SKU
