@@ -270,23 +270,34 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       setMessage(error instanceof Error ? error.message : 'De privé-CSV kon niet worden gemaakt.')
     }
   }
-  async function downloadPrintable() {
+  async function downloadPrintable(includeExtras = false) {
     if (!currentCaptureAvailable()) {
       setMessage('De bron is verlopen. Herzie eerst de winkelprijzen.')
       return
     }
     try {
       const { privateSingleStorePrintableHtml } = await import('./privateSingleStorePrintableHtml.ts')
+      let extras: import('../comparison/ownExtraGroceriesStorage.ts').Item[] | undefined
+      if (includeExtras) {
+        const { readSavedExtrasForPlan } = await import('../comparison/ownExtraGroceriesStorage.ts')
+        const saved = readSavedExtrasForPlan(reviewed.planKey)
+        if (!saved.available || !saved.items.length)
+          throw Error('Bewaar je eigen extra boodschappen in de Lijst-tab voordat je ze print.')
+        extras = saved.items
+      }
       if (!currentCaptureAvailable()) throw Error('Verlopen bron')
       const html = privateSingleStorePrintableHtml({
         basket, observedAt: capture.observedAt,
         done: new Set(basket.lines.filter(line => checked[tick(line)]).map(line => line.id)),
+        extras,
       })
+      if (!currentCaptureAvailable()) throw Error('Verlopen bron tijdens afdruk.')
       const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = 'supa-' + store.toLowerCase() + '-boodschappenlijst.html'
+        link.download = 'supa-' + store.toLowerCase() +
+          (includeExtras ? '-met-ongeprijsde-extra-boodschappen.html' : '-boodschappenlijst.html')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
         setMessage('Printbare offline lijst lokaal opgeslagen. Open het HTML-bestand en druk af.')
@@ -467,7 +478,10 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           Download winkelmand + mijn bewaarde extra boodschappen (TXT)
         </button>
         <button type="button" onClick={() => { void downloadCsv() }}>Download volledig mandje met SKU’s (CSV)</button>
-        <button type="button" onClick={() => { void downloadPrintable() }}>Print volledig eigen mandje (HTML)</button>
+        <button type="button" onClick={() => { void downloadPrintable(false) }}>Print volledig eigen mandje (HTML)</button>
+        <button type="button" onClick={() => { void downloadPrintable(true) }}>
+          Print dit winkelmandje én mijn extra boodschappen (HTML)
+        </button>
         <button type="button" onClick={() => { void saveProgress() }}>Bewaar vinkjes (JSON)</button>
         <button type="button" onClick={() => progressInputRef.current?.click()}>Herstel vinkjes</button>
         <input ref={progressInputRef} type="file" accept=".json,application/json"

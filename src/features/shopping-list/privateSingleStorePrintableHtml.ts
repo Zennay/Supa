@@ -1,6 +1,7 @@
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { privateSingleStoreShoppingCsv } from './privateSourceShoppingCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import type { OwnExtraGrocery } from '../comparison/ownExtraGroceriesCsv.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const esc = (value: string | number) => String(value)
@@ -11,8 +12,9 @@ const esc = (value: string | number) => String(value)
 /** Inert, offline one-shop checklist for user-admitted current source observations.
  * Share/print is user-initiated; this HTML cannot import new retailer evidence.
  */
-export function privateSingleStorePrintableHtml({ basket, observedAt, done }: {
+export function privateSingleStorePrintableHtml({ basket, observedAt, done, extras }: {
   basket: OneStoreBasket; observedAt: string; done: ReadonlySet<string>
+  extras?: readonly OwnExtraGrocery[]
 }): string {
   // Reuse the exact existing CSV financial/physical admission instead of
   // letting printable output become a weaker independent price renderer.
@@ -32,6 +34,20 @@ export function privateSingleStorePrintableHtml({ basket, observedAt, done }: {
       esc(privateUnitPrice(line) ?? 'eenheidsprijs onbekend') + '</small></div>' +
       '<b>' + esc(money.format(line.lineTotalCents / 100)) + '</b></li>'
   }).join('')
+  if (extras && (extras.length > 100 || !extras.every(item =>
+      typeof item.name === 'string' && item.name.length > 0 && item.name.length <= 120 &&
+      Number.isFinite(item.quantity) && item.quantity > 0 && item.quantity <= 100000 &&
+      ['piece', 'g', 'ml'].includes(item.unit) && typeof item.done === 'boolean')))
+    throw Error('Extra boodschappen zijn niet geldig voor deze afdruk.')
+  const extrasHtml = extras?.length
+    ? '<section><h2>Eigen extra boodschappen · winkelprijs onbekend</h2><p>Deze ' +
+      extras.length + ' extra artikelen hebben geen gecontroleerde productprijs en ' +
+      'vallen buiten alle bovenstaande eurobedragen. Het echte eindtotaal is onbekend.</p><ul>' +
+      extras.map(item => '<li><span class="tick">' + (item.done ? '&#9745;' : '&#9744;') +
+        '</span><div><strong>' + esc(item.name) + '</strong><br><small>' +
+        esc(item.quantity) + ' ' + (item.unit === 'piece' ? 'stuks' : esc(item.unit)) +
+        ' · prijs onbekend</small></div></li>').join('') + '</ul></section>'
+    : ''
   const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="referrer" content="no-referrer">' +
@@ -57,7 +73,7 @@ export function privateSingleStorePrintableHtml({ basket, observedAt, done }: {
     esc(money.format(basket.totalCents / 100)) + '</strong></p>' +
     '<p>Nog op de lijst (niet-afgevinkt)<strong>' + esc(money.format(stillNeeded / 100)) +
     '</strong></p></section><main><h2>Artikelen</h2><ul>' + items +
-    '</ul></main><footer><p>Afgevinkt betekent niet betaald. Controleer de originele ' +
+    '</ul></main>' + extrasHtml + '<footer><p>Afgevinkt betekent niet betaald. Controleer de originele ' +
     'winkelprijzen opnieuw bij een volgende boodschappenronde. Print met je browser.</p>' +
     '</footer></body></html>'
   if (new TextEncoder().encode(html).length > 256_000)
