@@ -20,6 +20,8 @@ import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.t
 import { privateBasketMissingReason } from '../src/domain/privateBasketMissingReason.ts'
 import { matchIngredient } from '../src/domain/matching.ts'
 import { compareFullBaskets } from '../src/domain/basketComparison.ts'
+import { observedInstant } from '../src/domain/offlineReviewedImport.ts'
+import { privateUnitPrice } from '../src/features/comparison/privateUnitPrice.ts'
 
 const STORES = ['PLUS', 'DekaMarkt']
 const UNITS = ['g', 'kg', 'ml', 'l', 'piece']
@@ -177,15 +179,10 @@ function makeStoreBasket(store, capture, demand) {
 // Unit prices are informative labels only. Totals always come from canonical
 // exact whole-pack math, never from an approximate per-kg/per-litre label.
 function advisoryUnitPrice(line) {
-  if (line.status !== 'matched') return ''
-  const { amount, unit, count } = line.pack
-  const base = (unit === 'kg' || unit === 'l' ? amount * 1000 : amount) * count
-  const per = unit === 'g' || unit === 'kg' ? 'kg'
-    : unit === 'ml' || unit === 'l' ? 'liter' : 'stuk'
-  const multiplier = per === 'stuk' ? 1 : 1000
-  const cents = line.pricePerPackCents * multiplier / base
-  return base > 0 && Number.isFinite(cents) && cents >= 0
-    ? euro.format(cents / 100) + '/' + per : ''
+  // The browser and offline CLI use one exact decimal unit-rate formatter.
+  // Never calculate a currency rate through binary fraction multiplication;
+  // source whole-pack price remains the only financial authority.
+  return line.status === 'matched' ? (privateUnitPrice(line) ?? '') : ''
 }
 
 function rowCell(line) {
@@ -203,14 +200,7 @@ function rowCell(line) {
 
 // Date.parse discards the sub-millisecond fraction. Source timestamps may
 // legitimately carry nanoseconds; a 24h + 1ns gap must NEVER pass as paired.
-function observedNanoseconds(raw) {
-  const match = /\\.(\\d{1,9})[+-]\\d\\d:\\d\\d$/.exec(raw)
-  const fraction = (match?.[1] ?? '').padEnd(9, '0')
-  const milliseconds = Date.parse(raw)
-  if (!Number.isFinite(milliseconds)) throw Error('Invalid observation time')
-  return BigInt(milliseconds - Number(fraction.slice(0, 3))) * 1_000_000n +
-    BigInt(fraction || '0')
-}
+
 function ageDescription(age) {
   if (age < 0n) return 'in de toekomst'
   if (age < 3_600_000_000_000n) return String(age / 60_000_000_000n) + ' minuten oud'
@@ -346,7 +336,9 @@ async function main() {
   const comparison = compareFullBaskets({ baseline: left, candidate: right })
   const nowNs = BigInt(Date.now()) * 1_000_000n
   const dates = STORES.map(store => captures[store]?.observedAt ?? null)
-  const instants = dates.map(value => value === null ? null : observedNanoseconds(value))
+  // Use the browser's strict civil/offset validator and original nanoseconds.
+  // A 24-hour gap plus 1 ns must never be admitted as the same capture window.
+  const instants = dates.map(value => value === null ? null : observedInstant(value)?.ns ?? null)
   const ages = instants.map(instant => instant === null ? null : nowNs - instant)
   const gap = instants[0] === null || instants[1] === null ? null :
     (instants[0] >= instants[1] ? instants[0] - instants[1] : instants[1] - instants[0])
