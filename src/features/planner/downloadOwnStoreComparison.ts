@@ -1,4 +1,5 @@
 import type { OwnStoreWeekComparison } from './ownStoreBudgetComparison.ts'
+import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -57,4 +58,39 @@ export function downloadOwnStoreText(value: string): void {
   } finally {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
+}
+
+/** Planner CSV uses the identical, already-admitted private basket receipt
+ * serializer as Vergelijk. No alternate arithmetic or invented price source. */
+export function downloadOwnStoreCsv(
+  reviewed: import('../comparison/privateReviewedBasketBridge.ts').PrivateReviewedBaskets,
+  comparison: Extract<OwnStoreWeekComparison, { status: 'comparable' }>,
+): void {
+  const plus = reviewed.stores.PLUS
+  const deka = reviewed.stores.DekaMarkt
+  if (!plus || !deka || Math.abs(plus.capturedMs - deka.capturedMs) > 86400000) {
+    throw new Error('De eigen winkelbronnen zijn niet allebei vergelijkbaar.')
+  }
+  const content = createPrivateBasketComparisonCsv({
+    ingredients: plus.basket.lines.map(line => ({
+      id: line.id, label: line.ingredientLabel,
+      amount: line.requirement.amount, unit: line.requirement.unit,
+    })),
+    captures: {
+      PLUS: { observedAt: plus.observedAt },
+      DekaMarkt: { observedAt: deka.observedAt },
+    },
+    baskets: { PLUS: plus.basket, DekaMarkt: deka.basket },
+    fresh: { PLUS: true, DekaMarkt: true },
+    paired: true,
+    deltas: new Map(comparison.lines.map(line => [line.id, line.deltaCents])),
+  })
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
+  try {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'supa-prive-plus-deka-weekvergelijking.csv'
+    document.body.append(link)
+    try { link.click() } finally { link.remove() }
+  } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
 }

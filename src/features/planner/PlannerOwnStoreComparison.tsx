@@ -56,6 +56,21 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
       setDownloadMessage(error instanceof Error ? error.message : 'Download is niet gelukt.')
     }
   }
+  async function downloadPrivateCsv() {
+    setDownloadMessage('')
+    try {
+      const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      const fresh = ownStoreWeekComparison(current)
+      if (!current || fresh.status !== 'comparable') {
+        throw new Error('Voor deze CSV zijn twee actuele en volledig gecontroleerde winkelmandjes nodig.')
+      }
+      const { downloadOwnStoreCsv } = await import('./downloadOwnStoreComparison.ts')
+      downloadOwnStoreCsv(current, fresh)
+      setDownloadMessage('De privévergelijking met originele SKU’s en gehele centprijzen is lokaal als CSV gedownload.')
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : 'CSV-download mislukt.')
+    }
+  }
   return <section className="own-store-planner" aria-labelledby="own-store-planner-heading">
     <header className="own-store-planner__header">
       <div><span className="eyebrow">Eigen gecontroleerde winkelopnames</span>
@@ -109,6 +124,9 @@ export function PlannerOwnStoreComparison({ reviewed, preferred, hasDemand, budg
           <button type="button" className="ghost-button" onClick={onOpenList}>Open eigen boodschappenlijst</button>
           <button type="button" className="ghost-button" onClick={downloadPrivateComparison}>
             Download privévergelijking (TXT)
+          </button>
+          <button type="button" className="ghost-button" onClick={downloadPrivateCsv}>
+            Download privévergelijking met originele SKU's (CSV)
           </button>
           {summary.mixedRoute && <div className="own-store-planner__mix-preview">
             <h4>Combineren van goedkoopste artikelen</h4>
