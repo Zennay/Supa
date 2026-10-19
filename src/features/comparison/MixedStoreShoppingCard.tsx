@@ -42,6 +42,7 @@ export function MixedStoreShoppingCard({
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [extraCount, setExtraCount] = useState(0)
   const [showText, setShowText] = useState(false)
+  const [combinedCopy, setCombinedCopy] = useState<{ fingerprint: string; text: string } | null>(null)
   const [message, setMessage] = useState('')
   const [extraVisitCost, setExtraVisitCost] = useState('')
   const [mode, setMode] = useState<'auto' | 'mixed' | 'single'>('auto')
@@ -240,28 +241,40 @@ export function MixedStoreShoppingCard({
     }
   }
 
+  const copyFingerprint = JSON.stringify([privatePlanKey, printable, captured, mode, onlyOpen])
+  const currentCopyFingerprint = useRef(copyFingerprint)
+  currentCopyFingerprint.current = copyFingerprint
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === privatePlanKey) setCombinedCopy(null)
+    }
+    window.addEventListener('supa:private-week-extras-saved', refresh)
+    return () => window.removeEventListener('supa:private-week-extras-saved', refresh)
+  }, [privatePlanKey])
+  async function combinedRouteText(): Promise<string> {
+    if (!privatePlanKey || block || !eligibleNow())
+      throw Error('Controleer eerst alle originele bronartikelen en eventuele extra bezoekkosten.')
+    const { readSavedExtrasForPlan } = await import('./ownExtraGroceriesStorage.ts')
+    const saved = readSavedExtrasForPlan(privatePlanKey)
+    if (!saved.available || !saved.items.length)
+      throw Error('Bewaar eerst de eigen extra boodschappen voor deze exacte Planner-week.')
+    const visible = onlyOpen ? saved.items.filter(item => !item.done) : saved.items
+    const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
+    const complete = [printable, '',
+      'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ' apart bewaard)',
+      'Geen gekoppelde winkel, bronprijs, pakprijs of bijdrage aan bovenstaand prijsverschil.',
+      ...visible.map(item => (item.done ? '☑ ' : '☐ ') + clean(item.name) +
+        ' · ' + item.quantity + ' ' + (item.unit === 'piece' ? 'stuks' : item.unit) +
+        ' · prijs onbekend'),
+      'Bovenstaande bedragen omvatten uitsluitend het geprijsde Planner-weekmandje.',
+    ].join('\n')
+    if (new TextEncoder().encode(complete).length > 128000 || !eligibleNow())
+      throw Error('Bron of privélijst is gewijzigd of verlopen.')
+    return complete
+  }
   async function downloadRouteWithExtras() {
-    if (!privatePlanKey || block || !eligibleNow()) { setMessage('Herzie eerst het exacte Planner-weekmandje, de bronnen en kosten.'); return }
     try {
-      const { readSavedExtrasForPlan } = await import('./ownExtraGroceriesStorage.ts')
-      const saved = readSavedExtrasForPlan(privatePlanKey)
-      if (!saved.available) { setMessage('Extra lijst is niet veilig leesbaar.'); return }
-      if (!saved.items.length) {
-        setMessage('Bewaar jouw extra boodschappen onderaan Lijst eerst in dit tabblad.')
-        return
-      }
-      const visible = onlyOpen ? saved.items.filter(item => !item.done) : saved.items
-      const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
-      const complete = [printable, '',
-        'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ' apart bewaard)',
-        'Geen gekoppelde winkel, bronprijs, pakprijs of bijdrage aan bovenstaand prijsverschil.',
-        ...visible.map(item => (item.done ? '☑ ' : '☐ ') + clean(item.name) +
-          ' · ' + item.quantity + ' ' + (item.unit === 'piece' ? 'stuks' : item.unit) +
-          ' · prijs onbekend'),
-        'Bovenstaande bedragen omvatten uitsluitend het geprijsde Planner-weekmandje.',
-      ].join('\n')
-      if (new TextEncoder().encode(complete).length > 128000 || !eligibleNow())
-        throw Error('Bron of lijst is niet meer geldig.')
+      const complete = await combinedRouteText()
       const url = URL.createObjectURL(new Blob([complete], { type: 'text/plain;charset=utf-8' }))
       try {
         const link = document.createElement('a'); link.href = url
@@ -269,7 +282,22 @@ export function MixedStoreShoppingCard({
         document.body.append(link); try { link.click() } finally { link.remove() }
         setMessage('Gecombineerde privéroute opgeslagen. De extras tellen niet mee in eurototalen.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-    } catch { setMessage('Controleer je bron en eigen extra boodschappen voor export.') }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'De gecombineerde privélijst is niet beschikbaar.')
+    }
+  }
+  async function prepareCombinedCopy() {
+    try {
+      const original = copyFingerprint
+      const text = await combinedRouteText()
+      if (original !== currentCopyFingerprint.current || !eligibleNow())
+        throw Error('De bron of gekozen route is gewijzigd. Open de complete lijst opnieuw.')
+      setCombinedCopy({ fingerprint: original, text })
+      setMessage('Je kunt de volledige gekozen route plus ongeprijsde extras hieronder selecteren en kopiëren.')
+    } catch (error) {
+      setCombinedCopy(null)
+      setMessage(error instanceof Error ? error.message : 'Kopieerbare volledige route niet beschikbaar.')
+    }
   }
 
   function downloadRouteCsv() {
@@ -511,6 +539,10 @@ export function MixedStoreShoppingCard({
         Neem ongeprijsde Planner-vinkjes over
       </button>}
       <button type="button" className="ghost-button" onClick={() => setChecked({})}>Wis vinkjes</button>
+      {privatePlanKey && <button type="button" className="ghost-button"
+        onClick={() => { void prepareCombinedCopy() }}>
+        Toon kopieerbare route + extra boodschappen
+      </button>}
       <button type="button" className="ghost-button" onClick={download}>Download gekozen weergave (TXT)</button>
       {privatePlanKey && <button type="button" className="ghost-button"
         onClick={() => { void downloadRouteWithExtras() }}>
@@ -594,6 +626,17 @@ export function MixedStoreShoppingCard({
     </div>
     {privatePlanKey && <PrivateRouteExtraGroceries
       identity={privatePlanKey} onlyOpen={onlyOpen} onCount={setExtraCount} />}
+    {combinedCopy?.fingerprint === copyFingerprint && <label>
+      Kopieer mijn volledige privéroute inclusief ongeprijsde extra boodschappen
+      <textarea readOnly spellCheck={false}
+        rows={Math.min(20, Math.max(8, plan.lines.length + 8))}
+        value={combinedCopy.text} onFocus={event => {
+          if (!eligibleNow()) {
+            setCombinedCopy(null)
+            setMessage('Originele bronopnames zijn verlopen. Controleer de echte prijzen opnieuw.')
+          } else event.currentTarget.select()
+        }} />
+    </label>}
     {showText && <label>Kopieer mijn private boodschappenroute
       <textarea readOnly rows={Math.min(18, plan.lines.length + 15)}
         spellCheck={false} value={printable} onFocus={event => {
