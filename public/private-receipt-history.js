@@ -43,6 +43,34 @@ function instant(value) {
   const fraction = (m[7] || '').padEnd(9, '0')
   return BigInt(millis) * 1000000n + BigInt(fraction.slice(3) || '0')
 }
+const unitBases = {
+  g: [1n,'mass'], kg: [1000n,'mass'],
+  ml: [1n,'volume'], l: [1000n,'volume'],
+  piece: [1n,'piece']
+}
+function exactDecimal(value) {
+  if (typeof value!=='number' || !Number.isFinite(value) || value<=0) return null
+  const m=/^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/iu.exec(String(value))
+  if (!m) return null
+  const decimals=m[2]||''
+  const shift=Number(m[3]||'0')-decimals.length
+  if (!Number.isSafeInteger(shift) || Math.abs(shift)>400) return null
+  const number=BigInt(m[1]+decimals)
+  return shift<0 ? {number,scale:-shift} :
+    {number:number*10n**BigInt(shift),scale:0}
+}
+// Same exact decimal ceil convention as Supa's canonical pack calculator:
+// the human-required physical demand is never rounded to a smaller pack count.
+function exactRequiredPacks(demand, demandUnit, packAmount, packUnit, packCount) {
+  const a=exactDecimal(demand), b=exactDecimal(packAmount)
+  const demandBase=unitBases[demandUnit], packBase=unitBases[packUnit]
+  if (!a || !b || !demandBase || !packBase ||
+      demandBase[1]!==packBase[1] || !positive(packCount)) return null
+  const numerator=a.number*demandBase[0]*10n**BigInt(b.scale)
+  const denominator=b.number*packBase[0]*BigInt(packCount)*10n**BigInt(a.scale)
+  const packs=(numerator+denominator-1n)/denominator
+  return packs>0n && packs<=BigInt(Number.MAX_SAFE_INTEGER) ? Number(packs) : null
+}
 function product(p) {
   if (!rec(p) || !rec(p.package) ||
       !safeText(p.sourceProductId, 120) || !safeText(p.sourceProductName) ||
@@ -83,7 +111,15 @@ function readReceipt(raw) {
         !rec(entry.demand) || !decimal(entry.demand.amount) || !units.has(entry.demand.unit) ||
         rows.has(entry.ingredientId) || !Number.isSafeInteger(entry.dekaMinusPlusCents)) throw Error('Productregel ongeldig')
     const plus = product(entry.PLUS), deka = product(entry.DekaMarkt)
-    if (!plus || !deka || deka.total - plus.total !== entry.dekaMinusPlusCents) throw Error('Prijsregel ongeldig')
+    if (!plus || !deka || deka.total - plus.total !== entry.dekaMinusPlusCents)
+      throw Error('Prijsregel ongeldig')
+    // A saved report is NOT proof of a retailer visit, but it cannot silently
+    // claim a complete physical mandje with too few packages either.
+    if (plus.packs !== exactRequiredPacks(entry.demand.amount,entry.demand.unit,
+          plus.amount,plus.unit,plus.count) ||
+        deka.packs !== exactRequiredPacks(entry.demand.amount,entry.demand.unit,
+          deka.amount,deka.unit,deka.count))
+      throw Error('Vereiste fysieke verpakkingenaantallen ontbreken')
     sum.PLUS += plus.total
     sum.DekaMarkt += deka.total
     if (!cents(sum.PLUS) || !cents(sum.DekaMarkt)) throw Error('Onveilig mandtotaal')
