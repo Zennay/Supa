@@ -29,7 +29,7 @@ export function PlannerSourceMatchPreview({ needs, source }: {
           continue
         }
         const choice = matchIngredient({
-          id: need.id, query: need.label, amount: need.amount,
+          id: need.id, query: need.query || need.label, amount: need.amount,
           unit: need.unit as MatchUnit,
         }, capture.products)
         const match = choice.type === 'match' ? products[store].get(choice.productId) : null

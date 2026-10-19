@@ -2,6 +2,8 @@ import { makeBlankPlannerCaptureCsv, type CaptureStore, type PlannerCaptureNeed 
 
 export type PlannerCaptureGuideNeed = PlannerCaptureNeed & Readonly<{
   amount: number | null
+  // Canonical Planner basket query when available, never inferred from price data.
+  query?: string
 }>
 
 /**
