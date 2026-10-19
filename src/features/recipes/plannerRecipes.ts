@@ -10,14 +10,22 @@ import type { SavedRecipe } from './recipeLibrary.ts'
  * Rejected recipes remain editable in Mijn recepten. Never round eggs or other
  * pieces up, invent a pack, or turn missing source measurements into a price.
  */
-export function toPlannerRecipe(recipe: SavedRecipe): RecipeWithIngredients | null {
+export function toPlannerRecipe(
+  recipe: SavedRecipe,
+  options: { usage?: 'planner' | 'unpriced-demand' } = {},
+): RecipeWithIngredients | null {
+  const unpricedOnly = options.usage === 'unpriced-demand'
+  const durationValid = typeof recipe?.minutes === 'number' &&
+    Number.isFinite(recipe.minutes) && recipe.minutes > 0 && recipe.minutes <= 1440
   if (!recipe || typeof recipe !== 'object' ||
       !Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0 ||
-      !Array.isArray(recipe.warnings) || recipe.warnings.length !== 0 ||
+      !Array.isArray(recipe.warnings) ||
+      !recipe.warnings.every(warning => unpricedOnly
+        ? warning === 'Bereidingstijd ontbreekt of is onduidelijk'
+        : false) ||
       typeof recipe.servings !== 'number' || !Number.isFinite(recipe.servings) ||
       recipe.servings <= 0 || recipe.servings > 1000 ||
-      typeof recipe.minutes !== 'number' || !Number.isFinite(recipe.minutes) ||
-      recipe.minutes <= 0 || recipe.minutes > 1440) return null
+      (!unpricedOnly && !durationValid)) return null
 
   const ready = recipe.ingredients.every(ingredient => {
     if (!ingredient || ingredient.reviewReason !== null ||
@@ -31,7 +39,9 @@ export function toPlannerRecipe(recipe: SavedRecipe): RecipeWithIngredients | nu
   if (!ready) return null
 
   return {
-    id: recipe.id, title: recipe.title, minutes: recipe.minutes, servings: recipe.servings,
+    id: recipe.id, title: recipe.title,
+    // The private export removes minutes entirely. Never invent a duration.
+    minutes: durationValid ? recipe.minutes : Number.NaN, servings: recipe.servings,
     estimatedCost: Number.NaN, tags: ['Eigen recept'],
     ingredients: recipe.ingredients.map(ingredient => ({
       id: `own-ingredient:${ingredient.query}:${ingredient.unit}`,
