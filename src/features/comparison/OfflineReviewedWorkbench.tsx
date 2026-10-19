@@ -32,6 +32,14 @@ const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeSty
 const stores = ['PLUS', 'DekaMarkt'] as const
 const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
+type CapturePreviewStore = {
+  retailer: CaptureStore; enteredProducts: number; unobservedRows: number
+  observedAt: string; unavailableProducts: number
+  previewProducts: {
+    id: string; name: string; packAmount: number | null; packUnit: string
+    packCount: number; priceCents: number | null; available: boolean
+  }[]
+}
 
 function pricePerUnit(line: Matched): string | null {
   const { unit, amount, count } = line.pack
@@ -226,15 +234,8 @@ export function OfflineReviewedWorkbench({
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [capturePreview, setCapturePreview] = useState<{
-    file: File; week: string
-    stores: {
-      retailer: CaptureStore; enteredProducts: number; unobservedRows: number
-      observedAt: string; unavailableProducts: number
-      previewProducts: {
-        id: string; name: string; packAmount: number | null; packUnit: string
-        packCount: number; priceCents: number | null; available: boolean
-      }[]
-    }[]
+    files: File[]; week: string
+    stores: CapturePreviewStore[]
     unobservedOtherStoreRows: number
   } | null>(null)
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
@@ -269,35 +270,58 @@ export function OfflineReviewedWorkbench({
   const captureWeek = JSON.stringify([planKey ?? null, plannerCaptureNeeds.map(n => [n.id, n.label, n.unit, n.amount])])
   const currentPreview = capturePreview?.week === captureWeek ? capturePreview : null
 
-  async function previewFilledCsv(file?: File) {
-    if (!file) return
+  async function previewFilledCsv(files: File[]) {
+    if (files.length === 0) return
     const version = ++importRevision.current
     setCapturePreview(null)
     setBusy(true)
     try {
-      if (!file.size || file.size > 256000) throw Error('Ingevulde CSV ontbreekt of is te groot.')
-      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (files.length > 2) throw Error('Kies maximaal twee eigen CSV-bestanden.')
       const converterUrl = '/offline-two-store-csv.mjs'
       const module: unknown = await import(/* @vite-ignore */ converterUrl)
       if (!module || typeof module !== 'object' ||
         !('previewOwnStoreCsv' in module) || typeof module.previewOwnStoreCsv !== 'function' ||
         !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
         throw Error('De lokale CSV-converter is niet beschikbaar.')
-      const summary = (module.previewOwnStoreCsv as (v: string) => {
-        stores: {
-      retailer: CaptureStore; enteredProducts: number; unobservedRows: number
-      observedAt: string; unavailableProducts: number
-      previewProducts: {
-        id: string; name: string; packAmount: number | null; packUnit: string
-        packCount: number; priceCents: number | null; available: boolean
-      }[]
-    }[]
-        unobservedOtherStoreRows: number
-      })(raw)
-      parseOfflinePriceSnapshots((module.convertOwnStoreCsv as (v: string) => string)(raw), Date.now())
+      const storesInPreview: CapturePreviewStore[] = []
+      const captures: unknown[] = []
+      let blankOtherRows = 0
+      const seen = new Set<string>()
+      for (const file of files) {
+        if (!file.size || file.size > 256000)
+          throw Error('Elk ingevuld CSV-bestand moet gevuld zijn en maximaal 256 kB bevatten.')
+        const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+        const summary = (module.previewOwnStoreCsv as (v: string) => {
+          stores: CapturePreviewStore[]; unobservedOtherStoreRows: number
+        })(raw)
+        const normalized = (module.convertOwnStoreCsv as (v: string) => string)(raw)
+        const parsed = JSON.parse(normalized) as { captures: { retailer: CaptureStore }[] }
+        // Each file is admitted individually and the pair is admitted again
+        // as one full source. No guessed second retailer or synthesized price.
+        parseOfflinePriceSnapshots(normalized, Date.now())
+        if (files.length === 2 && summary.stores.length !== 1)
+          throw Error('Kies twee afzonderlijke CSV-bestanden met elk precies één werkelijk ingevulde winkel.')
+        for (const store of summary.stores) {
+          if (seen.has(store.retailer))
+            throw Error('Twee prijsbladen bevatten dezelfde winkel. Kies één PLUS- en één DekaMarkt-opname.')
+          seen.add(store.retailer)
+          storesInPreview.push(store)
+        }
+        blankOtherRows += summary.unobservedOtherStoreRows
+        captures.push(...parsed.captures)
+      }
+      if (files.length === 2) {
+        parseOfflinePriceSnapshots(JSON.stringify({
+          schema: 'supa-offline-prices-v1', captures,
+        }), Date.now())
+        blankOtherRows = 0
+      }
       if (version !== importRevision.current) return
-      setCapturePreview({ file, week: captureWeek, ...summary })
-      setWeekExportMessage('CSV lokaal gecontroleerd. Kijk hieronder en neem de bron bewust over.')
+      setCapturePreview({
+        files, week: captureWeek, stores: storesInPreview,
+        unobservedOtherStoreRows: blankOtherRows,
+      })
+      setWeekExportMessage('Eigen CSV-bronopnames lokaal gecontroleerd. Bekijk beide winkels en neem de brondata bewust over.')
     } catch (e) {
       if (version === importRevision.current) setWeekExportMessage(
         (e instanceof Error ? e.message : 'CSV ongeldig.') +
@@ -307,10 +331,13 @@ export function OfflineReviewedWorkbench({
 
   function applyPreviewCsv() {
     if (!currentPreview || busy) return
-    const file = currentPreview.file
+    const files = currentPreview.files
+    const file = files[0]
     const incoming = currentPreview.stores.map(s => s.retailer)
     const previous = imported ? Object.keys(imported.captures) : []
-    if (incoming.length === 1 && imported?.captures[incoming[0]])
+    if (files.length === 2)
+      void loadSelectedSources(files)
+    else if (incoming.length === 1 && imported?.captures[incoming[0]])
       void replaceStoreFile(incoming[0], file)
     else if (incoming.length === 1 && previous.length === 1)
       void loadFile(file, true)
@@ -1283,13 +1310,13 @@ export function OfflineReviewedWorkbench({
         )}
         <section className="offline-price-workbench__input"
           aria-label="Eigen ingevuld prijsblad eerst controleren">
-          <label>Controleer een ingevuld CSV-prijsblad vóór import
-            <input type="file" accept=".csv,text/csv"
+          <label>Controleer één ingevuld CSV-prijsblad of twee aparte winkelbladen vóór import
+            <input type="file" accept=".csv,text/csv" multiple
               disabled={busy || plannerCaptureNeeds.length === 0}
               onChange={event => {
-                const file = event.currentTarget.files?.[0]
+                const files = Array.from(event.currentTarget.files ?? [])
                 event.currentTarget.value = ''
-                void previewFilledCsv(file)
+                void previewFilledCsv(files)
               }} />
             <small>Controleert lokaal de oorspronkelijke bronvelden en timestamps.
               Een gedeeltelijk ingevulde regel wordt nooit stilzwijgend weggegooid.</small>
@@ -1343,8 +1370,10 @@ export function OfflineReviewedWorkbench({
                 Controleer na overname zelf ieder oorspronkelijk artikel,
                 de verpakking, prijs en datum.</p>
               <button type="button" disabled={busy} onClick={applyPreviewCsv}>
-                {currentPreview.stores.length === 1 &&
-                  imported?.captures[currentPreview.stores[0].retailer]
+                {currentPreview.files.length === 2
+                  ? 'Neem beide eigen winkelopnames over en controleer producten'
+                  : currentPreview.stores.length === 1 &&
+                    imported?.captures[currentPreview.stores[0].retailer]
                   ? 'Bekijk bronverschillen vóór vervanging'
                   : currentPreview.stores.length === 1 && imported &&
                     Object.keys(imported.captures).length === 1
