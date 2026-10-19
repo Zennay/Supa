@@ -528,6 +528,10 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         {refreshSummary && <div className="supa-planner-source-paste__changes"
           role="status" aria-label="Verschillen tussen eigen originele winkelopnames">
           <strong>{refreshSummary.store} · wijzigingen in je originele winkelbron</strong>
+          <small>Vorige echte bronopname:
+            {' '}{refreshSummary.changes.previousObservedAt ?? 'geen oudere bron'}.
+            {' '}Nieuwe echte bronopname:
+            {' '}{refreshSummary.changes.newObservedAt}.</small>
           <p>{refreshSummary.changes.addedSkus} nieuwe SKU’s;
             {' '}{refreshSummary.changes.removedSkus} verdwenen SKU’s;
             {' '}{refreshSummary.changes.priceChangedSkus} SKU’s met een andere
@@ -535,7 +539,25 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             {' '}{refreshSummary.changes.packageChangedSkus} met een gewijzigde
             {' '}verpakking;
             {' '}{refreshSummary.changes.becameUnpricedSkus} voorheen geprijsde
-            {' '}SKU’s nu zonder pakprijs.</p>
+            {' '}SKU’s nu zonder pakprijs;
+            {' '}{refreshSummary.changes.availabilityChangedSkus} SKU’s
+            {' '}met gewijzigde bronbeschikbaarheid.</p>
+          {refreshSummary.changes.affectedTotal > 0 && <details>
+            <summary>Bekijk originele SKU’s die opnieuw aandacht vragen
+              {' '}({refreshSummary.changes.affectedTotal})</summary>
+            <ul>
+              {refreshSummary.changes.affectedProducts.map(item =>
+                <li key={item.sku}><strong>{item.name}</strong>
+                  {' '}· originele SKU {item.sku}
+                  <small>{item.change}</small>
+                </li>)}
+            </ul>
+            {refreshSummary.changes.affectedTotal > refreshSummary.changes.affectedProducts.length &&
+              <small>En nog
+                {' '}{refreshSummary.changes.affectedTotal - refreshSummary.changes.affectedProducts.length}
+                {' '}andere originele artikelen. Open de complete nieuwe bron in Vergelijk.
+              </small>}
+          </details>}
           <small>Dit zijn verschillen tussen je twee eigen bronbestanden,
             geen onafhankelijke actuele prijscontrole. Verdwenen of ongeprijsde
             artikelen moeten opnieuw gekoppeld of werkelijk opgenomen worden;
