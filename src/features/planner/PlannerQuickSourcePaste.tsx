@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
+import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
@@ -21,10 +23,11 @@ async function normalizedOwnSource(raw: string): Promise<string> {
 }
 
 /** Local preview using the same converter and source contract as Vergelijk. */
-export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand }: {
+export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand, needs }: {
   onImport: (files: File[]) => void
   onRecapture: (store: 'PLUS' | 'DekaMarkt') => void
   hasDemand: boolean
+  needs: readonly PlannerCaptureGuideNeed[]
 }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
@@ -375,6 +378,8 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, hasDemand }: {
             : Object.keys(preview.data.captures).length === 2
               ? 'Bronmomenten meer dan 24 uur uiteen: geen volledig prijsverschil mogelijk.'
               : 'Nog maar één winkelbron. De andere winkel blijft ongeprijsd.'}</p>
+        {hasDemand && needs.length > 0 && <PlannerSourceMatchPreview needs={needs}
+          source={preview.data} />}
         <button type="button" disabled={!hasDemand}
           onClick={handoff}>Open mijn bron in Vergelijk voor productmatching</button>
         <button type="button" className="ghost-button"

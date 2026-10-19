@@ -1,0 +1,10 @@
+.supa-planner-source-matches { display: grid; gap: .55rem; border-top: 1px solid #cfdfd4; padding-top: 1rem; }
+.supa-planner-source-matches h4, .supa-planner-source-matches p { margin: 0; }
+.supa-planner-source-matches label { display: flex; align-items: center; gap: .5rem; }
+.supa-planner-source-matches input[type=checkbox] { width: 1.1rem; height: 1.1rem; }
+.supa-planner-source-matches__table { display: grid; max-height: 480px; overflow: auto; border: 1px solid #e3e9e5; }
+.supa-planner-source-matches__row { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border-bottom: 1px solid #e3e9e5; }
+.supa-planner-source-matches__row > * { padding: .55rem; overflow-wrap: anywhere; }
+.supa-planner-source-matches__row > :not(:last-child) { border-right: 1px solid #e3e9e5; }
+.supa-planner-source-matches__row small { display: block; margin-top: .2rem; }
+@media(max-width: 620px) { .supa-planner-source-matches__row { min-width: 560px; } }
