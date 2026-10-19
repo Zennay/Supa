@@ -21,6 +21,27 @@ const mealsInput = document.querySelector<HTMLInputElement>('#meal-count')!
 const existingLines = document.querySelector<HTMLElement>('#lines')!
 const maxChars = 40000
 const maxRows = 200
+const plannerHandoffKey = 'supa:unpriced-planner-handoff:v1'
+// Same-tab, same-origin, short-lived handoff. Only prefill the editable
+// unpriced *draft* textarea: never import a basket, SKU, or price on load.
+try {
+  const handoff = window.sessionStorage.getItem(plannerHandoffKey)
+  if (handoff !== null) {
+    window.sessionStorage.removeItem(plannerHandoffKey)
+    if (handoff.length > 0 && handoff.length <= maxChars &&
+        handoff.startsWith('Supa · mijn weekboodschappen · zonder winkelprijzen\n') &&
+        handoff.trimEnd().endsWith('Geen supermarktproduct of actuele prijs gekoppeld.')) {
+      textArea.value = handoff
+      status.textContent = 'Je eigen ongeprijsde Planner-weeklijst staat als concept klaar. Controleer het aantal maaltijden en de fysieke hoeveelheden. Klik daarna pas op Maak van deze lijst een privémandje; bestaande bronprijzen en winkel-SKU’s zijn niet aangepast.'
+      status.className = 'notice'
+    } else {
+      status.textContent = 'De doorgestuurde Planner-lijst is ongeldig of te groot. Gebruik de handmatige TXT-import; je bestaande mand is niet veranderd.'
+      status.className = 'notice error'
+    }
+  }
+} catch {
+  // Storage may be disabled by the browser. Manual TXT remains available.
+}
 const units: Record<string, MetricUnit> = {
   g: 'g', gram: 'g', kg: 'kg', ml: 'ml', l: 'l', liter: 'l',
   stuk: 'piece', stuks: 'piece', stukken: 'piece', 'stuk(s)': 'piece', piece: 'piece',

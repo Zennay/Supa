@@ -91,6 +91,24 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
   function prepareCopy() {
     setPrepared({ key: JSON.stringify([demandIdentity, checked]), text: shoppingText() })
   }
+  function openWithCurrentDemand() {
+    if (error || !items.length) return
+    const content = shoppingText()
+    if (content.length > 40_000) {
+      setBackupMessage('Deze lijst is te groot voor directe overdracht. Verklein het weekmenu.')
+      return
+    }
+    if (!window.confirm(
+      'Open de privé-mappingwizard in ditzelfde tabblad met je huidige ongeprijsde Planner-ingrediënten? ' +
+      'Dit is alleen een concept: bevestig daar zelf de import en kies daarna je werkelijk geobserveerde winkelartikelen.')) return
+    try {
+      window.sessionStorage.setItem('supa:unpriced-planner-handoff:v1', content)
+      window.location.assign('/private-basket-mapping.html')
+    } catch {
+      setBackupMessage('Direct overzetten niet beschikbaar. Download het TXT-bestand en importeer het in de privé-mappingwizard.')
+    }
+  }
+
   function downloadProgress() {
     if (error || !items.length) return
     try {
@@ -185,6 +203,9 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
             </label>
             <button type="button" className="ghost-button" onClick={downloadUnpricedList}>
               Download weekboodschappen (TXT)
+            </button>
+            <button type="button" className="ghost-button" onClick={openWithCurrentDemand}>
+              Neem deze ingrediënten direct mee naar privévergelijker
             </button>
             <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
               Open privévergelijker voor mijn TXT-lijst
