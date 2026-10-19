@@ -547,3 +547,11 @@ h3, p { margin: 0; }
   font-size: 12px;
   line-height: 1.45;
 }
+/* Keep historical/Figma pricing prototypes discoverable without presenting
+   them as part of the user's verified and currently priced catalog. */
+.supa-product-archive{margin:1rem auto 2rem;max-width:1060px;padding:1rem;
+  background:#f7f8f5;border:1px solid #cedbd0;border-radius:14px}
+.supa-product-archive>summary{cursor:pointer;font-weight:700;line-height:1.5;
+  padding:.25rem 0;color:#284a37}
+.supa-product-archive>p{line-height:1.5;color:#4e5f53}
+.supa-product-archive[open] .hifi-home{margin-top:1rem}

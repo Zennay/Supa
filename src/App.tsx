@@ -397,7 +397,17 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               navigate('list')
             }} />
         </Suspense>}
-        {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
+        {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
+          onNavigate={navigate} activeDays={activeDays}
+          addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
+        {tab === 'products' && <details className="supa-product-archive">
+          <summary>Oude ontwerpvoorbeelden en historische bronkaarten tonen (geen actuele prijzen)</summary>
+          <p>Alleen de persoonlijk bevestigde bronartikelen hierboven tellen mee in
+            de prijsvergelijking, budgetten en winkelroute. Deze voorbeelden zijn
+            geen supermarktvoorraad of actuele aanbiedingen.</p>
+          <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
+            addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
+        </details>}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
 
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
