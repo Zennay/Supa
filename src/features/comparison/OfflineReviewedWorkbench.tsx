@@ -7,6 +7,7 @@ import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwo
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
+import { makeBlankPlannerCaptureCsv } from './plannerPriceCaptureSheet.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { createMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
@@ -248,6 +249,11 @@ export function OfflineReviewedWorkbench({
     }
   }, [])
 
+  const plannerCaptureNeeds = useMemo(() => {
+    try { return aggregatePlanIngredients(plan, recipes, activeDays) }
+    catch { return [] }
+  }, [plan, recipes, activeDays])
+
   function saveSelectedWeek() {
     try {
       const json = exportPrivatePlannerWeek(plan, recipes, activeDays)
@@ -265,6 +271,23 @@ export function OfflineReviewedWorkbench({
       setWeekExportMessage('Je geselecteerde weekmenu is lokaal gedownload. Open het bestand in de privévergelijker onder stap 2. Geen winkelprijzen of winkelproduct-ID’s meegestuurd.')
     } catch {
       setWeekExportMessage('Weekmenu niet exporteerbaar. Controleer geselecteerde dagen, eigen recepten en metrische hoeveelheden in Planner.')
+    }
+  }
+
+  function downloadBlankPlannerCaptureCsv() {
+    try {
+      const csv = makeBlankPlannerCaptureCsv(plannerCaptureNeeds)
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-weekmenu-eigen-prijsopname-PLUS-DekaMarkt.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage('Leeg CSV-invulblad gedownload voor jouw huidige weekmenu. Zonder echte productcodes, verpakking, bronmoment, beschikbaarheid en prijs wordt geen product geaccepteerd of prijsverschil berekend.')
+    } catch {
+      setWeekExportMessage('Geen geldig weekmenu voor het prijsinvulblad. Controleer eerst je Planner-ingrediënten en hoeveelheden.')
     }
   }
 
@@ -1088,10 +1111,34 @@ export function OfflineReviewedWorkbench({
           <button type="button" onClick={saveSelectedWeek}>
             Download geselecteerd weekmenu (JSON)
           </button>
+          <button type="button" className="ghost-button"
+            disabled={plannerCaptureNeeds.length === 0}
+            onClick={downloadBlankPlannerCaptureCsv}>
+            Download leeg PLUS/Deka-prijsinvulblad (CSV)
+          </button>
           <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
           </a>
         </div>
+        {plannerCaptureNeeds.length > 0 && (
+          <details>
+            <summary>Welke prijsinvulregel hoort bij welk Planner-ingrediënt?</summary>
+            <p>Vul uitsluitend je werkelijk waargenomen winkelproduct in. In de CSV staan eerst
+              {` ${plannerCaptureNeeds.length} PLUS-regels, gevolgd door ${plannerCaptureNeeds.length} DekaMarkt-regels.`}
+              De eerste regel bevat kolomkoppen. Alle productcodes, namen, bronmomenten,
+              verpakkingsinhouden en prijzen zijn bewust leeg. De voorgestelde eenheid is
+              alleen een hulp; controleer de echte verpakking. Zet beschikbaarheid alleen
+              op <code>true</code> na controle van je echte bron. Lege regels worden overgeslagen.
+              De twee winkels hoeven niet allebei ingevuld te zijn; zonder tweede winkel
+              verschijnt geen prijsverschil.</p>
+            <ol>{plannerCaptureNeeds.map((need, index) => (
+              <li key={need.id}>
+                PLUS CSV-regel {index + 2} / DekaMarkt CSV-regel {index + 2 + plannerCaptureNeeds.length}:
+                {' '}{need.label} · gevraagd {need.amount ?? '?'} {need.unit}
+              </li>
+            ))}</ol>
+          </details>
+        )}
         <p role="status" aria-live="polite">{weekExportMessage}</p>
       </div>
       <LocalTwoStorePriceEditor

@@ -1020,3 +1020,30 @@ matching- en individuele tijd-/reviewgates zijn niet versoepeld.
 De productiebuild levert nu een aparte checkoutbundle van circa
 28 kB naast de gewone appbundle; de gewone appbundel is circa
 26 kB kleiner dan vóór de splitsing (ongecomprimeerd).
+
+## Nieuw weekmenu: direct een leeg CSV-prijsinvulblad downloaden
+
+In **Vergelijk → Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden** kun je
+**Download leeg PLUS/Deka-prijsinvulblad (CSV)** kiezen. Supa neemt alleen de
+*fysieke ingrediëntenbehoefte* van de geselecteerde Planner-dagen mee. Er wordt
+geen winkel-SKU, productnaam, oude prijs, tijdstempel, beschikbaarheid of
+retailerautorisatie aangemaakt. Het CSV-bestand heeft precies de bestaande
+negen verplichte kolomkoppen. Het is expliciet een **leeg werkblad, geen brondata**.
+
+Per ingrediënt is er één lege PLUS-regel en één lege DekaMarkt-regel. De
+uitklapbare hulp onder de knop toont de precieze spreadsheet-rijnummers en de
+gevraagde hoeveelheid. De eenheid is hooguit een bewerkbare hint; neem de
+werkelijke inhoud van de aangeboden verpakking over. Vul per werkelijk gevonden
+winkelproduct de originele `id`, `name`, `packAmount`, `packUnit`, `packCount`,
+`priceCents` in hele centen, `observedAt` met echte tijdzone en `available` als
+`true` of `false` in. Iedere ingevulde regel van dezelfde winkel moet dezelfde
+echte opnametijd hebben. Gebruik alleen bronnen die je rechtmatig mag verwerken.
+
+**Laat ontbrekende productregels helemaal leeg** (behalve hun al ingevulde
+winkelnaam, eventuele eenheidshint en `available=false`). De canonieke CSV-import
+slaat uitsluitend deze volledig lege bronrecords over; een half ingevuld artikel
+wordt geweigerd. Als maar één winkel werkelijk is ingevuld, kun je alleen diens
+gegevens importeren; een niet ingevulde tweede winkel wordt nooit gesimuleerd.
+Geen enkele waarneming betekent geen geprijsd mandje. Voor een prijsverschil
+blijven de bestaande 7-dagen-/24-uursgrenzen, daadwerkelijke bronproducten,
+volledige fysieke dekking en menselijke bevestiging vereist.

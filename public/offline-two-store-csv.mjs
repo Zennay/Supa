@@ -116,6 +116,15 @@ function convertStoreCsv(text, allowOne) {
     if (row.length !== HEADER.length) error(location + ': verwacht negen kolommen.')
     const [retailer, observedAt, id, name, pack, unit, count, cents, availableText] = row
     if (!RETAILERS.includes(retailer)) error(location + ': onbekende winkel.')
+    // The downloaded Planner sheet contains NO retailer identities, prices or
+    // source observation. Its truly untouched rows carry no product facts and
+    // are deliberately ignored. Partially entered rows must NOT be skipped.
+    // Only a real, explicitly completed source row can become a product.
+    if (observedAt === '' && id === '' && name === '' && pack === '' &&
+        count === '' && cents === '' && availableText === 'false' &&
+        (unit === '' || UNITS.includes(unit))) {
+      continue
+    }
     if (!validLabel(id, 100)) error(location + ': product-ID ongeldig.')
     if (!UNITS.includes(unit)) error(location + ': eenheid moet g/kg/ml/l/piece zijn.')
     if (!['true', 'false'].includes(availableText)) {
