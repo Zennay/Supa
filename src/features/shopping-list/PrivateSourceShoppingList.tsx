@@ -234,6 +234,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         <p><strong>{store}</strong> · bron van {date.format(new Date(capture.capturedMs))}</p>
         <strong>{euros.format(basket.totalCents / 100)}</strong>
         <p>{basket.lines.length} ingrediënten · {doneCount} afgevinkt</p>
+        <progress className="private-source-shopping__progress" value={doneCount}
+          max={basket.lines.length} aria-label={'Afgevinkte ' + store + '-boodschappen'} />
         <p><strong>Nog op je lijst: {euros.format(remainingCents / 100)}</strong>
           <small>Vinkjes betekenen niet dat producten zijn betaald.</small></p>
         {budgetCents !== null && budgetCents >= 0 &&
@@ -250,6 +252,31 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               ' goedkoper volgens jouw twee lokale, binnen 24 uur waargenomen bronnen.'}
           <small>Geen onafhankelijk gecontroleerde besparing.</small>
         </p>}
+      {comparison?.claimable && plus && deka && <div
+        className="private-source-shopping__store-switch" aria-label="Vergelijk hele winkelmandjes">
+        {stores.map(name => {
+          const source = reviewed.stores[name]!
+          return <div key={name}>
+            <strong>{name}</strong>
+            <span>{euros.format(source.basket.totalCents / 100)}</span>
+            <small>Eigen opname: {date.format(new Date(source.capturedMs))}</small>
+            <button type="button" disabled={store === name} onClick={() => {
+              const current = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
+              if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+                  Math.abs(current.stores.PLUS.capturedMs - current.stores.DekaMarkt.capturedMs) > 86400000 ||
+                  !compareFullBaskets({
+                    baseline: current.stores.PLUS.basket,
+                    candidate: current.stores.DekaMarkt.basket,
+                  }).claimable) {
+                setMessage('Deze vergelijking is verlopen. Controleer de winkelbronnen opnieuw.')
+                return
+              }
+              onChooseStore(name)
+              setMessage('Je kijkt nu naar jouw ' + name + '-lijst voor hetzelfde weekmenu.')
+            }}>{store === name ? 'Dit is mijn huidige lijst' : 'Open mijn ' + name + '-lijst'}</button>
+          </div>
+        })}
+      </div>}
       {mixed && single && plus && deka && <section ref={mixedSectionRef} className="private-source-shopping__mixed" aria-label="Combineer beide eigen winkelmandjes">
         <h3>Goedkoopste artikelen combineren</h3>
         <p>Verdeel alleen jouw gecontroleerde hele verpakkingen over beide winkels.
@@ -273,6 +300,25 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       <div className="private-source-shopping__actions">
         <label><input type="checkbox" checked={remainingOnly}
           onChange={event => setRemainingOnly(event.target.checked)} /> Alleen nog te kopen</label>
+        <button type="button" onClick={() => {
+          if (doneCount === basket.lines.length) {
+            setChecked(before => {
+              const next = { ...before }
+              for (const line of basket.lines) delete next[tick(line)]
+              return next
+            })
+            setMessage('Alle vinkjes voor ' + store + ' zijn gewist.')
+          } else if (window.confirm('Alle ' + basket.lines.length + ' artikelen van ' +
+            store + ' afvinken? Dit is geen betaalbevestiging.')) {
+            setChecked(before => ({
+              ...before,
+              ...Object.fromEntries(basket.lines.map(line => [tick(line), true])),
+            }))
+            setMessage(store + ': artikelen van jouw fysieke lijst afgevinkt.')
+          }
+        }}>{doneCount === basket.lines.length
+          ? 'Vinkjes bij ' + store + ' wissen'
+          : 'Alle ' + store + '-artikelen afvinken'}</button>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
         <button type="button" onClick={() => { void downloadCsv() }}>Download met eigen SKU’s en centprijzen (CSV)</button>
         <button type="button" onClick={() => { void downloadPrintable() }}>Printbare offline boodschappenlijst (HTML)</button>

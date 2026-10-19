@@ -32,3 +32,13 @@
 .private-source-shopping__mixed { scroll-margin-top: 18px; }
 
 .private-source-shopping__backup-input {position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+.private-source-shopping__progress{display:block;width:100%;height:11px;accent-color:#226f52}
+
+.private-source-shopping__store-switch{display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.private-source-shopping__store-switch>div{display:grid;gap:.5rem;border:1px solid #cbdccb;
+border-radius:12px;padding:1rem;background:#f3f8f3;min-width:0}
+.private-source-shopping__store-switch span{font-weight:700;font-size:1.18rem}
+.private-source-shopping__store-switch button:disabled{opacity:.7}
+@media(max-width:600px){.private-source-shopping__store-switch{grid-template-columns:1fr}}
