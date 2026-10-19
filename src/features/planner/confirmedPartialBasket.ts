@@ -29,11 +29,15 @@ export function confirmedPartialBasket(
       capture.reviewedLineCount < rows.length || rows.length > physicalLineCount ||
       rows.length > 1000) return null
   const ids = new Set<string>()
+  // A single purchased SKU cannot be charged independently for two different
+  // physical needs: multiple recipes may share one real package.
+  const physicalSkus = new Set<string>()
   let knownCents = 0
   for (const line of rows) {
     if (!line || typeof line.ingredientId !== 'string' || !line.ingredientId ||
         ids.has(line.ingredientId) ||
         typeof line.productId !== 'string' || !line.productId ||
+        physicalSkus.has(line.productId) ||
         typeof line.ingredientLabel !== 'string' || !line.ingredientLabel ||
         !Number.isFinite(line.requiredAmount) || line.requiredAmount <= 0 ||
         !['g', 'kg', 'ml', 'l', 'piece'].includes(line.requiredUnit) ||
@@ -45,6 +49,7 @@ export function confirmedPartialBasket(
         !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0 ||
         line.packagesNeeded * line.pricePerPackCents !== line.lineTotalCents) return null
     ids.add(line.ingredientId)
+    physicalSkus.add(line.productId)
     knownCents += line.lineTotalCents
     if (!Number.isSafeInteger(knownCents)) return null
   }
