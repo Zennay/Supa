@@ -49,7 +49,8 @@ export function joinPrivateStoreCsv(first, second) {
   const one = JSON.parse(convertOwnStoreCsv(first))
   const two = JSON.parse(convertOwnStoreCsv(second))
   if (one.captures.length !== 1 || two.captures.length !== 1 ||
-      one.captures[0].retailer === two.captures[0].retailer) {
+      one.captures[0].retailer !== 'PLUS' ||
+      two.captures[0].retailer !== 'DekaMarkt') {
     error('Gebruik één echte PLUS- en één DekaMarkt-opname, geen twee keer dezelfde winkel.')
   }
   const composed = { schema: 'supa-offline-prices-v1',

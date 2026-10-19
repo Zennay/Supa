@@ -490,6 +490,9 @@ async function loadSources() {
         throw Error('De twee winkelbronnen samen overschrijden 256 kB.')
     } else {
       parsed = JSON.parse(convertOwnStoreCsv(await readLocalFile(plus ?? deka)))
+      const selectedStore = plus ? 'PLUS' : 'DekaMarkt'
+      if (parsed.captures.length !== 1 || parsed.captures[0].retailer !== selectedStore)
+        throw Error('Het gekozen winkelvak hoort niet bij de winkelcode in het originele bestand.')
     }
     let verified = acceptJson(parsed)
     if (revision !== sourceRevision) return

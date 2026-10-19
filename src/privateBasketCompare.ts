@@ -228,7 +228,11 @@ async function parseSource(): Promise<Source> {
       throw Error('Twee winkelbronnen samen overschrijden 256 KB')
     return sourceFrom(composed)
   }
-  return sourceFrom(JSON.parse(convertOwnStoreCsv(await readSource((left ?? right)!))))
+  const one = JSON.parse(convertOwnStoreCsv(await readSource((left ?? right)!))) as Source
+  const selectedInput = left ? 'PLUS' : 'DekaMarkt'
+  if (one.captures.length !== 1 || one.captures[0].retailer !== selectedInput)
+    throw Error('Het gekozen winkelvak hoort niet bij de winkelcode in de originele opname.')
+  return sourceFrom(one)
 }
 
 async function readOwnBasketInputs(): Promise<{ source: Source; demand: Demand }> {
