@@ -4,7 +4,7 @@ import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBrid
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
-import { replaceOwnStoreCapture } from './combineOwnSourceCapture.ts'
+import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwnSourceCapture.ts'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
@@ -41,6 +41,9 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   const [updateDraft, setUpdateDraft] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
   const [undoSnapshot, setUndoSnapshot] = useState<Preview | null>(null)
+  const [refreshSummary, setRefreshSummary] = useState<{
+    store: 'PLUS' | 'DekaMarkt'; changes: CaptureRefreshChanges
+  } | null>(null)
   const [busy, setBusy] = useState(false)
   const [dropActive, setDropActive] = useState(false)
   const [message, setMessage] = useState('')
@@ -68,12 +71,12 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   const revision = useRef(0)
   function changeDraft(raw: string) {
     ++revision.current
-    setDraft(raw); setPreview(null); setUndoSnapshot(null); setBusy(false)
+    setDraft(raw); setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setBusy(false)
     setMessage(raw ? 'Concept gewijzigd. Controleer opnieuw voor import.' : '')
   }
   async function inspectSource(raw: string) {
     const ticket = ++revision.current
-    setPreview(null); setUndoSnapshot(null); setMessage('')
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage('')
     if (!raw.trim()) { setMessage('Plak eerst echte eigen CSV-, TSV- of JSON-bronregels.'); return }
     if (new TextEncoder().encode(raw).length > limit) {
       setMessage('Bron groter dan 256 kB. Splits de originele opnames op.'); return
@@ -97,7 +100,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   async function previewOneFile(file: File | undefined) {
     if (!file) return
     const ticket = ++revision.current
-    setPreview(null); setUndoSnapshot(null); setMessage('')
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage('')
     if (file.size === 0 || file.size > limit) {
       setMessage('Kies één gevuld bronbestand van maximaal 256 kB.')
       return
@@ -122,7 +125,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       return
     }
     const ticket = ++revision.current
-    setPreview(null); setUndoSnapshot(null); setMessage(''); setBusy(true)
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage(''); setBusy(true)
     try {
       const captures: unknown[] = []
       const seen = new Set<string>()
@@ -185,6 +188,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       // One-step undo lives only in React memory. No browser persistence,
       // retailer cache, remote upload or implicit Workbench approval.
       setUndoSnapshot(preview)
+      setRefreshSummary({ store: result.retailer, changes: result.changes })
       setDraft(result.normalized)
       // Do not retain a second raw copy of the just-ingested private source.
       setUpdateDraft('')
@@ -214,6 +218,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       setDraft(undoSnapshot.raw)
       setPreview({ ...undoSnapshot, data })
       setUndoSnapshot(null)
+      setRefreshSummary(null)
       setUpdateDraft('')
       setMessage('Vorige eigen winkelopname(s) in de lokale preview hersteld. Open Vergelijk opnieuw om deze bron te beoordelen; oude of verlopen prijzen blijven onbekend.')
     } catch {
@@ -224,14 +229,14 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   function changeSeparateDraft(store: 'PLUS' | 'DekaMarkt', raw: string) {
     ++revision.current
     setSeparateDrafts(previous => ({ ...previous, [store]: raw }))
-    setPreview(null); setUndoSnapshot(null)
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null)
     setMessage('Winkelbron gewijzigd. Controleer beide originele bronnen opnieuw.')
   }
 
   // Each paste is checked as an original single-retailer capture first.
   async function inspectSeparateDrafts() {
     const ticket = ++revision.current
-    setPreview(null); setUndoSnapshot(null); setMessage(''); setBusy(true)
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage(''); setBusy(true)
     try {
       const provided = (['PLUS', 'DekaMarkt'] as const)
         .filter(store => separateDrafts[store].trim().length > 0)
@@ -274,7 +279,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
 
   async function pasteClipboard() {
     const ticket = ++revision.current
-    setPreview(null); setUndoSnapshot(null); setMessage('')
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage('')
     try {
       if (!navigator.clipboard?.readText) throw new Error('Klembord niet beschikbaar')
       const raw = await navigator.clipboard.readText()
@@ -520,6 +525,22 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             { type: 'text/plain;charset=utf-8' }))}>
           Vernieuw alleen deze winkel met geplakte bronregels
         </button>
+        {refreshSummary && <div className="supa-planner-source-paste__changes"
+          role="status" aria-label="Verschillen tussen eigen originele winkelopnames">
+          <strong>{refreshSummary.store} · wijzigingen in je originele winkelbron</strong>
+          <p>{refreshSummary.changes.addedSkus} nieuwe SKU’s;
+            {' '}{refreshSummary.changes.removedSkus} verdwenen SKU’s;
+            {' '}{refreshSummary.changes.priceChangedSkus} SKU’s met een andere
+            {' '}opgenomen pakprijs;
+            {' '}{refreshSummary.changes.packageChangedSkus} met een gewijzigde
+            {' '}verpakking;
+            {' '}{refreshSummary.changes.becameUnpricedSkus} voorheen geprijsde
+            {' '}SKU’s nu zonder pakprijs.</p>
+          <small>Dit zijn verschillen tussen je twee eigen bronbestanden,
+            geen onafhankelijke actuele prijscontrole. Verdwenen of ongeprijsde
+            artikelen moeten opnieuw gekoppeld of werkelijk opgenomen worden;
+            vergelijk pas na de bestaande bron- en SKU-review.</small>
+        </div>}
         {undoSnapshot && <button type="button" className="ghost-button"
           disabled={busy} onClick={undoStoreReplacement}>
           Herstel vorige eigen winkelopname in deze preview
