@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
@@ -47,7 +47,9 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     }
   }, [])
   const [captureTarget, setCaptureTarget] = useState<'both' | CaptureStore>('both')
-  const [copyableMissingGuide, setCopyableMissingGuide] = useState<{ store: CaptureStore; text: string } | null>(null)
+  const [copyableMissingGuide, setCopyableMissingGuide] = useState<{
+    store: CaptureStore; text: string; fingerprint: string
+  } | null>(null)
   // Existing SKU reviews are not fresh source captures. Only missing physical
   // source candidates require this deliberately blank partial input sheet.
   const missingCaptureFor = (store: CaptureStore, at = now): PlannerCaptureGuideNeed[] => {
@@ -61,6 +63,13 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   }
 
   const [secondStopCost, setSecondStopCost] = useState<{ key: string; raw: string }>({ key: '', raw: '' })
+  const captureFingerprint = JSON.stringify([
+    captureNeeds.map(need => [need.id, need.label, need.unit, need.amount]),
+    captureProgress?.planKey, captureProgress?.stores, reviewed?.planKey,
+    reviewed?.stores.PLUS?.observedAt, reviewed?.stores.DekaMarkt?.observedAt,
+  ])
+  const latestCaptureFingerprint = useRef(captureFingerprint)
+  latestCaptureFingerprint.current = captureFingerprint
   // Never let a long-open Planner keep displaying expired personal prices.
   const currentSources = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', now)
   const summary = ownStoreWeekComparison(currentSources)
@@ -146,16 +155,24 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     try {
       const needs = missingCaptureFor(store, Date.now())
       if (!needs.length) throw new Error(store + ': er zijn geen ontbrekende producten om te kopiëren.')
+      const fingerprint = captureFingerprint
       const { makePlannerCaptureGuide } = await import('../comparison/plannerPriceCaptureGuide.ts')
+      if (latestCaptureFingerprint.current !== fingerprint)
+        throw new Error('Het weekmenu is gewijzigd. Kopieer de nieuwe opnamebehoefte opnieuw.')
       const content = makePlannerCaptureGuide(needs, [store])
       if (navigator.clipboard?.writeText) {
         try {
+          if (latestCaptureFingerprint.current !== fingerprint ||
+              JSON.stringify(missingCaptureFor(store, Date.now())) !== JSON.stringify(needs)) {
+            throw new Error('Brondata gewijzigd tijdens kopiëren.')
+          }
           await navigator.clipboard.writeText(content)
           setDownloadMessage(store + ': je ongeprijsde meeneemlijst met alle ontbrekende ingrediënten is gekopieerd.')
           return
         } catch { /* Fallback exposes same sanitized, selectable content. */ }
       }
-      setCopyableMissingGuide({ store, text: content })
+      if (latestCaptureFingerprint.current !== fingerprint) return
+      setCopyableMissingGuide({ store, text: content, fingerprint })
       setDownloadMessage('Klembord niet toegestaan: selecteer de meeneemlijst van ' + store + ' hieronder.')
     } catch (cause) {
       setDownloadMessage(cause instanceof Error ? cause.message : 'Mobiele meeneemlijst niet beschikbaar.')
@@ -165,6 +182,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     setDownloadMessage('')
     try {
       const needs = missingCaptureFor(store, Date.now())
+      const fingerprint = captureFingerprint
       if (!needs.length) throw new Error(store + ': geen ontbrekende productmatches. Beoordeel bestaande SKU’s in Vergelijk.')
       const content = kind === 'csv' || kind === 'csv-excel'
         ? (await import('../comparison/plannerPriceCaptureSheet.ts'))
@@ -174,6 +192,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
             .makePrintablePlannerCaptureHtml(needs, [store])
           : (await import('../comparison/plannerPriceCaptureGuide.ts'))
             .makePlannerCaptureGuide(needs, [store])
+      if (latestCaptureFingerprint.current !== fingerprint ||
+          JSON.stringify(missingCaptureFor(store, Date.now())) !== JSON.stringify(needs)) {
+        throw new Error('Het weekmenu of de winkelbron is gewijzigd. Maak het lege opnameblad opnieuw.')
+      }
       const url = URL.createObjectURL(new Blob([content], {
         type: kind === 'csv' || kind === 'csv-excel' ? 'text/csv;charset=utf-8' :
           kind === 'print' ? 'text/html;charset=utf-8' : 'text/plain;charset=utf-8',
@@ -373,7 +395,8 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               <button type="button" className="ghost-button" onClick={() => void downloadMissingCaptureFor(store, 'print')}>
                 Printbaar {store}-opnameblad (HTML)
               </button>
-              {copyableMissingGuide?.store === store && <label className="own-store-planner__targeted-copy">
+              {copyableMissingGuide?.store === store &&
+        copyableMissingGuide.fingerprint === captureFingerprint && <label className="own-store-planner__targeted-copy">
                 Mobiele ongeprijsde meeneemlijst · selecteer alle tekst
                 <textarea readOnly rows={Math.min(15, Math.max(6, pending.length + 8))}
                   value={copyableMissingGuide.text} onFocus={event => event.currentTarget.select()} />
