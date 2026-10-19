@@ -79,6 +79,25 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
     }
   }, [progress, demandIdentity, storageKey])
 
+  // A deliberate complete-week JSON restore writes the exact validated
+  // existing Planner progress file, then signals the mounted checklist to
+  // reload. A storage event does not fire in the tab performing the write.
+  useEffect(() => {
+    const reload = () => {
+      try {
+        const raw = window.sessionStorage.getItem(storageKey)
+        const recovered = raw ? importUnpricedProgress(raw, demandIdentity, keys) : {}
+        setProgress({ identity: demandIdentity, checked: recovered })
+        setPrepared(null)
+        setBackupMessage('Je Planner-afvinkingen zijn uit de complete privéweekback-up hersteld.')
+      } catch {
+        setBackupMessage('De aangeleverde Planner-vinkjes kunnen niet worden gelezen; het zichtbare overzicht is behouden.')
+      }
+    }
+    window.addEventListener('supa:private-planner-ticks-restored', reload)
+    return () => window.removeEventListener('supa:private-planner-ticks-restored', reload)
+  }, [demandIdentity, storageKey])
+
   const completed = items.filter(item => checked[itemKey(item)]).length
   const visible = items.filter(item => !openOnly || !checked[itemKey(item)])
   const copyKey = JSON.stringify([demandIdentity, checked, openOnly])

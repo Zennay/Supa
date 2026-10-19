@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { decodeSaved, findReusableExtraLists, legacyKey, restore, storageKey, valid, type Item, type ReusableExtraList, type Unit } from './ownExtraGroceriesStorage.ts'
+import { CompleteWeekBackupControls } from './CompleteWeekBackupControls.tsx'
 export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   identity: string
   plan: PlannedMeal[]
@@ -488,6 +489,13 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       </div>}
     {data.locked && <p role="alert">De opgeslagen extra lijst voor deze week is niet leesbaar of is gewijzigd.
       Het bewaarde bestand wordt niet overschreven.</p>}
+    <CompleteWeekBackupControls identity={identity} plan={plan} recipes={recipes}
+      activeDays={activeDays} extras={items} currentRaw={data.raw}
+      locked={data.locked} onRestore={(restored, savedRaw) => {
+        setData(prev => ({ ...prev, identity, raw: savedRaw, items: restored }))
+        setEditing(null)
+        setPreparedCopy(null)
+      }} />
     {notice && <p role="status">{notice}</p>}
   </section>
 }
