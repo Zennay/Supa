@@ -21,7 +21,6 @@ type Suggestion = {
   packCents: number; unitRate: string | null; packsNeeded: number; lineCents: number
 } | null
 type UnpricedHint = { name: string; sku: string; reason: string } | null
-const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const wholeMoney = new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 0 })
 /** Exact original integer cent presentation, including large safe pack totals. */
 const exactEuro = (cents: number): string => {
@@ -546,7 +545,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                   {' '}DekaMarkt {exactEuro(suggestions.DekaMarkt.lineCents)}.
                 </small>
                 <small>Verschil Deka min PLUS:
-                  {' '}{diff === 0 ? 'gelijk (' + money.format(0) + ')' :
+                  {' '}{diff === 0 ? 'gelijk (' + exactEuro(0) + ')' :
                     (diff > 0 ? '+' : '−') + exactEuro(Math.abs(diff))}.
                   {' '}Nog geen bevestigd prijsverschil of mandbesparing.
                 </small>
@@ -562,7 +561,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
             <small>SKU {suggestions[store]!.sku} · niet bevestigd</small>
             <small>{suggestions[store]!.packCount} × {suggestions[store]!.packAmount}
               {' '}{suggestions[store]!.packUnit} · opgenomen bronpakprijs
-              {' '}{money.format(suggestions[store]!.packCents / 100)}
+              {' '}{exactEuro(suggestions[store]!.packCents)}
               {suggestions[store]!.unitRate
                 ? ' · informatief ' + suggestions[store]!.unitRate : ''}
               {' '}· bronmoment niet automatisch gevalideerd</small>

@@ -1,10 +1,10 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useRef, useState } from 'react'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant, type OwnStore, type PrivateCaptureProgress } from '../comparison/privateReviewedBasketBridge.ts'
 import './plannerReviewedSourceLines.css'
 
 const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
-const eur = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 /** Individual admitted SKU facts only. Never a complete basket authority. */
 export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
@@ -105,11 +105,11 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
       ...pairs.map(({ one, other, difference }) => [
         safe(one.ingredientLabel) + ' | ' + one.requiredAmount + ' ' + safe(one.requiredUnit),
         'PLUS SKU ' + safe(one.productId) + ': ' +
-          one.packagesNeeded + ' pak(ken) | ' + eur.format(one.lineTotalCents / 100),
+          one.packagesNeeded + ' pak(ken) | ' + exactEuro.formatCents(one.lineTotalCents),
         'DekaMarkt SKU ' + safe(other.productId) + ': ' +
-          other.packagesNeeded + ' pak(ken) | ' + eur.format(other.lineTotalCents / 100),
+          other.packagesNeeded + ' pak(ken) | ' + exactEuro.formatCents(other.lineTotalCents),
         'Voorlopig REGELverschil: ' +
-          (difference === 0 ? 'gelijk' : eur.format(Math.abs(difference) / 100) +
+          (difference === 0 ? 'gelijk' : exactEuro.formatCents(Math.abs(difference)) +
           ' lager bij ' + (difference > 0 ? 'PLUS' : 'DekaMarkt')),
         '',
       ].join('\n')),
@@ -156,13 +156,13 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
           <article key={one.ingredientId}>
             <strong>{one.ingredientLabel} · {one.requiredAmount} {one.requiredUnit}</strong>
             <small>PLUS · {one.productName} · SKU {one.productId}</small>
-            <span>{one.packagesNeeded} pak(ken) · {eur.format(one.lineTotalCents / 100)}</span>
+            <span>{one.packagesNeeded} pak(ken) · {exactEuro.formatCents(one.lineTotalCents)}</span>
             <small>{one.unitPrice ?? 'Eenheidsprijs onbekend'}</small>
             <small>DekaMarkt · {other.productName} · SKU {other.productId}</small>
-            <span>{other.packagesNeeded} pak(ken) · {eur.format(other.lineTotalCents / 100)}</span>
+            <span>{other.packagesNeeded} pak(ken) · {exactEuro.formatCents(other.lineTotalCents)}</span>
             <small>{other.unitPrice ?? 'Eenheidsprijs onbekend'}</small>
             <strong>{difference === 0 ? 'Gelijke bevestigde regelprijs' :
-              eur.format(Math.abs(difference) / 100) + ' op deze regel ' +
+              exactEuro.formatCents(Math.abs(difference)) + ' op deze regel ' +
                 (difference > 0 ? 'lager bij PLUS' : 'lager bij DekaMarkt')}</strong>
           </article>)}
       </div>
@@ -190,10 +190,10 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
           {pairs.slice(0, 12).map(({ one, other, difference }) =>
             <article key={one.ingredientId}>
               <strong>{one.ingredientLabel} · {one.requiredAmount} {one.requiredUnit}</strong>
-              <span>PLUS: {eur.format(one.lineTotalCents / 100)} · {one.packagesNeeded} pak(ken)</span>
-              <span>DekaMarkt: {eur.format(other.lineTotalCents / 100)} · {other.packagesNeeded} pak(ken)</span>
+              <span>PLUS: {exactEuro.formatCents(one.lineTotalCents)} · {one.packagesNeeded} pak(ken)</span>
+              <span>DekaMarkt: {exactEuro.formatCents(other.lineTotalCents)} · {other.packagesNeeded} pak(ken)</span>
               <strong>{difference === 0 ? 'Gelijke regelprijs'
-                : eur.format(Math.abs(difference) / 100) + ' verschil op deze regel (' +
+                : exactEuro.formatCents(Math.abs(difference)) + ' verschil op deze regel (' +
                   (difference > 0 ? 'PLUS' : 'DekaMarkt') + ' lager)'}</strong>
             </article>)}
         </div>
@@ -228,10 +228,10 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
           <strong>{line.productName}</strong>
           <small>Originele SKU: {line.productId}</small>
           <span>Pak: {line.packCount} × {line.packAmount} {line.packUnit}</span>
-          <span>{eur.format(line.pricePerPackCents / 100)} per pak ·
+          <span>{exactEuro.formatCents(line.pricePerPackCents)} per pak ·
             {' '}{line.unitPrice ?? 'Eenheidsprijs onbekend'}</span>
           <span>{line.packagesNeeded} hele pak(ken) voor deze regel ·
-            {' '}{eur.format((line.packagesNeeded * line.pricePerPackCents) / 100)}</span>
+            {' '}{exactEuro.formatCents(line.lineTotalCents)}</span>
           <button type="button" className="ghost-button" onClick={() => {
             const current = progress.stores[store]
             if (!current || !recentOwnCaptureInstant(current.observedAt, Date.now())) return

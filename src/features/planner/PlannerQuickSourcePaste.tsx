@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
@@ -11,7 +12,7 @@ import './plannerQuickSourcePaste.css'
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
 const limit = 256000
 const dateText = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
-const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+
 
 async function normalizedOwnSource(raw: string): Promise<string> {
   // Spreadsheet/desktop copy can include a single UTF-8 BOM even when the
@@ -482,7 +483,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
                       ? 'Niet beschikbaar volgens eigen bron; geen pakprijs'
                       : !priced
                         ? 'Pakprijs of verpakking ontbreekt'
-                        : money.format(product.sourcePriceCents! / 100) +
+                        : exactEuro.formatCents(product.sourcePriceCents!) +
                           ' per pak · ' + (rate ? formatPrivateUnitRate(rate) : 'eenheidsprijs onbekend')}</span>
                   </li>
                 })}

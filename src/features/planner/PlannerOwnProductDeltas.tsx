@@ -4,15 +4,15 @@ import type { OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import './plannerPriceBreakdown.css'
 
-const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+import { euro as exactEuro } from '../../lib/money.ts'
 type DifferenceFilter = 'all' | 'PLUS' | 'DekaMarkt' | 'equal'
 type DifferenceSort = 'impact' | 'ingredient' | 'plus-price' | 'deka-price'
 
 function PriceEvidence({ line }: { line: ComparedOwnLine['plus'] }) {
   return <>
-    <strong>{euro.format(line.lineTotalCents / 100)}</strong>
+    <strong>{exactEuro.formatCents(line.lineTotalCents)}</strong>
     <small>{line.packs} × {line.productName} · SKU {line.productId}</small>
-    <small>{line.pack.amount} {line.pack.unit} × {line.pack.count} per pak · {euro.format(line.pricePerPackCents / 100)} per pak</small>
+    <small>{line.pack.amount} {line.pack.unit} × {line.pack.count} per pak · {exactEuro.formatCents(line.pricePerPackCents)} per pak</small>
     <small>{privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'}</small>
   </>
 }
@@ -110,7 +110,7 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
               <th scope="row">{item.ingredientLabel}</th>
               {([item.plus, item.deka] as const).map((line, index) =>
                 <td key={index}><PriceEvidence line={line} /></td>)}
-              <td><strong>{item.deltaCents === 0 ? 'Gelijk' : euro.format(Math.abs(item.deltaCents) / 100)}</strong>
+              <td><strong>{item.deltaCents === 0 ? 'Gelijk' : exactEuro.formatCents(Math.abs(item.deltaCents))}</strong>
                 <small>{item.deltaCents > 0 ? 'PLUS lager' : item.deltaCents < 0 ? 'DekaMarkt lager' : 'Geen verschil'}</small>
                 <div className="own-store-planner__line-actions" aria-label={'Kies winkel voor ' + item.ingredientLabel}>
                   <button type="button" onClick={() => onChooseLine(item.id, 'PLUS')}>Kies PLUS</button>
@@ -133,7 +133,7 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
             </div>
             <p className="own-store-breakdown__mobile-difference">
               <strong>{item.deltaCents === 0 ? 'Gelijke regelprijs' :
-                euro.format(Math.abs(item.deltaCents) / 100) + ' lager bij ' +
+                exactEuro.formatCents(Math.abs(item.deltaCents)) + ' lager bij ' +
                 (item.deltaCents > 0 ? 'PLUS' : 'DekaMarkt')}</strong>
               {' '}voor dezelfde gecontroleerde fysieke behoefte.
             </p>

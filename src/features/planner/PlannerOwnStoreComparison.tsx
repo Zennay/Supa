@@ -23,10 +23,10 @@ const PlannerQuickSourcePaste = lazy(() => import('./PlannerQuickSourcePaste.tsx
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
+import { euro as exactEuro } from '../../lib/money.ts'
 import { confirmedPartialBasket } from './confirmedPartialBasket.ts'
 import './plannerOwnStoreComparison.css'
 
-const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
@@ -97,6 +97,17 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   ])
   const shownCost = secondStopCost.key === costSourceKey ? secondStopCost.raw : ''
   const parsedSecondStopCents = parsePrivateExtraVisitCostCents(shownCost)
+  // The canonical basket supplies safe integer cents. A user's additional
+  // stop cost can push their *sum* beyond Number.MAX_SAFE_INTEGER: retain
+  // exact cents for all displayed travel and week-budget calculations.
+  const mixedTripCents = summary.status === 'comparable' && summary.mixedRoute &&
+    parsedSecondStopCents !== null
+    ? BigInt(summary.mixedRoute.totalCents) + BigInt(parsedSecondStopCents) : null
+  const mixedNetDifferenceCents = summary.status === 'comparable' && summary.mixedRoute &&
+    parsedSecondStopCents !== null
+    ? BigInt(summary.mixedRoute.possibleProductDifferenceCents) - BigInt(parsedSecondStopCents) : null
+  const mixedBudgetDifferenceCents = mixedTripCents !== null && budgetCents !== null
+    ? mixedTripCents - BigInt(budgetCents) : null
 
   const selected = currentSources?.stores[preferred] ? preferred : currentSources?.stores.PLUS ? 'PLUS' : currentSources?.stores.DekaMarkt ? 'DekaMarkt' : preferred
   function selectCurrentStore(store: OwnStore) {
@@ -504,7 +515,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
         return <div className="own-store-planner__card" key={store}>
           <strong>{store}</strong>
           <span className="own-store-planner__price">{capture && typeof cents === 'number' && Number.isSafeInteger(cents) && cents >= 0
-            ? money.format(cents / 100) : 'Prijs onbekend'}</span>
+            ? exactEuro.formatCents(cents) : 'Prijs onbekend'}</span>
           <small>{capture ? `Eigen opname: ${capture.observedAt}` : 'Nog geen complete, gecontroleerde opname'}</small>
           {captureProgress?.stores[store] && !capture && (() => {
             const progress = captureProgress.stores[store]!
@@ -518,7 +529,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                 {' '}{progress.reviewedLineCount}/{progress.demandLineCount} fysiek gecontroleerd.</small>
               {partial && <div className="own-store-planner__partial-amount"
                 aria-label={store + ': alleen persoonlijk gecontroleerde prijzen'}>
-                <strong>Al gecontroleerde artikelregels: {money.format(partial.knownCents / 100)}</strong>
+                <strong>Al gecontroleerde artikelregels: {exactEuro.formatCents(partial.knownCents)}</strong>
                 <small>{partial.confirmedCount} van {partial.physicalLineCount} ingrediënten bevestigd.
                   {' '}{partial.remainingCount} nog niet volledig in deze deelberekening.
                   Dit is <strong>geen volledig mandtotaal</strong>, geen winkelwinnaar en
@@ -597,8 +608,8 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
           )}
           {capture && typeof cents === 'number' && Number.isSafeInteger(cents) && cents >= 0 && budgetCents !== null &&
             <small className="own-store-planner__budget-gap">{cents > budgetCents
-              ? `${money.format((cents - budgetCents) / 100)} boven je ingestelde weekbudget`
-              : `${money.format((budgetCents - cents) / 100)} binnen je ingestelde weekbudget`}</small>}
+              ? `${exactEuro.formatCents(cents - budgetCents)} boven je ingestelde weekbudget`
+              : `${exactEuro.formatCents(budgetCents - cents)} binnen je ingestelde weekbudget`}</small>}
           {capture && <button type="button" onClick={() => selectCurrentStore(store)}
             className="ghost-button" aria-pressed={selected === store}>
             {selected === store ? 'Gekozen voor mijn budget' : 'Gebruik voor mijn budget'}
@@ -653,7 +664,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     {summary.status === 'comparable'
       ? <div className="own-store-planner__result" role="status">
           <strong>{summary.cheapest === null ? 'Beide eigen mandjes hebben hetzelfde totaal.'
-            : `${summary.cheapest} is ${money.format(summary.differenceCents / 100)} voordeliger voor jouw mandje.`}</strong>
+            : `${summary.cheapest} is ${exactEuro.formatCents(summary.differenceCents)} voordeliger voor jouw mandje.`}</strong>
           <p>Dezelfde gecontroleerde fysieke vraag en benodigde hele verpakkingen, eigen bronmomenten maximaal 24 uur uit elkaar. Geen kassagarantie of onafhankelijk bewezen besparing.</p>
           {summary.cheapest && selected !== summary.cheapest && <button type="button" className="ghost-button"
             onClick={() => selectCurrentStore(summary.cheapest!)}>Kies {summary.cheapest} voor mijn weekbudget</button>}
@@ -675,10 +686,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
           </button>
           {summary.mixedRoute && <div className="own-store-planner__mix-preview">
             <h4>Combineren van goedkoopste artikelen</h4>
-            <p><strong>{money.format(summary.mixedRoute.totalCents / 100)} aan winkelproducten</strong>
+            <p><strong>{exactEuro.formatCents(summary.mixedRoute.totalCents)} aan winkelproducten</strong>
               {' '}als je per ingrediënt het goedkoopste gecontroleerde hele-verpakkingenbedrag neemt.
               {summary.mixedRoute.requiresTwoStops
-                ? <> Dit is {money.format(summary.mixedRoute.possibleProductDifferenceCents / 100)}
+                ? <> Dit is {exactEuro.formatCents(summary.mixedRoute.possibleProductDifferenceCents)}
                     {' '}lager dan de goedkoopste volledige winkel, <strong>vóór extra bezoekkosten</strong>.
                     Het werkelijke voordeel is onbekend zolang reistijd of extra kosten niet zijn ingevuld.</>
                 : <> Deze selectie past bij één winkel; een tweede winkelstop is niet nodig.</>}</p>
@@ -692,20 +703,19 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                 netto voordeel onbekend. Dit is geen kassaprijs- of besparingsbewijs.</p>
               {shownCost.trim() && parsedSecondStopCents === null && <p role="alert">
                 Vul € 0,00 tot € 1.000,00 in, met maximaal twee decimalen.</p>}
-              {parsedSecondStopCents !== null && <>
+              {parsedSecondStopCents !== null && mixedTripCents !== null &&
+                mixedNetDifferenceCents !== null && <>
                 <p role="status">Twee winkelstops inclusief extra kosten:
-                  {' '}<strong>{money.format((summary.mixedRoute.totalCents + parsedSecondStopCents) / 100)}</strong>.
-                  {' '}{summary.mixedRoute.possibleProductDifferenceCents > parsedSecondStopCents
-                    ? money.format((summary.mixedRoute.possibleProductDifferenceCents - parsedSecondStopCents) / 100) +
-                      ' minder dan één hele winkel.'
-                    : summary.mixedRoute.possibleProductDifferenceCents === parsedSecondStopCents
+                  {' '}<strong>{exactEuro.formatCents(mixedTripCents)}</strong>.
+                  {' '}{mixedNetDifferenceCents > 0n
+                    ? exactEuro.formatCents(mixedNetDifferenceCents) + ' minder dan één hele winkel.'
+                    : mixedNetDifferenceCents === 0n
                       ? 'Gelijk aan één hele winkel.'
-                      : money.format((parsedSecondStopCents - summary.mixedRoute.possibleProductDifferenceCents) / 100) +
-                        ' duurder dan één hele winkel.'}</p>
-                {budgetCents !== null && <p>Weekbudget:
-                  {' '}{summary.mixedRoute.totalCents + parsedSecondStopCents > budgetCents
-                    ? money.format((summary.mixedRoute.totalCents + parsedSecondStopCents - budgetCents) / 100) + ' overschreden.'
-                    : money.format((budgetCents - summary.mixedRoute.totalCents - parsedSecondStopCents) / 100) + ' over.'}</p>}
+                      : exactEuro.formatCents(-mixedNetDifferenceCents) + ' duurder dan één hele winkel.'}</p>
+                {mixedBudgetDifferenceCents !== null && <p>Weekbudget:
+                  {' '}{mixedBudgetDifferenceCents > 0n
+                    ? exactEuro.formatCents(mixedBudgetDifferenceCents) + ' overschreden.'
+                    : exactEuro.formatCents(-mixedBudgetDifferenceCents) + ' over.'}</p>}
               </>}
             </div>}
             <button type="button" className="ghost-button" onClick={openCurrentMixedRoute}>

@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useRef, useState } from 'react'
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
@@ -28,7 +29,6 @@ export type SavedReceipt = {
   cheapest: 'PLUS' | 'DekaMarkt' | null
   lines: ReceiptLine[]
 }
-const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -232,10 +232,10 @@ export function PrivateOwnReceiptViewer() {
     {saved && <div className="own-store-planner__archive-content">
       <p><strong>Historisch, niet opnieuw geverifieerd rapport</strong> · aangemaakt {saved.generatedAt}</p>
       <p>Origineel opgenomen: PLUS {saved.plusObservedAt} · DekaMarkt {saved.dekaObservedAt}</p>
-      <p><strong>PLUS {euro.format(saved.plusCents / 100)} · DekaMarkt {euro.format(saved.dekaCents / 100)}</strong></p>
+      <p><strong>PLUS {exactEuro.formatCents(saved.plusCents)} · DekaMarkt {exactEuro.formatCents(saved.dekaCents)}</strong></p>
       <p>{saved.cheapest === null ? 'In dit opgeslagen rapport waren de mandjes even duur.' :
         'In dit opgeslagen rapport was ' + saved.cheapest + ' ' +
-        euro.format(saved.differenceCents / 100) + ' goedkoper voor hetzelfde fysieke mandje.'}</p>
+        exactEuro.formatCents(saved.differenceCents) + ' goedkoper voor hetzelfde fysieke mandje.'}</p>
       <div className="own-store-planner__archive-filters">
         <label>Zoek historisch product of SKU
           <input type="search" value={query} maxLength={120}
@@ -263,10 +263,10 @@ export function PrivateOwnReceiptViewer() {
         <table><thead><tr><th>Ingrediënt</th><th>PLUS</th><th>DekaMarkt</th><th>Historisch verschil</th></tr></thead>
           <tbody>{visible.map(item => <tr key={item.ingredientId}>
             <th scope="row">{item.ingredient}</th>
-            <td>{item.PLUS.sourceProductName} · {item.PLUS.sourceProductId} · {euro.format(item.PLUS.totalWholePackagesCents / 100)}</td>
-            <td>{item.DekaMarkt.sourceProductName} · {item.DekaMarkt.sourceProductId} · {euro.format(item.DekaMarkt.totalWholePackagesCents / 100)}</td>
+            <td>{item.PLUS.sourceProductName} · {item.PLUS.sourceProductId} · {exactEuro.formatCents(item.PLUS.totalWholePackagesCents)}</td>
+            <td>{item.DekaMarkt.sourceProductName} · {item.DekaMarkt.sourceProductId} · {exactEuro.formatCents(item.DekaMarkt.totalWholePackagesCents)}</td>
             <td>{item.dekaMinusPlusCents === 0 ? 'Gelijk' :
-              euro.format(Math.abs(item.dekaMinusPlusCents) / 100) +
+              exactEuro.formatCents(Math.abs(item.dekaMinusPlusCents)) +
               (item.dekaMinusPlusCents > 0 ? ' goedkoper bij PLUS' : ' goedkoper bij DekaMarkt')}</td>
           </tr>)}</tbody>
         </table>

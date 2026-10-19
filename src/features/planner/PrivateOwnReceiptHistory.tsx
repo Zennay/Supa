@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useEffect, useRef, useState } from 'react'
 import { readPrivateReceipt } from './PrivateOwnReceiptViewer.tsx'
 import { privateOwnComparisonReceipt } from './privateOwnComparisonReceipt.ts'
@@ -5,9 +6,8 @@ import type { PrivateReviewedBaskets } from '../comparison/privateReviewedBasket
 import { comparePrivateReceiptHistory, type HistoricalReceiptResult, type ReceiptStore } from './privateReceiptHistory.ts'
 import { exportPrivateReceiptHistoryCsv } from './privateReceiptHistoryCsv.ts'
 
-const MONEY = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const STORES: readonly ReceiptStore[] = ['PLUS', 'DekaMarkt']
-const amount = (cents: number) => MONEY.format(cents / 100)
+const amount = (cents: number) => exactEuro.formatCents(cents)
 const movement = (cents: number | null) => cents === null ? 'onbekend' :
   cents === 0 ? 'ongewijzigd' : (cents > 0 ? '+' : '−') + amount(Math.abs(cents))
 

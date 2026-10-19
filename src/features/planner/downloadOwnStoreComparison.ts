@@ -3,7 +3,7 @@ import type { OwnStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 
-const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+import { euro as exactEuro } from '../../lib/money.ts'
 
 function readable(value: string): string {
   // Private text-only export: keep literal observed identities, but never let
@@ -21,10 +21,10 @@ export function printableOwnStoreComparison(
     'Privé: alleen uit door mij ingevoerde en bevestigde bronnen; geen kassagarantie.',
     'PLUS bronmoment: ' + readable(observations.PLUS),
     'DekaMarkt bronmoment: ' + readable(observations.DekaMarkt),
-    'PLUS totaal hele verpakkingen: ' + money.format(comparison.plusCents / 100),
-    'DekaMarkt totaal hele verpakkingen: ' + money.format(comparison.dekaCents / 100),
+    'PLUS totaal hele verpakkingen: ' + exactEuro.formatCents(comparison.plusCents),
+    'DekaMarkt totaal hele verpakkingen: ' + exactEuro.formatCents(comparison.dekaCents),
     comparison.cheapest === null ? 'De beide winkelmandjes zijn even duur.' :
-      comparison.cheapest + ' is ' + money.format(comparison.differenceCents / 100) + ' voordeliger voor dit mandje.',
+      comparison.cheapest + ' is ' + exactEuro.formatCents(comparison.differenceCents) + ' voordeliger voor dit mandje.',
     '', 'Vergelijking per ingredient (zelfde fysieke vraag):',
   ]
   for (const row of comparison.lines) {
@@ -34,14 +34,14 @@ export function printableOwnStoreComparison(
       'SKU ' + readable(line.productId),
       line.packs + ' volledige verpakking(en)',
       line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count + ' per verpakking',
-      money.format(line.pricePerPackCents / 100) + ' per verpakking',
+      exactEuro.formatCents(line.pricePerPackCents) + ' per verpakking',
       (privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'),
-      money.format(line.lineTotalCents / 100) + ' benodigd',
+      exactEuro.formatCents(line.lineTotalCents) + ' benodigd',
     ].join(' · ')
     lines.push('', label + ': ' + row.plus.requirement.amount + ' ' + row.plus.requirement.unit + ' benodigd',
       '  ' + entry('PLUS', row.plus), '  ' + entry('DekaMarkt', row.deka),
       '  Regelverschil: ' + (row.deltaCents === 0 ? 'gelijk' :
-        money.format(Math.abs(row.deltaCents) / 100) +
+        exactEuro.formatCents(Math.abs(row.deltaCents)) +
         (row.deltaCents > 0 ? ' lager bij PLUS' : ' lager bij DekaMarkt')))
   }
   lines.push('', 'Alleen eigen opnames; geen onafhankelijk geverifieerd besparingsbewijs.')
