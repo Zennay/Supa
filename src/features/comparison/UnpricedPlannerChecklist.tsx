@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
+import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import './unpricedPlannerChecklist.css'
 
 type ChecklistProps = {
@@ -93,19 +94,19 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
   }
   function openWithCurrentDemand() {
     if (error || !items.length) return
-    const content = shoppingText()
-    if (content.length > 40_000) {
-      setBackupMessage('Deze lijst is te groot voor directe overdracht. Verklein het weekmenu.')
-      return
-    }
-    if (!window.confirm(
-      'Open de privé-mappingwizard in ditzelfde tabblad met je huidige ongeprijsde Planner-ingrediënten? ' +
-      'Dit is alleen een concept: bevestig daar zelf de import en kies daarna je werkelijk geobserveerde winkelartikelen.')) return
     try {
-      window.sessionStorage.setItem('supa:unpriced-planner-handoff:v1', content)
+      // Preserve canonical ingredient IDs, selected recipe identity, exact
+      // amounts and actual meal count. The TXT export remains available for
+      // manual editing, but it deliberately cannot preserve those identities.
+      const content = exportPrivatePlannerWeek(plan, recipes, activeDays)
+      if (!window.confirm(
+        'Open jouw geselecteerde Planner-week in de privé-mappingwizard? Daar controleer en bevestig je eerst ' +
+        'de oorspronkelijke fysieke ingrediënten; winkelproducten en prijzen worden niet overgenomen.')) return
+      window.sessionStorage.setItem('supa:private-planner-week-handoff:v1', content)
       window.location.assign('/private-basket-mapping.html')
     } catch {
-      setBackupMessage('Direct overzetten niet beschikbaar. Download het TXT-bestand en importeer het in de privé-mappingwizard.')
+      setBackupMessage('Het exacte Planner-weekmenu kan niet direct worden overgedragen. ' +
+        'Controleer je recepten en hoeveelheden of download een eigen JSON/TXT-bestand.')
     }
   }
 
@@ -171,7 +172,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
           Vinkjes blijven lokaal beschikbaar zolang dit browsertabblad open is,
           ook bij herladen van dit browsertabblad. Afvinkingen worden alleen in je eigen tabopslag bewaard;
           je kunt ze privé downloaden en op een ander apparaat voor exact hetzelfde weekmenu herstellen.
-          Download ook de TXT-lijst om deze zonder winkelprijzen als ingrediëntenmand in de privévergelijker te importeren.</p>
+          Download ook de TXT-lijst om een eigen leesbaar overzicht handmatig in de privévergelijker te importeren.</p>
       </div>
       {error ? <p role="status" className="unpriced-planner-checklist__note">{error}</p> : (
         <>
@@ -205,7 +206,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
               Download weekboodschappen (TXT)
             </button>
             <button type="button" className="ghost-button" onClick={openWithCurrentDemand}>
-              Neem deze ingrediënten direct mee naar privévergelijker
+              Neem exact weekmenu mee naar privévergelijker
             </button>
             <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
               Open privévergelijker voor mijn TXT-lijst

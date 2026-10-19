@@ -78,6 +78,53 @@ function demandFromWeek(week: Week) {
   }
 }
 
+
+type PrivateDemand = ReturnType<typeof demandFromWeek>
+const handoffKey = 'supa:private-planner-week-handoff:v1'
+const acceptHandoff = document.querySelector<HTMLButtonElement>('#week-handoff-accept')!
+const currentLines = document.querySelector<HTMLElement>('#lines')!
+let stagedHandoff: PrivateDemand | null = null
+try {
+  // Do not leave a sensitive week/menu payload in tab storage after display.
+  const saved = window.sessionStorage.getItem(handoffKey)
+  if (saved !== null) {
+    window.sessionStorage.removeItem(handoffKey)
+    if (!saved.length || new TextEncoder().encode(saved).length > maxBytes)
+      throw Error('Het doorgestuurde weekmenu is leeg of te groot.')
+    stagedHandoff = demandFromWeek(readWeek(JSON.parse(saved)))
+    acceptHandoff.hidden = false
+    acceptHandoff.disabled = false
+    info.textContent = 'Je gekozen Planner-week staat klaar: ' +
+      stagedHandoff.selectedMealCount + ' maaltijden en ' +
+      stagedHandoff.ingredients.length + ' oorspronkelijke fysieke ingrediënten. ' +
+      'Controleer ze en klik zelf op Neem mijn Planner-week over. Er zijn geen winkelproducten of prijzen geïmporteerd.'
+    info.className = 'notice'
+  }
+} catch {
+  stagedHandoff = null
+  info.textContent = 'De directe Planner-overdracht was niet bruikbaar. Je kunt dezelfde week zelf als JSON openen; het eerdere mandje blijft ongewijzigd.'
+  info.className = 'notice error'
+}
+
+acceptHandoff.addEventListener('click', () => {
+  const demand = stagedHandoff
+  if (!demand) return
+  if (currentLines.children.length && !window.confirm(
+    'Vervang de huidige fysieke mandvraag door ' + demand.ingredients.length +
+    ' originele ingrediënten uit je Planner-week? Eerder gekozen SKU’s en vinkjes moeten opnieuw worden beoordeeld. ' +
+    'Bestaande bronprijzen worden niet aangevuld of gefingeerd.')) return
+  // The only state-changing operation is this explicit button press. The
+  // existing wizard alone decides which manual source choices remain valid.
+  document.dispatchEvent(new CustomEvent('supa:private-planner-demand', { detail: demand }))
+  stagedHandoff = null
+  acceptHandoff.hidden = true
+  acceptHandoff.disabled = true
+  info.textContent = 'Originele Planner-vraag overgenomen: ' + demand.selectedMealCount +
+    ' maaltijden en ' + demand.ingredients.length + ' fysieke ingrediënten. ' +
+    'Kies nu jouw werkelijk geobserveerde producten per winkel; onbekende prijzen blijven onbekend.'
+  info.className = 'notice'
+})
+
 upload.addEventListener('change', async () => {
   const current = ++revision
   const file = upload.files?.[0]
