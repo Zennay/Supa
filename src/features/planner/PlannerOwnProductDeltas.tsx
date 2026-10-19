@@ -29,6 +29,9 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
   const [filter, setFilter] = useState<DifferenceFilter>('all')
   const [sort, setSort] = useState<DifferenceSort>('impact')
   const [query, setQuery] = useState('')
+  // A typical eleven-ingredient field basket should show its real product
+  // comparison immediately; larger lists remain collapsible by default.
+  const [expanded, setExpanded] = useState(lines.length <= 12)
   if (!lines.length) return null
 
   const plusLower = lines.filter(line => line.deltaCents > 0).length
@@ -59,7 +62,7 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
     setSort('impact')
   }
 
-  return <details className="own-store-planner__details">
+  return <details className="own-store-planner__details" open={expanded} onToggle={event => setExpanded(event.currentTarget.open)}>
     <summary>Bekijk {lines.length} productprijzen, verpakkingen en regelverschillen</summary>
     <p>Per ingrediënt het originele, persoonlijk gecontroleerde winkelproduct. Eenheidsprijzen
       zijn indicatief per kg, liter of stuk; de vergelijking rekent met hele verpakkingen.
