@@ -8,6 +8,15 @@ const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR'
 type DifferenceFilter = 'all' | 'PLUS' | 'DekaMarkt' | 'equal'
 type DifferenceSort = 'impact' | 'ingredient' | 'plus-price' | 'deka-price'
 
+function PriceEvidence({ line }: { line: ComparedOwnLine['plus'] }) {
+  return <>
+    <strong>{euro.format(line.lineTotalCents / 100)}</strong>
+    <small>{line.packs} × {line.productName} · SKU {line.productId}</small>
+    <small>{line.pack.amount} {line.pack.unit} × {line.pack.count} per pak · {euro.format(line.pricePerPackCents / 100)} per pak</small>
+    <small>{privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'}</small>
+  </>
+}
+
 /**
  * A local view over the already-approved same-demand canonical comparison.
  * Filtering and sorting must never change priced basket totals, store choice,
@@ -88,19 +97,16 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
       {visibleLines.length < lines.length ? ' De volledige mandtotalen hierboven blijven ongewijzigd.' : ''}
     </p>
     {visibleLines.length > 0
-      ? <div className="own-store-planner__scroll" role="region"
+      ? <>
+        <div className="own-store-planner__scroll" role="region"
           aria-label="Eigen productprijzen per winkel" tabIndex={0}>
           <table>
             <thead><tr><th scope="col">Ingrediënt</th><th scope="col">PLUS</th>
               <th scope="col">DekaMarkt</th><th scope="col">Verschil</th></tr></thead>
             <tbody>{visibleLines.map(item => <tr key={item.id}>
               <th scope="row">{item.ingredientLabel}</th>
-              {([item.plus, item.deka] as const).map((line, index) => <td key={index}>
-                <strong>{euro.format(line.lineTotalCents / 100)}</strong>
-                <small>{line.packs} × {line.productName} · SKU {line.productId}</small>
-                <small>{line.pack.amount} {line.pack.unit} × {line.pack.count} per pak · {euro.format(line.pricePerPackCents / 100)} per pak</small>
-                <small>{privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'}</small>
-              </td>)}
+              {([item.plus, item.deka] as const).map((line, index) =>
+                <td key={index}><PriceEvidence line={line} /></td>)}
               <td><strong>{item.deltaCents === 0 ? 'Gelijk' : euro.format(Math.abs(item.deltaCents) / 100)}</strong>
                 <small>{item.deltaCents > 0 ? 'PLUS lager' : item.deltaCents < 0 ? 'DekaMarkt lager' : 'Geen verschil'}</small>
                 <div className="own-store-planner__line-actions" aria-label={'Kies winkel voor ' + item.ingredientLabel}>
@@ -111,6 +117,30 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
             </tr>)}</tbody>
           </table>
         </div>
+        <div className="own-store-breakdown__mobile" aria-label="Mobiele productprijsvergelijking">
+          {visibleLines.map(item => <article className="own-store-breakdown__mobile-card" key={item.id}>
+            <h4>{item.ingredientLabel}</h4>
+            <div className="own-store-breakdown__mobile-shops">
+              <section aria-label={'PLUS voor ' + item.ingredientLabel}>
+                <h5>PLUS</h5><PriceEvidence line={item.plus} />
+              </section>
+              <section aria-label={'DekaMarkt voor ' + item.ingredientLabel}>
+                <h5>DekaMarkt</h5><PriceEvidence line={item.deka} />
+              </section>
+            </div>
+            <p className="own-store-breakdown__mobile-difference">
+              <strong>{item.deltaCents === 0 ? 'Gelijke regelprijs' :
+                euro.format(Math.abs(item.deltaCents) / 100) + ' lager bij ' +
+                (item.deltaCents > 0 ? 'PLUS' : 'DekaMarkt')}</strong>
+              {' '}voor dezelfde gecontroleerde fysieke behoefte.
+            </p>
+            <div className="own-store-planner__line-actions" aria-label={'Kies winkel voor ' + item.ingredientLabel}>
+              <button type="button" onClick={() => onChooseLine(item.id, 'PLUS')}>Kies PLUS</button>
+              <button type="button" onClick={() => onChooseLine(item.id, 'DekaMarkt')}>Kies DekaMarkt</button>
+            </div>
+          </article>)}
+        </div>
+      </>
       : <div className="own-store-breakdown__empty" role="status">
           <p>Geen gecontroleerde productregels met deze zoekopdracht en dit filter.</p>
           <button type="button" className="ghost-button" onClick={resetView}>Toon alle productprijzen</button>
