@@ -1,4 +1,8 @@
+import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import { recentOwnCaptureInstant, type PrivateCaptureProgress, type OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
+
+const supportedUnit = (unit: unknown): unit is 'g' | 'kg' | 'ml' | 'l' | 'piece' =>
+  unit === 'g' || unit === 'kg' || unit === 'ml' || unit === 'l' || unit === 'piece'
 
 export type ConfirmedPartialBasket = {
   confirmedCount: number
@@ -38,16 +42,21 @@ export function confirmedPartialBasket(
         ids.has(line.ingredientId) ||
         typeof line.productId !== 'string' || !line.productId ||
         physicalSkus.has(line.productId) ||
-        typeof line.ingredientLabel !== 'string' || !line.ingredientLabel ||
+        typeof line.ingredientLabel !== 'string' || !line.ingredientLabel.trim() ||
+        typeof line.productName !== 'string' || !line.productName.trim() ||
         !Number.isFinite(line.requiredAmount) || line.requiredAmount <= 0 ||
-        !['g', 'kg', 'ml', 'l', 'piece'].includes(line.requiredUnit) ||
+        !supportedUnit(line.requiredUnit) ||
         !Number.isFinite(line.packAmount) || line.packAmount <= 0 ||
-        !['g', 'kg', 'ml', 'l', 'piece'].includes(line.packUnit) ||
+        !supportedUnit(line.packUnit) ||
         !Number.isSafeInteger(line.packCount) || line.packCount < 1 ||
         !Number.isSafeInteger(line.packagesNeeded) || line.packagesNeeded < 1 ||
         !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
         !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0 ||
-        line.packagesNeeded * line.pricePerPackCents !== line.lineTotalCents) return null
+        line.packagesNeeded * line.pricePerPackCents !== line.lineTotalCents ||
+        calculateDecimalPackCount(
+          [{ amount: line.requiredAmount, unit: line.requiredUnit }],
+          { amount: line.packAmount, unit: line.packUnit, count: line.packCount },
+        ) !== line.packagesNeeded) return null
     ids.add(line.ingredientId)
     physicalSkus.add(line.productId)
     knownCents += line.lineTotalCents
