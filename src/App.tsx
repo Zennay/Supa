@@ -43,7 +43,6 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'recipes', label: 'Recepten', icon: figmaAssets.imgButton1 },
   { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2 },
   { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3 },
-  { id: 'basket', label: 'Vergelijk', icon: figmaAssets.imgButton2 },
 ]
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
@@ -255,7 +254,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       <div className="content">
         {isHiFiView && <HiFiHome view={tab as 'home' | 'recipes' | 'products'} onNavigate={navigate} activeDays={activeDays} addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
-        {tab === 'list' && <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />}
         {persistenceWarning && (
           <p role="alert" className="disclaimer" aria-live="assertive">
             {persistenceWarning === 'protected'
@@ -335,6 +333,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           />
         )}
         {tab === 'list' && <ShoppingListView basket={basket} />}
+        {tab === 'list' && designProductIds.length > 0 && (
+          <details className="hifi-demo-details">
+            <summary>Voorbeeldproducten uit het ontwerp</summary>
+            <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+          </details>
+        )}
         {tab === 'observe' && <ObservationView />}
       </div>
 
