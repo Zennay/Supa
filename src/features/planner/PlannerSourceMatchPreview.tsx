@@ -99,7 +99,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         // NEVER promote this projection into a purchasable or reviewed match.
         const incomplete = capture.products.filter(product =>
           !product.available && family(product.packUnit) === family(need.unit))
-        if (incomplete.length && choice.type !== 'match') {
+        if (incomplete.length && choice.type !== 'match' &&
+            !choice.reasons.includes('top candidates too close')) {
           const diagnostic = matchIngredient(requirement,
             incomplete.map(product => ({ ...product, available: true })),
             { minimumScore: 80, minimumMargin: 20 })
@@ -447,12 +448,15 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                     Dit is geen beschikbare prijs of bevestigde productmatch;
                     controleer de werkelijkheid vóór een nieuwe opname.</small></>
                 : 'Geen geschikte geprijsde SKU in deze bron; ontbrekende bron vastleggen'}
-          {onReviewIngredient && (suggestions[store] || manualReview[store]) &&
+          {onReviewIngredient && (suggestions[store] || manualReview[store] ||
+            unpricedHints[store]) &&
             source.captures[store] &&
             recentOwnCaptureInstant(source.captures[store]!.observedAt, clock) &&
             <button type="button" className="ghost-button"
               onClick={() => onReviewIngredient(store, need.id)}>
-              Controleer deze {store}-SKU in Vergelijk
+              {unpricedHints[store] && !suggestions[store] && !manualReview[store]
+                ? 'Bekijk bestaande maar ongeprijsde ' + store + '-SKU in Vergelijk'
+                : 'Controleer deze ' + store + '-SKU in Vergelijk'}
             </button>}
           {onRecapture && !suggestions[store] && !manualReview[store] &&
             <button type="button" className="ghost-button"
