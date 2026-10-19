@@ -8,7 +8,7 @@ const UNITS = ['g', 'kg', 'ml', 'l', 'piece']
 const MAX_BYTES = 256000
 const error = (message) => { throw new Error(message) }
 
-function parseCsv(text) {
+function parseCsv(text, delimiter) {
   if (typeof text !== 'string' || new TextEncoder().encode(text).length > MAX_BYTES) {
     error('CSV ontbreekt of is groter dan 256 kB.')
   }
@@ -46,7 +46,7 @@ function parseCsv(text) {
       if (!atStart || justClosed) error('CSV aanhalingstekens zijn ongeldig.')
       quoted = true
       atStart = false
-    } else if (c === ',') {
+    } else if (c === delimiter) {
       finishCell()
     } else if (c === '\n' || c === '\r') {
       if (c === '\r') {
@@ -71,8 +71,10 @@ const validLabel = (value, limit) =>
   !/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/u.test(value) &&
   !/^[=+@-]/u.test(value)
 const parsePositiveNumber = (text, ceiling) => {
-  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(text)) return null
-  const number = Number(text)
+  // A Dutch spreadsheet writes 0,75 kg with a decimal comma.
+  // This is exclusively a physical pack amount; priceCents remains integer.
+  if (!/^(?:0|[1-9]\d*)(?:[.,]\d{1,6})?$/.test(text)) return null
+  const number = Number(text.replace(',', '.'))
   return Number.isFinite(number) && number > 0 && number <= ceiling ? number : null
 }
 const parseInteger = (text, min, max) =>
@@ -101,11 +103,22 @@ function validObservedAt(raw) {
  * Convert only caller-supplied observations. Unknown package/price stays null,
  * and is NEVER promoted to purchasable inventory or savings evidence.
  */
+const validHeader = rows => rows.length > 0 &&
+  rows[0].length === HEADER.length &&
+  HEADER.every((name, index) => rows[0][index] === name)
+
 function convertStoreCsv(text, allowOne) {
-  const rows = parseCsv(text)
-  if (!rows.length || HEADER.some((h, i) => rows[0][i] !== h) ||
-      rows[0].length !== HEADER.length) {
-    error('CSV-kop moet exact zijn: ' + HEADER.join(','))
+  // Dutch spreadsheet programs frequently export semicolon-separated CSV.
+  // Accept either delimiter only when the canonical nine-column header
+  // agrees exactly. Do not guess column names, numbers, money or retailers.
+  let commaRows = null
+  try { commaRows = parseCsv(text, ',') }
+  catch { /* A valid semicolon file may contain quotes next to semicolons. */ }
+  const rows = commaRows && validHeader(commaRows)
+    ? commaRows : parseCsv(text, ';')
+  if (!validHeader(rows)) {
+    error('CSV-kop moet exact zijn: ' + HEADER.join(',') +
+      ' (kommagescheiden of puntkommagescheiden CSV).')
   }
   const captures = new Map()
   const seen = new Map()
@@ -127,8 +140,8 @@ function convertStoreCsv(text, allowOne) {
     }
     if (!validLabel(id, 100)) error(location + ': product-ID ongeldig.')
     if (!UNITS.includes(unit)) error(location + ': eenheid moet g/kg/ml/l/piece zijn.')
-    if (!['true', 'false'].includes(availableText)) {
-      error(location + ': beschikbaarheid moet letterlijk true of false zijn.')
+    if (!['true', 'false', 'ja', 'nee'].includes(availableText)) {
+      error(location + ': beschikbaarheid moet true/false of ja/nee zijn.')
     }
     // A row containing ANY original SKU, observation time or product fact is
     // not an untouched Planner placeholder. It must pass full admission, or
@@ -137,7 +150,7 @@ function convertStoreCsv(text, allowOne) {
     if (!validLabel(name, 160)) error(location + ': productnaam ongeldig of ontbreekt.')
     if (seen.get(retailer).has(id)) error(location + ': dubbele product-ID.')
     seen.get(retailer).add(id)
-    const available = availableText === 'true'
+    const available = availableText === 'true' || availableText === 'ja'
     const amount = pack === '' ? null : parsePositiveNumber(pack, 100000)
     if (pack !== '' && amount === null) error(location + ': verpakkingsinhoud ongeldig.')
     if (unit === 'piece' && amount !== null && !Number.isSafeInteger(amount)) {

@@ -23,6 +23,7 @@ export type PlannerCaptureNeed = Readonly<{
 export function makeBlankPlannerCaptureCsv(
   needs: readonly PlannerCaptureNeed[],
   selectedStores: readonly CaptureStore[] = STORES,
+  delimiter: ',' | ';' = ',',
 ): string {
   if (!Array.isArray(needs) || needs.length < 1 || needs.length > 200 ||
       needs.some(need => !need || typeof need.id !== 'string' ||
@@ -35,14 +36,14 @@ export function makeBlankPlannerCaptureCsv(
       selectedStores.some(store => !STORES.includes(store))) {
     throw new Error('Selecteer één of beide ondersteunde winkels.')
   }
-  const rows: string[] = [HEADER.map(quote).join(',')]
+  const rows: string[] = [HEADER.map(quote).join(delimiter)]
   for (const retailer of selectedStores) {
     for (const need of needs) {
       // Unit hints are not recorded retailer packaging. Unknown stays empty.
       const packUnit = SUPPORTED_UNITS.has(need.unit) ? need.unit : ''
       rows.push([
         retailer, '', '', '', '', packUnit, '', '', 'false',
-      ].map(quote).join(','))
+      ].map(quote).join(delimiter))
     }
   }
   const csv = rows.join('\r\n') + '\r\n'

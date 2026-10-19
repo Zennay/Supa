@@ -121,28 +121,29 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage(error instanceof Error ? error.message : 'Controlelijst downloaden mislukt.')
     }
   }
-  async function downloadFieldSheet(kind: 'csv' | 'guide') {
+  async function downloadFieldSheet(kind: 'csv' | 'csv-excel' | 'guide') {
     setDownloadMessage('')
     try {
       const stores: readonly CaptureStore[] = captureTarget === 'both'
         ? ['PLUS', 'DekaMarkt'] : [captureTarget]
-      const source = kind === 'csv'
+      const source = kind !== 'guide'
         ? (await import('../comparison/plannerPriceCaptureSheet.ts'))
-          .makeBlankPlannerCaptureCsv(captureNeeds, stores)
+          .makeBlankPlannerCaptureCsv(captureNeeds, stores, kind === 'csv-excel' ? ';' : ',')
         : (await import('../comparison/plannerPriceCaptureGuide.ts'))
           .makePlannerCaptureGuide(captureNeeds, stores)
       const url = URL.createObjectURL(new Blob([source], {
-        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+        type: kind !== 'guide' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
       }))
       try {
         const link = document.createElement('a')
         link.href = url
         link.download = 'supa-planner-' + captureTarget.toLowerCase() +
-          (kind === 'csv' ? '-lege-winkelopname.csv' : '-opnamegids.txt')
+          (kind === 'csv' ? '-lege-winkelopname.csv' :
+            kind === 'csv-excel' ? '-lege-winkelopname-spreadsheet.csv' : '-opnamegids.txt')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setDownloadMessage('Leeg ' + (kind === 'csv' ? 'prijsinvulblad' : 'opnameformulier') +
+      setDownloadMessage('Leeg ' + (kind !== 'guide' ? 'prijsinvulblad' : 'opnameformulier') +
         ' van dit weekmenu gedownload. Vul werkelijk waargenomen bronproducten in en importeer ze in Vergelijk.')
     } catch {
       setDownloadMessage('Prijsinvulblad niet beschikbaar. Controleer de fysieke ingrediënten en weekdagen.')
@@ -258,7 +259,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     </header>
     {captureNeeds.length > 0 && <div className="own-store-planner__capture" aria-label="Mijn lokale winkelprijsopname">
       <strong>Zelf winkelprijzen vastleggen voor dit weekmenu</strong>
-      <p>Download een leeg invulblad of opnamegids voor {captureNeeds.length} fysieke ingrediënten. Productcodes, bronmomenten en prijzen moet je werkelijk vastleggen.</p>
+      <p>Download een leeg invulblad of opnamegids voor {captureNeeds.length} fysieke ingrediënten. Productcodes, bronmomenten en prijzen moet je werkelijk vastleggen. Nederlandse spreadsheet-CSV met puntkomma en komma als decimaalteken wordt lokaal herkend. Prijzen blijven hele eurocenten.</p>
       <label>Winkel(s) voor eigen opname
         <select value={captureTarget}
           onChange={event => setCaptureTarget(event.currentTarget.value as 'both' | CaptureStore)}>
@@ -269,6 +270,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       </label>
       <div className="own-store-planner__capture-buttons">
         <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('csv')}>Download leeg CSV-prijsinvulblad</button>
+        <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('csv-excel')}>Download spreadsheet-CSV (puntkomma)</button>
         <button type="button" className="ghost-button" onClick={() => void downloadFieldSheet('guide')}>Download opnamegids (TXT)</button>
       </div>
     </div>}

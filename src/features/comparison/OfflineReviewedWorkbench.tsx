@@ -1906,6 +1906,9 @@ export function OfflineReviewedWorkbench({
             <small>Twee bestanden moeten ieder precies één verschillende winkel bevatten. Ongeldige of dubbele opnames worden samen geweigerd; onbekende prijzen blijven onbekend.</small>
           </label>
           <small>Sleep of selecteer maximaal twee eigen CSV/JSON-bestanden (elk 256 kB).
+            Excel-/spreadsheet-CSV mag komma's of puntkomma's tussen kolommen hebben;
+            een verpakkingsmaat mag een decimale komma gebruiken (bijvoorbeeld 0,75 kg).
+            Beschikbaarheid: true/false of ja/nee; prijs uitsluitend in hele eurocenten.
             Deze import gebruikt dezelfde lokale broncontrole als de bestandskiezer:
             ontbrekende prijzen blijven onbekend, en iedere SKU vereist jouw review.</small>
         </div>
