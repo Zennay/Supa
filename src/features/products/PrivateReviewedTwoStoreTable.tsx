@@ -38,6 +38,23 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const comparable = !!plus && !!deka &&
     privateReviewedPairWithin24Hours(plus, deka) &&
     compareFullBaskets({ baseline: plus.basket, candidate: deka.basket }).claimable
+  // A tab may cross its expiry boundary between renders. Navigation that
+  // commits a store/route preference must read the real clock again.
+  function openCheckedStoreList(shop: OwnStore) {
+    const now = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
+    if (!now?.stores[shop]) { onOpenComparison(); return }
+    onOpenList(shop)
+  }
+  function openCheckedMixedRoute() {
+    const now = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
+    if (!now?.stores.PLUS || !now.stores.DekaMarkt ||
+        !privateReviewedPairWithin24Hours(now.stores.PLUS, now.stores.DekaMarkt) ||
+        !compareFullBaskets({
+          baseline: now.stores.PLUS.basket,
+          candidate: now.stores.DekaMarkt.basket,
+        }).claimable) { onOpenComparison(); return }
+    onOpenMixedRoute()
+  }
   if (!comparable || !plus || !deka) {
     const missing = (['PLUS', 'DekaMarkt'] as const).filter(store => !fresh?.stores[store])
     const gap = !!plus && !!deka && !privateReviewedPairWithin24Hours(plus, deka)
@@ -54,7 +71,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
                 {budgetComparison(capture.basket.totalCents)}</small>}
               <small>{capture.basket.lines.length} oorspronkelijke, gecontroleerde SKU-regels</small>
               <time dateTime={capture.observedAt}>{capture.observedAt}</time>
-              <button type="button" onClick={() => onOpenList(shop)}>
+              <button type="button" onClick={() => openCheckedStoreList(shop)}>
                 Bekijk mijn {shop}-boodschappenlijst
               </button>
             </> : <>
@@ -156,7 +173,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <small>{splitTrip
         ? 'Twee winkels nodig. Extra reis-, parkeer- en tijdkosten zijn onbekend totdat je ze zelf invult. Netto voordeel wordt hier niet geclaimd.'
         : 'Voor deze goedkoopste productroute is slechts één winkel nodig; er is geen tweede winkelstop.'}</small>
-      <button type="button" onClick={onOpenMixedRoute}>
+      <button type="button" onClick={openCheckedMixedRoute}>
         Open mijn gecombineerde route en eigen extra bezoekkosten
       </button>
     </div>}
@@ -189,6 +206,6 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       </article>)}
       {!rows.length && <p>Geen vergelijkbare artikelen passen bij je zoekopdracht of eenheidsfilter.</p>}
     </div>
-    <button type="button" onClick={() => onOpenList(cheapest)}>Open het goedkoopste volledige winkelmandje ({cheapest}) in Lijst</button>
+    <button type="button" onClick={() => openCheckedStoreList(cheapest)}>Open het goedkoopste volledige winkelmandje ({cheapest}) in Lijst</button>
   </section>
 }
