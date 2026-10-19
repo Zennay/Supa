@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
@@ -116,20 +116,24 @@ export function PlannerView({
     : null
   // Derive reuse from current active recipe choices. No packet, leftover or
   // monetary savings conclusion can be inferred from ingredient overlap.
-  const ingredientRecipes = recipes.filter(
+  const ingredientRecipes = useMemo(() => recipes.filter(
     (recipe): recipe is RecipeWithIngredients =>
       recipe !== null && typeof recipe === 'object' &&
       Array.isArray((recipe as RecipeWithIngredients).ingredients),
-  )
+  ), [recipes])
   const hasIngredientData = ingredientRecipes.length > 0 &&
     ingredientRecipes.length === recipes.length
-  const captureNeeds = hasIngredientData ? (() => {
+  // The source-match preview can inspect up to 200 physical requirements
+  // against two local price files. Keep that exact Planner demand stable
+  // while users change unrelated UI controls such as budget or filters.
+  const captureNeeds = useMemo(() => {
+    if (!hasIngredientData) return []
     try { return aggregatePlanIngredients(plannedMeals, ingredientRecipes, activeDays) }
     catch { return [] }
-  })() : []
-  const reuseInsight = hasIngredientData
+  }, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
+  const reuseInsight = useMemo(() => hasIngredientData
     ? buildIngredientReuseInsight({ plan: plannedMeals, recipes: ingredientRecipes, activeDays })
-    : null
+    : null, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
 
   return (
     <section className="screen hifi-planner-screen" data-figma-node="3359:4896">
