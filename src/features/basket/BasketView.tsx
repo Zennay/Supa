@@ -1,7 +1,10 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { ManualStoreComparison } from '../comparison/ManualStoreComparison'
+const ManualStoreComparison = lazy(async () => {
+  const module = await import('../comparison/ManualStoreComparison')
+  return { default: module.ManualStoreComparison }
+})
 import { OfflineReviewedWorkbench } from '../comparison/OfflineReviewedWorkbench'
 import type { PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import type { BasketComparison } from '../../domain/basketComparison'
@@ -50,6 +53,7 @@ export function BasketView({
   // Called once for the first lazy mount, when the import DOM is available.
   // Subsequent tab switches are handled by App's existing navigation effect.
   useEffect(() => { onPrivateImportReady?.() }, [])
+  const [openedManualFallback, setOpenedManualFallback] = useState(false)
 
   const basketCost = basketCostDisclosure(
     basket.totalCents,
@@ -99,12 +103,24 @@ export function BasketView({
           planKey={privatePlanKey} onReviewedBaskets={onReviewedBaskets} />
       )}
       {manualPlan && manualRecipes && manualActiveDays && (
-        <ManualStoreComparison
-          key={JSON.stringify([manualPlan, manualActiveDays, manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
-          plan={manualPlan}
-          recipes={manualRecipes}
-          activeDays={manualActiveDays}
-        />
+        <details className="demo-comparison-disclosure" onToggle={event => {
+          if (event.currentTarget.open) setOpenedManualFallback(true)
+        }}>
+          <summary>Alternatieve handmatige rekenhulp (geen gecontroleerde bronimport)</summary>
+          <p className="disclaimer">Gebruik voor een volledige oorspronkelijke SKU-, verpakking-
+            en prijscontrole hierboven de persoonlijke PLUS/Deka-bronimport.
+            Deze oudere rekenhulp werkt uitsluitend met losse, door jou ingetypte bedragen;
+            er is geen bronmoment, SKU-bewijs of overgang naar geverifieerde winkelmandjes.</p>
+          {openedManualFallback && <Suspense fallback={<p role="status">Rekenhulp openen…</p>}>
+            <ManualStoreComparison
+              key={JSON.stringify([manualPlan, manualActiveDays,
+                manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
+              plan={manualPlan}
+              recipes={manualRecipes}
+              activeDays={manualActiveDays}
+            />
+          </Suspense>}
+        </details>
       )}
       <details className="demo-comparison-disclosure" open={!manualPlan}>
         <summary>{manualPlan ? 'Toon oude voorbeeldberekening (geen actuele winkelprijzen)' : 'Voorbeeldmandje'}</summary>
