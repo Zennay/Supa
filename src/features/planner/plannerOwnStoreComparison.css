@@ -132,3 +132,18 @@
   font-weight: 600;
   line-height: 1.4;
 }
+
+/* Complete one-shop lists are usable independently of a two-shop price pair.
+   Keep export actions touch friendly without mistaking a source for savings. */
+.own-store-planner__single-exports {
+  display: grid;
+  gap: .45rem;
+  border-top: 1px solid #dce9df;
+  padding-top: .6rem;
+}
+.own-store-planner__single-exports button { width: 100%; min-height: 44px; }
+.own-store-planner__single-exports small {
+  color: #496152;
+  font-weight: 400;
+  line-height: 1.45;
+}
