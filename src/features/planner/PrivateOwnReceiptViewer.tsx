@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react'
+import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
+import type { MatchUnit } from '../../domain/matching.ts'
 
 type ReceiptLine = {
   ingredient: string
@@ -29,7 +31,9 @@ function textValue(value: unknown, max = 250): value is string {
 function cents(value: unknown): value is number {
   return Number.isSafeInteger(value) && typeof value === 'number' && value >= 0
 }
-function extractProduct(value: unknown): ReceiptLine['PLUS'] | null {
+function extractProduct(
+  value: unknown, demand: { amount: number; unit: MatchUnit },
+): ReceiptLine['PLUS'] | null {
   if (!record(value) || !record(value.package) ||
       !textValue(value.sourceProductId, 120) || !textValue(value.sourceProductName) ||
       !cents(value.pricePerPackageCents) || !cents(value.totalWholePackagesCents) ||
@@ -43,6 +47,13 @@ function extractProduct(value: unknown): ReceiptLine['PLUS'] | null {
       value.pricePerPackageCents * value.packagesNeeded !== value.totalWholePackagesCents) {
     return null
   }
+  const minimumWholePacks = calculateDecimalPackCount(
+    [demand],
+    { amount: value.package.amount as number,
+      unit: value.package.unit as MatchUnit,
+      count: value.package.count as number },
+  )
+  if (minimumWholePacks === null || minimumWholePacks !== value.packagesNeeded) return null
   return {
     sourceProductId: value.sourceProductId,
     sourceProductName: value.sourceProductName,
@@ -89,8 +100,10 @@ export function readPrivateReceipt(raw: string): SavedReceipt | null {
           typeof item.demand.amount !== 'number' ||
           !Number.isFinite(item.demand.amount) || item.demand.amount <= 0 ||
           !['g', 'kg', 'ml', 'l', 'piece'].includes(String(item.demand.unit))) return null
-      const plus = extractProduct(item.PLUS)
-      const deka = extractProduct(item.DekaMarkt)
+      const demand = { amount: item.demand.amount as number,
+        unit: item.demand.unit as MatchUnit }
+      const plus = extractProduct(item.PLUS, demand)
+      const deka = extractProduct(item.DekaMarkt, demand)
       if (!plus || !deka || !Number.isSafeInteger(item.dekaMinusPlusCents) ||
           item.dekaMinusPlusCents !== deka.totalWholePackagesCents - plus.totalWholePackagesCents) return null
       plusTotal += plus.totalWholePackagesCents
