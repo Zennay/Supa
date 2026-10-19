@@ -5,7 +5,12 @@ import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { PlannerPortableWeek } from './features/planner/PlannerPortableWeek.tsx'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
-import { BasketView } from './features/basket/BasketView'
+// The private price workbench is sizeable and is not needed for Home, Recipes
+// or the ordinary unpriced list. Keep it mounted after the first visit.
+const BasketView = lazy(async () => {
+  const module = await import('./features/basket/BasketView')
+  return { default: module.BasketView }
+})
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
 import { privatePhysicalShoppingTick } from './features/shopping-list/privatePhysicalShoppingTick.ts'
@@ -610,7 +615,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {visitedBasket && (
           <div hidden={tab !== 'basket'} aria-hidden={tab !== 'basket'}>
+          <Suspense fallback={<section className="screen" role="status" aria-live="polite">
+            Vergelijker en persoonlijke prijsinvoer worden geopend…
+          </section>}>
           <BasketView
+            onPrivateImportReady={() => {
+              // On the FIRST lazy mount the ordinary RAF navigation effect
+              // may fire before the price import node exists. The mount
+              // callback runs after the workbench DOM is present.
+              if (tab === 'basket' && ownPriceImportSignal > 0) {
+                document.getElementById('supa-own-price-import')?.scrollIntoView({
+                  block: 'start', behavior: 'smooth',
+                })
+              }
+            }}
             basket={basket}
             comparison={basketComparison}
             comparisonBaseline={comparisonBaseline}
@@ -621,6 +639,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             privatePlanKey={privatePlanKey}
             onReviewedBaskets={onReviewedBaskets}
           />
+          </Suspense>
           </div>
         )}
         {visitedList && !livePrivateReviewed && (

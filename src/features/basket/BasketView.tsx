@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { ManualStoreComparison } from '../comparison/ManualStoreComparison'
@@ -33,6 +34,7 @@ export function BasketView({
   manualActiveDays,
   privatePlanKey,
   onReviewedBaskets,
+  onPrivateImportReady,
 }: {
   basket: OneStoreBasket
   comparison: BasketComparison
@@ -43,7 +45,12 @@ export function BasketView({
   manualActiveDays?: string[]
   privatePlanKey?: string
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
+  onPrivateImportReady?: () => void
 }) {
+  // Called once for the first lazy mount, when the import DOM is available.
+  // Subsequent tab switches are handled by App's existing navigation effect.
+  useEffect(() => { onPrivateImportReady?.() }, [])
+
   const basketCost = basketCostDisclosure(
     basket.totalCents,
     basket.unresolvedLineCount,
