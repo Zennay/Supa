@@ -19,10 +19,17 @@ const HEADER = [
  * The imported values must survive the original strict browser converter
  * exactly, never silently sanitizing a real original SKU, name or price.
  */
-export async function ownPriceCapturesToCsv(sourceJson: string): Promise<string> {
+export async function ownPriceCapturesToCsv(
+  sourceJson: string, onlyStore?: 'PLUS' | 'DekaMarkt',
+): Promise<string> {
   parseOfflinePriceSnapshots(sourceJson, Date.now())
   const root = JSON.parse(sourceJson) as { captures: OwnCapture[] }
-  const captures = root.captures
+  const captures = onlyStore
+    ? root.captures.filter(capture => capture.retailer === onlyStore)
+    : root.captures
+  if (captures.length === 0) {
+    throw new Error('Voor deze winkel bestaat geen complete eigen bronopname.')
+  }
   const cell = (value: string) => '"' + value.replaceAll('"', '""') + '"'
   const rows = captures.flatMap(capture => capture.products.map(product => [
     capture.retailer, capture.observedAt, product.id, product.name,
