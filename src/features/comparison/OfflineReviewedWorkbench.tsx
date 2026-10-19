@@ -732,6 +732,30 @@ export function OfflineReviewedWorkbench({
       importSnapshots(input)
       return
     }
+    // An unchanged replay must not erase the user's real source reviews and
+    // physical ticks. Compare admitted original facts, not JSON whitespace
+    // or CSV source ordering; never carry approvals across a changed fact.
+    const sameCapture = (store: typeof stores[number]) => {
+      const old = imported.captures[store]
+      const nextCapture = next.captures[store]
+      if (!old || !nextCapture || old.observedAt !== nextCapture.observedAt ||
+          old.products.length !== nextCapture.products.length) return false
+      const before = new Map(old.products.map(product => [product.id, product]))
+      return nextCapture.products.every(product => {
+        const previous = before.get(product.id)
+        return previous && previous.name === product.name &&
+          previous.packAmount === product.packAmount &&
+          previous.packUnit === product.packUnit &&
+          previous.packCount === product.packCount &&
+          previous.sourcePriceCents === product.sourcePriceCents &&
+          previous.sourceAvailable === product.sourceAvailable
+      })
+    }
+    if (stores.every(sameCapture)) {
+      setPendingTwoStore(null)
+      setMessage('Beide bronopnames zijn inhoudelijk identiek aan je huidige bronnen. Eerdere productcontroles en afvinkingen zijn behouden.')
+      return
+    }
     const changes = stores.map(store => {
       const prior = imported.captures[store]
       const incoming = next.captures[store]!
