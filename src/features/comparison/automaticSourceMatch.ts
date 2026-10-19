@@ -38,9 +38,10 @@ export function automaticallyAcceptedSourceLine(
   query: string,
   explicitSku: string | undefined,
 ): boolean {
-  if (line.status !== 'matched' || explicitSku !== undefined ||
-      !line.reasons.includes('query phrase present') ||
-      !Number.isFinite(line.matchScore) || line.matchScore < 100 ||
+  if (line.status !== 'matched' || Boolean(explicitSku) ||
+      // The canonical matcher has already required a clear margin over the
+      // runner-up. Exact semantic identity is the additional auto-accept gate.
+      !Number.isFinite(line.matchScore) || line.matchScore < 65 ||
       !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0 ||
       !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
       !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
