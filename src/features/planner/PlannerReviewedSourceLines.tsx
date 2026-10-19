@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant, type OwnStore, type PrivateCaptureProgress } from '../comparison/privateReviewedBasketBridge.ts'
 import './plannerReviewedSourceLines.css'
@@ -18,6 +18,8 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
   const [shop, setShop] = useState<'both' | OwnStore>('both')
   const [expanded, setExpanded] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
+  const latestEvidence = useRef(progress)
+  latestEvidence.current = progress
   if (!progress) return null
   const entries = shops.flatMap(store => {
     const source = progress.stores[store]
@@ -50,6 +52,40 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
     (shop === 'both' || shop === store) &&
     (!search || [line.ingredientLabel, line.productName, line.productId]
       .some(value => value.normalize('NFKC').toLocaleLowerCase('nl').includes(search))))
+  async function downloadPairedCsv() {
+    setExportMessage('')
+    try {
+      const original = progress
+      if (!plus || !deka || !pairedTime || !pairs.length ||
+          !recentOwnCaptureInstant(plus.observedAt, Date.now()) ||
+          !recentOwnCaptureInstant(deka.observedAt, Date.now())) {
+        throw new Error('Bevestigde bronprijzen zijn niet meer actueel of onderling vergelijkbaar.')
+      }
+      const { privatePairedSourceCsv } = await import('./privatePairedSourceCsv.ts')
+      // The lazy formatter must not extend the lifetime of an obsolete
+      // receipt when another source or physical Planner week replaces it.
+      if (latestEvidence.current !== original ||
+          !recentOwnCaptureInstant(plus.observedAt, Date.now()) ||
+          !recentOwnCaptureInstant(deka.observedAt, Date.now())) {
+        throw new Error('De winkelbron is gewijzigd of verlopen. Open de huidige bron opnieuw.')
+      }
+      const csv = privatePairedSourceCsv(pairs, {
+        PLUS: plus.observedAt, DekaMarkt: deka.observedAt,
+      })
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-eigen-voorlopige-plus-deka-productregels.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setExportMessage('Bevestigde productregels met originele SKU’s en regelverschillen als privé-CSV opgeslagen. Geen volledig mandtotaal.')
+    } catch (error) {
+      setExportMessage(error instanceof Error ? error.message : 'Voorlopige productregels exporteren lukt niet.')
+    }
+  }
+
   function downloadPairedRows() {
     // Refresh both original source instants at the actual click. A long-open
     // tab cannot export already-expired numbers as a live price comparison.
@@ -130,6 +166,10 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
       </div>
       {pairs.length > 3 && <small>En {pairs.length - 3} andere controleerbare
         regelverschillen. De totale winkelprijs blijft onbekend tot beide mandjes compleet zijn.</small>}
+      <button type="button" className="ghost-button" onClick={() => void downloadPairedCsv()}>
+        Download gecontroleerde PLUS/Deka-productregels (CSV)
+      </button>
+      {exportMessage && <p role="status" aria-live="polite">{exportMessage}</p>}
     </section>}
     <details className="supa-reviewed-source-lines" open={expanded}
     onToggle={event => setExpanded(event.currentTarget.open)}>
