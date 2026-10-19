@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { MatchUnit } from '../../domain/matching.ts'
 
 type ReceiptLine = {
@@ -83,6 +84,17 @@ export function readPrivateReceipt(raw: string): SavedReceipt | null {
         root.wholeBasket.observedWithin24Hours !== true ||
         !cents(root.wholeBasket.absoluteDifferenceCents) ||
         !Array.isArray(root.products) || root.products.length > 200) return null
+
+    // An archived report may be old, but its claimed original two-shop
+    // observation pair still needs exact civil instants within 24 hours.
+    // A boolean inside user-selected JSON does not establish time provenance.
+    const plusObserved = observedInstant(root.stores.PLUS.observedAt as string)
+    const dekaObserved = observedInstant(root.stores.DekaMarkt.observedAt as string)
+    if (!plusObserved || !dekaObserved) return null
+    const timeGap = plusObserved.ns >= dekaObserved.ns
+      ? plusObserved.ns - dekaObserved.ns
+      : dekaObserved.ns - plusObserved.ns
+    if (timeGap > 86_400_000_000_000n) return null
 
     const plusCents = root.stores.PLUS.totalWholePackagesCents
     const dekaCents = root.stores.DekaMarkt.totalWholePackagesCents
