@@ -21,7 +21,10 @@ const PrivateReviewedProductCatalog = lazy(async () => {
   return { default: module.PrivateReviewedProductCatalog }
 })
 import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
-import { OwnExtraGroceries } from './features/comparison/OwnExtraGroceries.tsx'
+const OwnExtraGroceries = lazy(async () => {
+  const module = await import('./features/comparison/OwnExtraGroceries.tsx')
+  return { default: module.OwnExtraGroceries }
+})
 import type { PrivateExtraVisitCostIntent } from './features/comparison/privateExtraVisitCost.ts'
 import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
@@ -699,8 +702,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {tab === 'list' && (
           <section className="screen" aria-label="Persoonlijke extra boodschappen buiten het prijsmandje">
-            <OwnExtraGroceries identity={privatePlanKey}
-              plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
+            <Suspense fallback={<p>Eigen ongeprijsde boodschappen openen…</p>}>
+              <OwnExtraGroceries identity={privatePlanKey}
+                plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
+            </Suspense>
           </section>
         )}
         {tab === 'observe' && <ObservationView />}

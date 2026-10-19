@@ -50,6 +50,8 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   const [quantity, setQuantity] = useState('1')
   const [unit, setUnit] = useState<Unit>('piece')
   const [notice, setNotice] = useState('')
+  const [paste, setPaste] = useState('')
+  const [pendingPaste, setPendingPaste] = useState<Item[] | null>(null)
   const currentIdentity = useRef(identity)
   currentIdentity.current = identity
   const [preparedCopy, setPreparedCopy] = useState<{
@@ -65,8 +67,75 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   useEffect(() => {
     setData({ identity, ...restore(identity) })
     setEditing(null)
+    setPendingPaste(null)
+    setPaste('')
     setNotice('')
   }, [identity])
+  function previewPaste(event: FormEvent) {
+    event.preventDefault()
+    setPendingPaste(null)
+    if (new TextEncoder().encode(paste).length > 20000) {
+      setNotice('Plak maximaal 20 kB aan boodschappen.')
+      return
+    }
+    const lines = paste.replace(/\r/g, '').split('\n').map(s => s.trim()).filter(Boolean)
+    if (!lines.length || lines.length > 100 || items.length + lines.length > 100) {
+      setNotice('Plak minimaal één artikel, maximaal 100 inclusief je bestaande extra boodschappen.')
+      return
+    }
+    const preview: Item[] = []
+    for (const line of lines) {
+      const parts = line.split(';').map(s => s.trim())
+      let name = line
+      let quantity = 1
+      let unit: Unit = 'piece'
+      if (parts.length === 3) {
+        const [, amount, kind] = parts
+        if (!/^\d{1,6}(?:[.,]\d{1,3})?$/.test(amount)) {
+          setNotice('Ongeldige hoeveelheid: gebruik bijvoorbeeld koffie; 2; stuks.')
+          return
+        }
+        name = parts[0]
+        quantity = Number(amount.replace(',', '.'))
+        if (!['stuks', 'g', 'ml'].includes(kind.toLowerCase())) {
+          setNotice('Gebruik uitsluitend stuks, g of ml bij geplakte hoeveelheden.')
+          return
+        }
+        unit = kind.toLowerCase() === 'stuks' ? 'piece' : kind.toLowerCase() as Unit
+      } else if (parts.length !== 1) {
+        setNotice('Gebruik één artikel per regel of artikel; hoeveelheid; stuks/g/ml.')
+        return
+      }
+      const next: Item = { id: 'preview', name, quantity, unit, done: false }
+      if (!valid(next)) {
+        setNotice('Een van de regels bevat een ongeldig artikel of een ongeldige hoeveelheid.')
+        return
+      }
+      preview.push(next)
+    }
+    setPendingPaste(preview)
+    setNotice('Controleer de voorbeeldregels voordat je ze toevoegt. Er zijn nog geen artikelen gewijzigd.')
+  }
+  function acceptPaste() {
+    if (!pendingPaste || items.length + pendingPaste.length > 100 || data.locked) return
+    const values = new Uint32Array(pendingPaste.length * 4)
+    try { window.crypto.getRandomValues(values) } catch {
+      setNotice('Deze browser kan geen veilige artikel-ID maken.')
+      return
+    }
+    const imported = pendingPaste.map((item, index) => ({ ...item,
+      id: Array.from(values.slice(index * 4, index * 4 + 4), n =>
+        n.toString(16).padStart(8, '0')).join('-'),
+    }))
+    if (new Set([...items, ...imported].map(item => item.id)).size !== items.length + imported.length) {
+      setNotice('Unieke artikel-ID kon niet worden toegekend. Probeer opnieuw.')
+      return
+    }
+    setData(prev => ({ ...prev, identity, items: [...items, ...imported] }))
+    setPendingPaste(null)
+    setPaste('')
+    setNotice(`${imported.length} ongeprijsde boodschappen toegevoegd. Bewaar ze desgewenst in deze tab.`)
+  }
   function add(e: FormEvent) {
     e.preventDefault()
     // crypto.randomUUID() is secure-context-only. Supa's private IP/HTTP
@@ -251,6 +320,22 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       </select></label>
       <button type="submit">Voeg toe</button>
     </form>
+    <form onSubmit={previewPaste} className="unpriced-planner-checklist__paste">
+      <label>Plak eigen boodschappen · één artikel per regel, of artikel; hoeveelheid; stuks/g/ml
+        <textarea value={paste} maxLength={20000} rows={5}
+          placeholder={'Koffie; 500; g\nToiletpapier; 6; stuks\nAfwasmiddel'}
+          onChange={event => { setPaste(event.target.value); setPendingPaste(null) }} />
+      </label>
+      <button type="submit" disabled={!paste.trim() || data.locked}>Bekijk plaklijst</button>
+    </form>
+    {pendingPaste && <div className="unpriced-planner-checklist__paste-preview">
+      <h4>Controleer {pendingPaste.length} extra boodschappen zonder winkelprijzen</h4>
+      <ul>{pendingPaste.map((row, index) => <li key={index}>
+        {row.quantity} {row.unit === 'piece' ? 'stuks' : row.unit} {row.name}
+      </li>)}</ul>
+      <button type="button" onClick={acceptPaste}>Voeg alle artikelen toe</button>
+      <button type="button" onClick={() => setPendingPaste(null)}>Annuleer</button>
+    </div>}
     <p>{items.filter(x => x.done).length} van {items.length} extra artikelen afgevinkt.</p>
     <ul>{items.map(item => <li key={item.id}>
       {editing === item.id ? <form onSubmit={saveEdit} className="unpriced-planner-checklist__actions">

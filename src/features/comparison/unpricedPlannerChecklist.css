@@ -53,3 +53,10 @@
   .unpriced-planner-checklist__extras li { flex-wrap: wrap; }
   .unpriced-planner-checklist__extras form label { width: 100%; }
 }
+
+.unpriced-planner-checklist__paste { margin: 1rem 0; display:flex; flex-wrap:wrap; align-items:flex-end; gap:.8rem; }
+.unpriced-planner-checklist__paste label { flex: 1 1 18rem; display:flex; flex-direction:column; gap:.4rem; }
+.unpriced-planner-checklist__paste textarea { width:100%; min-height:6rem; padding:.7rem; border:1px solid #8aad96; border-radius:.5rem; resize:vertical; }
+.unpriced-planner-checklist__paste-preview { border:1px solid #8aad96; border-radius:.6rem; padding:.8rem; max-height:22rem; overflow:auto; }
+.unpriced-planner-checklist__paste-preview li { display:list-item; list-style:disc inside; padding:.25rem 0; border:0; }
+.unpriced-planner-checklist__paste-preview button { margin-right:.6rem; }
