@@ -1,4 +1,5 @@
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
+import { isCoherentPricedBasket } from '../../domain/basketComparison.ts'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 
 /** Transient, human-reviewed own-source baskets. No storage, no retailer rights. */
@@ -64,8 +65,10 @@ export function freshReviewedBaskets(
   const nowNs = BigInt(nowMs) * 1_000_000n
   const allowedFutureNs = 300_000_000_000n
   const maxAgeNs = 604_800_000_000_000n
-  const entries = Object.entries(snapshots.stores).filter(([, value]) => {
-    if (!value || !Number.isSafeInteger(value.capturedMs)) return false
+  const entries = Object.entries(snapshots.stores).filter(([store, value]) => {
+    if ((store !== 'PLUS' && store !== 'DekaMarkt') || !value ||
+        !Number.isSafeInteger(value.capturedMs) ||
+        !isCoherentPricedBasket(value.basket, store)) return false
     // Keep full nanoseconds exactly as the original private import already
     // admitted them. Never display a stale source for a further fraction of
     // a millisecond, and never ignore a changed capturedMs envelope.
@@ -73,8 +76,10 @@ export function freshReviewedBaskets(
     if (!instant || instant.ms !== value.capturedMs ||
         nowNs < instant.ns - allowedFutureNs ||
         nowNs - instant.ns > maxAgeNs) return false
-    return value.basket.lines.length > 0 && value.basket.unresolvedLineCount === 0 &&
-      value.basket.matchedLineCount === value.basket.lines.length
+    // Counts alone are insufficient to admit a store as priced: the shared
+    // basket contract above also checks SKU pack arithmetic, exact total cents,
+    // required quantities, duplicate rows and retailer identity.
+    return true
   })
   if (!entries.length) return null
   return { planKey: snapshots.planKey,
