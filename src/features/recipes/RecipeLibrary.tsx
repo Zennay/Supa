@@ -83,6 +83,13 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [mode, setMode] = useState<'manual' | 'url' | 'paste' | 'plain'>('manual')
   const [form, setForm] = useState(blank)
   const [url, setUrl] = useState('')
+  // Preview only the public attribution that will leave this browser.
+  // The raw pasted link is never used by the network import.
+  const publicRecipeLink = (() => {
+    if (!url.trim()) return null
+    try { return safeRecipeSourceUrl(url.trim()) }
+    catch { return null }
+  })()
   const [pastedSource, setPastedSource] = useState('')
   const [source, setSource] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -518,6 +525,20 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     detail.current?.close()
     editor.current?.showModal()
   }
+  async function pasteRecipeLink() {
+    try {
+      if (!navigator.clipboard?.readText)
+        throw new Error('Klembordtoegang ontbreekt in deze browser.')
+      const pasted = (await navigator.clipboard.readText()).trim()
+      if (pasted.length > 2048)
+        throw new Error('De openbare receptlink is te lang (maximaal 2048 tekens).')
+      // Do not send the pasted link until the user explicitly imports.
+      setUrl(pasted)
+      setError('')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Plakken is niet beschikbaar. Gebruik het linkveld.')
+    }
+  }
   async function importLink(event: FormEvent) {
     event.preventDefault(); request.current?.abort()
     const controller = new AbortController(); request.current = controller
@@ -698,7 +719,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       </button>}
     <dialog className="hifi-dialog recipe-dialog" ref={editor} aria-labelledby="recipe-editor-title" onCancel={closeEditor} onClose={() => { request.current?.abort(); setBusy(false) }}>
       <button className="recipe-close" onClick={closeEditor} aria-label="Recept sluiten">×</button><h2 id="recipe-editor-title">{mode === 'url' ? 'Recept importeren' : mode === 'paste' ? 'Receptgegevens lokaal plakken' : mode === 'plain' ? 'Recepttekst lokaal importeren' : editingId ? 'Mijn recept aanpassen' : isVariant ? 'Receptvariant maken' : 'Eigen recept toevoegen'}</h2>
-      {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button className="recipe-primary" disabled={busy}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('plain'); setError('') }}>Plak gewone recepttekst</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
+      {mode === 'url' ? <form onSubmit={importLink} className="recipe-form"><p>Plak een openbare receptlink. Daarna kun je ingrediënten, porties en bereiding controleren.</p><label>Receptlink<input required type="url" maxLength={2048} placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} /></label><button type="button" disabled={busy} onClick={() => void pasteRecipeLink()}>Plak receptlink vanuit klembord</button>{url.trim() && (publicRecipeLink === null ? <small role="alert">Controleer de openbare HTTPS-receptlink. Inloggegevens en ongeldige links worden niet verstuurd.</small> : publicRecipeLink !== url.trim() ? <small role="status">Privé-inlogparameters of fragmenten worden verwijderd vóór import en opslag. Alleen de openbare receptlink wordt gebruikt.</small> : <small>Deze openbare HTTPS-link wordt pas na je klik opgehaald. Productprijzen blijven onbekend.</small>)}<button className="recipe-primary" disabled={busy || !publicRecipeLink}>{busy ? 'Recept ophalen…' : 'Importeer recept'}</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('paste'); setError('') }}>Plak JSON-LD in plaats van de link op te halen</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('plain'); setError('') }}>Plak gewone recepttekst</button><button type="button" onClick={() => { request.current?.abort(); setBusy(false); setMode('manual'); setError('') }}>Handmatig toevoegen</button></form>
         : mode === 'plain' ? <form className="recipe-form" onSubmit={importPlainText}>
           <p>Plak een zelf verkregen recept, ook als Markdown uit een notitie of website.
             Nederlandse en Engelse koppen zoals Ingrediënten, Ingredients, Bereiding, Method en Directions worden herkend,
