@@ -1,3 +1,4 @@
+import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl.ts'
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport.ts'
 
 export type SavedRecipe = UserRecipeDraft & { id: string; savedAt: string }
@@ -12,7 +13,25 @@ export function reviewRecipe(draft: UserRecipeDraft): UserRecipeDraft {
     ingredients: draft.ingredients.map(i => i.original), steps: draft.steps,
   })
   if (!reviewed.steps.length) throw new Error('Voeg minstens één bereidingsstap toe.')
-  return { ...reviewed, source: draft.source, sourceUrl: draft.sourceUrl }
+  // Source-specific manual-review warnings are restrictive provenance, not
+  // quantities. Cosmetic edits must not erase them; only correcting that exact
+  // original ingredient text can release the existing Planner projection gate.
+  const ingredients = reviewed.ingredients.map((normalized, index) => {
+    const prior = draft.ingredients[index]
+    if (!prior || prior.original !== normalized.original ||
+        typeof prior.reviewReason !== 'string' || !prior.reviewReason.trim()) return normalized
+    return { ...normalized, reviewReason: normalized.reviewReason ?? prior.reviewReason.slice(0, 240) }
+  })
+  const warnings = ingredients.flatMap((ingredient, index) =>
+    ingredient.reviewReason ? [`Ingrediënt ${index + 1}: ${ingredient.reviewReason}`] : [])
+  if (reviewed.servings === null) warnings.push('Porties ontbreken of zijn onduidelijk')
+  if (reviewed.minutes === null) warnings.push('Bereidingstijd ontbreekt of zijn onduidelijk')
+  const sourceUrl = draft.source === 'url' ? safeRecipeSourceUrl(draft.sourceUrl) : null
+  if (draft.source === 'url' && !sourceUrl) throw new Error('Receptbronlink ontbreekt.')
+  if (draft.source !== 'url' && (draft.source !== 'manual' || draft.sourceUrl !== null)) {
+    throw new Error('Receptbron en bronlink spreken elkaar tegen.')
+  }
+  return { ...reviewed, ingredients, warnings, source: draft.source, sourceUrl }
 }
 
 export function readRecipeLibrary(storage: Storage): LibraryState {

@@ -327,3 +327,4 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     </section>
   )
 }
+

@@ -26,7 +26,9 @@ function physicalCaptureNanoseconds(capturedAt) {
   const timezone = parts[8]
   if (timezone !== 'Z') {
     const [hours, minutes] = timezone.slice(1).split(':').map(Number)
-    if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) {
+    const maximum = timezone[0] === '-' ? 12 : 14
+    if (hours > maximum || minutes > 59 ||
+        (hours === maximum && minutes !== 0)) {
       throw new Error('Invalid retailer capture UTC offset')
     }
   }
@@ -45,16 +47,59 @@ function safeId(value) {
   return typeof value === 'string' && /^[a-zA-Z0-9._-]{1,160}$/.test(value)
 }
 
-function normalizedObservation(value) {
+// Direct catalog callers must obey the same retailer and shape source
+// identity boundary as reviewed offline adapters. Parsed URL normalization
+// alone is insufficient: it can silently discard query/fragment delimiters.
+function safeDirectRetailerSourceUrl(raw, retailer, kind) {
+  if (typeof raw !== 'string' || raw.length < 24 || raw.length > 2048 ||
+      !['plus', 'dekamarkt'].includes(retailer) ||
+      !['product', 'catalog', 'offers'].includes(kind) ||
+      /[\u0000-\u0020\u007f\u005c]/u.test(raw) || raw.includes('?') || raw.includes('#')) {
+    throw new Error('Untrusted retailer capture source URL')
+  }
+  let url
+  try { url = new URL(raw) }
+  catch { throw new Error('Untrusted retailer capture source URL') }
+  const host = retailer === 'plus' ? 'www.plus.nl' : 'www.dekamarkt.nl'
+  const path = url.pathname
+  // Keep raw path identity unambiguous: never decode encoded separators,
+  // dot segments or invisible URL encodings into a reviewed retailer source.
+  const canonicalPath = /^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\/?$/u.test(path)
+  const validPath = canonicalPath && (kind === 'offers'
+    ? (path === '/aanbiedingen' || path.startsWith('/aanbiedingen/'))
+    : kind === 'catalog'
+      ? (path === '/producten' || path.startsWith('/producten/'))
+      : retailer === 'plus'
+        ? path.startsWith('/product/') && path.length > '/product/'.length
+        : path.startsWith('/producten/') && path.length > '/producten/'.length)
+  if (url.href !== raw || url.protocol !== 'https:' || url.hostname !== host ||
+      url.port !== '' || url.username !== '' || url.password !== '' ||
+      url.search !== '' || url.hash !== '' || !validPath) {
+    throw new Error('Untrusted retailer capture source URL')
+  }
+}
+
+// A legacy internal cross-kind view may label *the same validated product
+// observation* as catalog evidence. It is never proof of an independent
+// capture or a new permitted URL. Compare all physical and price facts.
+function physicalProductFactSignature(value) {
+  return JSON.stringify([
+    value.supermarket, value.sourceProductId, value.provenance.url,
+    value.provenance.capturedAt, value.provenance.sha256, value.name,
+    value.currentPriceCents, value.currency, value.pack, value.offer,
+    value.availability,
+  ])
+}
+
+function normalizedObservation(value, pairedProductAlias = false) {
   validateRawProductObservation(value)
   if (!safeId(value.sourceProductId)) throw new Error('Unsafe/missing retail product identity')
   // A direct caller must not bypass source trust by providing a structurally
   // valid yet credential-bearing URL, impossible clock or unsafe money value.
-  const origin = new URL(value.provenance.url)
-  if (origin.username || origin.password || origin.hash ||
-      origin.port || origin.searchParams.has('access_token')) {
-    throw new Error('Untrusted retailer capture source URL')
-  }
+  safeDirectRetailerSourceUrl(
+    value.provenance.url, value.supermarket,
+    pairedProductAlias ? 'product' : value.provenance.kind,
+  )
   // Strict direct API admission: Date.parse alone normalizes impossible
   // days such as February 30 and drops submillisecond source chronology.
   physicalCaptureNanoseconds(value.provenance.capturedAt)
@@ -97,6 +142,23 @@ export function buildUniversalRetailerCatalog(batch) {
   }
   const groups = new Map()
   let observationsCount = 0
+  // Only recognize a product-route URL with a catalog label if an *identical*
+  // separately validated product observation is present in this same private
+  // batch. This preserves historical cross-kind UI grouping without accepting
+  // arbitrary catalog URLs under the product-route exception.
+  const productAliases = new Set()
+  for (const result of batch.results) {
+    if (result?.accepted !== true ||
+        !['plus:product', 'dekamarkt:product'].includes(result.key) ||
+        !Array.isArray(result.observations)) continue
+    for (const observation of result.observations) {
+      const normalized = normalizedObservation(observation)
+      if (result.key !== observation.supermarket + ':' + normalized.sourceKind) {
+        throw new Error('Ingestion result does not match validated retailer adapter')
+      }
+      productAliases.add(physicalProductFactSignature(observation))
+    }
+  }
   for (const result of batch.results) {
     if (!result || result.accepted !== true ||
         !Array.isArray(result.observations) ||
@@ -105,7 +167,9 @@ export function buildUniversalRetailerCatalog(batch) {
       throw new Error('Refusing incomplete or untrusted retailer ingest batch')
     }
     for (const observation of result.observations) {
-      const normalized = normalizedObservation(observation)
+      const isPairedProductAlias = observation?.provenance?.kind === 'catalog' &&
+        productAliases.has(physicalProductFactSignature(observation))
+      const normalized = normalizedObservation(observation, isPairedProductAlias)
       const scope = observation.supermarket
       if (!['plus', 'dekamarkt'].includes(scope) ||
           result.key !== scope + ':' + normalized.sourceKind) {

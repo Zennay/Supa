@@ -101,7 +101,7 @@ function validObservedAt(raw) {
  * Convert only caller-supplied observations. Unknown package/price stays null,
  * and is NEVER promoted to purchasable inventory or savings evidence.
  */
-export function convertTwoStoreCsv(text) {
+export function convertTwoStoreCsv(text, { singleStore = false } = {}) {
   const rows = parseCsv(text)
   if (!rows.length || HEADER.some((h, i) => rows[0][i] !== h) ||
       rows[0].length !== HEADER.length) {
@@ -116,18 +116,17 @@ export function convertTwoStoreCsv(text) {
     if (row.length !== HEADER.length) error(location + ': verwacht negen kolommen.')
     const [retailer, observedAt, id, name, pack, unit, count, cents, availableText] = row
     if (!RETAILERS.includes(retailer)) error(location + ': onbekende winkel.')
-    if (!validLabel(id, 100)) error(location + ': product-ID ongeldig.')
     if (!UNITS.includes(unit)) error(location + ': eenheid moet g/kg/ml/l/piece zijn.')
     if (!['true', 'false'].includes(availableText)) {
       error(location + ': beschikbaarheid moet letterlijk true of false zijn.')
     }
-    // The planner deliberately exports one unobserved demand row per store.
-    // No product name, package, price or time exists for such a row. Omit it
-    // instead of inventing a retailer SKU. The existing basket matcher then
-    // leaves the corresponding ingredient unresolved, never priced at €0.
-    if (name === '' && pack === '' && count === '' && cents === '' && availableText === 'false') {
+    // Ignore only fully blank Planner placeholders. A partial observation
+    // must never disappear silently or be priced as zero.
+    if (observedAt === '' && id === '' && name === '' &&
+        pack === '' && count === '' && cents === '' && availableText === 'false') {
       continue
     }
+    if (!validLabel(id, 100)) error(location + ': vul de originele winkelproductcode in.')
     if (!validObservedAt(observedAt)) error(location + ': werkelijke ISO-tijd met UTC-offset vereist.')
     if (!validLabel(name, 160)) error(location + ': productnaam ongeldig of ontbreekt.')
     if (seen.get(retailer).has(id)) error(location + ': dubbele product-ID.')
@@ -152,12 +151,22 @@ export function convertTwoStoreCsv(text) {
     if (packCount !== null) product.packCount = packCount
     capture.products.push(product)
   }
-  if (captures.size !== 2 || !RETAILERS.every(store => captures.has(store))) {
-    error('CSV vereist minimaal één expliciete rij voor elk van de twee winkels.')
+  if (singleStore ? captures.size !== 1 :
+      captures.size !== 2 || !RETAILERS.every(store => captures.has(store))) {
+    error(singleStore
+      ? 'Losse CSV moet precies één winkel met minstens één echte productregel bevatten.'
+      : 'CSV vereist minimaal één expliciete rij voor elk van de twee winkels.')
   }
-  const value = { schema: 'supa-offline-prices-v1', captures: RETAILERS.map(store => captures.get(store)) }
+  const value = singleStore
+    ? { schema: 'supa-offline-store-capture-v1', capture: [...captures.values()][0] }
+    : { schema: 'supa-offline-prices-v1', captures: RETAILERS.map(store => captures.get(store)) }
   const json = JSON.stringify(value, null, 2) + '\n'
   if (new TextEncoder().encode(json).length > MAX_BYTES) error('Gegenereerde JSON is groter dan 256 kB.')
   return json
 }
 
+
+/** A real single-retailer CSV may be staged until the other store arrives. */
+export function convertSingleStoreCsv(text) {
+  return convertTwoStoreCsv(text, { singleStore: true })
+}

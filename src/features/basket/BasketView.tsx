@@ -1,6 +1,11 @@
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { ManualStoreComparison } from '../comparison/ManualStoreComparison'
+import { OfflineReviewedWorkbench } from '../comparison/OfflineReviewedWorkbench'
+import { ImportedShoppingList } from '../comparison/ImportedShoppingList.tsx'
+import { StagedStorePreview } from '../comparison/StagedStorePreview.tsx'
+export { resolveStagedBasket } from '../comparison/stagedSessionBasket.ts'
+import type { OfflineComparisonSession } from '../comparison/offlineComparisonSession.ts'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
@@ -29,6 +34,13 @@ export function BasketView({
   manualPlan,
   manualRecipes,
   manualActiveDays,
+  manualWeekBudgetEuros,
+  offlinePriceSession,
+  displayLocalList,
+  displayStagedOnly,
+  onOpenComparison,
+  onOpenList,
+  onOpenPlanner,
 }: {
   basket: OneStoreBasket
   comparison: BasketComparison
@@ -37,7 +49,37 @@ export function BasketView({
   manualPlan?: PlannedMeal[]
   manualRecipes?: RecipeWithIngredients[]
   manualActiveDays?: string[]
+  manualWeekBudgetEuros?: number
+  offlinePriceSession: OfflineComparisonSession
+  displayLocalList?: boolean
+  displayStagedOnly?: boolean
+  onOpenComparison?: () => void
+  onOpenList?: () => void
+  onOpenPlanner?: () => void
 }) {
+  if (displayStagedOnly && manualPlan && manualRecipes && manualActiveDays) {
+    const stores = (['PLUS', 'DekaMarkt'] as const).filter(
+      store => !!offlinePriceSession.stagedCaptures[store])
+    return <section className="offline-price-workbench__results" aria-label="Losse eigen winkelopnames">
+      <h2>Mijn tijdelijke winkelboodschappen</h2>
+      <p role="status">Zonder geldig winkelpaar is er geen prijsverschil. Een enkele
+        toegelaten winkelopname is wel bruikbaar als eigen lijst, zonder prijsclaim.</p>
+      {stores.map(store => <StagedStorePreview key={store} store={store}
+        session={offlinePriceSession} capture={offlinePriceSession.stagedCaptures[store]!}
+        plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
+        clockMs={Date.now()} />)}
+      <button type="button" className="ghost-button" onClick={onOpenComparison}>
+        Open Vergelijk om de tweede winkel te importeren
+      </button>
+    </section>
+  }
+  if (displayLocalList && manualPlan && manualRecipes && manualActiveDays) {
+    return <ImportedShoppingList
+      session={offlinePriceSession}
+      plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
+      onOpenComparison={onOpenComparison ?? (() => {})}
+    />
+  }
   const basketCost = basketCostDisclosure(
     basket.totalCents,
     basket.unresolvedLineCount,
@@ -82,12 +124,25 @@ export function BasketView({
   return (
     <section className="screen">
       {manualPlan && manualRecipes && manualActiveDays && (
-        <ManualStoreComparison
-          key={JSON.stringify([manualPlan, manualActiveDays, manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
-          plan={manualPlan}
-          recipes={manualRecipes}
-          activeDays={manualActiveDays}
-        />
+        <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
+          budgetEuros={manualWeekBudgetEuros} session={offlinePriceSession}
+          onOpenList={onOpenList} onOpenPlanner={onOpenPlanner} />
+      )}
+      {manualPlan && manualRecipes && manualActiveDays && (
+        <details className="demo-comparison-disclosure">
+          <summary>Oudere losse winkelvergelijker (optioneel)</summary>
+          <p className="disclaimer">
+            Deze oudere invoer staat los van de nieuwe PLUS/DekaMarkt-prijsimport,
+            Planner-budgetkoppeling en privé winkeltour hierboven.
+            Gebruik voor jouw actuele weekmenu bij voorkeur de nieuwe vergelijking.
+          </p>
+          <ManualStoreComparison
+            key={JSON.stringify([manualPlan, manualActiveDays, manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
+            plan={manualPlan}
+            recipes={manualRecipes}
+            activeDays={manualActiveDays}
+          />
+        </details>
       )}
       <details className="demo-comparison-disclosure" open={!manualPlan}>
         <summary>{manualPlan ? 'Toon oude voorbeeldberekening (geen actuele winkelprijzen)' : 'Voorbeeldmandje'}</summary>

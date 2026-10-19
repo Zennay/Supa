@@ -1,3 +1,4 @@
+import { safeRecipeSourceUrl } from './recipeSourceUrl.ts'
 /**
  * Private user-recipe intake, before any persistence, price calculation or fetch.
  * A caller must fetch HTML through a separately protected server boundary.
@@ -91,31 +92,9 @@ const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|banan
 export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const original = text(raw, 400)
   if (!original) throw new Error('Ingredientregel ontbreekt')
-  // A single-unit match must never consume only the first part of
-  // "1 kg 250 g bloem" and mistake "250 g" for a product name.
-  // Parse two physically stated measures BEFORE falling back to the single
-  // amount pattern: keeping only the first segment would undercount shopping.
-  const compound = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+(.+)$/iu)
-  if (compound) {
-    const first = quantity(compound[1])
-    const second = quantity(compound[3])
-    const firstUnit = units[compound[2].toLowerCase()]
-    const secondUnit = units[compound[4].toLowerCase()]
-    const label = compound[5].trim()
-    if (first !== null && second !== null &&
-        Number.isFinite(first) && Number.isFinite(second) &&
-        first > 0 && second > 0 && first <= 100_000 && second <= 100_000 &&
-        firstUnit && secondUnit && firstUnit.unit === secondUnit.unit &&
-        label && !/^\d+(?:[.,]\d+)?\s+(?:g|kg|ml|l|oz|lb)\b/i.test(label)) {
-      const normalized = rounded(first * firstUnit.factor + second * secondUnit.factor)
-      if (Number.isFinite(normalized) && normalized > 0 && normalized <= 1_000_000) {
-        return { original, label, query: label.toLocaleLowerCase('nl'),
-          amount: normalized, unit: firstUnit.unit, reviewReason: null }
-      }
-    }
-    return { original, label: original, query: original.toLocaleLowerCase('nl'),
-      amount: null, unit: null, reviewReason: 'Controleer de samengestelde hoeveelheden' }
-  }
+  // One canonical parser handles one or several physical measures. A separate
+  // two-measure shortcut used to reject valid third measures as a product name.
+  // Never consume just the first amount when the remainder is another measure.
   const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
   if (!match) return { original, label: original, query: original.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid of eenheid ontbreekt' }
   const amount = quantity(match[1])
@@ -123,7 +102,35 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const wordMatch = tail.match(/^([^\s,]+)(?:\s+|,\s*)(.*)$/u)
   const word = (wordMatch ? wordMatch[1] : tail).toLowerCase()
   const metric = units[word]
-  const label = metric ? (wordMatch?.[2] || '').trim() : tail
+  let label = metric ? (wordMatch?.[2] || '').trim() : tail
+  let compoundAmount = 0
+  let compoundFound = false
+  // Accept at most eight compatible physical components, including the first.
+  // Parse consecutive measurable additions instead of trusting only the first
+  // quantity (which would silently underbuy 1 kg 250 g as 1000 g).
+  if (metric) {
+    const additional = /^(?:(?:en|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([^\s,]+)(?:\s+|,\s*|$)(.*)$/u
+    for (let index = 0; index < 7; index++) {
+      const second = additional.exec(label)
+      if (!second) break
+      const extraUnit = units[second[2].toLowerCase()]
+      const extraAmount = quantity(second[1])
+      if (!extraUnit || extraUnit.unit !== metric.unit ||
+          extraAmount === null || !Number.isFinite(extraAmount) || extraAmount <= 0) {
+        return { original, label: original, query: original.toLocaleLowerCase('nl'),
+          amount: null, unit: null,
+          reviewReason: 'Controleer samengestelde hoeveelheden en voer het metrische totaal in' }
+      }
+      compoundFound = true
+      compoundAmount += extraAmount * extraUnit.factor
+      label = second[3].trim()
+    }
+    // A ninth quantity is not silently accepted as the ingredient label.
+    if (compoundFound && additional.test(label)) {
+      return { original, label: original, query: original.toLocaleLowerCase('nl'),
+        amount: null, unit: null, reviewReason: 'Te veel samengestelde hoeveelheden: controleer handmatig' }
+    }
+  }
   const inferredPiece = !metric && pieceNouns.test(tail)
   if (!amount || !Number.isFinite(amount) || amount > 100_000 || !label) {
     return { original, label: label || original, query: (label || original).toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Controleer de hoeveelheid en het ingrediënt' }
@@ -132,7 +139,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Onbekende maat: voer een metrische hoeveelheid in' }
   }
   const unit = metric?.unit || 'piece'
-  const normalized = rounded(amount * (metric?.factor || 1))
+  const normalized = rounded(amount * (metric?.factor || 1) + compoundAmount)
   if (!Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid is buiten bereik' }
   }
@@ -211,8 +218,9 @@ function locateRecipe(value: unknown, depth = 0): Record<string, unknown> | null
  */
 export function importRecipeFromHtml(html: string, sourceUrl: string): UserRecipeDraft {
   if (typeof html !== 'string' || !html || html.length > MAX_HTML) throw new Error('HTML ontbreekt of is te groot')
-  let parsedUrl: URL
-  try { parsedUrl = new URL(sourceUrl) } catch { throw new Error('Ongeldige receptlink') }
+  const approvedSource = safeRecipeSourceUrl(sourceUrl)
+  if (!approvedSource) throw new Error('Ongeldige publieke receptbronlink')
+  const parsedUrl = new URL(approvedSource)
   if (parsedUrl.protocol !== 'https:' || !parsedUrl.hostname || parsedUrl.username || parsedUrl.password) {
     throw new Error('Alleen publieke HTTPS-receptlinks zijn toegestaan')
   }

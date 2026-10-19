@@ -1,3 +1,4 @@
+import { safeRecipeSourceUrl } from '../src/domain/recipeSourceUrl.ts'
 import https from 'node:https'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
@@ -19,9 +20,11 @@ export function recipeUrl(input) {
   if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443') ||
       isIP(url.hostname.replace(/^\[|\]$/g, '')) || !url.hostname.includes('.') ||
       /\.(localhost|local|internal|test|invalid)$/i.test(url.hostname)) throw new Error('Gebruik een publieke HTTPS-receptlink.')
-  for (const key of url.searchParams.keys()) if (/token|password|secret|auth|api.?key|signature/i.test(key)) throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
-  url.hash = ''
-  return url
+  // Reuse the same bounded encoded/Unicode query-key privacy gate as offline
+  // imports and portable backups, before any DNS lookup or HTTP request.
+  const safeSource = safeRecipeSourceUrl(url.href)
+  if (!safeSource) throw new Error('Ongeldige openbare receptbronlink.')
+  return new URL(safeSource)
 }
 
 /** Validate every redirect and pin DNS to the exact public address checked. */

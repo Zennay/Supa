@@ -1,0 +1,27 @@
+/* Planner-first shopping remains usable with zero retailer price sources. */
+.supa-unpriced-weeklist { display:grid; gap:16px; padding:clamp(14px,3vw,22px);
+  background:#f9fbf8; border:1px solid #bcd1c3; border-radius:16px; color:#183c2b; }
+.supa-unpriced-weeklist header { display:grid; gap:7px; }
+.supa-unpriced-weeklist h2 { margin:0; font-size:1.22rem; }
+.supa-unpriced-weeklist p { margin:0; font-size:.9rem; line-height:1.52; }
+.supa-unpriced-weeklist__summary { display:grid; gap:8px; }
+.supa-unpriced-weeklist__summary progress { width:100%; height:1rem; accent-color:#277352; }
+.supa-unpriced-weeklist__summary p { color:#7d511e; }
+.supa-unpriced-weeklist__items { list-style:none; padding:0; margin:0; display:grid; gap:8px; }
+.supa-unpriced-weeklist__items li { border:1px solid #d6e3d9; border-radius:11px; background:#fff; }
+.supa-unpriced-weeklist__items label { min-height:56px; display:flex; gap:14px; align-items:center;
+  padding:10px 14px; cursor:pointer; overflow-wrap:anywhere; }
+.supa-unpriced-weeklist__items input { width:22px; height:22px; flex:0 0 22px; accent-color:#24734e; }
+.supa-unpriced-weeklist__items span { display:grid; gap:4px; min-width:0; }
+.supa-unpriced-weeklist__items small { color:#526959; }
+.supa-unpriced-weeklist__items input:checked + span { text-decoration:line-through; opacity:.6; }
+.supa-unpriced-weeklist__actions { display:flex; flex-wrap:wrap; gap:10px; }
+.supa-unpriced-weeklist button { min-height:44px; padding:10px 14px; border:1px solid #4c8666;
+  border-radius:11px; background:#fff; color:#005135; font:inherit; cursor:pointer; }
+.supa-unpriced-weeklist__actions button:first-child { background:#005135; color:#fff; }
+.supa-unpriced-weeklist button:disabled { opacity:.45; cursor:not-allowed; }
+.supa-unpriced-weeklist button:focus-visible,.supa-unpriced-weeklist input:focus-visible {
+  outline:3px solid #1c8056; outline-offset:3px; }
+.supa-unpriced-weeklist > small { line-height:1.5; color:#526959; }
+@media(max-width:600px) { .supa-unpriced-weeklist__actions { display:grid; }
+  .supa-unpriced-weeklist__actions button { width:100%; } }

@@ -1,0 +1,345 @@
+.offline-price-workbench { display: grid; gap: 1.25rem; margin: 1rem 0 2rem; color: var(--text, #232323); }
+.offline-price-workbench__intro, .offline-price-workbench__input,
+.offline-price-workbench__results, .offline-price-workbench__schema {
+  border: 1px solid #dbdfd6; border-radius: 18px; padding: clamp(1rem, 3vw, 1.6rem);
+  background: #fff; min-width: 0;
+}
+.offline-price-workbench h2 { font-size: clamp(1.3rem, 4vw, 1.8rem); line-height: 1.25; margin: .45rem 0; }
+.offline-price-workbench h3 { font-size: 1.2rem; margin: 0 0 .8rem; }
+.offline-price-workbench h4 { font-size: 1.03rem; margin: 0 0 .55rem; }
+.offline-price-workbench p { line-height: 1.5; }
+.offline-price-workbench .disclaimer { font-size: .9rem; color: #616c66; }
+.offline-price-workbench__schema summary { font-weight: 700; cursor: pointer; }
+.offline-price-workbench__schema code { overflow-wrap: anywhere; font-size: .88em; }
+.offline-price-workbench__input { display: grid; gap: .9rem; }
+.offline-price-workbench__input label { display: grid; gap: .4rem; font-weight: 600; }
+.offline-price-workbench__input textarea, .offline-price-workbench__input input[type=file] {
+  box-sizing: border-box; display: block; width: 100%; min-width: 0;
+  background: #fcfcfa; color: #232323; border: 1px solid #9fa9a4; border-radius: 10px;
+  padding: .65rem; font: inherit;
+}
+.offline-price-workbench__input textarea { font-family: ui-monospace, monospace; font-size: .85rem; }
+.offline-price-workbench__input :is(button, textarea, input):focus-visible,
+.offline-price-workbench__schema summary:focus-visible { outline: 3px solid #226f52; outline-offset: 3px; }
+.offline-price-workbench__actions { display: flex; flex-wrap: wrap; gap: .7rem; }
+.offline-price-workbench__actions button { min-height: 44px; padding: .6rem 1rem; cursor: pointer; border-radius: 9px; }
+.offline-price-workbench__actions button:disabled { opacity: .5; cursor: not-allowed; }
+.offline-price-workbench__totals { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.offline-price-workbench__totals section { display: grid; gap: .45rem; border-radius: 12px; background: #f4f6f2; padding: 1rem; }
+.offline-price-workbench__totals section > strong { font-size: clamp(1.05rem, 3vw, 1.6rem); }
+.offline-price-workbench__totals span, .offline-price-workbench__dates { font-size: .89rem; color: #4d5c53; }
+.offline-price-workbench__difference { font-weight: 650; padding: 1rem; border-left: 3px solid #4f8068; background: #f5f8f4; }
+.offline-price-workbench__difference small { display: block; font-weight: normal; margin-top: .35rem; }
+.offline-price-workbench__stores { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.offline-price-workbench__stores > section { min-width: 0; }
+.offline-price-workbench__line { display: flex; justify-content: space-between; align-items: flex-start;
+  gap: .5rem; border-bottom: 1px solid #e5e9e1; padding: .8rem 0; overflow-wrap: anywhere; }
+.offline-price-workbench__line div { display: grid; gap: .3rem; min-width: 0; }
+.offline-price-workbench__line div span { font-size: .85rem; color: #4e5e54; }
+.offline-price-workbench__line > strong { white-space: nowrap; }
+@media (max-width: 640px) {
+  .offline-price-workbench__stores, .offline-price-workbench__totals { grid-template-columns: minmax(0, 1fr); }
+}
+
+.offline-price-workbench__drivers { margin: .8rem 0; border-top: 1px solid #d6ded6; padding-top: 1rem; }
+.offline-price-workbench__drivers p { border-bottom: 1px solid #e5eae4; padding: .3rem 0; margin: .3rem 0; }
+.offline-price-workbench__checklist { background: #f5f8f4; border-radius: 10px; padding: .8rem; margin-bottom: .75rem; }
+.offline-price-workbench__checklist summary { cursor: pointer; font-weight: 700; min-height: 32px; }
+.offline-price-workbench__checklist textarea { box-sizing: border-box; width: 100%; border: 1px solid #a3b0a5; background: white; padding: .6rem; border-radius: 8px; resize: vertical; font: .86rem/1.5 ui-monospace, monospace; color: #232323; }
+.offline-price-workbench__checklist :is(summary,textarea):focus-visible { outline: 3px solid #226f52; outline-offset: 3px; }
+
+/* Direct two-store entry stays fully local and is scoped separately from M3 field evidence. */
+.offline-manual-editor { background:#fff; border:1px solid #dbe0d9; border-radius:18px;
+  padding:clamp(1rem,3vw,1.5rem); display:grid; gap:1rem; min-width:0; }
+.offline-manual-editor__header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:1rem; }
+.offline-manual-editor__header h3 { margin:.2rem 0; }
+.offline-manual-editor__header p { margin:.4rem 0; max-width:54ch; }
+.offline-manual-editor__header button { min-height:44px; }
+.offline-manual-editor__stores { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.offline-manual-editor__stores>section { display:grid; gap:1rem; align-content:start; min-width:0; }
+.offline-manual-editor__stores>section>h4 { margin:0; }
+.offline-manual-editor__time { display:grid; gap:.35rem; font-weight:650; }
+.offline-manual-editor__row { display:grid; gap:.7rem; padding:1rem;
+  border:1px solid #cbd6ca; border-radius:12px; min-width:0; background:#fafcf9; }
+.offline-manual-editor__row legend { font-weight:700; padding:0 .4rem; overflow-wrap:anywhere; }
+.offline-manual-editor__row label { display:grid; gap:.35rem; font-size:.88rem; }
+.offline-manual-editor__row input,.offline-manual-editor__row select,
+.offline-manual-editor__time input { min-width:0; max-width:100%; box-sizing:border-box;
+  border:1px solid #929d96; border-radius:9px; background:white; color:#252525;
+  padding:.55rem; font:inherit; min-height:43px; }
+.offline-manual-editor__quantities { display:grid; gap:.5rem; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.offline-manual-editor__available { display:flex !important; align-items:center; gap:.55rem !important;
+  font-weight:700; cursor:pointer; }
+.offline-manual-editor__available input { min-height:20px; width:20px; flex:0 0 20px; }
+.offline-manual-editor :is(input,select,button,textarea,summary):focus-visible {
+  outline:3px solid #236e54; outline-offset:2px; }
+.offline-manual-editor__export { padding:1rem; background:#eff5ee; border-radius:12px; }
+.offline-manual-editor__export summary { cursor:pointer; font-weight:700; }
+.offline-manual-editor__export textarea { width:100%; box-sizing:border-box; padding:.7rem;
+  border-radius:10px; border:1px solid #9aa99d; font-family:ui-monospace,monospace; }
+@media(max-width:790px) {
+  .offline-manual-editor__stores { grid-template-columns:minmax(0,1fr); }
+}
+@media(max-width:390px) {
+  .offline-manual-editor__quantities { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .offline-manual-editor__quantities label:last-child { grid-column:1 / -1; }
+}
+
+.offline-manual-editor__draft { display:grid; gap:.5rem; background:#f4f8f3; border:1px solid #d3dfd2;
+  padding:1rem; border-radius:12px; }
+.offline-manual-editor__draft label { display:flex; gap:.55rem; align-items:flex-start; line-height:1.45; font-weight:600; }
+.offline-manual-editor__draft input[type="checkbox"] { flex:0 0 20px; min-width:20px; min-height:20px; }
+.offline-manual-editor__draft span { font-size:.88rem; color:#536257; }
+.offline-manual-editor__draft button { justify-self:start; min-height:44px; }
+
+/* Human-reviewed bindings only reference actual imported available products.
+   Never style this as verified retailer evidence or AI certainty. */
+.offline-price-workbench__manual-match {
+  display: grid;
+  gap: .4rem;
+  min-width: 0;
+  margin-top: .65rem;
+  padding: .7rem;
+  background: #f5f7f2;
+  border: 1px solid #d8e3d9;
+  border-radius: 10px;
+  font-size: .82rem;
+  font-weight: 650;
+}
+.offline-price-workbench__manual-match select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: .5rem;
+  border: 1px solid #84998a;
+  border-radius: 9px;
+  background: white;
+  color: #213a2b;
+  font: inherit;
+  text-overflow: ellipsis;
+}
+.offline-price-workbench__manual-match select:focus-visible {
+  outline: 3px solid #236e54;
+  outline-offset: 2px;
+}
+
+/* Large user-imported catalogs remain searchable on narrow screens. */
+.offline-price-workbench__product-picker { display: grid; gap: .45rem; min-width: 0; width: 100%; }
+.offline-price-workbench__product-picker label { display: grid; gap: .35rem; min-width: 0; }
+.offline-price-workbench__product-picker input,
+.offline-price-workbench__product-picker select { width: 100%; max-width: 100%; min-width: 0; }
+.offline-price-workbench__product-picker small { color: var(--text-muted, #5d666e); }
+
+/* Explicit per-store matching coverage; partial totals remain non-claimable. */
+.offline-price-workbench__coverage { display:grid; gap:.55rem; margin:.7rem 0 1rem; }
+.offline-price-workbench__coverage strong { color:#33483a; }
+.offline-price-workbench__coverage progress { width:100%; height:1rem; accent-color:#357454; }
+.offline-price-workbench__coverage button { min-height:44px; padding:.65rem; justify-self:start;
+  border-radius:9px; border:1px solid #597461; background:white; color:#234a30; cursor:pointer; }
+.offline-price-workbench__coverage button:focus-visible { outline:3px solid #226f52; outline-offset:2px; }
+
+.offline-price-workbench__budget { font-weight:700; border-top:1px solid #d0ddd1;
+  padding-top:.5rem; color:#294b34 !important; line-height:1.45; }
+
+.offline-price-workbench__open-list {
+  min-height: 44px; padding: .8rem 1rem; width: 100%; text-align: center;
+  border: 0; border-radius: 12px; color: #fff; background: #005135;
+  font-size: .94rem; font-weight: 650; cursor: pointer;
+}
+.offline-price-workbench__open-list:focus-visible { outline: 3px solid #008b64; outline-offset: 3px; }
+
+.offline-price-workbench__replace {
+  display:grid; gap:.55rem; padding:1rem; background:#eaf5ec;
+  border:1px solid #a9cfb2; border-radius:12px;
+}
+.offline-price-workbench__replace label { font-weight:700; color:#245337; }
+
+/* User-selected extras are explicitly outside the exact two-store meal basket. */
+.offline-own-extras { display:grid; gap:.8rem; margin:1rem 0; padding:1rem;
+  border:1px solid #9dbca6; border-radius:13px; background:#f4faf5; }
+.offline-own-extras h3 { margin:0; font-size:1.06rem; }
+.offline-own-extras ul { list-style:none; margin:0; padding:0; display:grid; gap:.7rem; }
+.offline-own-extras li { display:flex; align-items:center; gap:.8rem; flex-wrap:wrap;
+  background:white; border:1px solid #d3ded5; border-radius:10px; padding:.75rem; }
+.offline-own-extras label { display:flex; gap:.6rem; align-items:center; flex:1; min-width:0; cursor:pointer; }
+.offline-own-extras label input { width:22px; height:22px; flex:0 0 22px; }
+.offline-own-extras label span { display:grid; gap:3px; overflow-wrap:anywhere; }
+.offline-own-extras label small { font-size:.77rem; color:#526458; }
+.offline-own-extras button { min-height:44px; padding:.5rem .8rem; border-radius:10px; }
+.offline-own-extras > small { color:#5a6c60; font-size:.78rem; }
+.offline-own-extras :is(button,input):focus-visible { outline:3px solid #008b64; outline-offset:3px; }
+
+
+/* Complete, private per-ingredient ledger: mobile layout never hides missing prices. */
+.offline-ingredient-ledger { display:grid; gap:.9rem; padding:1rem 0;
+  border-top:1px solid #d6ded6; border-bottom:1px solid #d6ded6; min-width:0; }
+.offline-ingredient-ledger__header { display:flex; flex-wrap:wrap; align-items:start;
+  justify-content:space-between; gap:1rem; }
+.offline-ingredient-ledger__header p { max-width:65ch; margin:.3rem 0; font-size:.91rem; }
+.offline-ingredient-ledger__controls { display:grid; gap:.5rem; }
+.offline-ingredient-ledger__controls label { display:flex; gap:.6rem; align-items:center;
+  font-size:.88rem; cursor:pointer; }
+.offline-ingredient-ledger__controls input { width:19px; height:19px; accent-color:#216344; }
+.offline-ingredient-ledger__controls input:disabled { opacity:.4; }
+.offline-ingredient-ledger__table { display:grid; overflow-x:auto; border:1px solid #dbe5d9;
+  border-radius:12px; min-width:0; }
+.offline-ingredient-ledger__row { display:grid; grid-template-columns:minmax(130px,1.15fr)
+  minmax(165px,1fr) minmax(165px,1fr) minmax(116px,.75fr); gap:.75rem;
+  padding:.75rem; border-bottom:1px solid #e6ece4; align-items:start; }
+.offline-ingredient-ledger__row:last-child { border:0; }
+.offline-ingredient-ledger__row:nth-child(2n) { background:#f7faf6; }
+.offline-ingredient-ledger__column-head { background:#e8f1e8 !important; font-size:.9rem; }
+.offline-ingredient-ledger__need,.offline-ingredient-ledger__store,
+.offline-ingredient-ledger__unknown,.offline-ingredient-ledger__delta {
+  display:grid; gap:.3rem; min-width:0; overflow-wrap:anywhere; }
+.offline-ingredient-ledger__store span { font-size:.88rem; }
+.offline-ingredient-ledger__row small { font-size:.78rem; line-height:1.4; color:#57655b; }
+.offline-ingredient-ledger__unknown strong { color:#82521a; }
+.offline-ingredient-ledger__delta { font-size:.85rem; }
+.offline-ingredient-ledger__row button { min-height:40px; justify-self:start;
+  padding:.45rem .65rem; margin-top:.3rem; background:white; color:#24533b;
+  border:1px solid #8dac98; border-radius:8px; font:inherit; font-size:.84rem;
+  cursor:pointer; }
+.offline-ingredient-ledger :is(button,input):focus-visible {
+  outline:3px solid #226f52; outline-offset:3px; }
+@media(max-width:760px) {
+  .offline-ingredient-ledger__column-head { display:none; }
+  .offline-ingredient-ledger__row:not(.offline-ingredient-ledger__column-head) {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); min-width:0; }
+  .offline-ingredient-ledger__need { grid-column:1 / -1; }
+  .offline-ingredient-ledger__delta { grid-column:1 / -1; border-top:1px solid #dbe5d9;
+    padding-top:.5rem; }
+}
+
+
+/* Direct correction of unresolved shopping items without inventing any prices. */
+.offline-list-missing { display:grid; gap:.65rem; padding:1rem; margin:.8rem 0;
+  border:1px solid #bfcfbd; background:#f6faf3; border-radius:12px; }
+.offline-list-missing h3 { margin:0; font-size:1.05rem; }
+.offline-list-missing p { margin:0; font-size:.9rem; }
+.offline-list-missing ul { list-style:none; padding:0; margin:0; display:grid; gap:.5rem; }
+.offline-list-missing li { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between;
+  padding:.7rem; gap:.65rem; border:1px solid #d8e2d7; border-radius:10px; background:#fff; }
+.offline-list-missing li span { overflow-wrap:anywhere; min-width:0; }
+.offline-list-missing button { min-height:44px; border:1px solid #477657;
+  background:white; color:#204f31; border-radius:9px; cursor:pointer; padding:.5rem .85rem; }
+.offline-list-missing button:focus-visible { outline:3px solid #226f52; outline-offset:3px; }
+
+
+.offline-own-extras__subtotal { display:grid; gap:.25rem; margin:0; padding:.75rem;
+  border:1px solid #bfcebc; background:#fff; border-radius:9px; }
+.offline-own-extras__subtotal strong { font-size:1.05rem; color:#235039; }
+.offline-own-extras__subtotal small { color:#57665a; }
+.offline-own-extras__quantity { display:grid; gap:.3rem; font-size:.85rem; font-weight:650; }
+.offline-own-extras__quantity select { min-width:75px; min-height:44px;
+  background:#fff; border:1px solid #829c8c; border-radius:8px;
+  padding:.45rem; font:inherit; color:#243f2e; }
+
+
+/* A single validated local retailer can show a private list, never a two-store delta. */
+.offline-staged-preview { display:grid; gap:.65rem; margin:.75rem 0; padding:1rem;
+  border:1px solid #adc4b1; background:#f6faf5; border-radius:14px; min-width:0; }
+.offline-staged-preview h3 { margin:0; }
+.offline-staged-preview p { margin:.1rem 0; }
+.offline-staged-preview .private-store-trip { margin-top:.5rem; }
+
+
+/* In-product next actions for completing the *private* two-store comparison. */
+.offline-readiness { display:grid; gap:.8rem; padding:clamp(.9rem,2.5vw,1.35rem);
+  margin:1rem 0; background:#f7faf6; border:1px solid #adcbb6; border-radius:15px; }
+.offline-readiness__heading h4 { margin:0 0 .35rem; }
+.offline-readiness__heading p { margin:.2rem 0; max-width:70ch; font-size:.9rem; }
+.offline-readiness__steps { display:grid; gap:.7rem; list-style:none;
+  margin:0; padding:0; counter-reset:readiness; }
+.offline-readiness__steps li { display:flex; justify-content:space-between;
+  gap:1rem; align-items:center; min-width:0; padding:.85rem; border-radius:11px;
+  background:white; border:1px solid #d4e2d6; counter-increment:readiness; }
+.offline-readiness__steps li strong::before { content:counter(readiness) ". "; color:#256247; }
+.offline-readiness__steps li p { margin:.3rem 0 0; font-size:.83rem; color:#536058; }
+.offline-readiness__step-actions { display:grid; gap:.45rem; justify-items:stretch; min-width:min(220px,100%); }
+.offline-readiness__steps li button { flex:0 0 auto; max-width:100%; min-height:44px;
+  padding:.6rem .8rem; border:1px solid #256247; background:#fff; color:#17452d;
+  border-radius:9px; cursor:pointer; font-weight:600; }
+.offline-readiness__steps li button:focus-visible { outline:3px solid #1e8b5c; outline-offset:3px; }
+.offline-readiness__complete { margin:0; color:#254d37; font-weight:600; }
+@media (max-width:640px) {
+  .offline-readiness__steps li { display:grid; }
+  .offline-readiness__steps li button { justify-self:stretch; white-space:normal; }
+}
+
+/* Preview actual permitted local candidates without truncating long mobile
+   select options. The user must tap explicitly to change a product match. */
+.offline-match-choices { min-width:0; display:grid; gap:.55rem; padding:.7rem;
+  border:1px solid #c9dccb; background:#f6faf6; border-radius:13px; }
+.offline-match-choices__grid { display:grid; gap:.5rem;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr)); }
+.offline-match-choices__grid button { display:grid; gap:.4rem; text-align:left;
+  padding:.7rem; min-height:72px; border:1px solid #b4ccb7; border-radius:10px;
+  background:#fff; color:#203d2b; cursor:pointer; overflow-wrap:anywhere; }
+.offline-match-choices__grid button[aria-pressed=true] { border:2px solid #27744a;
+  background:#e5f3e7; }
+.offline-match-choices__grid button:focus-visible { outline:3px solid #27744a; outline-offset:3px; }
+.offline-match-choices__grid button span { display:grid; gap:.1rem; }
+.offline-match-choices__grid button small { font-size:.82rem; color:#536456; }
+
+/* Side-by-side selection of the same demand from two admitted local captures. */
+.offline-ingredient-ledger__edit { background:#f3f8f3 !important; }
+.offline-ingredient-ledger__editor { grid-column:1 / -1; display:grid; gap:.8rem; min-width:0; }
+.offline-ingredient-ledger__editor > p { margin:0; font-size:.87rem; }
+.offline-ingredient-ledger__edit-stores { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.offline-ingredient-ledger__edit-stores section { min-width:0; display:grid; gap:.6rem;
+  padding:.8rem; border:1px solid #cbdcce; border-radius:10px; background:white; }
+.offline-ingredient-ledger__edit-stores h5 { font-size:1rem; margin:0; }
+.offline-ingredient-ledger__edit-stores .offline-match-choices__grid { grid-template-columns:1fr; }
+@media(max-width:760px) { .offline-ingredient-ledger__edit-stores { grid-template-columns:1fr; } }
+
+.offline-ingredient-ledger__progress { display:grid; gap:.3rem; max-width:330px;
+  margin-top:.6rem; font-size:.88rem; color:#335443; }
+.offline-ingredient-ledger__progress progress { width:100%; height:1rem; accent-color:#327550; }
+.offline-ingredient-ledger__controls > button { min-height:44px; padding:.6rem .8rem;
+  border-radius:9px; border:1px solid #397452; background:#f3faf3;
+  color:#194b2a; cursor:pointer; font-weight:650; }
+.offline-ingredient-ledger__controls > button:focus-visible {
+  outline:3px solid #226f52; outline-offset:3px; }
+
+.offline-match-backup { border:1px solid #cbd9ca; border-radius:12px; padding:.8rem 1rem;
+  background:#f6faf4; display:grid; gap:.7rem; }
+.offline-match-backup summary { font-weight:650; cursor:pointer; }
+.offline-match-backup p { line-height:1.5; }
+.offline-match-backup input[type=file] { max-width:100%; }
+.offline-match-backup__confirm { display:flex; gap:.6rem; flex-wrap:wrap;
+  align-items:center; border-top:1px solid #cbd9ca; padding-top:.6rem; }
+.offline-match-backup__confirm p { flex-basis:100%; margin:0; }
+.offline-match-backup__confirm button { min-height:44px; }
+.offline-match-backup :is(summary,button,input):focus-visible { outline:3px solid #267452; outline-offset:3px; }
+
+/* Private source-change confirmation is a deliberate user action. A pending
+   upload never silently replaces admitted captures or stored checkmarks. */
+.offline-price-workbench__replace-preview {
+  display: grid; gap: .6rem; padding: clamp(1rem, 3vw, 1.5rem);
+  border: 2px solid #54745e; border-radius: 15px; background: #f6faf5;
+}
+.offline-price-workbench__replace-preview h4,
+.offline-price-workbench__replace-preview p { margin: 0; }
+.offline-price-workbench__replace-preview .offline-price-workbench__actions {
+  display: flex; flex-wrap: wrap; gap: .65rem;
+}
+.offline-price-workbench__replace-preview button { min-height: 44px; }
+.offline-price-workbench__replace-preview :is(button):focus-visible {
+  outline: 3px solid #226f52; outline-offset: 3px;
+}
+
+/* Actionable, private collection list for genuinely missing basket matches. */
+.offline-missing-checklist {
+  display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap;
+  gap: .85rem; padding: 1rem; border: 1px solid #b5cbb7;
+  background: #f5faf4; border-radius: 13px;
+}
+.offline-missing-checklist > div { flex: 1 1 320px; min-width: 0; }
+.offline-missing-checklist h4 { margin: 0 0 .35rem; }
+.offline-missing-checklist p { margin: .35rem 0; }
+.offline-missing-checklist button { min-height: 44px; max-width: 100%; }
+.offline-missing-checklist button:focus-visible {
+  outline: 3px solid #226f52; outline-offset: 2px;
+}

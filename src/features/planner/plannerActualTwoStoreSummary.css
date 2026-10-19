@@ -1,0 +1,29 @@
+.planner-actual-store-compare{margin:1.5rem 0;padding:1.25rem;border:1px solid #a7bfb3;border-radius:1rem;background:#fbfdfb;color:#193626}
+.planner-actual-store-compare__stores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}
+.planner-actual-store-compare__stores article{border:1px solid #c8d6cd;border-radius:.75rem;padding:1rem;display:grid;gap:.4rem;min-width:0}
+.planner-actual-store-compare__stores b{font-size:1.2rem;overflow-wrap:anywhere}
+.planner-actual-store-compare__stores small{color:#4b6858}
+@media(max-width:580px){.planner-actual-store-compare__stores{grid-template-columns:1fr}}
+
+.planner-actual-store-compare__details{margin:1rem 0}
+.planner-actual-store-compare__details summary{cursor:pointer;font-weight:650}
+.planner-actual-store-compare__details article{border-top:1px solid #cbd8cf;padding:1rem 0}
+.planner-actual-store-compare__details h4,.planner-actual-store-compare__details h5{margin:.3rem 0}
+.planner-actual-store-compare__line{display:grid;grid-template-columns:1fr 1fr .7fr;gap:.7rem}
+.planner-actual-store-compare__line section{padding:.6rem;border:1px solid #d0dfd4;border-radius:.5rem;min-width:0}
+.planner-actual-store-compare__line section>div{display:grid;gap:.25rem}
+.planner-actual-store-compare__line small{overflow-wrap:anywhere}
+@media(max-width:680px){.planner-actual-store-compare__line{grid-template-columns:1fr}}
+.planner-actual-store-compare__route{margin:1rem 0;padding:1rem;border:1px solid #a7bfb3;border-radius:.65rem}
+.planner-actual-store-compare__route summary{cursor:pointer;font-weight:650}
+.planner-actual-store-compare__cost{display:grid;gap:.4rem;margin:1rem 0}
+.planner-actual-store-compare__cost input{max-width:420px;width:100%;box-sizing:border-box}
+.planner-actual-store-compare__route-stores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.planner-actual-store-compare__route-stores ul{padding-left:1.3rem}
+.planner-actual-store-compare__route-stores li{margin:.4rem 0;overflow-wrap:anywhere}
+@media(max-width:680px){.planner-actual-store-compare__route-stores{grid-template-columns:1fr}}
+.planner-actual-store-compare__downloads{display:flex;flex-wrap:wrap;gap:.7rem;margin:1rem 0}
+.planner-actual-store-compare__progress{display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;margin:1rem 0}
+.planner-actual-store-compare__progress progress{width:160px;max-width:100%}
+.planner-actual-store-compare__progress label,.planner-actual-store-compare__route-stores label{display:flex;gap:.5rem;align-items:center}
+.planner-actual-store-compare__route-stores input{flex-shrink:0}

@@ -3,7 +3,8 @@ import type { SavedRecipe } from './recipeLibrary.ts'
 
 /** Same canonical recipe shape as built-ins, with no invented cost estimate. */
 export function toPlannerRecipe(recipe: SavedRecipe): RecipeWithIngredients | null {
-  if (recipe.servings === null || recipe.minutes === null || recipe.ingredients.some(i => i.reviewReason || i.amount === null || i.unit === null)) return null
+  if (recipe.servings === null || recipe.minutes === null || recipe.ingredients.some(i => i.reviewReason || i.amount === null || i.unit === null ||
+    (i.unit === 'piece' && !Number.isSafeInteger(i.amount)))) return null
   return {
     id: recipe.id, title: recipe.title, minutes: recipe.minutes, servings: recipe.servings,
     estimatedCost: Number.NaN, tags: ['Eigen recept'],
