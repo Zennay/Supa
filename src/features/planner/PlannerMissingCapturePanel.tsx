@@ -14,7 +14,7 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
 }) {
   const [localMessage, setLocalMessage] = useState('')
   const [copyableMissingGuide, setCopyableMissingGuide] = useState<{
-    store: CaptureStore; text: string; fingerprint: string
+    store: CaptureStore | 'both'; text: string; fingerprint: string
   } | null>(null)
   // Existing SKU reviews are not fresh source captures. Only missing physical
   // source candidates require this deliberately blank partial input sheet.
@@ -62,6 +62,37 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
       setLocalMessage('Klembord niet toegestaan: selecteer de meeneemlijst van ' + store + ' hieronder.')
     } catch (cause) {
       setLocalMessage(cause instanceof Error ? cause.message : 'Mobiele meeneemlijst niet beschikbaar.')
+    }
+  }
+  async function copyCombinedMissingCapture() {
+    setLocalMessage('')
+    setCopyableMissingGuide(null)
+    try {
+      const fingerprint = captureFingerprint
+      const needs = {
+        PLUS: missingCaptureFor('PLUS', Date.now()),
+        DekaMarkt: missingCaptureFor('DekaMarkt', Date.now()),
+      }
+      const { selectiveTwoStoreCaptureGuide } = await import('./selectiveTwoStoreCapture.ts')
+      const content = selectiveTwoStoreCaptureGuide(needs)
+      if (latestCaptureFingerprint.current !== fingerprint ||
+          JSON.stringify(needs) !== JSON.stringify({
+            PLUS: missingCaptureFor('PLUS', Date.now()),
+            DekaMarkt: missingCaptureFor('DekaMarkt', Date.now()),
+          })) throw new Error('Het weekmenu is veranderd tijdens het maken van de lijst.')
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(content)
+          if (latestCaptureFingerprint.current !== fingerprint) return
+          setLocalMessage('De gecombineerde ongeprijsde PLUS/Deka-meeneemlijst is gekopieerd.')
+          return
+        } catch { /* Show selectable fallback. */ }
+      }
+      if (latestCaptureFingerprint.current !== fingerprint) return
+      setCopyableMissingGuide({ store: 'both', text: content, fingerprint })
+      setLocalMessage('Selecteer en kopieer de gecombineerde meeneemlijst hieronder.')
+    } catch (cause) {
+      setLocalMessage(cause instanceof Error ? cause.message : 'Gecombineerde lijst niet beschikbaar.')
     }
   }
   async function downloadCombinedMissingCapture(kind: 'csv' | 'csv-excel' | 'guide') {
@@ -160,6 +191,16 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
             <button type="button" className="ghost-button" onClick={() => void downloadCombinedMissingCapture('guide')}>
               Download één bijbehorende rijgids (TXT)
             </button>
+            <button type="button" className="ghost-button" onClick={() => void copyCombinedMissingCapture()}>
+              Kopieer gecombineerde meeneemlijst (mobiel)
+            </button>
+            {copyableMissingGuide?.store === 'both' &&
+              copyableMissingGuide.fingerprint === captureFingerprint &&
+              <label className="own-store-planner__targeted-copy">
+                Beide winkels: selecteer de volledige ongeprijsde meeneemlijst
+                <textarea readOnly rows={12} value={copyableMissingGuide.text}
+                  onFocus={event => event.currentTarget.select()} />
+              </label>}
             <small>De winkels mogen verschillende aantallen lege regels hebben.
               De gids vermeldt exact welke rij bij welk Planner-ingrediënt hoort.
               Importeer het ingevulde bestand via de bestaande Vergelijk-knop.</small>
