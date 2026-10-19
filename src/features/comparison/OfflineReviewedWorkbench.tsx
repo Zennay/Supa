@@ -7,6 +7,7 @@ import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwo
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
+import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { createMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
@@ -223,6 +224,7 @@ export function OfflineReviewedWorkbench({
   } | null>(null)
 
   const [weekExportMessage, setWeekExportMessage] = useState('')
+  const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   const [manualSku, setManualSku] = useState<Record<typeof stores[number], Record<string, string>>>({
     PLUS: {}, DekaMarkt: {},
@@ -248,6 +250,11 @@ export function OfflineReviewedWorkbench({
     }
   }, [])
 
+  const plannerCaptureNeeds = useMemo(() => {
+    try { return aggregatePlanIngredients(plan, recipes, activeDays) }
+    catch { return [] }
+  }, [plan, recipes, activeDays])
+
   function saveSelectedWeek() {
     try {
       const json = exportPrivatePlannerWeek(plan, recipes, activeDays)
@@ -265,6 +272,75 @@ export function OfflineReviewedWorkbench({
       setWeekExportMessage('Je geselecteerde weekmenu is lokaal gedownload. Open het bestand in de privévergelijker onder stap 2. Geen winkelprijzen of winkelproduct-ID’s meegestuurd.')
     } catch {
       setWeekExportMessage('Weekmenu niet exporteerbaar. Controleer geselecteerde dagen, eigen recepten en metrische hoeveelheden in Planner.')
+    }
+  }
+
+  async function downloadBlankPlannerCaptureCsv() {
+    try {
+      const target = captureSheetStore
+      const storesToCapture: readonly CaptureStore[] = target === 'both'
+        ? stores : [target]
+      const { makeBlankPlannerCaptureCsv } = await import('./plannerPriceCaptureSheet.ts')
+      const csv = makeBlankPlannerCaptureCsv(plannerCaptureNeeds, storesToCapture)
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = target === 'both'
+          ? 'supa-weekmenu-eigen-prijsopname-PLUS-DekaMarkt.csv'
+          : 'supa-weekmenu-eigen-prijsopname-' + target + '.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage('Leeg CSV-invulblad voor ' + (target === 'both' ? 'beide winkels' : target) + ' gedownload. De andere winkel kun je later apart importeren. Zonder echte productcodes, verpakking, bronmoment, beschikbaarheid en prijs wordt niets geprijsd.')
+    } catch {
+      setWeekExportMessage('Geen geldig weekmenu voor het prijsinvulblad. Controleer eerst je Planner-ingrediënten en hoeveelheden.')
+    }
+  }
+
+  async function downloadPlannerCaptureGuide() {
+    try {
+      const target = captureSheetStore
+      const selected: readonly CaptureStore[] = target === 'both'
+        ? stores : [target]
+      const { makePlannerCaptureGuide } = await import('./plannerPriceCaptureGuide.ts')
+      const guide = makePlannerCaptureGuide(plannerCaptureNeeds, selected)
+      const url = URL.createObjectURL(new Blob([guide], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = target === 'both'
+          ? 'supa-weekmenu-PLUS-Deka-opnamegids.txt'
+          : 'supa-weekmenu-' + target + '-opnamegids.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage('Opnamegids lokaal gedownload. De CSV-regels en oorspronkelijke Planner-hoeveelheden staan erin; bronproducten en prijzen moet je zelf echt vastleggen.')
+    } catch {
+      setWeekExportMessage('Geen geldig weekmenu voor de opnamegids. Controleer de Planner-ingrediënten.')
+    }
+  }
+
+  async function downloadPrintablePlannerCapture() {
+    try {
+      const target = captureSheetStore
+      const selected: readonly CaptureStore[] = target === 'both'
+        ? stores : [target]
+      const { makePrintablePlannerCaptureHtml } = await import('./plannerPriceCapturePrint.ts')
+      const html = makePrintablePlannerCaptureHtml(plannerCaptureNeeds, selected)
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = target === 'both'
+          ? 'supa-weekmenu-PLUS-Deka-opnameformulier.html'
+          : 'supa-weekmenu-' + target + '-opnameformulier.html'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage('Printbaar opnameformulier lokaal opgeslagen. Open de HTML zonder internet en print het; schrijf alleen echte bronproducten, verpakkingen en prijzen op. Vul later de bijhorende CSV in.')
+    } catch {
+      setWeekExportMessage('Geen geldig weekmenu voor het opnameformulier. Controleer de Planner-ingrediënten.')
     }
   }
 
@@ -1088,10 +1164,57 @@ export function OfflineReviewedWorkbench({
           <button type="button" onClick={saveSelectedWeek}>
             Download geselecteerd weekmenu (JSON)
           </button>
+          <label>Invulblad voor winkel(s)
+            <select value={captureSheetStore}
+              onChange={event => setCaptureSheetStore(event.target.value as 'both' | CaptureStore)}>
+              <option value="both">PLUS en DekaMarkt</option>
+              <option value="PLUS">Alleen PLUS</option>
+              <option value="DekaMarkt">Alleen DekaMarkt</option>
+            </select>
+          </label>
+          <button type="button" className="ghost-button"
+            disabled={plannerCaptureNeeds.length === 0}
+            onClick={downloadBlankPlannerCaptureCsv}>
+            Download leeg prijsinvulblad (CSV)
+          </button>
+          <button type="button" className="ghost-button"
+            disabled={plannerCaptureNeeds.length === 0}
+            onClick={downloadPlannerCaptureGuide}>
+            Download bijhorende opnamegids (TXT)
+          </button>
+          <button type="button" className="ghost-button"
+            disabled={plannerCaptureNeeds.length === 0}
+            onClick={downloadPrintablePlannerCapture}>
+            Download printbaar opnameformulier (HTML)
+          </button>
           <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
           </a>
         </div>
+        {plannerCaptureNeeds.length > 0 && (
+          <details>
+            <summary>Welke prijsinvulregel hoort bij welk Planner-ingrediënt?</summary>
+            <p>Vul uitsluitend je werkelijk waargenomen winkelproduct in. In de CSV staan eerst
+              {captureSheetStore === 'both'
+                ? ` ${plannerCaptureNeeds.length} PLUS-regels, gevolgd door ${plannerCaptureNeeds.length} DekaMarkt-regels.`
+                : ` ${plannerCaptureNeeds.length} ${captureSheetStore}-regels.`}
+              De eerste regel bevat kolomkoppen. Alle productcodes, namen, bronmomenten,
+              verpakkingsinhouden en prijzen zijn bewust leeg. De voorgestelde eenheid is
+              alleen een hulp; controleer de echte verpakking. Zet beschikbaarheid alleen
+              op <code>true</code> na controle van je echte bron. Lege regels worden overgeslagen.
+              De twee winkels hoeven niet allebei ingevuld te zijn; zonder tweede winkel
+              verschijnt geen prijsverschil.</p>
+            <ol>{plannerCaptureNeeds.map((need, index) => (
+              <li key={need.id}>
+                {captureSheetStore !== 'DekaMarkt' && <>PLUS CSV-regel {index + 2}</>}
+                {captureSheetStore === 'both' && ' / '}
+                {captureSheetStore !== 'PLUS' && <>DekaMarkt CSV-regel {index + 2 +
+                  (captureSheetStore === 'both' ? plannerCaptureNeeds.length : 0)}</>}:
+                {' '}{need.label} · gevraagd {need.amount ?? '?'} {need.unit}
+              </li>
+            ))}</ol>
+          </details>
+        )}
         <p role="status" aria-live="polite">{weekExportMessage}</p>
       </div>
       <LocalTwoStorePriceEditor

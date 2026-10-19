@@ -1020,3 +1020,42 @@ matching- en individuele tijd-/reviewgates zijn niet versoepeld.
 De productiebuild levert nu een aparte checkoutbundle van circa
 28 kB naast de gewone appbundle; de gewone appbundel is circa
 26 kB kleiner dan vóór de splitsing (ongecomprimeerd).
+
+## Nieuw weekmenu: direct een leeg CSV-prijsinvulblad downloaden
+
+In **Vergelijk → Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden** kun je
+**Download leeg prijsinvulblad (CSV)** kiezen. Kies eerst **beide winkels**, **alleen PLUS** of **alleen DekaMarkt**. Supa neemt alleen de
+*fysieke ingrediëntenbehoefte* van de geselecteerde Planner-dagen mee. Er wordt
+geen winkel-SKU, productnaam, oude prijs, tijdstempel, beschikbaarheid of
+retailerautorisatie aangemaakt. Het CSV-bestand heeft precies de bestaande
+negen verplichte kolomkoppen. Het is expliciet een **leeg werkblad, geen brondata**.
+
+Per ingrediënt is er één regel per gekozen winkel. Het gecombineerde werkblad
+heeft eerst alle PLUS-regels en dan alle DekaMarkt-regels; een enkelwinkelblad
+heeft alleen de rijen van die winkel. Je kunt na een echte PLUS-waarneming
+later apart DekaMarkt invullen en toevoegen, zonder vooraf een tweede bron te
+verzinnen. De
+uitklapbare hulp onder de knop toont de precieze spreadsheet-rijnummers en de
+gevraagde hoeveelheid. Met **Download bijhorende opnamegids (TXT)** krijg je
+precies die rijnummers en hoeveelheden op papier of in een offline notitie,
+passend bij de gekozen een- of tweewinkel-CSV. De gids bevat zelf geen
+winkelproducten, prijzen of bewijs. Met **Download printbaar opnameformulier
+(HTML)** krijg je voor dezelfde keuze een geheel offline, zelf af te drukken
+winkelblad met lege schrijfvelden voor de originele productcode, naam,
+verpakking, prijs, beschikbaarheid en de echte broncontext. Het formulier
+draait geen scripts of netwerkverzoeken en verandert geen enkele bronopname;
+na de winkeltrip zet je zelf alleen de geobserveerde feiten in het CSV-bestand. De eenheid is hooguit een bewerkbare hint; neem de
+werkelijke inhoud van de aangeboden verpakking over. Vul per werkelijk gevonden
+winkelproduct de originele `id`, `name`, `packAmount`, `packUnit`, `packCount`,
+`priceCents` in hele centen, `observedAt` met echte tijdzone en `available` als
+`true` of `false` in. Iedere ingevulde regel van dezelfde winkel moet dezelfde
+echte opnametijd hebben. Gebruik alleen bronnen die je rechtmatig mag verwerken.
+
+**Laat ontbrekende productregels helemaal leeg** (behalve hun al ingevulde
+winkelnaam, eventuele eenheidshint en `available=false`). De canonieke CSV-import
+slaat uitsluitend deze volledig lege bronrecords over; een half ingevuld artikel
+wordt geweigerd. Als maar één winkel werkelijk is ingevuld, kun je alleen diens
+gegevens importeren; een niet ingevulde tweede winkel wordt nooit gesimuleerd.
+Geen enkele waarneming betekent geen geprijsd mandje. Voor een prijsverschil
+blijven de bestaande 7-dagen-/24-uursgrenzen, daadwerkelijke bronproducten,
+volledige fysieke dekking en menselijke bevestiging vereist.
