@@ -56,7 +56,7 @@ export function PlannerActualTwoStoreSummary({plus,deka,comparison,source,fresh,
   const visitCost = parsePrivateExtraVisitCostCents(visitCostText)
   const netDifference = mixed && (!needsSecondStop || visitCost !== null)
     ? mixed.additionalDifferenceCents - (needsSecondStop ? visitCost! : 0) : null
-  function downloadMixedRoute() {
+  async function downloadMixedRoute(kind: 'txt' | 'csv' | 'html') {
     try {
       const current = BigInt(Date.now()) * 1_000_000n
       const datesCurrent = (['PLUS', 'DekaMarkt'] as const).every(store => {
@@ -69,22 +69,37 @@ export function PlannerActualTwoStoreSummary({plus,deka,comparison,source,fresh,
       const second = (['PLUS', 'DekaMarkt'] as const).every(shop =>
         freshPlan.lines.some(line => line.store === shop))
       const extra = parsePrivateExtraVisitCostCents(visitCostText)
-      const text = formatMixedStoreShoppingPlan(freshPlan, {
+      const captured = {
         PLUS: source.captures.PLUS.observedAt,
         DekaMarkt: source.captures.DekaMarkt.observedAt,
-      }, {}, second ? extra : 0)
+      }
+      const costCents = second ? extra : 0
+      const text = kind === 'txt'
+        ? formatMixedStoreShoppingPlan(freshPlan, captured, {}, costCents)
+        : kind === 'csv'
+          ? (await import('../comparison/mixedStoreRouteCsv.ts'))
+            .exportMixedStoreRouteCsv({
+              plus, deka, route: freshPlan, captured, checked: new Set<string>(),
+              extraVisitCostCents: costCents, strategy: 'auto',
+            })
+          : (await import('../comparison/mixedStorePrintHtml.ts'))
+            .printMixedStoreRouteHtml({
+              plus, deka, route: freshPlan, captured, checked: new Set<string>(),
+              extraVisitCostCents: costCents, strategy: 'auto',
+            })
       if (new TextEncoder().encode(text).byteLength > 256_000) {
         throw Error('De winkelroute is te groot voor export.')
       }
-      const url = URL.createObjectURL(new Blob([text], {type: 'text/plain;charset=utf-8'}))
+      const url = URL.createObjectURL(new Blob([text], {type: (kind === 'txt' ? 'text/plain' :
+        kind === 'csv' ? 'text/csv' : 'text/html') + ';charset=utf-8'}))
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = 'supa-mijn-twee-winkelroute.txt'
+        link.download = 'supa-mijn-twee-winkelroute.' + kind
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setDownloadMessage('Privéwinkelroute gedownload. Controleer de bronprijzen zelf.')
+      setDownloadMessage('Privéwinkelroute als ' + kind.toUpperCase() + ' gedownload. Controleer de bronprijzen zelf.')
     } catch (error) {
       setDownloadMessage(error instanceof Error ? error.message :
         'Geen betrouwbare winkelroute beschikbaar.')
@@ -173,9 +188,14 @@ export function PlannerActualTwoStoreSummary({plus,deka,comparison,source,fresh,
               {' '}({line.ingredientLabel}) · {euros.format(line.lineTotalCents / 100)}</li>)}</ul>
         </section>)}
       </div>
-      <button type="button" className="ghost-button" onClick={downloadMixedRoute}>
-        Download mijn privéwinkelroute (TXT)
-      </button>
+      <div className="planner-actual-store-compare__downloads">
+        {(['txt', 'csv', 'html'] as const).map(kind => <button
+          key={kind} type="button" className="ghost-button"
+          onClick={() => { void downloadMixedRoute(kind) }}>
+          {kind === 'html' ? 'Afdrukbare privéroute (HTML)' :
+            'Download mijn privéroute (' + kind.toUpperCase() + ')'}
+        </button>)}
+      </div>
       <p role="status">{downloadMessage}</p>
     </details>}
     <button type="button" className="ghost-button" onClick={onOpen}>

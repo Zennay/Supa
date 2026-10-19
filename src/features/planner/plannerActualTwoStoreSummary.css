@@ -22,3 +22,4 @@
 .planner-actual-store-compare__route-stores ul{padding-left:1.3rem}
 .planner-actual-store-compare__route-stores li{margin:.4rem 0;overflow-wrap:anywhere}
 @media(max-width:680px){.planner-actual-store-compare__route-stores{grid-template-columns:1fr}}
+.planner-actual-store-compare__downloads{display:flex;flex-wrap:wrap;gap:.7rem;margin:1rem 0}
