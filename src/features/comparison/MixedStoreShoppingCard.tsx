@@ -20,7 +20,7 @@ const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
  */
 export function MixedStoreShoppingCard({
   mixed, single, plus, deka, captured, eligibleNow, weekBudget,
-  plannerPlan, plannerRecipes, plannerActiveDays, isSingleCheckedOnRoute, routeChoice, routeCostIntent,
+  plannerPlan, plannerRecipes, plannerActiveDays, privatePlanKey, isSingleCheckedOnRoute, routeChoice, routeCostIntent,
 }: {
   mixed: MixedStoreShoppingPlan
   single: MixedStoreShoppingPlan
@@ -32,6 +32,7 @@ export function MixedStoreShoppingCard({
   plannerPlan?: PlannedMeal[]
   plannerRecipes?: RecipeWithIngredients[]
   plannerActiveDays?: string[]
+  privatePlanKey?: string
   isSingleCheckedOnRoute?: (line: MixedStoreLine) => boolean
   routeChoice?: PrivateRouteChoice | null
   routeCostIntent?: PrivateExtraVisitCostIntent | null
@@ -237,6 +238,38 @@ export function MixedStoreShoppingCard({
     }
   }
 
+  async function downloadRouteWithExtras() {
+    if (!privatePlanKey || block || !eligibleNow()) { setMessage('Herzie eerst het exacte Planner-weekmandje, de bronnen en kosten.'); return }
+    try {
+      const { readSavedExtrasForPlan } = await import('./ownExtraGroceriesStorage.ts')
+      const saved = readSavedExtrasForPlan(privatePlanKey)
+      if (!saved.available) { setMessage('Extra lijst is niet veilig leesbaar.'); return }
+      if (!saved.items.length) {
+        setMessage('Bewaar jouw extra boodschappen onderaan Lijst eerst in dit tabblad.')
+        return
+      }
+      const visible = onlyOpen ? saved.items.filter(item => !item.done) : saved.items
+      const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
+      const complete = [printable, '',
+        'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ' apart bewaard)',
+        'Geen gekoppelde winkel, bronprijs, pakprijs of bijdrage aan bovenstaand prijsverschil.',
+        ...visible.map(item => (item.done ? '☑ ' : '☐ ') + clean(item.name) +
+          ' · ' + item.quantity + ' ' + (item.unit === 'piece' ? 'stuks' : item.unit) +
+          ' · prijs onbekend'),
+        'Bovenstaande bedragen omvatten uitsluitend het geprijsde Planner-weekmandje.',
+      ].join('\n')
+      if (new TextEncoder().encode(complete).length > 128000 || !eligibleNow())
+        throw Error('Bron of lijst is niet meer geldig.')
+      const url = URL.createObjectURL(new Blob([complete], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a'); link.href = url
+        link.download = 'supa-winkelroute-plus-ongeprijsde-extra-boodschappen.txt'
+        document.body.append(link); try { link.click() } finally { link.remove() }
+        setMessage('Gecombineerde privéroute opgeslagen. De extras tellen niet mee in eurototalen.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch { setMessage('Controleer je bron en eigen extra boodschappen voor export.') }
+  }
+
   function downloadRouteCsv() {
     if (block || !eligibleNow()) {
       setMessage('Controleer eerst alle originele bronartikelen en de eventueel opgegeven extra kosten.')
@@ -421,6 +454,10 @@ export function MixedStoreShoppingCard({
       </button>}
       <button type="button" className="ghost-button" onClick={() => setChecked({})}>Wis vinkjes</button>
       <button type="button" className="ghost-button" onClick={download}>Download gekozen weergave (TXT)</button>
+      {privatePlanKey && <button type="button" className="ghost-button"
+        onClick={() => { void downloadRouteWithExtras() }}>
+        Download gekozen winkelroute + bewaarde ongeprijsde extras (TXT)
+      </button>}
       <button type="button" className="ghost-button" onClick={downloadRouteCsv}>
         Download volledige route met beide winkelprijzen (CSV)
       </button>
@@ -433,6 +470,9 @@ export function MixedStoreShoppingCard({
         setShowText(value => !value)
       }}>{showText ? 'Verberg kopieerbare lijst' : 'Toon kopieerbare lijst'}</button>
     </div>
+    <small>De gecombineerde route-TXT bevat alleen expliciet in deze tab bewaarde extra
+      boodschappen van exact deze Planner-week. Extra kosten zijn onbekend en
+      niet in de winkelvergelijking opgeteld.</small>
     <small>TXT en kopieerweergave volgen 'Alleen nog te kopen'. CSV en printbare
       HTML bewaren steeds de volledige gecontroleerde route inclusief vinkjes,
       originele SKU’s, pakprijzen en bronmomenten.</small>

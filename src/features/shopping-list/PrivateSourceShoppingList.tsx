@@ -403,6 +403,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               captured={{ PLUS: plus.observedAt, DekaMarkt: deka.observedAt }}
               eligibleNow={pairCurrentNow} weekBudget={budget}
               plannerPlan={plan} plannerRecipes={recipes} plannerActiveDays={activeDays}
+              privatePlanKey={reviewed.planKey}
               isSingleCheckedOnRoute={isSingleCheckedOnRoute}
               routeChoice={routeChoice?.planKey === reviewed.planKey ? routeChoice : null}
               routeCostIntent={routeCostIntent?.planKey === reviewed.planKey &&
