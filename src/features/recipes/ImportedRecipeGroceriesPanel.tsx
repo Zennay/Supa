@@ -477,6 +477,43 @@ export function ImportedRecipeGroceriesPanel({
       setFeedback(cause instanceof Error ? cause.message : 'Het lege winkelopnameblad is niet beschikbaar.')
     }
   }
+  async function downloadPrintableCaptureKit() {
+    if (!privateTransfer.ready) return
+    setFeedback('')
+    const key = captureKey
+    try {
+      requireLatestOwnedRecipes()
+      const [{ combinedRecipesCaptureKit }, { makePrintablePlannerCaptureHtml }] =
+        await Promise.all([
+          import('./combinedRecipesCaptureKit.ts'),
+          import('../comparison/plannerPriceCapturePrint.ts'),
+        ])
+      requireLatestOwnedRecipes()
+      if (latestCaptureKey.current !== key)
+        throw new Error('De gekozen recepten of winkels zijn veranderd. Maak het formulier opnieuw.')
+      const stores = captureTarget === 'both' ? ['PLUS', 'DekaMarkt'] as const : [captureTarget]
+      const kit = combinedRecipesCaptureKit(selected, portionsById, stores)
+      // This canonical capture kit already fixes source demand, CSV row order,
+      // store grouping and the physical limits. Use its first store's rows as
+      // needs: the existing print engine reproduces those exact row numbers.
+      const needs = kit.rows.filter(row => row.store === stores[0]).map(row => ({
+        id: row.id, label: row.label, amount: row.amount, unit: row.unit,
+      }))
+      const html = makePrintablePlannerCaptureHtml(needs, stores)
+      requireLatestOwnedRecipes()
+      if (latestCaptureKey.current !== key)
+        throw new Error('De fysieke weekvraag of winkelkeuze is veranderd.')
+      const fingerprint = unpricedProgressStorageKey(progressIdentity).split(':').pop()!
+      savePrivateFile('supa-recepten-' + fingerprint + '-' + kit.storeLabel +
+        '-printbare-lege-winkelopname.html', html, 'text/html;charset=utf-8')
+      setFeedback('Printbaar offline-formulier voor precies dezelfde CSV-rijen opgeslagen. ' +
+        'Open de HTML lokaal en print deze. De originele broncode, prijs, verpakking en echte tijd ' +
+        'moet je zelf rechtmatig vastleggen; kopieer ze daarna in het bijbehorende lege CSV.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'Het printbare formulier is niet beschikbaar. De winkelprijzen blijven onbekend.')
+    }
+  }
   const exportForStores = () => {
     if (!list?.canCopy) return
     try {
@@ -761,6 +798,10 @@ export function ImportedRecipeGroceriesPanel({
           <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void downloadCaptureKit('csv')}>
             Download leeg winkelinvulblad (CSV)
+          </button>
+          <button type="button" disabled={!privateTransfer.ready}
+            onClick={() => void downloadPrintableCaptureKit()}>
+            Download printbaar opnameformulier (HTML)
           </button>
           <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void downloadCaptureKit('guide')}>
