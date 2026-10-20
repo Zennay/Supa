@@ -89,8 +89,15 @@ export function LocalDeviceBarcodeScanner({
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false, video: { facingMode: { ideal: 'environment' } },
       })
-      if (generation !== generationRef.current) {
+      // Camera permission may resolve only after the user changes tabs.
+      // Never activate the stream in an invisible/background document.
+      if (generation !== generationRef.current || document.visibilityState === 'hidden') {
         stream.getTracks().forEach(track => track.stop())
+        if (generation === generationRef.current) {
+          stopCamera()
+          setState('idle')
+          setError('Scan gestopt: het tabblad was niet zichtbaar toen de camera beschikbaar kwam.')
+        }
         return
       }
       streamRef.current = stream
