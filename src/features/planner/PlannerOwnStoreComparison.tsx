@@ -9,6 +9,8 @@ import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { printableOwnStoreComparison } from './downloadOwnStoreComparison.ts'
 // Price deltas only exist after both sources are fully reviewed; defer these
 // heavier presentational modules so the everyday Planner loads sooner.
+const PlannerKnownLinePrices = lazy(() => import('./PlannerKnownLinePrices.tsx')
+  .then(module => ({ default: module.PlannerKnownLinePrices })))
 const PlannerOwnProductDeltas = lazy(() => import('./PlannerOwnProductDeltas.tsx')
   .then(module => ({ default: module.PlannerOwnProductDeltas })))
 const PlannerTwoStoreCoverage = lazy(() => import('./PlannerTwoStoreCoverage.tsx')
@@ -541,6 +543,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               : summary.status === 'different-moments'
                 ? 'De originele winkelmomenten liggen meer dan 24 uur uiteen.'
                 : 'De fysieke mandjes zijn nog niet aantoonbaar gelijkwaardig.'}</p>
+          {captureProgress && <Suspense fallback={<p role="status">Oorspronkelijke losse winkelprijzen laden…</p>}>
+            <PlannerKnownLinePrices progress={captureProgress} reviewed={reviewed}
+              now={now} onReviewIngredient={onReviewIngredient} />
+          </Suspense>}
           {summary.available.length > 0 && <div className="own-store-planner__overview-totals"
             aria-label="Losse complete eigen winkelmandjes, geen prijsvergelijking">
             {stores.map(store => {

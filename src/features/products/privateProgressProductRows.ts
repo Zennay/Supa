@@ -111,6 +111,9 @@ function originalPartialProduct(line: PrivateReviewedSourceLine): PrivateKnownPr
 
 export type PrivateKnownPricePair = {
   ingredientId: string
+  ingredientLabel: string
+  requiredAmount: number
+  requiredUnit: string
   plusCents: number
   dekaCents: number
   plusPacks: number
@@ -138,6 +141,9 @@ export function privateKnownPricePairs(
   for (const pair of privateProgressPricePairs(progress, now)) {
     result.set(pair.one.ingredientId, {
       ingredientId: pair.one.ingredientId,
+      ingredientLabel: pair.one.ingredientLabel,
+      requiredAmount: pair.one.requiredAmount,
+      requiredUnit: pair.one.requiredUnit,
       plusCents: pair.one.lineTotalCents,
       dekaCents: pair.other.lineTotalCents,
       plusPacks: pair.one.packagesNeeded,
@@ -181,6 +187,9 @@ export function privateKnownPricePairs(
       if (!Number.isSafeInteger(difference)) continue
       result.set(line.ingredientId, {
         ingredientId: line.ingredientId,
+        ingredientLabel: line.ingredientLabel,
+        requiredAmount: line.requiredAmount,
+        requiredUnit: line.requiredUnit,
         plusCents, dekaCents,
         plusPacks: completeStore === 'PLUS' ? original.packs : line.packagesNeeded,
         dekaPacks: completeStore === 'DekaMarkt' ? original.packs : line.packagesNeeded,
