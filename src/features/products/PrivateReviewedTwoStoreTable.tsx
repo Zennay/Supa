@@ -10,6 +10,7 @@ import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPl
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
+import { printableOwnStoreComparison } from '../planner/downloadOwnStoreComparison.ts'
 import { freshReviewedBaskets, privateReviewedPairWithin24Hours, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
@@ -36,6 +37,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const checkedRef = useRef(checked)
   checkedRef.current = checked
   const [receiptMessage, setReceiptMessage] = useState('')
+  const [portableReceipt, setPortableReceipt] = useState<{ pair: string; text: string } | null>(null)
   // Temporary trip costs belong to ONE original physical basket pair.
   // Never carry a previous week's travel scenario into newly imported prices.
   const [costIntent, setCostIntent] = useState<{ pair: string; raw: string } | null>(null)
@@ -143,6 +145,60 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         ' met originele prijzen, vinkjes en bekende kosten lokaal opgeslagen.')
     } catch {
       setReceiptMessage('Afdrukbare route niet beschikbaar. Controleer de originele winkelbronnen opnieuw.')
+    }
+  }
+  /** Explicit, local sharing of the SAME canonical whole-basket comparison as TXT.
+   * No outgoing requests, browser storage or inferred retailer prices.
+   * Revalidate original physical demand and observation instants at click time.
+   */
+  async function sharePrivateComparison(method: 'copy' | 'share') {
+    const current = freshReviewedBaskets(reviewedRef.current,
+      reviewedRef.current.planKey, Date.now())
+    const comparison = ownStoreWeekComparison(current)
+    if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+        !privateReviewedPairWithin24Hours(current.stores.PLUS, current.stores.DekaMarkt) ||
+        comparison.status !== 'comparable') {
+      setPortableReceipt(null)
+      setReceiptMessage('Deze eigen winkelbronnen zijn niet meer volledig vergelijkbaar. Herzie ze in Vergelijk.')
+      return
+    }
+    const livePairKey = JSON.stringify([
+      current.planKey, current.stores.PLUS.observedAt, current.stores.DekaMarkt.observedAt,
+      current.stores.PLUS.basket, current.stores.DekaMarkt.basket,
+    ])
+    const currentCost = costIntentRef.current?.pair === livePairKey
+      ? costIntentRef.current.raw.trim() : ''
+    const parsedCost = currentCost ? parsePrivateExtraVisitCostCents(currentCost) : null
+    if (currentCost && parsedCost === null) {
+      setReceiptMessage('Corrigeer de zelf opgegeven extra winkelstopkosten vóór delen.')
+      return
+    }
+    const text = printableOwnStoreComparison(comparison, {
+      PLUS: current.stores.PLUS.observedAt,
+      DekaMarkt: current.stores.DekaMarkt.observedAt,
+    }, comparison.mixedRoute?.requiresTwoStops ? parsedCost : null)
+    // The share sheet is deliberately only opened by an explicit user click.
+    // A browser without secure-context clipboard still has a local select/copy route.
+    try {
+      if (method === 'share' && typeof navigator.share === 'function') {
+        await navigator.share({ title: 'Supa · mijn privéwinkelvergelijking', text })
+        setPortableReceipt(null)
+        setReceiptMessage('Je eigen winkelvergelijking is aangeboden aan het deelmenu.')
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+        setPortableReceipt(null)
+        setReceiptMessage('De volledige privévergelijking is gekopieerd, inclusief SKU, bronmoment, hele-pak- en eenheidsprijzen.')
+      } else {
+        setPortableReceipt({ pair: livePairKey, text })
+        setReceiptMessage('Klembord niet beschikbaar. Selecteer en kopieer de lokale tekst hieronder.')
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setReceiptMessage('Delen geannuleerd. Je originele winkelbronnen zijn ongewijzigd.')
+        return
+      }
+      setPortableReceipt({ pair: livePairKey, text })
+      setReceiptMessage('Automatisch delen is niet gelukt. Je kunt de tekst hieronder zelf selecteren en kopiëren.')
     }
   }
   async function downloadReceipt(kind: 'csv' | 'txt') {
@@ -388,6 +444,20 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <button type="button" onClick={() => { void downloadReceipt('txt') }}>
         Bewaar winkeloverzicht (TXT{splitTrip && costCents !== null ? ' met extra kosten' : ''})
       </button>
+      <button type="button" onClick={() => { void sharePrivateComparison('copy') }}>
+        Kopieer de volledige privéwinkelvergelijking
+      </button>
+      {typeof navigator !== 'undefined' && typeof navigator.share === 'function' &&
+        <button type="button" onClick={() => { void sharePrivateComparison('share') }}>
+          Deel mijn volledige privéwinkelvergelijking
+        </button>}
+      {portableReceipt?.pair === pairKey && <div className="private-reviewed-products__copy-fallback">
+        <label htmlFor="supa-private-basket-copy">Zelf selecteerbare privévergelijking</label>
+        <textarea id="supa-private-basket-copy" readOnly rows={8}
+          value={portableReceipt.text}
+          onFocus={event => event.currentTarget.select()} />
+        <button type="button" onClick={() => setPortableReceipt(null)}>Sluit kopieertekst</button>
+      </div>}
       <button type="button" onClick={() => { void downloadMixedRoute('html') }}>
         Bewaar afdrukbare complete winkelroute (HTML)
       </button>
