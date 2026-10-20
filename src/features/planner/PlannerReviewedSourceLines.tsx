@@ -103,36 +103,32 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
   async function copyPairedCsv() {
     setExportMessage('')
     setPairCopyFallback(null)
+    let portableCsv: string | null = null
     try {
       const original = progress
       if (!plus || !deka || !pairedTime || !bothFresh || !pairs.length)
         throw new Error('Er zijn geen twee actuele, controleerbare bronproducten om te kopiëren.')
       const { privatePairedSourceCsv } = await import('./privatePairedSourceCsv.ts')
-      // Slow imports and tab changes must never keep an expired or superseded
-      // pair alive. The copied text preserves original SKU and capture time.
+      // Lazy import and tab updates must never retain an expired pair.
       if (latestEvidence.current !== original ||
           !recentOwnCaptureInstant(plus.observedAt, Date.now()) ||
           !recentOwnCaptureInstant(deka.observedAt, Date.now()))
         throw new Error('De bron is gewijzigd of verlopen. Bekijk eerst de huidige winkelopname.')
-      const csv = privatePairedSourceCsv(pairs, {
+      portableCsv = privatePairedSourceCsv(pairs, {
         PLUS: plus.observedAt, DekaMarkt: deka.observedAt,
       })
-      if (!navigator.clipboard?.writeText)
-        throw new Error('Klembord niet beschikbaar; selecteer de privé-CSV hieronder.')
-      await navigator.clipboard.writeText(csv)
+      if (!navigator.clipboard?.writeText) throw new Error('Klembord niet beschikbaar.')
+      await navigator.clipboard.writeText(portableCsv)
       setExportMessage('Eigen oorspronkelijke PLUS/Deka-bronproducten als privé-CSV gekopieerd. Deel ze alleen bewust; dit is geen volledig mandtotaal.')
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Klembord niet beschikbaar')) {
-        const { privatePairedSourceCsv } = await import('./privatePairedSourceCsv.ts')
-        if (latestEvidence.current === progress && bothFresh && pairs.length > 0 &&
-            plus && deka && recentOwnCaptureInstant(plus.observedAt, Date.now()) &&
-            recentOwnCaptureInstant(deka.observedAt, Date.now())) {
-          setPairCopyFallback({ source: progress, csv: privatePairedSourceCsv(pairs, {
-            PLUS: plus.observedAt, DekaMarkt: deka.observedAt,
-          }) })
-          setExportMessage('Automatisch kopiëren ontbreekt. Selecteer hieronder je eigen privé-CSV.')
-          return
-        }
+      // Permission denied or browser clipboard unavailable: give a local
+      // selectable fallback ONLY for this unchanged, still-fresh source.
+      if (portableCsv && latestEvidence.current === progress && bothFresh && pairs.length > 0 &&
+          plus && deka && recentOwnCaptureInstant(plus.observedAt, Date.now()) &&
+          recentOwnCaptureInstant(deka.observedAt, Date.now())) {
+        setPairCopyFallback({ source: progress, csv: portableCsv })
+        setExportMessage('Automatisch kopiëren niet beschikbaar. Selecteer hieronder je eigen privé-CSV.')
+        return
       }
       setExportMessage(error instanceof Error ? error.message :
         'Bronproducten kopiëren is niet beschikbaar. Download de privé-CSV.')
