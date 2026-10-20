@@ -63,8 +63,13 @@ function recipeMinutes(value: unknown): number | null {
 }
 
 function quantity(raw: string): number | null {
-  const vulgar: Record<string, number> = { '½': 0.5, '¼': 0.25, '¾': 0.75 }
+  const vulgar: Record<string, number> = {
+    '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3,
+    '⅛': 1 / 8, '⅜': 3 / 8, '⅝': 5 / 8, '⅞': 7 / 8,
+  }
   if (Object.hasOwn(vulgar, raw)) return vulgar[raw]
+  const joined = /^(\d+)\s?([½¼¾⅓⅔⅛⅜⅝⅞])$/u.exec(raw)
+  if (joined) return Number(joined[1]) + vulgar[joined[2]]
   // A dotted three-digit group (1.000 g) is ambiguous in Dutch recipes:
   // it may mean 1000 g, so never silently treat it as 1 g.
   if (/^[1-9]\d{0,2}\.\d{3}$/.test(raw)) return null
@@ -109,7 +114,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   // Common food labels such as "2 × 250 g rijst" represent two measured
   // portions, not two grams or an unexplained "x" ingredient. The exact
   // original stays attached to the draft for user review and provenance.
-  const multiplied = /^(\d{1,4})\s*[x×*]\s*((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+(.+)$/iu.exec(original)
+  const multiplied = /^(\d{1,4})\s*[x×*]\s*((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([a-z]+)\s+(.+)$/iu.exec(original)
   if (multiplied) {
     const repetitions = Number(multiplied[1])
     const perPart = quantity(multiplied[2])
@@ -132,7 +137,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
       amount: null, unit: null, reviewReason:
         'Controleer het aantal maal de verpakking en voer het metrische totaal in' }
   }
-  const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
+  const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*(.*)$/u)
   if (!match) return { original, label: original, query: original.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid of eenheid ontbreekt' }
   const amount = quantity(match[1])
   const tail = match[2].trim()
@@ -145,7 +150,7 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   // Each additional unit must belong to the same physical family. Never
   // silently turn "1 kg 250 g 100 g" into a label or underbuy ingredients.
   if (metric) {
-    const additional = /^(?:(?:en|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([^\s,]+)(?:\s+|,\s*)(.*)$/u
+    const additional = /^(?:(?:en|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([^\s,]+)(?:\s+|,\s*)(.*)$/u
     for (; componentCount < 8; componentCount++) {
       const next = additional.exec(label)
       if (!next) break
