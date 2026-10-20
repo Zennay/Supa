@@ -240,3 +240,13 @@ background:#e7f4eb!important}
 .private-reviewed-products__missing-transfer p{ margin:0; font-size:.9rem; line-height:1.5; }
 .private-reviewed-products__missing-transfer button{ width:100%; }
 @media(max-width:620px){.private-reviewed-products__pending{grid-template-columns:1fr}}
+
+/* Actual individually confirmed products can be browsed before a complete
+   basket exists, without making an incomplete cost a basket total. */
+.private-reviewed-products__partial-cards{display:grid;gap:.8rem;padding:1rem;
+  background:#f5f9f5;border:1px solid #d0dfd2;border-radius:14px;min-width:0}
+.private-reviewed-products__partial-cards h3{margin:0}
+.private-reviewed-products__partial-cards p{line-height:1.5;margin:0}
+.private-reviewed-products__partial-cards>.private-reviewed-products__grid{margin:.25rem 0}
+.private-reviewed-products__partial-cards article{align-content:start}
+.private-reviewed-products__partial-cards article button{margin-top:auto}

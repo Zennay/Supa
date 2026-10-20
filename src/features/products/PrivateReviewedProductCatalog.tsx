@@ -16,11 +16,11 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
 const emptyReviewed: PrivateReviewedBaskets = { planKey: '', stores: {} }
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
-// Reuse the Planner's admitted partial-source rows and same-demand pairing.
-// Its formatter never converts incomplete sources into whole-basket totals.
-const PlannerReviewedSourceLines = lazy(async () => {
-  const module = await import('../planner/PlannerReviewedSourceLines.tsx')
-  return { default: module.PlannerReviewedSourceLines }
+// Individually admitted, incomplete product rows have their own browseable
+// cards; they must not masquerade as complete store receipts.
+const PrivatePartialProductCards = lazy(async () => {
+  const module = await import('./PrivatePartialProductCards.tsx')
+  return { default: module.PrivatePartialProductCards }
 })
 // Reuse the Planner's exact admitted offline CSV/TSV/JSON paste workflow.
 // It previews original SKU and capture facts, then hands off to Vergelijk;
@@ -309,17 +309,18 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
     </div>
     {currentProgress && !fullPairReady && <Suspense fallback={<p role="status">
       Bevestigde losse bronartikelen laden…</p>}>
-      <PlannerReviewedSourceLines progress={currentProgress} now={nowMs}
-        onOpenComparison={onOpenComparison} onReviewIngredient={onReviewIngredient}
-        hasCompleteComparison={fullPairReady} />
+      <PrivatePartialProductCards progress={currentProgress} reviewed={currentReviewed}
+        now={nowMs} onOpenComparison={onOpenComparison}
+        onReviewIngredient={onReviewIngredient} />
     </Suspense>}
     {hasExpiredSource && <p role="status" className="private-reviewed-products__age">
       Eén of beide eerdere winkelopnames zijn verlopen of niet meer bruikbaar.
       De bijbehorende prijzen zijn verborgen. Herzie de originele bron in Vergelijk;
       je eerdere lijstvinkjes blijven bewaard.
     </p>}
-    {!sources.length ? <p role="status">Nog geen complete en actuele eigen bronproducten beschikbaar.
-      Kies een weekmenu, importeer je eigen winkelbron en controleer iedere SKU en verpakking.</p> : <>
+    {!sources.length ? <p role="status">Er is nog geen volledig geprijsd winkelmandje.
+      De al bevestigde losse bronartikelen staan hierboven wanneer beschikbaar.
+      Controleer de ontbrekende SKU’s in Vergelijk; verzin geen prijzen.</p> : <>
       <div className="private-reviewed-products__controls">
         <label>Winkel <select value={store} onChange={event => {
           const next = event.target.value as 'all' | OwnStore
