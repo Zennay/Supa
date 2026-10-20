@@ -14,6 +14,7 @@ export function RecipeShoppingChangePanel({ preview, day }: {
   const [notice, setNotice] = useState('')
   const [showCopy, setShowCopy] = useState(false)
   const [showFullCopy, setShowFullCopy] = useState(false)
+  const [captureGuideCopy, setCaptureGuideCopy] = useState<{ stores: string; text: string } | null>(null)
   if (preview.status !== 'ready') return <section className="recipe-reuse-preview-shopping"
     aria-label="Boodschappenwijziging niet beschikbaar">
     <h4>Nieuwe boodschappen nog niet betrouwbaar</h4>
@@ -87,6 +88,25 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       setNotice('Alleen een leeg ' + stores.join(' + ') + '-invulbestand opgeslagen: nog geen bronprijzen.')
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Kan het winkelopnameblad niet downloaden.')
+    }
+  }
+
+  async function copyStoreCaptureGuide(stores: readonly CaptureStore[]) {
+    try {
+      const kit = proposedWeekCaptureKit(preview, stores)
+      if (typeof navigator.clipboard?.writeText !== 'function')
+        throw new Error('Klembord niet beschikbaar')
+      await navigator.clipboard.writeText(kit.guide)
+      setCaptureGuideCopy(null)
+      setNotice('Ongeprijsde ' + stores.join(' + ') + '-opnamegids gekopieerd. Je plan blijft ongewijzigd.')
+    } catch {
+      try {
+        const kit = proposedWeekCaptureKit(preview, stores)
+        setCaptureGuideCopy({ stores: stores.join(' + '), text: kit.guide })
+        setNotice('Klembord niet beschikbaar. Selecteer en kopieer de gids hieronder.')
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : 'De opnamegids is niet beschikbaar.')
+      }
     }
   }
   async function shareStoreCapture(stores: readonly CaptureStore[]) {
@@ -272,6 +292,8 @@ export function RecipeShoppingChangePanel({ preview, day }: {
             onClick={() => downloadStoreCapture([store], 'csv')}>Download lege {store}-CSV</button>
           <button type="button" className="ghost-button"
             onClick={() => downloadStoreCapture([store], 'guide')}>Download {store}-opnamegids</button>
+          <button type="button" className="ghost-button"
+            onClick={() => void copyStoreCaptureGuide([store])}>Kopieer {store}-opnamegids (mobiel)</button>
         </div>)}
         <button type="button" className="ghost-button"
           onClick={() => void shareStoreCapture(['PLUS', 'DekaMarkt'])}>
@@ -282,6 +304,11 @@ export function RecipeShoppingChangePanel({ preview, day }: {
     <small>De invulbladen bevatten geen bronproducten of bedragen en horen alleen bij dit
       voorgestelde weekmenu. Kies het recept eerst en vul uitsluitend echt waargenomen
       brongegevens in voordat je de CSV via Vergelijk importeert.</small>
+    {captureGuideCopy && <label>Opnamegids voor {captureGuideCopy.stores} handmatig kopiëren
+      <textarea readOnly rows={12} value={captureGuideCopy.text}
+        onFocus={event => event.currentTarget.select()} />
+      <small>Dit is alleen je voorgestelde fysieke behoefte. Geen retailerprijs of bewijs.</small>
+    </label>}
     {notice && <p role="status" aria-live="polite">{notice}</p>}
     {showFullCopy && <label>Volledige voorgestelde weeklijst zelf kopiëren (zonder prijzen)
       <textarea readOnly rows={Math.min(completeWeek.length + 7, 16)}
