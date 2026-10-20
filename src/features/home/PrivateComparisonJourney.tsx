@@ -705,6 +705,20 @@ export function PrivateComparisonJourney({
       }}>Bewaar mijn bekende winkelprijzen als offline afdruk (HTML)</button>
       {exportMessage && <p role="status">{exportMessage}</p>}
     </section>}
+    {!hasAnySource && captureNeeds.length > 0 && <section
+      className="private-comparison-journey__unpriced-start"
+      aria-label="Weekboodschappen zonder winkelprijzen">
+      <div>
+        <h3>Je weekboodschappen zijn al bruikbaar</h3>
+        <p>{captureNeeds.length} oorspronkelijke fysieke ingrediëntvragen in
+          jouw gekozen weekmenu. Open de ongeprijsde afvinklijst, ook als je nog
+          geen toegestane PLUS- of DekaMarkt-prijsopnames hebt.
+          Er worden geen winkelprijzen of producten verzonnen.</p>
+      </div>
+      <button type="button" onClick={() => onOpenList()}>
+        Open mijn ongeprijsde weeklijst
+      </button>
+    </section>}
     <div className="private-comparison-journey__actions">
       <button type="button" onClick={onOpenPlanner}>Open weekplanner</button>
       <button type="button" onClick={onOpenImport}>Importeer of controleer prijzen</button>

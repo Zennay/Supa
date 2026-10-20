@@ -123,3 +123,10 @@
 .private-comparison-journey__pending-actions{display:flex;flex-wrap:wrap;gap:.55rem}
 .private-comparison-journey__pending-actions button{flex:1 1 190px}
 .private-comparison-journey__pending-export textarea{display:block;width:100%;max-width:100%;min-height:120px;padding:.7rem;resize:vertical;overflow-wrap:anywhere;border:1px solid #9ab39e;border-radius:10px;background:#fff}
+/* The real, unpriced Planner checklist must not depend on price-source capture. */
+.private-comparison-journey__unpriced-start{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;margin:1rem 0;padding:1rem 1.1rem;border-radius:14px;border:1px solid #cbdccb;background:#f5f9f5}
+.private-comparison-journey__unpriced-start>div{flex:2 1 360px;min-width:0}
+.private-comparison-journey__unpriced-start h3{margin:0 0 .35rem;font-size:1.08rem}
+.private-comparison-journey__unpriced-start p{margin:0;line-height:1.5;color:#425c49}
+.private-comparison-journey__unpriced-start button{flex:1 1 180px}
+@media(max-width:630px){.private-comparison-journey__unpriced-start button{width:100%}}
