@@ -11,6 +11,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 import { evaluatePrivateAdapterHealth } from './retailer-private-adapter-health.mjs'
+import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
 import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
 
 const SHAPES = ['product', 'catalog', 'offers']
@@ -47,6 +48,34 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
       health.productionEnabled !== false ||
       health.publicSavingsClaimEligible !== false ||
       health.externalRequests !== 0) fail()
+
+  // A complete six-shape archive may still contain incompatible facts for the
+  // same product. Reconcile against the canonical catalog and route review to
+  // the affected retailer only; never mistake source coverage for consistency.
+  const accepted = batch.results.filter(result => result.accepted === true)
+  const catalog = accepted.length
+    ? buildUniversalRetailerCatalog({
+      summary: { mode: 'reviewed-offline-only' }, results: accepted,
+    })
+    : null
+  if ((catalog?.conflictCount ?? 0) !== health.inconsistentProducts) fail()
+  const conflictRetailers = new Set((catalog?.products ?? [])
+    .filter(product => product.consistency !== 'consistent')
+    .map(product => product.retailerId))
+  if ([...conflictRetailers].some(id => !RETAILERS.includes(id)) ||
+      health.operatorActions.includes('review-conflicting-product-facts') !==
+        (conflictRetailers.size > 0)) fail()
+  // Publish review workload *counts*, never product identifiers, prices or
+  // capture hashes. Catalog consistency is already canonical and reviewed.
+  const conflictCounts = Object.fromEntries(RETAILERS.map(id => [id, 0]))
+  for (const product of catalog?.products ?? []) {
+    if (!RETAILERS.includes(product.retailerId)) fail()
+    if (product.consistency !== 'consistent') {
+      conflictCounts[product.retailerId]++
+    }
+  }
+  if (RETAILERS.reduce((sum, id) => sum + conflictCounts[id], 0) !==
+      (catalog?.conflictCount ?? 0)) fail()
 
   const retailers = RETAILERS.map(retailerId => {
     const source = permissionGate.sources.find(row => row.supermarket === retailerId)
@@ -94,6 +123,8 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
         ? ['review-rejected-adapter-evidence'] : []),
       ...(kinds.some(k => k.staleHistoricalCaptures > 0)
         ? ['review-historical-capture-freshness'] : []),
+      ...(conflictRetailers.has(retailerId)
+        ? ['review-conflicting-product-facts'] : []),
       'validate-new-captures-offline-before-separate-release-approval',
     ]
     return {
@@ -102,6 +133,7 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
       sourceRightsReadyForProduction: !rightsBlocked,
       technicalAdapterShapeCount: SHAPES.length,
       acceptedHistoricalShapes: kinds.filter(k => k.acceptedSources > 0).length,
+      historicalConflictingProductCount: conflictCounts[retailerId],
       shapes: kinds,
       nextActions: actions,
       liveScrapingEnabled: false,
@@ -118,6 +150,7 @@ export function planPrivateRetailerRollout(permissionGate, batch, {
     expectedShapeCount: RETAILERS.length * SHAPES.length,
     historicalAcceptedShapes: retailers.reduce((sum, row) =>
       sum + row.acceptedHistoricalShapes, 0),
+    historicalConflictingProductCount: catalog?.conflictCount ?? 0,
     staleHistoricalCaptures: health.staleSources,
     missingHistoricalShapeCount: health.missingSourceKinds.length,
     rightsGateProductionReady: rights.productionReady,
