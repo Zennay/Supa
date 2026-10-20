@@ -56,3 +56,7 @@ padding:1rem;background:#f3f8f3;border:1px solid #cbdccb;border-radius:12px}
 background:#f3f8f3;border:1px solid #c0d3c2;border-radius:10px}
 .private-reviewed-products__difference-focus p{margin:0}
 .private-reviewed-products__difference-focus small{line-height:1.45}
+
+.private-reviewed-products__receipt-actions{display:flex;flex-wrap:wrap;align-items:start;gap:.65rem}
+.private-reviewed-products__receipt-actions button{flex:1 1 260px}
+.private-reviewed-products__receipt-actions small,.private-reviewed-products__receipt-actions p{flex:1 1 100%;margin:0;line-height:1.45}

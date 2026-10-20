@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
@@ -27,6 +29,34 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   checked: Readonly<Record<string, boolean>>
 }) {
+  const [receiptMessage, setReceiptMessage] = useState('')
+  async function downloadReceipt(kind: 'csv' | 'txt') {
+    // Keep the display and export on the same admitted original physical
+    // demand. Await lazy receipt code before rechecking source expiry.
+    try {
+      const exports = await import('../planner/downloadOwnStoreComparison.ts')
+      const current = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
+      const comparison = ownStoreWeekComparison(current)
+      if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+          !privateReviewedPairWithin24Hours(current.stores.PLUS, current.stores.DekaMarkt) ||
+          comparison.status !== 'comparable') {
+        setReceiptMessage('De originele winkelopnames zijn niet meer samen vergelijkbaar. Controleer ze opnieuw in Vergelijk.')
+        return
+      }
+      if (kind === 'csv') {
+        exports.downloadOwnStoreCsv(current, comparison)
+      } else {
+        const text = exports.printableOwnStoreComparison(comparison, {
+          PLUS: current.stores.PLUS.observedAt,
+          DekaMarkt: current.stores.DekaMarkt.observedAt,
+        })
+        exports.downloadOwnStoreText(text)
+      }
+      setReceiptMessage('Privé-overzicht gemaakt uit de twee volledige, actuele eigen winkelmandjes.')
+    } catch {
+      setReceiptMessage('Het privé-overzicht kon niet worden gemaakt. Je winkelbronnen blijven ongewijzigd.')
+    }
+  }
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
   const budgetComparison = (totalCents: number) => budgetCents === null ? null :
@@ -175,6 +205,18 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         of een berekening van werkelijk afgerekende producten.</small>
     </div>}
     <strong role="status">{leader}</strong>
+    <div className="private-reviewed-products__receipt-actions">
+      <button type="button" onClick={() => { void downloadReceipt('csv') }}>
+        Download volledige PLUS/Deka-prijsvergelijking (CSV)
+      </button>
+      <button type="button" onClick={() => { void downloadReceipt('txt') }}>
+        Bewaar leesbaar winkeloverzicht (TXT)
+      </button>
+      <small>Beide downloads bevatten het originele complete weekmandje en
+        bronmomenten, onafhankelijk van je zoekfilter. Alleen privé; geen kassagarantie,
+        openbare besparingsclaim of nieuwe winkelbronimport.</small>
+      {receiptMessage && <p role="status">{receiptMessage}</p>}
+    </div>
     <div className="private-reviewed-products__difference-focus" aria-label="Prijsverschil per ingrediënt">
       <strong>{changed.length} van {rows.length} zichtbare ingrediënten verschillen in hele-pakprijs.</strong>
       {largest ? <p>Grootste zichtbaar verschil: <strong>{largest.plus.ingredientLabel}</strong> · {' '}
