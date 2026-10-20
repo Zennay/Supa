@@ -45,6 +45,17 @@ export function LocalDeviceBarcodeScanner({
     streamRef.current = null
   }
 
+  useEffect(() => {
+    const stopOnHidden = () => {
+      if (document.visibilityState !== 'hidden' || !streamRef.current) return
+      stopCamera()
+      setState('idle')
+      setError('De camera is gestopt toen het tabblad naar de achtergrond ging. Start opnieuw als je wilt scannen.')
+    }
+    document.addEventListener('visibilitychange', stopOnHidden)
+    return () => document.removeEventListener('visibilitychange', stopOnHidden)
+  }, [])
+
   useEffect(() => () => {
     // Unmount or changing the selected Planner row releases the camera.
     ++generationRef.current
@@ -89,8 +100,15 @@ export function LocalDeviceBarcodeScanner({
       await video.play()
       if (generation !== generationRef.current) return
       setState('scanning')
+      const deadline = Date.now() + 90_000
       const scan = async () => {
         if (generation !== generationRef.current || !videoRef.current) return
+        if (Date.now() >= deadline) {
+          stopCamera()
+          setState('idle')
+          setError('De camerascan is na 90 seconden gestopt. Je kunt opnieuw scannen of de code handmatig invullen.')
+          return
+        }
         try {
           if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
             const found = await reader.detect(video)
