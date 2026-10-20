@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { readRecipeLibrary, type SavedRecipe } from './recipeLibrary.ts'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { scaleOwnRecipe } from './scaleOwnRecipe.ts'
@@ -123,14 +123,20 @@ export function ImportedRecipeGroceriesPanel({
     ]),
   ]))
   useEffect(() => { setChecked({}); setFeedback('') }, [signature])
-  const result = selected.length
-    ? combinedImportedRecipeGroceries(selected, portionsById) : null
+  // A checklist tick, a search keystroke, or opening a field-guide preview
+  // must not recompute all 15 recipes' metric scaling and canonical groups.
+  // The full selection snapshots + explicit portions remain the cache key.
+  const result = useMemo(() => selected.length
+    ? combinedImportedRecipeGroceries(selected, portionsById) : null,
+  // variantInputKey serializes every selected source record and target portion.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [variantInputKey])
   const list = result?.checklist ?? null
   // A fully checked *display list* is not necessarily a valid portable basket:
   // the canonical private-week exporter enforces combined whole-piece, source
   // identity and maximum physical-demand limits too. Admit the exact same
   // demand here BEFORE enabling any source handoff or field CSV actions.
-  const privateTransfer = (() => {
+  const privateTransfer = useMemo(() => {
     if (!result?.complete || selected.length > 14) return { ready: false, reason: '' }
     try {
       exportCombinedRecipesPrivateWeek(selected, portionsById)
@@ -139,7 +145,9 @@ export function ImportedRecipeGroceriesPanel({
       return { ready: false, reason: cause instanceof Error ? cause.message :
         'De volledige fysieke weekvraag kan nog niet veilig worden overgedragen.' }
     }
-  })()
+  // Same source-identity + complete flag as the authoritative offline engine.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variantInputKey, result?.complete])
   const plannerReadyForSelection = allPlannerReady && !(result?.identityConflicts.length ?? 0)
   // Persist ONLY explicit downloaded checkmarks. Bind them to selected recipe
   // identities, exact current physical amounts and original review warnings.
