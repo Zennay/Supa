@@ -10,6 +10,14 @@ export function ownRecipeAsMarkdown(recipe: SavedRecipe): string {
       recipe.ingredients.length > 100 || recipe.steps.length > 100) {
     throw new Error('Dit recept is niet volledig genoeg voor een leesbare export.')
   }
+  // A human-review warning is part of the recipe's meaning. Markdown is
+  // intentionally a readable, lossy format and cannot retain that hold.
+  // Use the complete JSON backup instead of laundering an unreviewed amount
+  // into a new seemingly review-free draft on reimport.
+  if (!Array.isArray(recipe.warnings) || recipe.warnings.length ||
+      recipe.ingredients.some(item => item.reviewReason)) {
+    throw new Error('Dit recept heeft openstaande bron- of hoeveelheidscontroles. Gebruik de volledige JSON-back-up om de waarschuwingen te behouden.')
+  }
   // Newlines and invisible controls inside an imported field could otherwise
   // create new Markdown sections and an apparent extra physical ingredient.
   const line = (value: string) => {

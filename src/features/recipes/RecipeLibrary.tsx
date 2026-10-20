@@ -508,6 +508,29 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setBackupError(cause instanceof Error ? cause.message : 'Importeren is niet gelukt. Je bestaande recepten blijven staan.')
     }
   }
+  function downloadPlainRecipeCollection() {
+    setCollectionError(''); setCollectionMessage('')
+    try {
+      if (library.error) throw new Error(library.error)
+      if (!library.recipes.length) throw new Error('Voeg eerst eigen recepten toe.')
+      if (library.recipes.length > 15) throw new Error('De tekstimport ondersteunt maximaal 15 recepten per bestand. Gebruik de volledige JSON-back-up voor grotere verzamelingen.')
+      // Readable Markdown cannot retain source-review holds. Each unreviewed
+      // recipe must travel in the existing lossless JSON backup instead.
+      const markdown = library.recipes.map(ownRecipeAsMarkdown).join('\n---\n')
+      if (new TextEncoder().encode(markdown).length > 500_000)
+        throw new Error('Het Markdownbestand is groter dan 500 kB. Gebruik de JSON-back-up.')
+      const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url; link.download = 'supa-mijn-recepten.md'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setCollectionMessage('De gecontroleerde eigen recepten zijn als één Markdownbestand opgeslagen. Je kunt dit via Meerdere recepten uit tekst opnieuw importeren.')
+    } catch (cause) {
+      setCollectionError(cause instanceof Error ? cause.message : 'Exporteren is niet gelukt.')
+    }
+  }
   async function loadPlainRecipeCollection(file?: File) {
     if (!file) return
     const revision = ++collectionReadVersion.current
@@ -767,6 +790,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       <div className="recipe-backup-panel__actions">
         <button type="button" onClick={previewPlainRecipeCollection}
           disabled={!collectionText.trim() || !!library.error}>Controleer mijn recepten</button>
+        <button type="button" onClick={downloadPlainRecipeCollection}
+          disabled={!!library.error || !library.recipes.length}>Download mijn recepten (Markdown)</button>
         <button type="button" onClick={() => {
           collectionReadVersion.current++; setCollectionText(''); setCollectionPreview(null)
           setCollectionError(''); setCollectionMessage('')
@@ -787,6 +812,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <button type="button" onClick={() => setCollectionPreview(null)}>Annuleer</button>
           </div>
         </div>}
+      <small>Een Markdownexport is beschikbaar voor maximaal 15 al gecontroleerde recepten.
+        Recepten met openstaande bron- of hoeveelheidswaarschuwingen neem je veilig mee via
+        de volledige JSON-back-up hieronder; zo verdwijnen controlepunten niet ongemerkt.</small>
       {collectionError && <p role="alert" className="recipe-error">{collectionError}</p>}
       {collectionMessage && <p role="status">{collectionMessage}</p>}
     </section>
