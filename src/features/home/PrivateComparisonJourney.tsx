@@ -11,6 +11,8 @@ import {
   type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { makePlannerCaptureGuide } from '../comparison/plannerPriceCaptureGuide.ts'
+import { makeBlankPlannerCaptureCsv } from '../comparison/plannerPriceCaptureSheet.ts'
 import './privateComparisonJourney.css'
 
 const PlannerQuickSourcePaste = lazy(async () => {
@@ -117,7 +119,7 @@ export function PrivateComparisonJourney({
       plusCents: one.lineTotalCents, dekaCents: other.lineTotalCents,
     })))
   }
-  async function downloadBlankHomeCapture(format: 'csv' | 'html') {
+  async function downloadBlankHomeCapture(format: 'csv' | 'html' | 'txt') {
     const selectedWeek = captureKey
     setCaptureMessage('')
     try {
@@ -126,29 +128,91 @@ export function PrivateComparisonJourney({
       const text = format === 'csv'
         ? (await import('../comparison/plannerPriceCaptureSheet.ts'))
             .makeBlankPlannerCaptureCsv(captureNeeds, stores, ';')
-        : (await import('../comparison/plannerPriceCapturePrint.ts'))
-            .makePrintablePlannerCaptureHtml(captureNeeds, stores)
+        : format === 'html'
+          ? (await import('../comparison/plannerPriceCapturePrint.ts'))
+              .makePrintablePlannerCaptureHtml(captureNeeds, stores)
+          : (await import('../comparison/plannerPriceCaptureGuide.ts'))
+              .makePlannerCaptureGuide(captureNeeds, stores)
       if (selectedWeek !== liveCaptureKey.current)
         throw new Error('Je weekmenu is veranderd; maak het opnameblad opnieuw.')
       if (new TextEncoder().encode(text).length > 800000)
         throw new Error('Het opnameblad is te groot; kies minder ingrediënten.')
       const url = URL.createObjectURL(new Blob([text], {
-        type: format === 'csv' ? 'text/csv;charset=utf-8' : 'text/html;charset=utf-8',
+        type: format === 'csv' ? 'text/csv;charset=utf-8' :
+          format === 'html' ? 'text/html;charset=utf-8' : 'text/plain;charset=utf-8',
       }))
       try {
         const link = document.createElement('a')
         link.href = url
         link.download = format === 'csv' ?
-          'supa-leeg-eigen-plus-deka-prijsblad.csv' : 'supa-eigen-plus-deka-opnameformulier.html'
+          'supa-leeg-eigen-plus-deka-prijsblad.csv' : format === 'html' ?
+            'supa-eigen-plus-deka-opnameformulier.html' :
+            'supa-eigen-plus-deka-csv-rijnummers.txt'
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setCaptureMessage('Leeg, lokaal opnameformulier bewaard. Vul uitsluitend werkelijk gecontroleerde ' +
-        'productcodes, verpakkingen, echte bronmomenten en prijzen in. Dit is geen bronbewijs.')
+      setCaptureMessage(format === 'txt' ?
+        'Gids met originele ingrediënten en CSV-rijnummers bewaard. Dit is geen importbestand.' :
+        'Leeg lokaal opnameformulier bewaard; vul uitsluitend werkelijk geobserveerde bronnen en prijzen in.')
     } catch (error) {
       setCaptureMessage(error instanceof Error ? error.message : 'Kon het opnameblad niet downloaden.')
     }
   }
+  async function handOffBlankHomeCapture(action: 'copy' | 'share') {
+    // User-initiated handoff of the exact SAME blank two-store worksheet that
+    // the download uses. It contains personal planned demand, never prices.
+    const selectedWeek = captureKey
+    setCaptureMessage('')
+    try {
+      if (!captureNeeds.length || captureNeeds.length > 200)
+        throw new Error('Kies eerst een weekmenu met 1–200 fysieke ingrediënten.')
+      // Build synchronously before Web Share / clipboard: mobile browsers
+      // require transient activation from the original button click.
+      const csv = makeBlankPlannerCaptureCsv(captureNeeds, stores, ';')
+      const guide = makePlannerCaptureGuide(captureNeeds, stores)
+      if (selectedWeek !== liveCaptureKey.current)
+        throw new Error('Je weekmenu is veranderd; maak het opnameblad opnieuw.')
+      const bytes = new TextEncoder().encode(csv).length
+      const guideBytes = new TextEncoder().encode(guide).length
+      if (bytes > 256000 || guideBytes > 256000)
+        throw new Error('Het opnameblad is te groot om te delen. Download het als bestand.')
+      if (action === 'copy') {
+        if (!navigator.clipboard?.writeText)
+          throw new Error('Kopiëren is in deze browser niet beschikbaar. Download de CSV.')
+        await navigator.clipboard.writeText(guide)
+        setCaptureMessage('Gids met originele ingrediënten en CSV-rijnummers gekopieerd. ' +
+          'Download ook de aparte lege CSV om de werkelijk waargenomen winkelproducten in te vullen.')
+        return
+      }
+      if (typeof navigator.share !== 'function')
+        throw new Error('Mobiel delen is niet beschikbaar. Gebruik kopiëren of download de CSV.')
+      const title = 'Supa · PLUS/DekaMarkt-opnameblad en persoonlijke gids'
+      const files = [
+        new File([csv], 'supa-leeg-plus-deka-opnameblad.csv',
+          { type: 'text/csv;charset=utf-8' }),
+        new File([guide], 'supa-plus-deka-csv-rijnummers.txt',
+          { type: 'text/plain;charset=utf-8' }),
+      ]
+      if (navigator.canShare?.({ files })) {
+        await navigator.share({ title, files })
+        setCaptureMessage('Lege import-CSV en gids met dezelfde CSV-rijnummers gedeeld. ' +
+          'Vul uitsluitend werkelijk geobserveerde brongegevens in.')
+      } else {
+        if (guideBytes > 64000)
+          throw new Error('De gids is te groot om als tekst te delen. Download de TXT-gids.')
+        await navigator.share({ title, text: guide })
+        setCaptureMessage('Gids gedeeld; download daarnaast de aparte lege import-CSV. ' +
+          'Er zijn geen winkelprijzen of bronproductcodes verzonnen.')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        setCaptureMessage('Delen geannuleerd; je winkelprijzen zijn niet gewijzigd.')
+      } else {
+        setCaptureMessage(error instanceof Error ? error.message : 'Overdragen is niet gelukt.')
+      }
+    }
+  }
+
   async function downloadCompleteOwnComparison(format: 'csv' | 'txt') {
     setExportMessage('')
     try {
@@ -215,6 +279,18 @@ export function PrivateComparisonJourney({
         <button type="button" disabled={!captureNeeds.length}
           onClick={() => void downloadBlankHomeCapture('html')}>
           Print winkelopnameformulier (HTML)
+        </button>
+        <button type="button" disabled={!captureNeeds.length}
+          onClick={() => void downloadBlankHomeCapture('txt')}>
+          Download gids met ingrediënten per CSV-regel (TXT)
+        </button>
+        <button type="button" disabled={!captureNeeds.length}
+          onClick={() => void handOffBlankHomeCapture('copy')}>
+          Kopieer gids met ingrediënten en CSV-rijnummers
+        </button>
+        <button type="button" disabled={!captureNeeds.length}
+          onClick={() => void handOffBlankHomeCapture('share')}>
+          Deel opnameblad en gids met telefoon
         </button>
       </div>
       {captureMessage && <p role="status">{captureMessage}</p>}
