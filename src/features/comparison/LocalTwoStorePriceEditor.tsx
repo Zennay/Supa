@@ -321,6 +321,14 @@ export function LocalTwoStorePriceEditor({
   ).map(need => need.id))
   const nextIncompletePairIndex = activeNeeds.findIndex(need =>
     !readyPairedDraftIds.has(need.id))
+  const openCaptureTasks = selectedStores.flatMap(store => activeNeeds.flatMap(need => {
+    const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+    const status = ownCaptureStatus(row, need)
+    return status === 'priced' || status === 'unavailable'
+      ? []
+      : [{ store, need, status }]
+  }))
+
 
   const allowedDraftRows = new Set(activeNeeds.flatMap(need => stores.map(store => key(store, need.id))))
   // Ingredient identity includes its human meaning, not just a stable ID.
@@ -509,6 +517,47 @@ export function LocalTwoStorePriceEditor({
     }
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
   }
+  function downloadOpenCaptureTasks() {
+    if (!openCaptureTasks.length) return
+    try {
+      const printable = (value: string) =>
+        value.replace(/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/gu, ' ').trim().slice(0, 180)
+      const rows = [
+        'Supa · nog te verzamelen eigen winkelproducten voor dit exacte Planner-weekmenu',
+        'Dit is een ongeprijsde werklijst, geen winkelbron, voorraadbevestiging of prijsbewijs.',
+        'Gebruik uitsluitend eigen rechtmatig verkregen producten, echte opnamemomenten en echte pakprijzen.',
+        '',
+        ...openCaptureTasks.map(item => [
+          '[ ] ' + item.store + ': ' + printable(item.need.label) +
+            ' · nodig ' + (item.need.amount === null ? 'hoeveelheid controleren' :
+              String(item.need.amount).replace('.', ',') + ' ' + item.need.unit),
+          '    Nog te doen: ' + captureStatusNames[item.status] +
+            (item.need.unit === 'piece' && item.need.amount === null
+              ? ' · corrigeer eerst het aantal stuks in Recepten' : ''),
+        ].join('\n')),
+        '',
+        'Na de echte winkelopname: vul SKU, naam, pakmaat, aantal, prijs, voorraad en bronmoment in Supa in.',
+        'Pas na volledige originele broncontrole kan Vergelijk een mandverschil berekenen.',
+      ]
+      const output = rows.join('\n') + '\n'
+      if (new TextEncoder().encode(output).length > 100_000)
+        throw Error('De openstaande winkelcontroles passen niet in één bestand.')
+      const url = URL.createObjectURL(new Blob([output], {
+        type: 'text/plain;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-plus-deka-open-winkelproducten.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setDraftStatus('Ongeprijsde open winkelproducten lokaal gedownload. Alleen je eigen originele bronnen kunnen prijzen leveren.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch {
+      setDraftStatus('Kon de open winkelproducten niet downloaden. Je invoer blijft bewaard.')
+    }
+  }
+
   function changeTimestamp(store: OfflineRetailer, value: string) {
     setCapturedAt(prev => ({ ...prev, [store]: value }))
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
@@ -891,6 +940,10 @@ export function LocalTwoStorePriceEditor({
               ? 'Beide originele bronmomenten zijn voorlopig binnen 24 uur en maximaal zeven dagen oud.'
               : 'Prijsverschillen blijven verborgen tot beide echte winkelmomenten geldig en maximaal 24 uur uit elkaar zijn.'}
               {' '}Dit is geen bevestigde match en geen volledig mandtotaal.</small>
+            {openCaptureTasks.length > 0 && <button type="button" className="ghost-button"
+              onClick={downloadOpenCaptureTasks}>
+              Download {openCaptureTasks.length} openstaande winkelcontroles (zonder prijzen)
+            </button>}
             {nextIncompletePairIndex >= 0 && <button type="button" className="ghost-button"
               onClick={() => {
                 const need = activeNeeds[nextIncompletePairIndex]
@@ -941,6 +994,9 @@ export function LocalTwoStorePriceEditor({
                 <span>PLUS {plus.packagesNeeded} × pak: <strong>{exactEuro.formatCents(plus.lineTotalCents)}</strong>
                   {' · '}DekaMarkt {deka.packagesNeeded} × pak:
                   {' '}<strong>{exactEuro.formatCents(deka.lineTotalCents)}</strong></span>
+                <small>Indicatieve eenheidsprijzen vanuit je invoer:
+                  {' '}PLUS {plus.unitRate ?? 'onbekend'} ·
+                  {' '}DekaMarkt {deka.unitRate ?? 'onbekend'}.</small>
                 <strong>{difference === 0 ? 'Gelijke voorlopige regelprijs' :
                   exactEuro.formatCents(Math.abs(difference)) +
                   ' op deze ene regel lager bij ' + (difference > 0 ? 'PLUS' : 'DekaMarkt')}</strong>
