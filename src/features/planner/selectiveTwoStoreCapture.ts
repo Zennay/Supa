@@ -70,6 +70,10 @@ export function selectiveTwoStoreCaptureGuide(needs: MissingStoreNeeds): string 
     'Alleen echt geobserveerde originele SKU, naam, verpakking, prijs in eurocenten,',
     'beschikbaarheid en bronmoment (ISO met UTC-offset) mogen in het CSV-blad.',
     'Niet gevonden blijft leeg. De voorgestelde ingrediënteenheid is GEEN bewezen verpakking.',
+    'Gebruik altijd het echte oorspronkelijke bronmoment van de nieuwe waarneming.',
+    'Alleen echt gelijktijdig waargenomen SKU’s mogen bij één eerder bronmoment worden gevoegd.',
+    'Later geobserveerde producten vereisen een complete nieuwe winkelopname.',
+    'Kopieer nooit een oud bronmoment naar nieuwe winkelprijzen.',
     '',
   ]
   for (const store of shops) {
