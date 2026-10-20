@@ -67,3 +67,31 @@ export function nextWeekPhysicalListText(preview: RecipeShoppingChange, day: str
     throw new Error('De voorgestelde weeklijst is te groot om lokaal te downloaden.')
   return output
 }
+
+
+/** Spreadsheet-friendly, supplier-neutral export of a PROPOSED week.
+ * This is NOT a retailer capture, approved SKU match or price quote.
+ * Quote all cells and keep leading formula characters literal on import.
+ */
+export function nextWeekPhysicalListCsv(preview: RecipeShoppingChange, day: string): string {
+  const items = nextWeekPhysicalItems(preview)
+  const safeCell = (raw: string): string => {
+    const plain = raw.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
+    // Normalize only for formula detection; preserve the actual written label.
+    const normalized = plain.normalize('NFKC')
+    const literal = /^[\s\p{M}]*(?:[=+\-@])/u.test(normalized) ? "'" + plain : plain
+    return '"' + literal.replaceAll('"', '""') + '"'
+  }
+  const proposal = 'VOORSTEL voor ' + labelForPrint(day) + '; nog niet ingepland'
+  const rows = [
+    ['Ingredient-ID', 'Ingredient', 'Hoeveelheid', 'Eenheid', 'Planning', 'Winkelprijs'],
+    ...items.map(item => [
+      item.id, item.label, String(item.amount).replace('.', ','),
+      item.unit === 'piece' ? 'stuks' : item.unit, proposal, 'Onbekend',
+    ]),
+  ]
+  const body = rows.map(row => row.map(safeCell).join(';')).join('\r\n') + '\r\n'
+  if (new TextEncoder().encode(body).length > 100_000)
+    throw new Error('Het voorgestelde weekmandje is te groot voor een CSV-export.')
+  return '\uFEFF' + body
+}
