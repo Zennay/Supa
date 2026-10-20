@@ -95,3 +95,61 @@ export function privateFullStoreRecaptureGuide(capture: OfflineCapture): string 
     throw new Error('De bronhandleiding is te groot.')
   return text
 }
+
+/** One same-workbook field route for BOTH original retailer inventories.
+ * It deliberately does not synthesize an aligned capture time or cross-store
+ * SKU correspondence: only the canonical reviewed planner basket does that.
+ */
+export function privatePairedStoreRecaptureCsv(
+  plus: OfflineCapture, deka: OfflineCapture,
+  delimiter: ',' | ';' = ',',
+): string {
+  if (plus?.retailer !== 'PLUS' || deka?.retailer !== 'DekaMarkt')
+    throw new Error('Selecteer de oorspronkelijke PLUS- en DekaMarkt-opnames.')
+  const first = privateFullStoreRecaptureCsv(plus, delimiter).replace(/^\uFEFF/u, '')
+    .trimEnd().split('\r\n')
+  const second = privateFullStoreRecaptureCsv(deka, delimiter).replace(/^\uFEFF/u, '')
+    .trimEnd().split('\r\n')
+  if (!first.length || first[0] !== second[0])
+    throw new Error('De twee winkelbladen hebben geen identiek CSV-formaat.')
+  const csv = '\uFEFF' + [first[0], ...first.slice(1), ...second.slice(1)]
+    .join('\r\n') + '\r\n'
+  if (new TextEncoder().encode(csv).length > 256000)
+    throw new Error('Gecombineerde PLUS/Deka-opname groter dan 256 kB. Gebruik twee losse winkelbladen.')
+  return csv
+}
+
+export function privatePairedStoreRecaptureGuide(
+  plus: OfflineCapture, deka: OfflineCapture,
+): string {
+  if (plus?.retailer !== 'PLUS' || deka?.retailer !== 'DekaMarkt')
+    throw new Error('Selecteer oorspronkelijke PLUS- en DekaMarkt-opnames.')
+  // Make sure both complete original identity lists are canonical and
+  // unambiguous before offering one dual-store field capture.
+  const first = collect(plus)
+  const second = collect(deka)
+  const text = [
+    'SUPA · nieuwe volledige bronopnames PLUS en DekaMarkt',
+    'PLUS eerdere opname: ' + first.originalObservedAt,
+    'DekaMarkt eerdere opname: ' + second.originalObservedAt,
+    'Identiteiten: PLUS ' + first.products.length +
+      ', DekaMarkt ' + second.products.length + '.',
+    'Dit bestand bevat geen nieuwe waarneming, actuele prijs of bronrechten.',
+    'De oude SKU en productnaam dienen ALLEEN om producten terug te vinden.',
+    '',
+    'Vul per winkel elke daadwerkelijk opnieuw bekeken rij in.',
+    'Gebruik per winkel precies één werkelijke nieuwe ISO-tijd met UTC-offset.',
+    'Voor een eventuele vergelijking moeten die twee ECHTE opnames maximaal',
+    '24 uur uiteen liggen en binnen het geldige 7-daagse bronvenster vallen.',
+    'Bepaal verpakking/eenheid, beschikbaarheid en prijs in hele eurocenten',
+    'uitsluitend vanuit de nieuwe bron; oude waarden zijn bewust leeg.',
+    'Sla SKU-kolommen op als tekst om voorloopnullen te behouden.',
+    'Verwijder niet opnieuw gevonden regels of registreer werkelijk niet-beschikbaar.',
+    'Importeer het ingevulde CSV-bestand in Supa Vergelijk; controleer beide',
+    'winkelproducten en het identieke fysieke weekmandje handmatig.',
+    'Geen volledige dekking? Het prijsverschil blijft onbekend.',
+  ].join('\n') + '\n'
+  if (new TextEncoder().encode(text).length > 120000)
+    throw new Error('De gecombineerde bronhandleiding is te groot.')
+  return text
+}
