@@ -18,6 +18,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
 }) {
   const [name, setName] = useState('')
   const [bulkDraft, setBulkDraft] = useState('')
+  const [bulkPreview, setBulkPreview] = useState<{
+    draft: string; existing: string; selectedStore: UnpricedShoppingNote['store'];
+    incoming: Array<Pick<UnpricedShoppingNote, 'label' | 'store' | 'done'>>;
+    duplicateCount: number
+  } | null>(null)
   const bulkFileSerial = useRef(0)
   const [store, setStore] = useState<UnpricedShoppingNote['store']>('Algemeen')
   const [onlyOpen, setOnlyOpen] = useState(false)
@@ -164,6 +169,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
       if (serial !== bulkFileSerial.current) return
       if (source.length > 15000) throw Error('Deze tekst past niet in het invulveld.')
+      setBulkPreview(null)
       setBulkDraft(source)
       setMessage('Je eigen TXT is lokaal ingelezen; bekijk de tekst en klik zelf op toevoegen.')
     } catch (error) {
@@ -211,17 +217,48 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setMessage('Je lijst heeft ruimte voor maximaal 100 verschillende artikelen. Er is niets toegevoegd.')
       return
     }
-    const added = distinct.map(item => ({
-      id: 'own-note-' + crypto.randomUUID(), label: item.label, store: item.store, done: item.done,
-    }))
-    setNotes(current => {
-      const existing = new Set(current.map(item => duplicateKey(item.store, item.label)))
-      const newItems = added.filter(item => !existing.has(duplicateKey(item.store, item.label)))
-      return current.length + newItems.length > 100 ? current : [...current, ...newItems]
+    if (!distinct.length) {
+      setBulkPreview(null)
+      setMessage('Alle artikelen staan al op de gekozen winkellijsten. Bestaande vinkjes blijven behouden.')
+      return
+    }
+    setBulkPreview({
+      draft: bulkDraft, existing: serializePrivateNotes(notes), selectedStore: store,
+      incoming: distinct, duplicateCount: parsed.length - distinct.length,
     })
-    setBulkDraft('')
-    setMessage(distinct.length + ' eigen boodschappen toegevoegd met oorspronkelijke winkels en vinkjes; ' +
-      (parsed.length - distinct.length) + ' dubbele regels overgeslagen. Alles blijft ongeprijsd.')
+    setMessage('Controleer de nieuwe ongeprijsde artikelen, winkels en vinkjes en bevestig daarna.')
+  }
+  function confirmBulk() {
+    if (!bulkPreview) return
+    try {
+      if (bulkPreview.draft !== bulkDraft || bulkPreview.selectedStore !== store ||
+          bulkPreview.existing !== serializePrivateNotes(notes)) {
+        setBulkPreview(null)
+        setMessage('Lijst, winkelselectie of invoer is ondertussen gewijzigd. Bekijk de import opnieuw.')
+        return
+      }
+      const incoming = bulkPreview.incoming
+      const existing = new Set(notes.map(item => duplicateKey(item.store, item.label)))
+      if (notes.length + incoming.length > 100 ||
+          incoming.some(item => existing.has(duplicateKey(item.store, item.label)))) {
+        setBulkPreview(null)
+        setMessage('Deze artikelen passen niet meer in de huidige lijst. Bekijk de import opnieuw.')
+        return
+      }
+      const added = incoming.map(item => ({
+        ...item, id: 'own-note-' + crypto.randomUUID(),
+      }))
+      const before = bulkPreview.existing
+      setNotes(current => serializePrivateNotes(current) === before
+        ? [...current, ...added] : current)
+      setBulkDraft('')
+      setBulkPreview(null)
+      setMessage(incoming.length + ' eigen boodschappen toegevoegd, ' +
+        bulkPreview.duplicateCount + ' dubbel overgeslagen. Originele vinkjes en winkels bewaard; geen prijzen.')
+    } catch {
+      setBulkPreview(null)
+      setMessage('Import geweigerd vanwege een gewijzigde of ongeldige persoonlijke lijst.')
+    }
   }
   function add(event: FormEvent) {
     event.preventDefault()
@@ -574,15 +611,27 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         <label>Je ongeprijsde boodschappen
           <textarea rows={5} maxLength={15000} value={bulkDraft}
             placeholder={'Vuilniszakken\nAfwasmiddel\nToiletpapier'}
-            onChange={event => { bulkFileSerial.current++; setBulkDraft(event.target.value) }} />
+            onChange={event => { bulkFileSerial.current++; setBulkPreview(null); setBulkDraft(event.target.value) }} />
         </label>
         <label>Of kies een eerder gedownloade eigen Supa-lijst (TXT, maximaal 15 kB)
           <input type="file" accept=".txt,text/plain"
             onChange={event => { void readBulkText(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
         </label>
         <button type="submit" disabled={!bulkDraft.trim() || notes.length >= 100}>
-          Voeg regels toe aan mijn lijst
+          Bekijk artikelen vóór toevoegen
         </button>
+        {bulkPreview && <div className="manual-shopping-notes__bulk-preview" role="group"
+          aria-label="Voorbeeld van de ongeprijsde bulkimport">
+          <strong>{bulkPreview.incoming.length} nieuwe persoonlijke artikelen</strong>
+          <p>{bulkPreview.duplicateCount} dubbele regels overgeslagen.
+            Alle winkelprijzen blijven onbekend. Je bestaande vinkjes veranderen niet.</p>
+          <ul>{bulkPreview.incoming.slice(0, 15).map((item, index) =>
+            <li key={index}>{item.done ? '☑' : '☐'} [{item.store}] {item.label}</li>)}</ul>
+          {bulkPreview.incoming.length > 15 && <p>En {bulkPreview.incoming.length - 15} andere.</p>}
+          <button type="button" onClick={confirmBulk}>Bevestig toevoegen aan eigen lijst</button>
+          <button type="button" onClick={() => setBulkPreview(null)}>Annuleer import</button>
+        </div>}
+
       </form>
     </details>
     <div className="manual-shopping-notes__top">

@@ -85,3 +85,9 @@
 .manual-shopping-notes__next-round-confirm { display:flex; flex-wrap:wrap; gap:.6rem; align-items:center;
   border:1px solid #d7c392; background:#fff9ea; border-radius:10px; padding:.7rem; }
 .manual-shopping-notes__next-round-confirm p { flex-basis:100%; }
+
+.manual-shopping-notes__bulk-preview { border:1px solid #92b3a1; background:#f4fcf5; padding:12px;
+  display:flex; flex-wrap:wrap; gap:10px; border-radius:12px; }
+.manual-shopping-notes__bulk-preview strong,.manual-shopping-notes__bulk-preview p,
+.manual-shopping-notes__bulk-preview ul { flex-basis:100%; }
+.manual-shopping-notes__bulk-preview ul { max-height:220px; overflow:auto; }
