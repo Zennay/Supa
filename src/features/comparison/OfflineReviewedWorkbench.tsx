@@ -393,6 +393,8 @@ export function OfflineReviewedWorkbench({
   const [tripExportMessage, setTripExportMessage] = useState('')
   const [tripProgressMessage, setTripProgressMessage] = useState('')
   const [coverageMessage, setCoverageMessage] = useState('')
+  const [coverageScope, setCoverageScope] = useState<'all' | 'open' | 'PLUS' | 'DekaMarkt'>('open')
+  const [coverageSearch, setCoverageSearch] = useState('')
   // Prevent stale imports from appearing comparable after an open browser tab
   // crosses a 7-day boundary. Refresh only the UI clock, not source observations.
   const [clockMs, setClockMs] = useState(() => Date.now())
@@ -2052,6 +2054,21 @@ export function OfflineReviewedWorkbench({
     : null
   const openCoverageRows = coverageRows.filter(row =>
     !!olderPairCapture || stores.some(store => row[store].status !== 'Persoonlijk bevestigd'))
+  // Display filters do not affect source prices, human review, or completeness.
+  const outstandingByStore = Object.fromEntries(stores.map(store => [store,
+    coverageRows.filter(row => olderPairCapture === store ||
+      row[store].status !== 'Persoonlijk bevestigd').length,
+  ])) as Record<(typeof stores)[number], number>
+  const normalizedCoverageSearch = searchableSourceText(coverageSearch)
+  const visibleCoverageRows = coverageRows.filter(row => {
+    if (coverageScope === 'open' && !openCoverageRows.includes(row)) return false
+    if ((coverageScope === 'PLUS' || coverageScope === 'DekaMarkt') &&
+        olderPairCapture !== coverageScope &&
+        row[coverageScope].status === 'Persoonlijk bevestigd') return false
+    return !normalizedCoverageSearch || searchableSourceText([row.label, row.id,
+      row.PLUS.status, row.PLUS.product, row.DekaMarkt.status, row.DekaMarkt.product,
+    ].join(' ')).includes(normalizedCoverageSearch)
+  })
   // Price capture is needed only for missing source facts or stale
   // observations. An existing matched SKU awaiting human review does not
   // require another fictitious catalog observation.
@@ -2848,6 +2865,25 @@ export function OfflineReviewedWorkbench({
                     </button>
                   </div>
                   {coverageMessage && <p role="status" aria-live="polite">{coverageMessage}</p>}
+                  <div className="offline-price-workbench__coverage-filters" role="group"
+                    aria-label="Filter de winkeldekking van jouw mandje">
+                    <label>Toon ingrediënten
+                      <select value={coverageScope}
+                        onChange={event => setCoverageScope(event.currentTarget.value as typeof coverageScope)}>
+                        <option value="open">Nog open ({openCoverageRows.length})</option>
+                        <option value="all">Alle ingrediënten ({coverageRows.length})</option>
+                        <option value="PLUS">Nog open bij PLUS ({outstandingByStore.PLUS})</option>
+                        <option value="DekaMarkt">Nog open bij DekaMarkt ({outstandingByStore.DekaMarkt})</option>
+                      </select>
+                    </label>
+                    <label>Zoek ingrediënt of origineel bronartikel
+                      <input type="search" value={coverageSearch} maxLength={120}
+                        placeholder="Bijvoorbeeld rijst of artikelcode"
+                        onChange={event => setCoverageSearch(event.currentTarget.value)} />
+                    </label>
+                    <p role="status" aria-live="polite">{visibleCoverageRows.length} van {coverageRows.length}
+                      {' '}ingrediënten zichtbaar. Dit filter wijzigt geen brondata of prijsbevestiging.</p>
+                  </div>
                   <div className="offline-price-workbench__breakdown-scroll">
                     <table>
                       <caption>Bron- en reviewstatus per ingrediënt, zonder fictieve prijs.</caption>
@@ -2856,7 +2892,7 @@ export function OfflineReviewedWorkbench({
                         <th scope="col">PLUS</th>
                         <th scope="col">DekaMarkt</th>
                       </tr></thead>
-                      <tbody>{coverageRows.map(row => (
+                      <tbody>{visibleCoverageRows.map(row => (
                         <tr key={row.id}>
                           <th scope="row">{row.label}<small>{row.amount ?? '?'} {row.unit} nodig</small></th>
                           {stores.map(store => {

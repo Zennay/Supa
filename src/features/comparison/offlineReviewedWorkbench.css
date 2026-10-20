@@ -433,3 +433,11 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 }
 .offline-price-workbench__capture-followup-row > span { flex:1 1 100%; overflow-wrap:anywhere; }
 .offline-price-workbench__capture-followup-row button { min-height:44px; }
+
+/* Search and completion filters for the user's own two-store product coverage. */
+.offline-price-workbench__coverage-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; margin:1rem 0; align-items:end; }
+.offline-price-workbench__coverage-filters label { display:grid; gap:.35rem; font-weight:650; font-size:.9rem; min-width:0; }
+.offline-price-workbench__coverage-filters :is(select,input) { box-sizing:border-box; min-width:0; width:100%; min-height:44px; padding:.55rem; border:1px solid #9fa9a4; border-radius:9px; background:#fff; color:#232323; font:inherit; }
+.offline-price-workbench__coverage-filters :is(select,input):focus-visible { outline:3px solid #226f52; outline-offset:2px; }
+.offline-price-workbench__coverage-filters p { grid-column:1 / -1; margin:0; color:#4d5c53; font-size:.86rem; }
+@media(max-width:640px) { .offline-price-workbench__coverage-filters { grid-template-columns:minmax(0,1fr); } }
