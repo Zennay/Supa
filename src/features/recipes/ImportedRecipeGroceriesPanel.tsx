@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { SavedRecipe } from './recipeLibrary.ts'
+import { readRecipeLibrary, type SavedRecipe } from './recipeLibrary.ts'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { scaleOwnRecipe } from './scaleOwnRecipe.ts'
 import type { UserRecipeDraft } from '../../domain/userRecipeImport.ts'
@@ -70,6 +70,19 @@ export function ImportedRecipeGroceriesPanel({
     const recipe = recipes.find(item => item.id === id)
     return recipe ? [recipe] : []
   })
+  function requireLatestOwnedRecipes() {
+    // Another tab may have edited or deleted an ingredient after this UI
+    // rendered. Never download a field sheet or hand off a priced-demand
+    // candidate from a stale recipe snapshot. No saving or extra network work.
+    const library = readRecipeLibrary(window.localStorage)
+    if (library.error) throw new Error(library.error)
+    const current = new Map(library.recipes.map(recipe => [recipe.id, recipe]))
+    if (selected.length !== selectedIds.length || selected.some(recipe =>
+      !current.has(recipe.id) || JSON.stringify(current.get(recipe.id)) !== JSON.stringify(recipe))) {
+      throw new Error('Eén of meer gekozen recepten zijn in een ander tabblad gewijzigd of verwijderd. ' +
+        'Heropen de actuele recepten voordat je winkelproducten koppelt of prijzen opneemt.')
+    }
+  }
   const incomingBatch = recentIds.join('\u001f')
   const lastImportedBatch = useRef(incomingBatch)
   useEffect(() => {
