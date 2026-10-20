@@ -69,7 +69,7 @@ function evaluatedQuote(need: ManualNeed, quote: ManualQuote | undefined) {
   const name = quote.product.trim()
   if (need.amount === null || !Number.isFinite(need.amount) || need.amount <= 0 ||
       name.length < 2 || name.length > 160 || /[\u0000-\u001f\u007f]/u.test(name) ||
-      !unitsFor(need.unit).includes(quote.packUnit) || amount === null || cents === null) {
+      !unitsFor(need.unit).includes(quote.packUnit as MatchUnit) || amount === null || cents === null) {
     return { state: 'invalid' as const, packs: null, lineCents: null, unitPriceCents: null }
   }
   const packs = calculateDecimalPackCount(
