@@ -35,7 +35,7 @@ function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): stri
         safeTableCell(need.id), store,
         safeTableCell(quote?.product ?? ''),
         safeTableCell(quote?.packAmount ?? ''),
-        quote?.packUnit ?? need.unit,
+        quote?.packUnit ?? '',
         safeTableCell(quote?.price ?? ''),
       ].join('\t')
     })),
@@ -54,7 +54,7 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): ManualEntr
     if (cells.length !== 6) throw new Error('Gebruik zes tabgescheiden kolommen.')
     const [id, shop, product, packAmount, unit, price] = cells
     if (!expected.has(id) || (shop !== 'PLUS' && shop !== 'DekaMarkt') ||
-        !manualCompatibleUnits(expected.get(id)!.unit).includes(unit as ManualQuote['packUnit']) ||
+        (unit !== '' && !manualCompatibleUnits(expected.get(id)!.unit).includes(unit as ManualQuote['packUnit'])) ||
         product.length > 160 || packAmount.length > 32 || price.length > 20) {
       throw new Error('De tabel bevat een onbekend product, winkel of eenheid.')
     }
@@ -90,7 +90,7 @@ export function ManualStoreComparison({
     const key = manualQuoteKey(store, need.ingredientId)
     setEntries(previous => {
       const quote = previous[key] ?? {
-        product: '', packAmount: '', packUnit: need.requiredUnit, price: '',
+        product: '', packAmount: '', packUnit: '', price: '',
       }
       return { ...previous, [key]: { ...quote, [field]: value } }
     })
@@ -202,9 +202,10 @@ export function ManualStoreComparison({
                               value={quote?.packAmount ?? ''}
                               onChange={event => setQuote(row, shop, 'packAmount', event.target.value)} />
                           </label>
-                          <label>Eenheid
-                            <select value={quote?.packUnit ?? row.requiredUnit}
+                          <label>Werkelijke verpakkingseenheid
+                            <select value={quote?.packUnit ?? ''}
                               onChange={event => setQuote(row, shop, 'packUnit', event.target.value)}>
+                              <option value="">Selecteer eenheid uit het winkelproduct</option>
                               {manualCompatibleUnits(row.requiredUnit).map(unit => (
                                 <option key={unit} value={unit}>{UNIT_LABEL[unit]}</option>
                               ))}
