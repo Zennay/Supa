@@ -123,7 +123,7 @@ const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|banan
  * 100 g boter", not only ordinary "1 kg rijst en 100 g boter".
  */
 function containsSecondPhysicalQuantity(label: string): boolean {
-  const pattern = /(?:^|[^\\p{L}\\p{N}])((?:\\d+\\s+)?\\d+\\/\\d+|\\d+\\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\\d+(?:[.,]\\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\\s*([a-z]+\\.?)(?=\\s|[,;]|$)/giu
+  const pattern = /(?:^|[^\p{L}\p{N}])((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([a-z]+\.?)(?=\s|[,;]|$)/giu
   let match: RegExpExecArray | null
   while ((match = pattern.exec(label)) !== null) {
     if (units[match[2].toLowerCase()]) return true
