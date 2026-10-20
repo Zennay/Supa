@@ -521,7 +521,7 @@ export function LocalTwoStorePriceEditor({
     if (!openCaptureTasks.length) return
     try {
       const printable = (value: string) =>
-        value.replace(/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/gu, ' ').trim().slice(0, 180)
+        value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
       const rows = [
         'Supa · nog te verzamelen eigen winkelproducten voor dit exacte Planner-weekmenu',
         'Dit is een ongeprijsde werklijst, geen winkelbron, voorraadbevestiging of prijsbewijs.',
