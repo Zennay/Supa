@@ -18,6 +18,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
 }) {
   const [name, setName] = useState('')
   const [bulkDraft, setBulkDraft] = useState('')
+  const bulkFileSerial = useRef(0)
   const [store, setStore] = useState<UnpricedShoppingNote['store']>('Algemeen')
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
@@ -142,24 +143,53 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     }
   }
 
+  async function readBulkText(file?: File) {
+    const serial = ++bulkFileSerial.current
+    if (!file) return
+    try {
+      if (!file.size || file.size > 15000) throw Error('TXT groter dan 15 kB of leeg.')
+      const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (serial !== bulkFileSerial.current) return
+      if (source.length > 15000) throw Error('Deze tekst past niet in het invulveld.')
+      setBulkDraft(source)
+      setMessage('Je eigen TXT is lokaal ingelezen; bekijk de tekst en klik zelf op toevoegen.')
+    } catch (error) {
+      if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'TXT kon niet worden gelezen.')
+    }
+  }
   function addBulk(event: FormEvent) {
     event.preventDefault()
-    // Human-authored lines, not supermarket product identities or price data.
-    const parsed = bulkDraft.split(/\r?\n/u)
-      .map(source => {
-        const row = source.replace(/^(?:[-*•]\s+|\d{1,3}[.)]\s+)/u, '')
-        const done = /^(?:☑|\[[xX]\])(?:\s|$)/u.test(row)
-        const label = safeLabel(row.replace(/^(?:☑|☐|\[[xX ]\])\s*/u, ''))
-        return { label, done }
-      })
-      .filter(item => item.label.length > 0)
-    if (!parsed.length || parsed.some(item => item.label.length > 140) || parsed.length > 100) {
-      setMessage('Controleer de geplakte lijst: maximaal 100 regels van 140 tekens.')
+    // A Supa TXT export is a personal unpriced list, never retailer evidence.
+    const exported = bulkDraft.trimStart().startsWith('SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ')
+    const parsed: { label: string; done: boolean; store: UnpricedShoppingNote['store'] }[] = []
+    let invalid = false
+    for (const source of bulkDraft.split(/\r?\n/u)) {
+      const row = source.trim().replace(/^(?:[-*•]\s+|\d{1,3}[.)]\s+)/u, '')
+      if (!row) continue
+      if (exported && (row.startsWith('SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ') ||
+          row === 'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.' ||
+          row === 'Alleen nog open artikelen:' ||
+          row === 'Geen winkelprijs, bronrecht of besparingsclaim.')) continue
+      const done = /^(?:☑|\[[xX]\])(?:\s|$)/u.test(row)
+      const content = row.replace(/^(?:☑|☐|\[[xX ]\])\s*/u, '')
+      const tagged = /^\[(Algemeen|PLUS|DekaMarkt)\]\s+(.+)$/u.exec(content)
+      if (exported && (!tagged || !tagged[2].endsWith(' · prijs onbekend'))) {
+        invalid = true
+        continue
+      }
+      const targetStore = tagged ? tagged[1] as UnpricedShoppingNote['store'] : store
+      const rawLabel = tagged ? tagged[2] : content
+      const label = safeLabel(exported ? rawLabel.slice(0, -' · prijs onbekend'.length) : rawLabel)
+      if (!label || label.length > 140) invalid = true
+      else parsed.push({ label, done, store: targetStore })
+    }
+    if (invalid || !parsed.length || parsed.length > 100) {
+      setMessage('Lijst ongeldig: maximaal 100 artikelen van 140 tekens; controleer de originele Supa TXT-regels.')
       return
     }
     const seen = new Set(notes.map(item => duplicateKey(item.store, item.label)))
     const distinct = parsed.filter(item => {
-      const key = duplicateKey(store, item.label)
+      const key = duplicateKey(item.store, item.label)
       if (seen.has(key)) return false
       seen.add(key)
       return true
@@ -169,7 +199,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       return
     }
     const added = distinct.map(item => ({
-      id: 'own-note-' + crypto.randomUUID(), label: item.label, store, done: item.done,
+      id: 'own-note-' + crypto.randomUUID(), label: item.label, store: item.store, done: item.done,
     }))
     setNotes(current => {
       const existing = new Set(current.map(item => duplicateKey(item.store, item.label)))
@@ -177,8 +207,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       return current.length + newItems.length > 100 ? current : [...current, ...newItems]
     })
     setBulkDraft('')
-    setMessage(distinct.length + ' nieuwe artikelen toegevoegd aan ' + store +
-      '; ' + (parsed.length - distinct.length) + ' dubbele regels overgeslagen. Zonder winkelprijzen.')
+    setMessage(distinct.length + ' eigen boodschappen toegevoegd met oorspronkelijke winkels en vinkjes; ' +
+      (parsed.length - distinct.length) + ' dubbele regels overgeslagen. Alles blijft ongeprijsd.')
   }
   function add(event: FormEvent) {
     event.preventDefault()
@@ -289,12 +319,17 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <form onSubmit={addBulk}>
         <p>Eén eigen artikel per regel. Opsommingstekens en originele vinkjes
           (☐, ☑, [ ] of [x]) worden herkend; al afgevinkte artikelen blijven afgevinkt.
-          Alle regels gaan naar {store}; dubbele artikelen worden overgeslagen,
-          zonder bestaande vinkjes of prijzen te wijzigen.</p>
+          Gewone regels gaan naar {store}; bij gekopieerde Supa-TXT met [PLUS],
+          [DekaMarkt] of [Algemeen] blijven de oorspronkelijke winkels behouden.
+          Dubbele artikelen worden overgeslagen, zonder bestaande vinkjes of prijzen te wijzigen.</p>
         <label>Je ongeprijsde boodschappen
           <textarea rows={5} maxLength={15000} value={bulkDraft}
             placeholder={'Vuilniszakken\nAfwasmiddel\nToiletpapier'}
-            onChange={event => setBulkDraft(event.target.value)} />
+            onChange={event => { bulkFileSerial.current++; setBulkDraft(event.target.value) }} />
+        </label>
+        <label>Of kies een eerder gedownloade eigen Supa-lijst (TXT, maximaal 15 kB)
+          <input type="file" accept=".txt,text/plain"
+            onChange={event => { void readBulkText(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
         </label>
         <button type="submit" disabled={!bulkDraft.trim() || notes.length >= 100}>
           Voeg regels toe aan mijn lijst
