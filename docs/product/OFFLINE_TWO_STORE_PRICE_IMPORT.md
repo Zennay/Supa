@@ -1075,3 +1075,27 @@ Wanneer een eigen PLUS/Deka-opname is geladen toont de gewone Vergelijk-tab nu p
 **Nieuwe aanvulroute op de winkelkaart:** voor werkelijk nieuwe artikelnummers bij **exact hetzelfde oorspronkelijke winkelopnamemoment** kun je een eigen CSV/JSON met één winkel selecteren en na een expliciete bevestiging alleen nieuwe bronartikelen toevoegen. De bestaande `parseOfflinePriceSnapshots` valideert beide originele bestanden en de samengevoegde opname, inclusief maximaal 256 kB, originele SKU-uniciteit, fysieke verpakking en prijs, 7-dagenvenster en bestaande rechten-/actualiteitsgrenzen. De originele bronartikelen, tijdstempel, andere winkel en hun prijsbedragen blijven ongewijzigd. Duplicate bestaande broncodes worden geweigerd: correcties horen in **Vervang winkelopname**. Een ander (ook recenter) bronmoment wordt geweigerd: oude prijzen mogen niet stil naar een nieuwe observatie worden verplaatst. Dit vereist een volledige, nieuwe opname van die winkel, niet een prijsclaim van gemengde bronnen.
 
 Een ongeldig of afgewezen aanvulbestand verandert helemaal niets aan al geladen brongegevens, productkeuzes of afvinkingen. Nieuw toegevoegde SKU's vereisen nog steeds de bestaande persoonlijke match-/pak-/prijsbeoordeling. Historische adapterdata blijven niet-publiceerbare research en worden niet via deze route als huidige winkelopname gepresenteerd. Geen actieve retailerscraper, fictieve prijs of onderzoeksmijlpaal geïntroduceerd.
+
+## Start vanuit Home — eigen echte winkelprijzen
+
+Op **Home → Vergelijk dezelfde boodschappen** zie je per winkel of er al
+een volledig gecontroleerd eigen mandje beschikbaar is. Staat een opname
+gedeeltelijk open, gebruik dan **Controleer volgend bronartikel** om direct
+naar de bestaande originele SKU-, verpakking- en prijscontrole te gaan.
+
+Met **Eigen PLUS/Deka-prijsbestanden meteen openen** kies je 1 of 2 lokale
+CSV-, TSV-, TXT- of Supa JSON-bronnen van maximaal 256 kB per bestand.
+Deze worden naar dezelfde canonieke privé-importer doorgestuurd als via
+Lijst of Vergelijk: geen tweede parser, geen automatische fetch en geen
+stilzwijgende vervanging van bestaande gegevens. Als er meer dan twee
+bestanden gekozen zijn, of een bestand leeg/te groot is, blijft de selectie
+geweigerd. Na geldige import blijven bronmomenten en oorspronkelijke
+SKU-/verpakkingseenheden behouden.
+
+Home toont een verschil in euro's uitsluitend wanneer **beide** fysieke
+weekmandjes volledig persoonlijk bevestigd, canoniek consistent en actueel
+zijn, en de PLUS- en DekaMarkt-bronmomenten maximaal 24 uur uiteenliggen.
+Anders staat er expliciet **Volledig prijsverschil nog onbekend**.
+Een bekende eigen bronprijs is nooit gelijk aan een publiek geverifieerde
+winkelprijs of onafhankelijk bewezen besparing. Verouderde bronnen worden
+niet automatisch ververst en er worden geen bronrechten afgeleid.
