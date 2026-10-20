@@ -5,14 +5,21 @@ import test from 'node:test'
 
 const evidenceDir = 'evidence/m3'
 const allowedExtensions = new Set(['.json', '.md'])
+// Canonicalize JSON key spellings before applying the privacy denylist.
+// Do not allow a snake_case, kebab-case, dotted, spaced, case-variant,
+// or Unicode-width alias to bypass the same direct-identifier restriction.
 const directIdentifierKeys = new Set([
-  'participantName',
-  'participantEmail',
-  'emailAddress',
-  'accountId',
-  'accountEmail',
-  'fullName',
+  'participantname',
+  'participantemail',
+  'emailaddress',
+  'accountid',
+  'accountemail',
+  'fullname',
 ])
+
+function canonicalIdentifierKey(key) {
+  return key.normalize('NFKC').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+}
 const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
 
 function assertNoEvidenceSymlink(entry, path) {
@@ -52,7 +59,7 @@ function inspectForDirectIdentifiers(value, path = '$') {
   if (value && typeof value === 'object') {
     for (const [key, item] of Object.entries(value)) {
       assert.equal(
-        directIdentifierKeys.has(key),
+        directIdentifierKeys.has(canonicalIdentifierKey(key)),
         false,
         `direct participant identifier key is not allowed in M3 evidence: ${path}.${key}`,
       )
@@ -124,4 +131,38 @@ test('committed M3 study JSON stays structurally identifiable and privacy-safe',
 
     inspectForDirectIdentifiers(study)
   }
+})
+
+
+test('M3 evidence privacy boundary rejects equivalent direct-identifier key spellings', () => {
+  const disallowedAliases = [
+    'participant_name',
+    'PARTICIPANT-NAME',
+    'participant.name',
+    'participant name',
+    'ParticipantEmail',
+    'account-id',
+    'ACCOUNT_EMAIL',
+    'Full Name',
+    'email-address',
+    'ｅｍａｉｌ＿ａｄｄｒｅｓｓ',
+  ]
+
+  for (const key of disallowedAliases) {
+    assert.throws(
+      () => inspectForDirectIdentifiers({ nested: [{ [key]: 'Synthetic Person' }] }),
+      /direct participant identifier key is not allowed in M3 evidence/,
+      `identifier alias ${JSON.stringify(key)} must fail closed`,
+    )
+  }
+
+  assert.doesNotThrow(() =>
+    inspectForDirectIdentifiers({
+      participantKey: 'student-001',
+      studyId: 'week-001',
+      storeId: 'plus-001',
+      ingredientLabel: 'Broccoli',
+      provenanceNote: 'Synthetic test only',
+    }),
+  )
 })
