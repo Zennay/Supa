@@ -4,6 +4,7 @@
  * different products, cents, offers, packs or availability without a new
  * captured timestamp, URL or SHA. Never fetch, license or publish prices.
  */
+import { types as nodeTypes } from 'node:util'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
@@ -17,6 +18,73 @@ const fail = () => { throw new Error(FAIL) }
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v)
 const safe = v => v === null || (Number.isSafeInteger(v) && v >= 0)
 const count = v => Number.isSafeInteger(v) && v >= 0
+
+/**
+ * Copy only bounded own JSON data before an exported QA review touches caller
+ * values. Accessors and Proxy wrappers must be refused WITHOUT executing
+ * user-provided getter/trap code. Accepted aliases are retained, cycles denied.
+ */
+function inertEventReviewBatch(input) {
+  const seen = new WeakMap()
+  const active = new WeakSet()
+  let count = 0
+  const isIndex = key => /^(?:0|[1-9][0-9]*)$/.test(key)
+  function copy(value, depth) {
+    if (++count > 400_000 || depth > 40) fail()
+    if (value === null || typeof value === 'boolean') return value
+    if (typeof value === 'string') {
+      if (value.length > 100_000) fail()
+      return value
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) fail()
+      return value
+    }
+    if (typeof value !== 'object' || nodeTypes.isProxy(value) ||
+        active.has(value)) fail()
+    if (seen.has(value)) return seen.get(value)
+    const array = Array.isArray(value)
+    const prototype = Object.getPrototypeOf(value)
+    if (array ? prototype !== Array.prototype :
+        prototype !== Object.prototype && prototype !== null) fail()
+    const lengthDescriptor = array
+      ? Object.getOwnPropertyDescriptor(value, 'length') : null
+    const length = lengthDescriptor?.value
+    if (array && (!Number.isSafeInteger(length) || length > 10_000 ||
+        length < 0 || !Object.hasOwn(lengthDescriptor, 'value'))) fail()
+    const descriptors = Object.getOwnPropertyDescriptors(value)
+    const keys = Reflect.ownKeys(descriptors)
+    if (keys.some(key => typeof key !== 'string') ||
+        (array ? keys.length !== length + 1 : keys.length > 8_192)) fail()
+    if (array && keys.some(key => key !== 'length' &&
+        (!isIndex(key) || Number(key) >= length))) fail()
+    const out = array ? new Array(length) : Object.create(prototype)
+    seen.set(value, out)
+    active.add(value)
+    for (const key of keys) {
+      if (array && key === 'length') continue
+      const descriptor = descriptors[key]
+      if (!Object.hasOwn(descriptor, 'value') ||
+          descriptor.enumerable !== true) fail()
+      Object.defineProperty(out, key, {
+        value: copy(descriptor.value, depth + 1),
+        enumerable: true, configurable: true, writable: true,
+      })
+    }
+    if (array && keys.length !== length + 1) fail()
+    active.delete(value)
+    return out
+  }
+  const result = copy(input, 0)
+  function freeze(value) {
+    if (value === null || typeof value !== 'object' ||
+        Object.isFrozen(value)) return
+    for (const key of Object.keys(value)) freeze(value[key])
+    Object.freeze(value)
+  }
+  freeze(result)
+  return result
+}
 function instant(value, asOf) {
   if (typeof value !== 'string' ||
       !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value)) fail()
@@ -32,6 +100,9 @@ function origin(value, retailer, kind, clock) {
       typeof value.url !== 'string' || value.url.length > 2048) fail()
   let url
   try { url = new URL(value.url) } catch { fail() }
+  // WHATWG URL.search/hash hide empty raw delimiters; source provenance is
+  // byte-sensitive, not an inferred equivalent URL.
+  if (value.url.includes('#') || value.url.endsWith('?')) fail()
   if (url.protocol !== 'https:' || url.hostname !== STORES[retailer] ||
       url.username || url.password || url.port || url.hash ||
       url.href !== value.url ||
@@ -55,6 +126,7 @@ function facts(value) {
  * review is historical dataset consistency, not real-time price permission.
  */
 export function auditPrivateRetailerCaptureEvents(batch, { asOf = new Date().toISOString() } = {}) {
+  batch = inertEventReviewBatch(batch)
   const clock = instant(asOf, Date.now())
   if (!object(batch) || !object(batch.summary) ||
       batch.summary.mode !== 'reviewed-offline-only' ||
