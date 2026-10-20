@@ -140,7 +140,19 @@ export function ManualStoreComparison({
             ' ' + quote.packUnit + ' · ' + exactEuro.formatCents(line.lineCents))
         }
         rows.push('Rekenkundig regelverschil (Deka minus PLUS): ' +
-          exactEuro.formatCents(deka.lineCents - plus.lineCents), '')
+          exactEuro.formatCents(deka.lineCents - plus.lineCents))
+        if (plus.unitPriceCents !== null && deka.unitPriceCents !== null) {
+          const unitLabel = row.requiredUnit === 'piece' ? 'stuk' :
+            row.requiredUnit === 'g' || row.requiredUnit === 'kg' ? 'kg' : 'liter'
+          rows.push('Afgeronde eenheidsprijzen per ' + unitLabel + ': PLUS ' +
+            exactEuro.formatCents(plus.unitPriceCents) + ' / DekaMarkt ' +
+            exactEuro.formatCents(deka.unitPriceCents) +
+            '; verschil (Deka minus PLUS): ' +
+            exactEuro.formatCents(deka.unitPriceCents - plus.unitPriceCents))
+        } else {
+          rows.push('Eenheidsprijs: onbekend (geen schatting).')
+        }
+        rows.push('Mandkosten volgen uitsluitend de werkelijk te kopen hele multipacks.', '')
       }
       rows.push('PLUS eigen ingevuld totaal: ' + exactEuro.formatCents(summary.totals.PLUS),
         'DekaMarkt eigen ingevuld totaal: ' + exactEuro.formatCents(summary.totals.DekaMarkt),
