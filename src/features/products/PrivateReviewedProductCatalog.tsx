@@ -184,11 +184,6 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
           </section>
         })}
       </div>
-      {store === 'all' && currentReviewed && <PrivateReviewedTwoStoreTable reviewed={currentReviewed}
-        search={search} unitFilter={unitFilter} order={order} budget={budget}
-        onOpenComparison={onOpenComparison} onOpenList={onOpenList}
-        onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
-        checked={checked} />}
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.
         {' '}{ordered.filter(row => isChecked(row.shop, row.line)).length}
         {' '}van de getoonde artikelen staan op afgevinkt in je lijst.</p>
@@ -217,6 +212,11 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
         {store === 'all' ? 'Open mijn gecontroleerde boodschappenlijst' : `Open mijn ${store}-boodschappenlijst`}
       </button>
     </>}
+    {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
+      search={search} unitFilter={unitFilter} order={order} budget={budget}
+      onOpenComparison={onOpenComparison} onOpenList={onOpenList}
+      onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
+      checked={checked} />}
     <button type="button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>
     <small>Ontbrekende of verlopen bronproducten krijgen nooit een verzonnen prijs.</small>
   </section>
