@@ -117,8 +117,14 @@ export function ImportedRecipeGroceriesPanel({
     new Set(plannerAssignments.map(assignment => assignment.day)).size === plannerAssignments.length
   const variantInputKey = JSON.stringify(selected.map(recipe =>
     [recipe, Object.hasOwn(portionsById, recipe.id) ? portionsById[recipe.id] : recipe.servings]))
-  const latestVariantInputKey = useRef(variantInputKey)
-  latestVariantInputKey.current = variantInputKey
+  // A delayed download must also bind the *day assignments*, not just the
+  // original recipe bytes and portions: changing Monday to Thursday while a
+  // lazy module loads must never silently download the old plan.
+  const plannerExportKey = JSON.stringify([variantInputKey, startDay,
+    plannerAssignments.map(({ day, recipeId, recipeSnapshot }) =>
+      [day, recipeId, recipeSnapshot])])
+  const latestPlannerExportKey = useRef(plannerExportKey)
+  latestPlannerExportKey.current = plannerExportKey
   useEffect(() => setVariantPreview(null), [variantInputKey])
   const signature = JSON.stringify(selected.map(recipe => [
     recipe.id, portionsById[recipe.id] ?? recipe.servings, recipe.servings,
@@ -279,14 +285,14 @@ export function ImportedRecipeGroceriesPanel({
   }
   async function downloadPrintableRecipeWeek() {
     setFeedback('')
-    const expected = variantInputKey
+    const expected = plannerExportKey
     try {
       if (!plannerReadyForSelection || !plannerDaysDistinct ||
         plannerAssignments.length === 0 || !list?.canCopy)
         throw new Error('Controleer eerst alle recepten en unieke weekdagen.')
       requireLatestOwnedRecipes()
       const { exportRecipeWeekPrint } = await import('./exportRecipeWeekPrint.ts')
-      if (expected !== latestVariantInputKey.current)
+      if (expected !== latestPlannerExportKey.current)
         throw new Error('Recepten of porties zijn intussen veranderd. Maak het plan opnieuw.')
       requireLatestOwnedRecipes()
       const html = exportRecipeWeekPrint(plannerAssignments, selected, plannerDays, list)
@@ -301,14 +307,14 @@ export function ImportedRecipeGroceriesPanel({
   }
   async function downloadDayGroceryOrigin() {
     setFeedback('')
-    const expected = variantInputKey
+    const expected = plannerExportKey
     try {
       if (!plannerReadyForSelection || !plannerDaysDistinct ||
         plannerAssignments.length === 0 || !result?.complete)
         throw new Error('Controleer eerst alle ingrediënten en kies voor elk recept een eigen dag.')
       requireLatestOwnedRecipes()
       const { formatRecipeWeekShoppingByDay } = await import('./formatRecipeWeekShoppingByDay.ts')
-      if (expected !== latestVariantInputKey.current)
+      if (expected !== latestPlannerExportKey.current)
         throw new Error('De recepten of porties zijn intussen veranderd. Probeer opnieuw.')
       requireLatestOwnedRecipes()
       const text = formatRecipeWeekShoppingByDay(result, plannerAssignments)
