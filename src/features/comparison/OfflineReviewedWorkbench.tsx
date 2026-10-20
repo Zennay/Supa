@@ -656,9 +656,17 @@ export function OfflineReviewedWorkbench({
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         setWeekExportMessage('Delen geannuleerd; jouw bronbestanden blijven behouden.')
+      } else if (importRevision.current === revision && captureWeekRef.current === week &&
+          latestCapturePreview.current === preview) {
+        try {
+          const { text } = missingPreviewGuide()
+          setPortableMissingGuide({ source: preview, week, text })
+          setWeekExportMessage('Mobiel delen geweigerd; selecteer de lokale ongeprijsde lijst hieronder.')
+        } catch {
+          setWeekExportMessage('De bronpreview is veranderd. Maak de lijst opnieuw.')
+        }
       } else {
-        setWeekExportMessage(error instanceof Error ? error.message :
-          'Mobiel delen niet beschikbaar. Gebruik de TXT-download.')
+        setWeekExportMessage('De bronpreview is veranderd. Maak de lijst opnieuw.')
       }
     }
   }
@@ -2620,8 +2628,7 @@ export function OfflineReviewedWorkbench({
                 retailerrechten, bronverificatie of besparingsbewijs.
                 Controleer na overname zelf ieder oorspronkelijk artikel,
                 de verpakking, prijs en datum.</p>
-              {currentPreview.stores.some(store => (store.matching?.unresolved ?? 0) > 0) ||
-                currentPreview.stores.length < 2 ? (
+              {stores.some(store => missingPreviewCaptureNeeds(store).length > 0) ? (
                 <>
                   <button type="button" className="ghost-button" disabled={busy}
                     onClick={downloadMissingFromPreview}>
