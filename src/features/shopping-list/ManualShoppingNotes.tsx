@@ -285,6 +285,16 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const selected = notes.filter(note => filterStore === 'Alle winkels' ||
     note.store === filterStore || note.store === 'Algemeen')
   const visible = onlyOpen ? selected.filter(note => !note.done) : selected
+  const visibleIds = new Set(visible.map(note => note.id))
+  const remainingVisible = visible.filter(note => !note.done).length
+  const completedVisible = visible.length - remainingVisible
+  function markVisible(done: boolean) {
+    if (visibleIds.size === 0) return
+    setNotes(current => current.map(item => visibleIds.has(item.id) && item.done !== done
+      ? { ...item, done } : item))
+    setMessage((done ? 'Zichtbare boodschappen afgevinkt' : 'Zichtbare boodschappen weer opengezet') +
+      '; andere winkels en oorspronkelijke prijsdata blijven onaangeroerd.')
+  }
   const exportText = [
     'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ' + filterStore,
     'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.', '',
@@ -345,6 +355,15 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         </select>
       </label>
       <label><input type="checkbox" checked={onlyOpen} onChange={event => setOnlyOpen(event.target.checked)} /> Alleen open</label>
+    </div>
+    <div className="manual-shopping-notes__batch" role="group" aria-label="Zichtbare boodschappen beheren">
+      <button type="button" disabled={remainingVisible === 0} onClick={() => markVisible(true)}>
+        Vink {remainingVisible} zichtbare open boodschappen af
+      </button>
+      <button type="button" disabled={completedVisible === 0} onClick={() => markVisible(false)}>
+        Zet {completedVisible} zichtbare boodschappen weer open
+      </button>
+      <small>Alleen de huidige winkel- en open-filterselectie. Geen prijzen of bronmomenten wijzigen.</small>
     </div>
     <ul>{visible.map(note => <li key={note.id}>
       {editing?.id === note.id ? <form className="manual-shopping-notes__edit" onSubmit={saveEditedNote}>
