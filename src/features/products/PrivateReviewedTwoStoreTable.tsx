@@ -33,10 +33,14 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
 }) {
   const reviewedRef = useRef(reviewed)
   reviewedRef.current = reviewed
+  const checkedRef = useRef(checked)
+  checkedRef.current = checked
   const [receiptMessage, setReceiptMessage] = useState('')
   // Temporary trip costs belong to ONE original physical basket pair.
   // Never carry a previous week's travel scenario into newly imported prices.
   const [costIntent, setCostIntent] = useState<{ pair: string; raw: string } | null>(null)
+  const costIntentRef = useRef(costIntent)
+  costIntentRef.current = costIntent
   const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
   async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt') {
     const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
@@ -51,7 +55,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           .privateSingleStoreShoppingCsv({
             basket: receipt.basket, observedAt: receipt.observedAt,
             done: new Set(receipt.basket.lines.filter(line => line.status === 'matched' &&
-              checked[privatePhysicalShoppingTick(origin.planKey, shop, receipt.basket.store.id, line)])
+              checkedRef.current[privatePhysicalShoppingTick(origin.planKey, shop, receipt.basket.store.id, line)])
               .map(line => line.id)),
           })
         : (await import('../shopping-list/privateSingleStoreShoppingText.ts'))
@@ -84,13 +88,15 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     // demand. Await lazy receipt code before rechecking source expiry.
     const initial = freshReviewedBaskets(reviewedRef.current,
       reviewedRef.current.planKey, Date.now())
+    const initialCostIntent = costIntentRef.current
     try {
       const exports = await import('../planner/downloadOwnStoreComparison.ts')
       const current = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
       if (!current || !initial || current.planKey !== initial.planKey ||
           current.stores.PLUS !== initial.stores.PLUS ||
-          current.stores.DekaMarkt !== initial.stores.DekaMarkt) {
+          current.stores.DekaMarkt !== initial.stores.DekaMarkt ||
+          (kind === 'txt' && splitTrip && initialCostIntent !== costIntentRef.current)) {
         setReceiptMessage('Bronnen gewijzigd tijdens voorbereiden. Start opnieuw.')
         return
       }
