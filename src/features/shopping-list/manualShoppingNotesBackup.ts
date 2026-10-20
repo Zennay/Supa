@@ -1,4 +1,5 @@
 import type { UnpricedShoppingNote } from './ManualShoppingNotes.tsx'
+import { literalCsv } from '../../privateBasketComparisonCsv.ts'
 
 export const PRIVATE_NOTES_BACKUP_MAX_BYTES = 65536
 const MAX_NOTES = 100
@@ -59,4 +60,34 @@ export function mergePrivateNotes(current: UnpricedShoppingNote[], incoming: Unp
   }
   if (existing.size > MAX_NOTES) throw new Error('De samengevoegde lijst zou meer dan 100 artikelen bevatten.')
   return { notes: [...current, ...additional], added: additional.length }
+}
+
+/** Keep handwritten groceries outside the original eighteen-column retailer
+ * evidence and euro arithmetic. Rows have NO store observation, SKU or price. */
+export function appendHandwrittenNotesToShoppingCsv(
+  original: string, notes: readonly UnpricedShoppingNote[],
+  store: 'PLUS' | 'DekaMarkt',
+): string {
+  if (!original.startsWith('"soort","winkel","opnametijd",') ||
+      !original.endsWith('\r\n') || !['PLUS', 'DekaMarkt'].includes(store))
+    throw Error('Geen geldige oorspronkelijke privéwinkel-CSV.')
+  const validated = normalizePrivateNotes({
+    schema: 'supa-private-unpriced-notes-v1', notes,
+  })
+  const relevant = validated.filter(note => note.store === 'Algemeen' || note.store === store)
+  if (!relevant.length) return original
+  const appended = relevant.map(note => {
+    const row = Array<string>(18).fill('')
+    row[0] = 'handmatig_ongeprijsd'
+    row[3] = note.id
+    row[4] = note.label
+    row[16] = note.done ? 'ja' : 'nee'
+    row[17] = 'Zelf toegevoegd voor ' + note.store +
+      '; geen retailer-SKU, bronmoment, prijs, eenheid of mandtotaal.'
+    return row.map(value => literalCsv(value)).join(',')
+  })
+  const output = original + appended.join('\r\n') + '\r\n'
+  if (new TextEncoder().encode(output).length > 256000)
+    throw Error('De gecombineerde privéwinkel-CSV is te groot.')
+  return output
 }

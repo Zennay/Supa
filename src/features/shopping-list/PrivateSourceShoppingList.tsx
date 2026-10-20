@@ -254,8 +254,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         setMessage('Extra boodschappen van deze week zijn niet veilig leesbaar. Niets gedownload.')
         return
       }
-      if (!saved.items.length) {
-        setMessage('Voeg onderaan Lijst eerst eigen extra boodschappen toe en klik Bewaar in deze tab. Daarna kun je één gezamenlijke lijst downloaden.')
+      if (!saved.items.length && !ownNotes.length) {
+        setMessage('Voeg eerst eigen ongeprijsde boodschappen toe in de Lijst. Daarna kun je ze samen met je winkelmand downloaden.')
         return
       }
       if (!currentCaptureAvailable()) throw Error('De oorspronkelijke winkelopname is inmiddels verlopen.')
@@ -267,9 +267,11 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       const all = [
         textList,
         '',
-        'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ', expliciet in deze tab bewaard)',
-        'Niet gekoppeld aan PLUS of DekaMarkt. Buiten alle getoonde eurototalen en besparingen.',
-        ...extraLines,
+        ...(saved.items.length ? [
+          'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ', expliciet in deze tab bewaard)',
+          'Niet gekoppeld aan PLUS of DekaMarkt. Buiten alle getoonde eurototalen en besparingen.',
+          ...extraLines,
+        ] : []),
         '',
         'De winkelbedragen hierboven zijn uitsluitend voor de eigen gecontroleerde',
         'fysieke Planner-producten; deze extra boodschappen hebben onbekende kosten.',
@@ -284,7 +286,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         link.download = 'supa-' + store.toLowerCase() + '-met-eigen-extra-boodschappen.txt'
         document.body.append(link)
         try { link.click() } finally { link.remove() }
-        setMessage('Eigen gecontroleerde ' + store + '-lijst inclusief apart bewaarde ongeprijsde extras gedownload. Je getoonde winkelbedrag is exclusief extras.')
+        setMessage('Eigen ' + store + '-mand en ongeprijsde boodschappen samen gedownload. Deze eigen artikelen blijven buiten de eurototalen.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch {
       setMessage('Gecombineerde export niet beschikbaar: controleer de bron en je opgeslagen extra artikelen.')
@@ -310,9 +312,16 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
             import('./singleStoreWithExtrasCsv.ts'),
           ])
         const saved = readSavedExtrasForPlan(reviewed.planKey)
-        if (!saved.available || !saved.items.length)
-          throw Error('Bewaar eerst je eigen extra boodschappen voor deze week in de Lijst-tab.')
-        csv = appendUnpricedExtrasToSingleStoreCsv(reviewedCsv, saved.items)
+        if (!saved.available)
+          throw Error('Eigen extra boodschappen konden niet worden gelezen.')
+        if (!saved.items.length && !ownNotes.length)
+          throw Error('Voeg eerst eigen ongeprijsde boodschappen toe in de Lijst.')
+        csv = saved.items.length
+          ? appendUnpricedExtrasToSingleStoreCsv(reviewedCsv, saved.items) : reviewedCsv
+        if (manualNotes.length) {
+          const { appendHandwrittenNotesToShoppingCsv } = await import('./manualShoppingNotesBackup.ts')
+          csv = appendHandwrittenNotesToShoppingCsv(csv, manualNotes, store)
+        }
       }
       if (!currentCaptureAvailable()) throw Error('De originele bron is intussen verlopen.')
       const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
@@ -323,7 +332,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           (includeExtras ? '-met-ongeprijsde-extras.csv' : '-eigen-boodschappen.csv')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
-        setMessage('Eigen artikelen, hele verpakkingen en exacte centprijzen lokaal als CSV opgeslagen.')
+        setMessage(includeExtras ? 'Geprijsde originele SKU-regels en eigen ongeprijsde boodschappen staan apart in de privé-CSV. De eurototalen zijn ongewijzigd.' : 'Eigen artikelen, hele verpakkingen en exacte centprijzen lokaal als CSV opgeslagen.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'De privé-CSV kon niet worden gemaakt.')
@@ -340,8 +349,10 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       if (includeExtras) {
         const { readSavedExtrasForPlan } = await import('../comparison/ownExtraGroceriesStorage.ts')
         const saved = readSavedExtrasForPlan(reviewed.planKey)
-        if (!saved.available || !saved.items.length)
-          throw Error('Bewaar je eigen extra boodschappen in de Lijst-tab voordat je ze print.')
+        if (!saved.available)
+          throw Error('De eigen extra boodschappen konden niet worden gelezen.')
+        if (!saved.items.length && !ownNotes.length)
+          throw Error('Voeg eerst ongeprijsde artikelen aan je lijst toe.')
         extras = saved.items
       }
       if (!currentCaptureAvailable()) throw Error('Verlopen bron')
@@ -349,6 +360,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         basket, observedAt: capture.observedAt,
         done: new Set(basket.lines.filter(line => checked[tick(line)]).map(line => line.id)),
         extras,
+        manualNotes: includeExtras ? manualNotes : undefined,
       })
       if (!currentCaptureAvailable()) throw Error('Verlopen bron tijdens afdruk.')
       const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
@@ -542,15 +554,15 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           Ze tellen niet mee voor winkelbedragen, besparingen of CSV-/HTML-bronrapporten.
         </p>}
         <button type="button" onClick={() => { void downloadStoreWithExtras() }}>
-          Download winkelmand + mijn bewaarde extra boodschappen (TXT)
+          Download winkelmand + al mijn ongeprijsde boodschappen (TXT)
         </button>
         <button type="button" onClick={() => { void downloadCsv(false) }}>Download volledig mandje met SKU’s (CSV)</button>
         <button type="button" onClick={() => { void downloadCsv(true) }}>
-          Download dit winkelmandje + ongeprijsde extras (CSV)
+          Download winkelmand + mijn ongeprijsde boodschappen (CSV)
         </button>
         <button type="button" onClick={() => { void downloadPrintable(false) }}>Print volledig eigen mandje (HTML)</button>
         <button type="button" onClick={() => { void downloadPrintable(true) }}>
-          Print dit winkelmandje én mijn extra boodschappen (HTML)
+          Print winkelmand én mijn ongeprijsde boodschappen (HTML)
         </button>
         <button type="button" onClick={() => { void saveProgress() }}>Bewaar vinkjes (JSON)</button>
         <button type="button" onClick={() => progressInputRef.current?.click()}>Herstel vinkjes</button>

@@ -3,6 +3,8 @@ import type { OneStoreBasket } from '../../domain/basket.ts'
 import { privateSingleStoreShoppingCsv } from './privateSourceShoppingCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import type { OwnExtraGrocery } from '../comparison/ownExtraGroceriesCsv.ts'
+import type { UnpricedShoppingNote } from './ManualShoppingNotes.tsx'
+import { normalizePrivateNotes } from './manualShoppingNotesBackup.ts'
 
 const esc = (value: string | number) => String(value)
   .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
@@ -12,9 +14,10 @@ const esc = (value: string | number) => String(value)
 /** Inert, offline one-shop checklist for user-admitted current source observations.
  * Share/print is user-initiated; this HTML cannot import new retailer evidence.
  */
-export function privateSingleStorePrintableHtml({ basket, observedAt, done, extras }: {
+export function privateSingleStorePrintableHtml({ basket, observedAt, done, extras, manualNotes }: {
   basket: OneStoreBasket; observedAt: string; done: ReadonlySet<string>
   extras?: readonly OwnExtraGrocery[]
+  manualNotes?: readonly UnpricedShoppingNote[]
 }): string {
   // Reuse the exact existing CSV financial/physical admission instead of
   // letting printable output become a weaker independent price renderer.
@@ -48,6 +51,18 @@ export function privateSingleStorePrintableHtml({ basket, observedAt, done, extr
         esc(item.quantity) + ' ' + (item.unit === 'piece' ? 'stuks' : esc(item.unit)) +
         ' · prijs onbekend</small></div></li>').join('') + '</ul></section>'
     : ''
+  const checkedNotes = manualNotes ? normalizePrivateNotes({
+    schema: 'supa-private-unpriced-notes-v1', notes: manualNotes,
+  }).filter(note => note.store === 'Algemeen' || note.store === basket.store.id) : []
+  const manualHtml = checkedNotes.length
+    ? '<section><h2>Zelf toegevoegde boodschappen · prijs onbekend</h2>' +
+      '<p>Deze ' + checkedNotes.length + ' handmatig ingevoerde artikelen zijn ' +
+      'niet in de originele winkelprijs of besparing opgenomen.</p><ul>' +
+      checkedNotes.map(note => '<li><span class="tick">' +
+        (note.done ? '&#9745;' : '&#9744;') + '</span><div><strong>' +
+        esc(note.label) + '</strong><br><small>Mijn ' + esc(note.store) +
+        '-notitie · geen winkelprijs of productcode</small></div></li>').join('') +
+      '</ul></section>' : ''
   const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="referrer" content="no-referrer">' +
@@ -73,7 +88,7 @@ export function privateSingleStorePrintableHtml({ basket, observedAt, done, extr
     esc(exactEuro.formatCents(basket.totalCents)) + '</strong></p>' +
     '<p>Nog op de lijst (niet-afgevinkt)<strong>' + esc(exactEuro.formatCents(stillNeeded)) +
     '</strong></p></section><main><h2>Artikelen</h2><ul>' + items +
-    '</ul></main>' + extrasHtml + '<footer><p>Afgevinkt betekent niet betaald. Controleer de originele ' +
+    '</ul></main>' + extrasHtml + manualHtml + '<footer><p>Afgevinkt betekent niet betaald. Controleer de originele ' +
     'winkelprijzen opnieuw bij een volgende boodschappenronde. Print met je browser.</p>' +
     '</footer></body></html>'
   if (new TextEncoder().encode(html).length > 256_000)
