@@ -2,6 +2,8 @@ import { makeBlankPlannerCaptureCsv, type CaptureStore, type PlannerCaptureNeed 
 
 export type PlannerCaptureGuideNeed = PlannerCaptureNeed & Readonly<{
   amount: number | null
+  // Canonical Planner basket query when available, never inferred from price data.
+  query?: string
 }>
 
 /**
@@ -24,6 +26,8 @@ export function makePlannerCaptureGuide(
     'Vul in de aparte CSV ALLEEN werkelijk waargenomen gegevens in:',
     'originele winkelproductcode, originele naam, gemeten verpakking, echte',
     'datum/tijd met expliciete UTC-offset, hele prijscenten en beschikbaarheid.',
+    'UTC-tijdstempels met Z zijn ook geldig: YYYY-MM-DDTHH:mm:ssZ.',
+    'Noteer het werkelijke bronmoment; vul NOOIT automatisch de huidige tijd in.',
     'Laat niet gevonden producten volledig oningevuld: geen prijs is niet €0.',
     'De voorgestelde eenheid is geen geobserveerde verpakking.',
     '',

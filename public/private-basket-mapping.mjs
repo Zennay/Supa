@@ -2,15 +2,37 @@
  * Source admission delegates to the existing canonical offline CSV converter.
  * No storage, remote requests, inferred product equivalence or monetary computation.
  */
-import { convertTwoStoreCsv, convertOwnStoreCsv } from './offline-two-store-csv.mjs'
+import { convertOwnStoreCsv } from './offline-two-store-csv.mjs'
 
 const stores = ['PLUS', 'DekaMarkt']
 const units = ['g', 'kg', 'ml', 'l', 'piece']
 const maxBytes = 256000
+const DAY_NS = 86400000000000n
+const WEEK_NS = DAY_NS * 7n
+// Source admission already requires an exact civil ISO date and explicit
+// offset. Preserve the original fractional seconds when showing source-pair
+// readiness: Date.parse alone would erase a 24-hour + 1 ns mismatch.
+function observedNs(value) {
+  if (!validSourceInstant(value)) return null
+  const ms = Date.parse(value)
+  const fraction = (/\.(\d{1,9})[+-]\d\d:\d\d$/u.exec(value)?.[1] ?? '').padEnd(9, '0')
+  return BigInt(ms - Number(fraction.slice(0, 3))) * 1000000n + BigInt(fraction || '0')
+}
+function ageNs(at, now) {
+  const recorded = observedNs(at)
+  return recorded === null ? null : BigInt(now) * 1000000n - recorded
+}
+function pairGapNs(first, second) {
+  const left = observedNs(first)
+  const right = observedNs(second)
+  return left === null || right === null ? null : left > right ? left - right : right - left
+}
+function needsRecapture(age) {
+  return age !== null && (age < 0n || age > WEEK_NS)
+}
 const sourceInput = document.querySelector('#source')
 const plusInput = document.querySelector('#plus-source')
 const dekaInput = document.querySelector('#deka-source')
-const csvHeader = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 let sourceRevision = 0
 let pendingManualEdit = false
 const sourceStatus = document.querySelector('#source-status')
@@ -166,13 +188,15 @@ function updateCoverage() {
       (duplicated ? ' · ' + duplicated + ' regels met dubbel gekozen SKU' : '')
   })
   const now = Date.now()
-  const observed = stores.map(store => captures[store] ? Date.parse(captures[store].observedAt) : null)
-  const ages = observed.map(time => time === null ? null : now - time)
-  const fresh = ages.every(age => age !== null && Number.isFinite(age) && age >= 0 && age <= 7 * 86400000)
-  const paired = observed.every(time => time !== null) &&
-    Math.abs(observed[0] - observed[1]) <= 86400000
+  const observed = stores.map(store => captures[store] ? observedNs(captures[store].observedAt) : null)
+  const ages = stores.map(store => captures[store] ? ageNs(captures[store].observedAt, now) : null)
+  const fresh = ages.every(age => age !== null && age >= 0n && age <= WEEK_NS)
+  const gap = observed[0] === null || observed[1] === null ? null :
+    observed[0] > observed[1] ? observed[0] - observed[1] : observed[1] - observed[0]
+  const paired = gap !== null && gap <= DAY_NS
   const complete = messages.every(value => value.includes(' ' + rows.length + ' van ' + rows.length))
-  const expiry = Math.min(...observed.filter(time => time !== null)) + 7 * 86400000
+  const oldest = observed.filter(time => time !== null).reduce((a, b) => a === null || b < a ? b : a, null)
+  const expiry = oldest === null ? null : Number((oldest + WEEK_NS) / 1000000n)
   const timeStatus = observed.some(time => time === null) ?
     'Voor één winkel ontbreekt een echte bronopname. Die winkel blijft onbekend; geen volledige twee-winkelvergelijking. ' :
     !fresh ? 'Eén of beide bronopnames zijn toekomstig of ouder dan zeven dagen. ' :
@@ -180,7 +204,7 @@ function updateCoverage() {
       'Beide bronmomenten zijn binnen zeven dagen en maximaal 24 uur uiteen. '
   coverage.className = 'notice' + (!complete || !fresh || !paired ? ' warning' : '')
   coverage.textContent = messages.join(' · ') + '. ' + timeStatus +
-    (fresh && paired ? 'Bronpaar geldig tot uiterlijk ' +
+    (fresh && paired && expiry !== null ? 'Bronpaar geldig tot uiterlijk ' +
       new Date(expiry).toLocaleString('nl-NL') + ' volgens de oorspronkelijke waarnemingen. ' : '') +
     'Alleen een complete, opnieuw berekende privévergelijking stelt de winkelbedragen vast. Onbekende of verlopen prijzen zijn nooit €0.'
 }
@@ -454,15 +478,16 @@ async function readLocalFile(file) {
   return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
 }
 
-function removeCsvHeader(source) {
-  const normalized = source.startsWith('\uFEFF') ? source.slice(1) : source
-  const firstEnd = normalized.indexOf('\n')
-  if (firstEnd < 0 || normalized.slice(0, firstEnd).replace(/\r$/, '') !== csvHeader) {
-    throw Error('Ieder CSV-bestand moet de bestaande negenkoloms-kop bevatten.')
-  }
-  const body = normalized.slice(firstEnd + 1)
-  if (!body) throw Error('Een van de winkelbestanden bevat geen opnameregels.')
-  return body.endsWith('\n') ? body : body + '\n'
+function parseSingleSource(text) {
+  const parsed = text.trimStart().startsWith('{')
+    ? JSON.parse(text) : JSON.parse(convertOwnStoreCsv(text))
+  // The existing mapping wizard's source boundary checks original IDs,
+  // prices, timestamps and physical packages. A full two-store JSON is not
+  // allowed in a single-retailer input field.
+  const verified = acceptJson(parsed)
+  if (Object.keys(verified).length !== 1) throw Error('Kies één winkelopname per los bestand.')
+  return { schema: 'supa-private-single-store-prices-v1',
+    captures: [verified[Object.keys(verified)[0]]] }
 }
 
 async function loadSources() {
@@ -483,17 +508,28 @@ async function loadSources() {
     let parsed
     if (combined) {
       const content = await readLocalFile(combined)
-      parsed = combined.name.toLowerCase().endsWith('.json')
+      parsed = combined.name.toLowerCase().endsWith('.json') || content.trimStart().startsWith('{')
         ? JSON.parse(content) : JSON.parse(convertOwnStoreCsv(content))
     } else if (plus && deka) {
       const [plusText, dekaText] = await Promise.all([readLocalFile(plus), readLocalFile(deka)])
-      const joined = csvHeader + '\n' + removeCsvHeader(plusText) + removeCsvHeader(dekaText)
-      if (new TextEncoder().encode(joined).length > maxBytes) {
-        throw Error('Twee samengevoegde CSV-bronnen zijn groter dan 256 kB.')
+      // Each real shop file passes the existing strict spreadsheet converter.
+      // Different separator conventions no longer corrupt or block the pair.
+      const first = parseSingleSource(plusText)
+      const second = parseSingleSource(dekaText)
+      if (first.captures.length !== 1 || second.captures.length !== 1 ||
+          first.captures[0].retailer !== 'PLUS' ||
+          second.captures[0].retailer !== 'DekaMarkt') {
+        throw Error('Het PLUS-vak vereist een echte PLUS-opname en het DekaMarkt-vak een echte DekaMarkt-opname.')
       }
-      parsed = JSON.parse(convertTwoStoreCsv(joined))
+      parsed = { schema: 'supa-offline-prices-v1',
+        captures: [...first.captures, ...second.captures] }
+      if (new TextEncoder().encode(JSON.stringify(parsed)).length > maxBytes)
+        throw Error('De twee winkelbronnen samen overschrijden 256 kB.')
     } else {
-      parsed = JSON.parse(convertOwnStoreCsv(await readLocalFile(plus ?? deka)))
+      parsed = parseSingleSource(await readLocalFile(plus ?? deka))
+      const selectedStore = plus ? 'PLUS' : 'DekaMarkt'
+      if (parsed.captures.length !== 1 || parsed.captures[0].retailer !== selectedStore)
+        throw Error('Het gekozen winkelvak hoort niet bij de winkelcode in het originele bestand.')
     }
     let verified = acceptJson(parsed)
     if (revision !== sourceRevision) return
@@ -546,25 +582,25 @@ async function loadSources() {
     const descriptions = stores.map(store => {
       const capture = captures[store]
       if (!capture) return store + ': nog geen bronopname; alle prijzen onbekend'
-      const ageMs = now - Date.parse(capture.observedAt)
-      const stale = ageMs < 0 ? ' · toekomstig' :
-        ageMs > 7 * 86400000 ? ' · ouder dan 7 dagen' : ''
+      const age = ageNs(capture.observedAt, now)
+      const stale = age !== null && age < 0n ? ' · toekomstig' :
+        age !== null && age > WEEK_NS ? ' · ouder dan 7 dagen' : ''
       return store + ': ' + capture.products.length + ' producten, vastgelegd ' +
         capture.observedAt + stale
     })
     const gap = captures.PLUS && captures.DekaMarkt
-      ? Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt)) : null
+      ? pairGapNs(captures.PLUS.observedAt, captures.DekaMarkt.observedAt) : null
     if (gap === null) descriptions.push('Voor een volledig winkelprijsverschil is nog een echte tweede winkelopname nodig.')
-    else if (gap > 86400000) descriptions.push('Opnames >24 uur uiteen. Opnieuw meten voor een volledige vergelijking.')
+    else if (gap > DAY_NS) descriptions.push('Opnames >24 uur uiteen. Opnieuw meten voor een volledige vergelijking.')
     if (append) descriptions.push('De twee afzonderlijk echt ingelezen winkelopnames zijn na jouw bevestiging lokaal gecombineerd.')
     descriptions.push(unchanged.length ? 'Eerder handmatig gekoppelde SKU’s zijn uitsluitend bij ongewijzigde originele winkelopname(n) behouden.' : 'Alle productkeuzes moeten opnieuw bevestigd worden.')
     descriptions.push('Selecteer uitsluitend door jou gecontroleerde matches. Geen automatische bronrechten of besparing.')
     const expired = stores.some(store => {
       if (!captures[store]) return false
-      const age = now - Date.parse(captures[store].observedAt)
-      return age < 0 || age > 7 * 86400000
+      const age = ageNs(captures[store].observedAt, now)
+      return needsRecapture(age)
     })
-    notice(sourceStatus, descriptions.join('\n'), gap === null || gap > 86400000 || expired ? 'warning' : '')
+    notice(sourceStatus, descriptions.join('\n'), gap === null || gap > DAY_NS || expired ? 'warning' : '')
   } catch {
     if (revision !== sourceRevision) return
     sourceInput.value = ''
@@ -641,24 +677,24 @@ document.addEventListener('supa:manual-source-admitted', event => {
     const labels = stores.map(store => {
       const capture = captures[store]
       if (!capture) return store + ': geen echte opname; onbekende artikelen en prijzen'
-      const age = now - Date.parse(capture.observedAt)
+      const age = ageNs(capture.observedAt, now)
       return store + ': ' + capture.products.length + ' echt ingevoerde product(en), ' +
-        capture.observedAt + (age < 0 ? ' · toekomstig' :
-          age > 7 * 86400000 ? ' · ouder dan 7 dagen' : '')
+        capture.observedAt + (age !== null && age < 0n ? ' · toekomstig' :
+          age !== null && age > WEEK_NS ? ' · ouder dan 7 dagen' : '')
     })
     const gap = captures.PLUS && captures.DekaMarkt
-      ? Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt)) : null
+      ? pairGapNs(captures.PLUS.observedAt, captures.DekaMarkt.observedAt) : null
     if (gap === null) labels.push('De tweede winkel is niet waargenomen; geen volledig prijsverschil.')
-    else if (gap > 86400000) labels.push('Opnames meer dan 24 uur uiteen: geen volledig betrouwbaar prijsverschil.')
+    else if (gap > DAY_NS) labels.push('Opnames meer dan 24 uur uiteen: geen volledig betrouwbaar prijsverschil.')
     labels.push(unchanged.length
       ? 'SKU-keuzes van uitsluitend ongewijzigde echte opname(n) behouden; gewijzigde winkelproducten opnieuw kiezen.'
       : 'Bevestig nu per ingrediënt de originele echte winkelproduct-ID’s.')
     const expired = stores.some(store => {
       if (!captures[store]) return false
-      const age = now - Date.parse(captures[store].observedAt)
-      return age < 0 || age > 7 * 86400000
+      const age = ageNs(captures[store].observedAt, now)
+      return needsRecapture(age)
     })
-    notice(sourceStatus, labels.join('\n'), gap === null || gap > 86400000 || expired ? 'warning' : '')
+    notice(sourceStatus, labels.join('\n'), gap === null || gap > DAY_NS || expired ? 'warning' : '')
   } catch {
     event.detail.accepted = false
     // A malformed replacement never destroys the existing valid source.
@@ -1098,12 +1134,13 @@ restoreSession.addEventListener('change', async () => {
     }
     invalidateUnpricedDemand()
     refresh()
+    const at = Date.now()
     const ages = stores.map(store => captures[store]
-      ? Date.now() - Date.parse(captures[store].observedAt) : null)
+      ? ageNs(captures[store].observedAt, at) : null)
     const gap = captures.PLUS && captures.DekaMarkt
-      ? Math.abs(Date.parse(captures.PLUS.observedAt) - Date.parse(captures.DekaMarkt.observedAt)) : null
-    const stale = ages.some(age => age !== null && (age < 0 || age > 7 * 86400000)) ||
-      gap === null || gap > 86400000
+      ? pairGapNs(captures.PLUS.observedAt, captures.DekaMarkt.observedAt) : null
+    const stale = ages.some(age => age !== null && (age < 0n || age > WEEK_NS)) ||
+      gap === null || gap > DAY_NS
     notice(sourceStatus, stores.map(store => captures[store]
       ? store + ': ' + captures[store].products.length +
         ' eigen bronartikelen, oorspronkelijke opname ' + captures[store].observedAt

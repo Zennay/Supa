@@ -4,6 +4,8 @@
 import { aggregatePlanIngredients, type RecipeWithIngredients } from './domain/basket.ts'
 import { readRecipeLibrary, type SavedRecipe } from './features/recipes/recipeLibrary.ts'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes.ts'
+import { scaledMetricPortionAmount } from './domain/metricPortionScale.ts'
+import type { MetricUnit } from './domain/userRecipeImport.ts'
 
 const loadButton = document.querySelector<HTMLButtonElement>('#load-own-recipes')!
 const convertButton = document.querySelector<HTMLButtonElement>('#own-recipes-to-demand')!
@@ -140,14 +142,18 @@ convertButton.addEventListener('click', () => {
       // Supa aggregator then combines repeated preparations and equivalent
       // store demands; never round physical pieces up or infer a package.
       const scaledIngredients = reviewed.ingredients.map(item => {
-        const scaled = item.amount! * portions / recipe.servings!
-        const rounded = Math.round(scaled * 1000) / 1000
-        if (!Number.isFinite(scaled) || scaled <= 0 ||
-            !Number.isFinite(rounded) || rounded <= 0 || rounded > 100000 ||
-            (item.unit === 'piece' && !Number.isSafeInteger(scaled))) {
+        // Keep the standalone recipe basket identical to Planner and
+        // Mijn recepten: exact decimal portions, UP to 0.001 g/ml,
+        // never a rounded or fractional physical piece.
+        const unit = item.unit
+        const scaled = ['g', 'ml', 'piece'].includes(unit)
+          ? scaledMetricPortionAmount(
+            item.amount!, recipe.servings!, portions, unit as MetricUnit,
+          ) : null
+        if (scaled === null || scaled > 100000) {
           throw Error('Gedeeltelijke stuks of onveilige metrische porties: corrigeer het recept eerst.')
         }
-        return { ...item, amount: rounded }
+        return { ...item, amount: scaled }
       })
       recipes.push({ ...reviewed, servings: portions, ingredients: scaledIngredients })
       for (let index = 0; index < times; index++) {

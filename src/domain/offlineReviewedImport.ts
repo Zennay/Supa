@@ -3,12 +3,20 @@ import type { MatchUnit } from './matching.ts'
 
 /** Local user-supplied observations. This format is NOT proof of retailer permission or independent field verification. */
 export type OfflineRetailer = 'PLUS' | 'DekaMarkt'
+/** Raw missing-price and availability signals only for explanatory UI.
+ * The purchasable StoreProduct shape is still fail-closed: no unknown price
+ * can become a zero-cent match through these optional source annotations. */
+export type OfflineStoreProduct = StoreProduct & {
+  sourcePriceCents?: number | null
+  sourceAvailable?: boolean
+}
+
 export type OfflineCapture = Readonly<{
   retailer: OfflineRetailer
   observedAt: string
   observedMs: number
   observedNs: bigint
-  products: StoreProduct[]
+  products: OfflineStoreProduct[]
 }>
 export type OfflinePriceSnapshots = Readonly<{
   captures: Readonly<Partial<Record<OfflineRetailer, OfflineCapture>>>
@@ -32,15 +40,22 @@ function validName(value: unknown, max: number): value is string {
     !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(value)
 }
 /** Only real Gregorian civil dates and explicit timezone offsets are accepted. */
-function observedInstant(raw: unknown): { ms: number; ns: bigint } | null {
+export function observedInstant(raw: unknown): { ms: number; ns: bigint } | null {
   if (typeof raw !== 'string') return null
-  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?([+-])(\d\d):(\d\d)$/.exec(raw)
+  // Existing approved capture tools and browser Date#toISOString use a
+  // literal UTC "Z", while hand-entered source records may use an explicit
+  // numeric offset. Both represent the SAME real instant; retain the exact
+  // original observedAt string throughout import, review and export.
+  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?(Z|([+-])(\d\d):(\d\d))$/.exec(raw)
   if (!match) return null
-  const [year, month, day, hour, minute, second, offsetHour, offsetMinute] =
-    [match[1], match[2], match[3], match[4], match[5], match[6], match[9], match[10]].map(Number)
-  if (year < 2000 || year > 2100 || offsetMinute > 59 ||
-      (match[8] === '+' ? offsetHour > 14 || (offsetHour === 14 && offsetMinute > 0)
-        : offsetHour > 12 || (offsetHour === 12 && offsetMinute > 0))) return null
+  const [year, month, day, hour, minute, second] =
+    [match[1], match[2], match[3], match[4], match[5], match[6]].map(Number)
+  const offsetHour = Number(match[10] ?? 0)
+  const offsetMinute = Number(match[11] ?? 0)
+  if (year < 2000 || year > 2100 || (match[8] !== 'Z' &&
+      (offsetMinute > 59 ||
+        (match[9] === '+' ? offsetHour > 14 || (offsetHour === 14 && offsetMinute > 0)
+          : offsetHour > 12 || (offsetHour === 12 && offsetMinute > 0))))) return null
   const civil = new Date(0)
   civil.setUTCFullYear(year, month - 1, day)
   civil.setUTCHours(hour, minute, second, 0)
@@ -55,7 +70,7 @@ function observedInstant(raw: unknown): { ms: number; ns: bigint } | null {
   const fractionalMillis = Number(fraction.slice(0, 3))
   return { ms: parsed, ns: BigInt(parsed - fractionalMillis) * 1_000_000n + BigInt(fraction) }
 }
-function parseProduct(raw: unknown, retailer: OfflineRetailer): StoreProduct {
+function parseProduct(raw: unknown, retailer: OfflineRetailer): OfflineStoreProduct {
   if (!isRecord(raw) || !allowedFields(raw, ['id', 'name', 'packAmount', 'packUnit', 'packCount', 'priceCents', 'available']) ||
       !validName(raw.id, 100) || !validName(raw.name, 160) ||
       (raw.packAmount !== null && (typeof raw.packAmount !== 'number' || !Number.isFinite(raw.packAmount) ||
@@ -81,6 +96,10 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): StoreProduct {
     // Missing price is always unavailable; never promote it to a zero-price match.
     available: raw.available && raw.priceCents !== null,
     priceCents: (raw.priceCents as number | null) ?? 0,
+    // Distinguish missing price from genuinely observed unavailability in
+    // the user's private UI, without loosening the strict CSV/JSON importer.
+    sourcePriceCents: raw.priceCents as number | null,
+    sourceAvailable: raw.available,
   }
 }
 export function parseOfflinePriceSnapshots(

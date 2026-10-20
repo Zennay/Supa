@@ -8,7 +8,7 @@ const UNITS = ['g', 'kg', 'ml', 'l', 'piece']
 const MAX_BYTES = 256000
 const error = (message) => { throw new Error(message) }
 
-function parseCsv(text) {
+function parseCsv(text, delimiter) {
   if (typeof text !== 'string' || new TextEncoder().encode(text).length > MAX_BYTES) {
     error('CSV ontbreekt of is groter dan 256 kB.')
   }
@@ -46,7 +46,7 @@ function parseCsv(text) {
       if (!atStart || justClosed) error('CSV aanhalingstekens zijn ongeldig.')
       quoted = true
       atStart = false
-    } else if (c === ',') {
+    } else if (c === delimiter) {
       finishCell()
     } else if (c === '\n' || c === '\r') {
       if (c === '\r') {
@@ -71,8 +71,10 @@ const validLabel = (value, limit) =>
   !/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/u.test(value) &&
   !/^[=+@-]/u.test(value)
 const parsePositiveNumber = (text, ceiling) => {
-  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(text)) return null
-  const number = Number(text)
+  // A Dutch spreadsheet writes 0,75 kg with a decimal comma.
+  // This is exclusively a physical pack amount; priceCents remains integer.
+  if (!/^(?:0|[1-9]\d*)(?:[.,]\d{1,6})?$/.test(text)) return null
+  const number = Number(text.replace(',', '.'))
   return Number.isFinite(number) && number > 0 && number <= ceiling ? number : null
 }
 const parseInteger = (text, min, max) =>
@@ -80,14 +82,20 @@ const parseInteger = (text, min, max) =>
   Number(text) >= min && Number(text) <= max ? Number(text) : null
 
 function validObservedAt(raw) {
-  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?([+-])(\d\d):(\d\d)$/.exec(raw)
+  // The authorized source capture adapter emits RFC3339 UTC "Z". Accept
+  // that exact real timestamp as well as a lawful ±HH:MM local offset.
+  // Never synthesize an observation moment or guess the user's timezone.
+  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?(Z|([+-])(\d\d):(\d\d))$/.exec(raw)
   if (!match) return false
-  const [, y, m, d, h, minute, second, , sign, tzHour, tzMinute] = match
-  const [year, month, day, hour, min, sec, zoneH, zoneM] =
-    [y, m, d, h, minute, second, tzHour, tzMinute].map(Number)
-  if (year < 2000 || year > 2100 || zoneM > 59 ||
-      (sign === '+' ? zoneH > 14 || (zoneH === 14 && zoneM !== 0)
-        : zoneH > 12 || (zoneH === 12 && zoneM !== 0))) return false
+  const [, y, m, d, h, minute, second] = match
+  const [year, month, day, hour, min, sec] =
+    [y, m, d, h, minute, second].map(Number)
+  const zoneH = Number(match[10] ?? 0)
+  const zoneM = Number(match[11] ?? 0)
+  if (year < 2000 || year > 2100 || (match[8] !== 'Z' &&
+      (zoneM > 59 ||
+        (match[9] === '+' ? zoneH > 14 || (zoneH === 14 && zoneM !== 0)
+          : zoneH > 12 || (zoneH === 12 && zoneM !== 0))))) return false
   const civil = new Date(0)
   civil.setUTCFullYear(year, month - 1, day)
   civil.setUTCHours(hour, min, sec, 0)
@@ -101,11 +109,27 @@ function validObservedAt(raw) {
  * Convert only caller-supplied observations. Unknown package/price stays null,
  * and is NEVER promoted to purchasable inventory or savings evidence.
  */
+const validHeader = rows => rows.length > 0 &&
+  rows[0].length === HEADER.length &&
+  HEADER.every((name, index) => rows[0][index] === name)
+
 function convertStoreCsv(text, allowOne) {
-  const rows = parseCsv(text)
-  if (!rows.length || HEADER.some((h, i) => rows[0][i] !== h) ||
-      rows[0].length !== HEADER.length) {
-    error('CSV-kop moet exact zijn: ' + HEADER.join(','))
+  // Spreadsheet export/paste is comma CSV, Dutch semicolon CSV or TSV.
+  // Admit a separator only when ALL nine canonical column names are intact;
+  // never guess user facts, source rights, physical quantities or prices.
+  let rows = null
+  for (const delimiter of [',', ';', '\t']) {
+    let candidate
+    try { candidate = parseCsv(text, delimiter) }
+    catch { continue }
+    if (validHeader(candidate)) {
+      rows = candidate
+      break
+    }
+  }
+  if (!rows) {
+    error('Kolomkop moet exact zijn: ' + HEADER.join(',') +
+      ' (CSV komma/puntkomma of gekopieerde tabgescheiden spreadsheet).')
   }
   const captures = new Map()
   const seen = new Map()
@@ -127,17 +151,17 @@ function convertStoreCsv(text, allowOne) {
     }
     if (!validLabel(id, 100)) error(location + ': product-ID ongeldig.')
     if (!UNITS.includes(unit)) error(location + ': eenheid moet g/kg/ml/l/piece zijn.')
-    if (!['true', 'false'].includes(availableText)) {
-      error(location + ': beschikbaarheid moet letterlijk true of false zijn.')
+    if (!['true', 'false', 'ja', 'nee'].includes(availableText)) {
+      error(location + ': beschikbaarheid moet true/false of ja/nee zijn.')
     }
     // A row containing ANY original SKU, observation time or product fact is
     // not an untouched Planner placeholder. It must pass full admission, or
     // its omission would silently hide an incomplete observation from the user.
-    if (!validObservedAt(observedAt)) error(location + ': werkelijke ISO-tijd met UTC-offset vereist.')
+    if (!validObservedAt(observedAt)) error(location + ': werkelijke ISO-tijd met UTC-Z of een numerieke tijdzone-offset vereist.')
     if (!validLabel(name, 160)) error(location + ': productnaam ongeldig of ontbreekt.')
     if (seen.get(retailer).has(id)) error(location + ': dubbele product-ID.')
     seen.get(retailer).add(id)
-    const available = availableText === 'true'
+    const available = availableText === 'true' || availableText === 'ja'
     const amount = pack === '' ? null : parsePositiveNumber(pack, 100000)
     if (pack !== '' && amount === null) error(location + ': verpakkingsinhoud ongeldig.')
     if (unit === 'piece' && amount !== null && !Number.isSafeInteger(amount)) {

@@ -1,4 +1,5 @@
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import { hasEveryOwnArrayIndex } from '../../domain/denseArray.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 
 /**
@@ -18,7 +19,9 @@ export function exportPrivatePlannerWeek(
   recipes: readonly RecipeWithIngredients[],
   activeDays: readonly string[],
 ): string {
-  if (!Array.isArray(plan) || !Array.isArray(recipes) || !Array.isArray(activeDays) ||
+  if (!Array.isArray(plan) || !hasEveryOwnArrayIndex(plan) ||
+    !Array.isArray(recipes) || !hasEveryOwnArrayIndex(recipes) ||
+    !Array.isArray(activeDays) || !hasEveryOwnArrayIndex(activeDays) ||
     activeDays.length < 1 || activeDays.length > 14 ||
     new Set(activeDays).size !== activeDays.length ||
     !activeDays.every(day => textField(day, 40))) {
@@ -40,6 +43,7 @@ export function exportPrivatePlannerWeek(
   }
   const minimalRecipes = selectedRecipes.map(recipe => {
     if (!textField(recipe.id, 100) || !Array.isArray(recipe.ingredients) ||
+      !hasEveryOwnArrayIndex(recipe.ingredients) ||
       recipe.ingredients.length > 1000) {
       throw new Error('Een geselecteerd recept heeft ongeldige gegevens.')
     }

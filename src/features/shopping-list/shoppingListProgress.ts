@@ -279,3 +279,72 @@ export function serializeShoppingListProgress(
     doneLineIds: safeDoneLineIds,
   } satisfies ShoppingListProgress)
 }
+
+
+// A new versioned key is mandatory: v1 included money and must never be
+// reinterpreted as a price-independent approval. Keep its exact parser intact.
+export const shoppingListPhysicalProgressStorageKey = 'supa:shopping-list-progress:v2'
+
+function physicalState(basket: OneStoreBasket): ShoppingListBasketState | null {
+  const validated = shoppingListBasketState(basket)
+  if (!validated) return null
+  const snapshot = JSON.parse(validated.basketKey) as {
+    storeId: string
+    lines: Record<string, unknown>[]
+  }
+  const lines = snapshot.lines.map(line => {
+    if (line.status !== 'matched') return line
+    const { pricePerPackCents: _packPrice, lineTotalCents: _total, ...physical } = line
+    void _packPrice
+    void _total
+    return physical
+  })
+  return { basketKey: JSON.stringify({ storeId: snapshot.storeId, lines }),
+    validIds: validated.validIds }
+}
+
+/** Physical completion can survive a price-only update, never a SKU/pack,
+ * store, amount, matched-status or ingredient-ID change.
+ */
+export function shoppingListPhysicalBasketKey(basket: OneStoreBasket): string {
+  const state = physicalState(basket)
+  if (!state) throw Error('Invalid physical shopping basket.')
+  return state.basketKey
+}
+
+export function restorePhysicalShoppingProgress(
+  basket: OneStoreBasket, raw: string | null,
+): string[] {
+  if (!raw) return []
+  try {
+    const state = physicalState(basket)
+    if (!state) return []
+    const root: unknown = JSON.parse(raw)
+    if (!root || typeof root !== 'object' || Array.isArray(root)) return []
+    const record = root as Record<string, unknown>
+    if (Object.keys(record).sort().join(',') !==
+        ['schemaVersion', 'physicalBasketKey', 'doneLineIds'].sort().join(',') ||
+        record.schemaVersion !== 2 || record.physicalBasketKey !== state.basketKey ||
+        !Array.isArray(record.doneLineIds) ||
+        record.doneLineIds.length > state.validIds.size) return []
+    const done = new Set<string>()
+    for (const id of record.doneLineIds) {
+      if (typeof id !== 'string' || !state.validIds.has(id) || done.has(id)) return []
+      done.add(id)
+    }
+    return [...done]
+  } catch { return [] }
+}
+
+export function serializePhysicalShoppingProgress(
+  basket: OneStoreBasket, doneLineIds: unknown,
+): string {
+  const state = physicalState(basket)
+  if (!state) throw Error('Invalid physical shopping basket.')
+  const candidates = Array.isArray(doneLineIds) ? doneLineIds : []
+  const done = Array.from(new Set(candidates.filter((id): id is string =>
+    typeof id === 'string' && state.validIds.has(id))))
+  return JSON.stringify({
+    schemaVersion: 2, physicalBasketKey: state.basketKey, doneLineIds: done,
+  })
+}

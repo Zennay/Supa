@@ -261,10 +261,60 @@
   .mixed-store-route__unit-stores { grid-template-columns:minmax(0,1fr); }
 }
 
+#supa-own-price-import{scroll-margin-top:18px}
+
+.mixed-store-route__progress-summary{display:grid;gap:.35rem;border:1px solid #cbdccb;
+border-radius:12px;padding:1rem;background:#f3f8f3}
+.mixed-store-route__progress-summary small{line-height:1.4}
+
+.mixed-store-route__chosen-from-products{background:#edf7e8;border:2px solid #38835e;
+border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
+
+/* Drag/drop shares the strict local CSV/JSON file-picker admission flow. */
+.offline-price-workbench__dropzone {
+  display:grid; gap:.65rem; padding:clamp(.9rem,2.5vw,1.35rem);
+  background:#f5f8f4; border:2px dashed #8aab97; border-radius:14px;
+}
+.offline-price-workbench__dropzone>strong { color:#215a40; }
+.offline-price-workbench__dropzone.is-dragging { background:#e4f2e8; border-color:#17563a; }
+.offline-price-workbench__dropzone small { line-height:1.5; color:#4c6357; }
+.offline-price-workbench__dropzone:focus-within { outline:2px solid #246b50; outline-offset:2px; }
+
+.offline-price-workbench__candidate-preview { padding:.75rem; margin:.5rem 0; border:1px solid #c5d9ce; border-radius:10px; }
+.offline-price-workbench__candidate-preview summary { min-height:44px; cursor:pointer; font-weight:650; }
+.offline-price-workbench__candidate-preview p { margin:.4rem 0; line-height:1.45; }
+.offline-price-workbench__candidate-preview ul { margin:.4rem 0; padding-left:1.3rem; }
+.offline-price-workbench__candidate-preview li { margin:.45rem 0; overflow-wrap:anywhere; }
+.offline-price-workbench__candidate-preview summary:focus-visible { outline:3px solid #22734f; outline-offset:2px; }
+
+.offline-price-workbench__candidate-preview li button { display:block; min-height:44px; margin:.35rem 0; padding:.5rem .8rem; border:1px solid #7ca88e; border-radius:9px; color:#19503a; background:#eff8f1; cursor:pointer; font:inherit; }
+.offline-price-workbench__candidate-preview li button:disabled { opacity:.65; cursor:default; }
+.offline-price-workbench__candidate-preview li button:focus-visible { outline:3px solid #22734f; outline-offset:2px; }
 /* Personal same-demand capture matrix; never treated as accepted source pricing. */
 .offline-manual-editor__pair-matrix { display:grid; gap:.55rem; padding:1rem;
   border:1px solid #cbd9ce; border-radius:14px; background:#f7faf5; min-width:0; }
 .offline-manual-editor__pair-matrix h4 { margin:0; }
+.offline-manual-editor__pair-coverage {
+  display:grid; grid-template-columns:1fr; justify-items:start; gap:.35rem;
+  padding:.75rem; border:1px solid #cbd9ce; border-radius:.7rem;
+  background:#fff; max-width:100%; min-width:0;
+}
+.offline-manual-editor__pair-coverage strong { overflow-wrap:anywhere; }
+.offline-manual-editor__pair-coverage progress {
+  width:100%; max-width:460px; height:.75rem;
+}
+.offline-manual-editor__pair-coverage small {
+  color:#4e6253; line-height:1.5; overflow-wrap:anywhere;
+}
+.offline-manual-editor__pair-coverage button { min-height:44px; max-width:100%; text-align:left; }
+.offline-manual-editor__pair-coverage label { display:grid; gap:.4rem; width:100%; min-width:0; }
+.offline-manual-editor__pair-coverage textarea {
+  box-sizing:border-box; display:block; width:100%; min-width:0;
+  min-height:8rem; padding:.7rem; border:1px solid #a8bba8;
+  border-radius:.6rem; font:inherit; line-height:1.45; overflow-wrap:anywhere;
+}
+
+
 .offline-manual-editor__pair-matrix p { margin:.2rem 0; line-height:1.45; }
 .offline-manual-editor__pair-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr);
   align-items:center; gap:.7rem; border-bottom:1px solid #d9e3d8; padding:.5rem 0; }
@@ -278,6 +328,20 @@
 .offline-manual-editor__pair-stores button[data-capture-status="priced"] { border-left:4px solid #447d5d; }
 .offline-manual-editor__pair-stores button[data-capture-status="unavailable"] { border-left:4px solid #a87936; }
 .offline-manual-editor__pair-stores button[data-capture-status="incompatible"] { border-left:4px solid #aa493f; }
+.offline-manual-editor__pair-provisional {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: .3rem;
+  padding: .65rem .8rem;
+  border: 1px dashed #bccdbb;
+  border-radius: .65rem;
+  background: #fff;
+  min-width: 0;
+  font-size: .87rem;
+  overflow-wrap: anywhere;
+}
+.offline-manual-editor__pair-provisional > small { color: #4e6253; line-height: 1.45; }
+.offline-manual-editor__pair-provisional > strong { font-size: .97rem; }
 @media(max-width:620px) { .offline-manual-editor__pair-row { grid-template-columns:1fr; gap:.35rem; } }
 
 
@@ -316,4 +380,44 @@
   padding: .75rem .9rem; margin: .25rem 0;
   background: #fff6e5; color: #644211; border-left: 3px solid #af7326;
   border-radius: 6px; font-weight: 650; overflow-wrap: anywhere;
+}
+
+.mixed-store-route__extras { margin-top:1rem; padding:1rem; border:1px solid #bdd3bd; border-radius:.7rem; background:#f9fcf8; }
+.mixed-store-route__extras ul { padding:0; list-style:none; margin:.7rem 0; }
+.mixed-store-route__extras li { border-top:1px solid #e1eae0; padding:.75rem 0; }
+.mixed-store-route__extras li label { display:flex; align-items:baseline; gap:.65rem; cursor:pointer; }
+.mixed-store-route__extras li input { flex-shrink:0; }
+.mixed-store-route__extras-form { display:flex; flex-wrap:wrap; gap:.7rem; align-items:end; margin:.8rem 0; }
+.mixed-store-route__extras-form label { display:flex; flex-direction:column; gap:.25rem; flex:1 1 8rem; }
+.mixed-store-route__extras-form input,.mixed-store-route__extras-form select { box-sizing:border-box; width:100%; padding:.6rem; border:1px solid #aec5ad; border-radius:.35rem; }
+.mixed-store-route__extras li { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; }
+.mixed-store-route__extras li label { flex:1; }
+
+/* Complete private PLUS/Deka recapture is separate from already observed prices. */
+.offline-price-workbench__recapture-both {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  padding: clamp(.85rem, 3vw, 1.25rem);
+  margin: .85rem 0 1rem;
+  border: 1px solid #a9c9b1;
+  background: #f3f9f5;
+  border-radius: 12px;
+  min-width: 0;
+}
+.offline-price-workbench__recapture-both > strong,
+.offline-price-workbench__recapture-both > p {
+  flex: 1 1 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.offline-price-workbench__recapture-both > p { max-width: 78ch; line-height: 1.55; }
+.offline-price-workbench__recapture-both > button {
+  min-height: 44px;
+  white-space: normal;
+  text-align: left;
+}
+.offline-price-workbench__recapture-both button:focus-visible {
+  outline: 3px solid #226f52;
+  outline-offset: 3px;
 }

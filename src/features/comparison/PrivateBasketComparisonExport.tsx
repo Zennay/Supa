@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useState } from 'react'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
@@ -122,7 +123,7 @@ function buildCsv(plus: OneStoreBasket, deka: OneStoreBasket,
  * ledger/same-demand admission as CSV; do not create a second looser trust
  * path for downloaded HTML. This is a local document, not a price publication.
  */
-function privateComparisonHtml(
+export function privateComparisonHtml(
   plus: OneStoreBasket,
   deka: OneStoreBasket,
   plusObservedAt: string,
@@ -140,9 +141,7 @@ function privateComparisonHtml(
     .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-  const money = (cents: number) => new Intl.NumberFormat('nl-NL', {
-    style: 'currency', currency: 'EUR',
-  }).format(cents / 100)
+  const money = (cents: number) => exactEuro.formatCents(cents)
   const dekaLines = new Map(deka.lines.map(line => [line.id, line] as const))
   function product(line: BasketTraceLine) {
     if (line.status === 'unresolved') return '<strong>Niet gekoppeld</strong><br><small>Prijs onbekend — handmatig kiezen</small>'

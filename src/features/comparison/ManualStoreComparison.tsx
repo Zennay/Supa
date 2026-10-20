@@ -1,3 +1,4 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { useMemo, useState } from 'react'
 import type { ManualLine } from '../../domain/manualStoreComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
@@ -14,13 +15,16 @@ import {
 } from '../../domain/manualStoreComparison.ts'
 import './manualStoreComparison.css'
 
-const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const UNIT_LABEL: Record<string, string> = {
   g: 'gram', kg: 'kg', ml: 'ml', l: 'liter', piece: 'stuks',
 }
 const tableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tprijs'
 function safeTableCell(value: string) {
-  return value.replace(/[\t\r\n]/gu, ' ').replace(/^[\s\uFEFF]*[=+@-]/u, "'")
+  // The plain TSV route must guard the same invisible-prefix and NFKC
+  // spreadsheet formula cases as the existing private CSV exports.
+  const flat = value.replace(/[\t\r\n]/gu, ' ')
+  const formula = /^[\p{White_Space}\p{Cf}\p{Mn}\p{Mc}\p{Me}]*[=+@-]/u
+  return formula.test(flat.normalize('NFKC')) ? "'" + flat : flat
 }
 function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): string {
   return [
@@ -132,7 +136,7 @@ export function ManualStoreComparison({
             <div className="manual-compare__totals">
               {MANUAL_RETAILERS.map(shop => (
                 <div key={shop}><span>{shop}</span><strong>
-                  {summary.totals[shop] === null ? 'Nog niet compleet' : euros.format(summary.totals[shop]! / 100)}
+                  {summary.totals[shop] === null ? 'Nog niet compleet' : exactEuro.formatCents(summary.totals[shop]!)}
                 </strong></div>
               ))}
             </div>
@@ -140,7 +144,7 @@ export function ManualStoreComparison({
               <p>
                 {summary.cheaper === null
                   ? 'De door jou ingevulde volledige mandjes zijn even duur.'
-                  : `Op basis van jouw ingevoerde producten is ${summary.cheaper} ${euros.format(Math.abs(summary.deltaCents) / 100)} goedkoper voor deze week.`}
+                  : `Op basis van jouw ingevoerde producten is ${summary.cheaper} ${exactEuro.formatCents(Math.abs(summary.deltaCents))} goedkoper voor deze week.`}
                 {' '}Dit is geen gecontroleerd besparingsbewijs.
               </p>
             ) : (
@@ -214,12 +218,12 @@ export function ManualStoreComparison({
                         </div>
                         <p className="manual-compare__row-result" aria-live="polite">
                           {state.state === 'complete'
-                            ? `${state.packs} × verpakking = ${euros.format(state.lineCents! / 100)}`
+                            ? `${state.packs} × verpakking = ${exactEuro.formatCents(state.lineCents!)}`
                             : state.state === 'invalid'
                               ? 'Controleer product, verpakking, eenheid en prijs.'
                               : 'Nog geen prijsberekening.'}
                           {state.state === 'complete' && state.unitPriceCents !== null &&
-                            ` · ${euros.format(state.unitPriceCents / 100)} per ${row.requiredUnit === 'g' || row.requiredUnit === 'kg' ? 'kg' : 'liter'}`}
+                            ` · ${exactEuro.formatCents(state.unitPriceCents)} per ${row.requiredUnit === 'g' || row.requiredUnit === 'kg' ? 'kg' : 'liter'}`}
                         </p>
                       </fieldset>
                     )

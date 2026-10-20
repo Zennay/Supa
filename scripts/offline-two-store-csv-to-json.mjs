@@ -8,9 +8,9 @@ import { constants } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { convertTwoStoreCsv } from '../public/offline-two-store-csv.mjs'
+import { convertTwoStoreCsv, convertOwnStoreCsv } from '../public/offline-two-store-csv.mjs'
+import { offlinePriceJsonToCsv } from './offline-private-prices-json-to-csv.mjs'
 
-const CSV_HEADER = 'retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available'
 const MAX_BYTES = 256_000
 const error = (message) => { throw new Error(message) }
 
@@ -40,27 +40,37 @@ export async function readPrivateCsv(path) {
 }
 
 /**
- * Combine two independently supplied supermarket worksheets without
- * implementing another CSV parser or weakening the shared strict importer.
- * The header is intentionally fixed, so quoted multiline product names stay
- * untouched and are interpreted only by convertTwoStoreCsv.
+ * Normalize two independent owned CSV/TSV/JSON files through the SAME strict
+ * one-store converter before composing their canonical two-store CSV. Excel
+ * semicolon, TSV and comma exports may differ. Neither store may be fabricated or copied
+ * under the other retailer ID; unknowns remain null, not zero prices.
  */
+/** Retain original one-shop source bytes until canonical CSV admission.
+ * A JSON input is re-serialized only by the existing strict reverse adapter;
+ * no new source rows, prices, package counts or observation times are made. */
+export function ownedSourceAsCsv(raw) {
+  if (typeof raw !== 'string') error('Eigen winkelbron moet een tekstbestand zijn.')
+  const source = raw.replace(/^\uFEFF/u, '')
+  return source.trimStart().startsWith('{')
+    ? offlinePriceJsonToCsv(source) : source
+}
+
 export function joinPrivateStoreCsv(first, second) {
-  const body = (source) => {
-    const input = source.startsWith('\uFEFF') ? source.slice(1) : source
-    const end = input.indexOf('\n')
-    if (end < 0 || input.slice(0, end).replace(/\r$/, '') !== CSV_HEADER) {
-      error('Beide winkelbestanden moeten dezelfde negen Supa CSV-kolommen bevatten.')
-    }
-    const records = input.slice(end + 1).replace(/\r?\n$/, '')
-    if (!records.trim()) error('Elke winkelopname moet productregels bevatten.')
-    return records
+  const one = JSON.parse(convertOwnStoreCsv(ownedSourceAsCsv(first)))
+  const two = JSON.parse(convertOwnStoreCsv(ownedSourceAsCsv(second)))
+  if (one.captures.length !== 1 || two.captures.length !== 1 ||
+      one.captures[0].retailer !== 'PLUS' ||
+      two.captures[0].retailer !== 'DekaMarkt') {
+    error('Gebruik één echte PLUS- en één DekaMarkt-opname, geen twee keer dezelfde winkel.')
   }
-  const combined = CSV_HEADER + '\n' + body(first) + '\n' + body(second) + '\n'
-  if (new TextEncoder().encode(combined).length > MAX_BYTES) {
-    error('Samengevoegde winkelopnames zijn groter dan 256 kB.')
-  }
-  return combined
+  const composed = { schema: 'supa-offline-prices-v1',
+    captures: [...one.captures, ...two.captures] }
+  // The existing reverse adapter preserves exact source IDs, packaging,
+  // original timestamps and absent prices. Its 256 kB bound is mandatory.
+  const csv = offlinePriceJsonToCsv(JSON.stringify(composed))
+  // Keep the original two-store admission as the final authority.
+  convertTwoStoreCsv(csv)
+  return csv
 }
 
 /**
@@ -68,8 +78,17 @@ export function joinPrivateStoreCsv(first, second) {
  * authorised access, published prices or matching with a selected week.
  */
 function localCaptureGuidance(captures) {
-  const now = Date.now()
-  const instants = captures.map(item => Date.parse(item.observedAt))
+  const nowNs = BigInt(Date.now()) * 1000000n
+  // Original ISO instants were already admitted by the strict source parser.
+  // Keep fractional nanoseconds for truthful operator guidance at exactly
+  // 24 h + 1 ns or 7 d + 1 ns, not Date.parse's truncated milliseconds.
+  const sourceNs = (raw) => {
+    const ms = Date.parse(raw)
+    if (!Number.isFinite(ms)) return null
+    const fraction = (/\.(\d{1,9})[+-]\d\d:\d\d$/u.exec(raw)?.[1] ?? '').padEnd(9, '0')
+    return BigInt(ms - Number(fraction.slice(0, 3))) * 1000000n + BigInt(fraction || '0')
+  }
+  const instants = captures.map(item => sourceNs(item.observedAt))
   const details = captures.map(item => {
     const usable = item.products.filter(product =>
       product.available === true && Number.isSafeInteger(product.priceCents) &&
@@ -80,14 +99,15 @@ function localCaptureGuidance(captures) {
       ' niet prijsbaar'
   })
   const warnings = []
-  if (instants.some(time => !Number.isFinite(time) || time > now)) {
+  if (instants.some(time => time === null || time > nowNs)) {
     warnings.push('Een opnametijd ligt in de toekomst; controleer datum en UTC-offset.')
   }
-  if (instants.some(time => Number.isFinite(time) && now - time > 7 * 24 * 60 * 60 * 1000)) {
+  if (instants.some(time => time !== null && nowNs - time > 604800000000000n)) {
     warnings.push('Een winkelopname is ouder dan 7 dagen; ververs de echte brondata.')
   }
-  if (instants.length === 2 && instants.every(Number.isFinite) &&
-      Math.abs(instants[0] - instants[1]) > 24 * 60 * 60 * 1000) {
+  if (instants.length === 2 && instants[0] !== null && instants[1] !== null &&
+      (instants[0] > instants[1] ? instants[0] - instants[1] : instants[1] - instants[0])
+        > 86400000000000n) {
     warnings.push('De twee winkeltijden liggen meer dan 24 uur uiteen.')
   }
   return [...details, ...warnings]
@@ -96,11 +116,12 @@ function localCaptureGuidance(captures) {
 async function main() {
   const args = process.argv.slice(2)
   const pairing = args[0] === '--pair'
-  const names = pairing ? args.slice(1) : args
+  const single = args[0] === '--single'
+  const names = pairing || single ? args.slice(1) : args
   if ((!pairing && names.length !== 2) || (pairing && names.length !== 3) ||
       names.some(name => !name || name.startsWith('-'))) {
     error('Gebruik: node scripts/offline-two-store-csv-to-json.mjs samen.csv uitvoer.json ' +
-      'of --pair plus.csv deka.csv uitvoer.json')
+      'of --pair plus.csv deka.json uitvoer.json of --single een-winkel.csv uitvoer.json')
   }
   const sources = names.slice(0, -1).map(resolve)
   const target = resolve(names.at(-1))
@@ -108,17 +129,21 @@ async function main() {
     error('Invoerbestanden en uitvoerbestand moeten verschillende paden zijn.')
   }
   const texts = await Promise.all(sources.map(readPrivateCsv))
-  const csv = pairing ? joinPrivateStoreCsv(texts[0], texts[1]) : texts[0]
+  const csv = pairing ? joinPrivateStoreCsv(texts[0], texts[1]) :
+    single ? ownedSourceAsCsv(texts[0]) : texts[0]
   // Keep the one existing converter as the only authority for captured-at
-  // timestamps, two retail identities, SKU uniqueness and physical prices.
-  const json = convertTwoStoreCsv(csv)
+  // timestamps, SKU uniqueness and physical prices. `--single` does not
+  // manufacture a second store or relax the two-store default mode.
+  const json = single ? convertOwnStoreCsv(csv) : convertTwoStoreCsv(csv)
   const captures = JSON.parse(json).captures
+  if (single && captures.length !== 1) error('Geef exact één winkelopname bij --single.')
   // The operator receives only row counts, never private names, amounts,
   // prices, source URLs, participant identities or an implied license.
   const counts = captures.map(capture => capture.retailer + ': ' + capture.products.length)
   await writeFile(target, json, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
   process.stdout.write('Privé CSV omgezet (' + counts.join(', ') + '). Importeer JSON in Supa → Vergelijk. Geen openbare prijsclaim.\n' +
     localCaptureGuidance(captures).join('\n') + '\n' +
+    (single ? 'Tweede winkel ontbreekt: prijsverschil onbekend tot eigen tweede bron is ingelezen.\n' : '') +
     'Prijsverschil en ontbrekende productmatches zijn pas in de gekozen Supa-week te beoordelen.\n')
 }
 

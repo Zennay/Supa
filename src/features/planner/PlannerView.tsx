@@ -1,15 +1,23 @@
-import { useState, type FormEvent } from 'react'
+import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
-import type { RecipeWithIngredients } from '../../domain/basket.ts'
+import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { IngredientReuseCard } from './IngredientReuseCard.tsx'
-import { RecipeReusePreviewPanel } from './RecipeReusePreviewPanel.tsx'
+// Previewing a proposed replacement is optional: do not pull its entire
+// physical shopping and retailer capture-sheet toolchain into app startup.
+const RecipeReusePreviewPanel = lazy(() => import('./RecipeReusePreviewPanel.tsx')
+  .then(module => ({ default: module.RecipeReusePreviewPanel })))
 import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
 import { RecipePriceExplanation } from './RecipePriceExplanation'
 import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts'
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { HiFiPlannerWeekCard } from './HiFiPlannerWeekCard.tsx'
+// The full trusted source matching and multi-store comparison are only needed
+// when the user opens Planner, never on the lightweight Supa home screen.
+const PlannerOwnStoreComparison = lazy(() => import('./PlannerOwnStoreComparison.tsx')
+  .then(module => ({ default: module.PlannerOwnStoreComparison })))
+import type { PrivateReviewedBaskets, PrivateCaptureProgress, OwnStore, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
@@ -19,12 +27,21 @@ type PlannerViewProps = {
   activeDays: string[]
   plannedMeals: PlannedMeal[]
   recipes: Recipe[]
+  ownReviewed?: PrivateReviewedBaskets | null
+  captureProgress?: PrivateCaptureProgress | null
+  preferredOwnStore: OwnStore
+  onOpenShoppingList: () => void
+  onOpenRecipes: () => void
+  onOpenMixedRoute: (extraCostRaw?: string) => void
+  onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   basketTotalCents: number | null
   basketUnresolvedLineCount: number
   ownSource?: { store: string; observedAt: string }
   ownSourceChoices?: { store: string; observedAt: string }[]
-  onOwnSourceChange?: (store: string) => void
+  onOwnSourceChange: (store: OwnStore) => void
   onOpenComparison: () => void
+  onImportSourceFiles: (files: File[]) => void
+  onReviewIngredient: (store: OwnStore, ingredientId: string) => void
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
@@ -36,12 +53,21 @@ export function PlannerView({
   activeDays,
   plannedMeals,
   recipes,
+  ownReviewed,
+  captureProgress,
+  preferredOwnStore,
+  onOpenShoppingList,
+  onOpenRecipes,
+  onOpenMixedRoute,
+  onChooseRouteLine,
   basketTotalCents,
   basketUnresolvedLineCount,
   ownSource,
   ownSourceChoices,
   onOwnSourceChange,
   onOpenComparison,
+  onImportSourceFiles,
+  onReviewIngredient,
   onBudgetChange,
   onToggleDay,
   onRecipeChange,
@@ -98,16 +124,40 @@ export function PlannerView({
     : null
   // Derive reuse from current active recipe choices. No packet, leftover or
   // monetary savings conclusion can be inferred from ingredient overlap.
-  const ingredientRecipes = recipes.filter(
+  const ingredientRecipes = useMemo(() => recipes.filter(
     (recipe): recipe is RecipeWithIngredients =>
       recipe !== null && typeof recipe === 'object' &&
       Array.isArray((recipe as RecipeWithIngredients).ingredients),
-  )
+  ), [recipes])
   const hasIngredientData = ingredientRecipes.length > 0 &&
     ingredientRecipes.length === recipes.length
-  const reuseInsight = hasIngredientData
+  // The source-match preview can inspect up to 200 physical requirements
+  // against two local price files. Keep that exact Planner demand stable
+  // while users change unrelated UI controls such as budget or filters.
+  const captureNeeds = useMemo(() => {
+    if (!hasIngredientData) return []
+    try { return aggregatePlanIngredients(plannedMeals, ingredientRecipes, activeDays) }
+    catch { return [] }
+  }, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
+  const pieceReviewLabels = useMemo(() => {
+    const byId = new Map(ingredientRecipes.map(recipe => [recipe.id, recipe]))
+    const active = new Set(activeDays)
+    const labels = new Map<string, string>()
+    for (const meal of plannedMeals) {
+      if (!active.has(meal.day)) continue
+      for (const item of byId.get(meal.recipeId)?.ingredients ?? []) {
+        if (item.unit !== 'piece' || item.amount === null ||
+            typeof item.amount !== 'number' ||
+            (Number.isSafeInteger(item.amount) && item.amount > 0)) continue
+        if (typeof item.id === 'string' && typeof item.label === 'string')
+          labels.set(item.id, item.label)
+      }
+    }
+    return [...labels.values()].slice(0, 20)
+  }, [ingredientRecipes, plannedMeals, activeDays])
+  const reuseInsight = useMemo(() => hasIngredientData
     ? buildIngredientReuseInsight({ plan: plannedMeals, recipes: ingredientRecipes, activeDays })
-    : null
+    : null, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
 
   return (
     <section className="screen hifi-planner-screen" data-figma-node="3359:4896">
@@ -172,7 +222,10 @@ export function PlannerView({
         <div className="budget-card" aria-label="Kies welke echte winkelbron jouw weekbudget gebruikt">
           <label htmlFor="own-source-budget-store"><strong>Winkel voor jouw eigen bronbudget</strong></label>
           <select id="own-source-budget-store" value={ownSource.store}
-            onChange={event => onOwnSourceChange(event.currentTarget.value)}
+            onChange={event => {
+              const choice = event.currentTarget.value
+              if (choice === 'PLUS' || choice === 'DekaMarkt') onOwnSourceChange(choice)
+            }}
             style={{ display: 'block', width: '100%', minHeight: 44, marginTop: 8 }}>
             {ownSourceChoices.map(choice =>
               <option key={choice.store} value={choice.store}>{choice.store} · eigen opname {choice.observedAt}</option>)}
@@ -315,14 +368,41 @@ export function PlannerView({
         </p>}
       </section>
 
+      {pieceReviewLabels.length > 0 && <div className="attention-card" role="status">
+        <strong>{pieceReviewLabels.length} ingrediënt(en) hebben een gedeeltelijk of ongeldig aantal stuks</strong>
+        <p>Voor {pieceReviewLabels.join(', ')} kan Supa nog geen betrouwbaar
+          winkelproduct of volledig mandtotaal kiezen. Controleer eerst in Recepten
+          hoeveel hele stuks je wilt kopen; de rest van je boodschappenlijst blijft bruikbaar.</p>
+        <button type="button" className="ghost-button" onClick={onOpenRecipes}>
+          Open Recepten om aantallen te controleren
+        </button>
+      </div>}
+
+      <Suspense fallback={<p role="status" aria-live="polite">Eigen PLUS/Deka-winkelvergelijking laden…</p>}>
+      <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} captureProgress={captureProgress ?? null}
+        preferred={preferredOwnStore}
+        captureNeeds={captureNeeds}
+        hasDemand={activeDays.length > 0} budget={budget}
+        onSelect={onOwnSourceChange}
+        onOpenComparison={onOpenComparison}
+        onImportSourceFiles={onImportSourceFiles} onReviewIngredient={onReviewIngredient}
+        onOpenList={onOpenShoppingList}
+        onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine} />
+      </Suspense>
+
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
       {hasIngredientData && (
+        <Suspense fallback={<p role="status" aria-live="polite">Receptwissel en volledige weeklijst laden…</p>}>
         <RecipeReusePreviewPanel
           plannedMeals={plannedMeals}
           activeDays={activeDays}
           recipes={ingredientRecipes}
           onChooseRecipe={onRecipeChange}
+          onImportSourceFiles={onImportSourceFiles}
+          onOpenComparison={onOpenComparison}
+          onOpenList={onOpenShoppingList}
         />
+        </Suspense>
       )}
 
       <div className="insight-card">

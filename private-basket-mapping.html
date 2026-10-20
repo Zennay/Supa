@@ -94,10 +94,10 @@ Onbekende productmatches blijven onbekend. Bekende artikelen zonder prijs of bes
 <section aria-labelledby="source-title">
 <h2 id="source-title">1 · Open je eigen winkelopnames</h2>
 <label for="source">Gecombineerde eigen CSV, of supa-offline-prices-v1 JSON</label>
-<input id="source" type="file" accept=".csv,.json,text/csv,application/json">
+<input id="source" type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json">
 <div class="stores">
-<div><label for="plus-source">Of: jouw PLUS CSV (ook zonder DekaMarkt)</label><input id="plus-source" type="file" accept=".csv,text/csv"></div>
-<div><label for="deka-source">En/of: jouw DekaMarkt CSV (ook zonder PLUS)</label><input id="deka-source" type="file" accept=".csv,text/csv"></div>
+<div><label for="plus-source">Of: jouw PLUS CSV of eigen JSON (ook zonder DekaMarkt)</label><input id="plus-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
+<div><label for="deka-source">En/of: jouw DekaMarkt CSV of eigen JSON (ook zonder PLUS)</label><input id="deka-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
 </div>
 <p class="muted">Kies één eigen CSV-/JSON-bestand met één of twee werkelijke winkelopnames, of aparte CSV-bestanden per winkel.
 Elk afzonderlijk bestand moet de negen kolommen met de volledige CSV-kop bevatten.
@@ -201,7 +201,7 @@ Bewaar desgewenst je <strong>lokale bron- en mandinvoersessie</strong> inclusief
 <button id="show-unpriced" type="button" class="secondary" disabled>Open ongeprijsde afvinklijst</button><button id="save-session" type="button" class="secondary" disabled>Bewaar bron + productkeuzes (JSON)</button>
 <label for="restore-session" style="flex:1 1 250px">Open eerder opgeslagen privésessie (JSON)
 <input id="restore-session" type="file" accept=".json,application/json"></label>
-<a href="/private-basket-compare.html" class="secondary" style="display:inline-block;padding:11px 16px;border-radius:10px;text-decoration:none">Open de privé prijsvergelijking →</a></div>
+<a href="./private-basket-compare.html" class="secondary" style="display:inline-block;padding:11px 16px;border-radius:10px;text-decoration:none">Open de privé prijsvergelijking →</a></div>
 </section>
 <section id="unpriced-trip" hidden aria-label="Eigen ongeprijsde boodschappenlijst">
 <h2>Ongeprijsde boodschappenlijst uit jouw Planner</h2>

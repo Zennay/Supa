@@ -17,7 +17,14 @@
           "finding": "Published PLUS terms reserve website/app intellectual-property rights and state that reproducing, publishing or editing website/app information requires permission outside personal household use."
         }
       ],
-      "nextAction": "Obtain written permission or another explicit licensing basis before enabling scheduled production ingestion or redistribution."
+      "nextAction": "Locate the owner-reported existing authorization paperwork and verify the granting party, approved product/price fields, retrieval method, location, limits and publication rights; then record the evidence before enabling scheduled production ingestion.",
+      "ownerAuthorizationReport": {
+        "reportedAt": "2026-10-18",
+        "reportedScope": "All supermarkets in the current SUPA grocery-comparison scope; currently PLUS and DekaMarkt",
+        "recordUrl": "https://github.com/Zennay/Supa/issues/74#issuecomment-6247340961",
+        "documentaryReview": "pending-private-evidence-reference",
+        "note": "The project owner confirms existing authorizations and reports previously reviewing the supporting paperwork. The retailer-issued rights document and exact licensed scope have not yet been linked in the canonical gate."
+      }
     },
     {
       "supermarket": "dekamarkt",
@@ -32,7 +39,14 @@
           "finding": "The reviewed public general-conditions page does not provide a clear grant for systematic reuse of catalog or offer data; absence of a prohibition is not treated as permission."
         }
       ],
-      "nextAction": "Obtain written confirmation or a published licensing basis before enabling scheduled production ingestion or redistribution."
+      "nextAction": "Locate the owner-reported existing authorization paperwork and verify the granting party, approved product/price fields, retrieval method, location, limits and publication rights; then record the evidence before enabling scheduled production ingestion.",
+      "ownerAuthorizationReport": {
+        "reportedAt": "2026-10-18",
+        "reportedScope": "All supermarkets in the current SUPA grocery-comparison scope; currently PLUS and DekaMarkt",
+        "recordUrl": "https://github.com/Zennay/Supa/issues/74#issuecomment-6247340961",
+        "documentaryReview": "pending-private-evidence-reference",
+        "note": "The project owner confirms existing authorizations and reports previously reviewing the supporting paperwork. The retailer-issued rights document and exact licensed scope have not yet been linked in the canonical gate."
+      }
     }
   ]
 }

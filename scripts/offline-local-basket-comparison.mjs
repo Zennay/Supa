@@ -13,13 +13,14 @@ import { open, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readPrivateCsv, joinPrivateStoreCsv } from './offline-two-store-csv-to-json.mjs'
-import { convertTwoStoreCsv } from '../public/offline-two-store-csv.mjs'
-import { offlinePriceJsonToCsv } from './offline-private-prices-json-to-csv.mjs'
+import { readPrivateCsv, joinPrivateStoreCsv, ownedSourceAsCsv } from './offline-two-store-csv-to-json.mjs'
+import { convertTwoStoreCsv, convertOwnStoreCsv } from '../public/offline-two-store-csv.mjs'
 import { calculateDecimalPackCount } from '../src/domain/decimalPackArithmetic.ts'
 import { privateBasketMissingReason } from '../src/domain/privateBasketMissingReason.ts'
 import { matchIngredient } from '../src/domain/matching.ts'
 import { compareFullBaskets } from '../src/domain/basketComparison.ts'
+import { observedInstant } from '../src/domain/offlineReviewedImport.ts'
+import { privateUnitPrice } from '../src/features/comparison/privateUnitPrice.ts'
 
 const STORES = ['PLUS', 'DekaMarkt']
 const UNITS = ['g', 'kg', 'ml', 'l', 'piece']
@@ -100,7 +101,7 @@ function unresolved(ingredient, reason) {
 }
 
 function makeStoreBasket(store, capture, demand) {
-  const products = new Map(capture.products.map(product => [product.id, product]))
+  const products = new Map((capture?.products ?? []).map(product => [product.id, product]))
   // One physical store SKU is not two separate purchases. Until requirements
   // for a shared SKU are explicitly aggregated into a single ingredient row,
   // neither duplicate is a trustworthy whole-pack basket line.
@@ -116,6 +117,10 @@ function makeStoreBasket(store, capture, demand) {
   let unresolvedLineCount = 0
   const lines = demand.ingredients.map(ingredient => {
     const productId = ingredient.productIds[store]
+    if (!capture) {
+      unresolvedLineCount++
+      return unresolved(ingredient, 'Geen eigen winkelopname voor deze winkel; prijs onbekend')
+    }
     if (productId === null || productId === undefined) {
       unresolvedLineCount++
       return unresolved(ingredient, 'Product niet expliciet gekozen voor deze winkel')
@@ -173,15 +178,10 @@ function makeStoreBasket(store, capture, demand) {
 // Unit prices are informative labels only. Totals always come from canonical
 // exact whole-pack math, never from an approximate per-kg/per-litre label.
 function advisoryUnitPrice(line) {
-  if (line.status !== 'matched') return ''
-  const { amount, unit, count } = line.pack
-  const base = (unit === 'kg' || unit === 'l' ? amount * 1000 : amount) * count
-  const per = unit === 'g' || unit === 'kg' ? 'kg'
-    : unit === 'ml' || unit === 'l' ? 'liter' : 'stuk'
-  const multiplier = per === 'stuk' ? 1 : 1000
-  const cents = line.pricePerPackCents * multiplier / base
-  return base > 0 && Number.isFinite(cents) && cents >= 0
-    ? euro.format(cents / 100) + '/' + per : ''
+  // The browser and offline CLI use one exact decimal unit-rate formatter.
+  // Never calculate a currency rate through binary fraction multiplication;
+  // source whole-pack price remains the only financial authority.
+  return line.status === 'matched' ? (privateUnitPrice(line) ?? '') : ''
 }
 
 function rowCell(line) {
@@ -199,14 +199,7 @@ function rowCell(line) {
 
 // Date.parse discards the sub-millisecond fraction. Source timestamps may
 // legitimately carry nanoseconds; a 24h + 1ns gap must NEVER pass as paired.
-function observedNanoseconds(raw) {
-  const match = /\\.(\\d{1,9})[+-]\\d\\d:\\d\\d$/.exec(raw)
-  const fraction = (match?.[1] ?? '').padEnd(9, '0')
-  const milliseconds = Date.parse(raw)
-  if (!Number.isFinite(milliseconds)) throw Error('Invalid observation time')
-  return BigInt(milliseconds - Number(fraction.slice(0, 3))) * 1_000_000n +
-    BigInt(fraction || '0')
-}
+
 function ageDescription(age) {
   if (age < 0n) return 'in de toekomst'
   if (age < 3_600_000_000_000n) return String(age / 60_000_000_000n) + ' minuten oud'
@@ -231,9 +224,11 @@ function renderHtml(data, demand, left, right, comparison, observed, ages, gap, 
     'De opnames komen uitsluitend uit eigen aangeleverde lokale bestanden.',
     'Geen licentie, onafhankelijk winkelveldonderzoek of actuele publieke prijsclaim bewezen.',
     ...STORES.map((store, index) =>
-      store + ': ' + ageDescription(ages[index]) + (ages[index] > WEEK_NS
-        ? ' · ouder dan zeven dagen' : '')),
-    'Verschil tussen beide opname-instanten: ' +
+      ages[index] === null ? store + ': geen eigen winkelopname (prijs onbekend)' :
+        store + ': ' + ageDescription(ages[index]) + (ages[index] > WEEK_NS
+          ? ' · ouder dan zeven dagen' : '')),
+    gap === null ? 'Een tweede echte winkelopname ontbreekt; geen prijsverschil berekend.' :
+      'Verschil tussen beide opname-instanten: ' +
       String(gap / 3_600_000_000_000n) + ' hele uren' +
       (gap > DAY_NS ? ' · opnieuw waarnemen bij de oudste winkel' : ''),
     !fresh ? 'Opnames zijn te oud, toekomstig of meer dan 24 uur uiteen: prijsvergelijking geblokkeerd.' : '',
@@ -247,7 +242,7 @@ function renderHtml(data, demand, left, right, comparison, observed, ages, gap, 
       : amountLabel(ingredient.amount) + ' ' + ingredient.unit) +
     '</small></th>' + rowCell(left.lines[index]) + rowCell(right.lines[index]) + '</tr>').join('\n')
   const dates = STORES.map((store, index) =>
-    store + ': ' + escapeHtml(observed[index])).join(' · ')
+    store + ': ' + (observed[index] === null ? 'niet aangeleverd' : escapeHtml(observed[index]))).join(' · ')
   const sourceCaptures = new Map(data.captures.map(capture => [capture.retailer, capture]))
   const matchSuggestion = (store, ingredient) => {
     const capture = sourceCaptures.get(store)
@@ -312,7 +307,8 @@ async function main() {
   const argv = process.argv.slice(2)
   const paired = argv[0] === '--pair'
   const pricesJson = argv[0] === '--prices-json'
-  const args = paired || pricesJson ? argv.slice(1) : argv
+  const single = argv[0] === '--single'
+  const args = paired || pricesJson || single ? argv.slice(1) : argv
   if (args.length !== (paired ? 4 : 3) || args.some(arg => !arg || arg.startsWith('-'))) {
     throw Error('Expected inputs')
   }
@@ -325,9 +321,12 @@ async function main() {
     Promise.all(sourcePaths.map(readPrivateCsv)),
     readPrivateDemand(demandPath),
   ])
-  const normalizedJson = convertTwoStoreCsv(paired
+  const csv = paired
     ? joinPrivateStoreCsv(csvFiles[0], csvFiles[1])
-    : pricesJson ? offlinePriceJsonToCsv(csvFiles[0]) : csvFiles[0])
+    : pricesJson || single ? ownedSourceAsCsv(csvFiles[0]) : csvFiles[0]
+  // Missing retailer input remains UNKNOWN, never a fabricated second store.
+  const normalizedJson = single || pricesJson
+    ? convertOwnStoreCsv(csv) : convertTwoStoreCsv(csv)
   const source = JSON.parse(normalizedJson)
   const demand = parseDemand(demandText)
   const captures = Object.fromEntries(source.captures.map(c => [c.retailer, c]))
@@ -335,12 +334,15 @@ async function main() {
   const right = makeStoreBasket('DekaMarkt', captures.DekaMarkt, demand)
   const comparison = compareFullBaskets({ baseline: left, candidate: right })
   const nowNs = BigInt(Date.now()) * 1_000_000n
-  const dates = STORES.map(store => captures[store].observedAt)
-  const instants = dates.map(observedNanoseconds)
-  const ages = instants.map(instant => nowNs - instant)
-  const gap = instants[0] >= instants[1]
-    ? instants[0] - instants[1] : instants[1] - instants[0]
-  const fresh = ages.every(age => age >= 0n && age <= WEEK_NS) && gap <= DAY_NS
+  const dates = STORES.map(store => captures[store]?.observedAt ?? null)
+  // Use the browser's strict civil/offset validator and original nanoseconds.
+  // A 24-hour gap plus 1 ns must never be admitted as the same capture window.
+  const instants = dates.map(value => value === null ? null : observedInstant(value)?.ns ?? null)
+  const ages = instants.map(instant => instant === null ? null : nowNs - instant)
+  const gap = instants[0] === null || instants[1] === null ? null :
+    (instants[0] >= instants[1] ? instants[0] - instants[1] : instants[1] - instants[0])
+  const fresh = ages.every(age => age !== null && age >= 0n && age <= WEEK_NS) &&
+    gap !== null && gap <= DAY_NS
   const html = renderHtml(source, demand, left, right, comparison, dates, ages, gap, fresh)
   await writeFile(outputPath, html, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
   process.stdout.write('Privé HTML-mandrapport opgeslagen; ' +

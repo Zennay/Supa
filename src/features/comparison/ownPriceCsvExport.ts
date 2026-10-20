@@ -45,7 +45,7 @@ export async function ownPriceCapturesToCsv(
   }
   // Use the same strict browser importer as the file input, not a duplicate
   // validator with weaker security, schema, or observedAt rules.
-  const url = '/offline-two-store-csv.mjs'
+  const url = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
   const module: unknown = await import(/* @vite-ignore */ url)
   if (!module || typeof module !== 'object' ||
       !('convertOwnStoreCsv' in module) ||

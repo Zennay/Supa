@@ -68,11 +68,23 @@ Node 24+ aanbevolen; Node 22.22+ kan TypeScript-strip-imports ondersteunen.
 node --experimental-strip-types scripts/offline-local-basket-comparison.mjs --pair plus.csv deka.csv vraag.json mand.html
 ```
 
+De twee losse bestanden mogen ook een eerder door Supa bewaard éénwinkel-JSON bevatten, naast CSV/TSV. Zij kunnen verschillende correcte scheidingstekens hebben (bijvoorbeeld PLUS met puntkomma en DekaMarkt met tabs). Supa verwerkt ze eerst onafhankelijk met de bestaande negenkoloms-converter. Bij een dubbele winkelidentiteit of ongeldig bronbestand komt er geen rapport en worden geen prijzen aangevuld.
+
 Je kunt ook een eerder door Supa gegenereerd **eigen `supa-offline-prices-v1` JSON** rechtstreeks opnieuw gebruiken in dezelfde offline rapportage. De bestaande strikte negen-koloms CSV-converter blijft de autoriteit voor beide winkels, originele opnametijden, SKU-uniciteit, hele eurocenten en verpakkingen. Onbekende JSON-prijzen blijven onbekend, nooit €0:
 
 ```sh
 node --experimental-strip-types scripts/offline-local-basket-comparison.mjs --prices-json eigen-prijzen.json vraag.json mand.html
 ```
+
+Heb je nog maar **één echte winkelopname**? Maak toch een lokaal HTML-overzicht met werkelijke productregels, hele verpakkingen en indicatieve eenheidsprijzen. De tweede winkel en ieder prijsverschil blijven **onbekend**:
+
+```sh
+node --experimental-strip-types scripts/offline-local-basket-comparison.mjs --single een-winkel.csv vraag.json mand-onvolledig.html
+```
+
+`--single` accepteert nu ook een reeds opgeslagen eigen éénwinkel-JSON; de originele bron wordt via de bestaande strikte converter beoordeeld.
+
+`--prices-json` ondersteunt ook één reeds bestaande `supa-private-single-store-prices-v1`-opname. De standaard tweewinkelroute blijft strikt en verlangt twee echte opnames; er wordt geen tweede winkelbron verzonnen en niets opgehaald.
 
 Een ongeldig of verrijkt JSON-bronbestand wordt afgewezen. Er wordt niets automatisch opgevraagd, genormaliseerd naar fictieve prijzen of geüpload.
 
@@ -91,9 +103,20 @@ De hoofdsom en voordeligste winkel verschijnen **alleen** als:
 
 Anders geeft de rapportage zichtbaar **geen betrouwbaar volledig prijsverschil**, met afzonderlijke ontbrekende regels; eventueel getoonde regelprijzen zijn historische of incomplete privéwaarden. Er wordt niets naar een server gestuurd of gescrapet. Input is begrensd tot 256 kB per bestand; uitvoer is exclusief nieuw en mode `0600`, zonder actieve scripts of externe assets. De CLI schrijft geen privéprijzen of productnamen naar stdout.
 
-## Integratiepositie
+## Vanuit de huidige Supa-app: Planner → bronimport → boodschappenlijst
 
-Deze lokale zelfstandige route biedt alvast een **bruikbaar zichtbaar HTML-productresultaat** terwijl de bestaande React-vergelijkings-PR #3904, aanvullende UI #3916 en rechten/evidence-gates onafhankelijk worden afgerond. Het is géén claim dat deze losse tool al in de live Supa-app is geïntegreerd; de toekomstige app blijft dezelfde eigen JSON/CSV-bron en bestaande prijs-/manddomeinlogica hergebruiken.
+De **ontwikkelbranch** integreert de hierboven beschreven lokale bronconverter, SKU-/verpakkingscontrole en twee-winkelberekening in de bestaande React-werkstroom (gestapelde [PR #3936](https://github.com/Zennay/Supa/pull/3936), [#3939](https://github.com/Zennay/Supa/pull/3939) en [#3941](https://github.com/Zennay/Supa/pull/3941)). Dit betekent **niet** dat de functies al op beschermd `main` of een publieke live website zijn uitgerold.
+
+1. Open **Planner**, kies de maaltijden en fysieke hoeveelheden voor je week. Gebruik **Direct eigen winkelopname(s) openen in Vergelijk** voor één of twee bestaande, rechtmatig verkregen PLUS-/DekaMarkt-CSV/TSV/JSON-bestanden. Je kunt ze ook naar het invoervak slepen. **Vanaf Lijst kun je eveneens rechtstreeks één of twee bestaande CSV/TSV/TXT/JSON-bronbestanden kiezen**: Supa draagt de ongewijzigde lokale File-objecten over aan precies dezelfde bestaande canonieke bronimport in Vergelijk. Kies maximaal twee bestanden; beide verschillende winkels mogen ook uit één gevalideerd Supa-JSON-bestand komen.
+2. In **Vergelijk** controleert de bestaande canonieke bronimport de oorspronkelijke retailer-ID, tijd, product-ID, beschikbaarheid, hele-cent-prijs en verpakkingsgegevens. Controleer voorgestelde ingredient→SKU-koppelingen zelf wanneer die niet eenduidig zijn. Een onjuiste bron vervangt geen geldige bestaande opname automatisch.
+3. **Planner**, **Producten**, **Lijst** en **Vergelijk** tonen een volledig winkelmandtotaal alleen na volledige brontoelating. Met **één** volledig gecontroleerde winkel verschijnt in Planner al een bruikbaar éénwinkelmandje: open je boodschappenlijst, **download het eigen CSV-mandje**, **download een inert afdrukbaar HTML-overzicht** of **kopieer de tekstlijst voor mobiel**. Is het klembord niet beschikbaar, dan kun je dezelfde tekst lokaal selecteren.
+4. Ook **vóórdat een winkelmandje compleet is** toont Planner, waar mogelijk, per winkel een duidelijk gelabeld deelbedrag voor uitsluitend de reeds persoonlijk bevestigde SKU-regels, plus het aantal nog onbevestigde ingrediënten. Dit bedrag is **geen mandtotaal, budgetadvies of winkelwinnaar** en is verborgen bij onbetrouwbare bronregels, verlopen opnames of mogelijk dubbel getelde SKU's.
+   **Lijst** heeft daarnaast een aparte sectie **Neem al bevestigde winkelproducten mee** wanneer minstens één maar nog niet alle fysieke ingrediënten van die winkel zijn bevestigd. Hier kun je alleen die originele SKU's, pakprijzen, verpakkingen en indicatieve eenheidsprijzen bekijken, in deze browsersessie afvinken, als privé-TXT/CSV exporteren of naar het klembord kopiëren (met selecteerbare tekst als fallback). De resterende, nog ongeprijsde ingrediënten blijven apart zichtbaar in de gewone ongeprijsde weeklijst. Afvinkingen delen exact dezelfde fysieke SKU/hoeveelheids-identiteit met de volledige, later bevestigde winkelmand en blijven alleen voor identieke artikelen staan. Afvinken is **geen** bewijs van kassabetaling of prijsbronbevestiging.
+5. Heeft eenzelfde ingrediënt bij **beide** winkels een controleerbare eigen regelprijs en liggen de bronmomenten maximaal 24 uur uiteen, dan toont Planner meteen de eerste drie oorspronkelijke SKU-/hele-pak-regelvergelijkingen, inclusief indicatieve eenheidsprijzen. Het volledige uitklapbare overzicht biedt ook een voorlopige **TXT**- en **CSV**-download met beide originele bronmomenten en afzonderlijke regelverschillen. Ontbrekende ingrediënten tellen nooit als nul en er wordt nergens een complete winkelwinnaar of besparing uit zulke onvolledige regels afgeleid.
+6. Na een **tweede** complete, gecontroleerde opname van *dezelfde fysieke Planner-week* met bronmomenten maximaal 24 uur uit elkaar verschijnen het hele-verpakkingenverschil en de afzonderlijke SKU-/eenheidsprijzen in de app. De gemengde route kan afzonderlijk extra winkelbezoekkosten meenemen.
+7. Ontbrekende, oudere of niet bevestigde bronprijzen blijven **onbekend**. Een incomplete tegenwinkel levert geen €0-vergelijking en geen winkelwinnaar op. Bronrechten, empirische PLUS/Deka-veldwaarnemingen en publicatiebewijs worden nergens impliciet aangenomen.
+
+Alle genoemde gegevens blijven in de eigen lokale bron-/browserwerkstroom, zonder nieuwe live supermarktscraper, geautomatiseerde bronrechten of fictieve besparingsclaims. De bestaande officiële CI, onafhankelijke code-review, beschermde-branchrechten en exclusieve zCloud-releaselease bepalen of deze gestapelde PR-keten veilig kan worden geïntegreerd.
 
 ## Eén winkelartikel voor meerdere ingrediënten
 

@@ -20,3 +20,149 @@
 .unpriced-planner-checklist__upload { display:flex; flex-wrap:wrap; align-items:center; gap:.55rem; padding:.55rem .75rem; border:1px solid #aec9b4; border-radius:9px; color:#244e36; background:#f5f8f3; font-weight:600; }
 .unpriced-planner-checklist__upload input[type=file] { max-width:min(100%,260px); min-height:32px; font-size:.85rem; }
 .unpriced-planner-checklist__upload input[type=file]::file-selector-button { margin-right:.45rem; padding:.5rem; border:1px solid #8aad96; border-radius:7px; color:#244e36; background:#fff; cursor:pointer; }
+
+.unpriced-planner-checklist__progress{width:min(220px,100%);height:12px;accent-color:#236b48}
+
+/* User-owned grocery extras never enter the priced, matched week basket. */
+.unpriced-planner-checklist__extras {
+  margin-top: 1.35rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #d2d8dc);
+  border-radius: 1rem;
+}
+.unpriced-planner-checklist__extras > p { max-width: 70ch; }
+.unpriced-planner-checklist__extras form label {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  min-width: 8rem;
+}
+.unpriced-planner-checklist__extras form input,
+.unpriced-planner-checklist__extras form select { max-width: 19rem; min-height: 2.5rem; }
+.unpriced-planner-checklist__extras ul { list-style: none; padding: 0; }
+.unpriced-planner-checklist__extras li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .65rem 0;
+  border-bottom: 1px solid #d8dfdf;
+}
+.unpriced-planner-checklist__extras li label { display: flex; gap: .7rem; align-items: center; }
+@media (max-width: 520px) {
+  .unpriced-planner-checklist__extras li { flex-wrap: wrap; }
+  .unpriced-planner-checklist__extras form label { width: 100%; }
+}
+
+.unpriced-planner-checklist__paste { margin: 1rem 0; display:flex; flex-wrap:wrap; align-items:flex-end; gap:.8rem; }
+.unpriced-planner-checklist__paste label { flex: 1 1 18rem; display:flex; flex-direction:column; gap:.4rem; }
+.unpriced-planner-checklist__paste textarea { width:100%; min-height:6rem; padding:.7rem; border:1px solid #8aad96; border-radius:.5rem; resize:vertical; }
+.unpriced-planner-checklist__paste-preview { border:1px solid #8aad96; border-radius:.6rem; padding:.8rem; max-height:22rem; overflow:auto; }
+.unpriced-planner-checklist__paste-preview li { display:list-item; list-style:disc inside; padding:.25rem 0; border:0; }
+.unpriced-planner-checklist__paste-preview button { margin-right:.6rem; }
+
+/* The real, unpriced Planner checklist adopts the Figma Shoplist card
+   hierarchy without borrowing any historical/example retail prices. */
+.unpriced-planner-checklist {
+  background: #f5f6f9;
+  border: 0;
+  border-radius: 20px;
+  gap: 18px;
+}
+.unpriced-planner-checklist__intro h3 {
+  font-family: Poppins, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: clamp(1.1rem, 3vw, 1.45rem);
+  font-weight: 600;
+  color: #333;
+}
+.unpriced-planner-checklist__privacy,
+.unpriced-planner-checklist__advanced {
+  padding: .6rem .9rem;
+  border: 1px solid #e6e9ec;
+  border-radius: 14px;
+  background: #fff;
+  min-width: 0;
+}
+.unpriced-planner-checklist__privacy summary,
+.unpriced-planner-checklist__advanced summary {
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 650;
+  align-content: center;
+}
+.unpriced-planner-checklist__advanced[open] {
+  display: grid;
+  gap: 1rem;
+}
+.unpriced-planner-checklist__advanced .unpriced-planner-checklist__actions {
+  align-items: stretch;
+}
+.unpriced-planner-checklist__recipe-group {
+  display: grid;
+  gap: .65rem;
+  min-width: 0;
+}
+.unpriced-planner-checklist__group-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .65rem;
+  padding: .35rem 0;
+}
+.unpriced-planner-checklist__group-title h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  color: #111;
+}
+.unpriced-planner-checklist__group-title span {
+  color: #777;
+  font-size: .85rem;
+}
+.unpriced-planner-checklist__item {
+  display: grid;
+  grid-template-columns: 20px 50px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: .75rem;
+  min-height: 74px;
+  background: #fff;
+  border: 0;
+  border-radius: 20px;
+  padding: 12px;
+}
+.unpriced-planner-checklist__item:has(input:checked) { opacity: .74; }
+.unpriced-planner-checklist__thumb {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #eaf0e9;
+  color: #53715e;
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+.unpriced-planner-checklist__item-copy { min-width: 0; }
+.unpriced-planner-checklist__item-copy strong {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: .9rem;
+  color: #111;
+}
+.unpriced-planner-checklist__item-copy small { font-size: .88rem; color: #555; }
+.unpriced-planner-checklist__price {
+  font-size: 1rem;
+  color: #888;
+  text-align: right;
+}
+@media (max-width: 540px) {
+  .unpriced-planner-checklist__actions > button,
+  .unpriced-planner-checklist__advanced .unpriced-planner-checklist__actions > button {
+    flex: 1 1 100%;
+    min-height: 44px;
+  }
+  .unpriced-planner-checklist__item {
+    grid-template-columns: 20px 44px minmax(0, 1fr) 20px;
+    gap: .55rem;
+  }
+  .unpriced-planner-checklist__thumb { width: 44px; height: 44px; }
+}

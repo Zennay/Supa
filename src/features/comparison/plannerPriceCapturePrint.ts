@@ -30,7 +30,7 @@ export function makePrintablePlannerCaptureHtml(
     }).join('\n')
     return '<section class="store">' +
       '<h2>' + store + '</h2>' +
-      '<p><strong>Echte datum/tijd met UTC-offset:</strong> ' +
+      '<p><strong>Echte datum/tijd met UTC-offset of Z:</strong> ' +
       '<span class="blank">_______________________________________</span></p>' +
       '<p><strong>Eigen rechtmatige bron / winkel / context:</strong> ' +
       '<span class="blank">_______________________________________</span></p>' +
@@ -80,7 +80,8 @@ td { height: 70px; }
 <div class="notice"><strong>Leeg formulier, géén bewijs van winkelprijzen of besparing.</strong>
 Noteer uitsluitend werkelijk geobserveerde originele bronartikelen, verpakkingen,
 beschikbaarheid en prijzen die je rechtmatig mag vastleggen. Vul dezelfde echte
-waarnemingstijd per winkel in het digitale CSV-bestand in. Een onbekende prijs is nooit €0.
+waarnemingstijd per winkel in het digitale CSV-bestand in. UTC-Z (YYYY-MM-DDTHH:mm:ssZ) is geldig;
+verzin geen bronmoment of prijs. Een onbekende prijs is nooit €0.
 Voor een privé-tweewinkelverschil zijn twee complete recente mandjes en jouw bronbevestiging vereist.</div>
 ${sections}
 </body>

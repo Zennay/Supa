@@ -1,14 +1,21 @@
+import { euro as exactEuro } from '../../lib/money.ts'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
+import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwoStorePriceEditor.tsx'
 import { ownPriceCapturesToCsv } from './ownPriceCsvExport.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
+import {
+  privateFullStoreRecaptureCsv, privatePairedStoreRecaptureCsv,
+  privateFullStoreRecaptureGuide, privatePairedStoreRecaptureGuide,
+} from '../planner/privateFullStoreRecapture.ts'
 import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
+import type { PrivateSourceFileHandoff } from './privateSourceFileHandoff.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
 import { ComparisonReadiness } from './ComparisonReadiness.tsx'
 import { createMixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
@@ -18,7 +25,9 @@ const MixedStoreShoppingCard = lazy(async () => {
   const module = await import('./MixedStoreShoppingCard.tsx')
   return { default: module.MixedStoreShoppingCard }
 })
-import { privatePackUnitRate } from './privateUnitPrice.ts'
+import { privatePackUnitRate, formatPrivateUnitRate, privateUnitPrice } from './privateUnitPrice.ts'
+import { rankOwnSourceSuggestions } from './ownSourceSuggestions.ts'
+import { automaticallyAcceptedSourceLine } from './automaticSourceMatch.ts'
 import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 import { appendPrivateCaptureProducts } from './appendPrivateCaptureProducts.ts'
 import { describePrivateStoreCaptureChange } from './privateStoreCaptureDiff.ts'
@@ -26,13 +35,36 @@ import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
-import type { PrivateReviewedBaskets } from './privateReviewedBasketBridge.ts'
+import type { PrivateReviewedBaskets, PrivateCaptureProgress, PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
-
-const euros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores = ['PLUS', 'DekaMarkt'] as const
+type SourceSort = 'relevance' | 'whole-pack' | 'unit-price'
+// Some spreadsheet exports and mobile shares arrive as .txt or generic
+// application/octet-stream. Recognize only the EXACT existing nine-column
+// Supa header, then delegate all source facts to the canonical converter.
+// Never infer a retailer, observation time, SKU, package or price from a name.
+const privateSourceColumns = [
+  'retailer', 'observedAt', 'id', 'name', 'packAmount',
+  'packUnit', 'packCount', 'priceCents', 'available',
+] as const
+function isPrivateCaptureCsv(file: File, source: string): boolean {
+  if (/\.(?:csv|tsv)$/iu.test(file.name) || file.type === 'text/csv' ||
+      file.type === 'text/tab-separated-values') return true
+  const line = source.replace(/^\uFEFF/u, '').split(/\r?\n/u, 1)[0]
+  return [',', ';', '\t'].some(separator =>
+    line === privateSourceColumns.join(separator) ||
+    line === privateSourceColumns.map(column => '"' + column + '"').join(separator))
+}
 const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
+function exactPlanCheckpointKey(planKey: string): string {
+  let hash = 2166136261
+  for (let i = 0; i < planKey.length; i++) {
+    hash ^= planKey.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return privateTabCheckpointKey + ':' + (hash >>> 0).toString(16)
+}
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 type CapturePreviewStore = {
   retailer: CaptureStore; enteredProducts: number; unobservedRows: number
@@ -52,15 +84,12 @@ type CapturePreviewStore = {
 }
 
 function pricePerUnit(line: Matched): string | null {
-  const { unit, amount, count } = line.pack
-  const physical = amount * count
-  const basis = unit === 'g' || unit === 'ml' ? physical / 1000 : physical
-  if (!Number.isFinite(basis) || basis <= 0) return null
-  const cents = line.pricePerPackCents / basis
-  if (!Number.isFinite(cents) || cents < 0) return null
-  return euros.format(cents / 100) + ' per ' +
-    (unit === 'g' || unit === 'kg' ? 'kg' : unit === 'ml' || unit === 'l' ? 'liter' : 'stuk')
+  // One exact decimal per-kg/litre/piece rate in the private workbench,
+  // Planner product table, portable comparison and offline HTML report.
+  // Never derive the advisory unit rate through binary floating arithmetic.
+  return privateUnitPrice(line)?.replace(' / ', ' per ') ?? null
 }
+
 /**
  * Only an explicit review of THIS captured article can unlock an in-app total.
  * Changing the physical plan, original capture instant, package, price or SKU
@@ -73,6 +102,18 @@ function reviewedLineKey(store: typeof stores[number], observedAt: string, line:
     line.productName, line.pack.amount, line.pack.unit, line.pack.count,
     line.packs, line.pricePerPackCents, line.lineTotalCents,
   ])
+}
+/** Invalidate only the edited physical ingredient. Unchanged captures,
+ * SKU reviews and picked groceries for other requirements stay valid.
+ * Serialized identities are generated locally by reviewedLineKey and
+ * shoppingTaskKey; malformed entries are simply not trusted as matches. */
+function isOwnIngredientKey(key: string, store: typeof stores[number],
+  ingredientId: string, ingredientIndex: number): boolean {
+  try {
+    const parts: unknown = JSON.parse(key)
+    return Array.isArray(parts) && parts[0] === store &&
+      parts[ingredientIndex] === ingredientId
+  } catch { return false }
 }
 function shoppingTaskKey(store: typeof stores[number], line: BasketTraceLine): string {
   // A trip tick belongs to the exact physical requirement and chosen pack,
@@ -129,35 +170,95 @@ function sourcePackRate(product: import('../../domain/basket.ts').StoreProduct):
     count: product.packCount ?? 1,
     priceCents: product.available ? product.priceCents : null,
   })
-  return rate ? ' · ' + euros.format(rate.centsPerUnit / 100) + ' per ' + rate.unit : ''
+  return rate ? ' · ' + formatPrivateUnitRate(rate) : ''
+}
+/** Exact whole-pack preview for one original source candidate only.
+ * The canonical basket/review gate still decides whether this can become
+ * part of a complete priced weekly shop. */
+function sourceWholePackCents(product: OfflineStoreProduct,
+  required: BasketTraceLine['requirement']): number | null {
+  if (!product.available || product.packAmount === null ||
+      required.amount === null || !Number.isFinite(required.amount) ||
+      required.amount <= 0) return null
+  const packs = calculateDecimalPackCount(
+    [{ amount: required.amount, unit: required.unit }],
+    { amount: product.packAmount, unit: product.packUnit, count: product.packCount ?? 1 })
+  if (packs === null || !Number.isSafeInteger(packs) || packs < 1) return null
+  const totalCents = packs * product.priceCents
+  return Number.isSafeInteger(totalCents) && totalCents >= 0 ? totalCents : null
+}
+function sourceWholePackPreview(product: OfflineStoreProduct,
+  required: BasketTraceLine['requirement'], currentCents: number | null = null): string {
+  const total = sourceWholePackCents(product, required)
+  if (total === null) return ''
+  const packs = calculateDecimalPackCount(
+    [{ amount: required.amount!, unit: required.unit }],
+    { amount: product.packAmount!, unit: product.packUnit, count: product.packCount ?? 1 })!
+  const delta = currentCents === null || !Number.isSafeInteger(currentCents) ? '' :
+    total === currentCents ? ' · gelijk aan huidige regel' :
+      ' · ' + exactEuro.formatCents(Math.abs(total - currentCents)) +
+      (total < currentCents ? ' rekenkundig lager' : ' rekenkundig hoger') +
+      ' dan huidige regel (controleer productgelijkwaardigheid)'
+  return ' · ' + packs + ' hele pak(ken): ' + exactEuro.formatCents(total) +
+    ' voor deze ingrediëntregel' + delta
 }
 function searchableSourceText(value: string): string {
   // Discoverability only: never change an original source name/SKU/price.
   // A user typing 'creme' should find an observed 'crème' article.
   return value.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl').trim()
 }
-function sourceOptions(products: import('../../domain/basket.ts').StoreProduct[],
-  unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string) {
+function sourceOptions(products: OfflineStoreProduct[],
+  unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string,
+  ingredient: string, requestedAmount: number | null, sort: SourceSort,
+  cheaperThanCents: number | null = null) {
   const query = searchableSourceText(text)
   const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) =>
     !query || searchableSourceText(product.name).includes(query) ||
     searchableSourceText(product.id).includes(query)
   const physicallyCompatible = products.filter(p => compatibleSourceUnit(unit, p.packUnit))
   const available = physicallyCompatible.filter(p => p.available && p.packAmount !== null)
-  const filtered = available.filter(matchesQuery)
-  const shown = filtered.slice(0, 40)
+  const filtered = rankOwnSourceSuggestions(
+    available.filter(matchesQuery), ingredient, requestedAmount, unit, text)
+  // Price sorting is DISCOVERY, never an accepted match or a claim about
+  // products being interchangeable. Reject impossible whole-pack arithmetic.
+  // The existing suggestion rank wins ties and remains the default.
+  const wholeCost = (p: OfflineStoreProduct): number | null =>
+    sourceWholePackCents(p, { amount: requestedAmount, unit })
+  const rate = (p: OfflineStoreProduct): number | null =>
+    privatePackUnitRate({ amount: p.packAmount, unit: p.packUnit,
+      count: p.packCount ?? 1, priceCents: p.priceCents })?.centsPerUnit ?? null
+  const pricedCandidates = cheaperThanCents === null ? filtered : filtered.filter(p => {
+    const total = wholeCost(p)
+    return total !== null && total < cheaperThanCents &&
+      p.id !== keepId
+  })
+  const ranked = sort === 'relevance' ? pricedCandidates : [...pricedCandidates].sort((a, b) => {
+    const left = sort === 'whole-pack' ? wholeCost(a) : rate(a)
+    const right = sort === 'whole-pack' ? wholeCost(b) : rate(b)
+    return left === null && right === null ? 0 :
+      left === null ? 1 : right === null ? -1 : left - right
+  })
+  const shown = ranked.slice(0, 40)
   const current = available.find(p => p.id === keepId)
   if (current && !shown.some(p => p.id === keepId)) shown.unshift(current)
 
   // These are honest original capture records, but not purchasable price
   // candidates. Never put them in the select or recalculate a basket from them.
   const unpriced = physicallyCompatible.filter(p => !p.available || p.packAmount === null)
-  const unpricedFiltered = unpriced.filter(matchesQuery)
+  const unpricedFiltered = rankOwnSourceSuggestions(
+    unpriced.filter(matchesQuery), ingredient, requestedAmount, unit, text)
   return {
-    shown, total: filtered.length, availableCount: available.length,
+    shown, total: pricedCandidates.length, availableCount: available.length,
     unpricedShown: unpricedFiltered.slice(0, 5),
     unpricedTotal: unpricedFiltered.length, unpricedCount: unpriced.length,
   }
+}
+function explainUnpricedSource(product: OfflineStoreProduct): string {
+  const reasons: string[] = []
+  if (product.sourceAvailable === false) reasons.push('niet beschikbaar volgens de opname')
+  if (product.sourcePriceCents === null) reasons.push('prijs niet vastgelegd')
+  if (product.packAmount === null) reasons.push('verpakkingsinhoud ontbreekt')
+  return reasons.join(' · ') || 'nog niet volledig prijsklaar'
 }
 function captureDate(ms: number) { return dateTime.format(new Date(ms)) }
 function reviewRowId(store: string, ingredientId: string): string {
@@ -178,7 +279,7 @@ function readablePrivateComparison(
   rows: { delta: { ingredientLabel: string; deltaCents: number }; plus: Matched; deka: Matched }[],
 ): string {
   const plain = (s: string) => s.replace(/[\r\n\u2028\u2029\u0000-\u001f\u007f-\u009f]/gu, ' ')
-  const money = (cents: number) => euros.format(cents / 100)
+  const money = (cents: number) => exactEuro.formatCents(cents)
   return [
     'SUPA · persoonlijke vergelijking van twee zelf bevestigde winkelopnames',
     'Geen live winkelprijzen, retailerautorisatie of onafhankelijk besparingsbewijs.',
@@ -214,7 +315,7 @@ function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number],
   return [
     `Supa · boodschappen voor ${basket.store.name} · privé ingevoerde prijzen, niet geverifieerd`,
     ...basket.lines.map(line => line.status === 'matched'
-      ? `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: ${line.packs} × ${line.productName} (${euros.format(line.lineTotalCents / 100)})`
+      ? `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: ${line.packs} × ${line.productName} (${exactEuro.formatCents(line.lineTotalCents)})`
       : `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: handmatig kiezen, hoeveelheid ${line.requirement.amount ?? '?'} ${line.requirement.unit}`),
     'Prijzen zijn alleen indicatief op basis van lokaal aangeleverde gegevens.',
   ].join('\n')
@@ -222,25 +323,51 @@ function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number],
 
 /** Independent opt-in local import. Never treats JSON as evidence of retailer licensing or physical verification. */
 export function OfflineReviewedWorkbench({
-  plan, recipes, activeDays, planKey, onReviewedBaskets,
+  plan, recipes, activeDays, planKey, incomingSources, onSourceFilesConsumed, onReviewedBaskets, onCaptureProgress, focusReview,
 }: {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   planKey?: string
+  incomingSources?: PrivateSourceFileHandoff | null
+  onSourceFilesConsumed?: (serial: number) => void
   onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
+  onCaptureProgress?: (value: PrivateCaptureProgress | null) => void
+  focusReview?: PrivateReviewFocus | null
 }) {
+  // A pasted source is a proposal, never the admitted receipt currently
+  // powering reviews, exports, and shopping progress.
+  // A separate opt-in recovery slot for each exact physical Planner plan.
+  // The original single-slot key stays read-only for backward compatibility.
+  const tabCheckpointKey = planKey ? exactPlanCheckpointKey(planKey) : privateTabCheckpointKey
   const [text, setText] = useState('')
+  const [pasteDraft, setPasteDraft] = useState('')
   const currentActiveSource = useRef(text)
   currentActiveSource.current = text
   const [imported, setImported] = useState<OfflinePriceSnapshots | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [dropActive, setDropActive] = useState(false)
   const importRevision = useRef(0)
+  const lastPlannerFileSerial = useRef(0)
+  const currentlySelectedPlan = useRef(planKey)
+  currentlySelectedPlan.current = planKey
   const [pendingReplacement, setPendingReplacement] = useState<{
     sourceText: string; newText: string
     version: number; store: typeof stores[number]
     preview: ReturnType<typeof describePrivateStoreCaptureChange>
+  } | null>(null)
+
+  const [pendingTwoStore, setPendingTwoStore] = useState<{
+    sourceText: string
+    newText: string
+    version: number
+    snapshots: OfflinePriceSnapshots
+    changes: { store: typeof stores[number]; previousAt: string | null
+      nextAt: string; previousCount: number; nextCount: number
+      added: number; removed: number; changed: number
+      previousPriced: number; nextPriced: number; unchanged: boolean
+      examples: { id: string; name: string; before: string; after: string }[] }[]
   } | null>(null)
 
   const [weekExportMessage, setWeekExportMessage] = useState('')
@@ -253,10 +380,13 @@ export function OfflineReviewedWorkbench({
     retainedOther?: { retailer: CaptureStore; within24h: boolean; observedNs: bigint }
   } | null>(null)
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
+  const [rejectedAutoReviews, setRejectedAutoReviews] = useState<Record<string, boolean>>({})
   const [manualSku, setManualSku] = useState<Record<typeof stores[number], Record<string, string>>>({
     PLUS: {}, DekaMarkt: {},
   })
   const [skuFilter, setSkuFilter] = useState<Record<string, string>>({})
+  const [sourceSort, setSourceSort] = useState<Record<string, SourceSort>>({})
+  const [onlyCheaper, setOnlyCheaper] = useState<Record<string, boolean>>({})
   const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
   const [openTripOnly, setOpenTripOnly] = useState(false)
   const [tripExportMessage, setTripExportMessage] = useState('')
@@ -584,7 +714,7 @@ export function OfflineReviewedWorkbench({
           // A consciously chosen SKU can travel, but the independent
           // wizard must still ask the user to inspect source/matches.
           const explicit = manualSku[store][line.id] === line.productId
-          const reviewed = reviewedLines[reviewedLineKey(store, capture.observedAt, line)]
+          const reviewed = isAcceptedKey(reviewedLineKey(store, capture.observedAt, line))
           if (explicit || reviewed) selected[store][line.id] = line.productId
         }
       }
@@ -614,11 +744,11 @@ export function OfflineReviewedWorkbench({
   function saveTabCheckpoint() {
     try {
       const session = portableSessionText()
-      const existing = window.sessionStorage.getItem(privateTabCheckpointKey)
+      const existing = window.sessionStorage.getItem(tabCheckpointKey)
       if (existing !== null && !window.confirm(
-        'Er bestaat al een privéherstelpunt voor deze browsertab. Vervang het bewust door de huidige bron en artikelkeuzes?')) return
-      window.sessionStorage.setItem(privateTabCheckpointKey, session)
-      setMessage('Privéherstelpunt bewaard in deze browsertab. Bij herladen kun je de bron en SKU-keuzes terughalen; alle beoordelingen moet je opnieuw doen. Download een JSON-kopie voor langer bewaren.')
+        'Er bestaat al een privéherstelpunt voor dit exacte weekmenu. Vervang het bewust door de huidige bron en artikelkeuzes?')) return
+      window.sessionStorage.setItem(tabCheckpointKey, session)
+      setMessage('Privéherstelpunt voor dit weekmenu bewaard in deze browsertab. Bij herladen kun je de bron en SKU-keuzes terughalen; alle reviews moeten opnieuw. Download JSON voor langer bewaren.')
     } catch (error) {
       setMessage(error instanceof Error ? error.message :
         'Opslaan van het privéherstelpunt is niet gelukt. Gebruik de JSON-download.')
@@ -630,8 +760,10 @@ export function OfflineReviewedWorkbench({
     setPendingReplacement(null)
     setBusy(false)
     try {
-      const saved = window.sessionStorage.getItem(privateTabCheckpointKey)
-      if (saved === null) throw Error('Geen privéherstelpunt in deze browsertab gevonden.')
+      const saved = window.sessionStorage.getItem(tabCheckpointKey) ??
+        (tabCheckpointKey === privateTabCheckpointKey ? null :
+          window.sessionStorage.getItem(privateTabCheckpointKey))
+      if (saved === null) throw Error('Geen privéherstelpunt voor dit weekmenu gevonden.')
       const result = importPrivateBasketSession({
         text: saved, plan, recipes, activeDays, now: Date.now(),
       })
@@ -654,9 +786,26 @@ export function OfflineReviewedWorkbench({
 
   function deleteTabCheckpoint() {
     try {
-      if (!window.confirm('Wis het privéherstelpunt van deze browsertab definitief? Huidig geopende winkeldata blijven staan.')) return
-      window.sessionStorage.removeItem(privateTabCheckpointKey)
-      setMessage('Privéherstelpunt uit deze browsertab gewist. Geopende winkeldata zijn niet veranderd.')
+      let ownedKey = tabCheckpointKey
+      if (window.sessionStorage.getItem(ownedKey) === null &&
+          ownedKey !== privateTabCheckpointKey) {
+        // The original global slot may contain another week's saved private
+        // prices. Only delete it when strict import admits this exact week.
+        const old = window.sessionStorage.getItem(privateTabCheckpointKey)
+        if (old) {
+          try {
+            importPrivateBasketSession({ text: old, plan, recipes, activeDays, now: Date.now() })
+            ownedKey = privateTabCheckpointKey
+          } catch { /* Never delete another week's snapshot. */ }
+        }
+      }
+      if (window.sessionStorage.getItem(ownedKey) === null) {
+        setMessage('Voor dit weekmenu bestaat geen opgeslagen privéherstelpunt.')
+        return
+      }
+      if (!window.confirm('Wis het bewaarde privéherstelpunt voor dit weekmenu? Andere weken blijven onaangeroerd.')) return
+      window.sessionStorage.removeItem(ownedKey)
+      setMessage('Herstelpunt voor deze week gewist; andere weken en geopende winkeldata blijven intact.')
     } catch {
       setMessage('De browseropslag kon niet worden gewist. Gebruik de privacyinstellingen van je browser.')
     }
@@ -691,6 +840,49 @@ export function OfflineReviewedWorkbench({
         setMessage(error instanceof Error ? error.message : 'Privésessie niet geldig; bestaande invoer behouden.')
     } finally {
       if (version === importRevision.current) setBusy(false)
+    }
+  }
+
+  function downloadFreshProductReobservation(
+    retailer: 'PLUS' | 'DekaMarkt' | 'both',
+    format: 'csv' | 'csv-excel' | 'guide' = 'csv',
+  ) {
+    if (!imported) return
+    try {
+      // Read the canonical original data again at the actual click. Historical
+      // SKU names are lookup aids, not a new observed price/pack/time.
+      const current = parseOfflinePriceSnapshots(text, Date.now())
+      const plus = current.captures.PLUS
+      const deka = current.captures.DekaMarkt
+      const capture = retailer === 'both' ? null : current.captures[retailer]
+      if (retailer === 'both' && (!plus || !deka))
+        throw new Error('Voor beide winkels zijn twee oorspronkelijke winkelbronnen nodig.')
+      if (retailer !== 'both' && !capture)
+        throw new Error('Selecteer eerst een oorspronkelijke ' + retailer + '-winkelbron.')
+      const csvDelimiter = format === 'csv-excel' ? ';' : ','
+      const content = retailer === 'both'
+        ? format === 'guide'
+          ? privatePairedStoreRecaptureGuide(plus!, deka!)
+          : privatePairedStoreRecaptureCsv(plus!, deka!, csvDelimiter)
+        : format === 'guide'
+          ? privateFullStoreRecaptureGuide(capture!)
+          : privateFullStoreRecaptureCsv(capture!, csvDelimiter)
+      const url = URL.createObjectURL(new Blob([content], {
+        type: format === 'guide' ? 'text/plain;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + (retailer === 'both' ? 'plus-deka' : retailer.toLowerCase()) +
+          (format === 'guide' ? '-hele-bronopname-handleiding.txt' : '-complete-nieuwe-bronopname.csv')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage((retailer === 'both' ? 'PLUS en DekaMarkt' : retailer) +
+        ': nieuwe broninvoer voorbereid. Alleen originele SKU en naam zijn zoekhulp; oude tijden, pakgegevens, voorraad en prijzen zijn LEEG. Gebruik uitsluitend werkelijk opnieuw geobserveerde gegevens en controleer ze hier.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message :
+        'Een volledig lege bronopname kon niet uit de oorspronkelijke artikelen worden gemaakt.')
     }
   }
 
@@ -823,6 +1015,182 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function sameCanonicalCapture(
+    previous: OfflinePriceSnapshots['captures'][typeof stores[number]],
+    incoming: OfflinePriceSnapshots['captures'][typeof stores[number]],
+  ): boolean {
+    if (!previous || !incoming || previous.observedAt !== incoming.observedAt ||
+        previous.products.length !== incoming.products.length) return false
+    const bySku = new Map(previous.products.map(product => [product.id, product]))
+    return incoming.products.every(product => {
+      const old = bySku.get(product.id)
+      return !!old && old.name === product.name &&
+        old.packAmount === product.packAmount && old.packUnit === product.packUnit &&
+        old.packCount === product.packCount &&
+        old.sourcePriceCents === product.sourcePriceCents &&
+        old.sourceAvailable === product.sourceAvailable
+    })
+  }
+
+  function stageBothStoreReplacement(input: string, version: number) {
+    // Reuse canonical source admission. This is a preview of local user
+    // files, never a retailer-authorization or independent price claim.
+    const next = parseOfflinePriceSnapshots(input, Date.now())
+    if (!next.captures.PLUS || !next.captures.DekaMarkt)
+      throw new Error('Selecteer een oorspronkelijke PLUS- en DekaMarkt-opname.')
+    if (!imported) {
+      importSnapshots(input)
+      return
+    }
+    // Admission compares original facts, independent of JSON whitespace or SKU
+    // order. No approval may outlive a changed original shop observation.
+    const sameCapture = (store: typeof stores[number]) =>
+      sameCanonicalCapture(imported.captures[store], next.captures[store])
+    if (stores.every(sameCapture)) {
+      setPendingTwoStore(null)
+      setMessage('Beide bronopnames zijn inhoudelijk identiek aan je huidige bronnen. Eerdere productcontroles en afvinkingen zijn behouden.')
+      return
+    }
+    const changes = stores.map(store => {
+      const prior = imported.captures[store]
+      const incoming = next.captures[store]!
+      const oldBySku = new Map(prior?.products.map(product => [product.id, product]))
+      const newBySku = new Map(incoming.products.map(product => [product.id, product]))
+      const added = incoming.products.filter(item => !oldBySku.has(item.id)).length
+      const removed = prior?.products.filter(item => !newBySku.has(item.id)).length ?? 0
+      const changed = incoming.products.filter(item => {
+        const old = oldBySku.get(item.id)
+        return old && (old.name !== item.name ||
+          old.packAmount !== item.packAmount || old.packUnit !== item.packUnit ||
+          old.packCount !== item.packCount ||
+          old.sourcePriceCents !== item.sourcePriceCents ||
+          old.sourceAvailable !== item.sourceAvailable)
+      }).length
+      const priceLabel = (product?: OfflineStoreProduct) => {
+        if (!product) return 'niet meer in bestand'
+        if (product.sourceAvailable !== true || product.sourcePriceCents === null ||
+            product.sourcePriceCents === undefined || product.packAmount === null)
+          return 'pakprijs of beschikbaarheid onbekend'
+        return exactEuro.formatCents(product.sourcePriceCents) + ' per pak · ' +
+          product.packCount + ' × ' + product.packAmount + ' ' + product.packUnit
+      }
+      const examples = [...new Set([...oldBySku.keys(), ...newBySku.keys()])]
+        .filter(id => {
+          const old = oldBySku.get(id)
+          const latest = newBySku.get(id)
+          return !old || !latest || old.name !== latest.name ||
+            old.packAmount !== latest.packAmount || old.packUnit !== latest.packUnit ||
+            old.packCount !== latest.packCount ||
+            old.sourcePriceCents !== latest.sourcePriceCents ||
+            old.sourceAvailable !== latest.sourceAvailable
+        })
+        .slice(0, 6)
+        .map(id => {
+          const before = oldBySku.get(id)
+          const after = newBySku.get(id)
+          return { id, name: after?.name ?? before?.name ?? id,
+            before: before ? priceLabel(before) : 'nieuw bronproduct',
+            after: priceLabel(after) }
+        })
+      const priced = (product: OfflineStoreProduct) =>
+        product.sourceAvailable === true && product.sourcePriceCents !== null &&
+        product.sourcePriceCents !== undefined && product.packAmount !== null
+      return { store, previousAt: prior?.observedAt ?? null,
+        nextAt: incoming.observedAt, previousCount: prior?.products.length ?? 0,
+        nextCount: incoming.products.length, added, removed, changed,
+        previousPriced: prior?.products.filter(priced).length ?? 0,
+        nextPriced: incoming.products.filter(priced).length,
+        unchanged: sameCapture(store), examples }
+    })
+    setPendingReplacement(null)
+    setPendingTwoStore({ sourceText: text, newText: input, version,
+      snapshots: next, changes })
+    setMessage('Twee originele bronbestanden gecontroleerd; vergelijk eerst de wijzigingen. Geen oude winkeldata of vinkjes zijn vervangen.')
+  }
+
+  async function downloadTwoStoreChanges() {
+    const pending = pendingTwoStore
+    if (!pending || pending.version !== importRevision.current ||
+        pending.sourceText !== text) {
+      setMessage('Het wijzigingenoverzicht is verouderd; laad je eigen bronnen opnieuw.')
+      return
+    }
+    try {
+      const { twoStoreReplacementCsv } = await import('./twoStoreReplacementCsv.ts')
+      if (pending.version !== importRevision.current || pending.sourceText !== currentActiveSource.current)
+        throw new Error('De actieve winkelopnames zijn veranderd. Bekijk de nieuwe bronbestanden opnieuw.')
+      const content = twoStoreReplacementCsv(pending.sourceText, pending.newText, Date.now())
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-plus-deka-bronwijzigingen.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Alle oorspronkelijke SKU-verschillen lokaal als CSV opgeslagen. Dit bestand bewijst geen actuele retailerprijzen.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Het lokale verschillenbestand kon niet worden opgeslagen.')
+    }
+  }
+
+  function confirmBothStoreReplacement() {
+    const pending = pendingTwoStore
+    if (!pending || pending.version !== importRevision.current ||
+        pending.sourceText !== text) {
+      setPendingTwoStore(null)
+      setMessage('De actieve winkelopnames zijn ondertussen gewijzigd. Laad de twee nieuwe bestanden opnieuw.')
+      return
+    }
+    try {
+      // Recheck age and pair context at the actual approval moment.
+      const source = parseOfflinePriceSnapshots(pending.newText, Date.now())
+      if (!source.captures.PLUS || !source.captures.DekaMarkt)
+        throw new Error('Beide originele winkelopnames moeten aanwezig zijn.')
+      if (!imported) throw new Error('Je oorspronkelijke winkeldata zijn niet meer geladen.')
+      const changed = stores.filter(store =>
+        !sameCanonicalCapture(imported.captures[store], source.captures[store]))
+      const invalidates = (key: string) => changed.some(store =>
+        key.startsWith('[' + JSON.stringify(store) + ','))
+      ++importRevision.current
+      setPendingTwoStore(null)
+      setPendingReplacement(null)
+      setText(pending.newText)
+      setImported(source)
+      setClockMs(Date.now())
+      // Preserve user-reviewed SKUs and physical shopping ticks only for
+      // exactly identical underlying source records. A changed original
+      // capture always revokes its store's former choices and price approvals.
+      setManualSku(previous => ({
+        PLUS: changed.includes('PLUS') ? {} : previous.PLUS,
+        DekaMarkt: changed.includes('DekaMarkt') ? {} : previous.DekaMarkt,
+      }))
+      setSkuFilter(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !invalidates(key))))
+      setReviewedLines(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !invalidates(key))))
+      setDoneTripItems(previous => Object.fromEntries(
+        Object.entries(previous).filter(([key]) => !invalidates(key))))
+      setTripExportMessage('')
+      setTripProgressMessage('')
+      setMessage(changed.join(' en ') +
+        ': de nieuwe opname moet opnieuw worden gecontroleerd. ' +
+        stores.filter(store => !changed.includes(store)).join(' en ') +
+        (changed.length < 2 ? ' blijft met eigen originele bron, productkeuzes en afvinkingen behouden.' :
+          ' Geen oude prijsbevestigingen zijn overgenomen.'))
+    } catch (error) {
+      setPendingTwoStore(null)
+      setMessage((error instanceof Error ? error.message : 'Nieuwe brondata niet geldig.') +
+        ' De oude winkeldata en afvinkingen zijn behouden.')
+    }
+  }
+
+  function isSameSingleStoreCapture(preview: ReturnType<typeof describePrivateStoreCaptureChange>) {
+    return preview.previousObservedAt === preview.nextObservedAt &&
+      preview.previousCount === preview.nextCount &&
+      preview.added === 0 && preview.removed === 0 && preview.changed === 0
+  }
+
   function acceptManualSource(input: string) {
     ++importRevision.current
     setPendingReplacement(null)
@@ -834,6 +1202,10 @@ export function OfflineReviewedWorkbench({
         const store = shops[0]
         if (imported.captures[store]) {
           const preview = describePrivateStoreCaptureChange(text, input, store, Date.now())
+          if (isSameSingleStoreCapture(preview)) {
+            setMessage(store + ': deze winkelopname is volledig identiek. Je gekozen producten en afvinkingen blijven behouden.')
+            return
+          }
           setPendingReplacement({ sourceText: text, newText: input, store,
             version: importRevision.current, preview })
           setMessage(store + ': bekijk eerst de bronverschillen en bevestig de vervanging. De andere winkel blijft behouden.')
@@ -860,12 +1232,10 @@ export function OfflineReviewedWorkbench({
         setMessage(store + ': tweede echte privéopname toegevoegd; de andere winkel en zijn controles blijven intact. Controleer de nieuwe SKU’s.')
         return
       }
-      if (imported && !window.confirm(
-        'Beide vorige winkelopnames en controles vervangen door deze nieuwe invoer?')) {
-        setMessage('Nieuwe invoer niet toegepast; vorige winkelopnames behouden.')
+      if (imported && shops.length === 2) {
+        stageBothStoreReplacement(input, importRevision.current)
         return
       }
-      setText(input)
       importSnapshots(input)
     } catch (error) {
       setMessage((error instanceof Error ? error.message : 'Ongeldige bron.') +
@@ -874,27 +1244,101 @@ export function OfflineReviewedWorkbench({
   }
 
   function importSnapshots(input: string) {
-    // A new import, even identical bytes, requires explicit source review.
-    setReviewedLines({})
-    setDoneTripItems({})
-    setManualSku({ PLUS: {}, DekaMarkt: {} }); setSkuFilter({})
     try {
+      // Validate the entire proposed capture before changing the active
+      // source, review keys, physical ticks, or any derived basket totals.
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
-      setClockMs(Date.now())
+      setText(input)
       setImported(parsed)
+      setReviewedLines({})
+      setDoneTripItems({})
+      setManualSku({ PLUS: {}, DekaMarkt: {} })
+      setSkuFilter({})
+      setClockMs(Date.now())
       setMessage(Object.keys(parsed.captures).length === 1
-        ? 'Eén eigen winkelopname lokaal geladen. Een tweede winkel blijft onbekend tot je die werkelijk invoert.'
-        : 'Twee privéopnames lokaal geladen; Supa heeft geen gegevens naar een server verstuurd.')
+        ? 'Eén eigen winkelopname lokaal geladen. Voeg een echte andere winkel toe voor een prijsverschil.'
+        : 'Twee privéopnames lokaal geladen. Controleer de fysieke SKU’s en prijzen opnieuw.')
     } catch (error) {
-      // Never retain/display a previous basket after an invalid new import.
-      setImported(null)
-      setMessage(error instanceof Error ? error.message : 'Ongeldige import.')
+      setMessage((error instanceof Error ? error.message : 'Ongeldige import.') +
+        ' Vorige brondata, reviews en afvinkingen blijven intact.')
     }
   }
-  async function loadSelectedSources(files: File[]) {
+  /** Paste CSV straight from the user's own sheet; still use canonical
+   * source admission and require every original SKU/price to be reviewed. */
+  async function importPastedSource() {
+    const raw = pasteDraft
+    const version = ++importRevision.current
+    if (!raw.trim()) {
+      setMessage('Plak eerst eigen CSV- of JSON-brongegevens.')
+      return
+    }
+    if (raw.trimStart().startsWith('{')) {
+      acceptManualSource(raw)
+      return
+    }
+    setBusy(true)
+    try {
+      const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
+      const module: unknown = await import(/* @vite-ignore */ converterUrl)
+      if (!module || typeof module !== 'object' ||
+          !('convertOwnStoreCsv' in module) ||
+          typeof module.convertOwnStoreCsv !== 'function') {
+        throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
+      }
+      const normalized = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      if (version !== importRevision.current) return
+      // The same guarded one-shop append, same-shop replacement preview,
+      // and explicit full-source confirmation used by manual price entry.
+      acceptManualSource(normalized)
+    } catch (error) {
+      if (version !== importRevision.current) return
+      setMessage((error instanceof Error ? error.message : 'CSV kon niet worden verwerkt.') +
+        ' De oude winkeldata en productreviews zijn behouden.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
+    }
+  }
+  // Opening one file (including a drag/drop) should never silently replace
+  // the other already-reviewed shop. Reuse the same append/replacement preview
+  // that the manual editor and pasted CSV use.
+  async function stageSelectedSource(file: File, selectedForPlan?: string) {
+    const version = ++importRevision.current
+    setPendingReplacement(null)
+    setBusy(true)
+    try {
+      if (!file.size || file.size > 256000)
+        throw new Error('Bronbestand is leeg of groter dan 256 kB.')
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const isCsv = isPrivateCaptureCsv(file, raw)
+      let source = raw
+      if (isCsv) {
+        const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
+        const module: unknown = await import(/* @vite-ignore */ converterUrl)
+        if (!module || typeof module !== 'object' ||
+            !('convertOwnStoreCsv' in module) ||
+            typeof module.convertOwnStoreCsv !== 'function')
+          throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
+        source = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      }
+      if (version !== importRevision.current) return
+      if (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current) {
+        setMessage('Je weekmenu veranderde tijdens het lezen van dit bestand. Kies het opnieuw voor de huidige week.')
+        return
+      }
+      acceptManualSource(source)
+    } catch (error) {
+      if (version !== importRevision.current) return
+      setMessage((error instanceof Error ? error.message : 'Ongeldig bronbestand.') +
+        ' De huidige winkeldata en productreviews zijn behouden.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
+    }
+  }
+
+  async function loadSelectedSources(files: File[], selectedForPlan?: string) {
     if (files.length === 0) return
     if (files.length === 1) {
-      await loadFile(files[0])
+      await stageSelectedSource(files[0], selectedForPlan)
       return
     }
     // Keep current admitted sources and human checks intact until BOTH
@@ -911,10 +1355,10 @@ export function OfflineReviewedWorkbench({
         if (!file.size || file.size > 256000)
           throw new Error('Elk origineel winkelbestand moet gevuld zijn en maximaal 256 kB bevatten.')
         const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-        const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+        const isCsv = isPrivateCaptureCsv(file, raw)
         let json = raw
         if (isCsv) {
-          const converterUrl = '/offline-two-store-csv.mjs'
+          const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
           const module: unknown = await import(/* @vite-ignore */ converterUrl)
           if (!module || typeof module !== 'object' ||
               !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
@@ -934,29 +1378,22 @@ export function OfflineReviewedWorkbench({
           throw new Error('Origineel winkelbestand ongeldig.')
         sources.push(original.captures[0])
       }
+      if (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current) {
+        setMessage('Je weekmenu veranderde tijdens het lezen. Selecteer deze twee opnames opnieuw voor je huidige week.')
+        return
+      }
       // Preserve original SKUs, null prices and observation timestamps. The
       // canonical parser is the final authority for this composed capture.
       const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures: sources })
       const admitted = parseOfflinePriceSnapshots(combined, Date.now())
       if (version !== importRevision.current) return
-      if (imported && !window.confirm(
-        'Je hebt al eigen winkeldata geladen. Vervang beide huidige winkelopnames en ' +
-        'wis alle eerdere productbevestigingen en afvinkingen door deze twee nieuwe originele bestanden? ' +
-        'PLUS: ' + admitted.captures.PLUS!.products.length + ' bronartikelen; DekaMarkt: ' +
-        admitted.captures.DekaMarkt!.products.length + ' bronartikelen. ' +
-        'Je kunt eerst je oorspronkelijke brondata downloaden om ze te bewaren.')) {
-        setMessage('Nieuwe twee-winkelimport geannuleerd. Beide eerdere winkelopnames en beoordelingen blijven behouden.')
+      if (version !== importRevision.current) return
+      if (imported) {
+        stageBothStoreReplacement(combined, version)
         return
       }
-      if (version !== importRevision.current) return
-      setText(combined)
-      setImported(admitted)
-      setReviewedLines({})
-      setDoneTripItems({})
-      setManualSku({ PLUS: {}, DekaMarkt: {} })
-      setSkuFilter({})
-      setClockMs(Date.now())
-      setMessage('Twee originele winkelbestanden samen geladen, elk met eigen bronmoment en productcodes. Controleer alle fysieke matches en prijzen opnieuw voordat een prijsverschil verschijnt.')
+      importSnapshots(combined)
+      setMessage('Twee echte winkelbestanden lokaal geladen. Controleer per ingrediënt alle originele SKU’s en fysieke verpakkingen.')
     } catch (error) {
       if (version !== importRevision.current) return
       setMessage((error instanceof Error ? error.message :
@@ -967,6 +1404,27 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  // Planner only passes original user-picked File objects. This effect does
+  // not authorize their content: the existing importer and human review decide.
+  useEffect(() => {
+    if (!incomingSources || incomingSources.serial <= lastPlannerFileSerial.current) return
+    lastPlannerFileSerial.current = incomingSources.serial
+    // Release original File references after admission (or refusal), so
+    // selected source bytes never linger in App's long-lived tab state.
+    const release = () => onSourceFilesConsumed?.(incomingSources.serial)
+    if (incomingSources.planKey !== planKey) {
+      release()
+      setMessage('Je weekmenu is veranderd na de bestandskeuze. Kies opnieuw voor deze week.')
+      return
+    }
+    if (incomingSources.files.length === 0 || incomingSources.files.length > 2) {
+      setMessage('Selecteer maximaal twee eigen winkelbronbestanden.')
+      release()
+      return
+    }
+    void loadSelectedSources(incomingSources.files, incomingSources.planKey).finally(release)
+  }, [incomingSources, planKey, onSourceFilesConsumed])
+
   async function appendSameCapture(store: typeof stores[number], file?: File) {
     if (!file || !imported?.captures[store]) return
     const version = ++importRevision.current
@@ -976,10 +1434,10 @@ export function OfflineReviewedWorkbench({
       if (!file.size || file.size > 256000)
         throw new Error('Een aanvulbestand moet gevuld zijn en maximaal 256 kB bevatten.')
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      const isCsv = isPrivateCaptureCsv(file, raw)
       let source = raw
       if (isCsv) {
-        const converterUrl = '/offline-two-store-csv.mjs'
+        const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
         const module: unknown = await import(/* @vite-ignore */ converterUrl)
         if (!module || typeof module !== 'object' ||
             !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
@@ -1025,10 +1483,10 @@ export function OfflineReviewedWorkbench({
       if (!file.size || file.size > 256000)
         throw new Error('Nieuwe winkelopname is leeg of groter dan 256 kB.')
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      const isCsv = isPrivateCaptureCsv(file, raw)
       let json = raw
       if (isCsv) {
-        const converterUrl = '/offline-two-store-csv.mjs'
+        const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
         const module: unknown = await import(/* @vite-ignore */ converterUrl)
         if (!module || typeof module !== 'object' ||
             !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
@@ -1040,6 +1498,10 @@ export function OfflineReviewedWorkbench({
       // The original-price-null-sensitive comparison is purely informational.
       const preview = describePrivateStoreCaptureChange(text, json, store, Date.now())
       if (version !== importRevision.current) return
+      if (isSameSingleStoreCapture(preview)) {
+        setMessage(store + ': deze oorspronkelijke opname is identiek. Je producten en afvinkingen blijven staan.')
+        return
+      }
       setPendingReplacement({ sourceText: text, newText: json, store, version, preview })
       setMessage(store + ': nieuw bronbestand geldig gelezen. Bekijk eerst welke originele producten en prijzen wijzigen. De twee bestaande winkelopnames zijn nog niet vervangen.')
     } catch (error) {
@@ -1099,11 +1561,11 @@ export function OfflineReviewedWorkbench({
       // The same canonical local CSV converter is already used by the
       // independent browser mapping wizard. It does not request retailer data.
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      const isCsv = /\.csv$/iu.test(file.name) || file.type === 'text/csv'
+      const isCsv = isPrivateCaptureCsv(file, raw)
       let content = raw
       if (isCsv) {
         // Vite copies the existing public module without changing its parser.
-        const converterUrl = '/offline-two-store-csv.mjs'
+        const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
         const module: unknown = await import(/* @vite-ignore */ converterUrl)
         if (!module || typeof module !== 'object' ||
           !('convertTwoStoreCsv' in module) ||
@@ -1164,7 +1626,7 @@ export function OfflineReviewedWorkbench({
         setTripExportMessage('')
         setTripProgressMessage('')
         setMessage('Eigen originele ' + (isCsv ? 'winkel-CSV' : 'winkel-JSON') +
-          ' geldig geladen; alle nieuwe fysieke artikelmatches en prijzen opnieuw controleren.')
+          ' geladen. Eenduidige producten worden automatisch gekoppeld; twijfelgevallen blijven open voor controle.')
       }
     } catch (error) {
       if (version !== importRevision.current) return
@@ -1194,6 +1656,38 @@ export function OfflineReviewedWorkbench({
         ? compareFullBaskets({ baseline: plus, candidate: deka }) : null }
     } catch { return null }
   }, [imported, plan, recipes, activeDays, manualSku])
+  // Decisive, exact-semantic matches from the currently admitted local capture
+  // are accepted automatically. Every key includes original SKU, pack/price,
+  // physical demand and observation instant; old facts never carry over.
+  const autoReviewKeys = useMemo(() => {
+    const keys = new Set<string>()
+    if (!imported || !basketPair) return keys
+    try {
+      const ingredients = aggregatePlanIngredients(plan, recipes, activeDays)
+      const byId = new Map(ingredients.map(item => [item.id, item.query]))
+      for (const store of stores) {
+        const capture = imported.captures[store]
+        const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+        if (!capture || !basket) continue
+        for (const line of basket.lines) {
+          const query = byId.get(line.id)
+          if (line.status === 'matched' && query && automaticallyAcceptedSourceLine(
+            line, capture.products, query, manualSku[store][line.id],
+          )) keys.add(reviewedLineKey(store, capture.observedAt, line))
+        }
+      }
+    } catch {
+      return new Set<string>()
+    }
+    return keys
+  }, [imported, basketPair, plan, recipes, activeDays, manualSku])
+
+  const isAcceptedKey = (key: string): boolean =>
+    reviewedLines[key] === true ||
+    (autoReviewKeys.has(key) && rejectedAutoReviews[key] !== true)
+  const isAutomaticKey = (key: string): boolean =>
+    autoReviewKeys.has(key) && rejectedAutoReviews[key] !== true
+
   const reviewedRecaptureSeeds = useMemo(() => {
     const seeds: Record<string, ReviewedRecaptureSeed> = {}
     if (!imported || !basketPair) return seeds
@@ -1203,7 +1697,7 @@ export function OfflineReviewedWorkbench({
       if (!capture || !basket) continue
       for (const line of basket.lines) {
         if (line.status !== 'matched' || line.pack.unit === 'unknown' ||
-            !reviewedLines[reviewedLineKey(store, capture.observedAt, line)])
+            !isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
           continue
         seeds[JSON.stringify([store, line.id])] = {
           sourceId: line.productId, name: line.productName,
@@ -1213,7 +1707,7 @@ export function OfflineReviewedWorkbench({
       }
     }
     return seeds
-  }, [imported, basketPair, reviewedLines])
+  }, [imported, basketPair, reviewedLines, autoReviewKeys, rejectedAutoReviews])
 
   function downloadConfirmedComparisonCsv() {
     try {
@@ -1261,14 +1755,15 @@ export function OfflineReviewedWorkbench({
     const capture = imported?.captures[store]
     const keys = basket && capture ? basket.lines.flatMap(line => line.status === 'matched'
       ? [reviewedLineKey(store, capture.observedAt, line)] : []) : []
-    const accepted = keys.filter(key => reviewedLines[key]).length
+    const accepted = keys.filter(isAcceptedKey).length
+    const autoMatched = keys.filter(isAutomaticKey).length
     const complete = !!basket && basket.selectedMealCount > 0 && basket.lines.length > 0 &&
       basket.unresolvedLineCount === 0 && keys.length === basket.lines.length &&
       accepted === keys.length
     const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
     const fresh = !!capture && nowNs >= capture.observedNs - 300_000_000_000n &&
       nowNs - capture.observedNs <= 604_800_000_000_000n
-    return { store, accepted, required: keys.length, complete, fresh }
+    return { store, accepted, autoMatched, required: keys.length, complete, fresh }
   })
   const reviewedBridge = useMemo((): PrivateReviewedBaskets | null => {
     if (!imported || !basketPair || !planKey) return null
@@ -1281,7 +1776,7 @@ export function OfflineReviewedWorkbench({
         basket.unresolvedLineCount === 0 &&
         basket.matchedLineCount === basket.lines.length &&
         basket.lines.every(line => line.status === 'matched' &&
-          reviewedLines[reviewedLineKey(store, capture.observedAt, line)] === true)
+          isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
       const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
       const fresh = nowNs >= capture.observedNs - 300_000_000_000n &&
         nowNs - capture.observedNs <= 604_800_000_000_000n
@@ -1290,16 +1785,129 @@ export function OfflineReviewedWorkbench({
       }
     }
     return Object.keys(verified).length > 0 ? { planKey, stores: verified } : null
-  }, [imported, basketPair, reviewedLines, clockMs, planKey])
+  }, [imported, basketPair, reviewedLines, autoReviewKeys, rejectedAutoReviews, clockMs, planKey])
   useEffect(() => {
     onReviewedBaskets?.(reviewedBridge)
   }, [onReviewedBaskets, reviewedBridge])
+  // Never promote partial source matching to a priced Planner budget.
+  // This metadata is for navigation and explaining what remains to review.
+  const captureProgress = useMemo((): PrivateCaptureProgress | null => {
+    if (!imported || !planKey) return null
+    const statuses: PrivateCaptureProgress['stores'] = {}
+    for (const store of stores) {
+      const capture = imported.captures[store]
+      const basket = store === 'PLUS' ? basketPair?.plus : basketPair?.deka
+      if (!capture) continue
+      const nowNs = BigInt(Math.trunc(clockMs)) * 1_000_000n
+      statuses[store] = {
+        observedAt: capture.observedAt,
+        originalProductCount: capture.products.length,
+        nextIngredientId: basket?.lines.find(line =>
+          line.status !== 'matched' || !isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))?.id ?? null,
+        pricedProductCount: capture.products.filter(product =>
+          product.sourceAvailable === true &&
+          product.sourcePriceCents !== null &&
+          product.sourcePriceCents !== undefined &&
+          product.packAmount !== null).length,
+        demandLineCount: basket?.lines.length ?? 0,
+        matchedLineCount: basket?.matchedLineCount ?? 0,
+        reviewedLineCount: perStoreReview.find(item => item.store === store)?.accepted ?? 0,
+        autoMatchedLineCount: perStoreReview.find(item => item.store === store)?.autoMatched ?? 0,
+        // These original source amounts exist only after canonical matching
+        // AND the exact receipt-bound review/automatic-identity admission.
+        // Never send a partial sum upstream as an eligible basket total.
+        confirmedSourceLines: basket?.lines.flatMap(line => {
+          if (line.status !== 'matched' || !isAcceptedKey(
+            reviewedLineKey(store, capture.observedAt, line))) return []
+          if (!Number.isSafeInteger(line.pricePerPackCents) ||
+              line.pricePerPackCents < 0 ||
+              !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
+              !Number.isSafeInteger(line.lineTotalCents) ||
+              line.lineTotalCents < 0) return []
+          return [{
+            ingredientId: line.id, ingredientLabel: line.ingredientLabel,
+            requiredAmount: line.requirement.amount,
+            requiredUnit: line.requirement.unit,
+            lineTotalCents: line.lineTotalCents,
+            productId: line.productId, productName: line.productName,
+            packAmount: line.pack.amount, packUnit: line.pack.unit,
+            packCount: line.pack.count, packagesNeeded: line.packs,
+            pricePerPackCents: line.pricePerPackCents,
+            unitPrice: privateUnitPrice(line),
+            review: isAutomaticKey(reviewedLineKey(store, capture.observedAt, line))
+              ? 'automatic' as const : 'manual' as const,
+          }]
+        }) ?? [],
+        missingIngredients: basket?.lines.filter(line =>
+          line.status !== 'matched')
+          .map(line => ({
+            id: line.id, label: line.ingredientLabel,
+            amount: line.requirement.amount, unit: line.requirement.unit,
+          })) ?? [],
+        awaitingReviewIngredients: basket?.lines.filter(line =>
+          line.status === 'matched' &&
+          !isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
+          .map(line => ({
+            id: line.id, label: line.ingredientLabel,
+            amount: line.requirement.amount, unit: line.requirement.unit,
+          })) ?? [],
+        fresh: nowNs >= capture.observedNs - 300_000_000_000n &&
+          nowNs - capture.observedNs <= 604_800_000_000_000n,
+      }
+    }
+    return { planKey, stores: statuses }
+  }, [imported, planKey, basketPair, reviewedLines, autoReviewKeys, rejectedAutoReviews, clockMs])
+  useEffect(() => {
+    onCaptureProgress?.(captureProgress)
+  }, [onCaptureProgress, captureProgress])
+  const handledReviewFocus = useRef<number | null>(null)
+  // Planner may navigate into a lazily mounted compare view. The focus
+  // intent stays in App state until the actual article exists in the DOM.
+  // It is strictly navigation, never an approval of a suggested SKU.
+  useEffect(() => {
+    if (!focusReview || focusReview.planKey !== planKey || !imported ||
+        handledReviewFocus.current === focusReview.serial) return
+    setOpenTripOnly(false)
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(
+        reviewRowId(focusReview.store, focusReview.ingredientId))
+      if (target) {
+        handledReviewFocus.current = focusReview.serial
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // A visible keyboard focus completes the jump for screen-reader
+        // and keyboard users. Do not select or approve the product.
+        const search = target.querySelector<HTMLInputElement>('input[type="search"]')
+        if (search) search.focus({ preventScroll: true })
+        else target.focus({ preventScroll: true })
+      }
+    }, 100)
+    return () => window.clearTimeout(timer)
+  }, [focusReview, imported, planKey])
   function goToReviewRow(store: typeof stores[number], id: string) {
     setOpenTripOnly(false)
     window.setTimeout(() => document.getElementById(reviewRowId(store, id))?.scrollIntoView({
       behavior: 'smooth', block: 'center',
     }), 0)
   }
+  function chooseSourceSku(store: typeof stores[number], line: BasketTraceLine, id: string) {
+    // Selecting a candidate is never the human's price/pack review.
+    if (manualSku[store][line.id] === id) return
+    setManualSku(previous => ({
+      ...previous, [store]: { ...previous[store], [line.id]: id },
+    }))
+    setReviewedLines(previous => Object.fromEntries(
+      Object.entries(previous).filter(([key]) =>
+        !isOwnIngredientKey(key, store, line.id, 2))))
+    setDoneTripItems(previous => Object.fromEntries(
+      Object.entries(previous).filter(([key]) =>
+        !isOwnIngredientKey(key, store, line.id, 1))))
+    setTripExportMessage('')
+    setTripProgressMessage('')
+    setMessage(store + ': bronartikel voor ' + line.ingredientLabel +
+      ' gekozen. Bevestig de originele code, verpakking en prijs hieronder. ' +
+      'Overige fysieke boodschappen en bronreviews zijn behouden.')
+  }
+
   const allReviewed = perStoreReview.every(item => item.complete)
   const comparisonNextSteps = perStoreReview.flatMap(item => {
     const capture = imported?.captures[item.store]
@@ -1366,7 +1974,7 @@ export function OfflineReviewedWorkbench({
         ' · ' + line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count
       if (!perStoreReview.find(item => item.store === store)?.fresh)
         return { status: 'Opname verlopen of toekomstig', canReview: true, product }
-      if (!reviewedLines[reviewedLineKey(store, capture.observedAt, line)])
+      if (!isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
         return { status: 'Product, verpakking en prijs controleren', canReview: true, product }
       return { status: 'Persoonlijk bevestigd', canReview: true, product }
     }
@@ -1515,7 +2123,7 @@ export function OfflineReviewedWorkbench({
       <div className="offline-price-workbench__intro">
         <span className="eyebrow">Jouw planner → brongegevens → winkelmandjes</span>
         <h2>Vergelijk twee winkels met eigen prijsdata</h2>
-        <p>Vul producten en prijzen direct per winkel in, of laad een eerder rechtmatig verkregen JSON-export.
+        <p>Vul producten en prijzen direct per winkel in, of laad een eerder rechtmatig verkregen CSV- of JSON-export.
           Supa koppelt producten aan jouw huidige weekmenu, rondt verpakkingen naar boven af
           en berekent eenheidsprijzen en volledige mandtotalen. De import start geen scraper of netwerkverzoek.</p>
         <p className="disclaimer">Privé rekenhulp: een aangeleverd bestand bewijst geen toestemming, productidentiteit,
@@ -1556,7 +2164,7 @@ export function OfflineReviewedWorkbench({
             onClick={downloadPrintablePlannerCapture}>
             Download printbaar opnameformulier (HTML)
           </button>
-          <a className="ghost-button" href="/private-basket-mapping.html" target="_blank" rel="noopener noreferrer">
+          <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
           </a>
         </div>
@@ -1654,9 +2262,9 @@ export function OfflineReviewedWorkbench({
                         {' '}· {product.packAmount ?? 'onbekend'} {product.packUnit}
                         {' '}× {product.packCount}
                         {' '}· {product.available && product.priceCents !== null
-                          ? euros.format(product.priceCents / 100) + ' per verpakking'
+                          ? exactEuro.formatCents(product.priceCents) + ' per verpakking'
                           : 'pakprijs onbekend / niet beschikbaar'}
-                        {rate && <> · {euros.format(rate.centsPerUnit / 100)} / {rate.unit}</>}
+                        {rate && <> · {exactEuro.formatCents(rate.centsPerUnit)} / {rate.unit}</>}
                       </li>
                     })}
                   </ul>
@@ -1771,43 +2379,73 @@ export function OfflineReviewedWorkbench({
       <div id="supa-own-price-import" className="offline-price-workbench__input">
         <label>Herstel eerdere privémand-sessie van ditzelfde weekmenu (zonder oude bevestigingen)
           <input type="file" accept=".json,application/json" disabled={busy}
-            onChange={event => { void restorePortableSession(event.currentTarget.files?.[0]) }} />
-        </label>
-        <label>Open één bronbestand, of selecteer tegelijk je aparte PLUS- en DekaMarkt-bestanden (CSV/JSON)
-          <input type="file" accept=".csv,.json,text/csv,application/json" multiple disabled={busy}
             onChange={event => {
-              const files = Array.from(event.currentTarget.files ?? [])
+              const file = event.currentTarget.files?.[0]
               event.currentTarget.value = ''
-              void loadSelectedSources(files)
+              void restorePortableSession(file)
             }} />
-          <small>Twee bestanden moeten ieder precies één verschillende winkel bevatten. Ongeldige of dubbele opnames worden samen geweigerd; onbekende prijzen blijven onbekend.</small>
         </label>
+        <div className={'offline-price-workbench__dropzone' + (dropActive ? ' is-dragging' : '')}
+          onDragOver={event => {
+            if (busy || !Array.from(event.dataTransfer.types).includes('Files')) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'copy'
+            setDropActive(true)
+          }}
+          onDragLeave={event => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false)
+          }}
+          onDrop={event => {
+            if (!Array.from(event.dataTransfer.types).includes('Files')) return
+            event.preventDefault()
+            setDropActive(false)
+            if (!busy) void loadSelectedSources(Array.from(event.dataTransfer.files))
+          }}>
+          <strong>{dropActive ? 'Laat je eigen bestanden los om ze lokaal te openen' :
+            'Sleep eigen PLUS-/Deka-prijsbestanden hierheen'}</strong>
+          <label>Open één bronbestand, of selecteer tegelijk je aparte PLUS- en DekaMarkt-bestanden (CSV/TSV/JSON of negenkoloms-TXT)
+            <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" multiple disabled={busy}
+              onChange={event => {
+                const files = Array.from(event.currentTarget.files ?? [])
+                event.currentTarget.value = ''
+                void loadSelectedSources(files)
+              }} />
+            <small>Twee bestanden moeten ieder precies één verschillende winkel bevatten. Ongeldige of dubbele opnames worden samen geweigerd; onbekende prijzen blijven onbekend.</small>
+          </label>
+          <small>Sleep of selecteer maximaal twee eigen CSV/JSON-bestanden (elk 256 kB), ook tekstbestanden met exact de Supa-CSV-kop.
+            Excel-/spreadsheetgegevens mogen komma's, puntkomma's of tabs tussen kolommen hebben;
+            een verpakkingsmaat mag een decimale komma gebruiken (bijvoorbeeld 0,75 kg).
+            Beschikbaarheid: true/false of ja/nee; prijs uitsluitend in hele eurocenten.
+            Deze import gebruikt dezelfde lokale broncontrole als de bestandskiezer:
+            ontbrekende prijzen blijven onbekend, en iedere SKU vereist jouw review.</small>
+        </div>
         {imported && Object.keys(imported.captures).length === 1 && (
           <label>Voeg de echte opname van de andere winkel toe (CSV of JSON)
-            <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
-              onChange={event => { void loadFile(event.currentTarget.files?.[0], true) }} />
+            <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" disabled={busy}
+              onChange={event => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                void loadFile(file, true)
+              }} />
             <small>De al gecontroleerde oorspronkelijke winkel blijft bewaard. Nieuwe producten moet je zelf bevestigen; er wordt geen tweede winkel verzonnen.</small>
           </label>
         )}
-        <label>Of plak je eigen winkelopname(s) als JSON
-          <textarea rows={5} value={text} maxLength={256000} spellCheck={false}
+        <label>Of plak je eigen winkelopname(s) als CSV of JSON
+          <textarea rows={5} value={pasteDraft} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
               importRevision.current += 1
               setBusy(false)
-              setText(event.target.value)
-              setImported(null)
-              setReviewedLines({})
-              setDoneTripItems({})
-              setMessage('Invoer gewijzigd. Bereken opnieuw; eerder resultaat is niet meer geldig.')
+              setPasteDraft(event.target.value)
+              setPendingReplacement(null)
+              setMessage('Concept gewijzigd. Eerder bevestigde winkeldata en vinkjes blijven actief totdat je de nieuwe bron expliciet importeert.')
             }} />
         </label>
         <div className="offline-price-workbench__actions">
-          <button type="button" disabled={busy || !text.trim()} onClick={() => {
-            importRevision.current += 1
-            importSnapshots(text)
+          <button type="button" disabled={busy || !pasteDraft.trim()} onClick={() => {
+            void importPastedSource()
           }}>
-            Bereken mandjes
+            Importeer CSV/JSON en bereken mandjes
           </button>
           <button type="button" className="ghost-button" disabled={!imported || busy} onClick={downloadOwnSources}>
             Download mijn originele bronopnames (JSON)
@@ -1849,9 +2487,90 @@ export function OfflineReviewedWorkbench({
         </div>
         <p role="status" aria-live="polite">{message}</p>
       </div>
+      {pendingTwoStore && pendingTwoStore.version === importRevision.current &&
+        pendingTwoStore.sourceText === text && (
+        <section className="offline-price-workbench__replace-preview"
+          aria-label="Controleer beide nieuwe winkelopnames vóór vervangen">
+          <h3>Vergelijk beide nieuwe winkelopnames met je huidige mandje</h3>
+          <p>De nieuwe bestanden zijn uitsluitend lokaal gelezen. Je vorige producten,
+            originele bronmomenten, persoonlijke productkeuzes en afvinkingen blijven staan
+            tot je zelf bevestigt. Alleen winkels met gewijzigde bronfeiten
+            moeten daarna opnieuw worden beoordeeld.</p>
+          <ul>
+            {pendingTwoStore.changes.map(change => (
+              <li key={change.store}>
+                <strong>{change.store}</strong> · {change.unchanged
+                  ? 'Ongewijzigde originele bron — eerdere controles blijven behouden.'
+                  : 'Gewijzigde of nieuwe bron — productkeuzes opnieuw controleren.'}
+                <br />{change.previousCount} → {change.nextCount} producten
+                {' '}({change.added} nieuwe codes, {change.removed} verdwenen,
+                {' '}{change.changed} gewijzigde artikelen)
+                <br />Oud: {change.previousAt ?? 'Nog geen eigen opname'}
+                <br />Nieuw: {change.nextAt}
+                <br />Met vastgelegde beschikbare pakprijs:
+                {' '}{change.previousPriced}/{change.previousCount} →{' '}
+                {change.nextPriced}/{change.nextCount}.
+                {' '}{change.nextCount - change.nextPriced} producten zonder bruikbare geobserveerde pakprijs.
+                {change.examples.length > 0 && <details>
+                  <summary>Bekijk originele SKU- en pakprijswijzigingen (maximaal 6)</summary>
+                  <ul>{change.examples.map(item => (
+                    <li key={item.id}>{item.name} · broncode {item.id}
+                      <br />Oud: {item.before}
+                      <br />Nieuw: {item.after}</li>
+                  ))}</ul>
+                </details>}
+              </li>
+            ))}
+          </ul>
+          <p role="status">
+            {pendingTwoStore.snapshots.currentEnough
+              ? 'Beide nieuwe bronmomenten vallen binnen het geldige zeven-dagenvenster.'
+              : 'Een bronmoment is verlopen of te ver in de toekomst; geen actueel prijsverschil.'}
+            {' '}{pendingTwoStore.snapshots.pairedWithin24h
+              ? 'De opnamecontext valt binnen 24 uur.'
+              : 'De nieuwe opnames liggen meer dan 24 uur uiteen; het prijsverschil blijft onbekend.'}
+            {' '}De bedragen zijn uitsluitend jouw opgegeven brondata, geen retailerbewijs.
+          </p>
+          <div className="offline-price-workbench__actions">
+            <button type="button" className="ghost-button" disabled={busy}
+              onClick={() => void downloadTwoStoreChanges()}>
+              Download volledig origineel SKU- en prijsverschillenoverzicht (CSV)
+            </button>
+            <button type="button" disabled={busy} onClick={confirmBothStoreReplacement}>
+              Bevestig nieuwe bronnen en hercontroleer alleen gewijzigde winkels
+            </button>
+            <button type="button" className="ghost-button" disabled={busy}
+              onClick={() => {
+                ++importRevision.current
+                setPendingTwoStore(null)
+                setMessage('Twee-winkelvervanging geannuleerd; je bestaande opnames, productkeuzes en vinkjes blijven intact.')
+              }}>Annuleer en behoud mijn huidige winkels</button>
+          </div>
+        </section>
+      )}
       {imported && (
         <div className="offline-price-workbench__results">
           <h3>Winkelvergelijking voor jouw huidige weekmenu</h3>
+          {imported.captures.PLUS && imported.captures.DekaMarkt && <div
+            className="offline-price-workbench__recapture-both" aria-label="Beide originele winkelbronnen opnieuw opnemen">
+            <strong>PLUS en DekaMarkt opnieuw opnemen voor hetzelfde weekmandje</strong>
+            <p>Maak één nieuw winkelbronblad op basis van je oorspronkelijke SKU's.
+              De oude winkelprijzen, pakgroottes, voorraad en opnametijden zijn leeg.
+              Vul beide winkels werkelijk opnieuw in en controleer de hele vergelijking.
+              Deze actie vervangt of bevestigt nog niets in Supa.</p>
+            <button type="button" className="ghost-button"
+              onClick={() => downloadFreshProductReobservation('both', 'csv')}>
+              Maak nieuw twee-winkelbronblad (CSV)
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => downloadFreshProductReobservation('both', 'csv-excel')}>
+              Beide winkels als spreadsheet-CSV (puntkomma)
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => downloadFreshProductReobservation('both', 'guide')}>
+              Nieuwe echte bronopname: stappen (TXT)
+            </button>
+          </div>}
           <div className="offline-price-workbench__dates">
             {stores.map(store => {
               const capture = imported.captures[store]
@@ -1860,10 +2579,22 @@ export function OfflineReviewedWorkbench({
                     <p><strong>{store}</strong> · waargenomen {captureDate(capture.observedMs)}
                       {' '}· {capture.products.length} eigen bronproducten</p>
                     <button className="ghost-button" type="button" onClick={() => downloadPrivateRecaptureCsv(store)}>
-                      Maak nieuw prijsinvulblad voor {store} (CSV)
+                      Alleen nieuwe prijsopname: oude verpakking als invulhulp behouden (CSV)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      onClick={() => downloadFreshProductReobservation(store, 'csv')}>
+                      Nieuwe volledige {store}-meting: ook verpakking en opnametijd leeg (CSV)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      onClick={() => downloadFreshProductReobservation(store, 'csv-excel')}>
+                      Hele {store}-opname in spreadsheet-CSV (puntkomma)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      onClick={() => downloadFreshProductReobservation(store, 'guide')}>
+                      Uitleg voor nieuwe {store}-opname (TXT)
                     </button>
                     <label>Voeg originele nog ontbrekende {store}-producten toe uit dezelfde opname (CSV/JSON)
-                      <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
+                      <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" disabled={busy}
                         onChange={event => {
                           const file = event.currentTarget.files?.[0]
                           event.currentTarget.value = ''
@@ -1874,7 +2605,7 @@ export function OfflineReviewedWorkbench({
                         vervang dan de hele winkelopname. Eerdere artikelen worden nooit overschreven.</small>
                     </label>
                     <label>Vervang uitsluitend de {store}-opname met je nieuwe echte bron (CSV of JSON)
-                      <input type="file" accept=".csv,.json,text/csv,application/json" disabled={busy}
+                      <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" disabled={busy}
                         onChange={event => {
                           const file = event.currentTarget.files?.[0]
                           event.currentTarget.value = ''
@@ -1976,7 +2707,7 @@ export function OfflineReviewedWorkbench({
                         const capture = imported.captures[store]
                         return basket && capture ? basket.lines.filter(line =>
                           line.status === 'matched' &&
-                          !reviewedLines[reviewedLineKey(store, capture.observedAt, line)]
+                          !isAcceptedKey(reviewedLineKey(store, capture.observedAt, line))
                         ).map(line => ({ store, id: line.id })) : []
                       })[0]
                       if (pending) goToReviewRow(pending.store, pending.id)
@@ -2062,9 +2793,9 @@ export function OfflineReviewedWorkbench({
                   return (
                     <section key={store}>
                       <h4>{store}</h4>
-                      <strong>{complete ? euros.format(basket.totalCents / 100) : 'Nog geen bevestigd volledig totaal'}</strong>
+                      <strong>{complete ? exactEuro.formatCents(basket.totalCents) : 'Nog geen bevestigd volledig totaal'}</strong>
                       {!complete && basket.matchedLineCount > 0 && (
-                        <span>Voorlopig gekoppelde regels: {euros.format(basket.totalCents / 100)} (geen bevestigd mandtotaal)</span>
+                        <span>Voorlopig gekoppelde regels: {exactEuro.formatCents(basket.totalCents)} (geen bevestigd mandtotaal)</span>
                       )}
                       <span>{basket.matchedLineCount} automatisch gevonden, {basket.unresolvedLineCount} onbekend</span>
                       <span>{reviewedStore.accepted} van {reviewedStore.required} prijsregels door jou bevestigd</span>
@@ -2088,7 +2819,7 @@ export function OfflineReviewedWorkbench({
                 {canShowDifference && basketPair.comparison && basketPair.comparison.deltaCents !== null
                   ? basketPair.comparison.deltaCents === 0
                     ? 'Deze twee ingevoerde volledige mandjes hebben hetzelfde rekenkundige totaal.'
-                    : `${basketPair.comparison.deltaCents > 0 ? 'PLUS' : 'DekaMarkt'} is op basis van deze eigen invoer ${euros.format(Math.abs(basketPair.comparison.deltaCents) / 100)} goedkoper.`
+                    : `${basketPair.comparison.deltaCents > 0 ? 'PLUS' : 'DekaMarkt'} is op basis van deze eigen invoer ${exactEuro.formatCents(Math.abs(basketPair.comparison.deltaCents))} goedkoper.`
                   : 'Nog geen vergelijkbaar prijsverschil: controleer productmatches of vul ontbrekende / actuele bronnen aan.'}
                 <small> Dit is nooit een gecontroleerde publieke besparingsclaim.</small>
               </p>
@@ -2099,10 +2830,10 @@ export function OfflineReviewedWorkbench({
                     .sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents))
                     .slice(0, 5)
                     .map(line => (
-                      <p key={line.id}><strong>{line.ingredientLabel}</strong> · PLUS {euros.format(line.baselineLineTotalCents / 100)}
-                        {' '}· DekaMarkt {euros.format(line.candidateLineTotalCents / 100)}
+                      <p key={line.id}><strong>{line.ingredientLabel}</strong> · PLUS {exactEuro.formatCents(line.baselineLineTotalCents)}
+                        {' '}· DekaMarkt {exactEuro.formatCents(line.candidateLineTotalCents)}
                         {' '}· {line.deltaCents === 0 ? 'zelfde bedrag'
-                          : `${euros.format(Math.abs(line.deltaCents) / 100)} verschil`}</p>
+                          : `${exactEuro.formatCents(Math.abs(line.deltaCents))} verschil`}</p>
                     ))}
                 </section>
               )}
@@ -2121,6 +2852,7 @@ export function OfflineReviewedWorkbench({
                         DekaMarkt: imported.captures.DekaMarkt.observedAt,
                       }}
                       eligibleNow={eligibleComparisonRightNow}
+                      privatePlanKey={planKey}
                     />
                   </Suspense>
                 )}
@@ -2178,19 +2910,19 @@ export function OfflineReviewedWorkbench({
                           <th scope="row">{delta.ingredientLabel}
                             <small>{plus.requirement.amount} {plus.requirement.unit} benodigd</small>
                           </th>
-                          <td><strong>{euros.format(plus.lineTotalCents / 100)}</strong>
+                          <td><strong>{exactEuro.formatCents(plus.lineTotalCents)}</strong>
                             <small>{plus.productName} · broncode {plus.productId}</small>
                             <small>{plus.packs} × {plus.pack.amount} {plus.pack.unit} × {plus.pack.count}</small>
                             <small>{pricePerUnit(plus) ?? 'Eenheidsprijs onbekend'}</small>
                           </td>
-                          <td><strong>{euros.format(deka.lineTotalCents / 100)}</strong>
+                          <td><strong>{exactEuro.formatCents(deka.lineTotalCents)}</strong>
                             <small>{deka.productName} · broncode {deka.productId}</small>
                             <small>{deka.packs} × {deka.pack.amount} {deka.pack.unit} × {deka.pack.count}</small>
                             <small>{pricePerUnit(deka) ?? 'Eenheidsprijs onbekend'}</small>
                           </td>
                           <td><strong>{delta.deltaCents === 0 ? 'Gelijk'
                             : (delta.deltaCents > 0 ? '+' : '−') +
-                              euros.format(Math.abs(delta.deltaCents) / 100)}</strong>
+                              exactEuro.formatCents(Math.abs(delta.deltaCents))}</strong>
                             <small>Bedragen voor gehele benodigde verpakkingen.</small>
                           </td>
                         </tr>
@@ -2248,9 +2980,14 @@ export function OfflineReviewedWorkbench({
                       {visible.map(line => {
                         const searchKey = JSON.stringify([store, line.id])
                         const choices = sourceOptions(capture.products, line.requirement.unit,
-                          skuFilter[searchKey] ?? '', manualSku[store][line.id] ?? '')
+                          skuFilter[searchKey] ?? '', manualSku[store][line.id] ?? '',
+                          line.ingredientLabel, line.requirement.amount,
+                          sourceSort[searchKey] ?? 'relevance',
+                          onlyCheaper[searchKey] && line.status === 'matched'
+                            ? line.lineTotalCents : null)
                         return (
-                        <article key={line.id} id={reviewRowId(store, line.id)} className="offline-price-workbench__line">
+                        <article key={line.id} id={reviewRowId(store, line.id)} tabIndex={-1}
+                          className="offline-price-workbench__line">
                           <div>
                             <label className="offline-price-workbench__trip-tick">
                               <input type="checkbox" checked={Boolean(doneTripItems[shoppingTaskKey(store, line)])}
@@ -2274,43 +3011,82 @@ export function OfflineReviewedWorkbench({
                                   <small>{choices.total} prijsklare en {choices.unpricedTotal} niet-prijsklare bronartikelen in deze zoekopdracht.</small>
                                 </label>
                                 {choices.availableCount > 0 && (
+                                  <label>Sorteer mijn beschikbare geprijsde bronartikelen
+                                    <select value={sourceSort[searchKey] ?? 'relevance'}
+                                      onChange={event => setSourceSort(previous => ({ ...previous,
+                                        [searchKey]: event.currentTarget.value as SourceSort,
+                                      }))}>
+                                      <option value="relevance">Beste tekst- en verpakkingsmatch</option>
+                                      <option value="whole-pack" disabled={line.requirement.amount === null}>
+                                        Laagste prijs voor alle benodigde hele pakken
+                                      </option>
+                                      <option value="unit-price">Laagste indicatieve eenheidsprijs</option>
+                                    </select>
+                                    <small>Alleen jouw oorspronkelijke prijsklare en fysiek passende bronartikelen.
+                                      Goedkoopst betekent niet automatisch hetzelfde product; controleer zelf de verpakking,
+                                      broncode en toepassing voor je de match bevestigt.</small>
+                                  </label>
+                                )}
+                                {choices.availableCount > 0 && line.status === 'matched' && (
+                                  <label><input type="checkbox" checked={Boolean(onlyCheaper[searchKey])}
+                                    onChange={event => setOnlyCheaper(previous => ({ ...previous,
+                                      [searchKey]: event.currentTarget.checked,
+                                    }))} /> Toon alleen bronproducten met een lager berekend bedrag
+                                    voor deze hele benodigde hoeveelheid
+                                    <small>Geen substitutieadvies: een goedkoper bronartikel hoeft niet geschikt
+                                      of identiek te zijn. Jouw bestaande match blijft altijd beschikbaar
+                                      en geen bronreview wordt automatisch goedgekeurd.</small>
+                                  </label>
+                                )}
+                                {choices.availableCount > 0 && (
                                   <label>Kies een werkelijk waargenomen, prijsklaar bronartikel
                                     <select value={manualSku[store][line.id] ?? ''}
-                                      onChange={event => {
-                                        const id = event.currentTarget.value
-                                        setManualSku(previous => ({
-                                          ...previous, [store]: { ...previous[store], [line.id]: id },
-                                        }))
-                                        // A new SKU can change matching within this store,
-                                        // but does not revoke the other store's independently
-                                        // reviewed source or shopping progress.
-                                        const sameStore = (key: string) =>
-                                          key.startsWith('[' + JSON.stringify(store) + ',')
-                                        setReviewedLines(previous => Object.fromEntries(
-                                          Object.entries(previous).filter(([key]) => !sameStore(key))))
-                                        setDoneTripItems(previous => Object.fromEntries(
-                                          Object.entries(previous).filter(([key]) => !sameStore(key))))
-                                        setTripExportMessage('')
-                                        setTripProgressMessage('')
-                                      }}>
+                                      onChange={event => chooseSourceSku(store, line, event.currentTarget.value)}>
                                       <option value="">Automatisch voorstellen (of onbekend)</option>
                                       {choices.shown.map(product => (
                                         <option key={product.id} value={product.id}>
-                                          {product.name} · {product.id} · {(product.packCount ?? 1)} × {product.packAmount} {product.packUnit} · {euros.format(product.priceCents / 100)} per pak{sourcePackRate(product)}
+                                          {product.name} · {product.id} · {(product.packCount ?? 1)} × {product.packAmount} {product.packUnit} · {exactEuro.formatCents(product.priceCents)} per pak{sourcePackRate(product)}{sourceWholePackPreview(product, line.requirement,
+                                            line.status === 'matched' ? line.lineTotalCents : null)}
                                         </option>
                                       ))}
                                     </select>
-                                    <small>Maximaal 40 prijsklare keuzes tegelijk; verfijn de zoekterm. Een keuze vergt nog persoonlijke broncontrole.</small>
+                                    <small>Maximaal 40 originele artikelen, gerangschikt volgens jouw huidige keuze.
+                                      Het oorspronkelijke bronartikel blijft in de keuzelijst, ook wanneer een andere
+                                      sortering of zoekterm het verbergt. Controleer zelf de SKU, inhoud en prijs.</small>
+                                    {choices.shown.length > 0 && <details className="offline-price-workbench__candidate-preview">
+                                      <summary>Bekijk de eerste bronartikelen met benodigde hele verpakkingen</summary>
+                                      <p>Dit zijn ongetoetste alternatieven uit je eigen bron.
+                                        De berekening betreft alleen dit ingrediënt, nog niet het totale winkelmandje.</p>
+                                      <ul>{choices.shown.slice(0, 3).map(product => (
+                                        <li key={product.id}>
+                                          <strong>{product.name}</strong> · SKU {product.id}
+                                          {' '}· {product.packCount ?? 1} × {product.packAmount} {product.packUnit}
+                                          {' '}· {exactEuro.formatCents(product.priceCents)} per verpakking
+                                          {sourcePackRate(product)}
+                                          {sourceWholePackPreview(product, line.requirement,
+                                            line.status === 'matched' ? line.lineTotalCents : null)}
+                                          <button type="button"
+                                            disabled={manualSku[store][line.id] === product.id}
+                                            aria-label={'Kies bronartikel ' + product.name + ' voor ' + line.ingredientLabel}
+                                            onClick={() => chooseSourceSku(store, line, product.id)}>
+                                            {manualSku[store][line.id] === product.id
+                                              ? 'Dit artikel is gekozen' : 'Kies deze broncode'}
+                                          </button>
+                                        </li>
+                                      ))}</ul>
+                                    </details>}
                                   </label>
                                 )}
                                 {choices.unpricedShown.length > 0 && (
                                   <div className="offline-price-workbench__missing">
                                     <strong>Wel in jouw bron, nog niet prijsklaar</strong>
-                                    <p>Deze originele artikelen zijn niet beschikbaar of missen een bruikbare verpakking of prijs.
-                                      Ze zijn niet te kiezen voor een mandbedrag. Neem de werkelijke brongegevens opnieuw op.</p>
+                                    <p>Per bronartikel staat hieronder waarom het nog niet voor een
+                                      rekenbaar mandbedrag kan worden gekozen. Maak alleen een nieuwe opname
+                                      als je het ontbrekende gegeven werkelijk kunt vaststellen; onbekend is nooit € 0.</p>
                                     <ul>{choices.unpricedShown.map(product => (
                                       <li key={product.id}>{product.name} · broncode {product.id}
-                                        {' '}· {product.packAmount ?? '?'} {product.packUnit}</li>
+                                        {' '}· {product.packAmount ?? '?'} {product.packUnit}
+                                        <small> — {explainUnpricedSource(product)}</small></li>
                                     ))}</ul>
                                     {choices.unpricedTotal > choices.unpricedShown.length &&
                                       <small>Er zijn meer ongeprijsde artikelen; verfijn de zoekterm.</small>}
@@ -2321,7 +3097,7 @@ export function OfflineReviewedWorkbench({
 
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
                             {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
-                            {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {euros.format(line.pricePerPackCents / 100)} per verpakking</span>}
+                            {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {exactEuro.formatCents(line.pricePerPackCents)} per verpakking</span>}
                             {line.reasons.length > 0 && (
                               <details className="offline-price-workbench__match-explanation">
                                 <summary>Waarom is dit {line.status === 'matched' ? 'bronartikel voorgesteld' : 'ingrediënt nog niet gekoppeld'}?</summary>
@@ -2334,21 +3110,34 @@ export function OfflineReviewedWorkbench({
                                   Dit is geen kans op correctheid of externe productvalidatie.</small>}
                               </details>
                             )}
-                            {line.status === 'matched' && <label className="offline-price-workbench__review">
-                              <input type="checkbox"
-                                checked={Boolean(reviewedLines[reviewedLineKey(store, capture.observedAt, line)])}
-                                onChange={event => {
-                                  const key = reviewedLineKey(store, capture.observedAt, line)
-                                  const checked = event.currentTarget.checked
-                                  setReviewedLines(previous => ({ ...previous, [key]: checked }))
-                                }} />
-                              <span>Product, inhoud en prijs met mijn bronopname gecontroleerd</span>
-                            </label>}
+                            {line.status === 'matched' && (() => {
+                              const key = reviewedLineKey(store, capture.observedAt, line)
+                              const automatic = isAutomaticKey(key)
+                              const rejected = autoReviewKeys.has(key) && rejectedAutoReviews[key] === true
+                              return <label className="offline-price-workbench__review">
+                                <input type="checkbox"
+                                  checked={isAcceptedKey(key)}
+                                  onChange={event => {
+                                    const checked = event.currentTarget.checked
+                                    // Rejecting an automatic match keeps it unknown until the
+                                    // user deliberately approves the original SKU or changes it.
+                                    setRejectedAutoReviews(previous => ({ ...previous,
+                                      [key]: !checked }))
+                                    setReviewedLines(previous => ({ ...previous,
+                                      [key]: checked }))
+                                  }} />
+                                <span>{automatic
+                                  ? 'Automatisch gekoppeld: exacte ingrediënt- en productnaam, originele SKU, passende verpakking en bekende bronprijs. Haal het vinkje weg als dit niet klopt.'
+                                  : rejected
+                                    ? 'Automatische match door jou afgewezen. Kies een ander bronartikel, of controleer en bevestig dit product bewust.'
+                                    : 'Match niet eenduidig: controleer de originele SKU, inhoud en bronprijs. Alleen hier is nog een vinkje nodig.'}</span>
+                              </label>
+                            })()}
                             {line.status === 'unresolved' && <span>{line.reasons.some(reason => reason.includes('same source SKU'))
                               ? 'Dezelfde winkel-SKU is aan meerdere ingrediënten gekoppeld. Combineer de fysieke hoeveelheden in Planner of kies andere echte artikelen; zonder die keuze geen volledige prijs.'
                               : 'Niet gekoppeld · controleer bronproduct, beschikbaarheid of verpakking.'}</span>}
                           </div>
-                          <strong>{line.status === 'matched' ? euros.format(line.lineTotalCents / 100) : '—'}</strong>
+                          <strong>{line.status === 'matched' ? exactEuro.formatCents(line.lineTotalCents) : '—'}</strong>
                         </article>
                       )})}
                     </section>

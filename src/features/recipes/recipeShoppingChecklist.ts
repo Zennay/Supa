@@ -1,8 +1,12 @@
 import type { SavedRecipe } from './recipeLibrary.ts'
+import { scaledMetricPortionAmount } from '../../domain/metricPortionScale.ts'
+import { sumDecimalAmounts } from '../../domain/decimalPackArithmetic.ts'
 
 export type OwnRecipeChecklistLine = {
   key: string
   label: string
+  /** Exact canonical matching identity; never merge groceries by display label. */
+  query?: string
   amount: number | null
   unit: 'g' | 'ml' | 'piece' | null
   needsReview: boolean
@@ -12,6 +16,8 @@ export type OwnRecipeChecklistLine = {
 export type OwnRecipeChecklist = {
   title: string
   portions: number
+  /** Set only for an explicitly combined user-owned recipe collection. */
+  recipeCount?: number
   lines: OwnRecipeChecklistLine[]
   canCopy: boolean
   copyText: string
@@ -25,7 +31,9 @@ export function formatOwnRecipeChecklist(
   checked: Readonly<Record<string, boolean>>,
 ): string {
   return [
-    `Mijn recept: ${checklist.title} — ${checklist.portions} porties`,
+    checklist.recipeCount
+      ? `Mijn receptenbundel: ${checklist.recipeCount} eigen recepten`
+      : `Mijn recept: ${checklist.title} — ${checklist.portions} porties`,
     'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
     ...checklist.lines.map(line => line.needsReview
       ? `[?] ${line.original} — hoeveelheid handmatig controleren`
@@ -62,17 +70,20 @@ export function ownRecipeShoppingChecklist(recipe: SavedRecipe, portions: number
       typeof ingredient.amount === 'number' && Number.isFinite(ingredient.amount) &&
       ingredient.amount > 0 && ingredient.amount <= 1_000_000 &&
       (ingredient.unit === 'g' || ingredient.unit === 'ml' || ingredient.unit === 'piece')
-    const measured = valid ? ingredient.amount! * portions / recipe.servings : NaN
-    const reasonable = Number.isFinite(measured) && measured > 0 && measured <= 1_000_000
-    const rounded = reasonable ? Math.round(measured * 1000) / 1000 : NaN
-    const exactPieces = ingredient.unit !== 'piece' || Number.isSafeInteger(measured)
-    const verified = valid && reasonable && Number.isFinite(rounded) && rounded > 0 && exactPieces
+    // Identical exact-decimal rounding to the Planner variant: no hidden
+    // underbuy from Math.round(0.333333 g * 1000) and no fractional eggs.
+    const scaled = valid && ingredient.unit
+      ? scaledMetricPortionAmount(
+        ingredient.amount!, recipe.servings, portions, ingredient.unit,
+      )
+      : null
+    const verified = valid && scaled !== null
     const label = ingredient.label || ingredient.original
     const groupKey = verified ? JSON.stringify([ingredient.query, ingredient.unit]) : ''
     const previous = groupKey ? grouped.get(groupKey) : undefined
     if (previous && previous.amount !== null) {
-      const combined = Math.round((previous.amount + rounded) * 1000) / 1000
-      if (Number.isFinite(combined) && combined > 0 && combined <= 1_000_000) {
+      const combined = sumDecimalAmounts([previous.amount, scaled!])
+      if (combined !== null && combined <= 1_000_000) {
         previous.amount = combined
         continue
       }
@@ -80,7 +91,8 @@ export function ownRecipeShoppingChecklist(recipe: SavedRecipe, portions: number
     const line: OwnRecipeChecklistLine = {
       key: String(lines.length),
       label,
-      amount: verified ? rounded : null,
+      query: verified ? ingredient.query : undefined,
+      amount: verified ? scaled : null,
       unit: verified ? ingredient.unit : null,
       needsReview: !verified,
       original: ingredient.original,
