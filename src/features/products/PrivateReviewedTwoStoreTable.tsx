@@ -130,6 +130,58 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       setReceiptMessage('Het privé-overzicht kon niet worden gemaakt. Je winkelbronnen blijven ongewijzigd.')
     }
   }
+  async function handoffReceipt(kind: 'copy' | 'share') {
+    const initial = freshReviewedBaskets(reviewedRef.current,
+      reviewedRef.current.planKey, Date.now())
+    if (!initial?.stores.PLUS || !initial.stores.DekaMarkt ||
+        !privateReviewedPairWithin24Hours(initial.stores.PLUS, initial.stores.DekaMarkt)) {
+      setReceiptMessage('Een complete actuele vergelijking ontbreekt. Controleer eerst beide bronnen.')
+      return
+    }
+    try {
+      const exports = await import('../planner/downloadOwnStoreComparison.ts')
+      const current = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if (!current || current.planKey !== initial.planKey ||
+          current.stores.PLUS !== initial.stores.PLUS ||
+          current.stores.DekaMarkt !== initial.stores.DekaMarkt) {
+        throw Error('Bronnen tijdens voorbereiding gewijzigd.')
+      }
+      const comparison = ownStoreWeekComparison(current)
+      if (comparison.status !== 'comparable' ||
+          !current.stores.PLUS || !current.stores.DekaMarkt) {
+        throw Error('Geen vergelijkbare mandjes.')
+      }
+      const text = exports.printableOwnStoreComparison(comparison, {
+        PLUS: current.stores.PLUS.observedAt,
+        DekaMarkt: current.stores.DekaMarkt.observedAt,
+      })
+      if (kind === 'copy') {
+        if (!navigator.clipboard?.writeText) {
+          setReceiptMessage('Kopiëren wordt hier niet ondersteund. Gebruik de privé-TXT-download.')
+          return
+        }
+        await navigator.clipboard.writeText(text)
+        setReceiptMessage('Je volledige privéweekmand is naar je klembord gekopieerd.')
+      } else {
+        if (!navigator.share) {
+          setReceiptMessage('Mobiel delen wordt hier niet ondersteund. Bewaar een TXT- of HTML-bestand.')
+          return
+        }
+        // Native share sheet only after explicit user action. Never upload the
+        // personal comparison or silently send it to a third party.
+        await navigator.share({ title: 'SUPA · mijn privéweekmand', text })
+        setReceiptMessage('Je privéweekmand is via het gekozen deelvenster aangeboden.')
+      }
+    } catch (error) {
+      if (kind === 'share' && typeof error === 'object' && error !== null &&
+          'name' in error && error.name === 'AbortError') {
+        setReceiptMessage('Delen geannuleerd. Je winkelbronnen zijn behouden.')
+      } else {
+        setReceiptMessage('Privéoverzicht niet overgedragen. Controleer de bronnen of bewaar als TXT.')
+      }
+    }
+  }
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
   const budgetComparison = (totalCents: number) => budgetCents === null ? null :
@@ -320,7 +372,13 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <button type="button" onClick={() => { void downloadReceipt('html') }}>
         Bewaar printbaar volledig weekmandje (HTML)
       </button>
-      <small>Alle drie privédownloads bevatten het originele complete weekmandje en
+      <button type="button" onClick={() => { void handoffReceipt('copy') }}>
+        Kopieer mijn volledige privéweekmand
+      </button>
+      <button type="button" onClick={() => { void handoffReceipt('share') }}>
+        Deel privéweekmand via mijn apparaat
+      </button>
+      <small>Downloads, kopiëren en expliciet delen gebruiken het originele complete weekmandje en
         bronmomenten, onafhankelijk van je zoekfilter. Alleen privé; geen kassagarantie,
         openbare besparingsclaim of nieuwe winkelbronimport.</small>
       {receiptMessage && <p role="status">{receiptMessage}</p>}
