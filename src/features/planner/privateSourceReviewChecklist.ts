@@ -32,8 +32,8 @@ export function privateSourceReviewChecklist(input: {
     throw new Error('Geen geldige oorspronkelijke winkelartikelen om mee te nemen.')
   // Plain text must not let untrusted product labels manufacture lines, fake
   // headings or control sequences. Preserve source SKU meaning; never emit prices.
-  const label = (value: string) => value.replace(/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/gu, ' ')
-    .replace(/\\s+/gu, ' ').trim().slice(0, 180)
+  const label = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/\s+/gu, ' ').trim().slice(0, 180)
   const lines = [
     'SUPA · privé broncontrole · ' + store,
     'Oorspronkelijke opname: ' + label(observedAt),
@@ -65,7 +65,7 @@ export function privateSourceReviewChecklist(input: {
   if (lines.length === 5) throw new Error('Geen ontbrekende of verlopen originele broncontroles.')
   lines.push('', 'Leg alleen echt waargenomen producten/prijzen vast in een NIEUWE bronopname.',
     'Importeer daarna via de bestaande Supa broncontrole en kies de SKU zelf.')
-  const text = lines.join('\\n') + '\\n'
+  const text = lines.join('\n') + '\n'
   if (new TextEncoder().encode(text).length > 120_000)
     throw new Error('De broncontrolelijst is te groot. Verklein de selectie.')
   return text
