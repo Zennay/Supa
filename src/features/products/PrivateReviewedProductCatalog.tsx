@@ -130,8 +130,13 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
       privatePhysicalShoppingTick(reviewed!.planKey, shop, capture.basket.store.id, line)] === true
   }
   function chooseProductInRoute(shop: OwnStore, line: Matched) {
-    // Original paired SKU identity and source age are checked again at click.
-    const intent = currentPrivateRouteChoice(reviewed, line.id, shop, Date.now())
+    // Do not promote a newly replaced SKU merely because its ingredient ID
+    // coincides with the older visible card. The ORIGINAL card row is required.
+    const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+    const capture = current?.stores[shop]
+    const intent = capture?.basket.lines.includes(line)
+      ? currentPrivateRouteChoice(reviewed, line.id, shop, Date.now())
+      : null
     if (!intent) {
       setCheckMessage('De eigen winkelbronnen zijn verlopen of niet vergelijkbaar. ' +
         'Herzie de originele bronnen voordat je een winkel kiest.')
