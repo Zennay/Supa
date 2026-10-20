@@ -42,7 +42,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const costIntentRef = useRef(costIntent)
   costIntentRef.current = costIntent
   const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
-  async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt') {
+  async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt' | 'html') {
     const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
     const receipt = origin?.stores[shop]
     if (!receipt || !origin) {
@@ -50,22 +50,28 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       return
     }
     try {
+      const done = new Set(receipt.basket.lines.filter(line => line.status === 'matched' &&
+        checkedRef.current[privatePhysicalShoppingTick(origin.planKey, shop, receipt.basket.store.id, line)])
+        .map(line => line.id))
       const content = kind === 'csv'
         ? (await import('../shopping-list/privateSourceShoppingCsv.ts'))
           .privateSingleStoreShoppingCsv({
-            basket: receipt.basket, observedAt: receipt.observedAt,
-            done: new Set(receipt.basket.lines.filter(line => line.status === 'matched' &&
-              checkedRef.current[privatePhysicalShoppingTick(origin.planKey, shop, receipt.basket.store.id, line)])
-              .map(line => line.id)),
+            basket: receipt.basket, observedAt: receipt.observedAt, done,
           })
-        : (await import('../shopping-list/privateSingleStoreShoppingText.ts'))
-          .privateSingleStoreShoppingText({ basket: receipt.basket, observedAt: receipt.observedAt })
+        : kind === 'html'
+          ? (await import('../shopping-list/privateSingleStorePrintableHtml.ts'))
+            .privateSingleStorePrintableHtml({
+              basket: receipt.basket, observedAt: receipt.observedAt, done,
+            })
+          : (await import('../shopping-list/privateSingleStoreShoppingText.ts'))
+            .privateSingleStoreShoppingText({ basket: receipt.basket, observedAt: receipt.observedAt })
       const latest = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
       if (latest?.planKey !== origin.planKey || latest?.stores[shop] !== receipt)
         throw Error('De bron is tijdens voorbereiden veranderd.')
       const url = URL.createObjectURL(new Blob([content], {
-        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' :
+          kind === 'html' ? 'text/html;charset=utf-8' : 'text/plain;charset=utf-8',
       }))
       try {
         const a = document.createElement('a')
@@ -180,6 +186,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
               </button>
               <button type="button" onClick={() => { void downloadSingle(shop, 'txt') }}>
                 Bewaar mijn {shop}-lijst (TXT)
+              </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'html') }}>
+                Bewaar afdrukbare {shop}-lijst (HTML)
               </button>
             </> : <>
               <strong>Prijs onbekend</strong>
