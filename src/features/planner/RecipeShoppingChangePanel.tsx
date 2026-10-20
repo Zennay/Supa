@@ -98,6 +98,27 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       setShowFullCopy(true)
     }
   }
+  async function shareFullWeekCsv() {
+    try {
+      const csv = nextWeekPhysicalListCsv(preview, day)
+      const file = new File([csv], 'supa-voorstel-volledige-weekboodschappen.csv', {
+        type: 'text/csv;charset=utf-8',
+      })
+      if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function' ||
+          !navigator.canShare({ files: [file] })) {
+        downloadFullWeekCsv()
+        return
+      }
+      await navigator.share({ files: [file], title: 'Supa · ongeprijsd weekvoorstel' })
+      setNotice('Ongeprijsde weeklijst als CSV gedeeld; je planning blijft ongewijzigd.')
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        setNotice('Delen geannuleerd. Je planning blijft ongewijzigd.')
+      } else {
+        setNotice('CSV delen niet beschikbaar. Download het bestand en deel het vanuit je bestanden.')
+      }
+    }
+  }
   async function shareFullWeek() {
     try {
       const output = getFullText()
@@ -177,6 +198,7 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       <button type="button" className="ghost-button" onClick={downloadFullWeek}>Download volledige weeklijst (TXT)</button>
       <button type="button" className="ghost-button" onClick={downloadFullWeekCsv}>Download volledige weeklijst (CSV)</button>
       <button type="button" className="ghost-button" onClick={() => void shareFullWeek()}>Deel volledige weeklijst (mobiel)</button>
+      <button type="button" className="ghost-button" onClick={() => void shareFullWeekCsv()}>Deel weeklijst als CSV-bestand</button>
       <button type="button" className="ghost-button" onClick={() => void copyFullWeek()}>Kopieer volledige weeklijst</button>
       <button type="button" className="ghost-button" onClick={download}>Download wijziging (TXT)</button>
       <button type="button" className="ghost-button" onClick={() => void copy()}>Kopieer wijziging</button>
