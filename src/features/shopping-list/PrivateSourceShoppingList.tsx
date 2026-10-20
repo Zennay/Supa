@@ -178,6 +178,39 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       setMessage(error instanceof Error ? error.message : 'Overnemen van Planner-vinkjes is niet gelukt.')
     }
   }
+  /** Explicit device-only share of the current, originally reviewed store
+   * list. Re-admit the real capture immediately before exposing its prices. */
+  async function shareReviewedList() {
+    if (!currentCaptureAvailable()) {
+      setMessage('De oorspronkelijke winkelbron is verlopen of gewijzigd. Herzie de prijzen vóór delen.')
+      return
+    }
+    const text = textList
+    if (new TextEncoder().encode(text).length > 128_000) {
+      setMessage('Je winkelmand is te groot om mobiel te delen. Gebruik de lokale download.')
+      return
+    }
+    try {
+      if (typeof navigator.share === 'function') {
+        // Only a direct click can open the OS chooser. Supa selects no recipient.
+        await navigator.share({ title: 'Supa · eigen ' + store + '-boodschappen', text })
+        setMessage('Je persoonlijk gecontroleerde winkelmand is gedeeld via jouw gekozen app. Prijzen zijn geen kassagarantie.')
+        return
+      }
+      if (navigator.clipboard?.writeText) {
+        if (!currentCaptureAvailable()) throw new Error('De bron is inmiddels verlopen.')
+        await navigator.clipboard.writeText(text)
+        setMessage('Je eigen ' + store + '-lijst is naar je klembord gekopieerd.')
+        return
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+    }
+    // Existing selectable detail is safer than a newly persisted fallback:
+    // focusing it rechecks original provenance freshness once more.
+    setMessage('Delen/kopiëren is niet beschikbaar. Gebruik de kopieerbare lijst onderaan zolang je bron geldig is.')
+  }
+
   function downloadList() {
     if (!currentCaptureAvailable()) {
       setMessage('De bronopname is inmiddels verlopen. Werk je eigen winkelprijzen opnieuw bij in Vergelijk.')
@@ -486,6 +519,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           : 'Alle ' + store + '-artikelen afvinken'}</button>
         <button type="button" onClick={() => { void bringUnpricedWeekChecks() }}>
           Neem vinkjes uit mijn ongeprijsde Planner-lijst over
+        </button>
+        <button type="button" onClick={() => { void shareReviewedList() }}>
+          Deel of kopieer mijn actuele ${store}-winkelmandje
         </button>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
         <button type="button" onClick={() => { void downloadStoreWithExtras() }}>
