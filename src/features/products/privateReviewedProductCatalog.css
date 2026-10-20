@@ -145,3 +145,33 @@ background:#e7f4eb;color:#255336;font-weight:650}
   background:#fffaf1;
 }
 .private-reviewed-products__missing-empty > p { margin:0; }
+
+
+/* Separate unpriced capture progress from the admitted whole-pack price ledger.
+   This can render even when zero complete retailer baskets are available. */
+.private-reviewed-products__capture-progress {
+  display:grid; gap:.7rem; padding:1rem; background:#edf6ef;
+  border:1px solid #aecfb6; border-radius:14px; min-width:0;
+}
+.private-reviewed-products__capture-progress h3,
+.private-reviewed-products__capture-progress p { margin:0; }
+.private-reviewed-products__capture-grid {
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem;
+}
+.private-reviewed-products__capture-grid article {
+  display:grid; gap:.6rem; align-content:start; min-width:0; padding:.85rem;
+  border:1px solid #c5d9ca; border-radius:12px; background:white;
+}
+.private-reviewed-products__capture-grid article h4 { margin:0; }
+.private-reviewed-products__capture-grid progress { width:100%; height:12px; accent-color:#236d4d; }
+.private-reviewed-products__capture-grid small { line-height:1.5; }
+.private-reviewed-products__capture-grid .private-reviewed-products__missing ul {
+  display:grid; gap:.5rem; list-style:none; padding:0;
+}
+.private-reviewed-products__capture-grid .private-reviewed-products__missing li {
+  display:grid; gap:.35rem; overflow-wrap:anywhere;
+  padding:.6rem; background:white; border-radius:8px;
+}
+@media(max-width:650px) {
+  .private-reviewed-products__capture-grid { grid-template-columns:1fr; }
+}
