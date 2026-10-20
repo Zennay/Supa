@@ -1,4 +1,5 @@
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
+import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
 import {
   recentOwnCaptureInstant, type OwnStore, type PrivateCaptureProgress,
   type PrivateReviewedSourceLine,
@@ -20,25 +21,17 @@ export function privateProgressProductRows(
   if (!progress || !Number.isSafeInteger(now)) return []
   return shops.flatMap(store => {
     const capture = progress.stores[store]
-    if (!capture?.fresh || !recentOwnCaptureInstant(capture.observedAt, now)) return []
-    const seen = new Set<string>()
-    return (capture.confirmedSourceLines ?? []).flatMap(line => {
-      if (!line || typeof line.ingredientId !== 'string' ||
-          !line.ingredientId.trim() || seen.has(line.ingredientId) ||
-          typeof line.productId !== 'string' || !line.productId.trim() ||
-          typeof line.productName !== 'string' || !line.productName.trim() ||
-          typeof line.ingredientLabel !== 'string' || !line.ingredientLabel.trim() ||
-          !Number.isFinite(line.requiredAmount) || line.requiredAmount <= 0 ||
-          !Number.isFinite(line.packAmount) || line.packAmount <= 0 ||
-          !Number.isSafeInteger(line.packCount) || line.packCount <= 0 ||
-          !Number.isSafeInteger(line.packagesNeeded) || line.packagesNeeded <= 0 ||
-          !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
-          !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0 ||
-          line.pricePerPackCents * line.packagesNeeded !== line.lineTotalCents ||
-          (line.review !== 'manual' && line.review !== 'automatic')) return []
-      seen.add(line.ingredientId)
-      return [{ store, observedAt: capture.observedAt, line }]
-    })
+    // The shopping-list source bridge already enforces exact original
+    // SKU uniqueness, physical pack/demand arithmetic and cent-safe sums.
+    // Treat that ONE admission as the source of truth in Home, Producten and
+    // Planner rather than rendering rows a partial shopping list rejects.
+    const certified = confirmedPartialBasket(progress, store, now)
+    if (!capture || !certified ||
+        certified.confirmedCount !== capture.confirmedSourceLines?.length ||
+        certified.confirmedCount > certified.physicalLineCount) return []
+    return capture.confirmedSourceLines!.map(line => ({
+      store, observedAt: capture.observedAt, line,
+    }))
   })
 }
 
