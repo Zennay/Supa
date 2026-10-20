@@ -549,6 +549,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               ? privateCaptureProgress : null}
             preferredOwnStore={preferredOwnStore}
             onOpenShoppingList={() => navigate('list')}
+            onOpenRecipes={() => navigate('recipes')}
             onOpenMixedRoute={rawCost => {
               const serial = mixedRouteOpenSignal + 1
               const fresh = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
@@ -722,7 +723,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {visitedList && !livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
-              <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays} onOpenPriceImport={openOwnPriceImport} />
+              <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+                onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} />
               {tab === 'list' && (designProductIds.length > 0
                 ? <section aria-label="Mijn expliciet toegevoegde producten">
                     <h3>Mijn toegevoegde producten · apart van receptboodschappen</h3>
