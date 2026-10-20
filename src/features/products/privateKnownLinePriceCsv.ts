@@ -4,8 +4,12 @@ import { privateKnownPricePairs, privateProgressProductRows } from './privatePro
 
 const headers = [
   'soort', 'ingredient_id', 'ingredient', 'fysieke_hoeveelheid', 'eenheid',
-  'PLUS_originele_opnametijd', 'PLUS_hele_verpakkingen', 'PLUS_regelprijs_cent',
-  'DekaMarkt_originele_opnametijd', 'DekaMarkt_hele_verpakkingen',
+  'PLUS_originele_opnametijd', 'PLUS_SKU', 'PLUS_productnaam', 'PLUS_pakinhoud',
+  'PLUS_pakeenheid', 'PLUS_stuks_per_pak', 'PLUS_pakprijs_cent', 'PLUS_eenheidsprijs',
+  'PLUS_hele_verpakkingen', 'PLUS_regelprijs_cent',
+  'DekaMarkt_originele_opnametijd', 'DekaMarkt_SKU', 'DekaMarkt_productnaam',
+  'DekaMarkt_pakinhoud', 'DekaMarkt_pakeenheid', 'DekaMarkt_stuks_per_pak',
+  'DekaMarkt_pakprijs_cent', 'DekaMarkt_eenheidsprijs', 'DekaMarkt_hele_verpakkingen',
   'DekaMarkt_regelprijs_cent', 'regelverschil_cent', 'goedkoper_bij', 'geldigheid',
 ]
 
@@ -30,8 +34,14 @@ export function privateKnownLinePriceCsv(
     return [
       'alleen_ingredient', pair.ingredientId, need.ingredientLabel,
       String(need.requiredAmount), need.requiredUnit,
-      pair.plusObservedAt, String(pair.plusPacks), String(pair.plusCents),
-      pair.dekaObservedAt, String(pair.dekaPacks), String(pair.dekaCents),
+      pair.plusObservedAt, pair.plusProduct.productId, pair.plusProduct.productName,
+      String(pair.plusProduct.packAmount), pair.plusProduct.packUnit,
+      String(pair.plusProduct.packCount), String(pair.plusProduct.pricePerPackCents),
+      pair.plusProduct.unitRate ?? 'onbekend', String(pair.plusPacks), String(pair.plusCents),
+      pair.dekaObservedAt, pair.dekaProduct.productId, pair.dekaProduct.productName,
+      String(pair.dekaProduct.packAmount), pair.dekaProduct.packUnit,
+      String(pair.dekaProduct.packCount), String(pair.dekaProduct.pricePerPackCents),
+      pair.dekaProduct.unitRate ?? 'onbekend', String(pair.dekaPacks), String(pair.dekaCents),
       String(Math.abs(pair.difference)), pair.difference === 0 ? 'gelijk' :
         pair.difference > 0 ? 'PLUS' : 'DekaMarkt',
       'Eigen oorspronkelijk gecontroleerde bronregels; binnen 24 uur; geen compleet winkelmandje, kassagarantie of onafhankelijke besparingsclaim.',

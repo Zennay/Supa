@@ -1,4 +1,6 @@
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
+import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
+import type { BasketTraceLine } from '../../domain/basket.ts'
 import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
 import {
   recentOwnCaptureInstant, freshReviewedBaskets, type OwnStore, type PrivateCaptureProgress,
@@ -76,6 +78,37 @@ export function privateProgressPricePairs(
 /** Same physical ingredient, two independently confirmed own-source prices.
  * An incomplete store can provide a line delta but never a full-basket winner.
  */
+export type PrivateKnownProduct = {
+  productId: string
+  productName: string
+  packAmount: number
+  packUnit: string
+  packCount: number
+  pricePerPackCents: number
+  unitRate: string | null
+}
+
+function knownProduct(value: {
+  productId: string; productName: string; packAmount: number;
+  packUnit: string; packCount: number; pricePerPackCents: number
+}): PrivateKnownProduct {
+  const rate = privatePackUnitRate({ amount: value.packAmount,
+    unit: value.packUnit, count: value.packCount, priceCents: value.pricePerPackCents })
+  return { ...value, unitRate: rate ? formatPrivateUnitRate(rate) : null }
+}
+
+function originalCompleteProduct(line: Extract<BasketTraceLine, { status: 'matched' }>): PrivateKnownProduct {
+  return knownProduct({ productId: line.productId, productName: line.productName,
+    packAmount: line.pack.amount, packUnit: line.pack.unit, packCount: line.pack.count,
+    pricePerPackCents: line.pricePerPackCents })
+}
+
+function originalPartialProduct(line: PrivateReviewedSourceLine): PrivateKnownProduct {
+  return knownProduct({ productId: line.productId, productName: line.productName,
+    packAmount: line.packAmount, packUnit: line.packUnit, packCount: line.packCount,
+    pricePerPackCents: line.pricePerPackCents })
+}
+
 export type PrivateKnownPricePair = {
   ingredientId: string
   plusCents: number
@@ -86,6 +119,8 @@ export type PrivateKnownPricePair = {
   basis: 'partial-pair' | 'complete-and-partial'
   plusObservedAt: string
   dekaObservedAt: string
+  plusProduct: PrivateKnownProduct
+  dekaProduct: PrivateKnownProduct
 }
 
 export function privateKnownPricePairs(
@@ -111,6 +146,8 @@ export function privateKnownPricePairs(
       basis: 'partial-pair',
       plusObservedAt: progress.stores.PLUS!.observedAt,
       dekaObservedAt: progress.stores.DekaMarkt!.observedAt,
+      plusProduct: originalPartialProduct(pair.one),
+      dekaProduct: originalPartialProduct(pair.other),
     })
   }
   if (!complete) return [...result.values()]
@@ -150,6 +187,10 @@ export function privateKnownPricePairs(
         difference, basis: 'complete-and-partial',
         plusObservedAt: completeStore === 'PLUS' ? receipt.observedAt : partialCapture.observedAt,
         dekaObservedAt: completeStore === 'DekaMarkt' ? receipt.observedAt : partialCapture.observedAt,
+        plusProduct: completeStore === 'PLUS'
+          ? originalCompleteProduct(original) : originalPartialProduct(line),
+        dekaProduct: completeStore === 'DekaMarkt'
+          ? originalCompleteProduct(original) : originalPartialProduct(line),
       })
     }
   }

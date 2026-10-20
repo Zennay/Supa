@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
-import { privateKnownPricePairs, privateProgressProductRows } from '../products/privateProgressProductRows.ts'
+import { privateKnownPricePairs, privateProgressProductRows, type PrivateKnownProduct } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
 import { downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
 import { downloadPrivateKnownLinePricePrint } from '../products/privateKnownLinePricePrint.ts'
@@ -62,7 +62,11 @@ export function PrivateComparisonJourney({
   const admittedPartialRows = privateProgressProductRows(progress, nowMs)
   const originalNeeds = new Map(admittedPartialRows.map(({ line }) =>
     [line.ingredientId, line]))
-  const partialPairs = ready ? [] : privateKnownPricePairs(progress, reviewed, nowMs)
+  const partialPairs: Array<{
+    id: string; name: string; amount: number; unit: string;
+    plusPacks: number; dekaPacks: number; plusCents: number; dekaCents: number;
+    plusProduct?: PrivateKnownProduct; dekaProduct?: PrivateKnownProduct;
+  }> = ready ? [] : privateKnownPricePairs(progress, reviewed, nowMs)
     .flatMap(pair => {
       const need = originalNeeds.get(pair.ingredientId)
       if (!need) return []
@@ -71,6 +75,7 @@ export function PrivateComparisonJourney({
         amount: need.requiredAmount, unit: need.requiredUnit,
         plusPacks: pair.plusPacks, dekaPacks: pair.dekaPacks,
         plusCents: pair.plusCents, dekaCents: pair.dekaCents,
+        plusProduct: pair.plusProduct, dekaProduct: pair.dekaProduct,
       }]
     })
   // A complete reviewed basket may be available independently of the current
@@ -182,6 +187,14 @@ export function PrivateComparisonJourney({
       <ul>{partialPairs.slice(0, 3).map(item =>
         <li key={item.id}>
           <strong>{item.name} · {item.amount} {item.unit}</strong>
+          {item.plusProduct && <small>
+            PLUS · {item.plusProduct.productName} · SKU {item.plusProduct.productId} ·
+            {' '}{item.plusProduct.unitRate ?? 'eenheidsprijs onbekend'}
+          </small>}
+          {item.dekaProduct && <small>
+            DekaMarkt · {item.dekaProduct.productName} · SKU {item.dekaProduct.productId} ·
+            {' '}{item.dekaProduct.unitRate ?? 'eenheidsprijs onbekend'}
+          </small>}
           <span>PLUS {item.plusPacks} hele pakken: {euro.formatCents(item.plusCents)}</span>
           <span>DekaMarkt {item.dekaPacks} hele pakken: {euro.formatCents(item.dekaCents)}</span>
           <small>Alleen dit ingrediënt: {item.plusCents === item.dekaCents

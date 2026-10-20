@@ -161,6 +161,14 @@ export function PrivatePartialProductCards({
           {comparison && difference !== undefined && <div
             className="private-reviewed-products__card-difference" role="note">
             <strong>Dezelfde fysieke hoeveelheid bij twee winkels</strong>
+            <p><b>PLUS:</b> {comparison.plusProduct.productName} · SKU {comparison.plusProduct.productId}<br />
+              {comparison.plusProduct.packCount} × {comparison.plusProduct.packAmount}
+              {' '}{comparison.plusProduct.packUnit} per verpakking ·
+              {' '}{comparison.plusProduct.unitRate ?? 'eenheidsprijs onbekend'}</p>
+            <p><b>DekaMarkt:</b> {comparison.dekaProduct.productName} · SKU {comparison.dekaProduct.productId}<br />
+              {comparison.dekaProduct.packCount} × {comparison.dekaProduct.packAmount}
+              {' '}{comparison.dekaProduct.packUnit} per verpakking ·
+              {' '}{comparison.dekaProduct.unitRate ?? 'eenheidsprijs onbekend'}</p>
             <p>PLUS · {comparison.plusPacks} hele pakken ·
               {' '}{money.format(comparison.plusCents / 100)}<br />
               DekaMarkt · {comparison.dekaPacks} hele pakken ·
@@ -169,7 +177,8 @@ export function PrivatePartialProductCards({
               money.format(Math.abs(difference) / 100) +
               ' lagere hele-pakkosten bij ' +
               (difference > 0 ? 'PLUS' : 'DekaMarkt') + ' voor alleen deze regel.'}</strong>
-            <small>Beide oorspronkelijke winkelmomenten maximaal 24 uur uiteen.
+            <small>Afzonderlijke echte SKU’s voor dezelfde hoeveelheid; merk en verpakking kunnen verschillen.
+              Beide oorspronkelijke winkelmomenten maximaal 24 uur uiteen.
               {' '}{comparison.basis === 'complete-and-partial'
                 ? 'Andere winkel volledig; deze winkel nog niet. ' : ''}
               Geen compleet mandverschil of onafhankelijke besparingsclaim.</small>

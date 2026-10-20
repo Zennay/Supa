@@ -230,7 +230,11 @@ export function PartialReviewedShoppingList({
           const otherCents = store === 'PLUS' ? pair.dekaCents : pair.plusCents
           const ownCents = store === 'PLUS' ? pair.plusCents : pair.dekaCents
           const difference = ownCents - otherCents
+          const otherProduct = store === 'PLUS' ? pair.dekaProduct : pair.plusProduct
           return <p className="supa-partial-shop__individual-delta">
+            <small>{otherShop}: {otherProduct.productName} · SKU {otherProduct.productId} ·
+              {' '}{otherProduct.packCount} × {otherProduct.packAmount} {otherProduct.packUnit} per pak ·
+              {' '}{otherProduct.unitRate ?? 'eenheidsprijs onbekend'}.</small>
             <small>{otherShop}: {otherPacks} hele pakken ·
               {' '}{exactEuro.formatCents(otherCents)} voor dezelfde hoeveelheid.
               {' '}Eigen bronprijs, geen kassagarantie.</small>

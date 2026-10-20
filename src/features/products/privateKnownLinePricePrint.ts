@@ -26,10 +26,20 @@ export function privateKnownLinePricePrintHtml(
     return '<tr><th scope="row">' + esc(original.ingredientLabel) +
       '<small>' + esc(String(original.requiredAmount)) + ' ' +
       esc(original.requiredUnit) + ' nodig</small></th>' +
-      '<td><strong>' + esc(money.format(pair.plusCents / 100)) +
+      '<td><b>' + esc(pair.plusProduct.productName) + '</b>' +
+      '<small>SKU ' + esc(pair.plusProduct.productId) + ' · pak ' +
+      esc(String(pair.plusProduct.packCount)) + ' × ' +
+      esc(String(pair.plusProduct.packAmount)) + ' ' + esc(pair.plusProduct.packUnit) +
+      ' · ' + esc(pair.plusProduct.unitRate ?? 'eenheidsprijs onbekend') +
+      '</small><strong>' + esc(money.format(pair.plusCents / 100)) +
       '</strong><small>' + esc(String(pair.plusPacks)) + ' hele pakken · ' +
       esc(pair.plusObservedAt) + '</small></td>' +
-      '<td><strong>' + esc(money.format(pair.dekaCents / 100)) +
+      '<td><b>' + esc(pair.dekaProduct.productName) + '</b>' +
+      '<small>SKU ' + esc(pair.dekaProduct.productId) + ' · pak ' +
+      esc(String(pair.dekaProduct.packCount)) + ' × ' +
+      esc(String(pair.dekaProduct.packAmount)) + ' ' + esc(pair.dekaProduct.packUnit) +
+      ' · ' + esc(pair.dekaProduct.unitRate ?? 'eenheidsprijs onbekend') +
+      '</small><strong>' + esc(money.format(pair.dekaCents / 100)) +
       '</strong><small>' + esc(String(pair.dekaPacks)) + ' hele pakken · ' +
       esc(pair.dekaObservedAt) + '</small></td>' +
       '<td>' + esc(difference) + '</td></tr>'
