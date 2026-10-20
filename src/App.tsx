@@ -262,11 +262,60 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [preferences, setPreferences] = useState(() => initialLoad.preferences)
   const [persistenceWarning, setPersistenceWarning] = useState<PersistenceWarning>(initialLoad.warning)
   const [lastStoredRaw, setLastStoredRaw] = useState(initialLoad.raw)
+  // Event handlers must see the latest planned edit and saved storage revision,
+  // even before React rebinds the recipe-intent listeners after a render.
+  const currentPreferencesRef = useRef(preferences)
+  currentPreferencesRef.current = preferences
+  const storedPlannerRawRef = useRef(lastStoredRaw)
+  storedPlannerRawRef.current = lastStoredRaw
   const [planRepairMessage, setPlanRepairMessage] = useState('')
   const [manualWeekCopy, setManualWeekCopy] = useState<WeekSharePreview | null>(null)
   const [includeWeekBudget, setIncludeWeekBudget] = useState(false)
   const [includeWeekDetails, setIncludeWeekDetails] = useState(false)
   const [weekCopyMessage, setWeekCopyMessage] = useState('')
+  // A recipe-to-week navigation only succeeds AFTER the exact existing
+  // Planner v2 record has been CAS-saved. A rejected future-format record,
+  // another-tab revision or unavailable storage leaves both plan and route
+  // unchanged; never report a successful week assignment that disappears on
+  // reload. The existing Planner UI still handles ordinary editable drafts.
+  const saveChosenOwnRecipes = (
+    assignments: readonly { day: string; recipeId: string }[],
+    destination: 'planner' | 'basket' | 'list',
+  ): boolean => {
+    const current = currentPreferencesRef.current
+    const replacements = Object.fromEntries(assignments.map(pair => [pair.day, pair.recipeId]))
+    const chosenDays = new Set(assignments.map(pair => pair.day))
+    const next: PlannerPreferences = {
+      ...current,
+      activeDays: m2InitialPlan.map(meal => meal.day).filter(day =>
+        current.activeDays.includes(day) || chosenDays.has(day)),
+      recipeByDay: { ...current.recipeByDay, ...replacements },
+    }
+    const result = persistPlannerRecord({
+      read: () => window.localStorage.getItem(plannerStorageKey),
+      write: raw => window.localStorage.setItem(plannerStorageKey, raw),
+      expectedRaw: storedPlannerRawRef.current,
+      nextRaw: serializePlannerPreferences(next),
+      validDays: m2InitialPlan.map(meal => meal.day),
+      validRecipeIds,
+    })
+    if (result.status !== 'saved') {
+      setPersistenceWarning(result.status)
+      return false
+    }
+    // Keep callbacks and the ordinary persistence effect on the same exact
+    // record revision. No intermediate day-by-day writes or stale success.
+    storedPlannerRawRef.current = result.raw
+    currentPreferencesRef.current = next
+    setLastStoredRaw(result.raw)
+    setPreferences(next)
+    setPersistenceWarning(null)
+    if (destination === 'basket') {
+      navigate('basket')
+      setOwnPriceImportSignal(value => value + 1)
+    } else navigate(destination)
+    return true
+  }
   // RecipeLibrary dispatches an explicit local intent after the user chooses
   // one Planner day. Re-read the device-owned recipe at admission time: stale,
   // deleted, unreviewed or malformed ingredients must never enter the budget.
@@ -297,25 +346,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           event.preventDefault()
           return
         }
-        setPreferences(current => ({
-          ...current,
-          activeDays: current.activeDays.includes(day) ? current.activeDays :
-            [...current.activeDays, day],
-          recipeByDay: { ...current.recipeByDay, [day]: recipeId },
-        }))
-        // Explicit recipe-to-price navigation reuses the existing local
-        // source-import flow. Re-keying the plan invalidates any old retailer
-        // matching; no sample or stale price is carried to the new recipe.
-        if (destination === 'basket') {
-          navigate('basket')
-          setOwnPriceImportSignal(value => value + 1)
-        } else if (destination === 'list') {
-          // The existing list renders the newly selected physical Planner
-          // demand even without a usable price source (explicitly unpriced).
-          navigate('list')
-        } else {
-          navigate('planner')
-        }
+        const route = destination === 'basket' || destination === 'list'
+          ? destination : 'planner'
+        if (!saveChosenOwnRecipes([{ day, recipeId }], route)) event.preventDefault()
       } catch {
         // Never switch planning or use example prices after storage failure.
         event.preventDefault()
@@ -356,21 +389,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             JSON.stringify(recipe) === pair.recipeSnapshot &&
             recipes.some(item => item.id === pair.recipeId)
         })) return deny()
-        setPreferences(current => ({
-          ...current,
-          activeDays: m2InitialPlan.map(meal => meal.day).filter(day =>
-            current.activeDays.includes(day) || days.has(day)),
-          recipeByDay: { ...current.recipeByDay,
-            ...Object.fromEntries(pairs.map(pair => [pair.day, pair.recipeId])) },
-        }))
-        // Reuse the existing real-source basket/list, never promote sample
-        // prices or copy previous SKU approvals into a changed physical week.
-        if (destination === 'basket') {
-          navigate('basket')
-          setOwnPriceImportSignal(value => value + 1)
-        } else if (destination === 'list') {
-          navigate('list')
-        } else navigate('planner')
+        const route = destination === 'basket' || destination === 'list'
+          ? destination : 'planner'
+        if (!saveChosenOwnRecipes(pairs, route)) return deny()
       } catch {
         deny()
       }

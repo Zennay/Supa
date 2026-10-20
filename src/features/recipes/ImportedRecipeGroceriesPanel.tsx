@@ -128,7 +128,7 @@ export function ImportedRecipeGroceriesPanel({
       cancelable: true,
       detail: { assignments: plannerAssignments.map(({ day, recipeId, recipeSnapshot }) => ({ day, recipeId, recipeSnapshot })), destination },
     }))
-    if (!accepted) setFeedback('De Planner kan één of meer recepten niet meer veilig plaatsen. Open de actuele bibliotheek opnieuw; het bestaande weekmenu blijft behouden.')
+    if (!accepted) setFeedback('Het recept of de beveiligde Planner-opslag is veranderd of niet beschikbaar. De hele batch is geweigerd en het bestaande weekmenu is behouden.')
   }
   const exportText = () => {
     if (!list?.canCopy) return

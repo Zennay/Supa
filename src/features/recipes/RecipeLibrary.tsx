@@ -461,7 +461,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       detail: { recipeId: recipe.id, day: plannerDay, destination },
     }))
     if (!accepted) {
-      setPrivateWeekMessage('Dit recept is niet meer geldig beschikbaar voor Planner. Herlaad je eigen recepten en controleer het opnieuw.')
+      setPrivateWeekMessage('Het recept of de beveiligde Planner-opslag is veranderd of niet beschikbaar. Er is niets opnieuw ingepland. Controleer je recept en Planner-opslag.')
       return
     }
     setPrivateWeekMessage('')
