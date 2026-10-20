@@ -175,3 +175,21 @@ background:#e7f4eb;color:#255336;font-weight:650}
 @media(max-width:650px) {
   .private-reviewed-products__capture-grid { grid-template-columns:1fr; }
 }
+
+
+/* Admitted individual private pack prices remain separate from a complete basket total. */
+.private-reviewed-products__confirmed-lines {
+  border:1px solid #b9d2c2; border-radius:10px; background:#f7fbf7; padding:.65rem;
+}
+.private-reviewed-products__confirmed-lines summary {
+  min-height:44px; cursor:pointer; font-weight:650; align-content:center;
+}
+.private-reviewed-products__confirmed-lines ul {
+  list-style:none; display:grid; gap:.6rem; margin:.5rem 0 0; padding:0;
+  max-height:420px; overflow:auto;
+}
+.private-reviewed-products__confirmed-lines li {
+  display:grid; gap:.35rem; padding:.65rem; background:white;
+  border:1px solid #d5e4d9; border-radius:9px; overflow-wrap:anywhere;
+}
+.private-reviewed-products__confirmed-lines li button { justify-self:start; }
