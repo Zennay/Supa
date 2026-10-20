@@ -362,12 +362,20 @@ export function ImportedRecipeGroceriesPanel({
       gewenste porties per recept. Gedeeltelijke fysieke stuks blijven handmatig
       te beoordelen. Producten, verpakkingsprijzen en besparingen blijven
       onbekend tot je eigen winkelbronnen controleert.</p>
-    <label className="recipe-collection-label">Zoek recept in mijn bibliotheek
+    <label className="recipe-collection-label">Zoek recepten op naam of ingrediënt
       <input type="search" maxLength={120} value={query}
-        placeholder="Zoek jouw eigen recepten" onChange={event => setQuery(event.currentTarget.value)} />
+        placeholder="Bijvoorbeeld rijst, paprika of pastasaus"
+        onChange={event => setQuery(event.currentTarget.value)} />
+    </label>
+    <label className="recipe-collection-groceries__reuse-filter">
+      <input type="checkbox" checked={reuseFirst}
+        onChange={event => setReuseFirst(event.currentTarget.checked)} />
+      Toon recepten met gedeelde gecontroleerde ingrediënten eerst
     </label>
     <small>{selected.length} van {recipes.length} recepten gekozen (maximaal 15).
-      Met zoeken worden gekozen recepten niet ongemerkt verwijderd.</small>
+      {search ? ' ' + visibleRecipes.length + ' recepten gevonden.' : ''}
+      {' '}Zoeken en sorteren wijzigen je gekozen recepten of hoeveelheden niet.
+      Overeenkomende ingrediënten zijn alleen een hergebruikhint, geen voorraad- of prijsbewijs.</small>
     {selected.length > 1 && <div className="recipe-collection-groceries__order"
       role="group" aria-label="Volgorde van gekozen recepten">
       <strong>Volgorde voor het weekmenu en de gecombineerde lijst</strong>
@@ -391,6 +399,10 @@ export function ImportedRecipeGroceriesPanel({
             onChange={event => changeSelection(recipe.id, event.currentTarget.checked)} />
           {recipe.title}
         </label>
+        {reuseCount(recipe) > 0 &&
+          <small className="recipe-collection-groceries__shared">Deelt {reuseCount(recipe)}
+            {' '}gecontroleerde fysieke ingrediënt{reuseCount(recipe) === 1 ? '' : 'en'}
+            {' '}met je gekozen recepten; bekijk de originele hoeveelheden voordat je kookt.</small>}
         {selectedIds.includes(recipe.id) && <label>Gewenste porties
           <input type="number" min="1" max="100" step="1"
             aria-label={'Gewenste porties voor ' + recipe.title}
