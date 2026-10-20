@@ -85,7 +85,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       setReceiptMessage('Download van eigen ' + shop + '-mand mislukt. Herzie de bron.')
     }
   }
-  async function downloadMixedPrint() {
+  async function downloadMixedRoute(kind: 'html' | 'csv') {
     if (costInvalid) {
       setReceiptMessage('Corrigeer je eigen extra tweede-stopkosten voor de afdruk.')
       return
@@ -98,8 +98,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       return
     }
     try {
-      const { printMixedStoreRouteHtml } =
-        await import('../comparison/mixedStorePrintHtml.ts')
+      const exportRoute = kind === 'html'
+        ? (await import('../comparison/mixedStorePrintHtml.ts')).printMixedStoreRouteHtml
+        : (await import('../comparison/mixedStoreRouteCsv.ts')).exportMixedStoreRouteCsv
       const current = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
       if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
@@ -119,7 +120,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         return line?.status === 'matched' && checkedRef.current[
           privatePhysicalShoppingTick(current.planKey, item.store, source.store.id, line)] === true
       }).map(item => item.key))
-      const html = printMixedStoreRouteHtml({
+      const content = exportRoute({
         plus: current.stores.PLUS.basket,
         deka: current.stores.DekaMarkt.basket,
         route,
@@ -129,14 +130,17 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         },
         checked: done, extraVisitCostCents: costCents, strategy: 'mixed',
       })
-      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'html' ? 'text/html;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
       try {
         const a = document.createElement('a')
-        a.href = url; a.download = 'supa-eigen-twee-winkelroute.html'
+        a.href = url; a.download = 'supa-eigen-twee-winkelroute.' + kind
         document.body.append(a)
         try { a.click() } finally { a.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setReceiptMessage('Afdrukbare offline route met jouw eigen prijzen, vinkjes en bekende kosten bewaard.')
+      setReceiptMessage('Privéwinkelroute in ' + kind.toUpperCase() +
+        ' met originele prijzen, vinkjes en bekende kosten lokaal opgeslagen.')
     } catch {
       setReceiptMessage('Afdrukbare route niet beschikbaar. Controleer de originele winkelbronnen opnieuw.')
     }
@@ -384,8 +388,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <button type="button" onClick={() => { void downloadReceipt('txt') }}>
         Bewaar winkeloverzicht (TXT{splitTrip && costCents !== null ? ' met extra kosten' : ''})
       </button>
-      <button type="button" onClick={() => { void downloadMixedPrint() }}>
+      <button type="button" onClick={() => { void downloadMixedRoute('html') }}>
         Bewaar afdrukbare complete winkelroute (HTML)
+      </button>
+      <button type="button" onClick={() => { void downloadMixedRoute('csv') }}>
+        Bewaar complete winkelroute met kosten (CSV)
       </button>
       <small>Beide downloads bevatten het originele complete weekmandje en
         bronmomenten, onafhankelijk van je zoekfilter. Alleen TXT neemt jouw zelf
